@@ -1,0 +1,23 @@
+== Dbg ==
+src<debug.hs:(3,1)-(5,29)>
+src<debug.hs:3:9>
+src<debug.hs:4:9>
+src<debug.hs:5:13-17>
+src<debug.hs:5:14>
+src<debug.hs:5:21-29>
+src<debug.hs:5:25-29>
+src<debug.hs:5:26>
+src<debug.hs:5:9-17>
+src<debug.hs:5:9-29>
+src<debug.hs:6:1-21>
+89
+== Dbg -O2 ==
+src<debug.hs:(3,1)-(5,29)>
+src<debug.hs:3:9>
+src<debug.hs:4:9>
+src<debug.hs:5:21-29>
+src<debug.hs:5:9-29>
+src<debug.hs:6:1-21>
+== CBE ==
+src<debug.hs:4:9>
+89

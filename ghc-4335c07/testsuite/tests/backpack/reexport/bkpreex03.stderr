@@ -1,0 +1,5 @@
+[1 of 1] Processing p
+  [1 of 4] Compiling M1               ( p/M1.hs, nothing )
+  [2 of 4] Compiling M2               ( p/M2.hs, nothing )
+  [3 of 4] Compiling A[sig]           ( p/A.hsig, nothing )
+  [4 of 4] Compiling A[sig]           ( p/A.hsig, nothing )

@@ -1,0 +1,17 @@
+name:                T2971a
+version:             0.1.0.0
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  build-depends:       base
+  include-dirs:        include
+  install-includes:    T2971a.h
+  default-language:    Haskell2010
+
+executable exe
+  main-is:             Main.hs
+  build-depends:       base, T2971a
+  default-language:    Haskell2010

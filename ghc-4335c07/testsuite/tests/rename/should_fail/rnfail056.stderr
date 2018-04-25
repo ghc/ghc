@@ -1,0 +1,4 @@
+
+rnfail056.hs:6:7: Illegal tuple section: use TupleSections
+
+rnfail056.hs:8:7: Illegal tuple section: use TupleSections

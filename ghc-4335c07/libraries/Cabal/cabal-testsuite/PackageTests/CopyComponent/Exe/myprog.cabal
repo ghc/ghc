@@ -1,0 +1,17 @@
+name:                myprog
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable myprog
+  main-is:             Main.hs
+  build-depends:       base
+  default-language:    Haskell2010
+
+executable myprog2
+  main-is:             Main2.hs
+  build-depends:       base
+  default-language:    Haskell2010

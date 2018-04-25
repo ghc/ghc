@@ -1,0 +1,8 @@
+# cabal sandbox init
+Writing a default package environment file to <ROOT>/sandbox.dist/cabal.sandbox.config
+Creating a new sandbox at <ROOT>/sandbox.dist/sandbox
+# cabal sandbox add-source
+# cabal install
+Resolving dependencies...
+In order, the following would be installed:
+Cabal-2.0.0.0 (new version)

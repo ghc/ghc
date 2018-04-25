@@ -1,0 +1,9 @@
+
+T2627b.hs:20:24: error:
+    • Occurs check: cannot construct the infinite type:
+        b0 ~ Dual (Dual b0)
+        arising from a use of ‘conn’
+      The type variable ‘b0’ is ambiguous
+    • In the expression: conn undefined undefined
+      In an equation for ‘conn’:
+          conn (Rd k) (Wr a r) = conn undefined undefined

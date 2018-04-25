@@ -1,0 +1,6 @@
+
+tcfail096.hs:23:10:
+    Functional dependencies conflict between instance declarations:
+      instance Foo (p -> s) (t p) (t s) -- Defined at tcfail096.hs:23:10
+      instance Foo ((a, b) -> r) (c a, c b) (c r)
+        -- Defined at tcfail096.hs:24:10

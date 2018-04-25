@@ -1,0 +1,110 @@
+# Setup configure
+Configuring library 'mylib' for Includes2-0.1.0.0..
+# Setup build
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with Database = <Database>
+for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Running Haddock on library 'mylib' instantiated with Database = <Database>
+for Includes2-0.1.0.0..
+Documentation created: setup-per-component.dist/work/dist/doc/html/Includes2/index.html
+# Setup copy
+Installing internal library mylib in <PATH>
+# Setup register
+Registering library 'mylib' instantiated with Database = <Database>
+for Includes2-0.1.0.0..
+# Setup configure
+Configuring library 'mysql' for Includes2-0.1.0.0..
+# Setup build
+Preprocessing library 'mysql' for Includes2-0.1.0.0..
+Building library 'mysql' for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing library 'mysql' for Includes2-0.1.0.0..
+Running Haddock on library 'mysql' for Includes2-0.1.0.0..
+Documentation created: setup-per-component.dist/work/dist/doc/html/Includes2/index.html
+# Setup copy
+Installing internal library mysql in <PATH>
+# Setup register
+Registering library 'mysql' for Includes2-0.1.0.0..
+# Setup configure
+Configuring library 'postgresql' for Includes2-0.1.0.0..
+# Setup build
+Preprocessing library 'postgresql' for Includes2-0.1.0.0..
+Building library 'postgresql' for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing library 'postgresql' for Includes2-0.1.0.0..
+Running Haddock on library 'postgresql' for Includes2-0.1.0.0..
+Documentation created: setup-per-component.dist/work/dist/doc/html/Includes2/index.html
+# Setup copy
+Installing internal library postgresql in <PATH>
+# Setup register
+Registering library 'postgresql' for Includes2-0.1.0.0..
+# Setup configure
+Configuring library 'mylib' instantiated with
+  Database = mysql-0.1.0.0:Database.MySQL
+for Includes2-0.1.0.0..
+# Setup build
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with
+  Database = mysql-0.1.0.0:Database.MySQL
+for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Running Haddock on library 'mylib' instantiated with
+  Database = mysql-0.1.0.0:Database.MySQL
+for Includes2-0.1.0.0..
+Documentation created: setup-per-component.dist/work/dist/doc/html/Includes2/index.html
+# Setup copy
+Installing internal library mylib in <PATH>
+# Setup register
+Registering library 'mylib' instantiated with
+  Database = mysql-0.1.0.0:Database.MySQL
+for Includes2-0.1.0.0..
+# Setup configure
+Configuring library 'mylib' instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for Includes2-0.1.0.0..
+# Setup build
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Building library 'mylib' instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing library 'mylib' for Includes2-0.1.0.0..
+Running Haddock on library 'mylib' instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for Includes2-0.1.0.0..
+Documentation created: setup-per-component.dist/work/dist/doc/html/Includes2/index.html
+# Setup copy
+Installing internal library mylib in <PATH>
+# Setup register
+Registering library 'mylib' instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for Includes2-0.1.0.0..
+# Setup configure
+Configuring library for Includes2-0.1.0.0..
+# Setup build
+Preprocessing library for Includes2-0.1.0.0..
+Building library for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing library for Includes2-0.1.0.0..
+Running Haddock on library for Includes2-0.1.0.0..
+Documentation created: setup-per-component.dist/work/dist/doc/html/Includes2/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for Includes2-0.1.0.0..
+# Setup configure
+Configuring executable 'exe' for Includes2-0.1.0.0..
+# Setup build
+Preprocessing executable 'exe' for Includes2-0.1.0.0..
+Building executable 'exe' for Includes2-0.1.0.0..
+# Setup haddock
+Preprocessing executable 'exe' for Includes2-0.1.0.0..
+# Setup copy
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup-per-component.dist/usr/bin is not in the system search path.
+# Setup register
+# exe
+"minemysql minepostgresql"

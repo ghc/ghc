@@ -1,0 +1,3 @@
+
+T8759.hs:9:4: warning:
+    PatSynI T8759.P (ForallT [] [] (ForallT [] [] (TupleT 0)))

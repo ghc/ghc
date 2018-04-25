@@ -1,0 +1,27 @@
+unit p where
+    signature T where
+        data T
+    signature H where
+        import T
+        f :: T -> T
+unit timpl where
+    module TImpl where
+        data T = T
+unit q where
+    dependency timpl
+    dependency p[H=<H>,T=<T>]
+    signature T(module T, T) where
+        import TImpl
+    module A where
+        import H
+        import TImpl
+        x = f T
+unit r-impl where
+    dependency timpl
+    module H where
+        import TImpl
+        f T = T
+    module T(T) where
+        import TImpl
+unit r where
+    dependency q[H=r-impl:H,T=r-impl:T]

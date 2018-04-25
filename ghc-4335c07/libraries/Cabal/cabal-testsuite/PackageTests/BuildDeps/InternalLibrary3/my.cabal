@@ -1,0 +1,23 @@
+name: InternalLibrary3
+version: 0.1
+license: BSD3
+cabal-version: >= 1.7.1
+author: Stephen Blackheath
+stability: stable
+category: PackageTests
+build-type: Simple
+
+description:
+    This test is to make sure that the internal library is preferred by ghc to
+    an installed one of the same name, but a *newer* version.
+
+---------------------------------------
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base, bytestring, pretty
+
+Executable lemon
+    main-is: lemon.hs
+    hs-source-dirs: programs
+    build-depends: base, bytestring, pretty, InternalLibrary3

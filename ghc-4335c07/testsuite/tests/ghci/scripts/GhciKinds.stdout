@@ -1,0 +1,17 @@
+Int :: *
+Maybe :: * -> *
+F [[[Int]]] :: *
+F [[[Int]]] :: *
+= [[Int]] -> [Int] -> Int -> Bool
+F (Maybe Int) :: *
+= Char
+F (Maybe Bool) :: *
+= Char
+forall a. F (Maybe a) :: *
+= Char
+$(unboxedTupleT 2) :: forall (k0 :: RuntimeRep) (k1 :: RuntimeRep).
+                      TYPE k0
+                      -> TYPE k1
+                      -> TYPE
+                           ('TupleRep
+                              ((':) RuntimeRep k0 ((':) RuntimeRep k1 ('[] RuntimeRep))))

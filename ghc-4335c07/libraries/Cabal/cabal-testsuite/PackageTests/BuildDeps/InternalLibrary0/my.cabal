@@ -1,0 +1,24 @@
+name: InternalLibrary0
+version: 0.1
+license: BSD3
+cabal-version: >= 1.6
+author: Stephen Blackheath
+stability: stable
+category: PackageTests
+build-type: Simple
+
+description:
+    Check that with 'cabal-version:' containing versions less than 1.7, we do *not*
+    have the new behaviour to allow executables to refer to the library defined
+    in the same module.
+
+---------------------------------------
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base, bytestring, pretty
+
+Executable lemon
+    main-is: lemon.hs
+    hs-source-dirs: programs
+    build-depends: base, bytestring, pretty, InternalLibrary0

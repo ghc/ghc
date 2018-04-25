@@ -1,0 +1,17 @@
+name: T4447
+version: 1.0
+cabal-version: >= 2.0
+build-type: Simple
+
+library foo-indef
+    exposed-modules: B
+    signatures: A
+    build-depends: base
+    hs-source-dirs: foo-indef
+    default-language: Haskell2010
+
+executable foo-exe
+    build-depends: foo-indef, base
+    other-modules: A
+    main-is: Main.hs
+    default-language: Haskell2010

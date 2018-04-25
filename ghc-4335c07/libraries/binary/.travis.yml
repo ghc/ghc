@@ -1,0 +1,59 @@
+# See https://github.com/hvr/multi-ghc-travis for more information
+
+language: c
+
+sudo: false
+
+matrix:
+  include:
+    - env: CABALVER=1.18 GHCVER=7.4.2
+      addons: {apt: {packages: [cabal-install-1.18,ghc-7.4.2], sources: [hvr-ghc]}}
+    - env: CABALVER=1.18 GHCVER=7.6.3
+      addons: {apt: {packages: [cabal-install-1.18,ghc-7.6.3], sources: [hvr-ghc]}}
+    - env: CABALVER=1.22 GHCVER=7.8.4
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4], sources: [hvr-ghc]}}
+    - env: CABALVER=1.22 GHCVER=7.10.3
+      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+    - env: CABALVER=1.24 GHCVER=8.0.1
+      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.1], sources: [hvr-ghc]}}
+    - env: CABALVER=head GHCVER=head
+      addons: {apt: {packages: [cabal-install-head,ghc-head],  sources: [hvr-ghc]}}
+
+  allow_failures:
+    - env: CABALVER=head GHCVER=head
+
+before_install:
+ - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
+
+install:
+ - cabal --version
+ - travis_retry cabal update
+# workaround for https://ghc.haskell.org/trac/ghc/ticket/9221
+ - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
+ - cabal sandbox init
+# can't use "cabal install --only-dependencies --enable-tests --enable-benchmarks" due to dep-cycle.
+# must split in two separate 'cabal install's since cabal doesn't update the cabal library before it's needed in 'cabal-version' constraints.
+ - cabal install "bytestring >= 0.10.4" 'Cabal == 1.24.*' -j
+ - cabal install criterion deepseq mtl "QuickCheck >= 2.8" HUnit "test-framework-quickcheck2 >= 0.3" "random >= 1.0.1.0" attoparsec cereal tar zlib -j
+
+script:
+ - cabal configure --enable-tests --enable-benchmarks -v2 --ghc-options=-fno-spec-constr
+ - cabal build
+ - cabal test
+# "cabal check" disabled due to -O2 warning
+# - cabal check
+ - cabal sdist
+# check that the generated source-distribution can be built & installed
+ - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
+   cd dist/;
+   cabal sandbox init;
+   if [ -f "$SRC_TGZ" ]; then
+      cabal install --force-reinstalls "$SRC_TGZ";
+   else
+      echo "expected '$SRC_TGZ' not found";
+      exit 1;
+   fi
+
+notifications:
+  email:
+    - kolmodin@gmail.com

@@ -1,0 +1,18 @@
+# Setup configure
+Resolving dependencies...
+Configuring T4270-0.1...
+# Setup build
+Preprocessing library for T4270-0.1..
+Building library for T4270-0.1..
+Preprocessing test suite 'test' for T4270-0.1..
+Building test suite 'test' for T4270-0.1..
+# Setup test
+Preprocessing library for T4270-0.1..
+Building library for T4270-0.1..
+Preprocessing test suite 'test' for T4270-0.1..
+Building test suite 'test' for T4270-0.1..
+Running 1 test suites...
+Test suite test: RUNNING...
+Test suite test: PASS
+Test suite logged to: setup.cabal.dist/work/dist/test/T4270-0.1-test.log
+1 of 1 test suites (1 of 1 test cases) passed.

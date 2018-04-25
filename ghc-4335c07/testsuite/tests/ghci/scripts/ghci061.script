@@ -1,0 +1,5 @@
+:l ghci061.hs
+:set prompt-function two_args
+:set prompt-function three_args
+:set prompt-cont-function two_args
+:set prompt-cont-function three_args

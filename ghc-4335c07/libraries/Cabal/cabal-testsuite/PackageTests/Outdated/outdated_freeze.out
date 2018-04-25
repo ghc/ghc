@@ -1,0 +1,20 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# cabal outdated
+Outdated dependencies:
+base ==3.0.3.2 (latest: 4.0.0.0)
+template-haskell ==2.3.0.0 (latest: 2.4.0.0)
+# cabal outdated
+All dependencies are up to date.
+# cabal outdated
+Outdated dependencies:
+template-haskell ==2.3.0.0 (latest: 2.3.0.1)
+# cabal outdated
+Outdated dependencies:
+base ==3.0.3.2 (latest: 4.0.0.0)
+template-haskell ==2.3.0.0 (latest: 2.4.0.0)
+# cabal outdated
+All dependencies are up to date.
+# cabal outdated
+Outdated dependencies:
+template-haskell ==2.3.0.0 (latest: 2.3.0.1)

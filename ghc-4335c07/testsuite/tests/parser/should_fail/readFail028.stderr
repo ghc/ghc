@@ -1,0 +1,4 @@
+
+readFail028.hs:4:11:
+    The last statement in a 'do' block must be an expression
+      x <- return ()

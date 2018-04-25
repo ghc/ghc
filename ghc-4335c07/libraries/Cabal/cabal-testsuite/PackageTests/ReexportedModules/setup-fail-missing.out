@@ -1,0 +1,9 @@
+# Setup configure
+Configuring p-0.1.0.0...
+Error:
+    Problem with module re-exports:
+      - The module 'Missing'
+        is not exported by any suitable package.
+        It occurs in neither the 'exposed-modules' of this package,
+        nor any of its 'build-depends' dependencies.
+    In the stanza library

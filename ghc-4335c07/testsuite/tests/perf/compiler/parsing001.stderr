@@ -1,0 +1,4 @@
+
+parsing001.hs:3:1: error:
+    Could not find module ‘Wibble’
+    Use -v to see a list of the files searched for.

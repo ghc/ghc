@@ -1,0 +1,4 @@
+:set -fobject-code
+:load T8696A T8696B
+T8696A.a
+T8696B.b

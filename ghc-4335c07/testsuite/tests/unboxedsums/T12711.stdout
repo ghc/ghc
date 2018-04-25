@@ -1,0 +1,2 @@
+(# _ | _ #) :: TYPE
+                 ('GHC.Types.SumRep '['GHC.Types.LiftedRep, 'GHC.Types.LiftedRep])

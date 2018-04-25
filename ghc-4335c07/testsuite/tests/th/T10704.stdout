@@ -1,0 +1,16 @@
+Just (Fixity 0 InfixR)
+Nothing
+Nothing
+Just (Fixity 6 InfixL)
+Nothing
+Nothing
+Nothing
+Nothing
+Just (Fixity 0 InfixR)
+Just (Fixity 0 InfixR)
+Just (Fixity 1 InfixL)
+Just (Fixity 2 InfixL)
+Just (Fixity 3 InfixN)
+Just (Fixity 4 InfixN)
+Just (Fixity 5 InfixR)
+Just (Fixity 6 InfixR)

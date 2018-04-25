@@ -1,0 +1,28 @@
+
+Data Parallel Haskell Examples
+
+ broken             
+   Examples that have never worked, or don't anymore.
+
+ examples/smoke
+   Smoke tests are there to check that the library works, but no one would want
+   the output. This is where we try to concatentate a random array and see what
+   happens.
+
+   examples/smoke/data     Test vectorisation of data types.
+   examples/smoke/prims    Test functions in the lifted primitive library
+   examples/smoke/sharing  Test for work complexity problems related to sharing.
+
+ examples/imaginary
+   Imaginary micro benchmarks compute a useful result, but not in a computationally
+   relevant way. This inefficiency is good for stress testing DPH, but they are
+   too slow to be useful in practice.
+
+ examples/spectral
+   Spectral benchmarks are kernels of real algorithms. They do something useful in
+   a computatinally relevant way, but are not complete application programs.
+
+ examples/real
+   Real programs are the ones that might be used for some purpose other than
+   testing DPH.
+

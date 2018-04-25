@@ -1,0 +1,10 @@
+
+tc126.hs:16:25: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘bug’
+    • In the instance declaration for ‘Bug (Int -> r) Int r’
+
+tc126.hs:17:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘bug’
+    • In the instance declaration for ‘Bug f (c a) (c r)’

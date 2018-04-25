@@ -1,0 +1,4 @@
+
+T9177a.hs:3:8: error: Variable not in scope: bar
+
+T9177a.hs:4:8: error: Data constructor not in scope: Fun

@@ -1,0 +1,5 @@
+
+T13625.hs:5:11: error:
+    • Data constructor ‘Y’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘Y’

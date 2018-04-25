@@ -1,0 +1,37 @@
+
+T12177.hs:3:19: error:
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of bar :: p -> p1 -> t at T12177.hs:3:1-19
+    • In the expression: _
+      In the expression: \ x -> _
+      In the expression: \ x -> \ x -> _
+    • Relevant bindings include
+        x :: p1 (bound at T12177.hs:3:14)
+        bar :: p -> p1 -> t (bound at T12177.hs:3:1)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T12177.hs:1:8-10
+           (and originally defined in ‘GHC.Err’))
+
+T12177.hs:5:37: error:
+    • Found hole: _ :: t
+      Where: ‘t’ is a rigid type variable bound by
+               the inferred type of baz :: p -> p1 -> p2 -> p3 -> p4 -> t
+               at T12177.hs:5:1-37
+    • In the expression: _
+      In the expression: \ z -> _
+      In the expression: \ x -> \ z -> _
+    • Relevant bindings include
+        z :: p4 (bound at T12177.hs:5:32)
+        x :: p3 (bound at T12177.hs:5:26)
+        y :: p1 (bound at T12177.hs:5:14)
+        baz :: p -> p1 -> p2 -> p3 -> p4 -> t (bound at T12177.hs:5:1)
+      Valid substitutions include
+        undefined :: forall (a :: TYPE r).
+                     GHC.Stack.Types.HasCallStack =>
+                     a
+          (imported from ‘Prelude’ at T12177.hs:1:8-10
+           (and originally defined in ‘GHC.Err’))

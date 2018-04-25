@@ -1,0 +1,13 @@
+tick "()";
+module "HpcCombine" {}
+module "HpcDraft" {}
+module "HpcFlags" {}
+module "HpcLexer" {}
+module "HpcMap" {}
+module "HpcMarkup" {}
+module "HpcOverlay" {}
+module "HpcReport" {}
+module "HpcSet" {}
+module "HpcShowTix" {}
+module "HpcUtils" {}
+module "Main" {}

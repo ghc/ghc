@@ -1,0 +1,18 @@
+Stopped in Main.mymap, Test3.hs:2:18-31
+_result :: [a] = _
+f :: Integer -> a = _
+x :: Integer = 1
+xs :: [Integer] = [2,3]
+xs :: [Integer] = [2,3]
+x :: Integer = 1
+f :: Integer -> a = _
+_result :: [a] = _
+y = (_t1::a)
+y = 2
+xs :: [Integer] = [2,3]
+x :: Integer = 1
+f :: Integer -> Integer = _
+_result :: [Integer] = _
+y :: Integer = 2
+_t1 :: Integer = 2
+2

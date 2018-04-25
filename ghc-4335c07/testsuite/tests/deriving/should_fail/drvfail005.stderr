@@ -1,0 +1,4 @@
+
+drvfail005.hs:4:13: error:
+    • ‘Show a’ is not a unary constraint, as expected by a deriving clause
+    • In the data declaration for ‘Test’

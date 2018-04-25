@@ -1,0 +1,7 @@
+
+<no location info>: error:
+    Could not find module ‘Control.Monad.Trans.State’
+    Perhaps you meant
+      Control.Monad.Trans.State (from transformers-0.5.2.0)
+      Control.Monad.Trans.Class (from transformers-0.5.2.0)
+      Control.Monad.Trans.Cont (from transformers-0.5.2.0)

@@ -1,0 +1,12 @@
+# cabal sandbox init
+Writing a default package environment file to <ROOT>/sandbox.dist/cabal.sandbox.config
+Creating a new sandbox at <ROOT>/sandbox.dist/sandbox
+# cabal install
+Resolving dependencies...
+Configuring my-foreign-lib-0.1.0.0...
+Preprocessing foreign library 'myforeignlib' for my-foreign-lib-0.1.0.0..
+Building foreign library 'myforeignlib' for my-foreign-lib-0.1.0.0..
+Installing foreign library myforeignlib in <PATH>
+Installed my-foreign-lib-0.1.0.0
+# cabal exec
+Hi from a foreign library! Foo has value 5678

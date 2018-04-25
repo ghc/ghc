@@ -1,0 +1,6 @@
+Breakpoint 0 activated at T9367.hs:1:5-9
+"Stopped in Main.x, T9367.hs:1:5-9
+_result :: [Char] = _
+1  x = "abc"
+       ^^^^^
+2  main = print x

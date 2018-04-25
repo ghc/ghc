@@ -1,0 +1,6 @@
+--Testing standalone deriving
+:set -XStandaloneDeriving
+data Foo = A | B | C
+deriving instance Show Foo
+A
+C

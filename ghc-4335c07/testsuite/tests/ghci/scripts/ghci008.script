@@ -1,0 +1,7 @@
+-- testing :info
+:info +
+:info (+)
+:info Data.Complex.:+
+:info (Data.Complex.:+)
+:info RealFloat
+:info `Data.List.isPrefixOf`

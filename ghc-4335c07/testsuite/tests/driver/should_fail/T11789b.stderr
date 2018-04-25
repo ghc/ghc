@@ -1,0 +1,7 @@
+ghc: unrecognised flag: -rtsopts=somw
+did you mean one of:
+  -rtsopts=some
+  -rtsopts=none
+  -rtsopts
+
+Usage: For basic information, try the `--help' option.

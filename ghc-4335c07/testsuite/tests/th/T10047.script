@@ -1,0 +1,4 @@
+:set -XTemplateHaskell -XQuasiQuotes
+:l T10047
+:t [| $(dyn "foo") |]
+:t [| [n|foo|] |]

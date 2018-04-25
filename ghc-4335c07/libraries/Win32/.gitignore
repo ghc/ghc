@@ -1,0 +1,7 @@
+# Specific generated files
+GNUmakefile
+ghc.mk
+dist/
+*.hi
+*.o
+*.a

@@ -1,0 +1,9 @@
+name: old-time
+version: 1.1.0.3
+build-type: Simple
+cabal-version: >= 1.10
+
+library
+    exposed-modules: System.Time
+    build-depends: base, old-locale == 1.0.*
+    default-language: Haskell2010

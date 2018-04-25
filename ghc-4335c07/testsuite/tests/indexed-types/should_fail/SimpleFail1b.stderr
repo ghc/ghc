@@ -1,0 +1,4 @@
+
+SimpleFail1b.hs:4:1: error:
+    • Expected kind ‘* -> *’, but ‘T1 Int Bool’ has kind ‘*’
+    • In the data instance declaration for ‘T1’

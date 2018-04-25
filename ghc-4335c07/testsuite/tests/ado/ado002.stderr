@@ -1,0 +1,81 @@
+
+ado002.hs:8:8: error:
+    • Couldn't match expected type ‘Char -> IO b0’
+                  with actual type ‘IO Char’
+    • The function ‘getChar’ is applied to one argument,
+      but its type ‘IO Char’ has none
+      In a stmt of a 'do' block: y <- getChar 'a'
+      In the expression:
+        do x <- getChar
+           y <- getChar 'a'
+           print (x, y)
+
+ado002.hs:9:3: error:
+    • Couldn't match type ‘()’ with ‘Int’
+      Expected type: IO Int
+        Actual type: IO ()
+    • In a stmt of a 'do' block: print (x, y)
+      In the expression:
+        do x <- getChar
+           y <- getChar 'a'
+           print (x, y)
+      In an equation for ‘f’:
+          f = do x <- getChar
+                 y <- getChar 'a'
+                 print (x, y)
+
+ado002.hs:15:11: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: y
+      In a stmt of a 'do' block: return (y, x)
+      In the expression:
+        do x <- getChar
+           y <- getChar
+           return (y, x)
+
+ado002.hs:15:13: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x
+      In a stmt of a 'do' block: return (y, x)
+      In the expression:
+        do x <- getChar
+           y <- getChar
+           return (y, x)
+
+ado002.hs:23:9: error:
+    • Couldn't match expected type ‘Char -> IO t0’
+                  with actual type ‘IO Char’
+    • The function ‘getChar’ is applied to one argument,
+      but its type ‘IO Char’ has none
+      In a stmt of a 'do' block: x5 <- getChar x4
+      In the expression:
+        do x1 <- getChar
+           x2 <- getChar
+           x3 <- const (return ()) x1
+           x4 <- getChar
+           x5 <- getChar x4
+           return (x2, x4)
+
+ado002.hs:24:11: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x2
+      In a stmt of a 'do' block: return (x2, x4)
+      In the expression:
+        do x1 <- getChar
+           x2 <- getChar
+           x3 <- const (return ()) x1
+           x4 <- getChar
+           x5 <- getChar x4
+           return (x2, x4)
+
+ado002.hs:24:14: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x4
+      In a stmt of a 'do' block: return (x2, x4)
+      In the expression:
+        do x1 <- getChar
+           x2 <- getChar
+           x3 <- const (return ()) x1
+           x4 <- getChar
+           x5 <- getChar x4
+           return (x2, x4)

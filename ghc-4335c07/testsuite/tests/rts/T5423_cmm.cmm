@@ -1,0 +1,16 @@
+#include "Cmm.h"
+test (W_ r1,
+      W_ r2,
+      W_ r3,
+      W_ r4,
+      W_ r5,
+      W_ r6,
+      W_ r7,
+      W_ r8,
+      W_ r9,
+      W_ r10)
+ {
+    foreign "C" printf("%d  %d  %d  %d  %d  %d  %d  %d  %d  %d\n",
+                        r1, r2, r3, r4, r5, r6, r7, r8, r9, r10);
+    return (r10);
+ }

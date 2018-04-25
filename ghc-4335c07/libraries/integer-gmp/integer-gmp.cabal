@@ -1,0 +1,75 @@
+cabal-version:       2.0
+name:                integer-gmp
+version:             1.0.1.0
+
+synopsis:            Integer library based on GMP
+license:             BSD3
+license-file:        LICENSE
+author:              Herbert Valerio Riedel
+maintainer:          hvr@gnu.org
+category:            Numeric, Algebra
+build-type:          Configure
+description:
+    This package provides the low-level implementation of the standard
+    'Integer' type based on the
+    <http://gmplib.org/ GNU Multiple Precision Arithmetic Library (GMP)>.
+    .
+    This package provides access to the internal representation of
+    'Integer' as well as primitive operations with no proper error
+    handling, and should only be used directly with the utmost care.
+
+extra-source-files:
+    aclocal.m4
+    cbits/wrappers.c
+    changelog.md
+    config.guess
+    config.sub
+    configure
+    configure.ac
+    gmp/config.mk.in
+    include/HsIntegerGmp.h.in
+    install-sh
+    integer-gmp.buildinfo.in
+
+extra-tmp-files:
+    autom4te.cache
+    config.log
+    config.status
+    gmp/config.mk
+    integer-gmp.buildinfo
+    include/HsIntegerGmp.h
+
+library
+  default-language:    Haskell2010
+  other-extensions:
+    BangPatterns
+    CApiFFI
+    CPP
+    DeriveDataTypeable
+    ExplicitForAll
+    GHCForeignImportPrim
+    MagicHash
+    NegativeLiterals
+    NoImplicitPrelude
+    RebindableSyntax
+    StandaloneDeriving
+    UnboxedTuples
+    UnliftedFFITypes
+  build-depends:       ghc-prim ^>= 0.5.1.0
+  hs-source-dirs:      src/
+  ghc-options: -this-unit-id integer-gmp -Wall
+  cc-options: -std=c99 -Wall
+
+  include-dirs: include
+  c-sources:
+    cbits/wrappers.c
+
+  exposed-modules:
+    GHC.Integer
+    GHC.Integer.Logarithms
+    GHC.Integer.Logarithms.Internals
+
+    GHC.Integer.GMP.Internals
+
+  other-modules:
+    GHC.Integer.Type

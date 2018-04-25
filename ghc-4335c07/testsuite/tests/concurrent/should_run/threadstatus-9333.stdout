@@ -1,0 +1,9 @@
+p: forking child thread
+c: filling full MVar
+p: emptying full MVar (expect child to be blocked on it)
+p: child is ThreadBlocked BlockedOnMVar
+p: from MVar: full
+p: reading empty MVar
+c: filling empty MVar (expect parent to be blocked)
+c: parent is ThreadBlocked BlockedOnMVar
+p: from MVar: filled empty var

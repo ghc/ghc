@@ -1,0 +1,94 @@
+
+Input expression letrec
+    p a b = let
+        p = - (+ a b) 20
+    in let
+        m p q = let
+            g = + a 6
+        in let
+            d pp = + (+ pp q) p
+        in let
+            c q = + (- q g) a
+        in - (- (d (+ 1 a)) (c (- a b))) p
+    in letrec
+        f a b = g a (+ b 1);
+        g x y = f x (+ y b)
+    in let
+        h a n = m (+ n 1) (f a n)
+    in h a p
+in p 5 6
+Result
+
+$main  = letrec
+          p = SC6
+      in p 5 6
+SC6 a b = let
+          p = - (+ a b) 20
+      in let
+          m = SC5 a b
+      in letrec
+          f = SC1 g;
+          g = SC2 b f
+      in let
+          h = SC0 f m
+      in h a p
+SC0 f m a n = m (+ n 1) (f a n)
+SC1 g a b = g a (+ b 1)
+SC2 b f x y = f x (+ y b)
+SC5 a b p q = let
+          g = + a 6
+      in let
+          d = SC4 p q
+      in let
+          c = SC3 a g
+      in - (- (d (+ 1 a)) (c (- a b))) p
+SC3 a g q = + (- q g) a
+SC4 p q pp = + (+ pp q) p
+Fully lazy 
+
+$main  = let
+          v13 = + 1
+      in letrec
+          p0 = SC11 v13
+      in p0 5 6
+SC11 v13 a1 = let
+          v12 = + a1
+      in let
+          g20 = + a1 6
+      in let
+          c16 = SC10 a1 g20
+      in let
+          v12 = v13 a1
+      in let
+          v15 = - a1
+      in SC9 a1 c16 v12 v15
+SC9 a1 c16 v12 v15 b2 = let
+          p11 = - (v12 b2) 20
+      in let
+          v14 = c16 (v15 b2)
+      in let
+          m9 = SC8 v12 v14
+      in letrec
+          f5 = SC3 g6;
+          g6 = SC5 b2 f5
+      in let
+          h3 = SC1 f5 m9
+      in h3 a1 p11
+SC1 f5 m9 a4 = let
+          v6 = f5 a4
+      in SC0 m9 v6
+SC0 m9 v6 n5 = m9 (+ n5 1) (v6 n5)
+SC3 g6 a7 = let
+          v9 = g6 a7
+      in SC2 v9
+SC2 v9 b8 = v9 (+ b8 1)
+SC5 b2 f5 x8 = let
+          v10 = f5 x8
+      in SC4 b2 v10
+SC4 b2 v10 y9 = v10 (+ y9 b2)
+SC8 v12 v14 p10 = SC7 p10 v12 v14
+SC7 p10 v12 v14 q11 = let
+          d18 = SC6 p10 q11
+      in - (- (d18 v12) v14) p10
+SC6 p10 q11 pp19 = + (+ pp19 q11) p10
+SC10 a1 g20 q17 = + (- q17 g20) a1

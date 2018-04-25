@@ -1,0 +1,5 @@
+
+tcfail079.hs:9:19: error:
+    • A newtype cannot have an unlifted argument type
+    • In the definition of data constructor ‘Unboxed’
+      In the newtype declaration for ‘Unboxed’

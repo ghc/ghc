@@ -1,0 +1,5 @@
+a = (_t1::[MkT Integer])
+()
+a = (_t2::MkT Integer) : (_t3::[MkT Integer])
+()
+a = MkT 1 : (_t4::[MkT Integer])

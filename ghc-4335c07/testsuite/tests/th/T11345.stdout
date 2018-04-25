@@ -1,0 +1,10 @@
+data Main.GADT (a_0 :: *) where
+    Main.Prefix :: GHC.Types.Int ->
+                   GHC.Types.Int -> Main.GADT GHC.Types.Int
+    (Main.:***:) :: GHC.Types.Int ->
+                    GHC.Types.Int -> Main.GADT GHC.Types.Int
+Constructor from Main.GADT: (Main.:***:) :: GHC.Types.Int ->
+                                            GHC.Types.Int -> Main.GADT GHC.Types.Int
+Nothing
+Just (Fixity 7 InfixR)
+1 :****: 4

@@ -1,0 +1,39 @@
+
+Starting
+
+Adding trivially true invariant (no TVar access)
+
+Adding trivially true invariant (no TVar access)
+
+Adding a trivially true invariant (TVar access)
+
+Adding an invariant that's false when attempted to be added
+Caught: URK
+
+Writing to a TVar watched by a trivially true invariant
+
+Adding a second trivially true invariant (same TVar access)
+
+Writing to a TVar watched by both trivially true invariants
+
+Adding a trivially false invariant (no TVar access)
+Caught: Exn raised in invariant
+
+Adding a trivially false invariant (no TVar access)
+Caught: Exn raised in invariant
+
+Adding a trivially false invariant (no TVar access)
+Caught: Transactional invariant violation
+
+Adding a trivially false invariant (with TVar access)
+Caught: Exn raised in invariant
+
+Adding a third invariant true if TVar != 42
+
+Violating third invariant by setting TVar to 42
+Caught: Exn raised in invariant
+
+Checking final TVar contents
+Final value = 18
+
+Done

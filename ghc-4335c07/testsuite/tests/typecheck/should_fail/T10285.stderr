@@ -1,0 +1,22 @@
+
+T10285.hs:8:17: error:
+    • Could not deduce: Coercible a b arising from a use of ‘coerce’
+      from the context: Coercible (N a) (N b)
+        bound by a pattern with constructor:
+                   Coercion :: forall k (a :: k) (b :: k).
+                               Coercible a b =>
+                               Coercion a b,
+                 in an equation for ‘oops’
+        at T10285.hs:8:6-13
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          oops :: forall a b. Coercion (N a) (N b) -> a -> b
+        at T10285.hs:7:1-38
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          oops :: forall a b. Coercion (N a) (N b) -> a -> b
+        at T10285.hs:7:1-38
+    • In the expression: coerce
+      In an equation for ‘oops’: oops Coercion = coerce
+    • Relevant bindings include
+        oops :: Coercion (N a) (N b) -> a -> b (bound at T10285.hs:8:1)

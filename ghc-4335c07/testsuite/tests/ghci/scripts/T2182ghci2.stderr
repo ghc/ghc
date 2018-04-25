@@ -1,0 +1,10 @@
+
+<interactive>:7:1: error:
+    • No instance for (GHC.Show.Show Float)
+        arising from a use of ‘System.IO.print’
+    • In a stmt of an interactive GHCi command: System.IO.print it
+
+<interactive>:15:1: error:
+    • No instance for (GHC.Show.Show Float)
+        arising from a use of ‘System.IO.print’
+    • In a stmt of an interactive GHCi command: System.IO.print it

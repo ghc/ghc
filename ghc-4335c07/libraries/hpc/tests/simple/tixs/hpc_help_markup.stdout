@@ -1,0 +1,20 @@
+Usage: hpc markup [OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]
+Markup Haskell source with program coverage
+
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --srcdir=DIR                  path to source directory of .hs files
+                                  multi-use of srcdir possible
+    --hpcdir=DIR                  append sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --reset-hpcdirs               empty the list of hpcdir's
+                                  [rarely used]
+    --fun-entry-count             show top-level function entry counts
+    --highlight-covered           highlight covered code, rather that code gaps
+    --destdir=DIR                 path to write output to
+    --verbosity=[0-2]             verbosity level, 0-2
+                                  default 1
+

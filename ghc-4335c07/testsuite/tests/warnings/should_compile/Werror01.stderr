@@ -1,0 +1,2 @@
+Werror01.hs:5:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature: foo :: () -> ()

@@ -1,0 +1,18 @@
+
+T7734.hs:4:13: error:
+    • Occurs check: cannot construct the infinite type: t ~ t -> t1
+    • In the first argument of ‘x’, namely ‘x’
+      In the expression: x x
+      In an equation for ‘f’: x `f` y = x x
+    • Relevant bindings include
+        x :: t -> t1 (bound at T7734.hs:4:1)
+        f :: (t -> t1) -> p -> t1 (bound at T7734.hs:4:3)
+
+T7734.hs:5:13: error:
+    • Occurs check: cannot construct the infinite type: t ~ t -> t1
+    • In the first argument of ‘x’, namely ‘x’
+      In the expression: x x
+      In an equation for ‘&’: (&) x y = x x
+    • Relevant bindings include
+        x :: t -> t1 (bound at T7734.hs:5:5)
+        (&) :: (t -> t1) -> p -> t1 (bound at T7734.hs:5:1)

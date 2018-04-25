@@ -1,0 +1,10 @@
+
+tcfail040.hs:19:5: error:
+    Ambiguous type variable ‘a0’ arising from a use of ‘<<’
+    prevents the constraint ‘(ORD a0)’ from being solved.
+    Probable fix: use a type annotation to specify what ‘a0’ should be.
+    These potential instance exist:
+      instance ORD (a -> b) -- Defined at tcfail040.hs:17:10
+    In the first argument of ‘(===)’, namely ‘(<<)’
+    In the expression: (<<) === (<<)
+    In an equation for ‘f’: f = (<<) === (<<)

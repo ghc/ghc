@@ -1,0 +1,159 @@
+# NB: don't set `language: haskell` here
+# We specify language: c, so it doesn't default to e.g. ruby
+language: c
+
+dist: trusty
+
+sudo: false
+
+# Remember to add release branches
+# we whitelist branches, as we don't really need to build dev-branches.
+branches:
+  only:
+    - master
+    - "2.0"
+    - "1.24"
+    - "1.22"
+    - "1.20"
+    - "1.18"
+
+# The following enables several GHC versions to be tested; often it's enough to
+# test only against the last release in a major GHC version. Feel free to omit
+# lines listings versions you don't need/want testing for.
+#
+# NB: If you test the same GHC version/OS combo multiple times with
+# SCRIPT=script (e.g., see PARSEC=YES below), you MUST supply a
+# TAGSUFFIX to help travis/upload.sh disambiguate the matrix entry.
+matrix:
+  include:
+   - env: GHCVER=8.2.1 SCRIPT=meta BUILDER=none
+     os: linux
+     sudo: required
+   # These don't have -dyn/-prof whitelisted yet, so we have to
+   # do the old-style installation
+   - env: GHCVER=7.4.2 SCRIPT=script CABAL_LIB_ONLY=YES TEST_OTHER_VERSIONS=YES
+     os: linux
+     sudo: required
+   - env: GHCVER=7.6.3 SCRIPT=script
+     os: linux
+     sudo: required
+   - env: GHCVER=7.8.4 SCRIPT=script USE_GOLD=YES
+     os: linux
+     sudo: required
+   # Ugh, we'd like to drop 'sudo: required' and use the
+   # apt plugin for the next two
+   # but the GCE instance we get has more memory, which makes
+   # a big difference
+   - env: GHCVER=7.10.3 SCRIPT=script USE_GOLD=YES
+     os: linux
+     sudo: required
+   - env: GHCVER=8.0.2 SCRIPT=script DEPLOY_DOCS=YES USE_GOLD=YES TEST_SOLVER_BENCHMARKS=YES
+     sudo: required
+     os: linux
+
+   - env: GHCVER=8.0.2 SCRIPT=solver-debug-flags USE_GOLD=YES
+     sudo: required
+     os: linux
+   - env: GHCVER=8.0.2 SCRIPT=script DEBUG_EXPENSIVE_ASSERTIONS=YES TAGSUFFIX="-fdebug-expensive-assertions" USE_GOLD=YES
+     os: linux
+     sudo: required
+   - env: GHCVER=8.0.2 SCRIPT=bootstrap USE_GOLD=YES
+     sudo: required
+     os: linux
+   - env: GHCVER=8.2.1 SCRIPT=script
+     os: linux
+     sudo: required
+
+   # We axed GHC 7.6 and earlier because it's not worth the trouble to
+   # make older GHC work with clang's cpp.  See
+   # https://ghc.haskell.org/trac/ghc/ticket/8493
+   - env: GHCVER=7.8.4 SCRIPT=script
+     os: osx
+     # Keep this synced with travis/upload.sh
+     osx_image: xcode6.4 # We need 10.10
+
+   # TODO: We might want to specify OSX version
+   # https://docs.travis-ci.com/user/osx-ci-environment/#OS-X-Version
+   - env: GHCVER=7.10.3 SCRIPT=script
+     os: osx
+   - env: GHCVER=8.0.2 SCRIPT=script
+     os: osx
+   - env: GHCVER=8.0.2 SCRIPT=bootstrap
+     os: osx
+
+   - env: GHCVER=via-stack SCRIPT=stack STACKAGE_RESOLVER=lts
+     os: linux
+     addons:
+        apt:
+            packages:
+                - libgmp-dev
+
+  allow_failures:
+   - env: GHCVER=via-stack SCRIPT=stack STACKAGE_RESOLVER=lts
+
+ # TODO add PARSEC_BUNDLED=YES when it's so
+ # It seems pointless to run head if we're going to ignore the results.
+ #- GHCVER=head
+
+# Note: the distinction between `before_install` and `install` is not important.
+before_install:
+ - export PATH=/opt/ghc/$GHCVER/bin:$PATH
+ - export PATH=$HOME/.ghc-install/$GHCVER/bin:$PATH
+ - export PATH=$HOME/bin:$PATH
+ - export PATH=$HOME/.cabal/bin:$PATH
+ - export PATH=$HOME/.local/bin:$PATH
+ - export PATH=/opt/cabal/2.0/bin:$PATH
+ - export PATH=/opt/happy/1.19.5/bin:$PATH
+ - export PATH=/opt/alex/3.1.7/bin:$PATH
+ - if [ "$USE_GOLD" = "YES" ]; then sudo update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20; fi
+ - if [ "$USE_GOLD" = "YES" ]; then sudo update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.bfd" 10; fi
+ - ld -v
+ - ./travis-install.sh
+
+install:
+ # We intentionally do not install anything before trying to build Cabal because
+ # it should build with each supported GHC version out-of-the-box.
+
+# Here starts the actual work to be performed for the package under test; any
+# command which exits with a non-zero exit code causes the build to fail. Using
+# ./dist/setup/setup here instead of cabal-install to avoid breakage when the
+# build config format changed.
+script:
+ - rm -rf dist-newstyle
+ - ./travis-${SCRIPT}.sh -j2
+
+cache:
+ directories:
+ - $HOME/.cabal/packages
+ - $HOME/.cabal/store
+ - $HOME/.cabal/bin
+
+ - $HOME/.stack/bin
+ - $HOME/.stack/precompiled
+ - $HOME/.stack/programs
+ - $HOME/.stack/setup-exe-cache
+ - $HOME/.stack/snapshots
+
+# We remove the index because it churns quite a bit and we don't want
+# to pay the cost of repeatedly caching it even though we don't care
+# about most changing packages.
+before_cache:
+ - rm -fv $HOME/.cabal/packages/hackage.haskell.org/build-reports.log
+ - rm -fv $HOME/.cabal/packages/hackage.haskell.org/00-index*
+ - rm -fv $HOME/.cabal/packages/hackage.haskell.org/01-index*
+ - rm -fv $HOME/.cabal/packages/hackage.haskell.org/*.json
+
+# Deploy Haddocks to the haskell/cabal-website repo.
+after_success:
+ # Set up deployment to the haskell/cabal-website repo.
+ # NB: these commands MUST be in .travis.yml, otherwise the secret key can be
+ # leaked! See https://github.com/travis-ci/travis.rb/issues/423.
+ # umask to get the permissions to be 600.
+ - if [ "x$TRAVIS_REPO_SLUG" = "xhaskell/cabal" -a "x$TRAVIS_PULL_REQUEST" = "xfalse" -a "x$TRAVIS_BRANCH" = "xmaster" -a "x$DEPLOY_DOCS" = "xYES"  ]; then (umask 177 && openssl aes-256-cbc -K $encrypted_edaf6551664d_key -iv $encrypted_edaf6551664d_iv -in id_rsa_cabal_website.aes256.enc -out ~/.ssh/id_rsa -d); fi
+ - ./travis-deploy.sh
+
+notifications:
+  irc:
+    channels:
+      - "chat.freenode.net##haskell-cabal"
+  slack: haskell-cabal:sCq6GLfy9N8MJrInosg871n4

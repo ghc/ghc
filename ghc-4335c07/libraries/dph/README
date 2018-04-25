@@ -1,0 +1,94 @@
+
+Directories in libraries/dph
+
+   dph-base/
+        Common config and debugging functions for Data Parallel Haskell.
+
+   dph-buildbot/
+        Performance regression buildbot.
+
+   dph-examples/
+        Examples using Data Parallel Haskell.
+
+   dph-prim-interface/
+        Empty implementation of flat parallel arrays. 
+        This package exists only so that dph-prim-par and dph-prim-seq
+        can provide the same interface.
+
+   dph-prim-seq/
+        Sequential implementation of the flat parallel array API defined
+        in dph-prim-interface.
+        This is only used during debugging.
+        You probably want dph-prim-par instead.
+
+   dph-prim-par/
+        Production implementation of the flat parallel array API defined
+        in dph-prim-interface.
+
+   dph-lifted-base/
+        Common definitions used by the other dph-lifted packages.
+
+
+   The following packages provide:
+     Nested arrays and the primitive operators that work on them (PA functions).
+     The lifted array combinators that the vectoriser introduces (PP functions).
+     The user facing library functions that work on [::] style arrays (P functions).
+
+     dph-lifted-boxed/
+        Incomplete implementation using boxed array elements.
+        This is very slow, but sometimes useful for debugging.
+        
+     dph-lifted-copy/
+        Deprecated implementation that performs deep copying replicate.
+        Using this package can cause the vectorised program to have worse
+        asymptotic complexity than the original.
+        Use dph-lifted-vseg instead.
+
+     dph-lifted-vseg/
+        This implementation directly encodes sharing between array segments,
+        and avoids the copying that dph-lifted-copy would otherwise do.
+        Use this version for production code.
+
+
+   Odds and ends:
+   make/
+        Makefiles used for development and debugging
+
+   dph-test/
+        Quickcheck tests for the array operators.
+
+   dtrace/
+        Old code to add dtrace support to DPH.
+
+   examples/
+        Rotted example code that doesn't build anymore and should 
+        probably just be deleted.
+    
+
+To compile programs use:
+     ghc -rtsopts -threaded 
+         -fllvm -optlo-O3 
+         -Odph -fcpr-off -fno-liberate-case 
+         -package dph-lifted-vseg
+
+Why:
+     -rtsopts -threaded         -- You'll want to pass +RTS -Nwhatever when running
+                                --  the compiled program to enable threads.
+
+     -fllvm                     -- LLVM produces much better numerical code than GHC's
+                                --  default native code generator.
+
+     -optlo-O3                  -- Turn on more LLVM optimisations. 
+                                --  This can produce better numerical code, 
+                                --  but sometimes tickles bugs in LLVM.
+
+     -fcpr-off                  -- The Constructed Product Result transform sometimes
+                                --  interferes with fusion in the Data.Vector Library.
+
+     -fno-liberate-case         -- The LiberateCase transform can duplicate lots of 
+                                --  intermediate code, result in slow compile times,
+                                --  large binaries, and minimal performance improvement.
+                                --  The implementation of the DPH backend library should
+                                --  manually handle most cases where LiberateCase
+                                --  would fire.
+

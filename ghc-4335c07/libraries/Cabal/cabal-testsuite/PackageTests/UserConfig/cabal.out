@@ -1,0 +1,8 @@
+# cabal user-config
+Writing default configuration to <ROOT>/cabal.dist/cabal-config
+# cabal user-config
+cabal: <ROOT>/cabal.dist/cabal-config already exists.
+# cabal user-config
+Writing default configuration to <ROOT>/cabal.dist/cabal-config
+# cabal user-config
+Writing default configuration to <ROOT>/cabal.dist/cabal-config2

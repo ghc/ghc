@@ -1,0 +1,92 @@
+{-# LANGUAGE RoleAnnotations #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+unit prelude-sig where
+    signature Prel where
+        data List a = Nil | Cons a (List a)
+
+unit arrays-sig where
+    dependency prelude-sig[Prel=<Prel>]
+    signature Array where
+        import Prel
+        data Arr i e
+        something :: List (Arr i e)
+
+unit structures where
+    dependency arrays-sig[Prel=<Prel>, Array=<Array>]
+    module Set where
+        import Prel
+        data S a = S (List a)
+    module Graph where
+        import Prel
+        import Array
+        data G = G (Arr Int [Int])
+    module Tree where
+        import Prel
+        import Graph
+        data T = T G
+
+unit arrays-a where
+    dependency prelude-sig[Prel=<Prel>]
+    module Array where
+        import qualified Prel as P
+        type role Arr representational representational
+        data Arr i e = MkArr ()
+        something :: P.List (Arr i e)
+        something = P.Nil
+
+unit arrays-b where
+    dependency prelude-sig[Prel=<Prel>]
+    module Array where
+        import Prel
+        data Arr i e = ANil | ACons i e (Arr i e)
+        -- NB: If you uncomment this, GHC decides to order the
+        -- quantifiers the other way, and you are a sad panda.
+        something :: Prel.List (Arr i e)
+        something = Cons ANil Nil
+
+unit graph-a where
+    dependency arrays-a[Prel=<Prel>]
+    dependency structures[Prel=<Prel>,Array=arrays-a[Prel=<Prel>]:Array] (Graph)
+
+unit graph-b where
+    dependency arrays-b[Prel=<Prel>]
+    dependency structures[Prel=<Prel>,Array=arrays-b[Prel=<Prel>]:Array] (Graph)
+
+unit multiinst where
+    dependency arrays-a[Prel=<Prel>] (Array as AA)
+    dependency arrays-b[Prel=<Prel>] (Array as AB)
+    dependency structures[Prel=<Prel>,Array=arrays-a[Prel=<Prel>]:Array] (Graph as GA)
+    dependency structures[Prel=<Prel>,Array=arrays-b[Prel=<Prel>]:Array] (Graph as GB)
+    module Client where
+        import qualified GA
+        import qualified GB
+        x = GA.G
+        y = GB.G
+        instance Show GA.G where
+            show = undefined
+        instance Show GB.G where
+            show = undefined
+
+unit applic-left where
+    dependency arrays-a[Prel=<Prel>]
+    dependency structures[Prel=<Prel>,Array=arrays-a[Prel=<Prel>]:Array] (Graph)
+    module Left where
+        import Graph
+        x :: G
+        x = undefined
+
+unit applic-right where
+    dependency arrays-a[Prel=<Prel>]
+    dependency structures[Prel=<Prel>,Array=arrays-a[Prel=<Prel>]:Array] (Graph)
+    module Right where
+        import Graph
+        f :: G -> G
+        f = id
+
+unit applic-bot where
+    dependency applic-left[Prel=<Prel>]
+    dependency applic-right[Prel=<Prel>]
+    module Bot where
+        import Left
+        import Right
+        g = f x

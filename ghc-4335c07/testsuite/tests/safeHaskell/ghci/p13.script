@@ -1,0 +1,13 @@
+-- Test restricted functionality: Overlapping
+:unset +s
+:set -XSafe
+:set -XFlexibleInstances
+
+:l P13_A
+
+instance {-# OVERLAPPING #-} Pos [Int] where { res _ = error "This curry is poisoned!" }
+
+res [1::Int, 2::Int]
+-- res 'c'
+-- res ['c']
+

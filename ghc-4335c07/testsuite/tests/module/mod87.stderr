@@ -1,0 +1,5 @@
+
+mod87.hs:4:5: error:
+    • Data constructor not in scope: Left :: GHC.Types.Char -> t
+    • Perhaps you want to add ‘Left’ to the import list
+      in the import of ‘Prelude’ (mod87.hs:3:1-22).

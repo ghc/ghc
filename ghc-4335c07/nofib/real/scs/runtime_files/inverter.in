@@ -1,0 +1,16 @@
+v	Plus	plus	ground	(0, 3m)
+v	Minus	ground	minus	(0, 3m)
+
+v	In	input	ground	(0, 0)	(1u, 3m)  (3u, -3m)  (4u, 0)
+
+j	Top	plus	upper	1a	1M	0
+j	Upper	upper	output	2a	1M	0
+j	Lower	output	lower	2a	1M	0
+j	Bottom	lower	minus	1a	1M	0
+
+c	UpIn	input	upper	8a	0
+c	UpBias	minus	upper	7a	0
+c	LoIn	input	lower	8a	0
+c	LoBias	plus	lower	7a	0
+
+c	Load	output	ground	1f	0

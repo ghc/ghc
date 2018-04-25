@@ -1,0 +1,4 @@
+T9579_outofheap_rtssome: Heap exhausted;
+T9579_outofheap_rtssome: Current maximum heap size is NUM bytes (1 MB).
+T9579_outofheap_rtssome: Relink with -rtsopts and use `+RTS -M<size>' to increase it.
+251

@@ -1,0 +1,4 @@
+
+WildcardInInstanceSig.hs:5:13: error:
+    Wildcard ‘_’ not allowed
+      in a class method signature for ‘negate’

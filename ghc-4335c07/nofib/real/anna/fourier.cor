@@ -1,0 +1,62 @@
+
+list a ::= Nil | Cons a (list a);
+pair a b ::= Pair a b;
+complex a b ::= Cpx a b;
+
+;;
+
+plusC c1 c2
+  = case c1 of Cpx r1 i1 -> case c2 of Cpx r2 i2 -> Cpx (r1+r2) (i1+i2)
+    end end;
+
+minC c1 c2
+  = case c1 of Cpx r1 i1 -> case c2 of Cpx r2 i2 -> Cpx (r1-r2) (i1-i2)
+    end end;
+
+mulC c1 c2
+  = case c1 of Cpx r1 i1 -> case c2 of Cpx r2 i2 
+     -> Cpx (r1 * r2 - i1 * i2) (r1 * i2 + i1 * r2)
+    end end;
+
+if c t f = case c of True -> t; False -> f end;
+
+length l = case l of Nil -> 0; Cons x xs -> 1 + length xs end;
+
+append xl yl = case xl of Nil -> yl; Cons x xs -> Cons x (append xs yl) end;
+
+sin x = x + 1;
+cos x = x - 1;
+pi = 3;
+
+root j n = let z = (2 * j * pi) / n
+           in  Cpx (cos z) (sin z);
+
+error = error;
+
+split l
+  = case l of
+       Nil -> Pair Nil Nil;
+       Cons a as -> case as of 
+                      Nil -> error;
+                      Cons b rest -> 
+                        case split rest of Pair even odd
+                           -> Pair (Cons a even) (Cons b odd) end end end;
+
+
+merge even odd n
+= letrec merge2 = \ere oro i ->
+               case ere of Cons e re ->
+               case oro of Cons o ro ->
+             ( letrec urest_umrest = merge2 re ro (i+1);
+                   ri = root i n;
+                   prod = mulC ri o;
+                   ui = plusC e prod;
+                   umi = minC e prod;
+                   urest = case urest_umrest of Pair urest umrest -> urest end;
+                   umrest = case urest_umrest of Pair urest umrest -> umrest end
+               in  Pair (Cons ui urest) (Cons umi umrest)   );
+                           Nil -> Pair Nil Nil end;
+                           Nil -> Pair Nil Nil end
+   in case merge2 even odd 0 of
+         Pair low high -> append low high end;
+

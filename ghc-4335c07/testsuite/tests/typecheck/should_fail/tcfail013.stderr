@@ -1,0 +1,7 @@
+
+tcfail013.hs:4:3: error:
+    • Couldn't match expected type ‘[a]’ with actual type ‘Bool’
+    • In the pattern: True
+      In an equation for ‘f’: f True = 2
+    • Relevant bindings include
+        f :: [a] -> p (bound at tcfail013.hs:3:1)

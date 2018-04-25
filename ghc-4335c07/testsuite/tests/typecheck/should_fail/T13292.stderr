@@ -1,0 +1,23 @@
+
+T13292a.hs:4:12: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Ambiguous type variable ‘m0’ arising from a use of ‘return’
+      prevents the constraint ‘(Monad m0)’ from being solved.
+      Relevant bindings include
+        someFunc :: m0 () (bound at T13292a.hs:4:1)
+      Probable fix: use a type annotation to specify what ‘m0’ should be.
+      These potential instances exist:
+        instance Monad IO -- Defined in ‘GHC.Base’
+        instance Monad Maybe -- Defined in ‘GHC.Base’
+        instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+        ...plus one other
+        ...plus two instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: return ()
+      In an equation for ‘someFunc’: someFunc = return ()
+
+T13292.hs:6:1: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘GHC.Types.Any’ with ‘IO’
+      Expected type: IO ()
+        Actual type: GHC.Types.Any ()
+    • In the expression: main
+      When checking the type of the IO action ‘main’

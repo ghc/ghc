@@ -1,0 +1,4 @@
+
+NestedNamedExtraConstraintsWildcard.hs:4:23: error:
+    Wildcard ‘_a’ not allowed in a constraint
+      in the type signature for ‘foo’

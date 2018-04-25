@@ -1,0 +1,4 @@
+
+T9815.hs:6:13:
+    Illegal `..' notation for constructor ‘N’
+      The constructor has no labelled fields

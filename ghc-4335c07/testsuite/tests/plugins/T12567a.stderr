@@ -1,0 +1,10 @@
+[1 of 1] Compiling T12567a          ( T12567a.hs, T12567a.o )
+Simple Plugin Passes Queried
+Got options: 
+Simple Plugin Pass Run
+[1 of 1] Compiling T12567a          ( T12567a.hs, T12567a.o ) [Simple.Plugin changed]
+[1 of 2] Compiling T12567a          ( T12567a.hs, T12567a.o ) [Simple.Plugin changed]
+Simple Plugin Passes Queried
+Got options: 
+Simple Plugin Pass Run
+[2 of 2] Compiling T12567b          ( T12567b.hs, T12567b.o )

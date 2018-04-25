@@ -1,0 +1,3 @@
+
+T13947.hs:4:12: error:
+    Not in scope: type constructor or class ‘:~:’

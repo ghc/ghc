@@ -1,0 +1,9 @@
+-----<module Main>-----
+ 75% expressions used (3/4)
+100% boolean coverage (0/0)
+     100% guards (0/0)
+     100% 'if' conditions (0/0)
+     100% qualifiers (0/0)
+100% alternatives used (0/0)
+100% local declarations used (0/0)
+100% top-level declarations used (1/1)

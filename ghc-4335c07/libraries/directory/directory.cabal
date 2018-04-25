@@ -1,0 +1,112 @@
+name:           directory
+version:        1.3.1.5
+-- NOTE: Don't forget to update ./changelog.md
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports:    https://github.com/haskell/directory/issues
+synopsis:       Platform-agnostic library for filesystem operations
+description:
+  This library provides a basic set of operations for manipulating files and
+  directories in a portable way.
+category:       System
+build-type:     Configure
+cabal-version:  >= 1.10
+tested-with:    GHC>=7.4.1
+
+extra-tmp-files:
+    autom4te.cache
+    config.log
+    config.status
+    HsDirectoryConfig.h
+
+extra-source-files:
+    HsDirectoryConfig.h.in
+    README.md
+    System/Directory/Internal/*.h
+    changelog.md
+    configure
+    configure.ac
+    directory.buildinfo
+    tests/*.hs
+    tests/util.inl
+
+source-repository head
+    type:     git
+    location: https://github.com/haskell/directory
+
+Library
+    default-language: Haskell2010
+    other-extensions:
+        CPP
+        Trustworthy
+
+    exposed-modules:
+        System.Directory
+        System.Directory.Internal
+        System.Directory.Internal.Prelude
+    other-modules:
+        System.Directory.Internal.C_utimensat
+        System.Directory.Internal.Common
+        System.Directory.Internal.Config
+        System.Directory.Internal.Posix
+        System.Directory.Internal.Windows
+
+    include-dirs: .
+
+    build-depends:
+        base     >= 4.5 && < 4.12,
+        time     >= 1.4 && < 1.9,
+        filepath >= 1.3 && < 1.5
+    if os(windows)
+        build-depends: Win32 >= 2.2.2 && < 2.7
+    else
+        build-depends: unix >= 2.5.1 && < 2.8
+
+    ghc-options: -Wall
+
+test-suite test
+    default-language: Haskell2010
+    other-extensions: BangPatterns, CPP
+    ghc-options:      -Wall
+    hs-source-dirs:   tests
+    main-is:          Main.hs
+    type:             exitcode-stdio-1.0
+    build-depends:    base, directory, filepath, time
+    if os(windows)
+        build-depends: Win32
+    else
+        build-depends: unix
+    other-modules:
+        TestUtils
+        Util
+        -- test-modules-begin
+        CanonicalizePath
+        CopyFile001
+        CopyFile002
+        CopyFileWithMetadata
+        CreateDirectory001
+        CreateDirectoryIfMissing001
+        CurrentDirectory001
+        Directory001
+        DoesDirectoryExist001
+        DoesPathExist
+        FileTime
+        FindFile001
+        GetDirContents001
+        GetDirContents002
+        GetFileSize
+        GetHomeDirectory001
+        GetPermissions001
+        LongPaths
+        MakeAbsolute
+        PathIsSymbolicLink
+        RemoveDirectoryRecursive001
+        RemovePathForcibly
+        RenameDirectory
+        RenameFile001
+        RenamePath
+        Safe
+        T8482
+        WithCurrentDirectory
+        -- test-modules-end

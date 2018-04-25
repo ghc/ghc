@@ -1,0 +1,84 @@
+-- 
+--      Patricia Fasel
+--      Los Alamos National Laboratory
+--      1990 August
+--
+module
+
+#include "gamtebType.t"
+#include "consts.t"
+#include "utils.t"
+
+export outGamteb;
+
+
+rec -- outGamteb :: Integer -> [Stats] -> [Result] -> [Char] -> [Char]
+
+    outGamteb npart stats results =
+	  outResults results
+  	@ outResultsRaw results
+	@ outStats npart stats
+--	@ outXsectTbl
+
+
+and	-- output the result of particle transformations
+	-- outResults :: [Result] -> [Char]
+
+    outResults results =
+	let rec resArray =
+	   (array 1 (numexit*numlev)
+	    Sumf
+	    ([(i,v) ;; (i,v) <- map (\(Res i j w).((i-1)*numlev+j,w)) results])
+	    ) in
+	let a = ((scatter-1)*numlev) in
+	let b = ((escape-1)*numlev) in
+	let c = ((transit-1)*numlev) in
+	  "\nScatter table:\n" @ showArray (a+1) (a+numlev) resArray
+	@ "\nEscape table:\n" @ showArray (b+1) (b+numlev) resArray
+	@ "\nTransit table:\n" @ showArray (c+1) (c+numlev) resArray
+
+
+and	-- print statistics
+	-- outStats :: Stats -> [Char]
+
+    outStats npart stats =
+	let rec statArray =
+	    (array 1 13
+	     Sumf
+	     ([(i,v) ;; (i,v) <- map (\(St i v).(i,v))  stats])
+	    ) in
+	  "Number of particles: " @ show_int npart @ "\n\n"
+	@ "Number of escapes: " @ showFloat (statArray?ne) @ "\n"
+	@ "Number of transits: " @ showFloat (statArray?nt) @ "\n"
+	@ "Number of scatters: " @ showFloat (statArray?ns) @ "\n"
+	@ "Number of energy kills: " @ showFloat (statArray?nek) @ "\n"
+	@ "Number of weight kills: " @ showFloat (statArray?nwk) @ "\n"
+	@ "Number of roulettes: " @ showFloat (statArray?nr) @ "\n"
+	@ "Number of splits: " @ showFloat (statArray?nsp) @ "\n\n"
+	@ "Number of collisions: " @ showFloat (statArray?nc) @ "\n"
+	@ "Number of noncollisions: " @ showFloat (statArray?nnc) @ "\n\n"
+	@ "Number of roulette kills: " @ showFloat (statArray?nrk) @ "\n\n"
+	@ "Weight of roulette kills: " @ showFloat (statArray?wrl) @ "\n"
+	@ "Weight of roulette gains: " @ showFloat (statArray?wrg) @ "\n\n"
+
+
+and	-- output result list
+	-- outResultsRaw :: [Result] -> [Char]
+
+    outResultsRaw [] = []
+||  outResultsRaw ((Res t i w).rs) =
+	"Result: index " @ show_int i @ 
+	"  type " @ show_int t @ 
+	"  weight " @ showFloat w @ "\n" @ 
+	outResultsRaw rs
+
+
+and	-- floating point sum of a list
+	-- Sumf :: [Float] -> Float
+
+    Sumf l = (sumf l 0.0
+	where rec
+	    sumf [] a = a
+	||  sumf (x.l) a = sumf l (x+.a))
+
+end

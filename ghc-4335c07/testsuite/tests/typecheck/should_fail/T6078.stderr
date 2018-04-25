@@ -1,0 +1,5 @@
+
+T6078.hs:8:10: error:
+    You can't mix polymorphic and unlifted bindings:
+      ip1p@(Ptr ip1) = Ptr ip0 `plusPtr` len
+    Probable fix: add a type signature

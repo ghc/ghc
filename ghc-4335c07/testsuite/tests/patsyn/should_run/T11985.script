@@ -1,0 +1,4 @@
+:set -XPatternSynonyms
+
+pattern Point{x, y} = (x, y)
+(1, 2) { x = 3}

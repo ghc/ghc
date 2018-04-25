@@ -1,0 +1,1223 @@
+%!PS-Adobe-2.0
+%%Created by Haskell Graph Package
+/SMALL /Helvetica findfont 4 scalefont def
+/SMALLBOLD /Helvetica-Bold findfont 4 scalefont def
+/SMALLITALIC /Helvetica-Oblique findfont 4 scalefont def
+/NORM /Helvetica findfont 5 scalefont def
+/BOLD /Helvetica-Bold findfont 5 scalefont def
+/LARGE /Helvetica-Bold findfont 11 scalefont def
+NORM setfont
+2.84584 2.84584 scale
+/rightshow
+{dup stringwidth pop
+0 exch sub
+0 rmoveto
+show } def 
+/centreshow
+{dup stringwidth pop
+0 exch sub
+2 div
+0 rmoveto
+show } def 
+0.2 setlinewidth
+8 290 translate
+270 rotate
+20 10 translate
+0.9 0.9 scale
+0.2 setlinewidth
+newpath
+0 0 moveto
+0 190 rlineto
+280 0 rlineto
+0 -190 rlineto
+closepath
+stroke
+0.2 setlinewidth
+newpath
+1 1 moveto
+0 5 rlineto
+278 0 rlineto
+0 -5 rlineto
+closepath
+stroke
+0.2 setlinewidth
+newpath
+1 183 moveto
+0 6 rlineto
+278 0 rlineto
+0 -6 rlineto
+closepath
+stroke
+BOLD setfont
+140 184 moveto
+(Processor Activity Graph) centreshow
+NORM setfont
+LARGE setfont
+10 16 moveto
+(3) centreshow
+SMALL setfont
+10 12 moveto
+(PE(s)) centreshow
+stroke
+SMALL setfont
+10 8 moveto
+(displayed) centreshow
+stroke
+NORM setfont
+2 2 moveto
+SMALL setfont
+0 setgray
+(Configuration:) show
+SMALLITALIC setfont
+55 2 moveto
+0 setgray
+(14.0) show
+stroke
+SMALLBOLD setfont
+111 2 moveto
+0 setgray
+(15.1) show
+stroke
+SMALLBOLD setfont
+167 2 moveto
+0 setgray
+(15.0) show
+stroke
+SMALLBOLD setfont
+223 2 moveto
+0 setgray
+(14.1) show
+stroke
+stroke
+NORM setfont
+20 25 translate
+newpath
+0 -5 moveto
+0 150 lineto
+-5 0 moveto
+250 0 lineto
+stroke
+SMALL setfont
+newpath
+250 0 moveto
+0 -2 rlineto
+250 -5 moveto
+(12800) centreshow
+stroke
+newpath
+225 0 moveto
+0 -2 rlineto
+225 -5 moveto
+(11520) centreshow
+stroke
+newpath
+200 0 moveto
+0 -2 rlineto
+200 -5 moveto
+(10240) centreshow
+stroke
+newpath
+175 0 moveto
+0 -2 rlineto
+175 -5 moveto
+(8960) centreshow
+stroke
+newpath
+150 0 moveto
+0 -2 rlineto
+150 -5 moveto
+(7680) centreshow
+stroke
+newpath
+125 0 moveto
+0 -2 rlineto
+125 -5 moveto
+(6400) centreshow
+stroke
+newpath
+100 0 moveto
+0 -2 rlineto
+100 -5 moveto
+(5120) centreshow
+stroke
+newpath
+75 0 moveto
+0 -2 rlineto
+75 -5 moveto
+(3840) centreshow
+stroke
+newpath
+50 0 moveto
+0 -2 rlineto
+50 -5 moveto
+(2560) centreshow
+stroke
+newpath
+25 0 moveto
+0 -2 rlineto
+25 -5 moveto
+(1280) centreshow
+stroke
+2.5 0 moveto
+0 -1 rlineto
+stroke
+5.0 0 moveto
+0 -1 rlineto
+stroke
+7.5 0 moveto
+0 -1 rlineto
+stroke
+10.0 0 moveto
+0 -1 rlineto
+stroke
+12.5 0 moveto
+0 -1 rlineto
+stroke
+15.0 0 moveto
+0 -1 rlineto
+stroke
+17.5 0 moveto
+0 -1 rlineto
+stroke
+20.0 0 moveto
+0 -1 rlineto
+stroke
+22.5 0 moveto
+0 -1 rlineto
+stroke
+25.0 0 moveto
+0 -1 rlineto
+stroke
+27.5 0 moveto
+0 -1 rlineto
+stroke
+30.0 0 moveto
+0 -1 rlineto
+stroke
+32.5 0 moveto
+0 -1 rlineto
+stroke
+35.0 0 moveto
+0 -1 rlineto
+stroke
+37.5 0 moveto
+0 -1 rlineto
+stroke
+40.0 0 moveto
+0 -1 rlineto
+stroke
+42.5 0 moveto
+0 -1 rlineto
+stroke
+45.0 0 moveto
+0 -1 rlineto
+stroke
+47.5 0 moveto
+0 -1 rlineto
+stroke
+50.0 0 moveto
+0 -1 rlineto
+stroke
+52.5 0 moveto
+0 -1 rlineto
+stroke
+55.0 0 moveto
+0 -1 rlineto
+stroke
+57.5 0 moveto
+0 -1 rlineto
+stroke
+60.0 0 moveto
+0 -1 rlineto
+stroke
+62.5 0 moveto
+0 -1 rlineto
+stroke
+65.0 0 moveto
+0 -1 rlineto
+stroke
+67.5 0 moveto
+0 -1 rlineto
+stroke
+70.0 0 moveto
+0 -1 rlineto
+stroke
+72.5 0 moveto
+0 -1 rlineto
+stroke
+75.0 0 moveto
+0 -1 rlineto
+stroke
+77.5 0 moveto
+0 -1 rlineto
+stroke
+80.0 0 moveto
+0 -1 rlineto
+stroke
+82.5 0 moveto
+0 -1 rlineto
+stroke
+85.0 0 moveto
+0 -1 rlineto
+stroke
+87.5 0 moveto
+0 -1 rlineto
+stroke
+90.0 0 moveto
+0 -1 rlineto
+stroke
+92.5 0 moveto
+0 -1 rlineto
+stroke
+95.0 0 moveto
+0 -1 rlineto
+stroke
+97.5 0 moveto
+0 -1 rlineto
+stroke
+100.0 0 moveto
+0 -1 rlineto
+stroke
+102.5 0 moveto
+0 -1 rlineto
+stroke
+105.0 0 moveto
+0 -1 rlineto
+stroke
+107.5 0 moveto
+0 -1 rlineto
+stroke
+110.0 0 moveto
+0 -1 rlineto
+stroke
+112.5 0 moveto
+0 -1 rlineto
+stroke
+115.0 0 moveto
+0 -1 rlineto
+stroke
+117.5 0 moveto
+0 -1 rlineto
+stroke
+120.0 0 moveto
+0 -1 rlineto
+stroke
+122.5 0 moveto
+0 -1 rlineto
+stroke
+125.0 0 moveto
+0 -1 rlineto
+stroke
+127.5 0 moveto
+0 -1 rlineto
+stroke
+130.0 0 moveto
+0 -1 rlineto
+stroke
+132.5 0 moveto
+0 -1 rlineto
+stroke
+135.0 0 moveto
+0 -1 rlineto
+stroke
+137.5 0 moveto
+0 -1 rlineto
+stroke
+140.0 0 moveto
+0 -1 rlineto
+stroke
+142.5 0 moveto
+0 -1 rlineto
+stroke
+145.0 0 moveto
+0 -1 rlineto
+stroke
+147.5 0 moveto
+0 -1 rlineto
+stroke
+150.0 0 moveto
+0 -1 rlineto
+stroke
+152.5 0 moveto
+0 -1 rlineto
+stroke
+155.0 0 moveto
+0 -1 rlineto
+stroke
+157.5 0 moveto
+0 -1 rlineto
+stroke
+160.0 0 moveto
+0 -1 rlineto
+stroke
+162.5 0 moveto
+0 -1 rlineto
+stroke
+165.0 0 moveto
+0 -1 rlineto
+stroke
+167.5 0 moveto
+0 -1 rlineto
+stroke
+170.0 0 moveto
+0 -1 rlineto
+stroke
+172.5 0 moveto
+0 -1 rlineto
+stroke
+175.0 0 moveto
+0 -1 rlineto
+stroke
+177.5 0 moveto
+0 -1 rlineto
+stroke
+180.0 0 moveto
+0 -1 rlineto
+stroke
+182.5 0 moveto
+0 -1 rlineto
+stroke
+185.0 0 moveto
+0 -1 rlineto
+stroke
+187.5 0 moveto
+0 -1 rlineto
+stroke
+190.0 0 moveto
+0 -1 rlineto
+stroke
+192.5 0 moveto
+0 -1 rlineto
+stroke
+195.0 0 moveto
+0 -1 rlineto
+stroke
+197.5 0 moveto
+0 -1 rlineto
+stroke
+200.0 0 moveto
+0 -1 rlineto
+stroke
+202.5 0 moveto
+0 -1 rlineto
+stroke
+205.0 0 moveto
+0 -1 rlineto
+stroke
+207.5 0 moveto
+0 -1 rlineto
+stroke
+210.0 0 moveto
+0 -1 rlineto
+stroke
+212.5 0 moveto
+0 -1 rlineto
+stroke
+215.0 0 moveto
+0 -1 rlineto
+stroke
+217.5 0 moveto
+0 -1 rlineto
+stroke
+220.0 0 moveto
+0 -1 rlineto
+stroke
+222.5 0 moveto
+0 -1 rlineto
+stroke
+225.0 0 moveto
+0 -1 rlineto
+stroke
+227.5 0 moveto
+0 -1 rlineto
+stroke
+230.0 0 moveto
+0 -1 rlineto
+stroke
+232.5 0 moveto
+0 -1 rlineto
+stroke
+235.0 0 moveto
+0 -1 rlineto
+stroke
+237.5 0 moveto
+0 -1 rlineto
+stroke
+240.0 0 moveto
+0 -1 rlineto
+stroke
+242.5 0 moveto
+0 -1 rlineto
+stroke
+245.0 0 moveto
+0 -1 rlineto
+stroke
+247.5 0 moveto
+0 -1 rlineto
+stroke
+250.0 0 moveto
+0 -1 rlineto
+stroke
+stroke
+newpath
+0 150 moveto
+-2 0 rlineto
+-3 150 moveto
+(100) rightshow
+stroke
+newpath
+0 135 moveto
+-2 0 rlineto
+-3 135 moveto
+(90) rightshow
+stroke
+newpath
+0 120 moveto
+-2 0 rlineto
+-3 120 moveto
+(80) rightshow
+stroke
+newpath
+0 105 moveto
+-2 0 rlineto
+-3 105 moveto
+(70) rightshow
+stroke
+newpath
+0 90 moveto
+-2 0 rlineto
+-3 90 moveto
+(60) rightshow
+stroke
+newpath
+0 75 moveto
+-2 0 rlineto
+-3 75 moveto
+(50) rightshow
+stroke
+newpath
+0 60 moveto
+-2 0 rlineto
+-3 60 moveto
+(40) rightshow
+stroke
+newpath
+0 45 moveto
+-2 0 rlineto
+-3 45 moveto
+(30) rightshow
+stroke
+newpath
+0 30 moveto
+-2 0 rlineto
+-3 30 moveto
+(20) rightshow
+stroke
+newpath
+0 15 moveto
+-2 0 rlineto
+-3 15 moveto
+(10) rightshow
+stroke
+0 1.5 moveto
+-1 0 rlineto
+0 3.0 moveto
+-1 0 rlineto
+0 4.5 moveto
+-1 0 rlineto
+0 6.0 moveto
+-1 0 rlineto
+0 7.5 moveto
+-1 0 rlineto
+0 9.0 moveto
+-1 0 rlineto
+0 10.5 moveto
+-1 0 rlineto
+0 12.0 moveto
+-1 0 rlineto
+0 13.5 moveto
+-1 0 rlineto
+0 15.0 moveto
+-1 0 rlineto
+0 16.5 moveto
+-1 0 rlineto
+0 18.0 moveto
+-1 0 rlineto
+0 19.5 moveto
+-1 0 rlineto
+0 21.0 moveto
+-1 0 rlineto
+0 22.5 moveto
+-1 0 rlineto
+0 24.0 moveto
+-1 0 rlineto
+0 25.5 moveto
+-1 0 rlineto
+0 27.0 moveto
+-1 0 rlineto
+0 28.5 moveto
+-1 0 rlineto
+0 30.0 moveto
+-1 0 rlineto
+0 31.5 moveto
+-1 0 rlineto
+0 33.0 moveto
+-1 0 rlineto
+0 34.5 moveto
+-1 0 rlineto
+0 36.0 moveto
+-1 0 rlineto
+0 37.5 moveto
+-1 0 rlineto
+0 39.0 moveto
+-1 0 rlineto
+0 40.5 moveto
+-1 0 rlineto
+0 42.0 moveto
+-1 0 rlineto
+0 43.5 moveto
+-1 0 rlineto
+0 45.0 moveto
+-1 0 rlineto
+0 46.5 moveto
+-1 0 rlineto
+0 48.0 moveto
+-1 0 rlineto
+0 49.5 moveto
+-1 0 rlineto
+0 51.0 moveto
+-1 0 rlineto
+0 52.5 moveto
+-1 0 rlineto
+0 54.0 moveto
+-1 0 rlineto
+0 55.5 moveto
+-1 0 rlineto
+0 57.0 moveto
+-1 0 rlineto
+0 58.5 moveto
+-1 0 rlineto
+0 60.0 moveto
+-1 0 rlineto
+0 61.5 moveto
+-1 0 rlineto
+0 63.0 moveto
+-1 0 rlineto
+0 64.5 moveto
+-1 0 rlineto
+0 66.0 moveto
+-1 0 rlineto
+0 67.5 moveto
+-1 0 rlineto
+0 69.0 moveto
+-1 0 rlineto
+0 70.5 moveto
+-1 0 rlineto
+0 72.0 moveto
+-1 0 rlineto
+0 73.5 moveto
+-1 0 rlineto
+0 75.0 moveto
+-1 0 rlineto
+0 76.5 moveto
+-1 0 rlineto
+0 78.0 moveto
+-1 0 rlineto
+0 79.5 moveto
+-1 0 rlineto
+0 81.0 moveto
+-1 0 rlineto
+0 82.5 moveto
+-1 0 rlineto
+0 84.0 moveto
+-1 0 rlineto
+0 85.5 moveto
+-1 0 rlineto
+0 87.0 moveto
+-1 0 rlineto
+0 88.5 moveto
+-1 0 rlineto
+0 90.0 moveto
+-1 0 rlineto
+0 91.5 moveto
+-1 0 rlineto
+0 93.0 moveto
+-1 0 rlineto
+0 94.5 moveto
+-1 0 rlineto
+0 96.0 moveto
+-1 0 rlineto
+0 97.5 moveto
+-1 0 rlineto
+0 99.0 moveto
+-1 0 rlineto
+0 100.5 moveto
+-1 0 rlineto
+0 102.0 moveto
+-1 0 rlineto
+0 103.5 moveto
+-1 0 rlineto
+0 105.0 moveto
+-1 0 rlineto
+0 106.5 moveto
+-1 0 rlineto
+0 108.0 moveto
+-1 0 rlineto
+0 109.5 moveto
+-1 0 rlineto
+0 111.0 moveto
+-1 0 rlineto
+0 112.5 moveto
+-1 0 rlineto
+0 114.0 moveto
+-1 0 rlineto
+0 115.5 moveto
+-1 0 rlineto
+0 117.0 moveto
+-1 0 rlineto
+0 118.5 moveto
+-1 0 rlineto
+0 120.0 moveto
+-1 0 rlineto
+0 121.5 moveto
+-1 0 rlineto
+0 123.0 moveto
+-1 0 rlineto
+0 124.5 moveto
+-1 0 rlineto
+0 126.0 moveto
+-1 0 rlineto
+0 127.5 moveto
+-1 0 rlineto
+0 129.0 moveto
+-1 0 rlineto
+0 130.5 moveto
+-1 0 rlineto
+0 132.0 moveto
+-1 0 rlineto
+0 133.5 moveto
+-1 0 rlineto
+0 135.0 moveto
+-1 0 rlineto
+0 136.5 moveto
+-1 0 rlineto
+0 138.0 moveto
+-1 0 rlineto
+0 139.5 moveto
+-1 0 rlineto
+0 141.0 moveto
+-1 0 rlineto
+0 142.5 moveto
+-1 0 rlineto
+0 144.0 moveto
+-1 0 rlineto
+0 145.5 moveto
+-1 0 rlineto
+0 147.0 moveto
+-1 0 rlineto
+0 148.5 moveto
+-1 0 rlineto
+0 150.0 moveto
+-1 0 rlineto
+stroke
+0 154 moveto
+(% Activity) rightshow
+stroke
+250 -8 moveto
+(Time (ms)) rightshow
+stroke
+NORM setfont
+newpath
+0 -17 moveto
+0 9 rlineto
+16 0 rlineto
+0 -9 rlineto
+closepath
+.2 setgray
+fill
+stroke
+17 -14 moveto
+0 setgray
+(Garbage Collection) show
+stroke
+8 -14 moveto
+1 setgray
+BOLD setfont
+(8.4%) centreshow
+stroke
+NORM setfont
+1 setgray
+newpath
+62 -17 moveto
+0 9 rlineto
+16 0 rlineto
+0 -9 rlineto
+closepath
+0 setgray
+fill
+stroke
+79 -14 moveto
+0 setgray
+(Reduction) show
+stroke
+70 -14 moveto
+1 setgray
+BOLD setfont
+(38%) centreshow
+stroke
+NORM setfont
+1 setgray
+newpath
+124 -17 moveto
+0 9 rlineto
+16 0 rlineto
+0 -9 rlineto
+closepath
+.8 setgray
+fill
+stroke
+141 -14 moveto
+0 setgray
+(Idle) show
+stroke
+132 -14 moveto
+0 setgray
+BOLD setfont
+(5.6%) centreshow
+stroke
+NORM setfont
+1 setgray
+newpath
+186 -17 moveto
+0 9 rlineto
+16 0 rlineto
+0 -9 rlineto
+closepath
+.5 setgray
+fill
+stroke
+203 -14 moveto
+0 setgray
+(Flush Read/Write) show
+stroke
+194 -14 moveto
+0 setgray
+BOLD setfont
+(48%) centreshow
+stroke
+NORM setfont
+1 setgray
+2.5 0.390625 scale
+.5 setgray
+newpath
+0 0 moveto
+0 358 lineto
+1 384 lineto
+2 384 lineto
+3 384 lineto
+4 384 lineto
+5 384 lineto
+6 384 lineto
+7 384 lineto
+8 384 lineto
+9 384 lineto
+10 384 lineto
+11 384 lineto
+12 384 lineto
+13 384 lineto
+14 384 lineto
+15 384 lineto
+16 384 lineto
+17 384 lineto
+18 384 lineto
+19 384 lineto
+20 382 lineto
+21 384 lineto
+22 384 lineto
+23 384 lineto
+24 384 lineto
+25 384 lineto
+26 384 lineto
+27 384 lineto
+28 384 lineto
+29 384 lineto
+30 382 lineto
+31 384 lineto
+32 384 lineto
+33 384 lineto
+34 384 lineto
+35 384 lineto
+36 384 lineto
+37 384 lineto
+38 384 lineto
+39 384 lineto
+40 384 lineto
+41 384 lineto
+42 384 lineto
+43 384 lineto
+44 384 lineto
+45 384 lineto
+46 384 lineto
+47 384 lineto
+48 384 lineto
+49 382 lineto
+50 384 lineto
+51 384 lineto
+52 384 lineto
+53 384 lineto
+54 290 lineto
+55 128 lineto
+56 128 lineto
+57 128 lineto
+58 126 lineto
+59 128 lineto
+60 128 lineto
+61 128 lineto
+62 128 lineto
+63 128 lineto
+64 128 lineto
+65 128 lineto
+66 128 lineto
+67 128 lineto
+68 128 lineto
+69 128 lineto
+70 128 lineto
+71 126 lineto
+72 128 lineto
+73 128 lineto
+74 128 lineto
+75 128 lineto
+76 128 lineto
+77 128 lineto
+78 128 lineto
+79 128 lineto
+80 128 lineto
+81 128 lineto
+82 126 lineto
+83 126 lineto
+84 128 lineto
+85 128 lineto
+86 128 lineto
+87 128 lineto
+88 128 lineto
+89 128 lineto
+90 128 lineto
+91 128 lineto
+92 128 lineto
+93 128 lineto
+94 128 lineto
+95 84 lineto
+96 0 lineto
+closepath
+fill
+stroke
+.8 setgray
+newpath
+0 0 moveto
+0 302 lineto
+1 326 lineto
+2 320 lineto
+3 304 lineto
+4 300 lineto
+5 318 lineto
+6 88 lineto
+7 119 lineto
+8 223 lineto
+9 181 lineto
+10 164 lineto
+11 260 lineto
+12 216 lineto
+13 54 lineto
+14 173 lineto
+15 301 lineto
+16 109 lineto
+17 128 lineto
+18 381 lineto
+19 230 lineto
+20 63 lineto
+21 233 lineto
+22 109 lineto
+23 0 lineto
+24 198 lineto
+25 301 lineto
+26 82 lineto
+27 120 lineto
+28 257 lineto
+29 160 lineto
+30 151 lineto
+31 310 lineto
+32 146 lineto
+33 132 lineto
+34 328 lineto
+35 132 lineto
+36 70 lineto
+37 177 lineto
+38 184 lineto
+39 173 lineto
+40 296 lineto
+41 244 lineto
+42 187 lineto
+43 202 lineto
+44 128 lineto
+45 55 lineto
+46 96 lineto
+47 219 lineto
+48 201 lineto
+49 297 lineto
+50 246 lineto
+51 128 lineto
+52 219 lineto
+53 312 lineto
+54 162 lineto
+55 0 lineto
+56 0 lineto
+57 52 lineto
+58 80 lineto
+59 66 lineto
+60 82 lineto
+61 78 lineto
+62 62 lineto
+63 66 lineto
+64 56 lineto
+65 70 lineto
+66 84 lineto
+67 64 lineto
+68 80 lineto
+69 60 lineto
+70 112 lineto
+71 126 lineto
+72 128 lineto
+73 4 lineto
+74 0 lineto
+75 0 lineto
+76 32 lineto
+77 60 lineto
+78 80 lineto
+79 84 lineto
+80 80 lineto
+81 76 lineto
+82 76 lineto
+83 74 lineto
+84 76 lineto
+85 86 lineto
+86 74 lineto
+87 86 lineto
+88 58 lineto
+89 66 lineto
+90 70 lineto
+91 74 lineto
+92 76 lineto
+93 76 lineto
+94 92 lineto
+95 52 lineto
+96 0 lineto
+closepath
+fill
+stroke
+0 setgray
+newpath
+0 0 moveto
+0 48 lineto
+1 70 lineto
+2 64 lineto
+3 48 lineto
+4 177 lineto
+5 318 lineto
+6 88 lineto
+7 113 lineto
+8 214 lineto
+9 177 lineto
+10 155 lineto
+11 256 lineto
+12 216 lineto
+13 54 lineto
+14 173 lineto
+15 301 lineto
+16 107 lineto
+17 119 lineto
+18 381 lineto
+19 230 lineto
+20 63 lineto
+21 232 lineto
+22 109 lineto
+23 0 lineto
+24 189 lineto
+25 301 lineto
+26 82 lineto
+27 119 lineto
+28 257 lineto
+29 157 lineto
+30 139 lineto
+31 310 lineto
+32 146 lineto
+33 131 lineto
+34 323 lineto
+35 126 lineto
+36 65 lineto
+37 172 lineto
+38 178 lineto
+39 167 lineto
+40 293 lineto
+41 244 lineto
+42 187 lineto
+43 198 lineto
+44 128 lineto
+45 51 lineto
+46 86 lineto
+47 197 lineto
+48 186 lineto
+49 287 lineto
+50 242 lineto
+51 128 lineto
+52 211 lineto
+53 303 lineto
+54 162 lineto
+55 0 lineto
+56 0 lineto
+57 52 lineto
+58 78 lineto
+59 60 lineto
+60 78 lineto
+61 78 lineto
+62 62 lineto
+63 66 lineto
+64 56 lineto
+65 70 lineto
+66 78 lineto
+67 58 lineto
+68 70 lineto
+69 58 lineto
+70 112 lineto
+71 126 lineto
+72 128 lineto
+73 4 lineto
+74 0 lineto
+75 0 lineto
+76 32 lineto
+77 54 lineto
+78 72 lineto
+79 76 lineto
+80 78 lineto
+81 72 lineto
+82 74 lineto
+83 68 lineto
+84 70 lineto
+85 78 lineto
+86 74 lineto
+87 78 lineto
+88 54 lineto
+89 66 lineto
+90 68 lineto
+91 68 lineto
+92 68 lineto
+93 74 lineto
+94 80 lineto
+95 52 lineto
+96 0 lineto
+closepath
+fill
+stroke
+.2 setgray
+newpath
+0 0 moveto
+0 0 lineto
+1 0 lineto
+2 0 lineto
+3 0 lineto
+4 0 lineto
+5 103 lineto
+6 0 lineto
+7 8 lineto
+8 46 lineto
+9 18 lineto
+10 3 lineto
+11 17 lineto
+12 35 lineto
+13 0 lineto
+14 12 lineto
+15 49 lineto
+16 51 lineto
+17 32 lineto
+18 107 lineto
+19 70 lineto
+20 0 lineto
+21 62 lineto
+22 7 lineto
+23 0 lineto
+24 34 lineto
+25 61 lineto
+26 0 lineto
+27 4 lineto
+28 32 lineto
+29 31 lineto
+30 4 lineto
+31 59 lineto
+32 0 lineto
+33 38 lineto
+34 94 lineto
+35 4 lineto
+36 4 lineto
+37 11 lineto
+38 60 lineto
+39 16 lineto
+40 47 lineto
+41 60 lineto
+42 119 lineto
+43 15 lineto
+44 48 lineto
+45 5 lineto
+46 5 lineto
+47 9 lineto
+48 8 lineto
+49 53 lineto
+50 75 lineto
+51 0 lineto
+52 96 lineto
+53 41 lineto
+54 58 lineto
+55 0 lineto
+56 0 lineto
+57 0 lineto
+58 14 lineto
+59 14 lineto
+60 12 lineto
+61 0 lineto
+62 0 lineto
+63 0 lineto
+64 0 lineto
+65 16 lineto
+66 32 lineto
+67 12 lineto
+68 24 lineto
+69 0 lineto
+70 0 lineto
+71 48 lineto
+72 50 lineto
+73 0 lineto
+74 0 lineto
+75 0 lineto
+76 0 lineto
+77 12 lineto
+78 12 lineto
+79 24 lineto
+80 12 lineto
+81 12 lineto
+82 28 lineto
+83 10 lineto
+84 10 lineto
+85 18 lineto
+86 0 lineto
+87 18 lineto
+88 12 lineto
+89 0 lineto
+90 8 lineto
+91 8 lineto
+92 14 lineto
+93 18 lineto
+94 32 lineto
+95 12 lineto
+96 0 lineto
+closepath
+fill
+stroke
+showpage

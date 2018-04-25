@@ -1,0 +1,5 @@
+:set -XPolyKinds
+data T m a = T (m a)
+:k T
+:set -fprint-explicit-foralls
+:k T

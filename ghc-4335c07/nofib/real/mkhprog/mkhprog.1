@@ -1,0 +1,153 @@
+.\" @(#)mkhprog.1	2.3 dated 92/06/23 at 15:02:17
+.TH MKHPROG 1 local
+.SH NAME
+mkhprog \- make skeleton of a Haskell program
+.SH SYNOPSIS
+.B mkhprog
+[
+.B \-l
+] [
+.B \-m
+module_name ] [
+.B \-o
+file_name ] [[\-flag type] ... ]
+.SH DESCRIPTION
+.I mkhprog
+will make the skeleton of a Haskell program, which includes the code for
+parsing command line arguments
+that almost all programs need.
+.PP
+The program so made is normally written to the standard output.
+It can be placed in a named file by using the
+.B \-o
+flag, see below.
+To get a feel for the generated code, give the command:
+.IP
+mkhprog \-o Main.hs \-b Bool \-s String \-n Int
+.PP
+and look at the program produced in
+.IR Main.hs .
+.PP
+Flags following any
+.BR \-l ,
+.B \-m
+or
+.B \-o
+options are those to be interpreted by the generated program.
+Each such flag must be followed by a Haskell type, which is the type of
+the value associated with that flag by the generated program.
+Thus
+.IP
+mkhprog \-b Bool \-s String \-n Int \-f Foo
+.PP
+produces a program which interprets a binary flag,
+.IR b ,
+a flag followed by a string argument,
+.IR s ,
+a flag followed by an
+.I Int
+argument,
+.IR n ,
+and a flag followed by an argument of type
+.IR "Foo, f" .
+That program would be invoked, for example, as
+.IP
+prog \-b \-n 17 \-s string \-f "MkFoo 3 True"
+.PP
+assuming
+.I MkFoo 3 True
+is a valid item of type
+.IR Foo .
+.PP
+A special form of binary flag is available by using
+.I +flag Bool
+instead of
+.I "\-flag Bool" :
+this produces a program which interprets
+.I \-flag
+to set an internal value to
+.IR False ,
+and
+.I +flag
+to set an internal value to
+.IR True .
+.PP
+Internally, the values of the flags, plus their command line
+arguments, are passed to a function which can process them as it wishes.
+.PP
+Such values are initialized explicitly to the empty string in the case of
+.IR String s ,
+and
+.I False
+in the case of
+.IR Bool s .
+The user must declare the default value for other types.
+.PP
+The flags interpreted by
+.I mkhprog
+are:
+.TP
+.B \-l
+produce a ``literate'' Haskell program, in which lines of code begin with
+``> ''.
+.TP
+.BI \-m " module_name"
+Produces a module called
+.I module_name
+rather than the default
+.IR Main .
+.TP
+.BI \-o " file_name"
+Writes the generated program to
+.I file_name
+rather than the standard output.
+.SH POINTS TO NOTE
+.I mkhprog
+uses the Haskell function
+.I reads
+to read values other than
+.IR String s
+and
+.IR Bool s .
+Thus, while flags with type
+.I String
+do not need quotes round their argument, any other sorts of
+.I String
+will need quotes.
+For example, if
+.I Bar
+is a type synonym for
+.IR String ,
+then a program generated with
+.IP
+mkhprog \-f Bar
+.PP
+will have to be invoked as
+.IP
+prog \-f \\"string\\"
+.PP
+Some Haskell compilers produce programs whose command line parameters are
+not all available to a call of
+.IR getArgs .
+For example,
+.I getArgs
+may only pick up arguments following an isolated \-.
+Check your documentation for details.
+.PP
+Because
+.I mkhprog
+interprets the
+.BR \-l ,
+.B \-m
+and
+.B \-o
+flags, it can be difficult to generate a program which itself interprets them.
+The easiest solution to this is to use a flag name which
+.I mkhprog
+does not interpret and then change its name in the generated program.
+.SH ACKNOWLEDGEMENTS
+The functionality and manual page of
+.I mkhprog
+are based on those of the C program
+.IR mkprog ,
+though the implementation is entirely different.

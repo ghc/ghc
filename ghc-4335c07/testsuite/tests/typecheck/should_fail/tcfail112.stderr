@@ -1,0 +1,15 @@
+
+tcfail112.hs:11:6:
+    Constructor ‘S’ does not have the required strict field(s): y
+    In the expression: S {}
+    In an equation for ‘s1’: s1 = S {}
+
+tcfail112.hs:12:6:
+    Constructor ‘S’ does not have the required strict field(s): y
+    In the expression: S {x = 3}
+    In an equation for ‘s2’: s2 = S {x = 3}
+
+tcfail112.hs:14:6:
+    Constructor ‘T’ does not have the required strict field(s)
+    In the expression: T {}
+    In an equation for ‘t’: t = T {}

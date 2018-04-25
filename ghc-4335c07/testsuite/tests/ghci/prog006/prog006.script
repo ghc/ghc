@@ -1,0 +1,6 @@
+:! cp Boot1.hs Boot.hs
+:l Boot.hs
+:! sleep 1
+:! cp Boot2.hs Boot.hs
+:r
+

@@ -1,0 +1,12 @@
+
+ds019.hs:6:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f d (j, k) p = ...
+
+ds019.hs:7:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f (e, f, g) l q = ...
+
+ds019.hs:8:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f h (m, n) r = ...

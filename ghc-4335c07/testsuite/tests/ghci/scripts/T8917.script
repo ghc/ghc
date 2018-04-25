@@ -1,0 +1,4 @@
+:load T8917
+:seti -XDataKinds -XTypeOperators
+:kind! Zero + Succ Zero
+:kind! Succ (Zero + Zero)

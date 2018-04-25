@@ -1,0 +1,6 @@
+
+T11466.hs:15:10: error:
+    • Illegal implicit parameter ‘?x::Int’
+    • In the context: Bla
+      While checking an instance declaration
+      In the instance declaration for ‘Eq T’

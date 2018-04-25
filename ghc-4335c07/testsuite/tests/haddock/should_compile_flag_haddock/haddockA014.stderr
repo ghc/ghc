@@ -1,0 +1,8 @@
+
+==================== Parser ====================
+ a header
+module HeaderTest where
+<document comment>
+x = 0
+
+

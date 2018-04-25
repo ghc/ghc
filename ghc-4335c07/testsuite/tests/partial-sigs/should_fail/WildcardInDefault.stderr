@@ -1,0 +1,4 @@
+
+WildcardInDefault.hs:4:10: error:
+    Wildcard ‘_’ not allowed
+      in a `default' declaration

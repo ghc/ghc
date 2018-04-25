@@ -1,0 +1,4 @@
+
+T1914A.hs:1:38:
+    Parse error: module header, import declaration
+    or top-level declaration expected.

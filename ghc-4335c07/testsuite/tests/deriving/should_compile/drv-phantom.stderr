@@ -1,0 +1,18 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Base.Functor DrvPhantom.NotAList where
+    GHC.Base.fmap _ = GHC.Prim.coerce
+  
+  instance Data.Foldable.Foldable DrvPhantom.NotAList where
+    Data.Foldable.foldMap _ _ = GHC.Base.mempty
+  
+  instance Data.Traversable.Traversable DrvPhantom.NotAList where
+    Data.Traversable.traverse _ z = GHC.Base.pure (GHC.Prim.coerce z)
+  
+
+Derived type family instances:
+
+
+
+==================== Filling in method body ====================

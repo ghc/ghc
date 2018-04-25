@@ -1,0 +1,6 @@
+#!/nix/store/nkq0n2m4shlbdvdq0qijib5zyzgmn0vq-bash-4.4-p12/bin/sh
+if [ -z "$WITH_GHC" ]; then
+    echo "Need to set WITH_GHC"
+    exit 1
+fi
+exec "$WITH_GHC" "$@"

@@ -1,0 +1,13 @@
+ - - - - - - - -
+ - - - - - - - -
+ - - - - P b - -
+ - - P - - - - -
+ - - K P p - - -
+ - - - - - - - -
+ - r - k - - - -
+ - - - - - - - -
+
+White to move and mate in 4
+1. R/QN2-QN1,
+	if P-K4; 2. B/KB6-Q8, P-Q6; 3. B/Q8-QN6, K-Q5; 4. R/QN1-QN4++
+	if P-Q6; 2. B/KB6-QR1, P-K4; 3. R/QN1-QN2, K-Q5; 4. R/QN2-QN4++

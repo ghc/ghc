@@ -1,0 +1,11 @@
+
+FD3.hs:15:15: error:
+    • Occurs check: cannot construct the infinite type: a ~ (String, a)
+        arising from a functional dependency between:
+          constraint ‘MkA (String, a) a’ arising from a use of ‘mkA’
+          instance ‘MkA a1 a1’ at FD3.hs:12:10-16
+    • In the expression: mkA a
+      In an equation for ‘translate’: translate a = mkA a
+    • Relevant bindings include
+        a :: (String, a) (bound at FD3.hs:15:11)
+        translate :: (String, a) -> A a (bound at FD3.hs:15:1)

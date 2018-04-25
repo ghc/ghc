@@ -1,0 +1,15 @@
+
+T2490.hs:6:10:
+    A section must be enclosed in parentheses thus: (`head` x)
+
+T2490.hs:7:10:
+    A section must be enclosed in parentheses thus: (+ x)
+
+T2490.hs:8:14:
+    A section must be enclosed in parentheses thus: (+ x)
+
+T2490.hs:9:14:
+    A section must be enclosed in parentheses thus: (+ x)
+
+T2490.hs:10:14:
+    A section must be enclosed in parentheses thus: (x +)

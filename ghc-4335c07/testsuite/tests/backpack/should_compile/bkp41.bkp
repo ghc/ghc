@@ -1,0 +1,18 @@
+unit impl where
+    module A where
+        data T = T
+    module B(module A, module B) where
+        import A
+        instance Show T where
+            show T = "T"
+
+unit sig where
+    signature B where
+        data T = T
+        instance Show T
+    module App where
+        import B
+        app = print T
+
+unit main where
+    dependency sig[B=impl:B]

@@ -1,0 +1,10 @@
+
+T9144.hs:34:26: error:
+    • Couldn't match type ‘Integer’ with ‘FooTerm’
+      Expected type: DemoteRep 'KProxy
+        Actual type: DemoteRep 'KProxy
+      Use -fprint-explicit-kinds to see the kind arguments
+    • In the first argument of ‘toSing’, namely ‘n’
+      In the expression: toSing n
+      In the expression:
+        case toSing n of { SomeSing n' -> SomeSing (SBar n') }

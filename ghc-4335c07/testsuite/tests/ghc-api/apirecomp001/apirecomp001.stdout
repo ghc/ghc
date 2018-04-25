@@ -1,0 +1,4 @@
+target nothing: ok
+target interpreted: ok
+42
+ok

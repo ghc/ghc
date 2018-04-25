@@ -1,0 +1,18 @@
+name:                Exe
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable goodexe
+  main-is:             Good.hs
+  build-depends:       base
+  default-language:    Haskell2010
+
+-- We deliberately don't configure badexe, so that we can build ONLY goodexe
+executable badexe
+  main-is:             Bad.hs
+  build-depends:       totally-impossible-dependency-to-fill == 10000.25.6
+  default-language:    Haskell2010

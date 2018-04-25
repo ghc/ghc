@@ -1,0 +1,9 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - inplace-dep-1.0 (lib) (first run)
+Configuring library for inplace-dep-1.0..
+Preprocessing library for inplace-dep-1.0..
+Building library for inplace-dep-1.0..
+# cabal new-exec

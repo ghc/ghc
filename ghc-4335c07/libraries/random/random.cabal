@@ -1,0 +1,70 @@
+name:		random
+version:	1.1
+
+
+
+
+license:	BSD3
+license-file:	LICENSE
+maintainer:	core-libraries-committee@haskell.org
+bug-reports:	https://github.com/haskell/random/issues
+synopsis:	random number library
+category:       System
+description:
+	This package provides a basic random number generation
+	library, including the ability to split random number
+	generators.
+
+extra-source-files:
+  .travis.yml
+  README.md
+  CHANGELOG.md
+  .gitignore
+  .darcs-boring
+
+
+
+build-type: Simple
+-- cabal-version 1.8 needed because "the field 'build-depends: random' refers
+-- to a library which is defined within the same package"
+cabal-version: >= 1.8
+
+
+
+Library
+    exposed-modules:
+        System.Random
+    extensions:	CPP
+    GHC-Options: -O2
+    build-depends: base >= 3 && < 5, time
+
+source-repository head
+    type:     git
+    location: https://github.com/haskell/random.git
+
+-- To run the Test-Suite:
+-- $ cabal configure --enable-tests
+-- $ cabal test --show-details=always --test-options="+RTS -M1M -RTS"
+
+Test-Suite T7936
+    type:           exitcode-stdio-1.0
+    main-is:        T7936.hs
+    hs-source-dirs: tests
+    build-depends:  base >= 3 && < 5, random
+    ghc-options:    -rtsopts -O2
+
+Test-Suite TestRandomRs
+    type:           exitcode-stdio-1.0
+    main-is:        TestRandomRs.hs
+    hs-source-dirs: tests
+    build-depends:  base >= 3 && < 5, random
+    ghc-options:    -rtsopts -O2
+    -- TODO. Why does the following not work?
+    --test-options:   +RTS -M1M -RTS
+
+Test-Suite TestRandomIOs
+    type:           exitcode-stdio-1.0
+    main-is:        TestRandomIOs.hs
+    hs-source-dirs: tests
+    build-depends:  base >= 3 && < 5, random
+    ghc-options:    -rtsopts -O2

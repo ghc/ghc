@@ -1,0 +1,12 @@
+
+mono.hs:7:4: error:
+    • Couldn't match type ‘Bool’ with ‘Int’
+      Expected type: [Bool]
+        Actual type: [Int]
+    • In the pattern: Single x
+      In an equation for ‘f’: f (Single x) = x
+
+mono.hs:7:16: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    • In the expression: x
+      In an equation for ‘f’: f (Single x) = x

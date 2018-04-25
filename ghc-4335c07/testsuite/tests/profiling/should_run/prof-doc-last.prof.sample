@@ -1,0 +1,34 @@
+	Sat Jun  4 11:59 2016 Time and Allocation Profiling Report  (Final)
+
+	   prof-doc-last +RTS -hc -p -RTS
+
+	total time  =        0.12 secs   (121 ticks @ 1000 us, 1 processor)
+	total alloc = 384,052,480 bytes  (excludes profiling overheads)
+
+COST CENTRE  MODULE SRC                       %time %alloc
+
+main.ys      Main   prof-doc-last.hs:3:15-31   39.7   37.5
+last_init_ys Main   prof-doc-last.hs:7:45-58   23.1   29.2
+main.xs      Main   prof-doc-last.hs:2:15-31   23.1   18.7
+last_init_xs Main   prof-doc-last.hs:5:46-59   11.6   14.6
+last_xs      Main   prof-doc-last.hs:4:41-47    1.7    0.0
+
+
+                                                                                      individual      inherited
+COST CENTRE    MODULE                SRC                           no.     entries  %time %alloc   %time %alloc
+
+MAIN           MAIN                  <built-in>                     46          0    0.0    0.0   100.0  100.0
+ CAF           Main                  <entire-module>                91          0    0.0    0.0     0.0    0.0
+  main         Main                  prof-doc-last.hs:(2,1)-(7,58)  92          1    0.0    0.0     0.0    0.0
+ CAF           GHC.IO.Handle.FD      <entire-module>                86          0    0.0    0.0     0.0    0.0
+ CAF           GHC.IO.Handle.Text    <entire-module>                85          0    0.0    0.0     0.0    0.0
+ CAF           GHC.Conc.Signal       <entire-module>                81          0    0.0    0.0     0.0    0.0
+ CAF           GHC.IO.Encoding       <entire-module>                78          0    0.0    0.0     0.0    0.0
+ CAF           GHC.IO.Encoding.Iconv <entire-module>                65          0    0.0    0.0     0.0    0.0
+ main          Main                  prof-doc-last.hs:(2,1)-(7,58)  93          0    0.0    0.0   100.0  100.0
+  last_init_xs Main                  prof-doc-last.hs:5:46-59       96          1   11.6   14.6    11.6   14.6
+  last_init_ys Main                  prof-doc-last.hs:7:45-58       99          1   23.1   29.2    23.1   29.2
+  last_xs      Main                  prof-doc-last.hs:4:41-47       94          1    1.7    0.0     1.7    0.0
+  last_ys      Main                  prof-doc-last.hs:6:41-47       97          1    0.8    0.0     0.8    0.0
+  main.xs      Main                  prof-doc-last.hs:2:15-31       95          1   23.1   18.7    23.1   18.7
+  main.ys      Main                  prof-doc-last.hs:3:15-31       98          1   39.7   37.5    39.7   37.5

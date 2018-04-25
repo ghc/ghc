@@ -1,0 +1,9 @@
+
+T14380.hs:8:15: error:
+    Invalid right-hand side of bidirectional pattern synonym ‘Bar’:
+      Pattern ‘[]’ is not invertible
+      Suggestion: instead use an explicitly bidirectional pattern synonym, e.g.
+        pattern Bar <- Foo [] where Bar = ...
+      Reason: rebindable syntax is on.
+      This is fixable: add use-case to Trac #14380
+    RHS pattern: Foo []

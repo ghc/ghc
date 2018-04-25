@@ -1,0 +1,4 @@
+
+T3263.hs:8:12: warning: [-Wunused-do-bind (in -Wall)]
+    A do-notation statement discarded a result of type ‘Char’
+    Suppress this warning by saying ‘_ <- getChar’

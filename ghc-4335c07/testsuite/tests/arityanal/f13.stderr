@@ -1,0 +1,17 @@
+***expensive e1 0
+
+==================== IdInfo ====================
+lvl_s1AR :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lvl_s1AQ :: GHC.Num.Integer :: [*
+				Str: DmdType]
+F13.f13 :: forall a_a19A a_a1gc.
+	   (GHC.Num.Num a_a19A,
+	    GHC.Base.Ord a_a19A,
+	    GHC.Num.Num a_a1gc,
+	    GHC.Num.Num (a_a19A -> a_a1gc -> a_a1gc)) =>
+	   a_a19A -> a_a1gc -> a_a1gc -> a_a1gc :: [Arity 6
+						    0 -> 0 -> 0 -> 0 -> 0 -> 0 -> 0 -> *
+						    Str: DmdType LLLLLL]
+
+

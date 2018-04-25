@@ -1,0 +1,15 @@
+***Arity is changed as occur in Lambda: polyzufail_s1tt{v} 1 0
+
+==================== IdInfo ====================
+poly_fail_s1tt :: forall a_a175. [a_a175] :: [*
+					      Str: DmdType b]
+Prim.zipWith2 :: forall a_a16Z a_a171 a_a175.
+		 (a_a16Z -> a_a171 -> a_a175) -> [a_a16Z] -> [a_a171] -> [a_a175] :: [Arity 3
+										      0 -> 0 -> 0 -> *
+										      Str: DmdType LSS]
+Prim.map2 :: forall a_a17C a_a17G.
+	     (a_a17C -> a_a17G) -> [a_a17C] -> [a_a17G] :: [Arity 2
+							    0 -> 0 -> *
+							    Str: DmdType LS]
+
+

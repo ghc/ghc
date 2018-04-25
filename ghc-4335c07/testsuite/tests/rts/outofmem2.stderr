@@ -1,0 +1,3 @@
+outofmem2: Heap exhausted;
+outofmem2: Current maximum heap size is 5242880 bytes (5 MB).
+outofmem2: Use `+RTS -M<size>' to increase it.

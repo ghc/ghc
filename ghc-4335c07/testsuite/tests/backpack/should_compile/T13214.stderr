@@ -1,0 +1,18 @@
+[1 of 5] Processing p
+  [1 of 3] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 3] Compiling B                ( p/B.hs, nothing )
+  [3 of 3] Compiling H[sig]           ( p/H.hsig, nothing )
+[2 of 5] Processing q
+  Instantiating q
+  [1 of 2] Compiling A                ( q/A.hs, T13214.out/q/A.o )
+  [2 of 2] Compiling A2               ( q/A2.hs, T13214.out/q/A2.o )
+[3 of 5] Processing r1
+  [1 of 2] Compiling H[sig]           ( r1/H.hsig, nothing )
+  [2 of 2] Compiling C                ( r1/C.hs, nothing )
+[4 of 5] Processing r2
+  [1 of 2] Compiling H[sig]           ( r2/H.hsig, nothing )
+  [2 of 2] Compiling C                ( r2/C.hs, nothing )
+[5 of 5] Processing r3
+  [1 of 3] Compiling X[sig]           ( r3/X.hsig, nothing )
+  [2 of 3] Compiling H[sig]           ( r3/H.hsig, nothing )
+  [3 of 3] Compiling D                ( r3/D.hs, nothing )

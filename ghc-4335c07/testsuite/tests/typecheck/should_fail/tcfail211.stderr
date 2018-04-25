@@ -1,0 +1,12 @@
+
+tcfail211.hs:5:1: error:
+    • Illegal implicit parameter ‘?imp::Int’
+    • In the context: ?imp::Int
+      While checking the super-classes of class ‘D’
+      In the class declaration for ‘D’
+
+tcfail211.hs:8:10: error:
+    • Illegal implicit parameter ‘?imp::Int’
+    • In the context: ?imp::Int
+      While checking an instance declaration
+      In the instance declaration for ‘D Int’

@@ -1,0 +1,13 @@
+[1 of 3] Processing r
+  [1 of 2] Compiling H[sig]           ( r/H.hsig, nothing )
+  [2 of 2] Compiling M                ( r/M.hs, nothing )
+[2 of 3] Processing h-impl
+  Instantiating h-impl
+  [1 of 2] Compiling A                ( h-impl/A.hs, bkp18.out/h-impl/A.o )
+  [2 of 2] Compiling H                ( h-impl/H.hs, bkp18.out/h-impl/H.o )
+[3 of 3] Processing s
+  Instantiating s
+  [1 of 1] Including r[H=h-impl:H]
+    Instantiating r[H=h-impl:H]
+    [1 of 2] Compiling H[sig]           ( r/H.hsig, bkp18.out/r/r-5FYQgnNkfSvBT5yogOxPpf/H.o )
+    [2 of 2] Compiling M                ( r/M.hs, bkp18.out/r/r-5FYQgnNkfSvBT5yogOxPpf/M.o )

@@ -1,0 +1,7 @@
+
+UnsafeWarn06.hs:3:16: warning: [-Wunsafe]
+    ‘UnsafeWarn06’ has been inferred as unsafe!
+    Reason:
+        UnsafeWarn06.hs:8:11: warning:
+            Rule "f" ignored
+            User defined rules are disabled under Safe Haskell

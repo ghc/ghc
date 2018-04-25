@@ -1,0 +1,4 @@
+
+read043.hs:8:5: warning: [-Wtabs (in -Wdefault)]
+    Tab character found here, and in one further location.
+    Please use spaces instead.

@@ -1,0 +1,109 @@
+module
+
+#include "floatop.t"
+#include "gamtebType.t"
+#include "consts.t"
+#include "utils.t"
+#include "distance.t"
+#include "roulSplit.t"
+#include "photoElec.t"
+#include "compton.t"
+#include "pair.t"
+
+export transPort;
+
+
+rec	-- transport a particle
+	-- transPort :: Particle -> Prob -> ([Result], [Stat])
+
+    transPort (Part pos dir w e eIndx cell seed)
+	  (prob as Pr pComp pPair pPhot pTot) trace =
+	let (r, r1) = genRand seed in
+	let (dSurf, surf) = distSurf pos dir in
+	let dColl = (float0 .- (log r ./ pTot)) in
+	let trace = trace @ ("Tport: " @
+		"dSurf: " @ showFloat dSurf @ " surf: " @
+		show_int surf @ " dColl: " @ showFloat dColl @ "\n") in
+	if (dColl < dSurf)
+	  then 		-- collision in cylinder
+	    let pos' = transPos pos dir dColl in
+	    let p = Part pos' dir w e eIndx cell seed in
+	    let doCompton = (r1 < (pComp ./ (pTot .- pPhot))) in
+	    let (res, stat, trace) = collision p prob doCompton trace in
+	    (res, [St nc float1] @ stat, trace)
+	  else 		-- no collision in cylinder
+	    let pos' = transPos pos dir dSurf in
+	    let p = Part pos' dir w e eIndx cell seed in
+	    let (res, stat, trace) = noCollision p prob surf trace in
+	    (res, [St nnc float1] @ stat, trace)
+
+
+and	-- no collision inside cylinder
+	-- noCollision :: Particle -> Prob -> Int -> ([Result], [Stat])
+
+    noCollision (p as Part pos dir w e eIndx cell seed) prob surf trace =
+	case surf in
+	    1:  let trace = trace @ "scatter\n" in
+		([Res scatter eIndx w], [St ns float1], trace)
+	||  2:	let trace = trace @ "escape\n" in
+		([Res escape eIndx w], [St ne float1], trace)
+	||  4:	let trace = trace @ "transit\n" in
+		([Res transit eIndx w], [St nt float1], trace)
+	||  3:	-- cross internal surface
+		-- particle will split, die in russian roulette, or continue
+		-- cell = [1..] causes roulet or split to alternate
+		if (cell = 1)
+	    	  then
+		    let trace = trace @ "split\n" in
+		    let (p1, p2) = split p in
+		    let (r1, s1, trace) = transPort p1 prob trace in
+		    let (r2, s2, trace) = transPort p2 prob trace in
+		    (r1 @ r2, [St nsp float1] @ s1 @ s2, trace)
+	    	  else
+		    let trace = trace @ "roulet\n" in
+		    let (p', stat, roulKill) = roulet p in
+		    if (roulKill)
+	    	      then ([], stat, trace)
+	    	      else let (res, stat', trace) = transPort p' prob trace in
+			   (res, stat @ stat', trace)
+	end
+
+
+and	-- collision is in cylinder, do collision physics
+	-- collision :: Particle -> Prob -> Bool-> ([Result], [Stat])
+
+    collision p prob doCompton trace =
+	let (Part pos dir w e eIndx cell seed) = p in
+	let (Pr pComp pPair pPhot pTot) = prob in
+	let (p, absorb, wgtKill) = photoElec p prob in
+	if (wgtKill ) 
+	  then 
+		let trace = trace @ "weightkill\n" in
+	        ([], [St nwk float1], trace)
+	  else
+	    if (doCompton)
+	      then	-- compton scattering
+		let trace = trace @ "compton\n" in
+		let (p', prob', cut) = compton p in
+	    	if cut
+		    then ([], [St nek float1], trace)
+		    else transPort p' prob' trace
+	      else	-- pair production
+		let trace = trace @ "pair\n" in
+		let (p', prob', cut) = pair p in
+	    	if cut 
+		    then ([], [St nek float1], trace)
+		    else transPort p' prob' trace
+
+
+and	-- translate a particle position
+	-- transPos :: Point -> Point -> Float -> Point
+
+    transPos (Pt x y z) (Pt u v w) dist = 
+	let x = x .+ (u .* dist) in
+	let y = y .+ (v .* dist) in
+	let z = z .+ (w .* dist) in
+	(Pt x y z)
+
+
+end

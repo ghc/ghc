@@ -1,0 +1,32 @@
+[1 of 1] Processing p
+  [1 of 3] Compiling H1[sig]          ( p/H1.hsig, nothing )
+  [2 of 3] Compiling H2[sig]          ( p/H2.hsig, nothing )
+  [3 of 3] Compiling M                ( p/M.hs, nothing )
+
+bkpfail24.bkp:14:15: error:
+    • Could not deduce: a ~ b
+      from the context: {H1.T} ~ {H2.T}
+        bound by the type signature for:
+                   f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b
+        at bkpfail24.bkp:13:9-34
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b
+        at bkpfail24.bkp:13:9-34
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b
+        at bkpfail24.bkp:13:9-34
+    • In the expression: x
+      In an equation for ‘f’: f x = x
+    • Relevant bindings include
+        x :: a (bound at bkpfail24.bkp:14:11)
+        f :: a -> b (bound at bkpfail24.bkp:14:9)
+
+bkpfail24.bkp:19:15: error:
+    • Couldn't match expected type ‘{H2.T}’
+                  with actual type ‘{H1.T}’
+      NB: ‘{H1.T}’ is defined at bkpfail24.bkp:4:9-14
+          ‘{H2.T}’ is defined at bkpfail24.bkp:6:9-14
+    • In the expression: x
+      In an equation for ‘g’: g x = x

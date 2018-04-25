@@ -1,0 +1,11 @@
+
+tcfail097.hs:5:6: error:
+    • Could not deduce (Eq a0)
+      from the context: Eq a
+        bound by the type signature for:
+                   f :: forall a. Eq a => Int -> Int
+        at tcfail097.hs:5:6-23
+      The type variable ‘a0’ is ambiguous
+    • In the ambiguity check for ‘f’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature: f :: Eq a => Int -> Int

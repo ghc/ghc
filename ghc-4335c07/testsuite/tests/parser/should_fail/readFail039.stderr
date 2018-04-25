@@ -1,0 +1,6 @@
+
+readFail039.hs:8:14: error:
+    Can't make a derived instance of ‘C Foo’:
+      ‘C’ is not a stock derivable class (Eq, Show, etc.)
+      Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+    In the newtype declaration for ‘Foo’

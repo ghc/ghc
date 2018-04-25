@@ -1,0 +1,8 @@
+
+T12918a.hs:8:11: error:
+    • The default type signature for fresh:
+        forall (t :: (* -> *) -> * -> *). MonadTrans t => t m Integer
+      does not match its corresponding non-default type signature
+    • When checking the class method:
+        fresh :: forall (m :: * -> *). MonadSupply m => m Integer
+      In the class declaration for ‘MonadSupply’

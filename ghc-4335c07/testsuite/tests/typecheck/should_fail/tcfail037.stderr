@@ -1,0 +1,7 @@
+
+tcfail037.hs:7:11: error:
+    Ambiguous occurrence ‘+’
+    It could refer to either ‘Prelude.+’,
+                             imported from ‘Prelude’ at tcfail037.hs:3:8-17
+                             (and originally defined in ‘GHC.Num’)
+                          or ‘ShouldFail.+’, defined at tcfail037.hs:10:5

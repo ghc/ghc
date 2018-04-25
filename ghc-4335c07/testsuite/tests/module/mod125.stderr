@@ -1,0 +1,5 @@
+
+mod125.hs:7:5: error:
+    Data constructor not in scope: T
+    Perhaps you want to remove ‘T’ from the explicit hiding list
+    in the import of ‘Mod125_A’ (mod125.hs:4:1-26).

@@ -1,0 +1,5 @@
+
+M.hs:4:5: error:
+    • No instance for (Show T) arising from a use of ‘show’
+    • In the expression: show
+      In an equation for ‘f’: f = show

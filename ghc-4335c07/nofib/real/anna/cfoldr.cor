@@ -1,0 +1,157 @@
+list a ::= Nil | Cons a (list a); ;;
+{
+type Ans == num ;
+
+
+dec Cfoldr, Cfoldl : (alpha -> beta -> (beta -> Ans) -> Ans)
+                   # (list alpha)
+                   # beta
+                   # (beta -> Ans)
+                     -> Ans ;
+}
+
+cfoldr f l b consume
+   = case l of
+        Nil -> consume b;
+        Cons a as -> cfoldr f as b (\x -> f a x consume)
+     end;
+{
+--- Cfoldr( f, [], b, consume ) <= consume b ;
+
+--- Cfoldr( f, a::as, b, consume )
+    <= Cfoldr( f, as, b, lambda x => ((f a) x) consume end ) ;
+}
+cfoldl f l b consume
+   = case l of
+        Nil -> consume b;
+        Cons a as -> f a b (\x -> cfoldl f as x consume)
+     end;
+
+{
+--- Cfoldl( f, [], b, consume ) <= consume b ;
+
+--- Cfoldl( f, a::as, b, consume )
+    <= ((f a) b) lambda x => Cfoldl( f, as, x, consume ) end ;
+}
+capp l ys cont
+   = case l of
+        Nil -> cont ys;
+        Cons x xs -> capp xs ys (\zs -> cont (Cons x zs))
+     end;
+
+{
+dec Capp : (list alpha) -> (list alpha) -> ((list alpha) -> Ans) -> Ans ;
+
+--- Capp [] <= lambda ys => lambda cont => cont ys end end ;
+
+--- Capp (x::xs)
+    <= lambda ys => lambda cont =>
+       ((Capp xs) ys) lambda zs => cont( x::zs ) end ;
+}
+
+ccat ass cont
+   = cfoldr capp ass Nil cont;
+
+{
+dec Ccat : (list(list alpha)) # ((list alpha) -> Ans) -> Ans ;
+
+--- Ccat( ass, cont )
+    <= Cfoldr( Capp,
+               ass,
+               [],
+               cont
+             ) ;
+}
+
+crevcat ass cont
+   = cfoldl capp ass Nil cont;
+
+{
+dec Crevcat : (list(list alpha)) # ((list alpha) -> Ans) -> Ans ;
+
+--- Crevcat( ass, cont )
+    <= Cfoldl( Capp,
+               ass,
+               [],
+               cont
+             ) ;
+}
+
+kk a b = a;
+
+{
+dec K : alpha -> beta -> alpha ;
+
+--- K a <= lambda b => a end ;
+}
+isnil l
+   = case l of 
+        Nil -> 1;
+        Cons a as -> 0
+     end;
+
+{
+dec isnil : (list alpha) -> num ;
+
+--- isnil [] <= 1 ;
+
+--- isnil( a::as ) <= 0 ;
+}
+
+length l
+   = case l of
+        Nil -> 0;
+        Cons a as -> 1 + length as
+     end;
+
+{
+dec length : (list alpha) -> num ;
+
+--- length [] <= 0 ;
+
+--- length( a::as ) <= 1 + (length as) ;
+}
+
+sum l
+   = case l of
+        Nil -> 0;
+        Cons n ns -> n + sum ns
+     end;
+{
+dec sum : (list num) -> num ;
+
+--- sum [] <= 0 ;
+
+--- sum( n::ns ) <= n + (sum ns) ;
+}
+
+{dec c0, c1, c2, c3, r0, r1, r2, r3 : list(list num) -> num ;}
+
+c0 nss = ccat nss (kk 0);
+{--- c0 nss <= Ccat( nss, K 0 ) ;}
+
+c1 nss = ccat nss isnil;
+{--- c1 nss <= Ccat( nss, isnil ) ;}
+
+c2 nss = ccat nss length;
+{--- c2 nss <= Ccat( nss, length ) ;}
+
+c3 nss = ccat nss sum;
+{--- c3 nss <= Ccat( nss, sum ) ;}
+
+r0 nss = crevcat nss (kk 0);
+{--- r0 nss <= Crevcat( nss, K 0 ) ;}
+
+r1 nss = crevcat nss isnil;
+{--- r1 nss <= Crevcat( nss, isnil ) ;}
+
+r2 nss = crevcat nss length;
+{--- r2 nss <= Crevcat( nss, length ) ;}
+
+r3 nss = crevcat nss sum;
+{--- r3 nss <= Crevcat( nss, sum ) ;}
+
+
+
+{(c0,c1,c2,c3,r0,r1,r2,r3) ;}
+

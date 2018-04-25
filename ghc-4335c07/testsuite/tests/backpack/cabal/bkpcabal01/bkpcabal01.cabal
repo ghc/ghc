@@ -1,0 +1,33 @@
+name:                bkpcabal01
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.25
+
+library impl
+  exposed-modules: H, I
+  build-depends: base
+  hs-source-dirs: impl
+  default-language:    Haskell2010
+
+library p
+  exposed-modules: P
+  signatures: H
+  hs-source-dirs: p
+  build-depends: base
+  default-language:    Haskell2010
+
+library q
+  exposed-modules: Q
+  signatures: I
+  hs-source-dirs: q
+  build-depends: p, impl, base
+  mixins: impl (H)
+  default-language:    Haskell2010
+
+executable exe
+  main-is: Main.hs
+  build-depends: base, q, impl
+  default-language:    Haskell2010

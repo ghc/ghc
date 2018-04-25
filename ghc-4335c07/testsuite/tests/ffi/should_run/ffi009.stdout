@@ -1,0 +1,165 @@
+Testing 5 Int arguments...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing 11 Double arguments...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing 11 mixed arguments...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 1st argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 2nd argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 3rd argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 4th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 5th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 6th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 7th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 8th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 9th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 10th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 11th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+Testing Double as 12th argument, rest Int...
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True

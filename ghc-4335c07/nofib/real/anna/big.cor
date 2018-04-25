@@ -1,0 +1,299 @@
+
+day ::= Monday     |
+        Tuesday    | 
+        Wednesday  |
+        Thursday   |
+        Friday     |
+        Saturday   |
+        Sunday ;
+
+domain ::= Unit  |
+           Lift (domain);
+
+pair a b ::= Pair a b;
+
+list a ::= Nil | Cons a (list a);
+
+tree a ::= Leaf | Branch (tree a) a (tree a);
+
+assoc a b ::= NilAssoc |
+              Assoc a b (assoc a b) ;
+
+;;
+
+z4 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (x+y) (z4 xs ys)
+                     end
+     end;
+
+z6 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (z4 x y) (z6 xs ys)
+                     end
+     end;
+
+z8 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (z6 x y) (z8 xs ys)
+                     end
+     end;
+
+z10 l1 l2
+   = case l1 of
+        Nil -> Nil;
+        Cons x xs -> case l2 of
+                        Nil -> Nil;
+                        Cons y ys -> Cons (z8 x y) (z10 xs ys)
+                     end
+     end;
+
+f2 a b 
+  = case a == 0 of
+       True -> b;
+       False -> f2 b a
+    end;
+
+f3 a b c 
+  = case a == 0 of
+       True -> b;
+       False -> f3 c b a
+    end;
+
+f4 a b c d
+  = case a == 0 of
+       True -> b;
+       False -> f4 d c b a 
+    end;
+
+f5 a b c d e
+  = case a == 0 of
+       True -> b;
+       False -> f5 e d c b a 
+    end;
+
+f6 a b c d e f
+  = case a == 0 of
+       True -> b;
+       False -> f6 f e d c b a 
+    end;
+
+f7 a b c d e f g
+  = case a == 0 of
+       True -> b;
+       False -> f7 g f e d c b a
+    end;
+
+p2 a b                       = a;
+
+p3 a b c                     = a + c;
+
+p4 a b c d                   = a + c;
+
+p5 a b c d e                 = a + c + e;
+
+p6 a b c d e f               = a + c + e;
+
+p7 a b c d e f g             = a + c + e + g;
+
+p8 a b c d e f g h           = a + c + e + g;
+
+p9 a b c d e f g h i         = a + c + e + g + i;
+
+p10 a b c d e f g h i j      = a + c + e + g + i;
+
+p11 a b c d e f g h i j k    = a + c + e + g + i + k;
+
+p12 a b c d e f g h i j k l  = a + c + e + g + i + k;
+
+s2 a b                       = a + b;
+
+s4 a b c d                   = a + b + c + d;
+
+s6 a b c d e f               = a + b + c + d + e + f;
+
+s8 a b c d e f g h           = a + b + c + d + e + f + g + h;
+
+s10 a b c d e f g h i j      = a + b + c + d + e + f + g + h + i + j;
+
+s12 a b c d e f g h i j k l  = a + b + c + d + e + f + g + h + i + j + k + l;
+
+
+l2 a b                       = 37;
+
+l4 a b c d                   = 37;
+
+l6 a b c d e f               = 37;
+
+l8 a b c d e f g h           = 37;
+
+l9 a b c d e f g h i         = 37;
+
+l10 a b c d e f g h i j      = 37;
+
+l12 a b c d e f g h i j k l  = 37;
+
+bottomAny = bottomAny;
+
+             bigs  d l2 = case l2 of
+                                Nil -> Nil;
+                                Cons l2x l2xs ->
+                                   case l2x>d of
+                                      True -> Cons l2x (bigs d l2xs);
+                                      False -> bigs d l2xs
+                                   end
+                             end;
+
+             smalls d l2 = case l2 of
+                                Nil -> Nil;
+                                Cons l2x l2xs ->
+                                   case l2x<=d of
+                                      True -> Cons l2x (smalls d l2xs);
+                                      False -> smalls d l2xs
+                                   end
+                             end;
+
+qsort l = 
+          
+          case l of
+              Nil -> Nil;
+              Cons h t -> append (qsort (smalls h t)) 
+                                 (Cons h (qsort (bigs h t)))
+          end;
+
+topInt = 42;
+
+domainHeight d
+   = case d of
+        Unit -> 1;
+        Lift d1 -> 1 + domainHeight d1
+     end;
+
+workingHours d
+   = case d of
+        Saturday -> 0;
+        Sunday -> 0;
+        Monday -> 2;
+        Tuesday -> 4;
+        Wednesday -> 5;
+        Thursday -> 3;
+        Friday -> 1
+     end;
+
+incHead l = case l of
+              Nil -> Nil;
+              Cons a as -> Cons (a+1) as
+            end;
+
+tricky a b = case a==0 of
+                True -> b;
+                False -> tricky (a-1) b
+             end;
+
+length x = case x of
+              Nil -> 0;
+              Cons a as -> 1 + length as
+           end;
+
+sum x = case x of
+           Nil -> 0;
+           Cons a as -> a + sum as
+        end;
+
+append x y = case x of
+                Nil -> y;
+                Cons a as -> Cons a (append as y)
+             end;
+
+rev x = case x of
+           Nil -> Nil;
+           Cons a as -> append (rev as) (Cons a Nil)
+        end;
+
+take n l = case l of 
+              Nil -> Nil;
+              Cons x xs -> case (n==0) of
+                              True -> Nil;
+                              False ->  Cons x (take (n-1) xs)
+                           end
+           end;
+
+drop n l = case l of
+              Nil -> Nil;
+              Cons x xs -> case (n==0) of
+                              True -> Cons x xs;
+                              False -> drop (n-1) xs
+                           end
+           end;
+
+first p = case p of Pair a b -> a end;
+
+second p = case p of Pair a b -> b end;
+
+mirror t = case t of
+             Leaf -> Leaf;
+             Branch l x r -> Branch (mirror r) x (mirror l)
+           end;
+
+sumt t = case t of
+            Leaf -> 0;
+            Branch l x r -> sumt l + x + sumt r
+         end;
+
+aLookupDef al key default
+   = case al of
+        NilAssoc -> default;
+        Assoc a b abs -> case a==key of
+                            True -> b;
+                            False -> aLookupDef abs key default
+                         end
+     end;
+
+aDomain al 
+   = case al of
+       NilAssoc -> Nil;
+       Assoc a b abs -> Cons a (aDomain abs)
+     end;
+
+aInverse al
+   = case al of
+       NilAssoc -> NilAssoc;
+       Assoc a b abs -> Assoc b a (aInverse abs)
+     end;
+
+flatten t = case t of
+               Leaf -> Nil;
+               Branch l x r -> append (flatten l) (Cons x (flatten r))
+            end;
+
+insert x t = case t of
+                Leaf -> Branch Leaf x Leaf;
+                Branch l x1 r ->
+                 case x==x1 of
+                    True -> Branch l x1 r;
+                    False -> case x<x1 of
+                                True -> Branch (insert x l) x1 r;
+                                False -> Branch l x1 (insert x r)
+                             end
+                 end
+            end;
+
+listToTree l =
+   letrec ltt = \tr li -> case li of
+                             Nil -> tr;
+                             Cons x xs -> ltt (insert x tr) xs
+                          end
+   in ltt Leaf l;
+
+nodups l = flatten (listToTree l);
+
+

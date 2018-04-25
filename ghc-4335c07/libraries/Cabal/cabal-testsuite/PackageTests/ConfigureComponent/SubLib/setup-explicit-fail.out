@@ -1,0 +1,13 @@
+# Setup configure
+Configuring library 'sublib' for Lib-0.1.0.0..
+# Setup build
+Preprocessing library 'sublib' for Lib-0.1.0.0..
+Building library 'sublib' for Lib-0.1.0.0..
+# Setup copy
+Installing internal library sublib in <PATH>
+# Setup register
+Registering library 'sublib' for Lib-0.1.0.0..
+# Setup configure
+Configuring executable 'exe' for Lib-0.1.0.0..
+setup: Encountered missing dependencies:
+    sublib -any

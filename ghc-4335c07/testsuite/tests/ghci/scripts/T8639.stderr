@@ -1,0 +1,5 @@
+
+<interactive>:1:1: error:
+    Not in scope: ‘H.bit’
+    Perhaps you meant ‘Q.bit’ (imported from T8639)
+    No module named ‘H’ is imported.

@@ -1,0 +1,5 @@
+
+T13487.hs:19:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • GHC panic in 3... 2... 1...
+    • In the expression: K 'a' 'b'
+      In an equation for ‘foo’: foo = K 'a' 'b'

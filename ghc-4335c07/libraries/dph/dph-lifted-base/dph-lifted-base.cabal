@@ -1,0 +1,65 @@
+Name:           dph-lifted-base
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell common definitions used by other dph-lifted packages.
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel.PArray.Types
+        Data.Array.Parallel.PArray.Reference
+        Data.Array.Parallel.PArray.Reference.Convert
+        Data.Array.Parallel.PArr
+        
+  Exposed:
+        False
+
+  Extensions:
+        BangPatterns,
+        PatternGuards
+        TypeFamilies,
+        TypeOperators,
+        RankNTypes,
+        BangPatterns,
+        MagicHash,
+        UnboxedTuples,
+        TypeOperators,
+        FlexibleContexts,
+        FlexibleInstances,
+        EmptyDataDecls,
+        NoMonomorphismRestriction,
+        MultiParamTypeClasses,
+        EmptyDataDecls,
+        StandaloneDeriving,
+        ExplicitForAll,
+        ParallelListComp,
+        ExistentialQuantification,
+        ScopedTypeVariables,
+        PatternGuards,
+        DeriveDataTypeable
+
+  GHC-Options:
+        -Odph 
+        -fcpr-off -fno-liberate-case -fno-spec-constr
+        -Wall
+        -fno-warn-missing-methods
+        -fno-warn-orphans
+
+  Build-Depends:  
+        base                    == 4.8.*,
+        ghc                     == 7.*,
+        array                   == 0.5.*,
+        random                  == 1.0.*,
+        template-haskell        == 2.10.*,
+        dph-base                == 0.8.*,
+        dph-prim-par            == 0.8.*,
+        vector                  == 0.11.*,
+        pretty                  == 1.1.*,
+        containers              == 0.5.*

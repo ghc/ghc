@@ -1,0 +1,22 @@
+[1 of 5] Processing h
+  [1 of 1] Compiling H[sig]           ( h/H.hsig, nothing )
+[2 of 5] Processing t-impl
+  Instantiating t-impl
+  [1 of 1] Compiling T                ( t-impl/T.hs, bkpfail05.out/t-impl/T.o )
+[3 of 5] Processing p
+  [1 of 1] Compiling H[sig]           ( p/H.hsig, nothing )
+[4 of 5] Processing h-impl
+  Instantiating h-impl
+  [1 of 1] Including t-impl
+  [1 of 1] Compiling H                ( h-impl/H.hs, bkpfail05.out/h-impl/H.o )
+[5 of 5] Processing q
+  Instantiating q
+  [1 of 1] Including p[H=h-impl:H]
+    Instantiating p[H=h-impl:H]
+    [1 of 2] Including h[H=h-impl:H]
+      Instantiating h[H=h-impl:H]
+      [1 of 1] Compiling H[sig]           ( h/H.hsig, bkpfail05.out/h/h-5FYQgnNkfSvBT5yogOxPpf/H.o )
+
+bkpfail05.out/h/h-5FYQgnNkfSvBT5yogOxPpf/../H.hi:1:1: error:
+    • ‘T1’ is exported by the hsig file, but not exported by the implementing module ‘h-impl:H’
+    • while checking that h-impl:H implements signature H in h[H=h-impl:H]

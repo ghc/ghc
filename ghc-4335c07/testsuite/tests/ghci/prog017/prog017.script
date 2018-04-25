@@ -1,0 +1,136 @@
+:load TopLevel
+
+:complete repl ".."
+-- 9 results from all modules including submodules
+
+:complete repl "..+"
+-- should list completions from all modules including submodules
+
+:complete repl "..+="
+-- should list one result
+
+:complete repl "Lev"
+-- should list completions from submodules
+
+:complete repl "Level1"
+-- should list completions from submodule
+
+:complete repl "Level1."
+-- should give same results
+
+:complete repl "..>"
+
+:complete repl "..!"
+
+-- for all Unicode tests should be returned list of two results
+
+-- General Punctuation
+:complete repl "⁐"
+
+-- currencySymbolR
+:complete repl "₽"
+
+-- letterLikeSymbolR
+:complete repl "⅀"
+
+-- enclosedAlphanumericsR
+:complete repl "⒡"
+
+-- enclosedAlphanumericSupplementR
+:complete repl "🄐"
+
+-- enclosedIdeographicSupplementR
+:complete repl "🈐"
+
+-- arrowsR
+:complete repl "←"
+
+-- supplementalArrowsAR
+:complete repl "⟹"
+
+-- supplementalArrowsBR
+:complete repl "⤴"
+
+-- supplementalArrowsCR
+:complete repl "🡘"
+
+-- miscellaneousSymbolsAndArrowsR
+:complete repl "⬤"
+
+-- dingbatArrowsR
+:complete repl "➾"
+
+-- mathematicalOperators
+:complete repl "∀"
+
+-- miscellaneousMathematicalSymbolsAR
+:complete repl "⟑"
+
+-- miscellaneousMathematicalSymbolsBR
+:complete repl "⧦"
+
+-- supplementalMathematicalOperatorsR
+:complete repl "⨶"
+
+-- mathematicalAlphanumericSymbolsR
+:complete repl "𝛌"
+
+-- miscellaneousTechnicalR
+:complete repl "⌘"
+
+-- controlPicturesR
+:complete repl "␘"
+
+-- characterRecognitionR
+:complete repl "⑁"
+
+-- byzantineMusicalSymbolsR
+:complete repl "𝀐"
+
+-- musicalSymbolsR
+:complete repl "𝄢"
+
+-- ancientGreekMusicalNotationR
+:complete repl "𝉀"
+
+-- mahjongTilesR
+:complete repl "🀐"
+
+-- dominoTilesR
+:complete repl "🀱"
+
+-- playingCardsR
+:complete repl "🂿"
+
+-- miscellaneousSymbolsR
+:complete repl "☀"
+
+-- miscellaneousSymbolsAndPictographsR
+:complete repl "🌓"
+
+-- transportAndMapSymbolsR
+:complete repl "🚭"
+
+-- dingbatsR
+:complete repl "✔"
+
+-- boxDrawingR
+:complete repl "━"
+
+-- blockElementsR
+:complete repl "▙"
+
+-- geometricShapesR
+:complete repl "△"
+
+-- geometricShapesExtendedR
+:complete repl "🞋"
+
+-- ornamentalDingbatsR
+:complete repl "🙫"
+
+-- arabicMathematicalAlphabeticSymbolsR
+:complete repl "𞺂"
+
+-- alchemicalSymbolsR
+:complete repl "🜄"

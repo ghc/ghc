@@ -1,0 +1,12 @@
+name: q
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.2
+
+library
+  exposed-modules: QQ
+  build-depends: base
+
+executable qexe
+  main-is: Main.hs
+  other-modules: QMain

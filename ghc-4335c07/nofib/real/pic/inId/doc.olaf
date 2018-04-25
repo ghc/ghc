@@ -1,0 +1,42 @@
+pic_top ncells nparticles n_steps
+    init_particles nparticles ncells
+	grand
+    pict particles ncells n_steps
+	pic particles ncells n_steps
+	    log_2
+	    init_phi particles ncells max_depth
+		charge_density particles ncells
+		zeros ncells
+		solve_for_potential phi0 rho ncells max_depth 1
+	    take_time_step particles phi ncells dt depth
+
+		Phase I:
+		charge_density particles ncells
+		    locate
+
+		Phase II:
+		solve_for_potential phi rho ncells depth 1
+		    V_cycle phi rho n depth
+			residual u f n
+			    apply_operator_to_mesh residual_op
+			    laplacian_op
+			project r n
+			zeros n_half
+			V_cycle e0 rcoarse n_half (depth-1)
+			correct
+			    interpolate
+			relax
+			    apply_operator_to_mesh relax_op
+
+		Phase III:
+		e_field new_phi ncells
+		    gradx phi ncells
+			apply_operator_to_mesh gradx_op phi ncells
+		    grady phi ncells
+			apply_operator_to_mesh grady_op phi ncells
+
+		Phase IV:
+		push_particles particles e ncells dt
+		    vel_boundary_conds tvx tvy ncells
+		    posit_boundary_conds tx ty ncells
+		time_step vmax amax

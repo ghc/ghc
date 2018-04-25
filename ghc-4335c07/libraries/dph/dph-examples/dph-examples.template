@@ -1,0 +1,212 @@
+Name:                dph-examples
+Version:             0.8.0.1
+License:             BSD3
+License-file:        LICENSE
+Author:              The DPH Team
+Maintainer:          Ben Lippmeier <benl@ouroborus.net>
+Build-Type:          Simple
+Cabal-Version:       >=1.8
+Stability:           experimental
+Category:            Data Structures
+Homepage:            http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Description:         Data Parallel Haskell example programs.
+Synopsis:            Data Parallel Haskell example programs.
+
+-- Smoke ----------------------------------------------------------------------
+-- examples/smoke/data
+Executable dph-smoke-bool
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised
+  hs-source-dirs: examples/smoke/data/Bool
+  ghc-options:    DPH_OPTIONS
+
+
+-- examples/smoke/prims
+Executable dph-smoke-concat
+  build-depends:  DPH_DEPENDS
+  main-is:        Main.hs
+  other-modules:  Vectorised
+  hs-source-dirs: examples/smoke/prims/Concat
+  ghc-options:    DPH_OPTIONS
+
+
+Executable dph-smoke-sumsq
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vector
+                  Vectorised
+                  Timing Randomish
+  hs-source-dirs: examples/smoke/prims/SumSquares/dph lib
+  ghc-options:    DPH_OPTIONS
+ 
+ 
+Executable dph-smoke-evens
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vector
+                  Vectorised
+                  Timing Randomish
+  hs-source-dirs: examples/smoke/prims/Evens/dph lib
+  ghc-options:    DPH_OPTIONS
+
+
+-- examples/smoke/sharing
+Executable dph-smoke-indices
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised Vector
+  hs-source-dirs: examples/smoke/sharing/Indices lib
+  ghc-options:    DPH_OPTIONS
+ 
+ 
+Executable dph-smoke-rank
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised Util Timing Randomish
+  hs-source-dirs: examples/smoke/sharing/Rank lib
+  ghc-options:    DPH_OPTIONS
+
+
+Executable dph-smoke-reverse
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised Vector Randomish
+  hs-source-dirs: examples/smoke/sharing/Reverse lib
+  ghc-options:    DPH_OPTIONS
+
+
+-- Imaginary ------------------------------------------------------------------
+-- Executable dph-imaginary-primes
+--   Build-depends:  DPH_DEPENDS
+--   Main-is:        Main.hs
+--   other-modules:  Vectorised
+--   hs-source-dirs: examples/imaginary/Primes lib
+--   ghc-options:    DPH_OPTIONS
+
+Executable dph-imaginary-stringsearch
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised
+                  Vector
+                  Timing
+  hs-source-dirs: examples/imaginary/StringSearch lib
+  ghc-options:    DPH_OPTIONS
+
+Executable dph-imaginads
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised
+  hs-source-dirs: examples/imaginary/Words lib
+  ghc-options:    DPH_OPTIONS
+
+
+-- Spectral -------------------------------------------------------------------
+Executable dph-spectral-closestpairs
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vector
+                  Vector1
+                  Vectorised1
+                  Timing
+                  Points2D.Types
+  hs-source-dirs: examples/spectral/ClosestPairs/dph lib
+  ghc-options:    DPH_OPTIONS
+
+Executable dph-spectral-dotp
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vector
+                  Vectorised
+                  Timing Randomish
+  hs-source-dirs: examples/spectral/DotProduct/dph lib
+  ghc-options:    DPH_OPTIONS
+
+
+-- Executable dph-spectral-smvm
+--   Build-depends:  DPH_DEPENDS, repa-flow == 3.2.*
+--   Main-is:        Main.hs
+--   other-modules:  Vectorised
+--                   Vector
+--                   Timing
+--   hs-source-dirs: examples/spectral/SMVM/dph lib
+--   ghc-options:    DPH_OPTIONS
+
+
+Executable dph-spectral-quickhull
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised
+                  Timing Points2D.Types SVG
+  hs-source-dirs: examples/spectral/QuickHull/dph examples/spectral/QuickHull/lib lib
+  ghc-options:    DPH_OPTIONS
+
+
+Executable dph-spectral-quickhull-vector
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  QuickHullIO
+                  QuickHullSplit
+                  QuickHullVector
+                  Timing Points2D.Types SVG
+  hs-source-dirs: examples/spectral/QuickHull/vector examples/spectral/QuickHull/lib lib
+  ghc-options:    DPH_OPTIONS
+
+
+-- Executable dph-spectral-quickhull-handvec
+--   Build-depends:  DPH_DEPENDS, dph-lifted-copy
+--   Main-is:        Main.hs
+--   other-modules:  Handvec
+--                   HandvecWrp
+--                   Timing Points2D.Types SVG
+--   hs-source-dirs: examples/spectral/QuickHull/handvec examples/spectral/QuickHull/lib lib
+--   ghc-options:    DPH_OPTIONS -hide-package dph-lifted-vseg
+
+
+Executable dph-spectral-quicksort
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised
+                  Timing
+  hs-source-dirs: examples/spectral/QuickSort/dph lib
+  ghc-options:    DPH_OPTIONS
+
+
+Executable dph-spectral-quickselect
+  Build-depends:  DPH_DEPENDS
+  Main-is:        Main.hs
+  other-modules:  Vectorised
+                  Vector
+                  Timing
+  hs-source-dirs: examples/spectral/QuickSelect/dph lib
+  ghc-options:    DPH_OPTIONS
+
+
+-- Real -----------------------------------------------------------------------
+--Executable dph-real-nbody-gloss
+--    Main-is:        MainGloss.hs
+--    other-modules:  Common.Dump Common.World Common.Body Common.Util 
+--                     Solver Solver.ListBH.Solver
+--                            Solver.NestedBH.Solver
+--                            Solver.VectorBH.Solver
+--                            Solver.VectorNaive.Solver
+--                     Timing Points2D.Types Points2D.Generate
+--                     System.Console.ParseArgs
+--                     Gloss.MainArgs Gloss.Draw Gloss.Config
+--    Build-depends:  DPH_DEPENDS, gloss == 1.6.*
+--    hs-source-dirs: examples/real/NBody examples/real/NBody/Gloss lib
+--    ghc-options:    DPH_OPTIONS
+
+Executable dph-real-nbody
+    Main-is:        MainBatch.hs
+    other-modules:  Common.Dump Common.World Common.Body Common.Util 
+                    Solver Solver.ListBH.Solver
+                           Solver.NestedBH.Solver
+                           Solver.VectorBH.Solver
+                           Solver.VectorNaive.Solver
+                    Timing Points2D.Types Points2D.Generate
+                    Batch.MainArgs Batch.Config
+    Build-depends:  DPH_DEPENDS
+    hs-source-dirs: examples/real/NBody examples/real/NBody/Batch lib
+    ghc-options:    DPH_OPTIONS
+

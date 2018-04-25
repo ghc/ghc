@@ -1,0 +1,11 @@
+
+mc22.hs:10:26: error:
+    • Occurs check: cannot construct the infinite type: a ~ t a
+      Expected type: [a] -> [t a]
+        Actual type: [t a] -> [t a]
+    • In the expression: take 5
+      In a stmt of a monad comprehension: then group using take 5
+      In the expression:
+        [x + 1 | x <- ["Hello", "World"], then group using take 5]
+    • Relevant bindings include
+        foo :: [t [Char]] (bound at mc22.hs:8:1)

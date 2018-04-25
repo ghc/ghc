@@ -1,0 +1,15 @@
+// Test for proc points
+
+foo () {
+  bits32 x, y, z;
+  if (x<3) {
+    y = 1;
+    foreign "C--" bar() "safe";
+    z = 1;
+  } else {
+    y = 2;
+    foreign "C--" baz() "safe";
+    z = 2;
+  }
+  return (x, y, z);
+}

@@ -1,0 +1,3 @@
+
+T2526.hs:4:1: warning: [-Wmissing-exported-signatures]
+    Top-level binding with no type signature: foo :: Integer

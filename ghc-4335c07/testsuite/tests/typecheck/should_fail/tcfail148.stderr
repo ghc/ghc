@@ -1,0 +1,7 @@
+
+tcfail148.hs:5:28:
+    Expecting one more argument to ‘List’
+    Expected a type, but ‘List’ has kind ‘* -> *’
+    In the type ‘List’
+    In the definition of data constructor ‘Cons’
+    In the data declaration for ‘List’

@@ -1,0 +1,7 @@
+
+T7224.hs:6:19: error:
+    • Expected kind ‘i’, but ‘i’ has kind ‘*’
+    • In the first argument of ‘m’, namely ‘i’
+      In the type signature:
+        ret' :: a -> m i i a
+      In the class declaration for ‘PMonad'’

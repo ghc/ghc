@@ -1,0 +1,689 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Canned Heap-Check and Stack-Check sequences.
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+#include "Updates.h"
+#include "SMPClosureOps.h"
+
+#if defined(__PIC__)
+import pthread_mutex_unlock;
+#endif
+import EnterCriticalSection;
+import LeaveCriticalSection;
+
+/* Stack/Heap Check Failure
+ * ------------------------
+ *
+ * Both heap and stack check failures end up in the same place, so
+ * that we can share the code for the failure case when a proc needs
+ * both a stack check and a heap check (a common case).
+ *
+ * So when we get here, we have to tell the difference between a stack
+ * check failure and a heap check failure.  The code for the checks
+ * looks like this:
+
+        if (Sp - 16 < SpLim) goto c1Tf;
+        Hp = Hp + 16;
+        if (Hp > HpLim) goto c1Th;
+        ...
+    c1Th:
+        HpAlloc = 16;
+        goto c1Tf;
+    c1Tf: jump stg_gc_enter_1 ();
+
+ * Note that Sp is not decremented by the check, whereas Hp is.  The
+ * reasons for this seem to be largely historic, I can't think of a
+ * good reason not to decrement Sp at the check too. (--SDM)
+ *
+ * Note that HpLim may be set to zero arbitrarily by the timer signal
+ * or another processor to trigger a context switch via heap check
+ * failure.
+ *
+ * The job of these fragments (stg_gc_enter_1 and friends) is to
+ *   1. Leave no slop in the heap, so Hp must be retreated if it was
+ *      incremented by the check.  No-slop is a requirement for LDV
+ *      profiling, at least.
+ *   2. If a heap check failed, try to grab another heap block from
+ *      the nursery and continue.
+ *   3. otherwise, return to the scheduler with StackOverflow,
+ *      HeapOverflow, or ThreadYielding as appropriate.
+ *
+ * We can tell whether Hp was incremented, because HpAlloc is
+ * non-zero: HpAlloc is required to be zero at all times unless a
+ * heap-check just failed, which is why the stack-check failure case
+ * does not set HpAlloc (see code fragment above).  So that covers (1).
+ * HpAlloc is zeroed in LOAD_THREAD_STATE().
+ *
+ * If Hp > HpLim, then either (a) we have reached the end of the
+ * current heap block, or (b) HpLim == 0 and we should yield.  Hence
+ * check Hp > HpLim first, and then HpLim == 0 to decide whether to
+ * return ThreadYielding or try to grab another heap block from the
+ * nursery.
+ *
+ * If Hp <= HpLim, then this must be a StackOverflow.  The scheduler
+ * will either increase the size of our stack, or raise an exception if
+ * the stack is already too big.
+ */
+
+#define PRE_RETURN(why,what_next)                       \
+  StgTSO_what_next(CurrentTSO) = what_next::I16;        \
+  StgRegTable_rRet(BaseReg) = why;                      \
+  R1 = BaseReg;
+
+/* Remember that the return address is *removed* when returning to a
+ * ThreadRunGHC thread.
+ */
+
+stg_gc_noregs
+{
+    W_ ret;
+
+    DEBUG_ONLY(foreign "C" heapCheckFail());
+    if (Hp > HpLim) {
+        Hp = Hp - HpAlloc/*in bytes*/;
+        if (HpLim == 0) {
+                ret = ThreadYielding;
+                goto sched;
+        }
+        if (HpAlloc <= BLOCK_SIZE
+            && bdescr_link(CurrentNursery) != NULL) {
+            HpAlloc = 0;
+            CLOSE_NURSERY();
+            Capability_total_allocated(MyCapability()) =
+              Capability_total_allocated(MyCapability()) +
+              BYTES_TO_WDS(bdescr_free(CurrentNursery) -
+                           bdescr_start(CurrentNursery));
+            CurrentNursery = bdescr_link(CurrentNursery);
+            bdescr_free(CurrentNursery) = bdescr_start(CurrentNursery);
+            OPEN_NURSERY();
+            if (Capability_context_switch(MyCapability()) != 0 :: CInt ||
+                Capability_interrupt(MyCapability())      != 0 :: CInt ||
+                (StgTSO_alloc_limit(CurrentTSO) `lt` (0::I64) &&
+                 (TO_W_(StgTSO_flags(CurrentTSO)) & TSO_ALLOC_LIMIT) != 0)) {
+                ret = ThreadYielding;
+                goto sched;
+            } else {
+                jump %ENTRY_CODE(Sp(0)) [];
+            }
+        } else {
+            ret = HeapOverflow;
+            goto sched;
+        }
+    } else {
+        if (CHECK_GC()) {
+            ret = HeapOverflow;
+        } else {
+            ret = StackOverflow;
+        }
+    }
+  sched:
+    PRE_RETURN(ret,ThreadRunGHC);
+    jump stg_returnToSched [R1];
+}
+
+#define HP_GENERIC                              \
+    PRE_RETURN(HeapOverflow, ThreadRunGHC)      \
+    jump stg_returnToSched [R1];
+
+#define BLOCK_GENERIC                           \
+    PRE_RETURN(ThreadBlocked,  ThreadRunGHC)    \
+    jump stg_returnToSched [R1];
+
+#define YIELD_GENERIC                           \
+    PRE_RETURN(ThreadYielding, ThreadRunGHC)    \
+    jump stg_returnToSched [R1];
+
+#define BLOCK_BUT_FIRST(c)                      \
+    PRE_RETURN(ThreadBlocked, ThreadRunGHC)     \
+    R2 = c;                                     \
+    jump stg_returnToSchedButFirst [R1,R2,R3];
+
+#define YIELD_TO_INTERPRETER                    \
+    PRE_RETURN(ThreadYielding, ThreadInterpret) \
+    jump stg_returnToSchedNotPaused [R1];
+
+/* -----------------------------------------------------------------------------
+   Heap checks in thunks/functions.
+
+   In these cases, node always points to the function closure.  This gives
+   us an easy way to return to the function: just leave R1 on the top of
+   the stack, and have the scheduler enter it to return.
+
+   There are canned sequences for 'n' pointer values in registers.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET ( stg_enter, RET_SMALL, W_ info_ptr, P_ closure )
+    return (/* no return values */)
+{
+    ENTER(closure);
+}
+
+__stg_gc_enter_1 (P_ node)
+{
+    jump stg_gc_noregs (stg_enter_info, node) ();
+}
+
+/* -----------------------------------------------------------------------------
+   Canned heap checks for primitives.
+
+   We can't use stg_gc_fun because primitives are not functions, so
+   these fragments let us save some boilerplate heap-check-failure
+   code in a few common cases.
+   -------------------------------------------------------------------------- */
+
+stg_gc_prim (W_ fun)
+{
+    call stg_gc_noregs ();
+    jump fun();
+}
+
+stg_gc_prim_p (P_ arg, W_ fun)
+{
+    call stg_gc_noregs ();
+    jump fun(arg);
+}
+
+stg_gc_prim_pp (P_ arg1, P_ arg2, W_ fun)
+{
+    call stg_gc_noregs ();
+    jump fun(arg1,arg2);
+}
+
+stg_gc_prim_n (W_ arg, W_ fun)
+{
+    call stg_gc_noregs ();
+    jump fun(arg);
+}
+
+INFO_TABLE_RET(stg_gc_prim_p_ll, RET_SMALL, W_ info, P_ arg, W_ fun)
+    /* explicit stack */
+{
+    W_ fun;
+    P_ arg;
+    fun = Sp(2);
+    arg = Sp(1);
+    Sp_adj(3);
+    R1 = arg;
+    jump fun [R1];
+}
+
+stg_gc_prim_p_ll
+{
+    W_ fun;
+    P_ arg;
+    fun = R2;
+    arg = R1;
+    Sp_adj(-3);
+    Sp(2) = fun;
+    Sp(1) = arg;
+    Sp(0) = stg_gc_prim_p_ll_info;
+    jump stg_gc_noregs [];
+}
+
+/* -----------------------------------------------------------------------------
+   Info tables for returning values of various types.  These are used
+   when we want to push a frame on the stack that will return a value
+   to the frame underneath it.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET ( stg_ret_v, RET_SMALL, W_ info_ptr )
+    return (/* no return values */)
+{
+    return ();
+}
+
+INFO_TABLE_RET ( stg_ret_p, RET_SMALL, W_ info_ptr, P_ ptr )
+    return (/* no return values */)
+{
+    return (ptr);
+}
+
+INFO_TABLE_RET ( stg_ret_n, RET_SMALL, W_ info_ptr, W_ nptr )
+    return (/* no return values */)
+{
+    return (nptr);
+}
+
+INFO_TABLE_RET ( stg_ret_f, RET_SMALL, W_ info_ptr, F_ f )
+    return (/* no return values */)
+{
+    return (f);
+}
+
+INFO_TABLE_RET ( stg_ret_d, RET_SMALL, W_ info_ptr, D_ d )
+    return (/* no return values */)
+{
+    return (d);
+}
+
+INFO_TABLE_RET ( stg_ret_l, RET_SMALL, W_ info_ptr, L_ l )
+    return (/* no return values */)
+{
+    return (l);
+}
+
+/* -----------------------------------------------------------------------------
+   Canned heap-check failures for case alts, where we have some values
+   in registers or on the stack according to the NativeReturn
+   convention.
+   -------------------------------------------------------------------------- */
+
+
+/*-- void return ------------------------------------------------------------ */
+
+/*-- R1 is a GC pointer, but we don't enter it ----------------------- */
+
+stg_gc_unpt_r1 return (P_ ptr) /* NB. return convention */
+{
+    jump stg_gc_noregs (stg_ret_p_info, ptr) ();
+}
+
+/*-- R1 is unboxed -------------------------------------------------- */
+
+stg_gc_unbx_r1 return (W_ nptr) /* NB. return convention */
+{
+    jump stg_gc_noregs (stg_ret_n_info, nptr) ();
+}
+
+/*-- F1 contains a float ------------------------------------------------- */
+
+stg_gc_f1 return (F_ f)
+{
+    jump stg_gc_noregs (stg_ret_f_info, f) ();
+}
+
+/*-- D1 contains a double ------------------------------------------------- */
+
+stg_gc_d1 return (D_ d)
+{
+    jump stg_gc_noregs (stg_ret_d_info, d) ();
+}
+
+
+/*-- L1 contains an int64 ------------------------------------------------- */
+
+stg_gc_l1 return (L_ l)
+{
+    jump stg_gc_noregs (stg_ret_l_info, l) ();
+}
+
+/*-- Unboxed tuples with multiple pointers -------------------------------- */
+
+stg_gc_pp return (P_ arg1, P_ arg2)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2);
+}
+
+stg_gc_ppp return (P_ arg1, P_ arg2, P_ arg3)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2,arg3);
+}
+
+stg_gc_pppp return (P_ arg1, P_ arg2, P_ arg3, P_ arg4)
+{
+    call stg_gc_noregs();
+    return (arg1,arg2,arg3,arg4);
+}
+
+/* -----------------------------------------------------------------------------
+   Generic function entry heap check code.
+
+   At a function entry point, the arguments are as per the calling convention,
+   i.e. some in regs and some on the stack.  There may or may not be
+   a pointer to the function closure in R1 - if there isn't, then the heap
+   check failure code in the function will arrange to load it.
+
+   The function's argument types are described in its info table, so we
+   can just jump to this bit of generic code to save away all the
+   registers and return to the scheduler.
+
+   This code arranges the stack like this:
+
+         |        ....         |
+         |        args         |
+         +---------------------+
+         |      f_closure      |
+         +---------------------+
+         |        size         |
+         +---------------------+
+         |   stg_gc_fun_info   |
+         +---------------------+
+
+   The size is the number of words of arguments on the stack, and is cached
+   in the frame in order to simplify stack walking: otherwise the size of
+   this stack frame would have to be calculated by looking at f's info table.
+
+   -------------------------------------------------------------------------- */
+
+__stg_gc_fun /* explicit stack */
+{
+    W_ size;
+    W_ info;
+    W_ type;
+
+    info = %GET_FUN_INFO(UNTAG(R1));
+
+    // cache the size
+    type = TO_W_(StgFunInfoExtra_fun_type(info));
+    if (type == ARG_GEN) {
+        size = BITMAP_SIZE(StgFunInfoExtra_bitmap(info));
+    } else {
+        if (type == ARG_GEN_BIG) {
+#if defined(TABLES_NEXT_TO_CODE)
+            // bitmap field holds an offset
+            size = StgLargeBitmap_size(
+                      TO_W_(StgFunInfoExtraRev_bitmap_offset(info))
+                      + %GET_ENTRY(UNTAG(R1)) /* ### */ );
+#else
+            size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info) );
+#endif
+        } else {
+            size = BITMAP_SIZE(W_[stg_arg_bitmaps + WDS(type)]);
+        }
+    }
+
+#if defined(NO_ARG_REGS)
+    // we don't have to save any registers away
+    Sp_adj(-3);
+    Sp(2) = R1;
+    Sp(1) = size;
+    Sp(0) = stg_gc_fun_info;
+    jump stg_gc_noregs [];
+#else
+    W_ type;
+    type = TO_W_(StgFunInfoExtra_fun_type(info));
+    // cache the size
+    if (type == ARG_GEN || type == ARG_GEN_BIG) {
+        // regs already saved by the heap check code
+        Sp_adj(-3);
+        Sp(2) = R1;
+        Sp(1) = size;
+        Sp(0) = stg_gc_fun_info;
+        // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
+        jump stg_gc_noregs [];
+    } else {
+        jump W_[stg_stack_save_entries + WDS(type)] [*]; // all regs live
+            // jumps to stg_gc_noregs after saving stuff
+    }
+#endif /* !NO_ARG_REGS */
+}
+
+
+/* -----------------------------------------------------------------------------
+   Generic Apply (return point)
+
+   The dual to stg_fun_gc_gen (above): this fragment returns to the
+   function, passing arguments in the stack and in registers
+   appropriately.  The stack layout is given above.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET ( stg_gc_fun, RET_FUN )
+    /* explicit stack */
+{
+    R1 = Sp(2);
+    Sp_adj(3);
+#if defined(NO_ARG_REGS)
+    // Minor optimisation: there are no argument registers to load up,
+    // so we can just jump straight to the function's entry point.
+    jump %GET_ENTRY(UNTAG(R1)) [R1];
+#else
+    W_ info;
+    W_ type;
+
+    info = %GET_FUN_INFO(UNTAG(R1));
+    type = TO_W_(StgFunInfoExtra_fun_type(info));
+    if (type == ARG_GEN || type == ARG_GEN_BIG) {
+        jump StgFunInfoExtra_slow_apply(info) [R1];
+    } else {
+        if (type == ARG_BCO) {
+            // cover this case just to be on the safe side
+            Sp_adj(-2);
+            Sp(1) = R1;
+            Sp(0) = stg_apply_interp_info;
+            jump stg_yield_to_interpreter [];
+        } else {
+            jump W_[stg_ap_stack_entries + WDS(type)] [R1];
+        }
+    }
+#endif
+}
+
+/* -----------------------------------------------------------------------------
+   Yields
+   -------------------------------------------------------------------------- */
+
+stg_yield_noregs
+{
+    YIELD_GENERIC;
+}
+
+/* -----------------------------------------------------------------------------
+   Yielding to the interpreter... top of stack says what to do next.
+   -------------------------------------------------------------------------- */
+
+stg_yield_to_interpreter
+{
+    YIELD_TO_INTERPRETER;
+}
+
+/* -----------------------------------------------------------------------------
+   Blocks
+   -------------------------------------------------------------------------- */
+
+stg_block_noregs
+{
+    BLOCK_GENERIC;
+}
+
+/* -----------------------------------------------------------------------------
+ * takeMVar/putMVar-specific blocks
+ *
+ * Stack layout for a thread blocked in takeMVar/readMVar:
+ *
+ *       ret. addr
+ *       ptr to MVar   (R1)
+ *       stg_block_takemvar_info (or stg_block_readmvar_info)
+ *
+ * Stack layout for a thread blocked in putMVar:
+ *
+ *       ret. addr
+ *       ptr to Value  (R2)
+ *       ptr to MVar   (R1)
+ *       stg_block_putmvar_info
+ *
+ * See PrimOps.cmm for a description of the workings of take/putMVar.
+ *
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET ( stg_block_takemvar, RET_SMALL, W_ info_ptr, P_ mvar )
+    return ()
+{
+    jump stg_takeMVarzh(mvar);
+}
+
+// code fragment executed just before we return to the scheduler
+stg_block_takemvar_finally
+{
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
+    unlockClosure(R3, stg_MVAR_DIRTY_info);
+    R1 = r1;
+    R3 = r3;
+    jump StgReturn [R1];
+}
+
+stg_block_takemvar /* mvar passed in R1 */
+{
+    Sp_adj(-2);
+    Sp(1) = R1;
+    Sp(0) = stg_block_takemvar_info;
+    R3 = R1; // mvar communicated to stg_block_takemvar_finally in R3
+    BLOCK_BUT_FIRST(stg_block_takemvar_finally);
+}
+
+INFO_TABLE_RET ( stg_block_readmvar, RET_SMALL, W_ info_ptr, P_ mvar )
+    return ()
+{
+    jump stg_readMVarzh(mvar);
+}
+
+// code fragment executed just before we return to the scheduler
+stg_block_readmvar_finally
+{
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
+    unlockClosure(R3, stg_MVAR_DIRTY_info);
+    R1 = r1;
+    R3 = r3;
+    jump StgReturn [R1];
+}
+
+stg_block_readmvar /* mvar passed in R1 */
+{
+    Sp_adj(-2);
+    Sp(1) = R1;
+    Sp(0) = stg_block_readmvar_info;
+    R3 = R1; // mvar communicated to stg_block_readmvar_finally in R3
+    BLOCK_BUT_FIRST(stg_block_readmvar_finally);
+}
+
+INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, W_ info_ptr,
+                P_ mvar, P_ val )
+    return ()
+{
+    jump stg_putMVarzh(mvar, val);
+}
+
+// code fragment executed just before we return to the scheduler
+stg_block_putmvar_finally
+{
+    W_ r1, r3;
+    r1 = R1;
+    r3 = R3;
+    unlockClosure(R3, stg_MVAR_DIRTY_info);
+    R1 = r1;
+    R3 = r3;
+    jump StgReturn [R1];
+}
+
+stg_block_putmvar (P_ mvar, P_ val)
+{
+    push (stg_block_putmvar_info, mvar, val) {
+      R3 = R1; // mvar communicated to stg_block_putmvar_finally in R3
+      BLOCK_BUT_FIRST(stg_block_putmvar_finally);
+   }
+}
+
+stg_block_blackhole (P_ node)
+{
+    Sp_adj(-2);
+    Sp(1) = node;
+    Sp(0) = stg_enter_info;
+    BLOCK_GENERIC;
+}
+
+INFO_TABLE_RET ( stg_block_throwto, RET_SMALL, W_ info_ptr,
+                 P_ tso, P_ exception )
+    return ()
+{
+    jump stg_killThreadzh(tso, exception);
+}
+
+stg_block_throwto_finally
+{
+    // unlock the throwto message, but only if it wasn't already
+    // unlocked.  It may have been unlocked if we revoked the message
+    // due to an exception being raised during threadPaused().
+    if (StgHeader_info(StgTSO_block_info(CurrentTSO)) == stg_WHITEHOLE_info) {
+        W_ r1;
+        r1 = R1;
+        unlockClosure(StgTSO_block_info(CurrentTSO), stg_MSG_THROWTO_info);
+        R1 = r1;
+    }
+    jump StgReturn [R1];
+}
+
+stg_block_throwto (P_ tso, P_ exception)
+{
+    push (stg_block_throwto_info, tso, exception) {
+       BLOCK_BUT_FIRST(stg_block_throwto_finally);
+    }
+}
+
+#if defined(mingw32_HOST_OS)
+INFO_TABLE_RET ( stg_block_async, RET_SMALL, W_ info_ptr, W_ ares )
+    return ()
+{
+    W_ len, errC;
+
+    len = TO_W_(StgAsyncIOResult_len(ares));
+    errC = TO_W_(StgAsyncIOResult_errCode(ares));
+    ccall free(ares "ptr");
+    return (len, errC);
+}
+
+stg_block_async
+{
+    Sp_adj(-2);
+    Sp(0) = stg_block_async_info;
+    BLOCK_GENERIC;
+}
+
+/* Used by threadDelay implementation; it would be desirable to get rid of
+ * this free()'ing void return continuation.
+ */
+INFO_TABLE_RET ( stg_block_async_void, RET_SMALL, W_ info_ptr, W_ ares )
+    return ()
+{
+    ccall free(ares "ptr");
+    return ();
+}
+
+stg_block_async_void
+{
+    Sp_adj(-2);
+    Sp(0) = stg_block_async_void_info;
+    BLOCK_GENERIC;
+}
+
+#endif
+
+
+/* -----------------------------------------------------------------------------
+   STM-specific waiting
+   -------------------------------------------------------------------------- */
+
+stg_block_stmwait
+{
+    // When blocking on an MVar we have to be careful to only release
+    // the lock on the MVar at the very last moment (using
+    // BLOCK_BUT_FIRST()), since when we release the lock another
+    // Capability can wake up the thread, which modifies its stack and
+    // other state.  This is not a problem for STM, because STM
+    // wakeups are non-destructive; the waker simply calls
+    // tryWakeupThread() which sends a message to the owner
+    // Capability.  So the moment we release this lock we might start
+    // getting wakeup messages, but that's perfectly harmless.
+    //
+    // Furthermore, we *must* release these locks, just in case an
+    // exception is raised in this thread by
+    // maybePerformBlockedException() while exiting to the scheduler,
+    // which will abort the transaction, which needs to obtain a lock
+    // on all the TVars to remove the thread from the queues.
+    //
+    ccall stmWaitUnlock(MyCapability() "ptr", R3 "ptr");
+    BLOCK_GENERIC;
+}

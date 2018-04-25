@@ -1,0 +1,2 @@
+# Setup configure
+cabal: Version mismatch between ghc and ghc-pkg: <ROOT>/./ghc is version <GHCVER> <ROOT>/bin/ghc-pkg is version 9999999

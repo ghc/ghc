@@ -1,0 +1,7 @@
+
+T12055a.hs:27:1: error:
+    • Non type-variable argument in the constraint: Category (Dom f)
+      (Use FlexibleContexts to permit this)
+    • In the context: (Category (Dom f), Category (Cod f))
+      While checking the super-classes of class ‘Functor’
+      In the class declaration for ‘Functor’

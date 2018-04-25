@@ -1,0 +1,335 @@
+-- Load a minimalist module 100 times
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+:load T4029a
+
+-- Load a minimalist module and reload it 99 times
+:load T4029a
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+:! touch T4029a.hs
+:reload
+
+-- Load a more complex module 10 times
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+:load T4029b
+
+-- Load a more complex module and reload it 9 times
+:load T4029b
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload
+:! touch T4029b.hs
+:reload

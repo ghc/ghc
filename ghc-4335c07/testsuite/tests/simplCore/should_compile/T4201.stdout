@@ -1,0 +1,3 @@
+  {- Arity: 1, HasNoCafRefs, Strictness: <S,1*U()>m,
+     Unfolding: InlineRule (0, True, True)
+                bof `cast` (Sym (N:Foo[0]) ->_R <T>_R) -}

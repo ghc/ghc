@@ -1,0 +1,6 @@
+
+T7943.hs:4:22:
+     Record syntax is illegal here: {bar :: String}
+     In the type ‘{bar :: String}’
+      In the definition of data constructor ‘B’
+      In the data declaration for ‘Foo’

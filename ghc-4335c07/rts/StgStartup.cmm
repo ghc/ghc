@@ -1,0 +1,189 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2012
+ *
+ * Code for starting, stopping and restarting threads.
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+
+/*
+ * This module contains the two entry points and the final exit point
+ * to/from the Haskell world.  We can enter either by:
+ *
+ *   a) returning to the address on the top of the stack, or
+ *   b) entering the closure on the top of the stack
+ *
+ * the function stg_stop_thread_entry is the final exit for a
+ * thread: it is the last return address on the stack.  It returns
+ * to the scheduler marking the thread as finished.
+ */
+
+#define CHECK_SENSIBLE_REGS()                           \
+    ASSERT(Hp != 0);                                    \
+    ASSERT(HpAlloc == 0);                               \
+    ASSERT(Sp != 0);                                    \
+    ASSERT(SpLim != 0);                                 \
+    ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp);
+
+/* -----------------------------------------------------------------------------
+   Returning from the STG world.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
+               W_ info_ptr,
+               PROF_HDR_FIELDS(W_,p1,p2))
+/* no return list: explicit stack layout */
+{
+    /*
+       The final exit.
+
+       The top-top-level closures (e.g., "main") are of type "IO a".
+       When entered, they perform an IO action and return an 'a' in R1.
+
+       We save R1 on top of the stack where the scheduler can find it,
+       tidy up the registers and return to the scheduler.
+
+       We Leave the stack looking like this:
+
+                +----------------+
+                |      -------------------> return value
+                +----------------+
+                | stg_enter_info |
+                +----------------+
+
+       The stg_enter_info is just a dummy info table so that the
+       garbage collector can understand the stack (there must always
+       be an info table on top of the stack).
+    */
+
+    /*
+       Here we setup the stack unwinding annotation necessary to allow
+       debuggers to find their way back to the C stack.
+
+       This is a bit fiddly as we assume the layout of the stack prepared
+       for us by StgRun. Note that in most cases StgRun is written in assembler
+       and therefore has no associated unwind information. For this reason we
+       need to identify the platform stack pointer and return address values for
+       the StgRun's caller.
+     */
+#if defined(x86_64_HOST_ARCH)
+    // offset of 8 in MachSp value due to return address
+    unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE + 8,
+           UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE];
+#else
+    // FIXME: Fill in for other platforms
+    unwind MachSp = return,
+           UnwindReturnReg = return;
+#endif
+
+    Sp = Sp + SIZEOF_StgStopFrame - WDS(2);
+    Sp(1) = R1;
+    Sp(0) = stg_enter_info;
+
+    StgTSO_what_next(CurrentTSO) = ThreadComplete::I16;
+
+    SAVE_THREAD_STATE();
+
+    /* The return code goes in BaseReg->rRet, and BaseReg is returned in R1 */
+    StgRegTable_rRet(BaseReg) = ThreadFinished;
+    R1 = BaseReg;
+
+    jump StgReturn [R1];
+}
+
+/* -----------------------------------------------------------------------------
+   Start a thread from the scheduler by returning to the address on
+   the top of the stack.  This is used for all entries to STG code
+   from C land.
+
+   On the way back, we (usually) pass through stg_returnToSched which saves
+   the thread's state away nicely.
+   -------------------------------------------------------------------------- */
+
+stg_returnToStackTop /* no args: explicit stack layout */
+{
+  LOAD_THREAD_STATE();
+  CHECK_SENSIBLE_REGS();
+  jump %ENTRY_CODE(Sp(0)) [];
+}
+
+stg_returnToSched /* no args: explicit stack layout */
+{
+  W_ r1;
+  r1 = R1; // foreign calls may clobber R1
+  SAVE_THREAD_STATE();
+  foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
+  R1 = r1;
+  jump StgReturn [R1];
+}
+
+// A variant of stg_returnToSched that doesn't call threadPaused() on the
+// current thread.  This is used for switching from compiled execution to the
+// interpreter, where calling threadPaused() on every switch would be too
+// expensive.
+//
+// See Note [avoiding threadPaused] in Interpreter.c
+//
+stg_returnToSchedNotPaused /* no args: explicit stack layout */
+{
+  SAVE_THREAD_STATE();
+  jump StgReturn [R1];
+}
+
+// A variant of stg_returnToSched, but instead of returning directly to the
+// scheduler, we jump to the code fragment pointed to by R2.  This lets us
+// perform some final actions after making the thread safe, such as unlocking
+// the MVar on which we are about to block in SMP mode.
+stg_returnToSchedButFirst /* no args: explicit stack layout */
+{
+  W_ r1, r2, r3;
+  r1 = R1;
+  r2 = R2;
+  r3 = R3;
+  SAVE_THREAD_STATE();
+  // foreign calls may clobber R1/R2/.., so we save them above
+  foreign "C" threadPaused(MyCapability() "ptr", CurrentTSO);
+  R1 = r1;
+  R2 = r2;
+  R3 = r3;
+  jump R2 [R1,R3];
+}
+
+stg_threadFinished /* no args: explicit stack layout */
+{
+  StgRegTable_rRet(BaseReg) = ThreadFinished;
+  R1 = BaseReg;
+  jump StgReturn [R1];
+}
+
+/* -----------------------------------------------------------------------------
+    Strict IO application - performing an IO action and entering its result.
+
+    rts_evalIO() lets you perform Haskell IO actions from outside of
+    Haskell-land, returning back to you their result. Want this result
+    to be evaluated to WHNF by that time, so that we can easily get at
+    the int/char/whatever using the various get{Ty} functions provided
+    by the RTS API.
+
+    stg_forceIO takes care of this, performing the IO action and entering
+    the results that comes back.
+
+    ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET(stg_forceIO, RET_SMALL, P_ info_ptr)
+    return (P_ ret)
+{
+    ENTER(ret);
+}
+
+/* Called when compiled with -falignment-sanitisation on alignment failure */
+stg_badAlignment_entry
+{
+  foreign "C" barf();
+}

@@ -1,0 +1,4 @@
+
+<interactive>:0:1: error:
+    Cycle in type synonym declarations:
+      <interactive>:0:1-10: type A = A

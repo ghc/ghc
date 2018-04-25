@@ -1,0 +1,24 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+unit p where
+    signature H where
+        data T a
+    module M where
+        import H
+        instance Functor T
+
+unit q where
+    module H where
+        -- No good!
+        type T a = a
+
+unit r where
+    dependency p[H=q:H]
+
+{-
+If we get:
+
+     The type synonym ‘T’ should have 1 argument, but has been given none 
+     In the instance declaration for ‘Functor T’
+
+that is too late! Need to catch this earlier.
+-}

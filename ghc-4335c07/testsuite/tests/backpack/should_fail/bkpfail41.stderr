@@ -1,0 +1,22 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B[sig]           ( p/B.hsig, nothing )
+[2 of 3] Processing i
+  Instantiating i
+  [1 of 1] Compiling A                ( i/A.hs, bkpfail41.out/i/A.o )
+[3 of 3] Processing r
+  [1 of 1] Compiling B[sig]           ( r/B.hsig, nothing )
+
+bkpfail41.bkp:10:9: error:
+    • Class ‘C’ has conflicting definitions in the module
+      and its hsig file
+      Main module: class C a where
+                     f :: a -> a
+                     {-# MINIMAL f #-}
+      Hsig file:  class C a where
+                    f :: a -> a
+                    default f :: a -> a
+      The methods do not match:
+        The default methods associated with ‘f’ are not compatible
+      The MINIMAL pragmas are not compatible
+    • while checking that i:A implements signature A in p[A=i:A,B=<B>]

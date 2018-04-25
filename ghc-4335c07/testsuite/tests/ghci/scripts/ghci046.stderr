@@ -1,0 +1,5 @@
+
+<interactive>:7:15: error:
+    Conflicting family instance declarations:
+      AND HTrue HTrue = HTrue -- Defined at <interactive>:7:15
+      AND HTrue HTrue = HFalse -- Defined at <interactive>:20:15

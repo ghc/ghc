@@ -1,0 +1,93 @@
+
+
+atree itemType depthType
+   ::= ALeaf |
+       ABranch (atree itemType depthType) 
+               itemType 
+               (atree itemType depthType) 
+               depthType;
+
+list a ::= Nil | Cons a (list a);
+
+;;
+error = error;
+
+{
+add :: Ord a  =>  ATree a -> a -> ATree a
+
+add ALeaf x = ABranch ALeaf x ALeaf 1
+add (ABranch l y r hy) x
+   | y > x = let (ABranch l1 z l2 _) = add l x
+             in combine l1 (f l1) l2 (f l2) r (f r) z y
+   | x > y = let (ABranch r1 z r2 _) = add r x
+             in combine l (f l) r1 (f r1) r2 (f r2) y z
+   where
+      f ALeaf = 0
+      f (ABranch _ _ _ d) = d
+}
+
+add tree x
+  = let
+       f = \ft -> case ft of ALeaf -> 0; ABranch fl fm fr fd -> fd end
+    in
+      case tree of
+        ALeaf -> ABranch ALeaf x ALeaf 1;
+        ABranch l y r hy ->
+         case y > x of
+           True -> case add l x of ALeaf -> error;
+                      ABranch l1 z l2 dontCare ->
+                       combine l1 (f l1) l2 (f l2) r (f r) z y end;
+           False -> case add r x of ALeaf -> error;
+                      ABranch r1 z r2 dontCare ->
+                       combine l (f l) r1 (f r1) r2 (f r2) y z end
+         end
+      end;
+
+       
+{
+combine ::  ATree a -> Int -> 
+            ATree a -> Int ->
+            ATree a -> Int ->  a -> a ->  ATree a
+
+combine t1 h1 t2 h2 t3 h3 a c
+   | h2 > h1 && h2 > h3
+      = ABranch (ABranch t1 a t21 (h1+1)) b (ABranch t22 c t3 (h3+1)) (h1+2)
+   | h1 >= h2 && h1 >= h3
+      = ABranch t1 a (ABranch t2 c t3 (max1 h2 h3)) (max1 h1 (max1 h2 h3))
+   | h3 >= h2 && h3 >= h1
+      = ABranch (ABranch t1 a t2 (max1 h1 h2)) c t3 (max1 (max1 h1 h2) h3)
+   where
+      (ABranch t21 b t22 _) = t2
+      max1 a b = 1 + (if a > b then a else b)
+}
+
+combine t1 h1 t2 h2 t3 h3 a c
+  = let
+       max1 = \pp qq -> 1 + (case pp > qq of True -> pp; False -> qq end)
+    in
+    case h2 > h1 & h2 > h3 of
+      True -> case t2 of ABranch t21 b t22 dontCare -> ABranch (ABranch t1 a t21 (h1+1)) b (ABranch t22 c t3 (h3+1)) (h1+2); ALeaf -> error end;
+      False ->
+    case h1 >= h2 & h1 >= h3 of
+      True -> ABranch t1 a (ABranch t2 c t3 (max1 h1 h2)) (max1 h1 (max1 h2 h3));
+      False -> ABranch (ABranch t1 a t2 (max1 h1 h2)) c t3 (max1 (max1 h1 h2) h3)
+    end end;
+
+{
+toAVL :: Ord a  =>  [a] -> ATree a
+toAVL [] = ALeaf
+toAVL (x:xs) = add (toAVL xs) x
+}
+
+toAVL l
+ = case l of
+     Nil -> ALeaf;
+     Cons x xs -> add (toAVL xs) x
+   end;
+
+{
+maxd :: ATree a -> Int
+maxd ALeaf = 0
+maxd (ABranch l _ r _) = let dl = maxd l; dr = maxd r
+                         in 1 + (if dl > dr then dl else dr)
+}

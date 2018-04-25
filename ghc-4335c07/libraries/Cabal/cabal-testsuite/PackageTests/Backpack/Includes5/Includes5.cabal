@@ -1,0 +1,25 @@
+name:                Includes5
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Simple
+cabal-version:       >=1.25
+
+library impl
+  build-depends: base
+  exposed-modules: Foobar, Quxbaz
+  hs-source-dirs: impl
+  default-language:    Haskell2010
+
+library good
+  build-depends: base, impl
+  mixins: impl hiding (Foobar)
+  exposed-modules: A
+  default-language:    Haskell2010
+
+library bad
+  build-depends: base, impl, good
+  mixins: impl hiding (Foobar)
+  exposed-modules: B
+  default-language:    Haskell2010

@@ -1,0 +1,6 @@
+
+T13780a.hs:9:40: error:
+    • Expected kind ‘Foo a’, but ‘MkFoo’ has kind ‘Foo Bool’
+    • In the second argument of ‘(~)’, namely ‘MkFoo’
+      In the definition of data constructor ‘SMkFoo’
+      In the data instance declaration for ‘Sing’

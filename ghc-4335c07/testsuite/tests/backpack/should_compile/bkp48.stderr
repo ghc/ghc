@@ -1,0 +1,22 @@
+[1 of 5] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[2 of 5] Processing q
+  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+[3 of 5] Processing r
+  [1 of 1] Compiling A[sig]           ( r/A.hsig, nothing )
+[4 of 5] Processing i
+  Instantiating i
+  [1 of 1] Compiling A                ( i/A.hs, bkp48.out/i/A.o )
+[5 of 5] Processing m
+  Instantiating m
+  [1 of 3] Including r[A=i:A]
+    Instantiating r[A=i:A]
+    [1 of 2] Including p[A=i:A]
+      Instantiating p[A=i:A]
+      [1 of 1] Compiling A[sig]           ( p/A.hsig, bkp48.out/p/p-CtJxD03mJqIIVJzOga8l4X/A.o )
+    [2 of 2] Including q[A=i:A]
+      Instantiating q[A=i:A]
+      [1 of 1] Compiling A[sig]           ( q/A.hsig, bkp48.out/q/q-CtJxD03mJqIIVJzOga8l4X/A.o )
+    [1 of 1] Compiling A[sig]           ( r/A.hsig, bkp48.out/r/r-CtJxD03mJqIIVJzOga8l4X/A.o )
+  [2 of 3] Including p[A=i:A]
+  [3 of 3] Including q[A=i:A]

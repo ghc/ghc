@@ -1,0 +1,16 @@
+# cabal sandbox init
+Writing a default package environment file to <ROOT>/sandbox.dist/cabal.sandbox.config
+Creating a new sandbox at <ROOT>/sandbox.dist/sandbox
+# cabal exec
+cabal: The program 'my-executable' is required but it could not be found.
+# cabal install
+Resolving dependencies...
+Configuring my-0.1...
+Preprocessing executable 'my-executable' for my-0.1..
+Building executable 'my-executable' for my-0.1..
+Preprocessing library for my-0.1..
+Building library for my-0.1..
+Installing executable my-executable in <PATH>
+Installing library in <PATH>
+Installed my-0.1
+# cabal exec

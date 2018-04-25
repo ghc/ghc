@@ -1,0 +1,3 @@
+# Setup configure
+Configuring build-tools-bad-version-0.1.0.0...
+setup: The package has an impossible version range for a dependency on an internal executable: build-tools-bad-version:hello-world >=2. This version range does not include the current package, and must be removed as the current package's executable will always be used.

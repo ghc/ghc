@@ -1,0 +1,12 @@
+
+ExpandSynsFail2.hs:19:37: error:
+    • Couldn't match type ‘Int’ with ‘Bool’
+      Expected type: ST s Foo
+        Actual type: MyBarST s
+      Type synonyms expanded:
+      Expected type: ST s Int
+        Actual type: ST s Bool
+    • In the first argument of ‘runST’, namely ‘barGen’
+      In the second argument of ‘(==)’, namely ‘runST barGen’
+      In the first argument of ‘print’, namely
+        ‘(runST fooGen == runST barGen)’

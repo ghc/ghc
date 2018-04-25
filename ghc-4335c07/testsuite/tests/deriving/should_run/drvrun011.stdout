@@ -1,0 +1,2 @@
+([Commit Nothing,Commit (Just "foo")],[Foo,Baz True],[Boz 3,Boz (-2)])
+([Commit Nothing,Commit (Just "foo")],[Foo,Baz True],[Boz 3,Boz (-2)])

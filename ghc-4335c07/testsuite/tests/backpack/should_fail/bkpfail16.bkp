@@ -1,0 +1,5 @@
+unit p where
+    signature ShouldFail where
+        data Booly
+unit q where
+    dependency p[ShouldFail=base:Data.Bool]

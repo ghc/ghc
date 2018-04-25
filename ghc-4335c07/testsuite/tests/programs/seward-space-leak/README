@@ -1,0 +1,13 @@
+I thought this crashed if compiled without -O, but I
+can't make it do so.
+
+	glhc -darity-checks -C Main.hs
+
+then
+
+	glhc -g -v -optc-O Main.hc -o cg023-reg
+
+It eats 3Gbytes and runs for 10mins but doesn't crash.
+
+
+SLPJ 17 june 93

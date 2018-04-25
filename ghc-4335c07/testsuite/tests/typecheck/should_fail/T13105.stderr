@@ -1,0 +1,6 @@
+
+T13105.hs:22:8: error:
+    A levity-polymorphic type is not allowed here:
+      Type: Rep Int
+      Kind: TYPE (RepRep Int)
+    In the type of binder ‘n’

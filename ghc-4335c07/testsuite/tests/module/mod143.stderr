@@ -1,0 +1,7 @@
+
+mod143.hs:2:21:
+    Conflicting exports for ‘Foo’:
+       ‘module Mod143_A’ exports ‘Mod143_A.Foo’
+         imported from ‘Mod143_A’ at mod143.hs:4:1-15
+         (and originally defined at Mod143_A.hs:3:1-14)
+       ‘module M’ exports ‘M.Foo’ defined at mod143.hs:6:1

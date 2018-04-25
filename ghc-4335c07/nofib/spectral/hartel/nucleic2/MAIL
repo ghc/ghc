@@ -1,0 +1,160 @@
+Date: Mon, 13 Jun 1994 14:04:55 +0200
+Return-Path: <pieter@fwi.uva.nl>
+From: pieter@fwi.uva.nl (Pieter H. Hartel)
+X-Organisation: Faculty of Mathematics & Computer Science University of 
+                Amsterdam Kruislaan 403 NL-1098 SJ Amsterdam The Netherlands
+X-Phone: +31 20 525 7463
+X-Telex: 10262 hef nl
+X-Fax: +31 20 525 7490
+To: Edoardo.Biagioni@cs.cmu.edu, J.A.Sharp@swansea.ac.uk, Pierre.Weis@inria.fr, 
+    Pum@cwi.nl, R.G.Morgan@durham.ac.uk, Xavier.Leroy@inria.fr, 
+    ad@cs.st-andrews.ac.uk, alt@cs.uni-sb.de, arvind@abp.lcs.mit.edu, 
+    augustss@cs.chalmers.se, baumann@ifi.unizh.ch, beemster@fwi.uva.nl, 
+    colin@cs.chalmers.se, cvh@dcs.gla.ac.uk, dat@ukc.ac.uk, 
+    dmg@oceanus.mitre.org, feeley@iro.umontreal.ca, 
+    herbert@informatik.rwth-aachen.de, hg@ecs.southampton.ac.uk, 
+    hudak-paul@cs.yale.edu, jasper@cwi.nl, johnsson@cs.chalmers.se, 
+    jones-mark@cs.yale.edu, jont@harlequin.co.uk, jtod@dcs.gla.ac.uk, 
+    kh@dcs.gla.ac.uk, kurtz@TechFak.Uni-Bielefeld.DE, 
+    loogen@informatik.uni-marburg.de, macqueen@research.att.com, 
+    magnus@cs.chalmers.se, marko@cs.kun.nl, mfx@cs.tu-berlin.de, 
+    mike@erix.ericsson.se, miller@diego.llnl.gov, partain@dcs.gla.ac.uk, 
+    petel@cs.cmu.edu, peterson-john@cs.yale.edu, pieter@fwi.uva.nl, 
+    pohlmann@sunjessen2.informatik.tu-muenchen.de, 
+    richard@schoenfinkel.cs.uwindsor.ca, rinus@cs.kun.nl, rjmh@cs.chalmers.se, 
+    rlpage@mailhost.ecn.uoknor.edu, robert@TechFak.Uni-Bielefeld.DE, 
+    robison@shell.com, rwh@cs.cmu.edu, simon@abstract-hardware-ltd.co.uk, 
+    simonpj@dcs.gla.ac.uk, thiemann@provence.informatik.uni-tuebingen.de, 
+    tofte@diku.dk, truve@cs.chalmers.se, turcotte@iro.UMontreal.ca, 
+    wadler@dcs.gla.ac.uk
+Subject: Request participation pseudo knot benchmark
+
+Dear Colleague,
+
+At the Dagstuhl Workshop on Applications of Functional Programming in
+the Real World in May 1994, the idea came up to benchmark a large
+number of compilers for functional languages using a real program.
+
+I am asking you to contribute to this ``pseudo knot'' benchmark.
+
+The goal is to produce a jointly written paper describing the practical
+use of many of the functional language systems available to date.
+
+There is some work involved, but there are some benefits as well. What
+you would have to do to take part is this.
+
+1) Print a copy of the draft paper, read it carefully and tell me what
+   you think.
+
+2) Port one of the versions of the benchmark program as supplied to
+   your system.
+
+3) Compile your version, and measure its user and system time using the
+   Csh ``time'' command.
+   Run ``ps -v'' to find the maximum space the compiler needs (heading SIZE).
+
+4) Execute your ``a.out'' using ``time repeat 10 a.out'' (or ``time a.out'').
+   Run ``ps -v'' to find the maximum space the binary needs (heading SIZE).
+
+5) If you wish change the program according to the rules in the paper
+   to make it run faster.
+
+6) Compile the C version of the benchmark program using ``cc -O''.
+
+7) Execute the C compiled ``a.out'' and measure its user and system
+   time using ``time repeat 10 a.out'' on the same machine as you have
+   used in steps 3 and 4.
+
+8) Fill in the details concerning your translation, compiler and
+   measurements and send me an updated version of the paper. Please
+   remember to include the bibliographic data for the references you will
+   probably be adding (bibtex or refer format).
+
+9) If possible, send me a compressed, uuencoded copy of your ``a.out''
+   binary (for SUN SPARC, SunOS 4.1.2) so that I can time all versions
+   on one architecture. Do not forget to specify the options to be
+   supplied to the binary.
+
+>From the current experience with a number of ports, the whole exercise
+should cost you no more than two days of work. In return, you will
+become co-author of the paper.
+
+I hope that you are interested. Please let me know about this asap. I
+would like to have all the data:
+
+                        before July 1st 1994
+
+If you are not able to make a contribution before this date, but are
+willing to participate then please contact me.
+
+The paper will be submitted to the Journal of Functional Programming,
+special issue on state-of-the-art applications of pure functional
+programming languages. (see CFP below)
+
+If you know other implementors of functional languages who might be
+interested in taking part, please let me know.
+
+--pieter
+
+PS.
+
+I am sending you as a separate mail a uuencoded, compressed tar file
+containing a number of versions of the program as well a draft of the
+paper. Should there be any trouble receiving this file, you can also
+obtain it from ftp.fwi.uva.nl:/pub/functional/nucleic2.tar.Z.
+
+-----------------------------------------------------------------------
+
+      Journal of Functional Programming - call for Papers
+         Special issue on state-of-the-art applications
+            of pure functional programming languages
+
+A special issue of the Journal of Functional Programming will be
+devoted to presenting state-of-the-art applications of pure functional
+languages. The submission deadline is June 30, 1994.
+
+The special issue will consist of a number of papers describing real
+applications implemented purely functionally. These applications can be
+made by non-expert and expert functional programmers alike. Each paper
+describes the lessons learned whilst writing the application. This
+should include the whole trajectory: design, implementation,
+performance, and use.
+
+Applications may be written in any purely-functional language, such as
+Haskell or Sisal, or in the functional subset of languages which
+support side effects, such as Lisp, Standard ML, or Id. (There is an
+interesting question as to what extent impure effects are helpful in
+functional programs, but this special issue will concentrate instead on
+the interesting question of how far one can get in the pure world
+alone.)  Authors should assume familiarity with the language they use,
+except perhaps for esoteric features.
+
+Particularly welcome are applications that clearly demonstrate the
+advantages and disadvantages of lazy or non-strict functional
+programming, by discussing the effects this has on expressiveness and
+performance.
+
+It is strongly encouraged to make the application and the input and
+output data sets available via anonymous ftp, so that programs can be
+used for benchmarking purposes by others. A few realistic input data
+sets and the corresponding outputs should be supplied with each
+program.
+
+Submission by Email of postscript is encouraged, but hard copies are
+also welcome. All submissions for the special issue on applications
+should be sent to one of the guest editors, see addresses below.
+Submissions should arrive by June 30 1994. For other submission
+details please consult an issue of the Journal of Functional
+Programming.
+
+Guest Editors
+---------------------------------------------------------------------
+Pieter Hartel                         Rinus Plasmeijer
+Dept. of Computer Systems             Dept. of Computer Science
+Univ. of Amsterdam                    Univ. of Nijmegen
+Kruislaan 403                         Toernooiveld 1
+1098 SJ Amsterdam                     6525 ED Nijmegen
+The Netherlands                       The Netherlands
+Phone: +31-20-5257566                 Phone: +31-80-652643
+Email: pieter@fwi.uva.nl              Email: rinus@cs.kun.nl
+---------------------------------------------------------------------

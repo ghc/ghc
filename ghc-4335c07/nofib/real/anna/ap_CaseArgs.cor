@@ -1,0 +1,81 @@
+
+t0 a ::= N0 | C0 a;
+
+t1 a ::= N1 | C1 a (t1 a);
+
+t2 a ::= N2 | C2 a (t2 a) (t2 a);
+
+t3 a ::= N3 | C3 a (t3 a) (t3 a) (t3 a);
+
+t4 a ::= N4 | C4 a (t4 a) (t4 a) (t4 a) (t4 a);
+
+t5 a ::= N5 | C5 a (t5 a) (t5 a) (t5 a) (t5 a) (t5 a);
+
+t6 a ::= N6 | C6 a (t6 a) (t6 a) (t6 a) (t6 a) (t6 a) (t6 a);
+
+;;
+{
+ca0 x =
+  case x of
+    N0 -> 23;
+    C0 a -> 24
+  end;
+
+ca1 x =
+  case x of
+    N1 -> 23;
+    C1 a b1 -> 24
+  end;
+
+ca2 x =
+  case x of
+    N2 -> 23;
+    C2 a b1 b2 -> 24
+  end;
+
+ca3 x =
+  case x of
+    N3 -> 23;
+    C3 a b1 b2 b3 -> 24
+  end;
+
+ca4 x =
+  case x of
+    N4 -> 23;
+    C4 a b1 b2 b3 b4 -> 24
+  end;
+
+ca5 x =
+  case x of
+    N5 -> 23;
+    C5 a b1 b2 b3 b4 b5 -> 24
+  end;
+}
+ca6 x =
+  case x of
+    N6 -> 23;
+    C6 a b1 b2 b3 b4 b5 b6 -> 24
+  end;
+
+ 
+{
+                            Arg  Result  Group  Total   Func   Case     Anna     Norm    Norm   ac(n)/
+   Name               Rec Points Points    Max  Nodes  Nodes  Nodes     Cost       ap      ar   ac(n-1)
+------------------------------------------------------------------------------------------------------
+
+   _ca0                no      3      2      1      5      0      1     3574     1084     383
+   _ca1                no      4      2      1      5      0      1     8566     1544     546   2.396
+   _ca2                no      4      2      1      5      0      1    35417     6386    2258   4.134
+   _ca3                no      4      2      1      5      0      1   198671    35844   12672   5.609
+   _ca4                no      4      2      1      5      0      1  1135747   204817   72413   5.716
+   _ca5                no      4      2      1      5      0      1  6254293  1127880  398765   5.506
+   _ca6                no      4      2      1      5      0      1 33119065  5972589 2111629   5.295
+
+ca0  50642    54216
+ca1  51027    59593
+ca2  51371    86788 
+ca3  51715   250386
+ca4  52059  1187806
+ca5  52375  6306668
+ca6  64920 33183985
+}

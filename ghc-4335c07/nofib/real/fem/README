@@ -1,0 +1,94 @@
+
+             2D TRUSS STRUCTURAL ANALYSIS PROGRAM IN HASKELL
+             ===============================================
+
+                          Dr. Junxian Liu
+                      Department of Computing
+                 Imperial College, London SW7 2BZ
+		     (email: jjl@doc.ic.ac.uk)
+
+
+Finite Element Module:
+
+  Two dimensional bar element(pin jointed);     
+
+  Element description:
+
+     Geometrical data ---- left node (xl,yl), right node (xr,yr);
+     Material property --- e*a (elastical stiffness and cross section area);
+     Deformation data ---- left node (ul,vl), right node (ur,vr);
+     Internal force   ---- tension along the bar;
+
+
+Source Data Format:
+
+   0) Control data
+        nnode ---- total number of nodes,
+        nelem ---- total number of elements,
+        nmats ---- total number of different material properties,
+        nplds ---- total number of nodal loads;
+
+   1) Node data
+        x.1,y.1,bc.1 ---- coordinates and fixity information of 1st node;
+                          bc.1 = abc, a=1 means u is free,
+                                      a=3 means u is fixed;
+                                      b=1 means v is free,
+                                      b=3 means v ix fixed;
+                                      c=1 means theta is free,
+                                      c=3 means theta is fixed;
+        x.2,y.2,bc.2 ---- 2nd node;
+           ... ...
+        x.nnode,y.nnode,bc.nnode  ---- nnode-th node, the last node;
+
+        Note: Nodal displacement 'theta' is used for expanding to frame
+              strutures (fixed jointed structures).
+
+   2) Element data
+        nl.1,nr.1,m.1 ---- left and right node number and material property
+                           number of 1st element;
+        nl.2,nr.2,m.2 ---- 2nd element;
+         ... ...
+        nl.nelem,nr.nelem,m.nelem ---- nelem-th element, the last element;
+
+   3) Material property data
+        ea.1,ei.1 ---- material property of 1st kind of material used;
+        ea.2,ei.2 ---- 2nd;
+          ... ...
+        ea.nmats,ei.nmats ---- nmats-th , the last one.
+
+        note: For two dimensional bar element, ei is always zero. We put it
+              here because we want use the same program code for two dimension
+              beam element later.
+
+   4) Load data
+        to_point.1,px.1,py.1,m.1 ---- 1st nodal load;
+        to_point.2,px.2,py.2,m.2 ---- 2nd nodal load;
+           ... ...
+        to_point.nplds,px.nplds,py.nplds,m.nplds ---- last nodal load;
+
+        node: For the same reason as in 3) above, we keep m here.
+
+
+Input File:
+
+   Standard input       ----    source data.
+
+
+Output File:
+
+   standard output      ----    computation result.
+
+
+Example Source Data Files:
+
+   data.0		----	3 nodes, 2 bars.
+   data.1		----    8 nodes, 16 elements.
+   data.2		----	14 nodes, 31 elements.
+   data.3		----    36 nodes, 72 elements.
+
+
+Code Origin:
+
+   The code was translated from the corresponding Miranda version 
+   developed by the author.  
+   

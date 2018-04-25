@@ -1,0 +1,16 @@
+name: Haddock
+version: 0.1
+license: BSD3
+author: Iain Nicol
+stability: stable
+category: PackageTests
+build-type: Simple
+Cabal-version: >= 1.2
+
+description:
+    Check that Cabal successfully invokes Haddock.
+
+Library
+    exposed-modules: CPP, Literate, NoCPP, Simple
+    other-extensions: CPP
+    build-depends: base

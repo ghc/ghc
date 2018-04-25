@@ -1,0 +1,8 @@
+name: p
+version: 1.0
+build-type: Simple
+cabal-version: >= 1.2
+
+executable p
+  main-is: Main.hs
+  build-depends: q, base

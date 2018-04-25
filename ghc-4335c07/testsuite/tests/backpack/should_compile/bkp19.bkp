@@ -1,0 +1,18 @@
+unit r where
+    signature H where
+        newtype Foo = Foo Bool
+    -- NB: Foo here gets compiled into Foo{v} on the RHS, referring
+    -- to the DataCon wrapper!
+    -- (There should be a test for type class too)
+    module M where
+        import H
+        d = Foo True
+
+unit h-impl where
+    module A where
+        newtype Foo = Foo Bool
+    module H(Foo(..)) where
+        import A
+
+unit s where
+    dependency r[H=h-impl:H]

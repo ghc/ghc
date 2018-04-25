@@ -1,0 +1,4 @@
+
+T7937.hs:8:13: error:
+    • Variable not in scope: (***) :: Bool -> Bool -> t
+    • Perhaps you meant ‘**’ (imported from Prelude)

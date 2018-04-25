@@ -1,0 +1,11 @@
+foo ()
+{
+  STK_CHK_GEN_N (8); /* panics on i386 */
+  return (0);
+}
+
+bar ()
+{
+  STK_CHK_GEN_N (16); /* panics on amd64 */
+  return (0);
+}

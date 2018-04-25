@@ -1,0 +1,41 @@
+\setlength{\unitlength}{0.00050000in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(6036,3169)(0,-10)
+\path(1692,3142)(1692,2692)(3342,2692)
+\path(1692,2317)(1692,2692)
+\path(1722.000,2572.000)(1692.000,2692.000)(1662.000,2572.000)
+\path(4992,2317)(4992,2692)
+\path(5022.000,2572.000)(4992.000,2692.000)(4962.000,2572.000)
+\path(4992,2692)(4992,3142)
+\path(3342,3142)(3342,2692)(4992,2692)
+\path(3342,2317)(3342,2692)
+\path(3372.000,2572.000)(3342.000,2692.000)(3312.000,2572.000)
+\path(42,3142)(42,2692)(1692,2692)
+\path(42,2317)(42,2692)
+\path(72.000,2572.000)(42.000,2692.000)(12.000,2572.000)
+\put(1992,2767){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}use}}}}}
+\put(342,2767){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}lag}}}}}
+\put(117,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}created}}}}}
+\put(3642,2767){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}drag}}}}}
+\put(1767,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}first used}}}}}
+\put(3417,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}last used}}}}}
+\put(5067,2092){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}destroyed}}}}}
+\path(4992,292)(4992,667)
+\path(5022.000,547.000)(4992.000,667.000)(4962.000,547.000)
+\path(4992,667)(4992,1117)
+\path(1692,667)(3342,667)(4992,667)
+\path(42,1117)(42,667)(1692,667)
+\path(42,292)(42,667)
+\path(72.000,547.000)(42.000,667.000)(12.000,547.000)
+\put(117,67){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}created}}}}}
+\put(5067,67){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}destroyed}}}}}
+\put(1992,742){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}void}}}}}
+\end{picture}
+}

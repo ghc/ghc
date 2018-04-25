@@ -1,0 +1,111 @@
+From: sandra@minster.york.ac.uk
+To: partain
+Subject:    potatoes and FiveTrees
+Date:        5 Mar 1992 17:28:03 GMT
+
+Will,
+
+	While Simon was visiting us this week he suggested that the potato
+	printing program, even in the form it was when last seen, might be
+	useful as one on which to try out versions of the compiler.
+	So I've put it in:
+	/tmp_mnt/users/staff/other/sandra/haskell/reptile
+	together with sample input in the file called input
+	and the output that I get from the York version which turns
+	out to be the same as the output from the Glasgow version
+	(I used /users/fp/kh/haskell/madras3/hc)
+	also the output using the alternative Main module, which is
+	a version which soon dies in York. (with Segmentation fault messages)
+
+
+	I append here a module which might be useful to other people
+	so could go in your library of Haskell programs. I'm not sure
+	where to put it, so am sending it to you instead.
+
+Sandra
+From sandra@minster.york.ac.uk Thu Mar 12 09:12:14 1992
+Via: uk.ac.york.minster; Thu, 12 Mar 92 09:12:11 GMT
+Message-Id: <swordfish.700391868@minster.york.ac.uk>
+From: sandra@minster.york.ac.uk
+To: partain
+Subject:    "reptile" test case
+Date:       12 Mar 1992 09:17:46 GMT
+
+
+Thanks for your mail - just received as I've been away for a few days.
+All feedback is useful.
+
+At the time the Haskell reptile was abandoned, I was attempting to
+get the program to save patterns to files, and retrieve them, as the
+LML version did.
+
+But there were the various error messages (Segmentation fault etc)
+for both the first and third versions of 'main' (with the type
+of potatotile appropriately changed for the first) below:
+
+.........................................................
+-- NOT OK
+-- potatotile :: State -> [[Char]] -> [Request]
+module ReqMain(main) where
+
+import ...
+
+main ~(Str fromMgr : _) =
+  (ReadChan stdin: toMgr)
+  where
+  toMgr = [AppendChan stdout
+		      (...	-- STRINGS TO MGR TO SET UP THE SCREEN
+                       ...
+                       ...)] ++
+          potatotile ([],1,initalist) (lines fromMgr) ++
+	  [AppendChan stdout
+                      (...	-- STRINGS TO MGR TO CLEAR UP AFTERWARDS 
+                       ...)]
+..........................................................
+
+-- OK
+-- potatotile :: State -> [[Char]] -> [Char]
+module Main(main) where
+
+import ...
+
+main ~(Str fromMgr : _) =
+  [ReadChan stdin, AppendChan stdout toMgr]
+  where
+  toMgr = ...
+          ...
+          ... ++
+          potatotile ([],1,initalist) (lines fromMgr) ++
+          ... 
+          ...
+
+...........................................................
+
+-- NOT OK
+-- potatotile :: State -> [[Char]] -> [Char]
+module NewMain(main) where
+
+import ...
+
+main ~(Str fromMgr : _) =
+  (ReadChan stdin: map (AppendChan stdout) toMgr)
+  where
+  toMgr = [(...
+            ...
+            ...),
+            potatotile ([],1,initalist) (lines fromMgr),
+           (...
+            ...)]
+
+
+..............................................................
+
+
+Could well be partly due to our local system. Anyway I'll let you know
+when I hit similar problems with my current project - or rather the
+current version of the current project.
+
+Sandra
+
+
+

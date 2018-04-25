@@ -1,0 +1,29 @@
+# Setup configure
+Configuring library 'q' for p-0.1.0.0..
+# Setup build
+Preprocessing library 'q' for p-0.1.0.0..
+Building library 'q' for p-0.1.0.0..
+# Setup copy
+Installing internal library q in <PATH>
+# Setup register
+Registering library 'q' for p-0.1.0.0..
+# Setup configure
+Configuring library for p-0.1.0.0..
+# Setup build
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for p-0.1.0.0..
+# Setup configure
+Configuring executable 'foo' for p-0.1.0.0..
+# Setup build
+Preprocessing executable 'foo' for p-0.1.0.0..
+Building executable 'foo' for p-0.1.0.0..
+# Setup copy
+Installing executable foo in <PATH>
+Warning: The directory <ROOT>/setup-per-component.dist/usr/bin is not in the system search path.
+# Setup register
+# foo
+I AM THE ONE

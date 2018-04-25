@@ -1,0 +1,6 @@
+MkT2 [Just 1]
+Breakpoint 0 activated at print029.hs:4:7
+MkT2 Stopped in Main.f, print029.hs:4:7
+_result :: t Int = _
+x :: t Int = [Just 1]
+x = [Just 1]

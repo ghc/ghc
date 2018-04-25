@@ -1,0 +1,11 @@
+:load B.hs
+
+-- The testsuite driver runs ghci script tests by default with `-v0`, which
+-- prevents the bug from triggering. By adding a `:show modules` here, we do
+-- trigger the bug.
+-- 
+-- Adding the setup function `extra_run_opts('-v1')` would also work, but it
+-- annoyingly prints the ghc version number, which would make the expected
+-- test output dependent on that version number.
+
+:show modules

@@ -1,0 +1,15 @@
+# Setup configure
+Configuring p-0.1.0.0...
+# Setup build
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for p-0.1.0.0..
+# Setup configure
+Configuring q-0.1.0.0...
+# Setup build
+Preprocessing executable 'foo' for q-0.1.0.0..
+Building executable 'foo' for q-0.1.0.0..
+Preprocessing executable 'bar' for q-0.1.0.0..

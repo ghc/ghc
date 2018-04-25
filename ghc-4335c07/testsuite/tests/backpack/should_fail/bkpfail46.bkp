@@ -1,0 +1,17 @@
+{-# LANGUAGE ConstraintKinds #-}
+unit p where
+    signature A where
+        import Prelude hiding ((==))
+        class K a
+        infix 4 ==
+        (==) :: K a => a -> a -> Bool
+    module M where
+        import Prelude hiding ((==))
+        import A
+        f a b c = a == b && b == c
+unit q where
+    module A(K, (==)) where
+        -- This won't match because it's not nullary
+        type K a = Eq a
+unit r where
+    dependency p[A=q:A]

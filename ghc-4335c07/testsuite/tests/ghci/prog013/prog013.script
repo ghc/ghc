@@ -1,0 +1,12 @@
+:set editor echo
+:l Good.hs
+:e
+:l Bad.hs
+:e
+:e ./Bad.hs
+:l Good.hs
+:e
++
+:e foo
+:l Bad.hs
+:e bar

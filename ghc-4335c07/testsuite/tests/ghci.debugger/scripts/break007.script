@@ -1,0 +1,5 @@
+:!rm -f Break007.o Break007.hi
+:set -fobject-code
+:l Break007
+:b 1
+-- can't set a breakpoint in a compiled module

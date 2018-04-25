@@ -1,0 +1,5 @@
+
+T10890_2.hs:12:1: warning: [-Wunused-imports (in -Wextra)]
+    The import of ‘T10890_2B’ is redundant
+      except perhaps to import instances from ‘T10890_2B’
+    To import instances alone, use: import T10890_2B()

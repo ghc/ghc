@@ -1,0 +1,6 @@
+-- Test Trac #2766
+:set -XTypeOperators
+:m Control.Arrow
+:t first :: Arrow to => b `to` c -> (b, d) `to` (c, d)
+type a ~> b = a -> b
+:t first :: b~>c -> (b, d)~>(c, d)

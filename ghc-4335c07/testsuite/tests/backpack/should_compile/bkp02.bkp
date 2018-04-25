@@ -1,0 +1,18 @@
+unit p where
+    signature H where
+        data T
+    module A where
+        import H
+        data A = MkA T
+
+unit q where
+    module H where
+        data T = T
+
+unit r where
+    dependency q
+    dependency p[H=q:H]
+    module R where
+        import A
+        import H
+        x = MkA T

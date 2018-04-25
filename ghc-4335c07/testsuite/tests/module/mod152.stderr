@@ -1,0 +1,7 @@
+
+mod152.hs:2:26: error:
+    Ambiguous occurrence ‘id’
+    It could refer to either ‘Prelude.id’,
+                             imported from ‘Prelude’ at mod152.hs:2:8
+                             (and originally defined in ‘GHC.Base’)
+                          or ‘M.id’, defined at mod152.hs:2:36

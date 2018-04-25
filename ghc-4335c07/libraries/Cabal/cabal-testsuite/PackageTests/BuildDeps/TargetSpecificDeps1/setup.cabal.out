@@ -1,0 +1,8 @@
+# Setup configure
+Resolving dependencies...
+Configuring TargetSpecificDeps1-0.1...
+# Setup build
+Preprocessing executable 'lemon' for TargetSpecificDeps1-0.1..
+Building executable 'lemon' for TargetSpecificDeps1-0.1..
+Preprocessing library for TargetSpecificDeps1-0.1..
+Building library for TargetSpecificDeps1-0.1..

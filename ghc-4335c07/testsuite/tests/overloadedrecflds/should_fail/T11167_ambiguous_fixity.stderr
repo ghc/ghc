@@ -1,0 +1,16 @@
+[1 of 3] Compiling T11167_ambiguous_fixity_A ( T11167_ambiguous_fixity_A.hs, T11167_ambiguous_fixity_A.o )
+[2 of 3] Compiling T11167_ambiguous_fixity_B ( T11167_ambiguous_fixity_B.hs, T11167_ambiguous_fixity_B.o )
+[3 of 3] Compiling T11167_ambiguous_fixity ( T11167_ambiguous_fixity.hs, T11167_ambiguous_fixity.o )
+
+T11167_ambiguous_fixity.hs:6:7: error:
+    Ambiguous fixity for record field ‘foo’
+    Conflicts: 
+      infixr 3
+        imported from ‘T11167_ambiguous_fixity_A’ at T11167_ambiguous_fixity.hs:3:1-32
+        (and originally defined at T11167_ambiguous_fixity_A.hs:4:16-18)
+      infixr 3
+        imported from ‘T11167_ambiguous_fixity_A’ at T11167_ambiguous_fixity.hs:3:1-32
+        (and originally defined at T11167_ambiguous_fixity_A.hs:3:16-18)
+      infixl 5
+        imported from ‘T11167_ambiguous_fixity_B’ at T11167_ambiguous_fixity.hs:4:1-32
+        (and originally defined at T11167_ambiguous_fixity_B.hs:2:16-18)

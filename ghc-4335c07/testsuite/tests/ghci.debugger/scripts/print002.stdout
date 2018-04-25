@@ -1,0 +1,8 @@
+Just 1.2
+f = Just 1.2
+i = Just 10
+10
+i = Just 10
+'a'
+s = S1 'a' 'b' 'c'
+s = S1 'a' 'b' 'c'

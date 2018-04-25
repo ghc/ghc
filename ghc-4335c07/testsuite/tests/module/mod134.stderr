@@ -1,0 +1,9 @@
+
+mod134.hs:6:19: error:
+    Not in scope: ‘Prelude.head’
+    Perhaps you meant one of these:
+      ‘Prelude.read’ (imported from Prelude),
+      ‘Prelude.reads’ (imported from Prelude),
+      data constructor ‘Prelude.Left’ (imported from Prelude)
+    Perhaps you want to remove ‘head’ from the explicit hiding list
+    in the import of ‘Prelude’ (mod134.hs:4:1-28).

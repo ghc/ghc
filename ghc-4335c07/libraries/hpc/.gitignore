@@ -1,0 +1,5 @@
+GNUmakefile
+dist-install
+dist-boot
+ghc.mk
+*.normalised

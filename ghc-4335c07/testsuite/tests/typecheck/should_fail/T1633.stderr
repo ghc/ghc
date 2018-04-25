@@ -1,0 +1,5 @@
+
+T1633.hs:8:18: error:
+    Expected kind ‘* -> *’, but ‘Bool’ has kind ‘*’
+    In the first argument of ‘Functor’, namely ‘Bool’
+    In the instance declaration for ‘Functor Bool’

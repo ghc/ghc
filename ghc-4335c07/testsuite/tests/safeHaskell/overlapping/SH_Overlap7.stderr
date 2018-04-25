@@ -1,0 +1,19 @@
+[1 of 3] Compiling SH_Overlap7_B    ( SH_Overlap7_B.hs, SH_Overlap7_B.o )
+[2 of 3] Compiling SH_Overlap7_A    ( SH_Overlap7_A.hs, SH_Overlap7_A.o )
+[3 of 3] Compiling SH_Overlap7      ( SH_Overlap7.hs, SH_Overlap7.o )
+
+SH_Overlap7.hs:1:16: error: [-Wunsafe, -Werror=unsafe]
+    ‘SH_Overlap7’ has been inferred as unsafe!
+    Reason:
+        SH_Overlap7.hs:14:8: warning:
+            • Unsafe overlapping instances for C [Int]
+                arising from a use of ‘f’
+              The matching instance is:
+                instance [overlap ok] [safe] C [Int]
+                  -- Defined at SH_Overlap7_A.hs:12:3
+              It is compiled in a Safe module and as such can only
+              overlap instances from the same module, however it
+              overlaps the following instances from different modules:
+                instance C [a] -- Defined at SH_Overlap7.hs:10:10
+            • In the expression: f ([1, 2, 3, 4] :: [Int])
+              In an equation for ‘test’: test = f ([1, 2, 3, 4] :: [Int])

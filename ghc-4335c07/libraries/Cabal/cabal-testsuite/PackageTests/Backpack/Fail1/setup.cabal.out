@@ -1,0 +1,8 @@
+# Setup configure
+Resolving dependencies...
+Configuring Fail1-0.1.0.0...
+Error:
+    The library 'sig' from package 'Fail1-0.1.0.0' does not require:
+        MissingReq
+    In mixins: Fail1:sig requires (MissingReq as A)
+    In the stanza library

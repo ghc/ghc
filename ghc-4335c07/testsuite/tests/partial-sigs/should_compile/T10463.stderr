@@ -1,0 +1,8 @@
+
+T10463.hs:5:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘[Char]’
+    • In a pattern type signature: _
+      In the pattern: x :: _
+      In an equation for ‘f’: f (x :: _) = x ++ ""
+    • Relevant bindings include
+        f :: [Char] -> [Char] (bound at T10463.hs:5:1)

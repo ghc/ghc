@@ -1,0 +1,6 @@
+
+T9600-1.hs:5:39: error:
+    Can't make a derived instance of ‘Applicative Foo’
+      (even with cunning GeneralizedNewtypeDeriving):
+      cannot eta-reduce the representation type enough
+    In the newtype declaration for ‘Foo’

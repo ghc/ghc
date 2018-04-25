@@ -1,0 +1,40 @@
+{-# LANGUAGE RoleAnnotations #-}
+unit p where
+    signature A where
+        data T a
+unit q1 where
+    module A where
+        data T a = T a
+unit q2 where
+    module A where
+        type role T nominal
+        data T a = T a
+unit q3 where
+    module A where
+        data T a = T
+unit r where
+    -- Subtyping test
+    dependency p[A=q1:A]
+    dependency p[A=q2:A]
+    dependency p[A=q3:A]
+
+unit p2 where
+    signature A where
+        type role T representational
+        data T a
+    module M where
+        import Data.Coerce
+        import A
+        newtype K = K Int
+        f :: T K -> T Int
+        f = coerce
+unit p3 where
+    -- Merge test
+    dependency p[A=<A>]
+    dependency p2[A=<A>]
+    module M2 where
+        import Data.Coerce
+        import A
+        newtype K = K Int
+        f :: T K -> T Int
+        f = coerce

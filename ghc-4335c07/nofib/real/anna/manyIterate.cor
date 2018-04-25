@@ -1,0 +1,60 @@
+
+list a ::= Nil | Cons a (list a) ;
+
+;;
+
+
+intsFrom a = Cons a (intsFrom (a+1));
+
+interesting x = letrec loop = loop in loop;
+
+if c t f = case c of
+             True -> t;
+             False -> f
+           end;
+
+id x = x;
+add2 x = 2 + x;
+
+fac n acc = if (n==0) acc (fac (n-1) (n*acc));
+
+fact n = fac n 1;
+
+hof g x y = let
+              kk = \x y -> x;
+              ii = \x -> x
+            in (g (hof (kk 0) x (y-1))) +
+               (if (y==0) x (hof ii 3 (y-1)));
+
+useHOF x y = let
+            neg = \n -> 0-n
+         in hof neg x y;
+
+ff c q v = case v of
+              Nil -> f2231 c c q;
+              Cons x xs -> f2231 c c q
+           end;
+
+f223 x y = (if (x == 
+    (letrec
+        rf = \a b -> b - (rg (let sq = \n -> n * (let nnn = \w -> 1 in n) in a) 4);
+        rg = \a b -> if (b==0) b (rf a a)
+     in 0)
+                ) y (f223 (x - 1) y));
+
+
+f2231 x y z = (if (y == 0) (f2231 0 1 x) x);
+
+f2232 x y z p
+   = if (p==0)
+     (x+z)
+     ( (f2232 y 0 0 (p-1)) + (f2232 z z 0 (p-1)) );
+
+hudak x y z p q = if (p>0) 
+                     (if (p==1) 
+                         (if (z==0) 
+                             x 
+                             y) 
+                         (hudak z z 0 (p-1) x))
+                     (hudak 0 0 z 1 y);
+

@@ -1,0 +1,6 @@
+
+T3153.hs:1:1:
+    Cannot parse LANGUAGE pragma
+    Expecting comma-separated list of language options,
+    each starting with a capital letter
+      E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}

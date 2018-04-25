@@ -1,0 +1,8 @@
+
+T10668.hs:3:27: error:
+    In module ‘Data.Type.Equality’:
+      ‘Refl’ is a data constructor of ‘(:~:)’
+    To import it use
+      import Data.Type.Equality( (:~:)( Refl ) )
+    or
+      import Data.Type.Equality( (:~:)(..) )

@@ -1,0 +1,122 @@
+name:		Win32
+version:	2.6.1.0
+license:	BSD3
+license-file:	LICENSE
+author:		Alastair Reid, shelarcy, Tamar Christina
+copyright:	Alastair Reid, 1999-2003; shelarcy, 2012-2013; Tamar Christina, 2016-2017
+maintainer:	Haskell Libraries <libraries@haskell.org>
+bug-reports:    https://github.com/haskell/win32/issues
+homepage:       https://github.com/haskell/win32
+category:	System, Graphics
+synopsis:	A binding to part of the Win32 library
+description:	A binding to part of the Win32 library.
+build-type:     Simple
+cabal-version:  >=1.10
+extra-source-files:
+	include/diatemp.h include/dumpBMP.h include/ellipse.h include/errors.h
+	include/Win32Aux.h include/win32debug.h include/alignment.h
+        changelog.md
+
+Library
+    default-language: Haskell2010
+    default-extensions: ForeignFunctionInterface, CPP
+    if impl(ghc >= 7.1)
+        default-extensions: NondecreasingIndentation
+
+    if !os(windows)
+        -- This package requires Windows to build
+        build-depends: unbuildable<0
+        buildable: False
+
+    build-depends:	base >= 4.5 && < 5, bytestring, filepath
+    ghc-options:    -Wall -fno-warn-name-shadowing
+    cc-options:     -fno-strict-aliasing
+    exposed-modules:
+        Graphics.Win32.GDI
+        Graphics.Win32.GDI.Bitmap
+        Graphics.Win32.GDI.Brush
+        Graphics.Win32.GDI.Clip
+        Graphics.Win32.GDI.Font
+        Graphics.Win32.GDI.Graphics2D
+        Graphics.Win32.GDI.HDC
+        Graphics.Win32.GDI.Palette
+        Graphics.Win32.GDI.Path
+        Graphics.Win32.GDI.Pen
+        Graphics.Win32.GDI.Region
+        Graphics.Win32.GDI.Types
+        Graphics.Win32
+        Graphics.Win32.Control
+        Graphics.Win32.Dialogue
+        Graphics.Win32.Icon
+        Graphics.Win32.Key
+        Graphics.Win32.Menu
+        Graphics.Win32.Message
+        Graphics.Win32.Misc
+        Graphics.Win32.Resource
+        Graphics.Win32.Window
+        Graphics.Win32.LayeredWindow
+        Graphics.Win32.GDI.AlphaBlend
+        Graphics.Win32.Window.AnimateWindow
+        Graphics.Win32.Window.HotKey
+        Graphics.Win32.Window.IMM
+        Graphics.Win32.Window.ForegroundWindow
+        Graphics.Win32.Window.PostMessage
+
+        Media.Win32
+
+        System.Win32
+        System.Win32.DebugApi
+        System.Win32.DLL
+        System.Win32.File
+        System.Win32.FileMapping
+        System.Win32.Info
+        System.Win32.Path
+        System.Win32.Mem
+        System.Win32.MinTTY
+        System.Win32.NLS
+        System.Win32.Process
+        System.Win32.Registry
+        System.Win32.SimpleMAPI
+        System.Win32.Time
+        System.Win32.Console
+        System.Win32.Security
+        System.Win32.Types
+        System.Win32.Shell
+        System.Win32.Automation
+        System.Win32.Automation.Input
+        System.Win32.Automation.Input.Key
+        System.Win32.Automation.Input.Mouse
+        System.Win32.Console.CtrlHandler
+        System.Win32.Console.HWND
+        System.Win32.Console.Title
+        System.Win32.Encoding
+        System.Win32.Exception.Unsupported
+        System.Win32.HardLink
+        System.Win32.Info.Computer
+        System.Win32.Info.Version
+        System.Win32.String
+        System.Win32.SymbolicLink
+        System.Win32.Thread
+        System.Win32.Utils
+        System.Win32.Word
+
+    extra-libraries:
+        "user32", "gdi32", "winmm", "advapi32", "shell32", "shfolder", "shlwapi", "msimg32", "imm32"
+    ghc-options:      -Wall
+    include-dirs:     include
+    includes:         "alphablend.h", "diatemp.h", "dumpBMP.h", "ellipse.h", "errors.h", "HsGDI.h", "HsWin32.h", "Win32Aux.h", "win32debug.h", "windows_cconv.h", "WndProc.h", "alignment.h"
+    install-includes: "HsWin32.h", "HsGDI.h", "WndProc.h", "windows_cconv.h", "alphablend.h", "winternl_compat.h", "winuser_compat.h"
+    c-sources:
+        cbits/HsGDI.c
+        cbits/HsWin32.c
+        cbits/WndProc.c
+        cbits/diatemp.c
+        cbits/dumpBMP.c
+        cbits/ellipse.c
+        cbits/errors.c
+        cbits/alphablend.c
+    cc-options: -Wall
+
+source-repository head
+    type:     git
+    location: git://github.com/haskell/win32

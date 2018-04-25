@@ -1,0 +1,35 @@
+
+T9662.hs:47:8: error:
+    • Couldn't match type ‘k’ with ‘Int’
+      ‘k’ is a rigid type variable bound by
+        the type signature for:
+          test :: forall sh k m n.
+                  Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
+        at T9662.hs:44:1-50
+      Expected type: Exp (((sh :. m) :. n) :. k)
+                     -> Exp (((sh :. m) :. n) :. k)
+        Actual type: Exp
+                       (Tuple (((Atom a0 :. Atom Int) :. Atom Int) :. Atom Int))
+                     -> Exp
+                          (Plain (((Unlifted (Atom a0) :. Exp Int) :. Exp Int) :. Exp Int))
+    • In the first argument of ‘backpermute’, namely
+        ‘(modify
+            (atom :. atom :. atom :. atom)
+            (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))’
+      In the expression:
+        backpermute
+          (modify
+             (atom :. atom :. atom :. atom)
+             (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
+          id
+      In an equation for ‘test’:
+          test
+            = backpermute
+                (modify
+                   (atom :. atom :. atom :. atom)
+                   (\ (sh :. k :. m :. n) -> (sh :. m :. n :. k)))
+                id
+    • Relevant bindings include
+        test :: Shape (((sh :. k) :. m) :. n)
+                -> Shape (((sh :. m) :. n) :. k)
+          (bound at T9662.hs:45:1)

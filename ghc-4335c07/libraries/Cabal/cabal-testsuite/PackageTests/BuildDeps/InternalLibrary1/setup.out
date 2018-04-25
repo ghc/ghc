@@ -1,0 +1,7 @@
+# Setup configure
+Configuring InternalLibrary1-0.1...
+# Setup build
+Preprocessing library for InternalLibrary1-0.1..
+Building library for InternalLibrary1-0.1..
+Preprocessing executable 'lemon' for InternalLibrary1-0.1..
+Building executable 'lemon' for InternalLibrary1-0.1..

@@ -1,0 +1,6 @@
+o = O (_t1::a)
+()
+_t1 :: SafeList Integer NonEmpty
+o = O (Cons 3 (_t4::SafeList Integer y))
+()
+o = O (Cons 3 (Cons 6 (_t9::SafeList Integer y)))

@@ -1,0 +1,9 @@
+Stopped in Main.g, break013.hs:1:7-13
+_result :: (Bool, Bool, ()) = _
+a :: Bool = _
+b :: Bool = _
+c :: () = _
+b :: Bool = _
+c :: () = _
+a :: Bool = _
+_result :: (Bool, Bool, ()) = _

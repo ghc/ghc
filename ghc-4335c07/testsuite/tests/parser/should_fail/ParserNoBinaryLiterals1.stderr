@@ -1,0 +1,5 @@
+
+ParserNoBinaryLiterals1.hs:4:1:
+    Equations for ‘f’ have different numbers of arguments
+      ParserNoBinaryLiterals1.hs:4:1-10
+      ParserNoBinaryLiterals1.hs:5:1-10

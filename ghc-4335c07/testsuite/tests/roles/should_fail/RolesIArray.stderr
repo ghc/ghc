@@ -1,0 +1,63 @@
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘Data.Array.Base.unsafeAccumArray’
+        from type ‘forall i e'.
+                   Ix i =>
+                   (Word64 -> e' -> Word64)
+                   -> Word64 -> (i, i) -> [(Int, e')] -> UArray i Word64’
+          to type ‘forall i e'.
+                   Ix i =>
+                   (N -> e' -> N) -> N -> (i, i) -> [(Int, e')] -> UArray i N’
+    When deriving the instance for (IArray UArray N)
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘Data.Array.Base.unsafeAccum’
+        from type ‘forall i e'.
+                   Ix i =>
+                   (Word64 -> e' -> Word64)
+                   -> UArray i Word64 -> [(Int, e')] -> UArray i Word64’
+          to type ‘forall i e'.
+                   Ix i =>
+                   (N -> e' -> N) -> UArray i N -> [(Int, e')] -> UArray i N’
+    When deriving the instance for (IArray UArray N)
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘Data.Array.Base.unsafeReplace’
+        from type ‘forall i.
+                   Ix i =>
+                   UArray i Word64 -> [(Int, Word64)] -> UArray i Word64’
+          to type ‘forall i. Ix i => UArray i N -> [(Int, N)] -> UArray i N’
+    When deriving the instance for (IArray UArray N)
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘Data.Array.Base.unsafeAt’
+        from type ‘forall i. Ix i => UArray i Word64 -> Int -> Word64’
+          to type ‘forall i. Ix i => UArray i N -> Int -> N’
+    When deriving the instance for (IArray UArray N)
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘Data.Array.Base.unsafeArray’
+        from type ‘forall i.
+                   Ix i =>
+                   (i, i) -> [(Int, Word64)] -> UArray i Word64’
+          to type ‘forall i. Ix i => (i, i) -> [(Int, N)] -> UArray i N’
+    When deriving the instance for (IArray UArray N)
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘Data.Array.Base.numElements’
+        from type ‘forall i. Ix i => UArray i Word64 -> Int’
+          to type ‘forall i. Ix i => UArray i N -> Int’
+    When deriving the instance for (IArray UArray N)
+
+RolesIArray.hs:10:13: error:
+    Couldn't match type ‘Word64’ with ‘N’
+      arising from the coercion of the method ‘bounds’
+        from type ‘forall i. Ix i => UArray i Word64 -> (i, i)’
+          to type ‘forall i. Ix i => UArray i N -> (i, i)’
+    When deriving the instance for (IArray UArray N)

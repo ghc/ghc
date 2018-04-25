@@ -1,0 +1,7 @@
+
+mod145.hs:2:30:
+    Conflicting exports for ‘m1’:
+       ‘module Mod145_A’ exports ‘Mod145_A.m1’
+         imported from ‘Mod145_A’ at mod145.hs:4:1-15
+         (and originally defined at Mod145_A.hs:4:3-20)
+       ‘module Mod145’ exports ‘Mod145.m1’ defined at mod145.hs:7:3

@@ -1,0 +1,14 @@
+
+list tau ::= Nil | Cons (list tau);
+
+;;
+
+alt
+  = case Nil of
+       Nil -> Nil;
+       Cons as -> case as of
+                     Nil -> as;
+                     Cons bs -> bs
+                  end 
+    end;
+

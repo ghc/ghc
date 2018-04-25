@@ -1,0 +1,17 @@
+
+T12634.hs:14:37: error:
+    • Found type wildcard ‘_’ standing for ‘()’
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature:
+        bench_twacePow :: forall t m m' r.
+                          _ => t m' r -> Bench '(t, m, m', r)
+
+T12634.hs:14:58: error:
+    • Expected a type, but
+      ‘'(t, m, m', r)’ has kind
+      ‘(* -> * -> *, *, *, *)’
+    • In the first argument of ‘Bench’, namely ‘'(t, m, m', r)’
+      In the type ‘t m' r -> Bench '(t, m, m', r)’
+      In the type signature:
+        bench_twacePow :: forall t m m' r.
+                          _ => t m' r -> Bench '(t, m, m', r)

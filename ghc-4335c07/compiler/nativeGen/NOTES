@@ -1,0 +1,41 @@
+TODO in new NCG
+~~~~~~~~~~~~~~~
+
+- Are we being careful enough about narrowing those out-of-range CmmInts?
+
+- Register allocator:
+    - fixup code
+    - keep track of free stack slots
+
+    Optimisations:
+
+    - picking the assignment on entry to a block: better to defer this
+      until we know all the assignments.  In a loop, we should pick
+      the assignment from the looping jump (fixpointing?), so that any
+      fixup code ends up *outside* the loop.  Otherwise, we should
+      pick the assignment that results in the least fixup code.
+
+- splitting?
+
+-- -----------------------------------------------------------------------------
+-- x86 ToDos
+
+- x86 genCCall needs to tack on the @size for stdcalls (might not be in the
+  foreignlabel).
+
+- x86: should really clean up that IMUL64 stuff, and tell the code gen about
+  Intel imul instructions.
+
+- x86: we're not careful enough about making sure that we only use
+  byte-addressable registers in byte instructions.  Should we do it this
+  way, or stick to using 32-bit registers everywhere?
+
+- Use SSE for floating point, optionally.
+
+------------------------------------------------------------------------------
+-- Further optimisations:
+
+- We might be able to extend the scope of the inlining phase so it can
+  skip over more statements that don't affect the value of the inlined
+  expr.
+

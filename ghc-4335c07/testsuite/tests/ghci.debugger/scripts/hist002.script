@@ -1,0 +1,20 @@
+:l Test3.hs
+-- set a break on the [] case in map
+:b 1
+-- trace an execution
+:tr mymap (+1) [1,2]
+:hist
+:back
+:show bindings
+:back
+:show bindings
+:force _result
+-- Run a GC so the BLACKHOLE indirection for _result (the AP_STACK) is removed,
+-- ensuring _result now points directly to the value (in this case, the integer
+-- 3).  This will be tagged, so we are checking that the pointer isn't naively
+-- dereferenced to generate an unaligned load.
+System.Mem.performGC
+:back
+:forward
+-- at this point, we can't retrieve the bindings because _result (the AP_STACK)
+-- was evaluated previously.  GHCi should not crash, preferably.

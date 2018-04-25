@@ -1,0 +1,81 @@
+Usage:
+
+    $$ [command-line-options-and-input-files]
+
+To compile and link a complete Haskell program, run the compiler like
+so:
+
+    $$ Main
+
+where the module Main is in a file named Main.hs (or Main.lhs) in the
+current directory.  The other modules in the program will be located
+and compiled automatically, and the linked program will be placed in
+the file `Main' (or `Main.exe' on Windows).
+
+Alternatively, $$ can be used to compile files individually.  Each
+input file is guided through (some of the) possible phases of a
+compilation:
+
+    - unlit:	extract code from a "literate program"
+    - hscpp:	run code through the C pre-processor (if -cpp flag given)
+    - hsc:	run the Haskell compiler proper
+    - gcc:	run the C compiler (if compiling via C)
+    - as:	run the assembler
+    - ld:	run the linker
+
+For each input file, the phase to START with is determined by the
+file's suffix:
+
+    - .lhs	literate Haskell		 unlit
+    - .hs	plain Haskell			 ghc
+    - .hc	C from the Haskell compiler	 gcc
+    - .c	C not from the Haskell compiler  gcc
+    - .s	assembly language		 as
+    - other	passed directly to the linker	 ld
+
+The phase at which to STOP processing is determined by a command-line
+option:
+
+    -E		stop after generating preprocessed, de-litted Haskell
+		     (used in conjunction with -cpp)
+    -C		stop after generating C (.hc output)
+    -S		stop after generating assembler (.s output)
+    -c		stop after generating object files (.o output)
+
+Other commonly-used options are:
+
+    -v[n]	    Control verbosity (n is 0--5, normal verbosity level is 1,
+	              -v alone is equivalent to -v3)
+
+    -O		    An `optimising' package of compiler flags, for faster code
+
+    -prof	    Compile for cost-centre profiling
+		     (add -fprof-auto for automagic cost-centres on all
+		      top-level functions)
+
+    -H14m	    Increase compiler's heap size (might make compilation
+		    faster, especially on large source files).
+
+    -M              Output Makefile rules recording the
+		    dependencies of a list of Haskell files.
+
+Given the above, here are some TYPICAL invocations of $$:
+
+    # compile a Haskell module to a .o file, optimising:
+    % $$ -c -O Foo.hs
+    # link three .o files into an executable called "test":
+    % $$ -o test Foo.o Bar.o Baz.o
+    # compile a Haskell module to C (a .hc file), using a bigger heap:
+    % $$ -C -H16m Foo.hs
+    # compile Haskell-produced C (.hc) to assembly language:
+    % $$ -S Foo.hc
+
+The User's Guide has more information about GHC's *many* options.  An
+online copy can be found here:
+
+   http://www.haskell.org/ghc/docs/latest/html/users_guide/
+
+If you *really* want to see every option, then you can pass
+'--show-options' to the compiler.
+
+------------------------------------------------------------------------

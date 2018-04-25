@@ -1,0 +1,7 @@
+// Basic function with a call
+
+foo1 {
+ B:
+  foreign "C--" bar() "safe";
+  goto B;
+}

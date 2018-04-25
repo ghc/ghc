@@ -1,0 +1,4 @@
+
+WildcardInNewtype.hs:7:29: error:
+    Wildcard ‘_’ not allowed
+      in the definition of data constructor ‘Foo’

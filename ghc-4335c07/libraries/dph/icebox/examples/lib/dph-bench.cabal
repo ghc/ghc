@@ -1,0 +1,20 @@
+Name:           dph-bench
+Version:        0.1
+License:        BSD3
+Author:         Roman Leshchinskiy
+Maintainer:     Roman Leshchinskiy <rl@cse.unsw.edu.au>
+Homepage:       http://www.cse.unsw.edu.au/~chak/project/dph/
+Category:       Benchmarking
+Synopsis:       Benchmarking Library for Data Parallel Haskell Examples
+
+Cabal-Version:  >= 1.2
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Bench.Time
+        Bench.Options
+        Bench.Benchmark
+
+  Build-Depends:  base, dph-prim-par, old-time
+

@@ -1,0 +1,9 @@
+[1 of 3] Processing f
+  Instantiating f
+  [1 of 1] Compiling F                ( f/F.hs, bkp36.out/f/F.o )
+[2 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling P                ( p/P.hs, nothing )
+[3 of 3] Processing q
+  [1 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
+  [2 of 2] Compiling Q                ( q/Q.hs, nothing )

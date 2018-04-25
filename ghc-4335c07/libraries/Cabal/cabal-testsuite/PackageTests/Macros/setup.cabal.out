@@ -1,0 +1,14 @@
+# Setup configure
+Resolving dependencies...
+Configuring macros-0.1.0.0...
+# Setup build
+Preprocessing library for macros-0.1.0.0..
+Building library for macros-0.1.0.0..
+Preprocessing executable 'macros-a' for macros-0.1.0.0..
+Building executable 'macros-a' for macros-0.1.0.0..
+Preprocessing executable 'macros-b' for macros-0.1.0.0..
+Building executable 'macros-b' for macros-0.1.0.0..
+# macros-a
+macros-0.1.0.0-macros-a
+# macros-b
+macros-0.1.0.0-macros-b

@@ -1,0 +1,5 @@
+
+T11381.hs:7:23:
+     Illegal injectivity annotation
+      Use TypeFamilyDependencies to allow this
+     In the type family declaration for ‘F’

@@ -1,0 +1,9 @@
+
+mod131.hs:2:27:
+    Conflicting exports for ‘f’:
+       ‘module Mod131_B’ exports ‘f’
+         imported from ‘Mod131_B’ at mod131.hs:3:17
+         (and originally defined at Mod131_B.hs:3:1)
+       ‘Mod131_A.f’ exports ‘Mod131_A.f’
+         imported qualified from ‘Mod131_A’ at mod131.hs:4:27
+         (and originally defined at Mod131_A.hs:3:1)

@@ -1,0 +1,2 @@
+^(?:cabal-dev|dist|tests/cabal-dev|tests/dist)$
+.*(?:\.orig|\.rej|~)$

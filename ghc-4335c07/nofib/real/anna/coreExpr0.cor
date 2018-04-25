@@ -1,0 +1,29 @@
+
+pair alpha beta ::= Pair alpha beta ;
+
+list item ::= Nil | Cons item (list item) ;
+
+annExprM bindAnn nodeAnn
+
+ ::= AVar name |
+
+     ANum num |
+     AConstr name |
+
+     AAp (pair nodeAnn (annExprM bindAnn nodeAnn)) 
+         (pair nodeAnn (annExprM bindAnn nodeAnn)) |
+
+     ALet bool (list (pair bindAnn (pair nodeAnn (annExprM bindAnn nodeAnn))))
+          (pair nodeAnn (annExprM bindAnn nodeAnn))  |
+
+     ACase (pair nodeAnn (annExprM bindAnn nodeAnn)) 
+           (list (pair name (pair (list bindAnn) 
+                  (pair nodeAnn (annExprM bindAnn nodeAnn))))) |
+
+     ALam (list bindAnn) (pair nodeAnn (annExprM bindAnn nodeAnn)) ;
+
+;;
+
+main = 42
+
+

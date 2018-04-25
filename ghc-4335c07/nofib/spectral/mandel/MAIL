@@ -1,0 +1,98 @@
+From hilly@dcs.qmw.ac.uk Fri Jul 10 10:20:57 1992
+X-VM-Attributes: [nil nil nil nil nil]
+Status: RO
+Via: uk.ac.qmw.dcs; Fri, 10 Jul 92 10:20:52 BST
+Received: from dcs.qmw.ac.uk by magician.dcs.qmw.ac.uk with SMTP (PP) 
+          id <3745-0@magician.dcs.qmw.ac.uk>; Fri, 10 Jul 1992 10:25:27 +0100
+Reply-To: hilly@dcs.qmw.ac.uk
+Organisation: Comp Sci Dept, Queen Mary and Westfield College, London
+X-Mailer: Mail User's Shell (7.2.3 5/22/91)
+Mmdf-Warning: Parse error in original version of preceding line at 
+              uk.ac.qmw.dcs.REDSTAR
+Message-Id: <9207101017.aa09227@uk.ac.qmw.dcs.REDSTAR>
+From: Jon Hill <hilly@dcs.qmw.ac.uk>
+To: partain
+Subject: Mandelbrot set
+Date: Fri, 10 Jul 1992 10:17:01 +0100
+
+I've just tried the mandelbrot set on various inputs. If you apply the 
+following changes to the file Mandel.lhs the program becomes a little 
+faster ( six times :-)
+
+(1)	Restrict type signature on mandel function :
+
+--mandel::(Num a) => a -> [a]
+mandel::Complex Double -> [Complex Double]
+mandel c = infiniteMandel
+	   where
+		   infiniteMandel = c : (map (\z -> z*z +c) infiniteMandel)
+
+
+(2)	Expand Haskells builtin magnitude function (Is the preludes definition
+	of magnitude a little paranoid - its *really* slow ??)
+
+diverge::Complex Double -> Double -> Bool
+--diverge cmplx radius =  magnitude cmplx > radius
+diverge (x:+y) radius = ((x*x) + (y*y)) > (radius * radius)
+
+
+STAT files produced before and after these Changes
+--------------------------------------------------
+
+input = {-2.0, -2.0, 2.0, 2.0, 50, 50, 20}
+
+Before Changes
+---------------
+
+       208 GCs,
+     54.30 (108.3) seconds total time,
+      1.95 (4.1) seconds GC time ( 3.6( 3.8)% of total time)
+  41748600 bytes allocated from the heap.
+210 chunks allocated
+No of CONC reductions: 0, of which 0 used associativity
+No of bigcmp: 0, eq: 0, ind: 0
+Memcheck histogram:
+  > 1024 :       0
+
+After Changes
+-------------
+
+        61 GCs,
+      9.47 (18.1) seconds total time,
+      0.54 (0.9) seconds GC time ( 5.7( 5.2)% of total time)
+  12382668 bytes allocated from the heap.
+63 chunks allocated
+No of CONC reductions: 0, of which 0 used associativity
+No of bigcmp: 0, eq: 0, ind: 0
+Memcheck histogram:
+  > 1024 :       0
+
+
+The following test data results in an execution time of about 4 minutes on a 
+sun IPC with 48 megs of main memory. 
+
+daphne> main -s -h100000 | xloadimage stdin
+Enter min x  = -2.0
+Enter min y  = -2.0
+Enter max x  = 2.0
+Enter max y  = 2.0
+Screen width = 150
+Screen height= 150
+Screen depth = 75
+
+stdin is a 150x150 Raw PPM image with 76 levels
+  Converting true color image to RGB image with 256 colors...image uses 37 color
+s...done
+  Building XImage...done
+daphne>
+
+
+-- 
+ ***************************************************************************
+ *   Jonathan Hill		     *					   *
+ *   Centre for Parallel Computing   *   Email    : hilly@dcs.qmw.ac.uk	   *
+ *   Computer Science Department     *     				   *
+ *   Queen Mary & Westfied College   *   Phone    : 071-975-5167 ex 3232   *
+ *   London E1 4NS                   * 				           *
+ *************************************************************************** 
+

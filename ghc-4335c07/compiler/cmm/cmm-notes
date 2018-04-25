@@ -1,0 +1,285 @@
+More notes (Aug 11)
+~~~~~~~~~~~~~~~~~~
+* CmmInfo.cmmToRawCmm expands info tables to their representations
+  (needed for .cmm files as well as the code generators)
+
+* Why is FCode a lazy monad?  That makes it inefficient.
+  We want laziness to get code out one procedure at a time,
+  but not at the instruction level.
+  UPDATE (31/5/2016): FCode is strict since 09afcc9b.
+
+Things we did
+  * Remove CmmCvt.graphToZgraph (Conversion from old to new Cmm reps)
+  * Remove HscMain.optionallyConvertAndOrCPS (converted old Cmm to
+    new, ran pipeline, and converted back)
+  * Remove CmmDecl. Put its types in Cmm.  Import Cmm into OldCmm
+    so it can get those types.
+
+
+More notes (June 11)
+~~~~~~~~~~~~~~~~~~~~
+
+* In CmmContFlowOpts.branchChainElim, can a single block be the
+  successor of two calls?
+
+* Check in ClosureInfo:
+     -- NB: Results here should line up with the results of SMRep.rtsClosureType
+
+More notes (May 11)
+~~~~~~~~~~~~~~~~~~~
+In CmmNode, consider spliting CmmCall into two: call and jump
+
+Notes on new codegen (Aug 10)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Things to do:
+ - Proc points pass all arguments on the stack, adding more code and
+   slowing down things a lot. We either need to fix this or even better
+   would be to get rid of proc points.
+
+ - Sort out Label, LabelMap, LabelSet versus BlockId, BlockEnv, BlockSet
+   dichotomy. Mostly this means global replace, but we also need to make
+   Label an instance of Outputable (probably in the Outputable module).
+
+   EZY: We should use Label, since that's the terminology Hoopl uses.
+
+ - AsmCodeGen has a generic Cmm optimiser; move this into new pipeline
+   EZY (2011-04-16): The mini-inliner has been generalized and ported,
+   but the constant folding and other optimizations need to still be
+   ported.
+
+ - AsmCodeGen has post-native-cg branch eliminator (shortCutBranches);
+   we ultimately want to share this with the Cmm branch eliminator.
+
+ - At the moment, references to global registers like Hp are "lowered" 
+   late (in CgUtils.fixStgRegisters). We should do this early, in the
+	new native codegen, much in the way that we lower calling conventions.
+	Might need to be a bit sophisticated about aliasing.
+
+ - Move to new Cmm rep:
+     * Make native CG consume New Cmm; 
+     * Convert Old Cmm->New Cmm to keep old path alive
+     * Produce New Cmm when reading in .cmm files
+
+ - Top-level SRT threading is a bit ugly
+
+ - See "CAFs" below; we want to totally refactor the way SRTs are calculated
+
+ - Garbage-collect http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/CPS
+   moving good stuff into 
+   http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/NewCodeGenPipeline
+
+ - Currently AsmCodeGen top level calls AsmCodeGen.cmmToCmm, which is a small
+   C-- optimiser.  It has quite a lot of boilerplate folding code in AsmCodeGen
+   (cmmBlockConFold, cmmStmtConFold, cmmExprConFold), before calling out to
+   CmmOpt.  ToDo: see what optimisations are being done; and do them before
+   AsmCodeGen.
+
+ - If we stick CAF and stack liveness info on a LastCall node (not LastRet/Jump)
+   then all CAF and stack liveness stuff be completed before we split
+   into separate C procedures.
+
+   Short term:
+     compute and attach liveness into LastCall
+     right at end, split, cvt to old rep
+     [must split before cvt, because old rep is not expressive enough]
+
+   Longer term: 
+     when old rep disappears, 
+     move the whole splitting game into the C back end *only*
+	 (guided by the procpoint set)
+
+----------------------------------------------------
+	Modules in codeGen/
+----------------------------------------------------
+
+
+------- Shared ---------
+Bitmap.hs
+SMRep.lhs
+
+CmmParse.y
+CgExtCode.hs   used in CmmParse.y
+
+------- New codegen ---------
+
+StgCmm.hs
+StgCmmBind.hs
+StgCmmClosure.hs     (corresponds to old ClosureInfo)
+StgCmmCon.hs
+StgCmmEnv.hs
+StgCmmExpr.hs
+StgCmmForeign.hs
+StgCmmHeap.hs
+StgCmmHpc.hs
+StgCmmLayout.hs
+StgCmmMonad.hs
+StgCmmPrim.hs
+StgCmmProf.hs
+StgCmmTicky.hs
+StgCmmUtils.hs
+
+------- Old codegen (moribund) ---------
+CodeGen.lhs
+CgBindery.lhs
+CgCallConv.hs
+CgCase.lhs
+CgClosure.lhs
+CgCon.lhs
+CgExpr.lhs
+CgLetNoEscape.lhs
+CgForeignCall.hs
+CgHeapery.lhs
+CgHpc.hs
+CgInfoTbls.hs
+CgMonad.lhs
+CgParallel.hs
+CgPrimOp.hs
+CgProf.hs
+CgStackery.lhs
+CgTailCall.lhs
+CgTicky.hs
+CgUtils.hs
+ClosureInfo.lhs
+
+----------------------------------------------------
+	Modules in cmm/
+----------------------------------------------------
+
+-------- Moribund stuff ------------
+OldCmm.hs      Definition of flowgraph of old representation
+               Imports some data types from (new) Cmm
+OldCmmUtil.hs  Utilites that operates mostly on on CmmStmt
+OldPprCmm.hs   Pretty print for CmmStmt, GenBasicBlock and ListGraph
+CmmOpt.hs      Hopefully-redundant optimiser
+
+-------- Stuff to keep ------------
+CmmPipeline.hs            Driver for new pipeline
+
+CmmLive.hs                Liveness analysis, dead code elim
+CmmProcPoint.hs           Identifying and splitting out proc-points
+
+CmmSpillReload.hs         Save and restore across calls
+
+CmmCommonBlockElim.hs     Common block elim
+CmmContFlowOpt.hs         Other optimisations (branch-chain, merging)
+
+CmmBuildInfoTables.hs     New info-table 
+CmmStackLayout.hs         and stack layout 
+CmmCallConv.hs
+CmmInfo.hs                Defn of InfoTables, and conversion to exact byte layout
+
+---------- Cmm data types --------------
+Cmm.hs              Cmm instantiations of dataflow graph framework
+  CmmExpr.hs        Type of Cmm expression
+  CmmType.hs        Type of Cmm types and their widths
+  CmmMachOp.hs      MachOp type and accompanying utilities
+
+PprCmm.hs	    Pretty printer for Cmm
+  PprCmmExpr.hs     Pretty printer for CmmExpr
+
+MkGraph.hs          Interface for building Cmm for codeGen/Stg*.hs modules
+
+CmmUtils.hs
+CmmLint.hs
+
+PprC.hs	            Pretty print Cmm in C syntax
+
+CLabel.hs           CLabel
+BlockId.hs          BlockId, BlockEnv, BlockSet
+
+
+----------------------------------------------------
+	Proc-points
+----------------------------------------------------
+
+Consider this program, which has a diamond control flow, 
+with a call on one branch
+ fn(p,x) {
+        h()
+	if b then { ... f(x) ...; q=5; goto J }
+             else { ...; q=7; goto J }
+     J: ..p...q...
+  }
+then the join point J is a "proc-point".  So, is 'p' passed to J
+as a parameter?  Or, if 'p' was saved on the stack anyway, perhaps
+to keep it alive across the call to h(), maybe 'p' gets communicated
+to J that way. This is an awkward choice.  (We think that we currently
+never pass variables to join points via arguments.)
+
+Furthermore, there is *no way* to pass q to J in a register (other
+than a parameter register).
+
+What we want is to do register allocation across the whole caboodle.
+Then we could drop all the code that deals with the above awkward
+decisions about spilling variables across proc-points.
+
+Note that J doesn't need an info table.
+
+What we really want is for each LastCall (not LastJump/Ret) 
+to have an info table.   Note that ProcPoints that are not successors
+of calls don't need an info table.
+
+Figuring out proc-points
+~~~~~~~~~~~~~~~~~~~~~~~~
+Proc-points are identified by
+CmmProcPoint.minimalProcPointSet/extendPPSet Although there isn't
+that much code, JD thinks that it could be done much more nicely using
+a dominator analysis, using the Dataflow Engine.
+
+----------------------------------------------------
+		CAFs
+----------------------------------------------------
+
+* The code for a procedure f may refer to either the *closure* 
+  or the *entry point* of another top-level procedure g.  
+  If f is live, then so is g.  f's SRT must include g's closure.
+
+* The CLabel for the entry-point/closure reveals whether g is 
+  a CAF (or refers to CAFs).  See the IdLabel constructor of CLabel.
+
+* The CAF-ness of the original top-level defininions is figured out
+  (by TidyPgm) before we generate C--.  This CafInfo is only set for
+  top-level Ids; nested bindings stay with MayHaveCafRefs.
+
+* Currently an SRT contains (only) pointers to (top-level) closures.
+
+* Consider this Core code
+	f = \x -> let g = \y -> ...x...y...h1...
+                  in ...h2...g...
+  and suppose that h1, h2 have IdInfo of MayHaveCafRefs.
+  Therefore, so will f,  But g will not (since it's nested).
+
+  This generates C-- roughly like this:
+     f_closure: .word f_entry
+     f_entry() [info-tbl-for-f] { ...jump g_entry...jump h2... }
+     g_entry() [info-tbl-for-g] { ...jump h1... }
+
+  Note that there is no top-level closure for g (only an info table).
+  This fact (whether or not there is a top-level closure) is recorded
+  in the InfoTable attached to the CmmProc for f, g
+  INVARIANT: 
+     Any out-of-Group references to an IdLabel goes to
+     a Proc whose InfoTable says "I have a top-level closure".
+  Equivalently: 
+     A CmmProc whose InfoTable says "I do not have a top-level
+     closure" is referred to only from its own Group.
+
+* So:   info-tbl-for-f must have an SRT that keeps h1,h2 alive
+        info-tbl-for-g must have an SRT that keeps h1 (only) alive
+
+  But if we just look for the free CAF refs, we get:
+	f   h2 (only)
+        g   h1
+
+  So we need to do a transitive closure thing to flesh out 
+  f's keep-alive refs to include h1.
+
+* The SRT info is the C_SRT field of Cmm.ClosureTypeInfo in a
+  CmmInfoTable attached to each CmmProc.  CmmPipeline.toTops actually does
+  the attaching, right at the end of the pipeline.  The C_SRT part
+  gives offsets within a single, shared table of closure pointers.
+
+* DECIDED: we can generate SRTs based on the final Cmm program
+  without knowledge of how it is generated.
+

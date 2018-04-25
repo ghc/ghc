@@ -1,0 +1,20 @@
+[unit : All x. x -> List x,
+ append : All x. List x -> List x -> List x,
+ fix : All x. (x -> x) -> x]
+? \x. x : a0 -> a0
+? \x y. x : a0 -> a1 -> a0
+? Failed to parse
+? Failed to type
+? \f g x. g (f x) : (a2 -> a3) -> (a3 -> a4) -> a2 -> a4
+? Failed to type
+? (\x. x) (\x. x) : a1 -> a1
+? Failed to type
+? let  id = (\x. x)  in  id id : a2 -> a2
+? Failed to type
+? fix (\x. x) : a2
+? Failed to type
+? \x. unit (unit x) : a0 -> List (List a0)
+? Failed to type
+? \x. fix (\xs. append (unit x) xs) : a0 -> List a0
+? let  id = (\x. x)  in  id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id id : a566 -> a566
+? 

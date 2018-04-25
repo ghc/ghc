@@ -1,0 +1,4 @@
+-- Both should raise an exception
+([seq (seq undefined (\a -> error "a"))] !! 0) [1]
+([seq (seq undefined (\a -> undefined))] !! 0) [1]
+

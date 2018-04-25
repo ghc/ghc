@@ -1,0 +1,9 @@
+unit p where
+    signature A(module A, newSTRef) where
+        import Data.STRef.Lazy(newSTRef)
+unit q where
+    signature A(module A, newSTRef) where
+        import Data.STRef.Strict(newSTRef)
+unit r where
+    dependency p[A=<B>]
+    dependency q[A=<B>]

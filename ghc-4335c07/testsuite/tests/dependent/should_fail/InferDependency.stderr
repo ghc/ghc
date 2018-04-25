@@ -1,0 +1,8 @@
+
+InferDependency.hs:6:1: error:
+    • Invalid declaration for ‘Proxy2’; you must explicitly
+      declare which variables are dependent on which others.
+      Inferred variable kinds:
+        k :: *
+        a :: k
+    • In the data type declaration for ‘Proxy2’

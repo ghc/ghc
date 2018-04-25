@@ -1,0 +1,22 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B                ( p/B.hs, nothing )
+[2 of 3] Processing a
+  Instantiating a
+  [1 of 1] Compiling A                ( a/A.hs, bkpfail45.out/a/A.o )
+[3 of 3] Processing q
+  Instantiating q
+  [1 of 1] Including p[A=a:A]
+    Instantiating p[A=a:A]
+    [1 of 2] Compiling A[sig]           ( p/A.hsig, bkpfail45.out/p/p-KvF5Y9pEVY39j64PHPNj9i/A.o )
+
+bkpfail45.bkp:13:9: error:
+    • Type constructor ‘T’ has conflicting definitions in the module
+      and its hsig file
+      Main module: type role T phantom
+                   data T a = T
+      Hsig file:  type role T nominal
+                  data T a = T
+      The roles do not match.
+      Roles on abstract types default to ‘representational’ in boot files.
+    • while checking that a:A implements signature A in p[A=a:A]

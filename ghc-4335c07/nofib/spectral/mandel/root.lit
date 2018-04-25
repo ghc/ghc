@@ -1,0 +1,39 @@
+\begin{onlystandalone}
+\documentstyle[12pt,literate]{article}
+\begin{document}
+\title{The Mandelbrot set in Haskell}
+\author{Jonathan Hill}
+
+\date{24th April 1992}
+\maketitle
+
+\end{onlystandalone}
+\begin{onlystandalone}
+
+\tableofcontents
+
+{\bf Note for Will:} I've just recompiled the program after performing some
+minor changes (making it a little prettier). Unfortunatly these small 
+changes have resulted in the program being considerably slower !!
+
+\section{Module \tr{Mandel.lhs}}
+\downsection
+\input{Mandel.lhs}
+\upsection
+
+\section{Module \tr{Main.lhs}}
+\downsection
+\input{Main.lhs}
+\upsection
+
+\section{Module \tr{PortablePixmap.lhs}}
+\downsection
+\input{PortablePixmap.lhs}
+\upsection
+
+%\bibliographystyle{alpha}
+%\bibliography{functional}
+
+\printindex
+\end{document}
+\end{onlystandalone}

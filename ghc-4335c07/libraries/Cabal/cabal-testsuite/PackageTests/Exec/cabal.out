@@ -1,0 +1,10 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - my-0.1 (exe:my-executable) (first run)
+Configuring my-0.1...
+Preprocessing executable 'my-executable' for my-0.1..
+Building executable 'my-executable' for my-0.1..
+# my my-executable
+This is my-executable

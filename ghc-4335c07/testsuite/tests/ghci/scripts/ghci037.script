@@ -1,0 +1,3 @@
+x <- Control.Concurrent.myThreadId
+y <- Control.Concurrent.myThreadId
+print (x == y)

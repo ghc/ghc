@@ -1,0 +1,21 @@
+unit p where
+    signature A where
+        data A
+        neg :: A -> A
+    module P where
+        import A
+        f :: A -> A
+        f = neg . neg
+
+unit r where
+    module A where
+        type A = Bool
+        neg :: A -> A
+        neg = not
+
+unit q where
+    dependency p[A=r:A]
+    module M where
+        import P
+        g :: Bool
+        g = f True

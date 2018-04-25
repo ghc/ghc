@@ -1,0 +1,5 @@
+foo() {
+    bits64 a;
+    a = (0x10000000000000000 :: bits64); // overflows 64 bits
+    return (a);
+}

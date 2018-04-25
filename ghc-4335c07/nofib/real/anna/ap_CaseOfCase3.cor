@@ -1,0 +1,125 @@
+
+thing a ::= Nil | Cons (thing a);
+
+;;
+
+tf1 x = 
+  case x  of Nil -> Nil; Cons as ->
+    as
+  end;
+
+tf2 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+    bs
+  end
+  end;
+
+tf3 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+  case bs of Nil -> Nil; Cons cs ->
+    cs
+  end
+  end
+  end;
+
+tf4 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+  case bs of Nil -> Nil; Cons cs ->
+  case cs of Nil -> Nil; Cons ds ->
+    ds
+  end
+  end
+  end
+  end;
+
+tf5 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+  case bs of Nil -> Nil; Cons cs ->
+  case cs of Nil -> Nil; Cons ds ->
+  case ds of Nil -> Nil; Cons es ->
+    es
+  end
+  end
+  end
+  end
+  end;
+
+tf6 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+  case bs of Nil -> Nil; Cons cs ->
+  case cs of Nil -> Nil; Cons ds ->
+  case ds of Nil -> Nil; Cons es ->
+  case es of Nil -> Nil; Cons fs ->
+    fs
+  end
+  end
+  end
+  end
+  end
+  end;
+
+tf7 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+  case bs of Nil -> Nil; Cons cs ->
+  case cs of Nil -> Nil; Cons ds ->
+  case ds of Nil -> Nil; Cons es ->
+  case es of Nil -> Nil; Cons fs ->
+  case fs of Nil -> Nil; Cons gs ->
+    gs
+  end
+  end
+  end
+  end
+  end
+  end
+  end;
+
+tf8 x =
+  case x  of Nil -> Nil; Cons as ->
+  case as of Nil -> Nil; Cons bs ->
+  case bs of Nil -> Nil; Cons cs ->
+  case cs of Nil -> Nil; Cons ds ->
+  case ds of Nil -> Nil; Cons es ->
+  case es of Nil -> Nil; Cons fs ->
+  case fs of Nil -> Nil; Cons gs ->
+  case gs of Nil -> Nil; Cons hs ->
+    hs
+  end
+  end
+  end
+  end
+  end
+  end
+  end
+  end;
+
+
+{
+                            Arg  Result  Group  Total   Func   Case     Anna      Norm    Norm
+   Name               Rec Points Points    Max  Nodes  Nodes  Nodes     Cost        ap      rp
+------------------------------------------------------------------------------------------------
+
+   _tf1                no      4      4      1      5      0      1     6437    1160.8   145.1
+   _tf2                no      4      4      1      8      0      2    10086    1818.9   227.4
+   _tf3                no      4      4      1     11      0      3    19263    3473.8   434.2
+   _tf4                no      4      4      1     14      0      4    44635    8049.3   1006
+   _tf5                no      4      4      1     17      0      5   118173   21311     2664
+   _tf6                no      4      4      1     20      0      6   335760   60550     7569
+   _tf7                no      4      4      1     23      0      7   985015  177634    22204
+   _tf8                no      4      4      1     26      0      8  2928636  528141    66018
+
+tf1  17310    23747  
+tf2  22964    33050
+tf3  29235    48498
+tf4  36249    80884
+tf5  44138   162311
+tf6  53034   388794
+tf7  63092  1048107
+tf8  74892  3003528 
+}

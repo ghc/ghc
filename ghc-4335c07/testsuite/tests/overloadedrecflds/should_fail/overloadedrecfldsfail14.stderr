@@ -1,0 +1,5 @@
+
+overloadedrecfldsfail14.hs:12:7: error:
+    ‘y’ is not a record selector
+    In the expression: r {x = 3, y = False}
+    In an equation for ‘f’: f r = r {x = 3, y = False}

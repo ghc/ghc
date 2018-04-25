@@ -1,0 +1,11 @@
+--Testing custom classes and instances as well as data type shadowing
+class C a
+instance C Int
+
+data Foo = Bar | Baz
+class MyEq a where ; myeq :: a -> a -> Bool ; a `myeq` b = True
+instance MyEq Foo
+Bar `myeq` Baz
+data Foo = Bar | Baz
+instance MyEq Foo where ; a `myeq` b = False
+Baz `myeq` Bar

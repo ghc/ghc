@@ -1,0 +1,14 @@
+EmptyCase001.hs:9:6: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: _ :: Int
+
+EmptyCase001.hs:14:8: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns not matched:
+            []
+            (_:_)
+
+EmptyCase001.hs:18:8: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: _ :: Char

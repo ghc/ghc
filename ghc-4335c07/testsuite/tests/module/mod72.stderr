@@ -1,0 +1,2 @@
+
+mod72.hs:3:7: error: Variable not in scope: g :: t -> t1

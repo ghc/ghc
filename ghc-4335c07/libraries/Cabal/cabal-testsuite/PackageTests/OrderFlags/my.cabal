@@ -1,0 +1,20 @@
+name: OrderFlags
+version: 0.1
+license: BSD3
+author: Oleksandr Manzyuk
+stability: stable
+category: PackageTests
+build-type: Simple
+cabal-version: >=1.9.2
+
+description:
+    Check that Cabal correctly orders flags that are passed to GHC.
+
+library
+    exposed-modules: Foo
+    build-depends: base
+
+    ghc-options: -Wall -Werror
+
+    if impl(ghc >= 6.12.1)
+        ghc-options: -fno-warn-unused-do-bind

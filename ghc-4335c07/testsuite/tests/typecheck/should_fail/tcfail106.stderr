@@ -1,0 +1,10 @@
+
+tcfail106.hs:11:10: error:
+    • No instance for (S Int)
+        arising from the superclasses of an instance declaration
+    • In the instance declaration for ‘C Int’
+
+tcfail106.hs:14:10: error:
+    • No instance for (S Int)
+        arising from the superclasses of an instance declaration
+    • In the instance declaration for ‘D Int’

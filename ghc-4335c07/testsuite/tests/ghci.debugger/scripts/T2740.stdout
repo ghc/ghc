@@ -1,0 +1,8 @@
+Stopped in Test.f, T2740.hs:3:11-13
+_result :: Bool = _
+x :: Integer = 1
+y :: Integer = 2
+x = 1
+y = 2
+x = 1
+y = 2

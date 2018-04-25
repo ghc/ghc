@@ -1,0 +1,79 @@
+include Makefile.inc
+
+OBJDIR = ${BUILDDIR}/obj/hsc2hs
+TARGET = ${DST}/hsc2hs$(EXE)
+
+SRCS   = Main.hs
+FROMC  = ../libraries/base/System/Console/GetOpt.$C \
+	 ../libraries/directory/System/Directory.$C \
+	 ../libraries/base/Data/List.$C \
+	 ../libraries/process/System/Cmd.$C \
+	 ../libraries/base/System/IO.$C \
+	 ../libraries/base/Control/Monad.$C \
+	 ../libraries/base/Control/Exception/Base.$C \
+	 ../libraries/base/Foreign/C/String.$C \
+	 ../libraries/base/Foreign/Marshal/Alloc.$C \
+	 ../libraries/base/System/Posix/Internals.$C \
+	 ../libraries/filepath/System/FilePath/Posix.$C \
+	 ../libraries/base/Foreign/Marshal/Array.$C \
+	 ../libraries/base/Foreign/Marshal/Utils.$C \
+	 ../libraries/base/NHC/PosixTypes.$C \
+	 ../libraries/base/Data/Typeable.$C \
+	 ../libraries/base/Data/HashTable.$C \
+	 ../libraries/base/NHC/SizedTypes.$C \
+	 ../libraries/base/Data/Bits.$C \
+	 ../libraries/base/Foreign/C/Types.$C
+
+FMERROR = ../libraries/base/Foreign/Marshal/Error.$C
+SIERROR = ../libraries/base/System/IO/Error.$C
+FCERROR = ../libraries/base/Foreign/C/Error.$C
+
+#REALC =  ../libraries/base/cbits/dirUtils.c
+
+CINCLUDES = -I../libraries/base/include -I../libraries/directory/include
+
+#	 ../libraries/base/Control/Exception.$C \
+#	 ../libraries/base/System/Posix/Types.$C \
+
+ifeq "$(findstring ghc, ${HC})" "ghc"
+HFLAGS = $(shell $(LOCAL)fixghc $(GHCSYM) -package base -package lang -package process -package directory )
+export HFLAGS
+endif
+ifeq "$(findstring hbc, ${HC})" "hbc"
+HFLAGS =
+export HFLAGS
+endif
+ifeq "$(findstring nhc98, ${HC})" "nhc98"
+HFLAGS = -package base -package filepath -package directory -package process +CTS -H4M -CTS
+export HFLAGS
+endif
+
+all: $(TARGET)
+install: $(TARGET)
+cfiles: cleanC $(SRCS)
+	$(HMAKE) -hc=$(LOCAL)nhc98 -package base -package filepath \
+	-package directory -package process -DBUILD_NHC -C Main.hs
+clean:
+	-rm -f *.hi *.o $(OBJDIR)/*.o
+cleanC: clean
+	-rm -f *.hc *.c
+realclean: clean cleanC
+	-rm -f $(OBJDIR)/Main$(EXE)
+
+$(TARGET): $(OBJDIR) $(SRCS)
+	$(HMAKE) -hc=$(HC) Main -d$(OBJDIR) -DBUILD_NHC \
+		$(shell echo "${BUILDOPTS}") $(HFLAGS) $(CYGFLAG)
+	mv $(OBJDIR)/Main$(EXE) $(TARGET)
+	$(HOSTSTRIP) $(TARGET)
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
+fromC: $(OBJDIR)
+	cp $(FROMC) .
+	cp $(FMERROR) ./FMError.$C
+	cp $(SIERROR) ./SIError.$C
+	cp $(FCERROR) ./FCError.$C
+	$(LOCAL)nhc98 -cpp -o $(TARGET) -d$(OBJDIR) $(CINCLUDES) *.$C $(REALC)
+	$(HOSTSTRIP) $(TARGET)
+

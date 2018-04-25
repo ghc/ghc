@@ -1,0 +1,10 @@
+
+ContextStack1.hs:10:5:
+    Reduction stack overflow; size = 11
+    When simplifying the following type: Cls [[[[[[[[[[()]]]]]]]]]]
+    Use -freduction-depth=0 to disable this check
+    (any upper bound you could choose might fail unpredictably with
+     minor updates to GHC, so disabling the check is recommended if
+     you're sure that type checking should terminate)
+    In the expression: meth
+    In an equation for ‘t’: t = meth

@@ -1,0 +1,9 @@
+# Setup configure
+Configuring bkpth-1.0...
+# Setup build
+Preprocessing library 'helper' for bkpth-1.0..
+Building library 'helper' instantiated with A = <A>
+for bkpth-1.0..
+Preprocessing library for bkpth-1.0..
+Building library instantiated with A = <A>
+for bkpth-1.0..

@@ -1,0 +1,50 @@
+(N :+ (N :* N))
+(N :+ (N :* N))
+((N :+ N) :+ N)
+((N :+ N) :+ N)
+((N :+ N) :+ N)
+((N :+ N) :+ N)
+((N :+ N) :+ N)
+((N :+ N) :+ N)
+(N :+ (N :* N))
+((N :+ N) :* N)
+(N :+ (N :+ N))
+((N :+ N) :+ N)
+(((N :+ N) :* N) :+ N)
+(N :+ (N :* (N :+ N)))
+((N :+ N) :* (N :+ N))
+((N :+ N) :* (N :+ N))
+((N :+ (N :* N)) :+ (N :* N))
+((N :+ N) :* (N :+ N))
+((N :+ (N :* N)) :+ N)
+((N :+ N) :+ N)
+(N :+ (N :+ N))
+(N :* (N :+ N))
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+True
+InfixE (Just (InfixE (Just (ConE TH_unresolvedInfix_Lib.N)) (ConE TH_unresolvedInfix_Lib.:*) (Just (ConE TH_unresolvedInfix_Lib.N)))) (ConE TH_unresolvedInfix_Lib.:+) (Just (ConE TH_unresolvedInfix_Lib.N))
+InfixE (Just (InfixE (Just (ConE TH_unresolvedInfix_Lib.N)) (ConE TH_unresolvedInfix_Lib.:*) (Just (ConE TH_unresolvedInfix_Lib.N)))) (ConE TH_unresolvedInfix_Lib.:+) (Just (ConE TH_unresolvedInfix_Lib.N))
+InfixP (InfixP (ConP TH_unresolvedInfix_Lib.N []) TH_unresolvedInfix_Lib.:* (ConP TH_unresolvedInfix_Lib.N [])) TH_unresolvedInfix_Lib.:+ (ConP TH_unresolvedInfix_Lib.N [])
+InfixP (InfixP (ConP TH_unresolvedInfix_Lib.N []) TH_unresolvedInfix_Lib.:* (ConP TH_unresolvedInfix_Lib.N [])) TH_unresolvedInfix_Lib.:+ (ConP TH_unresolvedInfix_Lib.N [])
+AppT (AppT (ConT TH_unresolvedInfix_Lib.+) (AppT (AppT (ConT TH_unresolvedInfix_Lib.*) (ConT GHC.Types.Int)) (ConT GHC.Types.Int))) (ConT GHC.Types.Int)
+AppT (AppT (ConT TH_unresolvedInfix_Lib.+) (AppT (AppT (ConT TH_unresolvedInfix_Lib.*) (ConT GHC.Types.Int)) (ConT GHC.Types.Int))) (ConT GHC.Types.Int)
+N :+ (N :+ N :+ N)
+(N)
+N :+ (N :+ N :+ N)
+(N)
+(Int + (Int + Int + Int))
+Int

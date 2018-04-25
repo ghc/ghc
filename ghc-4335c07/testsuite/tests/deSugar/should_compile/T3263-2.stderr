@@ -1,0 +1,8 @@
+
+T3263-2.hs:25:3: warning: [-Wwrong-do-bind (in -Wdefault)]
+    A do-notation statement discarded a result of type ‘m Int’
+    Suppress this warning by saying ‘_ <- return (return 10 :: m Int)’
+
+T3263-2.hs:37:3: warning: [-Wwrong-do-bind (in -Wdefault)]
+    A do-notation statement discarded a result of type ‘m Int’
+    Suppress this warning by saying ‘_ <- return (return 10 :: m Int)’

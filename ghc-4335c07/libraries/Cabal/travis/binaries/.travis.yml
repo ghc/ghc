@@ -1,0 +1,33 @@
+language: c
+dist: trusty
+# This doesn't actually help because we always push a single
+# commit to the branch in question
+#git:
+#    # https://github.com/travis-ci/travis-ci/issues/4575
+#    depth: 1
+sudo: required
+before_install:
+ - export PATH=/opt/ghc/$GHCVER/bin:$PATH
+ - export PATH=$HOME/.ghc-install/$GHCVER/bin:$PATH
+ - export PATH=$HOME/bin:$PATH
+ - export PATH=$HOME/.cabal/bin:$PATH
+ - export PATH=$HOME/.local/bin:$PATH
+ - export PATH=/opt/cabal/1.24/bin:$PATH
+ - export PATH=/opt/happy/1.19.5/bin:$PATH
+ - export PATH=/opt/alex/3.1.7/bin:$PATH
+ - ./travis-install.sh
+script:
+    - ./travis-test.sh
+after_success:
+    - ./travis-cleanup.sh
+notifications:
+  webhooks:
+    urls: https://sake-bot.herokuapp.com/
+    on_start: always
+  irc:
+    channels:
+      - "chat.freenode.net##haskell-cabal"
+  slack: haskell-cabal:sCq6GLfy9N8MJrInosg871n4
+# To append on:
+# env: GHCVER=7.6.3 UPSTREAM_BUILD_DIR=/home/travis/user/repo
+# os: linux

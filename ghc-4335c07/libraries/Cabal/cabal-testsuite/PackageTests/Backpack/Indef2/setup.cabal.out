@@ -1,0 +1,10 @@
+# Setup configure
+Resolving dependencies...
+Configuring Indef2-0.1.0.0...
+# Setup build
+Preprocessing library 'asig1' for Indef2-0.1.0.0..
+Building library 'asig1' instantiated with A = <A>
+for Indef2-0.1.0.0..
+Preprocessing library for Indef2-0.1.0.0..
+Building library instantiated with A = <A>
+for Indef2-0.1.0.0..

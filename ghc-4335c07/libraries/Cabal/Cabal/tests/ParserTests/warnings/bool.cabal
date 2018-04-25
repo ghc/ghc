@@ -1,0 +1,12 @@
+name: bool
+version: 1
+cabal-version: >= 1.6
+
+flag foo
+  manual: true
+
+library
+    build-depends: base >= 4.9 && <4.10
+    if flag(foo)
+      build-depends: containers
+    hs-source-dirs: .

@@ -1,0 +1,17 @@
+
+T7848.hs:10:9: error:
+    • Couldn't match expected type ‘Char’ with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          (&) :: forall a. a
+        at T7848.hs:10:9-35
+    • In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
+      In an equation for ‘x’:
+          x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)
+            = y
+            where
+                infixl 3 `y`
+                y _ = (&)
+                {-# INLINE (&) #-}
+                {-# SPECIALIZE (&) :: a #-}
+                (&) = 'c'

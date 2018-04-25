@@ -1,0 +1,84 @@
+"0x3y"
+[("0x3","y")]
+[(Number (MkNumber 16 [3]),"y")]
+
+"0X3abx"
+[("0X3ab","x")]
+[(Number (MkNumber 16 [3,10,11]),"x")]
+
+"0o39y"
+[("0o3","9y")]
+[(Number (MkNumber 8 [3]),"9y")]
+
+"0O334z"
+[("0O334","z")]
+[(Number (MkNumber 8 [3,3,4]),"z")]
+
+"NaN"
+[("NaN","")]
+[(Ident "NaN","")]
+
+"NaNx"
+[("NaNx","")]
+[(Ident "NaNx","")]
+
+"Infinity"
+[("Infinity","")]
+[(Ident "Infinity","")]
+
+"Infinityx"
+[("Infinityx","")]
+[(Ident "Infinityx","")]
+
+"Wibble Foo"
+[("Wibble"," Foo")]
+[(Ident "Wibble"," Foo")]
+
+"Wibble8_+"
+[("Wibble8_","+")]
+[(Ident "Wibble8_","+")]
+
+"34yy"
+[("34","yy")]
+[(Number (MkDecimal [3,4] Nothing Nothing),"yy")]
+
+"34.4x"
+[("34.4","x")]
+[(Number (MkDecimal [3,4] (Just [4]) Nothing),"x")]
+
+"034.4x"
+[("034.4","x")]
+[(Number (MkDecimal [0,3,4] (Just [4]) Nothing),"x")]
+
+"31.45e-6y"
+[("31.45e-6","y")]
+[(Number (MkDecimal [3,1] (Just [4,5]) (Just (-6))),"y")]
+
+"49.2v"
+[("49.2","v")]
+[(Number (MkDecimal [4,9] (Just [2]) Nothing),"v")]
+
+"049.2v"
+[("049.2","v")]
+[(Number (MkDecimal [0,4,9] (Just [2]) Nothing),"v")]
+
+"35e-3x"
+[("35e-3","x")]
+[(Number (MkDecimal [3,5] Nothing (Just (-3))),"x")]
+
+"035e-3x"
+[("035e-3","x")]
+[(Number (MkDecimal [0,3,5] Nothing (Just (-3))),"x")]
+
+"35e+3y"
+[("35e+3","y")]
+[(Number (MkDecimal [3,5] Nothing (Just 3)),"y")]
+
+"83.3e-22"
+[("83.3e-22","")]
+[(Number (MkDecimal [8,3] (Just [3]) (Just (-22))),"")]
+
+"083.3e-22"
+[("083.3e-22","")]
+[(Number (MkDecimal [0,8,3] (Just [3]) (Just (-22))),"")]
+

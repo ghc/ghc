@@ -1,0 +1,5 @@
+data Main.R = Main.MkR {Main.foo :: GHC.Types.Int}
+Main.foo :: Main.R -> GHC.Types.Int
+Main.foo :: Main.R -> GHC.Types.Int
+Main.foo :: Main.R -> GHC.Types.Int
+42

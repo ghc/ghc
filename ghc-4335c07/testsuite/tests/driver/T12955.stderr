@@ -1,0 +1,9 @@
+
+T12955.hsig:1:11: error:
+    Unexpected signature: ‘T12955’
+    (Try passing -instantiated-with="T12955=<T12955>"
+     replacing <T12955> as necessary.)
+
+T12955.hsig:1:11: error:
+    Unexpected signature: ‘T12955’
+    (Try adding ‘T12955’ to the ‘signatures’ field in your Cabal file.)

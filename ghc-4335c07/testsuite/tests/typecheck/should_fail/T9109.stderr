@@ -1,0 +1,14 @@
+
+T9109.hs:8:13: error:
+    • Couldn't match expected type ‘p’ with actual type ‘Bool’
+        ‘p’ is untouchable
+          inside the constraints: a ~ Bool
+          bound by a pattern with constructor: GBool :: G Bool,
+                   in an equation for ‘foo’
+          at T9109.hs:8:5-9
+      ‘p’ is a rigid type variable bound by
+        the inferred type of foo :: G a -> p at T9109.hs:8:1-16
+      Possible fix: add a type signature for ‘foo’
+    • In the expression: True
+      In an equation for ‘foo’: foo GBool = True
+    • Relevant bindings include foo :: G a -> p (bound at T9109.hs:8:1)

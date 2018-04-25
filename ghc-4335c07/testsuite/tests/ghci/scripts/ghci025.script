@@ -1,0 +1,25 @@
+:l ghci025
+System.IO.putStrLn "-- test :browse! functionality"
+System.IO.putStrLn ":browse! *T"
+:browse! *T
+System.IO.putStrLn ":browse! T"
+:browse! T
+:set -fprint-explicit-foralls
+System.IO.putStrLn ":browse! T -- with -fprint-explicit-foralls"
+:browse! T
+
+System.IO.putStrLn "-- test :browse! <target> relative to different contexts"
+:set -fforce-recomp
+:l Ghci025D.hs
+:add Ghci025C.hs
+System.IO.putStrLn ":browse! Ghci025C -- from *Ghci025C>"
+:browse! Ghci025C
+:add Ghci025B.hs
+System.IO.putStrLn ":browse! Ghci025C -- from *Ghci025B>, after :add Ghci025B"
+:browse! Ghci025C
+:m *Ghci025C
+System.IO.putStrLn ":browse! Ghci025C -- from *Ghci025C>, after :m *Ghci025C"
+:browse! Ghci025C
+:m *Ghci025D
+System.IO.putStrLn ":browse! Ghci025C -- from *Ghci025D>, after :m *Ghci025D"
+:browse! Ghci025C

@@ -1,0 +1,114 @@
+#!/bin/sh -e
+
+# Manuel M. T. Chakravarty <chak@acm.org>, June 2000
+# Updated for GHC 5.00, Simon Marlow, March 2001
+# Updated for GHC 5.04.3, Urban Boquist, March 2003
+#
+# Script to build GHC from .hc files (must be run in the fptools/ root
+# directory into which the source and .hc files must already have been
+# unpacked).  All options are passed through to ./configure (especially
+# useful with --prefix).
+
+configopts="$*"         # e.g., --enable-hc-boot-unregisterised
+PWD=`pwd`
+
+# check for GNU make
+#
+MAKENAMES="gmake make no-make"
+for make in $MAKENAMES; do
+  MAKE=$make
+  $make --version 2>&1 | grep "GNU Make" >/dev/null && break
+done
+if [ $MAKE = no-make ]; then
+  echo "Fatal error: Cannot find the GNU make utility"
+  exit 1
+fi
+
+# build configuration
+#
+case "$configopts" in
+*--enable-hc-boot-unregisterised*)
+cat >>mk/build.mk <<END
+GhcUnregisterised=YES
+GhcWithInterpreter=NO
+GhcWithNativeCodeGen=NO
+SplitObjs=NO
+GhcLibWays=
+GhcWithSMP=NO
+END
+;;
+
+*)
+cat >>mk/build.mk <<END
+# empty
+END
+;;
+esac
+
+echo "*** Building compiler..."
+./configure --enable-hc-boot $configopts
+
+# ToDo: figure out the minimal correct sequence here
+$MAKE -C utils/mkdependC boot all
+$MAKE -C utils/unlit boot all
+$MAKE -C utils/mkdirhier boot all
+$MAKE -C driver/mangler boot all
+$MAKE -C includes boot all
+$MAKE -C rts boot all
+$MAKE -C libraries boot all GhcBootLibs=YES
+$MAKE -C compat boot all
+$MAKE -C utils boot all
+$MAKE -C compiler boot all
+
+MAKEFLAGS=
+
+echo "*** Building libraries..."
+
+# Get rid of --enable-hc-boot-unregisterised in $configotps if we had it
+configopts=`echo $configopts | sed s/--enable-hc-boot-unregisterised//`
+
+# Reconfigure, using the newly-build ghc binary as our $(GHC), and
+# with hc bootstrapping disabled.
+HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/compiler/ghc-inplace" $configopts
+
+PRIMOP_BITS="primop-data-decl.hs-incl \
+	      primop-tag.hs-incl  \
+	      primop-list.hs-incl  \
+	      primop-has-side-effects.hs-incl  \
+	      primop-out-of-line.hs-incl  \
+	      primop-commutable.hs-incl  \
+	      primop-needs-wrapper.hs-incl  \
+	      primop-can-fail.hs-incl  \
+	      primop-strictness.hs-incl  \
+	      primop-usage.hs-incl  \
+	      primop-primop-info.hs-incl"
+
+# Remove the old libraries.  Don't use make clean, because we don't
+# want to delete the .hs files generated from the .hsc files, because
+# we don't have hsc2hs built yet.
+find libraries hslibs | grep '\.[oa]$' | xargs rm -f
+
+# Do includes and RTS now
+$MAKE -C includes boot && $MAKE -C includes all
+$MAKE -C rts      boot && $MAKE -C rts      all
+
+# Now build a new set of libraries (GhcBootLibs only for now)
+$MAKE -C libraries boot all GhcBootLibs=YES
+
+# Build all of compat
+$MAKE -C compat clean && $MAKE -C compat boot all
+
+# Build all of utils
+$MAKE -C utils clean && $MAKE -C utils boot all
+
+# Build the rest of the libraries
+$MAKE -C libraries boot all
+
+# The reconfigure step updates a few files, which can lead to
+# unnecessary recompilations.  Touch a bunch of things here to avoid
+# having to recompile stuff that we've already built.
+(cd compiler; touch main/Config.hs $PRIMOP_BITS stage1/*/*.o stage1/ghc-* ghc-*)
+
+echo hc-build done
+echo The tree should be safe to do 'make install stage=1' in.
+

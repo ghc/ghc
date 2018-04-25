@@ -1,0 +1,5 @@
+
+Main.hs:10:15: error:
+    Conflicting family instance declarations:
+      A (a, Y) = Bool -- Defined at Main.hs:10:15
+      A (B.X, b) = () -- Defined in ‘B’

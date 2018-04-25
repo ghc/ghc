@@ -1,0 +1,15 @@
+
+<no location info>: warning:
+    -XGeneralizedNewtypeDeriving is not allowed in Safe Haskell; ignoring -XGeneralizedNewtypeDeriving
+
+<interactive>:15:29: error:
+    • Can't make a derived instance of ‘Op T2’:
+        ‘Op’ is not a stock derivable class (Eq, Show, etc.)
+        Try GeneralizedNewtypeDeriving for GHC's newtype-deriving extension
+    • In the newtype declaration for ‘T2’
+
+<interactive>:18:9: error:
+    • Data constructor not in scope: T2 :: T -> t
+    • Perhaps you meant ‘T1’ (line 12)
+
+<interactive>:21:4: error: Variable not in scope: y

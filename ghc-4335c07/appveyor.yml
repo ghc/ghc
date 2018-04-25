@@ -1,0 +1,43 @@
+version: "{build}"
+
+build:
+  verbosity: normal
+
+environment:
+  matrix:
+  - COMPILER: msys2
+    PLATFORM: x64
+    MSYS2_ARCH: x86_64
+    MSYS2_DIR: msys64
+    MSYSTEM: MINGW64
+    BIT: 64
+
+os: Visual Studio 2015
+deploy: off
+
+install:
+  - cmd: |
+      SET "PATH=C:\%MSYS2_DIR%\%MSYSTEM%\bin;C:\%MSYS2_DIR%\usr\bin;%PATH%"
+      bash -lc "pacman --noconfirm -Syuu"
+      bash -lc "pacman --noconfirm -S --needed git tar bsdtar binutils autoconf make xz curl libtool automake python python2 p7zip patch mingw-w64-$(uname -m)-gcc mingw-w64-$(uname -m)-python3-sphinx mingw-w64-$(uname -m)-tools-git"
+      bash -lc "cd $APPVEYOR_BUILD_FOLDER; git config remote.origin.url git://github.com/ghc/ghc.git"
+      bash -lc "cd $APPVEYOR_BUILD_FOLDER; git config --global url.\"git://github.com/ghc/packages-\".insteadOf git://github.com/ghc/packages/"
+      bash -lc "cd $APPVEYOR_BUILD_FOLDER; git submodule init"
+      bash -lc "cd $APPVEYOR_BUILD_FOLDER; git submodule --quiet update --recursive"
+      bash -lc "curl -L https://downloads.haskell.org/~ghc/8.2.1/ghc-8.2.1-x86_64-unknown-mingw32.tar.xz | tar -xJ -C /mingw64 --strip-components=1"
+      bash -lc "mkdir -p /usr/local/bin"
+      bash -lc "curl -L https://www.haskell.org/cabal/release/cabal-install-1.24.0.0/cabal-install-1.24.0.0-x86_64-unknown-mingw32.zip | bsdtar -xzf- -C /usr/local/bin"
+      bash -lc "cabal update"
+      bash -lc "cabal install -j --prefix=/usr/local alex happy"
+
+build_script:
+  - bash -lc "cd $APPVEYOR_BUILD_FOLDER; ./boot"
+  - bash -lc "cd $APPVEYOR_BUILD_FOLDER; ./configure --enable-tarballs-autodownload"
+  - bash -lc "cd $APPVEYOR_BUILD_FOLDER; make -j2"
+  - bash -lc "cd $APPVEYOR_BUILD_FOLDER; make binary_dist"
+    bash -lc "cd $APPVEYOR_BUILD_FOLDER; 7z a ghc-windows.zip *.tar.xz"
+
+artifacts:
+  - path: C:\projects\ghc\ghc-windows.zip
+    name: GHC Windows bindist
+    type: zip

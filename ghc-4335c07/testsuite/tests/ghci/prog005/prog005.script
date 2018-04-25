@@ -1,0 +1,18 @@
+:unset +s
+:unset +t
+
+:!cp A1.hs A.hs
+:load B
+
+-- eval something that isn't exported from B
+z
+
+:!sleep 1
+:!touch A.hs
+:reload
+
+-- A should be recompiled, B will be skipped.  We should still have
+-- the full top-level scope of B available, though.  This was
+-- nearly broken in GHC 6.4
+z
+

@@ -1,0 +1,12 @@
+BEGIN
+LT
+GT
+LT
+GT
+EQ
+(True,EQ)
+(False,LT)
+(False,GT)
+(True,EQ)
+True
+END

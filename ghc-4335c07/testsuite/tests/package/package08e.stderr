@@ -1,0 +1,16 @@
+
+package08e.hs:2:1: error:
+    Could not find module ‘MyHsTypes’
+    Use -v to see a list of the files searched for.
+
+package08e.hs:3:1: error:
+    Could not find module ‘HsTypes’
+    Use -v to see a list of the files searched for.
+
+package08e.hs:4:1: error:
+    Could not find module ‘HsUtils’
+    Use -v to see a list of the files searched for.
+
+package08e.hs:5:1: error:
+    Could not find module ‘UniqFM’
+    Use -v to see a list of the files searched for.

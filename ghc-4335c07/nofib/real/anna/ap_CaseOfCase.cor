@@ -1,0 +1,80 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+ev1 l =
+   case l  of Nil -> Nil; Cons a as ->
+      as
+   end;
+
+ev2 l =
+   case l  of Nil -> Nil; Cons a as ->
+   case as of Nil -> Nil; Cons b bs ->
+      bs
+   end
+   end;
+
+ev3 l =
+   case l  of Nil -> Nil; Cons a as ->
+   case as of Nil -> Nil; Cons b bs ->
+   case bs of Nil -> Nil; Cons c cs ->
+      cs
+   end
+   end
+   end;
+
+ev4 l =
+   case l  of Nil -> Nil; Cons a as ->
+   case as of Nil -> Nil; Cons b bs ->
+   case bs of Nil -> Nil; Cons c cs ->
+   case cs of Nil -> Nil; Cons d ds ->
+      ds
+   end
+   end
+   end
+   end;
+
+ev5 l =
+   case l  of Nil -> Nil; Cons a as ->
+   case as of Nil -> Nil; Cons b bs ->
+   case bs of Nil -> Nil; Cons c cs ->
+   case cs of Nil -> Nil; Cons d ds ->
+   case ds of Nil -> Nil; Cons e es ->
+      es
+   end
+   end
+   end
+   end
+   end;
+
+ev6 l =
+   case l  of Nil -> Nil; Cons a as ->
+   case as of Nil -> Nil; Cons b bs ->
+   case bs of Nil -> Nil; Cons c cs ->
+   case cs of Nil -> Nil; Cons d ds ->
+   case ds of Nil -> Nil; Cons e es ->
+   case es of Nil -> Nil; Cons f fs ->
+      fs
+   end
+   end
+   end
+   end
+   end
+   end;
+
+{
+Costs:
+
+                            Arg  Result  Group  Total   Func   Case     Anna      Norm        Norm
+   Name               Rec Points Points    Max  Nodes  Nodes  Nodes     Cost        ap          rp
+-----------------------------------------------------------------------------------------------------
+
+   _ev1                no      4      4      1      5      0      1     9874     1780.6     222.58
+   _ev2                no      4      4      1      8      0      2    14992     2703.6     337.95
+   _ev3                no      4      4      1     11      0      3    31570     5693.2     711.65
+   _ev4                no      4      4      1     14      0      4    92113    16611      2076.4
+   _ev5                no      4      4      1     17      0      5   326596    58897      7362.2
+   _ev6                no      4      4      1     20      0      6  1254874   226300     28287
+
+}

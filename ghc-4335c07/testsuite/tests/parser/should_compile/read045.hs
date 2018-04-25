@@ -1,0 +1,4 @@
+{
+main =
+putStr "hello";
+}

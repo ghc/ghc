@@ -1,0 +1,20 @@
+
+T9939.hs:6:1: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the type signature for:
+           f1 :: forall a. (Eq a, Ord a) => a -> a -> Bool
+
+T9939.hs:10:1: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the type signature for:
+           f2 :: forall a. (Eq a, Ord a) => a -> a -> Bool
+
+T9939.hs:14:1: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq b
+    • In the type signature for:
+           f3 :: forall a b. (Eq a, a ~ b, Eq b) => a -> b -> Bool
+
+T9939.hs:21:1: warning: [-Wredundant-constraints]
+    • Redundant constraint: Eq a
+    • In the type signature for:
+           f4 :: forall a b. (Eq a, Eq b) => a -> b -> Equal a b -> Bool

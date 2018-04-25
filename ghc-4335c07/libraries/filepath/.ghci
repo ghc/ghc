@@ -1,0 +1,13 @@
+:set -fwarn-unused-binds -fwarn-unused-imports
+:set -isrc -itests
+:load System.FilePath System.FilePath.Windows System.FilePath.Posix Generate Test
+import qualified System.FilePath.Windows as W
+import qualified System.FilePath.Posix as P
+
+:def docs_ const $ return ":!cabal haddock"
+:def docs const $ return $ unlines [":docs_",":!start dist\\doc\\html\\filepath\\System-FilePath.html"]
+
+:def gen const $ return "Generate.main"
+:def test \x -> return $ if null x then "Test.main" else "System.Environment.withArgs [" ++ show x ++ "] Test.main"
+:def go \x -> return $ unlines [":reload",":gen",":reload",":test " ++ x,":gen",":reload"]
+:def testfull const $ return $ unlines [":reload","gen",":reload","!cabal test"]

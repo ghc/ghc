@@ -1,0 +1,13 @@
+ 
+tcfail026.hs:2:
+    Conflicting exports for local name:  A
+	module Main
+	module Main
+ 
+tcfail026.hs:6:
+    Class type variable ``a'' does not appear in method signature:
+	op2 ::
+	    `b' -> `b'
+
+
+Compilation had errors

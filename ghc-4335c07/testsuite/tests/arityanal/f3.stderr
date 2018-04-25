@@ -1,0 +1,15 @@
+***Arity is changed as occur many times: F3.f3{v r157} 1 0
+
+==================== IdInfo ====================
+$wfac_s1Bz :: GHC.Prim.Int# -> GHC.Prim.Int# :: [Arity 1
+						 0 -> *
+						 Str: DmdType L]
+F3.fac :: GHC.Base.Int -> GHC.Base.Int :: [Arity 1
+					   T
+					   Worker $wfac_s1Bz
+					   Str: DmdType U(L)m]
+F3.f3 :: GHC.Base.Int -> GHC.Base.Int :: [Arity 1
+					  T
+					  Str: DmdType U(L)m]
+
+

@@ -1,0 +1,3 @@
+# Setup configure
+Configuring InternalLibrary0-0.1...
+setup: The field 'build-depends: InternalLibrary0' refers to a library which is defined within the same package. To use this feature the package must specify at least 'cabal-version: >= 1.8'.

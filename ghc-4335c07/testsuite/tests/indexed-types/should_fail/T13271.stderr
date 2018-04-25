@@ -1,0 +1,4 @@
+
+T13271.hs:9:1: error:
+    • You can't do that!
+    • In the type synonym declaration for ‘T2’

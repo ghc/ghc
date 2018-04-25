@@ -1,0 +1,15 @@
+
+T11974b.hs:5:1: error:
+    • The default type ‘Either’ is not an instance of
+        ‘Num’ or ‘Show’ or ‘Eq’ or ‘Ord’ or ‘Foldable’ or ‘Traversable’
+    • When checking the types in a default declaration
+
+T11974b.hs:5:1: error:
+    • The default type ‘Monad’ is not an instance of
+        ‘Num’ or ‘Show’ or ‘Eq’ or ‘Ord’ or ‘Foldable’ or ‘Traversable’
+    • When checking the types in a default declaration
+
+T11974b.hs:5:1: error:
+    • The default type ‘Blah’ is not an instance of
+        ‘Num’ or ‘Show’ or ‘Eq’ or ‘Ord’ or ‘Foldable’ or ‘Traversable’
+    • When checking the types in a default declaration

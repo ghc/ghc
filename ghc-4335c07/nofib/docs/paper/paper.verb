@@ -1,0 +1,765 @@
+%\documentstyle[11pt,grasp]{article}
+%\documentstyle[12pt,springer-wcs]{article}
+\documentstyle[wicsbook]{article}
+\pagestyle{empty}
+\newcommand{\struthack}[1]{\rule{0pt}{#1}}
+%\setlength{\marginparwidth}{1.5cm}
+%\setlength{\parskip}{0.25cm}
+%\setlength{\parindent}{0cm}
+%\renewcommand{\textfraction}{0.2}
+%\renewcommand{\floatpagefraction}{0.7}
+%
+% to avoid src-location marginpars, comment in/out the out/in defns.
+%\newcommand{\srcloc}[1]{}
+%\newcommand{\onlyIfSrcLocs}[1]{}
+%
+%\newcommand{\onlyIfSrcLocs}[1]{#1}
+%
+\newcommand{\ToDo}[1]{{\em (ToDo: #1)}}
+\begin{document}
+\title{\vspace{-3pc}\titlesize\bf The @nofib@ Benchmark Suite\\
+of Haskell Programs}
+\author{\large Will Partain\\
+\normalsize University of Glasgow}
+%\normalsize e-mail: partain@@dcs.glasgow.ac.uk
+%\author{Will Partain\thanks{
+%Department of Computing Science, University of Glasgow, Glasgow,
+%Scotland~G12~8QQ.
+%E-mail: partain@@dcs.glasgow.ac.uk.
+%}}
+%\date{University of Glasgow\\ August 17, 1992}
+\date{}
+\maketitle
+\thispagestyle{empty}
+% temporarily....
+%\tableofcontents
+%\clearpage
+\begin{abstract}\ninesize
+\noindent This position paper describes the need for, make-up of, and
+``rules of the game'' for a benchmark suite of Haskell programs.  (It
+does not include results from running the suite.) Those of us working
+on the Glasgow Haskell compiler hope this suite will encourage sound,
+quantitative assessment of lazy functional programming systems.  This
+version of this paper reflects the state of play at the initial
+pre-release of the suite.
+\end{abstract}
+
+%************************************************************************
+%*									*
+\section{Towards lazy functional benchmarking}
+%*									*
+%************************************************************************
+
+%************************************************************************
+%*									*
+\subsection{History of benchmarking---functional}
+%*									*
+%************************************************************************
+
+The quantitative measurement of systems for lazy functional
+programming is a near-scandalous subject.  Dancing behind a thin veil
+of disclaimers, researchers in the field can still be found quoting
+``nfibs/sec'' (or something equally egregious), as if this refers to
+anything remotely interesting.
+
+The April, 1989, {\em Computer Journal} special issue on lazy
+functional programming is a not-too-dated self-portrait of the
+community that promotes computing in this way.  It is one that
+non-specialists are likely to see.  There are three papers under
+the heading ``Efficiency of functional languages.''
+
+The Yale group, reporting on their ALFL compiler, cites results for
+the benchmarks @queens 8@, @nfib 20@, @tak@, @mm@, @deriv@,
+@tfib 100 40@, @qsort@, and @init@, noting that several are from the
+Gabriel suite of LISP benchmarks.  They say that results from these
+tests ``indicate that functional languages are indeed becoming
+competitive with conventional languages'' \cite[page~160]{bloss89a}.
+
+Augustsson and Johnsson have a section about performance in their
+paper on the LML compiler \cite{augustsson89a}.  They consider some of
+the usual suspects: @8queens@, @fib 20@, @prime@, and @kwic@,
+comparing against implementations of these algorithms in C, Edinburgh
+and New Jersey SML, and Miranda.\footnote{Miranda is a trademark of
+Research Software Ltd.} To their credit, the wondrous Chalmers hackers
+are somewhat apologetic, conceding that ``measuring
+performance of the compiled code is very difficult...''
+
+Finally, Wray and Fairbairn argue for programming techniques
+that make ``essential use of non-strictness'' and for an
+implementation (TIM) that makes these techniques inexpensive
+\cite{wray89a}.  Though they delve into a substantial spread\-sheet-like
+example program, they do not report any actual measurements.
+However, they astutely take issue with the usual toy benchmarks:
+``There was in the past a tendency for implementations to be judged on
+their performance for unusually strict benchmarks.''
+% (I'm not sure where they got the ``in the past'' part.)
+
+%************************************************************************
+%*									*
+\subsection{History of benchmarking---imperative}
+%*									*
+%************************************************************************
+
+Our imperative-programming colleagues are not far removed from our
+brutish benchmarking condition.  Only a few years ago, ``MIPS
+ratings,'' Dhrystones and friends were all the rage: marketeers
+bandied them about shamelessly, compiler writers tweaked their
+compilers to spot specific constructs in certain benchmarks, users were
+baffled, and no-one learned much that was worth knowing.  The section
+on performance in Hennessy and Patterson's standard text on computer
+architecture is an admirable expos\'e of these shenanigans and is well
+worth reading \cite{hennessy90a}.
+
+Then, in 1988, enter the Standard Performance Evaluation
+Cor\-po\-ra\-tion (SPEC)
+%\footnote{It may have been ``Systems Performance Evaluation
+%Corporation'' to start with, but it has changed its name once or twice
+%to keep up with California tax laws.}
+benchmarking suite.  The initial version included source
+code and sample inputs (``workloads'') for four mostly-integer programs
+and six mostly-floating-point programs.  These are all either real
+programs (e.g., the GNU C compiler) or the ``kernel'' of a real program
+(e.g., @matrix300@, floating-point matrix multiplication).  Computer
+vendors have since put immense effort into improving their
+``SPECmarks,'' and this has delivered
+real benefit to the workstation user.
+
+%************************************************************************
+%*									*
+\subsection{Towards lazy benchmarking}
+%*									*
+%************************************************************************
+
+The SPEC suite is the most visible artifact of an important shift towards
+{\em system} benchmarking.  A big reason for the shift lies in the
+benchmarked systems themselves.  Fifteen years ago, a typical computer
+system---hardware and software---probably came from
+one manufacturer, sat in one room, and was a computing environment all
+on its own.
+% The systems we face today are quite different: pieces of
+% hardware built by different companies are scattered around a building
+% (if not even further afield), and software is deeply layered and of
+% diverse origin;\footnote{As I type this, I am running SunOS, an MIT X
+% server, twm (by Tom LaStrange), tcsh (from Cornell), GNU emacs (FSF),
+% \LaTeX{} (Knuth plus Lamport), perl (Larry Wall) and xdvi (a
+% mongrel).} moreover, for all I know, my machine is busy handling
+% network traffic from the other side of the world.
+
+An excellent discussion about benchmarking from the
+self-con\-tained-sys\-tems era is Gabriel and Masinter's paper about
+LISP systems \cite{gabriel82a}.  ``The proper role of benchmarking is
+to measure various dimensions of Lisp system performance and to order
+those systems along each of these dimensions'' (page~136).  A toy
+benchmark, of the type I have derided so far, can focus on one of
+these ``dimensions,'' thus contributing to an overall picture.
+
+% Dhrystone is a ``synthetic'' benchmark in C, meaning it attempts to
+% mimic a typical C program by having so many integer adds, so many
+% subroutine calls, so many branches, etc., etc.  By implication, these
+% things are the important dimensions for C implementations'
+% performance.
+
+Much early measurement work in functional programming was of this
+plot-along-dimensions style; however, the concern was usually to
+assess a particular implementation technique, not the system as a
+whole.  For example, Hailpern, Huynh and R{\'e}v{\'e}sz tried to
+compare systems that use strict versus lazy evaluation
+\cite{hailpern89a}.  They went to considerable effort to factor out
+irrelevant details, hoping to end up with pristine data points along
+interesting dimensions.  Hartel's effort to characterise the relative
+costs of fixed-combinator versus program-derived-combinator
+implementations was even more elaborate, using non-toy SASL
+programs \cite{hartel91a}.
+
+So, can SPEC be seen as a culmination of good practice in
+benchmarking-by-characteristics?  No!  SPEC makes {\em no effort} to
+pinpoint systems along ``interesting'' dimensions, except for the
+very simplest---elapsed wall-clock time.  An underlying premise of
+SPEC is that systems are sufficiently complicated that we probably
+won't even be able to pick out the interesting dimensions to measure,
+much less characterise benchmarks in terms of them.  SPEC represents a
+shift to {\em lazy} benchmarking {\em of systems}.
+%From this vantage point,
+%toy programs really are useless as
+%benchmarks---their very use suggests you know more about your overall
+%system than you really do.
+
+Conte and Hwu's survey confirms that, at least in computer
+architecture, this shift towards ``lazy, system-oriented
+benchmarking'' is supported as a Good Thing \cite{conte91a}.  The
+trend can also be seen in some specialised areas of computing: the
+Perfect Benchmarks for supercomputers (Crays, etc., running FORTRAN
+programs) \cite{pointer90a} and the Stanford benchmarks for parallel,
+shared-memory systems \cite{singh-j92a} are two examples.
+
+%************************************************************************
+%*									*
+\section{Some serious benchmarks, @nofib@}
+%*									*
+%************************************************************************
+
+We, the Glasgow Haskell compiler group, wish to (help) develop and
+promote a freely-available benchmark suite for lazy functional
+programming systems---called the @nofib@ suite---consisting of:
+\begin{enumerate}
+\item
+Source code for ``real'' Haskell programs to compile and run;
+\item
+Sample inputs (workloads) to feed into the compiled programs,
+along with the expected outputs;
+\item
+``Rules'' for compiling and running the benchmark programs, and (more
+notably) for reporting your benchmarking results; and
+\item
+Sample reports, showing by example how results should be reported.
+%\item
+%Guidelines for how to improve the benchmark suite.
+\end{enumerate}
+
+%************************************************************************
+%*									*
+\subsection{Our (non-)motivations in creating this suite}
+%*									*
+%************************************************************************
+
+Benchmarking is a delicate art and science, and it's hard work, to boot.
+%Any given benchmark
+% (suite) can be made to appear arbitrarily useless by ignoring its
+%promulgator's caveats.  Also, good benchmarking is more effort for
+%less recognition (including money) than is really worth it.  For these
+%reasons,
+We have quite limited goals for the @nofib@ suite, are hoping for lots
+of help, and are prepared to overlook considerable shortcomings,
+especially at the beginning.
+
+%************************************************************************
+%*									*
+\subsubsection{Motivations.}
+%*									*
+%************************************************************************
+
+\begin{itemize}
+\item
+Our main {\em initial} motivation is to give functional-language
+implementors (including ourselves) a common set of ``real Haskell
+programs'' to attack and study.  We encourage implementors to tackle
+the problems that {\em actually} make Haskell programs large and slow,
+thus hastening solutions to those problems.
+
+And of course, because the benchmark programs are shared, it will be
+possible to {\em compare} performance results between systems
+running on identical hardware (e.g., Chalmers HBC vs.~Glasgow Haskell, both
+running on the same Sun4).  Racing is the fun part!
+
+\item
+Our {\em ultimate} motivation for this benchmark suite is to provide
+``end users'' of Haskell implementations with a useful {\em predictor}
+of how those systems will perform on their own programs.
+
+The initial @nofib@ suite will have no value as a predictive tool.
+Perhaps those with greater expertise will help us correct this.  If
+necessary, we will gladly hand over ``the token'' for the suite to a
+more disinterested party.
+
+\item
+We are very keen on (some might say ``paranoid about'')
+read\-ily-ac\-ces\-sible {\em reproducible} results.  That is the whole
+point of the ``reporting rules'' elsewhere in this paper.
+
+Good-but-irreproducible benchmarking results are very damaging,
+because they lull implementors into a false sense of security.
+
+\item
+After the initial pre-release of the suite, which will be for
+(possibly major) debugging, we intend to keep the suite {\em stable},
+so that sensible comparisons can be made over time.
+
+\item
+Having said that, benchmarks must change over time, or they become
+stale.  It is difficult to brim with confidence about the Gabriel
+benchmarks for LISP systems; they are more than a decade old.
+
+Being forced to change a benchmark suite can be a mark of success.
+The SPEC people made substantial changes to their suite in 1992: so
+much work had gone into compiler tricks that improved SPEC performance
+results that some tests were no longer useful (notably the @matrix300@
+test mentioned earlier).
+%
+%We will strive for similar, orderly change to the @nofib@ suite.
+\end{itemize}
+
+%************************************************************************
+%*									*
+\subsubsection{Non-motivations.}
+%*									*
+%************************************************************************
+
+%\begin{itemize}
+%\item
+We are profoundly uninterested in distilling a ``single figure of
+merit'' (e.g., MIPS) to characterise a Haskell implementation's
+performance.
+
+%\item
+Initially at least, we are also uninterested in any statistics derived
+from the raw @nofib@ numbers, e.g., various means, standard
+deviations, etc.  You may calculate and report any such numbers---all
+honest efforts to understand these benchmarks are welcome---but the
+raw, underlying numbers must be readily available.
+
+An important issue we are {\em not} addressing with this suite is
+inter-language comparisons: ``How does program $X$ written in Haskell
+fare against the same program written in language $Y$?''  Such
+comparisons raise a nest of issues all their own; for example, is it
+really the ``same'' program when written in the two compared
+languages?  This disclaimer aside, we do provide the @nofib@ program
+sources in other languages if we happen to have them.
+
+%Once some consensus is reached about what derived statistics are
+%preferred, we will probably ask that they be reported.  The raw
+%numbers will always be required, however.
+%\end{itemize}
+
+%************************************************************************
+%*									*
+%\subsubsection{Acknowledged shortcomings.}
+%*									*
+%************************************************************************
+
+%\begin{itemize}
+%\item
+%It is probably too Unix-specific.
+%\item
+%It is over-oriented towards batch-style compilers.
+%\item
+%It is of no use for measuring parallel implementations of Haskell.
+%\item
+%It is of no use for comparing lazy functional programs to those
+%written in other styles (e.g., imperative, object-oriented, etc.).
+%\item
+%In its initial form, it may have {\em no} use as a tool to predict
+%performance.
+%\item
+%It says nothing about many important properties of a Haskell
+%implementation; for example, how quickly it reports errors, or how
+%clearly it does so.
+%\end{itemize}
+
+%************************************************************************
+%*									*
+%\subsubsection{Past hindrances to a functional benchmark suite}
+%*									*
+%************************************************************************
+
+% A lazy-functional lazy-benchmarking suite would have been impractical
+% a few years ago.  A prerequisite for such a suite is a {\em lingua
+% franca}, a role which C fulfills in the imperative Unix world.  Until
+% recently, there was no such lazy functional language.  Enter Haskell,
+% stage left: there is now a generally-agreed language for lazy
+% functional programming, with an ever-growing list of implementations.
+% 
+% Another peculiarity of the lazy-functional-programming world is the
+% relative lack of ``real programs'' from which one might draw a
+% benchmark suite.  I suspect that there are less than 100 non-toy,
+% non-demo, non-author-use-only programs; fewer than that would be
+% written in Haskell and fewer still generally available in source form.
+% Certainly there are vanishingly few floating-point-intensive programs
+% around.  In this gloomy landscape, there is one shining light, namely
+% the FLARE project, directed by Colin Runciman at York \ToDo{citation}.
+% This project has written several sizable Haskell programs for use in
+% various disciplines.  These programs make up the bulk of the
+% benchmarking suite promoted herein.
+% 
+% A final reason why real-program benchmarking would have been dicey in
+% the lazy-functional world before now is the lack of useful profiling
+% tools.  Had there been a good benchmark suite and had you collected a
+% set of results, you would have had no tools with which to dissect the
+% results, to find out {\em why} this or that was slow and/or large...
+% The recent surge forward in profiling tools for lazy languages should
+% eliminate this problem.  The ``heap-profiling'' work at York
+% \cite{runciman92b,runciman92a} and Patrick Sansom's work on the
+% Glasgow Haskell compiler \cite{sansom92a} are two ready-to-use
+% examples.
+% 
+% % Unlike the imperative SPEC world, there are no large amounts of money
+% % riding on benchmarking results for lazy functional programming (yet!).
+% % As far as I know, no departmental workstation orders have been decided
+% % on the basis of ``machine $X$ runs Haskell programs faster than
+% % machine $Y$.''  This greatly eases the Paranoia Factor that must be
+% % brought to bear when creating a benchmark suite.
+
+%************************************************************************
+%*									*
+\subsection{The Real subset}
+%*									*
+%************************************************************************
+
+The @nofib@ programs are divided into three subsets: Real, Imaginary,
+and Spectral (somewhere between Real and Imaginary).
+
+The Real subset of the @nofib@ suite is by far the most important.  In
+fact, we insist that anyone who wishes to report any results from
+running this suite (in whatever form) must first distribute their
+complete, raw results for the Real subset in a public forum
+(e.g., available by anonymous FTP).
+
+\begin{table}[t]
+\hrule
+\centering
+\struthack{5pt}
+\begin{tabular}{@@{}lll@@{}}
+Program & Description & Origin \\ \hline
+@anna@	    & Strictness analyser & Julian Seward (Manchester) \\
+%@bspt@	    & BSP-tree modeller & Iain Checkland (York) \\
+@calc@	    & arbitrary-precision calculator & Liang \& Mirani (Yale) \\
+%@csg@	    & & Duncan Sinclair (Glasgow) \\
+@compress@  & Text compression & Paul Sanders (BT) \\
+@fluid@	    & Fluid-dynamics program & Xiaoming Zhang (Swansea) \\
+@gamteb@    & Monte Carlo photon transport & Pat Fasel (Los Alamos) \\
+@gg@	    & Graphs from GRIP statistics & Iain Checkland (York) \\
+@hpg@	    & Haskell program generator & Nick North (NPL) \\
+@infer@	    & Hindley-Milner type inference & Phil Wadler (Glasgow) \\
+@lift@	    & Fully-lazy lambda lifter	& David Lester (Manchester) \& \\
+	    &				& Simon Peyton Jones (Glasgow) \\
+% linear
+@maillist@  & Mailing-list generator & Paul Hudak (Yale) \\
+@mkhprog@   & Haskell program skeletons & Nick North (NPL) \\
+@parser@    & Partial Haskell parser & Julian Seward (Manchester) \\
+@pic@	    & Particle in cell & Pat Fasel (Los Alamos) \\
+@prolog@    & ``mini-Prolog'' interpreter & Mark Jones (Oxford) \\
+@reptile@   & Escher tiling program & Sandra Foubister (York) \\
+@veritas@   & Theorem-prover & Gareth Howells (Kent)
+\end{tabular}
+\caption{@nofib@ benchmarks: Real Subset}\label{real-subset}
+\struthack{2pt}
+\hrule
+\end{table}
+%\footnotetext{Number of modules/number of lines.}
+%\addtocounter{footnote}{-1}
+
+The programs in the Real subset are listed in Table~\ref{real-subset}.
+Each one meets most of the following criteria:
+\begin{itemize}
+\item
+Written in standard Haskell (version~1.2 or greater).
+\item
+Written by someone trying to get a job done, not by someone trying to
+make a pedagogical or stylistic point.
+\item
+Performs some useful task such that someone other than the author
+might want to execute the program for other than watch-a-demo reasons.
+\item
+Neither implausibly small or impossibly large (the Glasgow Haskell
+compiler, written in Haskell, falls in the latter category).
+\item
+The run time and space for the compiled program must neither be too small
+(e.g., time less than five secs.) or too large (e.g., such that a
+research student in a typical academic setting could not run it).
+\end{itemize}
+
+\noindent
+Other desiderata for the Real subset as a whole:
+\begin{itemize}
+\item
+Written by diverse people, with varying functional-programming
+skills and styles, at different sites.
+\item
+Include programs of varying ``ages,'' from first attempts, to
+heavily-tuned rewritten-four-times behemoths, to
+transliterations-from-LML, etc...
+\item
+Span across as many different application areas as possible.
+% (Initially, however, we include every suitable program
+% onto which we can attach our grubby paws.)
+\item
+The suite, as a whole, should be able to compile and run to completion
+overnight, in a typical academic Unix computing environment.
+\end{itemize}
+
+%************************************************************************
+%*									*
+\subsection{The Spectral subset}
+%*									*
+%************************************************************************
+
+The programs in the Spectral subset of @nofib@---listed in
+Table~\ref{spectral-subset}---are those that don't quite meet the
+criteria for Real programs, usually the stipulation that someone
+other than the author might want to run them.  Many of these programs
+fall into Hennessy and Patterson's category of ``kernel'' benchmarks,
+being ``small, key pieces from real programs''
+\cite[page~45]{hennessy90a}.
+\begin{table}[t]
+\hrule
+\centering
+\struthack{5pt}
+\begin{tabular}{@@{}lll@@{}}
+Program & Description & Origin \\ \hline
+@boyer@	    & Gabriel suite `boyer' benchmark & Denis Howe (Imperial) \\
+@cichelli@  & Perfect hashing function & Iain Checkland (York) \\
+@clausify@  & Propositions to clausal form & Colin Runciman (York) \\
+@fish@	    & Draws Escher's fish & Satnam Singh (Glasgow) \\
+@knights@   & Knight's tour & Jon Hill (QMW) \\
+@life@	    & Game of Life & John Launchbury (Glasgow) \\
+@mandel@    & Mandelbrot sets & Jon Hill (QMW) \\
+@minimax@   & tic-tac-toe (0s and Xs) & Iain Checkland (York) \\
+@multiplier@& Binary-multiplier simulator & John O'Donnell (Glasgow) \\
+@pretty@    & Pretty-printer & John Hughes (Chalmers) \\
+@primetest@ & Primality testing & David Lester (Manchester) \\
+@rewrite@   & Rewriting system & Mike Spivey (Oxford) \\
+@scc@	    & Strongly-connected components & John Launchbury (Glasgow) \\
+@sorting@   & Sorting algorithms & Will Partain (Glasgow)	\\
+\end{tabular}
+\caption{@nofib@ benchmarks: Spectral Subset}\label{spectral-subset}
+\struthack{2pt}
+\hrule
+\end{table}
+
+%************************************************************************
+%*									*
+\subsection{The Imaginary subset}
+%*									*
+%************************************************************************
+
+The Imaginary subset of the suite is the usual small toy benchmarks,
+e.g., @primes@, @kwic@, @queens@, and @tak@.
+These are distinctly
+unimportant, and you may get a special commendation if you ignore them
+completely. They can be quite useful as test programs, e.g., to answer
+the question, ``Does the system work at all after Simon's changes?''
+
+% \begin{table}[t]
+% \centering
+% \hrule
+% \struthack{5pt}
+% \begin{tabular}{lrp{3.0in}}
+% Program & Lines & Description \\ \hline
+% @exp3_8@    & 120 & $3^8$, using Peano arithmetic \\
+% @kwic@	    &	 & \\
+% @primes@    & 15 & Calculate prime numbers \\
+% @queens@    & 16 & $n$-queens \\
+% @tak@	    & 	 & \\
+% \end{tabular}
+% \caption{@nofib@ benchmarks: Imaginary Subset}\label{imaginary-subset}
+% \struthack{2pt}
+% \hrule
+% \end{table}
+
+%************************************************************************
+%*									*
+\section{Rules for running and reporting}
+%*									*
+%************************************************************************
+
+Glasgow will provide the @nofib@ program sources, as well as input
+workloads and expected outputs.  (We will also provide some
+``scaffolding'' to make it easier to run the benchmarks.)
+
+Anyone can then run the benchmark programs through their Haskell
+system.  The ``price'' for using the benchmark suite is that you must
+follow our rules if you report your results in any public forum,
+including any publication.
+
+In the big-money-on-the-line world of the SPEC suite, the running and
+reporting rules are complicated and arcane.  That's because there are
+many people who would rather be sneaky than do honest work to
+improve their system's performance.  For now, we assume that
+functional programmers are more noble creatures; the @nofib@ rules are
+therefore quite simple.
+
+The basic reporting principle is:  You must provide enough information
+and results that someone with a similar hardware/software
+configuration can {\em easily} duplicate your results.
+
+The most important specific @nofib@ reporting rule is: if you
+wish to report or publish some results from running some part of the
+@nofib@ suite, then you must first ``file'' a complete set of
+how-I-did-it/what-I-got information for the entire Real subset of
+programs, in some public forum (a newsgroup, mailing list, an
+anonymous-FTP directory, ...).  Thereafter, you may claim whatever you
+like, the idea being that people can look up your ``filed''
+information and laugh at you if you're making unsubstantiated claims.
+
+%It is OK, of course, to file a full @nofib@ report by saying, ``My raw
+%results on the Real subset were the same as X's, retrievable from Y.''
+
+We are not insisting on these rules because
+we like playing lawyer.  We intend as little hindrance as
+possible to creative, honest uses of this suite.
+%Meanwhile, sleazier
+%or more misguided uses will either be out of bounds (for not filing
+%proper full reports) or caught out (by cross-checking with the full
+%reports).
+%Please let us know further steps we can take to promote the
+%better uses and stamp out the worse ones.
+
+There are more details about the reporting rules in the version of
+this paper that is distributed with the suite.
+
+%************************************************************************
+%*									*
+\section{Concluding remarks}
+%*									*
+%************************************************************************
+
+Inattention to benchmarking is not just sloppy, it ends up as
+self-delusion.  Assertions that various functional-languages compilers
+``... generate code that is competitive with that generated by
+conventional language compilers ...''\footnote{Citation withheld to protect
+the guilty!} % \cite[page~404]{hudak89a} :-)
+are {\em simply false} by any common-sense measure; what's more,
+when they are repeated by Respected People, they are downright
+harmful: they detract from the urgency of building better
+implementations.
+
+By introducing the @nofib@ suite of Haskell programs, we hope for an
+immediate payoff, simply by giving all Haskell implementors a common
+set of sources with which to race each other.  We also hope that we
+are setting the foundation for a sound predictor of Haskell-system
+performance.
+
+This suite follows the general trend away from
+``plot-the-characteristics benchmarking'' and towards ``lazy, systems
+benchmarking,'' of which the SPEC suite is the most prominent example.
+This approach to benchmarking gives the greatest credence is given to
+gross system behaviour on sizable, real programs.
+
+% Readily-available, reproducible results are a major concern.
+
+% Useful in hardware selection.
+
+% Indicates seriousness of intent.
+
+Comments on this paper and on the @nofib@ suite itself are most
+welcome.  Contributions of substantial functional programs that could
+be added to the suite would be even more welcome!  I can be reached by
+electronic mail at @glasgow-haskell-request@@dcs.glasgow.ac.uk@.
+
+%\ToDo{Take anything?}
+
+Haskell-related things, including the @nofib@ suite, can be retrieved
+by anonymous FTP from @ftp.dcs.glasgow.ac.uk@, in
+@pub/haskell/glasgow@.  The sites @nebula.cs.yale.edu@ and
+@animal.cs.chalmers.se@ usually have copies as well (in the same
+directory).
+
+An up-to-date version of this paper will be included in the @nofib@
+distribution.  There is also a top-level @README@, which is the first
+file you should consult.
+
+\paragraph{Acknowledgements.}  My thanks to John Mashey
+% (@mash@@mips.com@)
+for his many fine articles in @comp.arch@ that
+promote sensible benchmarking, and to Jeff Reilly
+% (@jwreilly@@mipos2.intel.com@)
+for providing information about SPEC.  Vincent Delacour, Denis Howe,
+John O'Donnell, Paul Sanders, and Julian Seward were among those who
+provided helpful comment on earlier versions of this paper.
+Of course, we are {\em most} indebted to those people who have let
+their code be included in the suite.
+%Work on
+%the Glasgow Haskell compiler is supported by SERC under the GRASP
+%project.
+
+% ToDo: where do I get this stuff?
+
+\bibliographystyle{plain}   % wpplain, wplong, wpannote, ...
+\bibliography{wp_abbrevs,comp,nofib_only}
+
+%------------------------------------------------------------------------
+\appendix
+
+%************************************************************************
+%*									*
+% \section{Further details on reporting @nofib@ results}
+% %*									*
+% %************************************************************************
+% 
+% Here are further details about reporting @nofib@ results.
+% Some of the required reports, e.g., changes made and command-line
+% options used, can be made simply by @diff@ing against an unblemished
+% @nofib@ distribution.
+% \begin{enumerate}
+% \item
+% As suggested elsewhere, the non-Real @nofib@ subsets are optional.
+% 
+% \item
+% A simple way to ensure a complete report is to mimic one of the sample
+% reports which are provided with the suite.
+% 
+% \item
+% Please report exactly which version of the suite you are using.
+% 
+% \item
+% Please report, fairly precisely, what kind of machine you ran the
+% benchmarks on, what release of the operating system you used, etc.  Be
+% sure to report the amount of physical main memory.  (Use only one
+% machine to run the whole suite.)
+% 
+% \item
+% If you have to change any program source files or workload
+% inputs, you must report these.  If your results don't match the
+% expected output files, the discrepancies should be reported.  (Some of
+% this would be expected, especially to do with printing of
+% floating-point results.)
+% 
+% \item
+% For each benchmark program that you do report, you should provide:
+% \begin{description}
+% \item[Compiler options:] The exact command-line options used to
+%     compile each module; it is obviously OK to say, ``I did them all
+%     the same way, as follows...''
+% 
+% \item[Compile time:] (optional) The {\em elapsed time} to compile all
+%     of the modules of the program (to produce a full complement of
+%     @.o@ files from the program's @.hs@ files).  It's OK to compile
+%     them once to produce interface files friendly to your system, then
+%     remove all the object files, and {\em then} time how long it takes
+%     to (re-)compile the objects.
+% 
+%     The elapsed-time requirement means you will want to run on an
+%     unloaded machine.  We don't want to hear about ``user CPU
+%     seconds'' or other figments of your operating system's
+%     imagination.  (We are prepared to believe your machine can tell
+%     time: its idea of elapsed time will do---you need not bring along
+%     a digital stopwatch.)
+% 
+% \item[Compile space:] (optional) The maximum amount of
+%    dynamically-allocated memory used in compiling the program.  This
+%    may be just one number, or reported on a per-module basis.  What we
+%    want to know is: if your compiler has a garbage-collected heap,
+%    what was the heap's maximum size when compiling this
+%    program/module?
+% 
+% \item[Run time:] (required) The elapsed time to run the compiled
+% program on the input workload provided.
+% 
+% %---we concur with
+% %Hennessy and Patterson, ``... the only consistent and reliable measure
+% %of performance is the execution time of real programs''
+% %\cite[page~40]{hennessy90a}.  (For functional programs, you had better
+% %measure space usage, too.)
+% 
+% \item[Run space:] (required) Assuming your Haskell system has a
+% garbage-collected heap, the maximum amount of memory allocated to that
+% heap during the run of the program.
+% 
+% We are interested in the total amount of memory assigned to the heap,
+% so, if you have a two-space copying collector, you should report the
+% combined size of both semi-spaces.
+% 
+% \item[If it worked:] (required) If your system was unable to
+% compile/run a particular benchmark, you must say so.
+% \end{description}
+% 
+% \item
+% You are welcome to report any other particulars that you consider
+% helpful.
+% \end{enumerate}
+
+%************************************************************************
+%*									*
+%\section{Details for unpacking, installing distribution, etc.}
+%*									*
+%************************************************************************
+\end{document}

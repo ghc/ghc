@@ -1,0 +1,3 @@
+
+ParserNoMultiWayIf.hs:4:5:
+    Multi-way if-expressions need MultiWayIf turned on

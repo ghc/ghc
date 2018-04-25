@@ -1,0 +1,9 @@
+
+PatBind3.hs:6:12: error:
+    • Couldn't match type ‘(Bool, w)’ with ‘Char’
+      Expected type: Maybe ((Bool, w) -> Char)
+        Actual type: Maybe ((Bool, w) -> (Bool, w))
+    • In the expression: Just id
+      In a pattern binding: Just foo = Just id
+    • Relevant bindings include
+        foo :: (Bool, w) -> Char (bound at PatBind3.hs:6:6)

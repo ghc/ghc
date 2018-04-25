@@ -1,0 +1,8 @@
+class (GHC.Base.Alternative m, GHC.Base.Monad m) =>
+      GHC.Base.MonadPlus (m :: * -> *) where
+  ...
+  mplus :: m a -> m a -> m a
+class (GHC.Base.Alternative m, GHC.Base.Monad m) =>
+      GHC.Base.MonadPlus (m :: * -> *) where
+  ...
+  Control.Monad.mplus :: m a -> m a -> m a

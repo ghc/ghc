@@ -1,0 +1,262 @@
+______________________________________________________________________________
+Mini Prolog Version 1.5                       Mark P. Jones 22nd November 1990
+
+              A simple Prolog interpreter, written in Haskell B.
+
+______________________________________________________________________________
+
+
+This document gives a brief introduction to Mini Prolog Version 1.5, a  simple
+Prolog interpreter written  in  Haskell  B.   The  original  version  of  this
+interpreter was written  over  a  year  and  a  half  ago  in  an  interpreted
+functional language Orwell used for teaching in Oxford.  Looking around for an
+interesting project to experiment with our recently installed LML and  Haskell
+B compilers (thank you Chalmers), I decided to try extending and rewriting the
+interpreter in Haskell.  This is my first significant Haskell program and I've
+been experimenting with a number of its special features,  including  modules,
+type classes and I/O.
+
+This document isn't going to explain a  lot  about  how  Prolog  programs  are
+written and work.  But there are plenty of other references for that.   Please
+feel free to contact me with any questions or suggestions.
+
+mpj@prg.oxford.ac.uk
+______________________________________________________________________________
+
+                           GETTING STARTED
+
+The Mini Prolog interpreter takes the form of a small  collection  of  Haskell
+modules together with a Makefile which can be used to automate the compilation
+process.  The most important part of  any  implementation  of  Prolog  is  the
+inference engine  which  controls  the  search  for  goals  to  user  supplied
+queries.  Mini Prolog comes with a choice of two different inference  engines,
+the `pure' engine uses lazy evaluation to construct and  traverse  potentially
+infinite proof trees.  The `stack' engine uses an explicit stack  (implemented
+using a list) to provide a more concrete  description  of  backtracking.   The
+stack engine also implements  the  Prolog  cut  `!'  predicate,  used  in  the
+examples below.  Assuming that you've got everything set up  properly  to  use
+the Haskell B.  compiler, all you need to do to  create  the  binary  for  the
+stack based version is type:
+
+  machine% make SetStack
+  machine% make Prolog
+
+and let the machine build the Prolog  interpreter  for  you.   Note  that  the
+binaries produced by Haskell B. are a little on the large size, so you'll need
+to have plenty of free disk space (plus a few minutes to spare waiting for the
+compiler to finish).
+
+Warning: This program has only  been  tested  using  the  Chalmers  Haskell  B
+compiler and may not be accepted by  other  compilers  with  more  restrictive
+syntax (e.g. sections).
+
+Once the interpreter is built, you can invoke it with the command `Prolog':
+
+  machine% ./Prolog
+  MiniProlog Version 1.5
+
+  Reading stdlib...done
+  >
+
+The `>' prompt indicates that the interpreter is running and waiting for  user
+input.
+
+                        STANDARD PREDICATES
+
+Before the `>' prompt appears, Mini Prolog reads a set of  standard  predicate
+definitions from the file `stdlib' in the current directory.  You are free  to
+modify this file to suit your own needs.  The only predicate that is built  in
+to Mini Prolog is the cut, written `!' whose use is demonstrated below.  There
+are no other  extralogical  predicates,  no  input/output  predicates  and  no
+arithmetic as found in full implementations of Prolog.  Some of these features
+could be added to the interpreter without too much  difficulty,  others  would
+require rather more work.
+
+At any time, you can ask the interpreter to display the list of rules that are
+being held in the database by typing "??" and pressing the  return  key.   Try
+this after you've started the  interpreter  and  you'll  get  a  list  of  the
+predicates defined in the file `stdlib'.  For example:
+
+  > ??
+  append(nil,X,X).
+  append(cons(X,Y),Z,cons(X,W)):-append(Y,Z,W).
+
+  equals(X,X).
+
+  not(X):-X,!,false.
+  not(X).
+
+  or(X,Y):-X.
+  or(X,Y):-Y.
+
+  true.
+  >
+
+                          THE APPEND PREDICATE
+
+The Mini Prolog interpreter does not support the standard  Prolog  syntax  for
+lists.    Instead,   you   have    to    write    the    list    [1,2,3]    as
+"cons(1,cons(2,cons(3,nil)))".  One of the first things I tried was  appending
+two simple lists:
+
+  > ?- append(cons(1,nil),cons(2,nil),X)
+  X = cons(1,cons(2,nil)) ;
+  no.
+  >
+
+Given a query, Mini Prolog attempts to find values for each of  the  variables
+(beginning with a capital letter) in the query.  Here Mini  Prolog  has  found
+that X = cons(1,cons(2,nil)) is a solution to the query.   When  I  press  the
+semicolon key, ";", it tries to find another solution, but fails and  displays
+the message "no.".
+
+What amazed me when I first started experimenting with Prolog was that I could
+actually ask Mini Prolog to work through the problem in reverse, asking  which
+lists could be appended to get the list cons(1,cons(2,nil)):
+
+  > ?- append(X,Y,cons(1,cons(2,nil)))
+  X = nil
+  Y = cons(1,cons(2,nil)) ;
+  X = cons(1,nil)
+  Y = cons(2,nil) ;
+  X = cons(1,cons(2,nil))
+  Y = nil ;
+  no.
+  >
+
+Note that the interpreter pauses after displaying each solution and waits  for
+a key to be  pressed.  Pressing `;' tells Mini Prolog  to continue looking for
+another solution, displaying `no' if no more solutions can be found.  Pressing
+any other key stops the execution of the query.  If there are no variables  in
+the original query, then the interpreter simply outputs `yes' if the query can
+be proved and otherwise prints `no':
+
+  > ?- append(cons(1,nil),cons(2,nil),cons(1,cons(2,nil)))
+  yes.
+  > ?- append(cons(1,nil),cons(2,nil),cons(1,cons(3,nil)))
+  no.
+  >
+
+Unfortunately, typing a control C to interrupt a query with an  infinite  loop
+will exit the Prolog interpreter completely -- sorry, but I don't know  a  way
+around this at the moment.
+
+
+                       RUNNING IN THE FAMILY
+
+You don't have to stick with the standard predicates that are already included
+in Mini Prolog.  Additional rules can be typed in at the ">" prompt.  Here are
+a couple of examples based around the idea of family trees:
+
+  > parent(Child,Parent):-father(Child,Parent).
+  > parent(Child,Parent):-mother(Child,Parent).
+  > grandparent(GChild,Gparent):-parent(GChild,Parent),parent(Parent,Gparent).
+  >
+
+Note that  Mini Prolog  expects  a maximum of one rule per line,  and will not
+allow predicate definitions to be spread out over a number of lines.
+
+All you have to do now is enter some details about your family  and  then  you
+can ask who your grandparents are ... let's take a typical family:
+
+  > father(charles,princePhilip).
+  > mother(charles,theQueen).
+  > father(anne,princePhilip).
+  > mother(anne,theQueen).
+  > father(andrew,princePhilip).
+  > mother(andrew,theQueen).
+  > father(edward,princePhilip).
+  > mother(edward,theQueen).
+  > mother(theQueen,theQueenMother).
+  > father(william,charles).
+  > mother(william,diana).
+  > father(harry,charles).
+  > mother(harry,diana).
+  >
+
+And  now  we  can  ask  some  questions;  like  who  are  the  Queen  mother's
+grandchildren ?
+
+  > ?- grandparent(X,theQueenMother)
+  X = charles ;
+  X = anne ;
+  X = andrew ;
+  X = edward ;
+  no.
+  >
+
+or, who are Harry's grandparents ?
+
+  > ?- grandparent(harry,Who)
+  Who = princePhilip ;
+  Who = theQueen ;
+  no.
+  >
+
+Note that Mini Prolog can only use the facts it has been  given.   Tell  it  a
+little more about Diana's parents and you'll find it knows more about  Harry's
+grandparents.
+
+Now suppose we define a sibling relation:
+
+  > sibling(One,Tother) :- parent(One,X),parent(Tother,X).
+  >
+
+Fine.  It all looks quite correct.  But when you try to find Harry's siblings,
+you get:
+
+  > ?- sibling(harry,Who)
+  Who = william ;
+  Who = harry ;
+  Who = william ;
+  Who = harry ;
+  no.
+  >
+
+Each of William and Harry  appears  twice  in  the  above.   Once  by  putting
+X=charles and once using X=diana in the definition of sibling above.   We  can
+use the cut predicate to make sure that we look for at most one parent:
+
+  > newsib(One,Tother) :- parent(One,X),!,parent(Tother,X).
+  >
+  > ?- newsib(harry,Who)
+  Who = william ;
+  Who = harry ;
+  no.
+  >
+
+Thats better, but we don't really want to list Harry as his  own  sibling,  so
+we'll add a further restriction:
+
+  > newsib1(O,T):-parent(O,X),!,parent(T,X),not(equals(O,T)).
+  >
+  > ?- newsib1(harry,Who)
+  Who = william ;
+  no.
+  >
+
+Thats just about perfect.  You might like to play with  some  other  examples,
+enlarge the family tree, work out suitable predicates for other relations (who
+are Harry's aunts ?) etc.  Initially, the answers that Mini Prolog gives  will
+all be pretty obvious to you.  Try getting involved in a  larger  family  tree
+and more complicated relations and you'll find it's not so easy.
+
+                                  GOODBYES
+
+I could go on with more examples, but I guess you've got the  picture  by  now
+... at least I hope so !  I suppose I should just tell you how to get  out  of
+Mini Prolog (ok. ^C works but its not exactly elegant).  Just type  "bye"  (or
+"quit") and you're out.  Be warned though: when you leave Mini Prolog, it will
+not retain any new rules that you've entered, so  you'll  have  to  find  some
+other way to save them (I usually type  "??"  to  list  the  rules  that  I've
+entered and use the mouse to paste them into an editor in another window,  but
+that obviously requires you to be using a workstation at the time).
+
+  > bye
+  Thank you and goodbye
+  machine%
+
+Have fun with Mini Prolog, and let me hear  any  comments  that  you  have  to
+make.
+
+______________________________________________________________________________

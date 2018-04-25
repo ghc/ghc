@@ -1,0 +1,19 @@
+gamteb
+    sources
+	crpart
+	tport
+	    dist_to_surf (Point -> Point -> (Float, Int))
+		dist_to_cyl (Point -> Point -> Float)
+		dist_to_plane (Float -> Float -> Float -> Float)
+	    collision
+		*roulet (Particle -> Float -> (Particle, Bool))
+		?split (Particle -> (Particle, Particle))
+		photo_elect
+		compton_or_pair
+		    *pair (Particle -> Float -> Table -> (Particle, Bool))
+			*isos (Random -> Point)
+		    ?compton (Particle -> (Particle, Bool)
+			*klein (Energy -> Random -> Energy)
+			*rotas (Point -> Angle -> Random -> Point)
+		    tport
+    output

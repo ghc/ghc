@@ -1,0 +1,9 @@
+name: old-locale
+version: 1.0.0.7
+build-type: Simple
+cabal-version: >= 1.10
+
+library
+    exposed-modules: System.Locale
+    build-depends: base
+    default-language: Haskell2010

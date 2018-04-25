@@ -1,0 +1,3 @@
+
+T3449.hs-boot:8:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘unused’

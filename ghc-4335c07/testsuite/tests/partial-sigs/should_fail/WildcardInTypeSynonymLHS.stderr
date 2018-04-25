@@ -1,0 +1,6 @@
+
+WildcardInTypeSynonymLHS.hs:4:10:
+    Unexpected type ‘_’
+    In the type declaration for ‘Foo’
+    A type declaration should have form
+      type Foo a = ...

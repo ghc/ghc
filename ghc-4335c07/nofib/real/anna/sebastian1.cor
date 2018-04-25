@@ -1,0 +1,32 @@
+
+list a ::= Nil | Cons a (list a);
+
+;;
+
+lid l = case l of Nil -> l; Cons x xs -> l end;
+  {abstract identity on 4}
+
+foldr f a l 
+  = case l of
+       Nil -> lid a; 
+       Cons x xs -> f x (foldr f a xs)
+    end;
+{
+map f
+  = foldr (\a b -> Cons (f a) b) Nil;
+
+
+sum
+  = foldr (\x y -> x + y) 0;
+
+length xs
+  = sum (map (\a -> 1) xs);
+
+lengthRec l
+  = case l of
+       Nil -> 0;
+       Cons x xs -> 1 + lengthRec xs
+    end;
+}
+
+{  foldr  (2,4):   Anna307FT -- 7 approxes, 2062 evals   }

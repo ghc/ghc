@@ -1,0 +1,11 @@
+
+;;
+
+parallelOr a b c = a # b # c;
+
+f a = a # a;
+
+
+
+
+

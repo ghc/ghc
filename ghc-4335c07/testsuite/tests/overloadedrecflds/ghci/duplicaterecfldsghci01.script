@@ -1,0 +1,17 @@
+
+:set -XDuplicateRecordFields
+data S = MkS { foo :: Int }
+data T a = MkT { foo :: Bool, bar :: a -> a }
+let t = MkT { foo = True, bar = id }
+(\MkT{foo=foo} -> foo) t
+:info foo
+:type foo
+foo (MkS 42)
+bar (MkT True id) True
+:set -XNoDuplicateRecordFields
+-- Should be ambiguous
+:type foo
+data U = MkU { foo :: Int }
+-- New foo should shadow the old ones
+:type foo
+foo (MkU 42)

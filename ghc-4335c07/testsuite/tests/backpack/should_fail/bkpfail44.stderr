@@ -1,0 +1,23 @@
+[1 of 1] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B                ( p/B.hs, nothing )
+
+bkpfail44.bkp:10:15: error:
+    • Could not deduce: a ~ b
+      from the context: Coercible (T a) (T b)
+        bound by the type signature for:
+                   f :: forall a b. Coercible (T a) (T b) => a -> b
+        at bkpfail44.bkp:9:9-44
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a b. Coercible (T a) (T b) => a -> b
+        at bkpfail44.bkp:9:9-44
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a b. Coercible (T a) (T b) => a -> b
+        at bkpfail44.bkp:9:9-44
+    • In the expression: x
+      In an equation for ‘f’: f x = x
+    • Relevant bindings include
+        x :: a (bound at bkpfail44.bkp:10:11)
+        f :: a -> b (bound at bkpfail44.bkp:10:9)

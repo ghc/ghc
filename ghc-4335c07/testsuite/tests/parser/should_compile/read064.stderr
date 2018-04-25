@@ -1,0 +1,3 @@
+
+read064.hs:4:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma

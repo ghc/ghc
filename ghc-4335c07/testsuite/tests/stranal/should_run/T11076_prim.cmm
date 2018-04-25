@@ -1,0 +1,10 @@
+#include "Cmm.h"
+#include "MachDeps.h"
+
+testPrim(gcptr x)
+{
+  W_ a;
+  a = 123;
+  return (a);
+}
+

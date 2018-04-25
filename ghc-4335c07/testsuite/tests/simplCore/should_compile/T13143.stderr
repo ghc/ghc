@@ -1,0 +1,116 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 71, types: 44, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
+T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
+  :: forall a. GHC.Prim.Void# -> a
+[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b]
+T13143.$wf = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
+end Rec }
+
+-- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
+f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<B,A>b,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#}]
+f = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13143.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T13143.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13143.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T13143.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T13143.$trModule2 = "T13143"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T13143.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T13143.$trModule1 = GHC.Types.TrNameS T13143.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T13143.$trModule :: GHC.Types.Module
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T13143.$trModule
+  = GHC.Types.Module T13143.$trModule3 T13143.$trModule1
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+lvl :: Int
+[GblId, Str=b]
+lvl = T13143.$wf @ Int GHC.Prim.void#
+
+Rec {
+-- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
+T13143.$wg [InlPrag=NOUSERINLINE[0], Occ=LoopBreaker]
+  :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=3, Str=<S,1*U><S,1*U><S,U>]
+T13143.$wg
+  = \ (w :: Bool) (w1 :: Bool) (ww :: GHC.Prim.Int#) ->
+      case w of {
+        False ->
+          case w1 of {
+            False -> T13143.$wg GHC.Types.False GHC.Types.True ww;
+            True -> GHC.Prim.+# ww 1#
+          };
+        True ->
+          case w1 of {
+            False -> T13143.$wg GHC.Types.True GHC.Types.True ww;
+            True -> case lvl of wild2 { }
+          }
+      }
+end Rec }
+
+-- RHS size: {terms: 14, types: 6, coercions: 0, joins: 0/0}
+g [InlPrag=NOUSERINLINE[0]] :: Bool -> Bool -> Int -> Int
+[GblId,
+ Arity=3,
+ Str=<S,1*U><S,1*U><S(S),1*U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once] :: Bool)
+                 (w1 [Occ=Once] :: Bool)
+                 (w2 [Occ=Once!] :: Int) ->
+                 case w2 of { GHC.Types.I# ww1 [Occ=Once] ->
+                 case T13143.$wg w w1 ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+                 }}]
+g = \ (w :: Bool) (w1 :: Bool) (w2 :: Int) ->
+      case w2 of { GHC.Types.I# ww1 ->
+      case T13143.$wg w w1 ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+      }
+
+
+

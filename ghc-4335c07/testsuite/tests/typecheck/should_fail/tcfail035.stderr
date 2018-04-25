@@ -1,0 +1,5 @@
+
+tcfail035.hs:6:10:
+    Duplicate instance declarations:
+      instance Num NUM -- Defined at tcfail035.hs:6:10
+      instance Num NUM -- Defined at tcfail035.hs:7:10

@@ -1,0 +1,5 @@
+
+PromotedClass.hs:10:15: error:
+    • Illegal constraint in a type: Show a0
+    • In the first argument of ‘Proxy’, namely ‘( 'MkX  'True)’
+      In the type signature: foo :: Proxy ( 'MkX  'True)

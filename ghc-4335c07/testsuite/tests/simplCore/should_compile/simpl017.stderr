@@ -1,0 +1,22 @@
+
+simpl017.hs:50:15: error:
+    • Couldn't match type ‘[E m i] -> E' v0 m a’
+                     with ‘forall v. [E m i] -> E' v m a’
+      Expected type: E m (forall v. [E m i] -> E' v m a)
+        Actual type: E' RValue m ([E m i] -> E' v0 m a)
+    • In the expression:
+        E (do let ix :: [E m i] -> m i
+                  ix [i] = runE i
+                  {-# INLINE f #-}
+                  ....
+              return f)
+      In an equation for ‘liftArray’:
+          liftArray a
+            = E (do let ix :: [E m i] -> m i
+                        ix [i] = runE i
+                        ....
+                    return f)
+    • Relevant bindings include
+        a :: arr i a (bound at simpl017.hs:50:11)
+        liftArray :: arr i a -> E m (forall v. [E m i] -> E' v m a)
+          (bound at simpl017.hs:50:1)

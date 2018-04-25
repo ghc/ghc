@@ -1,0 +1,22 @@
+-- Test restricted functionality: GeneralizedNewtypeDeriving
+:unset +s
+:set -XSafe
+
+:set -XGeneralizedNewtypeDeriving
+
+class Op a where { op :: a -> String }
+
+data T = A | B | C deriving (Show)
+instance Op T where { op _ = "T" }
+
+newtype T1 = T1 T
+instance Op T1 where op _ = "t1"
+
+newtype T2 = T2 T deriving (Op)
+
+let x = T1 A
+let y = T2 A
+
+op x
+op y
+

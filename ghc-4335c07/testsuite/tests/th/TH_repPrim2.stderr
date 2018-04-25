@@ -1,0 +1,8 @@
+LitE (IntPrimL 20)
+20#
+LitE (WordPrimL 32)
+32##
+LitE (FloatPrimL (123 % 10))
+12.3#
+LitE (DoublePrimL (123 % 5))
+24.6##

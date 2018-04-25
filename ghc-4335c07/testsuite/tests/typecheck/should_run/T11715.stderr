@@ -1,0 +1,3 @@
+T11715: No more bug!
+CallStack (from HasCallStack):
+  error, called at T11715.hs:15:31 in main:Main

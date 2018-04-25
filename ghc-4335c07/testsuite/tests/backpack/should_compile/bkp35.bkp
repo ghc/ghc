@@ -1,0 +1,19 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
+unit p where
+    signature A where
+        data K a
+        instance Show (K (a -> b))
+unit q where
+    signature A where
+        data K a
+        instance Show a => Show (K a)
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]
+    module R where
+        import A
+        f :: Show a => K a -> String
+        f = show
+        g :: K (a -> b) -> String
+        g = show

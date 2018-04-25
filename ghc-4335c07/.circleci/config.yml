@@ -1,0 +1,243 @@
+version: 2
+
+aliases:
+  - &defaults
+    working_directory: ~/ghc
+
+  # Make sure we have proper openssh before checkout: CircleCI git
+  # does not check the repository out properly without it and also
+  # takes 20 times longer than it should be.
+  - &precheckout
+    run:
+      name: Install OpenSSH client
+      command: |
+        apt-get update -qq
+        apt-get install -qy openssh-client
+  - &prepare
+    run:
+      name: prepare-system
+      command: .circleci/prepare-system.sh
+  - &submodules
+    run:
+      name: submodules
+      command: .circleci/fetch-submodules.sh
+  - &buildenv
+    THREADS: 3
+    SKIP_PERF_TESTS: YES
+    VERBOSE: 2
+  - &boot
+    run:
+      name: Boot
+      command: |
+        ./boot
+
+        cat <<EOF >> mk/build.mk
+        BuildFlavour=$BUILD_FLAVOUR
+        ifneq "\$(BuildFlavour)" ""
+        include mk/flavours/\$(BuildFlavour).mk
+        endif
+        EOF
+  - &configure_unix
+    run:
+      name: Configure
+      command: ./configure
+  - &configure_bsd
+    run:
+      name: Configure
+      command: ./configure --target=x86_64-unknown-freebsd10
+  - &configure_unreg
+    run:
+      name: Configure
+      command: ./configure --enable-unregisterised
+  - &make
+    run:
+      name: Build
+      command: "make -j$THREADS"
+  - &build_hadrian
+    run:
+      name: Build Hadrian
+      command: |
+        cd hadrian
+        cabal update
+        cabal install
+  - &build_ghc_hadrian
+    run:
+      name: Build GHC using Hadrian
+      command: |
+        $HOME/.cabal/bin/hadrian -j$THREADS
+  - &test
+    run:
+      name: Test
+      command: make test
+  - &slowtest
+    run:
+      name: Full Test
+      command: make slowtest
+  - &bindist
+    run:
+      name: Create bindist
+      command: make binary-dist
+      # Building bindist takes ~15 minutes without output, account for
+      # that.
+      no_output_timeout: "30m"
+  - &collectartifacts
+    run:
+      name: Collect artifacts
+      # We need this because CircleCI expects a path without
+      # wildcards but bindist archive name is not static
+      command: |
+        mkdir -p /tmp/artifacts
+        pwd
+        find .
+        cp ghc*.tar.xz /tmp/artifacts
+  - &storeartifacts
+    store-artifacts:
+      path: /tmp/artifacts
+
+jobs:
+  "validate-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
+  "validate-x86_64-freebsd":
+    resource_class: xlarge
+    docker:
+      - image: tweag/toolchain-x86_64-freebsd
+    environment:
+      TARGET: FreeBSD
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_bsd
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
+  "validate-x86_64-darwin":
+    macos:
+      xcode: "9.0"
+    environment:
+      MACOSX_DEPLOYMENT_TARGET: "10.7"
+      # Only Sierra and onwards supports clock_gettime. See #12858
+      ac_cv_func_clock_gettime: "no"
+    environment:
+      <<: *buildenv
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *test
+      - *bindist
+      - *collectartifacts
+      - *storeartifacts
+
+  "validate-hadrian-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *build_hadrian
+      - *build_ghc_hadrian
+
+  "validate-x86_64-linux-unreg":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unreg
+      - *make
+      - *test
+
+  "validate-x86_64-linux-llvm":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+      BUILD_FLAVOUR: perf-llvm
+    steps:
+      - run:
+          name: Install LLVM
+          command: |
+            apt-get update
+            apt-get install -y curl xz-utils
+            curl http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
+            # See https://discuss.circleci.com/t/how-to-add-a-path-to-path-in-circle-2-0/11554/3
+            echo "export PATH=`pwd`/../clang+llvm-5.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
+      - run:
+          name: Verify that llc works
+          command: llc
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
+
+workflows:
+  version: 2
+  validate:
+    jobs:
+    - validate-x86_64-linux
+    # FreeBSD disabled: https://github.com/haskell/unix/issues/102
+    # - validate-x86_64-freebsd
+    - validate-x86_64-darwin
+    - validate-x86_64-linux-llvm
+    - validate-hadrian-x86_64-linux
+
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
+    jobs:
+    - validate-x86_64-linux-unreg
+    - validate-x86_64-linux-llvm
+
+notify:
+  webhooks:
+    - url: https://phabricator.haskell.org/harbormaster/hook/circleci/

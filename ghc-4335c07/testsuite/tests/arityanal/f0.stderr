@@ -1,0 +1,12 @@
+
+==================== IdInfo ====================
+lvl_s1yb :: GHC.Base.Int :: [*
+			     Str: DmdType m]
+F0.f0 :: GHC.Base.Int
+	 -> GHC.Base.Int
+	 -> GHC.Base.Int
+	 -> GHC.Base.Int :: [Arity 3
+			     0 -> 0 -> 0 -> *
+			     Str: DmdType U(L)LLm]
+
+

@@ -1,0 +1,4 @@
+-- Testing that script input is interpreted at UTF-8
+:set -XUnicodeSyntax -XRankNTypes
+let (∘) :: ∀ α β γ . (β → γ) → (α → β) → (α → γ); (f ∘ g) x = f (g x)
+reverse ∘ map Data.Char.toUpper $ "fish"

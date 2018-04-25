@@ -1,0 +1,6 @@
+Breakpoint 0 activated at Test3.hs:2:18-31
+Stopped in Main.mymap, Test3.hs:2:18-31
+_result :: [a] = _
+f :: t -> a = _
+x :: t = _
+xs :: [t] = [_]

@@ -1,0 +1,11 @@
+
+T13441b.hs:12:19: error:
+    • Couldn't match expected type ‘[a0]’ with actual type ‘x’
+      ‘x’ is a rigid type variable bound by
+        the signature for pattern synonym ‘P’ at T13441b.hs:12:1-19
+    • In the first argument of ‘MkS’, namely ‘x’
+      In the expression: MkS x
+      In an equation for ‘P’: P x = MkS x
+    • Relevant bindings include
+        x :: x (bound at T13441b.hs:12:19)
+        $bP :: x -> S (bound at T13441b.hs:12:9)

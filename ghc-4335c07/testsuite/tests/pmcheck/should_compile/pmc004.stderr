@@ -1,0 +1,4 @@
+
+pmc004.hs:16:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘h’: h _ G1 = ...

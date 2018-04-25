@@ -1,0 +1,1 @@
+[PragmaD (AnnP (TypeAnnotation T9738.Foo) (LitE (StringL "hi"))),PragmaD (AnnP (ValueAnnotation T9738.MkFoo) (LitE (StringL "there"))),PragmaD (AnnP ModuleAnnotation (LitE (StringL "Charley")))]

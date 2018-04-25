@@ -1,0 +1,17 @@
+
+list a ::= Nil | Cons a (list a);
+
+tp2 a b ::= Mk2 a b;
+
+tp3 a b c ::= Mk3 a b c;
+
+tp4 a b c d ::= Mk4 a b c d;
+
+;;
+
+unzip2 l
+  = case l of
+       Nil -> Mk2 Nil Nil;
+       Cons pair pairs -> case pair of
+          Mk2 x y      -> case unzip2 pairs of
+          Mk2 xs ys    -> Mk2 (Cons x xs) (Cons y ys) end end end;

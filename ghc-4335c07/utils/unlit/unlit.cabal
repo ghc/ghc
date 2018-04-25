@@ -1,0 +1,16 @@
+cabal-version: >=2.1
+Name: unlit
+Version: 0.1
+Copyright: XXX
+License: BSD3
+Author: XXX
+Maintainer: XXX
+Synopsis: Literate program filter
+Description: XXX
+Category: Development
+build-type: Simple
+
+Executable unlit
+    Default-Language: Haskell2010
+    Main-Is: unlit.c
+    C-Sources: unlit.c

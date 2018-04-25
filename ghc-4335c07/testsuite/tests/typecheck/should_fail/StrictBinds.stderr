@@ -1,0 +1,5 @@
+
+StrictBinds.hs:7:11: error:
+    Recursive bindings for unlifted types aren't allowed:
+      x = 3# +# y
+      y = x

@@ -1,0 +1,19 @@
+
+la a ::= Na | Ca a (lb a) ;
+
+lb b ::= Nb | Cb b (la b) ; ;;
+
+
+
+
+
+fa x = case x of
+         Na -> 0;
+         Ca y ys -> (fb ys) + y
+       end;
+
+fb x = case x of
+         Nb -> 0;
+         Cb y ys -> (fa ys) - y
+       end;
+

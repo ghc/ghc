@@ -1,0 +1,15 @@
+writeFile "dummy.hs"  "t = putStrLn \"Test\""
+writeFile "dummy.lhs" "> t = putStrLn \"Test\""
+:ctags  dummy.hs
+:ctags  dummy.lhs
+:ctags! dummy.hs
+:ctags! dummy.lhs
+:etags  dummy.hs
+:etags  dummy.lhs
+:ctags  dummy.tags
+:ctags! dummy.tags
+:etags  dummy.tags
+:l dummy.hs
+t
+:l dummy.lhs
+t

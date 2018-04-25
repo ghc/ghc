@@ -1,0 +1,117 @@
+
+<interactive>:10:15: error:
+    Type family equations violate injectivity annotation:
+      F Char Bool Int = Int -- Defined at <interactive>:10:15
+      F Bool Int Char = Int -- Defined at <interactive>:11:15
+
+<interactive>:16:15: error:
+    Type family equations violate injectivity annotation:
+      I Int Char Bool = Bool -- Defined at <interactive>:16:15
+      I Int Int Int = Bool -- Defined at <interactive>:17:15
+
+<interactive>:26:15: error:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      IdProxy a = Id a -- Defined at <interactive>:26:15
+
+<interactive>:34:15: error:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation is a bare type variable
+    but these LHS type and kind patterns are not bare variables: ‘'Z’
+      P 'Z m = m -- Defined at <interactive>:34:15
+
+<interactive>:40:15: error:
+    Type family equation violates injectivity annotation.
+    Type variable ‘b’ cannot be inferred from the right-hand side.
+    In the type family equation:
+      J Int b c = Char -- Defined at <interactive>:40:15
+
+<interactive>:44:15: error:
+    Type family equation violates injectivity annotation.
+    Type variable ‘n’ cannot be inferred from the right-hand side.
+    In the type family equation:
+      K ('S n) m = 'S m -- Defined at <interactive>:44:15
+
+<interactive>:49:15: error:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      L a = MaybeSyn a -- Defined at <interactive>:49:15
+
+<interactive>:55:41: error:
+    Type family equation violates injectivity annotation.
+    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Use -fprint-explicit-kinds to see the kind arguments
+    In the type family equation:
+      PolyKindVarsF '[] = '[] -- Defined at <interactive>:55:41
+
+<interactive>:60:15: error:
+    Type family equation violates injectivity annotation.
+    Kind variable ‘k1’ cannot be inferred from the right-hand side.
+    Use -fprint-explicit-kinds to see the kind arguments
+    In the type family equation:
+      PolyKindVars '[] = '[] -- Defined at <interactive>:60:15
+
+<interactive>:64:15: error:
+    Type family equation violates injectivity annotation.
+    Kind variable ‘k’ cannot be inferred from the right-hand side.
+    Use -fprint-explicit-kinds to see the kind arguments
+    In the type family equation:
+      forall k (a :: k) (b :: k).
+        Fc a b = Int -- Defined at <interactive>:64:15
+
+<interactive>:68:15: error:
+    Type family equation violates injectivity annotation.
+    Type and kind variables ‘k’, ‘a’, ‘b’
+    cannot be inferred from the right-hand side.
+    Use -fprint-explicit-kinds to see the kind arguments
+    In the type family equation:
+      forall k (a :: k) (b :: k).
+        Gc a b = Int -- Defined at <interactive>:68:15
+
+<interactive>:81:15: error:
+    Type family equations violate injectivity annotation:
+      F1 [a] = Maybe (GF1 a) -- Defined at <interactive>:81:15
+      F1 (Maybe a) = Maybe (GF2 a) -- Defined at <interactive>:82:15
+
+<interactive>:85:15: error:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation is a bare type variable
+    but these LHS type and kind patterns are not bare variables: ‘[a]’
+      W1 [a] = a -- Defined at <interactive>:85:15
+
+<interactive>:88:15: error:
+    Type family equation violates injectivity annotation.
+    RHS of injective type family equation cannot be a type family:
+      W2 [a] = W2 a -- Defined at <interactive>:88:15
+
+<interactive>:92:15: error:
+    Type family equations violate injectivity annotation:
+      Z1 [a] = (a, a) -- Defined at <interactive>:92:15
+      Z1 (Maybe b) = (b, [b]) -- Defined at <interactive>:93:15
+
+<interactive>:96:15: error:
+    Type family equations violate injectivity annotation:
+      G1 [a] = [a] -- Defined at <interactive>:96:15
+      G1 (Maybe b) = [(b, b)] -- Defined at <interactive>:97:15
+
+<interactive>:100:15: error:
+    Type family equations violate injectivity annotation:
+      G3 a Int = (a, Int) -- Defined at <interactive>:100:15
+      G3 a Bool = (Bool, a) -- Defined at <interactive>:101:15
+
+<interactive>:104:15: error:
+    Type family equation violates injectivity annotation.
+    Type variable ‘b’ cannot be inferred from the right-hand side.
+    In the type family equation:
+      G4 a b = [a] -- Defined at <interactive>:104:15
+
+<interactive>:107:15: error:
+    Type family equations violate injectivity annotation:
+      G5 [a] = [GF1 a] -- Defined at <interactive>:107:15
+      G5 Int = [Bool] -- Defined at <interactive>:108:15
+
+<interactive>:111:15: error:
+    Type family equation violates injectivity annotation.
+    Type variable ‘a’ cannot be inferred from the right-hand side.
+    In the type family equation:
+      G6 [a] = [HF1 a] -- Defined at <interactive>:111:15

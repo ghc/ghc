@@ -1,0 +1,30 @@
+def f(name, opts):
+    opts.extra_hc_opts = '-XTemplateHaskellQuotes -package template-haskell'
+
+setTestOpts(f)
+
+test('T2931', normal, compile, ['-v0'])
+test('T3572', normal, compile_and_run, [''])
+test('T4056', normal, compile, ['-v0'])
+test('T4169', normal, compile, ['-v0'])
+test('T4170', normal, compile, ['-v0'])
+test('T5721', normal, compile, ['-v0'])
+test('T6062', normal, compile, ['-v0'])
+test('T8455', normal, compile, ['-v0'])
+test('T8633', normal, compile_and_run, [''])
+test('T8759a', normal, compile, ['-v0'])
+test('T9824', normal, compile, ['-v0'])
+test('T10384', normal, compile_fail, [''])
+
+test('TH_tf2', normal, compile, ['-v0'])
+test('TH_ppr1', normal, compile_and_run, [''])
+test('TH_bracket1', normal, compile, [''])
+test('TH_bracket2', normal, compile, [''])
+test('TH_bracket3', normal, compile, [''])
+test('TH_scope', normal, compile, [''])
+test('TH_reifyType1', normal, compile, [''])
+test('TH_reifyType2', normal, compile, [''])
+test('TH_repE1', normal, compile, [''])
+test('TH_repE3', normal, compile, [''])
+test('TH_abstractFamily', normal, compile_fail, [''])
+test('TH_localname', normal, compile_fail, [''])

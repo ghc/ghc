@@ -1,0 +1,4 @@
+
+T13568.hs:7:8: error:
+    Not in scope: type constructor or class ‘A’
+    A data constructor of that name is in scope; did you mean DataKinds?

@@ -1,0 +1,8 @@
+
+<interactive>:19:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
+    Unrecognised pragma
+
+<interactive>:62:1: error:
+    • Role mismatch on variable b:
+        Annotation says phantom but role representational is required
+    • while checking a role annotation for ‘T1’

@@ -1,0 +1,1 @@
+Library for manipulating FilePath's in a cross platform way.

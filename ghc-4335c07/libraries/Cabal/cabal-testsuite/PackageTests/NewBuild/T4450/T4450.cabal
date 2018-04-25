@@ -1,0 +1,17 @@
+name: T4450
+version: 1.0
+build-type: Custom
+cabal-version: >= 1.10
+
+library
+    exposed-modules: A
+    build-depends: base
+    default-language: Haskell2010
+
+executable foo
+    main-is: Main.hs
+    build-depends: base, T4450
+    default-language: Haskell2010
+
+custom-setup
+    setup-depends: base, Cabal

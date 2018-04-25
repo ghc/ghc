@@ -1,0 +1,2036 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+><head
+  ><link rel="stylesheet" type="text/css" href="style.css"
+     /><script type="text/javascript" src="highlight.js"
+    ></script
+    ></head
+  ><body
+  ><pre
+    ><span class="hs-pragma"
+      >{-# LANGUAGE RankNTypes #-}</span
+      ><span
+      >
+</span
+      ><a name="line-2"
+      ></a
+      ><span class="hs-pragma"
+      >{-# LANGUAGE ScopedTypeVariables #-}</span
+      ><span
+      >
+</span
+      ><a name="line-3"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-4"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-5"
+      ></a
+      ><span class="hs-keyword"
+      >module</span
+      ><span
+      > </span
+      ><span class="hs-identifier"
+      >Polymorphism</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span
+      >
+</span
+      ><a name="line-6"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-7"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-8"
+      ></a
+      ><span class="hs-identifier"
+      >foo</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-9"
+      ></a
+      ><a name="foo"
+      ><a href="Polymorphism.html#foo"
+	><span class="hs-identifier"
+	  >foo</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-10"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-11"
+      ></a
+      ><span class="hs-identifier"
+      >foo'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-12"
+      ></a
+      ><a name="foo%27"
+      ><a href="Polymorphism.html#foo%27"
+	><span class="hs-identifier"
+	  >foo'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-13"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-14"
+      ></a
+      ><span class="hs-identifier"
+      >bar</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-15"
+      ></a
+      ><a name="bar"
+      ><a href="Polymorphism.html#bar"
+	><span class="hs-identifier"
+	  >bar</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-16"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-17"
+      ></a
+      ><span class="hs-identifier"
+      >bar'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >b</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-18"
+      ></a
+      ><a name="bar%27"
+      ><a href="Polymorphism.html#bar%27"
+	><span class="hs-identifier"
+	  >bar'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-19"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-20"
+      ></a
+      ><span class="hs-identifier"
+      >baz</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >[</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >]</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-21"
+      ></a
+      ><a name="baz"
+      ><a href="Polymorphism.html#baz"
+	><span class="hs-identifier"
+	  >baz</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-22"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-23"
+      ></a
+      ><span class="hs-identifier"
+      >baz'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >b</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >[</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >]</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-24"
+      ></a
+      ><a name="baz%27"
+      ><a href="Polymorphism.html#baz%27"
+	><span class="hs-identifier"
+	  >baz'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-25"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-26"
+      ></a
+      ><span class="hs-identifier"
+      >quux</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-27"
+      ></a
+      ><a name="quux"
+      ><a href="Polymorphism.html#quux"
+	><span class="hs-identifier"
+	  >quux</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >f</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>f</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-28"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-29"
+      ></a
+      ><span class="hs-identifier"
+      >quux'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-30"
+      ></a
+      ><a name="quux%27"
+      ><a href="Polymorphism.html#quux%27"
+	><span class="hs-identifier"
+	  >quux'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >f</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>f</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-31"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-32"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-33"
+      ></a
+      ><span class="hs-identifier"
+      >num</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Num</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-34"
+      ></a
+      ><a name="num"
+      ><a href="Polymorphism.html#num"
+	><span class="hs-identifier"
+	  >num</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-35"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-36"
+      ></a
+      ><span class="hs-identifier"
+      >num'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Num</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-37"
+      ></a
+      ><a name="num%27"
+      ><a href="Polymorphism.html#num%27"
+	><span class="hs-identifier"
+	  >num'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-38"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-39"
+      ></a
+      ><span class="hs-identifier"
+      >eq</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-identifier hs-type"
+      >Eq</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Eq</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >[</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >]</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >[</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >]</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-40"
+      ></a
+      ><a name="eq"
+      ><a href="Polymorphism.html#eq"
+	><span class="hs-identifier"
+	  >eq</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-41"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-42"
+      ></a
+      ><span class="hs-identifier"
+      >eq'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >b</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-identifier hs-type"
+      >Eq</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Eq</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >[</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >]</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >[</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >]</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-43"
+      ></a
+      ><a name="eq%27"
+      ><a href="Polymorphism.html#eq%27"
+	><span class="hs-identifier"
+	  >eq'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-44"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-45"
+      ></a
+      ><span class="hs-identifier"
+      >mon</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Monad</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>m</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>m</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>m</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-46"
+      ></a
+      ><a name="mon"
+      ><a href="Polymorphism.html#mon"
+	><span class="hs-identifier"
+	  >mon</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-47"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-48"
+      ></a
+      ><span class="hs-identifier"
+      >mon'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >m</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Monad</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>m</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>m</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>m</span
+	></a
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-49"
+      ></a
+      ><a name="mon%27"
+      ><a href="Polymorphism.html#mon%27"
+	><span class="hs-identifier"
+	  >mon'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-var"
+      >undefined</span
+      ><span
+      >
+</span
+      ><a name="line-50"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-51"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-52"
+      ></a
+      ><span class="hs-identifier"
+      >norf</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Ord</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-53"
+      ></a
+      ><a name="norf"
+      ><a href="Polymorphism.html#norf"
+	><span class="hs-identifier"
+	  >norf</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >f</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-54"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-55"
+      ></a
+      ><span class="hs-identifier"
+      >norf'</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><span class="hs-identifier hs-type"
+      >Ord</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-56"
+      ></a
+      ><a name="norf%27"
+      ><a href="Polymorphism.html#norf%27"
+	><span class="hs-identifier"
+	  >norf'</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >f</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-57"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-58"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-59"
+      ></a
+      ><span class="hs-identifier"
+      >plugh</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-60"
+      ></a
+      ><a name="plugh"
+      ><a href="Polymorphism.html#plugh"
+	><span class="hs-identifier"
+	  >plugh</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-61"
+      ></a
+      ><span
+      >
+</span
+      ><a name="line-62"
+      ></a
+      ><span class="hs-identifier"
+      >thud</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-keyword"
+      >forall</span
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >a</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >b</span
+	  ></a
+	></a
+      ><span class="hs-operator"
+      >.</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-63"
+      ></a
+      ><a name="thud"
+      ><a href="Polymorphism.html#thud"
+	><span class="hs-identifier"
+	  >thud</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >f</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >x</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      >
+</span
+      ><a name="line-64"
+      ></a
+      ><span
+      >    </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>y</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span class="hs-special"
+      >,</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      >
+</span
+      ><a name="line-65"
+      ></a
+      ><span
+      >  </span
+      ><span class="hs-keyword"
+      >where</span
+      ><span
+      >
+</span
+      ><a name="line-66"
+      ></a
+      ><span
+      >    </span
+      ><a name=""
+      ><a href="#"
+	><span class="hs-identifier"
+	  >y</span
+	  ></a
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >=</span
+      ><span
+      > </span
+      ><span class="hs-special"
+      >(</span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>f</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>a</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >-&gt;</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span class="hs-special"
+      >)</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-var"
+	>x</span
+	></a
+      ><span
+      > </span
+      ><span class="hs-glyph"
+      >::</span
+      ><span
+      > </span
+      ><a href="#"
+      ><span class="hs-identifier hs-type"
+	>b</span
+	></a
+      ><span
+      >
+</span
+      ><a name="line-67"
+      ></a
+      ></pre
+    ></body
+  ></html
+>

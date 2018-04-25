@@ -1,0 +1,4 @@
+
+T3811e.hs:6:6:
+    Illegal datatype context (use DatatypeContexts): (Show a,
+                                                      Read a) =>

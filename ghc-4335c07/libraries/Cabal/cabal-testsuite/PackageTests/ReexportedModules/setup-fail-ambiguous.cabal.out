@@ -1,0 +1,25 @@
+# Setup configure
+Resolving dependencies...
+Configuring containers-dupe-0.1.0.0...
+# Setup build
+Preprocessing library for containers-dupe-0.1.0.0..
+Building library for containers-dupe-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for containers-dupe-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring p-0.1.0.0...
+Error:
+    Problem with module re-exports:
+      - Ambiguous reexport 'Data.Map'
+        It could refer to either:
+             'containers-<VERSION>:Data.Map'
+             brought into scope by build-depends: containers
+          or 'containers-dupe-0.1.0.0:Data.Map'
+             brought into scope by build-depends: containers-dupe
+        The ambiguity can be resolved by qualifying the
+        re-export with a package name.
+        The syntax is 'packagename:ModuleName [as NewName]'.
+    In the stanza library

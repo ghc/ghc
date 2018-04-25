@@ -1,0 +1,3 @@
+
+mod89.hs:5:16: error:
+    Expecting a type constructor but found a variable, ‘map’.

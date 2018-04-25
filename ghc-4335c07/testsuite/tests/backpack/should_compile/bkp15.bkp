@@ -1,0 +1,80 @@
+{-# LANGUAGE RankNTypes, DatatypeContexts, CApiFFI, GADTs, TypeFamilies, DefaultSignatures, MultiParamTypeClasses, FunctionalDependencies, PatternSynonyms #-}
+
+-- Reflexivity test, bang on the units with as much
+-- stuff as we can.
+unit p where
+    signature H where
+        x :: (forall a. a -> a) -> (Int, Bool)
+        data Eq a => T a = T (a -> a) | S (S a)
+        data S a = R (T a)
+        data {-# CTYPE "Foo" #-} Foo where
+            Foo :: Foo
+        newtype F a = F a
+        type X m a = m a
+        type family Elem c
+        class Eq a => Bloop a b | a -> b where
+            data GMap a (v :: * -> *) :: *
+            xa :: a -> a -> Bool
+            default xa :: a -> a -> Bool
+            y :: a -> a -> Ordering
+            default y :: Ord a => a -> a -> Ordering
+            {-# MINIMAL xa | y #-}
+        -- type instance Elem Int = Bool
+        -- pattern Blub n = ("foo", n)
+
+-- keept his synced up!
+unit q where
+    signature H where
+        x :: (forall a. a -> a) -> (Int, Bool)
+        data Eq a => T a = T (a -> a) | S (S a)
+        data S a = R (T a)
+        data {-# CTYPE "Foo" #-} Foo where
+            Foo :: Foo
+        newtype F a = F a
+        type X m a = m a
+        type family Elem c
+        class Eq a => Bloop a b | a -> b where
+            data GMap a (v :: * -> *) :: *
+            xa :: a -> a -> Bool
+            default xa :: a -> a -> Bool
+            y :: a -> a -> Ordering
+            default y :: Ord a => a -> a -> Ordering
+            {-# MINIMAL xa | y #-}
+        -- type instance Elem Int = Bool
+        -- pattern Blub n = ("foo", n)
+
+unit r where
+    dependency p[H=<H>]
+    dependency q[H=<H>]
+    module M where
+        import H
+        a = x id
+        b = T (id :: String -> String)
+        c = S (R b)
+        d = F Foo :: X F Foo
+        type instance Elem Bool = Int
+        instance Bloop Bool Bool where
+            data GMap Bool v = GMapBool (v Bool)
+            xa a b = a == not b
+
+unit h-impl where
+    module H where
+        x :: (forall a. a -> a) -> (Int, Bool)
+        x f = (f 2, f True)
+        data Eq a => T a = T (a -> a) | S (S a)
+        data S a = R (T a)
+        data {-# CTYPE "Foo" #-} Foo where
+            Foo :: Foo
+        newtype F a = F a
+        type X m a = m a
+        type family Elem c
+        class Eq a => Bloop a b | a -> b where
+            data GMap a (v :: * -> *) :: *
+            xa :: a -> a -> Bool
+            xa = (==)
+            y :: a -> a -> Ordering
+            default y :: Ord a => a -> a -> Ordering
+            y = compare
+            {-# MINIMAL xa | y #-}
+unit s where
+    dependency r[H=h-impl:H]

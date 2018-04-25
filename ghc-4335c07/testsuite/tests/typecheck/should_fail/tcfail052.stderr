@@ -1,0 +1,2 @@
+
+tcfail052.hs:3:16: Not in scope: type variable ‘c’

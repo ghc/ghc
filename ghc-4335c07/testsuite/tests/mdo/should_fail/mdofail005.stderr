@@ -1,0 +1,4 @@
+
+mdofail005.hs:11:14: error:
+    parse error on input ‘<-’
+    Perhaps you intended to use RecursiveDo

@@ -1,0 +1,16 @@
+cabal-version: >=2.1
+Name: touchy
+Version: 0.1
+Copyright: XXX
+License: BSD3
+Author: XXX
+Maintainer: XXX
+Synopsis: @touch@ for windows
+Description: XXX
+Category: Development
+build-type: Simple
+
+Executable unlit
+    Default-Language: Haskell2010
+    Main-Is: touchy.c
+    C-Sources: touchy.c

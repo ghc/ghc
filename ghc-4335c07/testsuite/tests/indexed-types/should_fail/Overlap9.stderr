@@ -1,0 +1,8 @@
+
+Overlap9.hs:10:7:
+    Couldn't match expected type ‘F a’ with actual type ‘Int’
+    In the expression: length (show x)
+    In an equation for ‘g’: g x = length (show x)
+    Relevant bindings include
+      x :: a (bound at Overlap9.hs:10:3)
+      g :: a -> F a (bound at Overlap9.hs:10:1)

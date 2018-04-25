@@ -1,0 +1,18 @@
+name:                build-tool-depends-extra-version
+version:             0.1.0.0
+synopsis:            Checks build-tool-depends warns for extraneous version
+license:             BSD3
+category:            Testing
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     Foo
+  build-tool-depends:  build-tool-depends-extra-version:hello-world >=0.0.0.1
+  -- ^ internal dependency, extraneous version
+  default-language:    Haskell2010
+
+executable             hello-world
+  main-is:             Main.hs
+  build-depends:       base
+  default-language:    Haskell2010

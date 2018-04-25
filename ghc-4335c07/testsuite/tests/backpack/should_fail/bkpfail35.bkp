@@ -1,0 +1,13 @@
+unit p where
+    signature A where
+        x :: Bool
+        y :: Bool
+    module B where
+unit q where
+    dependency signature p[A=<A>]
+    signature A (x) where
+unit aimpl where
+    module A where
+        x = True
+unit r where
+    dependency q[A=aimpl:A]

@@ -1,0 +1,44 @@
+:set -fprint-explicit-foralls -XKindSignatures -XExplicitNamespaces
+import Data.Kind (type Type)
+
+
+class C a where f :: a b
+:t f
+class C (a :: * -> * ) where f :: a b
+:t f
+class C (a :: ★ -> * ) where f :: a b
+:t f
+class C (a :: * -> ★ ) where f :: a b
+:t f
+class C (a :: ★ -> ★ ) where f :: a b
+:t f
+class C (a :: Type -> Type ) where f :: a b
+:t f
+
+:set -fprint-unicode-syntax 
+
+class C a where f :: a b
+:t f
+class C (a :: * -> * ) where f :: a b
+:t f
+class C (a :: ★ -> * ) where f :: a b
+:t f
+class C (a :: * -> ★ ) where f :: a b
+:t f
+class C (a :: ★ -> ★ ) where f :: a b
+:t f
+class C (a :: Type -> Type ) where f :: a b
+:t f
+
+:t fmap
+:i fmap
+:k Functor
+
+import GHC.Generics
+:i Functor
+:t datatypeName
+:i datatypeName
+:t (:*:)
+:k Rep
+:k M1
+

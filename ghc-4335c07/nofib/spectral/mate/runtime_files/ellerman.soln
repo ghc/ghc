@@ -1,0 +1,19 @@
+ b k - - - - - -
+ - n p - - - - -
+ - - - - - - - -
+ r - - - - p - -
+ R - - - K - - -
+ - - - r P - p -
+ - Q - - - - - -
+ - - - - - q B B
+
+White to move and mate in 2
+1. R/Q3-Q7,
+	if Q/QN7xN/QN2; 2. B/QR8xQ/QN7++
+	if Q/QN7-Q5; 2. N/QN7-Q6++
+	if Q/QN7-K4; 2. N/QN7-QB5++
+	if B/KR8-KB6; 2. Q/KB1-Q3++
+	if B/KN8-KB7; 2. Q/KB1xB/KR1++
+	if R/QR5-Q5; 2. R/Q7-K7++
+	if Q/QN7-QR8, -QR6, -K7, -KB7, -KN7, -KN2, -KR7, -KR1; 2. N/QN7-Q8++
+	if others; 2. Q/KB1-KB4++

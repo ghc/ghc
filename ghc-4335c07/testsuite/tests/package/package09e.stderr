@@ -1,0 +1,5 @@
+
+package09e.hs:2:1: error:
+    Ambiguous module name ‘M’:
+      it is bound as Data.Set by a package flag
+      it is bound as Data.Map by a package flag

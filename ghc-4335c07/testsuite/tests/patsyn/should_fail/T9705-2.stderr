@@ -1,0 +1,4 @@
+
+T9705-2.hs:6:5: error:
+    Pattern synonyms not allowed in instance declaration:
+      pattern P = ()

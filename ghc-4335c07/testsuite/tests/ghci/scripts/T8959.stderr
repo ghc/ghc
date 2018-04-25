@@ -1,0 +1,36 @@
+
+<interactive>:1:1: error:
+    Arrow command found where an expression was expected:
+      () >- () -< () >>- () -<< ()
+
+<interactive>:8:15: error:
+    • Couldn't match expected type ‘()’ with actual type ‘Bool’
+    • In the pattern: True
+      In a stmt of a pattern guard for
+                     an equation for ‘fun’:
+        True <- ()
+      In an equation for ‘fun’: fun foo | True <- () = ()
+
+<interactive>:1:1: error:
+    Arrow command found where an expression was expected:
+      () ⤚ () ⤙ () ⤜ () ⤛ ()
+
+<interactive>:15:15: error:
+    • Couldn't match expected type ‘()’ with actual type ‘Bool’
+    • In the pattern: True
+      In a stmt of a pattern guard for
+                     an equation for ‘fun’:
+        True ← ()
+      In an equation for ‘fun’: fun foo | True ← () = ()
+
+<interactive>:1:1: error:
+    Arrow command found where an expression was expected:
+      () >- () -< () >>- () -<< ()
+
+<interactive>:22:15: error:
+    • Couldn't match expected type ‘()’ with actual type ‘Bool’
+    • In the pattern: True
+      In a stmt of a pattern guard for
+                     an equation for ‘fun’:
+        True <- ()
+      In an equation for ‘fun’: fun foo | True <- () = ()

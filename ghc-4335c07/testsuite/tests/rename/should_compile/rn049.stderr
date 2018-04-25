@@ -1,0 +1,4 @@
+
+rn049.hs:12:6: Warning:
+    accepting non-standard pattern guards (use PatternGuards to suppress this message)
+        x <- 1 * 2 + 3 * 4

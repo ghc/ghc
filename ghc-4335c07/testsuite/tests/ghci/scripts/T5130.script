@@ -1,0 +1,3 @@
+:set -XScopedTypeVariables
+let f = (\(x :: a, y :: a) -> [x, y])
+

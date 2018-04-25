@@ -1,0 +1,3 @@
+do {let {}; GHC.Base.return GHC.Tuple.()}
+do {let {x_0 = 5}; GHC.Base.return x_0}
+do {let {x_0 = 5; y_1 = 3}; GHC.Base.return x_0}

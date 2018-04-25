@@ -1,0 +1,6 @@
+
+T11941.hs:7:30: error:
+    Not in scope: ‘getFrst’
+    Perhaps you meant one of these:
+      ‘getFirst’ (imported from Data.Monoid),
+      ‘getLast’ (imported from Data.Monoid)

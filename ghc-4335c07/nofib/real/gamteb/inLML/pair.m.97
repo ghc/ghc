@@ -1,0 +1,53 @@
+module
+
+#include "floatop.t"
+#include "gamtebType.t"
+#include "consts.t"
+#include "utils.t"
+
+export pair;
+
+
+rec	-- pair production after a collision
+	-- pair :: Particle -> (Particle, Prob, Bool)
+
+    pair (Part pos dir w e eIndx cell seed) =
+	let (seed', r2) = genRand seed in
+	let (r3, r4) = genRand r2 in
+	-- when energy changes, so does the index and the probabilities
+	let e' = stof "0.511008" in
+	let (eIndx', prob') = xsectInterp e' in
+	let w' = float2 .* w in
+	if (e' <= energyCutoff)
+	    then 
+		(Part pos dir w' e' eIndx' cell seed', prob', true)
+	    else 
+		let dir' = isos r3 in
+		(Part pos dir' w' e' eIndx' cell seed', prob', false)
+	
+
+and	-- sample a direction u,v,w isotropically
+	-- isotropic emision in lab system
+	-- isos :: Random -> Point
+
+    isos r =
+	let (r1, r2) = genRand r in
+	let (r3, r4) = genRand r2 in
+	let t1 = (float2 .* r4) .- float1 in
+	let t2 = (float2 .* r3) .- float1 in
+	(isos' t1 t2 ((t1 .* t1) .+ (t2 .* t2)) 
+	    where rec
+		isos' t1 t2 rsq & (rsq > float1) =
+		    let (r1, r2) = genRand r1 in
+		    let (r3, r4) = genRand r2 in
+		    let t1 = (float2 .* r4) .- float1 in
+		    let t2 = (float2 .* r3) .- float1 in
+		    isos' t1 t2 ((t1 .* t1) .+ (t2 .* t2))
+	    ||  isos' t1 t2 rsq =
+		    let u = (float2 .* rsq) .- float1 in
+		    let t3 = sqrt ((float1 .- (u .* u)) ./ rsq) in
+                    let v = t1 .* t3 in
+                    let w = t2 .* t3 in
+                    (Pt u v w))
+
+end

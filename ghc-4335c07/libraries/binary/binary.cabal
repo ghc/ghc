@@ -1,0 +1,199 @@
+name:            binary
+version:         0.8.5.1
+license:         BSD3
+license-file:    LICENSE
+author:          Lennart Kolmodin <kolmodin@gmail.com>
+maintainer:      Lennart Kolmodin, Don Stewart <dons00@gmail.com>
+homepage:        https://github.com/kolmodin/binary
+description:     Efficient, pure binary serialisation using lazy ByteStrings.
+                 Haskell values may be encoded to and from binary formats,
+                 written to disk as binary, or sent over the network.
+                 The format used can be automatically generated, or
+                 you can choose to implement a custom format if needed.
+                 Serialisation speeds of over 1 G\/sec have been observed,
+                 so this library should be suitable for high performance
+                 scenarios.
+synopsis:        Binary serialisation for Haskell values using lazy ByteStrings
+category:        Data, Parsing
+stability:       provisional
+build-type:      Simple
+cabal-version:   >= 1.8
+tested-with:     GHC == 7.4.2, GHC == 7.6.3, GHC == 7.8.4, GHC == 7.10.3, GHC == 8.0.2
+extra-source-files:
+  README.md changelog.md docs/hcar/binary-Lb.tex tools/derive/*.hs
+
+-- from the benchmark 'bench'
+extra-source-files:
+  benchmarks/CBenchmark.h
+
+source-repository head
+  type: git
+  location: git://github.com/kolmodin/binary.git
+
+library
+  build-depends:   base >= 4.5.0.0 && < 5, bytestring >= 0.10.4, containers, array
+  hs-source-dirs:  src
+  exposed-modules: Data.Binary,
+                   Data.Binary.Put,
+                   Data.Binary.Get,
+                   Data.Binary.Get.Internal,
+                   Data.Binary.Builder
+
+  other-modules:   Data.Binary.Class,
+                   Data.Binary.Internal,
+                   Data.Binary.Generic,
+                   Data.Binary.FloatCast
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+  ghc-options:     -O2 -Wall -fliberate-case-threshold=1000
+
+  if impl(ghc >= 8.0)
+    ghc-options: -Wcompat -Wnoncanonical-monad-instances -Wnoncanonical-monadfail-instances
+
+-- Due to circular dependency, we cannot make any of the test-suites or
+-- benchmark depend on the binary library. Instead, for each test-suite and
+-- benchmark, we include the source directory of binary and build-depend on all
+-- the dependencies binary has.
+
+test-suite qc
+  type:  exitcode-stdio-1.0
+  hs-source-dirs: src tests
+  main-is: QC.hs
+  other-modules:
+    Action
+    Arbitrary
+  build-depends:
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4,
+    random>=1.0.1.0,
+    test-framework,
+    test-framework-quickcheck2 >= 0.3,
+    QuickCheck == 2.9.*
+
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  ghc-options: -Wall -O2 -threaded
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+
+test-suite read-write-file
+  type:  exitcode-stdio-1.0
+  hs-source-dirs: src tests
+  main-is: File.hs
+  build-depends:
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4,
+    Cabal,
+    directory,
+    filepath,
+    HUnit
+
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  ghc-options: -Wall
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+
+benchmark bench
+  type: exitcode-stdio-1.0
+  hs-source-dirs: src benchmarks
+  main-is: Benchmark.hs
+  other-modules: MemBench
+  build-depends:
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  c-sources: benchmarks/CBenchmark.c
+  include-dirs: benchmarks
+  ghc-options: -O2
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+
+benchmark get
+  type: exitcode-stdio-1.0
+  hs-source-dirs: src benchmarks
+  main-is: Get.hs
+  build-depends:
+    attoparsec,
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4,
+    cereal,
+    criterion == 1.*,
+    deepseq,
+    mtl
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  ghc-options: -O2 -Wall
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+
+benchmark put
+  type: exitcode-stdio-1.0
+  hs-source-dirs: src benchmarks
+  main-is: Put.hs
+  build-depends:
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4,
+    criterion == 1.*,
+    deepseq
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  ghc-options: -O2 -Wall
+  other-modules: Data.Binary.Generic
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+benchmark generics-bench
+  type: exitcode-stdio-1.0
+  hs-source-dirs: src benchmarks
+  main-is: GenericsBench.hs
+  build-depends:
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4,
+    Cabal == 1.24.*,
+    directory,
+    filepath,
+    tar,
+    unordered-containers,
+    zlib,
+    criterion
+    
+  other-modules:
+    GenericsBenchCache
+    GenericsBenchTypes
+    Data.Binary.Generic
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  ghc-options: -O2 -Wall
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim
+
+benchmark builder
+  type: exitcode-stdio-1.0
+  hs-source-dirs: src benchmarks
+  main-is: Builder.hs
+  build-depends:
+    base >= 4.5.0.0 && < 5,
+    bytestring >= 0.10.4,
+    criterion == 1.*,
+    deepseq,
+    mtl
+  -- build dependencies from using binary source rather than depending on the library
+  build-depends: array, containers
+  ghc-options: -O2
+  if impl(ghc <= 7.6)
+    -- prior to ghc-7.4 generics lived in ghc-prim
+    build-depends: ghc-prim

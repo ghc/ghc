@@ -1,0 +1,30 @@
+# Setup configure
+Configuring q-0.1.0.0...
+# Setup build
+Preprocessing library for q-0.1.0.0..
+Building library for q-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for q-0.1.0.0..
+# Setup configure
+Configuring p-0.1.0.0...
+# Setup build
+Preprocessing library 'q' for p-0.1.0.0..
+Building library 'q' for p-0.1.0.0..
+Preprocessing executable 'foo' for p-0.1.0.0..
+Building executable 'foo' for p-0.1.0.0..
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup copy
+Installing internal library q in <PATH>
+Installing executable foo in <PATH>
+Warning: The directory <ROOT>/setup.dist/usr/bin is not in the system search path.
+Installing library in <PATH>
+# Setup register
+Registering library 'q' for p-0.1.0.0..
+Registering library for p-0.1.0.0..
+# Setup clean
+cleaning...
+# foo
+I AM THE ONE

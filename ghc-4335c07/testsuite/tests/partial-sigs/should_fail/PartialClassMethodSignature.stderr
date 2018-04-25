@@ -1,0 +1,4 @@
+
+PartialClassMethodSignature.hs:6:15: error:
+    Wildcard ‘_’ not allowed
+      in a class method signature for ‘foo’

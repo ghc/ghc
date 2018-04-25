@@ -1,0 +1,6 @@
+-- Test load works
+:unset +s
+:set -XSafe
+
+:load A
+

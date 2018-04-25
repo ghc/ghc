@@ -1,0 +1,81 @@
+The Knights Tour in Haskell
+---------------------------
+
+Jonathan Hill
+
+email : hilly@dcs.qmw.ac.uk
+
+Introduction
+------------
+
+Heres a useless library program that does nothing that other people can use-
+sort of like the dreaded N-Queen demo that crops up all the time. 
+
+History
+-------
+
+As my interest is in data parallel languages and algorithms, I wrote
+a collection of demonstration programs for a lazy data parallel language.
+For each of the programs I tried to encode the best sequential algorithm 
+available, and a data parallel varient of the program.
+This program is the sequetial version of the knights tour, written in 
+Haskell. I've got a data parallel version of the same program that
+re-uses 80% of the code given here (a parallel search strategy is used 
+instead of depth first), and Richard came up with a clever data parallel
+algorithm using a totally different approach ( bastard :-) ).
+
+As most of my work to date has been using Miranda, this program is to
+get me used to the Haskell system. Hence you will find bits of the 
+documentation rambling on about Haskell syntax etc... 
+
+How to compile the program
+--------------------------
+
+Assuming youve got the Glasgow set-up (literate programming stuff + hc0.411),
+you should just be able to type 'make knights' on a sun 3, and go off to
+lunch while it compiles.
+
+I've included a dvi file of the documentation with this set of files, but
+if you feel brave enough to re-make the documentation type 'make root.dvi'.
+
+How to use the program
+----------------------
+
+The program takes a couple of arguments off the command line that correspond
+to the size of the chess board used in the knights tour, and the number
+of solutions that are to be found.
+
+e.g 
+diamond> knights 8 1
+
+Knights tour with 0 backtracking moves
+1  34 3  18 41 32 13 16
+4  19 64 33 14 17 44 31
+35 2  37 40 63 42 15 12
+20 5  56 47 38 45 30 43
+55 36 39 62 57 48 11 26
+6  21 52 49 46 27 60 29
+51 54 23 8  61 58 25 10
+22 7  50 53 24 9  28 59
+diamond>
+
+diamond> knights 16 1		 |------Never seems to backtrack !!!
+				\/
+Knights tour with 0 backtracking moves
+1   66  3   68  255 76  29  104 253 114 27  172 149 146 25  174
+4   69  256 75  30  103 254 115 28  141 252 145 26  173 150 147
+65  2   67  102 77  118 105 142 113 144 171 166 251 148 175 24
+70  5   74  31  82  101 116 125 140 167 178 169 176 185 182 151
+33  64  83  78  117 106 119 112 143 170 165 204 179 250 23  184
+6   71  32  73  100 81  124 139 126 203 168 177 186 183 152 181
+63  34  79  84  107 120 111 122 193 164 205 210 249 180 207 22
+56  7   72  99  80  123 138 127 202 189 222 187 206 209 248 153
+35  62  57  108 85  110 121 192 163 194 211 226 247 228 21  208
+8   55  50  61  98  137 128 201 190 221 188 223 232 225 154 239
+49  36  95  58  109 86  191 162 195 212 199 246 227 240 229 20
+54  9   60  51  94  97  136 129 200 245 220 233 224 231 238 155
+37  48  53  96  59  130 87  196 161 198 213 244 241 234 19  230
+10  43  40  47  52  93  90  135 132 219 242 217 214 237 156 235
+41  38  45  12  91  88  131 14  197 160 133 16  243 158 215 18
+44  11  42  39  46  13  92  89  134 15  218 159 216 17  236 157
+

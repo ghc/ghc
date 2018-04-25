@@ -1,0 +1,4 @@
+
+Dep08.hs:5:1:
+    GHC.IOArray: Can't be safely imported!
+    The module itself isn't safe.

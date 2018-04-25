@@ -1,0 +1,7 @@
+
+T10828b.hs:9:4:
+    Cannot mix GADT constructors with Haskell 98 constructors
+    When splicing a TH declaration:
+      data T a :: *
+    = MkT a a
+    | MkC :: forall a . a ~ Int => {foo :: a, bar :: b} -> T Int

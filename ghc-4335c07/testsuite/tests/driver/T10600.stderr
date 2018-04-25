@@ -1,0 +1,2 @@
+T10600.hs:10:1:
+    Top-level bindings for unlifted types aren't allowed: foo = 10600#

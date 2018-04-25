@@ -1,0 +1,10 @@
+"compress" program in Haskell
+
+Most of what's here is from Paul Sanders at BT.
+
+The files lzw.c, Lzw.hs, and Lzw.icl (in Clean) are the same basic
+deal, from John van Groningen at Nijmegen.  These are *not* what's run
+by default, but I would welcome the insight of anyone who messes with
+them.
+
+The MAIL file contains some relevant correspondence.

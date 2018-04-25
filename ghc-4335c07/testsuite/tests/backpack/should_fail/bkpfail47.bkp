@@ -1,0 +1,12 @@
+{-# LANGUAGE RoleAnnotations #-}
+unit p where
+    signature A where
+        type role T nominal representational
+        data T a b
+unit q where
+    signature A where
+        type role T representational nominal
+        data T a b = MkT
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]

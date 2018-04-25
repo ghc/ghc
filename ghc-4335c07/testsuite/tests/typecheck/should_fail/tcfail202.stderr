@@ -1,0 +1,7 @@
+
+tcfail202.hs:11:10:
+    Functional dependencies conflict between instance declarations:
+      instance [incoherent] C Bool Int Float
+        -- Defined at tcfail202.hs:11:10
+      instance [incoherent] C Char Int Double
+        -- Defined at tcfail202.hs:12:10

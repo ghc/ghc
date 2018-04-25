@@ -1,0 +1,6 @@
+# Setup configure
+Resolving dependencies...
+Configuring PathsModule-0.1...
+# Setup build
+Preprocessing executable 'TestPathsModule' for PathsModule-0.1..
+Building executable 'TestPathsModule' for PathsModule-0.1..

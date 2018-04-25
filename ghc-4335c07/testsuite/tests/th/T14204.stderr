@@ -1,0 +1,5 @@
+
+T14204.hs:8:35: error:
+    • Illegal static expression: static "wat"
+        Use StaticPointers to enable this extension
+    • In the untyped splice: $(pure (StaticE (LitE (StringL "wat"))))

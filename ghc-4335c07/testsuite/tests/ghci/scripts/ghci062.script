@@ -1,0 +1,9 @@
+-- Tests for a bug in -fexternal-interpreter where we call loadObj
+-- with a local path for the object file, and the iserv process is
+-- running with a different current directory so it can't load the
+-- object file.
+
+:cd ghci062
+:set -fobject-code
+:load Test
+test

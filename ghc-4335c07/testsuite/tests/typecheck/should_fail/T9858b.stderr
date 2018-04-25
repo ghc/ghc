@@ -1,0 +1,8 @@
+
+T9858b.hs:7:8: error:
+    No instance for (Typeable (Eq Int => Int))
+      arising from a use of ‘typeRep’
+      (maybe you haven't applied a function to enough arguments?)
+    In the expression: typeRep (Proxy :: Proxy (Eq Int => Int))
+    In an equation for ‘test’:
+        test = typeRep (Proxy :: Proxy (Eq Int => Int))

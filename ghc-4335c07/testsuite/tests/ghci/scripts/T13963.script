@@ -1,0 +1,9 @@
+:set -XTypeInType -XRankNTypes
+import GHC.Exts (TYPE, RuntimeRep(LiftedRep))
+type Pair (a :: TYPE rep) (b :: TYPE rep') rep'' = forall (r :: TYPE rep''). (a -> b -> r)
+:kind Pair
+:kind Pair Int
+:kind Pair Int Float
+:kind Pair Int Float LiftedRep
+
+

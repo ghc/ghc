@@ -1,0 +1,28 @@
+Name:                dph-buildbot
+Version:             0.8.0.1
+License:             BSD3
+License-file:        LICENSE
+Author:              The DPH Team
+Maintainer:          Ben Lippmeier <benl@ouroborus.net>
+Build-Type:          Simple
+Cabal-Version:       >=1.6
+Stability:           experimental
+Category:            Data Structures
+Homepage:            http://trac.haskell.org/repa
+Bug-reports:         http://trac.haskell.org/repa/newticket
+Description:         DPH Performance regression build bot.
+Synopsis:            DPH Performance regression build bot.
+
+Executable dph-buildbot
+  Build-depends: 
+        base                == 4.*,
+        directory           >= 1.0    && < 1.2,
+        time                >= 1.1    && < 1.3,
+        parseargs           == 0.1.*,
+        buildbox            == 1.5.*,
+        mtl                 == 2.0.*,
+        random              == 1.*
+
+  Main-is:        Main.hs
+  hs-source-dirs: src
+  ghc-options:    -O -Wall -threaded

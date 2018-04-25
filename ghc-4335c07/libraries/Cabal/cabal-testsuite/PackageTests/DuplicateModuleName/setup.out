@@ -1,0 +1,21 @@
+# Setup configure
+Configuring DuplicateModuleName-0.1.0.0...
+# Setup build
+Preprocessing library for DuplicateModuleName-0.1.0.0..
+Building library for DuplicateModuleName-0.1.0.0..
+Preprocessing test suite 'foo' for DuplicateModuleName-0.1.0.0..
+Building test suite 'foo' for DuplicateModuleName-0.1.0.0..
+Preprocessing test suite 'foo2' for DuplicateModuleName-0.1.0.0..
+Building test suite 'foo2' for DuplicateModuleName-0.1.0.0..
+# Setup test
+Running 1 test suites...
+Test suite foo: RUNNING...
+Test suite foo: FAIL
+Test suite logged to: setup.dist/work/dist/test/DuplicateModuleName-0.1.0.0-foo.log
+0 of 1 test suites (0 of 2 test cases) passed.
+# Setup test
+Running 1 test suites...
+Test suite foo2: RUNNING...
+Test suite foo2: FAIL
+Test suite logged to: setup.dist/work/dist/test/DuplicateModuleName-0.1.0.0-foo2.log
+0 of 1 test suites (0 of 2 test cases) passed.

@@ -1,0 +1,105 @@
+%%
+%% CoreSyn.ott
+%%
+%% defines formal version of core syntax
+%%
+%% See accompanying README file
+
+embed {{ tex-preamble
+  \newcommand{\coderef}[2]{\ghcfile{#1}:\texttt{#2}%
+}
+  \newcommand{\keyword}[1]{\textbf{#1} }
+  \newcommand{\labeledjudge}[1]{\vdash_{\!\!\mathsf{#1} } }
+}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Metavariables  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+metavar f, x, y, z ::=   {{ com Variable names }}
+metavar K ::=   {{ com Data constructor names }}
+
+indexvar i, j, k, n ::= {{ com Indices to be used in lists }}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%  Syntax  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+grammar
+
+lit {{ tex \textsf{lit} }} :: 'Literal_' ::=
+  {{ com Literals, \coderef{basicTypes/Literal.lhs}{Literal} }}
+
+op {{ tex \textsf{op} }} :: 'StgOp_' ::=
+  {{ com Primitive operation or foreign call, \coderef{stgSyn/StgSyn.lhs}{StgOp} }}
+
+cc {{ tex \textsf{cc} }} :: 'CostCentre_' ::=
+  {{ com Cost-centre, \coderef{profiling/CostCentre.lhs}{CostCentre} }}
+
+ccs {{ tex \textsf{ccs} }} :: 'CostCentreStack_' ::=
+  | CCCS :: :: CurrentCCS {{ com Current cost-centre stack }}
+    {{ tex \bullet }}
+  | _    :: :: DontCareCCS {{ com Don't care cost-centre stack }}
+  | ccs ^ ccs' :: :: EnterFunCCS {{ com Function entry, \coderef{rts/Profiling.c}{enterFunCCS} }}
+  | ccs # cc   :: :: PushCC {{ com Push a cost-centre, \coderef{rts/Profiling.c}{pushCostCentre} }}
+  {{ com Cost-centre stack, \coderef{profiling/CostCentre.lhs}{CostCentreStack} }}
+
+a, b, c :: 'StgArg_' ::= {{ com Arguments, \coderef{stgSyn/StgSyn.lhs}{StgArg} }}
+  | x   ::   :: StgVarArg {{ com Variable }}
+  | lit ::   :: StgLitArg {{ com Literal }}
+
+args :: 'StgArgs_' ::= {{ com List of arguments }}
+  | </ ai // , // i /> :: :: List
+  | args args' :: :: Append
+  | xs :: :: CastVariables
+  | nil :: :: EmptyList
+
+xs :: 'Ids_' ::= {{ com List of variables }}
+  | </ xi // , // i /> :: :: List
+  | nil :: :: EmptyList
+  | xs xs' :: :: Append
+
+e :: 'StgExpr_' ::= {{ com Expressions, \coderef{stgSyn/StgSyn.lhs}{StgExpr} }}
+  | lit                                  ::   :: StgLit {{ com Literal }}
+  | x args                               ::   :: StgApp {{ com Function application (or variable) }}
+  | K args                               ::   :: StgConApp {{ com Saturated constructor application }}
+  | op args                              ::   :: StgOpApp {{ com Saturated primitive application }}
+  | case e as x of </ alti // | // i />  ::   :: StgCase {{ com Pattern match }}
+  | let binding in e                     ::   :: StgLet  {{ com Let binding }}
+  | lne binding in e                     ::   :: StgLetNoEscape  {{ com Let-no-escape binding }}
+  | scc cc e                             ::   :: StgSCC {{ com Set cost-centre }}
+  | ( e )                                :: M :: Parens {{ com Parenthesized expression }}
+  | e' subst                             :: M :: Tsub
+
+subst :: 'Subst_' ::= {{ com List of substitutions }}
+  | [ a / x ]         ::   :: Mapping
+  | </ substi // i /> ::   :: List
+
+binding :: 'StgBind_' ::= {{ com Let-bindings, \coderef{stgSyn/StgSyn.lhs}{StgBind} }}
+  | x = rhs                         ::   :: StgNonRec  {{ com Non-recursive binding }}
+  | rec </ xi = rhsi // and // i /> ::   :: StgRec     {{ com Recursive binding }}
+
+upd :: 'UpdateFlag_' ::= {{ com Update flag, \coderef{stgSyn/StgSyn.lhs}{UpdateFlag} }}
+  | r :: :: ReEntrant {{ com Function (re-entrant closure) }}
+  | u :: :: Updatable {{ com Thunk (updatable closure) }}
+
+cl :: 'StgRhsClosure_' ::= {{ com StgRhsClosure }}
+  | \ upd ccs xs . e  :: :: StgRhsClosure
+
+rhs :: 'StgRhs_' ::= {{ com Right-hand sides, \coderef{stgSyn/StgSyn.lhs}{StgRhs} }}
+  | cl                :: :: StgRhsClosure {{ com Closure }}
+  | K ccs args        :: :: StgRhsCon {{ com Constructor }}
+  | x                 :: :: StgRhsIndirection {{ com Indirection (runtime only) }}
+
+alt :: 'StgAlt_' ::= {{ com Case alternative, \coderef{stgSyn/StgSyn.lhs}{StgAlt} }}
+  | K </ xi // i /> -> e    ::   :: StgAlt  {{ com Constructor applied to fresh names }}
+
+terminals :: 'terminals_' ::=
+  | \                   ::   :: lambda     {{ tex \lambda }}
+  | ->                  ::   :: arrow      {{ tex \rightarrow }}
+  | |->                 ::   :: mapsto     {{ tex \mapsto }}
+  | <>                  ::   :: union      {{ tex \mathbin{\mathaccent\cdot\cup} }}
+  | nil                 ::   :: empty      {{ tex \cdot }}
+  | /=                  ::   :: neq        {{ tex \neq }}
+  | ^                   ::   :: enterFun   {{ tex \bowtie }}
+  | #                   ::   :: push       {{ tex \triangleright }}

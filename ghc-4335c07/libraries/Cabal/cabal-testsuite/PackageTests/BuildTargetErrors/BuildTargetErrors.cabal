@@ -1,0 +1,10 @@
+name: BuildTargetErrors
+version: 1.0
+build-type: Simple
+cabal-version: >= 1.9
+
+library
+
+executable not-buildable-exe
+    main-is: Main.hs
+    buildable: False

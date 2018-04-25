@@ -1,0 +1,13 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling P                ( p/P.hs, nothing )
+[2 of 3] Processing r
+  Instantiating r
+  [1 of 1] Compiling A                ( r/A.hs, bkp26.out/r/A.o )
+[3 of 3] Processing q
+  Instantiating q
+  [1 of 1] Including p[A=r:A]
+    Instantiating p[A=r:A]
+    [1 of 2] Compiling A[sig]           ( p/A.hsig, bkp26.out/p/p-8YQRY0unRYZCev5HBjXieS/A.o )
+    [2 of 2] Compiling P                ( p/P.hs, bkp26.out/p/p-8YQRY0unRYZCev5HBjXieS/P.o )
+  [1 of 1] Compiling M                ( q/M.hs, bkp26.out/q/M.o )

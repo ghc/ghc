@@ -1,0 +1,8 @@
+name: pkg
+version: 1.0
+build-type: Simple
+cabal-version: >= 1.2
+
+executable my-exe
+  main-is: Main.hs
+  build-depends: base

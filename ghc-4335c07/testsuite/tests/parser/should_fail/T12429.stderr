@@ -1,0 +1,4 @@
+
+T12429.hs:2:29: error:
+    parse error on input ‘Y’
+    Perhaps you intended to use PatternSynonyms

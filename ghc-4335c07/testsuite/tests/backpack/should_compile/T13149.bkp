@@ -1,0 +1,16 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE TypeInType #-}
+unit p where
+    signature A where
+        import GHC.Types
+        type family F a where
+          F Bool = Type
+    module B where
+        import A
+        foo :: forall (a :: F Bool). a -> a
+        foo x = x
+unit q where
+    dependency p[A=<A>]
+    module C where
+        import B

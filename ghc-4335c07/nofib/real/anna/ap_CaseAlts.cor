@@ -1,0 +1,86 @@
+
+t0 {a} ::= N0;
+
+t1 a ::= N1 | C1A a (t1 a);
+
+t2 a ::= N2 | C2A a (t2 a) | C2B a (t2 a);
+
+t3 a ::= N3 | C3A a (t3 a) | C3B a (t3 a) | C3C a (t3 a);
+
+t4 a ::= N4 | C4A a (t4 a) | C4B a (t4 a) | C4C a (t4 a) | C4D a (t4 a);
+
+t5 a ::= N5 | C5A a (t5 a) | C5B a (t5 a) | C5C a (t5 a) | C5D a (t5 a) | C5E a (t5 a);
+
+t6 a ::= N6 | C6A a (t6 a) | C6B a (t6 a) | C6C a (t6 a) | C6D a (t6 a) | C6E a (t6 a) | C6F a (t6 a);
+;;
+
+ca0 x
+  = case x of
+      N0 -> 11
+    end;
+
+ca1 x
+  = case x of
+      N1 -> 11;
+      C1A a1 a2 -> 12
+    end;
+
+ca2 x
+  = case x of
+      N2 -> 11;
+      C2A a1 a2 -> 12;
+      C2B b1 b2 -> 12
+    end;
+
+ca3 x
+  = case x of
+      N3 -> 11;
+      C3A a1 a2 -> 12;
+      C3B b1 b2 -> 12;
+      C3C c1 c2 -> 12
+    end;
+
+ca4 x
+  = case x of 
+      N4 -> 11;
+      C4A a1 a2 -> 12;
+      C4B b1 b2 -> 12;
+      C4C c1 c2 -> 12;
+      C4D d1 d2 -> 12
+    end;
+
+ca5 x
+  = case x of 
+      N5 -> 11;
+      C5A a1 a2 -> 12;
+      C5B b1 b2 -> 12;
+      C5C c1 c2 -> 12;
+      C5D d1 d2 -> 12;
+      C5E e1 e2 -> 12
+    end;
+
+ca6 x
+  = case x of 
+      N6 -> 11;
+      C6A a1 a2 -> 12;
+      C6B b1 b2 -> 12;
+      C6C c1 c2 -> 12;
+      C6D d1 d2 -> 12;
+      C6E e1 e2 -> 12;
+      C6F f1 f2 -> 12
+    end;
+
+
+{
+                            Arg  Result  Group  Total   Func   Case    Anna     Norm    Norm  ac(n)-
+   Name               Rec Points Points    Max  Nodes  Nodes  Nodes    Cost       ap      rp  ac(n-1)
+-----------------------------------------------------------------------------------------------------
+
+   _ca0                no      2      2      1      4      0      1    1871   1349.6   477.2
+   _ca1                no      4      2      1      5      0      1    8579   1547.1   547.0
+   _ca2                no      4      2      1      6      0      1   14513   2617.2   925.3   5934
+   _ca3                no      4      2      1      7      0      1   20658   3275.4  1317     6145
+   _ca4                no      4      2      1      8      0      1   27050   4878.1  1725     6392
+   _ca5                no      4      2      1      9      0      1   33725   6081.9  2150     6675
+   _ca6                no      4      2      1     10      0      1   40719   7343.1  2596     6994
+}

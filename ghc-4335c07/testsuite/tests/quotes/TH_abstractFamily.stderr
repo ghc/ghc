@@ -1,0 +1,5 @@
+
+TH_abstractFamily.hs:11:7:
+    abstract closed type family not (yet) handled by Template Haskell
+      type family G a where
+        ..

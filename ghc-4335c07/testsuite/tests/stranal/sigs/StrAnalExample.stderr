@@ -1,0 +1,12 @@
+
+==================== Strictness signatures ====================
+StrAnalExample.$trModule: m
+StrAnalExample.foo: <S,1*U>
+
+
+
+==================== Strictness signatures ====================
+StrAnalExample.$trModule: m
+StrAnalExample.foo: <S,1*U>
+
+

@@ -1,0 +1,6 @@
+
+rn063.hs:10:9: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘x’
+
+rn063.hs:13:9: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘y’

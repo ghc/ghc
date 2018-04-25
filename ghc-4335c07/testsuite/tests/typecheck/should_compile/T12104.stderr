@@ -1,0 +1,5 @@
+
+T12104.hs:11:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • error
+    • In the expression: ()
+      In an equation for ‘err’: err = ()

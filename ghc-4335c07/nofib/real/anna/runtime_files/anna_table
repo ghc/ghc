@@ -1,0 +1,29 @@
+
+[
+   (Func [Two, Two] Two,
+    6),
+
+   (Func [Two, Two, Two] Two,
+    20),
+
+   (Func [Lift1 [Two]] Lift1 [Two],
+    10),
+
+   (Func [Two, Lift2 [Two]] Two,
+    15),
+
+   (Func [Two, Two] Lift2 [Two],
+    50),
+
+   (Func [Two, Two, Lift1 [Two]] Two,
+    50),
+
+   (Func [Lift2 [Two], Lift2 [Two]] Two,
+    70),
+
+   (Func [Two, Lift2 [Two]] Lift2 [Two],
+    490),
+
+   (Func [Lift2 [Two], Lift2 [Two]] Lift2 [Two],
+    24696)
+]

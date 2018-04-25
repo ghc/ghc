@@ -1,0 +1,3 @@
+:i thisIsNotDefined
+-- In 6.9, GHCi used to exit at this point
+putStrLn "Foo"

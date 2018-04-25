@@ -1,0 +1,4 @@
+set terminal latex
+set output "sine.tex"
+set nokey
+plot [0.0:1.0] "sine.plt" with lines

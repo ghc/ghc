@@ -1,0 +1,11 @@
+# Setup configure
+Configuring PreProcess-0.1...
+# Setup build
+Preprocessing test suite 'my-test-suite' for PreProcess-0.1..
+Building test suite 'my-test-suite' for PreProcess-0.1..
+Preprocessing executable 'my-executable' for PreProcess-0.1..
+Building executable 'my-executable' for PreProcess-0.1..
+Preprocessing benchmark 'my-benchmark' for PreProcess-0.1..
+Building benchmark 'my-benchmark' for PreProcess-0.1..
+Preprocessing library for PreProcess-0.1..
+Building library for PreProcess-0.1..

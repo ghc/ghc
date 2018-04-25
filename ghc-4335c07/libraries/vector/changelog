@@ -1,0 +1,58 @@
+Changes in version 0.11.0.0
+
+ * Define `Applicative` instances for `Data.Vector.Fusion.Util.{Box,Id}`
+ * Define non-bottom `fail` for `instance Monad Vector`
+ * New generalized stream fusion framework
+ * Various safety fixes
+   - Various overflows due to vector size have been eliminated
+   - Memory is initialized on creation of unboxed vectors
+ * Changes to SPEC usage to allow building under more conditions
+
+Changes in version 0.10.12.3
+
+ * Allow building with `primtive-0.6`
+
+Changes in version 0.10.12.2
+
+ * Add support for `deepseq-1.4.0.0`
+
+Changes in version 0.10.12.1
+
+ * Fixed compilation on non-head GHCs
+
+Changes in version 0.10.12.0
+
+ * Export MVector constructor from Data.Vector.Primitive to match Vector's
+   (which was already exported).
+
+ * Fix building on GHC 7.9 by adding Applicative instances for Id and Box
+
+Changes in version 0.10.11.0
+
+ * Support OverloadedLists for boxed Vector in GHC >= 7.8
+
+Changes in version 0.10.10.0
+
+ * Minor version bump to rectify PVP violation occured in 0.10.9.3 release
+
+Changes in version 0.10.9.3 (deprecated)
+
+ * Add support for OverloadedLists in GHC >= 7.8
+
+Changes in version 0.10.9.2
+
+ * Fix compilation with GHC 7.9
+
+Changes in version 0.10.9.1
+
+ * Implement poly-kinded Typeable
+
+Changes in version 0.10.0.1
+
+ * Require `primitive` to include workaround for a GHC array copying bug
+
+Changes in version 0.10
+
+ * `NFData` instances
+ * More efficient block fills
+ * Safe Haskell support removed

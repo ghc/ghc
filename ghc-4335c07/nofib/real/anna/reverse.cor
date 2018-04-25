@@ -1,0 +1,12 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+dot f g x = f (g x);
+
+lid4 l = case l of Nil -> l; Cons x xs -> l end;
+
+lid6 l = case l of Nil -> l; Cons x xs -> Cons (lid4 x) xs end;
+
+wiggle = dot lid4 lid4;
+
+wigglewiggle = dot lid6 lid6;

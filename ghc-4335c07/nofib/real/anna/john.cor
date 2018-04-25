@@ -1,0 +1,14 @@
+
+list a ::= Nil | Cons a (list a); ;;
+
+ccat xss k =
+case xss of
+   Nil -> k Nil;
+   Cons xs xss2 -> ccat xss2 (\ys -> capp xs ys k)
+end;
+
+capp l ys cont
+   = case l of
+        Nil -> cont ys;
+        Cons x xs -> capp xs ys (\zs -> cont (Cons x zs))
+     end;

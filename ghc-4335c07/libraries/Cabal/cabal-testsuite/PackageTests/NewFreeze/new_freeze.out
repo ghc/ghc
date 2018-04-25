@@ -1,0 +1,29 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following would be built:
+ - my-build-tool-dep-1.0 (exe:my-build-tool) (requires download & build)
+ - my-build-tool-dep-3.0 (exe:my-build-tool) (requires download & build)
+ - my-library-dep-1.0 (lib) (requires download & build)
+ - my-local-package-1.0 (lib) (first run)
+# cabal new-freeze
+Resolving dependencies...
+Wrote freeze file: <ROOT>/new_freeze.dist/source/cabal.project.freeze
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following would be built:
+ - my-build-tool-dep-1.0 (exe:my-build-tool) (requires download & build)
+ - my-build-tool-dep-2.0 (exe:my-build-tool) (requires download & build)
+ - my-library-dep-1.0 (lib) (requires download & build)
+ - my-local-package-1.0 (lib) (first run)
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following would be built:
+ - my-build-tool-dep-1.0 (exe:my-build-tool) (requires download & build)
+ - my-build-tool-dep-3.0 (exe:my-build-tool) (requires download & build)
+ - my-library-dep-1.0 (lib) (requires download & build)
+ - my-local-package-1.0 (lib) (first run)

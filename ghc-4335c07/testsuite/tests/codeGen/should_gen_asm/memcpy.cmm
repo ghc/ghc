@@ -1,0 +1,8 @@
+#include "Cmm.h"
+
+// Large memcpy's should lower to calls.
+callMemcpy (W_ dst, W_ src)
+{
+  prim %memcpy(dst, src, 1024, 4);
+  return ();
+}

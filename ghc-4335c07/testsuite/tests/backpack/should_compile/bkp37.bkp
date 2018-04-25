@@ -1,0 +1,11 @@
+{-# LANGUAGE FlexibleInstances #-}
+unit p where
+    signature A where
+        data K a
+        instance Show (K Int)
+        instance Show (K Bool)
+unit q where
+    module A where
+        type K = []
+unit r where
+    dependency p[A=q:A]

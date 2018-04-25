@@ -1,0 +1,96 @@
+name:           deepseq
+version:        1.4.3.0
+-- NOTE: Don't forget to update ./changelog.md
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports:    https://github.com/haskell/deepseq/issues
+synopsis:       Deep evaluation of data structures
+category:       Control
+description:
+    This package provides methods for fully evaluating data structures
+    (\"deep evaluation\"). Deep evaluation is often used for adding
+    strictness to a program, e.g. in order to force pending exceptions,
+    remove space leaks, or force lazy I/O to happen. It is also useful
+    in parallel programs, to ensure pending work does not migrate to the
+    wrong thread.
+    .
+    The primary use of this package is via the 'deepseq' function, a
+    \"deep\" version of 'seq'. It is implemented on top of an 'NFData'
+    typeclass (\"Normal Form Data\", data structures with no unevaluated
+    components) which defines strategies for fully evaluating different
+    data types.
+build-type:     Simple
+cabal-version:  >=1.10
+tested-with:    GHC==8.2.1,
+                GHC==8.0.2, GHC==8.0.1,
+                GHC==7.10.3, GHC==7.10.2, GHC==7.10.1,
+                GHC==7.8.4, GHC==7.8.3, GHC==7.8.2, GHC==7.8.1,
+                GHC==7.6.3, GHC==7.6.2, GHC==7.6.1,
+                GHC==7.4.2, GHC==7.4.1
+
+extra-source-files: changelog.md
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell/deepseq.git
+
+library
+  default-language: Haskell2010
+  other-extensions:
+    BangPatterns
+    CPP
+
+  -- Enable Generics-backed DefaultSignatures for `rnf`
+  other-extensions:
+    DefaultSignatures
+    GADTs
+    FlexibleContexts
+    FlexibleInstances
+    MultiParamTypeClasses
+    Safe
+    TypeOperators
+
+  -- GHC.Generics lived in `ghc-prim` for GHC 7.2 & GHC 7.4
+  if impl(ghc == 7.4.*)
+    build-depends: ghc-prim == 0.2.*
+
+  if impl(ghc>=7.6)
+    other-extensions: PolyKinds
+
+  if impl(ghc>=7.8)
+    other-extensions: EmptyCase
+
+  build-depends: base       >= 4.5 && < 4.12,
+                 array      >= 0.4 && < 0.6
+  ghc-options: -Wall
+
+  exposed-modules: Control.DeepSeq
+  other-modules:   Control.DeepSeq.BackDoor
+
+test-suite deepseq-generics-tests
+    default-language:    Haskell2010
+    type:                exitcode-stdio-1.0
+    hs-source-dirs:      . tests
+    main-is:             Main.hs
+    other-extensions:
+        CPP
+        BangPatterns
+        DefaultSignatures
+        DeriveDataTypeable
+        DeriveGeneric
+        FlexibleContexts
+        Safe
+        TupleSections
+        TypeOperators
+
+    ghc-options:         -Wall
+
+    build-depends:
+        array,
+        base,
+        ghc-prim,
+        -- end of packages with inherited version constraints
+        test-framework == 0.8.*,
+        test-framework-hunit == 0.3.*,
+        HUnit >= 1.2 && < 1.7

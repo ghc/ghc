@@ -1,0 +1,32 @@
+name:       template-haskell
+version:    2.4.0.0
+x-revision: 1
+license:    BSD3
+license-file:   LICENSE
+maintainer: libraries@haskell.org
+bug-reports: http://hackage.haskell.org/trac/ghc/newticket?component=Template%20Haskell
+description:
+    Facilities for manipulating Haskell source code using Template Haskell.
+build-type: Simple
+Cabal-Version: >= 1.6
+
+Library
+    build-depends: base >= 3 && < 4.3,
+                   pretty, containers
+    exposed-modules:
+        Language.Haskell.TH.Syntax.Internals
+        Language.Haskell.TH.Syntax
+        Language.Haskell.TH.PprLib
+        Language.Haskell.TH.Ppr
+        Language.Haskell.TH.Lib
+        Language.Haskell.TH.Quote
+        Language.Haskell.TH
+    extensions: MagicHash, PatternGuards, PolymorphicComponents,
+                DeriveDataTypeable, TypeSynonymInstances
+    -- We need to set the package name to template-haskell (without a
+    -- version number) as it's magic.
+    ghc-options: -package-name template-haskell
+
+source-repository head
+    type:     darcs
+    location: http://darcs.haskell.org/packages/template-haskell/

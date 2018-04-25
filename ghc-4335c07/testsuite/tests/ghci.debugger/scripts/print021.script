@@ -1,0 +1,3 @@
+:l print021.hs
+:print test
+:force test

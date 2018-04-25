@@ -1,0 +1,9 @@
+
+T8044.hs:16:13:
+    Couldn't match type ‘Frob a’ with ‘Char’
+    Expected type: X (Frob a)
+      Actual type: X Char
+    In the expression: XChar
+    In an equation for ‘frob’: frob _ = XChar
+    Relevant bindings include
+      frob :: X a -> X (Frob a) (bound at T8044.hs:15:1)

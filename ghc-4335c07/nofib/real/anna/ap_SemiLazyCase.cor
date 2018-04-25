@@ -1,0 +1,51 @@
+
+;;
+
+f2 a b 
+  = case a == 0 of
+       True -> b;
+       False -> f2 b a
+    end;
+
+f3 a b c 
+  = case a == 0 of
+       True -> b;
+       False -> f3 c b a
+    end;
+
+f4 a b c d
+  = case a == 0 of
+       True -> b;
+       False -> f4 d c b a 
+    end;
+
+f5 a b c d e
+  = case a == 0 of
+       True -> b;
+       False -> f5 e d c b a 
+    end;
+
+f6 a b c d e f
+  = case a == 0 of
+       True -> b;
+       False -> f6 f e d c b a 
+    end;
+
+f7 a b c d e f g
+  = case a == 0 of
+       True -> b;
+       False -> f7 g f e d c b a
+    end;
+
+{
+                         Arg  Result  Group  Total   Func   Case       Anna     Norm   Norm
+   Name            Rec Points Points    Max  Nodes  Nodes  Nodes       Cost       ap     rp
+---------------------------------------------------------------------------------------------
+
+   _f2             yes      4      2      1     14      2      1       7491  1350.9   477.6
+   _f3             yes      8      2      1     17      2      1      13055   784.77  277.4
+   _f4             yes     16      2      1     20      2      1      37576   847.04  299.4
+   _f5             yes     32      2      1     23      2      1      79861   720.09  254.6
+   _f6             yes     64      2      1     26      2      1     176920   664.69  235.0
+   _f7             yes    128      2      1     29      2      1     397273   639.69  226.2
+}

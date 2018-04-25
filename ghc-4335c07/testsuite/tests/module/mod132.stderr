@@ -1,0 +1,4 @@
+
+mod132.hs:6:7: error:
+    • Data constructor not in scope: Foo
+    • Perhaps you meant variable ‘foo’ (line 6)

@@ -1,0 +1,5 @@
+unit p where
+    signature ShouldFail(module ShouldFail, newSTRef) where
+        import Data.STRef.Lazy(newSTRef)
+unit q where
+    dependency p[ShouldFail=base:Data.STRef]

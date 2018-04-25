@@ -1,0 +1,23 @@
+TYPE SIGNATURES
+  NamedWildcardInDataFamilyInstanceLHS.A :: MyKind
+  NamedWildcardInDataFamilyInstanceLHS.B :: MyKind
+  NamedWildcardInDataFamilyInstanceLHS.SingA ::
+    forall (_a :: MyKind).
+    (_a ~ 'A) =>
+    NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
+  NamedWildcardInDataFamilyInstanceLHS.SingB ::
+    forall (_a :: MyKind).
+    (_a ~ 'B) =>
+    NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
+TYPE CONSTRUCTORS
+  data MyKind = A | B
+  data family Sing (a :: k)
+COERCION AXIOMS
+  axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
+    Sing = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
+      -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
+FAMILY INSTANCES
+  data instance Sing
+Dependent modules: []
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]

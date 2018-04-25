@@ -1,0 +1,8 @@
+This "unlit" program, used by the GHC driver, is originally by Mark
+Jones (then at Oxford).  It is taken in its present form *directly*
+from the LML/HBC distribution (from Chalmers).
+
+We are grateful for this piece of shared code.
+
+For more "powerful" swizzling of literate scripts, please see the
+"literate" stuff from Glasgow.

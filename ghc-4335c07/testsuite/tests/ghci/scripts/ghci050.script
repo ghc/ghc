@@ -1,0 +1,7 @@
+--Testing for proper name printing in complex error messages (a previous bug)
+:set -XTypeFamilies
+:set -XFlexibleInstances
+class Listable t where ; type ListableElem t :: * ; asList :: t -> [ListableElem t]
+instance Listable (a,a) where ; asList (a,b) = [a,b]
+instance Listable (a,a) where ; type ListableElem (a,a) = a ; asList (a,b) = [a,b]
+asList ("as","df")

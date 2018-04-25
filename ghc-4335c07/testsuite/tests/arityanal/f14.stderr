@@ -1,0 +1,26 @@
+***expensive e1 0
+***Arity is changed as occur many times: F14.f14{v r16A} 4 0
+
+==================== IdInfo ====================
+lvl_s1zz :: forall a_a19p. a_a19p -> a_a19p :: [Arity 1
+						0 -> *
+						Str: DmdType S]
+lvl_s1zy :: GHC.Num.Integer :: [*
+				Str: DmdType]
+$wf14_s1Ak :: forall a_a19p.
+	      (a_a19p -> a_a19p -> GHC.Base.Bool)
+	      -> {GHC.Num.Num a_a19p}
+	      -> a_a19p
+	      -> a_a19p
+	      -> a_a19p
+	      -> a_a19p :: [Arity 4
+			    2 -> 0 -> 0 -> 0 -> 0 -> *
+			    Str: DmdType C(C(S))LLL]
+F14.f14 :: forall a_a19p.
+	   (GHC.Base.Ord a_a19p, GHC.Num.Num a_a19p) =>
+	   a_a19p -> a_a19p -> a_a19p -> a_a19p :: [Arity 4
+						    T
+						    Worker $wf14_s1Ak
+						    Str: DmdType U(AAC(C(S))AAAAA)LLL]
+
+

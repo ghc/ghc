@@ -1,0 +1,18 @@
+:! echo module A where {} >A.hs
+:! echo module B where { import A } >B.hs
+
+:load B
+
+-- We're going to replace B.hs with an invalid module but without
+-- changing its timestamp.  A :reload should *not* look at the
+-- contents of the file, because the timestamp hasn't changed.
+:! cp B.hs B.hs-copy
+:! touch -r B.hs B.hs-copy
+:! echo "*** INVALID ***" >B.hs
+:! touch -r B.hs-copy B.hs
+
+:reload
+
+-- Put the original file back, now it should work
+:! cp B.hs-copy B.hs
+:reload

@@ -1,0 +1,22 @@
+
+overloadedlabelsfail01.hs:6:5: error:
+    • No instance for (IsLabel "x" t0)
+        arising from the overloaded label ‘#x’
+    • In the expression: #x
+      In an equation for ‘a’: a = #x
+
+overloadedlabelsfail01.hs:10:5: error:
+    • No instance for (IsLabel "x" Int)
+        arising from the overloaded label ‘#x’
+    • In the expression: #x
+      In an equation for ‘b’: b = #x
+
+overloadedlabelsfail01.hs:14:5: error:
+    • Could not deduce (IsLabel "y" t)
+        arising from the overloaded label ‘#y’
+      from the context: IsLabel "x" t
+        bound by the type signature for:
+                   c :: forall t. IsLabel "x" t => t
+        at overloadedlabelsfail01.hs:13:1-23
+    • In the expression: #y
+      In an equation for ‘c’: c = #y

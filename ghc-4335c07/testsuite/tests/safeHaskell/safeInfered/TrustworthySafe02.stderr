@@ -1,0 +1,3 @@
+
+TrustworthySafe02.hs:1:14: warning: [-Wtrustworthy-safe (in -Wall)]
+    ‘TrustworthySafe02’ is marked as Trustworthy but has been inferred as safe!

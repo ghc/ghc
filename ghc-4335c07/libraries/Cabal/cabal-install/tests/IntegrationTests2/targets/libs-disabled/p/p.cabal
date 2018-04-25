@@ -1,0 +1,9 @@
+name: p
+version: 0.1
+build-type: Simple
+cabal-version: >= 1.2
+
+library
+  exposed-modules: P
+  build-depends: base
+  buildable: False

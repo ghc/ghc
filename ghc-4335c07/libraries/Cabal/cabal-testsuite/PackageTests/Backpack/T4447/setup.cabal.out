@@ -1,0 +1,10 @@
+# Setup configure
+Resolving dependencies...
+Configuring T4447-1.0...
+Error:
+    Cannot instantiate requirement 'A' brought into scope by build-depends: T4447:foo-indef
+    with locally defined module brought into scope by other-modules: A
+    as this would create a cyclic dependency, which GHC does not support.
+    Try moving this module to a separate library, e.g.,
+    create a new stanza: library 'sublib'.
+    In the stanza executable foo-exe

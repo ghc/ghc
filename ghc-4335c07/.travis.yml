@@ -1,0 +1,61 @@
+# The following enables container-based travis instances
+sudo: false
+
+git:
+  submodules: false
+
+env:
+ - DEBUG_STAGE2=YES
+ - DEBUG_STAGE2=NO
+
+# TODO. Install llvm once llvm's APT repository is working again.
+# See http://lists.llvm.org/pipermail/llvm-dev/2016-May/100303.html.
+addons:
+  apt:
+    sources:
+    - hvr-ghc
+    #- llvm-toolchain-precise-3.7
+    - ubuntu-toolchain-r-test
+    packages:
+    - cabal-install-2.0
+    - ghc-8.2.1
+    - alex-3.1.7
+    - happy-1.19.5
+    - python3
+    #- llvm-3.7
+
+before_install:
+ - export PATH=/opt/ghc/8.2.1/bin:/opt/cabal/1.24/bin:/opt/alex/3.1.7/bin:/opt/happy/1.19.5/bin:/usr/lib/llvm-3.7/bin:$PATH
+
+# Be explicit about which protocol to use, such that we don't have to repeat the rewrite command for each.
+ - git config remote.origin.url git://github.com/${TRAVIS_REPO_SLUG}.git
+ - git config --global url."git://github.com/${TRAVIS_REPO_SLUG%/*}/packages-".insteadOf "git://github.com/${TRAVIS_REPO_SLUG%/*}/packages/"
+ - git submodule --quiet init # Be quiet about these urls, as we may override them later.
+
+# Check if submodule repositories exist.
+ - git config --get-regexp submodule.*.url | while read entry url; do git ls-remote "$url" dummyref 2>/dev/null && echo "$entry = $url" || git config --unset-all "$entry" ; done
+
+# Use github.com/ghc for those submodule repositories we couldn't connect to.
+ - git config remote.origin.url git://github.com/ghc/ghc.git
+ - git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/
+ - git submodule init # Don't be quiet, we want to show these urls.
+ - git submodule --quiet update --recursive # Now we can be quiet again.
+
+script:
+ # do  not build docs
+ - echo 'HADDOCK_DOCS       = NO' >> mk/validate.mk
+ - echo 'BUILD_SPHINX_HTML  = NO' >> mk/validate.mk
+ - echo 'BUILD_SPHINX_PDF   = NO' >> mk/validate.mk
+ # do not build dynamic libraries
+ - echo 'DYNAMIC_GHC_PROGRAMS = NO' >> mk/validate.mk
+ - echo 'GhcLibWays = v' >> mk/validate.mk
+ - if [ "$DEBUG_STAGE2" = "YES" ]; then echo 'GhcStage2HcOpts += -DDEBUG' >> mk/validate.mk; fi
+ # * Use --quiet, otherwise the build log might exceed the limit of 4
+ # megabytes, causing Travis to kill our job.
+ # * But use VERBOSE=2 (the default, but not when using --quiet) otherwise
+ # the testsuite might not print output for over 10 minutes (more likely so
+ # when DEBUG_STAGE2=NO), causing Travis to again kill our job.
+ # * Use --fast, to stay within the time limits set by Travis.
+ # See Note [validate and testsuite speed] in toplevel Makefile.
+ # Actually, do not run test suite. Takes too long.
+ - THREADS=3 SKIP_PERF_TESTS=YES VERBOSE=2 ./validate --fast --quiet --build-only

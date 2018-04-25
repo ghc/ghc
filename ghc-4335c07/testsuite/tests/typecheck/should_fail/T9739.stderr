@@ -1,0 +1,14 @@
+
+T9739.hs:4:1: error:
+    • Superclass cycle for ‘Class1’
+        one of whose superclasses is ‘Class3’
+        one of whose superclasses is ‘Class1’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘Class1’
+
+T9739.hs:9:1: error:
+    • Superclass cycle for ‘Class3’
+        one of whose superclasses is ‘Class1’
+        one of whose superclasses is ‘Class3’
+      Use UndecidableSuperClasses to accept this
+    • In the class declaration for ‘Class3’

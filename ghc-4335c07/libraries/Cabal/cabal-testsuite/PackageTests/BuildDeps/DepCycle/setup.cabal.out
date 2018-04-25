@@ -1,0 +1,6 @@
+# Setup configure
+Resolving dependencies...
+Configuring DepCycle-1.0...
+Error:
+    Components in the package depend on each other in a cyclic way:
+  'library 'bar'' depends on 'library 'foo'' depends on 'library 'bar''

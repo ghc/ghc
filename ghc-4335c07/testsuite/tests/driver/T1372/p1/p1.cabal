@@ -1,0 +1,4 @@
+name: p1
+version: 1.0
+exposed-modules: A
+build-depends: base

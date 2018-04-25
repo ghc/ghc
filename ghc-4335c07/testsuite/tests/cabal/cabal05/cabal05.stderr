@@ -1,0 +1,5 @@
+
+T.hs:3:1: error:
+    Ambiguous module name ‘Conflict’:
+      it is bound as p-0.1.0.0:P2 by a reexport in package p-0.1.0.0
+      it is bound as P by a reexport in package p-0.1.0.0

@@ -1,0 +1,9 @@
+unit p where
+    signature A where
+        foo :: a -> a
+
+unit q where
+    dependency p[A=<A>]
+    module B where
+        import A
+        bar x = foo (x + x)

@@ -1,0 +1,20 @@
+# Setup configure
+Configuring library 'sublib' for Lib-0.1.0.0..
+# Setup build
+Preprocessing library 'sublib' for Lib-0.1.0.0..
+Building library 'sublib' for Lib-0.1.0.0..
+# Setup copy
+Installing internal library sublib in <PATH>
+# Setup register
+Registering library 'sublib' for Lib-0.1.0.0..
+# Setup configure
+Configuring executable 'exe' for Lib-0.1.0.0..
+# Setup build
+Preprocessing executable 'exe' for Lib-0.1.0.0..
+Building executable 'exe' for Lib-0.1.0.0..
+# Setup copy
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup-explicit.dist/usr/bin is not in the system search path.
+# Setup register
+# exe
+OK

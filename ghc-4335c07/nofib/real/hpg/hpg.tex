@@ -1,0 +1,77 @@
+% hpg.tex - main LaTeX file for printing HPG
+
+% @(#)hpg.tex   1.9 dated 92/07/20 at 17:30:35
+
+% Crown Copyright 1992
+
+\documentstyle[a4wide]{article}
+
+\title{The Haskell Program Generator}
+\author{N D North\\
+        National Physical Laboratory\\
+        Teddington, TW11 0LW, UK.\\
+        {\tt ndn@seg.npl.co.uk}}
+
+% Some macros lifted from elsewhere to make this more standalone.
+\makeatletter
+% INLINE PROGRAM CODE
+%
+% \prog{foo} sets its argument in typewriter font.
+\def\prog#1{\ifmmode\mbox{\tt #1}\else{\tt #1}\fi}
+
+% NEWVERBATIM (from iso.sty)
+%
+% \newverbatim{foo} creates a new environment, foo, which behaves exactly
+% like the verbatim environment except that it is delimited by
+% \begin{foo} ... \end{foo}.
+% See the VERBATIM section of latex.tex for the inspiration behind this.
+%
+\def\newverbatim#1{\expandafter\def\csname #1\endcsname{%
+\@verbatim \frenchspacing\@vobeyspaces \csname @x#1verbatim\endcsname}
+\expandafter\let\csname end#1\endcsname=\endtrivlist
+\new@xverbatim{#1}}
+
+\begingroup \catcode `|=0 \catcode `[= 1
+\catcode`]=2 \catcode `\{=12 \catcode `\}=12
+\catcode`\\=12
+|gdef|new@xverbatim#1[
+|expandafter|def|csname @x#1verbatim|endcsname##1\end{#1}[##1|end[#1]]]
+|endgroup
+\makeatother
+
+\newverbatim{haskell}
+\def\HPG{{\sc HPG}}
+
+\begin{document}
+\maketitle
+
+\input{intro.tex}
+
+\input{Types.lhs}
+
+\newpage
+\input{Env.lhs}
+
+\newpage
+\input{GenType.lhs}
+
+\newpage
+\input{GenVal.lhs}
+
+\newpage
+\input{GenExp.lhs}
+
+\newpage
+\input{Main.lhs}
+
+\newpage
+\input{outro.tex}
+
+\appendix
+
+\input{Config.lhs}
+
+\newpage
+\input{Utils.lhs}
+
+\end{document}

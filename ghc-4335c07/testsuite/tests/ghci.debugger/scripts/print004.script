@@ -1,0 +1,28 @@
+-- simple :print tests
+
+let a = False
+:sp a 
+:p a
+
+let b = map Just [1::Integer .. 4]
+:p b
+head b
+:p b
+length b
+:p b
+:sp b
+b
+:p b
+
+-- Force loading of a external package and keep pushing
+:m +Language.Haskell.TH
+let c = ListT
+:p c
+let d = map TupleT [1..4]
+:p d
+head d
+:p d
+length d
+:p d
+d
+:p d

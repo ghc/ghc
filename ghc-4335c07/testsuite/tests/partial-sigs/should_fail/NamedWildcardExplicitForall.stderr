@@ -1,0 +1,41 @@
+
+NamedWildcardExplicitForall.hs:8:7: error:
+    • Couldn't match type ‘_a’ with ‘Bool’
+      ‘_a’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall _a. _a -> _a
+        at NamedWildcardExplicitForall.hs:7:1-27
+      Expected type: _a -> _a
+        Actual type: Bool -> Bool
+    • In the expression: not
+      In an equation for ‘foo’: foo = not
+    • Relevant bindings include
+        foo :: _a -> _a (bound at NamedWildcardExplicitForall.hs:8:1)
+
+NamedWildcardExplicitForall.hs:10:8: error:
+    • Found type wildcard ‘_a’ standing for ‘Bool’
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: bar :: _a -> _a
+
+NamedWildcardExplicitForall.hs:13:26: error:
+    • Found type wildcard ‘_b’ standing for ‘Bool’
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: baz :: forall _a. _a -> _b -> (_a, _b)
+
+NamedWildcardExplicitForall.hs:14:16: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘_a’
+      ‘_a’ is a rigid type variable bound by
+        the inferred type of baz :: _a -> Bool -> (_a, Bool)
+        at NamedWildcardExplicitForall.hs:14:1-24
+    • In the first argument of ‘not’, namely ‘x’
+      In the expression: not x
+      In the expression: (not x, not y)
+    • Relevant bindings include
+        x :: _a (bound at NamedWildcardExplicitForall.hs:14:5)
+        baz :: _a -> Bool -> (_a, Bool)
+          (bound at NamedWildcardExplicitForall.hs:14:1)
+
+NamedWildcardExplicitForall.hs:16:8: error:
+    • Found type wildcard ‘_a’ standing for ‘Bool’
+      To use the inferred type, enable PartialTypeSignatures
+    • In the type signature: qux :: _a -> (forall _a. _a -> _a) -> _a

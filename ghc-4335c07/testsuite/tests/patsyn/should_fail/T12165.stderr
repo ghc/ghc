@@ -1,0 +1,5 @@
+
+T12165.hs:5:9: error:
+    Duplicate pattern synonym signatures for ‘P’
+    at T12165.hs:4:9
+       T12165.hs:5:9

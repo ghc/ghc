@@ -1,0 +1,8 @@
+-- #1827 - Printing overloaded values
+
+:print (+)
+:print print
+:print log
+:print head
+:print tail
+:print fst

@@ -1,0 +1,7 @@
+name: shadowdep
+version: 1
+abi: ddd
+id: shadowdep-1-XXX
+key: shadowdep-1-XXX
+depends: shadow-1-XXX
+abi-depends: shadow-1-XXX=aaa

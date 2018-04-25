@@ -1,0 +1,5 @@
+
+T9968a.hs:8:13: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘bimap’ or (‘first’ and ‘second’)
+    • In the instance declaration for ‘Bifunctor Blah’

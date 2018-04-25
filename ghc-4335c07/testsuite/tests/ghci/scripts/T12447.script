@@ -1,0 +1,9 @@
+:set -XRankNTypes -XConstraintKinds -XTypeApplications
+
+import Data.Typeable
+
+class Deferrable p where deferEither :: proxy p -> (p => r) -> Either String r
+
+instance (Typeable a, Typeable b) => Deferrable (a ~ b) where deferEither = undefined
+
+:t deferEither @(_ ~ _)

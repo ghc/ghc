@@ -1,0 +1,11 @@
+name: thtest
+version: 1.0
+cabal-version: >= 1.2
+build-type: Simple
+
+library {
+  build-depends: base, template-haskell
+  extensions: TemplateHaskell
+  exposed-modules: Library
+  other-modules: TH
+}

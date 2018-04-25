@@ -1,0 +1,179 @@
+
+Defer01.hs:11:40: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘Char’ with ‘[Char]’
+      Expected type: String
+        Actual type: Char
+    • In the first argument of ‘putStr’, namely ‘','’
+      In the second argument of ‘(>>)’, namely ‘putStr ','’
+      In the expression: putStr "Hello World" >> putStr ','
+
+Defer01.hs:14:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: 'p'
+      In an equation for ‘a’: a = 'p'
+
+Defer01.hs:18:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for (Eq B) arising from a use of ‘==’
+    • In the expression: x == x
+      In an equation for ‘b’: b x = x == x
+
+Defer01.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘c’: c (C2 x) = ...
+
+Defer01.hs:25:4: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘Int’ with ‘Bool’
+      Inaccessible code in
+        a pattern with constructor: C2 :: Bool -> C Bool,
+        in an equation for ‘c’
+    • In the pattern: C2 x
+      In an equation for ‘c’: c (C2 x) = True
+
+Defer01.hs:28:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for (Num (a -> a)) arising from the literal ‘1’
+        (maybe you haven't applied a function to enough arguments?)
+    • In the expression: 1
+      In an equation for ‘d’: d = 1
+
+Defer01.hs:31:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
+    • The function ‘e’ is applied to one argument,
+      but its type ‘Char’ has none
+      In the expression: e 'q'
+      In an equation for ‘f’: f = e 'q'
+    • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
+
+Defer01.hs:34:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Char’ with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          h :: forall a. a -> (Char, Char)
+        at Defer01.hs:33:1-21
+    • In the expression: x
+      In the expression: (x, 'c')
+      In an equation for ‘h’: h x = (x, 'c')
+    • Relevant bindings include
+        x :: a (bound at Defer01.hs:34:3)
+        h :: a -> (Char, Char) (bound at Defer01.hs:34:1)
+
+Defer01.hs:39:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Bool’ with actual type ‘T a’
+    • In the first argument of ‘not’, namely ‘(K a)’
+      In the expression: (not (K a))
+      In the expression: seq (not (K a)) ()
+    • Relevant bindings include
+        a :: a (bound at Defer01.hs:39:3)
+        i :: a -> () (bound at Defer01.hs:39:1)
+
+Defer01.hs:43:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for (MyClass a1) arising from a use of ‘myOp’
+    • In the expression: myOp 23
+      In an equation for ‘j’: j = myOp 23
+
+Defer01.hs:43:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Ambiguous type variable ‘a1’ arising from the literal ‘23’
+      prevents the constraint ‘(Num a1)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘a1’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘myOp’, namely ‘23’
+      In the expression: myOp 23
+      In an equation for ‘j’: j = myOp 23
+
+Defer01.hs:47:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘Bool’ with actual type ‘Int’
+    • In the expression: x
+      In an equation for ‘k’: k x = x
+
+Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match expected type ‘IO a0’
+                  with actual type ‘Char -> IO ()’
+    • Probable cause: ‘putChar’ is applied to too few arguments
+      In the first argument of ‘(>>)’, namely ‘putChar’
+      In the expression: putChar >> putChar 'p'
+      In an equation for ‘l’: l = putChar >> putChar 'p'
+*** Exception: Defer01.hs:11:40: error:
+    • Couldn't match type ‘Char’ with ‘[Char]’
+      Expected type: String
+        Actual type: Char
+    • In the first argument of ‘putStr’, namely ‘','’
+      In the second argument of ‘(>>)’, namely ‘putStr ','’
+      In the expression: putStr "Hello World" >> putStr ','
+(deferred type error)
+*** Exception: Defer01.hs:14:5: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: 'p'
+      In an equation for ‘a’: a = 'p'
+(deferred type error)
+*** Exception: Defer01.hs:18:7: error:
+    • No instance for (Eq B) arising from a use of ‘==’
+    • In the expression: x == x
+      In an equation for ‘b’: b x = x == x
+(deferred type error)
+
+<interactive>:10:11: error:
+    • Couldn't match type ‘Bool’ with ‘Int’
+      Expected type: C Int
+        Actual type: C Bool
+    • In the first argument of ‘c’, namely ‘(C2 True)’
+      In the first argument of ‘print’, namely ‘(c (C2 True))’
+      In the expression: print (c (C2 True))
+*** Exception: Defer01.hs:28:5: error:
+    • No instance for (Num (a -> a)) arising from the literal ‘1’
+        (maybe you haven't applied a function to enough arguments?)
+    • In the expression: 1
+      In an equation for ‘d’: d = 1
+(deferred type error)
+*** Exception: Defer01.hs:31:5: error:
+    • Couldn't match expected type ‘Char -> t’ with actual type ‘Char’
+    • The function ‘e’ is applied to one argument,
+      but its type ‘Char’ has none
+      In the expression: e 'q'
+      In an equation for ‘f’: f = e 'q'
+    • Relevant bindings include f :: t (bound at Defer01.hs:31:1)
+(deferred type error)
+*** Exception: Defer01.hs:34:8: error:
+    • Couldn't match expected type ‘Char’ with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          h :: forall a. a -> (Char, Char)
+        at Defer01.hs:33:1-21
+    • In the expression: x
+      In the expression: (x, 'c')
+      In an equation for ‘h’: h x = (x, 'c')
+    • Relevant bindings include
+        x :: a (bound at Defer01.hs:34:3)
+        h :: a -> (Char, Char) (bound at Defer01.hs:34:1)
+(deferred type error)
+*** Exception: Defer01.hs:39:17: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘T a’
+    • In the first argument of ‘not’, namely ‘(K a)’
+      In the expression: (not (K a))
+      In the expression: seq (not (K a)) ()
+    • Relevant bindings include
+        a :: a (bound at Defer01.hs:39:3)
+        i :: a -> () (bound at Defer01.hs:39:1)
+(deferred type error)
+*** Exception: Defer01.hs:43:5: error:
+    • No instance for (MyClass a1) arising from a use of ‘myOp’
+    • In the expression: myOp 23
+      In an equation for ‘j’: j = myOp 23
+(deferred type error)
+
+<interactive>:16:8: error:
+    • Couldn't match type ‘Int’ with ‘Bool’ arising from a use of ‘k’
+    • In the first argument of ‘print’, namely ‘(k 2)’
+      In the expression: print (k 2)
+      In an equation for ‘it’: it = print (k 2)
+*** Exception: Defer01.hs:50:5: error:
+    • Couldn't match expected type ‘IO a0’
+                  with actual type ‘Char -> IO ()’
+    • Probable cause: ‘putChar’ is applied to too few arguments
+      In the first argument of ‘(>>)’, namely ‘putChar’
+      In the expression: putChar >> putChar 'p'
+      In an equation for ‘l’: l = putChar >> putChar 'p'
+(deferred type error)

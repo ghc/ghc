@@ -1,0 +1,83 @@
+# Setup configure
+Resolving dependencies...
+Configuring sigs-0.1.0.0...
+# Setup build
+Preprocessing library for sigs-0.1.0.0..
+Building library instantiated with Data.Map = <Data.Map>
+for sigs-0.1.0.0..
+# Setup haddock
+Preprocessing library for sigs-0.1.0.0..
+Running Haddock on library instantiated with Data.Map = <Data.Map>
+for sigs-0.1.0.0..
+Documentation created: ../setup-external-ok.cabal.dist/work/sigs/dist/doc/html/sigs/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Data.Map = <Data.Map>
+for sigs-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring indef-0.1.0.0...
+# Setup build
+Preprocessing library for indef-0.1.0.0..
+Building library instantiated with Data.Map = <Data.Map>
+for indef-0.1.0.0..
+# Setup haddock
+Preprocessing library for indef-0.1.0.0..
+Running Haddock on library instantiated with Data.Map = <Data.Map>
+for indef-0.1.0.0..
+Documentation created: ../setup-external-ok.cabal.dist/work/indef/dist/doc/html/indef/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Data.Map = <Data.Map>
+for indef-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring sigs-0.1.0.0...
+# Setup build
+Preprocessing library for sigs-0.1.0.0..
+Building library instantiated with Data.Map = containers-<VERSION>:Data.Map
+for sigs-0.1.0.0..
+# Setup haddock
+Preprocessing library for sigs-0.1.0.0..
+Running Haddock on library instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for sigs-0.1.0.0..
+Documentation created: ../setup-external-ok.cabal.dist/work/sigs/dist/doc/html/sigs/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Data.Map = containers-<VERSION>:Data.Map
+for sigs-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring indef-0.1.0.0...
+# Setup build
+Preprocessing library for indef-0.1.0.0..
+Building library instantiated with Data.Map = containers-<VERSION>:Data.Map
+for indef-0.1.0.0..
+# Setup haddock
+Preprocessing library for indef-0.1.0.0..
+Running Haddock on library instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for indef-0.1.0.0..
+Documentation created: ../setup-external-ok.cabal.dist/work/indef/dist/doc/html/indef/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Data.Map = containers-<VERSION>:Data.Map
+for indef-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring exe-0.1.0.0...
+# Setup build
+Preprocessing executable 'exe' for exe-0.1.0.0..
+Building executable 'exe' for exe-0.1.0.0..
+# Setup copy
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup-external-ok.cabal.dist/usr/bin is not in the system search path.
+# Setup register
+Package contains no library to register: exe-0.1.0.0...
+# exe
+fromList [(0,2),(2,4)]

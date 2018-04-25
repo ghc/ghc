@@ -1,0 +1,14 @@
+unit p where
+    signature A where
+        data I
+        x :: I
+unit q where
+    signature B where
+        data I
+        f :: I -> I
+unit r where
+    dependency p[A=<C>]
+    dependency q[B=<C>]
+    module M where
+        import C
+        g = f x

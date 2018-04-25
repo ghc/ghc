@@ -1,0 +1,100 @@
+name:		parsec
+version:	3.1.12
+cabal-version: >= 1.10
+license:	BSD3
+license-file:	LICENSE
+author:		Daan Leijen <daan@microsoft.com>, Paolo Martini <paolo@nemail.it>
+maintainer:	Antoine Latter <aslatter@gmail.com>
+homepage:	https://github.com/haskell/parsec
+bug-reports:    https://github.com/haskell/parsec/issues
+category:	Parsing
+synopsis:	Monadic parser combinators
+build-type:     Simple
+description:
+	Parsec is designed from scratch as an industrial-strength parser
+	library.  It is simple, safe, well documented (on the package
+	homepage), has extensive libraries, good error messages,
+	and is fast.  It is defined as a monad transformer that can be
+	stacked on arbitrary monads, and it is also parametric in the
+	input stream type.
+extra-source-files: CHANGES, README.md
+tested-with: GHC==8.2.1, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4, GHC==7.6.3, GHC==7.4.2, GHC==7.2.2, GHC==7.0.4
+
+source-repository head
+    type: git
+    location: https://github.com/haskell/parsec
+
+library
+    exposed-modules:
+        Text.Parsec,
+        Text.Parsec.String,
+        Text.Parsec.ByteString,
+        Text.Parsec.ByteString.Lazy,
+        Text.Parsec.Text,
+        Text.Parsec.Text.Lazy,
+        Text.Parsec.Pos,
+        Text.Parsec.Error,
+        Text.Parsec.Prim,
+        Text.Parsec.Char,
+        Text.Parsec.Combinator,
+        Text.Parsec.Token,
+        Text.Parsec.Expr,
+        Text.Parsec.Language,
+        Text.Parsec.Perm,
+        Text.ParserCombinators.Parsec,
+        Text.ParserCombinators.Parsec.Char,
+        Text.ParserCombinators.Parsec.Combinator,
+        Text.ParserCombinators.Parsec.Error,
+        Text.ParserCombinators.Parsec.Expr,
+        Text.ParserCombinators.Parsec.Language,
+        Text.ParserCombinators.Parsec.Perm,
+        Text.ParserCombinators.Parsec.Pos,
+        Text.ParserCombinators.Parsec.Prim,
+        Text.ParserCombinators.Parsec.Token
+
+    build-depends:
+       base >= 4 && < 5,
+       mtl,
+       bytestring,
+       text >= 0.2 && < 1.3
+
+    default-language: Haskell2010
+    other-extensions:
+       CPP
+       DeriveDataTypeable
+       ExistentialQuantification
+       FlexibleContexts
+       FlexibleInstances
+       FunctionalDependencies
+       MultiParamTypeClasses
+       PolymorphicComponents
+       StandaloneDeriving
+       UndecidableInstances
+
+    ghc-options: -Wall
+    if impl(ghc >= 8.0)
+       ghc-options: -Wcompat -Wnoncanonical-monad-instances -Wnoncanonical-monadfail-instances
+    else
+       -- provide/emulate `Control.Monad.Fail` API for pre-GHC8
+       build-depends: fail == 4.9.*
+
+
+Test-Suite tests
+    default-language: Haskell2010
+    type:        exitcode-stdio-1.0
+    hs-source-dirs:  test
+    main-is:     Main.hs
+    other-modules:
+                 Bugs,
+                 Bugs.Bug2,
+                 Bugs.Bug6,
+                 Bugs.Bug9,
+                 Bugs.Bug35,
+                 Util
+    build-depends:
+       base,
+       parsec,
+       HUnit >= 1.2 && < 1.4,
+       test-framework >= 0.6 && < 0.9,
+       test-framework-hunit >= 0.2 && < 0.4
+    ghc-options: -Wall

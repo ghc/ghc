@@ -1,0 +1,9 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - RunExe-1.0 (exe:foo) (first run)
+Configuring executable 'foo' for RunExe-1.0..
+Preprocessing executable 'foo' for RunExe-1.0..
+Building executable 'foo' for RunExe-1.0..
+# cabal new-exec

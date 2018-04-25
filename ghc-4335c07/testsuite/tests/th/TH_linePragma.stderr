@@ -1,0 +1,2 @@
+
+virtual file:42:1: error: Variable not in scope: doesntExist

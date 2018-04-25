@@ -1,0 +1,64 @@
+
+File: holzhausen.prob
+ - - - - R - - K
+ - - - - - - - b
+ - b - - N - q -
+ - - - - - - - -
+ - - - - - - P -
+ - r - - - - p -
+ - - p - - - - k
+ - - - - - - - -
+
+White to move and mate in 4
+
+1. B/QN6-QB7,
+	if R/K1-KB1; 2. B/QB7-K5,
+		if N/K3-KN2; 3. B/K5xN/KN7++
+		if R/KB1-KB3; 3. B/K5xR/KB6, N/K3-KN2; 4. B/KB6xN/KN7++
+	if R/K1-K2; 2. B/QB7-K5,
+		if R/K2-KN2; 3. B/K5-KB6, ...; 4. B/KB6xR/KN7++
+		if N/K3-KN2; 3. R/QN3-QN8, R/K2-K1; 4. R/QN8xR/K8++
+	if R/K1-KN1; 2. B/QB7-K5,
+		if R/KN1-KN2; 3. B/K5-KB6, ...; 4. B/KB6xR/KN7++
+		if N/K3-KN2; 3. B/K5-QR1, ...; 4. B/QR1xN/KN7++
+	if R/K1-QN1; 2. B/QB7-KB4,
+		if R/QN1-KB1; 3. B/KB4-K5,
+			if N/K3-KN2; 4. B/K5xN/KN7++
+			if R/KB1-KB3; 4. Q/KN6-KN8++
+		if R/QN1-QN4; 3. B/KB4-K5,
+			if N/K3-KN2; 4. B/K5xN/KN7++
+			if R/QN4xB/K4; 4. Q/KN6-KN8++
+		if N/K3-Q1; 3. B/KB4xR/QN8,
+			if N/Q1-QN2; 4. B/QN8-K5++
+			if others; 4. Q/KN6-KN8++
+		if N/K3-QB4; 3. B/KB4xR/QN8,
+			if N/QB4-QR5, -QR3, xR/QN6, -QN2; 4. B/QN8-K5++
+			if others; 4. Q/KN6-KN8++
+		if N/K3-KN2; 3. B/KB4xR/QN8, ...; 4. Q/KN6-KN8++
+		if R/QN1-KN1; 3. B/KR7xR/KN8,
+			if N/K3xB/KB5, -KN2; 4. Q/KN6-KR7++
+			if others; 4. B/KB4-K5++
+		if R/QN1-QN2; 3. Q/KN6-KN8++
+		if N/K3xB/KB5; 3. R/QN3xR/QN8++
+		if N/K3-QB2, -Q5, -KB1, -KN4; 3. B/KB4-K5++
+		if others; 3. B/KB4-K5, N/K3-KN2; 4. B/K5xN/KN7++
+	if N/K3xB/QB2; 2. R/QN3-QN8,
+		if R/K1xR/QN1; 3. B/KR7-KN8,
+			if R/QN1xB/KN1; 4. Q/KN6-KR6++
+			if others; 4. Q/KN6-KR7++
+		if N/QB2-K3; 3. R/QN8xR/K8, N/K3-KB1; 4. R/K8xN/KB8++
+		if R/K1-KB1; 3. R/QN8xR/KB8++
+		if R/K1-KN1; 3. R/QN8xR/KN8++
+		if R/K1-Q1; 3. R/QN8xR/Q8, N/QB2-K1; 4. R/Q8xN/K8++
+		if R/K1-QB1; 3. R/QN8xR/QB8, N/QB2-K1; 4. R/QB8xN/K8++
+		if others; 3. R/QN8xR/K8++
+	if N/K3-KN2; 2. R/QN3-QN8,
+		if R/K1xR/QN1; 3. B/QB7xR/QN8, ...; 4. Q/KN6-KN8++
+		if N/KN2-K3; 3. R/QN8xR/K8, N/K3-KB1; 4. R/K8xN/KB8++
+		if R/K1-KB1; 3. R/QN8xR/KB8++
+		if R/K1-KN1; 3. R/QN8xR/KN8++
+		if R/K1-Q1; 3. R/QN8xR/Q8, N/KN2-K1; 4. R/Q8xN/K8++
+		if R/K1-QB1; 3. R/QN8xR/QB8, N/KN2-K1; 4. R/QB8xN/K8++
+		if others; 3. R/QN8xR/K8++
+	if R/K1-QR1, -QB1, -Q1; 2. B/QB7-K5, N/K3-KN2; 3. B/K5xN/KN7++
+	if others; 2. B/QB7-K5, R/K1xB/K4; 3. Q/KN6-KN8++

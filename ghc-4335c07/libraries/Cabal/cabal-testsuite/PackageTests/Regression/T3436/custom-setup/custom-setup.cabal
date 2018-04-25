@@ -1,0 +1,9 @@
+name: custom-setup
+version: 1.0
+build-type: Custom
+cabal-version: >= 99999
+
+custom-setup
+  setup-depends: base, Cabal >= 99999
+
+library

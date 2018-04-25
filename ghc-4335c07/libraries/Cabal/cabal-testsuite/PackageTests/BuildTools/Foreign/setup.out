@@ -1,0 +1,9 @@
+# Setup configure
+Configuring build-tools-path-foreign-0.1.0.0...
+# Setup build
+Preprocessing library for build-tools-path-foreign-0.1.0.0..
+Building library for build-tools-path-foreign-0.1.0.0..
+Preprocessing executable 'hello-world' for build-tools-path-foreign-0.1.0.0..
+Building executable 'hello-world' for build-tools-path-foreign-0.1.0.0..
+# hello-world
+1111

@@ -1,0 +1,21 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+unit sig where
+    signature A where
+        data T
+        instance Show T
+    module M where
+        import A
+        f :: T -> String
+        f x = show x
+
+unit mod where
+    module A where
+        data X = X -- no Show instance
+        type T = [X]
+
+unit join where
+    dependency sig[A=mod:A]
+    module S where
+        import M
+        g :: String -> String
+        g x = f (x ++ "a")

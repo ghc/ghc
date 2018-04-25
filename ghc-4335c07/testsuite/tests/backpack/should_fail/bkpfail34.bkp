@@ -1,0 +1,7 @@
+unit p where
+    signature A where
+        data T
+        x :: T
+unit q where
+    dependency signature p[A=<A>]
+    signature A (x) where

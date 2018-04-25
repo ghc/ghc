@@ -1,0 +1,9 @@
+# Setup configure
+Resolving dependencies...
+Configuring myprog-0.1.0.0...
+# Setup build
+Preprocessing executable 'myprog' for myprog-0.1.0.0..
+Building executable 'myprog' for myprog-0.1.0.0..
+# Setup copy
+Installing executable myprog in <PATH>
+Warning: The directory <ROOT>/setup.cabal.dist/usr/bin is not in the system search path.

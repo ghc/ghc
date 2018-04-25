@@ -1,0 +1,21 @@
+
+list a ::= Nil a;
+
+type  ::=   EAp (type)
+          | ELet (type); 
+
+;; 
+
+listId l1 
+   = case l1 of 
+        Nil n -> Nil n
+     end;
+
+allBinders e = 
+   case e of
+      EAp x ->   listId (allBinders x);
+      ELet y ->  listId (allBinders y)
+   end;
+             
+
+

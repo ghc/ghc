@@ -1,0 +1,55 @@
+\setlength{\unitlength}{0.00054167in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(5787,4014)(0,-10)
+\path(2700,912)(5325,912)(5325,1212)
+	(2700,1212)(2700,912)
+\path(2850,12)(5100,12)(5100,312)
+	(2850,312)(2850,12)
+\path(2700,1812)(5325,1812)(5325,2112)
+	(2700,2112)(2700,1812)
+\path(3825,2712)(5700,2712)(5700,3012)
+	(3825,3012)(3825,2712)
+\path(3825,3687)(5625,3687)(5625,3987)
+	(3825,3987)(3825,3687)
+\path(2625,3687)(3825,3687)(3825,3987)
+	(2625,3987)(2625,3687)
+\path(3795.000,3357.000)(3825.000,3237.000)(3855.000,3357.000)
+\path(3825,3237)(3825,3687)
+\path(3855.000,3567.000)(3825.000,3687.000)(3795.000,3567.000)
+\path(3795.000,1332.000)(3825.000,1212.000)(3855.000,1332.000)
+\path(3825,1212)(3825,1812)
+\path(3855.000,1692.000)(3825.000,1812.000)(3795.000,1692.000)
+\path(1875,3237)(5775,3237)(5775,762)
+	(1875,762)(1875,3237)
+\path(3855.000,642.000)(3825.000,762.000)(3795.000,642.000)
+\path(3825,762)(3825,312)
+\path(3795.000,432.000)(3825.000,312.000)(3855.000,432.000)
+\path(2025,2712)(3525,2712)(3525,3012)
+	(2025,3012)(2025,2712)
+\path(3195.000,2232.000)(3225.000,2112.000)(3255.000,2232.000)
+\path(3225,2112)(3225,2712)
+\path(3255.000,2592.000)(3225.000,2712.000)(3195.000,2592.000)
+\path(4320.000,2232.000)(4350.000,2112.000)(4380.000,2232.000)
+\path(4350,2112)(4350,2712)
+\path(4380.000,2592.000)(4350.000,2712.000)(4320.000,2592.000)
+\path(3525,2937)(3825,2937)
+\path(3705.000,2907.000)(3825.000,2937.000)(3705.000,2967.000)
+\path(3825,2787)(3525,2787)
+\path(3645.000,2817.000)(3525.000,2787.000)(3645.000,2757.000)
+\put(3225,1887){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}block allocator}}}}}
+\put(3000,987){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}megablock allocator}}}}}
+\put(3150,87){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}operating system}}}}}
+\put(2700,3762){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}mutatator}}}}}
+\put(3900,3762){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}runtime system}}}}}
+\put(2100,2787){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}heap allocator}}}}}
+\put(3975,2787){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}garbage collector}}}}}
+\put(0,1962){\makebox(0,0)[lb]{\smash{{{\SetFigFont{8}{9.6}{\rmdefault}{\mddefault}{\updefault}storage manager}}}}}
+\end{picture}
+}

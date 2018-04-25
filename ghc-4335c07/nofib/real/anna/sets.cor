@@ -1,0 +1,57 @@
+
+list a ::= Nil | Cons a (list a) ; ;;
+
+if c t f = case c of True -> t; False -> f end;
+
+utSetEmpty = Nil;
+
+utSetIsEmpty s = case s of
+                    Nil -> True;
+                    Cons x xs -> False
+                 end;
+
+utSetSingleton x = Cons x Nil;
+
+utSetFromList l
+   = letrec
+        rmdup = \rl -> case rl of
+                      Nil -> Nil;
+                      Cons x xs -> case xs of
+                                      Nil -> Cons x Nil;
+                                      Cons y ys -> case x==y of
+                                         True -> Cons x (rmdup ys);
+                                         False -> Cons x (Cons y (rmdup ys))
+                                                   end
+                                   end
+                   end;
+        sort = \sl -> 
+        letrec
+        insert = \a l -> case l of
+                            Nil -> Cons a Nil;
+                            Cons bb xx -> case a <= bb of
+                                            True -> Cons a (Cons bb xx);
+                                            False -> Cons bb (insert a xx)    
+                                          end
+                         end
+
+        in          case sl of
+                        Nil -> Nil;
+                        Cons a x -> insert a (sort x)
+                     end
+       in  rmdup (sort l);
+
+utSetToList xs = xs;
+
+utSetUnion seta setb
+ = case seta of 
+     Nil -> Nil;
+     Cons a as -> case setb of
+                    Nil -> Nil;
+                    Cons b bs ->
+       case a <  b of
+         True -> Cons a (utSetUnion as setb);
+         False -> case a == b of
+           True-> Cons a (utSetUnion as bs);
+           False -> Cons b (utSetUnion seta bs)
+         end end end end;
+

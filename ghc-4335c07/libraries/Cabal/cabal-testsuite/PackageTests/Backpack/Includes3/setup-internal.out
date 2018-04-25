@@ -1,0 +1,44 @@
+# Setup configure
+Configuring Includes3-0.1.0.0...
+# Setup build
+Preprocessing library 'sigs' for Includes3-0.1.0.0..
+Building library 'sigs' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Preprocessing library 'indef' for Includes3-0.1.0.0..
+Building library 'indef' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Preprocessing library 'indef' for Includes3-0.1.0.0..
+Building library 'indef' instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for Includes3-0.1.0.0..
+Preprocessing executable 'exe' for Includes3-0.1.0.0..
+Building executable 'exe' for Includes3-0.1.0.0..
+# Setup copy
+Installing internal library sigs in <PATH>
+Installing internal library indef in <PATH>
+Installing internal library indef in <PATH>
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup-internal.dist/usr/bin is not in the system search path.
+# Setup register
+Registering library 'sigs' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Registering library 'indef' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Registering library 'indef' instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for Includes3-0.1.0.0..
+# Setup build
+Preprocessing library 'sigs' for Includes3-0.1.0.0..
+Building library 'sigs' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Preprocessing library 'indef' for Includes3-0.1.0.0..
+Building library 'indef' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Preprocessing library 'indef' for Includes3-0.1.0.0..
+Building library 'indef' instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for Includes3-0.1.0.0..
+Preprocessing executable 'exe' for Includes3-0.1.0.0..
+Building executable 'exe' for Includes3-0.1.0.0..
+# exe
+fromList [(0,2),(2,4)]

@@ -1,0 +1,20 @@
+# Setup configure
+Resolving dependencies...
+Warning: solver failed to find a solution:
+Could not resolve dependencies:
+trying: Exe-0.1.0.0 (user goal)
+unknown package: totally-impossible-dependency-to-fill (dependency of Exe)
+fail (backjumping, conflict set: Exe, totally-impossible-dependency-to-fill)
+After searching the rest of the dependency tree exhaustively, these were the goals I've had most trouble fulfilling: Exe (2), totally-impossible-dependency-to-fill (1)
+Trying configure anyway.
+Configuring executable 'goodexe' for Exe-0.1.0.0..
+# Setup build
+Preprocessing executable 'goodexe' for Exe-0.1.0.0..
+Building executable 'goodexe' for Exe-0.1.0.0..
+# Setup copy
+Installing executable goodexe in <PATH>
+Warning: The directory <ROOT>/setup.cabal.dist/usr/bin is not in the system search path.
+# Setup register
+Package contains no library to register: Exe-0.1.0.0...
+# goodexe
+OK

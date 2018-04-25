@@ -1,0 +1,4 @@
+type family T8884.Foo (a_0 :: k_1) = (r_2 :: k_1) | r_2 -> k_1 a_0 where
+    T8884.Foo (x_3 :: k_4) = x_3
+type family T8884.Baz (a_0 :: k_1) = (r_2 :: k_1) | r_2 -> k_1 a_0
+type instance T8884.Baz (x_0 :: k_1) = x_0

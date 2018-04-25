@@ -1,0 +1,23 @@
+{-# LANGUAGE RoleAnnotations, FlexibleContexts #-}
+unit p where
+    signature A where
+        type role T nominal
+        data T a = T
+    module B where
+        import Data.Coerce
+        import A
+        f :: Coercible (T a) (T b) => a -> b
+        f x = x
+unit a where
+    module A where
+        data T a = T
+unit q where
+    dependency p[A=a:A]
+    module C where
+        import B
+        g :: a -> b
+        g = f
+
+-- Either:
+--  a) B should fail to typecheck against the signature, or
+--  b) A should fail to match against the signature

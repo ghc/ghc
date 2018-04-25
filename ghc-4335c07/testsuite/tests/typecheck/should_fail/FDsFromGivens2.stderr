@@ -1,0 +1,14 @@
+
+FDsFromGivens2.hs:15:15: error:
+    • Couldn't match type ‘Char’ with ‘[a]’
+        arising from a functional dependency between constraints:
+          ‘C Char [a]’ arising from a use of ‘f’ at FDsFromGivens2.hs:15:15
+          ‘C Char Char’
+            arising from a pattern with constructor:
+                           KCC :: C Char Char => () -> KCC,
+                         in an equation for ‘bar’
+            at FDsFromGivens2.hs:15:6-10
+    • In the expression: f
+      In an equation for ‘bar’: bar (KCC _) = f
+    • Relevant bindings include
+        bar :: KCC -> a -> a (bound at FDsFromGivens2.hs:15:1)

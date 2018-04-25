@@ -1,0 +1,20 @@
+unit sig where
+    signature A where
+        x :: Int
+        y :: Int
+
+unit blub where
+    dependency signature sig[A=<A>]
+    signature A (x) where
+        x :: Int
+    module M (y) where
+        import A
+        y = x
+
+unit impl where
+    module A where
+        x :: Int
+        x = 2
+
+unit all where
+    dependency blub[A=impl:A]

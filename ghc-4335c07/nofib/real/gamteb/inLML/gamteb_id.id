@@ -1,0 +1,519 @@
+% -*- Mode: ID -*-
+%
+% Gamteb - Monte Carlo photon transport
+%          in a cylinder of carbon
+%
+def grand seed =
+  {con1 = 65599;
+   con2 = 71123;
+   r1 = remainder ((314557*seed)+2711) con1;
+   r2 = remainder ((2711*seed)+314557) con2;
+   in
+     r1/con1, r2/con2};
+		   
+def find_energy_bin ergs_table e =
+  {i=1;
+   el = log e;
+   in
+     {while (el>ergs_table[i]) do
+	next i = i+1;
+      finally i}};
+
+def exp x =  2.71828^x;
+
+def xsect_interp xsect_table e e_bin =
+  {prob = pcompton, ppair, pphoto, ptotal;
+   ergs_table, xcompton_table, xpair_table, xphoto_table = xsect_table ;   
+
+   f = (log e - ergs_table[e_bin-1])/(ergs_table[e_bin] - ergs_table[e_bin-1]);
+   pcompton = exp (xcompton_table[e_bin-1] + (f*(xcompton_table[e_bin]-xcompton_table[e_bin-1])));
+   ppair = exp (xpair_table[e_bin-1] + (f*(xpair_table[e_bin]-xpair_table[e_bin-1])));
+   pphoto = exp (xphoto_table[e_bin-1] + (f*(xphoto_table[e_bin]-xphoto_table[e_bin-1])));
+   ptotal = pcompton+ppair+pphoto;
+   in
+     prob};
+
+def dist_to_collision ptotal rand = -(log rand)/ptotal;
+
+def translate_particle posit dir_cos d =
+  {(x,y,z) = posit;
+   (u,v,w) = dir_cos;
+
+   nx = x+u*d;
+   ny = y+v*d;
+   nz = z+w*d;
+   in
+     (nx,ny,nz)};
+
+def dist_to_cylinder x y z u v w =
+  {def f1 x y z u v w =
+     {m = w/u;
+      b = z-m*x;
+      s = m*m+1;
+      r = sqrt (s-b*b);
+      xi = if u>0 then
+	     (-m*b+r)/s
+           else
+	     (-m*b-r)/s;
+      in
+	(xi-x)/u};
+
+   def f2 x y z u v w =
+     {m = w/v;
+      b = z-m*y;
+      r = sqrt (1-x*x);
+      yi = if v>0 then
+	     (r-b)/m
+	   else
+	     (-r-b)/m;
+      in
+	(yi-y)/v};
+
+   def f3 x y z u v w =
+     {zi = sqrt (1-x*x);
+      in
+	if w>0 then
+	  zi-z
+	else
+	  -zi-z};
+      
+   t = u*u + w*w;
+   in
+     if t==0 then
+       100.0
+     else if u<>0 then
+       f1 x y z u v w
+     else if (u==0 and v<>0) then
+       f2 x y z u v w
+     else
+       f3 x y z u v w};
+
+def dist_to_plane y y_plane v =
+  {t = if v<>0 then
+	 (y_plane-y)/v
+       else
+	 100;
+   in
+     if t<=0 then 100
+     else t};
+
+def dist_to_surface posit dir_cos =
+  {x, y, z = posit;
+   u, v, w = dir_cos;
+
+   d1 = dist_to_plane y 0 v;
+   d2 = dist_to_cylinder x y z u v w;
+   d3 = dist_to_plane y 20 v;
+   d4 = dist_to_plane y 30 v;
+   d_min = min (min d1 d2) (min d3 d4);
+   in
+     if(d_min==d1) then
+       d_min+1.0e-13,1
+     else if (d_min==d2) then
+       d_min+1.0e-13,2
+     else if (d_min==d3) then
+       d_min+1.0e-13,3
+     else
+       d_min+1.0e-13,4};
+
+
+def tally w hist bin =
+  {call 1d_accumulate hist bin w};
+
+def russian_roulette particle d_surf =
+  {posit, dir_cos, w, e, e_bin, cell, seed = particle;
+   new_particle = new_posit, dir_cos, new_w, e, e_bin, new_cell, new_seed;
+
+   new_posit = translate_particle posit dir_cos d_surf;
+   new_cell = 1;
+   rand1, rand2 = grand seed;
+   kill = .5 < rand1;
+   new_seed, rand3 = grand rand2;
+   new_w = if (kill) then 0
+	   else
+	     .5*w;
+   in
+     new_particle, kill};
+
+def splitting particle d_surf =
+  {posit, dir_cos, w, e, e_bin, cell, seed = particle;
+   new_particle1 = new_posit, dir_cos, new_w, e, e_bin, new_cell, new_seed1;
+   new_particle2 = new_posit, dir_cos, new_w, e, e_bin, new_cell, new_seed2;
+
+   new_posit = translate_particle posit dir_cos d_surf;
+   new_w = .5*w;
+   new_cell = 2;
+   new_seed1, new_seed2 = grand seed;
+   in
+     new_particle1, new_particle2};
+
+def photo_elect particle d_coll pphoto ptotal =
+  {posit, dir_cos, w, e, e_bin, cell, seed = particle;
+   new_particle = new_posit, dir_cos, new_w, e, e_bin, cell, new_seed;
+   
+   new_posit = translate_particle posit dir_cos d_coll;
+   new_seed, rand2 = grand seed;
+   rand1, rand3 = grand rand2;
+   tmp_w = w*(1-(pphoto/ptotal));
+   absorb = w-tmp_w;
+   new_w, kill = if (tmp_w>.25) then
+		   tmp_w, false
+		 else
+		   if tmp_w*cell<(rand1*.5) then
+		     tmp_w, true
+		   else
+		     .5/cell, false
+      in
+	new_particle, absorb, kill};
+
+
+def klein_nishina e r =
+  {def f1 e x2 x5 x6 = 2*e*(1+e)*x5*x5+4*x2+(1-2*x2*(1+x2))*x6;
+   def f2 x2 x3 x4 x5 x7 = 1+x2*(x2*(2*x7+x4-x3+x2*(x5-x7-x4))-x7);
+   def csa e ne = 1+1/e-1/ne;
+
+   t2 = 1/e;
+   t4 = 2*e+1;
+   t5 = 1/t4;
+   t6 = log(t4);
+   t3 = f1 e t2 t5 t6;
+   new_e, scat_angle = if (e>1.16666667) then
+			 {t7 = 1.65898+t2*(.62537*t2-1.00796);
+			  tt3 = t7/t3;
+			  in
+			    if (r>tt3) then
+			      {tt4 = (t6-1.20397)/(1-tt3);
+			       tt7 = .3*exp (tt4*(tt3-r));
+			       in
+				 tt7*e*.51108, csa e (tt7*e)}
+			    else
+			      {xt4 = t7/(3.6333+t2*(5.44444*t2-4.66667));
+			       xt7 = .5*t7;
+			       xt2 = r/tt3;
+			       xt3 = 2.1;
+			       xt5 = 1.4;
+			       x = f2 xt2 xt3 xt4 xt5 xt7;
+			       in
+				 e*x*.51108, csa e (e*x)}}
+		       else
+			 {yt4 = t3/(t4+t5);
+			  yt7 = .5*t3;
+			  yt2 = r;
+			  yt5 = 1-t5;
+			  yt3 = 3*yt5;
+			  zt5 = 2*yt5;
+			  x = f2 yt2 yt3 yt4 zt5 yt7;
+			  in
+			    e*x*.51108, csa e (e*x)};
+   in
+     new_e, scat_angle};
+   
+def rotas dir_cos scat_angle rand =
+  {u,v,w = dir_cos;
+   rs=2;
+   r1=2;
+   r2=2;
+   rsq, t1, t2 = {while ((rs>1) or (rs<1.0e-9)) do
+		    rand1, rand2 = grand rand;
+		    next rand, rand3 = grand rand2;
+		    
+		    next r1 = 2*(rand1)-1;
+		    next r2 = 2*(rand3)-1;
+		    next rs = r1*r1 + r2*r2;
+		  finally rs, r1, r2};
+   r = sqrt ((1-scat_angle*scat_angle)/rsq);
+   ww = 1-w*w;
+   nu, nv, nw = if (ww<1.0e-9) then
+		   t1*r, t2*r, w*scat_angle
+		 else
+		   {s = sqrt ww;
+		    in
+		      u*scat_angle + (t1*r*u*w-t2*r*v)/s,v*scat_angle + (t1*r*v*w-t2*r*u)/s,w*scat_angle-t1*r*s};
+   in
+     nu, nv, nw};
+
+def compton particle d_coll xsect_table=
+  {posit, dir_cos, w, e, e_bin, cell, seed = particle;
+   new_particle = new_posit, new_dir_cos, w, new_e, new_e_bin, cell, new_seed;
+   ergs_table, xcompton_table, xpair_table, xphoto_table = xsect_table;
+
+   new_posit = translate_particle posit dir_cos d_coll;
+
+   new_seed, rand2 = grand seed;
+   rand3, rand4 = grand rand2;
+   new_e, scat_angle = klein_nishina (1.956917*e) rand3;
+   new_e_bin = find_energy_bin ergs_table new_e;
+   prob = xsect_interp xsect_table new_e new_e_bin;
+
+   new_dir_cos = rotas dir_cos scat_angle rand4;
+   e_kill = new_e < 1.0e-3; 
+   in
+     new_particle, prob, e_kill};
+
+def isotropic rand =
+  {rs=2;
+   r1=2;
+   r2=2;
+   rsq, t1, t2 = {while (rs>1) do
+		    next rand, rand2 = grand rand;
+		    rand3, rand4 = grand rand2;
+		    
+		    next r1 = 2*rand4-1;
+		    next r2 = 2*rand3-1;
+		    next rs = r1*r1 + r2*r2;
+		  finally rs, r1, r2};
+   u = 2*rsq-1;
+   t3 = sqrt ((1-u*u)/rsq);
+   v = t1*t3;
+   w = t2*t3;
+   in
+     u,v,w};
+ 
+def pair_prod particle d_coll xsect_table =
+  {posit, dir_cos, w, e, e_bin, cell, seed = particle;
+   new_particle = new_posit, new_dir_cos, new_w, new_e, new_e_bin, cell, new_seed;
+   ergs_table, xcompton_table, xpair_table, xphoto_table = xsect_table;
+
+   new_seed, rand2 = grand seed;
+   rand3, rand4 = grand rand2;
+   
+   new_posit = translate_particle posit dir_cos d_coll;
+   new_e = .51008;
+   new_e_bin = find_energy_bin ergs_table new_e;
+   new_w = 2*w;
+   new_dir_cos = isotropic rand3;
+   prob = xsect_interp xsect_table new_e new_e_bin;
+   in
+     new_particle, prob};
+
+def transport_particle xsect_table particle prob =
+  {posit, dir_cos, w, e, e_bin, cell, seed = particle;
+   pcompton, ppair, pphoto, ptotal = prob;
+   pnphoto = ptotal - pphoto;
+   bscat = 1; escape = 2; transit = 3;
+   
+   d_surf,surface = dist_to_surface posit dir_cos;
+   rand, rand1 = grand seed;
+   d_coll = dist_to_collision ptotal rand;
+   
+   part_list = IF (D_COLL>=D_SURF) THEN
+		  If (surface==1) then
+		    (e_bin,w,bscat) : nil
+
+		  Else if (surface==2) then
+		    (e_bin,w,escape) : nil
+
+   	          Else if (surface==4) then
+		    (e_bin,w,transit) : nil
+			      
+		  Else
+		    if (cell==2) then
+		       {d_particle, kill = russian_roulette particle d_surf;
+			in
+			  if (not kill) then
+			    transport_particle xsect_table d_particle prob
+			  else
+			    nil}
+		     else
+		       nil
+%		       {d1_particle, d2_particle = splitting particle d_surf;
+%			in
+%			  append (transport_particle xsect_table d1_particle prob)
+%			  (transport_particle xsect_table d2_particle prob)}
+		  
+		ELSE   % (D_COLL < D_SURF)
+		  {t_particle, absorb, w_kill = photo_elect particle d_coll pphoto ptotal;
+		   p_compton = pcompton/pnphoto;
+		   in
+		     If (not w_kill) and (rand1 < p_compton) then
+		       {d_particle, d_prob, e_kill = compton t_particle d_coll xsect_table;
+			in
+			  if (not e_kill) then
+			    transport_particle xsect_table d_particle d_prob
+			  else
+			    nil}
+		      Else if (not w_kill) and (rand1 >= p_compton) then
+			 {d_particle, d_prob = pair_prod t_particle d_coll xsect_table;
+			  in
+			    transport_particle xsect_table d_particle d_prob}
+		      Else
+		         nil}
+   in
+     part_list};
+
+def create_particle seed e ergs_table =
+  {posit = (0,0,0);
+   dir_cos = (0,1,0);
+   w =1;
+%  e = 6.;
+   e_bin = find_energy_bin ergs_table e;
+   cell = 1;
+   p_seed, new_seed = grand seed;
+  in
+    (posit, dir_cos, w, e, e_bin, cell, p_seed), new_seed};
+
+def gamteb1 n_sources seed init_tables e0 =
+  { def gen_particles n = create_sources_log xsect_table e0 seed n;
+    def bin? (e_bin,wt,bin_type) = (e_bin,bin_type);
+    def select_wt (e_bin,wt,bin_type) = wt;
+    
+    n_escape,n_transit,n_bscat,w_absorb,n_ekill,n_wkill,n_roul,n_col,no_col = bin_counts;
+    xsect_table = init_tables 35;
+
+    spectrum =  {2d_array ((1,35),(1,3))
+		 | [i,j] = 0 || i <- 1 to 35 & j <- 1 to 3
+		 accumulate (+)
+		 | (bin? part_tup) gets (select_wt part_tup)
+			   || part_tup <- create_sources_log xsect_table e0 seed n_sources};
+   in
+     spectrum};
+
+def create_sources_log xsect_table e0 rnd n =
+  {ergs_table, xcompton_table, xpair_table, xphoto_table = xsect_table;
+   in
+     if (n<=0) then
+       nil
+     else if (n<=1) then
+	    {particle, rndo = create_particle rnd e0 ergs_table;
+	     posit, dir_cos, w, e, e_bin, cell, rnd1 = particle;
+	     prob = xsect_interp xsect_table e e_bin;
+	     in
+	       transport_particle xsect_table particle prob}
+     else
+            {rnd1, rnd2 = grand rnd;
+	     in
+	       append create_sources_log xsect_table e0 rnd1 (n/2)
+	       create_sources_log xsect_table e0 rnd2 (n/2)}};
+
+  
+def dummy_tables n =
+  {def f1 i = (i-2)+.01;
+   def f2 i = -10.0;
+   def f3 i = 0.0;
+   def f4 i = -10.0;
+   ergs = make_1d_array (1,n) f1;
+   xc = make_1d_array (1,n) f2;
+   xp = make_1d_array (1,n) f3;
+   xpe = make_1d_array (1,n) f4;
+   in
+     ergs, xc, xp, xpe};
+   
+def init_tables n =
+  {def f1 x i = if (x[i] < 1.0e-13) then -30.0 else log (2.2*x[i]);
+   def f2 x i = if (x[i] < 1.0e-13) then -30.0 else log x[i];
+   
+   energies = {1d_array (1,n)
+   | [1] = .001
+   | [2] = .0015
+   | [3] = .002
+   | [4] = .003
+   | [5] = .004
+   | [6] = .005
+   | [7] = .006
+   | [8] = .008
+   | [i] = energies[i-8]*10 || i <- 9 to 32
+   | [33] = 10.0
+   | [34] = 15.0
+   | [35] = 20.0};
+
+   xc = {1d_array (1,n)
+   | [1] = .015
+   | [2] = .0296
+   | [3] = .0451
+   | [4] = .0717
+   | [5] = .0913
+   | [6] = .105
+   | [7] = .115
+   | [8] = .128
+   | [9] = .137
+   | [10] = .152
+   | [11] = .160
+   | [12]= .165
+   | [13] = .165
+   | [14] = .163
+   | [15] = .160
+   | [16] = .153
+   | [17] = .146
+   | [18] = .133
+   | [19] = .122
+   | [20] = .106
+   | [21] = .0953
+   | [22] = .0867
+   | [23] = .0802
+   | [24] = .0707
+   | [25] = .0637
+   | [26] = .0516
+   | [27] = .0440
+   | [28] = .0346
+   | [29] = .0289
+   | [30] = .025
+   | [31] = .0221
+   | [32] = .0181
+   | [33] = .0154
+   | [34] = .0114
+   | [35] = .00913};
+
+   xp = {1d_array (1,n)
+   | [i] = 0 || i <- 1 to 25
+   | [26] = .0000792
+   | [27] = .000316
+   | [28] = .000923
+   | [29] = .00153
+   | [30] = .00208
+   | [31] = .00256
+   | [32] = .00343
+   | [33] = .00414
+   | [34] = .00547
+   | [35] = .00652};
+
+   xpe = {1d_array (1,n)
+   | [1] = 2010.0
+   | [2] = 632.0
+   | [3] = 280.0
+   | [4] = 87.7
+   | [5] = 37.3
+   | [6] = 18.9
+   | [7] = 10.4
+   | [8] = 4.01
+   | [9] = 1.91
+   | [10] =.489
+   | [11] = .192
+   | [12]= .0491
+   | [13] = .0186
+   | [14] = .00887
+   | [15] = .00481
+   | [16] = .00179
+   | [17] = .000862
+   | [18] = .000234
+   | [19] = .0000918
+   | [i] = 0 || i <- 20 to 35};
+   
+   xcompton = make_1d_array (1,n) (f1 xc);
+   xpair = make_1d_array (1,n) (f1 xp);
+   xphoto = make_1d_array (1,n) (f1 xpe);
+   ergs = make_1d_array (1,n) (f2 energies);
+   in
+      ergs, xcompton, xpair, xphoto};
+
+
+def sel_ergs xsect_table =
+  {ergs, xcompton, xpair, xphoto = xsect_table;
+   in
+     ergs};
+
+def sel_comp xsect_table =
+  {ergs, xcompton, xpair, xphoto = xsect_table;
+   in
+     xcompton};
+
+def sel_pair xsect_table =
+  {ergs, xcompton, xpair, xphoto = xsect_table;
+   in
+     xpair};
+
+def sel_photo xsect_table =
+  {ergs, xcompton, xpair, xphoto = xsect_table;
+   in
+     xphoto};
+
+

@@ -1,0 +1,11 @@
+EmptyCase009.hs:19:9: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: _ :: Bar f
+
+EmptyCase009.hs:31:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (Bar MkDB2_u)
+
+EmptyCase009.hs:40:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: (Bar MkGB3)

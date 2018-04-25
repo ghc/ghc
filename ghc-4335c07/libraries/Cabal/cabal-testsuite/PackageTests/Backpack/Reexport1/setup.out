@@ -1,0 +1,22 @@
+# Setup configure
+Configuring p-0.1.0.0...
+# Setup build
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup haddock
+Preprocessing library for p-0.1.0.0..
+Running Haddock on library for p-0.1.0.0..
+Documentation created: ../setup.dist/work/p/dist/doc/html/p/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for p-0.1.0.0..
+# Setup configure
+Configuring q-0.1.0.0...
+# Setup build
+Preprocessing library for q-0.1.0.0..
+Building library for q-0.1.0.0..
+# Setup haddock
+Preprocessing library for q-0.1.0.0..
+Running Haddock on library for q-0.1.0.0..
+Documentation created: ../setup.dist/work/q/dist/doc/html/q/index.html

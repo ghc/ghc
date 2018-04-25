@@ -1,0 +1,5 @@
+name: orphan
+version: 1.0
+exposed-modules: F, O
+build-depends: base
+build-type: Simple

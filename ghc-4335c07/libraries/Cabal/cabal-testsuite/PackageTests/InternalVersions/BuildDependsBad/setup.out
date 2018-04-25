@@ -1,0 +1,3 @@
+# Setup configure
+Configuring build-depends-bad-version-0.1.0.0...
+setup: The package has an impossible version range for a dependency on an internal library: build-depends-bad-version >=2. This version range does not include the current package, and must be removed as the current package's library will always be used.

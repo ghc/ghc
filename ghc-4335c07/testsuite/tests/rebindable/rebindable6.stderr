@@ -1,0 +1,73 @@
+
+rebindable6.hs:110:17: error:
+    • Ambiguous type variable ‘t0’ arising from a do statement
+      prevents the constraint ‘(HasSeq
+                                  (IO a -> t0 -> IO b))’ from being solved.
+        (maybe you haven't applied a function to enough arguments?)
+      Relevant bindings include
+        g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
+        f :: IO a (bound at rebindable6.hs:108:17)
+        test_do :: IO a -> IO (Maybe b) -> IO b
+          (bound at rebindable6.hs:108:9)
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      These potential instance exist:
+        instance HasSeq (IO a -> IO b -> IO b)
+          -- Defined at rebindable6.hs:56:18
+    • In a stmt of a 'do' block: f
+      In the expression:
+        do f
+           Just (b :: b) <- g
+           return b
+      In an equation for ‘test_do’:
+          test_do f g
+            = do f
+                 Just (b :: b) <- g
+                 return b
+
+rebindable6.hs:111:17: error:
+    • Ambiguous type variables ‘p0’, ‘t0’ arising from a do statement
+      prevents the constraint ‘(HasBind
+                                  (IO (Maybe b) -> (Maybe b -> p0) -> t0))’ from being solved.
+        (maybe you haven't applied a function to enough arguments?)
+      Relevant bindings include
+        g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
+        test_do :: IO a -> IO (Maybe b) -> IO b
+          (bound at rebindable6.hs:108:9)
+      Probable fix: use a type annotation to specify what ‘p0’,
+                                                          ‘t0’ should be.
+      These potential instance exist:
+        instance HasBind (IO a -> (a -> IO b) -> IO b)
+          -- Defined at rebindable6.hs:51:18
+    • In a stmt of a 'do' block: Just (b :: b) <- g
+      In the expression:
+        do f
+           Just (b :: b) <- g
+           return b
+      In an equation for ‘test_do’:
+          test_do f g
+            = do f
+                 Just (b :: b) <- g
+                 return b
+
+rebindable6.hs:112:17: error:
+    • Ambiguous type variable ‘p0’ arising from a use of ‘return’
+      prevents the constraint ‘(HasReturn (b -> p0))’ from being solved.
+        (maybe you haven't applied a function to enough arguments?)
+      Relevant bindings include
+        b :: b (bound at rebindable6.hs:111:23)
+        g :: IO (Maybe b) (bound at rebindable6.hs:108:19)
+        test_do :: IO a -> IO (Maybe b) -> IO b
+          (bound at rebindable6.hs:108:9)
+      Probable fix: use a type annotation to specify what ‘p0’ should be.
+      These potential instance exist:
+        instance HasReturn (a -> IO a) -- Defined at rebindable6.hs:46:18
+    • In a stmt of a 'do' block: return b
+      In the expression:
+        do f
+           Just (b :: b) <- g
+           return b
+      In an equation for ‘test_do’:
+          test_do f g
+            = do f
+                 Just (b :: b) <- g
+                 return b

@@ -1,0 +1,7 @@
+-- there's not much that can be done here in a test-env independent way
+:cd /
+:show paths
+:set -i
+:show paths
+:set -i/
+:show paths

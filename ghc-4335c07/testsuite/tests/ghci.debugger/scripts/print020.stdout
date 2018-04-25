@@ -1,0 +1,19 @@
+Breakpoint 0 activated at HappyTest.hs:226:12-13
+Breakpoint 1 activated at HappyTest.hs:228:11-19
+Breakpoint 2 activated at HappyTest.hs:228:23-30
+Breakpoint 3 activated at HappyTest.hs:229:11-19
+Breakpoint 4 activated at HappyTest.hs:229:23-35
+Breakpoint 5 activated at HappyTest.hs:230:11-19
+Breakpoint 6 activated at HappyTest.hs:230:23-35
+Breakpoint 7 activated at HappyTest.hs:231:18-35
+Breakpoint 8 activated at HappyTest.hs:232:18-37
+Breakpoint 9 activated at HappyTest.hs:233:18-38
+Breakpoint 10 activated at HappyTest.hs:234:18-38
+Breakpoint 11 activated at HappyTest.hs:235:18-36
+Breakpoint 12 activated at HappyTest.hs:236:18-35
+Breakpoint 13 activated at HappyTest.hs:237:18-35
+Stopped in Main.lexer, HappyTest.hs:228:11-19
+_result :: Bool = _
+c :: Char = '1'
+*** Ignoring breakpoint
+_result = False

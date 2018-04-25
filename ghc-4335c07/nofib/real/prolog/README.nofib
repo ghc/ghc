@@ -1,0 +1,4 @@
+Changed the orig source to use :== instead of :-, because the latter
+isn't a legal constructor op in std Haskell.
+
+Will Partain

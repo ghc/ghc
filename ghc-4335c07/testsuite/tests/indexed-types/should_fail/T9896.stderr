@@ -1,0 +1,5 @@
+
+T9896.hs:8:3:
+    Wrong category of family instance; declaration was for a type family
+    In the newtype instance declaration for ‘TestT’
+    In the instance declaration for ‘Test Bool’

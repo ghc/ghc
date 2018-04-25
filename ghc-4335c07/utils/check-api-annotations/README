@@ -1,0 +1,103 @@
+This programme is intended to be used by any GHC developers working on Parser.y
+or RdrHsSyn.hs, and who want to check that their changes do not break the API
+Annotations.
+
+It does a basic test that all annotations do make it to the final AST, and dumps
+a list of the annotations generated for a given file, so that they can be
+checked against the source being parsed for sanity.
+
+This utility is also intended to be used in tests, so that when new features are
+added the expected annotations are also captured.
+
+Usage
+
+In a test Makefile
+
+  $(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" FileToParse.hs
+
+See examples in (REPO_HOME)/testsuite/tests/ghc-api/annotations/Makefile
+
+
+Description of operation
+------------------------
+
+The programme is called with the name of a haskell source file.
+
+It uses the GHC API to load and parse this, and extracts the API annotations.
+
+These are of the form
+
+    Map.Map ApiAnnKey [SrcSpan]
+
+where
+
+    type ApiAnnKey = (SrcSpan,AnnKeywordId)
+
+So an annotation is a key comprising the parent SrcSpan in the ParsedSource
+together with an AnnKeywordId, and this maps to a list of locations where the
+specific keyword item occurs in the original source.
+
+The utility extracts all SrcSpans in the ParsedSource, and makes sure that for
+every ApiAnnKey the SrcSpan is actually present in the final ParsedSource. This
+is to ensure that when a given parser production is postprocessed anywhere along
+the line the relevant SrcSpan is not discarded, thus detaching the annotation
+from the final output.
+
+It also provides a list of each ApiAnnKey and the corresponding source
+locations, so these can be checked against the original source for correctness.
+
+Example
+-------
+
+Test10255.hs in the ghc-api/annotations tests has the following source
+
+------------------------------
+1:{-# LANGUAGE ScopedTypeVariables #-}
+2:module Test10255 where
+3:
+4:import Data.Maybe
+5:
+6:fob (f :: (Maybe t -> Int)) =
+7:  undefined
+------------------------------
+
+The output of this utility is
+
+------------------------------------------------------------------------
+---Problems (should be empty list)---
+[]
+---Annotations-----------------------
+-- SrcSpan the annotation is attached to, AnnKeywordId,
+--    list of locations the keyword item appears in
+[
+((Test10255.hs:1:1,AnnModule), [Test10255.hs:2:1-6]),
+((Test10255.hs:1:1,AnnWhere), [Test10255.hs:2:18-22]),
+((Test10255.hs:4:1-17,AnnImport), [Test10255.hs:4:1-6]),
+((Test10255.hs:4:1-17,AnnSemi), [Test10255.hs:6:1]),
+((Test10255.hs:(6,1)-(7,11),AnnEqual), [Test10255.hs:6:29]),
+((Test10255.hs:(6,1)-(7,11),AnnFunId), [Test10255.hs:6:1-3]),
+((Test10255.hs:(6,1)-(7,11),AnnSemi), [Test10255.hs:8:1]),
+((Test10255.hs:6:5-27,AnnCloseP), [Test10255.hs:6:27]),
+((Test10255.hs:6:5-27,AnnOpenP), [Test10255.hs:6:5]),
+((Test10255.hs:6:6-26,AnnDcolon), [Test10255.hs:6:8-9]),
+((Test10255.hs:6:11-26,AnnCloseP), [Test10255.hs:6:26]),
+((Test10255.hs:6:11-26,AnnOpenP), [Test10255.hs:6:11]),
+((Test10255.hs:6:12-18,AnnRarrow), [Test10255.hs:6:20-21]),
+((Test10255.hs:6:12-25,AnnRarrow), [Test10255.hs:6:20-21]),
+((<no location info>,AnnEofPos), [Test10255.hs:8:1])
+]
+------------------------------------------------------------------------
+
+To interpret this, firstly the problems list is empty, so there are not
+annotations that do not appear in the final AST.
+
+Secondly, the list of annotations and locations can be checked against the test
+source code to ensure that every AnnKeywordId does in fact appear.
+
+It will return a zero exit code if the list of problems is empty, non-zero
+otherwise.
+
+Note: In some cases, such as T10269 in the ghc-api/annotations tests the list is
+non-empty, due to postprocessing of the parsed result. In general this should
+only happen for an `AnnVal` and if it does the actual annotations provided need
+to be inspected to check that an equivalent annotation is provided.

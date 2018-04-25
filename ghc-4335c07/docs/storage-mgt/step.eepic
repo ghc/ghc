@@ -1,0 +1,121 @@
+\setlength{\unitlength}{0.00050000in}
+%
+\begingroup\makeatletter\ifx\SetFigFont\undefined%
+\gdef\SetFigFont#1#2#3#4#5{%
+  \reset@font\fontsize{#1}{#2pt}%
+  \fontfamily{#3}\fontseries{#4}\fontshape{#5}%
+  \selectfont}%
+\fi\endgroup%
+{\renewcommand{\dashlinestretch}{30}
+\begin{picture}(10749,10689)(0,-10)
+\path(7437,4362)(10737,4362)(10737,3162)
+	(7437,3162)(7437,4362)
+\path(7557.000,3792.000)(7437.000,3762.000)(7557.000,3732.000)
+\path(7437,3762)(10587,3762)
+\path(10467.000,3732.000)(10587.000,3762.000)(10467.000,3792.000)
+\path(10587,4362)(10587,3162)
+\put(8637,4437){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks}}}}}
+\put(8412,3912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}single object}}}}}
+\path(7437,2262)(10737,2262)(10737,1062)
+	(7437,1062)(7437,2262)
+\path(7557.000,1692.000)(7437.000,1662.000)(7557.000,1632.000)
+\path(7437,1662)(10587,1662)
+\path(10467.000,1632.000)(10587.000,1662.000)(10467.000,1692.000)
+\path(10587,2262)(10587,1062)
+\put(8637,2337){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks}}}}}
+\put(8412,1812){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}single object}}}}}
+\path(3912,2262)(5487,2262)(5487,1062)
+	(3912,1062)(3912,2262)
+\path(4662,2112)(4662,2562)(7437,2562)(7437,2262)
+\path(7407.000,2382.000)(7437.000,2262.000)(7467.000,2382.000)
+\path(4812,1812)(4812,2562)
+\path(5487,2262)(5937,2262)(5937,1062)
+	(5487,1062)(5487,2262)
+\path(5937,2262)(6387,2262)(6387,1062)
+	(5937,1062)(5937,2262)
+\path(6387,2262)(6837,2262)(6837,1062)
+	(6387,1062)(6387,2262)
+\put(3987,2037){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}start}}}}}
+\put(3987,1737){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}free}}}}}
+\put(4137,1137){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}link}}}}}
+\put(6087,1662){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}...}}}}}
+\put(3987,1437){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks=$n_2$}}}}}
+\path(3912,9912)(5487,9912)(5487,8712)
+	(3912,8712)(3912,9912)
+\path(4662,9762)(4662,10212)(7287,10212)(7287,9912)
+\path(7257.000,10032.000)(7287.000,9912.000)(7317.000,10032.000)
+\path(10362,9912)(10362,8712)
+\path(4812,9462)(4812,10212)
+\path(7287,9912)(10587,9912)(10587,8712)
+	(7287,8712)(7287,9912)
+\path(4812,9462)(4812,10662)(10362,10662)(10362,9912)
+\path(10332.000,10032.000)(10362.000,9912.000)(10392.000,10032.000)
+\path(7407.000,9342.000)(7287.000,9312.000)(7407.000,9282.000)
+\path(7287,9312)(10362,9312)
+\path(10242.000,9282.000)(10362.000,9312.000)(10242.000,9342.000)
+\put(3987,9687){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}start}}}}}
+\put(3987,9387){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}free}}}}}
+\put(4137,8787){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}link}}}}}
+\put(3987,9087){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks=1}}}}}
+\put(7962,10062){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}single block}}}}}
+\put(7962,9462){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}used memory}}}}}
+\path(3462,7587)(3462,7062)(3837,7062)
+\path(3717.000,7032.000)(3837.000,7062.000)(3717.000,7092.000)
+\path(3912,7362)(5487,7362)(5487,6162)
+	(3912,6162)(3912,7362)
+\path(4662,7212)(4662,7662)(7287,7662)(7287,7362)
+\path(7257.000,7482.000)(7287.000,7362.000)(7317.000,7482.000)
+\path(10362,7362)(10362,6162)
+\path(4812,6912)(4812,7662)
+\path(7287,7362)(10587,7362)(10587,6162)
+	(7287,6162)(7287,7362)
+\path(4812,6912)(4812,8112)(10362,8112)(10362,7362)
+\path(10332.000,7482.000)(10362.000,7362.000)(10392.000,7482.000)
+\path(7407.000,6792.000)(7287.000,6762.000)(7407.000,6732.000)
+\path(7287,6762)(10362,6762)
+\path(10242.000,6732.000)(10362.000,6762.000)(10242.000,6792.000)
+\put(3237,7812){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(3987,7137){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}start}}}}}
+\put(3987,6837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}free}}}}}
+\put(3987,6537){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks=1}}}}}
+\put(7962,7512){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}single block}}}}}
+\put(7962,6912){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}used memory}}}}}
+\put(3987,6237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}link=NULL}}}}}
+\path(4062,8862)(3462,8862)(3462,8112)
+\path(3432.000,8232.000)(3462.000,8112.000)(3492.000,8232.000)
+\path(3942.000,1182.000)(4062.000,1212.000)(3942.000,1242.000)
+\path(4062,1212)(3462,1212)(3462,12)(3912,12)
+\path(3792.000,-18.000)(3912.000,12.000)(3792.000,42.000)
+\path(3942.000,3282.000)(4062.000,3312.000)(3942.000,3342.000)
+\path(4062,3312)(3462,3312)(3462,2112)(3912,2112)
+\path(3792.000,2082.000)(3912.000,2112.000)(3792.000,2142.000)
+\path(3912,4362)(5487,4362)(5487,3162)
+	(3912,3162)(3912,4362)
+\path(4812,3912)(4812,4662)
+\path(5487,4362)(5937,4362)(5937,3162)
+	(5487,3162)(5487,4362)
+\path(5937,4362)(6387,4362)(6387,3162)
+	(5937,3162)(5937,4362)
+\path(6387,4362)(6837,4362)(6837,3162)
+	(6387,3162)(6387,4362)
+\path(4662,4212)(4662,4662)(7437,4662)(7437,4362)
+\path(7407.000,4482.000)(7437.000,4362.000)(7467.000,4482.000)
+\path(12,6087)(1737,6087)(1737,4887)
+	(12,4887)(12,6087)
+\path(987,5637)(2637,5637)(2637,9612)(3912,9612)
+\path(3792.000,9582.000)(3912.000,9612.000)(3792.000,9642.000)
+\path(1587,5037)(2637,5037)(2637,4062)(3912,4062)
+\path(3792.000,4032.000)(3912.000,4062.000)(3792.000,4092.000)
+\put(4137,12){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}......}}}}}
+\put(3987,4137){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}start}}}}}
+\put(3987,3837){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}free}}}}}
+\put(3987,3537){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks=$n_1$}}}}}
+\put(4137,3237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}link}}}}}
+\put(6087,3762){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}...}}}}}
+\put(462,6237){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}step}}}}}
+\put(87,5562){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}blocks}}}}}
+\put(87,5862){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}no}}}}}
+\put(87,5262){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}n\_blocks}}}}}
+\put(87,4962){\makebox(0,0)[lb]{\smash{{{\SetFigFont{10}{12.0}{\rmdefault}{\mddefault}{\updefault}large\_object}}}}}
+\end{picture}
+}

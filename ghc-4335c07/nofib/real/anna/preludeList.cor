@@ -1,0 +1,494 @@
+
+{----------------------------------------------------------------}
+{--- My attempt at a translation of the Haskell 1.1           ---}
+{--- list prelude, "module PreludeList".                      ---}
+{----------------------------------------------------------------}
+
+list a ::= Nil | Cons a (list a); 
+
+pair a b ::= Pair a b;
+
+tp3 a b c ::= Tp3 a b c;
+
+tp4 a b c d ::= Tp4 a b c d;
+
+;;
+
+{--------------------------------------------------------}
+{--- Preliminaries                                    ---}
+{--------------------------------------------------------}
+
+{--------------------------------------------------------}
+error 
+= error;
+
+
+{--------------------------------------------------------}
+dot f g x
+= f (g x);
+
+
+{--------------------------------------------------------}
+flip f x y 
+= f y x;
+
+
+{--------------------------------------------------------}
+max x y
+= case x > y of True -> x; False -> y end;
+
+
+{--------------------------------------------------------}
+min x y 
+= case x < y of True -> x; False -> y end;
+
+
+{--------------------------------------------------------}
+{--- PreludeList                                      ---}
+{--------------------------------------------------------}
+
+{--------------------------------------------------------}
+head l 
+= case l of 
+    Cons x xs -> x; 
+    Nil -> error 
+  end;
+
+
+{--------------------------------------------------------}
+last l
+= case l of
+    Nil -> error;
+    Cons x xs -> case xs of 
+                    Nil -> x;
+                    Cons y ys -> last xs
+                 end
+  end;
+
+
+{--------------------------------------------------------}
+tail l 
+= case l of 
+    Cons x xs -> xs; 
+    Nil -> error 
+  end;
+
+
+{--------------------------------------------------------}
+init l
+= case l of
+    Nil -> error;
+    Cons x xs -> case xs of
+                    Nil -> Nil;
+                    Cons y ys -> Cons x (init xs)
+                 end
+  end;
+
+
+{--------------------------------------------------------}
+null l
+= case l of
+    Nil -> True;
+    Cons x xs -> False
+  end;
+
+
+{--------------------------------------------------------}
+append l1 l2
+= foldr Cons l2 l1;
+
+
+{--------------------------------------------------------}
+diff 
+= letrec
+    del = \xl y -> case xl of 
+                     Nil -> Nil;
+                     Cons x xs -> case x == y of
+                                    True -> xs;
+                                    False -> Cons x (del xs y)
+                                  end
+                   end
+  in 
+     foldl del;
+
+
+{--------------------------------------------------------}
+length
+= foldl (\n dontCare -> n+1) 0;
+
+
+{--------------------------------------------------------}
+nth l n
+= case l of
+    Nil -> error;
+    Cons x xs -> case n == 0 of
+                   True -> x;
+                   False -> nth xs (n-1)
+                 end
+  end;
+
+
+{--------------------------------------------------------}
+map f l
+= case l of
+    Nil -> Nil;
+    Cons x xs -> Cons (f x) (map f xs)
+  end;
+
+
+{--------------------------------------------------------}
+filter p
+= foldr (\x xs -> case p x of True -> Cons x xs; False -> xs end) Nil;
+
+
+{--------------------------------------------------------}
+partition p
+= let 
+    select = \x tsfs ->
+             case tsfs of Pair ts fs ->
+             case p x of
+               True -> Pair (Cons x ts) fs;
+               False -> Pair ts (Cons x fs)
+             end
+             end
+  in foldr select (Pair Nil Nil);
+
+
+{--------------------------------------------------------}
+foldl f z l
+= case l of 
+    Nil -> z;
+    Cons x xs -> foldl f (f z x) xs
+  end;
+
+
+{--------------------------------------------------------}
+foldl1 f xl
+= case xl of
+    Nil -> error;
+    Cons x xs -> foldl f x xs
+  end;
+
+
+{--------------------------------------------------------}
+scanl f q xl
+= Cons q (case xl of
+            Nil -> Nil;
+            Cons x xs -> scanl f (f q x) xs end);
+
+
+{--------------------------------------------------------}
+scanl1 f xl
+= case xl of
+    Nil -> error;
+    Cons x xs -> scanl f x xs
+  end;
+
+
+{--------------------------------------------------------}
+foldr f z l
+= case l of
+    Nil -> z;
+    Cons x xs -> f x (foldr f z xs)
+  end;
+
+
+{--------------------------------------------------------}
+foldr1 f xl
+= case xl of
+    Nil -> error;
+    Cons x xs -> case xs of
+                   Nil -> x;
+                   Cons y ys -> f x (foldr1 f xs)
+                 end
+  end;
+
+
+{--------------------------------------------------------}
+scanr f q0 xl
+= case xl of
+    Nil -> Cons q0 Nil;
+    Cons x xs -> let
+                   qs = scanr f q0 xs
+                 in case qs of
+                      Nil -> error;
+                      Cons qsx qsxs -> Cons (f x qsx) qs
+                    end
+  end;
+
+
+{--------------------------------------------------------}
+scanr1 f xl
+= case xl of 
+    Nil -> error;
+    Cons x xs -> let
+                   qs = scanr1 f xs
+                 in case qs of
+                      Nil -> error;
+                      Cons qsx qsxs -> Cons (f x qsx) qs
+                    end
+  end;
+
+
+{--------------------------------------------------------}
+iterate f x
+= Cons x (iterate f (f x));
+
+
+{--------------------------------------------------------}
+repeat x
+= letrec 
+    xs = Cons x xs
+  in 
+    xs;
+
+
+{--------------------------------------------------------}
+cycle xs
+= letrec
+    xss = append xs xss
+  in
+    xss;
+
+
+{--------------------------------------------------------}
+take n xl
+= case n == 0 of
+    True -> Nil;
+    False -> case xl of
+               Nil -> Nil;
+               Cons x xs -> Cons x (take (n-1) xs)
+             end
+  end;
+
+
+{--------------------------------------------------------}
+drop n xl
+= case n == 0 of
+    True -> xl;
+    False -> case xl of
+               Nil -> Nil;
+               Cons x xs -> drop (n-1) xs
+             end
+  end;
+
+
+{--------------------------------------------------------}
+splitAt n xl
+= case n == 0 of
+    True -> Pair Nil xl;
+    False -> case xl of
+               Nil -> Pair Nil Nil;
+               Cons x xs
+                 -> case splitAt (n-1) xs of
+                      Pair xsp xspp
+                        -> Pair (Cons x xsp) xspp
+                    end
+             end
+  end;
+
+
+{--------------------------------------------------------}
+takeWhile p xl
+= case xl of
+    Nil -> Nil;
+    Cons x xs -> case p x of
+                   True -> Cons x (takeWhile p xs);
+                   False -> Nil
+                 end
+  end;
+
+
+{--------------------------------------------------------}
+dropWhile p xl
+= case xl of
+    Nil -> Nil;
+    Cons x xsp -> case p x of
+                    True -> dropWhile p xsp;
+                    False -> xl
+                  end
+  end;
+
+
+{--------------------------------------------------------}
+span p xs
+= case xs of
+    Nil -> Pair Nil Nil;
+    Cons x xsp -> case p x of 
+                    False -> Pair Nil xs;
+                    True -> 
+                      case span p xsp of
+                        Pair ys zs -> Pair (Cons x ys) zs
+                      end
+                  end
+  end;
+
+
+{--------------------------------------------------------}
+break p
+= span (dot not p);
+
+
+{--------------------------------------------------------}
+{- lines, words, unlines and unwords -}
+
+
+{--------------------------------------------------------}
+nub xl
+= case xl of
+    Nil -> Nil;
+    Cons x xs -> Cons x (nub (filter (\a -> not (a == x)) xs))
+  end;
+
+
+{--------------------------------------------------------}
+reverse
+= foldl (flip Cons) Nil;
+
+
+{--------------------------------------------------------}
+and
+= foldr (\a b -> a & b) True;
+
+
+{--------------------------------------------------------}
+or
+= foldr (\a b -> a | b) True;
+
+
+{--------------------------------------------------------}
+any p
+= dot or (map p);
+
+
+{--------------------------------------------------------}
+all p
+= dot and (map p);
+
+
+{--------------------------------------------------------}
+elem 
+= dot any (\a b -> a == b);
+
+
+{--------------------------------------------------------}
+notElem 
+= dot all (\a b -> not (a == b));
+
+
+{--------------------------------------------------------}
+sum
+= foldl (\a b -> a + b) 0;
+
+
+{--------------------------------------------------------}
+product 
+= foldl (\a b -> a * b) 1;
+
+
+{--------------------------------------------------------}
+sums 
+= scanl (\a b -> a + b) 0;
+
+
+{--------------------------------------------------------}
+products
+= scanl (\a b -> a * b) 1;
+
+
+{--------------------------------------------------------}
+maximum 
+= foldl1 max;
+
+
+{--------------------------------------------------------}
+minimum
+= foldl1 min;
+
+
+{--------------------------------------------------------}
+concat
+= foldr append Nil;
+
+
+{--------------------------------------------------------}
+transpose
+= foldr 
+    (\xs xss -> zipWith Cons xs (append xss (repeat Nil)))
+    Nil;
+
+
+{--------------------------------------------------------}
+zip
+= zipWith (\a b -> Pair a b);
+
+
+{--------------------------------------------------------}
+{
+zip3 
+= zipWith3 (\a b c -> Tp3 a b c);
+}
+
+{--------------------------------------------------------}
+{
+zip4
+= zipWith4 (\a b c d -> Tp4 a b c d);
+}
+
+{--------------------------------------------------------}
+zipWith z al bl
+= case al of
+    Cons a as -> case bl of
+                   Cons b bs -> Cons (z a b) (zipWith z as bs);
+                   Nil -> Nil
+                 end;
+    Nil -> Nil
+  end;
+
+
+{--------------------------------------------------------}
+{
+zipWith3 z al bl cl
+= case al of
+    Cons a as -> case bl of
+                   Cons b bs -> case cl of
+                                  Cons c cs -> Cons (z a b c) 
+                                                    (zipWith3 z as bs cs);
+                                  Nil -> Nil
+                                end;
+                   Nil -> Nil
+                 end;
+    Nil -> Nil
+  end;
+}
+
+{--------------------------------------------------------}
+{
+zipWith4 z al bl cl dl
+= case al of
+    Cons a as 
+      -> case bl of
+           Cons b bs 
+             -> case cl of
+                  Cons c cs 
+                    -> case dl of
+                         Cons d ds 
+                           -> Cons (z a b c d) (zipWith4 z as bs cs ds);
+                              Nil -> Nil
+                       end;
+                  Nil -> Nil
+                end;
+           Nil -> Nil
+         end;
+    Nil -> Nil
+  end;
+}
+
+{--------------------------------------------------------}
+{--------------------------------------------------------}
+{--------------------------------------------------------}
+{--------------------------------------------------------}
+
+{----------------------------------------------------------------}
+{--- end                                      preludeList.cor ---}
+{----------------------------------------------------------------}

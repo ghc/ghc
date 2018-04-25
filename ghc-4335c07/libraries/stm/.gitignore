@@ -1,0 +1,20 @@
+*.o
+*.aux
+*.hi
+*.comp.stderr
+*.comp.stdout
+*.interp.stderr
+*.interp.stdout
+*.run.stderr
+*.run.stdout
+*.eventlog
+*.genscript
+*.normalised
+
+# Backup files
+*~
+
+# Specific generated files
+/GNUmakefile
+/dist-install/
+/ghc.mk

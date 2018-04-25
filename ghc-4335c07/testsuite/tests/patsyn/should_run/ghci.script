@@ -1,0 +1,8 @@
+:set -XPatternSynonyms
+
+pattern Single x = [x]
+:i Single
+let foo (Single x) = Single (not x)
+:t foo
+foo [True]
+foo [True, False]

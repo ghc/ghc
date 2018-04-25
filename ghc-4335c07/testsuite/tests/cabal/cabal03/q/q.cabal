@@ -1,0 +1,5 @@
+name: q
+version: 1.0
+build-depends: p
+exposed-modules:
+build-type: Simple

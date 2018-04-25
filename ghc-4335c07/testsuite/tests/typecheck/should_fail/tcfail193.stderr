@@ -1,0 +1,8 @@
+
+tcfail193.hs:10:31: error:
+    • Occurs check: cannot construct the infinite type: a ~ [a]
+      Expected type: [a] -> [a]
+        Actual type: [a] -> [[a]]
+    • In the expression: inits
+      In a stmt of a list comprehension: then inits
+      In the expression: [x | x <- [3, 2, 1], then inits]

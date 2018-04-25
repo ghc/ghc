@@ -1,0 +1,7 @@
+# Setup configure
+Configuring templateHaskell-0.1...
+# Setup build
+Preprocessing executable 'main' for templateHaskell-0.1..
+Building executable 'main' for templateHaskell-0.1..
+Preprocessing library for templateHaskell-0.1..
+Building library for templateHaskell-0.1..

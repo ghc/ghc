@@ -1,0 +1,16 @@
+
+T12444.hs:19:11: error:
+    • Couldn't match type ‘b’ with ‘'Succ (c :+: b)’
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          foo :: forall (c :: Nat) (b :: Nat).
+                 SNat ('Succ c) -> SNat b -> SNat ('Succ (c :+: b))
+        at T12444.hs:18:1-55
+      Expected type: SNat ('Succ (c :+: b))
+        Actual type: SNat b
+    • In the expression: x
+      In an equation for ‘foo’: foo _ x = x
+    • Relevant bindings include
+        x :: SNat b (bound at T12444.hs:19:7)
+        foo :: SNat ('Succ c) -> SNat b -> SNat ('Succ (c :+: b))
+          (bound at T12444.hs:19:1)

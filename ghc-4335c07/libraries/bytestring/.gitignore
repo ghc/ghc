@@ -1,0 +1,9 @@
+GNUmakefile
+cabal-dev
+dist
+dist-install
+ghc.mk
+.cabal-sandbox
+cabal.sandbox.config
+.hsenv
+*~

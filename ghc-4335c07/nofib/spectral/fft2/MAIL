@@ -1,0 +1,150 @@
+Date:    Thu, 01 Oct 92 19:10:13 -0600
+From:    Rex Page <zrlp09@trc.amoco.com>
+To:      augustss@cs.chalmers.se, simonpj@dcs.gla.ac.uk, dat@ukc.ac.uk
+cc:      rpage@trc.amoco.com
+Subject: some benchmark data on hbc and Miranda
+
+Attached are some functions expressed in Haskell and
+Miranda, and some timing figures.  The functions
+specify floating point calculations that make heavy use
+of sine and cosine.  The code might be suitable for test suites,
+and the numbers are of at least passing interest.
+
+It appears that hbc and Miranda 2.017 yield similar performance
+on floating point calculations (at least on these calculations),
+and that both are 40 to 50 times slower than Fortran (200 or more
+times slower on a cosine-intensive computation, probably
+reflecting the relative maturity of mathematical libraries).
+
+Since all three codes are included, this message may be too
+long for the email system.  If part of it fails to reach you
+and you'd like to receive that part, let me know and I'll
+resend in sections.
+
+Best wishes
+Rex Page
+
+- -----------------------------
+
+     Benchmarks based on Fourier transforms
+
+         Miranda           Rex Page
+         Haskell           Sep 1992
+         Fortran             
+
+ Summary:
+             n = 256          512           1024
+    tstfft         8 hbc       17 hbc         41 hbc
+                   9 mira      21 mira        48 mira
+                 0.2 ftn      0.5 ftn        0.9 ftn 
+
+    tstdft        14 hbc       36 hbc      out of heap
+                  20 mira      46 mira        111 mira
+                 0.5 ftn        1 ftn         2.2 ftn
+
+    tstsct        41 hbc         174 hbc      706 hbc
+                  16 mira         64 mira     257 mira
+                0.25 ftn         0.5 ftn      1.1 ftn
+
+
+[Main.lhs omitted -- wdp]
+
+  Haskell timings (in seconds)    hbc running on a SparcStation 1+
+  rampWave
+             n = 256         512          1024
+    tstfft         8sec       17sec         41sec   22Sep92
+    tstdft        14          36      out of heap   29Sep92
+    tstsct        41         174           706      22Sep92
+               8.4E6       67.E6         536.E6
+  Note:  result should be approximately zero
+         in all the above test cases, but isn't in sct cases
+         (may indicate a problem with the hbc cosine routine;
+          probably for large arguments -- such problems are
+          unavoidable in general, but these results seem too
+          far out, and they aren't consistent with Fortran
+          and Miranda results)
+
+
+[Fourier.lhs omitted --wdp]
+
+[Complex_Vectors.lhs omitted --wdp]
+
+[fourier.m (miranda) omitted --wdp]
+
+[fourier.f (fortran) omitted --wdp]
+
+--------------------------------------------------------------
+
+Date:    Fri, 02 Oct 92 01:33:39 +0000
+From:    Lennart Augustsson <augustss@cs.chalmers.se>
+To:      zrlp09@trc.amoco.com
+cc:      simonpj@dcs.gla.ac.uk, dat@ukc.ac.uk, rpage@trc.amoco.com
+Subject: Re: some benchmark data on hbc and Miranda
+
+
+The reason for the bogus results from hbc is the bug we already 
+discussed.  I'll have a look at the performance issue.
+
+	-- Lennart
+
+>From my earlier letter regarding thetas:
+> The following function works under hbi, but gives a
+> floating point exception under hbc.
+Your problem was caused by a typo in the compiler.  Instead of calling the
+function to convert from Int to Float the function to convert from Float to Int
+was called.
+You can avoid it by using Double instead of Float.  BTW, Double and Float are
+the same in hbc.
+
+------- Message 2
+
+Date:    Fri, 02 Oct 92 02:22:47 +0000
+From:    Lennart Augustsson <augustss@cs.chalmers.se>
+To:      zrlp09@trc.amoco.com
+cc:      simonpj@dcs.gla.ac.uk, dat@ukc.ac.uk, rpage@trc.amoco.com
+Subject: Re: some benchmark data on hbc and Miranda
+
+
+
+> It appears that hbc and Miranda 2.017 yield similar performance
+> on floating point calculations (at least on these calculations),
+> and that both are 40 to 50 times slower than Fortran (200 or more
+> times slower on a cosine-intensive computation, probably
+> reflecting the relative maturity of mathematical libraries).
+
+Well, I took a quick look.  The conclusion is:
+
+	BLAME IT ON THE OVERLOADING!
+
+Or at least the lousy implementation of it in hbc.  Some quick tricks
+(using some non-standard extension to Haskell in hbc) doubled the
+speed.  I'm planning to take a look at overloading in the near future,
+so don't dispair.  I think a 5-fold speed increase is within reach for
+this program if you use all the trick I have on my list for makeing
+overloading reasonable.
+
+	-- Lennart
+
+PS.  Simon, could you make sure Will adds this to his nofib suite.
+
+
+Return-Path: simonpj@dcs.gla.ac.uk
+Return-Path: <simonpj@dcs.gla.ac.uk>
+Received: from tutuila.dcs.gla.ac.uk by goggins.dcs.gla.ac.uk with SMTP (PP) 
+          id <19802-0@goggins.dcs.gla.ac.uk>; Fri, 2 Oct 1992 07:55:51 +0100
+Received: by tutuila.dcs.gla.ac.uk (4.1/Dumb) id AA27855;
+          Fri, 2 Oct 92 07:55:40 BST
+Message-Id: <9210020655.AA27855@tutuila.dcs.gla.ac.uk>
+To: Lennart Augustsson <augustss@cs.chalmers.se>
+Cc: zrlp09@trc.amoco.com, dat@ukc.ac.uk, rpage@trc.amoco.com, 
+    simonpj@dcs.gla.ac.uk, andy@dcs.gla.ac.uk, partain@dcs.gla.ac.uk
+Subject: Re: some benchmark data on hbc and Miranda
+Date: Fri, 02 Oct 92 07:55:40 +0100
+From: Simon L Peyton Jones <simonpj@dcs.gla.ac.uk>
+
+
+Terrific, Rex!  It's great to have some example code to bite on.  We'll try
+glhc on it asap (which means in the next few weeks, rather than tomorrow,
+because we're still putting floating point in properly.
+
+Simon

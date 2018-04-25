@@ -1,0 +1,17 @@
+*.ast
+*.ppr.hs
+*.ppr
+*.o
+*.hi
+*.out
+Ppr003
+Ppr004
+Ppr016
+Ppr026
+Ppr029
+Ppr034
+Ppr041
+Ppr042
+Ppr043
+Ppr044
+Ppr046

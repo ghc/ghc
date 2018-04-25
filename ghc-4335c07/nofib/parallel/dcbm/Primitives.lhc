@@ -1,0 +1,107 @@
+\begin{code}
+ED_RO_(Prelude_True_closure);
+ED_RO_(Prelude_False_closure);
+ED_RO_(Prelude_True_inregs_info);
+ED_RO_(Prelude_False_inregs_info);
+
+ED_RO_(Ind_info);
+
+ED_RO_(Types_TRUE_inregs_info);
+ED_RO_(Types_FALSE_inregs_info);
+ED_RO_(Types_UNKNOWN_inregs_info);
+
+STATIC_ITBL(Primitives_boolval_info,Primitives_boolval_entry,StdErrorCode,1,-1,STATIC_VHS,0,const,EF_,0,0,0);
+FN_(Primitives_boolval_entry) {
+ED_(Primitives_boolval_closure);
+EF_(Primitives_boolval_fast1);
+
+FB_
+ARGS_CHK_A_LOAD_NODE(1,Primitives_boolval_closure);
+R1.p=*SpA;
+SpA=SpA+1;
+
+
+JMP_(Primitives_boolval_fast1);
+FE_
+}
+FN_(Primitives_boolval_fast1) {
+  FB_
+/*    fprintf(stderr,"%lx, %lx, %lx, %lx\n",R1.p,INFO_PTR(R1.p),Prelude_True_closure,Prelude_False_closure);*/
+  if (R1.p == Prelude_True_closure) 
+    {
+      R2.d=Types_TRUE_inregs_info;
+      JMP_((RetReg)[RVREL(0)]);
+    }
+  else if (R1.p == Prelude_False_closure) 
+    {
+      R2.d=Types_FALSE_inregs_info;
+      JMP_((RetReg)[RVREL(1)]);
+    }
+  else
+    {	
+      R2.d=Types_UNKNOWN_inregs_info;
+      JMP_((RetReg)[RVREL(2)]);
+    }
+  FE_
+}
+
+SET_STATIC_HDR(Primitives_boolval_closure,Primitives_boolval_info,0,,ED_RO_)
+
+
+};
+
+/* IS_INDIRECTION doesn't seem to be in the official release yet! */
+
+#ifndef IS_INDIRECTION
+#define IS_INDIRECTION(ip) (ip == (W_) Ind_info || ip == (W_) Caf_info)
+#endif
+
+
+/*
+   Definition of "eq"
+*/
+
+STATIC_ITBL(Primitives_eq_info,Primitives_eq_entry,StdErrorCode,1,-1,STATIC_VHS,0,const,EF_,0,0,0);
+FN_(Primitives_eq_entry) {
+  ED_(Primitives_eq_closure);
+
+  FB_
+  ARGS_CHK_A_LOAD_NODE(2,Primitives_eq_closure);
+  R1.p=*SpA;
+  R2.p=SpA[1];
+  SpA=SpA+2;
+
+  /* Follow Indirection chains -- JSM */
+  while (IS_INDIRECTION(INFO_PTR(R1.p)))
+    R1.p = (P_) IND_CLOSURE_PTR(R1.p);
+
+  while (IS_INDIRECTION(INFO_PTR(R2.p)))
+    R2.p = (P_) IND_CLOSURE_PTR(R2.p);
+
+/* Debug code -- induces crashes!
+  fprintf(stderr,"R1: %lx [%lx -- %lx], R2: %lx [%lx -- %lx]\n",
+	  R1.p, INFO_PTR(R1.p), INFO_TAG(INFO_PTR(R1.p)),
+	  R2.p, INFO_PTR(R2.p),INFO_TAG(INFO_PTR(R2.p)));
+*/
+
+  /* Following code suggested by JSM.  Long live tagless code! */
+  if (R1.p == R2.p || 
+      (EVAL_TAG(INFO_PTR(R1.p)) 
+       && EVAL_TAG(INFO_PTR(R2.p)) && INFO_TAG(INFO_PTR(R1.p)) == INFO_TAG(INFO_PTR(R2.p))))
+    {
+      R2.d=Prelude_True_inregs_info;
+      JMP_((RetReg)[RVREL(1)]);
+    }
+  else
+    {
+      R2.d=Prelude_False_inregs_info;
+      JMP_((RetReg)[RVREL(0)]);
+    }
+FE_
+}
+
+SET_STATIC_HDR(Primitives_eq_closure,Primitives_eq_info,0,,ED_RO_)
+
+
+};
+\end{code}

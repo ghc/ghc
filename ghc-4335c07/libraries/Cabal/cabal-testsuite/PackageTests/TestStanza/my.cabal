@@ -1,0 +1,22 @@
+name: TestStanza
+version: 0.1
+license: BSD3
+author: Thomas Tuegel
+stability: stable
+category: PackageTests
+build-type: Simple
+cabal-version: >= 1.10
+
+description:
+    Check that Cabal recognizes the Test stanza defined below.
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base
+    default-language: Haskell2010
+
+test-suite dummy
+    main-is: dummy.hs
+    type: exitcode-stdio-1.0
+    build-depends: base
+    default-language: Haskell2010

@@ -1,0 +1,10 @@
+good Maybe [Char] == Maybe Int?
+good Maybe == Maybe?
+good Proxy * [Char] == Proxy * Int?
+good Proxy * == Proxy *?
+good Product * (Const * [Char]) (Const * Int) Int == Product * (Const * [Char]) (Const * Char) Int?
+good Product * (Const * [Char]) (Const * Int) == Product * (Const * [Char]) (Const * Char)?
+good Product * (Const * [Char]) == Product * (Const * [Char])?
+good Product * (Const * [Char]) (Const * Int) Int == Product * (Const * [Char]) (Const * Int) Char?
+good Product * (Const * [Char]) (Const * Int) == Product * (Const * [Char]) (Const * Int)?
+good Product * (Const * [Char]) == Product * (Const * [Char])?

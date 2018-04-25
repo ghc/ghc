@@ -1,0 +1,6 @@
+No 'category' field.
+No 'maintainer' field.
+No 'description' field.
+The 'license' field is missing.
+Suspicious flag names: 無. To avoid ambiguity in command line interfaces, flag shouldn't start with a dash. Also for better compatibility, flag names shouldn't contain non-ascii characters.
+Non ascii custom fields: x-無. For better compatibility, custom field names shouldn't contain non-ascii characters.

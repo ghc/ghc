@@ -1,0 +1,27 @@
+[1 of 3] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[2 of 3] Processing q
+  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+[3 of 3] Processing r
+  [1 of 2] Compiling A[sig]           ( r/A.hsig, nothing )
+  [2 of 2] Compiling R                ( r/R.hs, nothing )
+
+bkpfail28.bkp:18:13: error:
+    • Overlapping instances for Show (K a) arising from a use of ‘show’
+      Matching instances:
+        instance [safe] Show a => Show (K a)
+          -- Defined at bkpfail28.bkp:11:18
+        instance [safe] Read a => Show (K a)
+          -- Defined at bkpfail28.bkp:11:18
+    • In the expression: show
+      In an equation for ‘f’: f = show
+
+bkpfail28.bkp:20:13: error:
+    • Overlapping instances for Show (K a) arising from a use of ‘show’
+      Matching instances:
+        instance [safe] Show a => Show (K a)
+          -- Defined at bkpfail28.bkp:11:18
+        instance [safe] Read a => Show (K a)
+          -- Defined at bkpfail28.bkp:11:18
+    • In the expression: show
+      In an equation for ‘g’: g = show

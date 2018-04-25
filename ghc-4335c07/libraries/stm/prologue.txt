@@ -1,0 +1,1 @@
+Software Transactional Memory: a modular composable concurrency abstraction.

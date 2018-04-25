@@ -1,0 +1,38 @@
+At position: 0, found: '-'
+At position: 1, found: '-'
+At position: 2, found: ' '
+At position: 3, found: '!'
+At position: 4, found: '!'
+
+At position: 4, found: '!'
+At position: 3, found: '!'
+At position: 2, found: ' '
+At position: 1, found: '-'
+At position: 0, found: '-'
+
+Using hSeek/AbsoluteSeek: 
+At position: 0, found: '-'
+At position: 1, found: '-'
+At position: 2, found: ' '
+At position: 3, found: '!'
+At position: 4, found: '!'
+
+At position: 4, found: '!'
+At position: 3, found: '!'
+At position: 2, found: ' '
+At position: 1, found: '-'
+At position: 0, found: '-'
+
+Using hSeek/SeekFromEnd: 
+(Don't worry if you're seeing differing numbers here, it might be down to '\n' vs '\r\n')
+At position: 0, found: '-'
+At position: 1, found: '-'
+At position: 2, found: ' '
+At position: 3, found: '!'
+At position: 4, found: '!'
+
+At position: 1376, found: 'n'
+At position: 1377, found: ' '
+At position: 1378, found: '"'
+At position: 1379, found: '"'
+At position: 1380, found: '\n'

@@ -1,0 +1,12 @@
+[1 of 1] Processing p
+  [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, nothing )
+
+bkpfail18.bkp:3:18: error:
+    Duplicate instance declarations:
+      instance Show Int -- Defined at bkpfail18.bkp:3:18
+      instance Show Int -- Defined in ‘GHC.Show’
+
+bkpfail18.bkp:4:18: error:
+    Duplicate instance declarations:
+      instance Show Int -- Defined at bkpfail18.bkp:4:18
+      instance Show Int -- Defined in ‘GHC.Show’

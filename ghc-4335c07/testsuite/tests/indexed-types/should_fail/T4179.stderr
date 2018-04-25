@@ -1,0 +1,16 @@
+
+T4179.hs:26:16: error:
+    • Couldn't match type ‘A2 (x (A2 (FCon x) -> A3 (FCon x)))’
+                     with ‘A2 (FCon x)’
+      Expected type: x (A2 (FCon x) -> A3 (FCon x))
+                     -> A2 (FCon x) -> A3 (FCon x)
+        Actual type: x (A2 (FCon x) -> A3 (FCon x))
+                     -> A2 (x (A2 (FCon x) -> A3 (FCon x)))
+                     -> A3 (x (A2 (FCon x) -> A3 (FCon x)))
+      NB: ‘A2’ is a non-injective type family
+    • In the first argument of ‘foldDoC’, namely ‘op’
+      In the expression: foldDoC op
+      In an equation for ‘fCon’: fCon = foldDoC op
+    • Relevant bindings include
+        fCon :: Con x -> A2 (FCon x) -> A3 (FCon x)
+          (bound at T4179.hs:26:1)

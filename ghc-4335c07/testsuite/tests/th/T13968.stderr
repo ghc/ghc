@@ -1,0 +1,3 @@
+
+T13968.hs:6:3: error:
+    Cannot redefine a Name retrieved by a Template Haskell quote: succ

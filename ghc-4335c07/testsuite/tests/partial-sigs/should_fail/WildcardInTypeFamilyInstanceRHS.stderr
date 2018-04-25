@@ -1,0 +1,4 @@
+
+WildcardInTypeFamilyInstanceRHS.hs:8:25: error:
+    Wildcard ‘_’ not allowed
+      in the declaration for type synonym ‘Dual’

@@ -1,0 +1,6 @@
+("f",["0x1"])
+("ib",["001"])
+("ia",["1"])
+("ia",["0x999"])
+("ia",["1"])
+("tp",["((SourceText \"0x1\",SourceText \"0x2\"),(SourceText \"0x3\",SourceText \"0x4\"))"])

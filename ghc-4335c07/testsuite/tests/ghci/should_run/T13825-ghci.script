@@ -1,0 +1,13 @@
+:l T13825-ghci
+let ghciPacked = Packed 1.0 2.0 3 4 5 6
+map addOne (ghciPacked : packedAll)
+let ghciAddOne (Packed a b c d e f) = Packed (a + 1.0) (b + 1.0) (c + 1) (d + 1) (e + 1.0) (f + 1)
+map ghciAddOne (ghciPacked : packedAll)
+
+:set -fobject-code
+:l T13825-ghci
+:set -fbyte-code
+let ghciPacked = Packed 1.0 2.0 3 4 5 6
+map addOne (ghciPacked : packedAll)
+let ghciAddOne (Packed a b c d e f) = Packed (a + 1.0) (b + 1.0) (c + 1) (d + 1) (e + 1.0) (f + 1)
+map ghciAddOne (ghciPacked : packedAll)

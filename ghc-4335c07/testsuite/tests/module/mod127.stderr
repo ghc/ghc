@@ -1,0 +1,5 @@
+
+mod127.hs:6:6: error:
+    Not in scope: type constructor or class ‘T’
+    Perhaps you want to remove ‘T’ from the explicit hiding list
+    in the import of ‘Mod127_A’ (mod127.hs:4:1-26).

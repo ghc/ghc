@@ -1,0 +1,12 @@
+
+T7175.hs:8:4: error:
+    Data constructor ‘G1C’ returns type ‘F Int’
+      instead of an instance of its parent type ‘G1 a’
+    In the definition of data constructor ‘G1C’
+    In the data type declaration for ‘G1’
+
+T7175.hs:11:4: error:
+    Data constructor ‘G2C’ returns type ‘F Int’
+      instead of an instance of its parent type ‘G2 a’
+    In the definition of data constructor ‘G2C’
+    In the data type declaration for ‘G2’

@@ -1,0 +1,5 @@
+
+tc116.hs:13:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘foo’
+    • In the instance declaration for ‘Foo [m a] (m a)’

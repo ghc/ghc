@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage name="hpc_sample.tix">
+  <summary>
+    <exprs boxes="4" count="3"/>
+    <booleans boxes="0" true="0" false="0" count="0"/>
+    <guards boxes="0" true="0" false="0" count="0"/>
+    <conditionals boxes="0" true="0" false="0" count="0"/>
+    <qualifiers boxes="0" true="0" false="0" count="0"/>
+    <alts boxes="0" count="0"/>
+    <local boxes="0" count="0"/>
+    <toplevel boxes="1" count="1"/>
+  </summary>
+</coverage>

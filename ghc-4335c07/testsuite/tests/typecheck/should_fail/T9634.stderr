@@ -1,0 +1,3 @@
+
+T9634.hs:3:10:
+    Cannot parse data constructor in a data/newtype declaration: 1

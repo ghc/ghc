@@ -1,0 +1,5 @@
+
+mod114.hs:3:16: error:
+    Not in scope: type constructor or class ‘Stuff’
+    Perhaps you want to remove ‘Stuff’ from the explicit hiding list
+    in the import of ‘Mod114_Help’ (mod114.hs:4:1-36).

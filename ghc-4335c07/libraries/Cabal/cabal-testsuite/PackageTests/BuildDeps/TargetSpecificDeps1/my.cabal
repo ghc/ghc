@@ -1,0 +1,22 @@
+name: TargetSpecificDeps1
+version: 0.1
+license: BSD3
+cabal-version: >= 1.7.1
+author: Stephen Blackheath
+stability: stable
+category: PackageTests
+build-type: Simple
+
+description:
+    Check for the new build-dep behaviour, where build-depends are
+    handled specifically for each target
+
+---------------------------------------
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base, bytestring
+
+Executable lemon
+    main-is: lemon.hs
+    build-depends: base, bytestring, pretty

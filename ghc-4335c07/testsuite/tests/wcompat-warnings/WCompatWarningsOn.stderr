@@ -1,0 +1,35 @@
+
+WCompatWarningsOn.hs:13:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)]
+    • Could not deduce (Control.Monad.Fail.MonadFail m)
+        arising from the failable pattern ‘Just _’
+        (this will become an error in a future GHC release)
+      from the context: Monad m
+        bound by the type signature for:
+                   monadFail :: forall (m :: * -> *) a. Monad m => m a
+        at WCompatWarningsOn.hs:11:1-27
+      Possible fix:
+        add (Control.Monad.Fail.MonadFail m) to the context of
+          the type signature for:
+            monadFail :: forall (m :: * -> *) a. Monad m => m a
+    • In a stmt of a 'do' block: Just _ <- undefined
+      In the expression:
+        do Just _ <- undefined
+           undefined
+      In an equation for ‘monadFail’:
+          monadFail
+            = do Just _ <- undefined
+                 undefined
+
+WCompatWarningsOn.hs:16:1: warning: [-Wsemigroup (in -Wcompat)]
+    Local definition of ‘<>’ clashes with a future Prelude name.
+    This will become an error in a future release.
+
+WCompatWarningsOn.hs:22:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
+    Noncanonical ‘(<>) = mappend’ definition detected
+    in the instance declaration for ‘Semigroup S’.
+    Move definition from ‘mappend’ to ‘(<>)’
+
+WCompatWarningsOn.hs:25:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
+    Noncanonical ‘mappend’ definition detected
+    in the instance declaration for ‘Monoid S’.
+    Define as ‘mappend = (<>)’

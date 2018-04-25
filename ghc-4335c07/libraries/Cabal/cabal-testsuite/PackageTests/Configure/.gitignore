@@ -1,0 +1,6 @@
+zlib.buildinfo
+autom4te.cache/
+*.log
+*.status
+configure
+include/HsZlibConfig.h

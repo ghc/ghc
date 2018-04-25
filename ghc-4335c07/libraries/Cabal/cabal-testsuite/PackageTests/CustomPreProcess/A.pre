@@ -1,0 +1,4 @@
+module A where
+
+a :: String
+a = "hello from A"

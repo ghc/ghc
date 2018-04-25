@@ -1,0 +1,5 @@
+
+mod130.hs:7:5: error:
+    Variable not in scope: (<) :: Integer -> Int -> Int
+    Perhaps you want to remove ‘<’ from the explicit hiding list
+    in the import of ‘Prelude’ (mod130.hs:4:1-33).

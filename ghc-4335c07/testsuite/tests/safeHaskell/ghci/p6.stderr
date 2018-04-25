@@ -1,0 +1,10 @@
+
+<interactive>:11:1: error:
+    • Unacceptable result type in foreign declaration:
+        Safe Haskell is on, all FFI imports must be in the IO monad
+    • When checking declaration:
+        foreign import ccall safe "sin" c_sin :: Double -> Double
+
+<interactive>:12:1: error:
+    • Variable not in scope: c_sin :: Integer -> t
+    • Perhaps you meant ‘c_sin'’ (line 7)

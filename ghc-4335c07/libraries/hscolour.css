@@ -1,0 +1,5 @@
+
+.keyglyph, .layout {color: red;}
+.keyword {color: blue;}
+.comment, .comment a {color: green;}
+.str, .chr {color: teal;}

@@ -1,0 +1,10 @@
+
+tcfail033.hs:4:12: error:
+    • Occurs check: cannot construct the infinite type: a ~ (a, b)
+    • In the expression: x
+      In the expression: [x | (x, y) <- buglet]
+      In an equation for ‘buglet’: buglet = [x | (x, y) <- buglet]
+    • Relevant bindings include
+        y :: b (bound at tcfail033.hs:4:19)
+        x :: a (bound at tcfail033.hs:4:17)
+        buglet :: [(a, b)] (bound at tcfail033.hs:4:1)

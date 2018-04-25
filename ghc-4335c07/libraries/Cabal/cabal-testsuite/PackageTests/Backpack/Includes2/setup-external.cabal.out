@@ -1,0 +1,120 @@
+# Setup configure
+Resolving dependencies...
+Configuring mylib-0.1.0.0...
+# Setup build
+Preprocessing library for mylib-0.1.0.0..
+Building library instantiated with Database = <Database>
+for mylib-0.1.0.0..
+# Setup haddock
+Preprocessing library for mylib-0.1.0.0..
+Running Haddock on library instantiated with Database = <Database>
+for mylib-0.1.0.0..
+Documentation created: ../setup-external.cabal.dist/work/mylib/dist/doc/html/mylib/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Database = <Database>
+for mylib-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring mysql-0.1.0.0...
+# Setup build
+Preprocessing library for mysql-0.1.0.0..
+Building library for mysql-0.1.0.0..
+# Setup haddock
+Preprocessing library for mysql-0.1.0.0..
+Running Haddock on library for mysql-0.1.0.0..
+Documentation created: ../setup-external.cabal.dist/work/mysql/dist/doc/html/mysql/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for mysql-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring postgresql-0.1.0.0...
+# Setup build
+Preprocessing library for postgresql-0.1.0.0..
+Building library for postgresql-0.1.0.0..
+# Setup haddock
+Preprocessing library for postgresql-0.1.0.0..
+Running Haddock on library for postgresql-0.1.0.0..
+Documentation created: ../setup-external.cabal.dist/work/postgresql/dist/doc/html/postgresql/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for postgresql-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring mylib-0.1.0.0...
+# Setup build
+Preprocessing library for mylib-0.1.0.0..
+Building library instantiated with Database = mysql-0.1.0.0:Database.MySQL
+for mylib-0.1.0.0..
+# Setup haddock
+Preprocessing library for mylib-0.1.0.0..
+Running Haddock on library instantiated with
+  Database = mysql-0.1.0.0:Database.MySQL
+for mylib-0.1.0.0..
+Documentation created: ../setup-external.cabal.dist/work/mylib/dist/doc/html/mylib/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with Database = mysql-0.1.0.0:Database.MySQL
+for mylib-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring mylib-0.1.0.0...
+# Setup build
+Preprocessing library for mylib-0.1.0.0..
+Building library instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for mylib-0.1.0.0..
+# Setup haddock
+Preprocessing library for mylib-0.1.0.0..
+Running Haddock on library instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for mylib-0.1.0.0..
+Documentation created: ../setup-external.cabal.dist/work/mylib/dist/doc/html/mylib/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library instantiated with
+  Database = postgresql-0.1.0.0:Database.PostgreSQL
+for mylib-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Configuring src-0.1.0.0...
+# Setup build
+Preprocessing library for src-0.1.0.0..
+Building library for src-0.1.0.0..
+# Setup haddock
+Preprocessing library for src-0.1.0.0..
+Running Haddock on library for src-0.1.0.0..
+Documentation created: ../setup-external.cabal.dist/work/src/dist/doc/html/src/index.html
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for src-0.1.0.0..
+# Setup configure
+Resolving dependencies...
+Warning: solver failed to find a solution:
+Could not resolve dependencies:
+trying: exe-0.1.0.0 (user goal)
+next goal: src (dependency of exe)
+rejecting: src-<VERSION>/installed-<HASH>... (conflict: src => mylib==0.1.0.0/installed-0.1..., src => mylib==0.1.0.0/installed-0.1...)
+fail (backjumping, conflict set: exe, src)
+After searching the rest of the dependency tree exhaustively, these were the goals I've had most trouble fulfilling: exe (2), src (2)
+Trying configure anyway.
+Configuring exe-0.1.0.0...
+# Setup build
+Preprocessing executable 'exe' for exe-0.1.0.0..
+Building executable 'exe' for exe-0.1.0.0..
+# Setup haddock
+Warning: No documentation was generated as this package does not contain a library. Perhaps you want to use the --executables, --tests, --benchmarks or --foreign-libraries flags.
+# Setup copy
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup-external.cabal.dist/usr/bin is not in the system search path.
+# Setup register
+Package contains no library to register: exe-0.1.0.0...
+# exe
+"minemysql minepostgresql"

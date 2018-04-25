@@ -1,0 +1,5 @@
+
+CustomTypeErrors03.hs:6:6: error:
+    This is a type error
+    In the type signature:
+      f :: TypeError (Text "This is a type error")

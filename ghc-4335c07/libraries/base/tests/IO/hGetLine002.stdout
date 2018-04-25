@@ -1,0 +1,2 @@
+this line doesn't end with a newline
+<stdin>: hGetLine: end of file

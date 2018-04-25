@@ -1,0 +1,15 @@
+Name: quasiQuotes
+Version: 0.1
+Build-Type: Simple
+Cabal-Version: >= 1.2
+
+Library
+    Exposed-Modules: Lib
+    Other-Modules: QQ
+    Build-Depends: base, template-haskell
+    Extensions: QuasiQuotes
+
+Executable main
+    Main-is: Exe.hs
+    Build-Depends: base, template-haskell
+    Extensions: QuasiQuotes

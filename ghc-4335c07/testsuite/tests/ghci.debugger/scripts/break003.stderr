@@ -1,0 +1,5 @@
+
+<interactive>:4:1: error:
+    • No instance for (Show (t -> a)) arising from a use of ‘print’
+        (maybe you haven't applied a function to enough arguments?)
+    • In a stmt of an interactive GHCi command: print it

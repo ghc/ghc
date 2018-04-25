@@ -1,0 +1,9 @@
+
+T7881.hs:7:6: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+T7881.hs:25:6: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+T7881.hs:31:6: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty

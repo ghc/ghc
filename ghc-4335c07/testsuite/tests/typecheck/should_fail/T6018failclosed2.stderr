@@ -1,0 +1,7 @@
+
+T6018failclosed2.hs:17:14:
+    Couldn't match expected type ‘Bar a0’ with actual type ‘Char’
+    The type variable ‘a0’ is ambiguous
+    In the first argument of ‘bar’, namely ‘'c'’
+    In the expression: bar 'c'
+    In an equation for ‘barapp’: barapp = bar 'c'

@@ -1,0 +1,9 @@
+
+overloadedlistsfail03.hs:3:28: error:
+    • Couldn't match type ‘[Char]’ with ‘Char’
+      Expected type: GHC.Exts.Item [Char]
+        Actual type: [Char]
+    • In the expression: "b"
+      In the first argument of ‘length’, namely ‘(['a', "b"] :: [Char])’
+      In the first argument of ‘print’, namely
+        ‘(length (['a', "b"] :: [Char]))’

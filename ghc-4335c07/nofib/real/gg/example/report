@@ -1,0 +1,25 @@
+#! /bin/sh
+
+ADMIN=.
+
+cp $ADMIN/Report.tex $1.tex
+
+echo "\begin{verbatim}" > details.tex
+sed -e /Subject/,/Status/!d $1 | sed -e /Status/d | fold -80 >> details.tex
+grep "Date" $1 >> details.tex
+echo >> details.tex
+grep "IMU" $1 >> details.tex
+grep "RunTime" $1 >> details.tex
+echo "\end{verbatim}" >> details.tex
+
+gg -A $1 Activity.ps
+echo "Done Activity Graph"
+gg -S $1 Spark.ps
+echo "Done Spark Graph"
+gg -P $1 Pool.ps
+echo "Done Poll Graph"
+
+latex $1.tex
+dvips -f $1.dvi > $1.ps
+
+rm Activity.ps Spark.ps Pool.ps details.tex $1.tex $1.log $1.aux $1.dvi

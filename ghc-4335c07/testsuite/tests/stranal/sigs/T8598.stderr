@@ -1,0 +1,12 @@
+
+==================== Strictness signatures ====================
+T8598.$trModule: m
+T8598.fun: <S(S),1*U(U)>m
+
+
+
+==================== Strictness signatures ====================
+T8598.$trModule: m
+T8598.fun: <S(S),1*U(U)>m
+
+

@@ -1,0 +1,12 @@
+[1 of 3] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[2 of 3] Processing q
+  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
+[3 of 3] Processing r
+  [1 of 2] Compiling A[sig]           ( r/A.hsig, nothing )
+  [2 of 2] Compiling B                ( r/B.hs, nothing )
+
+bkp47.bkp:19:18: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘f’ or ‘g’
+    • In the instance declaration for ‘C Int’

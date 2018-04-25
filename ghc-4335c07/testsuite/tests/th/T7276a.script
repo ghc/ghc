@@ -1,0 +1,4 @@
+:set -XTemplateHaskell -fdefer-type-errors
+import Language.Haskell.TH
+let x = [d|a = ()|] :: Q Exp
+:t $x

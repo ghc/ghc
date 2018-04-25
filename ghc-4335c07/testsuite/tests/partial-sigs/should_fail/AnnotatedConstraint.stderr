@@ -1,0 +1,6 @@
+
+AnnotatedConstraint.hs:7:8: error:
+    No instance for (Eq (a0 -> a0)) arising from a use of ‘foo’
+      (maybe you haven't applied a function to enough arguments?)
+    In the expression: foo id
+    In an equation for ‘test’: test = foo id

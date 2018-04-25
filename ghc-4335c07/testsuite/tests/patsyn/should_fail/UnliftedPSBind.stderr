@@ -1,0 +1,5 @@
+
+UnliftedPSBind.hs:12:9: error: [-Wunbanged-strict-patterns (in -Wextra), -Werror=unbanged-strict-patterns]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
+      P x = P 4#

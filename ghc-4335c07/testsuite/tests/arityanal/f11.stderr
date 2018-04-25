@@ -1,0 +1,45 @@
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+***expensive e1 0
+
+==================== IdInfo ====================
+lvl_s1Fz :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lvl_s1Fv :: GHC.Num.Integer :: [*
+				Str: DmdType]
+lvl_s1Fu :: GHC.Num.Integer :: [*
+				Str: DmdType]
+fib_s1Fj :: GHC.Num.Integer -> GHC.Num.Integer :: [Arity 1
+						   0 -> *
+						   Str: DmdType S]
+lvl_s1IP :: GHC.Num.Integer :: [*]
+x_s1Fr :: GHC.Num.Integer :: [*
+			      Str: DmdType]
+lvl_s1IQ :: GHC.Num.Integer :: [*]
+a_s1rF :: GHC.Num.Integer :: [*
+			      Str: DmdType]
+lvl_s1IR :: GHC.Num.Integer :: [*]
+a_s1rE :: GHC.Num.Integer :: [*
+			      Str: DmdType]
+F11.f11 :: (GHC.Num.Integer, GHC.Num.Integer) :: [*
+						  Str: DmdType m]
+F11.f11f :: forall t_a1gd.
+	    t_a1gd -> GHC.Num.Integer -> GHC.Num.Integer :: [Arity 2
+							     T
+							     Str: DmdType AS]
+F11.fib :: forall a_a19x a_a1eN.
+	   (GHC.Num.Num a_a1eN, GHC.Num.Num a_a19x) =>
+	   a_a19x -> a_a1eN :: [Arity 2
+				0 -> 0 -> 0 -> *
+				Str: DmdType LL
+				RULES: "SPEC F11.fib" __forall {$dNum_X1Fo :: {GHC.Num.Num GHC.Num.Integer}
+								$dNum_X1Fq :: {GHC.Num.Num GHC.Num.Integer}}
+							F11.fib @ GHC.Num.Integer
+								@ GHC.Num.Integer
+								$dNum_X1Fo
+								$dNum_X1Fq
+							= fib_s1Fj ;]
+
+

@@ -1,0 +1,3 @@
+
+T14149.hs:8:13: warning: [-Wdeferred-out-of-scope-variables (in -Wdefault)]
+    Variable not in scope: k :: Int

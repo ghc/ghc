@@ -1,0 +1,16 @@
+Name:           dph-par
+Version:        0.5.1.99
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       (deprecated)
+Description:    This package used to export DPH array primitives, but they're in dph-primpar now.
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed: False

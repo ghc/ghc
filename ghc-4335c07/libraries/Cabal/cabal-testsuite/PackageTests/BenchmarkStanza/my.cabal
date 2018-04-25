@@ -1,0 +1,20 @@
+name: BenchmarkStanza
+version: 0.1
+license: BSD3
+author: Johan Tibell
+stability: stable
+category: PackageTests
+build-type: Simple
+cabal-version: >= 1.10
+
+description:
+    Check that Cabal recognizes the benchmark stanza defined below.
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base
+
+benchmark dummy
+    main-is: dummy.hs
+    type: exitcode-stdio-1.0
+    build-depends: base

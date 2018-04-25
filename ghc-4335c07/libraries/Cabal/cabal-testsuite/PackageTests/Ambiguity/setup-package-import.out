@@ -1,0 +1,25 @@
+# Setup configure
+Configuring p-0.1.0.0...
+# Setup build
+Preprocessing library for p-0.1.0.0..
+Building library for p-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for p-0.1.0.0..
+# Setup configure
+Configuring q-0.1.0.0...
+# Setup build
+Preprocessing library for q-0.1.0.0..
+Building library for q-0.1.0.0..
+# Setup copy
+Installing library in <PATH>
+# Setup register
+Registering library for q-0.1.0.0..
+# Setup configure
+Configuring package-import-0.1.0.0...
+# Setup build
+Preprocessing executable 'package-import' for package-import-0.1.0.0..
+Building executable 'package-import' for package-import-0.1.0.0..
+# package-import
+p q

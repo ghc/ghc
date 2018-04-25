@@ -1,0 +1,14 @@
+
+annfail11.hs:3:1: error:
+    Not in scope: ‘length’
+    Perhaps you want to add ‘length’ to the import list
+    in the import of ‘Prelude’ (annfail11.hs:1:8-16).
+    In the annotation:
+      {-# ANN length "Cannot annotate other modules yet" #-}
+
+annfail11.hs:4:1: error:
+    Not in scope: type constructor or class ‘Integer’
+    Perhaps you want to add ‘Integer’ to the import list
+    in the import of ‘Prelude’ (annfail11.hs:1:8-16).
+    In the annotation:
+      {-# ANN type Integer "Cannot annotate other modules yet" #-}

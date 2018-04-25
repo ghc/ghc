@@ -1,0 +1,7 @@
+
+T9160.hs:19:12: error:
+    Expecting one more argument to ‘Maybe’
+    Expected a type, but ‘Maybe’ has kind ‘* -> *’
+    In the type ‘Maybe’
+    In the type instance declaration for ‘F’
+    In the instance declaration for ‘C (a :: *)’

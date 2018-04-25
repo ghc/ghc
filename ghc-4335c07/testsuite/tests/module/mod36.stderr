@@ -1,0 +1,5 @@
+
+mod36.hs:5:5: error:
+    Variable not in scope: const
+    Perhaps you want to remove ‘const’ from the explicit hiding list
+    in the import of ‘Prelude’ (mod36.hs:3:1-32).

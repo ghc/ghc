@@ -1,0 +1,13 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# cabal new-build
+Resolving dependencies...
+cabal: Could not resolve dependencies:
+trying: pkg-1.0 (user goal)
+next goal: setup-dep (user goal)
+rejecting: setup-dep-2.0 (conflict: pkg => setup-dep==1.*)
+rejecting: setup-dep-1.0 (constraint from user target requires ==2.0)
+fail (backjumping, conflict set: pkg, setup-dep)
+After searching the rest of the dependency tree exhaustively, these were the goals I've had most trouble fulfilling: setup-dep (3), pkg (2)
+# pkg my-exe
+Main.hs: setup-dep from repo

@@ -1,0 +1,635 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Exception support
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+#include "Cmm.h"
+#include "RaiseAsync.h"
+
+import CLOSURE ghczmprim_GHCziTypes_True_closure;
+
+/* -----------------------------------------------------------------------------
+   Exception Primitives
+
+   A thread can request that asynchronous exceptions not be delivered
+   ("masked") for the duration of an I/O computation.  The primitives
+
+        maskAsyncExceptions# :: IO a -> IO a
+
+   and
+
+        maskUninterruptible# :: IO a -> IO a
+
+   are used for this purpose.  During a masked section, asynchronous
+   exceptions may be unmasked again temporarily:
+
+        unmaskAsyncExceptions# :: IO a -> IO a
+
+   Furthermore, asynchronous exceptions are masked automatically during
+   the execution of an exception handler.  All three of these primitives
+   leave a continuation on the stack which reverts to the previous
+   state (masked interruptible, masked non-interruptible, or unmasked)
+   on exit.
+
+   A thread which wants to raise an exception in another thread (using
+   killThread#) must block until the target thread is ready to receive
+   it.  The action of unmasking exceptions in a thread will release all
+   the threads waiting to deliver exceptions to that thread.
+
+   NB. there's a bug in here.  If a thread is inside an
+   unsafePerformIO, and inside maskAsyncExceptions# (there is an
+   unmaskAsyncExceptions_ret on the stack), and it is blocked in an
+   interruptible operation, and it receives an exception, then the
+   unsafePerformIO thunk will be updated with a stack object
+   containing the unmaskAsyncExceptions_ret frame.  Later, when
+   someone else evaluates this thunk, the original masking state is
+   not restored.
+
+   -------------------------------------------------------------------------- */
+
+
+INFO_TABLE_RET(stg_unmaskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
+    /* explicit stack */
+{
+    unwind Sp = Sp + WDS(1);
+    CInt r;
+
+    P_ ret;
+    ret = R1;
+
+    StgTSO_flags(CurrentTSO) = %lobits32(
+      TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
+
+    /* Eagerly raise a masked exception, if there is one */
+    if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
+
+        STK_CHK_P_LL (WDS(2), stg_unmaskAsyncExceptionszh_ret_info, R1);
+        /*
+         * We have to be very careful here, as in killThread#, since
+         * we are about to raise an async exception in the current
+         * thread, which might result in the thread being killed.
+         */
+        Sp_adj(-2);
+        Sp(1) = ret;
+        Sp(0) = stg_ret_p_info;
+        SAVE_THREAD_STATE();
+        (r) = ccall maybePerformBlockedException (MyCapability() "ptr",
+                                                      CurrentTSO "ptr");
+        if (r != 0::CInt) {
+            if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+                jump stg_threadFinished [];
+            } else {
+                LOAD_THREAD_STATE();
+                ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+                R1 = ret;
+                jump %ENTRY_CODE(Sp(0)) [R1];
+            }
+        }
+        else {
+            /*
+               the thread might have been removed from the
+               blocked_exception list by someone else in the meantime.
+               Just restore the stack pointer and continue.
+            */
+            Sp_adj(2);
+        }
+    }
+
+    Sp_adj(1);
+    R1 = ret;
+    jump %ENTRY_CODE(Sp(0)) [R1];
+}
+
+INFO_TABLE_RET(stg_maskAsyncExceptionszh_ret, RET_SMALL, W_ info_ptr)
+    return (P_ ret)
+{
+    unwind Sp = Sp + WDS(1);
+    StgTSO_flags(CurrentTSO) =
+       %lobits32(
+         TO_W_(StgTSO_flags(CurrentTSO))
+          | TSO_BLOCKEX | TSO_INTERRUPTIBLE
+      );
+
+    return (ret);
+}
+
+INFO_TABLE_RET(stg_maskUninterruptiblezh_ret, RET_SMALL, W_ info_ptr)
+    return (P_ ret)
+{
+    unwind Sp = Sp + WDS(1);
+    StgTSO_flags(CurrentTSO) =
+       %lobits32(
+        (TO_W_(StgTSO_flags(CurrentTSO))
+          | TSO_BLOCKEX)
+          & ~TSO_INTERRUPTIBLE
+       );
+
+    return (ret);
+}
+
+stg_maskAsyncExceptionszh /* explicit stack */
+{
+    /* Args: R1 :: IO a */
+    STK_CHK_P_LL (WDS(1)/* worst case */, stg_maskAsyncExceptionszh, R1);
+
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
+        /* avoid growing the stack unnecessarily */
+        if (Sp(0) == stg_maskAsyncExceptionszh_ret_info) {
+            Sp_adj(1);
+        } else {
+            Sp_adj(-1);
+            Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+        }
+    } else {
+        if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) == 0) {
+            Sp_adj(-1);
+            Sp(0) = stg_maskUninterruptiblezh_ret_info;
+        }
+    }
+
+    StgTSO_flags(CurrentTSO) = %lobits32(
+        TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_fast_v();
+    jump stg_ap_v_fast [R1];
+}
+
+stg_maskUninterruptiblezh /* explicit stack */
+{
+    /* Args: R1 :: IO a */
+    STK_CHK_P_LL (WDS(1)/* worst case */, stg_maskUninterruptiblezh, R1);
+
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) == 0) {
+        /* avoid growing the stack unnecessarily */
+        if (Sp(0) == stg_maskUninterruptiblezh_ret_info) {
+            Sp_adj(1);
+        } else {
+            Sp_adj(-1);
+            Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+        }
+    } else {
+        if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0) {
+            Sp_adj(-1);
+            Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+        }
+    }
+
+    StgTSO_flags(CurrentTSO) = %lobits32(
+        (TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX) & ~TSO_INTERRUPTIBLE);
+
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_fast_v();
+    jump stg_ap_v_fast [R1];
+}
+
+stg_unmaskAsyncExceptionszh /* explicit stack */
+{
+    CInt r;
+    W_ level;
+
+    /* Args: R1 :: IO a */
+    P_ io;
+    io = R1;
+
+    STK_CHK_P_LL (WDS(4), stg_unmaskAsyncExceptionszh, io);
+    /* 4 words: one for the unmask frame, 3 for setting up the
+     * stack to call maybePerformBlockedException() below.
+     */
+
+    /* If exceptions are already unmasked, there's nothing to do */
+    if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) {
+
+        /* avoid growing the stack unnecessarily */
+        if (Sp(0) == stg_unmaskAsyncExceptionszh_ret_info) {
+            Sp_adj(1);
+        } else {
+            Sp_adj(-1);
+            if ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0) {
+                Sp(0) = stg_maskAsyncExceptionszh_ret_info;
+            } else {
+                Sp(0) = stg_maskUninterruptiblezh_ret_info;
+            }
+        }
+
+        StgTSO_flags(CurrentTSO) = %lobits32(
+            TO_W_(StgTSO_flags(CurrentTSO)) & ~(TSO_BLOCKEX|TSO_INTERRUPTIBLE));
+
+        /* Eagerly raise a masked exception, if there is one */
+        if (StgTSO_blocked_exceptions(CurrentTSO) != END_TSO_QUEUE) {
+            /*
+             * We have to be very careful here, as in killThread#, since
+             * we are about to raise an async exception in the current
+             * thread, which might result in the thread being killed.
+             *
+             * Now, if we are to raise an exception in the current
+             * thread, there might be an update frame above us on the
+             * stack due to unsafePerformIO.  Hence, the stack must
+             * make sense, because it is about to be snapshotted into
+             * an AP_STACK.
+             */
+            Sp_adj(-3);
+            Sp(2) = stg_ap_v_info;
+            Sp(1) = io;
+            Sp(0) = stg_enter_info;
+
+            SAVE_THREAD_STATE();
+            (r) = ccall maybePerformBlockedException (MyCapability() "ptr",
+                                                      CurrentTSO "ptr");
+
+            if (r != 0::CInt) {
+                if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+                    jump stg_threadFinished [];
+                } else {
+                    LOAD_THREAD_STATE();
+                    ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+                    R1 = io;
+                    jump %ENTRY_CODE(Sp(0)) [R1];
+                }
+            } else {
+                /* we'll just call R1 directly, below */
+                Sp_adj(3);
+            }
+        }
+
+    }
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_fast_v();
+    R1 = io;
+    jump stg_ap_v_fast [R1];
+}
+
+
+stg_getMaskingStatezh ()
+{
+    /* args: none */
+    /*
+       returns: 0 == unmasked,
+                1 == masked, non-interruptible,
+                2 == masked, interruptible
+    */
+    return (((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_BLOCKEX) != 0) +
+            ((TO_W_(StgTSO_flags(CurrentTSO)) & TSO_INTERRUPTIBLE) != 0));
+}
+
+stg_killThreadzh (P_ target, P_ exception)
+{
+    W_ why_blocked;
+
+    /* Needs 3 words because throwToSingleThreaded uses some stack */
+    STK_CHK_PP (WDS(3), stg_killThreadzh, target, exception);
+    /* We call allocate in throwTo(), so better check for GC */
+    MAYBE_GC_PP (stg_killThreadzh, target, exception);
+
+    /*
+     * We might have killed ourselves.  In which case, better be *very*
+     * careful.  If the exception killed us, then return to the scheduler.
+     * If the exception went to a catch frame, we'll just continue from
+     * the handler.
+     */
+    if (target == CurrentTSO) {
+        /*
+         * So what should happen if a thread calls "throwTo self" inside
+         * unsafePerformIO, and later the closure is evaluated by another
+         * thread?  Presumably it should behave as if throwTo just returned,
+         * and then continue from there.  See #3279, #3288.  This is what
+         * happens: on resumption, we will just jump to the next frame on
+         * the stack, which is the return point for stg_killThreadzh.
+         */
+        R1 = target;
+        R2 = exception;
+        jump stg_killMyself [R1,R2];
+    } else {
+        W_ msg;
+
+        ("ptr" msg) = ccall throwTo(MyCapability() "ptr",
+                                    CurrentTSO "ptr",
+                                    target "ptr",
+                                    exception "ptr");
+
+        if (msg == NULL) {
+            return ();
+        } else {
+            StgTSO_why_blocked(CurrentTSO) = BlockedOnMsgThrowTo;
+            StgTSO_block_info(CurrentTSO) = msg;
+            // we must block, and unlock the message before returning
+            jump stg_block_throwto (target, exception);
+        }
+    }
+}
+
+/*
+ * We must switch into low-level Cmm in order to raise an exception in
+ * the current thread, hence this is in a separate proc with arguments
+ * passed explicitly in R1 and R2.
+ */
+stg_killMyself
+{
+    P_ target, exception;
+    target = R1;
+    exception = R2;
+
+    SAVE_THREAD_STATE();
+    /* ToDo: what if the current thread is masking exceptions? */
+    ccall throwToSingleThreaded(MyCapability() "ptr",
+                                target "ptr", exception "ptr");
+    if (StgTSO_what_next(CurrentTSO) == ThreadKilled::I16) {
+        jump stg_threadFinished [];
+    } else {
+        LOAD_THREAD_STATE();
+        ASSERT(StgTSO_what_next(CurrentTSO) == ThreadRunGHC::I16);
+        jump %ENTRY_CODE(Sp(0)) [];
+    }
+}
+
+/* -----------------------------------------------------------------------------
+   Catch frames
+   -------------------------------------------------------------------------- */
+
+/* Catch frames are very similar to update frames, but when entering
+ * one we just pop the frame off the stack and perform the correct
+ * kind of return to the activation record underneath us on the stack.
+ */
+
+#define CATCH_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,exceptions_blocked,handler)   \
+  w_ info_ptr,                                                          \
+  PROF_HDR_FIELDS(w_,p1,p2)                                             \
+  w_ exceptions_blocked,                                                \
+  p_ handler
+
+
+INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
+               CATCH_FRAME_FIELDS(W_,P_,info_ptr, p1, p2,
+                                  exceptions_blocked,handler))
+    return (P_ ret)
+{
+    unwind Sp = Sp + SIZEOF_StgCatchFrame;
+    return (ret);
+}
+
+/* -----------------------------------------------------------------------------
+ * The catch infotable
+ *
+ * This should be exactly the same as would be generated by this STG code
+ *
+ * catch = {x,h} \n {} -> catch#{x,h}
+ *
+ * It is used in deleteThread when reverting blackholes.
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_catch,2,0,FUN,"catch","catch")
+    (P_ node)
+{
+    jump stg_catchzh(StgClosure_payload(node,0),StgClosure_payload(node,1));
+}
+
+stg_catchzh ( P_ io,      /* :: IO a */
+              P_ handler  /* :: Exception -> IO a */ )
+{
+    W_ exceptions_blocked;
+
+    STK_CHK_GEN();
+
+    exceptions_blocked =
+        TO_W_(StgTSO_flags(CurrentTSO)) & (TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+    TICK_CATCHF_PUSHED();
+
+    /* Apply R1 to the realworld token */
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_fast_v();
+
+    jump stg_ap_v_fast
+        (CATCH_FRAME_FIELDS(,,stg_catch_frame_info, CCCS, 0,
+                            exceptions_blocked, handler))
+        (io);
+}
+
+/* -----------------------------------------------------------------------------
+ * The raise infotable
+ *
+ * This should be exactly the same as would be generated by this STG code
+ *
+ *   raise = {err} \n {} -> raise#{err}
+ *
+ * It is used in stg_raisezh to update thunks on the update list
+ * -------------------------------------------------------------------------- */
+
+INFO_TABLE(stg_raise,1,0,THUNK_1_0,"raise","raise")
+{
+    jump stg_raisezh(StgThunk_payload(R1,0));
+}
+
+section "data" {
+  no_break_on_exception: W_[1];
+}
+
+INFO_TABLE_RET(stg_raise_ret, RET_SMALL, W_ info_ptr, P_ exception)
+    return (P_ ret)
+{
+    unwind Sp = Sp + WDS(2);
+    W_[no_break_on_exception] = 1;
+    jump stg_raisezh (exception);
+}
+
+stg_raisezh /* explicit stack */
+/*
+ * args : R1 :: Exception
+ *
+ * Here we assume that the NativeNodeCall convention always puts the
+ * first argument in R1 (which it does).  We cannot use high-level cmm
+ * due to all the LOAD_THREAD_STATE()/SAVE_THREAD_STATE() and stack
+ * walking that happens in here.
+ */
+{
+    W_ handler;
+    W_ frame_type;
+    W_ exception;
+
+   exception = R1;
+
+#if defined(PROFILING)
+    /* Debugging tool: on raising an  exception, show where we are. */
+
+    /* ToDo: currently this is a hack.  Would be much better if
+     * the info was only displayed for an *uncaught* exception.
+     */
+    if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags) != 0::CBool) {
+        SAVE_THREAD_STATE();
+        ccall fprintCCS_stderr(CCCS "ptr",
+                                     exception "ptr",
+                                     CurrentTSO "ptr");
+        LOAD_THREAD_STATE();
+    }
+#endif
+
+retry_pop_stack:
+    SAVE_THREAD_STATE();
+    (frame_type) = ccall raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", exception "ptr");
+    LOAD_THREAD_STATE();
+    if (frame_type == ATOMICALLY_FRAME) {
+      /* The exception has reached the edge of a memory transaction.  Check that
+       * the transaction is valid.  If not then perhaps the exception should
+       * not have been thrown: re-run the transaction.  "trec" will either be
+       * a top-level transaction running the atomic block, or a nested
+       * transaction running an invariant check.  In the latter case we
+       * abort and de-allocate the top-level transaction that encloses it
+       * as well (we could just abandon its transaction record, but this makes
+       * sure it's marked as aborted and available for re-use). */
+      W_ trec, outer;
+      W_ r;
+      trec = StgTSO_trec(CurrentTSO);
+      (r) = ccall stmValidateNestOfTransactions(MyCapability() "ptr", trec "ptr");
+      outer  = StgTRecHeader_enclosing_trec(trec);
+      ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+      ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
+
+      if (outer != NO_TREC) {
+        ccall stmAbortTransaction(MyCapability() "ptr", outer "ptr");
+        ccall stmFreeAbortedTRec(MyCapability() "ptr", outer "ptr");
+      }
+
+      StgTSO_trec(CurrentTSO) = NO_TREC;
+      if (r != 0) {
+        // Transaction was valid: continue searching for a catch frame
+        Sp = Sp + SIZEOF_StgAtomicallyFrame;
+        goto retry_pop_stack;
+      } else {
+        // Transaction was not valid: we retry the exception (otherwise continue
+        // with a further call to raiseExceptionHelper)
+        ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr");
+        StgTSO_trec(CurrentTSO) = trec;
+        R1 = StgAtomicallyFrame_code(Sp);
+        jump stg_ap_v_fast [R1];
+      }
+    }
+
+    // After stripping the stack, see whether we should break here for
+    // GHCi (c.f. the -fbreak-on-exception flag).  We do this after
+    // stripping the stack for a reason: we'll be inspecting values in
+    // GHCi, and it helps if all the thunks under evaluation have
+    // already been updated with the exception, rather than being left
+    // as blackholes.
+    if (W_[no_break_on_exception] != 0) {
+        W_[no_break_on_exception] = 0;
+    } else {
+        if (TO_W_(CInt[rts_stop_on_exception]) != 0) {
+            W_ ioAction;
+            // we don't want any further exceptions to be caught,
+            // until GHCi is ready to handle them.  This prevents
+            // deadlock if an exception is raised in InteractiveUI,
+            // for exmplae.  Perhaps the stop_on_exception flag should
+            // be per-thread.
+            CInt[rts_stop_on_exception] = 0;
+            ("ptr" ioAction) = ccall deRefStablePtr (W_[rts_breakpoint_io_action] "ptr");
+            Sp = Sp - WDS(9);
+            Sp(8) = exception;
+            Sp(7) = stg_raise_ret_info;
+            Sp(6) = exception;
+            Sp(5) = ghczmprim_GHCziTypes_True_closure; // True <=> a breakpoint
+            Sp(4) = stg_ap_ppv_info;
+            Sp(3) = 0;
+            Sp(2) = stg_ap_n_info;
+            Sp(1) = 0;
+            R1 = ioAction;
+            jump RET_LBL(stg_ap_n) [R1];
+        }
+    }
+
+    if (frame_type == STOP_FRAME) {
+        /*
+         * We've stripped the entire stack, the thread is now dead.
+         * We will leave the stack in a GC'able state, see the stg_stop_thread
+         * entry code in StgStartup.cmm.
+         */
+        W_ stack;
+        stack = StgTSO_stackobj(CurrentTSO);
+        Sp = stack + OFFSET_StgStack_stack
+                + WDS(TO_W_(StgStack_stack_size(stack))) - WDS(2);
+        Sp(1) = exception;      /* save the exception */
+        Sp(0) = stg_enter_info; /* so that GC can traverse this stack */
+        StgTSO_what_next(CurrentTSO) = ThreadKilled::I16;
+        SAVE_THREAD_STATE();    /* inline! */
+
+        jump stg_threadFinished [];
+    }
+
+    /* Ok, Sp points to the enclosing CATCH_FRAME or CATCH_STM_FRAME.
+     * Pop everything down to and including this frame, update Su,
+     * push R1, and enter the handler.
+     */
+    if (frame_type == CATCH_FRAME) {
+      handler = StgCatchFrame_handler(Sp);
+    } else {
+      handler = StgCatchSTMFrame_handler(Sp);
+    }
+
+    /* Restore the masked/unmasked state for asynchronous exceptions
+     * at the CATCH_FRAME.
+     *
+     * If exceptions were unmasked, arrange that they are unmasked
+     * again after executing the handler by pushing an
+     * unmaskAsyncExceptions_ret stack frame.
+     *
+     * If we've reached an STM catch frame then roll back the nested
+     * transaction we were using.
+     */
+    W_ frame;
+    frame = Sp;
+    if (frame_type == CATCH_FRAME)
+    {
+      Sp = Sp + SIZEOF_StgCatchFrame;
+      if ((StgCatchFrame_exceptions_blocked(frame) & TSO_BLOCKEX) == 0) {
+          Sp_adj(-1);
+          Sp(0) = stg_unmaskAsyncExceptionszh_ret_info;
+      }
+
+      /* Ensure that async exceptions are masked when running the handler.
+      */
+      StgTSO_flags(CurrentTSO) = %lobits32(
+          TO_W_(StgTSO_flags(CurrentTSO)) | TSO_BLOCKEX | TSO_INTERRUPTIBLE);
+
+      /* The interruptible state is inherited from the context of the
+       * catch frame, but note that TSO_INTERRUPTIBLE is only meaningful
+       * if TSO_BLOCKEX is set.  (we got this wrong earlier, and #4988
+       * was a symptom of the bug).
+       */
+      if ((StgCatchFrame_exceptions_blocked(frame) &
+           (TSO_BLOCKEX | TSO_INTERRUPTIBLE)) == TSO_BLOCKEX) {
+          StgTSO_flags(CurrentTSO) = %lobits32(
+              TO_W_(StgTSO_flags(CurrentTSO)) & ~TSO_INTERRUPTIBLE);
+      }
+    }
+    else /* CATCH_STM_FRAME */
+    {
+      W_ trec, outer;
+      trec = StgTSO_trec(CurrentTSO);
+      outer  = StgTRecHeader_enclosing_trec(trec);
+      ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
+      ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
+      StgTSO_trec(CurrentTSO) = outer;
+      Sp = Sp + SIZEOF_StgCatchSTMFrame;
+    }
+
+    /* Call the handler, passing the exception value and a realworld
+     * token as arguments.
+     */
+    Sp_adj(-1);
+    Sp(0) = exception;
+    R1 = handler;
+    Sp_adj(-1);
+    TICK_UNKNOWN_CALL();
+    TICK_SLOW_CALL_fast_pv();
+    jump RET_LBL(stg_ap_pv) [R1];
+}
+
+stg_raiseIOzh (P_ exception)
+{
+    jump stg_raisezh (exception);
+}

@@ -1,0 +1,18 @@
+extlinks = {
+    'ghc-ticket': ('https://ghc.haskell.org/trac/ghc/ticket/%s', 'Trac #'),
+    'ghc-wiki': ('https://ghc.haskell.org/trac/ghc/wiki/%s', 'Trac #'),
+}
+
+libs_base_uri = '../libraries'
+lib_versions = {
+    'base': '@LIBRARY_base_VERSION@',
+    'ghc-prim': '@LIBRARY_ghc_prim_VERSION@',
+    'template-haskell': '@LIBRARY_template_haskell_VERSION@',
+    'ghc-compact': '@LIBRARY_ghc_compact_VERSION@',
+    'ghc': '@LIBRARY_ghc_VERSION@',
+    'parallel': '@LIBRARY_parallel_VERSION@',
+    'Cabal': '@LIBRARY_Cabal_VERSION@',
+    'array': '@LIBRARY_array_VERSION@',
+}
+
+version = '@ProjectVersion@'

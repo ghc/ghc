@@ -1,0 +1,20 @@
+data R
+  = R {x :: Char, y :: Int, z :: Float}
+  | S {x :: Char}
+  | T {y :: Int, z :: Float}
+  | W
+data R
+  = R {x :: Char, y :: Int, z :: Float}
+  | S {x :: Char}
+  | T {y :: Int, z :: Float}
+  | W
+  	-- Defined at T4015.hs:3:1
+data R = ... | S {...} | ... 	-- Defined at T4015.hs:4:10
+data R = ... | T {...} | ... 	-- Defined at T4015.hs:5:10
+data R = ... | W 	-- Defined at T4015.hs:6:10
+data R = R {x :: Char, ...} | S {x :: Char} | ...
+  	-- Defined at T4015.hs:3:14
+data R = R {..., y :: Int, ...} | ... | T {y :: Int, ...} | ...
+  	-- Defined at T4015.hs:3:25
+data R = R {..., z :: Float} | ... | T {..., z :: Float} | ...
+  	-- Defined at T4015.hs:3:35

@@ -1,0 +1,10 @@
+
+tc078.hs:9:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘==’ or ‘/=’
+    • In the instance declaration for ‘Eq (Bar a)’
+
+tc078.hs:10:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        either ‘compare’ or ‘<=’
+    • In the instance declaration for ‘Ord (Bar a)’

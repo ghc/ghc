@@ -1,0 +1,7 @@
+# Setup configure
+Resolving dependencies...
+Configuring HaddockNewline-0.1.0.0...
+# Setup haddock
+Preprocessing library for HaddockNewline-0.1.0.0..
+Running Haddock on library for HaddockNewline-0.1.0.0..
+Documentation created: setup.cabal.dist/work/dist/doc/html/HaddockNewline/index.html

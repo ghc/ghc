@@ -1,0 +1,31 @@
+name: SameDepsAllRound
+version: 0.1
+license: BSD3
+cabal-version: >= 1.6
+author: Stephen Blackheath
+stability: stable
+synopsis: Same dependencies all round
+category: PackageTests
+build-type: Simple
+
+description:
+    Check for the "old build-dep behaviour" namely that we get the same
+    package dependencies on all build targets, even if different ones
+    were specified for different targets
+    .
+    Here all .hs files use the three packages mentioned, so this shows
+    that build-depends is not target-specific.  This is the behaviour
+    we want when cabal-version contains versions less than 1.7.
+
+---------------------------------------
+
+Library
+    exposed-modules: MyLibrary
+    build-depends: base, bytestring
+
+Executable lemon
+    main-is: lemon.hs
+    build-depends: pretty
+
+Executable pineapple
+    main-is: pineapple.hs

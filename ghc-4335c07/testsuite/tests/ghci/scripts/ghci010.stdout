@@ -1,0 +1,14 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.03, for Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- !!! check we can detect deadlock
+Prelude> :set -package concurrent
+Loading package lang ... linking ... done.
+Loading package concurrent ... linking ... done.
+Prelude> Concurrent.newEmptyMVar >>= Concurrent.takeMVar
+Deadlocked.
+Prelude> Leaving GHCi.

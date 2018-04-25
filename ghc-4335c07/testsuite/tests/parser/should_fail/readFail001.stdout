@@ -1,0 +1,87 @@
+
+==================== Parser ====================
+module OneOfEverything (
+	module OneOfEverything, module OneC, OrdClass(orda, ordb),
+	EqClass(..), EqTree(EqLeaf, EqBranch), FooDataC(..), FooDataB(..),
+	FooData, fixn
+    ) where
+import Prelude
+import IO (putStr)
+import System hiding (getArgs)
+import Monad
+bindwith :: (OrdClass a, OrdClass b) => a -> b -> b
+g :: (Num a, Eq b) => Foo a -> [b] -> (a, a, a) -> b
+g x y z = head y
+f _
+  x
+  1
+  1.93
+  'c'
+  "dog"
+  ~y
+  (z@(Foo a b))
+  (c Bar d)
+  [1, 2]
+  (3, 4)
+  ((n+42))
+    = y
+expr a b c d
+       = ((((((((a + ((:) a b)) + (a : b))
+	       + (((1 - 'c') - "abc") - 1.293))
+	      + ((\ x y z -> x) 42))
+	     + ((9 *)))
+	    + ((* 8)))
+	   + (case x of
+		PrelBase.[]
+		  | null x -> 99
+		  | otherwise -> 98
+		  | True -> 97
+		  where
+		      null x = False))
+	  + ([z | z <- c, isSpace z]))
+	 + (let y = foo
+	    in
+	      (((((((y + [1, 2, 3, 4]) + (4, 3, 2, 1)) + (4 :: (Num a) => a))
+		  + (if 42 == 42.0 then 1 else 4))
+		 + ([1 .. ]))
+		+ ([2, 4 .. ]))
+	       + ([3 .. 5]))
+	      + ([4, 8 .. 999]))
+mat a b c d
+      | foof a b = d
+      | foof a c = d
+      | foof b c = d
+      where
+	  foof a b = a == b
+(~(a, b, c))
+    | nullity b = a
+    | nullity c = a
+    | otherwise = a
+    where
+	nullity = null
+recb a = reca a
+reca a = recb a
+bindwith a b = b
+singlebind x = x
+fixr x y = x
+fixl x y = x
+fixn x y = x
+infix 6 fixn
+infixl 7 +#
+infixr 8 fixr
+type Pair a b = (a, b)
+data FooData = FooCon Int
+data FooDataB = FooConB Double
+data (Eq a) => EqTree a = EqLeaf a | EqBranch (EqLeaf a) (EqLeaf a)
+class (Eq a) => EqClass a where {
+    eqc = :: a -> Char; Just eqc x = '?' }
+class (Ord a) => OrdClass a where {
+    orda = :: a -> Char; ordb = :: a -> Char; ordc = :: a -> Char;
+    Just
+    }
+instance (Eq a) => {EqClass (EqTree a)} where
+    []
+    eqc x = 'a'
+default (Integer, Rational)
+
+

@@ -1,0 +1,12 @@
+// Test update frames
+
+foo1(bits32 x, bits32 y) jump update (x, y) {
+  bits32 z;
+  return (z);
+}
+
+foo2(bits32 x, bits32 y) jump update (x, y) {
+  bits32 z;
+  foreign "C--" bar() "safe";
+  return (z);
+}

@@ -1,0 +1,3 @@
+
+mod5.hs:2:10: warning: [-Wduplicate-exports (in -Wdefault)]
+    ‘K1’ is exported by ‘T(K1, K1)’ and ‘T(K1, K1)’

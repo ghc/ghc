@@ -1,0 +1,7 @@
+
+T12041.hs:12:15: error:
+    • Expected kind ‘i -> Constraint’,
+        but ‘(~) Int’ has kind ‘* -> Constraint’
+    • In the type ‘(~) Int’
+      In the type instance declaration for ‘Ob’
+      In the instance declaration for ‘Category I’

@@ -1,0 +1,8 @@
+[1 of 3] Processing i
+  Instantiating i
+  [1 of 1] Compiling I                ( i/I.hs, bkp28.out/i/I.o )
+[2 of 3] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[3 of 3] Processing q
+  [1 of 2] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 2] Compiling B                ( q/B.hs, nothing )

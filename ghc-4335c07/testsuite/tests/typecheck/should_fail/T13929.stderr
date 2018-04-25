@@ -1,0 +1,24 @@
+
+T13929.hs:29:27: error:
+    A levity-polymorphic type is not allowed here:
+      Type: GUnboxed f rf
+      Kind: TYPE rf
+    In the type of expression: gunbox x
+
+T13929.hs:29:37: error:
+    A levity-polymorphic type is not allowed here:
+      Type: GUnboxed g rg
+      Kind: TYPE rg
+    In the type of expression: gunbox y
+
+T13929.hs:33:24:
+    A levity-polymorphic type is not allowed here:
+      Type: GUnboxed f rf
+      Kind: TYPE rf
+    In the type of expression: gunbox l
+
+T13929.hs:34:26:
+    A levity-polymorphic type is not allowed here:
+      Type: GUnboxed g rg
+      Kind: TYPE rg
+    In the type of expression: gunbox r

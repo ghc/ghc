@@ -1,0 +1,24 @@
+# Setup configure
+Resolving dependencies...
+Configuring TestOptions-0.1...
+# Setup build
+Preprocessing test suite 'test-TestOptions' for TestOptions-0.1..
+Building test suite 'test-TestOptions' for TestOptions-0.1..
+Preprocessing executable 'dummy' for TestOptions-0.1..
+Building executable 'dummy' for TestOptions-0.1..
+# Setup test
+Preprocessing test suite 'test-TestOptions' for TestOptions-0.1..
+Building test suite 'test-TestOptions' for TestOptions-0.1..
+Running 1 test suites...
+Test suite test-TestOptions: RUNNING...
+Test suite test-TestOptions: PASS
+Test suite logged to: setup.cabal.dist/work/dist/test/TestOptions-0.1-test-TestOptions.log
+1 of 1 test suites (1 of 1 test cases) passed.
+# Setup test
+Preprocessing test suite 'test-TestOptions' for TestOptions-0.1..
+Building test suite 'test-TestOptions' for TestOptions-0.1..
+Running 1 test suites...
+Test suite test-TestOptions: RUNNING...
+Test suite test-TestOptions: PASS
+Test suite logged to: setup.cabal.dist/work/dist/test/TestOptions-0.1-test-TestOptions.log
+1 of 1 test suites (1 of 1 test cases) passed.

@@ -1,0 +1,7 @@
+i = (_t1::[Maybe (Maybe MyInt)])
+()
+i = (_t2::Maybe (Maybe MyInt)) : (_t3::[Maybe (Maybe MyInt)])
+()
+i = Just (_t4::Maybe MyInt) : (_t5::[Maybe (Maybe MyInt)])
+()
+i = Just (Just (My 1)) : (_t6::[Maybe (Maybe MyInt)])

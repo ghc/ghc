@@ -1,0 +1,5 @@
+:set -lB
+import Foreign
+import Foreign.C.Types
+foreign import ccall "bar" dle :: IO CInt
+dle

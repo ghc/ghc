@@ -1,0 +1,49 @@
+"NO"
+(\x -> x)
+
+:m +Text.Show.Functions
+"YES"
+(\x -> x)
+
+:m -Text.Show.Functions
+"NO"
+(\x -> x)
+
+:load T2182ghci_A
+"YES"
+(\x -> x)
+T
+
+:m -T2182ghci_A
+"NO"
+(\x -> x)
+
+:load T2182ghci_B
+"YES"
+(\x -> x)
+T
+
+:m -T2182ghci_B
+"NO"
+(\x -> x)
+
+:load T2182ghci_C
+"YES"
+(\x -> x)
+T
+
+:m -T2182ghci_C
+:load T2182ghci_A
+:load T2182ghci_B
+"YES"
+(\x -> x)
+T
+
+:m -T2182ghci_A
+"YES"
+(\x -> x)
+T
+
+:m -T2182ghci_B
+"NO"
+(\x -> x)

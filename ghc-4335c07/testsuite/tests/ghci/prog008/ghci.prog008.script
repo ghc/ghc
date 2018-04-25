@@ -1,0 +1,4 @@
+:l A
+:browse A
+:set -fprint-explicit-foralls
+:browse A

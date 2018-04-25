@@ -1,0 +1,2 @@
+pattern X' :: () => (a ~ [x]) => A a
+  	-- Defined at <interactive>:4:1

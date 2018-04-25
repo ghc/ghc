@@ -1,0 +1,210 @@
+name:           text
+version:        1.2.3.0
+homepage:       https://github.com/haskell/text
+bug-reports:    https://github.com/haskell/text/issues
+synopsis:       An efficient packed Unicode text type.
+description:
+    .
+    An efficient packed, immutable Unicode text type (both strict and
+    lazy), with a powerful loop fusion optimization framework.
+    .
+    The 'Text' type represents Unicode character strings, in a time and
+    space-efficient manner. This package provides text processing
+    capabilities that are optimized for performance critical use, both
+    in terms of large data quantities and high speed.
+    .
+    The 'Text' type provides character-encoding, type-safe case
+    conversion via whole-string case conversion functions. It also
+    provides a range of functions for converting 'Text' values to and from
+    'ByteStrings', using several standard encodings.
+    .
+    Efficient locale-sensitive support for text IO is also supported.
+    .
+    These modules are intended to be imported qualified, to avoid name
+    clashes with Prelude functions, e.g.
+    .
+    > import qualified Data.Text as T
+    .
+    To use an extended and very rich family of functions for working
+    with Unicode text (including normalization, regular expressions,
+    non-standard encodings, text breaking, and locales), see
+    the @text-icu@ package:
+    <http://hackage.haskell.org/package/text-icu>
+
+license:        BSD2
+license-file:   LICENSE
+author:         Bryan O'Sullivan <bos@serpentine.com>
+maintainer:     Bryan O'Sullivan <bos@serpentine.com>
+copyright:      2009-2011 Bryan O'Sullivan, 2008-2009 Tom Harper
+category:       Data, Text
+build-type:     Simple
+cabal-version:  >= 1.8
+tested-with:    GHC==8.2.1, GHC==8.0.2, GHC==7.10.3, GHC==7.8.4,
+                GHC==7.6.3, GHC==7.4.2, GHC==7.2.2, GHC==7.0.4
+extra-source-files:
+    -- scripts/CaseFolding.txt
+    -- scripts/SpecialCasing.txt
+    README.markdown
+    benchmarks/Setup.hs
+    benchmarks/cbits/*.c
+    benchmarks/haskell/*.hs
+    benchmarks/haskell/Benchmarks/*.hs
+    benchmarks/haskell/Benchmarks/Programs/*.hs
+    benchmarks/python/*.py
+    benchmarks/ruby/*.rb
+    benchmarks/text-benchmarks.cabal
+    changelog.md
+    include/*.h
+    scripts/*.hs
+    tests-and-benchmarks.markdown
+    tests/*.hs
+    tests/.ghci
+    tests/Makefile
+    tests/Tests/*.hs
+    tests/Tests/Properties/*.hs
+    tests/cabal.config
+    tests/scripts/*.sh
+    tests/text-tests.cabal
+
+flag bytestring-builder
+  description: Depend on the bytestring-builder package for backwards compatibility.
+  default: False
+  manual: False
+
+flag developer
+  description: operate in developer mode
+  default: False
+  manual: True
+
+flag integer-simple
+  description: Use the simple integer library instead of GMP
+  default: False
+  manual: False
+
+library
+  c-sources:    cbits/cbits.c
+  include-dirs: include
+
+  exposed-modules:
+    Data.Text
+    Data.Text.Array
+    Data.Text.Encoding
+    Data.Text.Encoding.Error
+    Data.Text.Foreign
+    Data.Text.IO
+    Data.Text.Internal
+    Data.Text.Internal.Builder
+    Data.Text.Internal.Builder.Functions
+    Data.Text.Internal.Builder.Int.Digits
+    Data.Text.Internal.Builder.RealFloat.Functions
+    Data.Text.Internal.Encoding.Fusion
+    Data.Text.Internal.Encoding.Fusion.Common
+    Data.Text.Internal.Encoding.Utf16
+    Data.Text.Internal.Encoding.Utf32
+    Data.Text.Internal.Encoding.Utf8
+    Data.Text.Internal.Functions
+    Data.Text.Internal.Fusion
+    Data.Text.Internal.Fusion.CaseMapping
+    Data.Text.Internal.Fusion.Common
+    Data.Text.Internal.Fusion.Size
+    Data.Text.Internal.Fusion.Types
+    Data.Text.Internal.IO
+    Data.Text.Internal.Lazy
+    Data.Text.Internal.Lazy.Encoding.Fusion
+    Data.Text.Internal.Lazy.Fusion
+    Data.Text.Internal.Lazy.Search
+    Data.Text.Internal.Private
+    Data.Text.Internal.Read
+    Data.Text.Internal.Search
+    Data.Text.Internal.Unsafe
+    Data.Text.Internal.Unsafe.Char
+    Data.Text.Internal.Unsafe.Shift
+    Data.Text.Lazy
+    Data.Text.Lazy.Builder
+    Data.Text.Lazy.Builder.Int
+    Data.Text.Lazy.Builder.RealFloat
+    Data.Text.Lazy.Encoding
+    Data.Text.Lazy.IO
+    Data.Text.Lazy.Internal
+    Data.Text.Lazy.Read
+    Data.Text.Read
+    Data.Text.Unsafe
+
+  other-modules:
+    Data.Text.Show
+
+  build-depends:
+    array      >= 0.3,
+    base       >= 4.2 && < 5,
+    binary,
+    deepseq    >= 1.1.0.0,
+    ghc-prim   >= 0.2
+
+  if flag(bytestring-builder)
+    build-depends: bytestring         >= 0.9    && < 0.10.4,
+                   bytestring-builder >= 0.10.4
+  else
+    build-depends: bytestring         >= 0.10.4
+
+  cpp-options: -DHAVE_DEEPSEQ
+  ghc-options: -Wall -fwarn-tabs -funbox-strict-fields -O2
+  if flag(developer)
+    ghc-prof-options: -auto-all
+    ghc-options: -Werror
+    cpp-options: -DASSERTS
+
+  if flag(integer-simple)
+    cpp-options: -DINTEGER_SIMPLE
+    build-depends: integer-simple >= 0.1 && < 0.5
+  else
+    cpp-options: -DINTEGER_GMP
+    build-depends: integer-gmp >= 0.2
+
+test-suite tests
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: tests .
+  main-is:        Tests.hs
+  c-sources:      cbits/cbits.c
+  include-dirs:   include
+
+  ghc-options:
+    -Wall -threaded -O0 -rtsopts
+
+  cpp-options:
+    -DASSERTS -DHAVE_DEEPSEQ -DTEST_SUITE
+
+  build-depends:
+    HUnit >= 1.2,
+    QuickCheck >= 2.7 && < 2.10,
+    array,
+    base,
+    binary,
+    deepseq,
+    directory,
+    ghc-prim,
+    quickcheck-unicode >= 1.0.1.0,
+    random,
+    test-framework >= 0.4,
+    test-framework-hunit >= 0.2,
+    test-framework-quickcheck2 >= 0.2
+
+  if flag(bytestring-builder)
+    build-depends: bytestring         >= 0.9    && < 0.10.4,
+                   bytestring-builder >= 0.10.4
+  else
+    build-depends: bytestring         >= 0.10.4
+
+  if flag(integer-simple)
+    cpp-options: -DINTEGER_SIMPLE
+    build-depends: integer-simple >= 0.1 && < 0.5
+  else
+    cpp-options: -DINTEGER_GMP
+    build-depends: integer-gmp >= 0.2
+
+source-repository head
+  type:     git
+  location: https://github.com/haskell/text
+
+source-repository head
+  type:     mercurial
+  location: https://bitbucket.org/bos/text

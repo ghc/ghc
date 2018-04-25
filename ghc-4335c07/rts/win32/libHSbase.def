@@ -1,0 +1,47 @@
+
+LIBRARY "libHSbase-@LibVersion@-ghc@ProjectVersion@.dll"
+
+EXPORTS
+
+	base_GHCziInt_I8zh_con_info
+	base_GHCziInt_I16zh_con_info
+	base_GHCziInt_I32zh_con_info
+	base_GHCziInt_I64zh_con_info
+
+	base_GHCziWord_W8zh_con_info
+	base_GHCziWord_W16zh_con_info
+	base_GHCziWord_W32zh_con_info
+	base_GHCziWord_W64zh_con_info
+
+	base_GHCziStable_StablePtr_con_info
+
+	base_GHCziPack_unpackCString_closure
+
+	base_GHCziTopHandler_runIO_closure
+	base_GHCziTopHandler_runNonIO_closure
+
+	base_GHCziIOziException_stackOverflow_closure
+	base_GHCziIOziException_heapOverflow_closure
+
+	base_GHCziPtr_Ptr_con_info
+	base_GHCziPtr_FunPtr_con_info
+
+	base_GHCziConcziIO_ensureIOManagerIsRunning_closure
+	base_GHCziConcziIO_ioManagerCapabilitiesChanged_closure
+	base_GHCziConcziSync_runSparks_closure
+
+	base_GHCziTopHandler_flushStdHandles_closure
+
+        base_GHCziWeak_runFinalizzerBatch_closure
+	base_GHCziPack_unpackCString_closure
+	base_GHCziIOziException_blockedIndefinitelyOnMVar_closure
+	base_GHCziIOziException_blockedIndefinitelyOnSTM_closure
+        base_GHCziIOziException_allocationLimitExceeded_closure
+        base_GHCziIOziException_stackOverflow_closure
+        base_GHCziIOziException_cannotCompactFunction_closure
+        base_GHCziIOziException_cannotCompactPinned_closure
+        base_GHCziIOziException_cannotCompactMutable_closure
+
+	base_ControlziExceptionziBase_nonTermination_closure
+	base_ControlziExceptionziBase_nestedAtomically_closure
+	base_GHCziEventziThread_blockedOnBadFD_closure

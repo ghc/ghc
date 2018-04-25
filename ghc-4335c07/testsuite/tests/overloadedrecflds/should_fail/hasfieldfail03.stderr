@@ -1,0 +1,21 @@
+
+hasfieldfail03.hs:9:10: error:
+    • Illegal instance declaration for ‘HasField "woo" a Bool’
+        Record data type must be specified
+    • In the instance declaration for ‘HasField "woo" a Bool’
+
+hasfieldfail03.hs:13:10: error:
+    • Illegal instance declaration for ‘HasField "foo" T Int’
+        T already has a field ‘foo’
+    • In the instance declaration for ‘HasField "foo" T Int’
+
+hasfieldfail03.hs:17:10: error:
+    • Illegal instance declaration for ‘HasField "bar" T Bool’
+        T already has a field ‘bar’
+    • In the instance declaration for ‘HasField "bar" T Bool’
+
+hasfieldfail03.hs:34:10: error:
+    • Illegal instance declaration for
+        ‘HasField "baz" (V a b c d) Bool’
+        Record data type may not be a data family
+    • In the instance declaration for ‘HasField "baz" (V a b c d) Bool’

@@ -1,0 +1,3 @@
+
+ds053.hs:5:1: warning: [-Wunused-top-binds (in -Wextra, -Wunused-binds)]
+    Defined but not used: ‘f’

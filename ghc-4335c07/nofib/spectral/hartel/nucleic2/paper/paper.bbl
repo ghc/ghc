@@ -1,0 +1,59 @@
+\begin{thebibliography}{10}
+
+\bibitem{Arm93}
+J.~Armstrong, M.~Williams, and R.~Virding.
+\newblock {\em Concurrent programming in Erlang}.
+\newblock Prentice Hall, Englewood Cliffs, New Jersey, 1993.
+
+\bibitem{Aug89}
+L.~Augustsson and T.~Johnsson.
+\newblock The {Chalmers} {Lazy-ML} compiler.
+\newblock {\em The computer journal}, 32(2):127--141, Apr 1989.
+
+\bibitem{Bee92a}
+M.~Beemster.
+\newblock The lazy functional intermediate language {Stoffel}.
+\newblock Technical report CS-92-16, Dept. of Comp. Sys, Univ. of Amsterdam,
+  Dec 1992.
+
+\bibitem{Fee94}
+M.~Feeley, M.~Turcotte, and G.~LaPalme.
+\newblock Using {{Multilisp}} for solving constraint satisfaction problems: an
+  application to nucleic acid {{3D}} structure determination.
+\newblock {\em Lisp and symbolic computation}, to appear, 1994.
+
+\bibitem{Har91}
+P.~H. Hartel, H.~W. Glaser, and J.~M. Wild.
+\newblock Compilation of functional languages using flow graph analysis.
+\newblock {\em Software---practice and experience}, 24(2):127--173, Feb 1994.
+
+\bibitem{Hud92a}
+P.~Hudak, S.~L. {Peyton Jones}, and P.~L.~Wadler (editors).
+\newblock Report on the programming language {Haskell} -- a non-strict purely
+  functional language, version 1.2.
+\newblock {\em ACM SIGPLAN notices}, 27(5):1--162, May 1992.
+
+\bibitem{Mil90}
+R.~Milner, M.~Tofte, and R.~Harper.
+\newblock {\em The definition of standard {ML}}.
+\newblock MIT Press, Cambridge, Massachusetts, 1990.
+
+\bibitem{Pla93}
+M.~J. Plasmeijer and M.~C. J.~D. van Eekelen.
+\newblock {\em Functional programming and parallel graph rewriting}.
+\newblock Addison Wesley, Reading, Massachusetts, 1993.
+
+\bibitem{Tur85}
+D.~A. Turner.
+\newblock {Miranda}: A non-strict functional language with polymorphic types.
+\newblock In J.-P. Jouannaud, editor, {\em 2nd Functional programming languages
+  and computer architecture, {LNCS} 201}, pages 1--16, Nancy, France, Sep 1985.
+  Springer-Verlag, Berlin.
+
+\bibitem{Tur90a}
+D.~A. Turner.
+\newblock {\em {Miranda} system manual}.
+\newblock Research Software Ltd, 23 St Augustines Road, Canterbury, Kent CT1
+  1XP, England, Apr 1990.
+
+\end{thebibliography}

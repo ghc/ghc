@@ -1,0 +1,48 @@
+T13199.hs:(14,3)-(15,6): Splicing declarations
+    [d| instance C (Maybe a) (Maybe b) c |]
+  ======>
+    instance C (Maybe a) (Maybe b) c
+T13199.hs:21:3-44: Splicing declarations
+    [d| g (a :: (Int -> Int) -> Int) = True |]
+  ======>
+    g (a :: (Int -> Int) -> Int) = True
+T13199.hs:24:3-27: Splicing declarations
+    [d| h (id -> x) = True |] ======> h (id -> x) = True
+T13199.hs:27:3-37: Splicing declarations
+    [d| f (Just (Just False)) = True |]
+  ======>
+    f (Just (Just False)) = True
+T13199.hs:30:3-33: Splicing declarations
+    [d| i (B (a `B` c) d) = True |] ======> i (B (a `B` c) d) = True
+T13199.hs:33:3-29: Splicing declarations
+    [d| j B {aa = a} = True |] ======> j B {aa = a} = True
+T13199.hs:36:3-28: Splicing declarations
+    [d| k = id @(Maybe Int) |] ======> k = id @(Maybe Int)
+T13199.hs:38:3-58: Splicing declarations
+    [d| l = case Just 'a' of { Just a -> Just ((\ x -> x) a) } |]
+  ======>
+    l = case Just 'a' of { Just a -> Just ((\ x -> x) a) }
+T13199.ppr.hs:11:3-41: Splicing declarations
+    [d| instance C (Maybe a) (Maybe b) c |]
+  ======>
+    instance C (Maybe a) (Maybe b) c
+T13199.ppr.hs:12:3-44: Splicing declarations
+    [d| g (a :: (Int -> Int) -> Int) = True |]
+  ======>
+    g (a :: (Int -> Int) -> Int) = True
+T13199.ppr.hs:13:3-27: Splicing declarations
+    [d| h (id -> x) = True |] ======> h (id -> x) = True
+T13199.ppr.hs:14:3-37: Splicing declarations
+    [d| f (Just (Just False)) = True |]
+  ======>
+    f (Just (Just False)) = True
+T13199.ppr.hs:15:3-33: Splicing declarations
+    [d| i (B (a `B` c) d) = True |] ======> i (B (a `B` c) d) = True
+T13199.ppr.hs:16:3-28: Splicing declarations
+    [d| j B {aa = a} = True |] ======> j B {aa = a} = True
+T13199.ppr.hs:17:3-28: Splicing declarations
+    [d| k = id @(Maybe Int) |] ======> k = id @(Maybe Int)
+T13199.ppr.hs:18:3-63: Splicing declarations
+    [d| l = case Just 'a' of { Just a -> Just ((\ x -> x) a) } |]
+  ======>
+    l = case Just 'a' of { Just a -> Just ((\ x -> x) a) }

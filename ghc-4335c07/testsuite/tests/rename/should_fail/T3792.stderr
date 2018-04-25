@@ -1,0 +1,3 @@
+
+T3792.hs:3:17: error:
+    Illegal qualified name in import item: Prelude.map

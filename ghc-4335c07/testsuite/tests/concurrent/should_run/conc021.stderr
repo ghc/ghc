@@ -1,0 +1,3 @@
+conc021: wurble
+CallStack (from HasCallStack):
+  error, called at conc021.hs:9:9 in main:Main

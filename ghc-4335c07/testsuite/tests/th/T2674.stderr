@@ -1,0 +1,4 @@
+
+T2674.hs:9:3:
+    Function binding for ‘foo’ has no equations
+    When splicing a TH declaration: 

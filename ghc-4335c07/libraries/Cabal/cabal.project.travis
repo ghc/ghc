@@ -1,0 +1,22 @@
+-- Force error messages to be better
+-- Parallel new-build error messages are non-existent.
+-- Turn off parallelization to get good errors.
+jobs: 1
+
+constraints: cabal-install +monolithic
+
+-- We vendor a copy of hackage-repo-tool so that we can
+-- build it reliably.  If we eventually get new-install
+-- in the bootstrap, this can go away.
+optional-packages: hackage-repo-tool-*/
+-- hackage-repo-tool has upper bound on Cabal
+allow-newer: hackage-repo-tool:Cabal, hackage-repo-tool:time, hackage-repo-tool:directory
+
+-- The -fno-warn-orphans is a hack to make Cabal-1.24
+-- build properly (unfortunately the flags here get applied
+-- to the dependencies too!)
+package Cabal
+  ghc-options: -Werror -fno-warn-orphans
+
+package cabal-install
+  ghc-options: -Werror

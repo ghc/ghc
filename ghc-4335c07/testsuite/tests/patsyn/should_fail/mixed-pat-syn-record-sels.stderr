@@ -1,0 +1,5 @@
+
+mixed-pat-syn-record-sels.hs:9:9: error:
+    No constructor has all these fields: ‘a’, ‘b’
+    In the expression: x {a = True, b = False}
+    In an equation for ‘foo’: foo x = x {a = True, b = False}

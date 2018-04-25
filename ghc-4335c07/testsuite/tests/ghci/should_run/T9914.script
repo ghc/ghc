@@ -1,0 +1,9 @@
+let x = 1
+x
+ let x = 2 -- Note leading whitespace
+x
+2
+data T1 = MkT1
+:i T1
+ data T2 = MkT2 -- Note leading whitespace
+:i T2

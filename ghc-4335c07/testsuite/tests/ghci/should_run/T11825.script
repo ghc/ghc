@@ -1,0 +1,3 @@
+:set -fprint-unicode-syntax
+:load T11825.hs
+:info X

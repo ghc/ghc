@@ -1,0 +1,11 @@
+unit p where
+    signature A where
+        infixr 6 `op`
+        op :: Int -> Int -> Int
+unit q where
+    signature A where
+        infixr 4 `op`
+        op :: Int -> Int -> Int
+unit r where
+    dependency p[A=<A>]
+    dependency q[A=<A>]

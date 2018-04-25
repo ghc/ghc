@@ -1,0 +1,29 @@
+
+completesig06.hs:13:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘m1’: Patterns not matched: B
+
+completesig06.hs:16:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘m2’: Patterns not matched: A
+
+completesig06.hs:20:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘m3’:
+        Patterns not matched:
+            A
+            B
+
+completesig06.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘m4’:
+        Patterns not matched:
+            B D
+            A D
+
+completesig06.hs:29:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘m5’:
+        Patterns not matched:
+            A _
+            B _

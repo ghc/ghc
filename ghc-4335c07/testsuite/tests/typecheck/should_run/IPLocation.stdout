@@ -1,0 +1,16 @@
+
+CallStack (from ImplicitParams):
+  f1, called at IPLocation.hs:34:11 in main:Main
+CallStack (from ImplicitParams):
+  x, called at IPLocation.hs:16:8 in main:Main
+CallStack (from ImplicitParams):
+  x, called at IPLocation.hs:21:8 in main:Main
+  f4, called at IPLocation.hs:36:11 in main:Main
+
+CallStack (from ImplicitParams):
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:30:8 in main:Main
+  f6, called at IPLocation.hs:38:11 in main:Main

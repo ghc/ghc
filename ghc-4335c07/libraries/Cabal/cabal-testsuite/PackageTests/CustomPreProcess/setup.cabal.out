@@ -1,0 +1,12 @@
+# Setup configure
+Resolving dependencies...
+Configuring internal-preprocessor-test-0.1.0.0...
+# Setup build
+Preprocessing executable 'my-custom-preprocessor' for internal-preprocessor-test-0.1.0.0..
+Building executable 'my-custom-preprocessor' for internal-preprocessor-test-0.1.0.0..
+Preprocessing library for internal-preprocessor-test-0.1.0.0..
+Building library for internal-preprocessor-test-0.1.0.0..
+Preprocessing executable 'hello-world' for internal-preprocessor-test-0.1.0.0..
+Building executable 'hello-world' for internal-preprocessor-test-0.1.0.0..
+# hello-world
+hello from A

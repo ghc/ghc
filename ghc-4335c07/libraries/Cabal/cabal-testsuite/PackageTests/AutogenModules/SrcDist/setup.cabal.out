@@ -1,0 +1,11 @@
+# Setup configure
+Resolving dependencies...
+Configuring AutogenModules-0.1...
+# Setup sdist
+Building source dist for AutogenModules-0.1...
+Preprocessing executable 'Exe' for AutogenModules-0.1..
+Preprocessing library for AutogenModules-0.1..
+Source tarball created: setup.cabal.dist/work/dist/AutogenModules-0.1.tar.gz
+# Setup sdist
+List of package sources written to file '<ROOT>/setup.cabal.dist/work/./dist/list-sources.txt'
+List of package sources written to file '<ROOT>/setup.cabal.dist/work/./dist/list-sources.txt'

@@ -1,0 +1,91 @@
+% intro.tex - introduction to the HPG
+
+% @(#)intro.tex 1.9 dated 92/07/20 at 17:30:36
+
+% Crown Copyright 1991
+
+\section*{Introduction}
+
+This report describes the Haskell Program Generator (\HPG) and its
+implementation in Haskell~\cite{hudak}.
+The \HPG\ is a program for generating random programs in a functional
+programming language in order to test its compiler.
+It is designed to be easily converted to produce programs in any of
+the functional languages in the family including Haskell, Miranda,
+ML and Hope; the version documented here generates programs in, and is
+written in, Haskell.
+
+The document consists of a section giving an overview of the \HPG,
+a section for each of the system's program modules, and finally some
+results and conclusions.
+Further description of the module sections is contained in
+section~\ref{overview}.
+
+The report is written in the so-called literal, or inverse comment, style.
+This means that lines beginning ``\prog{> }'' are lines of program code,
+while all other lines are comments.
+This enables the same files to be typeset in the form of this report, and
+to be directly compiled by a Haskell compiler into executable code.
+For those who would like the original files, they are available from the
+author by electronic mail at the address \prog{ndn@seg.npl.co.uk}.
+
+
+\section{Overview}
+\label{overview}
+
+Random program generators, such as the \HPG, date back to the Pascal
+Program Generator~\cite{wichmann} and include, more recently, the Ada
+Program Generator~\cite{austin}.
+They generate pseudo-random self-checking programs for testing language
+compilers.
+The program generation process consists of producing a complex expression
+whose value is known, and then writing a program which evaluates the
+expression and checks that the value obtained is correct.
+The programs generated are far more convoluted than any user, or even
+a human tester, would write, but they uncover errors that can occur in
+quite straightforward programs.
+
+A random program generator is a useful adjunct to a language test suite
+as it can generate many more test cases than are in a suite, and their
+random nature prevents implementations from being ``tuned'' to pass the
+tests.
+
+In generating a random program the \HPG\ proceeds in a number of phases:
+\begin{enumerate}
+\item Generate a number of random algebraic type declarations.
+\item Generate a number of declarations of random values of the types from the
+    previous phase.
+\item Generate random expressions which evaluate to the random
+    values from the previous phase.
+\item Generate a program which tests the random values for
+    equality with their corresponding expressions.
+\item Print the type declarations, value declarations and test program.
+\end{enumerate}
+
+The user can supply values for: the random number generator seeds, the
+numbers of type declarations and expressions generated, and the complexity
+of those declarations and expressions.
+See section~\ref{genprog} for details of the \HPG's parameters.
+
+The \HPG\ system consists of a number of modules, each of which is described
+in a section of this report.
+The modules, in order, are:
+\begin{description}
+\item[Types] Declarations of types used throughout the \HPG.
+\item[Env] The environment used by the \HPG\ to record the current state of
+    the random number generator and details of the types, values etc
+    that have been generated.
+\item[GenType] Generates random algebraic datatypes.
+\item[GenVal] Generates random values of the algebraic datatypes.
+\item[GenExp] Generates an expression evaluating to each of the random
+    values --- this is the major part of the \HPG.
+\item[Main] Contains the top-level of the \HPG\ and orchestrates
+    the other modules to create the complete system.
+\item[Config] An appendix containing reconfigurable and language-dependent
+    constants.
+    If the \HPG\ is to be used for generating programs in another
+    language, such as Miranda, then this is where most of the alterations
+    should occur.
+\item[Utils] An appendix of generally useful functions used throughout
+    the \HPG.
+\end{description}

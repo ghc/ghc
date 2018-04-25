@@ -1,0 +1,107 @@
+Name:           dph-lifted-vseg
+Version:        0.8.0.1
+License:        BSD3
+License-File:   LICENSE
+Author:         The DPH Team
+Maintainer:     Ben Lippmeier <benl@cse.unsw.edu.au>
+Homepage:       http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell
+Category:       Data Structures
+Synopsis:       Data Parallel Haskell lifted array combinators.
+Description:    This package provides the following:
+                 nested arrays and the primitive operators that work on them (PA functions);
+                 the lifted array combinators that the vectoriser introduces (PP functions);
+                 the user facing library functions that work on [::] style arrays (P functions).
+                This implementation directly encodes sharing between array segments,
+                and avoids the copying that dph-lifted-copy would otherwise do.
+                Use this version for production code.
+
+Cabal-Version:  >= 1.6
+Build-Type:     Simple
+
+Library
+  Exposed-Modules:
+        Data.Array.Parallel.Lifted.Closure
+        Data.Array.Parallel.Lifted.Combinators
+        Data.Array.Parallel.Lifted
+        Data.Array.Parallel.PArray.PData.Base
+        Data.Array.Parallel.PArray.PData.Double
+        Data.Array.Parallel.PArray.PData.Int
+        Data.Array.Parallel.PArray.PData.Word8
+        Data.Array.Parallel.PArray.PData.Nested
+        Data.Array.Parallel.PArray.PData.Sum2
+        Data.Array.Parallel.PArray.PData.Tuple2
+        Data.Array.Parallel.PArray.PData.Tuple3
+        Data.Array.Parallel.PArray.PData.Tuple4
+        Data.Array.Parallel.PArray.PData.Tuple5
+        Data.Array.Parallel.PArray.PData.Tuple6
+        Data.Array.Parallel.PArray.PData.Tuple7
+        Data.Array.Parallel.PArray.PData.Unit
+        Data.Array.Parallel.PArray.PData.Void
+        Data.Array.Parallel.PArray.PData.Wrap
+        Data.Array.Parallel.PArray.PData
+        Data.Array.Parallel.PArray.PRepr.Base
+        Data.Array.Parallel.PArray.PRepr.Instances
+        Data.Array.Parallel.PArray.PRepr.Nested
+        Data.Array.Parallel.PArray.PRepr.Tuple
+        Data.Array.Parallel.PArray.PRepr
+        Data.Array.Parallel.PArray.Scalar
+        Data.Array.Parallel.PArray
+        Data.Array.Parallel.Prelude.Base
+        Data.Array.Parallel.Prelude.Bool
+        Data.Array.Parallel.Prelude.Double
+        Data.Array.Parallel.Prelude.Int
+        Data.Array.Parallel.Prelude.Word8
+        Data.Array.Parallel.Prelude.Tuple
+        Data.Array.Parallel.Prelude.Ordering
+        Data.Array.Parallel.Prelude
+        Data.Array.Parallel.Trace
+        Data.Array.Parallel
+        Data.Array.Parallel.Prim
+        
+  Exposed:
+        False
+
+  Extensions:
+        BangPatterns,
+        PatternGuards
+        TypeFamilies,
+        TypeOperators,
+        RankNTypes,
+        BangPatterns,
+        MagicHash,
+        UnboxedTuples,
+        TypeOperators,
+        FlexibleContexts,
+        FlexibleInstances,
+        EmptyDataDecls,
+        NoMonomorphismRestriction,
+        MultiParamTypeClasses,
+        EmptyDataDecls,
+        StandaloneDeriving,
+        ExplicitForAll,
+        ParallelListComp,
+        ExistentialQuantification,
+        ScopedTypeVariables,
+        PatternGuards,
+        DeriveDataTypeable
+
+  GHC-Options:
+        -Odph
+        -fcpr-off -fno-liberate-case -fno-spec-constr
+        -Wall
+        -fno-warn-missing-methods
+        -fno-warn-orphans
+
+  Build-Depends:  
+        base                    == 4.8.*,
+        ghc                     == 7.*,
+        array                   == 0.5.*,
+        random                  == 1.0.*,
+        template-haskell        == 2.10.*,
+        dph-base                == 0.8.*,
+        dph-prim-par            == 0.8.*,
+        dph-lifted-base         == 0.8.*,
+        vector                  == 0.11.*,
+        pretty                  == 1.1.*,
+        primitive               == 0.5.*,
+        containers              == 0.5.*

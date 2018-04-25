@@ -1,0 +1,4 @@
+
+mod102.hs:8:5: error:
+    • Variable not in scope: methB :: Bool -> Bool -> ()
+    • Perhaps you meant ‘methA’ (imported from Mod102_AuxB)

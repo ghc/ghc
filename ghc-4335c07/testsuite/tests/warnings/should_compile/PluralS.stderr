@@ -1,0 +1,27 @@
+
+PluralS.hs:15:17: warning: [-Wtype-defaults (in -Wall)]
+    • Defaulting the following constraint to type ‘Integer’
+        Num t0 arising from the literal ‘123’
+    • In the first argument of ‘seq’, namely ‘123’
+      In the expression: 123 `seq` ()
+      In an equation for ‘defaultingNum’: defaultingNum = 123 `seq` ()
+
+PluralS.hs:17:24: warning: [-Wtype-defaults (in -Wall)]
+    • Defaulting the following constraints to type ‘Integer’
+        (Show a0) arising from a use of ‘show’ at PluralS.hs:17:24-31
+        (Num a0) arising from the literal ‘123’ at PluralS.hs:17:29-31
+    • In the expression: show 123
+      In an equation for ‘defaultingNumAndShow’:
+          defaultingNumAndShow = show 123
+
+PluralS.hs:23:1: warning: [-Wredundant-constraints]
+    • Redundant constraint: Num a
+    • In the type signature for:
+           redundantNum :: forall a. (Num a, Num a) => a
+
+PluralS.hs:26:1: warning: [-Wredundant-constraints]
+    • Redundant constraints: (Show a, Num a, Eq a, Eq a)
+    • In the type signature for:
+           redundantMultiple :: forall a.
+                                (Num a, Show a, Num a, Eq a, Eq a) =>
+                                a

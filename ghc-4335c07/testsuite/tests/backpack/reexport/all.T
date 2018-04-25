@@ -1,0 +1,11 @@
+test('bkpreex01', normal, backpack_typecheck, [''])
+test('bkpreex02', normal, backpack_typecheck, [''])
+test('bkpreex03', normal, backpack_typecheck, [''])
+test('bkpreex04', normal, backpack_typecheck, [''])
+# These signatures are behaving badly and the renamer gets confused
+test('bkpreex05', expect_broken(0), backpack_typecheck, [''])
+test('bkpreex06', normal, backpack_typecheck, [''])
+test('bkpreex07', normal, backpack_typecheck, [''])
+test('bkpreex08', normal, backpack_typecheck, [''])
+test('bkpreex09', normal, backpack_typecheck, [''])
+test('bkpreex10', normal, backpack_typecheck, [''])

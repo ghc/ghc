@@ -1,0 +1,11 @@
+
+<interactive>:2:68:
+    Multiple declarations of ‘f’
+    Declared at: <interactive>:2:32
+                 <interactive>:2:68
+    In the Template Haskell quotation
+      [d| f = undefined
+          class Foo x where
+            f :: x -> x
+          instance Foo Int where
+            f = id |]

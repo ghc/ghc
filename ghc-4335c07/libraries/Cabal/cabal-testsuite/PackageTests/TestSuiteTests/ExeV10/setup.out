@@ -1,0 +1,18 @@
+# Setup configure
+Configuring my-0.1...
+# Setup build
+Preprocessing library for my-0.1..
+Building library for my-0.1..
+Preprocessing test suite 'test-Foo' for my-0.1..
+Building test suite 'test-Foo' for my-0.1..
+Preprocessing test suite 'test-Short' for my-0.1..
+Building test suite 'test-Short' for my-0.1..
+# Setup test
+Running 2 test suites...
+Test suite test-Foo: RUNNING...
+Test suite test-Foo: PASS
+Test suite logged to: setup.dist/work/dist/test/my-0.1-test-Foo.log
+Test suite test-Short: RUNNING...
+Test suite test-Short: PASS
+Test suite logged to: setup.dist/work/dist/test/my-0.1-test-Short.log
+2 of 2 test suites (2 of 2 test cases) passed.

@@ -1,0 +1,12 @@
+
+export-ps-rec-sel.hs:2:13: error:
+    Pattern synonyms can only be bundled with matching type constructors
+    Couldn't match expected type of ‘R’ with actual type of ‘Q’
+    In the pattern synonym: P
+    In the export: R(P, x)
+
+export-ps-rec-sel.hs:2:13: error:
+    Pattern synonyms can only be bundled with matching type constructors
+    Couldn't match expected type of ‘R’ with actual type of ‘Q’
+    In the pattern synonym record selector: x
+    In the export: R(P, x)

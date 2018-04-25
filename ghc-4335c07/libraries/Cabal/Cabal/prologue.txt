@@ -1,0 +1,7 @@
+The Haskell Cabal is the Common Architecture for Building Applications
+and Libraries.  It is a framework which defines a common interface for
+authors to more easily build their applications in a portable way. The
+Haskell Cabal is meant to be a part of a larger infrastructure for
+distributing, organizing, and cataloging Haskell Libraries and
+Tools. For more information, please see:
+<http://www.haskell.org/cabal/>.

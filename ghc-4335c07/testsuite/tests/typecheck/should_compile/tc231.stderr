@@ -1,0 +1,23 @@
+TYPE SIGNATURES
+  Node :: forall s a chain. s -> a -> chain -> Q s a chain
+  Z :: forall a. a -> Z a
+  foo ::
+    forall s b chain.
+    Zork s (Z [Char]) b =>
+    Q s (Z [Char]) chain -> ST s ()
+  huh ::
+    forall s a b. Zork s a b => forall chain. Q s a chain -> ST s ()
+  s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
+TYPE CONSTRUCTORS
+  data Q s a chain = Node s a chain
+  data Z a = Z a
+  class Zork s a b | a -> b where
+    huh :: Q s a chain -> ST s ()
+    {-# MINIMAL huh #-}
+COERCION AXIOMS
+  axiom N:Zork ::
+    Zork s a b = forall chain. Q s a chain -> ST s ()
+      -- Defined at tc231.hs:25:1
+Dependent modules: []
+Dependent packages: [base-4.11.0.0, ghc-prim-0.5.2.0,
+                     integer-gmp-1.0.1.0]

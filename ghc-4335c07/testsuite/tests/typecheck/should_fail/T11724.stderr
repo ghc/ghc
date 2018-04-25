@@ -1,0 +1,7 @@
+
+T11724.hs:7:44: error:
+    • A levity-polymorphic type is not allowed here:
+        Type: a
+        Kind: TYPE r
+    • In the definition of data constructor ‘Foo’
+      In the data type declaration for ‘Foo’

@@ -1,0 +1,4 @@
+
+WildcardInDefaultSignature.hs:7:16: error:
+    Wildcard ‘_’ not allowed
+      in a class method signature for ‘f’

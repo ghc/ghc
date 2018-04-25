@@ -1,0 +1,9 @@
+[1 of 1] Compiling ExportList       ( ExportList.hs, ExportList.o )
+Warning: vectorisation failure: identityConvTyCon: type constructor contains parallel arrays [::]
+  Could NOT call vectorised from original version
+  ExportList.solveV :: GHC.Types.Double -> [:GHC.Types.Double:]
+Warning: vectorisation failure: identityConvTyCon: type constructor contains parallel arrays NodeV
+  Could NOT call vectorised from original version
+  ExportList.solvePA :: ExportList.NodeV
+                        -> GHC.Types.Double
+                        -> Data.Array.Parallel.PArray.PData.Base.PArray GHC.Types.Double

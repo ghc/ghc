@@ -1,0 +1,4 @@
+-- :abandon in an exception breakpoint can lead to ghci freezing 
+:set -fbreak-on-exception
+error "an error"
+()

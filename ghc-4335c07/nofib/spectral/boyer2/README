@@ -1,0 +1,3 @@
+The interesting bit in this directory is ``Checker.hs''.  As of GHC 0.14,
+the simplifier explodes tautologyp into 700+K of threaded C code, with
+2000+ separate INTFUN's.  To see this, compile with -O.

@@ -1,0 +1,42 @@
+
+T11667.hs:12:22: error:
+    • Could not deduce (Num a) arising from the literal ‘42’
+      from the context: Eq a
+        bound by the signature for pattern synonym ‘Pat1’
+        at T11667.hs:12:9-12
+      Possible fix:
+        add (Num a) to the "required" context of
+          the signature for pattern synonym ‘Pat1’
+    • In the pattern: 42
+      In the pattern: Just 42
+      In the declaration for pattern synonym ‘Pat1’
+
+T11667.hs:18:28: error:
+    • Couldn't match type ‘b’ with ‘Bool’
+        arising from the "provided" constraints claimed by
+          the signature of ‘Pat2’
+      ‘b’ is a rigid type variable bound by
+        the signature for pattern synonym ‘Pat2’
+        at T11667.hs:17:1-50
+    • In the declaration for pattern synonym ‘Pat2’
+    • Relevant bindings include y :: b (bound at T11667.hs:18:21)
+
+T11667.hs:24:24: error:
+    • No instance for (Show a)
+        arising from the "provided" constraints claimed by
+          the signature of ‘Pat3’
+      In other words, a successful match on the pattern
+        Just x
+      does not provide the constraint (Show a)
+    • In the declaration for pattern synonym ‘Pat3’
+
+T11667.hs:31:16: error:
+    • Could not deduce (Num a) arising from a use of ‘MkS’
+      from the context: (Eq a, Show a)
+        bound by the signature for pattern synonym ‘Pat4’
+        at T11667.hs:31:1-21
+      Possible fix:
+        add (Num a) to the "required" context of
+          the signature for pattern synonym ‘Pat4’
+    • In the expression: MkS 42
+      In an equation for ‘Pat4’: Pat4 = MkS 42

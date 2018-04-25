@@ -1,0 +1,12 @@
+*~
+
+Thumbs.db
+.DS_Store
+
+GNUmakefile
+dist-install/
+ghc.mk
+
+dist
+.cabal-sandbox
+cabal.sandbox.config

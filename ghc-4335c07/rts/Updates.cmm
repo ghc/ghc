@@ -1,0 +1,103 @@
+/* -----------------------------------------------------------------------------
+ *
+ * (c) The GHC Team, 1998-2004
+ *
+ * Code to perform updates.
+ *
+ * This file is written in a subset of C--, extended with various
+ * features specific to GHC.  It is compiled by GHC directly.  For the
+ * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ *
+ * ---------------------------------------------------------------------------*/
+
+
+#include "Cmm.h"
+#include "rts/prof/LDV.h"
+
+#include "Updates.h"
+
+/*
+ * The update code is PERFORMANCE CRITICAL, if you make any changes
+ * here make sure you eyeball the assembly and check that the fast
+ * path (update in generation 0) is optimal.
+ *
+ * The return(ret) bit is passed down and pinned on the end of each
+ * branch (there end up being two major branches in the code), since
+ * we don't mind duplicating this jump.
+ */
+INFO_TABLE_RET ( stg_upd_frame, UPDATE_FRAME,
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,_unused,updatee) )
+    return (P_ ret) /* the closure being returned */
+{
+    ASSERT(HpAlloc == 0); // Note [HpAlloc]
+
+    /* ToDo: it might be a PAP, so we should check... */
+    TICK_UPD_CON_IN_NEW(sizeW_fromITBL(%GET_STD_INFO(updatee)));
+
+    updateWithIndirection(updatee, ret, return (ret));
+}
+
+/*
+ * An update frame where the updatee has been replaced by a BLACKHOLE
+ * closure by threadPaused.  We may have threads to wake up, and we
+ * also have to check whether the blackhole has been updated by
+ * another thread in the meantime.
+ */
+INFO_TABLE_RET ( stg_marked_upd_frame, UPDATE_FRAME,
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,_ccs,_unused,updatee) )
+    return (P_ ret) /* the closure being returned */
+{
+    W_ v;
+
+    ASSERT(HpAlloc == 0); // Note [HpAlloc]
+
+    // we know the closure is a BLACKHOLE
+    v = StgInd_indirectee(updatee);
+
+    if (GETTAG(v) != 0) {
+        // updated by someone else: discard our value and use the
+        // other one to increase sharing, but check the blocking
+        // queues to see if any threads were waiting on this BLACKHOLE.
+        ccall checkBlockingQueues(MyCapability() "ptr", CurrentTSO "ptr");
+        return (v);
+    }
+
+    // common case: it is still our BLACKHOLE
+    if (v == CurrentTSO) {
+        updateWithIndirection(updatee, ret, return (ret));
+    }
+
+    // The other cases are all handled by the generic code
+    ccall updateThunk (MyCapability() "ptr", CurrentTSO "ptr",
+                       updatee "ptr", ret "ptr");
+
+    return (ret);
+}
+
+/*
+ * Special update frame code for CAFs and eager-blackholed thunks: it
+ * knows how to update blackholes, but is distinct from
+ * stg_marked_upd_frame so that lazy blackholing won't treat it as the
+ * high watermark.
+ */
+INFO_TABLE_RET ( stg_bh_upd_frame, UPDATE_FRAME,
+                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,ccs,_unused,updatee) )
+    return (P_ ret) /* the closure being returned */
+{
+    // This all compiles away to a single jump instruction (sigh)
+    jump RET_LBL(stg_marked_upd_frame)
+        ( UPDATE_FRAME_FIELDS(,,info_ptr,ccs,_unused,updatee) )
+        (ret);
+}
+
+/* Note [HpAlloc]
+ *
+ * HpAlloc is required to be zero unless we just bumped Hp and failed
+ * the heap check: see HeapStackCheck.cmm.  Failures that result from
+ * HpAlloc being non-zero are very hard to track down, because they
+ * manifest as spurious heap corruption that happens only with +RTS
+ * -N2 or greater (because then we have a lot more
+ * interruptCapability() calls happening).  Hence, we assert
+ * HpAlloc==0 as often as possible, and in the update code is a good
+ * place to do that.
+ */

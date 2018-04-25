@@ -1,0 +1,4 @@
+
+T10598_fail5.hs:3:1: error:
+    Illegal use of multiple, consecutive deriving clauses
+    Use DerivingStrategies to allow this

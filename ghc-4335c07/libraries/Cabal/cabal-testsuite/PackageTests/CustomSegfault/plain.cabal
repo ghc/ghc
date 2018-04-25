@@ -1,0 +1,14 @@
+name:                plain
+version:             0.1.0.0
+license:             BSD3
+author:              Edward Z. Yang
+maintainer:          ezyang@cs.stanford.edu
+build-type:          Custom
+cabal-version:       >=1.10
+
+library
+  build-depends:       base
+  default-language:    Haskell2010
+
+custom-setup
+  setup-depends: base, unix

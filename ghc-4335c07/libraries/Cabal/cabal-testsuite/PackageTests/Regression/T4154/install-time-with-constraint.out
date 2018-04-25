@@ -1,0 +1,8 @@
+# cabal update
+Downloading the latest package list from test-local-repo
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following would be built:
+ - Cabal-99999 (lib) (requires download & build)
+ - time-99999 (lib:time) (first run)

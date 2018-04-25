@@ -1,0 +1,24 @@
+[Char]
+Char
+Int
+Word
+Double
+IO ()
+(Char,Int,[Char])
+SomeTypeRep
+Bool
+Ordering
+Int -> Int
+Proxy Constraint (Eq Int)
+Proxy * (Int,Int)
+Proxy Symbol "hello world"
+Proxy Nat 1
+Proxy [Nat] (': Nat 1 (': Nat 2 (': Nat 3 ('[] Nat))))
+Proxy Ordering 'EQ
+Proxy (RuntimeRep -> *) TYPE
+Proxy * *
+Proxy * *
+Proxy * *
+Proxy RuntimeRep 'LiftedRep
+Proxy (Nat,Symbol) ('(,) Nat Symbol 1 "hello")
+Proxy (* -> * -> Constraint) (~~ * *)

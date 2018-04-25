@@ -1,0 +1,20 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B                ( p/B.hs, nothing )
+[2 of 3] Processing q
+  Instantiating q
+  [1 of 1] Compiling A                ( q/A.hs, bkpfail43.out/q/A.o )
+[3 of 3] Processing r
+  Instantiating r
+  [1 of 1] Including p[A=q:A]
+    Instantiating p[A=q:A]
+    [1 of 2] Compiling A[sig]           ( p/A.hsig, bkpfail43.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
+
+bkpfail43.out/p/p-HVmFlcYSefiK5n1aDP1v7x/../A.hi:1:1: error:
+    • No instance for (GHC.Show.Show (a -> b))
+        arising when attempting to show that
+        instance [safe] GHC.Show.Show (a -> b)
+          -- Defined at bkpfail43.bkp:3:18
+        is provided by ‘q:A’
+        (maybe you haven't applied a function to enough arguments?)
+    • while checking that q:A implements signature A in p[A=q:A]

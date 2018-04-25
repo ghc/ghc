@@ -1,0 +1,4 @@
+
+Overlap4.hs:7:3: error:
+    • Number of parameters must match family declaration; expected 2
+    • In the type family declaration for ‘F’

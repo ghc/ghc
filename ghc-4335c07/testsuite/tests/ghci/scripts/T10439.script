@@ -1,0 +1,6 @@
+let tree = Data.Tree.Node 0 []
+Data.Tree.rootLabel tree
+let f (Data.Tree.Node i j) k = Data.Tree.Node k j
+f tree 1
+let g i j = i { Data.Tree.rootLabel = j }
+g tree 2

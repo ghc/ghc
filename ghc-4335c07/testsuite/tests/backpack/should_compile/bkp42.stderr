@@ -1,0 +1,14 @@
+[1 of 3] Processing impl
+  Instantiating impl
+  [1 of 3] Compiling A                ( impl/A.hs, bkp42.out/impl/A.o )
+  [2 of 3] Compiling B                ( impl/B.hs, bkp42.out/impl/B.o )
+  [3 of 3] Compiling C                ( impl/C.hs, bkp42.out/impl/C.o )
+[2 of 3] Processing sig
+  [1 of 2] Compiling B[sig]           ( sig/B.hsig, nothing )
+  [2 of 2] Compiling App              ( sig/App.hs, nothing )
+[3 of 3] Processing main
+  Instantiating main
+  [1 of 1] Including sig[B=impl:C]
+    Instantiating sig[B=impl:C]
+    [1 of 2] Compiling B[sig]           ( sig/B.hsig, bkp42.out/sig/sig-Ko6MwJiRFc509cOdDShPV5/B.o )
+    [2 of 2] Compiling App              ( sig/App.hs, bkp42.out/sig/sig-Ko6MwJiRFc509cOdDShPV5/App.o )

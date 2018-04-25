@@ -1,0 +1,3 @@
+signature Database where
+data Database
+databaseName :: String

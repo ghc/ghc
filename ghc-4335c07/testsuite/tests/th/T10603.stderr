@@ -1,0 +1,4 @@
+T10603.hs:5:18-68: Splicing expression
+    [| case Just 'a' of { Just a -> Just ((\ x -> x) a) } |]
+  ======>
+    case Just 'a' of { Just a -> Just ((\ x -> x) a) }

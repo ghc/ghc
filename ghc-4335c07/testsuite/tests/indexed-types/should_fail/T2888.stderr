@@ -1,0 +1,5 @@
+
+T2888.hs:6:1:
+    The associated type ‘D’
+    mentions none of the type or kind variables of the class ‘C w’
+    In the class declaration for ‘C’

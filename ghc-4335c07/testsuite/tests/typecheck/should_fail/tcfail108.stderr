@@ -1,0 +1,6 @@
+
+tcfail108.hs:7:10: error:
+    • Variable ‘f’ occurs more often
+        in the constraint ‘Eq (f (Rec f))’ than in the instance head
+      (Use UndecidableInstances to permit this)
+    • In the instance declaration for ‘Eq (Rec f)’

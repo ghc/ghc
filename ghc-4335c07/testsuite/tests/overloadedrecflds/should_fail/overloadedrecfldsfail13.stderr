@@ -1,0 +1,22 @@
+
+overloadedrecfldsfail13.hs:10:5: error:
+    ‘x’ is not a (visible) field of type ‘U’
+    In the expression: x (MkU :: U)
+    In an equation for ‘a’: a = x (MkU :: U)
+
+overloadedrecfldsfail13.hs:12:5: error:
+    Ambiguous occurrence ‘x’
+    It could refer to either the field ‘x’,
+                             defined at overloadedrecfldsfail13.hs:7:16
+                          or the field ‘x’, defined at overloadedrecfldsfail13.hs:6:16
+
+overloadedrecfldsfail13.hs:15:5: error:
+    ‘x’ is not a (visible) field of type ‘U’
+    In the expression: x
+    In an equation for ‘c’: c = x
+
+overloadedrecfldsfail13.hs:18:5: error:
+    Ambiguous occurrence ‘x’
+    It could refer to either the field ‘x’,
+                             defined at overloadedrecfldsfail13.hs:7:16
+                          or the field ‘x’, defined at overloadedrecfldsfail13.hs:6:16

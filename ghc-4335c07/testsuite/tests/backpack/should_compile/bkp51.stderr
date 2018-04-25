@@ -1,0 +1,22 @@
+[1 of 6] Processing p
+  Instantiating p
+  [1 of 3] Compiling A0               ( p/A0.hs, bkp51.out/p/A0.o )
+  [2 of 3] Compiling A                ( p/A.hs, bkp51.out/p/A.o )
+  [3 of 3] Compiling AA               ( p/AA.hs, bkp51.out/p/AA.o )
+[2 of 6] Processing q
+  [1 of 3] Compiling B[sig]           ( q/B.hsig, nothing )
+  [2 of 3] Compiling H[sig]           ( q/H.hsig, nothing )
+  [3 of 3] Compiling C                ( q/C.hs, nothing )
+[3 of 6] Processing r
+  [1 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
+  [2 of 3] Compiling B[sig]           ( r/B.hsig, nothing )
+  [3 of 3] Compiling D                ( r/D.hs, nothing )
+[4 of 6] Processing s
+  [1 of 2] Compiling H[sig]           ( s/H.hsig, nothing )
+  [2 of 2] Compiling E                ( s/E.hs, nothing )
+[5 of 6] Processing t
+  [1 of 2] Compiling H[sig]           ( t/H.hsig, nothing )
+  [2 of 2] Compiling F                ( t/F.hs, nothing )
+[6 of 6] Processing u
+  [1 of 2] Compiling H[sig]           ( u/H.hsig, nothing )
+  [2 of 2] Compiling G                ( u/G.hs, nothing )

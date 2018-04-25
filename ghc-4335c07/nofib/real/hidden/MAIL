@@ -1,0 +1,55 @@
+Return-Path: simonpj@dcs.gla.ac.uk
+Return-Path: <simonpj@dcs.gla.ac.uk>
+Received: from tutuila.dcs.gla.ac.uk by goggins.dcs.gla.ac.uk with SMTP (PP) 
+          id <06064-0@goggins.dcs.gla.ac.uk>; Wed, 23 Dec 1992 10:31:54 +0000
+Received: by tutuila.dcs.gla.ac.uk (4.1/Dumb) id AA16733;
+          Wed, 23 Dec 92 10:31:51 GMT
+Message-Id: <9212231031.AA16733@tutuila.dcs.gla.ac.uk>
+To: partain@dcs.gla.ac.uk
+Subject: For nofib...
+Date: Wed, 23 Dec 92 10:31:51 +0000
+From: Simon L Peyton Jones <simonpj@dcs.gla.ac.uk>
+
+
+
+------- Forwarded Message
+
+Date:    Tue, 22 Dec 92 18:30:23 +0100
+From:    ramaer@cs.utwente.nl (Mark Ramaer)
+To:      ramaer@cs.utwente.nl, simonpj@dcs.gla.ac.uk
+Subject: benchmark
+
+
+
+Simon,
+
+> Can we use your program in our nofib benchmark suite?  Looks fun.
+
+Certainly.  However, I should note that the program is written by
+Stef Joosten (joosten@cs.utwente.nl) in Miranda(TM) and I have translated
+it to Haskell to play with overloading; I also added the memoising.
+The documentation for the program can be found in Stef's Ph.D. thesis
+"The use of functional programming in software development."
+You can find reference to his thesis in the code.
+
+> Can you supply input and expected output for an "interesting" run?
+
+Most of the input is in the "objects" directory, the file "four.plate"
+contains the descriptions of four other files there: table, horse, bookcase
+and houses.
+
+An interesting run is:
+(echo 2,10,3; echo quit)|hiddenline objects/four.plate > four.2,10,3.ps
+To verify the result preview it with
+- - xps
+  A4 (four.2,10,3.ps)run
+- - gs
+  (cat four.2,10,3.ps;cat)|gs
+or print it on a postscript printer with
+  (echo '%\!'; cat four.2,10,3.ps; echo showpage) | lpr
+
+Greetings,
+Mark
+
+------- End of Forwarded Message
+

@@ -1,0 +1,3 @@
+
+records-check-sels.hs:10:7: error:
+    Variable not in scope: a :: Maybe Bool -> t

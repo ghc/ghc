@@ -1,0 +1,9 @@
+
+ado003.hs:7:3: error:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the pattern: 'a'
+    In a stmt of a 'do' block: 'a' <- return (3 :: Int)
+    In the expression:
+      do x <- getChar
+         'a' <- return (3 :: Int)
+         return ()

@@ -1,0 +1,4 @@
+name: bug1465
+version: 2.0
+exposed-modules: A
+build-depends: base

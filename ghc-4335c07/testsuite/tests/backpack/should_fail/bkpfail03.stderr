@@ -1,0 +1,17 @@
+[1 of 3] Processing q
+  [1 of 2] Compiling M1               ( q/M1.hs, nothing )
+  [2 of 2] Compiling M2[sig]          ( q/M2.hsig, nothing )
+[2 of 3] Processing m2
+  Instantiating m2
+  [1 of 1] Compiling M2               ( m2/M2.hs, nothing )
+[3 of 3] Processing p
+  Instantiating p
+  [1 of 1] Including q[M2=m2:M2]
+    Instantiating q[M2=m2:M2]
+    [1 of 2] Compiling M1               ( q/M1.hs, nothing )
+    [2 of 2] Compiling M2[sig]          ( q/M2.hsig, nothing )
+
+bkpfail03.bkp:3:9: error:
+    • The hsig file (re)exports ‘M1.M’
+      but the implementing module exports a different identifier ‘M2.M’
+    • while checking that m2:M2 implements signature M2 in q[M2=m2:M2]

@@ -1,0 +1,6 @@
+
+tcfail075.hs:10:1:
+    Top-level bindings for unlifted types aren't allowed: x = 1#
+
+tcfail075.hs:13:1:
+    Top-level bindings for unlifted types aren't allowed: y = x +# 1#

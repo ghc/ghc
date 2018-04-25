@@ -1,0 +1,4 @@
+
+mod69.hs:3:7: error:
+    Pattern syntax in expression context: x@1
+    Did you mean to enable TypeApplications?

@@ -1,0 +1,6 @@
+import GHC.Exts
+:set -XTypeApplications -XMagicHash -XTypeInType
+data TypeRep (a :: k) = TypeRep
+let typeRepKind = undefined :: TypeRep (a :: k) -> TypeRep k
+let typeRep = undefined :: TypeRep (a :: k)
+let x = typeRepKind (typeRep @(Maybe Int#))

@@ -1,0 +1,28 @@
+[1 of 7] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[2 of 7] Processing q1
+  Instantiating q1
+  [1 of 1] Compiling A                ( q1/A.hs, T13140.out/q1/A.o )
+[3 of 7] Processing q2
+  Instantiating q2
+  [1 of 1] Compiling A                ( q2/A.hs, T13140.out/q2/A.o )
+[4 of 7] Processing q3
+  Instantiating q3
+  [1 of 1] Compiling A                ( q3/A.hs, T13140.out/q3/A.o )
+[5 of 7] Processing r
+  Instantiating r
+  [1 of 3] Including p[A=q1:A]
+    Instantiating p[A=q1:A]
+    [1 of 1] Compiling A[sig]           ( p/A.hsig, T13140.out/p/p-BwqqugG2ETwLIwrPGPdl6W/A.o )
+  [2 of 3] Including p[A=q2:A]
+    Instantiating p[A=q2:A]
+    [1 of 1] Compiling A[sig]           ( p/A.hsig, T13140.out/p/p-KZH5iDezOjj6YVcfuBlAG2/A.o )
+  [3 of 3] Including p[A=q3:A]
+    Instantiating p[A=q3:A]
+    [1 of 1] Compiling A[sig]           ( p/A.hsig, T13140.out/p/p-200ijkYDy133WhdgYYHZ24/A.o )
+[6 of 7] Processing p2
+  [1 of 2] Compiling A[sig]           ( p2/A.hsig, nothing )
+  [2 of 2] Compiling M                ( p2/M.hs, nothing )
+[7 of 7] Processing p3
+  [1 of 2] Compiling A[sig]           ( p3/A.hsig, nothing )
+  [2 of 2] Compiling M2               ( p3/M2.hs, nothing )

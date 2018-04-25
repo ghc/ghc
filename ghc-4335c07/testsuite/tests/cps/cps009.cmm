@@ -1,0 +1,7 @@
+// Test basic stack check
+
+foo6_gc_slow("ptr" bits32 f) goto GC {
+  return (7);
+GC:
+  jump stg_gc_fun_v(f);
+}

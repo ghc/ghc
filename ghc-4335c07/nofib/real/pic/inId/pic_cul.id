@@ -1,0 +1,1016 @@
+From oml@newtowne-variety.lcs.mit.edu Wed Aug 26 06:54:19 1987
+Received: by a (5.51/5.17)
+	id AA28307; Wed, 26 Aug 87 06:54:15 MDT
+Received: by LANL-MILNET-GW.GOV (5.54/5.17)
+	id AA11858; Wed, 26 Aug 87 06:54:55 MDT
+Received: by LANL.GOV (5.54/1.14)
+	id AA05811; Wed, 26 Aug 87 06:52:39 MDT
+Received: by NEWTOWNE-VARIETY.LCS.MIT.EDU (4.12/4.7); Wed, 26 Aug 87 08:51:17 edt
+Date: Wed, 26 Aug 87 08:51:17 edt
+From: oml@newtowne-variety.lcs.mit.edu
+Message-Id: <8708261251.AA12747@NEWTOWNE-VARIETY.LCS.MIT.EDU>
+To: oml@beta
+Status: R
+
+% -*- Mode: ID; Package: GITA -*-
+%
+% 		Particle In Cell (PIC)
+% 	       
+%   A basic electrodynamics application in Id Nouveau.
+% 
+% 		David E. Culler
+%                June 1987
+% 
+% Given an initial configuration of particles, follow how they move under
+% the electric field they induce.  Torroidal boundary conditions are assumed,
+% so we wrap around in both dimensions.
+% 
+% Basic algorithm:
+% 
+% 	1. Calculate the charge density (rho),
+% 	2. Calculate the new potential Phi by solving Laplace's equation:
+% 		del2(phi) = rho.
+% 	3. Calculate the electric field: E = del(phi).
+% 	4. Push particles for a timestep delta_t, small enough that
+%          no particle moves more than the width of a cell.
+% 
+% An nxn mesh is used (indices running from 0 to n-1) to represent values
+% of x and y in the interval [0,1].  Thus, delta_x = delta_y = 1/n.
+% 
+% 
+% Data Structures:
+% 
+% 	phi (0..n-1,0..n-1) - electrostatic potential at grid point (i,j).
+% 
+% 	rho (0..n-1,0..n-1) - charge density at grid point (i,j)
+% 
+% 	Ex (0..n-1,0..n-1) - Ex(i,j) = x component of electric field between
+% 	grid points (i,j) and (i,j+1).
+% 
+% 	Ey (0..n-1,0..n-1) - Ey(i,j) = y component of electric field between
+% 	grid points (i,j) and (i+1,j).
+% 
+% 	Particles (0..n-1, 0..n-1) - Particles[i,j] index of first particle of the
+% 	list of particles in cell i,j.
+% 	
+% 	x_pos(1..m) - x-coordinate of particle displacement in units of delta_x.
+% 	y_pos(1..m) - y-coordinate of particle displacement in units of delta_x.
+% 	x_vel(1..m) - x-component of velocity vector in units of delta_x /sec.
+% 	y_vel(1..m) - y-component of velocity vector in units of delta_x /sec.
+% 	next(1..m)  - index of next particle in list (0 => EOL).
+% 
+% 	particle_heap = <x_pos, y_pos, x_vel, y_vel, next>
+% 
+% 	delta_t is in units of seconds.	
+%
+%   
+%                    Grid Structure
+%
+%  NW                               NE
+%        j = 0    1         n-1  (x direction)
+%     i = 0  +----+----+----+----
+%            |
+%         1  +    +    +    +
+%            |
+%            +    +    +    +
+%            |
+%        n-1 +    +    +    +----
+%            |              |
+%   (y direction)
+%  SW                               SE
+
+DEF PIC_step particle_heap particles m phi n niter depth mass charge =
+  {rho     = calculate_charge_density particles charge particle_heap n;
+   new_phi = calculate_potential rho phi niter depth n;
+   
+   Ex = calculate_field_x new_phi n;
+   Ey = calculate_field_y new_phi n;
+   
+   new_particles, new_particle_heap, new_delta_t =
+		  push_particles particle_heap m
+				 particles Ex Ey n
+				 charge mass;
+   IN
+     new_particles, new_particle_heap, new_delta_t, new_phi};
+
+
+
+% 		Phase I: Calculate charge density
+% 
+% Intermediate data structures:
+% 
+% 	NW(0..n-1,1..n-1): NW[i,j] = charge contribution in north-west 
+% 	direction from cell i,j (i.e. contribution to grid point i,j).
+% 
+% 	NE(0..n-1,0..n-1): NW[i,j] = charge contribution in north-east 
+% 	direction from cell i,j (i.e. contribution to grid point i,j+1).
+% 
+% 	SW(0..n-1,0..n-1): NW[i,j] = charge contribution in south-west 
+% 	direction from cell i,j (i.e. contribution to grid point i+1,j).
+% 
+% 	SE(0..n-1,0..n-1): NW[i,j] = charge contribution in south-east 
+% 	direction from cell i,j (i.e. contribution to grid point i+1,j+1).
+% 
+%  
+%  	PARTICLES[i,j] represents a list of particles in the i,j-th cell.
+%  	Compute the charge contribution to the four grid points of
+%  	the cell.
+%  
+%  	Convention:
+%  		      i,j       i,j+1
+%   			NW_____NE
+%                         |   |
+%                       SW-----SE
+%                     i+1,j     i+1, j+1
+%  
+
+DEF calculate_charge_density particles charge particle_heap n =
+  {contributions = charge_contribution particles charge particle_heap n;
+   new_rho = collect_charge contributions n;
+   IN new_rho};
+
+
+%%%	Charge Contribution
+%
+%  Each particle represents an amount of charge distributed over
+%  an entire cell.  In discretizing the charge density at the
+%  grid points we split the cell into four rectangles by a
+%  verticle and a horizontal line through the particle, and assign
+%  to each corner an amount of charge propotional to the area
+%  of the opposite diagonal sub rectangle.
+
+DEF Charge_Contribution Particles charge particle_heap n =
+  {n1 = n - 1;
+   x_pos, y_pos, x_vel, y_vel, next_pointers = particle_heap;
+   nw = matrix((0,n1),(0,n1));	% Contributions toward north-west point.
+   ne = matrix((0,n1),(0,n1));	% Contributions toward north-east point.
+   sw = matrix((0,n1),(0,n1));	% Contributions toward south-west point.
+   se = matrix((0,n1),(0,n1));	% Contributions toward south-east point.
+   
+   {FOR i FROM 0 TO n1 DO
+      {FOR j FROM 0 TO n1 DO
+	 nw[i,j],ne[i,j],sw[i,j],se[i,j] =
+	   {ul = 0; ur = 0; lr = 0; ll = 0;
+	    particle = Particles[i,j];
+	    IN
+	      {WHILE particle <> 0 DO
+		 NEXT particle = next_pointers[particle];
+		 pe = x_pos[particle] - j;	% distance from west edge
+		 ps = y_pos[particle] - i; 	% distance from north edge
+		 pw = 1. - pe;		
+		 pn = 1. - ps;		
+		 NEXT ul = ul + pn*pw;
+		 NEXT ur = ur + pn*pe;
+		 NEXT ll = ll + ps*pw;
+		 NEXT lr = lr + ps*pe;
+	       FINALLY charge*ul,charge*ur,charge*ll,charge*lr}}}}
+   IN (nw, ne, sw, se)};
+
+
+
+% 		Collect_Charge
+%  
+%  	Collect contributions to yield charge density at each
+%  	grid point:
+%  
+%            se[i-1,j-1] | sw[i-1,j]
+%                    -- i,j --
+%            ne[i,j-1]   | nw[i,j]
+% 
+DEF collect_charge (NW, NE, SW, SE) n =
+  {n1 = n - 1;
+   n2 = n - 2;
+   roh = matrix((0,n1),(0,n1));
+   
+   % Corners 
+   
+   roh[0,0]    = se[n1,n1] + sw[0,n1]  + ne[n1,0]  + nw[0,0];  % NW
+   roh[0,n1]   = se[n1,n2] + sw[0,n2]  + ne[n1,n1] + nw[0,n1]; % NE
+   roh[n1,0]   = se[n2,n1] + sw[n1,n1] + ne[n2,0]  + nw[n1,0]; % SW
+   roh[n1,n1]  = se[n2,n2] + sw[n1,n2] + ne[n2,n1] + nw[n1,n1];% SE
+   
+   % edges
+   
+   {FOR j FROM 1 TO n2 DO
+      roh[0,j]  = se[n1,j-1] + sw[0,j-1]  + ne[n1,j] + nw[0,j];	 % North
+      roh[n1,j] = se[n2,j-1] + sw[n1,j-1] + ne[n2,j] + nw[n1,j]};% South
+   
+   {FOR i FROM 1 TO n2 DO  
+      roh[i,0]  = se[i-1,n1] + sw[i,n1] + ne[i-1,0] + nw[i,0];	 % West
+      roh[i,n1] = se[i-1,n2] + sw[i,n2] + ne[i-1,n1] + nw[i,n1]};% East
+   
+   % The interior is easy.
+   {FOR i FROM 1 TO n2 DO
+      {FOR j FROM 1 TO n2 DO
+	 roh[i,j] = se[i-1,j-1] + sw[i,j-1] + ne[i-1,j] + nw[i,j]}};
+   in
+     roh};
+
+
+% 			Phase II:
+%
+% Given charge density rho compute a new electrostatic
+% potential phi' such that del2(phi') = rho.
+% 
+% Phi from the previous timestep is used as an initial
+% approximation.
+% 
+% Assume phi[i] = phi + error[i]
+% Compute d_phi = Laplacian(phi[i]) = Laplacian(phi) + Laplacian(error[i])
+% Compute d_error = d_phi - rho = Laplacian(error[i])
+% Compute error = Inverse_Laplacian(d_error)
+%	        = Inverse_Laplacian(Laplacian(error[i])) ~= error[i]
+% phi[i+1] = phi[i] - error
+%
+
+DEF calculate_potential rho phi niter depth n =
+  {res = 0;    
+   in {FOR i from 1 to niter do
+	 d_phi    = calculate_laplacian phi n;	
+	 d_error  = sub_mesh d_phi rho n;
+	 error    = V_cycle d_error depth n;
+	 NEXT phi = sub_mesh phi error n;
+       FINALLY phi}};
+
+%%%		Multigrid Laplacian Inverse
+%%%
+%%% Find Phi such that Laplacian(phi) = D_phi using a multigrid method.
+%%%
+DEF V_cycle d_phi depth n =
+  IF depth == 0 THEN
+    calculate_laplacian_inverse d_phi n
+  ELSE
+    {
+     %% First we invert D_phi on a course mesh
+     %% and interpolate to approximate phi.
+     course_d_phi = project d_phi n;
+     half_n       = fix (n/2);
+     course_phi   = v_cycle course_d_phi (depth - 1) half_n;
+     phi1         = interpolate course_phi half_n;
+     
+     %% If we assume phi1 = phi + error then
+     %% Lapacian(phi1) = d_phi + laplacian(error)
+     
+     d_phi1  = calculate_laplacian phi1 n;
+     d_error = sub_mesh d_phi1 d_phi n;
+     error   =  calculate_laplacian_inverse d_error n;
+     phi     = sub_mesh phi1 error n;
+     in phi};
+
+
+DEF calculate_laplacian phi n = apply_operator_to_mesh laplacian phi n;
+
+DEF calculate_laplacian_inverse d_phi n = apply_operator_to_mesh laplacian_inverse d_phi n;
+
+DEF laplacian phi (iu, i, il) (jl, j, jr) = 
+  -((phi[iu,jl] +     phi[iu,j] +     phi[iu,jr]) +
+    (phi[i,jl]  - 8 * phi[i,j]  +     phi[i ,jr]) +
+    (phi[il,jl] +     phi[il,j] +     phi[il,jr]));
+
+
+DEF laplacian_inverse R (iu, i, il) (jl, j, jr) =
+  ((0.0284 * R[iu,jl] +  0.0356 * R[i,jl] + 0.0284 * R[il,jl]) +
+   (0.0356 * R[iu,j ] +  0.1570 * R[i,j ] + 0.0356 * R[il,j ]) +
+   (0.0284 * R[iu,jr] +  0.0356 * R[i,jr] + 0.0284 * R[il,jr]));
+
+
+DEF apply_operator_to_mesh operator phi n =
+  {n1 = n - 1;
+   n2 = n - 2;
+   r = matrix((0,n1),(0,n1));
+   
+   %corners
+   r[0,0] =   {iu = n1;  i = 0;	il = 1;
+	       jl = n1;  j = 0;	jr = 1;	
+	       IN operator phi (iu, i, il) (jl, j, jr)};
+   
+   r[0,n1] =  {iu = n1;  i = 0; 	il = 1;
+	       jl = n2;  j = n1;	jr = 0;	
+	       IN operator phi (iu, i, il) (jl, j, jr)};
+   
+   r[n1,0] =  {iu = n2;   i = n1;  	il = 0;
+	       jl = n1;   j = 0;	jr = 1;	
+	       IN operator phi (iu, i, il) (jl, j, jr)};
+   
+   r[n1,n1] = {iu = n2;  i = n1;  	il = 0;
+	       jl = n2;  j = n1;	jr = 0;	
+	       IN operator phi (iu, i, il) (jl, j, jr)};
+   
+   % Edges
+   op_phi = operator phi;			% Eliminate common subexpressions
+   top    = (n1,  0, 1);			% in applying the operator
+   op_top = op_phi top;
+   bot    = (n2, n1, 0);
+   op_bot = op_phi bot;
+   {FOR j from 1 to n2 do
+      jl = j - 1;	jr = j + 1;	
+      r[0,j]  =  op_top (jl, j, jr);	% TOP i = 0
+      r[n1,j] =  op_bot (jl, j, jr)};	% Bottom i = n-1
+   {FOR i from 1 to n2 do
+      iu = i - 1;     il = i + 1;
+      r[i,0]  = op_phi (iu, i, il) (n1,  0, 1);	% Left j = 0
+      r[i,n1] = op_phi (iu, i, il) (n2, n1, 0)};	% right j = n1
+   
+   % interior
+   {FOR i from 1 to n2 do
+      iu = i - 1; 	il = i + 1;
+      op_row = op_phi (iu, i, il);
+      {FOR j from 1 to n2 do
+	 jl = j - 1;	jr = j + 1;	
+	 r[i,j] = op_row (jl, j, jr)}};
+   IN r};
+
+
+% Project a mesh onto one of half the rank. 
+
+DEF project R n =
+  { 
+   n1 = n - 1;
+   n2 = n - 2;
+   half_n = fix (n/2);
+   half_n1 = half_n - 1;
+   half_n2 = half_n - 2;
+   
+   res = matrix((0,half_n1),(0,half_n1));
+   
+   % corners
+   res[0, 0 ] = {iu = N1;  i  = 0;  il = 1;
+		 jl = N1;  j  = 0;  jr = 1;
+		 IN
+		   (0.25 * R[iu,jl] + 0.5 * R[iu,j] + 0.25 * R[iu,jr]) +    % NW
+		   (0.5  * R[i ,jl] + 1.0 * R[i ,j] + 0.5  * R[i ,jr]) +
+		   (0.25 * R[il,jl] + 0.5 * R[il,j] + 0.25 * R[il,jr])};
+   res[0, half_N1] = {iu = N1;  i  = 0;  il = 1;
+		      jl = N2;  j  = N1; jr = 0;
+		      IN
+			(0.25 * R[iu,jl] + 0.5 * R[iu,j] + 0.25 * R[iu,jr]) +    % NE
+			(0.5  * R[i ,jl] + 1.0 * R[i ,j] + 0.5  * R[i ,jr]) +
+			(0.25 * R[il,jl] + 0.5 * R[il,j] + 0.25 * R[il,jr])};
+   res[half_N1,0 ] = {iu = N2;  i  = N1; il = 0;
+		      jl = N1;  j  = 0;  jr = 1;
+		      IN
+			(0.25 * R[iu,jl] + 0.5 * R[iu,j] + 0.25 * R[iu,jr]) +    % SW
+			(0.5  * R[i ,jl] + 1.0 * R[i ,j] + 0.5  * R[i ,jr]) +
+			(0.25 * R[il,jl] + 0.5 * R[il,j] + 0.25 * R[il,jr])};
+   res[half_N1,half_N1] = {iu = N2;  i  = N1; il = 0;
+			   jl = N2;  j  = N1; jr = 0;
+			   IN
+			     (0.25 * R[iu,jl] + 0.5 * R[iu,j] + 0.25 * R[iu,jr]) +    % SE
+			     (0.5  * R[i ,jl] + 1.0 * R[i ,j] + 0.5  * R[i ,jr]) +
+			     (0.25 * R[il,jl] + 0.5 * R[il,j] + 0.25 * R[il,jr])};
+   % Edges
+   
+   {FOR jj from 1 to half_n2 do  
+      jl = j - 1;  j  = (2 * jj);  jr = j + 1;	
+      res[0,jj] = (0.25 * R[n1,jl] + 0.5 * R[n1,j] + 0.25 * R[n1,jr]) +     % North
+		  (0.5  * R[0 ,jl] + 1.0 * R[0 ,j] + 0.5  * R[0 ,jr]) +
+		  (0.25 * R[1 ,jl] + 0.5 * R[1 ,j] + 0.25 * R[1,jr]);
+      res[half_n1,jj] =
+	(0.25 * R[N2,jl] + 0.5 * R[N2,j]  + 0.25 * R[N2,jr]) +     % South
+	(0.5  * R[N1,jl] + 1.0 * R[N1,j]  + 0.5  * R[N1,jr]) +
+	(0.25 * R[0 ,jl] + 0.5 * R[0 ,j] + 0.25 * R[0 ,jr])};
+   
+   {FOR ii from 1 to half_n2 do
+      iu = i - 1;  i  = (2 * ii);  il = i + 1;
+      res[ii,0] = (0.25 * R[iu,n1] + 0.5 * R[iu,0] + 0.25 * R[iu,1]) +	      % West
+		  (0.5  * R[i ,n1] + 1.0 * R[i ,0]  + 0.5  * R[i ,1]) +
+		  (0.25 * R[il,n1] + 0.5 * R[il,0]  + 0.25 * R[il,1]);
+      res[ii,half_n1] = 
+	(0.25 * R[iu,N2] + 0.5 * R[iu,N1] + 0.25 * R[iu,0]) +      % East
+	(0.5  * R[i ,N2] + 1.0 * R[i ,N1] + 0.5  * R[i ,0]) +
+	(0.25 * R[il,N2] + 0.5 * R[il,N1] + 0.25 * R[il,0])};
+   
+   % interior
+   {FOR ii from 1 to half_n2 do
+      {FOR jj from 1 to half_n2 do
+	 iu = i - 1;  i  = (2 * ii);  il = i + 1;
+	 jl = j - 1;  j  = (2 * jj);  jr = j + 1;	
+	 res[ii,jj] = (0.25 * R[iu,jl] + 0.5 * R[iu,j] + 0.25 * R[iu,jr]) +
+		      (0.5  * R[i ,jl] + 1.0 * R[i ,j] + 0.5  * R[i ,jr]) +
+		      (0.25 * R[il,jl] + 0.5 * R[il,j] + 0.25 * R[il,jr])}};
+   IN res};
+
+
+% Generate an ((0,n-1),(0,n-1)) mesh by interpolating one of half the rank.
+% 
+%       ii-1,jj-1       ii-1,jj                       i-2,j-2         i-2,j
+%           *               *                            *               *                  
+% 
+% 
+%                                      ==>                       x       x
+%   
+% 
+%           *               *                            *       x       x
+%         ii,jj-1         ii,jj                         i,j-2   i,j-1   i,j
+%           
+
+DEF interpolate R half_n =
+  {n = 2 * half_n;
+   n1 = n - 1;
+   
+   half_n1 = half_n - 1;
+   half_n2 = half_n - 2;
+   res = matrix((0,n1),( 0,n1));
+   
+   % Four corners - this is a little tricky.  The three points to the left
+   % and above (0,0) represent the other corners with periodic boundaries.
+   
+   res[0,0]   = R[0,0];
+   res[0,n1]  = 0.5 * (R[0,0] + R[0,half_n1]);
+   res[n1,0]  = 0.5 * (R[0,0] + R[half_n1,0]);
+   res[n1,n1] = 0.25 * ((R[0,0]       + R[0,half_n1]) +
+			(R[half_n1,0] + R[half_n1,half_n1]));
+   
+   % edges
+   {for jj from 1 to half_n1 do
+      j = 2*jj;	
+      res[0,j]    = R[0,jj];					% north
+      res[0,j-1]  = 0.5 * (R[0,jj] + R[0,jj-1]);		% north
+      res[n1,j]   = 0.5 * (R[0,jj] + R[half_n1,jj]);		% south
+      res[n1,j-1] = 0.25 * ((R[0,jj]       + R[0,jj-1]) +	% south
+			    (R[half_n1,jj] + R[half_n1,jj-1]))};
+   
+   {for ii from 1 to half_n1 do
+      i = 2*ii;
+      res[i,0]    = R[ii,0];				% west
+      res[i,n1]   = 0.5 * (R[ii,0] + R[ii,half_n1]);	% east
+      res[i-1,0]  = 0.5 * (R[ii,0] + R[ii-1,0]);		% west
+      res[i-1,n1] = 0.25 * ((R[ii,0]   + R[ii,half_n1]) +	% east
+			    (R[ii-1,0] + R[ii-1,half_n1]))};
+   % Interior 
+   {for ii from 1 to half_n1 do
+      {for jj from 1 to half_n1 do
+	 i = 2*ii; j = 2*jj;			% i and j range from 1 to n2
+	 res[i,j]     = R[ii,jj];
+	 res[i,j-1]   = 0.5 * (R[ii,jj] + R[ii,jj-1]);
+	 res[i-1,j]   = 0.5 * (R[ii,jj] + R[ii-1,jj]);
+	 res[i-1,j-1] = 0.25 * ((R[ii,jj]   + R[ii,jj-1]) +
+				(R[ii-1,jj] + R[ii-1,jj-1]))}};
+   IN Res};
+
+
+%%%		Phase III
+%%%
+%%%	 Calculate electric fields.
+%%%
+%%% The x and y components of the electric field are approximated
+%%% by the first partial difference in each dimension.
+%%%
+
+DEF calculate_field_x phi n =
+  {delta_x = 1/n;
+   n1      = n - 1;
+   F       = matrix((0,n1),(0,n1));
+   {FOR i from 0 to n1 do
+      {FOR j from 0 to n1-1 do
+	 F[i,j] = (phi[i,j+1] - phi[i,j]) * delta_x};
+      F[i,n1] =  (phi[i,0] - phi[i,n1]) * delta_x}
+   in F};
+
+DEF calculate_field_y phi n =
+  {delta_y = 1/n;
+   n1 = n - 1;
+   F       = matrix((0,n1),(0,n1));
+   {FOR i from 0 to n1-1 do
+      {FOR j from 0 to n1 do
+	 F[i,j] = (phi[i+1,j] - phi[i,j]) * delta_y}};
+   {FOR j from 0 to n1 do
+      F[n1,j] = (phi[0,j] - phi[n1,j]) * delta_y};
+   IN F};
+
+
+%%%		 Phase IV: Particle push. 
+%%%
+%%% Each particle has an initial velocity determined by its motion
+%%% during the previous timestep and is accelerated by the field
+%%% induced by the collection of particles.
+%%%
+%%% Step 1. Compute the acceleration of esch particle.
+%%%         Find maximum acceleration in x and y.
+%%% Step 2. Determine a safe delta T, i.e. such that no particle
+%%%         will move a distance greater than the width of a cell.
+%%% Step 3. Compute new position, velocity, and cell of each particle.
+%%%         The new cell is determined relative to the old cell
+%%%         containing the particle.
+%%% Step 4. Regroup particles into one list per cell.
+
+DEF Push_Particles particle_heap m particles Ex Ey n charge mass =
+  {x_pos, y_pos, x_vel, y_vel, next_pointers = particle_heap;
+   n1 = n - 1;
+   n2 = n - 2;
+
+   new_x_pos = array(1,m);	% new particle heap 
+   new_y_pos = array(1,m);
+   new_x_vel = array(1,m);
+   new_y_vel = array(1,m);
+   new_next  = array(1,m);
+   new_particle_heap = new_x_pos, new_y_pos, new_x_vel, new_y_vel, new_next;
+   
+   receptor  = array(1,m);	% Neighbor to receive particle 
+   
+   new_particles = 2D_array((0,n1),(0,n1));
+   
+   %% Acceleration
+   new_x_acc, new_y_acc = Calculate_particle_accelerations particle_heap m
+			                                   particles
+			                                   Ex Ey n Charge mass;
+   %% Timestep
+   max_acc = Calculate_maximum_acceleration particle_heap new_x_acc new_y_acc particles n; 
+   max_vel = Calculate_maximum_velocity particle_heap particles n;
+   delta_t = calculate_delta_t max_acc max_vel;
+   
+   %% Position and Velocity
+   call Calculate_particle_motion receptor new_particle_heap 	
+	                          new_x_acc new_y_acc delta_t
+				  particle_heap
+				  particles n;
+   
+   %% New particle lists.
+   
+   %corners
+   new_particles[0,0]   = collect_lists particles next_pointers new_next receptor
+			  n1 0 1 n1 0 1;	% NW
+   new_particles[0,n1]  = collect_lists particles next_pointers new_next receptor
+			  n1 0 1 n2 n1 0;	% NE
+   new_particles[n1,0]  = collect_lists particles next_pointers new_next receptor
+			  n2 n1 0 n1 0 1;	% SW
+   new_particles[n1,n1] = collect_lists particles next_pointers new_next receptor
+			  n2 n1 0 n2 n1 0;	% SE
+
+   % edges
+   {FOR j from 1 to n2 do
+      new_particles[0,j]  = collect_lists particles next_pointers new_next receptor
+			    n1 0 1 (j-1) j (j+1);	% North
+      new_particles[n1,j] = collect_lists particles next_pointers new_next receptor
+			    n2 n1 0 (j-1) j (j+1)};% South
+
+   {FOR i from 1 to n2 do
+      new_particles[i,0] = collect_lists particles next_pointers new_next receptor
+			   (i-1) i (i+1) n1 0 1;	% West
+      new_particles[i,n1] = collect_lists particles next_pointers new_next receptor
+			    (i-1) i (i+1) n2 n1 0};% East
+   % interior
+   {FOR i from 1 to n2 do
+      {FOR j from 1 to n2 do
+	 new_particles[i,j] = collect_lists particles next_pointers new_next receptor
+			      (i-1) i (i+1) (j-1) j (j+1)}};
+   IN
+     new_particles, new_particle_heap, delta_t};
+
+
+%%% Calculate the X and Y components of the acceleration for
+%%% each particle.
+
+DEF Calculate_particle_accelerations particle_heap m particles
+                                     Ex Ey n charge mass =
+  {n1 = n - 1;
+   n2 = n - 2;
+   acc_x = array(1,m);	% acceleration for current time-step
+   acc_y = array(1,m);
+   
+   Specific_charge = charge / mass;
+   
+   {FOR i from 0 to n2 do
+      {FOR j from 0 to n2 do
+	 call compute_acceleration acc_x acc_y particle_heap
+	                           Ex Ey n specific_charge
+				   particles[i,j] i (i+1) j (j+1)}};
+      
+   % last row: i = n1
+   {FOR j FROM 0 TO n2 DO
+      call compute_acceleration acc_x acc_y particle_heap
+	                        Ex Ey n specific_charge
+				particles[n1,j] n1 0 j (j+1)};
+
+      
+   % Last column: j = n1
+   {FOR i FROM 0 TO n2 DO
+      call compute_acceleration acc_x acc_y particle_heap
+		                Ex Ey n specific_charge
+				particles[i,n1] i (i+1) n1 0};
+
+   % South-west corner
+   call compute_acceleration acc_x acc_y particle_heap
+	                     Ex Ey n specific_charge
+			     particles[n1,n1] n1 0 n1 0
+   in acc_x, acc_y};
+
+
+
+
+%%% Compute acceleration of particles in cell i,j.
+
+DEF compute_acceleration acc_x acc_y
+                         (x_pos, y_pos, x_vel, y_vel, next_pointers)
+                         Ex Ey n specific_charge
+                         particle i il j jr  =
+  {Ex_ij  = Ex[i,j];		% Field at north edge 
+   Ex_ij1 = Ex[il,j];		% Field at south edge 
+   Ey_ij  = Ey[i,j];		% Field at west edge 
+   Ey_ij1 = Ey[i,jr];		% Field east edge 
+   {while particle <> 0 do
+	NEXT particle = next_pointers[particle];
+	x  = x_pos[particle] - j; 	% displacement from west edge of cell
+	y  = y_pos[particle] - i; 	% displacement from north edge of cell
+	x1 = 1 - x; 		% displacement from east edge of cell 
+	y1 = 1 - y;
+	
+	%calculate acceleration from electric field. 
+	
+	Ax = - specific_charge * (Ex_ij * y1 + Ex_ij1 * y); % cells per sec per sec %
+	Ay = - specific_charge * (Ey_ij * x1 + Ey_ij1 * x);
+	
+	acc_x[particle] = Ax;
+	acc_y[particle] = Ay
+   }};
+
+
+DEF Calculate_maximum_velocity (x_pos, y_pos, x_vel, y_vel, next_pointers) particles n =
+  {N1    = n - 1;
+   max_v = 0;
+   IN
+     {FOR i from 0 to N1 do
+	v_row = {maxy_v = 0; 
+		 IN {FOR j from 0 to N1 do
+		       v_cell = max_v_for_cell particles[i,j] x_vel y_vel next_pointers;
+		       NEXT maxy_v = if maxy_v > v_cell then maxy_v else v_cell;
+		     FINALLY maxy_v}};
+	NEXT max_v = if max_v > v_row then max_v else v_row;
+      FINALLY max_v}};
+
+
+DEF max_v_for_cell particle x_vel y_vel next_pointer =
+  {v = 0;
+   IN {WHILE particle <> 0 DO
+	 x = x_vel[particle];
+	 y = y_vel[particle];
+	 vx = if x < 0 then -x else x;
+	 vy = if y < 0 then -y else y;
+	 vxy   = if vx < vy then vy else vx;
+	 NEXT v = if v < vxy then vxy else v;
+	 NEXT particle = next_pointer[particle];
+       FINALLY v}};
+
+
+DEF Calculate_maximum_acceleration (x_pos, y_pos, x_vel, y_vel, next_pointers) x_acc y_acc particles n =
+  {N1    = n - 1;
+   max_a = 0;
+   IN
+     {FOR i from 0 to N1 do
+	a_row = {maxy_a = 0; 
+		 IN {FOR j from 0 to N1 do
+		       a_cell = max_acc_for_cell particles[i,j] x_acc y_acc next_pointers;
+		       NEXT maxy_a = if maxy_a > a_cell then maxy_a else a_cell;
+		     FINALLY maxy_a}};
+	NEXT max_a = if max_a > a_row then max_a else a_row;
+      FINALLY max_a}};
+
+
+DEF max_acc_for_cell particle x_acc y_acc next_pointer =
+  {a = 0;
+   IN {WHILE particle <> 0 DO
+	 x = x_acc[particle];
+	 y = y_acc[particle];
+	 ax = if x < 0 then -x else x;
+	 ay = if y < 0 then -y else y;
+	 axy   = if ax < ay then ay else ax;
+	 NEXT a = if a < axy then axy else a;
+	 NEXT particle = next_pointer[particle];
+       FINALLY a}};
+
+
+%%% 		Calculate new delta_T
+%%%
+%%% Given the maximum acceleration A and the maximum velocity V
+%%% Find a t such that delta_x = A*T^2/2 + V*T < .5
+%%%
+%%% We do a few iterations of Newton's method to find a root of:
+%%%
+%%%   P(t) = A*t^2/2 + V*t - .5
+%%%
+%%%   P'(t) = A*t + v
+%%%
+%%% The recurence is:
+%%%   Tn+1 = Tn - P(Tn) / P'(Tn)
+%%%        = Tn - (A*Tn*Tn/2 + V*Tn - .5) / (A*Tn + V)
+%%%        = (A*Tn*Tn + V*Tn - A*Tn*Tn/2 - V*Tn + .5) / (A*Tn + V)
+%%%        = (A*Tn*Tn/2 + .5) / (A*Tn + V)
+%%%
+DEF Calculate_delta_t A V =
+  if (v < 0.01) then
+    if (a < 0.01) then 5 else sqrt (1/a)
+    else
+      {t = 0.5 / V
+       IN
+	 {FOR i from 1 to 3 do
+	    At = A * t;
+	    NEXT t =  ((At*t + 1)/2) / (At + V);
+	  FINALLY t}};
+
+%%%           Calculate Particle Motion
+%%%
+%%%
+%%% For each particle we record the realtive cell to which it moves.
+%%%
+%%%        NW         NE
+%%%          0 | 1 | 2
+%%%          ---------
+%%%          3 | 4 | 5
+%%%          ---------
+%%%          6 | 7 | 8
+%%%        SW         SE
+
+DEF Calculate_particle_motion receptor
+    new_particle_heap 	
+    new_x_acc new_y_acc delta_t
+    particle_heap
+    particle n =
+  {N1 = n - 1;
+   {FOR i from 0 to N1 do
+      {FOR j from 0 to N1 do
+	 CALL distribute_particles receptor new_particle_heap new_x_acc new_y_acc
+				   delta_t
+				   particle_heap
+				   particle[i,j] i j n}}};
+
+
+DEF distribute_particles receptor
+    (new_x_pos, new_y_pos, new_x_vel, new_y_vel, new_next)
+    acc_x acc_y delta_t
+    (x_pos, y_pos, x_vel, y_vel, next_pointer)
+    particle i j n =
+  {while particle <> 0 do
+     NEXT particle = next_pointer[particle];
+     x  = x_pos[particle]; 	% displacement in j dimension
+     y  = y_pos[particle]; 	% displacement in i dimension
+     Vx = x_vel[particle];	% velocity in cells per sec 
+     Vy = y_vel[particle];
+     Ax = acc_x[particle];
+     Ay = acc_y[particle];
+     
+     % velocity 
+     new_Vx = Ax * delta_t + Vx;
+     new_Vy = Ay * delta_t + Vy;
+     
+     % change in position 
+     new_x = new_vx * delta_t + x;
+     new_y = new_vy * delta_t + y;
+     
+     % Update NEXT particle heap. 
+     
+     new_x_vel[particle] = new_Vx;
+     new_y_vel[particle] = new_Vy;
+     
+     new_x_pos[particle] = if new_x < 0 then n + new_x	      % out west (left) 
+			   else if new_x > n then new_x - n   % out east (right)
+				else new_x;	           
+     new_y_pos[particle] = if new_y < 0 then n + new_y	      % out north (top)
+			   else if new_y > n then new_y - n   % out south (bottom)
+				else new_y;
+     
+     % determine new cell for particle. 
+     case = if new_x < j then
+     	      (if new_y < i then  0		% moving NW
+	       else if new_y < i+1 then 3 	% moving W
+		    else 6)			% moving SW
+	    else if new_x < j+1.0 then
+		   (if new_y < i then 1		% moving N
+		    else if new_y < i+1 then 4	% staying Home
+			 else 7)		% moving S
+		 else
+		   (if new_y < i then 2		% moving NE
+		    else if new_y < j+1 then 5	% moving E
+			 else 8);		% moving SE
+     
+     receptor[particle] = case}; 	%record for collection phase.%
+
+
+
+%%%                     Collect List
+%%%
+%%%  For each cell we scan its particle list looking for particles destined
+%%%  for us.  These lists are formed as <head,tail> pairs, where the tail
+%%%  points to a particle with an empty next field.  This way the nine list
+%%%  can be merged by concatenating tails to heads.
+%%%
+%%%         Receptors
+%%%
+%%%        NW         NE
+%%%          8 | 7 | 6
+%%%          ---------
+%%%          5 | 4 | 3
+%%%          ---------
+%%%          1 | 2 | 0
+%%%        SW         SE
+%%%
+%%%  
+
+DEF collect_lists particles next_ptrs new_next_ptrs receptor iu i il jl j jr =
+  {
+   % Collect nine lists for each cell.
+   Head_NW, Tail_NW     = get_particles particles[iu,jl] 
+			                next_ptrs new_next_ptrs receptor 8;
+   Head_N,  Tail_N      = get_particles particles[iu,j ] 
+			                next_ptrs new_next_ptrs receptor 7;
+   Head_NE, Tail_NE     = get_particles particles[iu,jr] 
+			                next_ptrs new_next_ptrs receptor 6;
+   Head_W,  Tail_W      = get_particles particles[i ,jl] 
+			                next_ptrs new_next_ptrs receptor 5;
+   Head_Home, Tail_home = get_particles particles[i ,j ] 
+			                next_ptrs new_next_ptrs receptor 4;
+   Head_E,  Tail_E      = get_particles particles[i ,jr] 
+			                next_ptrs new_next_ptrs receptor 3;
+   Head_SW, Tail_SW     = get_particles particles[il,jl] 
+			                next_ptrs new_next_ptrs receptor 2;
+   Head_S,  Tail_S      = get_particles particles[il,j ] 
+			                next_ptrs new_next_ptrs receptor 1;
+   Head_SE, Tail_SE     = get_particles particles[il,jr] 
+			                next_ptrs new_next_ptrs receptor 0;
+
+   % Coalesce the nine lists. 
+   H1 = head_NW;
+   T1 = tail_NW;
+   
+   H2 = if H1 == 0 then head_N else H1;
+   T2 = if head_N == 0 then T1 		% no new list. %
+	else if T1 == 0 then tail_N	% no previous list. %
+	     else {new_next_ptrs[t1] = head_N	% combine lists. %
+		   in tail_N};
+   
+   H3 = if H2 == 0 then head_NE else H2;
+   T3 = if head_NE == 0 then T2 		% no new list. %
+	else if T2 == 0 then tail_NE	% no previous list. %
+	     else {new_next_ptrs[t2] = head_NE	% combine lists. %
+		   in tail_NE};
+   
+   H4 = if H3 == 0 then head_W else H3;
+   T4 = if head_W == 0 then T3 		% no new list. %
+	else if T3 == 0 then tail_W	% no previous list. %
+	     else {new_next_ptrs[t3] = head_W	% combine lists. %
+		   in tail_W};
+   
+   H5 = if H4 == 0 then head_HOME else H4;
+   T5 = if head_HOME == 0 then T4 	% no new list. %
+	else if T4 == 0 then tail_HOME	% no previous list. %
+	     else {new_next_ptrs[t4] = head_HOME	% combine lists. %
+		   in tail_HOME};
+   
+   H6 = if H5 == 0 then head_E else H5;
+   T6 = if head_E == 0 then T5 		% no new list. %
+	else if T5 == 0 then tail_E	% no previous list. %
+	     else {new_next_ptrs[t5] = head_E	% combine lists. %
+		   in tail_E};
+   
+   H7 = if H6 == 0 then head_SW else H6;
+   T7 = if head_SW == 0 then T6 		% no new list. %
+	else if T6 == 0 then tail_SW	% no previous list. %
+	     else { new_next_ptrs[t6] = head_SW	% combine lists. %
+		   in tail_SW};
+   
+   H8 = if H7 == 0 then head_S else H7;
+   T8 = if head_S == 0 then T7 		% no new list. %
+	else if T7 == 0 then tail_S	% no previous list. %
+	     else { new_next_ptrs[t7] = head_S	% combine lists. %
+		   in tail_S};
+   
+   H9 = if H8 == 0 then head_SE else H8;
+   T9 = if head_SE == 0 then T8 		% no new list. %
+	else if T8 == 0 then tail_SE	% no previous list. %
+	     else {new_next_ptrs[t8] = head_SE	% combine lists. %
+		   in tail_SE};
+   in
+     if t9 == 0 then 0 else {new_next_ptrs[t9] = 0	% terminate list %
+			  IN H9}};
+
+
+DEF get_particles particle next_ptr new_next_ptr receptor target =
+  {
+   % Find first particle in list destined for target cell. 
+   
+   particle_head = {WHILE (if particle == 0 then (1==2) 
+			   else receptor[particle] <> target) DO
+		      NEXT particle = next_ptr[particle]
+		    FINALLY particle};
+   
+   % Find next_ptr particle in list for target cell, if there is one.
+   
+   start_tail   = if particle_head == 0 then 0
+		  else {particle = particle_head;
+			IN
+			  {WHILE (if particle == 0 then (1==2)
+				  else receptor[particle] <> target) DO
+			     NEXT particle = next_ptr[particle]
+			   FINALLY particle}};
+   
+   % Tack on all remaining particles for target cell, leaving an empty
+   %  next field at the end of the list. 
+   
+   particle_tail = if start_tail == 0 then 0
+		   else
+		     {prev_tail = start_tail;
+		      particle = next_ptr[start_tail]
+		      IN
+			{WHILE particle <> 0 do
+			   NEXT particle = next_ptr[particle];
+			   NEXT prev_tail = if receptor[particle] == target then
+					      {new_next_ptr[prev_tail] = particle
+					       IN particle}
+					    else prev_tail;
+			 FINALLY prev_tail}};
+   IN particle_head, particle_tail};
+
+
+
+DEF add_mesh M1 M2 n =
+  {n1 = n - 1;
+   res = matrix((0,n1),(0,n1));
+   {FOR i from 0 to n1 do
+      {FOR j from 0 to n1 do
+	 res[i,j] = m1[i,j] + m2[i,j]}};
+   IN res};
+
+DEF sub_mesh M1 M2 n =
+  {n1 = n - 1;
+   res = matrix((0,n1),(0,n1));
+   {FOR i from 0 to n1 do
+      {FOR j from 0 to n1 do
+	 res[i,j] = m1[i,j] - m2[i,j]}};
+   IN res};
+
+def init_pic n m =
+  {phi0 = make_2d_array ((0,n-1),(0,n-1)) z2;
+   particle_heap = (x, y, vx, vy, next_index);
+   x = distr m n .457791 .777123;
+   y = distr m n .33551 .232135;
+   vx = make_1d_array (1,m) z1;
+   vy = make_1d_array (1,m) z1;
+   next_index, particles = build_lists x y n m;
+   in x, y, vx, vy, next_index, particles};
+
+def z2 (i,j) = 0;
+
+def z1 i =0;
+
+def distr m n su sl =
+  {x = 1d_array (1,m);
+   {for i from 1 to m do
+      r, (next su), (next sl) = ranf su sl;
+      xx = r*r*n + .5*n;
+      x[i] = if (xx>=n) then xx-n else xx};
+   in x};
+
+def ranf su sl =
+  {p = 2.^24;
+   q = 1./p;
+   a = 6331197.*sl+1.;
+   b = 1136868.*sl;
+   c = 6331197.*su;
+   bb = (b-(fix b*q)*p)+(c-(fix c*q)*p)+(fix a*q);
+   new_su = bb-(fix bb*q)*p;
+   new_sl = a-(fix a*q)*p;
+   in (new_su, new_sl, new_su)};
+
+def build_lists x y n m =
+  {particles = 2d_array ((0,n-1),(0,n-1));
+   next_index = 1d_array (1,m);
+   {for i from 0 to n-1 do
+      {for j from 0 to n-1 do
+	 l=0;
+	 last = {for k from 1 to m do
+		   ii = fix y[k];
+		   jj = fix x[k];
+		   next l = if((ii==i)and(jj==j)) then
+			      if (l==0) then {particles[i,j] = k; in k}
+			      else {next_index[l] = k; in k}
+			    else l;	       
+	finally l};
+	if(last<>0) then {next_index[last] = 0} else {particles[i,j]=0}}};
+  in next_index, particles};
+
+def ret_x (x, y, vx, vy, next_index, particles) = x;
+
+def ret_y (x, y, vx, vy, next_index, particles) = y;
+
+def ret_vx (x, y, vx, vy, next_index, particles) = vx;
+
+def ret_vy (x, y, vx, vy, next_index, particles) = vy;
+
+def ret_next_index (x, y, vx, vy, next_index, particles) = next_index;
+
+def ret_particles (x, y, vx, vy, next_index, particles) = particles;
+
+def ret_particle_heap (x, y, vx, vy, next_index, particles) = x, y, vx, vy, next_index;
+
+def integrate_over_region x n =
+  {sum = 0;
+   in {for i from 0 to n-1 do
+	 next sum = {for j from 0 to n-1 do
+		       next sum = sum + x[i,j];
+		     finally sum};
+       finally sum}};
+
+def init2 n (i,j) =
+  {pi=3.1412;
+   in
+     sin(i/n*2.*pi)+cos(j/n*2.*pi)};
+

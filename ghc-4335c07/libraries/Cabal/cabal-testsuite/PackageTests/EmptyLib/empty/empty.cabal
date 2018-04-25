@@ -1,0 +1,6 @@
+name: emptyLib
+Cabal-version: >= 1.2
+version: 1.0
+build-type: Simple
+
+Library

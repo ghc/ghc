@@ -1,0 +1,2 @@
+testdup-1.0: package has duplicate dependencies: testpkg-1.2.3.4-XXX (use --force to override)
+testdup-1.0: package has duplicate dependencies: testpkg-1.2.3.4-XXX (ignoring)

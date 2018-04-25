@@ -1,0 +1,9 @@
+name: subsection
+version: 1
+cabal-version: >= 1.6
+
+library
+    build-depends: base >= 4.9 && <4.10
+    hs-source-dirs: .
+    iff os(windows)
+    	build-depends: containers

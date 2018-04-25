@@ -1,0 +1,9 @@
+// Verify continuations get created
+
+foo() {
+  bits32 x, y, z;
+  x = 3;
+  foreign "C--" bar() "safe";
+  y = 4;
+  return (z);
+}

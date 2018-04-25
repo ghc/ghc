@@ -1,0 +1,6 @@
+
+ScopedNamedWildcardsBad.hs:8:21: error:
+    • Couldn't match expected type ‘Bool’ with actual type ‘Char’
+    • In the first argument of ‘not’, namely ‘x’
+      In the expression: not x
+      In an equation for ‘v’: v = not x

@@ -1,0 +1,3 @@
+
+Check05.hs:1:16:
+    Warning: -fpackage-trust ignored; must be specified with a Safe Haskell flag

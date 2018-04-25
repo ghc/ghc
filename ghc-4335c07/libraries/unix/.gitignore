@@ -1,0 +1,24 @@
+# Specific generated files
+GNUmakefile
+autom4te.cache/
+.cabal-sandbox/
+cabal.project.local
+cabal.sandbox.config
+config.log
+config.status
+configure
+dist/
+dist-install/
+dist-newstyle/
+.ghc.environment.*
+ghc.mk
+include/HsUnixConfig.h
+include/HsUnixConfig.h.in
+unix.buildinfo
+tests/.hpc.*
+tests/*.eventlog
+tests/*.genscript
+tests/*.o
+tests/*.hi
+tests/*.normalised
+*~

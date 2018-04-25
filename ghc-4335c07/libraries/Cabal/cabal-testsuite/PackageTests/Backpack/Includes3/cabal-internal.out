@@ -1,0 +1,28 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - Includes3-0.1.0.0 (lib:sigs) (first run)
+ - Includes3-0.1.0.0 (lib:indef) (first run)
+ - Includes3-0.1.0.0 (lib:indef with Data.Map=containers-<VERSION>:Data.Map) (first run)
+ - Includes3-0.1.0.0 (exe:exe) (first run)
+Configuring library 'sigs' for Includes3-0.1.0.0..
+Preprocessing library 'sigs' for Includes3-0.1.0.0..
+Building library 'sigs' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Configuring library 'indef' for Includes3-0.1.0.0..
+Preprocessing library 'indef' for Includes3-0.1.0.0..
+Building library 'indef' instantiated with Data.Map = <Data.Map>
+for Includes3-0.1.0.0..
+Configuring library 'indef' instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for Includes3-0.1.0.0..
+Preprocessing library 'indef' for Includes3-0.1.0.0..
+Building library 'indef' instantiated with
+  Data.Map = containers-<VERSION>:Data.Map
+for Includes3-0.1.0.0..
+Configuring executable 'exe' for Includes3-0.1.0.0..
+Preprocessing executable 'exe' for Includes3-0.1.0.0..
+Building executable 'exe' for Includes3-0.1.0.0..
+# Includes3 exe
+fromList [(0,2),(2,4)]

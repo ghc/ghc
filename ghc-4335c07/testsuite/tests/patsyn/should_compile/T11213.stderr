@@ -1,0 +1,51 @@
+
+T11213.hs:19:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature: pattern P :: Bool
+
+T11213.hs:20:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pe :: () => forall a. a -> Ex
+
+T11213.hs:21:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pu :: forall p. p -> p
+
+T11213.hs:22:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pue :: forall a. () => forall a1. a -> a1 -> (a, Ex)
+
+T11213.hs:23:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pur :: forall a. (Eq a, Num a) => a -> [a]
+
+T11213.hs:24:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Purp :: forall a a1.
+                      (Eq a, Num a) =>
+                      Show a1 => a -> a1 -> ([a], UnivProv a1)
+
+T11213.hs:25:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pure :: forall a.
+                      (Eq a, Num a) =>
+                      forall a1. a -> a1 -> ([a], Ex)
+
+T11213.hs:26:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Purep :: forall a.
+                       (Eq a, Num a) =>
+                       forall a1. Show a1 => a -> a1 -> ([a], ExProv)
+
+T11213.hs:27:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pep :: () => forall a. Show a => a -> ExProv
+
+T11213.hs:28:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Pup :: forall a. () => Show a => a -> UnivProv a
+
+T11213.hs:29:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
+    Pattern synonym with no type signature:
+      pattern Puep :: forall b.
+                      () =>
+                      forall a. Show a => a -> b -> (ExProv, b)

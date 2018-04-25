@@ -1,0 +1,40 @@
+# Setup configure
+Resolving dependencies...
+Configuring Includes4-0.1.0.0...
+# Setup build
+Preprocessing library 'indef' for Includes4-0.1.0.0..
+Building library 'indef' instantiated with
+  A = <A>
+  B = <B>
+  Rec = <Rec>
+for Includes4-0.1.0.0..
+Preprocessing library 'impl' for Includes4-0.1.0.0..
+Building library 'impl' for Includes4-0.1.0.0..
+Preprocessing library 'indef' for Includes4-0.1.0.0..
+Building library 'indef' instantiated with
+  A = Includes4-0.1.0.0-impl:A
+  B = Includes4-0.1.0.0-impl:B
+  Rec = Includes4-0.1.0.0-impl:Rec
+for Includes4-0.1.0.0..
+Preprocessing executable 'exe' for Includes4-0.1.0.0..
+Building executable 'exe' for Includes4-0.1.0.0..
+# Setup copy
+Installing internal library indef in <PATH>
+Installing internal library impl in <PATH>
+Installing internal library indef in <PATH>
+Installing executable exe in <PATH>
+Warning: The directory <ROOT>/setup.cabal.dist/usr/bin is not in the system search path.
+# Setup register
+Registering library 'indef' instantiated with
+  A = <A>
+  B = <B>
+  Rec = <Rec>
+for Includes4-0.1.0.0..
+Registering library 'impl' for Includes4-0.1.0.0..
+Registering library 'indef' instantiated with
+  A = Includes4-0.1.0.0-impl:A
+  B = Includes4-0.1.0.0-impl:B
+  Rec = Includes4-0.1.0.0-impl:Rec
+for Includes4-0.1.0.0..
+# exe
+A (B (A (B

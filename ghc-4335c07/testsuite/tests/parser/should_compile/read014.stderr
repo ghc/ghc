@@ -1,0 +1,15 @@
+
+read014.hs:4:1: warning: [-Wmissing-signatures (in -Wall)]
+    Top-level binding with no type signature:
+      ng1 :: Num a => p -> a -> a
+
+read014.hs:4:5: warning: [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘x’
+
+read014.hs:6:10: warning: [-Wmissing-methods (in -Wdefault)]
+    • No explicit implementation for
+        ‘+’, ‘*’, ‘abs’, ‘signum’, and ‘fromInteger’
+    • In the instance declaration for ‘Num (a, b)’
+
+read014.hs:8:53: warning: [-Wunused-matches (in -Wextra)]
+    Defined but not used: ‘x’

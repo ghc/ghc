@@ -1,0 +1,5 @@
+# cabal new-build
+Resolving dependencies...
+Build profile: -w ghc-<GHCVER> -O1
+In order, the following will be built:
+ - custom-setup-without-cabal-defaultMain-1.0 (lib:custom-setup-without-cabal-defaultMain) (first run)

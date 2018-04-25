@@ -1,0 +1,21 @@
+-- :cmd accepts an expr of type 'IO String'
+let cmd = return "0"
+:cmd cmd
+
+-- works with multiline mode, handles indention correctly
+:{
+:cmd return $ unlines
+  [ "1"
+  , "2"
+  ]
+:}
+
+-- it should work even 'IO' or 'String' is not in scope
+import Prelude ()
+:cmd cmd
+
+-- or even when a different 'String' is in scope
+import Prelude
+type String = ShowS
+:def macro \_ -> return id
+:macro

@@ -1,0 +1,8 @@
+
+T13640.hs:13:22: error:
+    • Variable not in scope:
+        (.)
+          :: (f0 a c0 -> f0 b c0)
+             -> ((a0 -> b0) -> f1 a0 -> f1 b0) -> f a c -> f b d
+    • Perhaps you want to remove ‘.’ from the explicit hiding list
+      in the import of ‘Prelude’ (T13640.hs:4:1-27).

@@ -1,0 +1,328 @@
+.ps 9
+.sp 2
+
+%     Electrostatic PIC code 
+%
+%         Olaf Lubeck
+%
+%     written in Id Nouveau
+%        makes use of accumulator structure
+%
+
+def setup_accumulators ncells nparticles =
+  {addop = 1;
+   mulop = 2;
+   andop = 3;
+   orop = 4;
+   count = 4*nparticles;
+   acca,accr = make_1d_accumulator (0,(ncells*ncells-1)) (constant 0) addop count;
+   in
+     acca, accr};
+
+def locate particle_posit =
+  {x, y = particle_posit;
+   i = fix x;
+   j = fix y;
+   dx = x-i;
+   dy = y-j;
+   in
+     i, j, dx, dy};
+
+def linear i j ncells = (i * ncells) + j;
+
+def charge_density particles ncells =
+  {nparticles, charge, mass, particle_posit, particle_vel = particles;
+   rhoa, rhor = setup_accumulators ncells nparticles;
+   copy a (i,j) = a[linear i j ncells];
+   rho = make_2d_array ((0,ncells-1),(0,ncells-1)) (copy rhor);
+
+   {for np from 1 to nparticles do      
+      i, j, dx, dy = locate particle_posit[np];
+      rho_ij = charge*(1-dx)*(1-dy);
+      rho_i1j = charge*dx*(1-dy);
+      rho_ij1 = charge*(1-dx)*dy;
+      rho_i1j1 = charge*dx*dy;
+      i1 = remainder (i+1) ncells;
+      j1 = remainder (j+1) ncells;
+      call 1d_accumulate rhoa (linear i j ncells) rho_ij;
+      call 1d_accumulate rhoa (linear i1 j ncells) rho_i1j;
+      call 1d_accumulate rhoa (linear i j1 ncells) rho_ij1;
+      call 1d_accumulate rhoa (linear i1 j1 ncells) rho_i1j1};
+   in
+     rho};
+
+def grad phi ncells =
+  {grad_op mesh (iu,i,il) (jl,j,jr) = (mesh[iu,j]-mesh[i,j]),(mesh[i,jr]-mesh[i,j]);
+   in
+     apply_operator_to_mesh grad_op phi ncells};
+
+defsubst vel_boundary_conds tvx tvy ncells = tvx,tvy;
+
+defsubst posit_boundary_conds tx ty ncells =
+  {xb = if(tx>=ncells) then tx-ncells
+	else if (tx<0) then tx+ncells
+	     else tx;
+   yb = if(ty>=ncells) then ty-ncells
+	else if (ty<0) then ty+ncells
+	     else ty;
+   in
+     xb, yb};
+
+def push_particles particles e ncells dt =
+  {nparticles, charge, mass, particle_posit, particle_vel = particles;
+   
+   new_particles = nparticles, charge, mass, new_particle_posit, new_particle_vel;
+   new_particle_vel = 1d_array (1,nparticles);
+   new_particle_posit = 1d_array (1,nparticles);
+   
+   vmax = 0;
+   amax = 0;
+   n_vmax,n_amax = {for np from 1 to nparticles do
+		      i, j, dx, dy = locate particle_posit[np];
+		      j1 = remainder (j+1) ncells;
+		      i1 = remainder (i+1) ncells;
+		      
+		      x, y = particle_posit[np];
+		      vx, vy = particle_vel[np];
+		      
+		      ex, ey = e[i,j];
+		      exj, eyj = e[i,j1];
+		      exi, eyi = e[i1,j];
+		      
+		      ax = (charge/mass)*(ex*(1-dy) + exj*dy);
+		      ay = (charge/mass)*(ey*(1-dx) + eyi*dx);
+		      
+		      tvx = ax*dt + vx;
+		      tvy = ay*dt + vy;
+		      
+		      tx = tvx*dt + x;
+		      ty = tvy*dt + y;
+		      
+		      new_particle_vel[np] = vel_boundary_conds tvx tvy ncells;
+		      new_particle_posit[np] = posit_boundary_conds tx ty ncells;
+		      
+		      acc = max (abs ax) (abs ay);
+		      vel = max (abs tvx) (abs tvy);
+		      next vmax = max vel vmax;
+		      next amax = max acc amax;
+		      
+		    finally
+		      vmax, amax};
+   in
+     n_vmax, n_amax, new_particles};
+
+def time_step vmax amax = (sqrt (vmax*vmax+2*amax) - vmax)/ amax;
+
+def constant x y = x;
+
+def init_particles nparticles ncells =
+  {particles = nparticles, charge, mass, particle_posit, particle_vel;
+   
+   charge = 1;
+   mass = 1;
+
+   g ncells i = (remainder (i+.1) ncells, remainder (i+1.1) ncells);
+
+   particle_posit = make_1d_array (1,nparticles) (g ncells);
+   particle_vel = make_1d_array (1,nparticles) (constant (0,0));
+   in
+     particles};
+
+def init_phi particles ncells max_depth =
+  {rho = charge_density particles ncells;
+   in
+     solve_for_potential (zeros ncells) rho ncells max_depth 1};
+
+def take_time_step particles phi ncells dt depth =
+  {rho = charge_density particles ncells;
+   new_phi = solve_for_potential phi rho ncells depth 2;
+   e = grad new_phi ncells;
+   vmax, amax, new_particles = push_particles particles e ncells dt;
+   new_dt = time_step vmax amax;
+   in			
+     new_particles, new_phi, new_dt};
+
+def pic particles phi ncells n_steps =
+  {dt=.001;
+   max_depth = (log_2 ncells)-1;
+   depth = 0;
+   in
+     {for t from 1 to n_steps do
+	next particles, next phi, next dt = take_time_step particles phi ncells dt depth;
+	next depth = remainder (depth+1) max_depth;
+      finally
+	dt}};
+
+def log_2 n =
+  {log=0;
+   in
+     {while (n>1) do
+	next n = n/2;
+	next log = log+1;
+      finally
+	log}};
+		
+% 			Phase II:
+%
+% Given charge density rho compute a new electrostatic
+% potential phi' such that del2(phi') = rho.
+% 
+% Phi from the previous timestep is used as an initial
+% approximation.
+% 
+%
+
+defsubst laplacian_op mesh (iu, i, il) (jl, j, jr) = 
+  -(                  mesh[iu,j] +
+    mesh[i,jl]  - 4 * mesh[i,j]  +     mesh[i ,jr] +
+                      mesh[il,j]                  );
+
+
+defsubst avg_op mesh (iu, i, il) (jl, j, jr) =
+  .25* (              mesh[iu,j] +
+        mesh[i,jl] +                mesh[i,jr] +
+                      mesh[il,j]                );
+
+defsubst apply_operator_to_mesh operator mesh n =
+  {n1 = n-1;   n2 = n-2;
+   top_row = ((0,0),(1,n2));
+   bottom_row = ((n1,n1),(1,n2));
+   left_column = ((1,n2),(0,0));
+   right_column = ((1,n2),(n1,n1));
+   interior = ((1,n2),(1,n2));
+   op_interior mesh (i,j) = operator mesh (i-1,i,i+1) (j-1,j,j+1);
+   op_top mesh (i,j) = operator mesh (n1,0,1) (j-1,j,j+1);
+   op_bottom mesh (i,j) = operator mesh (n2,n1,0) (j-1,j,j+1);
+   op_left mesh (i,j) = operator mesh (i-1,i,i+1) (n1,0,1);
+   op_right mesh (i,j) = operator mesh (i-1,i,i+1) (n2,n1,0);
+   r = 2d_array ((0,n1),(0,n1));
+   
+   %corners
+   r[0,0] =   operator mesh (n1,0,1) (n1,0,1);
+   r[0,n1] =  operator mesh (n1,0,1) (n2,n1,0);
+   r[n1,0] =  operator mesh (n2,n1,0) (n1,0,1);
+   r[n1,n1] = operator mesh (n2,n1,0) (n2,n1,0);
+   
+   %edges
+   call fill_2d_array top_row (op_top mesh) r;                    %top
+   call fill_2d_array bottom_row (op_bottom mesh) r;                 %bottom
+   call fill_2d_array left_column (op_left mesh) r;                %left
+   call fill_2d_array right_column (op_right mesh) r;               % right
+   
+   %interior
+   call fill_2d_array interior (op_interior mesh) r;          % interior 
+
+   in
+     r};
+
+defsubst laplacian mesh n = apply_operator_to_mesh laplacian_op mesh n;
+
+defsubst relax mesh f n =
+  {relax_op f mesh (iu,i,il) (jl,j,jr) = .25*f[i,j] + (avg_op mesh (iu,i,il) (jl,j,jr));
+   in
+     apply_operator_to_mesh (relax_op f) mesh n};
+
+defsubst residual u f n =
+  {residual_op f u (iu,i,il) (jl,j,jr) = f[i,j]-laplacian_op u (iu,i,il) (jl,j,jr);
+   in
+    apply_operator_to_mesh (residual_op f) u n};
+
+defsubst zeros n =
+  {constant x i = x;
+   in
+     make_2d_array ((0,n-1),(0,n-1)) (constant 0)};
+
+def solve_for_potential phi rho n depth niter =
+  {for i from 1 to niter do
+	 next phi = V_cycle phi rho n depth;
+   finally phi};
+
+def V_cycle u0 f n depth =
+  {n_half = fix (n/2);
+   n1 = n-1;
+   u = relax u0 f n;
+   in
+     if (depth==0) then
+       relax u f n
+     else
+       {r = residual u f n;
+	e0 = zeros n_half;
+	e = V_cycle e0 (project r n) n_half (depth-1);
+	u_corrected = correct u n e n_half;
+	in
+	  u_corrected}};
+
+def project u n =
+  {proj u (i,j) = u[2*i,2*j];
+   n_half = fix (n/2);
+   n1_half = n_half - 1;
+   u_coarse = make_2d_array ((0,n1_half),(0,n1_half)) (proj u);
+   in
+     u_coarse};
+
+def correct u_fine n e_coarse n_half =
+  {add u e (i,j) = u[i,j]+e[i,j];
+   n1 = n-1;
+   e_fine = interpolate e_coarse n_half;
+   in
+     make_2d_array ((0,n1),(0,n1)) (add u_fine e_fine)};
+   
+def interpolate e_coarse n_half =
+  {n1 = (2*n_half)-1;
+   n1_half = n_half-1;
+   n2_half = n_half-2;
+   e_fine = 2d_array ((0,n1),(0,n1));
+   {for i from 0 to n2_half do
+      ii=2*i;
+      ii1=ii+1;
+      {for j from 0 to n2_half do
+	 jj=2*j;
+	 jj1=jj+1;
+	 e_fine[ii,jj] = e_coarse[i,j];
+	 e_fine[ii1,jj] = .5*(e_coarse[i,j]+e_coarse[i+1,j]);
+	 e_fine[ii,jj1] = .5*(e_coarse[i,j]+e_coarse[i,j+1]);
+	 e_fine[ii1,jj1] = .25*(e_coarse[i,j]+e_coarse[i+1,j]+e_coarse[i,j+1]+e_coarse[i+1,j+1])}};
+
+   %bottom two rows
+   {for j from 0 to n2_half do
+      e_fine[n1-1,2*j] = e_coarse[n1_half,j];
+      e_fine[n1-1,2*j+1] = .5*(e_coarse[n1_half,j]+e_coarse[n1_half,j+1]);
+      e_fine[n1,2*j] = .5*(e_coarse[n1_half,j]+e_coarse[0,j]);
+      e_fine[n1,2*j+1] = .25*(e_coarse[n1_half,j]+e_coarse[0,j]+e_coarse[n1_half,j+1]+e_coarse[0,j+1])};
+      
+   %right two columns
+   {for i from 0 to n2_half do
+      e_fine[2*i,n1-1] = e_coarse[i,n1_half];
+      e_fine[2*i+1,n1-1] = .5*(e_coarse[i,n1_half]+e_coarse[i+1,n1_half]);
+      e_fine[2*i,n1] = .5*(e_coarse[i,n1_half]+e_coarse[i,0]);
+      e_fine[2*i+1,n1] = .25*(e_coarse[i,n1_half]+e_coarse[i,0]+e_coarse[i+1,n1_half]+e_coarse[i+1,0])};
+
+   %right-bottom corners
+   e_fine[n1-1,n1-1] = e_coarse[n1_half,n1_half];
+   e_fine[n1-1,n1] = .5*(e_coarse[n1_half,n1_half]+e_coarse[n1_half,0]);
+   e_fine[n1,n1-1] = .5*(e_coarse[n1_half,n1_half]+e_coarse[0,n1_half]);
+   e_fine[n1,n1] = .25*(e_coarse[n1_half,n1_half]+e_coarse[0,n1_half]+e_coarse[n1_half,0]+e_coarse[0,0]);
+   
+   in
+     e_fine};
+
+def make_rho n =
+  {n1 = n-1;
+   pi = 2*3.14159;
+   f (i,j) = sin (i*pi/n);
+   in
+     make_2d_array ((0,n1),(0,n1)) f};
+
+def make_phi n =
+  {n1 = n-1;
+   nn = n/4;
+   pi2 = 2*3.14159;
+   f (i,j) = sin (i*pi2/n);
+   in
+     make_2d_array ((0,n1),(0,n1)) f};
+
+def make_ij n =
+  {n1 = n-1;
+   f (i,j) = 2*(i+j);
+   in
+     make_2d_array ((0,n1),(0,n1)) f};

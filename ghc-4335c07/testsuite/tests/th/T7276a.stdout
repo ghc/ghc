@@ -1,0 +1,19 @@
+
+<interactive>:3:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘[Dec]’ with ‘Exp’
+      Expected type: Q Exp
+        Actual type: DecsQ
+    • In the expression: [d| a = () |] :: Q Exp
+      In an equation for ‘x’: x = [d| a = () |] :: Q Exp
+
+<interactive>:1:1: error:
+    • Exception when trying to run compile-time code:
+        <interactive>:3:9: error:
+    • Couldn't match type ‘[Dec]’ with ‘Exp’
+      Expected type: Q Exp
+        Actual type: DecsQ
+    • In the expression: [d| a = () |] :: Q Exp
+      In an equation for ‘x’: x = [d| a = () |] :: Q Exp
+(deferred type error)
+      Code: x
+    • In the untyped splice: $x

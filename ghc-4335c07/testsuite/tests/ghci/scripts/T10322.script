@@ -1,0 +1,5 @@
+:set -fobject-code
+:load T10322A T10322B T10322C
+T10322A.a
+T10322B.b
+T10322C.c

@@ -1,0 +1,5 @@
+
+BadSock.hs:30:5: error:
+    • The type family ‘Readable’ should have 1 argument, but has been given none
+    • In the equations for closed type family ‘Foo’
+      In the type family declaration for ‘Foo’
