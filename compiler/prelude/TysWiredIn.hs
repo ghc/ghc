@@ -73,9 +73,9 @@ module TysWiredIn (
         mkTupleTy, mkBoxedTupleTy,
         tupleTyCon, tupleDataCon, tupleTyConName,
         promotedTupleDataCon,
-        unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
+        soloTyCon, soloDataCon, soloDataConId, soloTy, soloTyConKey,
         pairTyCon,
-        unboxedUnitTyCon, unboxedUnitDataCon,
+        unboxedSoloTyCon, unboxedSoloDataCon,
         unboxedTupleKind, unboxedSumKind,
 
         -- ** Constraint tuples
@@ -203,13 +203,13 @@ names in PrelNames, so they use wTcQual, wDataQual, etc
 -- See also Note [Known-key names]
 wiredInTyCons :: [TyCon]
 
-wiredInTyCons = [ -- Units are not treated like other tuples, because then
+wiredInTyCons = [ -- Solos are not treated like other tuples, because then
                   -- are defined in GHC.Base, and there's only a few of them. We
                   -- put them in wiredInTyCons so that they will pre-populate
                   -- the name cache, so the parser in isBuiltInOcc_maybe doesn't
                   -- need to look out for them.
-                  unitTyCon
-                , unboxedUnitTyCon
+                  soloTyCon
+                , unboxedSoloTyCon
                 , anyTyCon
                 , boolTyCon
                 , charTyCon
@@ -667,13 +667,13 @@ bit odd:
   1-tuples:  ??
   0-tuples:  ()     ()#
 
-Zero-tuples have used up the logical name. So we use 'Unit' and 'Unit#'
+Zero-tuples have used up the logical name. So we use 'Solo' and 'Solo#'
 for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
   data ()     = ()
-  data Unit a = Unit a
+  data Solo a = Solo a
   data (a,b)  = (a,b)
 
-NB (Feb 16): for /constraint/ one-tuples I have 'Unit%' but no class
+NB (Feb 16): for /constraint/ one-tuples I have 'Solo%' but no class
 decl in GHC.Classes, so I think this part may not work properly. But
 it's unused I think.
 -}
@@ -703,7 +703,7 @@ isBuiltInOcc_maybe occ =
 
       -- unboxed tuple data/tycon
       "(##)"  -> Just $ tup_name Unboxed 0
-      "Unit#" -> Just $ tup_name Unboxed 1
+      "Solo#" -> Just $ tup_name Unboxed 1
       _ | Just rest <- "(#" `BS.stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
         , "#)" <- rest'
@@ -749,17 +749,17 @@ mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
 
 mkBoxedTupleStr :: Arity -> String
 mkBoxedTupleStr 0  = "()"
-mkBoxedTupleStr 1  = "Unit"   -- See Note [One-tuples]
+mkBoxedTupleStr 1  = "Solo"   -- See Note [One-tuples]
 mkBoxedTupleStr ar = '(' : commas ar ++ ")"
 
 mkUnboxedTupleStr :: Arity -> String
 mkUnboxedTupleStr 0  = "(##)"
-mkUnboxedTupleStr 1  = "Unit#"  -- See Note [One-tuples]
+mkUnboxedTupleStr 1  = "Solo#"  -- See Note [One-tuples]
 mkUnboxedTupleStr ar = "(#" ++ commas ar ++ "#)"
 
 mkConstraintTupleStr :: Arity -> String
 mkConstraintTupleStr 0  = "(%%)"
-mkConstraintTupleStr 1  = "Unit%"   -- See Note [One-tuples]
+mkConstraintTupleStr 1  = "Solo%"   -- See Note [One-tuples]
 mkConstraintTupleStr ar = "(%" ++ commas ar ++ "%)"
 
 commas :: Arity -> String
@@ -877,26 +877,26 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
-unitTyCon :: TyCon
-unitTyCon = tupleTyCon Boxed 0
+soloTyCon :: TyCon
+soloTyCon = tupleTyCon Boxed 0
 
-unitTyConKey :: Unique
-unitTyConKey = getUnique unitTyCon
+soloTyConKey :: Unique
+soloTyConKey = getUnique soloTyCon
 
-unitDataCon :: DataCon
-unitDataCon   = head (tyConDataCons unitTyCon)
+soloDataCon :: DataCon
+soloDataCon   = head (tyConDataCons soloTyCon)
 
-unitDataConId :: Id
-unitDataConId = dataConWorkId unitDataCon
+soloDataConId :: Id
+soloDataConId = dataConWorkId soloDataCon
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
 
-unboxedUnitTyCon :: TyCon
-unboxedUnitTyCon = tupleTyCon Unboxed 0
+unboxedSoloTyCon :: TyCon
+unboxedSoloTyCon = tupleTyCon Unboxed 0
 
-unboxedUnitDataCon :: DataCon
-unboxedUnitDataCon = tupleDataCon   Unboxed 0
+unboxedSoloDataCon :: DataCon
+unboxedSoloDataCon = tupleDataCon   Unboxed 0
 
 
 {- *********************************************************************
@@ -1504,8 +1504,8 @@ mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
 mkBoxedTupleTy :: [Type] -> Type
 mkBoxedTupleTy tys = mkTupleTy Boxed tys
 
-unitTy :: Type
-unitTy = mkTupleTy Boxed []
+soloTy :: Type
+soloTy = mkTupleTy Boxed []
 
 {- *********************************************************************
 *                                                                      *

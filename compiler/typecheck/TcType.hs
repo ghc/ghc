@@ -221,7 +221,7 @@ import Name -- hiding (varName)
 import NameSet
 import VarEnv
 import PrelNames
-import TysWiredIn( coercibleClass, unitTyCon, unitTyConKey
+import TysWiredIn( coercibleClass, soloTyCon, soloTyConKey
                  , listTyCon, constraintKind )
 import BasicTypes
 import Util
@@ -2189,7 +2189,7 @@ isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
 isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
-isUnitTy       = is_tc unitTyConKey
+isUnitTy       = is_tc soloTyConKey
 isCharTy       = is_tc charTyConKey
 isAnyTy        = is_tc anyTyConKey
 
@@ -2549,12 +2549,12 @@ legalFEArgTyCon tc
 
 legalFIResultTyCon :: DynFlags -> TyCon -> Validity
 legalFIResultTyCon dflags tc
-  | tc == unitTyCon         = IsValid
+  | tc == soloTyCon         = IsValid
   | otherwise               = marshalableTyCon dflags tc
 
 legalFEResultTyCon :: TyCon -> Validity
 legalFEResultTyCon tc
-  | tc == unitTyCon         = IsValid
+  | tc == soloTyCon         = IsValid
   | otherwise               = boxedMarshalableTyCon tc
 
 legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Validity
@@ -2566,7 +2566,7 @@ legalFFITyCon :: TyCon -> Validity
 -- True for any TyCon that can possibly be an arg or result of an FFI call
 legalFFITyCon tc
   | isUnliftedTyCon tc = IsValid
-  | tc == unitTyCon    = IsValid
+  | tc == soloTyCon    = IsValid
   | otherwise          = boxedMarshalableTyCon tc
 
 marshalableTyCon :: DynFlags -> TyCon -> Validity

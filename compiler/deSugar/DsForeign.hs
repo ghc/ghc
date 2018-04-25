@@ -243,7 +243,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       raw_res_ty = case tcSplitIOType_maybe io_res_ty of
                                    Just (_ioTyCon, res_ty) -> res_ty
                                    Nothing                 -> io_res_ty
-                      isVoidRes = raw_res_ty `eqType` unitTy
+                      isVoidRes = raw_res_ty `eqType` soloTy
                       (mHeader, cResType)
                        | isVoidRes = (Nothing, text "void")
                        | otherwise = toCType raw_res_ty
@@ -558,7 +558,7 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
          typeCmmType dflags (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
-  res_hty_is_unit = res_hty `eqType` unitTy     -- Look through any newtypes
+  res_hty_is_unit = res_hty `eqType` soloTy     -- Look through any newtypes
 
   cResType | res_hty_is_unit = text "void"
            | otherwise       = showStgType res_hty
@@ -797,7 +797,7 @@ getPrimTyOf ty
 -- e.g. 'W' is a signed 32-bit integer.
 primTyDescChar :: DynFlags -> Type -> Char
 primTyDescChar dflags ty
- | ty `eqType` unitTy = 'v'
+ | ty `eqType` soloTy = 'v'
  | otherwise
  = case typePrimRep1 (getPrimTyOf ty) of
      IntRep      -> signed_word

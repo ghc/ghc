@@ -34,7 +34,7 @@ import TcEnv
 import TcBinds( tcRecSelBinds )
 import TyCoRep( Type(..), Coercion(..), UnivCoProvenance(..) )
 import TcType
-import TysWiredIn( unitTy )
+import TysWiredIn( soloTy )
 import MkCore( rEC_SEL_ERROR_ID )
 import HsSyn
 import Class
@@ -862,7 +862,7 @@ mkOneRecordSelector all_cons idDetails fl
     data_tv_set= mkVarSet data_tvs
     is_naughty = not (tyCoVarsOfType field_ty `subVarSet` data_tv_set)
     (field_tvs, field_theta, field_tau) = tcSplitSigmaTy field_ty
-    sel_ty | is_naughty = unitTy  -- See Note [Naughty record selectors]
+    sel_ty | is_naughty = soloTy  -- See Note [Naughty record selectors]
            | otherwise  = mkSpecForAllTys data_tvs          $
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
                           mkFunTy data_ty                   $

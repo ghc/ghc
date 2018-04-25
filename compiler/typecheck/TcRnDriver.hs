@@ -57,7 +57,7 @@ import RnUtils ( HsDocContext(..) )
 import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
-import TysWiredIn ( unitTy, mkListTy )
+import TysWiredIn ( soloTy, mkListTy )
 #if defined(GHCI)
 import DynamicLoading ( loadPlugins )
 import Plugins ( tcPlugin )
@@ -2133,7 +2133,7 @@ tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
         ret_id  <- tcLookupId returnIOName ;            -- return @ IO
         let {
-            ret_ty      = mkListTy unitTy ;
+            ret_ty      = mkListTy soloTy ;
             io_ret_ty   = mkTyConApp ioTyCon [ret_ty] ;
             tc_io_stmts = tcStmtsAndThen GhciStmtCtxt tcDoStmt stmts
                                          (mkCheckExpType io_ret_ty) ;
@@ -2166,8 +2166,8 @@ tcGhciStmts stmts
                 -- get their *polymorphic* values.  (And we'd get ambiguity errs
                 -- if they were overloaded, since they aren't applied to anything.)
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
-                       (noLoc $ ExplicitList unitTy Nothing (map mk_item ids)) ;
-            mk_item id = let ty_args = [idType id, unitTy] in
+                       (noLoc $ ExplicitList soloTy Nothing (map mk_item ids)) ;
+            mk_item id = let ty_args = [idType id, soloTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
                                    (map getRuntimeRep ty_args ++ ty_args))
                                  (nlHsVar id) ;

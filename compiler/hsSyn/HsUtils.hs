@@ -107,7 +107,7 @@ import RdrName
 import Var
 import TyCoRep
 import Type   ( filterOutInvisibleTypes )
-import TysWiredIn ( unitTy )
+import TysWiredIn ( soloTy )
 import TcType
 import DataCon
 import ConLike
@@ -302,7 +302,7 @@ mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = s
 mkLastStmt body     = LastStmt body False noSyntaxExpr
 mkBodyStmt body     = BodyStmt body noSyntaxExpr noSyntaxExpr placeHolderType
 mkBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr PlaceHolder
-mkTcBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr unitTy
+mkTcBindStmt pat body = BindStmt pat body noSyntaxExpr noSyntaxExpr soloTy
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body. SourceTextX idR =>
@@ -319,7 +319,7 @@ emptyRecStmt' tyVal =
 
 emptyRecStmt     = emptyRecStmt' placeHolderType
 emptyRecStmtName = emptyRecStmt' placeHolderType
-emptyRecStmtId   = emptyRecStmt' unitTy -- a panic might trigger during zonking
+emptyRecStmtId   = emptyRecStmt' soloTy -- a panic might trigger during zonking
 mkRecStmt stmts  = emptyRecStmt { recS_stmts = stmts }
 
 -------------------------------

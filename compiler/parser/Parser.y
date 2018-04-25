@@ -77,8 +77,8 @@ import TcEvidence       ( emptyTcEvBinds )
 import ForeignCall
 import TysPrim          ( eqPrimTyCon )
 import PrelNames        ( eqTyCon_RDR )
-import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
-                          unboxedUnitTyCon, unboxedUnitDataCon,
+import TysWiredIn       ( soloTyCon, soloDataCon, tupleTyCon, tupleDataCon, nilDataCon,
+                          unboxedSoloTyCon, unboxedSoloDataCon,
                           listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
 
 -- compiler/utils
@@ -3051,10 +3051,10 @@ con_list : con                  { sL1 $1 [$1] }
                                    return (sLL $1 $> ($1 : unLoc $3)) }
 
 sysdcon_nolist :: { Located DataCon }  -- Wired in data constructors
-        : '(' ')'               {% ams (sLL $1 $> unitDataCon) [mop $1,mcp $2] }
+        : '(' ')'               {% ams (sLL $1 $> soloDataCon) [mop $1,mcp $2] }
         | '(' commas ')'        {% ams (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
                                        (mop $1:mcp $3:(mcommas (fst $2))) }
-        | '(#' '#)'             {% ams (sLL $1 $> $ unboxedUnitDataCon) [mo $1,mc $2] }
+        | '(#' '#)'             {% ams (sLL $1 $> $ unboxedSoloDataCon) [mo $1,mc $2] }
         | '(#' commas '#)'      {% ams (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
 
@@ -3082,9 +3082,9 @@ qconop :: { Located RdrName }
 -- between gtycon and ntgtycon
 gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tuples
         : ntgtycon                     { $1 }
-        | '(' ')'                      {% ams (sLL $1 $> $ getRdrName unitTyCon)
+        | '(' ')'                      {% ams (sLL $1 $> $ getRdrName soloTyCon)
                                               [mop $1,mcp $2] }
-        | '(#' '#)'                    {% ams (sLL $1 $> $ getRdrName unboxedUnitTyCon)
+        | '(#' '#)'                    {% ams (sLL $1 $> $ getRdrName unboxedSoloTyCon)
                                               [mo $1,mc $2] }
 
 ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit tuples

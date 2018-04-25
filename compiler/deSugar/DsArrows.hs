@@ -313,12 +313,12 @@ dsProcExpr
         :: LPat GhcTc
         -> LHsCmdTop GhcTc
         -> DsM CoreExpr
-dsProcExpr pat (L _ (HsCmdTop cmd _unitTy cmd_ty ids)) = do
+dsProcExpr pat (L _ (HsCmdTop cmd _soloTy cmd_ty ids)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
     let locals = mkVarSet (collectPatBinders pat)
-    (core_cmd, _free_vars, env_ids) <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
+    (core_cmd, _free_vars, env_ids) <- dsfixCmd meth_ids locals soloTy cmd_ty cmd
     let env_ty = mkBigCoreVarTupTy env_ids
-    let env_stk_ty = mkCorePairTy env_ty unitTy
+    let env_stk_ty = mkCorePairTy env_ty soloTy
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
     fail_expr <- mkFailExpr ProcExpr env_stk_ty
     var <- selectSimpleMatchVarL pat
@@ -753,13 +753,13 @@ dsCmdDo _ _ _ [] _ = panic "dsCmdDo"
 dsCmdDo ids local_vars res_ty [L loc (LastStmt body _ _)] env_ids = do
     putSrcSpanDs loc $ dsNoLevPoly res_ty
                          (text "In the command:" <+> ppr body)
-    (core_body, env_ids') <- dsLCmd ids local_vars unitTy res_ty body env_ids
+    (core_body, env_ids') <- dsLCmd ids local_vars soloTy res_ty body env_ids
     let env_ty = mkBigCoreVarTupTy env_ids
     env_var <- newSysLocalDs env_ty
     let core_map = Lam env_var (mkCorePairExpr (Var env_var) mkCoreUnitExpr)
     return (do_premap ids
                         env_ty
-                        (mkCorePairTy env_ty unitTy)
+                        (mkCorePairTy env_ty soloTy)
                         res_ty
                         core_map
                         core_body,
@@ -809,14 +809,14 @@ dsCmdStmt
 --                      (first c >>> arr snd) >>> ss
 
 dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
-    (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy c_ty cmd
+    (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars soloTy c_ty cmd
     core_mux <- matchEnv env_ids
         (mkCorePairExpr
             (mkCorePairExpr (mkBigCoreVarTup env_ids1) mkCoreUnitExpr)
             (mkBigCoreVarTup out_ids))
     let
         in_ty = mkBigCoreVarTupTy env_ids
-        in_ty1 = mkCorePairTy (mkBigCoreVarTupTy env_ids1) unitTy
+        in_ty1 = mkCorePairTy (mkBigCoreVarTupTy env_ids1) soloTy
         out_ty = mkBigCoreVarTupTy out_ids
         before_c_ty = mkCorePairTy in_ty1 out_ty
         after_c_ty = mkCorePairTy c_ty out_ty
@@ -841,7 +841,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
 
 dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
     let pat_ty = hsLPatType pat
-    (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
+    (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars soloTy pat_ty cmd
     let pat_vars = mkVarSet (collectPatBinders pat)
     let
         env_ids2 = filterOut (`elemVarSet` pat_vars) out_ids
@@ -875,7 +875,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
     -- put it all together
     let
         in_ty = mkBigCoreVarTupTy env_ids
-        in_ty1 = mkCorePairTy (mkBigCoreVarTupTy env_ids1) unitTy
+        in_ty1 = mkCorePairTy (mkBigCoreVarTupTy env_ids1) soloTy
         in_ty2 = mkBigCoreVarTupTy env_ids2
         before_c_ty = mkCorePairTy in_ty1 in_ty2
     return (do_premap ids in_ty before_c_ty out_ty core_mux $

@@ -461,7 +461,7 @@ tcLcStmt _ _ (BodyStmt rhs _ _ _) elt_ty thing_inside
 -- ParStmt: See notes with tcMcStmt
 tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
   = do  { (pairs', thing) <- loop bndr_stmts_s
-        ; return (ParStmt pairs' noExpr noSyntaxExpr unitTy, thing) }
+        ; return (ParStmt pairs' noExpr noSyntaxExpr soloTy, thing) }
   where
     -- loop :: [([LStmt GhcRn], [GhcRn])]
     --      -> TcM ([([LStmt GhcTcId], [GhcTcId])], thing)
@@ -536,7 +536,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                            , trS_ret = noSyntaxExpr
                            , trS_bind = noSyntaxExpr
                            , trS_fmap = noExpr
-                           , trS_bind_arg_ty = unitTy
+                           , trS_bind_arg_ty = soloTy
                            , trS_form = form }, thing) }
 
 tcLcStmt _ _ stmt _ _

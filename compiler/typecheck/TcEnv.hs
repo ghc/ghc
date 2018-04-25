@@ -813,7 +813,7 @@ tcGetDefaultTys
         { integer_ty <- tcMetaTy integerTyConName
         ; list_ty <- tcMetaTy listTyConName
         ; checkWiredInTyCon doubleTyCon
-        ; let deflt_tys = opt_deflt extended_defaults [unitTy, list_ty]
+        ; let deflt_tys = opt_deflt extended_defaults [soloTy, list_ty]
                           -- Note [Extended defaults]
                           ++ [integer_ty, doubleTy]
                           ++ opt_deflt ovl_strings [stringTy]

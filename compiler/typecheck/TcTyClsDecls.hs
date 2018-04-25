@@ -39,7 +39,7 @@ import TcEvidence  ( tcCoercionKind, isEmptyTcEvBinds )
 import TcUnify     ( checkConstraints )
 import TcHsType
 import TcMType
-import TysWiredIn ( unitTy )
+import TysWiredIn ( soloTy )
 import TcType
 import RnEnv( lookupConstructorFields )
 import FamInst
@@ -1736,7 +1736,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
        ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys exp_tvs $
                                             mkFunTys ctxt $
                                             mkFunTys arg_tys $
-                                            unitTy)
+                                            soloTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
                  -- at hand. But the result would mention only the tmpl_tvs,

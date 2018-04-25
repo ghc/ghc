@@ -654,7 +654,7 @@ Consider the type
     type instance F Int = ()
 We want to parse that "()"
     as HsTupleTy HsBoxedOrConstraintTuple [],
-NOT as HsTyVar unitTyCon
+NOT as HsTyVar soloTyCon
 
 Why? Because F might have kind (* -> Constraint), so we when parsing we
 don't know if that tuple is going to be a constraint tuple or an ordinary
