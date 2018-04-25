@@ -455,7 +455,12 @@ mtimesDefault n x
 -- underlying 'Monoid'.
 --
 -- Ideally, this type would not exist at all and we would just fix the
--- 'Monoid' instance of 'Maybe'
+-- 'Monoid' instance of 'Maybe'.
+--
+-- In GHC 8.4 and higher, the 'Monoid' instance for 'Maybe' has been
+-- corrected to lift a 'Semigroup' instance instead of a 'Monoid'
+-- instance. Consequently, this type is no longer useful. It will be
+-- marked deprecated in GHC 8.8 and removed in GHC 8.10.
 newtype Option a = Option { getOption :: Maybe a }
   deriving ( Eq       -- ^ @since 4.9.0.0
            , Ord      -- ^ @since 4.9.0.0
