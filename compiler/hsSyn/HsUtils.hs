@@ -206,7 +206,8 @@ mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
-nlHsTyApp :: IdP (GhcPass id) -> [Type] -> LHsExpr (GhcPass id)
+nlHsTyApp :: (XVar p ~ PlaceHolder
+             ,XWrap p ~ PlaceHolder ) => IdP p-> [Type] -> LHsExpr p
 nlHsTyApp fun_id tys
   = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar noExt (noLoc fun_id)))
 
@@ -493,7 +494,7 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: LHsType (GhcPass p) -> Rig -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsFunTy :: (XFunTy p ~ PlaceHolder) => LHsType p -> Rig -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeCompoundHsType t))
@@ -742,7 +743,7 @@ mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
 -- Avoid (HsWrap co (HsWrap co' _)).
 -- See Note [Detecting forced eta expansion] in DsExpr
-mkHsWrap :: HsWrapper -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
+mkHsWrap :: (XWrap p ~ PlaceHolder) => HsWrapper -> HsExpr p -> HsExpr p
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 mkHsWrap co_fn (HsWrap _ co_fn' e)     = mkHsWrap (co_fn <.> co_fn') e
 mkHsWrap co_fn e                       = HsWrap noExt co_fn e
