@@ -667,13 +667,13 @@ bit odd:
   1-tuples:  ??
   0-tuples:  ()     ()#
 
-Zero-tuples have used up the logical name. So we use 'Unit' and 'Unit#'
+Zero-tuples have used up the logical name. So we use 'Solo' and 'Solo#'
 for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
   data ()     = ()
-  data Unit a = Unit a
+  data Solo a = Solo a
   data (a,b)  = (a,b)
 
-NB (Feb 16): for /constraint/ one-tuples I have 'Unit%' but no class
+NB (Feb 16): for /constraint/ one-tuples I have 'Solo%' but no class
 decl in GHC.Classes, so I think this part may not work properly. But
 it's unused I think.
 -}
@@ -703,7 +703,7 @@ isBuiltInOcc_maybe occ =
 
       -- unboxed tuple data/tycon
       "(##)"  -> Just $ tup_name Unboxed 0
-      "Unit#" -> Just $ tup_name Unboxed 1
+      "Solo#" -> Just $ tup_name Unboxed 1
       _ | Just rest <- "(#" `BS.stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
         , "#)" <- rest'
@@ -749,17 +749,17 @@ mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
 
 mkBoxedTupleStr :: Arity -> String
 mkBoxedTupleStr 0  = "()"
-mkBoxedTupleStr 1  = "Unit"   -- See Note [One-tuples]
+mkBoxedTupleStr 1  = "Solo"   -- See Note [One-tuples]
 mkBoxedTupleStr ar = '(' : commas ar ++ ")"
 
 mkUnboxedTupleStr :: Arity -> String
 mkUnboxedTupleStr 0  = "(##)"
-mkUnboxedTupleStr 1  = "Unit#"  -- See Note [One-tuples]
+mkUnboxedTupleStr 1  = "Solo#"  -- See Note [One-tuples]
 mkUnboxedTupleStr ar = "(#" ++ commas ar ++ "#)"
 
 mkConstraintTupleStr :: Arity -> String
 mkConstraintTupleStr 0  = "(%%)"
-mkConstraintTupleStr 1  = "Unit%"   -- See Note [One-tuples]
+mkConstraintTupleStr 1  = "Solo%"   -- See Note [One-tuples]
 mkConstraintTupleStr ar = "(%" ++ commas ar ++ "%)"
 
 commas :: Arity -> String
