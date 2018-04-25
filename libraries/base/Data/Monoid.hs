@@ -88,6 +88,16 @@ import Data.Semigroup.Internal
 --
 -- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
 -- Just "hello"
+--
+-- Use of this type is discouraged. Note the following equivalence:
+--
+-- > Data.Monoid.First x === Maybe (Data.Semigroup.First x)
+--
+-- In additional to being equivalent in the structural sense, the two
+-- also have 'Monoid' instances that behave the same. This type will
+-- be marked deprecated in GHC 8.8. It will be removed in GHC 8.10.
+-- Users are advised to use the variant from "Data.Semigroup" and wrap
+-- it in 'Maybe'.
 newtype First a = First { getFirst :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
