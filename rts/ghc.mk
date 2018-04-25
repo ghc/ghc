@@ -483,7 +483,6 @@ rts/sm/Compact_CC_OPTS += -Wno-inline
 rts/StgCRun_CC_OPTS += -w
 
 rts/RetainerProfile_CC_OPTS += -w
-rts/RetainerSet_CC_OPTS += -Wno-format
 # On Windows:
 rts/win32/ConsoleHandler_CC_OPTS += -w
 rts/win32/ThrIOManager_CC_OPTS += -w
