@@ -158,6 +158,7 @@ newtype Ap f a = Ap { getAp :: f a }
         deriving ( Alternative -- ^ @since 4.12.0.0
                  , Applicative -- ^ @since 4.12.0.0
                  , Data        -- ^ @since 4.12.0.0
+                 , Enum        -- ^ @since 4.12.0.0 
                  , Eq          -- ^ @since 4.12.0.0
                  , Foldable    -- ^ @since 4.12.0.0
                  , Functor     -- ^ @since 4.12.0.0
@@ -180,11 +181,6 @@ instance (Applicative f, Semigroup a) => Semigroup (Ap f a) where
 -- | @since 4.12.0.0
 instance (Applicative f, Monoid a) => Monoid (Ap f a) where
         mempty = Ap $ pure mempty
-
--- | @since 4.12.0.0
-instance (Applicative f, Enum a) => Enum (Ap f a) where
-  toEnum   = toEnum
-  fromEnum = fromEnum
 
 -- | @since 4.12.0.0
 instance (Applicative f, Bounded a) => Bounded (Ap f a) where
