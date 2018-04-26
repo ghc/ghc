@@ -92,6 +92,9 @@ $krep [InlPrag=NOUSERINLINE[~]]
       GHC.Types.$tcConstraint [] @ GHC.Types.KindRep
 $krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcConstraint [] @ GHC.Types.KindRep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
       T8958.$tcRepresentational
       ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
 $krep [InlPrag=NOUSERINLINE[~]]
