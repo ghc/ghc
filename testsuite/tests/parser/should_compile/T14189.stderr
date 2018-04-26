@@ -6,8 +6,8 @@
   (HsGroup
    (XValBindsLR
     (NValBinds
-      []
-      []))
+     []
+     []))
    []
    [(TyClGroup
      [({ T14189.hs:6:1-42 }
@@ -34,12 +34,14 @@
             []
             (Nothing)
             (PrefixCon
-             [({ T14189.hs:6:18-20 }
-               (HsTyVar
-                (PlaceHolder)
-                (NotPromoted)
-                ({ T14189.hs:6:18-20 }
-                 {Name: GHC.Types.Int})))])
+             [(Weighted
+               (One)
+               ({ T14189.hs:6:18-20 }
+                (HsTyVar
+                 (PlaceHolder)
+                 (NotPromoted)
+                 ({ T14189.hs:6:18-20 }
+                  {Name: GHC.Types.Int}))))])
             (Nothing)))
          ,({ T14189.hs:6:24-25 }
            (ConDeclH98
