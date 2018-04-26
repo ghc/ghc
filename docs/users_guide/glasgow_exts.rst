@@ -8478,7 +8478,7 @@ Haskell.
 
 .. note::
     The declaration for ``HCons`` also requires :extension:`TypeOperators`
-    because of infix type operator ``(:')``
+    because of infix type operator ``(':)``
 
 
 .. _promotion-existentials:
