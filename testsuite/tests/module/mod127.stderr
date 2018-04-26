@@ -1,6 +1,5 @@
 
 mod127.hs:6:6: error:
     Not in scope: type constructor or class ‘T’
-    A data constructor of that name is in scope; did you mean DataKinds?
     Perhaps you want to remove ‘T’ from the explicit hiding list
     in the import of ‘Mod127_A’ (mod127.hs:4:1-26).
