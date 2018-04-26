@@ -95,7 +95,7 @@ import Data.Semigroup.Internal
 --
 -- In additional to being equivalent in the structural sense, the two
 -- also have 'Monoid' instances that behave the same. This type will
--- be marked deprecated in GHC 8.8. It will be removed in GHC 8.10.
+-- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
 -- Users are advised to use the variant from "Data.Semigroup" and wrap
 -- it in 'Maybe'.
 newtype First a = First { getFirst :: Maybe a }
@@ -127,6 +127,16 @@ instance Monoid (First a) where
 --
 -- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
 -- Just "world"
+--
+-- Use of this type is discouraged. Note the following equivalence:
+--
+-- > Data.Monoid.Last x === Maybe (Data.Semigroup.Last x)
+--
+-- In additional to being equivalent in the structural sense, the two
+-- also have 'Monoid' instances that behave the same. This type will
+-- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
+-- Users are advised to use the variant from "Data.Semigroup" and wrap
+-- it in 'Maybe'.
 newtype Last a = Last { getLast :: Maybe a }
         deriving ( Eq          -- ^ @since 2.01
                  , Ord         -- ^ @since 2.01
