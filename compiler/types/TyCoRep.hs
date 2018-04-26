@@ -727,6 +727,7 @@ mkTyVarTys :: [TyVar] -> [Type]
 mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 
 infixr 3 `mkFunTy`      -- Associates to the right
+infixr 3 `mkFunTyOm`
 -- | Make an arrow type
 mkFunTy :: Rig -> Type -> Type -> Type
 mkFunTy weight arg res = FunTy weight arg res
