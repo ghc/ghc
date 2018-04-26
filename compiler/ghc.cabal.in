@@ -71,7 +71,7 @@ Library
     else
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*
-        Build-Depends: unix   == 2.7.*
+        Build-Depends: unix   >= 2.7 && < 2.9
 
     GHC-Options: -Wall
                  -Wno-name-shadowing

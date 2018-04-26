@@ -258,7 +258,7 @@ test('T13468',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13468'])
-test('T13543', normal, compile, ['-ddump-str-signatures'])
+test('T13543', only_ways(['optasm']), compile, ['-ddump-str-signatures'])
 test('T11272',
      normal,
      run_command,
@@ -303,3 +303,4 @@ test('T14978',
      ['$MAKE -s --no-print-directory T14978'])
 test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
 test('T15005', normal, compile, ['-O'])
+test('T15056', [extra_files(['T15056a.hs'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])

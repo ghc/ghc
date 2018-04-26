@@ -89,9 +89,9 @@ import GhcPrelude
 import qualified GHC.LanguageExtensions as LangExt
 }
 
-%expect 206 -- shift/reduce conflicts
+%expect 233 -- shift/reduce conflicts
 
-{- Last updated: 11 Dec 2017
+{- Last updated: 14 Apr 2018
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -202,6 +202,25 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
+state 203 contains 27 shift/reduce conflicts.
+
+        aexp2 -> TH_TY_QUOTE . tyvar
+        aexp2 -> TH_TY_QUOTE . gtycon
+    *** aexp2 -> TH_TY_QUOTE .
+
+    Conflicts: two single quotes is error syntax with specific error message.
+
+Example of ambiguity:
+    'x = '''
+    'x = ''a'
+    'x = ''T'
+
+Shift parses as (per longest-parse rule):
+    'x = ''a'
+    'x = ''T'
+
+-------------------------------------------------------------------------------
+
 state 307 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp
@@ -231,7 +250,7 @@ Same as state 60 but without contexts.
 
 -------------------------------------------------------------------------------
 
-state 357 contains 1 shift/reduce conflicts.
+state 359 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(' commas . ')'
@@ -246,7 +265,7 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 413 contains 1 shift/reduce conflicts.
+state 415 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(#' commas . '#)'
@@ -258,7 +277,7 @@ Same as State 357 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 424 contains 67 shift/reduce conflicts.
+state 426 contains 67 shift/reduce conflicts.
 
     *** exp10 -> '-' fexp .
         fexp -> fexp . aexp
@@ -268,7 +287,7 @@ Same as 147 but with a unary minus.
 
 -------------------------------------------------------------------------------
 
-state 488 contains 1 shift/reduce conflict.
+state 490 contains 1 shift/reduce conflict.
 
         oqtycon -> '(' qtyconsym . ')'
     *** qtyconop -> qtyconsym .
@@ -282,7 +301,7 @@ parenthesized infix type expression of length 1.
 
 -------------------------------------------------------------------------------
 
-state 689 contains 1 shift/reduce conflicts.
+state 691 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .
         dbind -> ipvar . '=' exp
@@ -297,7 +316,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 765 contains 1 shift/reduce conflicts.
+state 767 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp
 
@@ -314,7 +333,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 1013 contains 1 shift/reduce conflicts.
+state 1015 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp
         transformqual -> 'then' 'group' . 'by' exp 'using' exp
@@ -324,7 +343,7 @@ state 1013 contains 1 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 1390 contains 1 shift/reduce conflict.
+state 1393 contains 1 shift/reduce conflict.
 
     *** atype -> tyvar .
         tv_bndr -> '(' tyvar . '::' kind ')'
@@ -2626,6 +2645,7 @@ aexp2   :: { LHsExpr GhcPs }
         | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket noExt (VarBr noExt False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | TH_TY_QUOTE {- nothing -} {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket noExt (ExpBr noExt $2))
                                       (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
@@ -3700,6 +3720,24 @@ hintExplicitForall' span = do
         [ text illegalDot
         , text "Perhaps you intended to use RankNTypes or a similar language"
         , text "extension to enable explicit-forall syntax: forall <tvs>. <type>"
+        ]
+
+-- When two single quotes don't followed by tyvar or gtycon, we report the
+-- error as empty character literal, or TH quote that missing proper type
+-- variable or constructor. See Trac #13450.
+reportEmptyDoubleQuotes :: SrcSpan -> P (GenLocated SrcSpan (HsExpr GhcPs))
+reportEmptyDoubleQuotes span = do
+    thEnabled <- liftM ((LangExt.TemplateHaskellQuotes `extopt`) . options) getPState
+    if thEnabled
+      then parseErrorSDoc span $ vcat
+        [ text "Parser error on `''`"
+        , text "Character literals may not be empty"
+        , text "Or perhaps you intended to use quotation syntax of TemplateHaskell,"
+        , text "but the type variable or constructor is missing"
+        ]
+      else parseErrorSDoc span $ vcat
+        [ text "Parser error on `''`"
+        , text "Character literals may not be empty"
         ]
 
 {-

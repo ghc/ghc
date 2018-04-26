@@ -69,7 +69,7 @@ library
 
     Build-Depends:
         array            == 0.5.*,
-        base             >= 4.8 && < 4.12,
+        base             >= 4.8 && < 4.13,
         binary           == 0.8.*,
         bytestring       == 0.10.*,
         containers       == 0.5.*,
@@ -81,4 +81,4 @@ library
         transformers     == 0.5.*
 
     if !os(windows)
-        Build-Depends: unix == 2.7.*
+        Build-Depends: unix >= 2.7 && < 2.9

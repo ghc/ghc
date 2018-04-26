@@ -19,6 +19,7 @@ import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion
+import CoreLint
 import TcEvidence
 import LoadIface
 import TcRnMonad
@@ -160,13 +161,24 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
     ASSERT2( lhs_kind `eqType` rhs_kind, text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
     do { (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
+       ; dflags <- getDynFlags
+       ; let lhs'     = substTys subst lhs
+             rhs'     = substTy  subst rhs
+             tcv_set' = mkVarSet (tvs' ++ cvs')
+       ; when (gopt Opt_DoCoreLinting dflags) $
+           -- Check that the types involved in this instance are well formed.
+           -- Do /not/ expand type synonyms, for the reasons discussed in
+           -- Note [Linting type synonym applications].
+           case lintTypes dflags False tcv_set' (rhs':lhs') of
+             Nothing       -> pure ()
+             Just fail_msg -> pprPanic "Core Lint error" fail_msg
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
                          , fi_tvs      = tvs'
                          , fi_cvs      = cvs'
-                         , fi_tys      = substTys subst lhs
-                         , fi_rhs      = substTy  subst rhs
+                         , fi_tys      = lhs'
+                         , fi_rhs      = rhs'
                          , fi_axiom    = axiom }) }
   where
     lhs_kind = typeKind (mkTyConApp fam_tc lhs)

@@ -43,3 +43,5 @@ test('T10361a', normal, compile, [''])
 test('T10361b', normal, compile, [''])
 test('T11358', normal, compile_and_run, [''])
 test('T12220', normal, compile, [''])
+test('T15012', [extra_files(['T15012.hs', 'T15012a.hs'])], run_command,
+               ['$MAKE -s --no-print-directory T15012'])

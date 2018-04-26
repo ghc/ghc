@@ -476,12 +476,13 @@ test('parsing001',
           [(wordsize(32), 232777056, 10),
         # Initial:        274000576
         # 2017-03-24:     232777056
-           (wordsize(64), 490228304, 5)]),
+           (wordsize(64), 519401296, 5)]),
         # expected value: 587079016 (amd64/Linux)
         # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
         # 2016-12-19:     493730288 (amd64/Linux) Join points (#12988)
         # 2017-02-14:     463931280 Early inlining patch; acutal improvement 7%
         # 2017-12-11:     490228304 BlockArguments
+        # 2018-04-09:     519401296 Inexplicable, collateral of #14737
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -548,6 +549,9 @@ test('T5321Fun',
              # 2014-12-10: 206406188     #  Improvements in constraint solver
              # 2016-04-06: 279922360 x86/Linux
              # 2017-03-24: 244387620 x86/Linux (64-bit machine)
+
+            (platform('x86_64-apple-darwin'), 446893600, 5),
+             # 2018-03-17: 423774560     #  OS X-only (reason unknown, see #11753)
 
             (wordsize(64), 423774560, 5)])
              # prev:       585521080
@@ -743,7 +747,7 @@ test('T9020',
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 423163832, 10)])
+           (wordsize(64), 562206104, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -757,6 +761,7 @@ test('T9020',
            #                        Program size collapses in first simplification
            # 2017-03-31:  493596312 Fix memory leak in simplifier
            # 2017-04-28:  423163832  Remove exponential behaviour in simplifier
+           # 2018-04-09:  562206104 Inexplicable, collateral of #14737
       ],
       compile,[''])
 
@@ -882,7 +887,7 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 526485920, 5),
+          [(wordsize(64), 572537984, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
@@ -896,6 +901,7 @@ test('T9872d',
           # 2017-02-25    498855104   Early inlining
           # 2017-03-03    462817352   Share Typeable KindReps
           # 2018-03-25    526485920   Flattener patch does more work (#12919)
+          # 2018-04-11    572537984   simplCast improvement collateral (#11735)
 
            (wordsize(32), 232954000, 5)
           # some date     328810212
@@ -1034,7 +1040,7 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 134780272, 5),
+          [(wordsize(64), 141952368, 5),
           # initial:      125831400
           # 2017-01-18:   133380960  Allow top-level string literals in Core
           # 2017-02-17:   153611448  Type-indexed Typeable
@@ -1042,6 +1048,7 @@ test('T12425',
           # 2017-03-21:   134334800  Unclear
           # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
           # 2017-05-23:   134780272  Addition of llvm-targets in dynflags (D3352)
+          # 2018-04-15:   141952368  Collateral of #14737
           ]),
      ],
      compile,
@@ -1111,7 +1118,7 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1163821528, 5),
+          [(wordsize(64), 1237898376, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
@@ -1119,6 +1126,7 @@ test('T12707',
           # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
           # 2017-03-02: 1231809592  Drift from recent simplifier improvements
           # 2017-05-14: 1163821528  (amd64/Linux) Two-pass CmmLayoutStack
+          # 2018-04-09: 1237898376  Inexplicable, collateral of #14737
           ]),
      ],
      compile,
@@ -1227,6 +1235,17 @@ test('T14697',
      ],
      multimod_compile,
      ['T14697', '-v0'])
+
+test('T14683',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 10521594688, 10),
+          # initial:      25189145632
+          # 2018-04-19:   14675353056  Cache NthCo role (#14683)
+          # 2018-04-20:   10521594688  Remove unnecessary check in simplCast
+          ]),
+     ],
+     multimod_compile,
+     ['T14683', '-v0'])
 
 test('Naperian',
      [ reqlib('vector'),

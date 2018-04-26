@@ -152,8 +152,8 @@ g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coder
   | g1 ; g2                 ::   :: TransCo       {{ com \ctor{TransCo}: Transitivity }}
   | mu </ ti // i /> $ </ gj // j />
                             ::   :: AxiomRuleCo   {{ com \ctor{AxiomRuleCo}: Axiom-rule application (for type-nats) }}
-  | nth I g                 ::   :: NthCo         {{ com \ctor{NthCo}: Projection (0-indexed) }}
-    {{ tex \textsf{nth}^{[[I]]}\,[[g]] }}
+  | nth R I g               ::   :: NthCo         {{ com \ctor{NthCo}: Projection (0-indexed) }}
+    {{ tex \textsf{nth}^{[[I]]}_{[[R]]}\,[[g]] }}
   | LorR g                  ::   :: LRCo          {{ com \ctor{LRCo}: Left/right projection }}
   | g @ h                   ::   :: InstCo        {{ com \ctor{InstCo}: Instantiation }}
   | g |> h                  ::   :: CoherenceCo   {{ com \ctor{CoherenceCo}: Coherence }}
@@ -453,6 +453,8 @@ formula :: 'formula_' ::=
   | role_list1 = role_list2            ::   :: eq_role_list
   | R1 /= R2                           ::   :: role_neq
   | R1 = R2                            ::   :: eq_role
+  | R1 <= R2                           ::   :: lte_role
+    {{ tex [[R1]] \leq [[R2]] }}
   | </ Ki // i /> = tyConDataCons T    ::   :: tyConDataCons
   | O ( n ) = R                        ::   :: role_lookup
   | R elt role_list                    ::   :: role_elt

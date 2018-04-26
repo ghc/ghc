@@ -16,35 +16,35 @@
 	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = ../packages/haskeline.git
+	url = ssh://git@git.haskell.org/packages/haskeline.git
 	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
-	url = ../packages/pretty.git
+	url = ssh://git@git.haskell.org/packages/pretty.git
 	ignore = untracked
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
-	url = ../packages/terminfo.git
+	url = ssh://git@git.haskell.org/packages/terminfo.git
 	ignore = untracked
 [submodule "libraries/transformers"]
 	path = libraries/transformers
-	url = ../packages/transformers.git
+	url = ssh://git@git.haskell.org/packages/transformers.git
 	ignore = untracked
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
-	url = ../packages/xhtml.git
+	url = ssh://git@git.haskell.org/packages/xhtml.git
 	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = ../packages/Win32.git
+	url = ssh://git@git.haskell.org/packages/Win32.git
 	ignore = untracked
 [submodule "libraries/primitive"]
 	path = libraries/primitive
-	url = ../packages/primitive.git
+	url = ssh://git@git.haskell.org/packages/primitive.git
 	ignore = untracked
 [submodule "libraries/vector"]
 	path = libraries/vector
-	url = ../packages/vector.git
+	url = ssh://git@git.haskell.org/packages/vector.git
 	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
@@ -52,27 +52,27 @@
 	ignore = untracked
 [submodule "libraries/random"]
 	path = libraries/random
-	url = ../packages/random.git
+	url = ssh://git@git.haskell.org/packages/random.git
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
-	url = ../packages/array.git
+	url = ssh://git@git.haskell.org/packages/array.git
 	ignore = untracked
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
-	url = ../packages/deepseq.git
+	url = ssh://git@git.haskell.org/packages/deepseq.git
 	ignore = untracked
 [submodule "libraries/directory"]
 	path = libraries/directory
-	url = ../packages/directory.git
+	url = ssh://git@git.haskell.org/packages/directory.git
 	ignore = untracked
 [submodule "libraries/filepath"]
 	path = libraries/filepath
-	url = ../packages/filepath.git
+	url = ssh://git@git.haskell.org/packages/filepath.git
 	ignore = untracked
 [submodule "libraries/hpc"]
 	path = libraries/hpc
-	url = ../packages/hpc.git
+	url = ssh://git@git.haskell.org/packages/hpc.git
 	ignore = untracked
 [submodule "libraries/parsec"]
 	path = libraries/parsec
@@ -80,31 +80,31 @@
 	ignore = untracked
 [submodule "libraries/text"]
 	path = libraries/text
-	url = ../packages/text.git
+	url = ssh://git@git.haskell.org/packages/text.git
 	ignore = untracked
 [submodule "libraries/mtl"]
 	path = libraries/mtl
-	url = ../packages/mtl.git
+	url = ssh://git@git.haskell.org/packages/mtl.git
 	ignore = untracked
 [submodule "libraries/process"]
 	path = libraries/process
-	url = ../packages/process.git
+	url = ssh://git@git.haskell.org/packages/process.git
 	ignore = untracked
 [submodule "libraries/unix"]
 	path = libraries/unix
-	url = ../packages/unix.git
+	url = ssh://git@git.haskell.org/packages/unix.git
 	ignore = untracked
 [submodule "libraries/parallel"]
 	path = libraries/parallel
-	url = ../packages/parallel.git
+	url = ssh://git@git.haskell.org/packages/parallel.git
 	ignore = untracked
 [submodule "libraries/stm"]
 	path = libraries/stm
-	url = ../packages/stm.git
+	url = ssh://git@git.haskell.org/packages/stm.git
 	ignore = untracked
 [submodule "libraries/dph"]
 	path = libraries/dph
-	url = ../packages/dph.git
+	url = ssh://git@git.haskell.org/packages/dph.git
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
@@ -113,22 +113,22 @@
 	branch = ghc-head
 [submodule "nofib"]
 	path = nofib
-	url = ../nofib.git
+	url = ssh://git@git.haskell.org/nofib.git
 	ignore = untracked
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
-	url = ../hsc2hs.git
+	url = ssh://git@git.haskell.org/hsc2hs.git
 	ignore = untracked
 [submodule "libffi-tarballs"]
 	path = libffi-tarballs
-	url = ../libffi-tarballs.git
+	url = ssh://git@git.haskell.org/libffi-tarballs.git
 	ignore = untracked
 [submodule "gmp-tarballs"]
 	path = libraries/integer-gmp/gmp/gmp-tarballs
-	url = ../gmp-tarballs.git
+	url = ssh://git@git.haskell.org/gmp-tarballs.git
 [submodule ".arc-linters/arcanist-external-json-linter"]
 	path = .arc-linters/arcanist-external-json-linter
-	url = ../arcanist-external-json-linter.git
+	url = ssh://git@git.haskell.org/arcanist-external-json-linter.git
 [submodule "hadrian"]
 	path = hadrian
-	url = ../hadrian.git
+	url = ssh://git@git.haskell.org/hadrian.git

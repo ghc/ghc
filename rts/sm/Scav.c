@@ -1365,7 +1365,7 @@ scavenge_one(StgPtr p)
 
     case WEAK:
         // This WEAK object will not be considered by tidyWeakList during this
-        // collection because it is in a generation >= N, but it is on the
+        // collection because it is in a generation > N, but it is on the
         // mutable list so we must evacuate all of its pointers because some
         // of them may point into a younger generation.
         scavengeLiveWeak((StgWeak *)p);

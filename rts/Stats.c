@@ -1465,7 +1465,7 @@ statDescribeGens(void)
   }
   debugBelch("----------------------------------------------------------------------\n");
   debugBelch("%51s%9" FMT_Word " %9" FMT_Word "\n",
-             "",tot_live*sizeof(W_),tot_slop*sizeof(W_));
+             "",tot_live*(W_)sizeof(W_),tot_slop*(W_)sizeof(W_));
   debugBelch("----------------------------------------------------------------------\n");
   debugBelch("\n");
 }

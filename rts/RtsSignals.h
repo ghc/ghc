@@ -51,14 +51,6 @@ void freeSignalHandlers(void);
  */
 void awaitUserSignals(void);
 
-/*
- * Function: markSignalHandlers()
- *
- * Evacuate the handler queue. _Assumes_ that console event delivery
- * has already been blocked.
- */
-void markSignalHandlers (evac_fn evac, void *user);
-
 #include "EndPrivate.h"
 
 #endif /* RTS_USER_SIGNALS */

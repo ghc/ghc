@@ -470,15 +470,15 @@ AC_DEFUN([FP_SETTINGS],
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
     then
         mingw_bin_prefix=mingw/bin/
-        SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
-        SettingsHaskellCPPCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+	SettingsCCompilerCommand="\$tooldir/${mingw_bin_prefix}gcc.exe"
+	SettingsHaskellCPPCommand="\$tooldir/${mingw_bin_prefix}gcc.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
-        SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
-        SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
-        SettingsRanlibCommand="\$topdir/../${mingw_bin_prefix}ranlib.exe"
-        SettingsPerlCommand='$topdir/../perl/perl.exe'
-        SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
-        SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
+	SettingsLdCommand="\$tooldir/${mingw_bin_prefix}ld.exe"
+	SettingsArCommand="\$tooldir/${mingw_bin_prefix}ar.exe"
+	SettingsRanlibCommand="\$tooldir/${mingw_bin_prefix}ranlib.exe"
+	SettingsPerlCommand='$tooldir/perl/perl.exe'
+	SettingsDllWrapCommand="\$tooldir/${mingw_bin_prefix}dllwrap.exe"
+	SettingsWindresCommand="\$tooldir/${mingw_bin_prefix}windres.exe"
         SettingsTouchCommand='$topdir/bin/touchy.exe'
     elif test "$EnableDistroToolchain" = "YES"
     then
@@ -1294,7 +1294,7 @@ AC_DEFUN([FP_GCC_SUPPORTS_NO_PIE],
    AC_MSG_CHECKING([whether GCC supports -no-pie])
    echo 'int main() { return 0; }' > conftest.c
    # Some GCC versions only warn when passed an unrecognized flag.
-   if $CC -no-pie -x c /dev/null -dM -E > conftest.txt 2>&1 && ! grep -i unrecognized conftest.txt > /dev/null 2>&1; then
+   if $CC -no-pie -Werror -x c /dev/null -dM -E > conftest.txt 2>&1 && ! grep -i unrecognized conftest.txt > /dev/null 2>&1; then
        CONF_GCC_SUPPORTS_NO_PIE=YES
        AC_MSG_RESULT([yes])
    else

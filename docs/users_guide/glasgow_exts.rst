@@ -14406,11 +14406,8 @@ See also the :ghc-flag:`-funbox-strict-fields` flag, which essentially has the
 effect of adding ``{-# UNPACK #-}`` to every strict constructor field.
 
 .. [1]
-   in fact, UNPACK has no effect without
-   -O
-   , for technical reasons (see
-   tick 5252
-   )
+   In fact, ``UNPACK`` has no effect without :ghc-flag:`-O`, for technical
+   reasons (see :ghc-ticket:`5252`).
 
 .. _nounpack-pragma:
 

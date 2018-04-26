@@ -276,8 +276,8 @@ We could try and be careful by tracking which join points are still valid at
 each subexpression, but since join points aren't allocated or shared, there's
 less to gain by trying to CSE them. (#13219)
 
-Note [Don’t tryForCSE the RHS of a Join Point]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Look inside join-point binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Another way how CSE for joint points is tricky is
 
   let join foo x = (x, 42)
@@ -293,9 +293,9 @@ naively, CSE would turn this into
 but now bar is a join point that claims arity one, but its right-hand side
 is not a lambda, breaking the join-point invariant (this was #15002).
 
-Therefore, `cse_bind` will zoom past the lambdas of a join point (using
-`collectNBinders`) and resume searching for CSE opportunities only in the body
-of the join point.
+So `cse_bind` must zoom past the lambdas of a join point (using
+`collectNBinders`) and resume searching for CSE opportunities only in
+the body of the join point.
 
 Note [CSE for recursive bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -372,10 +372,10 @@ cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, 
 cse_bind toplevel env (in_id, in_rhs) out_id
   | isTopLevel toplevel, exprIsTickedString in_rhs
       -- See Note [Take care with literal strings]
-  = (env', (out_id, in_rhs))
+  = (env', (out_id', in_rhs))
 
   | Just arity <- isJoinId_maybe in_id
-      -- See Note [Don’t tryForCSE the RHS of a Join Point]
+      -- See Note [Look inside join-point binders]
   = let (params, in_body) = collectNBinders arity in_rhs
         (env', params') = addBinders env params
         out_body = tryForCSE env' in_body
@@ -384,8 +384,8 @@ cse_bind toplevel env (in_id, in_rhs) out_id
   | otherwise
   = (env', (out_id', out_rhs))
   where
-    out_rhs         = tryForCSE env in_rhs
     (env', out_id') = addBinding env in_id out_id out_rhs
+    out_rhs         = tryForCSE env in_rhs
 
 addBinding :: CSEnv                      -- Includes InId->OutId cloning
            -> InVar                      -- Could be a let-bound type

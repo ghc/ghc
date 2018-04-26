@@ -1,0 +1,6 @@
+
+T13450TH.hs:6:15: error:
+    Parser error on `''`
+    Character literals may not be empty
+    Or perhaps you intended to use quotation syntax of TemplateHaskell,
+    but the type variable or constructor is missing

@@ -70,6 +70,25 @@ Language
   See :ref:`Numeric underscores <numeric-underscores>`
   for the full details.
 
+- GHC is now more diligent about catching illegal uses of kind polymorphism.
+  For instance, this used to be accepted without :extension:`PolyKinds`: ::
+
+    class C a where
+      c :: Proxy (x :: a)
+
+  Despite the fact that ``a`` is used as a kind variable in the type signature
+  for ``c``. This is now an error unless :extension:`PolyKinds` is explicitly
+  enabled.
+
+  Moreover, GHC 8.4 would accept the following without the use of
+  :extension:`TypeInType` (or even :extension:`PolyKinds`!): ::
+
+    f :: forall k (a :: k). Proxy a
+    f = Proxy
+
+  Despite the fact that ``k`` is used as both a type and kind variable. This is
+  now an error unless :extension:`TypeInType` is explicitly enabled.
+
 Compiler
 ~~~~~~~~
 
@@ -78,6 +97,10 @@ Compiler
   an include path for `#include ""`. See :ghc-ticket:`14312`.
 
 - GHC now supports British spelling of :extension:`GeneralizedNewtypeDeriving`.
+
+- GHC now does significantly more constant folding in its core-to-core optimiser.
+  This will result in significantly better code being generated for some
+  programs. See :ghc-ticket:`9136`.
 
 - The code-generation effects of :ghc-flag:`-dynamic` can now be
   enabled independently by the flag
@@ -95,7 +118,7 @@ Runtime system
 - The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
   searches ``LD_LIBRARY_PATH``.
 
-- The GHC runtime on Windows is no longer constrained by MAX_PATH.
+- The GHC runtime on Windows is no longer constrained by ``MAX_PATH``.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
@@ -111,7 +134,7 @@ Template Haskell
 - ``($!)`` is now representation-polymorphic like ``($)``.
 
 - The module ``Data.Functor.Contravariant`` has been moved from the
-  ``contravariant`` package into base. All the other modules in
+  ``contravariant`` package into ``base``. All the other modules in
   ``contravariant`` (``Data.Functor.Contravariant.Divisible``, etc.)
   have not been moved to ``base``, and they still reside in ``contravariant``.
 
@@ -123,7 +146,7 @@ Windows Paths
 ~~~~~~~~~~~~~
 
 Windows paths are not all the same. The different kinds of paths each have
-different meanings. The MAX_PATH limitation is not a limitation of the Operating
+different meanings. The ``MAX_PATH`` limitation is not a limitation of the Operating
 System nor the File System. It is a limitation of the default namespace enforced
 by the Win32 API for backwards compatibility.
 
@@ -133,9 +156,9 @@ PATH.
 
 The namespaces are:
 
- - file namespace: \\?\
- - device namespace: \\.\
- - nt namespace: \
+ - file namespace: ``\\?\``
+ - device namespace: ``\\.\``
+ - nt namespace: ``\``
 
 Each of these turn off Path processing completely by the Win32 API and the paths
 are passed untouched to the filesystem.
@@ -149,7 +172,7 @@ The Haskell I/O manager will now automatically promote paths in the legacy
 format to Win32 file namespace. By default the I/O manager will do two things to
 your paths:
 
-  - replace / with \\
+  - replace ``/`` with ``\\``
   - expand relative paths to absolute paths
 
 If you want to opt out of all preprocessing just expliticly use namespaces in

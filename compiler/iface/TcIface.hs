@@ -1353,7 +1353,8 @@ tcIfaceCo = go
                                             <*> go c2
     go (IfaceInstCo c1 t2)       = (\a b -> InstCo a b)   <$> go c1
                                             <*> go t2
-    go (IfaceNthCo d c)          = NthCo d  <$> go c
+    go (IfaceNthCo d c)          = do { c' <- go c
+                                      ; return $ mkNthCo (nthCoRole d c') d c' }
     go (IfaceLRCo lr c)          = LRCo lr  <$> go c
     go (IfaceCoherenceCo c1 c2)  = (\a b -> CoherenceCo a b) <$> go c1
                                                <*> go c2

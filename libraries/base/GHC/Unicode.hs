@@ -220,11 +220,12 @@ isLower                 :: Char -> Bool
 -- This function is equivalent to 'Data.Char.isLetter'.
 isAlpha                 :: Char -> Bool
 
--- | Selects alphabetic or numeric digit Unicode characters.
+-- | Selects alphabetic or numeric Unicode characters.
 --
--- Note that numeric digits outside the ASCII range are selected by this
--- function but not by 'isDigit'.  Such digits may be part of identifiers
--- but are not used by the printer and reader to represent numbers.
+-- Note that numeric digits outside the ASCII range, as well as numeric
+-- characters which aren't digits, are selected by this function but not by
+-- 'isDigit'. Such characters may be part of identifiers but are not used by
+-- the printer and reader to represent numbers.
 isAlphaNum              :: Char -> Bool
 
 -- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.

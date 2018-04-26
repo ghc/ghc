@@ -33,7 +33,7 @@ test('rn037', normal, compile, [''])
 
 test('rn039', normal, compile, [''])
 test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
-test('rn041', expect_broken_for(10181, ['optasm', 'optllvm']), compile, [''])
+test('rn041', normal, compile, [''])
 test('rn042', [extra_files(['Rn042_A.hs'])], multimod_compile, ['rn042', '-v0'])
 test('rn043', [extra_files(['Rn043_A.hs', 'Rn043_B.hs'])], multimod_compile, ['rn043', '-v0'])
 test('rn044', [extra_files(['Rn044_A.hs', 'Rn044_B.hs'])], multimod_compile, ['rn044', '-v0'])

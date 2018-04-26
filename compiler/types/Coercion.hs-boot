@@ -26,7 +26,7 @@ mkUnsafeCo :: Role -> Type -> Type -> Coercion
 mkUnivCo :: UnivCoProvenance -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
-mkNthCo :: Int -> Coercion -> Coercion
+mkNthCo :: HasDebugCallStack => Role -> Int -> Coercion -> Coercion
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkInstCo :: Coercion -> Coercion -> Coercion
 mkCoherenceCo :: Coercion -> Coercion -> Coercion

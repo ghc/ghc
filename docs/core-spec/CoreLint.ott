@@ -300,11 +300,11 @@ not (si is_a_coercion)
 not (ti is_a_coercion)
 R' = (tyConRolesX R T)[i]
 ---------------------- :: NthCoTyCon
-G |-co nth i g : si k2~R' k2' ti
+G |-co nth R' i g : si k2~R' k2' ti
 
 G |-co g : (forall z1_k1.t1) k3~R k4 (forall z2_k2.t2)
 --------------------------- :: NthCoForAll
-G |-co nth 0 g : k1 *~Nom * k2
+G |-co nth Nom 0 g : k1 *~Nom * k2
 
 G |-co g : (s1 s2) k~Nom k' (t1 t2)
 G |-ty s1 : k1

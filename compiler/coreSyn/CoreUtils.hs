@@ -258,7 +258,7 @@ applyTypeToArgs e op_ty args
 
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
-mkCast :: HasCallStack => CoreExpr -> Coercion -> CoreExpr
+mkCast :: HasCallStack => CoreExpr -> CoercionR -> CoreExpr
 mkCast e co
   | ASSERT2( coercionRole co == Representational
            , text "coercion" <+> ppr co <+> ptext (sLit "passed to mkCast")

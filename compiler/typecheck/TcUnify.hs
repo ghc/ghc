@@ -2184,8 +2184,8 @@ occCheckExpand tv ty
     go_co env (TransCo co1 co2)         = do { co1' <- go_co env co1
                                              ; co2' <- go_co env co2
                                              ; return (mkTransCo co1' co2') }
-    go_co env (NthCo n co)              = do { co' <- go_co env co
-                                             ; return (mkNthCo n co') }
+    go_co env (NthCo r n co)            = do { co' <- go_co env co
+                                             ; return (mkNthCo r n co') }
     go_co env (LRCo lr co)              = do { co' <- go_co env co
                                              ; return (mkLRCo lr co') }
     go_co env (InstCo co arg)           = do { co' <- go_co env co
