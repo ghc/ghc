@@ -38,7 +38,7 @@ module TyCoRep (
 
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
-        mkFunTy, mkFunTyOm, mkFunTys, mkForAllTy, mkForAllTys,
+        mkFunTy, mkFunTyOm, mkFunTys, mkFunTysOm, mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
         isTYPE, tcIsTYPE,
         isLiftedTypeKind, isUnliftedTypeKind,
@@ -742,6 +742,11 @@ mkFunTyOm = mkFunTy Omega
 mkFunTys :: [Weighted Type] -> Type -> Type
 mkFunTys tys ty = foldr (\(Weighted w t) -> mkFunTy w t) ty tys
 -- FIXME: arnaud: see at use-site how to best refine this. Probably the list argument should be of pairs `(Rig,Type)`.
+-- MattP: The unweighted one should be the default. there are lots of "bad"
+-- calls to this which map unrestricted over the argument first.
+
+mkFunTysOm :: [Type] -> Type -> Type
+mkFunTysOm tys ty = mkFunTys (map unrestricted tys) ty
 
 mkForAllTy :: TyVar -> ArgFlag -> Type -> Type
 mkForAllTy tv vis ty = ForAllTy (TvBndr tv vis) ty
