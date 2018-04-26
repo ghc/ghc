@@ -45,13 +45,15 @@
           []
           (Nothing)
           (PrefixCon
-           [({ DumpParsedAst.hs:5:26-30 }
-             (HsTyVar
-              (PlaceHolder)
-              (NotPromoted)
-              ({ DumpParsedAst.hs:5:26-30 }
-               (Unqual
-                {OccName: Peano}))))])
+           [(Weighted
+             (One)
+             ({ DumpParsedAst.hs:5:26-30 }
+              (HsTyVar
+               (PlaceHolder)
+               (NotPromoted)
+               ({ DumpParsedAst.hs:5:26-30 }
+                (Unqual
+                 {OccName: Peano})))))])
           (Nothing)))]
        ({ <no location info> }
         []))
