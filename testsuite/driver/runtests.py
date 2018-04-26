@@ -81,6 +81,9 @@ if args.only:
     config.only = args.only
     config.run_only_some_tests = True
 
+with open("../skip-tests.txt", 'r') as f:
+    config.skipTests = set(f.read().splitlines())
+
 if args.way:
     for way in args.way:
         if way not in all_ways:

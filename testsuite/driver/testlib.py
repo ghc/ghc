@@ -671,6 +671,9 @@ def test(name, setup, func, args):
     # them, all tests will see the modified version!
     myTestOpts = copy.deepcopy(default_testopts)
 
+    if name in config.skipTests:
+        myTestOpts.skip = 1
+
     executeSetups([thisdir_settings, setup], name, myTestOpts)
 
     thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)

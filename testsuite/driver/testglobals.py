@@ -26,6 +26,10 @@ class TestConfig:
         self.run_only_some_tests = False
         self.only = set()
 
+        # Skip these tests
+
+        self.skipTests = set()
+
         # Accept new output which differs from the sample?
         self.accept = 0
         self.accept_platform = 0
