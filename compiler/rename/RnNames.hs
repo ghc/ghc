@@ -200,8 +200,8 @@ rnImports imports = do
       new_finsts = imp_finsts imp_avails1
 
 {-
-Note [Combine ImportAvails]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Combining ImportAvails]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 imp_finsts in ImportAvails is a list of family instance modules
 transitively depended on by an import. imp_finsts for a currently
 compiled module is a union of all the imp_finsts of imports.
