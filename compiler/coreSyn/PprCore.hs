@@ -395,7 +395,9 @@ pprTypedLamBinder bind_site debug_on var
       | isTyVar var  -> parens (pprKindedTyVarBndr var)
 
       | otherwise    -> parens (hang (pprIdBndr var)
-                                   2 (vcat [ dcolon <> brackets (ppr (idWeight var)) <+> pprType (idType var)
+                                   2 (vcat [  dcolon
+                                                -- <> brackets (ppr (idWeight var))
+                                                <+> pprType (idType var)
                                            , pp_unf]))
   where
     suppress_sigs = gopt Opt_SuppressTypeSignatures
