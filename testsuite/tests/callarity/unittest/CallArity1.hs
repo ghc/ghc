@@ -27,16 +27,16 @@ import FastString
 go, go2, x, d, n, y, z, scrutf, scruta :: Id
 [go, go2, x,d, n, y, z, scrutf, scruta, f] = mkTestIds
     (words "go go2 x d n y z scrutf scruta f")
-    [ mkFunTys [intTy, intTy] intTy
-    , mkFunTys [intTy, intTy] intTy
+    [ mkFunTysOm [intTy, intTy] intTy
+    , mkFunTysOm [intTy, intTy] intTy
     , intTy
-    , mkFunTys [intTy] intTy
-    , mkFunTys [intTy] intTy
+    , mkFunTysOm [intTy] intTy
+    , mkFunTysOm [intTy] intTy
     , intTy
     , intTy
-    , mkFunTys [boolTy] boolTy
+    , mkFunTysOm [boolTy] boolTy
     , boolTy
-    , mkFunTys [intTy, intTy] intTy -- protoypical external function
+    , mkFunTysOm [intTy, intTy] intTy -- protoypical external function
     ]
 
 exprs :: [(String, CoreExpr)]
@@ -188,7 +188,7 @@ mkLApps v = mkApps (Var v) . map mkLit
 mkACase = mkIfThenElse (mkVarApps (Var scrutf) [scruta])
 
 mkTestId :: Int -> String -> Type -> Id
-mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) ty
+mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) Omega ty
 
 mkTestIds :: [String] -> [Type] -> [Id]
 mkTestIds ns tys = zipWith3 mkTestId [0..] ns tys
