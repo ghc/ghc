@@ -89,12 +89,14 @@
             []
             (Nothing)
             (PrefixCon
-             [({ DumpRenamedAst.hs:6:26-30 }
-               (HsTyVar
-                (PlaceHolder)
-                (NotPromoted)
-                ({ DumpRenamedAst.hs:6:26-30 }
-                 {Name: DumpRenamedAst.Peano})))])
+             [(Weighted
+               (One)
+               ({ DumpRenamedAst.hs:6:26-30 }
+                (HsTyVar
+                 (PlaceHolder)
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:6:26-30 }
+                  {Name: DumpRenamedAst.Peano}))))])
             (Nothing)))]
          ({ <no location info> }
           []))
@@ -240,6 +242,7 @@
                (NotPromoted)
                ({ DumpRenamedAst.hs:12:20 }
                 {Name: k})))
+             (Omega)
              ({ DumpRenamedAst.hs:12:25-30 }
               (HsFunTy
                (PlaceHolder)
@@ -249,6 +252,7 @@
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:12:25 }
                   {Name: k})))
+               (Omega)
                ({ DumpRenamedAst.hs:12:30 }
                 (HsTyVar
                  (PlaceHolder)
@@ -284,6 +288,7 @@
                   (NotPromoted)
                   ({ DumpRenamedAst.hs:15:28 }
                    {Name: k})))
+                (Omega)
                 ({ DumpRenamedAst.hs:15:33 }
                  (HsTyVar
                   (PlaceHolder)
@@ -312,12 +317,14 @@
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:15:40 }
                       {Name: k})))
+                   (Omega)
                    ({ DumpRenamedAst.hs:15:45 }
                     (HsTyVar
                      (PlaceHolder)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:15:45 }
                       {Name: GHC.Types.*})))))))
+               (Omega)
                ({ DumpRenamedAst.hs:15:51 }
                 (HsTyVar
                  (PlaceHolder)
@@ -337,50 +344,53 @@
                  []})
                (Nothing)
                (PrefixCon
-                [({ DumpRenamedAst.hs:16:10-34 }
-                  (HsParTy
-                   (PlaceHolder)
-                   ({ DumpRenamedAst.hs:16:11-33 }
-                    (HsForAllTy
-                     (PlaceHolder)
-                     [({ DumpRenamedAst.hs:16:18-19 }
-                       (UserTyVar
+                [(Weighted
+                  (Omega)
+                  ({ DumpRenamedAst.hs:16:10-34 }
+                   (HsParTy
+                    (PlaceHolder)
+                    ({ DumpRenamedAst.hs:16:11-33 }
+                     (HsForAllTy
+                      (PlaceHolder)
+                      [({ DumpRenamedAst.hs:16:18-19 }
+                        (UserTyVar
+                         (PlaceHolder)
+                         ({ DumpRenamedAst.hs:16:18-19 }
+                          {Name: xx})))]
+                      ({ DumpRenamedAst.hs:16:22-33 }
+                       (HsFunTy
                         (PlaceHolder)
-                        ({ DumpRenamedAst.hs:16:18-19 }
-                         {Name: xx})))]
-                     ({ DumpRenamedAst.hs:16:22-33 }
-                      (HsFunTy
-                       (PlaceHolder)
-                       ({ DumpRenamedAst.hs:16:22-25 }
-                        (HsAppTy
-                         (PlaceHolder)
-                         ({ DumpRenamedAst.hs:16:22 }
-                          (HsTyVar
-                           (PlaceHolder)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:16:22 }
-                            {Name: f})))
-                         ({ DumpRenamedAst.hs:16:24-25 }
-                          (HsTyVar
-                           (PlaceHolder)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:16:24-25 }
-                            {Name: xx})))))
-                       ({ DumpRenamedAst.hs:16:30-33 }
-                        (HsAppTy
-                         (PlaceHolder)
-                         ({ DumpRenamedAst.hs:16:30 }
-                          (HsTyVar
-                           (PlaceHolder)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:16:30 }
-                            {Name: g})))
-                         ({ DumpRenamedAst.hs:16:32-33 }
-                          (HsTyVar
-                           (PlaceHolder)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:16:32-33 }
-                            {Name: xx})))))))))))])
+                        ({ DumpRenamedAst.hs:16:22-25 }
+                         (HsAppTy
+                          (PlaceHolder)
+                          ({ DumpRenamedAst.hs:16:22 }
+                           (HsTyVar
+                            (PlaceHolder)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:16:22 }
+                             {Name: f})))
+                          ({ DumpRenamedAst.hs:16:24-25 }
+                           (HsTyVar
+                            (PlaceHolder)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:16:24-25 }
+                             {Name: xx})))))
+                        (Omega)
+                        ({ DumpRenamedAst.hs:16:30-33 }
+                         (HsAppTy
+                          (PlaceHolder)
+                          ({ DumpRenamedAst.hs:16:30 }
+                           (HsTyVar
+                            (PlaceHolder)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:16:30 }
+                             {Name: g})))
+                          ({ DumpRenamedAst.hs:16:32-33 }
+                           (HsTyVar
+                            (PlaceHolder)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:16:32-33 }
+                             {Name: xx}))))))))))))])
                ({ DumpRenamedAst.hs:16:39-45 }
                 (HsAppTy
                  (PlaceHolder)
