@@ -103,7 +103,11 @@ irrelevantWeight = weightedThing
 mkWeighted = Weighted
 
 instance Outputable a => Outputable (Weighted a) where
-   ppr (Weighted cnt t) = ppr cnt <> ppr t
+   ppr (Weighted cnt t) = -- ppr cnt <> ppr t
+                          ppr t
+
+-- MattP: For now we don't print the weight by default as it creeps into
+-- error messages.
 
 instance Binary a => Binary (Weighted a) where
   put_ bh (Weighted r x) = put_ bh r >> put_ bh x
