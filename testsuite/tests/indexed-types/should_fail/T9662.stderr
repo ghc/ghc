@@ -1,7 +1,7 @@
 
 T9662.hs:47:8: error:
-    • Couldn't match type ‘m’ with ‘Int’
-      ‘m’ is a rigid type variable bound by
+    • Couldn't match type ‘k’ with ‘Int’
+      ‘k’ is a rigid type variable bound by
         the type signature for:
           test :: forall sh k m n.
                   Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
