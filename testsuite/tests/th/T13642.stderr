@@ -1,4 +1,0 @@
-
-T13642.hs:8:9: error:
-    Exotic form of kind not (yet) handled by Template Haskell
-      forall a. a -> Type
