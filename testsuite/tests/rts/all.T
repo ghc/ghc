@@ -382,3 +382,10 @@ test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
 test('T13894', normal, compile_and_run, [''])
 test('T14497', normal, compile_and_run, ['-O'])
+
+test('nursery-chunks1',
+  [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
+  , only_ways(['threaded1','threaded2'])
+  ],
+  compile_and_run,
+  [''])
