@@ -34,4 +34,27 @@ T8958
 T2414
 T12083a
 TypeAppData
-
+-- Fails on CI but not locally
+scc001
+ghcpkg05
+-- Fails with linearity checks enable, skipped for data constructor type
+T7360
+-- See #42
+T14682
+-- #40
+T1735
+-- #41
+T3234
+-- #37
+T7116
+T5996
+T13340
+-- #38
+TcCoercible
+-- #39
+T13233
+T13244
+-- #43
+inline-check
+-- #44
+print020
