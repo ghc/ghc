@@ -40,6 +40,7 @@ module Id (
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
         mkUserLocal, mkUserLocalOrCoVar,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
+        mkTemplateLocalW,
         mkWorkerId,
 
         -- ** Taking an Id apart
@@ -150,6 +151,7 @@ import Unique
 import UniqSupply
 import FastString
 import Util
+import Weight
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,
@@ -355,7 +357,10 @@ mkWorkerId uniq unwrkr ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) Omega ty
+mkTemplateLocal i ty = mkTemplateLocalW i (unrestricted ty)
+
+mkTemplateLocalW :: Int -> Weighted Type -> Id
+mkTemplateLocalW i (Weighted w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) w ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]

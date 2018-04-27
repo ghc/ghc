@@ -436,7 +436,7 @@ mkDataConWorkId wkr_name data_con
                   `setInlinePragInfo`     alwaysInlinePragma
                   `setUnfoldingInfo`      newtype_unf
                   `setLevityInfoWithType` nt_wrap_ty
-    id_arg1      = mkTemplateLocal 1 (weightedThing $ head nt_arg_tys)
+    id_arg1      = mkTemplateLocalW 1 (head nt_arg_tys)
     newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
                             isSingleton nt_arg_tys, ppr data_con  )
                               -- Note [Newtype datacons]
