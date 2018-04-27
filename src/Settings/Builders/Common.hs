@@ -29,9 +29,7 @@ cIncludeArgs = do
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
 
-    cross   <- expr crossCompiling
-    compilerOrGhc <- package compiler ||^ package ghc
-    mconcat [ not (cross && compilerOrGhc) ? arg "-Iincludes"
+    mconcat [ arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
