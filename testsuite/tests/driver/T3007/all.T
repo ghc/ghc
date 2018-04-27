@@ -1,5 +1,4 @@
 test('T3007',
-     [extra_files(['A/', 'B/']),
-      expect_broken(14759)],
+     extra_files(['A/', 'B/']),
      run_command,
      ['$MAKE -s --no-print-directory T3007'])

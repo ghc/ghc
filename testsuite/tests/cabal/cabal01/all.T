@@ -23,7 +23,6 @@ def ignoreLdOutput(str):
 
 test('cabal01',
      [extra_files(['A.hs', 'B/', 'MainA.hs', 'Setup.lhs', 'c_src/', 'hello.c', 'test.cabal']),
-      normalise_errmsg_fun(ignoreLdOutput),
-      expect_broken(14759)],
-     run_command, 
+      normalise_errmsg_fun(ignoreLdOutput)],
+     run_command,
      ['$MAKE -s --no-print-directory cabal01 VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn + ' ' + cleanup])
