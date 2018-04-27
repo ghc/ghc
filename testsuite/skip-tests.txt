@@ -55,6 +55,6 @@ TcCoercible
 T13233
 T13244
 -- #43
-inline-check
+-- inline-check
 -- #44
 print020
