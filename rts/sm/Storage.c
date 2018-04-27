@@ -220,6 +220,7 @@ initStorage (void)
 void storageAddCapabilities (uint32_t from, uint32_t to)
 {
     uint32_t n, g, i, new_n_nurseries;
+    nursery *old_nurseries;
 
     if (RtsFlags.GcFlags.nurseryChunkSize == 0) {
         new_n_nurseries = to;
@@ -229,6 +230,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
             stg_max(to, total_alloc / RtsFlags.GcFlags.nurseryChunkSize);
     }
 
+    old_nurseries = nurseries;
     if (from > 0) {
         nurseries = stgReallocBytes(nurseries,
                                     new_n_nurseries * sizeof(struct nursery_),
@@ -240,8 +242,9 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
 
     // we've moved the nurseries, so we have to update the rNursery
     // pointers from the Capabilities.
-    for (i = 0; i < to; i++) {
-        capabilities[i]->r.rNursery = &nurseries[i];
+    for (i = 0; i < from; i++) {
+        uint32_t index = capabilities[i]->r.rNursery - old_nurseries;
+        capabilities[i]->r.rNursery = &nurseries[index];
     }
 
     /* The allocation area.  Policy: keep the allocation area

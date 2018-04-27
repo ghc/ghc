@@ -402,3 +402,10 @@ test('alloccounter1', normal, compile_and_run,
     # allocation and messes up the results:
     '-with-rtsopts=-k1m'
   ])
+
+test('nursery-chunks1',
+  [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
+  , only_ways(['threaded1','threaded2'])
+  ],
+  compile_and_run,
+  [''])
