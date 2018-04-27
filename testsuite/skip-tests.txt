@@ -33,3 +33,5 @@ valid_substitutions
 T8958
 T2414
 T12083a
+TypeAppData
+
