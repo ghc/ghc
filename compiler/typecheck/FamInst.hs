@@ -162,12 +162,12 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
        ; dflags <- getDynFlags
        ; let lhs'     = substTys subst lhs
              rhs'     = substTy  subst rhs
-             tcv_set' = mkVarSet (tvs' ++ cvs')
+             tcvs'    = tvs' ++ cvs'
        ; when (gopt Opt_DoCoreLinting dflags) $
            -- Check that the types involved in this instance are well formed.
            -- Do /not/ expand type synonyms, for the reasons discussed in
            -- Note [Linting type synonym applications].
-           case lintTypes dflags False tcv_set' (rhs':lhs') of
+           case lintTypes dflags tcvs' (rhs':lhs') of
              Nothing       -> pure ()
              Just fail_msg -> pprPanic "Core Lint error" fail_msg
        ; return (FamInst { fi_fam      = tyConName fam_tc
