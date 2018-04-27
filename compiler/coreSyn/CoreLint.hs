@@ -767,7 +767,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
                   addGoodJoins [bndr] $
                   lintCoreExpr body)
         ; let l_weight = idWeight bndr
-        -- ; checkLinearity body_ue bndr
+        ; checkLinearity body_ue bndr
         ; return (body_ty, body_ue `addUE` (l_weight `scaleUE` body_ue))}
 
   | otherwise
@@ -804,7 +804,7 @@ lintCoreExpr (Lam var expr)
     markAllJoinsBad $
     lintBinder LambdaBind var $ \ var' ->
     do { (body_ty, ue) <- lintCoreExpr expr
-       -- ; checkLinearity ue var'
+       ; checkLinearity ue var'
        ; return $ (mkLamType var' body_ty, ue) }
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
@@ -1079,7 +1079,7 @@ lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
        ; lintAltBinders rhs_ue scrut_ty con_ty'  bndrs }
   | otherwise
   = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE -- TODO
-      -- ; checkCaseLinearity rhs_ue var_w bndr
+       ; checkCaseLinearity rhs_ue var_w bndr
        ; lintAltBinders rhs_ue scrut_ty con_ty' bndrs }
 
 -- | Implements the case rules for linearity
