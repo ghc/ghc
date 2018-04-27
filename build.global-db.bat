@@ -3,19 +3,25 @@ setlocal
 cd %~dp0
 mkdir bin 2> nul
 
-set ghcArgs=--make                     ^
-            -Wall                      ^
-            -fno-warn-name-shadowing   ^
-            -XRecordWildCards          ^
-            src\Main.hs                ^
-            -threaded                  ^
-            -isrc                      ^
-            -i..\libraries\Cabal\Cabal ^
-            -rtsopts                   ^
-            -with-rtsopts=-I0          ^
-            -outputdir=bin             ^
-            -j                         ^
-            -O                         ^
+set ghcArgs=--make                       ^
+            -Wall                        ^
+            -fno-warn-name-shadowing     ^
+            -XDeriveGeneric              ^
+            -XFlexibleInstances          ^
+            -XGeneralizedNewtypeDeriving ^
+            -XLambdaCase                 ^
+            -XRecordWildCards            ^
+            -XScopedTypeVariables        ^
+            -XTupleSections              ^
+            src\Main.hs                  ^
+            -threaded                    ^
+            -isrc                        ^
+            -i..\libraries\Cabal\Cabal   ^
+            -rtsopts                     ^
+            -with-rtsopts=-I0            ^
+            -outputdir=bin               ^
+            -j                           ^
+            -O                           ^
             -o bin\hadrian
 
 set hadrianArgs=--lint      ^
