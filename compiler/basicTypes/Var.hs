@@ -42,7 +42,7 @@ module Var (
         OutVar, OutCoVar, OutId, OutTyVar,
 
         -- ** Taking 'Var's apart
-        varName, varUnique, varType, varWeight, varWeightMaybe,
+        varName, varUnique, varType, varWeight, varWeightMaybe, varWeightDef,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType, updateVarType,
@@ -99,6 +99,7 @@ import DynFlags
 import Outputable
 
 import Data.Data
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -385,6 +386,9 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 varWeightMaybe :: Id -> Maybe Rig
 varWeightMaybe (Id { varWeight = w }) = Just w
 varWeightMaybe _ = Nothing
+
+varWeightDef :: Id -> Rig
+varWeightDef = fromMaybe Omega . varWeightMaybe
 
 {- *********************************************************************
 *                                                                      *

@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module TrieMap(
    -- * Maps over Core expressions
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
@@ -32,6 +33,8 @@ module TrieMap(
  ) where
 
 import GhcPrelude
+
+import Control.Arrow (first)
 
 import CoreSyn
 import Coercion
@@ -1092,22 +1095,24 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
 -- we can disambiguate this by matching on the type (or kind, if this
 -- a binder in a type) of the binder.
 --
--- We also need to do the same for linearity!
-data BndrMap a = BndrMap RigMap (TypeMapG a)
+-- We also need to do the same for linearity! The easiest way to do this is
+-- to store the linearity of a variable along with the payload and then
+-- check that they also match up when retrieving the value.
+data BndrMap a = BndrMap (TypeMapG (a, Rig))
 
 instance TrieMap BndrMap where
    type Key BndrMap = Var
-   emptyTM  = BndrMap emptyVarEnv emptyTM
+   emptyTM  = BndrMap emptyTM
    lookupTM = lkBndr emptyCME
    alterTM  = xtBndr emptyCME
    foldTM   = fdBndrMap
    mapTM    = mapBndrMap
 
 mapBndrMap :: (a -> b) -> BndrMap a -> BndrMap b
-mapBndrMap f (BndrMap rm tm) = BndrMap rm (mapTM f tm)
+mapBndrMap f (BndrMap tm) = BndrMap (mapTM (first f) tm)
 
 fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
-fdBndrMap f (BndrMap _ tm) = foldTM f tm
+fdBndrMap f (BndrMap tm) = foldTM (f . fst) tm
 
 
 
@@ -1120,16 +1125,17 @@ type RigMap = VarEnv Rig
 -- of these data types have binding forms.
 
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
-lkBndr env v (BndrMap rm tymap) = do
-  w <- lookupVarEnv rm v
-  guard (fromMaybe Omega (varWeightMaybe v) == w)
-  lkG (D env (varType v)) tymap
+lkBndr env v (BndrMap tymap) = do
+  (a, w) <- lkG (D env (varType v)) tymap
+  guard (w == varWeightDef v)
+  return a
 
 
-xtBndr :: CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
-xtBndr env v xt (BndrMap rm tymap)  =
-  BndrMap (extendVarEnv rm v (fromMaybe Omega (varWeightMaybe v)))
-          (xtG (D env (varType v)) xt tymap)
+xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
+xtBndr env v xt (BndrMap tymap)  =
+  let xt' :: Maybe (a, Rig) -> Maybe (a, Rig)
+      xt' mv = (\a -> (a, varWeightDef v)) <$> xt (fst <$> mv)
+  in BndrMap (xtG (D env (varType v)) xt' tymap)
 
 
 --------- Variable occurrence -------------
