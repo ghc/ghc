@@ -1040,7 +1040,7 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 141952368, 5),
+          [(wordsize(64), 150743648, 5),
           # initial:      125831400
           # 2017-01-18:   133380960  Allow top-level string literals in Core
           # 2017-02-17:   153611448  Type-indexed Typeable
@@ -1049,6 +1049,7 @@ test('T12425',
           # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
           # 2017-05-23:   134780272  Addition of llvm-targets in dynflags (D3352)
           # 2018-04-15:   141952368  Collateral of #14737
+          # 2018-04-26:   150743648  Do not unpack class dictionaries with INLINABLE
           ]),
      ],
      compile,
@@ -1061,7 +1062,7 @@ test('T12234',
           # initial:      83032768
           # 2017-02-19    89180624 (x64/Windows) - Unknown
           # 2017-02-25    79889200 (x64/Windows) - Early inline patch
-           (wordsize(64), 81696664, 5),
+           (wordsize(64), 85961968, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
           # 2017-02-01:   80882208  (Use superclass instances when solving)
@@ -1069,6 +1070,7 @@ test('T12234',
           # 2017-02-17:   86525344  (Type-indexed Typeable)
           # 2017-02-25:   83032768  (Early inline patch)
           # 2017-09-07:   81696664  (Semigroup=>Monoid patch, D3927)
+          # 2018-04-26:   85961968  (Do not unpack class dictionaries with INLINABLE)
           ]),
      ],
      compile,
@@ -1135,11 +1137,12 @@ test('T12707',
 test('T12150',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 73769936, 5)
+          [(wordsize(64), 77557800, 5)
           # initial:    70773000
           # 2017-08-25: 74358208  Refactor the Mighty Simplifier
           # 2017-08-25: 78300680  Drift
           # 2017-10-25: 73769936  amd64/linux Fix space leak in BinIface.getSymbolTable
+          # 2018-04-26: 77557800  Do not unpack class dictionaries with INLINABLE
           ]),
      ],
     compile,
