@@ -768,7 +768,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
                   lintCoreExpr body)
         ; let l_weight = idWeight bndr
         ; checkLinearity body_ue bndr
-        ; return (body_ty, body_ue `addUE` (l_weight `scaleUE` body_ue))}
+        ; return (body_ty, body_ue `addUE` (l_weight `scaleUE` let_ue))}
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
