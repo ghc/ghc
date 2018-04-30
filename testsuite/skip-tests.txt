@@ -49,5 +49,3 @@ TcCoercible
 -- #39
 T13233
 T13244
--- #44
-print020
