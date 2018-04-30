@@ -220,7 +220,9 @@ registerTimeout mgr us cb = do
       now <- getMonotonicTimeNSec
       let expTime = fromIntegral us * 1000 + now
 
-      editTimeouts mgr (Q.insert key expTime cb)
+      -- "unsafeInsertNew" is safe - the key must not exist in the PSQ. It
+      -- doesn't because we just generated it from a unique supply.
+      editTimeouts mgr (Q.unsafeInsertNew key expTime cb)
   return $ TK key
 
 -- | Unregister an active timeout.
