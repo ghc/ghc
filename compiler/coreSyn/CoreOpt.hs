@@ -963,6 +963,9 @@ pushCoTyArg co ty
   -- -- | tyL `eqType` tyR
   -- -- = Just (ty, Nothing)
 
+  | isReflCo co
+  = Just (ty, Nothing)
+
   | isForAllTy tyL
   = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
     Just (ty `mkCastTy` mkSymCo co1, Just co2)
@@ -997,6 +1000,9 @@ pushCoValArg co
   -- optimizer will take care of it. See Trac #14737.
   -- -- | tyL `eqType` tyR
   -- -- = Just (mkRepReflCo arg, Nothing)
+
+  | isReflCo co
+  = Just (mkRepReflCo arg, Nothing)
 
   | isFunTy tyL
   , (co1, co2) <- decomposeFunCo Representational co

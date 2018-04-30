@@ -1209,40 +1209,73 @@ rebuild env expr cont
 ************************************************************************
 -}
 
+{- Note [Optimising reflexivity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important (for compiler performance) to get rid of reflexivity as soon
+as it appears.  See Trac #11735, #14737, and #15019.
+
+In particular, we want to behave well on
+
+ *  e |> co1 |> co2
+    where the two happen to cancel out entirely. That is quite common;
+    e.g. a newtype wrapping and unwrapping cancel.
+
+
+ * (f |> co) @t1 @t2 ... @tn x1 .. xm
+   Here we wil use pushCoTyArg and pushCoValArg successively, which
+   build up NthCo stacks.  Silly to do that if co is reflexive.
+
+However, we don't want to call isReflexiveCo too much, because it uses
+type equality which is expensive on big types (Trac #14737 comment:7).
+
+A good compromise (determined experimentally) seems to be to call
+isReflexiveCo
+ * when composing casts, and
+ * at the end
+
+In investigating this I saw missed opportunities for on-the-fly
+coercion shrinkage. See Trac #15090.
+-}
+
+
 simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplCast env body co0 cont0
   = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co0
-        ; cont1 <- {-#SCC "simplCast-addCoerce" #-} addCoerce co1 cont0
+        ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
+                   if isReflCo co1
+                   then return cont0  -- See Note [Optimising reflexivity]
+                   else addCoerce co1 cont0
         ; {-#SCC "simplCast-simplExprF" #-} simplExprF env body cont1 }
   where
         -- If the first parameter is Nothing, then simplifying revealed a
         -- reflexive coercion. Omit.
-        addCoerce0 :: Maybe OutCoercion -> SimplCont -> SimplM SimplCont
-        addCoerce0 Nothing   cont = return cont
-        addCoerce0 (Just co) cont = addCoerce co cont
+        addCoerceM :: Maybe OutCoercion -> SimplCont -> SimplM SimplCont
+        addCoerceM Nothing   cont = return cont
+        addCoerceM (Just co) cont = addCoerce co cont
 
         addCoerce :: OutCoercion -> SimplCont -> SimplM SimplCont
-
-        addCoerce co1 (CastIt co2 cont)
-          = {-#SCC "addCoerce-simple-recursion" #-}
-            addCoerce (mkTransCo co1 co2) cont
+        addCoerce co1 (CastIt co2 cont)  -- See Note [Optimising reflexivity]
+          | isReflexiveCo co' = return cont
+          | otherwise         = addCoerce co' cont
+          where
+            co' = mkTransCo co1 co2
 
         addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
           | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
           = {-#SCC "addCoerce-pushCoTyArg" #-}
-            do { tail' <- addCoerce0 m_co' tail
+            do { tail' <- addCoerceM m_co' tail
                ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
 
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                 , sc_dup = dup, sc_cont = tail })
+                                      , sc_dup = dup, sc_cont = tail })
           | Just (co1, m_co2) <- pushCoValArg co
           , Pair _ new_ty <- coercionKind co1
-          , not (isTypeLevPoly new_ty)  -- without this check, we get a lev-poly arg
+          , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
                                         -- See Note [Levity polymorphism invariants] in CoreSyn
                                         -- test: typecheck/should_run/EtaExpandLevPoly
           = {-#SCC "addCoerce-pushCoValArg" #-}
-            do { tail' <- addCoerce0 m_co2 tail
+            do { tail' <- addCoerceM m_co2 tail
                ; if isReflCo co1
                  then return (cont { sc_cont = tail' })
                       -- Avoid simplifying if possible;
@@ -1260,15 +1293,10 @@ simplCast env body co0 cont0
                                     , sc_cont = tail' }) } }
 
         addCoerce co cont
-          | isReflexiveCo co = {-#SCC "addCoerce-reflexive" #-}
-                               return cont
-          | otherwise        = {-#SCC "addCoerce-other" #-}
-                               return (CastIt co cont)
-                 -- It's worth checking isReflexiveCo.
-                 -- For example, in the initial form of a worker
-                 -- we may find  (coerce T (coerce S (\x.e))) y
-                 -- and we'd like it to simplify to e[y/x] in one round
-                 -- of simplification
+          | isReflexiveCo co = return cont  -- Having this at the end makes a huge
+                                            -- difference in T12227, for some reason
+                                            -- See Note [Optimising reflexivity]
+          | otherwise        = return (CastIt co cont)
 
 simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
          -> SimplM (DupFlag, StaticEnv, OutExpr)
