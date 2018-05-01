@@ -8,6 +8,7 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -132,6 +133,7 @@ import Data.Data ( Data )
 import HsDumpAst
 import qualified Data.Set as S
 
+import Control.DeepSeq
 import Control.Monad
 
 #include "HsVersions.h"
@@ -1788,8 +1790,8 @@ runTcInteractive hsc_env thing_inside
                                  (loadSrcInterface (text "runTcInteractive") m
                                                    False mb_pkg)
 
-       ; orphs <- fmap concat . forM (ic_imports icxt) $ \i ->
-            case i of
+       ; !orphs <- fmap (force . concat) . forM (ic_imports icxt) $ \i ->
+            case i of                   -- force above: see #15111
                 IIModule n -> getOrphans n Nothing
                 IIDecl i ->
                   let mb_pkg = sl_fs <$> ideclPkgQual i in
@@ -1798,6 +1800,7 @@ runTcInteractive hsc_env thing_inside
        ; let imports = emptyImportAvails {
                             imp_orphs = orphs
                         }
+
        ; (gbl_env, lcl_env) <- getEnvs
        ; let gbl_env' = gbl_env {
                            tcg_rdr_env      = ic_rn_gbl_env icxt

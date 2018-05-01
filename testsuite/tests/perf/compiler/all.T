@@ -1205,12 +1205,15 @@ test('ManyAlternatives',
 test('T13701',
      [ compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 2217187888, 10),
-           (platform('x86_64-unknown-linux'), 2133380768, 10),
+           (platform('x86_64-unknown-linux'), 2413253392, 10),
            # initial:     2511285600
            # 2017-06-23:  2188045288    treat banged variable bindings as FunBinds
            # 2017-07-11:  2187920960
            # 2017-07-12:  2412223768    inconsistency between Ben's machine and Harbormaster?
            # 2017-07-17:  2133380768    Resolved the issue causing the inconsistencies in this test
+           # 2018-05-09:  2413253392    D4659 (Fix GHCi space leaks) added
+           #                            some strictness which causes some extra
+           #                            work to be done in this test.
           ]),
        pre_cmd('./genT13701'),
        extra_files(['genT13701']),
