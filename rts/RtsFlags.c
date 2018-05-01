@@ -343,6 +343,9 @@ usage_text[] = {
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
+#else
+"",
+"  -hT            Produce a heap profile grouped by closure type"
 #endif /* PROFILING */
 
 #if defined(TRACING)
