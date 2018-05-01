@@ -359,13 +359,24 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
   = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
 
   | otherwise
-  = simple_out_bind_pair env in_bndr mb_out_bndr
-                         (simple_opt_clo env clo)
+  = simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
                          occ active stable_unf
   where
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
     occ        = idOccInfo in_bndr
+
+    out_rhs | Just join_arity <- isJoinId_maybe in_bndr
+            = simple_join_rhs join_arity
+            | otherwise
+            = simple_opt_clo env clo
+
+    simple_join_rhs join_arity -- See Note [Preserve join-binding arity]
+      = mkLams join_bndrs' (simple_opt_expr env_body join_body)
+      where
+        env0 = soeSetInScope env rhs_env
+        (join_bndrs, join_body) = collectNBinders join_arity in_rhs
+        (env_body, join_bndrs') = subst_opt_bndrs env0 join_bndrs
 
     pre_inline_unconditionally :: Bool
     pre_inline_unconditionally
@@ -451,6 +462,14 @@ trivial ones.  But we do here!  Why?  In the simple optimiser
 Those differences obviate the reasons for not inlining a trivial rhs,
 and increase the benefit for doing so.  So we unconditionally inline trivial
 rhss here.
+
+Note [Preserve join-binding arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Be careful /not/ to eta-reduce the RHS of a join point, lest we lose
+the join-point arity invariant.  Trac #15108 was caused by simplifying
+the RHS with simple_opt_expr, which does eta-reduction.  Solution:
+simplify the RHS of a join point by simplifying under the lambdas
+(which of course should be there).
 -}
 
 ----------------------
