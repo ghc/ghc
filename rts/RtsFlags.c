@@ -343,10 +343,9 @@ usage_text[] = {
 "  -xt            Include threads (TSOs) in a heap profile",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
-#else
+#endif /* PROFILING */
 "",
 "  -hT            Produce a heap profile grouped by closure type"
-#endif /* PROFILING */
 
 #if defined(TRACING)
 "",
@@ -1955,6 +1954,9 @@ static bool read_heap_profiling_flag(const char *arg)
         case 'B':
         case 'b':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
+            break;
+        case 'T':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
             break;
         }
         break;
