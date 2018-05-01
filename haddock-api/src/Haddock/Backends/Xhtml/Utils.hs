@@ -110,7 +110,7 @@ renderToString debug html
 
 hsep :: [Html] -> Html
 hsep [] = noHtml
-hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
+hsep htmls = foldr1 (<+>) htmls
 
 -- | Concatenate a series of 'Html' values vertically, with linebreaks in between.
 vcat :: [Html] -> Html

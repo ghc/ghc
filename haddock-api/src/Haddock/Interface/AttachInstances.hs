@@ -86,7 +86,7 @@ attachToExportItem
   -> Ghc (ExportItem GhcRn)
 attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
   case attachFixities export of
-    e@ExportDecl { expItemDecl = L eSpan (TyClD d) } -> do
+    e@ExportDecl { expItemDecl = L eSpan (TyClD _ d) } -> do
       insts <-
         let mb_instances  = lookupNameEnv index (tcdName d)
             cls_instances = maybeToList mb_instances >>= fst

@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Hoogle
@@ -73,21 +74,21 @@ dropHsDocTy :: HsType a -> HsType a
 dropHsDocTy = f
     where
         g (L src x) = L src (f x)
-        f (HsForAllTy a e) = HsForAllTy a (g e)
-        f (HsQualTy a e) = HsQualTy a (g e)
-        f (HsBangTy a b) = HsBangTy a (g b)
-        f (HsAppTy a b) = HsAppTy (g a) (g b)
-        f (HsFunTy a b) = HsFunTy (g a) (g b)
-        f (HsListTy a) = HsListTy (g a)
-        f (HsPArrTy a) = HsPArrTy (g a)
-        f (HsTupleTy a b) = HsTupleTy a (map g b)
-        f (HsOpTy a b c) = HsOpTy (g a) b (g c)
-        f (HsParTy a) = HsParTy (g a)
-        f (HsKindSig a b) = HsKindSig (g a) b
-        f (HsDocTy a _) = f $ unL a
+        f (HsForAllTy x a e) = HsForAllTy x a (g e)
+        f (HsQualTy x a e) = HsQualTy x a (g e)
+        f (HsBangTy x a b) = HsBangTy x a (g b)
+        f (HsAppTy x a b) = HsAppTy x (g a) (g b)
+        f (HsFunTy x a b) = HsFunTy x (g a) (g b)
+        f (HsListTy x a) = HsListTy x (g a)
+        f (HsPArrTy x a) = HsPArrTy x (g a)
+        f (HsTupleTy x a b) = HsTupleTy x a (map g b)
+        f (HsOpTy x a b c) = HsOpTy x (g a) b (g c)
+        f (HsParTy x a) = HsParTy x (g a)
+        f (HsKindSig x a b) = HsKindSig x (g a) b
+        f (HsDocTy _ a _) = f $ unL a
         f x = x
 
-outHsType :: (SourceTextX a, OutputableBndrId a)
+outHsType :: (a ~ GhcPass p, OutputableBndrId a)
           => DynFlags -> HsType a -> String
 outHsType dflags = out dflags . dropHsDocTy
 
@@ -125,20 +126,20 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
                            , expItemFixities = fixities
                            } = ppDocumentation dflags dc ++ f decl
     where
-        f (TyClD d@DataDecl{})  = ppData dflags d subdocs
-        f (TyClD d@SynDecl{})   = ppSynonym dflags d
-        f (TyClD d@ClassDecl{}) = ppClass dflags d subdocs
-        f (TyClD (FamDecl d))   = ppFam dflags d
-        f (ForD (ForeignImport name typ _ _)) = [pp_sig dflags [name] (hsSigType typ)]
-        f (ForD (ForeignExport name typ _ _)) = [pp_sig dflags [name] (hsSigType typ)]
-        f (SigD sig) = ppSig dflags sig ++ ppFixities
+        f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
+        f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
+        f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
+        f (TyClD _ (FamDecl _ d)) = ppFam dflags d
+        f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
+        f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
+        f (SigD _ sig) = ppSig dflags sig ++ ppFixities
         f _ = []
 
         ppFixities = concatMap (ppFixity dflags) fixities
 ppExport _ _ = []
 
 ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppSigWithDoc dflags (TypeSig names sig) subdocs
+ppSigWithDoc dflags (TypeSig _ names sig) subdocs
     = concatMap mkDocSig names
     where
         mkDocSig n = mkSubdoc dflags n subdocs [pp_sig dflags [n] (hsSigWcType sig)]
@@ -189,7 +190,7 @@ ppClass dflags decl subdocs =
             , tcdTyVars = feqn_pats tfe
             , tcdFixity = feqn_fixity tfe
             , tcdRhs    = feqn_rhs tfe
-            , tcdFVs    = emptyNameSet
+            , tcdSExt   = emptyNameSet
             }
 
 ppFam :: DynFlags -> FamilyDecl GhcRn -> [String]
@@ -241,17 +242,17 @@ lookupCon dflags subdocs (L _ name) = case lookup name subdocs of
 ppCtor :: DynFlags -> TyClDecl GhcRn -> [(Name, DocForDecl Name)] -> ConDecl GhcRn -> [String]
 ppCtor dflags dat subdocs con@ConDeclH98 {}
   -- AZ:TODO get rid of the concatMap
-   = concatMap (lookupCon dflags subdocs) [con_name con] ++ f (getConDetails con)
+   = concatMap (lookupCon dflags subdocs) [con_name con] ++ f (getConArgs con)
     where
         f (PrefixCon args) = [typeSig name $ args ++ [resType]]
         f (InfixCon a1 a2) = f $ PrefixCon [a1,a2]
         f (RecCon (L _ recs)) = f (PrefixCon $ map cd_fld_type (map unLoc recs)) ++ concat
-                          [(concatMap (lookupCon dflags subdocs . noLoc . selectorFieldOcc . unLoc) (cd_fld_names r)) ++
-                           [out dflags (map (selectorFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
+                          [(concatMap (lookupCon dflags subdocs . noLoc . extFieldOcc . unLoc) (cd_fld_names r)) ++
+                           [out dflags (map (extFieldOcc . unLoc) $ cd_fld_names r) `typeSig` [resType, cd_fld_type r]]
                           | r <- map unLoc recs]
 
-        funs = foldr1 (\x y -> reL $ HsFunTy x y)
-        apps = foldl1 (\x y -> reL $ HsAppTy x y)
+        funs = foldr1 (\x y -> reL $ HsFunTy NoExt x y)
+        apps = foldl1 (\x y -> reL $ HsAppTy NoExt x y)
 
         typeSig nm flds = operator nm ++ " :: " ++ outHsType dflags (unL $ funs flds)
 
@@ -259,20 +260,20 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        resType = apps $ map (reL . HsTyVar NotPromoted . reL) $
-                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvExplicit $ tyClDeclTyVars dat]
+        resType = apps $ map (reL . HsTyVar NoExt NotPromoted . reL) $
+                        (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _ _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
-ppCtor dflags _dat subdocs con@ConDeclGADT {}
+ppCtor dflags _dat subdocs con@(ConDeclGADT { })
    = concatMap (lookupCon dflags subdocs) (getConNames con) ++ f
     where
-        f = [typeSig name (hsib_body $ con_type con)]
+        f = [typeSig name (getGADTConTypeG con)]
 
         typeSig nm ty = operator nm ++ " :: " ++ outHsType dflags (unL ty)
         name = out dflags $ map unL $ getConNames con
-
+ppCtor _ _ _ XConDecl {} = panic "haddock:ppCtor"
 
 ppFixity :: DynFlags -> (Name, Fixity) -> [String]
-ppFixity dflags (name, fixity) = [out dflags ((FixitySig [noLoc name] fixity) :: FixitySig GhcRn)]
+ppFixity dflags (name, fixity) = [out dflags ((FixitySig noExt [noLoc name] fixity) :: FixitySig GhcRn)]
 
 
 ---------------------------------------------------------------------

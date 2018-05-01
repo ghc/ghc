@@ -347,7 +347,7 @@ data InstType name
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
 
-instance (SourceTextX a, OutputableBndrId a)
+instance (a ~ GhcPass p,OutputableBndrId a)
          => Outputable (InstType a) where
   ppr (ClassInst { .. }) = text "ClassInst"
       <+> ppr clsiCtx
@@ -372,7 +372,7 @@ data PseudoFamilyDecl name = PseudoFamilyDecl
     }
 
 
-mkPseudoFamilyDecl :: FamilyDecl name -> PseudoFamilyDecl name
+mkPseudoFamilyDecl :: FamilyDecl (GhcPass p) -> PseudoFamilyDecl (GhcPass p)
 mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     { pfdInfo = fdInfo
     , pfdLName = fdLName
@@ -380,11 +380,13 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
     , pfdKindSig = fdResultSig
     }
   where
-    mkType (KindedTyVar (L loc name) lkind) =
-        HsKindSig tvar lkind
+    mkType (KindedTyVar _ (L loc name) lkind) =
+        HsKindSig NoExt tvar lkind
       where
-        tvar = L loc (HsTyVar NotPromoted (L loc name))
-    mkType (UserTyVar name) = HsTyVar NotPromoted name
+        tvar = L loc (HsTyVar NoExt NotPromoted (L loc name))
+    mkType (UserTyVar _ name) = HsTyVar NoExt NotPromoted name
+    mkType (XTyVarBndr _ ) = panic "haddock:mkPseudoFamilyDecl"
+mkPseudoFamilyDecl (XFamilyDecl {}) = panic "haddock:mkPseudoFamilyDecl"
 
 
 -- | An instance head that may have documentation and a source location.
@@ -666,14 +668,77 @@ instance Monad ErrMsgGhc where
 -- * Pass sensitive types
 -----------------------------------------------------------------------------
 
-type instance PostRn DocNameI NameSet        = PlaceHolder
-type instance PostRn DocNameI Fixity         = PlaceHolder
-type instance PostRn DocNameI Bool           = PlaceHolder
-type instance PostRn DocNameI Name           = DocName
-type instance PostRn DocNameI (Located Name) = Located DocName
-type instance PostRn DocNameI [Name]         = PlaceHolder
-type instance PostRn DocNameI DocName        = DocName
+type instance XForAllTy        DocNameI = NoExt
+type instance XQualTy          DocNameI = NoExt
+type instance XTyVar           DocNameI = NoExt
+type instance XAppsTy          DocNameI = NoExt
+type instance XAppTy           DocNameI = NoExt
+type instance XFunTy           DocNameI = NoExt
+type instance XListTy          DocNameI = NoExt
+type instance XPArrTy          DocNameI = NoExt
+type instance XTupleTy         DocNameI = NoExt
+type instance XSumTy           DocNameI = NoExt
+type instance XOpTy            DocNameI = NoExt
+type instance XParTy           DocNameI = NoExt
+type instance XIParamTy        DocNameI = NoExt
+type instance XEqTy            DocNameI = NoExt
+type instance XKindSig         DocNameI = NoExt
+type instance XSpliceTy        DocNameI = NoExt
+type instance XDocTy           DocNameI = NoExt
+type instance XBangTy          DocNameI = NoExt
+type instance XRecTy           DocNameI = NoExt
+type instance XExplicitListTy  DocNameI = NoExt
+type instance XExplicitTupleTy DocNameI = NoExt
+type instance XTyLit           DocNameI = NoExt
+type instance XWildCardTy      DocNameI = HsWildCardInfo
+type instance XXType           DocNameI = NewHsTypeX
 
-type instance PostTc DocNameI Kind     = PlaceHolder
-type instance PostTc DocNameI Type     = PlaceHolder
-type instance PostTc DocNameI Coercion = PlaceHolder
+type instance XUserTyVar    DocNameI = NoExt
+type instance XKindedTyVar  DocNameI = NoExt
+type instance XXTyVarBndr   DocNameI = NoExt
+
+type instance XFieldOcc    DocNameI = DocName
+type instance XXFieldOcc   DocNameI = NoExt
+
+type instance XFixitySig   DocNameI = NoExt
+type instance XFixSig      DocNameI = NoExt
+type instance XPatSynSig   DocNameI = NoExt
+type instance XClassOpSig  DocNameI = NoExt
+type instance XTypeSig     DocNameI = NoExt
+type instance XMinimalSig  DocNameI = NoExt
+
+type instance XForeignExport  DocNameI = NoExt
+type instance XForeignImport  DocNameI = NoExt
+type instance XConDeclGADT    DocNameI = NoExt
+type instance XConDeclH98     DocNameI = NoExt
+
+type instance XDerivD     DocNameI = NoExt
+type instance XInstD      DocNameI = NoExt
+type instance XForD       DocNameI = NoExt
+type instance XSigD       DocNameI = NoExt
+type instance XTyClD      DocNameI = NoExt
+
+type instance XNoSig      DocNameI = NoExt
+type instance XCKindSig   DocNameI = NoExt
+type instance XTyVarSig   DocNameI = NoExt
+
+type instance XCFamEqn       DocNameI _ _ = NoExt
+
+type instance XCClsInstDecl DocNameI = NoExt
+type instance XCDerivDecl   DocNameI = NoExt
+type instance XDataFamInstD DocNameI = NoExt
+type instance XTyFamInstD   DocNameI = NoExt
+type instance XClsInstD     DocNameI = NoExt
+type instance XCHsDataDefn  DocNameI = NoExt
+type instance XCFamilyDecl  DocNameI = NoExt
+type instance XClassDecl    DocNameI = NoExt
+type instance XDataDecl     DocNameI = NoExt
+type instance XSynDecl      DocNameI = NoExt
+type instance XFamDecl      DocNameI = NoExt
+
+type instance XHsIB      DocNameI _ = NoExt
+type instance XHsWC      DocNameI _ = NoExt
+
+type instance XHsQTvs        DocNameI = NoExt
+type instance XConDeclField  DocNameI = NoExt
+

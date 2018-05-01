@@ -1,3 +1,12 @@
+## TBD / GHC-8.5+
+
+ * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
+   documenting individual arguments of constructors/patterns (#709)
+
+## Changes in version 2.20.0
+
+TODO
+
 ## Changes in version 2.19.1
 
  * Show where instances are defined (#748)
@@ -38,7 +47,7 @@
    This notably fixes rendering of quasiquotes.
 
  * Overhaul Haddock's rendering of kind signatures so that invisible kind
-   parameters are not printed (#681)
+   parameters are not printed (#681) (Fixes #544)
 
  * Recognise `SPDX-License-Identifier` as alias for `License` in module header
    parser (#743)

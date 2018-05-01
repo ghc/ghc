@@ -65,7 +65,7 @@ executable haddock
 
   -- haddock typically only supports a single GHC major version 
   build-depends:
-    base ^>= 4.11.0
+    base ^>= 4.12.0
 
   if flag(in-ghc-tree)
     hs-source-dirs: haddock-api/src,  haddock-library/src
@@ -79,7 +79,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
       ghc-boot,
-      ghc == 8.4.*,
+      ghc == 8.5.*,
       bytestring,
       parsec,
       text,
@@ -136,7 +136,7 @@ executable haddock
       Haddock.GhcUtils
       Haddock.Syb
       Haddock.Convert
-      
+
       Paths_haddock
 
     autogen-modules:
