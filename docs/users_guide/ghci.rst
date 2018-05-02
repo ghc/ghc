@@ -2025,6 +2025,17 @@ mostly obvious.
 
     It will create ``.ghci-history`` in current folder where GHCi is launched.
 
+.. ghc-flag:: -fghci-leak-check
+    :shortdesc: (Debugging only) check for space leaks when loading
+                new modules in GHCi.
+    :type: dynamic
+    :reverse: -fno-ghci-leak-check
+    :category:
+
+    (Debugging only) When loading new modules with ``:load``, check
+    that any previously loaded modules have been correctly garbage
+    collected. Emits messages if a leak is detected.
+
 Packages
 ~~~~~~~~
 
