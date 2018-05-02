@@ -80,7 +80,7 @@ config.way_flags = {
     'prof_no_auto' : ['-prof', '-static', '-fasm'],
     'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'profthreaded' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded'],
-    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '+RTS', '-I0.1', '-RTS'],
+    'ghci'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fghci-leak-check', '+RTS', '-I0.1', '-RTS'],
     'sanity'       : ['-debug'],
     'threaded1'    : ['-threaded', '-debug'],
     'threaded1_ls' : ['-threaded', '-debug'],
