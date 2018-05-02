@@ -11,7 +11,8 @@ This is a bug-fix release resolving several regressions introduced in 8.4.1.
 The highlights, since the 8.4.1 release, are:
 
 - Fixed a regression causing uses of ``Control.Exception.evaluate`` to be
-  incorrectly optimised, resulting in space leaks (:ghc-ticket:`13930`)
+  incorrectly optimised, resulting in incorrect evaluation behavior
+  (:ghc-ticket:`13930`)
 
 - Fix a regression causing the interpreter to segmentation fault when built with
   profiling (:ghc-ticket:`14705`)
