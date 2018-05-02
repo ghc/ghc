@@ -178,9 +178,12 @@ exitifyRec in_scope pairs
         -- See Note [Interesting expression]
         is_interesting = anyVarSet isLocalId (fvs `minusVarSet` mkVarSet captured)
 
-        -- The possible arguments of this exit join point
-        -- No need for `sortQuantVars`, `captured` is already in dependency order
-        abs_vars = map zap $ filter (`elemVarSet` fvs) captured
+        -- The arguments of this exit join point
+        -- See Note [Picking arguments to abstract over]
+        abs_vars = snd $ foldr pick (fvs, []) captured
+          where
+            pick v (fvs', acc) | v `elemVarSet` fvs' = (fvs' `delVarSet` v, zap v : acc)
+                               | otherwise           = (fvs',               acc)
 
         -- We are going to abstract over these variables, so we must
         -- zap any IdInfo they have; see Trac #15005
@@ -260,7 +263,6 @@ addExit in_scope ty join_arity rhs = do
     fs <- get
     put ((v,rhs):fs)
     return v
-
 
 {-
 Note [Interesting expression]
@@ -467,5 +469,18 @@ Positions C and D have their advantages: C decreases allocations in simpl, but D
 
 Assuming we have a budget of _one_ run of Exitification, then C wins (but we
 could get more from running it multiple times, as seen in fish).
+
+Note [Picking arguments to abstract over]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When we create an exit join point, so we need to abstract over those of its
+free variables that are be out-of-scope at the destination of the exit join
+point. So we go through the list `captured` and pick those that are actually
+free variables of the join point.
+
+We do not just `filter (`elemVarSet` fvs) captured`, as there might be
+shadowing, and `captured` may contain multiple variables with the same Unique. I
+these cases we want to abstract only over the last occurence, hence the `foldr`
+(with emphasis on the `r`). This is #15110.
 
 -}
