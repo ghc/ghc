@@ -11,14 +11,14 @@ def junit(t):
                               errors = str(len(t.framework_failures)),
                               timestamp = datetime.now().isoformat())
 
-    for result, group in [('stat failure', t.unexpected_stat_failures),
+    for res_type, group in [('stat failure', t.unexpected_stat_failures),
                           ('unexpected failure', t.unexpected_failures)]:
         for (directory, testname, reason, way) in group:
             testcase = ET.SubElement(testsuite, 'testcase',
                                      classname = testname,
                                      name = way)
             result = ET.SubElement(testcase, 'failure',
-                                   type = result,
+                                   type = res_type,
                                    message = reason)
 
     for (directory, testname, reason, way) in t.framework_failures:
