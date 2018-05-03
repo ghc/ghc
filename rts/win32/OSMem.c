@@ -510,9 +510,18 @@ uint32_t osNumaNodes(void)
     static ULONG numNumaNodes = 0;
 
     /* Cache the amount of NUMA nodes. */
-    if (!numNumaNodes && !GetNumaHighestNodeNumber(&numNumaNodes))
+    if (!numNumaNodes)
     {
-        numNumaNodes = 1;
+        if (GetNumaHighestNodeNumber(&numNumaNodes))
+        {
+            // GetNumaHighestNodeNumber returns the highest node number
+            // i.e: 0 for a non-NUMA system, and >0 for a NUMA system, so add a 1.
+            numNumaNodes += 1;
+        }
+        else
+        {
+            numNumaNodes = 1;
+        }
     }
 
     return numNumaNodes;
@@ -520,12 +529,12 @@ uint32_t osNumaNodes(void)
 
 uint64_t osNumaMask(void)
 {
-    uint64_t numaMask;
-    if (!GetNumaNodeProcessorMask(0, &numaMask))
-    {
-        return 1;
+    // the concept of a numa node mask (c.f. numa_get_mems_allowed on POSIX)
+    // doesn't exist on Windows. Thus, all nodes are allowed.
+    if (osNumaNodes() > sizeof(StgWord)*8) {
+        barf("osNumaMask: too many NUMA nodes (%d)", osNumaNodes());
     }
-    return numaMask;
+    return (1 << osNumaNodes()) - 1;
 }
 
 void osBindMBlocksToNode(
