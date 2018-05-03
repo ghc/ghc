@@ -73,7 +73,6 @@ import Maybes
 import DynFlags
 import FastString
 import Control.Monad
-import Data.Foldable    ( toList )
 import ListSetOps       ( minusList )
 import qualified GHC.LanguageExtensions as LangExt
 import RnUnbound

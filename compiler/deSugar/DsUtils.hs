@@ -127,9 +127,9 @@ selectMatchVar :: Rig -> Pat GhcTc -> DsM Id
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
-selectMatchVar w (VarPat _ var)  = return (localiseId (unLoc var))
+selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
-selectMatchVar w (AsPat _ var _) = return (unLoc var)
+selectMatchVar _w (AsPat _ var _) = return (unLoc var)
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
 {-

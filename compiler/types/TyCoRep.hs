@@ -1684,7 +1684,7 @@ coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
 coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (ForAllCo tv kind_co co)
   = coVarsOfCo co `delVarSet` tv `unionVarSet` coVarsOfCo kind_co
-coVarsOfCo (FunCo _ w co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
+coVarsOfCo (FunCo _ _w co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (CoVarCo v)          = coVarsOfCoVar v
 coVarsOfCo (HoleCo h)           = coVarsOfCoVar (coHoleCoVar h)
                                   -- See Note [CoercionHoles and coercion free variables]

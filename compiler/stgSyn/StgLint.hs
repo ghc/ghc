@@ -48,7 +48,6 @@ import Name             ( getSrcLoc )
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
 import Type
 import RepType
-import Weight
 import SrcLoc
 import Outputable
 import qualified ErrUtils as Err

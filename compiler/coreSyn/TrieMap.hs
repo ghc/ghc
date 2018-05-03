@@ -54,8 +54,6 @@ import VarEnv
 import NameEnv
 import Outputable
 import Control.Monad( (>=>), guard)
-import Data.Maybe
-import PprCore
 
 {-
 This module implements TrieMaps, which are finite mappings
@@ -1114,10 +1112,6 @@ mapBndrMap f (BndrMap tm) = BndrMap (mapTM (first f) tm)
 fdBndrMap :: (a -> b -> b) -> BndrMap a -> b -> b
 fdBndrMap f (BndrMap tm) = foldTM (f . fst) tm
 
-
-
-
-type RigMap = VarEnv Rig
 
 -- Note [Binders]
 -- ~~~~~~~~~~~~~~

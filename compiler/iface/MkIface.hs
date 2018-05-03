@@ -73,7 +73,6 @@ import Annotations
 import CoreSyn
 import Class
 import TyCon
-import Weight
 import CoAxiom
 import ConLike
 import DataCon

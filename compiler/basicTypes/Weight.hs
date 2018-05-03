@@ -1,6 +1,7 @@
 -- TODO: arnaud: copyright notice
 
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# OPTIONS -Wno-missing-methods #-}
 
 -- | This module defines the semi-ring (aka Rig) of weights, and associated
 -- functions. Weights annotate arrow types to indicate the linearity of the
@@ -87,6 +88,7 @@ sup _     _     = Omega
 data Weighted a = Weighted {weightedWeight :: Rig, weightedThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
+unrestricted, linear, staticOnly, tyweight :: a -> Weighted a
 unrestricted = Weighted Omega
 linear = Weighted One
 staticOnly = Weighted Zero
@@ -100,6 +102,7 @@ knownOmega = weightedThing
 irrelevantWeight :: Weighted a -> a
 irrelevantWeight = weightedThing
 
+mkWeighted :: Rig -> a -> Weighted a
 mkWeighted = Weighted
 
 instance Outputable a => Outputable (Weighted a) where
@@ -149,7 +152,7 @@ unitUE x w = UsageEnv $ unitNameEnv (getName x) w
 mkUE :: [Weighted Name] -> UsageEnv
 mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (weightedThing wx,weightedWeight wx)) ws)
 
-zeroUE :: UsageEnv
+zeroUE, emptyUE :: UsageEnv
 zeroUE = UsageEnv emptyNameEnv
 
 emptyUE = zeroUE
@@ -178,7 +181,7 @@ deleteUEAsserting :: Rig -> Name -> UsageEnv -> Maybe UsageEnv
 deleteUEAsserting w x (UsageEnv e) | Just w' <- lookupNameEnv e x = do
   guard (subweight w' w)
   return $ UsageEnv (delFromNameEnv e x)
-deleteUEAsserting w x (UsageEnv e) = do
+deleteUEAsserting w _x (UsageEnv e) = do
   guard (subweight Zero w)
   return $ UsageEnv e
 

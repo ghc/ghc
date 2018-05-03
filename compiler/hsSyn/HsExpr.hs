@@ -46,7 +46,6 @@ import Util
 import Outputable
 import FastString
 import Type
-import Weight
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -874,6 +873,7 @@ type instance XXTupArg         (GhcPass _) = PlaceHolder
 instance Outputable (HsTupArg GhcTc) where
   ppr (Present _ lhs) = text "Present" <+> ppr lhs
   ppr (Missing ty)  = text "Missing" <+> ppr ty
+  ppr (XTupArg _)   = text "XTupArg"
 
 tupArgPresent :: LHsTupArg id -> Bool
 tupArgPresent (L _ (Present {})) = True

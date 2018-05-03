@@ -74,7 +74,6 @@ import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
-import Weight
 
 {-
 Note [GHC Formalism]
@@ -1071,7 +1070,7 @@ lintAltBinders :: (Rig, Var -> Rig, Rig)
                -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintAltBinders rhs_ue scrut_ty con_ty []
+lintAltBinders _rhs_ue scrut_ty con_ty []
   = ensureEqTys con_ty scrut_ty (mkBadPatMsg con_ty scrut_ty)
 lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
   | isTyVar bndr
@@ -1207,7 +1206,7 @@ lintCoreAlt _ _ _ alt_ty (DEFAULT, args, rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
      ; lintAltExpr rhs alt_ty }
 
-lintCoreAlt lookup_scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
+lintCoreAlt _lookup_scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
   | litIsLifted lit
   = failWithL integerScrutinisedMsg
   | otherwise
@@ -1226,8 +1225,8 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
         -- type variables of the data constructor
         -- We've already check
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
-    ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys;
-            con_weights = map weightedWeight (dataConRepArgTys con) }
+    ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys }
+
         -- And now bring the new binders into scope
     ; lintBinders CasePatBind args $ \ args' -> do
     {

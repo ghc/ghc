@@ -414,7 +414,7 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg  { sc_fun = ai, sc_weight = w })      = funArgTy (ai_type ai) -- MattP: This looks dodgy as sc_weight is not used.
+contHoleType (StrictArg  { sc_fun = ai, sc_weight = _w })      = funArgTy (ai_type ai) -- MattP: This looks dodgy as sc_weight is not used.
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
                          , sc_weight = w })

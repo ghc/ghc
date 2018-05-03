@@ -17,7 +17,6 @@ module CoreTidy (
 import GhcPrelude
 
 import CoreSyn
-import CoreUnfold ( mkCoreUnfolding )
 import CoreSeq ( seqUnfolding )
 import CoreArity
 import Id

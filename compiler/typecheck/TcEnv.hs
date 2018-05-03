@@ -33,8 +33,7 @@ module TcEnv(
         tcExtendLocalTypeEnv,
         isTypeClosedLetBndr, tcEmitBindingUsage,
         tcCollectingUsage, tcScalingUsage,
-        tcExtendBinderStack, tcExtendLocalTypeEnv,
-        isTypeClosedLetBndr,
+        tcExtendBinderStack,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,

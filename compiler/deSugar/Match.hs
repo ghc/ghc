@@ -232,7 +232,7 @@ match vars@(v:_) ty weight eqns    -- Eqns *can* be empty
 
 matchEmpty :: HasCallStack => MatchId -> Type -> Rig -> DsM [MatchResult]
 -- See Note [Empty case expressions]
-matchEmpty var res_ty weight
+matchEmpty var res_ty _weight
   = return [MatchResult CanFail mk_seq]
   where
     mk_seq fail = return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) res_ty

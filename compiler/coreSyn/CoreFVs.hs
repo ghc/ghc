@@ -720,7 +720,6 @@ freeVars = go
       where
         body'@(body_fvs, _) = go body
         b_ty  = idType b
-        b_w   = idWeight b
         b_fvs = tyCoVarsOfTypeDSet b_ty
 
     go (App fun arg)

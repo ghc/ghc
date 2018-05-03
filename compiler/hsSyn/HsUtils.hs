@@ -123,7 +123,6 @@ import Bag
 import Outputable
 import Constants
 import TyCon
-import Weight
 
 import Data.Either
 import Data.Function

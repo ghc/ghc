@@ -35,7 +35,6 @@ import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
 import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
-import CoreArity
 --import PrimOp           ( tagToEnumKey ) -- temporalily commented out. See #8326
 import CoreOpt          ( pushCoTyArg, pushCoValArg
                         , joinPointBinding_maybe, joinPointBindings_maybe )
@@ -913,7 +912,7 @@ simplExprF1 env expr@(Lam {}) cont
     zap b | isTyVar b = b
           | otherwise = zapLamIdInfo b
 
-simplExprF1 env (Case scrut bndr rty alts) cont
+simplExprF1 env (Case scrut bndr _rty alts) cont
   = -- pprTrace "simplExpr:case" (ppr bndr <+> ppr rty <+> ppr (contHoleType cont)) $
       {-#SCC "simplExprF1-Case" #-}
       simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr

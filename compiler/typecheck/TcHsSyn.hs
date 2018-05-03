@@ -47,7 +47,6 @@ import Id
 import IdInfo
 import TcRnMonad
 import PrelNames
-import Weight
 import TcType
 import TcMType
 import TcEvidence

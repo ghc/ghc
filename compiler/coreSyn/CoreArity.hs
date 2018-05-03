@@ -38,7 +38,7 @@ import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
 import Pair
-import Util     ( debugIsOn, HasCallStack )
+import Util     ( debugIsOn )
 
 {-
 ************************************************************************
