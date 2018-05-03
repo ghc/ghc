@@ -290,6 +290,7 @@ Library
         CoreTidy
         CoreUnfold
         CoreUtils
+        CoreMap
         CoreSeq
         CoreStats
         MkCore
