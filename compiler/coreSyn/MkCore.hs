@@ -824,40 +824,43 @@ Yikes!  That bogusly appears to evaluate the absentError!
 
 This is extremely tiresome.  Another way to think of this is that, in
 Core, it is an invariant that a strict data contructor, like MkT, must
-be be applied only to an argument in HNF. so (absentError "blah") had
+be applied only to an argument in HNF. So (absentError "blah") had
 better be non-bottom.
 
-So the "solution" is to make absentError behave like a data constructor,
-to respect this invariant.  Rather than have a special case in exprIsHNF,
-I eneded up doing this:
+So the "solution" is to add a special case for absentError to exprIsHNFlike.
+This allows Simplify.rebuildCase, in the Note [Case to let transformation]
+branch, to convert the case on absentError into a let. We also make
+absentError *not* be diverging, unlike the other error-ids, so that we
+can be sure not to remove the case branches before converting the case to
+a let.
 
- * Make absentError claim to be ConLike
-
- * Make exprOkForSpeculation/exprOkForSideEffects
-   return True for ConLike things
-
-  * In Simplify.rebuildCase, make the
-        Note [Case to let transformation]
-    branch use exprOkForSpeculation rather than exprIsHNF, so that
-    it converts the absentError case to a let.
-
-On the other hand if, by some bug or bizarre happenstance, we ever call
-absentError, we should thow an exception.  This should never happen, of
-course, but we definitely can't return anything.  e.g. if somehow we had
+If, by some bug or bizarre happenstance, we ever call absentError, we should
+throw an exception.  This should never happen, of course, but we definitely
+can't return anything.  e.g. if somehow we had
     case absentError "foo" of
        Nothing -> ...
        Just x  -> ...
 then if we return, the case expression will select a field and continue.
-Seg fault city. Better to throw an exception.  (Even though we've said
-it is ConLike :-)
+Seg fault city. Better to throw an exception. (Even though we've said
+it is in HNF :-)
+
+It might seem a bit surprising that seq on absentError is simply erased
+
+    absentError "foo" `seq` x ==> x
+
+but that should be okay; since there's no pattern match we can't really
+be relying on anything from it.
 -}
 
 aBSENT_ERROR_ID
- = mkVanillaGlobal absentErrorName absent_ty
+ = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
  where
    absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in WwLib
+   arity_info = vanillaIdInfo `setArityInfo` 1
+   -- NB: no bottoming strictness info, unlike other error-ids.
+   -- See Note [aBSENT_ERROR_ID]
 
 mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
                  -> String       -- The string to print
