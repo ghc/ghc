@@ -413,6 +413,12 @@ def compiler_profiled( ):
 def compiler_debugged( ):
     return config.compiler_debugged
 
+def have_gdb( ):
+    return config.have_gdb
+
+def have_readelf( ):
+    return config.have_readelf
+
 # ---
 
 def high_memory_usage(name, opts):

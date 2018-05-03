@@ -577,15 +577,8 @@ makeFixupBlock dflags sp0 l stack tscope assigs
   | otherwise = do
     tmp_lbl <- newBlockId
     let sp_off = sp0 - sm_sp stack
-        maybeAddUnwind block
-          | debugLevel dflags > 0
-          = block `blockSnoc` CmmUnwind [(Sp, Just unwind_val)]
-          | otherwise
-          = block
-          where unwind_val = cmmOffset dflags spExpr (sm_sp stack)
         block = blockJoin (CmmEntry tmp_lbl tscope)
-                          (  maybeAddSpAdj dflags sp_off
-                           $ maybeAddUnwind
+                          ( maybeAddSpAdj dflags sp0 sp_off
                            $ blockFromList assigs )
                           (CmmBranch l)
     return (tmp_lbl, [block])
@@ -851,28 +844,7 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     adj_pre_sp  = mapExpDeep (areaToSp dflags sp0            sp_high area_off)
     adj_post_sp = mapExpDeep (areaToSp dflags (sp0 - sp_off) sp_high area_off)
 
-    -- Add unwind pseudo-instruction at the beginning of each block to
-    -- document Sp level for debugging
-    add_initial_unwind block
-      | debugLevel dflags > 0
-      = CmmUnwind [(Sp, Just sp_unwind)] `blockCons` block
-      | otherwise
-      = block
-      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags)
-
-    -- Add unwind pseudo-instruction right before the Sp adjustment
-    -- if there is one.
-    add_adj_unwind block
-      | debugLevel dflags > 0
-      , sp_off /= 0
-      = block `blockSnoc` CmmUnwind [(Sp, Just sp_unwind)]
-      | otherwise
-      = block
-      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags - sp_off)
-
-    final_middle = maybeAddSpAdj dflags sp_off
-                 . add_adj_unwind
-                 . add_initial_unwind
+    final_middle = maybeAddSpAdj dflags sp0 sp_off
                  . blockFromList
                  . map adj_pre_sp
                  . elimStackStores stack0 stackmaps area_off
@@ -891,11 +863,33 @@ getAreaOff stackmaps (Young l) =
     Nothing -> pprPanic "getAreaOff" (ppr l)
 
 
-maybeAddSpAdj :: DynFlags -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
-maybeAddSpAdj _      0      block = block
-maybeAddSpAdj dflags sp_off block = block `blockSnoc` adj
+maybeAddSpAdj
+  :: DynFlags -> ByteOff -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
+maybeAddSpAdj dflags sp0 sp_off block =
+  add_initial_unwind $ add_adj_unwind $ adj block
   where
-    adj = CmmAssign spReg (cmmOffset dflags spExpr sp_off)
+    adj block
+      | sp_off /= 0
+      = block `blockSnoc` CmmAssign spReg (cmmOffset dflags spExpr sp_off)
+      | otherwise = block
+    -- Add unwind pseudo-instruction at the beginning of each block to
+    -- document Sp level for debugging
+    add_initial_unwind block
+      | debugLevel dflags > 0
+      = CmmUnwind [(Sp, Just sp_unwind)] `blockCons` block
+      | otherwise
+      = block
+      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags)
+
+    -- Add unwind pseudo-instruction right after the Sp adjustment
+    -- if there is one.
+    add_adj_unwind block
+      | debugLevel dflags > 0
+      , sp_off /= 0
+      = block `blockSnoc` CmmUnwind [(Sp, Just sp_unwind)]
+      | otherwise
+      = block
+      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags - sp_off)
 
 {- Note [SP old/young offsets]
 

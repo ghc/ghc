@@ -415,6 +415,12 @@ pprFrameBlock (DwarfFrameBlock hasInfo uws0) =
 -- Note that this will not prevent GDB from failing to look-up the
 -- correct function name for the frame, as that uses the symbol table,
 -- which we can not manipulate as easily.
+--
+-- There's a GDB patch to address this at [1]. At the moment of writing
+-- it's not merged, so I recommend building GDB with the patch if you
+-- care about unwinding. The hack above doesn't cover every case.
+--
+-- [1] https://sourceware.org/ml/gdb-patches/2018-02/msg00055.html
 
 -- | Get DWARF register ID for a given GlobalReg
 dwarfGlobalRegNo :: Platform -> GlobalReg -> Word8
