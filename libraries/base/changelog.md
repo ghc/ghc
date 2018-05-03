@@ -3,6 +3,9 @@
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 
+  * Add a new module `GHC.ResponseFile` (previously defined in the `haddock`
+    package). (#13896)
+
   * Move the module `Data.Functor.Contravariant` from the
     `contravariant` package to `base`.
 
