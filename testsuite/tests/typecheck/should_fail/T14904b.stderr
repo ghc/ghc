@@ -1,0 +1,6 @@
+
+T14904b.hs:9:7: error:
+    • Expected kind ‘forall (a :: k1). g a’, but ‘f’ has kind ‘k0’
+    • In the first argument of ‘F’, namely
+        ‘((f :: forall a. g a) :: forall a. g a)’
+      In the type family declaration for ‘F’

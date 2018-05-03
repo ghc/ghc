@@ -1,0 +1,8 @@
+
+T14904a.hs:8:1: error:
+    You have written a *complete user-suppled kind signature*,
+    but the following variable is undetermined: k0 :: *
+    Perhaps add a kind signature.
+    Inferred kinds of user-written variables:
+      g :: k0 -> *
+      f :: forall (a :: k0). g a
