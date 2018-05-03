@@ -679,7 +679,7 @@ pprDeclList :: [SDoc] -> SDoc   -- Braces with a space
 pprDeclList ds = pprDeeperList vcat ds
 
 ------------
-emptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b)
+emptyLocalBinds :: (XEmptyLocalBinds a b ~ PlaceHolder) => HsLocalBindsLR a b
 emptyLocalBinds = EmptyLocalBinds noExt
 
 -- AZ:These functions do not seem to be used at all?

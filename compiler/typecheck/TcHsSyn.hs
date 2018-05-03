@@ -594,12 +594,14 @@ zonkMatchGroup :: ZonkEnv
             -> MatchGroup GhcTcId (Located (body GhcTcId))
             -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
 zonkMatchGroup env zBody (MG { mg_alts = L l ms, mg_arg_tys = arg_tys
-                             , mg_res_ty = res_ty, mg_origin = origin })
+                             , mg_res_ty = res_ty, mg_origin = origin
+                             , mg_weight = w })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
         ; Compose arg_tys' <- zonkTcTypeToTypes env (Compose arg_tys)
         ; res_ty'  <- zonkTcTypeToType env res_ty
         ; return (MG { mg_alts = L l ms', mg_arg_tys = arg_tys'
-                     , mg_res_ty = res_ty', mg_origin = origin }) }
+                     , mg_res_ty = res_ty', mg_origin = origin
+                     , mg_weight = w }) }
 
 zonkMatch :: ZonkEnv
           -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))

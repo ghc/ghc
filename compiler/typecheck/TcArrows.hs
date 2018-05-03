@@ -259,7 +259,8 @@ tc_cmd env
                                          , m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match'], mg_arg_tys = map unrestricted arg_tys
-                                  , mg_res_ty = res_ty, mg_origin = origin })
+                                  , mg_res_ty = res_ty, mg_origin = origin, mg_weight = Omega  })
+                                    -- MattP: Check
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats

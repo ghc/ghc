@@ -161,10 +161,11 @@ type MatchId = Id   -- See Note [Match Ids]
 match :: [MatchId]        -- Variables rep\'ing the exprs we\'re matching with
                           -- See Note [Match Ids]
       -> Type             -- Type of the case expression
+      -> Rig              -- Weight of the case expression
       -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
       -> DsM MatchResult  -- Desugared result!
 
-match [] ty eqns
+match [] ty _w eqns
   = ASSERT2( not (null eqns), ppr ty )
     return (foldr1 combineMatchResults match_results)
   where
@@ -172,7 +173,7 @@ match [] ty eqns
                       eqn_rhs eqn
                     | eqn <- eqns ]
 
-match vars@(v:_) ty eqns    -- Eqns *can* be empty
+match vars@(v:_) ty weight eqns    -- Eqns *can* be empty
   = ASSERT2( all (isInternalName . idName) vars, ppr vars )
     do  { dflags <- getDynFlags
                 -- Tidy the first pattern, generating
@@ -194,24 +195,25 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
 
     match_groups :: [[(PatGroup,EquationInfo)]] -> DsM [MatchResult]
     -- Result list of [MatchResult] is always non-empty
-    match_groups [] = matchEmpty v ty
+    match_groups [] = matchEmpty v ty weight
     match_groups gs = mapM match_group gs
 
     match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
     match_group [] = panic "match_group"
     match_group eqns@((group,_) : _)
-        = case group of
-            PgCon {}  -> matchConFamily  vars ty (subGroupUniq [(c,e) | (PgCon c, e) <- eqns])
-            PgSyn {}  -> matchPatSyn     vars ty (dropGroup eqns)
-            PgLit {}  -> matchLiterals   vars ty (subGroupOrd [(l,e) | (PgLit l, e) <- eqns])
-            PgAny     -> matchVariables  vars ty (dropGroup eqns)
-            PgN {}    -> matchNPats      vars ty (dropGroup eqns)
-            PgOverS {}-> matchNPats      vars ty (dropGroup eqns)
-            PgNpK {}  -> matchNPlusKPats vars ty (dropGroup eqns)
-            PgBang    -> matchBangs      vars ty (dropGroup eqns)
-            PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
-            PgView {} -> matchView       vars ty (dropGroup eqns)
-            PgOverloadedList -> matchOverloadedList vars ty (dropGroup eqns)
+        =
+          case group of
+            PgCon {}  -> matchConFamily  vars ty weight (subGroupUniq [(c,e) | (PgCon c, e) <- eqns])
+            PgSyn {}  -> matchPatSyn     vars ty weight (dropGroup eqns)
+            PgLit {}  -> matchLiterals   vars ty weight (subGroupOrd [(l,e) | (PgLit l, e) <- eqns])
+            PgAny     -> matchVariables  vars ty weight (dropGroup eqns)
+            PgN {}    -> matchNPats      vars ty weight (dropGroup eqns)
+            PgOverS {}-> matchNPats      vars ty weight (dropGroup eqns)
+            PgNpK {}  -> matchNPlusKPats vars ty weight (dropGroup eqns)
+            PgBang    -> matchBangs      vars ty weight (dropGroup eqns)
+            PgCo {}   -> matchCoercion   vars ty weight (dropGroup eqns)
+            PgView {} -> matchView       vars ty weight (dropGroup eqns)
+            PgOverloadedList -> matchOverloadedList vars ty weight (dropGroup eqns)
 
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
@@ -228,43 +230,46 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))
 
-matchEmpty :: HasCallStack => MatchId -> Type -> DsM [MatchResult]
+matchEmpty :: HasCallStack => MatchId -> Type -> Rig -> DsM [MatchResult]
 -- See Note [Empty case expressions]
-matchEmpty var res_ty
+matchEmpty var res_ty weight
   = return [MatchResult CanFail mk_seq]
   where
     mk_seq fail = return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) res_ty
                                       [(DEFAULT, [], fail)]
 
-matchVariables :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchVariables :: [MatchId] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
 -- No binding to do: they'll all be wildcards by now (done in tidy)
-matchVariables (_:vars) ty eqns = match vars ty (shiftEqns eqns)
-matchVariables [] _ _ = panic "matchVariables"
+matchVariables (_:vars) ty weight eqns = match vars ty weight(shiftEqns eqns)
+matchVariables [] _ _ _ = panic "matchVariables"
 
-matchBangs :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
-matchBangs (var:vars) ty eqns
-  = do  { match_result <- match (var:vars) ty $
+matchBangs :: [MatchId] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
+matchBangs (var:vars) ty weight eqns
+  = do  { match_result <- match (var:vars) ty weight $
                           map (decomposeFirstPat getBangPat) eqns
         ; return (mkEvalMatchResult var ty match_result) }
-matchBangs [] _ _ = panic "matchBangs"
+matchBangs [] _ _ _ = panic "matchBangs"
 
-matchCoercion :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchCoercion :: HasCallStack => [MatchId] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
-matchCoercion (var:vars) ty (eqns@(eqn1:_))
+matchCoercion (var:vars) ty weight (eqns@(eqn1:_))
   = do  { let CoPat _ co pat _ = firstPat eqn1
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idWeight var) pat_ty'
-        ; match_result <- match (var':vars) ty $
+        ; var' <- newUniqueId var Omega pat_ty'
+        ; pprTrace "matchCoercion" (ppr var $$ ppr var' $$ ppr pat_ty' $$ ppr co $$ ppr eqn1) (return ())
+        ; pprTrace "matchCo" (ppr eqns $$ ppr (map (decomposeFirstPat getCoPat) eqns)) (return ())
+        ; match_result <- match (var':vars) ty weight $
                           map (decomposeFirstPat getCoPat) eqns
         ; core_wrap <- dsHsWrapper co
         ; let bind = NonRec var' (core_wrap (Var var))
+        ; pprTrace "bind" (ppr bind) (return ())
         ; return (mkCoLetMatchResult bind match_result) }
-matchCoercion _ _ _ = panic "matchCoercion"
+matchCoercion _ _ _ _ = panic "matchCoercion"
 
-matchView :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchView :: HasCallStack => [MatchId] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
 -- Apply the view function to the match variable and then match that
-matchView (var:vars) ty (eqns@(eqn1:_))
+matchView (var:vars) ty weight (eqns@(eqn1:_))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
@@ -272,26 +277,26 @@ matchView (var:vars) ty (eqns@(eqn1:_))
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var (idWeight var) pat_ty' -- TODO: arnaud: possibly not the right weight
-        ; match_result <- match (var':vars) ty $
+        ; match_result <- match (var':vars) ty weight $
                           map (decomposeFirstPat getViewPat) eqns
          -- compile the view expressions
         ; viewExpr' <- dsLExpr viewExpr
         ; return (mkViewMatchResult var'
                     (mkCoreAppDs (text "matchView") viewExpr' (Var var))
                     match_result) }
-matchView _ _ _ = panic "matchView"
+matchView _ _ _ _ = panic "matchView"
 
-matchOverloadedList :: HasCallStack => [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
-matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
+matchOverloadedList :: HasCallStack => [MatchId] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
+matchOverloadedList (var:vars) ty weight (eqns@(eqn1:_))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView
   = do { let ListPat _ _ elt_ty (Just (_,e)) = firstPat eqn1
        ; var' <- newUniqueId var (idWeight var) (mkListTy elt_ty)  -- we construct the overall type by hand
-       ; match_result <- match (var':vars) ty $
+       ; match_result <- match (var':vars) ty weight $
                             map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
        ; e' <- dsSyntaxExpr e [Var var]
        ; return (mkViewMatchResult var' e' match_result) }
-matchOverloadedList _ _ _ = panic "matchOverloadedList"
+matchOverloadedList _ _ _ _ = panic "matchOverloadedList"
 
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
@@ -710,13 +715,19 @@ JJQC 30-Nov-1997
 matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                              , mg_arg_tys = arg_tys
                              , mg_res_ty = rhs_ty
-                             , mg_origin = origin })
+                             , mg_origin = origin
+                             , mg_weight = weight })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
+        ; let scale_new_vars = map (\var -> scaleIdBy var weight)
 
-        ; new_vars    <- case matches of
+        ; new_vars    <- scale_new_vars <$> case matches of
                            []    -> mapM (\(Weighted w ty) -> newSysLocalDsNoLP w ty) arg_tys
-                           (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
+                           (m:_) ->
+                            selectMatchVars (zipWithEqual "matchWrapper"
+                                              (\a b -> (weightedWeight a, unLoc b))
+                                                arg_tys
+                                                (hsLMatchPats m))
 
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
@@ -728,7 +739,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
           checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
 
         ; result_expr <- handleWarnings $
-                         matchEquations ctxt new_vars eqns_info rhs_ty
+                         matchEquations ctxt new_vars eqns_info rhs_ty weight
         ; return (new_vars, result_expr) }
   where
     mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
@@ -747,12 +758,12 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
 
 
 matchEquations  :: HsMatchContext Name
-                -> [MatchId] -> [EquationInfo] -> Type
+                -> [MatchId] -> [EquationInfo] -> Type -> Rig
                 -> DsM CoreExpr
-matchEquations ctxt vars eqns_info rhs_ty
+matchEquations ctxt vars eqns_info rhs_ty weight
   = do  { let error_doc = matchContextErrString ctxt
 
-        ; match_result <- match vars rhs_ty eqns_info
+        ; match_result <- match vars rhs_ty weight eqns_info
 
         ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
         ; extractMatchResult match_result fail_expr }
@@ -815,7 +826,7 @@ match_single_pat_var var ctx pat ty match_result
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_rhs  = match_result }
-       ; match [var] ty [eqn_info] }
+       ; match [var] ty Omega [eqn_info] } -- MattP: TODO Not sure what this is used for
 
 
 {-

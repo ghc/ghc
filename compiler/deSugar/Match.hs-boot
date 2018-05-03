@@ -8,9 +8,11 @@ import CoreSyn  ( CoreExpr )
 import HsSyn    ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import Name     ( Name )
 import HsExtension ( GhcTc )
+import Weight   ( Rig )
 
 match   :: [Id]
         -> Type
+        -> Rig
         -> [EquationInfo]
         -> DsM MatchResult
 

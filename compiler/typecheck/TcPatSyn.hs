@@ -678,6 +678,7 @@ tcPatSynMatcher (L loc name) lpat
                       , mg_arg_tys = [unrestricted pat_ty] -- TODO: arnaud: unrestricted is surely incorrect here
                       , mg_res_ty = res_ty
                       , mg_origin = Generated
+                      , mg_weight = Omega -- MattP: Probably wrong
                       }
              body' = noLoc $
                      HsLam noExt $
@@ -686,6 +687,7 @@ tcPatSynMatcher (L loc name) lpat
                        , mg_arg_tys = map unrestricted [pat_ty, cont_ty, fail_ty] -- TODO: arnaud: unrestricted is surely incorrect here
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
+                       , mg_weight = Omega -- MattP: Probably wrong
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
@@ -696,6 +698,7 @@ tcPatSynMatcher (L loc name) lpat
                     , mg_arg_tys = []
                     , mg_res_ty = res_ty
                     , mg_origin = Generated
+                    , mg_weight = Omega -- MattP: Probably wrong
                     }
 
        ; let bind = FunBind{ fun_ext = emptyNameSet

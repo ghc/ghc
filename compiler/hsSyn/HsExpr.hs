@@ -46,6 +46,7 @@ import Util
 import Outputable
 import FastString
 import Type
+import Weight
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -1591,6 +1592,7 @@ data MatchGroup p body
   = MG { mg_alts    :: Located [LMatch p body]  -- The alternatives
        , mg_arg_tys :: [Weighted (PostTc p Type)]  -- Types of the arguments, t1..tn -- MattP: This looks wrong, should be PostTc ... (Weighted ..)
        , mg_res_ty  :: PostTc p Type    -- Type of the result, tr
+       , mg_weight :: PostTc p Rig -- The weight of the match
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr

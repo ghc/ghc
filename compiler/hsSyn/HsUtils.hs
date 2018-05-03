@@ -123,6 +123,7 @@ import Bag
 import Outputable
 import Constants
 import TyCon
+import Weight
 
 import Data.Either
 import Data.Function
@@ -143,9 +144,10 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (HsPar noExt e)
 
-mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP (GhcPass p)))
-              -> [LPat (GhcPass p)] -> Located (body (GhcPass p))
-              -> LMatch (GhcPass p) (Located (body (GhcPass p)))
+mkSimpleMatch :: (XEmptyLocalBinds p p ~ PlaceHolder)
+               => HsMatchContext (NameOrRdrName (IdP p))
+              -> [LPat p] -> Located (body p)
+              -> LMatch p (Located (body p))
 mkSimpleMatch ctxt pats rhs
   = L loc $
     Match { m_ctxt = ctxt, m_pats = pats
@@ -155,21 +157,23 @@ mkSimpleMatch ctxt pats rhs
                 []      -> getLoc rhs
                 (pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
-unguardedGRHSs :: Located (body (GhcPass p))
-               -> GRHSs (GhcPass p) (Located (body (GhcPass p)))
+unguardedGRHSs :: (XEmptyLocalBinds p p ~ PlaceHolder)
+               => Located (body p)
+               -> GRHSs p (Located (body p))
 unguardedGRHSs rhs@(L loc _)
   = GRHSs (unguardedRHS loc rhs) (noLoc emptyLocalBinds)
 
 unguardedRHS :: SrcSpan -> Located (body id) -> [LGRHS id (Located (body id))]
 unguardedRHS loc rhs = [L loc (GRHS [] rhs)]
 
-mkMatchGroup :: (PostTc name Type ~ PlaceHolder)
+mkMatchGroup :: (PostTc name Type ~ PlaceHolder, PostTc name Rig ~ PlaceHolder)
              => Origin -> [LMatch name (Located (body name))]
              -> MatchGroup name (Located (body name))
 mkMatchGroup origin matches = MG { mg_alts = mkLocatedList matches
                                  , mg_arg_tys = []
                                  , mg_res_ty = placeHolderType
-                                 , mg_origin = origin }
+                                 , mg_origin = origin
+                                 , mg_weight = PlaceHolder }
 
 mkLocatedList ::  [Located a] -> Located [Located a]
 mkLocatedList [] = noLoc []
@@ -201,8 +205,9 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
-mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
-            -> LMatch (GhcPass p) (Located (body (GhcPass p)))
+mkHsCaseAlt :: (XEmptyLocalBinds p p ~ PlaceHolder)
+            => LPat p -> (Located (body p))
+            -> LMatch p (Located (body p))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
@@ -827,7 +832,7 @@ mkPatSynBind name details lpat dir = PatSynBind noExt psb
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
 isInfixFunBind :: HsBindLR id1 id2 -> Bool
-isInfixFunBind (FunBind _ _ (MG matches _ _ _) _ _)
+isInfixFunBind (FunBind _ _ (MG matches _ _ _ _) _ _)
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
 

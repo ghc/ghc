@@ -55,7 +55,7 @@ module Id (
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
         zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
-        transferPolyIdInfo,
+        transferPolyIdInfo, scaleIdBy,
 
         -- ** Predicates on Ids
         isImplicitId, isDeadBinder,
@@ -192,6 +192,9 @@ idWeight :: HasCallStack => Id -> Rig
 idWeight x =
  -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
   Var.varWeight x
+
+scaleIdBy :: Id -> Rig -> Id
+scaleIdBy = Var.scaleVarBy
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName

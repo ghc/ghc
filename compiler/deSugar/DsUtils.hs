@@ -98,7 +98,7 @@ otherwise, make one up.
 -}
 
 selectSimpleMatchVarL :: LPat GhcTc -> DsM Id
-selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
+selectSimpleMatchVarL pat = selectMatchVar Omega (unLoc pat) -- TODO: MattP
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
@@ -116,17 +116,18 @@ selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [Pat GhcTc] -> DsM [Id]
-selectMatchVars ps = mapM selectMatchVar ps
+selectMatchVars :: [(Rig, Pat GhcTc)] -> DsM [Id]
+selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
-selectMatchVar :: Pat GhcTc -> DsM Id
-selectMatchVar (BangPat _ pat) = selectMatchVar (unLoc pat)
-selectMatchVar (LazyPat _ pat) = selectMatchVar (unLoc pat)
-selectMatchVar (ParPat _ pat)  = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat _ var)  = return (localiseId (unLoc var))
+selectMatchVar :: Rig -> Pat GhcTc -> DsM Id
+selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
+selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
+selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
+selectMatchVar w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
-selectMatchVar (AsPat _ var _) = return (unLoc var)
-selectMatchVar other_pat     = newSysLocalDsNoLP Omega (hsPatType other_pat) -- TODO: arnaud: I'm pretty sure I actually need to take the multiplicity of the pattern as an argument, though not knowing what the variable is used for, I don't know how I would use it quite yet
+selectMatchVar w (AsPat _ var _) = return (unLoc var)
+selectMatchVar w other_pat     =
+    newSysLocalDsNoLP w (hsPatType other_pat) -- TODO: arnaud: I'm pretty sure I actually need to take the multiplicity of the pattern as an argument, though not knowing what the variable is used for, I don't know how I would use it quite yet
                                   -- OK, better make up one...
 
 {-

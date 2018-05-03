@@ -90,39 +90,43 @@ have-we-used-all-the-constructors? question; the local function
 
 matchConFamily :: [Id]
                -> Type
+               -> Rig
                -> [[EquationInfo]]
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
-matchConFamily (var:vars) ty groups
+matchConFamily (var:vars) ty weight groups
   = do dflags <- getDynFlags
-       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
+       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty weight) groups
+       pprTrace "matchConfamily" (ppr var $$ ppr ty $$ ppr groups) (return ())
        return (mkCoAlgCaseMatchResult dflags var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
         _ -> panic "matchConFamily: not RealDataCon"
-matchConFamily [] _ _ = panic "matchConFamily []"
+matchConFamily [] _ _ _ = panic "matchConFamily []"
 
 matchPatSyn :: [Id]
             -> Type
+            -> Rig
             -> [EquationInfo]
             -> DsM MatchResult
-matchPatSyn (var:vars) ty eqns
-  = do alt <- fmap toSynAlt $ matchOneConLike vars ty eqns
+matchPatSyn (var:vars) ty weight eqns
+  = do alt <- fmap toSynAlt $ matchOneConLike vars ty weight eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
         PatSynCon psyn -> alt{ alt_pat = psyn }
         _ -> panic "matchPatSyn: not PatSynCon"
-matchPatSyn _ _ _ = panic "matchPatSyn []"
+matchPatSyn _ _ _ _ = panic "matchPatSyn []"
 
 type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
 
 matchOneConLike :: [Id]
                 -> Type
+                -> Rig
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
+matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single constructor
   = do  { let inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
                          arg_tys ++ mkTyVarTys tvs1
 
@@ -137,7 +141,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
                 = ASSERT( notNull arg_eqn_prs )
                   do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-                     ; match_result <- match (group_arg_vars ++ vars) ty eqns'
+                     ; match_result <- match (group_arg_vars ++ vars) ty weight eqns'
                      ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
 
               shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
@@ -150,8 +154,8 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
                             , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
-
-        ; arg_vars <- selectConMatchVars val_arg_tys args1
+        ; let scale_new_vars = map (\var -> scaleIdBy var weight)
+        ; arg_vars <- scale_new_vars <$> selectConMatchVars val_arg_tys args1
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
 
@@ -191,7 +195,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
         lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
-matchOneConLike _ _ [] = panic "matchOneCon []"
+matchOneConLike _ _ _ [] = panic "matchOneCon []"
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool
@@ -212,9 +216,12 @@ same_fields flds1 flds2
 
 -----------------
 selectConMatchVars :: [Weighted Type] -> ConArgPats -> DsM [Id]
-selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDsNoLP arg_tys
-selectConMatchVars _       (PrefixCon ps)   = selectMatchVars (map unLoc ps)
-selectConMatchVars _       (InfixCon p1 p2) = selectMatchVars [unLoc p1, unLoc p2]
+selectConMatchVars arg_tys con = case con of
+                                   (RecCon {}) -> newSysLocalsDsNoLP arg_tys
+                                   (PrefixCon ps) -> selectMatchVars (zipWeights arg_tys ps)
+                                   (InfixCon p1 p2) -> selectMatchVars (zipWeights arg_tys [p1, p2])
+  where
+    zipWeights = zipWithEqual "selectConMatchVar" (\a b -> (weightedWeight a, unLoc b))
 
 conArgPats :: [Weighted Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which
