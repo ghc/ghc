@@ -492,9 +492,11 @@ pprUnwindExpr spIsCFA expr
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
         pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
         pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul
-    in text "\t.uleb128 1f-.-1" $$ -- DW_FORM_block length
+    in text "\t.uleb128 2f-1f" $$ -- DW_FORM_block length
+       -- computed as the difference of the following local labels 2: and 1:
+       text "1:" $$
        pprE expr $$
-       text "1:"
+       text "2:"
 
 -- | Generate code for re-setting the unwind information for a
 -- register to @undefined@
