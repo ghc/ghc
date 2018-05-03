@@ -57,7 +57,12 @@ aliases:
   - &test
     run:
       name: Test
-      command: make test SKIP_PERF_TESTS=YES
+      command: |
+        mkdir -p test-results
+        make test SKIP_PERF_TESTS=YES JUNIT_FILE=../../test-results/junit.xml
+  - &store_test_results
+    store_test_results:
+      path: test-results
   - &slowtest
     run:
       name: Full Test
@@ -99,6 +104,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
@@ -118,6 +124,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-x86_64-darwin":
     macos:
@@ -139,6 +146,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
@@ -168,6 +176,7 @@ jobs:
       - *configure_unreg
       - *make
       - *test
+      - *store_test_results
 
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
@@ -209,6 +218,7 @@ jobs:
       - *configure_unreg
       - *make
       - *test
+      - *store_test_results
 
   "validate-i386-linux":
     resource_class: xlarge
@@ -227,6 +237,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-x86_64-fedora":
     resource_class: xlarge
@@ -245,6 +256,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
 workflows:
   version: 2
