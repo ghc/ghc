@@ -84,3 +84,4 @@ test('T14868',
      compile_and_run, [''])
 test('T14894', normal, compile_and_run, [''])
 test('T14965', normal, compile_and_run, [''])
+test('T15114', only_ways('optasm'), compile_and_run, [''])
