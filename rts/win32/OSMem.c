@@ -499,6 +499,11 @@ void osReleaseHeapMemory (void)
 
 #endif
 
+bool osBuiltWithNumaSupport(void)
+{
+    return true;
+}
+
 bool osNumaAvailable(void)
 {
     return osNumaNodes() > 1;

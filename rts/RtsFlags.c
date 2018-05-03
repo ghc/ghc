@@ -906,6 +906,12 @@ error = true;
                   }
 #if defined(THREADED_RTS)
                   else if (!strncmp("numa", &rts_argv[arg][2], 4)) {
+                      if (!osBuiltWithNumaSupport()) {
+                          errorBelch("%s: This GHC build was compiled without NUMA support.",
+                                     rts_argv[arg]);
+                          error = true;
+                          break;
+                      }
                       OPTION_SAFE;
                       StgWord mask;
                       if (rts_argv[arg][6] == '=') {
