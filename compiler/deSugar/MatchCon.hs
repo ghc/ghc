@@ -97,7 +97,6 @@ matchConFamily :: [Id]
 matchConFamily (var:vars) ty weight groups
   = do dflags <- getDynFlags
        alts <- mapM (fmap toRealAlt . matchOneConLike vars ty weight) groups
-       pprTrace "matchConfamily" (ppr var $$ ppr ty $$ ppr groups) (return ())
        return (mkCoAlgCaseMatchResult dflags var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
