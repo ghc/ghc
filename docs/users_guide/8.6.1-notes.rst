@@ -120,6 +120,9 @@ Runtime system
 
 - The GHC runtime on Windows is no longer constrained by ``MAX_PATH``.
 
+- The runtime now allows use of the :rts-flag:`-hT` profiling variety on
+  programs built with :ghc-flag:`-prof`.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
