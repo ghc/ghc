@@ -189,7 +189,8 @@ tcTyClGroup (XTyClGroup _) = panic "tcTyClGroup"
 
 tcTyClDecls :: [LTyClDecl GhcRn] -> RoleAnnotEnv -> TcM [TyCon]
 tcTyClDecls tyclds role_annots
-  = do {    -- Step 1: kind-check this group and returns the final
+  = tcExtendKindEnv promotion_err_env $   --- See Note [Type environment evolution]
+    do {    -- Step 1: kind-check this group and returns the final
             -- (possibly-polymorphic) kind of each TyCon and Class
             -- See Note [Kind checking for type and class decls]
          tc_tycons <- kcTyClGroup tyclds
@@ -214,12 +215,14 @@ tcTyClDecls tyclds role_annots
                  -- Also extend the local type envt with bindings giving
                  -- the (polymorphic) kind of each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
-             tcExtendKindEnv (foldl extendEnvWithTcTyCon emptyNameEnv tc_tycons) $
+                 -- and Note [Type environment evolution]
+             tcExtendKindEnvWithTyCons tc_tycons $
 
                  -- Kind and type check declarations for this group
                mapM (tcTyClDecl roles) tyclds
            } }
   where
+    promotion_err_env = mkPromotionErrorEnv tyclds
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
                                   , ppr (tyConBinders tc) <> comma
                                   , ppr (tyConResKind tc) ])
@@ -289,6 +292,26 @@ type synonyms in topological order is that we don't transparently
 support making synonyms of types with higher-rank kinds.  But
 you can always specify a CUSK directly to make this work out.
 See tc269 for an example.
+
+Note [Skip decls with CUSKs in kcLTyClDecl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+    data T (a :: *) = MkT (S a)   -- Has CUSK
+    data S a = MkS (T Int) (S a)  -- No CUSK
+
+Via getInitialKinds we get
+  T :: * -> *
+  S :: kappa -> *
+
+Then we call kcTyClDecl on each decl in the group, to constrain the
+kind unification variables.  BUT we /skip/ the RHS of any decl with
+a CUSK.  Here we skip the RHS of T, so we eventually get
+  S :: forall k. k -> *
+
+This gets us more polymorphism than we would otherwise get, similar
+(but implemented strangely differently from) the treatment of type
+signatures in value declarations.
 
 Open type families
 ~~~~~~~~~~~~~~~~~~
@@ -381,28 +404,65 @@ free vars of the kinds of the generalised variables (the kvs), but we get
 such a nice error message out of checkValidTelescope that it seems like the
 right thing to do.
 
+Note [Type environment evolution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As we typecheck a group of declarations the type environment evolves.
+Consider for example:
+  data B (a :: Type) = MkB (Proxy 'MkB)
+
+We do the following steps:
+
+  1. Start of tcTyClDecls: use mkPromotionErrorEnv to initialise the
+     type env with promotion errors
+            B   :-> TyConPE
+            MkB :-> DataConPE
+
+  2. kcTyCLGruup
+      - Do getInitialKinds, which will signal a promotion
+        error if B is used in any of the kinds needed to initialse
+        B's kind (e.g. (a :: Type)) here
+
+      - Extend the type env with these intial kinds (monomorphic for
+        decls that lack a CUSK)
+            B :-> TcTyCon <initial kind>
+        (thereby overriding the B :-> TyConPE binding)
+        and do kcLTyClDecl on each decl to get equality constraints on
+        all those inital kinds
+
+      - Generalise the inital kind, making a poly-kinded TcTyCon
+
+  3. Back in tcTyDecls, extend the envt with bindings of the poly-kinded
+     TcTyCons, again overriding the promotion-error bindings.
+
+     But note that the data constructor promotion errors are still in place
+     so that (in our example) a use of MkB will sitll be signalled as
+     an error.
+
+  4. Typecheck the decls.
+
+  5. In tcTyClGroup, extend the envt with bindings for TyCon and DataCons
+
+
+Note [Missed opportunity to retain higher-rank kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In 'kcTyClGroup', there is a missed opportunity to make kind
+inference work in a few more cases.  The idea is analogous
+to Note [Single function non-recursive binding special-case]:
+
+     * If we have an SCC with a single decl, which is non-recursive,
+       instead of creating a unification variable representing the
+       kind of the decl and unifying it with the rhs, we can just
+       read the type directly of the rhs.
+
+     * Furthermore, we can update our SCC analysis to ignore
+       dependencies on declarations which have CUSKs: we don't
+       have to kind-check these all at once, since we can use
+       the CUSK to initialize the kind environment.
+
+Unfortunately this requires reworking a bit of the code in
+'kcLTyClDecl' so I've decided to punt unless someone shouts about it.
 -}
 
-
--- Note [Missed opportunity to retain higher-rank kinds]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- In 'kcTyClGroup', there is a missed opportunity to make kind
--- inference work in a few more cases.  The idea is analogous
--- to Note [Single function non-recursive binding special-case]:
---
---      * If we have an SCC with a single decl, which is non-recursive,
---        instead of creating a unification variable representing the
---        kind of the decl and unifying it with the rhs, we can just
---        read the type directly of the rhs.
---
---      * Furthermore, we can update our SCC analysis to ignore
---        dependencies on declarations which have CUSKs: we don't
---        have to kind-check these all at once, since we can use
---        the CUSK to initialize the kind environment.
---
--- Unfortunately this requires reworking a bit of the code in
--- 'kcLTyClDecl' so I've decided to punt unless someone shouts about it.
---
 kcTyClGroup :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 
 -- Kind check this group, kind generalize, and return the resulting local env
@@ -420,33 +480,39 @@ kcTyClGroup decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; lcl_env <- solveEqualities $
-                     do { -- Step 1: Bind kind variables for all decls
-                          initial_kinds <- getInitialKinds decls
-                        ; traceTc "kcTyClGroup: initial kinds" $
-                          ppr initial_kinds
+          -- Step 1: Bind kind variables for all decls
+        ; initial_tcs <- getInitialKinds decls
+        ; traceTc "kcTyClGroup: initial kinds" $
+          ppr_tc_kinds initial_tcs
 
-                        -- Step 2: Set extended envt, kind-check the decls
-                        ; tcExtendKindEnv initial_kinds $
-                          do { mapM_ kcLTyClDecl decls
-                             ; getLclEnv } }
+         -- Step 2: Set extended envt, kind-check the decls
+         -- NB: the environment extension overrides the tycon
+         --     promotion-errors bindings
+         --     See Note [Type environment evolution]
+
+        ; solveEqualities $
+          tcExtendKindEnvWithTyCons initial_tcs $
+          mapM_ kcLTyClDecl decls
 
         -- Step 3: generalisation
         -- Kind checking done for this group
         -- Now we have to kind generalize the flexis
-        ; res <- concat <$> mapAndReportM (generaliseTCD (tcl_env lcl_env)) decls
+        ; poly_tcs <- mapAndReportM generalise initial_tcs
 
-        ; traceTc "---- kcTyClGroup end ---- }" (vcat (map pp_res res))
-        ; return res }
+        ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
+        ; return poly_tcs }
 
   where
-    generalise :: TcTypeEnv -> Name -> TcM TcTyCon
+    ppr_tc_kinds tcs = vcat (map pp_tc tcs)
+    pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
+
+    generalise :: TcTyCon -> TcM TcTyCon
     -- For polymorphic things this is a no-op
-    generalise kind_env name
-      | Just (ATcTyCon tc) <- lookupNameEnv kind_env name
+    generalise tc
       = setSrcSpan (getSrcSpan tc) $
         addTyConCtxt tc $
-        do { tc_binders  <- mapM zonkTcTyVarBinder (tyConBinders tc)
+        do { let name = tyConName tc
+           ; tc_binders  <- mapM zonkTcTyVarBinder (tyConBinders tc)
            ; tc_res_kind <- zonkTcType (tyConResKind tc)
            ; let scoped_tvs  = tcTyConScopedTyVars tc
                  user_tyvars = tcTyConUserTyVars tc
@@ -479,42 +545,11 @@ kcTyClGroup decls
                                scoped_tvs'
                                (tyConFlavour tc)) }
 
-      | otherwise
-      = pprPanic "kcTyClGroup.generalise" (ppr name)
-
-    generaliseTCD :: TcTypeEnv
-                  -> LTyClDecl GhcRn -> TcM [TcTyCon]
-    generaliseTCD kind_env (L _ decl)
-      | ClassDecl { tcdLName = (L _ name), tcdATs = ats } <- decl
-      = do { first <- generalise kind_env name
-           ; rest <- mapM ((generaliseFamDecl kind_env) . unLoc) ats
-           ; return (first : rest) }
-
-      | FamDecl { tcdFam = fam } <- decl
-      = do { res <- generaliseFamDecl kind_env fam
-           ; return [res] }
-
-      | otherwise
-      = do { res <- generalise kind_env (tcdName decl)
-           ; return [res] }
-
-    generaliseFamDecl :: TcTypeEnv
-                      -> FamilyDecl GhcRn -> TcM TcTyCon
-    generaliseFamDecl kind_env (FamilyDecl { fdLName = L _ name })
-      = generalise kind_env name
-    generaliseFamDecl _ (XFamilyDecl _) = panic "generaliseFamDecl"
-
-    pp_res tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
 
 --------------
-mkTcTyConEnv :: TcTyCon -> TcTypeEnv
-mkTcTyConEnv tc = unitNameEnv (getName tc) (ATcTyCon tc)
-
-extendEnvWithTcTyCon :: TcTypeEnv -> TcTyCon -> TcTypeEnv
--- Makes a binding to put in the local envt, binding
--- a name to a TcTyCon
-extendEnvWithTcTyCon env tc
-  = extendNameEnv env (getName tc) (ATcTyCon tc)
+tcExtendKindEnvWithTyCons :: [TcTyCon] -> TcM a -> TcM a
+tcExtendKindEnvWithTyCons tcs
+  = tcExtendKindEnvList [ (tyConName tc, ATcTyCon tc) | tc <- tcs ]
 
 --------------
 mkPromotionErrorEnv :: [LTyClDecl GhcRn] -> TcTypeEnv
@@ -546,28 +581,18 @@ mk_prom_err_env decl
     -- Works for family declarations too
 
 --------------
-getInitialKinds :: [LTyClDecl GhcRn] -> TcM (NameEnv TcTyThing)
--- Maps each tycon to its initial kind,
--- and each datacon to a suitable promotion error
---    tc :-> ATcTyCon (tc:initial_kind)
---    dc :-> APromotionErr RecDataConPE
---    See Note [Recursion and promoting data constructors]
+getInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
+-- Returns a TcTyCon for each TyCon bound by the decls,
+-- each with its initial kind
 
-getInitialKinds decls
-  = tcExtendKindEnv promotion_err_env $
-    do { tc_kinds <- mapM (addLocM getInitialKind) decls
-       ; return (foldl plusNameEnv promotion_err_env tc_kinds) }
-  where
-    promotion_err_env = mkPromotionErrorEnv decls
+getInitialKinds decls = concatMapM (addLocM getInitialKind) decls
 
-getInitialKind :: TyClDecl GhcRn
-               -> TcM (NameEnv TcTyThing)
+getInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
 -- Allocate a fresh kind variable for each TyCon and Class
--- For each tycon, return a NameEnv with
---      name :-> ATcTyCon (TcCyCon with kind k))
+-- For each tycon, return a TcTyCon with kind k
 -- where k is the kind of tc, derived from the LHS
---       of the definition (and probably including
---       kind unification variables)
+--         of the definition (and probably including
+--         kind unification variables)
 --      Example: data T a b = ...
 --      return (T, kv1 -> kv2 -> kv3)
 --
@@ -579,11 +604,11 @@ getInitialKind :: TyClDecl GhcRn
 
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = do { let cusk = hsDeclHasCusk decl
-       ; (tycon, inner_prs) <-
+       ; (tycon, inner_tcs) <-
            kcLHsQTyVars name ClassFlavour cusk ktvs $
-           do { inner_prs <- getFamDeclInitialKinds (Just cusk) ats
-              ; return (constraintKind, inner_prs) }
-       ; return (extendEnvWithTcTyCon inner_prs tycon) }
+           do { inner_tcs <- getFamDeclInitialKinds (Just cusk) ats
+              ; return (constraintKind, inner_tcs) }
+       ; return (tycon : inner_tcs) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdTyVars = ktvs
@@ -595,10 +620,11 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                            Just ksig -> tcLHsKindSig (DataKindCtxt name) ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
-        ; return (mkTcTyConEnv tycon) }
+        ; return [tycon] }
 
 getInitialKind (FamDecl { tcdFam = decl })
-  = getFamDeclInitialKind Nothing decl
+  = do { tc <- getFamDeclInitialKind Nothing decl
+       ; return [tc] }
 
 getInitialKind decl@(SynDecl { tcdLName = L _ name
                              , tcdTyVars = ktvs
@@ -609,7 +635,7 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
                             Nothing -> newMetaKindVar
                             Just ksig -> tcLHsKindSig (TySynKindCtxt name) ksig
                 ; return (res_k, ()) }
-        ; return (mkTcTyConEnv tycon) }
+        ; return [tycon] }
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
     kind_annotation (L _ ty) = case ty of
@@ -623,14 +649,13 @@ getInitialKind (XTyClDecl _) = panic "getInitialKind"
 ---------------------------------
 getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
                        -> [LFamilyDecl GhcRn]
-                       -> TcM TcTypeEnv
+                       -> TcM [TcTyCon]
 getFamDeclInitialKinds mb_cusk decls
-  = do { tc_kinds <- mapM (addLocM (getFamDeclInitialKind mb_cusk)) decls
-       ; return (foldr plusNameEnv emptyNameEnv tc_kinds) }
+  = mapM (addLocM (getFamDeclInitialKind mb_cusk)) decls
 
 getFamDeclInitialKind :: Maybe Bool  -- if assoc., CUSKness of assoc. class
                       -> FamilyDecl GhcRn
-                      -> TcM TcTypeEnv
+                      -> TcM TcTyCon
 getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                                                , fdTyVars    = ktvs
                                                , fdResultSig = L _ resultSig
@@ -646,7 +671,7 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                       -- by default
                       | otherwise                -> newMetaKindVar
               ; return (res_k, ()) }
-       ; return (mkTcTyConEnv tycon) }
+       ; return tycon }
   where
     cusk  = famDeclHasCusk mb_cusk decl
     flav  = case info of
@@ -660,8 +685,9 @@ getFamDeclInitialKind _ (XFamilyDecl _) = panic "getFamDeclInitialKind"
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
 kcLTyClDecl (L loc decl)
-  | hsDeclHasCusk decl
+  | hsDeclHasCusk decl  -- See Note [Skip decls with CUSKs in kcLTyClDecl]
   = traceTc "kcTyClDecl skipped due to cusk" (ppr tc_name)
+
   | otherwise
   = setSrcSpan loc $
     tcAddDeclCtxt decl $
