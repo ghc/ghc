@@ -124,7 +124,9 @@ exitifyRec in_scope pairs
             let rhs' = mkLams args body'
             return (x, rhs')
 
-    -- main working function. Goes through the RHS (tail-call positions only),
+    ---------------------
+    -- 'go' is the main working function.
+    -- It goes through the RHS (tail-call positions only),
     -- checks if there are no more recursive calls, if so, abstracts over
     -- variables bound on the way and lifts it out as a join point.
     --
@@ -139,63 +141,10 @@ exitifyRec in_scope pairs
     -- We first look at the expression (no matter what it shape is)
     -- and determine if we can turn it into a exit join point
     go captured ann_e
-        -- Do not touch an expression that is already a join jump where all arguments
-        -- are captured variables. See Note [Idempotency]
-        -- But _do_ float join jumps with interesting arguments.
-        -- See Note [Jumps can be interesting]
-        | (Var f, args) <- collectArgs e
-        , isJoinId f
-        , all isCapturedVarArg args
-        = return e
-
-        -- Do not touch a boring expression (see Note [Interesting expression])
-        | is_exit, not is_interesting = return e
-
-        -- Cannot float out if local join points are used, as
-        -- we cannot abstract over them
-        | is_exit, captures_join_points = return e
-
-        -- We have something to float out!
-        | is_exit = do
-            -- Assemble the RHS of the exit join point
-            let rhs = mkLams abs_vars e
-                ty = exprType rhs
-            let avoid = in_scope `extendInScopeSetList` captured
-            -- Remember this binding under a suitable name
-            v <- addExit avoid ty (length abs_vars) rhs
-            -- And jump to it from here
-            return $ mkVarApps (Var v) abs_vars
-      where
-        -- An exit expression has no recursive calls
-        is_exit = disjointVarSet fvs recursive_calls
-
-        -- Used to detect exit expressoins that are already proper exit jumps
-        isCapturedVarArg (Var v) = v `elem` captured
-        isCapturedVarArg _ = False
-
-        -- An interesting exit expression has free, non-imported
-        -- variables from outside the recursive group
-        -- See Note [Interesting expression]
-        is_interesting = anyVarSet isLocalId (fvs `minusVarSet` mkVarSet captured)
-
-        -- The arguments of this exit join point
-        -- See Note [Picking arguments to abstract over]
-        abs_vars = snd $ foldr pick (fvs, []) captured
-          where
-            pick v (fvs', acc) | v `elemVarSet` fvs' = (fvs' `delVarSet` v, zap v : acc)
-                               | otherwise           = (fvs',               acc)
-
-        -- We are going to abstract over these variables, so we must
-        -- zap any IdInfo they have; see Trac #15005
-        -- cf. SetLevels.abstractVars
-        zap v | isId v = setIdInfo v vanillaIdInfo
-              | otherwise = v
-
-        -- We cannot abstract over join points
-        captures_join_points = any isJoinId abs_vars
-
-        e = deAnnotate ann_e
-        fvs = dVarSetToVarSet (freeVarsOf ann_e)
+        | -- An exit expression has no recursive calls
+          let fvs = dVarSetToVarSet (freeVarsOf ann_e)
+        , disjointVarSet fvs recursive_calls
+        = go_exit captured (deAnnotate ann_e) fvs
 
     -- We could not turn it into a exit joint point. So now recurse
     -- into all expression where eligible exit join points might sit,
@@ -241,6 +190,69 @@ exitifyRec in_scope pairs
     -- tail-call subexpression. Nothing to do here.
     go _ ann_e = return (deAnnotate ann_e)
 
+    ---------------------
+    go_exit :: [Var]      -- Variables captured locally
+            -> CoreExpr   -- An exit expression
+            -> VarSet     -- Free vars of the expression
+            -> ExitifyM CoreExpr
+    -- go_exit deals with a tail expression that is floatable
+    -- out as an exit point; that is, it mentions no recursive calls
+    go_exit captured e fvs
+      -- Do not touch an expression that is already a join jump where all arguments
+      -- are captured variables. See Note [Idempotency]
+      -- But _do_ float join jumps with interesting arguments.
+      -- See Note [Jumps can be interesting]
+      | (Var f, args) <- collectArgs e
+      , isJoinId f
+      , all isCapturedVarArg args
+      = return e
+
+      -- Do not touch a boring expression (see Note [Interesting expression])
+      | not is_interesting
+      = return e
+
+      -- Cannot float out if local join points are used, as
+      -- we cannot abstract over them
+      | captures_join_points
+      = return e
+
+      -- We have something to float out!
+      | otherwise
+      = do { -- Assemble the RHS of the exit join point
+             let rhs   = mkLams abs_vars e
+                 avoid = in_scope `extendInScopeSetList` captured
+             -- Remember this binding under a suitable name
+           ; v <- addExit avoid (length abs_vars) rhs
+             -- And jump to it from here
+           ; return $ mkVarApps (Var v) abs_vars }
+
+      where
+        -- Used to detect exit expressoins that are already proper exit jumps
+        isCapturedVarArg (Var v) = v `elem` captured
+        isCapturedVarArg _ = False
+
+        -- An interesting exit expression has free, non-imported
+        -- variables from outside the recursive group
+        -- See Note [Interesting expression]
+        is_interesting = anyVarSet isLocalId $
+                         fvs `minusVarSet` mkVarSet captured
+
+        -- The arguments of this exit join point
+        -- See Note [Picking arguments to abstract over]
+        abs_vars = snd $ foldr pick (fvs, []) captured
+          where
+            pick v (fvs', acc) | v `elemVarSet` fvs' = (fvs' `delVarSet` v, zap v : acc)
+                               | otherwise           = (fvs',               acc)
+
+        -- We are going to abstract over these variables, so we must
+        -- zap any IdInfo they have; see Trac #15005
+        -- cf. SetLevels.abstractVars
+        zap v | isId v = setIdInfo v vanillaIdInfo
+              | otherwise = v
+
+        -- We cannot abstract over join points
+        captures_join_points = any isJoinId abs_vars
+
 
 -- Picks a new unique, which is disjoint from
 --  * the free variables of the whole joinrec
@@ -256,9 +268,10 @@ mkExitJoinId in_scope ty join_arity = do
     exit_id_tmpl = mkSysLocal (fsLit "exit") initExitJoinUnique ty
                     `asJoinId` join_arity
 
-addExit :: InScopeSet -> Type -> JoinArity -> CoreExpr -> ExitifyM JoinId
-addExit in_scope ty join_arity rhs = do
+addExit :: InScopeSet -> JoinArity -> CoreExpr -> ExitifyM JoinId
+addExit in_scope join_arity rhs = do
     -- Pick a suitable name
+    let ty = exprType rhs
     v <- mkExitJoinId in_scope ty join_arity
     fs <- get
     put ((v,rhs):fs)
