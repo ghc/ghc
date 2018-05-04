@@ -1561,11 +1561,14 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; typeintype <- xoptM LangExt.TypeInType
        ; let cusk = hsTvbAllKinded tyvars' &&
                     (not typeintype || no_rhs_kvs)
+             rn_info = DataDeclRn { tcdDataCusk = cusk
+                                  , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)
-       ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
-                          , tcdFixity = fixity
+       ; return (DataDecl { tcdLName    = tycon'
+                          , tcdTyVars   = tyvars'
+                          , tcdFixity   = fixity
                           , tcdDataDefn = defn'
-                          , tcdDExt = DataDeclRn cusk fvs }, fvs) } }
+                          , tcdDExt     = rn_info }, fvs) } }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                         tcdTyVars = tyvars, tcdFixity = fixity,
