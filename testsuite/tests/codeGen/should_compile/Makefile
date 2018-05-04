@@ -36,5 +36,5 @@ debug:
 
 T14999:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -g -c T14999.cmm -o T14999.o
-	gdb --batch -ex 'file T14999.o' -ex 'disassemble stg_catch_frame_info' --nx | tr -s '[:blank:]'
-	readelf --debug-dump=frames-interp T14999.o | tr -s '[:blank:]'
+	gdb --batch -ex 'file T14999.o' -ex 'disassemble stg_catch_frame_info' --nx | tr -s '[[:blank:]\n]'
+	readelf --debug-dump=frames-interp T14999.o | tr -s '[[:blank:]\n]'
