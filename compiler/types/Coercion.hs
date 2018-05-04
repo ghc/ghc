@@ -1302,7 +1302,7 @@ mkPiCos r vs co = foldr (mkPiCo r) co vs
 -- are quantified over the same type variable.
 mkPiCo  :: Role -> Var -> Coercion -> Coercion
 mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
-              | otherwise = mkFunCo r Omega (mkReflCo r (varType v)) co
+              | otherwise = mkFunCo r (varWeight v) (mkReflCo r (varType v)) co
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above
