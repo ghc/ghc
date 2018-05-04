@@ -70,7 +70,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import Data.List        ( isSuffixOf, intercalate )
+import Data.List        ( isInfixOf, isSuffixOf, intercalate )
 import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
@@ -823,7 +823,8 @@ llvmOptions dflags =
     ++ [("", "-filetype=obj") | fastLlvmPipeline dflags ]
 
     -- Additional llc flags
-    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu) ]
+    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
+                                 , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
 
   where target = LLVM_TARGET
