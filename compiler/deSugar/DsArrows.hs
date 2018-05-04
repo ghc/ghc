@@ -605,7 +605,7 @@ dsCmd ids local_vars stack_ty res_ty
                          (MG { mg_alts = L l matches'
                              , mg_arg_tys = arg_tys
                              , mg_res_ty = sum_ty, mg_origin = origin
-                             , mg_weight = Omega })) -- TODO: MattP
+                             , mg_weight = Omega })) -- TODO: MattP check this multiplicity is correct
         -- Note that we replace the HsCase result type by sum_ty,
         -- which is the type of matches'
 

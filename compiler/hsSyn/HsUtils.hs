@@ -144,10 +144,9 @@ just attach noSrcSpan to everything.
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (HsPar noExt e)
 
-mkSimpleMatch :: (XEmptyLocalBinds p p ~ PlaceHolder)
-               => HsMatchContext (NameOrRdrName (IdP p))
-              -> [LPat p] -> Located (body p)
-              -> LMatch p (Located (body p))
+mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP (GhcPass p)))
+              -> [LPat (GhcPass p)] -> Located (body (GhcPass p))
+              -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
   = L loc $
     Match { m_ctxt = ctxt, m_pats = pats
@@ -205,9 +204,8 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
-mkHsCaseAlt :: (XEmptyLocalBinds p p ~ PlaceHolder)
-            => LPat p -> (Located (body p))
-            -> LMatch p (Located (body p))
+mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
+            -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 

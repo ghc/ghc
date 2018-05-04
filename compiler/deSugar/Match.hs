@@ -161,7 +161,7 @@ type MatchId = Id   -- See Note [Match Ids]
 match :: [MatchId]        -- Variables rep\'ing the exprs we\'re matching with
                           -- See Note [Match Ids]
       -> Type             -- Type of the case expression
-      -> Rig              -- Weight of the case expression
+      -> Rig              -- multiplicity of the case expression
       -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
       -> DsM MatchResult  -- Desugared result!
 
@@ -256,14 +256,11 @@ matchCoercion :: HasCallStack => [MatchId] -> Type -> Rig -> [EquationInfo] -> D
 matchCoercion (var:vars) ty weight (eqns@(eqn1:_))
   = do  { let CoPat _ co pat _ = firstPat eqn1
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var Omega pat_ty'
-        ; pprTrace "matchCoercion" (ppr var $$ ppr var' $$ ppr pat_ty' $$ ppr co $$ ppr eqn1) (return ())
-        ; pprTrace "matchCo" (ppr eqns $$ ppr (map (decomposeFirstPat getCoPat) eqns)) (return ())
+        ; var' <- newUniqueId var (idWeight var) pat_ty'
         ; match_result <- match (var':vars) ty weight $
                           map (decomposeFirstPat getCoPat) eqns
         ; core_wrap <- dsHsWrapper co
         ; let bind = NonRec var' (core_wrap (Var var))
-        ; pprTrace "bind" (ppr bind) (return ())
         ; return (mkCoLetMatchResult bind match_result) }
 matchCoercion _ _ _ _ = panic "matchCoercion"
 
@@ -276,7 +273,7 @@ matchView (var:vars) ty weight (eqns@(eqn1:_))
          let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idWeight var) pat_ty' -- TODO: arnaud: possibly not the right weight
+        ; var' <- newUniqueId var (idWeight var) pat_ty' -- MattP: I am fairly sure this is right now -- or at least -- not very wrong
         ; match_result <- match (var':vars) ty weight $
                           map (decomposeFirstPat getViewPat) eqns
          -- compile the view expressions

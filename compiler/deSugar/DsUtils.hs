@@ -98,7 +98,11 @@ otherwise, make one up.
 -}
 
 selectSimpleMatchVarL :: LPat GhcTc -> DsM Id
-selectSimpleMatchVarL pat = selectMatchVar Omega (unLoc pat) -- TODO: MattP
+selectSimpleMatchVarL pat = selectMatchVar Omega (unLoc pat)
+-- TODO: MattP: This function is used in a few places where is might be
+-- necessary to take into account multiplicity but it wasn't on the
+-- critical path to fix for now.
+
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
@@ -126,9 +130,7 @@ selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
 selectMatchVar w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
 selectMatchVar w (AsPat _ var _) = return (unLoc var)
-selectMatchVar w other_pat     =
-    newSysLocalDsNoLP w (hsPatType other_pat) -- TODO: arnaud: I'm pretty sure I actually need to take the multiplicity of the pattern as an argument, though not knowing what the variable is used for, I don't know how I would use it quite yet
-                                  -- OK, better make up one...
+selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
 {-
 Note [Localise pattern binders]
