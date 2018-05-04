@@ -360,6 +360,7 @@
           [(TyConApp
             ({abstract:TyCon})
             [])])
+         (Omega)
          (FromSource))
         (WpHole)
         []))]}
