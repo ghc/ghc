@@ -156,9 +156,8 @@ mkSimpleMatch ctxt pats rhs
                 []      -> getLoc rhs
                 (pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
-unguardedGRHSs :: (XEmptyLocalBinds p p ~ PlaceHolder)
-               => Located (body p)
-               -> GRHSs p (Located (body p))
+unguardedGRHSs :: Located (body (GhcPass p))
+               -> GRHSs (GhcPass p) (Located (body (GhcPass p)))
 unguardedGRHSs rhs@(L loc _)
   = GRHSs (unguardedRHS loc rhs) (noLoc emptyLocalBinds)
 
