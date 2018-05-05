@@ -377,6 +377,9 @@ genCall t@(PrimTarget (MO_SubIntC w)) [dstV, dstO] [lhs, rhs] =
 genCall t@(PrimTarget (MO_Add2 w)) [dstO, dstV] [lhs, rhs] =
     genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
 
+genCall t@(PrimTarget (MO_AddWordC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
 genCall t@(PrimTarget (MO_SubWordC w)) [dstV, dstO] [lhs, rhs] =
     genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
 
@@ -490,6 +493,7 @@ genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
     let valid = op `elem`   [ MO_Add2 w
                             , MO_AddIntC w
                             , MO_SubIntC w
+                            , MO_AddWordC w
                             , MO_SubWordC w
                             ]
     MASSERT(valid)
@@ -799,6 +803,8 @@ cmmPrimOpFunctions mop = do
     MO_SubIntC w    -> fsLit $ "llvm.ssub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_AddWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)

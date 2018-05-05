@@ -1333,6 +1333,7 @@ genCCall target dest_regs argsAndHints
         PrimTarget (MO_U_Mul2 width) -> multOp2 platform width dest_regs
                                                 argsAndHints
         PrimTarget (MO_Add2 _) -> add2Op platform dest_regs argsAndHints
+        PrimTarget (MO_AddWordC _) -> addcOp platform dest_regs argsAndHints
         PrimTarget (MO_SubWordC _) -> subcOp platform dest_regs argsAndHints
         PrimTarget (MO_AddIntC width) -> addSubCOp ADDO platform width
                                                    dest_regs argsAndHints
@@ -1522,6 +1523,11 @@ genCCall target dest_regs argsAndHints
                                          ]
               add2Op _ _ _
                 = panic "genCCall: Wrong number of arguments/results for add2"
+
+              addcOp platform [res_r, res_c] [arg_x, arg_y]
+                = add2Op platform [res_c {-hi-}, res_r {-lo-}] [arg_x, arg_y]
+              addcOp _ _ _
+                = panic "genCCall: Wrong number of arguments/results for addc"
 
               -- PowerPC subfc sets the carry for rT = ~(rA) + rB + 1,
               -- which is 0 for borrow and 1 otherwise. We need 1 and 0
@@ -2025,6 +2031,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_U_QuotRem {}  -> unsupported
                     MO_U_QuotRem2 {} -> unsupported
                     MO_Add2 {}       -> unsupported
+                    MO_AddWordC {}   -> unsupported
                     MO_SubWordC {}   -> unsupported
                     MO_AddIntC {}    -> unsupported
                     MO_SubIntC {}    -> unsupported

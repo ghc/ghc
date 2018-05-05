@@ -265,6 +265,7 @@ primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
           nonzero if overflow occurred (the sum is either too large
           or too small to fit in an {\tt Int#}).}
    with code_size = 2
+        commutable = True
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
          {Subtract signed integers reporting overflow.
@@ -328,15 +329,25 @@ primtype Word#
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+primop   WordAddCOp   "addWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
+         {Add unsigned integers reporting overflow.
+          The first element of the pair is the result.  The second element is
+          the carry flag, which is nonzero on overflow. See also {\tt plusWord2#}.}
+   with code_size = 2
+        commutable = True
+
 primop   WordSubCOp   "subWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
          {Subtract unsigned integers reporting overflow.
           The first element of the pair is the result.  The second element is
           the carry flag, which is nonzero on overflow.}
+   with code_size = 2
 
--- Returns (# high, low #) (or equivalently, (# carry, low #))
-primop   WordAdd2Op  "plusWord2#"  GenPrimOp
-   Word# -> Word# -> (# Word#, Word# #)
-   with commutable = True
+primop   WordAdd2Op   "plusWord2#"   GenPrimOp   Word# -> Word# -> (# Word#, Word# #)
+         {Add unsigned integers, with the high part (carry) in the first
+          component of the returned pair and the low part in the second
+          component of the pair. See also {\tt addWordC#}.}
+   with code_size = 2
+        commutable = True
 
 primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
 

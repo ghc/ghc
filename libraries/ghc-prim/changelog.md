@@ -1,3 +1,10 @@
+## 0.5.2.1 (edit as necessary)
+
+- Shipped with GHC 8.6.1
+
+- Added to `GHC.Prim`:
+        addWordC# :: Word# -> Word# -> (# Word#, Int# #)
+
 ## 0.5.2.0
 
 - Shipped with GHC 8.4.1

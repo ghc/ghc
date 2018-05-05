@@ -126,7 +126,6 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
-
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -141,6 +140,12 @@ Template Haskell
   ``contravariant`` (``Data.Functor.Contravariant.Divisible``, etc.)
   have not been moved to ``base``, and they still reside in ``contravariant``.
 
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+-  Version number 0.5.2.1 (was 0.5.2.0)
+
+-  Added new ``addWordC#`` operation for unsigned addition with carry.
 
 Build system
 ~~~~~~~~~~~~
