@@ -449,7 +449,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1106015512, 5)]),
+           (wordsize(64), 1164944688, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -464,8 +464,9 @@ test('T5631',
         # 2017-02-17:     1517484488 (amd64/Linux) Type-indexed Typeable
         # 2017-03-03:     1065147968 (amd64/Linux) Share Typeable KindReps
         # 2017-03-31:     1037482512 (amd64/Linux) Fix memory leak in simplifier
-	# 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in TypeEqOrigin
-	#                                  should be fixed by #14037
+	    # 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in
+	    #                            TypeEqOrigin should be fixed by #14037
+        # 2018-05-05:     1164944688 (amd64/Linux) Simplify callSiteInline a little
        only_ways(['normal'])
       ],
      compile,
