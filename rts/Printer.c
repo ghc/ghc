@@ -542,6 +542,18 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_ap_ppppp_info\n" );
             } else if (c == (StgWord)&stg_ap_pppppp_info) {
                 debugBelch("stg_ap_pppppp_info\n" );
+            } else if (c == (StgWord)&stg_ret_v_info) {
+                debugBelch("stg_ret_v_info\n" );
+            } else if (c == (StgWord)&stg_ret_p_info) {
+                debugBelch("stg_ret_p_info\n" );
+            } else if (c == (StgWord)&stg_ret_n_info) {
+                debugBelch("stg_ret_n_info\n" );
+            } else if (c == (StgWord)&stg_ret_f_info) {
+                debugBelch("stg_ret_f_info\n" );
+            } else if (c == (StgWord)&stg_ret_d_info) {
+                debugBelch("stg_ret_d_info\n" );
+            } else if (c == (StgWord)&stg_ret_l_info) {
+                debugBelch("stg_ret_l_info\n" );
 #if defined(PROFILING)
             } else if (c == (StgWord)&stg_restore_cccs_info) {
                 debugBelch("stg_restore_cccs_info\n" );
