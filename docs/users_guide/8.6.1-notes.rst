@@ -13,6 +13,13 @@ Highlights
 
 The highlights, since the 8.4.1 release, are:
 
+- Programs are no longer constrained by the Windows ``MAX_PATH`` file path
+  length limit. The file path limit is now approximately 32,767 characters. Note
+  that GHC itself is still somewhat limited due to GCC not supporting file
+  namespaced paths. Paths that are passed directly to the compiler, linker or
+  other GNU tools are currently still constrained. See :ref:`windows-file-paths`
+  for details.
+
 - Many, many bug fixes.
 
 
@@ -118,7 +125,8 @@ Runtime system
 - The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
   searches ``LD_LIBRARY_PATH``.
 
-- The GHC runtime on Windows is no longer constrained by ``MAX_PATH``.
+- The GHC runtime on Windows is no longer constrained by the ``MAX_PATH`` file path
+  length limitation. See :ref:`windows-file-paths`.
 
 - The runtime now allows use of the :rts-flag:`-hT` profiling variety on
   programs built with :ghc-flag:`-prof`.
@@ -149,48 +157,6 @@ Template Haskell
 
 Build system
 ~~~~~~~~~~~~
-
-Windows Paths
-~~~~~~~~~~~~~
-
-Windows paths are not all the same. The different kinds of paths each have
-different meanings. The ``MAX_PATH`` limitation is not a limitation of the Operating
-System nor the File System. It is a limitation of the default namespace enforced
-by the Win32 API for backwards compatibility.
-
-The NT Kernel however allows you ways to opt out of this path preprocessing by
-the Win32 APIs. This is done by explicitly using the desired namespace in the
-PATH.
-
-The namespaces are:
-
- - file namespace: ``\\?\``
- - device namespace: ``\\.\``
- - nt namespace: ``\``
-
-Each of these turn off Path processing completely by the Win32 API and the paths
-are passed untouched to the filesystem.
-
-Paths with a drive letter are `legacy` paths. The drive letters are actually
-meaningless to the kernel. Just like Unix operating systems, drive letters are
-just a mount point. You can view your mount points by using the `mountvol`
-command.
-
-The Haskell I/O manager will now automatically promote paths in the legacy
-format to Win32 file namespace. By default the I/O manager will do two things to
-your paths:
-
-  - replace ``/`` with ``\\``
-  - expand relative paths to absolute paths
-
-If you want to opt out of all preprocessing just expliticly use namespaces in
-your paths. Due to this change, if you need to open raw devices (e.g. COM ports)
-you need to use the device namespace explicitly. (e.g. `\\.\COM1`). GHC and
-Haskell programs in general no longer support opening devices in the `legacy`
-format.
-
-See https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx for
-more details.
 
 
 Included libraries
