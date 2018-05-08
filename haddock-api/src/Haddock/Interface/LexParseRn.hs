@@ -104,7 +104,9 @@ rename dflags gre = rn
           -- We found no names in the env so we start guessing.
           [] ->
             case choices of
+              -- This shouldn't happen as 'dataTcOccs' always returns at least its input.
               [] -> pure (DocMonospaced (DocString (showPpr dflags x)))
+
               -- There was nothing in the environment so we need to
               -- pick some default from what's available to us. We
               -- diverge here from the old way where we would default
@@ -113,7 +115,7 @@ rename dflags gre = rn
               -- type constructor names (such as in #253). So now we
               -- only get type constructor links if they are actually
               -- in scope.
-              a:_ -> pure (outOfScope dflags a)
+              a:_ -> outOfScope dflags a
 
           -- There is only one name in the environment that matches so
           -- use it.
@@ -154,12 +156,15 @@ rename dflags gre = rn
 -- users shouldn't rely on this doing the right thing. See tickets
 -- #253 and #375 on the confusion this causes depending on which
 -- default we pick in 'rename'.
-outOfScope :: DynFlags -> RdrName -> Doc a
+outOfScope :: DynFlags -> RdrName -> ErrMsgM (Doc a)
 outOfScope dflags x =
   case x of
-    Unqual occ -> monospaced occ
-    Qual mdl occ -> DocIdentifierUnchecked (mdl, occ)
-    Orig _ occ -> monospaced occ
-    Exact name -> monospaced name  -- Shouldn't happen since x is out of scope
+    Unqual occ -> warnAndMonospace occ
+    Qual mdl occ -> pure (DocIdentifierUnchecked (mdl, occ))
+    Orig _ occ -> warnAndMonospace occ
+    Exact name -> warnAndMonospace name  -- Shouldn't happen since x is out of scope
   where
+    warnAndMonospace a = do
+      tell ["Warning: '" ++ showPpr dflags a ++ "' is out of scope."]
+      pure (monospaced a)
     monospaced a = DocMonospaced (DocString (showPpr dflags a))
