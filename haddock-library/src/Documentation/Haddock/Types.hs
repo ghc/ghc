@@ -107,8 +107,10 @@ data DocH mod id
   | DocParagraph (DocH mod id)
   | DocIdentifier id
   | DocIdentifierUnchecked mod
+  -- ^ A qualified identifier that couldn't be resolved.
   | DocModule String
   | DocWarning (DocH mod id)
+  -- ^ This constructor has no counterpart in Haddock markup.
   | DocEmphasis (DocH mod id)
   | DocMonospaced (DocH mod id)
   | DocBold (DocH mod id)
@@ -121,6 +123,7 @@ data DocH mod id
   | DocMathInline String
   | DocMathDisplay String
   | DocAName String
+  -- ^ A (HTML) anchor.
   | DocProperty String
   | DocExamples [Example]
   | DocHeader (Header (DocH mod id))
