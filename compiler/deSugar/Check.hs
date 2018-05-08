@@ -790,10 +790,13 @@ translatePat fam_insts pat = case pat of
   -- overloaded list
   ListPat (ListPatTc elem_ty (Just (pat_ty, _to_list))) lpats
     | Just e_ty <- splitListTyConApp_maybe pat_ty
+    , (_, norm_e_ty) <- normaliseType fam_insts Nominal e_ty
+         -- e_ty can be a type family instance, like
+         -- `It (List a)`, but we prefer `a`, see Trac #14547
     , (_, norm_elem_ty) <- normaliseType fam_insts Nominal elem_ty
          -- elem_ty is frequently something like
          -- `Item [Int]`, but we prefer `Int`
-    , norm_elem_ty `eqType` e_ty ->
+    , norm_elem_ty `eqType` norm_e_ty ->
         -- We have to ensure that the element types are exactly the same.
         -- Otherwise, one may give an instance IsList [Int] (more specific than
         -- the default IsList [a]) with a different implementation for `toList'
