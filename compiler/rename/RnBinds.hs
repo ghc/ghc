@@ -470,9 +470,10 @@ rnBind _ bind@(PatBind { pat_lhs = pat
               ok_nobind_pat
                   = -- See Note [Pattern bindings that bind no variables]
                     case pat of
-                       L _ (WildPat {}) -> True
-                       L _ (BangPat {}) -> True -- #9127, #13646
-                       _                -> False
+                       L _ (WildPat {})   -> True
+                       L _ (BangPat {})   -> True -- #9127, #13646
+                       L _ (SplicePat {}) -> True
+                       _                  -> False
 
         -- Warn if the pattern binds no variables
         -- See Note [Pattern bindings that bind no variables]
@@ -518,7 +519,7 @@ rnBind _ b = pprPanic "rnBind" (ppr b)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Generally, we want to warn about pattern bindings like
   Just _ = e
-because they don't do anything!  But we have two exceptions:
+because they don't do anything!  But we have three exceptions:
 
 * A wildcard pattern
        _ = rhs
@@ -531,6 +532,12 @@ because they don't do anything!  But we have two exceptions:
   This can fail, so unlike the lazy variant, it is not a no-op.
   Moreover, Trac #13646 argues that even for single constructor
   types, you might want to write the constructor.  See also #9127.
+
+* A splice pattern
+      $(th-lhs) = rhs
+   It is impossible to determine whether or not th-lhs really
+   binds any variable. We should disable the warning for any pattern
+   which contain splices, but that is a more expensive check.
 
 Note [Free-variable space leak]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
