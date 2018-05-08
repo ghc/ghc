@@ -820,14 +820,14 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal (unrestricted rep_ty)
+    unboxer arg_id = do { rep_id <- newLocal (linear rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (unrestricted $ TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal (linear $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCoUnchecked subst co
