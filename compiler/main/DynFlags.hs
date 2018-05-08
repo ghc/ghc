@@ -797,6 +797,7 @@ data WarningFlag =
    | Opt_WarnMissingHomeModules           -- Since 8.2
    | Opt_WarnPartialFields                -- Since 8.4
    | Opt_WarnMissingExportList
+   | Opt_WarnInaccessibleCode
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -3755,6 +3756,7 @@ wWarningFlagsDeps = [
   flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
   flagSpec "duplicate-exports"           Opt_WarnDuplicateExports,
   flagSpec "hi-shadowing"                Opt_WarnHiShadows,
+  flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
   flagSpec "incomplete-patterns"         Opt_WarnIncompletePatterns,
   flagSpec "incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
@@ -4455,7 +4457,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnUnsupportedLlvmVersion,
         Opt_WarnTabs,
         Opt_WarnUnrecognisedWarningFlags,
-        Opt_WarnSimplifiableClassConstraints
+        Opt_WarnSimplifiableClassConstraints,
+        Opt_WarnInaccessibleCode
       ]
 
 -- | Things you get with -W
