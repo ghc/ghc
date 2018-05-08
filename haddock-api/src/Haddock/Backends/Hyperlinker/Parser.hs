@@ -24,8 +24,13 @@ import Haddock.Backends.Hyperlinker.Types as T
 -- (In reality, this only holds for input not containing '\r', '\t', '\f', '\v',
 -- characters, since GHC transforms those into ' ' and '\n')
 parse :: DynFlags -> FilePath -> String -> [T.Token]
-parse dflags fp s = ghcToks (processCPP dflags fp s)
-
+parse dflags fp = ghcToks . processCPP dflags fp . filterCRLF
+  where
+    -- Remove CRLFs from source
+    filterCRLF :: String -> String
+    filterCRLF ('\r':'\n':cs) = '\n' : filterCRLF cs
+    filterCRLF (c:cs) = c : filterCRLF cs
+    filterCRLF [] = []
 
 -- | Parse the source into tokens using the GHC lexer.
 --
