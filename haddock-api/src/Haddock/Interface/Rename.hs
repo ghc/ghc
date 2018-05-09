@@ -560,12 +560,19 @@ renameDerivD :: DerivDecl GhcRn -> RnM (DerivDecl DocNameI)
 renameDerivD (DerivDecl { deriv_type = ty
                         , deriv_strategy = strat
                         , deriv_overlap_mode = omode }) = do
-  ty' <- renameLSigWcType ty
+  ty'    <- renameLSigWcType ty
+  strat' <- mapM (mapM renameDerivStrategy) strat
   return (DerivDecl { deriv_ext = noExt
                     , deriv_type = ty'
-                    , deriv_strategy = strat
+                    , deriv_strategy = strat'
                     , deriv_overlap_mode = omode })
 renameDerivD (XDerivDecl _) = panic "haddock:renameDerivD"
+
+renameDerivStrategy :: DerivStrategy GhcRn -> RnM (DerivStrategy DocNameI)
+renameDerivStrategy StockStrategy    = pure StockStrategy
+renameDerivStrategy AnyclassStrategy = pure AnyclassStrategy
+renameDerivStrategy NewtypeStrategy  = pure NewtypeStrategy
+renameDerivStrategy (ViaStrategy ty) = ViaStrategy <$> renameLSigType ty
 
 renameClsInstD :: ClsInstDecl GhcRn -> RnM (ClsInstDecl DocNameI)
 renameClsInstD (ClsInstDecl { cid_overlap_mode = omode

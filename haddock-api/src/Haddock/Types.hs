@@ -725,6 +725,7 @@ type instance XCFamEqn       DocNameI _ _ = NoExt
 
 type instance XCClsInstDecl DocNameI = NoExt
 type instance XCDerivDecl   DocNameI = NoExt
+type instance XViaStrategy  DocNameI = LHsSigType DocNameI
 type instance XDataFamInstD DocNameI = NoExt
 type instance XTyFamInstD   DocNameI = NoExt
 type instance XClsInstD     DocNameI = NoExt
