@@ -19,22 +19,13 @@ import Data.String
 import Outputable
 import Name
 import NameEnv
-import Var
 
 --
 -- * Core properties of weights
 --
 
-data Rig = Zero
-         | One
-         | Omega
-         | RigVar TyVar -- Invariant: Only variables of kind Multplicity
-         | RigAdd Rig Rig -- Syntactic representation of addition
-         | RigMul Rig Rig -- Syntactic representation of multiplication
+data Rig = Zero | One | Omega
   deriving (Eq,Ord,Data)
-
-omega :: Rig
-omega = Omega
 
 instance Num Rig where
   Zero * _ = Zero
@@ -52,17 +43,11 @@ instance Outputable Rig where
   ppr Zero = fromString "0"
   ppr One = fromString "1"
   ppr Omega = fromString "ω"
-  ppr (RigVar tv) = ppr tv
-  ppr (RigAdd r1 r2) = parens (hsep [ppr r1, text "+r", ppr r2])
-  ppr (RigMul r1 r2) = parens (hsep [ppr r1, text "*r", ppr r2])
 
 instance Binary Rig where
   put_ bh Zero = putByte bh 0
   put_ bh One = putByte bh 1
   put_ bh Omega = putByte bh 2
---  put_ bh (RigVar tv) = putByte bh 3 >> put_ bh tv
-  put_ bh (RigAdd r1 r2) = putByte bh 4 >> put_ bh r1 >> put_ bh r2
-  put_ bh (RigMul r1 r2) = putByte bh 5 >> put_ bh r1 >> put_ bh r2
 
   get bh = do
     h <- getByte bh
@@ -70,9 +55,6 @@ instance Binary Rig where
       0 -> return Zero
       1 -> return One
       2 -> return Omega
- --     3 -> RigVar <$> get bh
-      4 -> (\a b -> RigAdd a b) <$> get bh <*> get bh
-      5 -> (\a b -> RigMul a b) <$> get bh <*> get bh
       _ -> fail "Invalid binary data for multiplicity found"
 
 

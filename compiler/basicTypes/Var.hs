@@ -88,7 +88,7 @@ import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType)
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
-import {-# SOURCE #-} Weight
+import Weight
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -388,7 +388,7 @@ varWeightMaybe (Id { varWeight = w }) = Just w
 varWeightMaybe _ = Nothing
 
 varWeightDef :: Id -> Rig
-varWeightDef = fromMaybe omega . varWeightMaybe
+varWeightDef = fromMaybe Omega . varWeightMaybe
 
 scaleVarBy :: Id -> Rig -> Id
 scaleVarBy id r | isId id  = id { varWeight = r * (varWeight id) }
@@ -573,7 +573,7 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name omega ty GlobalId details info
+  = mk_id name Omega ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
@@ -583,13 +583,13 @@ mkLocalVar details name w ty info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name omega ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name Omega ty (LocalId NotExported) coVarDetails vanillaIdInfo
   -- TODO: arnaud: maybe coercions should have multiplicity 0? Them being entirely static.
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name omega ty (LocalId Exported) details info
+  = mk_id name Omega ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
 mk_id :: Name -> Rig -> Type -> IdScope -> IdDetails -> IdInfo -> Id
