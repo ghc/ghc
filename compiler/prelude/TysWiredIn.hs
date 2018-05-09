@@ -402,6 +402,14 @@ liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type")
 starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKindTyConKey starKindTyCon
 unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
 
+multiplicityTyConName :: Name
+multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multplicity")
+                          multiplicityTyConKey multiplicityTyCon
+
+oneDataConName, omegaDataConName :: Name
+oneDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
+omegaDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Omega") omegaDataConKey omegaDataCon
+
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
 vecRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "VecRep") vecRepDataConKey vecRepDataCon
@@ -1071,6 +1079,25 @@ mk_class :: TyCon -> PredType -> Id -> Class
 mk_class tycon sc_pred sc_sel_id
   = mkClass (tyConName tycon) (tyConTyVars tycon) [] [sc_pred] [sc_sel_id]
             [] [] (mkAnd []) tycon
+
+{- *********************************************************************
+*                                                                      *
+                Multiplicity Polymorphism
+*                                                                      *
+********************************************************************* -}
+
+-- For information about the usage of the following type,
+-- see Note [TYPE and RuntimeRep] in module TysPrim
+multiplicityTy :: Type
+multiplicityTy = mkTyConTy runtimeRepTyCon
+
+multiplicityTyCon :: TyCon
+multiplicityTyCon = pcTyCon multiplicityTyConName Nothing []
+                          [oneDataCon, omegaDataCon]
+
+oneDataCon, omegaDataCon :: DataCon
+oneDataCon = pcDataCon oneDataConName [] [] multiplicityTyCon
+omegaDataCon = pcDataCon omegaDataConName [] [] multiplicityTyCon
 
 {- *********************************************************************
 *                                                                      *
