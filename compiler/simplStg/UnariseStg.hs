@@ -204,7 +204,7 @@ import DataCon
 import FastString (FastString, mkFastString)
 import Id
 import Literal (Literal (..))
-import MkCore (aBSENT_ERROR_ID)
+import MkCore (aBSENT_SUM_FIELD_ERROR_ID)
 import MkId (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
@@ -334,7 +334,7 @@ unariseExpr _ e@StgLam{}
   = pprPanic "unariseExpr: found lambda" (ppr e)
 
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
-  -- a tuple/sum binders in the scrutinee can always be eliminated
+  -- tuple/sum binders in the scrutinee can always be eliminated
   | StgApp v [] <- scrut
   , Just (MultiVal xs) <- lookupVarEnv rho v
   = elimCase rho xs bndr alt_ty alts
@@ -351,7 +351,8 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
   = do scrut' <- unariseExpr rho scrut
        alts'  <- unariseAlts rho alt_ty bndr alts
        return (StgCase scrut' bndr alt_ty alts')
-                       -- bndr will be dead after unarise
+                       -- bndr may have a unboxed sum/tuple type but it will be
+                       -- dead after unarise (checked in StgLint)
 
 unariseExpr rho (StgLet bind e)
   = StgLet <$> unariseBinding rho bind <*> unariseExpr rho e
@@ -576,7 +577,8 @@ mkUbxSum dc ty_args args0
         = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
 
       slotRubbishArg :: SlotTy -> StgArg
-      slotRubbishArg PtrSlot    = StgVarArg aBSENT_ERROR_ID
+      slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+                         -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
       slotRubbishArg WordSlot   = StgLitArg (MachWord 0)
       slotRubbishArg Word64Slot = StgLitArg (MachWord64 0)
       slotRubbishArg FloatSlot  = StgLitArg (MachFloat 0)
