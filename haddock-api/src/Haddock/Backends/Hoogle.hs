@@ -225,11 +225,10 @@ ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
 
         -- GHC gives out "data Bar =", we want to delete the equals
         -- also writes data : a b, when we want data (:) a b
-        showData d = unwords $ map f $ if last xs == "=" then init xs else xs
+        showData d = unwords $ if last xs == "=" then init xs else xs
             where
                 xs = words $ out dflags d
                 nam = out dflags $ tyClDeclLName d
-                f w = if w == nam then operator nam else w
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
