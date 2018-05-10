@@ -46,7 +46,7 @@ module MkCore (
         rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
-        tYPE_ERROR_ID,
+        tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
     ) where
 
 #include "HsVersions.h"
@@ -708,9 +708,12 @@ recSelErrorName, runtimeErrorName, absentErrorName :: Name
 recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
+absentSumFieldErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
+absentSumFieldErrorName = err_nm "absentSumFieldError"  absentSumFieldErrorIdKey
+                            aBSENT_SUM_FIELD_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
@@ -726,7 +729,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
-tYPE_ERROR_ID, aBSENT_ERROR_ID :: Id
+tYPE_ERROR_ID, aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
@@ -734,6 +737,35 @@ pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
 tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
+
+-- Note [aBSENT_SUM_FIELD_ERROR_ID]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Absent argument error for unused unboxed sum fields are different than absent
+-- error used in dummy worker functions (see `mkAbsentErrorApp`):
+--
+-- - `absentSumFieldError` can't take arguments because it's used in unarise for
+--   unused pointer fields in unboxed sums, and applying an argument would
+--   require allocating a thunk.
+--
+-- - `absentSumFieldError` can't be CAFFY because that would mean making some
+--   non-CAFFY definitions that use unboxed sums CAFFY in unarise.
+--
+--   To make `absentSumFieldError` non-CAFFY we get a stable pointer to it in
+--   RtsStartup.c and mark it as non-CAFFY here.
+--
+-- Getting this wrong causes hard-to-debug runtime issues, see #15038.
+--
+-- TODO: Remove stable pointer hack after fixing #9718.
+--       However, we should still be careful about not making things CAFFY just
+--       because they use unboxed sums. Unboxed objects are supposed to be
+--       efficient, and none of the other unboxed literals make things CAFFY.
+
+aBSENT_SUM_FIELD_ERROR_ID
+  = mkVanillaGlobalWithInfo absentSumFieldErrorName
+      (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
+      (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] exnRes
+                     `setArityInfo` 0
+                     `setCafInfo` NoCafRefs) -- #15038
 
 mkRuntimeErrorId :: Name -> Id
 -- Error function
