@@ -2507,8 +2507,8 @@ matchInstEnv dflags short_cut_solver clas tys loc
             ([(ispec, inst_tys)], [], False)
                 | short_cut_solver
                 , isOverlappable ispec
-                -- If the instance has OVERLAPPABLE or OVERLAPS then
-                -- don't let the short-cut solver choose it, because a
+                -- If the instance has OVERLAPPABLE or OVERLAPS or INCOHERENT
+                -- then don't let the short-cut solver choose it, because a
                 -- later instance might overlap it.  Trac #14434 is an example
                 -- See Note [Shortcut solving: overlap]
                 -> do { traceTcS "matchClass: ingnoring overlappable" (ppr pred)
