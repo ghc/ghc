@@ -131,8 +131,10 @@ programPath context@Context {..} = do
     -- The @touchy@ utility lives in the @lib/bin@ directory instead of @bin@,
     -- which is likely just a historical accident that will hopefully be fixed.
     -- See: https://github.com/snowleopard/hadrian/issues/570
-    path <- if package /= touchy then stageBinPath stage
-                                 else stageLibPath stage <&> (-/- "bin")
+    -- Likewise for 'unlit'.
+    path <- if package `elem` [touchy, unlit]
+      then stageLibPath stage <&> (-/- "bin")
+      else stageBinPath stage
     pgm  <- programName context
     return $ path -/- pgm <.> exe
 
