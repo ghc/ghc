@@ -25,6 +25,9 @@
  * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
    documenting individual arguments of constructors/patterns (#709)
 
+ * Remove the response file related utilities, and use the ones that
+   come with `base` (Trac #13896)
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)
