@@ -52,6 +52,9 @@ TODO
  * Recognise `SPDX-License-Identifier` as alias for `License` in module header
    parser (#743)
 
+ * Remove the response file related utilities, and use the ones that
+   come with `base` (Trac #13896)
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)
