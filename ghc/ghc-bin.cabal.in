@@ -61,7 +61,6 @@ Executable ghc
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing
         Other-Modules:
-            GHCi.Leak
             GHCi.UI
             GHCi.UI.Info
             GHCi.UI.Monad
