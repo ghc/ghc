@@ -188,8 +188,9 @@ threadDelay time
         case delay# time# s of { s' -> (# s', () #)
         }}
 
--- | Set the value of returned TVar to True after a given number of
--- microseconds. The caveats associated with threadDelay also apply.
+-- | Switch the value of returned 'TVar' from initial value 'False' to 'True'
+-- after a given number of microseconds. The caveats associated with
+-- 'threadDelay' also apply.
 --
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs
