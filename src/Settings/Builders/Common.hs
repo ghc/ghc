@@ -11,8 +11,7 @@ module Settings.Builders.Common (
 
 import Base
 import Expression
-import GHC.Packages
-import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal.PackageData
 import Oracles.Flag
 import Oracles.Setting
 import Settings
@@ -23,22 +22,21 @@ cIncludeArgs = do
     pkg     <- getPackage
     root    <- getBuildRoot
     path    <- getBuildPath
-    incDirs <- getPackageData PD.includeDirs
-    depDirs <- getPackageData PD.depIncludeDirs
+    incDirs <- getPackageData includeDirs
+    depDirs <- getPackageData depIncludeDirs
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
-
     mconcat [ arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
             , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-            -- add the build path with include dirs in case we generated
-            -- some files with autoconf, which will end up in the build directory.
+            -- Add @incDirs@ in the build directory, since some files generated
+            -- with @autoconf@ may end up in the build directory.
             , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]
-            -- add the package directory with include dirs, for includes
-            -- shipped with the package
+            -- Add @incDirs@ in the package directory for include files shipped
+            -- with the package.
             , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
 
@@ -58,12 +56,12 @@ cWarnings = mconcat
 
 packageDatabaseArgs :: Args
 packageDatabaseArgs = do
-  stage <- getStage
-  dbPath <- expr (packageDbPath stage)
-  expr (need [dbPath -/- packageDbStamp])
-  root <- getBuildRoot
-  prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
-  arg $ prefix ++ root -/- relativePackageDbPath stage
+    stage <- getStage
+    dbPath <- expr (packageDbPath stage)
+    expr (need [dbPath -/- packageDbStamp])
+    root <- getBuildRoot
+    prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
+    arg $ prefix ++ root -/- relativePackageDbPath stage
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
