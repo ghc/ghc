@@ -11,14 +11,13 @@ import Hadrian.Utilities
 -- modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabal, compareSizes, compiler, containers
-    , deepseq, deriveConstants, directory, filepath, genapply, genprimopcode
-    , ghc, ghcBoot, ghcBootTh, ghcCompact, ghci, ghcPkg, ghcPrim
+    [ array, base, binary, bytestring, cabal, checkPpr, compareSizes, compiler
+    , containers, deepseq, deriveConstants, directory, filepath, genapply
+    , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact, ghci, ghcPkg, ghcPrim
     , ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
     , integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive
     , process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy
-    , transformers, unlit, unix, win32, xhtml
-    ]
+    , transformers, unlit, unix, win32, xhtml ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -30,6 +29,7 @@ base                = hsLib  "base"
 binary              = hsLib  "binary"
 bytestring          = hsLib  "bytestring"
 cabal               = hsLib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
+checkPpr            = hsUtil "check-ppr"
 compareSizes        = hsUtil "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = hsTop  "ghc"             `setPath` "compiler"
 containers          = hsLib  "containers"
@@ -57,7 +57,7 @@ hpc                 = hsLib  "hpc"
 hpcBin              = hsUtil "hpc-bin"         `setPath` "utils/hpc"
 integerGmp          = hsLib  "integer-gmp"
 integerSimple       = hsLib  "integer-simple"
-iservBin            = hsUtil "iserv-bin"           `setPath` "iserv"
+iservBin            = hsUtil "iserv-bin"       `setPath` "iserv"
 libffi              = cTop   "libffi"
 mtl                 = hsLib  "mtl"
 parsec              = hsLib  "parsec"
@@ -78,7 +78,6 @@ unlit               = hsUtil "unlit"
 unix                = hsLib  "unix"
 win32               = hsLib  "Win32"
 xhtml               = hsLib  "xhtml"
-
 
 -- | Construct a Haskell library package, e.g. @array@.
 hsLib :: PackageName -> Package

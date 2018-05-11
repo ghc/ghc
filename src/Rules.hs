@@ -31,32 +31,30 @@ allStages = [minBound .. maxBound]
 -- 'Stage1Only' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
-      (programs, libraries) <- partition isProgram <$> stagePackages Stage1
-      pgmNames <- mapM (g Stage1) programs
-      libNames <- mapM (g Stage1) libraries
+    (programs, libraries) <- partition isProgram <$> stagePackages Stage1
+    pgmNames <- mapM (g Stage1) programs
+    libNames <- mapM (g Stage1) libraries
 
-      verbosity <- getVerbosity
-      when (verbosity >= Loud) $ do
+    verbosity <- getVerbosity
+    when (verbosity >= Loud) $ do
         putNormal "Building stage2"
         putNormal . unlines $
-          [ "| Building Programs:  " ++ intercalate ", " pgmNames
-          , "| Building Libraries: " ++ intercalate ", " libNames
-          ]
+          [ "| Building Programs : " ++ intercalate ", " pgmNames
+          , "| Building Libraries: " ++ intercalate ", " libNames ]
 
-      targets <- mapM (f Stage1) =<< stagePackages Stage1
-      need targets
-
-      where
-        -- either the package database config file for libraries or
-        -- the programPath for programs. However this still does
-        -- not support multiple targets, where a cabal package has
-        -- a library /and/ a program.
-        f :: Stage -> Package -> Action FilePath
-        f stage pkg | isLibrary pkg = pkgConfFile (Context stage pkg (read "v"))
-                    | otherwise     = programPath =<< programContext stage pkg
-        g :: Stage -> Package -> Action String
-        g stage pkg | isLibrary pkg = return $ pkgName pkg
-                    | otherwise     = programName (Context stage pkg (read "v"))
+    targets <- mapM (f Stage1) =<< stagePackages Stage1
+    need targets
+  where
+    -- either the package database config file for libraries or
+    -- the programPath for programs. However this still does
+    -- not support multiple targets, where a cabal package has
+    -- a library /and/ a program.
+    f :: Stage -> Package -> Action FilePath
+    f stage pkg | isLibrary pkg = pkgConfFile (Context stage pkg (read "v"))
+                | otherwise     = programPath =<< programContext stage pkg
+    g :: Stage -> Package -> Action String
+    g stage pkg | isLibrary pkg = return $ pkgName pkg
+                | otherwise     = programName (Context stage pkg (read "v"))
 
 -- TODO: Get rid of the @includeGhciLib@ hack.
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.

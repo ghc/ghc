@@ -1,14 +1,14 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
     -- * GHC packages
-    array, base, binary, bytestring, cabal, compareSizes, compiler, containers,
-    deepseq, deriveConstants, directory, filepath, genapply, genprimopcode, ghc,
-    ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags,
-    ghcSplit, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp,
-    integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty,
+    array, base, binary, bytestring, cabal, checkPpr, compareSizes, compiler,
+    containers, deepseq, deriveConstants, directory, filepath, genapply,
+    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg,
+    ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin,
+    integerGmp, integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty,
     primitive, process, rts, runGhc, stm, templateHaskell, terminfo, text, time,
     touchy, transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
-    defaultPackages,
+    defaultPackages, testsuitePackages,
 
     -- * Package information
     programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
@@ -98,6 +98,10 @@ stage1Packages = do
 
 stage2Packages :: Action [Package]
 stage2Packages = return [haddock]
+
+-- | Packages that are built only for the testsuite.
+testsuitePackages :: Action [Package]
+testsuitePackages = return [checkPpr]
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC

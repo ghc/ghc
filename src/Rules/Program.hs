@@ -19,42 +19,42 @@ buildProgram :: [(Resource, Int)] -> Rules ()
 buildProgram rs = do
     root <- buildRootRules
     forM_ [Stage0 ..] $ \stage ->
-      [ root -/- stageString stage -/- "bin"     -/- "*"
-      , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do
+        [ root -/- stageString stage -/- "bin"     -/- "*"
+        , root -/- stageString stage -/- "lib/bin" -/- "*" ] |%> \bin -> do
+            -- This is quite inefficient, but we can't access 'programName' from
+            -- 'Rules', because it is an 'Action' depending on an oracle.
+            sPackages <- filter isProgram <$> stagePackages stage
+            tPackages <- testsuitePackages
+            -- TODO: Shall we use Stage2 for testsuite packages instead?
+            let allPackages = sPackages
+                           ++ if stage == Stage1 then tPackages else []
+            nameToCtxList <- forM allPackages $ \pkg -> do
+                let ctx = vanillaContext stage pkg
+                name <- programName ctx
+                return (name <.> exe, ctx)
 
-          -- quite inefficient. But we can't access the programName from
-          -- Rules, as it's an Action, due to being backed by an Oracle.
-          activeProgramPackages <- filter isProgram <$> stagePackages stage
-          nameToCtxList <- forM activeProgramPackages $ \pkg -> do
-            let ctx = vanillaContext stage pkg
-            name <- programName ctx
-            return (name <.> exe, ctx)
+            case lookup (takeFileName bin) nameToCtxList of
+                Nothing -> error $ "Unknown program " ++ show bin
+                Just (Context {..}) -> do
+                    -- Custom dependencies: this should be modeled better in the
+                    -- Cabal file somehow.
+                    -- TODO: Is this still needed? See 'runtimeDependencies'.
+                    when (package == hsc2hs) $ do
+                        -- 'Hsc2hs' needs the @template-hsc.h@ file.
+                        template <- templateHscPath stage
+                        need [template]
+                    when (package == ghc) $ do
+                        -- GHC depends on @settings@, @platformConstants@,
+                        -- @llvm-targets@, @ghc-usage.txt@, @ghci-usage.txt@.
+                        need =<< ghcDeps stage
 
-          case lookup (takeFileName bin) nameToCtxList of
-            Nothing -> fail "Unknown program"
-            Just (Context {..}) -> do
-              -- Rules for programs built in 'buildRoot'
-
-              -- Custom dependencies: this should be modeled better in the cabal file somehow.
-
-              when (package == hsc2hs) $ do
-                -- hsc2hs needs the template-hsc.h file
-                tmpl <- templateHscPath stage
-                need [tmpl]
-              when (package == ghc) $ do
-                -- ghc depends on settings, platformConstants, llvm-targets
-                --     ghc-usage.txt, ghci-usage.txt
-                need =<< ghcDeps stage
-
-              cross <- crossCompiling
-              -- for cross compiler, copy the stage0/bin/<pgm>
-              -- into stage1/bin/
-              case (cross, stage) of
-                (True, s) | s > Stage0 -> do
-                              srcDir <- buildRoot <&> (-/- (stageString Stage0 -/- "bin"))
-                              copyFile (srcDir -/- takeFileName bin) bin
-                _ -> buildBinary rs bin =<< programContext stage package
-          -- Rules for the GHC package, which is built 'inplace'
+                    cross <- crossCompiling
+                    -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.
+                    case (cross, stage) of
+                        (True, s) | s > Stage0 -> do
+                            srcDir <- buildRoot <&> (-/- (stageString Stage0 -/- "bin"))
+                            copyFile (srcDir -/- takeFileName bin) bin
+                        _ -> buildBinary rs bin =<< programContext stage package
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do
