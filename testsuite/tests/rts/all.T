@@ -174,14 +174,7 @@ def checkDynAsm(actual_file, normaliser):
     actual_raw = read_no_crs(actual_file)
     actual_str = normaliser(actual_raw)
     actual = actual_str.split()
-    if actual == ['initArray1', 'initArray2', 'ctors1', 'ctors2', 'success']:
-        return 1
-    elif actual == ['initArray1', 'initArray2', 'ctors2', 'ctors1', 'success']:
-        # gold seems to produce this ordering; this is slightly odd but if it's
-        # wrong it's not our fault. See #13883.
-        return 1
-    elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
-        if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
+    if actual == ['initArray1', 'initArray2', 'success']:
         return 1
     elif opsys('darwin') and actual == ['modInitFunc1', 'modInitFunc2', 'success']:
         return 1
@@ -202,9 +195,10 @@ test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259))],
      run_command, ['$MAKE -s --no-print-directory T5435_v_asm_a'])
+# this one just needs to run on linux, as darwin/mingw32 are covered
+# by the _a test already.
 test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']),
-		      when(arch('powerpc64') or arch('powerpc64le'),
-			  skip)],
+		      when(opsys('darwin') or opsys('mingw32'), skip)],
      run_command, ['$MAKE -s --no-print-directory T5435_v_asm_b'])
 test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
