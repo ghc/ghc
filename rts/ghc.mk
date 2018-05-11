@@ -22,10 +22,10 @@ rts_VERSION = 1.0
 # Minimum supported Windows version.
 # These numbers can be found at:
 #  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
-# If we're compiling on windows, enforce that we only support Vista SP1+
+# If we're compiling on windows, enforce that we only support Windows 7 and newer.
 # Adding this here means it doesn't have to be done in individual .c files
 # and also centralizes the versioning.
-rts_WINVER = 0x06000100
+rts_WINVER = 0x0601
 
 # merge GhcLibWays and GhcRTSWays but strip out duplicates
 rts_WAYS = $(GhcLibWays) $(filter-out $(GhcLibWays),$(GhcRTSWays))
@@ -192,11 +192,10 @@ endif
 
 rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 
-# If we're compiling on windows, enforce that we only support XP+
-# Adding this here means it doesn't have to be done in individual .c files
-# and also centralizes the versioning.
+# Windows version requirement
 ifeq "$$(TargetOS_CPP)" "mingw32"
 rts_dist_$1_CC_OPTS += -DWINVER=$(rts_WINVER)
+rts_dist_$1_CC_OPTS += -D_WIN32_WINNT=$(rts_WINVER)
 endif
 
 ifneq "$$(UseSystemLibFFI)" "YES"
@@ -372,6 +371,7 @@ endif
 # Set Windows version
 ifeq "$$(TargetOS_CPP)" "mingw32"
 rts_CC_OPTS += -DWINVER=$(rts_WINVER)
+rts_CC_OPTS += -D_WIN32_WINNT=$(rts_WINVER)
 endif
 
 #-----------------------------------------------------------------------------

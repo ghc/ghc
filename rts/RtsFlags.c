@@ -33,6 +33,14 @@
 
 #include <fs_rts.h>
 
+#if defined(mingw32_HOST_OS)
+#include <windows.h>
+#endif
+
+#if defined(darwin_HOST_OS)
+#include <sys/sysctl.h>
+#endif
+
 // Flag Structure
 RTS_FLAGS RtsFlags;
 
@@ -124,6 +132,8 @@ static void setProgName (char *argv[]);
 
 static void errorRtsOptsDisabled (const char *s);
 
+static StgWord32 largestCpuCacheSize(void);
+
 /* -----------------------------------------------------------------------------
  * Command-line option parsing routines.
  * ---------------------------------------------------------------------------*/
@@ -135,6 +145,10 @@ void initRtsFlagsDefaults(void)
     if (maxStkSize == 0)
         maxStkSize = 8 * 1024 * 1024;
 
+    StgWord32 minAllocAreaSize = largestCpuCacheSize();
+    if (minAllocAreaSize == 0)
+        minAllocAreaSize = 1024 * 1024;
+
     RtsFlags.GcFlags.statsFile          = NULL;
     RtsFlags.GcFlags.giveStats          = NO_GC_STATS;
 
@@ -143,7 +157,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.stkChunkSize       = (32 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.stkChunkBufferSize = (1 * 1024) / sizeof(W_);
 
-    RtsFlags.GcFlags.minAllocAreaSize   = (1024 * 1024)       / BLOCK_SIZE;
+    RtsFlags.GcFlags.minAllocAreaSize   = minAllocAreaSize / BLOCK_SIZE;
     RtsFlags.GcFlags.largeAllocLim      = 0; /* defaults to minAllocAreasize */
     RtsFlags.GcFlags.nurseryChunkSize   = 0;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
@@ -2235,6 +2249,67 @@ void freeRtsArgs(void)
     freeRtsArgv();
 }
 
+// Return the size in bytes of the largest L3 or L2 CPU cache on the system.
+// Returns 0 if the cache size can't be determined.
+static StgWord32 largestCpuCacheSize(void)
+{
+#if defined(linux_HOST_OS)
+    int args[2] = {
+        _SC_LEVEL3_CACHE_SIZE,
+        _SC_LEVEL2_CACHE_SIZE,
+    };
+    for (int i = 0; i < 2; i++) {
+        long size = sysconf(args[i]);
+        if (size > 0L)
+            return (StgWord32)size;
+    }
+#elif defined(mingw32_HOST_OS)
+    DWORD max_cache_size = 0;
+
+    DWORD buffer_size = 0;
+    // Determine the necessary buffer size
+    GetLogicalProcessorInformationEx(RelationCache, NULL, &buffer_size);
+
+    SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer =
+        (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)malloc(buffer_size);
+
+    BOOL ok =
+        GetLogicalProcessorInformationEx(RelationCache, buffer, &buffer_size);
+    if (!ok)
+        sysErrorBelch("GetLogicalProcessorInformationEx failed");
+
+    // SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX is a variable-size structure, so
+    // we progress by adding the size of the current SLPIE to the pointer.
+    for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = buffer;
+            (char*)p < (char*)buffer + buffer_size;
+            p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)
+                ((char*)p + p->Size)) {
+
+        if (p->Relationship == RelationCache) {
+            CACHE_RELATIONSHIP cache = p->Cache;
+            if ((cache.Type == CacheUnified || cache.Type == CacheData) &&
+                    (cache.Level == 2 || cache.Level == 3) &&
+                    cache.CacheSize > max_cache_size)
+                max_cache_size = cache.CacheSize;
+        } else
+            debugBelch("Unexpected Relationship %u", p->Relationship);
+    }
+    free(buffer);
+    return (StgWord32)max_cache_size;
+#elif defined(darwin_HOST_OS)
+    // TODO: The following code might also work on FreeBSD.
+    // Enable it if you can test it.
+    char* args[2] = { "hw.l3cachesize", "hw.l2cachesize" };
+    StgWord32 cache_size = 0;
+    size_t data_size = sizeof(cache_size);
+    for (int i = 0; i < 2; i++) {
+        int ret = sysctlbyname(args[i], &cache_size, &data_size, NULL, 0);
+        if (ret == 0 && cache_size > 0)
+            return cache_size;
+    }
+#endif
+    return 0;
+}
 
 /*
 Note [OPTION_SAFE vs OPTION_UNSAFE]
