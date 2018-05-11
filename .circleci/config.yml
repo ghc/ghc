@@ -162,6 +162,22 @@ jobs:
       - *configure_unix
       - *build_hadrian
 
+  "slow-validate-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
+
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
@@ -262,17 +278,7 @@ workflows:
   version: 2
   validate:
     jobs:
-    - validate-x86_64-linux:
-        *trigger_on_tags
-    # FreeBSD disabled: https://github.com/haskell/unix/issues/102
-    # - validate-x86_64-freebsd
-    - validate-x86_64-darwin:
-        *trigger_on_tags
-    - validate-x86_64-linux-llvm
-    - validate-i386-linux:
-        *trigger_on_tags
-    - validate-hadrian-x86_64-linux
-    - validate-x86_64-fedora:
+    - slow-validate-x86_64-linux:
         *trigger_on_tags
 
   nightly:
