@@ -206,7 +206,7 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
                                , getCaretDiagnostic, dumpSDoc )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
-import SysTools.BaseDir ( expandTopDir )
+import SysTools.BaseDir ( expandToolDir, expandTopDir )
 
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef
@@ -1148,10 +1148,11 @@ data LlvmTarget = LlvmTarget
 type LlvmTargets = [(String, LlvmTarget)]
 
 data Settings = Settings {
-  sTargetPlatform        :: Platform,    -- Filled in by SysTools
-  sGhcUsagePath          :: FilePath,    -- Filled in by SysTools
-  sGhciUsagePath         :: FilePath,    -- ditto
-  sTopDir                :: FilePath,
+  sTargetPlatform        :: Platform,       -- Filled in by SysTools
+  sGhcUsagePath          :: FilePath,       -- ditto
+  sGhciUsagePath         :: FilePath,       -- ditto
+  sToolDir               :: Maybe FilePath, -- ditto
+  sTopDir                :: FilePath,       -- ditto
   sTmpDir                :: String,      -- no trailing '/'
   sProgramName           :: String,
   sProjectVersion        :: String,
@@ -1211,6 +1212,8 @@ ghcUsagePath          :: DynFlags -> FilePath
 ghcUsagePath dflags = sGhcUsagePath (settings dflags)
 ghciUsagePath         :: DynFlags -> FilePath
 ghciUsagePath dflags = sGhciUsagePath (settings dflags)
+toolDir               :: DynFlags -> Maybe FilePath
+toolDir dflags = sToolDir (settings dflags)
 topDir                :: DynFlags -> FilePath
 topDir dflags = sTopDir (settings dflags)
 tmpDir                :: DynFlags -> String
@@ -5301,7 +5304,8 @@ compilerInfo dflags
       -- Next come the settings, so anything else can be overridden
       -- in the settings file (as "lookup" uses the first match for the
       -- key)
-    : map (fmap $ expandTopDir $ topDir dflags) (rawSettings dflags)
+    : map (fmap $ expandDirectories (topDir dflags) (toolDir dflags))
+          (rawSettings dflags)
    ++ [("Project version",             projectVersion dflags),
        ("Project Git commit id",       cProjectGitCommitId),
        ("Booter version",              cBooterVersion),
@@ -5352,6 +5356,8 @@ compilerInfo dflags
     showBool True  = "YES"
     showBool False = "NO"
     isWindows = platformOS (targetPlatform dflags) == OSMinGW32
+    expandDirectories :: FilePath -> Maybe FilePath -> String -> String
+    expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd
 
 -- Produced by deriveConstants
 #include "GHCConstantsHaskellWrappers.hs"

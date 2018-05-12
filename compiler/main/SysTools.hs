@@ -277,6 +277,7 @@ initSysTools mbMinusB
                     sTmpDir         = normalise tmpdir,
                     sGhcUsagePath   = ghc_usage_msg_path,
                     sGhciUsagePath  = ghci_usage_msg_path,
+                    sToolDir        = mtool_dir,
                     sTopDir         = top_dir,
                     sRawSettings    = mySettings,
                     sExtraGccViaCFlags = words myExtraGccViaCFlags,
