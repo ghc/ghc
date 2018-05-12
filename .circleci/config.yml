@@ -165,11 +165,11 @@ jobs:
   "slow-validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: haskell:8.2
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-linux
     steps:
-      - *precheckout
       - checkout
       - *prepare
       - *submodules
@@ -278,8 +278,19 @@ workflows:
   version: 2
   validate:
     jobs:
-    - slow-validate-x86_64-linux:
-        *trigger_on_tags
+    - slow-validate-x86_64-linux
+    # - validate-x86_64-linux:
+    #     *trigger_on_tags
+    # FreeBSD disabled: https://github.com/haskell/unix/issues/102
+    # - validate-x86_64-freebsd
+    # - validate-x86_64-darwin:
+    #     *trigger_on_tags
+    # - validate-x86_64-linux-llvm
+    # - validate-i386-linux:
+    #     *trigger_on_tags
+    # - validate-hadrian-x86_64-linux
+    # - validate-x86_64-fedora:
+    #    *trigger_on_tags
 
   nightly:
     triggers:
