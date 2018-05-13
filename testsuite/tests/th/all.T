@@ -407,6 +407,7 @@ test('T14869', normal, compile,
 test('T14888', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
 test('T14298', normal, compile_and_run, ['-v0'])
+test('T14875', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14885a', normal, compile, [''])
 test('T14885b', normal, compile, [''])
 test('T14885c', normal, compile, [''])

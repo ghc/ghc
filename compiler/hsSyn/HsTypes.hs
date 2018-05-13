@@ -66,7 +66,7 @@ module HsTypes (
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
-        isCompoundHsType, parenthesizeCompoundHsType
+        hsTypeNeedsParens, parenthesizeHsType
     ) where
 
 import GhcPrelude
@@ -1044,7 +1044,7 @@ mkHsOpTy ty1 op ty2 = HsOpTy noExt ty1 op ty2
 
 mkHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 mkHsAppTy t1 t2
-  = addCLoc t1 t2 (HsAppTy noExt t1 (parenthesizeCompoundHsType t2))
+  = addCLoc t1 t2 (HsAppTy noExt t1 (parenthesizeHsType appPrec t2))
 
 mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
@@ -1520,20 +1520,40 @@ ppr_tylit (HsNumTy _ i) = integer i
 ppr_tylit (HsStrTy _ s) = text (show s)
 
 
--- | Return 'True' for compound types that will need parentheses when used in
--- an argument position.
-isCompoundHsType :: LHsType pass -> Bool
-isCompoundHsType (L _ HsAppTy{} ) = True
-isCompoundHsType (L _ HsAppsTy{}) = True
-isCompoundHsType (L _ HsEqTy{}  ) = True
-isCompoundHsType (L _ HsFunTy{} ) = True
-isCompoundHsType (L _ HsOpTy{}  ) = True
-isCompoundHsType _                = False
+-- | @'hsTypeNeedsParens' p t@ returns 'True' if the type @t@ needs parentheses
+-- under precedence @p@.
+hsTypeNeedsParens :: PprPrec -> HsType pass -> Bool
+hsTypeNeedsParens p = go
+  where
+    go (HsForAllTy{})        = False
+    go (HsQualTy{})          = False
+    go (HsBangTy{})          = p > topPrec
+    go (HsRecTy{})           = False
+    go (HsTyVar{})           = False
+    go (HsFunTy{})           = p >= funPrec
+    go (HsTupleTy{})         = False
+    go (HsSumTy{})           = False
+    go (HsKindSig{})         = False
+    go (HsListTy{})          = False
+    go (HsPArrTy{})          = False
+    go (HsIParamTy{})        = p > topPrec
+    go (HsSpliceTy{})        = False
+    go (HsExplicitListTy{})  = False
+    go (HsExplicitTupleTy{}) = False
+    go (HsTyLit{})           = False
+    go (HsWildCardTy{})      = False
+    go (HsEqTy{})            = p >= opPrec
+    go (HsAppsTy _ args)     = p >= appPrec && not (null args)
+    go (HsAppTy{})           = p >= appPrec
+    go (HsOpTy{})            = p >= opPrec
+    go (HsParTy{})           = False
+    go (HsDocTy _ (L _ t) _) = go t
+    go (XHsType{})           = False
 
--- | @'parenthesizeCompoundHsType' ty@ checks if @'isCompoundHsType' ty@ is
+-- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is
 -- true, and if so, surrounds @ty@ with an 'HsParTy'. Otherwise, it simply
 -- returns @ty@.
-parenthesizeCompoundHsType :: LHsType (GhcPass p) -> LHsType (GhcPass p)
-parenthesizeCompoundHsType ty@(L loc _)
-  | isCompoundHsType ty = L loc (HsParTy NoExt ty)
-  | otherwise           = ty
+parenthesizeHsType :: PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+parenthesizeHsType p lty@(L loc ty)
+  | hsTypeNeedsParens p ty = L loc (HsParTy NoExt lty)
+  | otherwise              = lty

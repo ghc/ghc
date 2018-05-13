@@ -1186,10 +1186,9 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
         -- This complexity is to distinguish between
         --    deriving Show
         --    deriving (Show)
-        pp_dct [a@(HsIB { hsib_body = ty })]
-          | isCompoundHsType ty = parens (ppr a)
-          | otherwise           = ppr a
-        pp_dct _   = parens (interpp'SP dct)
+        pp_dct [HsIB { hsib_body = ty }]
+                 = ppr (parenthesizeHsType appPrec ty)
+        pp_dct _ = parens (interpp'SP dct)
   ppr (XHsDerivingClause x) = ppr x
 
 data NewOrData

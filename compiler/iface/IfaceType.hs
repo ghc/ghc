@@ -516,15 +516,15 @@ if_print_coercions yes no
     then yes
     else no
 
-pprIfaceInfixApp :: TyPrec -> SDoc -> SDoc -> SDoc -> SDoc
+pprIfaceInfixApp :: PprPrec -> SDoc -> SDoc -> SDoc -> SDoc
 pprIfaceInfixApp ctxt_prec pp_tc pp_ty1 pp_ty2
-  = maybeParen ctxt_prec TyOpPrec $
+  = maybeParen ctxt_prec opPrec $
     sep [pp_ty1, pp_tc <+> pp_ty2]
 
-pprIfacePrefixApp :: TyPrec -> SDoc -> [SDoc] -> SDoc
+pprIfacePrefixApp :: PprPrec -> SDoc -> [SDoc] -> SDoc
 pprIfacePrefixApp ctxt_prec pp_fun pp_tys
   | null pp_tys = pp_fun
-  | otherwise   = maybeParen ctxt_prec TyConPrec $
+  | otherwise   = maybeParen ctxt_prec appPrec $
                   hang pp_fun 2 (sep pp_tys)
 
 -- ----------------------------- Printing binders ------------------------------------
@@ -589,13 +589,13 @@ instance Outputable IfaceType where
   ppr ty = pprIfaceType ty
 
 pprIfaceType, pprParendIfaceType :: IfaceType -> SDoc
-pprIfaceType       = pprPrecIfaceType TopPrec
-pprParendIfaceType = pprPrecIfaceType TyConPrec
+pprIfaceType       = pprPrecIfaceType topPrec
+pprParendIfaceType = pprPrecIfaceType appPrec
 
-pprPrecIfaceType :: TyPrec -> IfaceType -> SDoc
+pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
 pprPrecIfaceType prec ty = eliminateRuntimeRep (ppr_ty prec) ty
 
-ppr_ty :: TyPrec -> IfaceType -> SDoc
+ppr_ty :: PprPrec -> IfaceType -> SDoc
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reson for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
@@ -604,11 +604,11 @@ ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
 ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
-    maybeParen ctxt_prec FunPrec $
-    sep [ppr_ty FunPrec ty1, sep (ppr_fun_tail ty2)]
+    maybeParen ctxt_prec funPrec $
+    sep [ppr_ty funPrec ty1, sep (ppr_fun_tail ty2)]
   where
     ppr_fun_tail (IfaceFunTy ty1 ty2)
-      = (arrow <+> ppr_ty FunPrec ty1) : ppr_fun_tail ty2
+      = (arrow <+> ppr_ty funPrec ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty
       = [arrow <+> pprIfaceType other_ty]
 
@@ -618,8 +618,8 @@ ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
       ppr_app_ty_no_casts
   where
     ppr_app_ty =
-        maybeParen ctxt_prec TyConPrec
-        $ ppr_ty FunPrec ty1 <+> ppr_ty TyConPrec ty2
+        maybeParen ctxt_prec appPrec
+        $ ppr_ty funPrec ty1 <+> ppr_ty appPrec ty2
 
     -- Strip any casts from the head of the application
     ppr_app_ty_no_casts =
@@ -639,7 +639,7 @@ ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
 
 ppr_ty ctxt_prec (IfaceCastTy ty co)
   = if_print_coercions
-      (parens (ppr_ty TopPrec ty <+> text "|>" <+> ppr co))
+      (parens (ppr_ty topPrec ty <+> text "|>" <+> ppr co))
       (ppr_ty ctxt_prec ty)
 
 ppr_ty ctxt_prec (IfaceCoercionTy co)
@@ -648,7 +648,7 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
       (text "<>")
 
 ppr_ty ctxt_prec ty
-  = maybeParen ctxt_prec FunPrec (pprIfaceSigmaType ShowForAllMust ty)
+  = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
 {-
 Note [Defaulting RuntimeRep variables]
@@ -767,10 +767,10 @@ instance Outputable IfaceTcArgs where
   ppr tca = pprIfaceTcArgs tca
 
 pprIfaceTcArgs, pprParendIfaceTcArgs :: IfaceTcArgs -> SDoc
-pprIfaceTcArgs  = ppr_tc_args TopPrec
-pprParendIfaceTcArgs = ppr_tc_args TyConPrec
+pprIfaceTcArgs  = ppr_tc_args topPrec
+pprParendIfaceTcArgs = ppr_tc_args appPrec
 
-ppr_tc_args :: TyPrec -> IfaceTcArgs -> SDoc
+ppr_tc_args :: PprPrec -> IfaceTcArgs -> SDoc
 ppr_tc_args ctx_prec args
  = let pprTys t ts = ppr_ty ctx_prec t <+> ppr_tc_args ctx_prec ts
    in case args of
@@ -904,7 +904,7 @@ criteria are met:
 -------------------
 
 -- See equivalent function in TyCoRep.hs
-pprIfaceTyList :: TyPrec -> IfaceType -> IfaceType -> SDoc
+pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print
 -- it in list notation [t1, ...].
 -- Precondition: Opt_PrintExplicitKinds is off
@@ -912,10 +912,10 @@ pprIfaceTyList ctxt_prec ty1 ty2
   = case gather ty2 of
       (arg_tys, Nothing)
         -> char '\'' <> brackets (fsep (punctuate comma
-                        (map (ppr_ty TopPrec) (ty1:arg_tys))))
+                        (map (ppr_ty topPrec) (ty1:arg_tys))))
       (arg_tys, Just tl)
-        -> maybeParen ctxt_prec FunPrec $ hang (ppr_ty FunPrec ty1)
-           2 (fsep [ colon <+> ppr_ty FunPrec ty | ty <- arg_tys ++ [tl]])
+        -> maybeParen ctxt_prec funPrec $ hang (ppr_ty funPrec ty1)
+           2 (fsep [ colon <+> ppr_ty funPrec ty | ty <- arg_tys ++ [tl]])
   where
     gather :: IfaceType -> ([IfaceType], Maybe IfaceType)
      -- (gather ty) = (tys, Nothing) means ty is a list [t1, .., tn]
@@ -929,22 +929,22 @@ pprIfaceTyList ctxt_prec ty1 ty2
       = ([], Nothing)
     gather ty = ([], Just ty)
 
-pprIfaceTypeApp :: TyPrec -> IfaceTyCon -> IfaceTcArgs -> SDoc
+pprIfaceTypeApp :: PprPrec -> IfaceTyCon -> IfaceTcArgs -> SDoc
 pprIfaceTypeApp prec tc args = pprTyTcApp prec tc args
 
-pprTyTcApp :: TyPrec -> IfaceTyCon -> IfaceTcArgs -> SDoc
+pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceTcArgs -> SDoc
 pprTyTcApp ctxt_prec tc tys =
     sdocWithDynFlags $ \dflags ->
     getPprStyle $ \style ->
     pprTyTcApp' ctxt_prec tc tys dflags style
 
-pprTyTcApp' :: TyPrec -> IfaceTyCon -> IfaceTcArgs
+pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceTcArgs
             -> DynFlags -> PprStyle -> SDoc
 pprTyTcApp' ctxt_prec tc tys dflags style
   | ifaceTyConName tc `hasKey` ipClassKey
   , ITC_Vis (IfaceLitTy (IfaceStrTyLit n)) (ITC_Vis ty ITC_Nil) <- tys
-  = maybeParen ctxt_prec FunPrec
-    $ char '?' <> ftext n <> text "::" <> ppr_ty TopPrec ty
+  = maybeParen ctxt_prec funPrec
+    $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
 
   | IfaceTupleTyCon arity sort <- ifaceTyConSort info
   , not (debugStyle style)
@@ -988,7 +988,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
 --
 -- See Note [Equality predicates in IfaceType]
 -- and Note [The equality types story] in TysPrim
-ppr_equality :: TyPrec -> IfaceTyCon -> [IfaceType] -> Maybe SDoc
+ppr_equality :: PprPrec -> IfaceTyCon -> [IfaceType] -> Maybe SDoc
 ppr_equality ctxt_prec tc args
   | hetero_eq_tc
   , [k1, k2, t1, t2] <- args
@@ -1029,27 +1029,27 @@ ppr_equality ctxt_prec tc args
       | otherwise
       = if tc_name `hasKey` eqReprPrimTyConKey
         then pprIfacePrefixApp ctxt_prec (text "Coercible")
-                               [pp TyConPrec ty1, pp TyConPrec ty2]
+                               [pp appPrec ty1, pp appPrec ty2]
         else pprIfaceInfixApp ctxt_prec (char '~')
-                 (pp TyOpPrec ty1) (pp TyOpPrec ty2)
+                 (pp opPrec ty1) (pp opPrec ty2)
       where
         ppr_infix_eq eq_op
            = pprIfaceInfixApp ctxt_prec eq_op
-                 (parens (pp TopPrec ty1 <+> dcolon <+> pp TyOpPrec ki1))
-                 (parens (pp TopPrec ty2 <+> dcolon <+> pp TyOpPrec ki2))
+                 (parens (pp topPrec ty1 <+> dcolon <+> pp opPrec ki1))
+                 (parens (pp topPrec ty2 <+> dcolon <+> pp opPrec ki2))
 
         print_kinds = gopt Opt_PrintExplicitKinds dflags
         print_eqs   = gopt Opt_PrintEqualityRelations dflags ||
                       dumpStyle style || debugStyle style
 
 
-pprIfaceCoTcApp :: TyPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc
+pprIfaceCoTcApp :: PprPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc
 pprIfaceCoTcApp ctxt_prec tc tys = ppr_iface_tc_app ppr_co ctxt_prec tc tys
 
-ppr_iface_tc_app :: (TyPrec -> a -> SDoc) -> TyPrec -> IfaceTyCon -> [a] -> SDoc
+ppr_iface_tc_app :: (PprPrec -> a -> SDoc) -> PprPrec -> IfaceTyCon -> [a] -> SDoc
 ppr_iface_tc_app pp _ tc [ty]
-  | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp TopPrec ty)
-  | tc `ifaceTyConHasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
+  | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
+  | tc `ifaceTyConHasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp topPrec ty)
 
 ppr_iface_tc_app pp ctxt_prec tc tys
   |  tc `ifaceTyConHasKey` starKindTyConKey
@@ -1058,15 +1058,15 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   = kindStar   -- Handle unicode; do not wrap * in parens
 
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
-  = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp TyConPrec) tys)
+  = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
 
   | [ty1,ty2] <- tys  -- Infix, two arguments;
                       -- we know nothing of precedence though
   = pprIfaceInfixApp ctxt_prec (ppr tc)
-                     (pp TyOpPrec ty1) (pp TyOpPrec ty2)
+                     (pp opPrec ty1) (pp opPrec ty2)
 
   | otherwise
-  = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp TyConPrec) tys)
+  = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
 pprSum :: Arity -> IsPromoted -> IfaceTcArgs -> SDoc
 pprSum _arity is_promoted args
@@ -1075,11 +1075,11 @@ pprSum _arity is_promoted args
     let tys   = tcArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
     in pprPromotionQuoteI is_promoted
-       <> sumParens (pprWithBars (ppr_ty TopPrec) args')
+       <> sumParens (pprWithBars (ppr_ty topPrec) args')
 
-pprTuple :: TyPrec -> TupleSort -> IsPromoted -> IfaceTcArgs -> SDoc
+pprTuple :: PprPrec -> TupleSort -> IsPromoted -> IfaceTcArgs -> SDoc
 pprTuple ctxt_prec ConstraintTuple IsNotPromoted ITC_Nil
-  = maybeParen ctxt_prec TyConPrec $
+  = maybeParen ctxt_prec appPrec $
     text "() :: Constraint"
 
 -- All promoted constructors have kind arguments
@@ -1105,27 +1105,27 @@ pprIfaceTyLit (IfaceNumTyLit n) = integer n
 pprIfaceTyLit (IfaceStrTyLit n) = text (show n)
 
 pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
-pprIfaceCoercion = ppr_co TopPrec
-pprParendIfaceCoercion = ppr_co TyConPrec
+pprIfaceCoercion = ppr_co topPrec
+pprParendIfaceCoercion = ppr_co appPrec
 
-ppr_co :: TyPrec -> IfaceCoercion -> SDoc
+ppr_co :: PprPrec -> IfaceCoercion -> SDoc
 ppr_co _         (IfaceReflCo r ty) = angleBrackets (ppr ty) <> ppr_role r
 ppr_co ctxt_prec (IfaceFunCo r co1 co2)
-  = maybeParen ctxt_prec FunPrec $
-    sep (ppr_co FunPrec co1 : ppr_fun_tail co2)
+  = maybeParen ctxt_prec funPrec $
+    sep (ppr_co funPrec co1 : ppr_fun_tail co2)
   where
     ppr_fun_tail (IfaceFunCo r co1 co2)
-      = (arrow <> ppr_role r <+> ppr_co FunPrec co1) : ppr_fun_tail co2
+      = (arrow <> ppr_role r <+> ppr_co funPrec co1) : ppr_fun_tail co2
     ppr_fun_tail other_co
       = [arrow <> ppr_role r <+> pprIfaceCoercion other_co]
 
 ppr_co _         (IfaceTyConAppCo r tc cos)
-  = parens (pprIfaceCoTcApp TopPrec tc cos) <> ppr_role r
+  = parens (pprIfaceCoTcApp topPrec tc cos) <> ppr_role r
 ppr_co ctxt_prec (IfaceAppCo co1 co2)
-  = maybeParen ctxt_prec TyConPrec $
-    ppr_co FunPrec co1 <+> pprParendIfaceCoercion co2
+  = maybeParen ctxt_prec appPrec $
+    ppr_co funPrec co1 <+> pprParendIfaceCoercion co2
 ppr_co ctxt_prec co@(IfaceForAllCo {})
-  = maybeParen ctxt_prec FunPrec $
+  = maybeParen ctxt_prec funPrec $
     pprIfaceForAllCoPart tvs (pprIfaceCoercion inner_co)
   where
     (tvs, inner_co) = split_co co
@@ -1140,7 +1140,7 @@ ppr_co _ (IfaceCoVarCo covar)   = ppr covar
 ppr_co _ (IfaceHoleCo covar)    = braces (ppr covar)
 
 ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
-  = maybeParen ctxt_prec TyConPrec $
+  = maybeParen ctxt_prec appPrec $
     text "UnsafeCo" <+> ppr r <+>
     pprParendIfaceType ty1 <+> pprParendIfaceType ty2
 
@@ -1150,20 +1150,20 @@ ppr_co _ (IfaceUnivCo prov role ty1 ty2)
           , dcolon <+>  ppr ty1 <> comma <+> ppr ty2 ])
 
 ppr_co ctxt_prec (IfaceInstCo co ty)
-  = maybeParen ctxt_prec TyConPrec $
+  = maybeParen ctxt_prec appPrec $
     text "Inst" <+> pprParendIfaceCoercion co
                         <+> pprParendIfaceCoercion ty
 
 ppr_co ctxt_prec (IfaceAxiomRuleCo tc cos)
-  = maybeParen ctxt_prec TyConPrec $ ppr tc <+> parens (interpp'SP cos)
+  = maybeParen ctxt_prec appPrec $ ppr tc <+> parens (interpp'SP cos)
 
 ppr_co ctxt_prec (IfaceAxiomInstCo n i cos)
   = ppr_special_co ctxt_prec (ppr n <> brackets (ppr i)) cos
 ppr_co ctxt_prec (IfaceSymCo co)
   = ppr_special_co ctxt_prec (text "Sym") [co]
 ppr_co ctxt_prec (IfaceTransCo co1 co2)
-  = maybeParen ctxt_prec TyOpPrec $
-    ppr_co TyOpPrec co1 <+> semi <+> ppr_co TyOpPrec co2
+  = maybeParen ctxt_prec opPrec $
+    ppr_co opPrec co1 <+> semi <+> ppr_co opPrec co2
 ppr_co ctxt_prec (IfaceNthCo d co)
   = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)
@@ -1175,9 +1175,9 @@ ppr_co ctxt_prec (IfaceCoherenceCo co1 co2)
 ppr_co ctxt_prec (IfaceKindCo co)
   = ppr_special_co ctxt_prec (text "Kind") [co]
 
-ppr_special_co :: TyPrec -> SDoc -> [IfaceCoercion] -> SDoc
+ppr_special_co :: PprPrec -> SDoc -> [IfaceCoercion] -> SDoc
 ppr_special_co ctxt_prec doc cos
-  = maybeParen ctxt_prec TyConPrec
+  = maybeParen ctxt_prec appPrec
                (sep [doc, nest 4 (sep (map pprParendIfaceCoercion cos))])
 
 ppr_role :: Role -> SDoc
@@ -1293,7 +1293,7 @@ instance Binary IfaceTcArgs where
 --
 -- In the event that we are printing a singleton context (e.g. @Eq a@) we can
 -- omit parentheses. However, we must take care to set the precedence correctly
--- to TyOpPrec, since something like @a :~: b@ must be parenthesized (see
+-- to opPrec, since something like @a :~: b@ must be parenthesized (see
 -- #9658).
 --
 -- When printing a larger context we use 'fsep' instead of 'sep' so that
@@ -1322,16 +1322,16 @@ instance Binary IfaceTcArgs where
 
 -- | Prints "(C a, D b) =>", including the arrow.
 -- Used when we want to print a context in a type, so we
--- use FunPrec to decide whether to parenthesise a singleton
+-- use 'funPrec' to decide whether to parenthesise a singleton
 -- predicate; e.g.   Num a => a -> a
 pprIfaceContextArr :: [IfacePredType] -> SDoc
 pprIfaceContextArr []     = empty
-pprIfaceContextArr [pred] = ppr_ty FunPrec pred <+> darrow
+pprIfaceContextArr [pred] = ppr_ty funPrec pred <+> darrow
 pprIfaceContextArr preds  = ppr_parend_preds preds <+> darrow
 
 -- | Prints a context or @()@ if empty
 -- You give it the context precedence
-pprIfaceContext :: TyPrec -> [IfacePredType] -> SDoc
+pprIfaceContext :: PprPrec -> [IfacePredType] -> SDoc
 pprIfaceContext _    []     = text "()"
 pprIfaceContext prec [pred] = ppr_ty prec pred
 pprIfaceContext _    preds  = ppr_parend_preds preds

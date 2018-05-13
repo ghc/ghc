@@ -23,7 +23,7 @@ import GhcPrelude
 import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
 import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
                     negateFractionalLit,SourceText(..),pprWithSourceText )
-import Type       ( Type )
+import Type
 import Outputable
 import FastString
 import HsExtension
@@ -282,30 +282,33 @@ pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
 pmPprHsLit (XLit x)           = ppr x
 
--- | Returns 'True' for compound literals that will need parentheses.
-isCompoundHsLit :: HsLit x -> Bool
-isCompoundHsLit (HsChar {})        = False
-isCompoundHsLit (HsCharPrim {})    = False
-isCompoundHsLit (HsString {})      = False
-isCompoundHsLit (HsStringPrim {})  = False
-isCompoundHsLit (HsInt _ x)        = il_neg x
-isCompoundHsLit (HsIntPrim _ x)    = x < 0
-isCompoundHsLit (HsWordPrim _ x)   = x < 0
-isCompoundHsLit (HsInt64Prim _ x)  = x < 0
-isCompoundHsLit (HsWord64Prim _ x) = x < 0
-isCompoundHsLit (HsInteger _ x _)  = x < 0
-isCompoundHsLit (HsRat _ x _)      = fl_neg x
-isCompoundHsLit (HsFloatPrim _ x)  = fl_neg x
-isCompoundHsLit (HsDoublePrim _ x) = fl_neg x
-isCompoundHsLit (XLit _)           = False
-
--- | Returns 'True' for compound overloaded literals that will need
--- parentheses when used in an argument position.
-isCompoundHsOverLit :: HsOverLit x -> Bool
-isCompoundHsOverLit (OverLit { ol_val = olv }) = compound_ol_val olv
+-- | @'hsLitNeedsParens' p l@ returns 'True' if a literal @l@ needs
+-- to be parenthesized under precedence @p@.
+hsLitNeedsParens :: PprPrec -> HsLit x -> Bool
+hsLitNeedsParens p = go
   where
-    compound_ol_val :: OverLitVal -> Bool
-    compound_ol_val (HsIntegral x)   = il_neg x
-    compound_ol_val (HsFractional x) = fl_neg x
-    compound_ol_val (HsIsString {})  = False
-isCompoundHsOverLit (XOverLit { }) = False
+    go (HsChar {})        = False
+    go (HsCharPrim {})    = False
+    go (HsString {})      = False
+    go (HsStringPrim {})  = False
+    go (HsInt _ x)        = p > topPrec && il_neg x
+    go (HsIntPrim _ x)    = p > topPrec && x < 0
+    go (HsWordPrim {})    = False
+    go (HsInt64Prim _ x)  = p > topPrec && x < 0
+    go (HsWord64Prim {})  = False
+    go (HsInteger _ x _)  = p > topPrec && x < 0
+    go (HsRat _ x _)      = p > topPrec && fl_neg x
+    go (HsFloatPrim _ x)  = p > topPrec && fl_neg x
+    go (HsDoublePrim _ x) = p > topPrec && fl_neg x
+    go (XLit _)           = False
+
+-- | @'hsOverLitNeedsParens' p ol@ returns 'True' if an overloaded literal
+-- @ol@ needs to be parenthesized under precedence @p@.
+hsOverLitNeedsParens :: PprPrec -> HsOverLit x -> Bool
+hsOverLitNeedsParens p (OverLit { ol_val = olv }) = go olv
+  where
+    go :: OverLitVal -> Bool
+    go (HsIntegral x)   = p > topPrec && il_neg x
+    go (HsFractional x) = p > topPrec && fl_neg x
+    go (HsIsString {})  = False
+hsOverLitNeedsParens _ (XOverLit { }) = False

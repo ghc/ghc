@@ -779,7 +779,7 @@ cvtClause :: HsMatchContext RdrName
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
-        ; pps <- mapM wrap_conpat ps'
+        ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
         ; returnL $ Hs.Match noExt ctxt pps (GRHSs noExt g' (noLoc ds')) }
@@ -795,8 +795,10 @@ cvtl e = wrapL (cvt e)
     cvt (VarE s)        = do { s' <- vName s; return $ HsVar noExt (noLoc s') }
     cvt (ConE s)        = do { s' <- cName s; return $ HsVar noExt (noLoc s') }
     cvt (LitE l)
-      | overloadedLit l = go cvtOverLit (HsOverLit noExt) isCompoundHsOverLit
-      | otherwise       = go cvtLit     (HsLit     noExt) isCompoundHsLit
+      | overloadedLit l = go cvtOverLit (HsOverLit noExt)
+                             (hsOverLitNeedsParens appPrec)
+      | otherwise       = go cvtLit (HsLit noExt)
+                             (hsLitNeedsParens appPrec)
       where
         go :: (Lit -> CvtM (l GhcPs))
            -> (l GhcPs -> HsExpr GhcPs)
@@ -821,7 +823,7 @@ cvtl e = wrapL (cvt e)
                                -- oddities that can result from zero-argument
                                -- lambda expressions. See #13856.
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
-                            ; let pats = map parenthesizeCompoundPat ps'
+                            ; let pats = map (parenthesizePat appPrec) ps'
                             ; return $ HsLam noExt (mkMatchGroup FromSource
                                              [mkSimpleMatch LambdaExpr
                                              pats e'])}
@@ -869,9 +871,10 @@ cvtl e = wrapL (cvt e)
 
     -- Infix expressions
     cvt (InfixE (Just x) s (Just y)) = do { x' <- cvtl x; s' <- cvtl s; y' <- cvtl y
+                                          ; let px = parenthesizeHsExpr opPrec x'
+                                                py = parenthesizeHsExpr opPrec y'
                                           ; wrapParL (HsPar noExt) $
-                                            OpApp noExt (mkLHsPar x') s'
-                                                        (mkLHsPar y') }
+                                            OpApp noExt px s' py }
                                             -- Parenthesise both arguments and result,
                                             -- to ensure this operator application does
                                             -- does not get re-associated
@@ -897,7 +900,8 @@ cvtl e = wrapL (cvt e)
 
     cvt (ParensE e)      = do { e' <- cvtl e; return $ HsPar noExt e' }
     cvt (SigE e t)       = do { e' <- cvtl e; t' <- cvtType t
-                              ; return $ ExprWithTySig (mkLHsSigWcType t') e' }
+                              ; let pe = parenthesizeHsExpr sigPrec e'
+                              ; return $ ExprWithTySig (mkLHsSigWcType t') pe }
     cvt (RecConE c flds) = do { c' <- cNameL c
                               ; flds' <- mapM (cvtFld (mkFieldOcc . noLoc)) flds
                               ; return $ mkRdrRecordCon c' (HsRecFields flds' Nothing) }
@@ -1041,9 +1045,9 @@ cvtMatch :: HsMatchContext RdrName
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
-        ; lp <- case ctxt of
-            CaseAlt -> return p'
-            _       -> wrap_conpat p'
+        ; let lp = case p' of
+                     L loc SigPat{} -> L loc (ParPat NoExt p') -- #14875
+                     _              -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
         ; returnL $ Hs.Match noExt ctxt [lp] (GRHSs noExt g' (noLoc decs')) }
@@ -1144,11 +1148,13 @@ cvtp (UnboxedSumP p alt arity)
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat noExt p' alt arity }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
-                            ; pps <- mapM wrap_conpat ps'
+                            ; let pps = map (parenthesizePat appPrec) ps'
                             ; return $ ConPatIn s' (PrefixCon pps) }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
                             ; wrapParL (ParPat noExt) $
-                              ConPatIn s' (InfixCon (mkParPat p1') (mkParPat p2')) }
+                              ConPatIn s' $
+                              InfixCon (parenthesizePat opPrec p1')
+                                       (parenthesizePat opPrec p2') }
                             -- See Note [Operator association]
 cvtp (UInfixP p1 s p2) = do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Converting UInfix]
 cvtp (ParensP p)       = do { p' <- cvtPat p;
@@ -1178,12 +1184,6 @@ cvtPatFld (s,p)
                                          = L ls $ mkFieldOcc (L ls s')
                                      , hsRecFieldArg = p'
                                      , hsRecPun      = False}) }
-
-wrap_conpat :: Hs.LPat GhcPs -> CvtM (Hs.LPat GhcPs)
-wrap_conpat p@(L _ (ConPatIn _ (InfixCon{})))   = returnL $ ParPat noExt p
-wrap_conpat p@(L _ (ConPatIn _ (PrefixCon []))) = return p
-wrap_conpat p@(L _ (ConPatIn _ (PrefixCon _)))  = returnL $ ParPat noExt p
-wrap_conpat p                                   = return p
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.
@@ -1393,9 +1393,9 @@ mk_apps head_ty (ty:tys) =
      ; mk_apps (HsAppTy noExt head_ty' p_ty) tys }
   where
     -- See Note [Adding parens for splices]
-    add_parens t
-      | isCompoundHsType t = returnL (HsParTy noExt t)
-      | otherwise          = return t
+    add_parens lt@(L _ t)
+      | hsTypeNeedsParens appPrec t = returnL (HsParTy noExt lt)
+      | otherwise                   = return lt
 
 wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)
 wrap_apps t@(L _ HsAppTy {}) = returnL (HsParTy noExt t)

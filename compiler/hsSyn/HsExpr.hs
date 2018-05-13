@@ -1005,8 +1005,8 @@ ppr_expr (OpApp _ e1 op e2)
     should_print_infix (HsWrap _ _ e)  = should_print_infix e
     should_print_infix _               = Nothing
 
-    pp_e1 = pprDebugParendExpr e1   -- In debug mode, add parens
-    pp_e2 = pprDebugParendExpr e2   -- to make precedence clear
+    pp_e1 = pprDebugParendExpr opPrec e1   -- In debug mode, add parens
+    pp_e2 = pprDebugParendExpr opPrec e2   -- to make precedence clear
 
     pp_prefixly
       = hang (ppr op) 2 (sep [pp_e1, pp_e2])
@@ -1014,7 +1014,7 @@ ppr_expr (OpApp _ e1 op e2)
     pp_infixly pp_op
       = hang pp_e1 2 (sep [pp_op, nest 2 pp_e2])
 
-ppr_expr (NegApp _ e _) = char '-' <+> pprDebugParendExpr e
+ppr_expr (NegApp _ e _) = char '-' <+> pprDebugParendExpr appPrec e
 
 ppr_expr (SectionL _ expr op)
   = case unLoc op of
@@ -1024,7 +1024,7 @@ ppr_expr (SectionL _ expr op)
                        -> pp_infixly (unboundVarOcc h)
       _                -> pp_prefixly
   where
-    pp_expr = pprDebugParendExpr expr
+    pp_expr = pprDebugParendExpr opPrec expr
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
                        4 (hsep [pp_expr, text "x_ )"])
@@ -1040,7 +1040,7 @@ ppr_expr (SectionR _ op expr)
                        -> pp_infixly (unboundVarOcc h)
       _                -> pp_prefixly
   where
-    pp_expr = pprDebugParendExpr expr
+    pp_expr = pprDebugParendExpr opPrec expr
 
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, text "x_"])
                        4 (pp_expr <> rparen)
@@ -1229,50 +1229,88 @@ can see the structure of the parse tree.
 -}
 
 pprDebugParendExpr :: (OutputableBndrId (GhcPass p))
-                   => LHsExpr (GhcPass p) -> SDoc
-pprDebugParendExpr expr
+                   => PprPrec -> LHsExpr (GhcPass p) -> SDoc
+pprDebugParendExpr p expr
   = getPprStyle (\sty ->
-    if debugStyle sty then pprParendLExpr expr
+    if debugStyle sty then pprParendLExpr p expr
                       else pprLExpr      expr)
 
-pprParendLExpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc
-pprParendLExpr (L _ e) = pprParendExpr e
+pprParendLExpr :: (OutputableBndrId (GhcPass p))
+               => PprPrec -> LHsExpr (GhcPass p) -> SDoc
+pprParendLExpr p (L _ e) = pprParendExpr p e
 
-pprParendExpr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> SDoc
-pprParendExpr expr
-  | hsExprNeedsParens expr = parens (pprExpr expr)
-  | otherwise              = pprExpr expr
+pprParendExpr :: (OutputableBndrId (GhcPass p))
+              => PprPrec -> HsExpr (GhcPass p) -> SDoc
+pprParendExpr p expr
+  | hsExprNeedsParens p expr = parens (pprExpr expr)
+  | otherwise                = pprExpr expr
         -- Using pprLExpr makes sure that we go 'deeper'
         -- I think that is usually (always?) right
 
-hsExprNeedsParens :: HsExpr id -> Bool
--- True of expressions for which '(e)' and 'e'
--- mean the same thing
-hsExprNeedsParens (ArithSeq {})       = False
-hsExprNeedsParens (PArrSeq {})        = False
-hsExprNeedsParens (HsLit {})          = False
-hsExprNeedsParens (HsOverLit {})      = False
-hsExprNeedsParens (HsVar {})          = False
-hsExprNeedsParens (HsUnboundVar {})   = False
-hsExprNeedsParens (HsConLikeOut {})   = False
-hsExprNeedsParens (HsIPVar {})        = False
-hsExprNeedsParens (HsOverLabel {})    = False
-hsExprNeedsParens (ExplicitTuple {})  = False
-hsExprNeedsParens (ExplicitList {})   = False
-hsExprNeedsParens (ExplicitPArr {})   = False
-hsExprNeedsParens (HsPar {})          = False
-hsExprNeedsParens (HsBracket {})      = False
-hsExprNeedsParens (HsRnBracketOut {}) = False
-hsExprNeedsParens (HsTcBracketOut {}) = False
-hsExprNeedsParens (HsDo _ sc _)
-       | isListCompExpr sc            = False
-hsExprNeedsParens (HsRecFld{})        = False
-hsExprNeedsParens (RecordCon{})       = False
-hsExprNeedsParens (HsSpliceE{})       = False
-hsExprNeedsParens (RecordUpd{})       = False
-hsExprNeedsParens (HsWrap _ _ e)      = hsExprNeedsParens e
-hsExprNeedsParens _ = True
+-- | @'hsExprNeedsParens' p e@ returns 'True' if the expression @e@ needs
+-- parentheses under precedence @p@.
+hsExprNeedsParens :: PprPrec -> HsExpr p -> Bool
+hsExprNeedsParens p = go
+  where
+    go (HsVar{})                      = False
+    go (HsUnboundVar{})               = False
+    go (HsConLikeOut{})               = False
+    go (HsIPVar{})                    = False
+    go (HsOverLabel{})                = False
+    go (HsLit _ l)                    = hsLitNeedsParens p l
+    go (HsOverLit _ ol)               = hsOverLitNeedsParens p ol
+    go (HsPar{})                      = False
+    go (HsCoreAnn _ _ _ (L _ e))      = go e
+    go (HsApp{})                      = p >= appPrec
+    go (HsAppType {})                 = p >= appPrec
+    go (OpApp{})                      = p >= opPrec
+    go (NegApp{})                     = p > topPrec
+    go (SectionL{})                   = True
+    go (SectionR{})                   = True
+    go (ExplicitTuple{})              = False
+    go (ExplicitSum{})                = False
+    go (HsLam{})                      = p > topPrec
+    go (HsLamCase{})                  = p > topPrec
+    go (HsCase{})                     = p > topPrec
+    go (HsIf{})                       = p > topPrec
+    go (HsMultiIf{})                  = p > topPrec
+    go (HsLet{})                      = p > topPrec
+    go (HsDo _ sc _)
+      | isListCompExpr sc             = False
+      | otherwise                     = p > topPrec
+    go (ExplicitList{})               = False
+    go (ExplicitPArr{})               = False
+    go (RecordUpd{})                  = False
+    go (ExprWithTySig{})              = p > topPrec
+    go (ArithSeq{})                   = False
+    go (PArrSeq{})                    = False
+    go (EWildPat{})                   = False
+    go (ELazyPat{})                   = False
+    go (EAsPat{})                     = False
+    go (EViewPat{})                   = True
+    go (HsSCC{})                      = p >= appPrec
+    go (HsWrap _ _ e)                 = go e
+    go (HsSpliceE{})                  = False
+    go (HsBracket{})                  = False
+    go (HsRnBracketOut{})             = False
+    go (HsTcBracketOut{})             = False
+    go (HsProc{})                     = p > topPrec
+    go (HsStatic{})                   = p >= appPrec
+    go (HsTick _ _ (L _ e))           = go e
+    go (HsBinTick _ _ _ (L _ e))      = go e
+    go (HsTickPragma _ _ _ _ (L _ e)) = go e
+    go (HsArrApp{})                   = True
+    go (HsArrForm{})                  = True
+    go (RecordCon{})                  = False
+    go (HsRecFld{})                   = False
+    go (XExpr{})                      = True
 
+-- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
+-- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
+parenthesizeHsExpr :: PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+parenthesizeHsExpr p le@(L loc e)
+  | hsExprNeedsParens p e = L loc (HsPar NoExt le)
+  | otherwise             = le
 
 isAtomicHsExpr :: HsExpr id -> Bool
 -- True of a single token
@@ -1744,7 +1782,7 @@ pprPatBind pat (grhss)
 pprMatch :: (OutputableBndrId (GhcPass idR), Outputable body)
          => Match (GhcPass idR) body -> SDoc
 pprMatch match
-  = sep [ sep (herald : map (nest 2 . pprParendLPat) other_pats)
+  = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
   where
     ctxt = m_ctxt match
@@ -1765,7 +1803,9 @@ pprMatch match
                 | otherwise -> (parens pp_infix, pats2)
                         -- (x &&& y) z = e
                 where
-                  pp_infix = pprParendLPat pat1 <+> pprInfixOcc fun <+> pprParendLPat pat2
+                  pp_infix = pprParendLPat opPrec pat1
+                         <+> pprInfixOcc fun
+                         <+> pprParendLPat opPrec pat2
 
             LambdaExpr -> (char '\\', m_pats match)
 

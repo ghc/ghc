@@ -191,7 +191,7 @@ mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExt matches))
   where
     matches = mkMatchGroup Generated
                            [mkSimpleMatch LambdaExpr pats' body]
-    pats' = map parenthesizeCompoundPat pats
+    pats' = map (parenthesizePat appPrec) pats
 
 mkHsLams :: [TyVar] -> [EvVar] -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
@@ -214,14 +214,14 @@ nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
 mkLHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
--- Wrap in parens if hsExprNeedsParens says it needs them
+-- Wrap in parens if (hsExprNeedsParens appPrec) says it needs them
 -- So   'f x'  becomes '(f x)', but '3' stays as '3'
-mkLHsPar le@(L loc e) | hsExprNeedsParens e = L loc (HsPar noExt le)
-                      | otherwise           = le
+mkLHsPar le@(L loc e) | hsExprNeedsParens appPrec e = L loc (HsPar noExt le)
+                      | otherwise                   = le
 
 mkParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
-mkParPat lp@(L loc p) | hsPatNeedsParens p = L loc (ParPat noExt lp)
-                      | otherwise          = lp
+mkParPat lp@(L loc p) | patNeedsParens appPrec p = L loc (ParPat noExt lp)
+                      | otherwise                = lp
 
 nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
 nlParPat p = noLoc (ParPat noExt p)
@@ -439,16 +439,18 @@ nlConVarPat con vars = nlConPat con (map nlVarPat vars)
 nlConVarPatName :: Name -> [Name] -> LPat GhcRn
 nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 
-nlInfixConPat :: IdP id -> LPat id -> LPat id -> LPat id
-nlInfixConPat con l r = noLoc (ConPatIn (noLoc con) (InfixCon l r))
+nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
+nlInfixConPat con l r = noLoc (ConPatIn (noLoc con)
+                              (InfixCon (parenthesizePat opPrec l)
+                                        (parenthesizePat opPrec r)))
 
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats =
-  noLoc (ConPatIn (noLoc con) (PrefixCon (map parenthesizeCompoundPat pats)))
+  noLoc (ConPatIn (noLoc con) (PrefixCon (map (parenthesizePat appPrec) pats)))
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats =
-  noLoc (ConPatIn (noLoc con) (PrefixCon (map parenthesizeCompoundPat pats)))
+  noLoc (ConPatIn (noLoc con) (PrefixCon (map (parenthesizePat appPrec) pats)))
 
 nlNullaryConPat :: IdP id -> LPat id
 nlNullaryConPat con = noLoc (ConPatIn (noLoc con) (PrefixCon []))
@@ -496,7 +498,7 @@ nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
 nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
-nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeCompoundHsType t))
+nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExt NotPromoted (noLoc x))
 nlHsFunTy a b = noLoc (HsFunTy noExt a b)
 nlHsParTy t   = noLoc (HsParTy noExt t)
@@ -855,8 +857,8 @@ mkMatch ctxt pats expr lbinds
                  , m_pats  = map paren pats
                  , m_grhss = GRHSs noExt (unguardedRHS noSrcSpan expr) lbinds })
   where
-    paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat noExt lp)
-                     | otherwise          = lp
+    paren lp@(L l p) | patNeedsParens appPrec p = L l (ParPat noExt lp)
+                     | otherwise                = lp
 
 {-
 ************************************************************************
