@@ -17,6 +17,9 @@
   * `asinh` for `Float` and `Double` is now numerical stable in the face of
     large negative arguments (#14927)
 
+  * `Numeric.showEFloat (Just 0)` now respects the user's requested precision.
+    (#15115)
+
 ## 4.11.1.0 *TBA*
   * Bundled with GHC 8.4.2
 

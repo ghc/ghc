@@ -690,6 +690,16 @@ formatRealFloatAlt fmt decs alt x
           [d]     -> d : ".0e" ++ show_e'
           (d:ds') -> d : '.' : ds' ++ "e" ++ show_e'
           []      -> errorWithoutStackTrace "formatRealFloat/doFmt/FFExponent: []"
+       Just 0 ->
+        -- handle this case specifically since we need to omit the
+        -- decimal point as well (#15115)
+        case is of
+          [0] -> "0e0"
+          _ ->
+           let
+             (ei,is') = roundTo base 1 is
+             d:_ = map intToDigit (if ei > 0 then init is' else is')
+           in d : 'e' : show (e-1+ei)
        Just dec ->
         let dec' = max dec 1 in
         case is of
