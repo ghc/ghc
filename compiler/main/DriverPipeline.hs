@@ -266,8 +266,7 @@ compileOne' m_tc_result mHscMessage
        prevailing_dflags = hsc_dflags hsc_env0
        dflags =
           dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
-                  , log_action = log_action prevailing_dflags
-                  , log_finaliser = log_finaliser prevailing_dflags }
+                  , log_action = log_action prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
                   -- not the one cached in the summary.  This is so
                   -- that we can change the log_action without having
