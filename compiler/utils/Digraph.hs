@@ -7,12 +7,10 @@ module Digraph(
 
         SCC(..), Node(..), flattenSCC, flattenSCCs,
         stronglyConnCompG,
-        topologicalSortG, dfsTopSortG,
+        topologicalSortG,
         verticesG, edgesG, hasVertexG,
         reachableG, reachablesG, transposeG,
-        outdegreeG, indegreeG,
-        vertexGroupsG, emptyG,
-        componentsG,
+        emptyG,
 
         findCycle,
 
@@ -45,17 +43,11 @@ import GhcPrelude
 import Util        ( minWith, count )
 import Outputable
 import Maybes      ( expectJust )
-import MonadUtils  ( allM )
-
--- Extensions
-import Control.Monad    ( filterM, liftM, liftM2 )
-import Control.Monad.ST
 
 -- std interfaces
 import Data.Maybe
 import Data.Array
 import Data.List hiding (transpose)
-import Data.Array.ST
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -349,12 +341,6 @@ topologicalSortG :: Graph node -> [node]
 topologicalSortG graph = map (gr_vertex_to_node graph) result
   where result = {-# SCC "Digraph.topSort" #-} topSort (gr_int_graph graph)
 
-dfsTopSortG :: Graph node -> [[node]]
-dfsTopSortG graph =
-  map (map (gr_vertex_to_node graph) . flatten) $ dfs g (topSort g)
-  where
-    g = gr_int_graph graph
-
 reachableG :: Graph node -> node -> [node]
 reachableG graph from = map (gr_vertex_to_node graph) result
   where from_vertex = expectJust "reachableG" (gr_node_to_vertex graph from)
@@ -381,26 +367,8 @@ transposeG graph = Graph (G.transposeG (gr_int_graph graph))
                          (gr_vertex_to_node graph)
                          (gr_node_to_vertex graph)
 
-outdegreeG :: Graph node -> node -> Maybe Int
-outdegreeG = degreeG outdegree
-
-indegreeG :: Graph node -> node -> Maybe Int
-indegreeG = degreeG indegree
-
-degreeG :: (G.Graph -> Table Int) -> Graph node -> node -> Maybe Int
-degreeG degree graph node = let table = degree (gr_int_graph graph)
-                            in fmap ((!) table) $ gr_node_to_vertex graph node
-
-vertexGroupsG :: Graph node -> [[node]]
-vertexGroupsG graph = map (map (gr_vertex_to_node graph)) result
-  where result = vertexGroups (gr_int_graph graph)
-
 emptyG :: Graph node -> Bool
 emptyG g = graphEmpty (gr_int_graph g)
-
-componentsG :: Graph node -> [[node]]
-componentsG graph = map (map (gr_vertex_to_node graph) . flatten)
-                  $ components (gr_int_graph graph)
 
 {-
 ************************************************************************
@@ -452,58 +420,3 @@ preorderF ts         = concat (map flatten ts)
 -- This generalizes reachable which was found in Data.Graph
 reachable    :: IntGraph -> [Vertex] -> [Vertex]
 reachable g vs = preorderF (dfs g vs)
-
-{-
-------------------------------------------------------------
--- Total ordering on groups of vertices
-------------------------------------------------------------
-
-The plan here is to extract a list of groups of elements of the graph
-such that each group has no dependence except on nodes in previous
-groups (i.e. in particular they may not depend on nodes in their own
-group) and is maximal such group.
-
-Clearly we cannot provide a solution for cyclic graphs.
-
-We proceed by iteratively removing elements with no outgoing edges
-and their associated edges from the graph.
-
-This probably isn't very efficient and certainly isn't very clever.
--}
-
-type Set s    = STArray s Vertex Bool
-
-mkEmpty      :: Bounds -> ST s (Set s)
-mkEmpty bnds  = newArray bnds False
-
-contains     :: Set s -> Vertex -> ST s Bool
-contains m v  = readArray m v
-
-include      :: Set s -> Vertex -> ST s ()
-include m v   = writeArray m v True
-
-vertexGroups :: IntGraph -> [[Vertex]]
-vertexGroups g = runST (mkEmpty (bounds g) >>= \provided -> vertexGroupsS provided g next_vertices)
-  where next_vertices = noOutEdges g
-
-noOutEdges :: IntGraph -> [Vertex]
-noOutEdges g = [ v | v <- vertices g, null (g!v)]
-
-vertexGroupsS :: Set s -> IntGraph -> [Vertex] -> ST s [[Vertex]]
-vertexGroupsS provided g to_provide
-  = if null to_provide
-    then do {
-          all_provided <- allM (provided `contains`) (vertices g)
-        ; if all_provided
-          then return []
-          else error "vertexGroup: cyclic graph"
-        }
-    else do {
-          mapM_ (include provided) to_provide
-        ; to_provide' <- filterM (vertexReady provided g) (vertices g)
-        ; rest <- vertexGroupsS provided g to_provide'
-        ; return $ to_provide : rest
-        }
-
-vertexReady :: Set s -> IntGraph -> Vertex -> ST s Bool
-vertexReady provided g v = liftM2 (&&) (liftM not $ provided `contains` v) (allM (provided `contains`) (g!v))
