@@ -678,7 +678,8 @@ cantFindErr cannot_find _ dflags mod_name find_result
          = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
            in text "You can run" <+>
               quotes (text ":set -package " <> ppr (packageName pkg)) <+>
-              text "to expose it."
+              text "to expose it." $$
+              text "(Note: this unloads all the modules in the current scope.)"
 
     mod_hidden pkg =
         text "it is a hidden module in the package" <+> quotes (ppr pkg)
