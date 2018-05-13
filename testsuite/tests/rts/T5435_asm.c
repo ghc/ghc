@@ -33,17 +33,19 @@ static void (*mod_init_func[2])(void) __attribute__((
 
 #else /* ELF */
 
+#if LOAD_CONSTR == 0
 static void (*const init_array[2])(void) __attribute__((
             section(".init_array"), // put it in the right section
             used,                   // prevent GCC from optimizing this away
             aligned(sizeof(void*))  // avoid slop between GCC's preloaded initializers and ours
             ))
     = {initArray1, initArray2};
-
+#else
 static void (*ctors[2])(void) __attribute__((
             section(".ctors"),
             used,
             aligned(sizeof(void*))))
     = {ctors2, ctors1}; // ctors run in reverse
+#endif
 
 #endif
