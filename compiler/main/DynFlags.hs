@@ -4825,12 +4825,14 @@ interpretPackageEnv :: DynFlags -> IO DynFlags
 interpretPackageEnv dflags = do
     mPkgEnv <- runMaybeT $ msum $ [
                    getCmdLineArg >>= \env -> msum [
-                       probeEnvFile env
+                       probeNullEnv env
+                     , probeEnvFile env
                      , probeEnvName env
                      , cmdLineError env
                      ]
                  , getEnvVar >>= \env -> msum [
-                       probeEnvFile env
+                       probeNullEnv env
+                     , probeEnvFile env
                      , probeEnvName env
                      , envError     env
                      ]
@@ -4842,6 +4844,9 @@ interpretPackageEnv dflags = do
     case mPkgEnv of
       Nothing ->
         -- No environment found. Leave DynFlags unchanged.
+        return dflags
+      Just "-" -> do
+        -- Explicitly disabled environment file. Leave DynFlags unchanged.
         return dflags
       Just envfile -> do
         content <- readFile envfile
@@ -4871,6 +4876,10 @@ interpretPackageEnv dflags = do
     probeEnvFile path = do
       guard =<< liftMaybeT (doesFileExist path)
       return path
+
+    probeNullEnv :: FilePath -> MaybeT IO FilePath
+    probeNullEnv "-" = return "-"
+    probeNullEnv _   = mzero
 
     parseEnvFile :: FilePath -> String -> DynP ()
     parseEnvFile envfile = mapM_ parseEntry . lines
