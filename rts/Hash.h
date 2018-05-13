@@ -56,7 +56,7 @@ typedef int HashFunction(const HashTable *table, StgWord key);
 typedef int CompareFunction(StgWord key1, StgWord key2);
 HashTable * allocHashTable_(HashFunction *hash, CompareFunction *compare);
 int hashWord(const HashTable *table, StgWord key);
-int hashStr(const HashTable *table, char *key);
+int hashStr(const HashTable *table, StgWord key);
 
 /* Freeing hash tables
  */
