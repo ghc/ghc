@@ -4845,6 +4845,9 @@ interpretPackageEnv dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
+        putLogMsg dflags NoReason SevInfo noSrcSpan
+             (defaultUserStyle dflags)
+             (text ("Loaded package environment from " ++ envfile))
         let setFlags :: DynP ()
             setFlags = do
               setGeneralFlag Opt_HideAllPackages
