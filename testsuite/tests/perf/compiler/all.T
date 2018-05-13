@@ -596,7 +596,7 @@ test('T5321FD',
             #  (due to better optCoercion, 5e7406d9, #9233)
             # 2016-04-06: 250757460 (x86/Linux)
 
-           (wordsize(64), 415136648, 10)])
+           (wordsize(64), 371826136, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -618,6 +618,7 @@ test('T5321FD',
             # 2016-07-16: 477840432
             #  Optimize handling of built-in OccNames
             # 2017-05-14: 415136648 (amd64/Linux) Two-pass CmmLayoutStack
+            # 2018-04-24: 371826136 (amd64/Linux) Store size in LitString
       ],
       compile,[''])
 

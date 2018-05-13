@@ -20,6 +20,7 @@ module BufWrite (
         bPutFS,
         bPutFZS,
         bPutLitString,
+        bPutReplicate,
         bFlush,
   ) where
 
@@ -97,18 +98,44 @@ bPutCStringLen b@(BufHandle buf r hdl) cstr@(ptr, len) = do
                 copyBytes (buf `plusPtr` i) ptr len
                 writeFastMutInt r (i + len)
 
-bPutLitString :: BufHandle -> LitString -> Int -> IO ()
-bPutLitString b@(BufHandle buf r hdl) a len = a `seq` do
+bPutLitString :: BufHandle -> LitString -> IO ()
+bPutLitString b@(BufHandle buf r hdl) l@(LitString a len) = l `seq` do
   i <- readFastMutInt r
   if (i+len) >= buf_size
         then do hPutBuf hdl buf i
                 writeFastMutInt r 0
                 if (len >= buf_size)
                     then hPutBuf hdl a len
-                    else bPutLitString b a len
+                    else bPutLitString b l
         else do
                 copyBytes (buf `plusPtr` i) a len
                 writeFastMutInt r (i+len)
+
+-- | Replicate an 8-bit character
+bPutReplicate :: BufHandle -> Int -> Char -> IO ()
+bPutReplicate (BufHandle buf r hdl) len c = do
+  i <- readFastMutInt r
+  let oc = fromIntegral (ord c)
+  if (i+len) < buf_size
+    then do
+      fillBytes (buf `plusPtr` i) oc len
+      writeFastMutInt r (i+len)
+    else do
+      -- flush the current buffer
+      when (i /= 0) $ hPutBuf hdl buf i
+      if (len < buf_size)
+        then do
+          fillBytes buf oc len
+          writeFastMutInt r len
+        else do
+          -- fill a full buffer
+          fillBytes buf oc buf_size
+          -- flush it as many times as necessary
+          let go n | n >= buf_size = do
+                                       hPutBuf hdl buf buf_size
+                                       go (n-buf_size)
+                   | otherwise     = writeFastMutInt r n
+          go len
 
 bFlush :: BufHandle -> IO ()
 bFlush (BufHandle buf r hdl) = do

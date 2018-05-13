@@ -103,7 +103,7 @@ module Pretty (
         Mode(..),
 
         -- ** General rendering
-        fullRender,
+        fullRender, txtPrinter,
 
         -- ** GHC-specific rendering
         printDoc, printDoc_,
@@ -120,7 +120,7 @@ import System.IO
 import Numeric (showHex)
 
 --for a RULES
-import GHC.Base ( unpackCString# )
+import GHC.Base ( unpackCString#, unpackNBytes#, Int(..) )
 import GHC.Ptr  ( Ptr(..) )
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
@@ -270,8 +270,10 @@ data TextDetails = Chr  {-# UNPACK #-} !Char -- ^ A single Char fragment
                  | Str  String -- ^ A whole String fragment
                  | PStr FastString                      -- a hashed string
                  | ZStr FastZString                     -- a z-encoded string
-                 | LStr {-# UNPACK #-} !LitString {-#UNPACK #-} !Int
+                 | LStr {-# UNPACK #-} !LitString
                    -- a '\0'-terminated array of bytes
+                 | RStr {-# UNPACK #-} !Int {-# UNPACK #-} !Char
+                   -- a repeated character (e.g., ' ')
 
 instance Show Doc where
   showsPrec _ doc cont = fullRender (mode style) (lineLength style)
@@ -296,25 +298,28 @@ char c = textBeside_ (Chr c) 1 Empty
 -- The side condition on the last law is necessary because @'text' \"\"@
 -- has height 1, while 'empty' has no height.
 text :: String -> Doc
-text s = case length s of {sl -> textBeside_ (Str s)  sl Empty}
+text s = textBeside_ (Str s) (length s) Empty
 {-# NOINLINE [0] text #-}   -- Give the RULE a chance to fire
                             -- It must wait till after phase 1 when
                             -- the unpackCString first is manifested
 
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
 -- intermediate packing/unpacking of the string.
-{-# RULES
-  "text/str" forall a. text (unpackCString# a) = ptext (Ptr a)
- #-}
+{-# RULES "text/str"
+    forall a. text (unpackCString# a)  = ptext (mkLitString# a)
+  #-}
+{-# RULES "text/unpackNBytes#"
+    forall p n. text (unpackNBytes# p n) = ptext (LitString (Ptr p) (I# n))
+  #-}
 
 ftext :: FastString -> Doc
-ftext s = case lengthFS s of {sl -> textBeside_ (PStr s) sl Empty}
+ftext s = textBeside_ (PStr s) (lengthFS s) Empty
 
 ptext :: LitString -> Doc
-ptext s = case lengthLS s of {sl -> textBeside_ (LStr s sl) sl Empty}
+ptext s = textBeside_ (LStr s) (lengthLS s) Empty
 
 ztext :: FastZString -> Doc
-ztext s = case lengthFZS s of {sl -> textBeside_ (ZStr s) sl Empty}
+ztext s = textBeside_ (ZStr s) (lengthFZS s) Empty
 
 -- | Some text with any width. (@text s = sizedText (length s) s@)
 sizedText :: Int -> String -> Doc
@@ -335,12 +340,6 @@ empty = Empty
 isEmpty :: Doc -> Bool
 isEmpty Empty = True
 isEmpty _     = False
-
--- | Produce spacing for indenting the amount specified.
---
--- an old version inserted tabs being 8 columns apart in the output.
-spaces :: Int -> String
-spaces !n = replicate n ' '
 
 {-
 Q: What is the reason for negative indentation (i.e. argument to indent
@@ -655,7 +654,7 @@ nilAboveNest _ _ Empty       = Empty
                                -- Here's why the "text s <>" is in the spec!
 nilAboveNest g k (Nest k1 q) = nilAboveNest g (k + k1) q
 nilAboveNest g k q           | not g && k > 0      -- No newline if no overlap
-                             = textBeside_ (Str (spaces k)) k q
+                             = textBeside_ (RStr k ' ') k q
                              | otherwise           -- Put them really above
                              = nilAbove_ (mkNest k q)
 
@@ -938,11 +937,12 @@ renderStyle s = fullRender (mode s) (lineLength s) (ribbonsPerLine s)
 
 -- | Default TextDetails printer
 txtPrinter :: TextDetails -> String -> String
-txtPrinter (Chr c)   s  = c:s
-txtPrinter (Str s1)  s2 = s1 ++ s2
-txtPrinter (PStr s1) s2 = unpackFS s1 ++ s2
-txtPrinter (ZStr s1) s2 = zString s1 ++ s2
-txtPrinter (LStr s1 _) s2 = unpackLitString s1 ++ s2
+txtPrinter (Chr c)    s  = c:s
+txtPrinter (Str s1)   s2 = s1 ++ s2
+txtPrinter (PStr s1)  s2 = unpackFS s1 ++ s2
+txtPrinter (ZStr s1)  s2 = zString s1 ++ s2
+txtPrinter (LStr s1)  s2 = unpackLitString s1 ++ s2
+txtPrinter (RStr n c) s2 = replicate n c ++ s2
 
 -- | The general rendering interface.
 fullRender :: Mode                     -- ^ Rendering mode
@@ -1028,10 +1028,7 @@ display m !page_width !ribbon_width txt end doc
         lay2 _ NoDoc               = error "display lay2 NoDoc"
         lay2 _ (Union {})          = error "display lay2 Union"
 
-        -- optimise long indentations using LitString chunks of 8 spaces
-        indent !n r | n >= 8    = LStr (sLit "        ") 8 `txt`
-                                  indent (n - 8) r
-                    | otherwise = Str (spaces n) `txt` r
+        indent !n r                = RStr n ' ' `txt` r
     in
     lay 0 doc
     }}
@@ -1050,21 +1047,21 @@ printDoc_ mode pprCols hdl doc
   = do { fullRender mode pprCols 1.5 put done doc ;
          hFlush hdl }
   where
-    put (Chr c)  next = hPutChar hdl c >> next
-    put (Str s)  next = hPutStr  hdl s >> next
-    put (PStr s) next = hPutStr  hdl (unpackFS s) >> next
-                        -- NB. not hPutFS, we want this to go through
-                        -- the I/O library's encoding layer. (#3398)
-    put (ZStr s) next = hPutFZS  hdl s >> next
-    put (LStr s l) next = hPutLitString hdl s l >> next
+    put (Chr c)    next = hPutChar hdl c >> next
+    put (Str s)    next = hPutStr  hdl s >> next
+    put (PStr s)   next = hPutStr  hdl (unpackFS s) >> next
+                          -- NB. not hPutFS, we want this to go through
+                          -- the I/O library's encoding layer. (#3398)
+    put (ZStr s)   next = hPutFZS  hdl s >> next
+    put (LStr s)   next = hPutLitString hdl s >> next
+    put (RStr n c) next = hPutStr hdl (replicate n c) >> next
 
     done = return () -- hPutChar hdl '\n'
 
   -- some versions of hPutBuf will barf if the length is zero
-hPutLitString :: Handle -> Ptr a -> Int -> IO ()
-hPutLitString handle a l = if l == 0
-                            then return ()
-                            else hPutBuf handle a l
+hPutLitString :: Handle -> LitString -> IO ()
+hPutLitString _handle (LitString _ 0) = return ()
+hPutLitString handle  (LitString a l) = hPutBuf handle a l
 
 -- Printing output in LeftMode is performance critical: it's used when
 -- dumping C and assembly output, so we allow ourselves a few dirty
@@ -1102,7 +1099,8 @@ layLeft b (TextBeside s _ p) = s `seq` (put b s >> layLeft b p)
     put b (Str s)    = bPutStr  b s
     put b (PStr s)   = bPutFS   b s
     put b (ZStr s)   = bPutFZS  b s
-    put b (LStr s l) = bPutLitString b s l
+    put b (LStr s)   = bPutLitString b s
+    put b (RStr n c) = bPutReplicate b n c
 layLeft _ _                  = panic "layLeft: Unhandled case"
 
 -- Define error=panic, for easier comparison with libraries/pretty.

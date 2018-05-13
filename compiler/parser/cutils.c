@@ -13,23 +13,6 @@ places in the GHC library.
 #include <unistd.h>
 #endif
 
-/*
-Calling 'strlen' and 'memcpy' directly gives problems with GCC's inliner,
-and causes gcc to require too many registers on x84
-*/
-
-HsInt
-ghc_strlen( HsPtr a )
-{
-    return (strlen((char *)a));
-}
-
-HsInt
-ghc_memcmp( HsPtr a1, HsPtr a2, HsInt len )
-{
-    return (memcmp((char *)a1, a2, len));
-}
-
 void
 enableTimingStats( void )       /* called from the driver */
 {
