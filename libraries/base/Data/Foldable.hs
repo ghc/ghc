@@ -299,11 +299,27 @@ instance Foldable [] where
 -- | @since 4.9.0.0
 instance Foldable NonEmpty where
   foldr f z ~(a :| as) = f a (List.foldr f z as)
-  foldl f z ~(a :| as) = List.foldl f (f z a) as
-  foldl1 f ~(a :| as) = List.foldl f a as
+  foldl f z (a :| as) = List.foldl f (f z a) as
+  foldl1 f (a :| as) = List.foldl f a as
+
+  -- GHC isn't clever enough to transform the default definition
+  -- into anything like this, so we'd end up shuffling a bunch of
+  -- Maybes around.
+  foldr1 f (p :| ps) = foldr go id ps p
+    where
+      go x r prev = f prev (r x)
+
+  -- We used to say
+  --
+  --   length (_ :| as) = 1 + length as
+  --
+  -- but the default definition is better, counting from 1.
+  --
+  -- The default definition also works great for null and foldl'.
+  -- As usual for cons lists, foldr' is basically hopeless.
+
   foldMap f ~(a :| as) = f a `mappend` foldMap f as
   fold ~(m :| ms) = m `mappend` fold ms
-  length (_ :| as) = 1 + List.length as
   toList ~(a :| as) = a : as
 
 -- | @since 4.7.0.0
