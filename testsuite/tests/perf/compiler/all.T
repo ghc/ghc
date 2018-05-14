@@ -1051,6 +1051,7 @@ test('T12425',
           # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
           # 2017-05-23:   134780272  Addition of llvm-targets in dynflags (D3352)
           # 2018-04-15:   141952368  Collateral of #14737
+          # 2018-04-30:   130646336  improved simplCast performance #15019
           # 2018-04-26:   150743648  Do not unpack class dictionaries with INLINABLE
           ]),
      ],
@@ -1122,7 +1123,7 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1237898376, 5),
+          [(wordsize(64), 1141555816, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
@@ -1131,6 +1132,7 @@ test('T12707',
           # 2017-03-02: 1231809592  Drift from recent simplifier improvements
           # 2017-05-14: 1163821528  (amd64/Linux) Two-pass CmmLayoutStack
           # 2018-04-09: 1237898376  Inexplicable, collateral of #14737
+          # 2018-04-30: 1141555816  improved simplCast performance #15019
           ]),
      ],
      compile,
