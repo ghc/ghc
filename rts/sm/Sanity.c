@@ -481,7 +481,7 @@ checkCompactObjects(bdescr *bd)
     // before the actual closure
 
     for ( ; bd != NULL; bd = bd->link) {
-        StgCompactNFDataBlock *block, *last = NULL;
+        StgCompactNFDataBlock *block, *last;
         StgCompactNFData *str;
         StgWord totalW;
 
