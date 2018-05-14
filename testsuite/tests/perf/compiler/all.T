@@ -1236,6 +1236,8 @@ test('T14697',
           # initial:    635573784
           # 2018-02-23: 337290376 Cache the fingerprint of sOpt_P
           ]),
+       # This generates too large of a command-line for poor Windows
+       when(opsys('mingw32'), expect_broken(15072)),
        pre_cmd('./genT14697'),
        extra_files(['genT14697']),
        extra_hc_opts('$(cat T14697-flags)'), # 10k -optP arguments
