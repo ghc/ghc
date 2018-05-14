@@ -449,7 +449,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1164944688, 5)]),
+           (wordsize(64), 1106015512, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -464,9 +464,8 @@ test('T5631',
         # 2017-02-17:     1517484488 (amd64/Linux) Type-indexed Typeable
         # 2017-03-03:     1065147968 (amd64/Linux) Share Typeable KindReps
         # 2017-03-31:     1037482512 (amd64/Linux) Fix memory leak in simplifier
-	    # 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in
-	    #                            TypeEqOrigin should be fixed by #14037
-        # 2018-05-05:     1164944688 (amd64/Linux) Simplify callSiteInline a little
+	# 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in TypeEqOrigin
+	#                                  should be fixed by #14037
        only_ways(['normal'])
       ],
      compile,
@@ -1271,11 +1270,10 @@ test ('T9630',
       [ compiler_stats_num_field('max_bytes_used', # Note [residency]
           [(platform('x86_64-unknown-mingw32'),   39867088, 15),
           # 2017-12-24:                     34171816 (x64/Windows)
-          (wordsize(64), 42664296, 15)
+          (wordsize(64), 35324712, 15)
           # initial:    56955240
           # 2017-06-07: 41568168     Stop the specialiser generating loopy code
           # 2018-02-25: 35324712     It's not entirely clear
-          # 2018-05-05: 42664296     Don't inline nested function bindings as aggressively
           ]),
       extra_clean(['T9630a.hi', 'T9630a.o'])
       ],
