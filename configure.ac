@@ -1258,6 +1258,12 @@ if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
     AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
 fi
 AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
+if test $HaveLibNuma = "YES" ; then
+  AC_SUBST([CabalHaveLibNuma],[True])
+else
+  AC_SUBST([CabalHaveLibNuma],[False])
+fi
+
 
 dnl ** Documentation
 dnl --------------------------------------------------------------
