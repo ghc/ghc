@@ -338,13 +338,4 @@ round_to_mblocks(StgWord words)
     return words;
 }
 
-INLINE_HEADER StgWord
-round_up_to_mblocks(StgWord words)
-{
-    words += FIRST_BLOCK_OFF/sizeof(W_);
-    words = ((words / MBLOCK_SIZE_W) + 1) * MBLOCK_SIZE_W;
-    words -= FIRST_BLOCK_OFF/sizeof(W_);
-    return words;
-}
-
 #endif /* !CMINUSMINUS */

@@ -210,6 +210,12 @@ void recordFreedBlocks(uint32_t node, uint32_t n)
    Allocation
    -------------------------------------------------------------------------- */
 
+STATIC_INLINE bdescr *
+tail_of (bdescr *bd)
+{
+    return bd + bd->blocks - 1;
+}
+
 STATIC_INLINE void
 initGroup(bdescr *head)
 {
@@ -223,7 +229,7 @@ initGroup(bdescr *head)
   // mblocks don't have bdescrs; freeing these is handled in a
   // different way by free_mblock_group().
   if (head->blocks > 1 && head->blocks <= BLOCKS_PER_MBLOCK) {
-      bdescr *last = head + head->blocks-1;
+      bdescr *last = tail_of(head);
       last->blocks = 0;
       last->link = head;
   }
@@ -283,13 +289,6 @@ free_list_insert (uint32_t node, bdescr *bd)
     ln = log_2(bd->blocks);
 
     dbl_link_onto(bd, &free_list[node][ln]);
-}
-
-
-STATIC_INLINE bdescr *
-tail_of (bdescr *bd)
-{
-    return bd + bd->blocks - 1;
 }
 
 // After splitting a group, the last block of each group must have a

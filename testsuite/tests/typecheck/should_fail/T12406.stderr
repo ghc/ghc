@@ -1,12 +1,3 @@
 
-T12406.hs:20:7: error:
-    • Couldn't match type ‘Ref m0’ with ‘IORef’
-      Expected type: IO (Ref m0 (f0 ()))
-        Actual type: IO (Ref IO (f0 ()))
-      The type variable ‘m0’ is ambiguous
-    • In the first argument of ‘(>>=)’, namely ‘newRef (pure ())’
-      In the expression: newRef (pure ()) >>= join . readRef
-      In an equation for ‘foo’: foo = newRef (pure ()) >>= join . readRef
-
 T12406.hs:20:28: error:
     Variable not in scope: join :: m0 (f0 ()) -> IO ()

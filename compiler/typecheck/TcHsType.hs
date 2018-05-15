@@ -195,11 +195,12 @@ tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
 kcHsSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
 kcHsSigType skol_info names (HsIB { hsib_body = hs_ty
-                                  , hsib_vars = sig_vars })
+                                  , hsib_ext = HsIBRn { hsib_vars = sig_vars }})
   = addSigCtxt (funsSigCtxt names) hs_ty $
     discardResult $
     tcImplicitTKBndrs skol_info sig_vars $
     tc_lhs_type typeLevelMode hs_ty liftedTypeKind
+kcHsSigType  _ _ (XHsImplicitBndrs _) = panic "kcHsSigType"
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking; this must be done outside
@@ -237,7 +238,8 @@ tc_hs_sig_type_and_gen :: SkolemInfo -> LHsSigType GhcRn -> Kind -> TcM Type
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking, but it does zonk en route to generalization
-tc_hs_sig_type_and_gen skol_info (HsIB { hsib_vars = sig_vars
+tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext
+                                              = HsIBRn { hsib_vars = sig_vars }
                                        , hsib_body = hs_ty }) kind
   = do { (tkvs, ty) <- solveEqualities $
                        tcImplicitTKBndrs skol_info sig_vars $
@@ -251,13 +253,14 @@ tc_hs_sig_type_and_gen skol_info (HsIB { hsib_vars = sig_vars
        ; ty1 <- zonkPromoteTypeInKnot $ mkSpecForAllTys tkvs ty
        ; kvs <- kindGeneralize ty1
        ; zonkSigType (mkInvForAllTys kvs ty1) }
+tc_hs_sig_type_and_gen _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn -> Kind -> TcM Type
 -- Kind-check/desugar a 'LHsSigType', but does not solve
 -- the equalities that arise from doing so; instead it may
 -- emit kind-equality constraints into the monad
 -- Zonking, but no validity checking
-tc_hs_sig_type skol_info (HsIB { hsib_vars = sig_vars
+tc_hs_sig_type skol_info (HsIB { hsib_ext = HsIBRn { hsib_vars = sig_vars }
                                , hsib_body = hs_ty }) kind
   = do { (tkvs, ty) <- tcImplicitTKBndrs skol_info sig_vars $
                        tc_lhs_type typeLevelMode hs_ty kind
@@ -265,6 +268,7 @@ tc_hs_sig_type skol_info (HsIB { hsib_vars = sig_vars
           -- need to promote any remaining metavariables; test case:
           -- dependent/should_fail/T14066e.
        ; zonkPromoteType (mkSpecForAllTys tkvs ty) }
+tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
 
 -----------------
 tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
@@ -317,7 +321,7 @@ tcHsVectInst ty
 tcHsTypeApp :: LHsWcType GhcRn -> Kind -> TcM Type
 -- See Note [Recipe for checking a signature] in TcHsType
 tcHsTypeApp wc_ty kind
-  | HsWC { hswc_wcs = sig_wcs, hswc_body = hs_ty } <- wc_ty
+  | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
   = do { ty <- tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        ; ty <- zonkPromoteType ty
@@ -326,6 +330,7 @@ tcHsTypeApp wc_ty kind
         -- NB: we don't call emitWildcardHoleConstraints here, because
         -- we want any holes in visible type applications to be used
         -- without fuss. No errors, warnings, extensions, etc.
+tcHsTypeApp (XHsWildCardBndrs _) _ = panic "tcHsTypeApp"
 
 {-
 ************************************************************************
@@ -372,12 +377,15 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
 -- or if NoMonoLocalBinds is set. Otherwise, nope.
 -- See Note [Kind generalisation plan]
 decideKindGeneralisationPlan :: LHsSigType GhcRn -> TcM Bool
-decideKindGeneralisationPlan sig_ty@(HsIB { hsib_closed = closed })
+decideKindGeneralisationPlan sig_ty@(HsIB { hsib_ext
+                                            = HsIBRn { hsib_closed = closed } })
   = do { mono_locals <- xoptM LangExt.MonoLocalBinds
        ; let should_gen = not mono_locals || closed
        ; traceTc "decideKindGeneralisationPlan"
            (ppr sig_ty $$ text "should gen?" <+> ppr should_gen)
        ; return should_gen }
+decideKindGeneralisationPlan(XHsImplicitBndrs _)
+  = panic "decideKindGeneralisationPlan"
 
 {- Note [Kind generalisation plan]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -792,7 +800,7 @@ tc_hs_type _ (HsWildCardTy wc) exp_kind
 tc_hs_type _ ty@(HsAppsTy {}) _
   = pprPanic "tc_hs_tyep HsAppsTy" (ppr ty)
 
-tcWildCardOcc :: HsWildCardInfo GhcRn -> Kind -> TcM TcType
+tcWildCardOcc :: HsWildCardInfo -> Kind -> TcM TcType
 tcWildCardOcc wc_info exp_kind
   = do { wc_tv <- tcLookupTyVar (wildCardName wc_info)
           -- The wildcard's kind should be an un-filled-in meta tyvar
@@ -1562,8 +1570,9 @@ kcLHsQTyVars :: Name              -- ^ of the thing being checked
              -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
              -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
 kcLHsQTyVars name flav cusk
-  user_tyvars@(HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
-                      , hsq_dependent = dep_names }) thing_inside
+  user_tyvars@(HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
+                                           , hsq_dependent = dep_names }
+                      , hsq_explicit = hs_tvs }) thing_inside
   | cusk
   = do { typeintype <- xoptM LangExt.TypeInType
        ; let m_kind
@@ -1686,7 +1695,7 @@ kcLHsQTyVars name flav cusk
                        2 (vcat (map pp_tv other_tvs)) ] }
       where
         pp_tv tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
-
+kcLHsQTyVars _ _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
 kcLHsTyVarBndrs :: Bool   -- True <=> bump the TcLevel when bringing vars into scope
                 -> Bool   -- True <=> Default un-annotated tyvar
@@ -2325,8 +2334,9 @@ tcHsPartialSigType
          , TcType )           -- Tau part
 -- See Note [Recipe for checking a signature]
 tcHsPartialSigType ctxt sig_ty
-  | HsWC { hswc_wcs  = sig_wcs,         hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_vars = implicit_hs_tvs, hsib_body = hs_ty } <- ib_ty
+  | HsWC { hswc_ext  = sig_wcs,         hswc_body = ib_ty } <- sig_ty
+  , HsIB { hsib_ext = HsIBRn { hsib_vars = implicit_hs_tvs }
+         , hsib_body = hs_ty } <- ib_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
@@ -2374,6 +2384,8 @@ tcHsPartialSigType ctxt sig_ty
        ; return (wcs, wcx, tv_names, all_tvs, theta, tau) }
   where
     skol_info   = SigTypeSkol ctxt
+tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPartialSigType"
+tcHsPartialSigType _ (XHsWildCardBndrs _) = panic "tcHsPartialSigType"
 
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext hs_theta
@@ -2446,8 +2458,9 @@ tcHsPatSigType :: UserTypeCtxt
 -- This may emit constraints
 -- See Note [Recipe for checking a signature]
 tcHsPatSigType ctxt sig_ty
-  | HsWC { hswc_wcs = sig_wcs,   hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_vars = sig_vars, hsib_body = hs_ty } <- ib_ty
+  | HsWC { hswc_ext = sig_wcs,   hswc_body = ib_ty } <- sig_ty
+  , HsIB { hsib_ext = HsIBRn { hsib_vars = sig_vars}
+         , hsib_body = hs_ty } <- ib_ty
   = addSigCtxt ctxt hs_ty $
     do { sig_tkvs <- mapM new_implicit_tv sig_vars
        ; (wcs, sig_ty)
@@ -2483,6 +2496,8 @@ tcHsPatSigType ctxt sig_ty
          -- But if it's a SigTyVar, it might have been unified
          -- with an existing in-scope skolem, so we must zonk
          -- here.  See Note [Pattern signature binders]
+tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPatSigType"
+tcHsPatSigType _ (XHsWildCardBndrs _) = panic "tcHsPatSigType"
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn

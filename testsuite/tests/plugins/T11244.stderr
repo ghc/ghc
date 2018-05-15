@@ -1,3 +1,5 @@
 <command line>: Could not find module ‘RuleDefiningPlugin’
 It is a member of the hidden package ‘rule-defining-plugin-0.1’.
+You can run ‘:set -package rule-defining-plugin’ to expose it.
+(Note: this unloads all the modules in the current scope.)
 Use -v to see a list of the files searched for.

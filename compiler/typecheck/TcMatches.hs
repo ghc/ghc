@@ -228,10 +228,9 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; pat_tys  <- mapM (mapM readExpType) pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts = L l matches'
-                    , mg_arg_tys = pat_tys
-                    , mg_res_ty = rhs_ty
-                    , mg_origin = origin
-                    , mg_weight = Omega }) } -- MattP: This information should be collected from above
+                    , mg_ext = MatchGroupTc pat_tys rhs_ty Omega -- MattP: This information should be collected from above
+                    , mg_origin = origin }) }
+tcMatches _ _ _ (XMatchGroup {}) = panic "tcMatches"
 
 -------------
 tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
@@ -248,8 +247,10 @@ tcMatch ctxt pat_tys rhs_ty match
       = add_match_ctxt match $
         do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
-           ; return (Match { m_ctxt = mc_what ctxt, m_pats = pats'
+           ; return (Match { m_ext = noExt
+                           , m_ctxt = mc_what ctxt, m_pats = pats'
                            , m_grhss = grhss' }) }
+    tc_match  _ _ _ (XMatch _) = panic "tcMatch"
 
         -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         -- so we don't want to add "In the lambda abstraction \x->e"
@@ -268,24 +269,26 @@ tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (Located (body GhcRn)) -> ExpRhoType
 -- We used to force it to be a monotype when there was more than one guard
 -- but we don't need to do that any more
 
-tcGRHSs ctxt (GRHSs grhss (L l binds)) res_ty
+tcGRHSs ctxt (GRHSs _ grhss (L l binds)) res_ty
   = do  { (binds', grhss')
             <- tcLocalBinds binds $
                mapM (wrapLocM (tcGRHS ctxt res_ty)) grhss
 
-        ; return (GRHSs grhss' (L l binds')) }
+        ; return (GRHSs noExt grhss' (L l binds')) }
+tcGRHSs _ (XGRHSs _) _ = panic "tcGRHSs"
 
 -------------
 tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (Located (body GhcRn))
        -> TcM (GRHS GhcTcId (Located (body GhcTcId)))
 
-tcGRHS ctxt res_ty (GRHS guards rhs)
+tcGRHS ctxt res_ty (GRHS _ guards rhs)
   = do  { (guards', rhs')
             <- tcStmtsAndThen stmt_ctxt tcGuardStmt guards res_ty $
                mc_body ctxt rhs
-        ; return (GRHS guards' rhs') }
+        ; return (GRHS noExt guards' rhs') }
   where
     stmt_ctxt  = PatGuard (mc_what ctxt)
+tcGRHS _ _ (XGRHS _) = panic "tcGRHS"
 
 {-
 ************************************************************************
@@ -381,11 +384,11 @@ tcStmtsAndThen _ _ [] res_ty thing_inside
         ; return ([], thing) }
 
 -- LetStmts are handled uniformly, regardless of context
-tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt (L l binds)) : stmts)
+tcStmtsAndThen ctxt stmt_chk (L loc (LetStmt x (L l binds)) : stmts)
                                                              res_ty thing_inside
   = do  { (binds', (stmts',thing)) <- tcLocalBinds binds $
               tcStmtsAndThen ctxt stmt_chk stmts res_ty thing_inside
-        ; return (L loc (LetStmt (L l binds')) : stmts', thing) }
+        ; return (L loc (LetStmt x (L l binds')) : stmts', thing) }
 
 -- Don't set the error context for an ApplicativeStmt.  It ought to be
 -- possible to do this with a popErrCtxt in the tcStmt case for
@@ -414,12 +417,12 @@ tcStmtsAndThen ctxt stmt_chk (L loc stmt : stmts) res_ty thing_inside
 ---------------------------------------------------
 
 tcGuardStmt :: TcExprStmtChecker
-tcGuardStmt _ (BodyStmt guard _ _ _) res_ty thing_inside
+tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
   = do  { guard' <- tcMonoExpr guard (mkCheckExpType boolTy)
         ; thing  <- thing_inside res_ty
-        ; return (BodyStmt guard' noSyntaxExpr noSyntaxExpr boolTy, thing) }
+        ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcGuardStmt ctxt (BindStmt pat rhs _ _ _) res_ty thing_inside
+tcGuardStmt ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
   = do  { (rhs', rhs_ty) <- tcInferSigmaNC rhs
                                    -- Stmt has a context already
         ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
@@ -448,13 +451,13 @@ tcGuardStmt _ stmt _ _
 tcLcStmt :: TyCon       -- The list/Parray type constructor ([] or PArray)
          -> TcExprStmtChecker
 
-tcLcStmt _ _ (LastStmt body noret _) elt_ty thing_inside
+tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
   = do { body' <- tcMonoExprNC body elt_ty
        ; thing <- thing_inside (panic "tcLcStmt: thing_inside")
-       ; return (LastStmt body' noret noSyntaxExpr, thing) }
+       ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
 -- A generator, pat <- rhs
-tcLcStmt m_tc ctxt (BindStmt pat rhs _ _ _) elt_ty thing_inside
+tcLcStmt m_tc ctxt (BindStmt _ pat rhs _ _) elt_ty thing_inside
  = do   { pat_ty <- newFlexiTyVarTy liftedTypeKind
         ; rhs'   <- tcMonoExpr rhs (mkCheckExpType $ mkTyConApp m_tc [pat_ty])
         ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (unrestricted $ mkCheckExpType pat_ty) $
@@ -462,15 +465,15 @@ tcLcStmt m_tc ctxt (BindStmt pat rhs _ _ _) elt_ty thing_inside
         ; return (mkTcBindStmt pat' rhs', thing) }
 
 -- A boolean guard
-tcLcStmt _ _ (BodyStmt rhs _ _ _) elt_ty thing_inside
+tcLcStmt _ _ (BodyStmt _ rhs _ _) elt_ty thing_inside
   = do  { rhs'  <- tcMonoExpr rhs (mkCheckExpType boolTy)
         ; thing <- thing_inside elt_ty
-        ; return (BodyStmt rhs' noSyntaxExpr noSyntaxExpr boolTy, thing) }
+        ; return (BodyStmt boolTy rhs' noSyntaxExpr noSyntaxExpr, thing) }
 
 -- ParStmt: See notes with tcMcStmt
-tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
+tcLcStmt m_tc ctxt (ParStmt _ bndr_stmts_s _ _) elt_ty thing_inside
   = do  { (pairs', thing) <- loop bndr_stmts_s
-        ; return (ParStmt pairs' noExpr noSyntaxExpr unitTy, thing) }
+        ; return (ParStmt unitTy pairs' noExpr noSyntaxExpr, thing) }
   where
     -- loop :: [([LStmt GhcRn], [GhcRn])]
     --      -> TcM ([([LStmt GhcTcId], [GhcTcId])], thing)
@@ -546,7 +549,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
                            , trS_ret = noSyntaxExpr
                            , trS_bind = noSyntaxExpr
                            , trS_fmap = noExpr
-                           , trS_bind_arg_ty = unitTy
+                           , trS_ext = unitTy
                            , trS_form = form }, thing) }
 
 tcLcStmt _ _ stmt _ _
@@ -560,13 +563,13 @@ tcLcStmt _ _ stmt _ _
 
 tcMcStmt :: TcExprStmtChecker
 
-tcMcStmt _ (LastStmt body noret return_op) res_ty thing_inside
+tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
   = do  { (body', return_op')
             <- tcSyntaxOp MCompOrigin return_op [SynRho] res_ty $
                \ [a_ty] [weight]->
                tcScalingUsage weight $ tcMonoExprNC body (mkCheckExpType a_ty)
         ; thing      <- thing_inside (panic "tcMcStmt: thing_inside")
-        ; return (LastStmt body' noret return_op', thing) }
+        ; return (LastStmt x body' noret return_op', thing) }
 
 -- Generators for monad comprehensions ( pat <- rhs )
 --
@@ -574,7 +577,7 @@ tcMcStmt _ (LastStmt body noret return_op) res_ty thing_inside
 --                            q   ::   a
 --
 
-tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op _) res_ty thing_inside
+tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
   = do  { ((rhs', pat', thing, new_res_ty), bind_op')
             <- tcSyntaxOp MCompOrigin bind_op
@@ -589,13 +592,13 @@ tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op _) res_ty thing_inside
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- tcMonadFailOp (MCompPatOrigin pat) pat' fail_op new_res_ty
 
-        ; return (BindStmt pat' rhs' bind_op' fail_op' new_res_ty, thing) }
+        ; return (BindStmt new_res_ty pat' rhs' bind_op' fail_op', thing) }
 
 -- Boolean expressions.
 --
 --   [ body | stmts, expr ]  ->  expr :: m Bool
 --
-tcMcStmt _ (BodyStmt rhs then_op guard_op _) res_ty thing_inside
+tcMcStmt _ (BodyStmt _ rhs then_op guard_op) res_ty thing_inside
   = do  { -- Deal with rebindable syntax:
           --    guard_op :: test_ty -> rhs_ty
           --    then_op  :: rhs_ty -> new_res_ty -> res_ty
@@ -611,7 +614,7 @@ tcMcStmt _ (BodyStmt rhs then_op guard_op _) res_ty thing_inside
                          tcScalingUsage test_weight $ tcMonoExpr rhs (mkCheckExpType test_ty)
                   ; thing <- tcScalingUsage fun_weight $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (thing, rhs', rhs_ty, guard_op') }
-        ; return (BodyStmt rhs' then_op' guard_op' rhs_ty, thing) }
+        ; return (BodyStmt rhs_ty rhs' then_op' guard_op', thing) }
 
 -- Grouping statements
 --
@@ -726,7 +729,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        ; return (TransStmt { trS_stmts = stmts', trS_bndrs = bindersMap'
                            , trS_by = by', trS_using = final_using
                            , trS_ret = return_op', trS_bind = bind_op'
-                           , trS_bind_arg_ty = n_app tup_ty
+                           , trS_ext = n_app tup_ty
                            , trS_fmap = fmap_op', trS_form = form }, thing) }
 
 -- A parallel set of comprehensions
@@ -758,7 +761,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 --        -> (m st2 -> m st3 -> m (st2, st3))   -- recursive call
 --        -> m (st1, (st2, st3))
 --
-tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
+tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
   = do { let star_star_kind = liftedTypeKind `mkFunTyOm` liftedTypeKind
        ; m_ty   <- newFlexiTyVarTy star_star_kind
 
@@ -787,7 +790,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
                                  tup_tys bndr_stmts_s
                  ; return (stuff, inner_res_ty) }
 
-       ; return (ParStmt blocks' mzip_op' bind_op' inner_res_ty, thing) }
+       ; return (ParStmt inner_res_ty blocks' mzip_op' bind_op', thing) }
 
   where
     mk_tuple_ty tys = foldr1 (\tn tm -> mkBoxedTupleTy [tn, tm]) tys
@@ -829,12 +832,12 @@ tcMcStmt _ stmt _ _
 
 tcDoStmt :: TcExprStmtChecker
 
-tcDoStmt _ (LastStmt body noret _) res_ty thing_inside
+tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
   = do { body' <- tcMonoExprNC body res_ty
        ; thing <- thing_inside (panic "tcDoStmt: thing_inside")
-       ; return (LastStmt body' noret noSyntaxExpr, thing) }
+       ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
-tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op _) res_ty thing_inside
+tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
                 --       (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
                 -- This level of generality is needed for using do-notation
@@ -852,9 +855,9 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op _) res_ty thing_inside
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op new_res_ty
 
-        ; return (BindStmt pat' rhs' bind_op' fail_op' new_res_ty, thing) }
+        ; return (BindStmt new_res_ty pat' rhs' bind_op' fail_op', thing) }
 
-tcDoStmt ctxt (ApplicativeStmt pairs mb_join _) res_ty thing_inside
+tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
   = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
                                 thing_inside . mkCheckExpType
         ; ((pairs', body_ty, thing), mb_join') <- case mb_join of
@@ -864,9 +867,9 @@ tcDoStmt ctxt (ApplicativeStmt pairs mb_join _) res_ty thing_inside
               (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
                \ [rhs_ty] [rhs_weight] -> tcScalingUsage rhs_weight $ tc_app_stmts (mkCheckExpType rhs_ty)) -- TODO: arnaud: probably not quite correct, check ApplicativeDo with linearity
 
-        ; return (ApplicativeStmt pairs' mb_join' body_ty, thing) }
+        ; return (ApplicativeStmt body_ty pairs' mb_join', thing) }
 
-tcDoStmt _ (BodyStmt rhs then_op _ _) res_ty thing_inside
+tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax;
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
         ; ((rhs', rhs_ty, thing), then_op')
@@ -875,7 +878,7 @@ tcDoStmt _ (BodyStmt rhs then_op _ _) res_ty thing_inside
                do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
                   ; thing <- tcScalingUsage fun_weight $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', rhs_ty, thing) }
-        ; return (BodyStmt rhs' then_op' noSyntaxExpr rhs_ty, thing) }
+        ; return (BodyStmt rhs_ty rhs' then_op' noSyntaxExpr, thing) }
 
 tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                        , recS_rec_ids = rec_names, recS_ret_fn = ret_op
@@ -921,9 +924,11 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; return (RecStmt { recS_stmts = stmts', recS_later_ids = later_ids
                           , recS_rec_ids = rec_ids, recS_ret_fn = ret_op'
                           , recS_mfix_fn = mfix_op', recS_bind_fn = bind_op'
-                          , recS_bind_ty = new_res_ty
-                          , recS_later_rets = [], recS_rec_rets = tup_rets
-                          , recS_ret_ty = stmts_ty }, thing)
+                          , recS_ext = RecStmtTc
+                            { recS_bind_ty = new_res_ty
+                            , recS_later_rets = []
+                            , recS_rec_rets = tup_rets
+                            , recS_ret_ty = stmts_ty} }, thing)
         }}
 
 tcDoStmt _ stmt _ _
@@ -1066,15 +1071,15 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
     goArg :: (ApplicativeArg GhcRn, Type, Type)
           -> TcM (ApplicativeArg GhcTcId)
 
-    goArg (ApplicativeArgOne pat rhs isBody, pat_ty, exp_ty)
+    goArg (ApplicativeArgOne x pat rhs isBody, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
            ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (unrestricted $ mkCheckExpType pat_ty) $
                           return ()
-           ; return (ApplicativeArgOne pat' rhs' isBody) }
+           ; return (ApplicativeArgOne x pat' rhs' isBody) }
 
-    goArg (ApplicativeArgMany stmts ret pat, pat_ty, exp_ty)
+    goArg (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
       = do { (stmts', (ret',pat')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
@@ -1083,11 +1088,14 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                                  return ()
                   ; return (ret', pat')
                   }
-           ; return (ApplicativeArgMany stmts' ret' pat') }
+           ; return (ApplicativeArgMany x stmts' ret' pat') }
+
+    goArg (XApplicativeArg _, _, _) = panic "tcApplicativeStmts"
 
     get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
-    get_arg_bndrs (ApplicativeArgOne pat _ _)  = collectPatBinders pat
-    get_arg_bndrs (ApplicativeArgMany _ _ pat) = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgOne _ pat _ _)  = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
+    get_arg_bndrs (XApplicativeArg _)            = panic "tcApplicativeStmts"
 
 
 {- Note [ApplicativeDo and constraints]
@@ -1144,3 +1152,5 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
 
     args_in_match :: LMatch GhcRn body -> Int
     args_in_match (L _ (Match { m_pats = pats })) = length pats
+    args_in_match (L _ (XMatch _)) = panic "checkArgs"
+checkArgs _ (XMatchGroup{}) = panic "checkArgs"

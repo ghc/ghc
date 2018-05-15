@@ -174,14 +174,7 @@ def checkDynAsm(actual_file, normaliser):
     actual_raw = read_no_crs(actual_file)
     actual_str = normaliser(actual_raw)
     actual = actual_str.split()
-    if actual == ['initArray1', 'initArray2', 'ctors1', 'ctors2', 'success']:
-        return 1
-    elif actual == ['initArray1', 'initArray2', 'ctors2', 'ctors1', 'success']:
-        # gold seems to produce this ordering; this is slightly odd but if it's
-        # wrong it's not our fault. See #13883.
-        return 1
-    elif actual == ['ctors1', 'ctors2', 'initArray1', 'initArray2', 'success']:
-        if_verbose(1, 'T5435_dyn_asm detected old-style dlopen, see #8458')
+    if actual == ['initArray1', 'initArray2', 'success']:
         return 1
     elif opsys('darwin') and actual == ['modInitFunc1', 'modInitFunc2', 'success']:
         return 1
@@ -191,13 +184,22 @@ def checkDynAsm(actual_file, normaliser):
         if_verbose(1, 'T5435_dyn_asm failed with %s, see all.T for details' % actual)
         return 0
 
+# T5435_v_asm got split into two tests because depending
+# on the linker, .init_array and .ctors sections are loaded
+# in a different order (but all entries within a section
+# do get loaded in a deterministic order). So we test each
+# separately now.
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
-
-test('T5435_v_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
+test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259))],
-     run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
+     run_command, ['$MAKE -s --no-print-directory T5435_v_asm_a'])
+# this one just needs to run on linux, as darwin/mingw32 are covered
+# by the _a test already.
+test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']),
+		      when(opsys('darwin') or opsys('mingw32'), skip)],
+     run_command, ['$MAKE -s --no-print-directory T5435_v_asm_b'])
 test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
                      when(arch('powerpc64') or arch('powerpc64le'),
                           expect_broken(11259))],
@@ -382,7 +384,12 @@ test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])
 
-test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
+test('T12903', [ when(opsys('mingw32'), skip)
+               # produces out of sequence samples in the profasm way
+	       , expect_broken_for(15065, ['profasm'])
+	       , omit_ways(['ghci'])
+	       ], compile_and_run, [''])
+
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
 test('T13894', normal, compile_and_run, [''])
 test('T14497', normal, compile_and_run, ['-O'])
@@ -402,3 +409,10 @@ test('alloccounter1', normal, compile_and_run,
     # allocation and messes up the results:
     '-with-rtsopts=-k1m'
   ])
+
+test('nursery-chunks1',
+  [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
+  , only_ways(['threaded1','threaded2'])
+  ],
+  compile_and_run,
+  [''])

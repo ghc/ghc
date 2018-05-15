@@ -494,8 +494,7 @@ splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> DmdResult -> 
 splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs mb_join_arity fun_ty
-                        wrap_dmds use_res_info
+    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_res_info
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
@@ -528,7 +527,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
 
                         `setInlinePragma` work_prag
 
-                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn (unfoldingInfo fn_info)
+                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
                                 -- See Note [Worker-wrapper for INLINABLE functions]
 
                         `setIdStrictness` mkClosedStrictSig work_demands work_res_info
@@ -577,13 +576,12 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
 
       Nothing -> return [(fn_id, rhs)]
   where
-    mb_join_arity   = isJoinId_maybe fn_id
     rhs_fvs         = exprFreeVars rhs
-    fun_ty          = idType fn_id
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
     fn_act          = inl_act fn_inl_prag
     rule_match_info = inlinePragmaRuleMatchInfo fn_inl_prag
+    fn_unfolding    = unfoldingInfo fn_info
     arity           = arityInfo fn_info
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
@@ -692,7 +690,7 @@ then the splitting will go deeper too.
 splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk dflags fam_envs is_rec fn_id rhs
   = ASSERT(not (isJoinId fn_id))
-    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs [fn_id]
+    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [fn_id]
        ; let res = [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
        ; if useful then ASSERT2( isNonRec is_rec, ppr fn_id ) -- The thunk must be non-recursive
                    return res

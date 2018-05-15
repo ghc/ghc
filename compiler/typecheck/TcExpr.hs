@@ -2028,6 +2028,7 @@ too_many_args fun args
   where
     pp (HsValArg e)                             = ppr e
     pp (HsTypeArg (HsWC { hswc_body = L _ t })) = pprHsType t
+    pp (HsTypeArg (XHsWildCardBndrs _)) = panic "too_many_args"
 
 
 {-

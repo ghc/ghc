@@ -791,16 +791,14 @@ checkPromptStringForErrors (_:xs) = checkPromptStringForErrors xs
 checkPromptStringForErrors "" = Nothing
 
 generatePromptFunctionFromString :: String -> PromptFunction
-generatePromptFunctionFromString promptS = \_ _ -> do
-    (context, modules_names, line) <- getInfoForPrompt
-
-    let
+generatePromptFunctionFromString promptS modules_names line =
+        processString promptS
+  where
         processString :: String -> GHCi SDoc
         processString ('%':'s':xs) =
             liftM2 (<>) (return modules_list) (processString xs)
             where
-              modules_list = context <> modules_bit
-              modules_bit = hsep $ map text modules_names
+              modules_list = hsep $ map text modules_names
         processString ('%':'l':xs) =
             liftM2 (<>) (return $ ppr line) (processString xs)
         processString ('%':'d':xs) =
@@ -860,8 +858,6 @@ generatePromptFunctionFromString promptS = \_ _ -> do
             liftM (char x <>) (processString xs)
         processString "" =
             return empty
-
-    processString promptS
 
 mkPrompt :: GHCi String
 mkPrompt = do

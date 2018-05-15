@@ -62,8 +62,8 @@ testOneFile libdir fileName = do
 
      doImportDecl :: ImportDecl GhcPs
                   -> [(String,[Located (SourceText,FastString)])]
-     doImportDecl (ImportDecl _ _ Nothing _ _ _ _ _ _) = []
-     doImportDecl (ImportDecl _ _ (Just ss) _ _ _ _ _ _)
+     doImportDecl (ImportDecl _ _ _ Nothing _ _ _ _ _ _) = []
+     doImportDecl (ImportDecl _ _ _ (Just ss) _ _ _ _ _ _)
                                                      = [("i",[conv (noLoc ss)])]
 
      doCType :: CType -> [(String,[Located (SourceText,FastString)])]
@@ -73,7 +73,7 @@ testOneFile libdir fileName = do
 
      doRuleDecl :: RuleDecl GhcPs
                 -> [(String,[Located (SourceText,FastString)])]
-     doRuleDecl (HsRule ss _ _ _ _ _ _) = [("r",[ss])]
+     doRuleDecl (HsRule _ ss _ _ _ _) = [("r",[ss])]
 
      doCCallTarget :: CCallTarget
                    -> [(String,[Located (SourceText,FastString)])]

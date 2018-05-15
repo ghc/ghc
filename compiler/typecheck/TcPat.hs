@@ -436,15 +436,16 @@ tc_pat penv (SigPat sig_ty pat ) pat_ty thing_inside
 
 ------------------------
 -- Lists, tuples, arrays
-tc_pat penv (ListPat x pats _ Nothing) pat_ty thing_inside
+tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
   = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv (weightedThing pat_ty)
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
                                      pats penv thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
-        ; return (mkHsWrapPat coi (ListPat x pats' elt_ty Nothing) pat_ty, res)
-        }
+        ; return (mkHsWrapPat coi
+                         (ListPat (ListPatTc elt_ty Nothing) pats') pat_ty, res)
+}
 
-tc_pat penv (ListPat x pats _ (Just (_,e))) pat_ty thing_inside
+tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
   = do  { tau_pat_ty <- expTypeToType (weightedThing pat_ty)
         ; ((pats', res, elt_ty), e')
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
@@ -453,7 +454,7 @@ tc_pat penv (ListPat x pats _ (Just (_,e))) pat_ty thing_inside
                  do { (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
                                                  pats penv thing_inside
                     ; return (pats', res, elt_ty) }
-        ; return (ListPat x pats' elt_ty (Just (tau_pat_ty,e')), res)
+        ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
 }
 
 tc_pat penv (PArrPat _ pats) pat_ty thing_inside

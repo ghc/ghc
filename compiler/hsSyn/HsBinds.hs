@@ -25,7 +25,6 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
-import PlaceHolder
 import HsExtension
 import HsTypes
 import PprCore ()
@@ -95,10 +94,10 @@ data HsLocalBindsLR idL idR
   | XHsLocalBindsLR
         (XXHsLocalBindsLR idL idR)
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = NoExt
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExt
+type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExt
+type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExt
 
 type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
@@ -136,7 +135,7 @@ data NHsValBindsLR idL
       [(RecFlag, LHsBinds idL)]
       [LSig GhcRn]
 
-type instance XValBinds    (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XValBinds    (GhcPass pL) (GhcPass pR) = NoExt
 type instance XXValBindsLR (GhcPass pL) (GhcPass pR)
             = NHsValBindsLR (GhcPass pL)
 
@@ -320,18 +319,18 @@ data NPatBindTc = NPatBindTc {
      pat_rhs_ty :: Type  -- ^ Type of the GRHSs
      } deriving Data
 
-type instance XFunBind    (GhcPass pL) GhcPs = PlaceHolder
+type instance XFunBind    (GhcPass pL) GhcPs = NoExt
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet -- Free variables
 type instance XFunBind    (GhcPass pL) GhcTc = NameSet -- Free variables
 
-type instance XPatBind    GhcPs (GhcPass pR) = PlaceHolder
+type instance XPatBind    GhcPs (GhcPass pR) = NoExt
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
 type instance XPatBind    GhcTc (GhcPass pR) = NPatBindTc
 
-type instance XVarBind    (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XPatSynBind (GhcPass pL) (GhcPass pR) = PlaceHolder
-type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = PlaceHolder
+type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExt
+type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExt
+type instance XPatSynBind (GhcPass pL) (GhcPass pR) = NoExt
+type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExt
 
 
         -- Consider (AbsBinds tvs ds [(ftvs, poly_f, mono_f) binds]
@@ -357,8 +356,8 @@ data ABExport p
         }
    | XABExport (XXABExport p)
 
-type instance XABE       (GhcPass p) = PlaceHolder
-type instance XXABExport (GhcPass p) = PlaceHolder
+type instance XABE       (GhcPass p) = NoExt
+type instance XXABExport (GhcPass p) = NoExt
 
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
@@ -370,9 +369,9 @@ type instance XXABExport (GhcPass p) = PlaceHolder
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
-  = PSB { psb_ext  :: XPSB idL idR,
+  = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
+                                               -- See Note [Bind free vars]
           psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
-          psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
           psb_args :: HsPatSynDetails (Located (IdP idR)),
                                                -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
@@ -380,8 +379,11 @@ data PatSynBind idL idR
      }
    | XPatSynBind (XXPatSynBind idL idR)
 
-type instance XPSB         (GhcPass idL) (GhcPass idR) = PlaceHolder
-type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = PlaceHolder
+type instance XPSB         (GhcPass idL) GhcPs = NoExt
+type instance XPSB         (GhcPass idL) GhcRn = NameSet
+type instance XPSB         (GhcPass idL) GhcTc = NameSet
+
+type instance XXPatSynBind (GhcPass idL) (GhcPass idR) = NoExt
 
 {-
 Note [AbsBinds]
@@ -765,7 +767,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       pprLHsBinds val_binds
 ppr_monobind (XHsBindsLR x) = ppr x
 
-instance (OutputableBndrId p) => Outputable (ABExport p) where
+instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ABExport p) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
@@ -822,13 +824,13 @@ data HsIPBinds id
         --                 -- uses of the implicit parameters
   | XHsIPBinds (XXHsIPBinds id)
 
-type instance XIPBinds       GhcPs = PlaceHolder
-type instance XIPBinds       GhcRn = PlaceHolder
+type instance XIPBinds       GhcPs = NoExt
+type instance XIPBinds       GhcRn = NoExt
 type instance XIPBinds       GhcTc = TcEvBinds -- binds uses of the
                                                -- implicit parameters
 
 
-type instance XXHsIPBinds    (GhcPass p) = PlaceHolder
+type instance XXHsIPBinds    (GhcPass p) = NoExt
 
 isEmptyIPBindsPR :: HsIPBinds (GhcPass p) -> Bool
 isEmptyIPBindsPR (IPBinds _ is) = null is
@@ -862,8 +864,8 @@ data IPBind id
         (LHsExpr id)
   | XCIPBind (XXIPBind id)
 
-type instance XIPBind     (GhcPass p) = PlaceHolder
-type instance XXIPBind    (GhcPass p) = PlaceHolder
+type instance XIPBind     (GhcPass p) = NoExt
+type instance XXIPBind    (GhcPass p) = NoExt
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsIPBinds p) where
@@ -1045,18 +1047,18 @@ data Sig pass
                      (Maybe (Located (IdP pass)))
   | XSig (XXSig pass)
 
-type instance XTypeSig          (GhcPass p) = PlaceHolder
-type instance XPatSynSig        (GhcPass p) = PlaceHolder
-type instance XClassOpSig       (GhcPass p) = PlaceHolder
-type instance XIdSig            (GhcPass p) = PlaceHolder
-type instance XFixSig           (GhcPass p) = PlaceHolder
-type instance XInlineSig        (GhcPass p) = PlaceHolder
-type instance XSpecSig          (GhcPass p) = PlaceHolder
-type instance XSpecInstSig      (GhcPass p) = PlaceHolder
-type instance XMinimalSig       (GhcPass p) = PlaceHolder
-type instance XSCCFunSig        (GhcPass p) = PlaceHolder
-type instance XCompleteMatchSig (GhcPass p) = PlaceHolder
-type instance XXSig             (GhcPass p) = PlaceHolder
+type instance XTypeSig          (GhcPass p) = NoExt
+type instance XPatSynSig        (GhcPass p) = NoExt
+type instance XClassOpSig       (GhcPass p) = NoExt
+type instance XIdSig            (GhcPass p) = NoExt
+type instance XFixSig           (GhcPass p) = NoExt
+type instance XInlineSig        (GhcPass p) = NoExt
+type instance XSpecSig          (GhcPass p) = NoExt
+type instance XSpecInstSig      (GhcPass p) = NoExt
+type instance XMinimalSig       (GhcPass p) = NoExt
+type instance XSCCFunSig        (GhcPass p) = NoExt
+type instance XCompleteMatchSig (GhcPass p) = NoExt
+type instance XXSig             (GhcPass p) = NoExt
 
 -- | Located Fixity Signature
 type LFixitySig pass = Located (FixitySig pass)
@@ -1065,8 +1067,8 @@ type LFixitySig pass = Located (FixitySig pass)
 data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
                     | XFixitySig (XXFixitySig pass)
 
-type instance XFixitySig  (GhcPass p) = PlaceHolder
-type instance XXFixitySig (GhcPass p) = PlaceHolder
+type instance XFixitySig  (GhcPass p) = NoExt
+type instance XXFixitySig (GhcPass p) = NoExt
 
 -- | Type checker Specialisation Pragmas
 --
@@ -1203,7 +1205,8 @@ ppr_sig (CompleteMatchSig _ src cs mty)
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
 ppr_sig (XSig x) = ppr x
 
-instance OutputableBndrId pass => Outputable (FixitySig pass) where
+instance (p ~ GhcPass pass, OutputableBndrId p)
+       => Outputable (FixitySig p) where
   ppr (FixitySig _ names fixity) = sep [ppr fixity, pprops]
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)

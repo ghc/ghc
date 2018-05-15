@@ -646,6 +646,7 @@ filterAlts _tycon inst_tys imposs_cons alts
     impossible_alt _  _                         = False
 
 -- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
+-- See Note [Refine Default Alts]
 refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
                  -> Rig               -- ^ Weight
                  -> TyCon             -- ^ Type constructor of scrutinee's type
@@ -688,6 +689,93 @@ refineDefaultAlt us weight tycon tys imposs_deflt_cons all_alts
 
   | otherwise      -- The common case
   = (False, all_alts)
+
+{- Note [Refine Default Alts]
+
+refineDefaultAlt replaces the DEFAULT alt with a constructor if there is one
+possible value it could be.
+
+The simplest example being
+
+foo :: () -> ()
+foo x = case x of !_ -> ()
+
+rewrites to
+
+foo :: () -> ()
+foo x = case x of () -> ()
+
+There are two reasons in general why this is desirable.
+
+1. We can simplify inner expressions
+
+In this example we can eliminate the inner case by refining the outer case.
+If we don't refine it, we are left with both case expressions.
+
+```
+{-# LANGUAGE BangPatterns #-}
+module Test where
+
+mid x = x
+{-# NOINLINE mid #-}
+
+data Foo = Foo1 ()
+
+test :: Foo -> ()
+test x =
+  case x of
+    !_ -> mid (case x of
+                Foo1 x1 -> x1)
+
+```
+
+refineDefaultAlt fills in the DEFAULT here with `Foo ip1` and then x
+becomes bound to `Foo ip1` so is inlined into the other case which
+causes the KnownBranch optimisation to kick in.
+
+
+2. combineIdenticalAlts does a better job
+
+Simon Jakobi also points out that that combineIdenticalAlts will do a better job
+if we refine the DEFAULT first.
+
+```
+data D = C0 | C1 | C2
+
+case e of
+   DEFAULT -> e0
+   C0 -> e1
+   C1 -> e1
+```
+
+When we apply combineIdenticalAlts to this expression, it can't
+combine the alts for C0 and C1, as we already have a default case.
+
+If we apply refineDefaultAlt first, we get
+
+```
+case e of
+  C0 -> e1
+  C1 -> e1
+  C2 -> e0
+```
+
+and combineIdenticalAlts can turn that into
+
+```
+case e of
+  DEFAULT -> e1
+  C2 -> e0
+```
+
+It isn't obvious that refineDefaultAlt does this but if you look at its one
+call site in SimplUtils then the `imposs_deflt_cons` argument is populated with
+constructors which are matched elsewhere.
+
+-}
+
+
+
 
 {- Note [Combine identical alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

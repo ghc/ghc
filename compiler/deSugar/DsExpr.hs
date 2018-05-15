@@ -447,7 +447,7 @@ ds_expr _ (HsMultiIf res_ty alts)
   | otherwise
   = do { match_result <- liftM (foldr1 combineMatchResults)
                                (mapM (dsGRHS IfAlt res_ty) alts)
-       ; checkGuardMatches IfAlt (GRHSs alts (noLoc emptyLocalBinds))
+       ; checkGuardMatches IfAlt (GRHSs noExt alts (noLoc emptyLocalBinds))
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where
@@ -630,13 +630,13 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         -- constructor arguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd Nothing (MG { mg_alts = noLoc alts
-                                                   , mg_arg_tys = [unrestricted in_ty] -- TODO: arnaud: haven't thought of the rules for record update
-                                                   , mg_res_ty = out_ty
-                                                   , mg_origin = FromSource
-                                                   , mg_weight = Omega }) -- MattP: TODO Check this multiplicity
-                                                   -- FromSource is not strictly right, but we
-                                                   -- want incomplete pattern-match warnings
+                <- matchWrapper RecUpd Nothing
+                                      (MG { mg_alts = noLoc alts
+                                          , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty Omega
+                                          , mg_origin = FromSource
+                                          }) -- MattP: TODO Check this multiplicity
+                                     -- FromSource is not strictly right, but we
+                                     -- want incomplete pattern-match warnings
 
         ; return (add_field_binds field_binds' $
                   bindNonRec discrim_var record_expr' matching_code) }
@@ -914,21 +914,21 @@ dsDo stmts
     goL [] = panic "dsDo"
     goL (L loc stmt:lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
 
-    go _ (LastStmt body _ _) stmts
+    go _ (LastStmt _ body _ _) stmts
       = ASSERT( null stmts ) dsLExpr body
         -- The 'return' op isn't used for 'do' expressions
 
-    go _ (BodyStmt rhs then_expr _ _) stmts
+    go _ (BodyStmt _ rhs then_expr _) stmts
       = do { rhs2 <- dsLExpr rhs
            ; warnDiscardedDoBindings rhs (exprType rhs2)
            ; rest <- goL stmts
            ; dsSyntaxExpr then_expr [rhs2, rest] }
 
-    go _ (LetStmt binds) stmts
+    go _ (LetStmt _ binds) stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt pat rhs bind_op fail_op res1_ty) stmts
+    go _ (BindStmt res1_ty pat rhs bind_op fail_op) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL pat
@@ -937,15 +937,16 @@ dsDo stmts
             ; match_code <- handle_failure pat match fail_op
             ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
-    go _ (ApplicativeStmt args mb_join body_ty) stmts
+    go _ (ApplicativeStmt body_ty args mb_join) stmts
       = do {
              let
                (pats, rhss) = unzip (map (do_arg . snd) args)
 
-               do_arg (ApplicativeArgOne pat expr _) =
+               do_arg (ApplicativeArgOne _ pat expr _) =
                  (pat, dsLExpr expr)
-               do_arg (ApplicativeArgMany stmts ret pat) =
+               do_arg (ApplicativeArgMany _ stmts ret pat) =
                  (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+               do_arg (XApplicativeArg _) = panic "dsDo"
 
                arg_tys = map hsLPatType pats
 
@@ -956,10 +957,9 @@ dsDo stmts
            ; let fun = L noSrcSpan $ HsLam noExt $
                    MG { mg_alts = noLoc [mkSimpleMatch LambdaExpr pats
                                                        body']
-                      , mg_arg_tys = map unrestricted arg_tys
-                      , mg_res_ty = body_ty
-                      , mg_origin = Generated
-                      , mg_weight = Omega } -- TODO: MattP: Check this multiplicity
+                      , mg_ext = MatchGroupTc (map unrestricted arg_tys) body_ty Omega
+                      , mg_origin = Generated }
+                      -- TODO: MattP: Check this multiplicity
 
            ; fun' <- dsLExpr fun
            ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
@@ -971,14 +971,15 @@ dsDo stmts
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
-                    , recS_bind_ty = bind_ty
-                    , recS_rec_rets = rec_rets, recS_ret_ty = body_ty }) stmts
+                    , recS_ext = RecStmtTc
+                        { recS_bind_ty = bind_ty
+                        , recS_rec_rets = rec_rets
+                        , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt (mkBigLHsPatTupId later_pats)
+        new_bind_stmt = L loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
-                                         bind_ty
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
@@ -990,9 +991,9 @@ dsDo stmts
                            (MG { mg_alts = noLoc [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
-                               , mg_arg_tys = [unrestricted tup_ty], mg_res_ty = body_ty
-                               , mg_origin = Generated
-                               , mg_weight = Omega }) -- TODO: MattP: check this multiplicity
+                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty Omega
+                               -- TODO: MattP: check this multiplicity
+                               , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt]))
@@ -1004,6 +1005,7 @@ dsDo stmts
 
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
+    go _ (XStmtLR   {}) _ = panic "dsDo XStmtLR"
 
 handle_failure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls

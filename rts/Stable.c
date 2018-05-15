@@ -181,7 +181,7 @@ initStableTables(void)
 {
     if (SNT_size > 0) return;
     SNT_size = INIT_SNT_SIZE;
-    stable_name_table = stgMallocBytes(SNT_size * sizeof *stable_name_table,
+    stable_name_table = stgMallocBytes(SNT_size * sizeof(snEntry),
                                        "initStableNameTable");
     /* we don't use index 0 in the stable name table, because that
      * would conflict with the hash table lookup operations which
@@ -192,7 +192,7 @@ initStableTables(void)
 
     if (SPT_size > 0) return;
     SPT_size = INIT_SPT_SIZE;
-    stable_ptr_table = stgMallocBytes(SPT_size * sizeof *stable_ptr_table,
+    stable_ptr_table = stgMallocBytes(SPT_size * sizeof(spEntry),
                                       "initStablePtrTable");
     initSpEntryFreeList(stable_ptr_table,INIT_SPT_SIZE,NULL);
 
@@ -214,12 +214,13 @@ enlargeStableNameTable(void)
     SNT_size *= 2;
     stable_name_table =
         stgReallocBytes(stable_name_table,
-                        SNT_size * sizeof *stable_name_table,
+                        SNT_size * sizeof(snEntry),
                         "enlargeStableNameTable");
 
     initSnEntryFreeList(stable_name_table + old_SNT_size, old_SNT_size, NULL);
 }
 
+// Must be holding stable_mutex
 static void
 enlargeStablePtrTable(void)
 {
@@ -233,11 +234,11 @@ enlargeStablePtrTable(void)
      * [Enlarging the stable pointer table].
      */
     new_stable_ptr_table =
-        stgMallocBytes(SPT_size * sizeof *stable_ptr_table,
+        stgMallocBytes(SPT_size * sizeof(spEntry),
                        "enlargeStablePtrTable");
     memcpy(new_stable_ptr_table,
            stable_ptr_table,
-           old_SPT_size * sizeof *stable_ptr_table);
+           old_SPT_size * sizeof(spEntry));
     ASSERT(n_old_SPTs < MAX_N_OLD_SPTS);
     old_SPTs[n_old_SPTs++] = stable_ptr_table;
 
@@ -376,9 +377,6 @@ removeIndirections (StgClosure* p)
 StgWord
 lookupStableName (StgPtr p)
 {
-  StgWord sn;
-  const void* sn_tmp;
-
   stableLock();
 
   if (stable_name_free == NULL) {
@@ -393,8 +391,7 @@ lookupStableName (StgPtr p)
   // register the untagged pointer.  This just makes things simpler.
   p = (StgPtr)UNTAG_CLOSURE((StgClosure*)p);
 
-  sn_tmp = lookupHashTable(addrToStableHash,(W_)p);
-  sn = (StgWord)sn_tmp;
+  StgWord sn = (StgWord)lookupHashTable(addrToStableHash,(W_)p);
 
   if (sn != 0) {
     ASSERT(stable_name_table[sn].addr == p);
@@ -531,7 +528,7 @@ threadStableTables( evac_fn evac, void *user )
 }
 
 /* -----------------------------------------------------------------------------
- * Garbage collect any dead entries in the stable pointer table.
+ * Garbage collect any dead entries in the stable name table.
  *
  * A dead entry has:
  *
@@ -549,32 +546,26 @@ gcStableTables( void )
 {
     FOR_EACH_STABLE_NAME(
         p, {
-            // Update the pointer to the StableName object, if there is one
+            // FOR_EACH_STABLE_NAME traverses free entries too, so
+            // check sn_obj
             if (p->sn_obj != NULL) {
+                // Update the pointer to the StableName object, if there is one
                 p->sn_obj = isAlive(p->sn_obj);
-                if(p->sn_obj == NULL) {
+                if (p->sn_obj == NULL) {
                     // StableName object died
                     debugTrace(DEBUG_stable, "GC'd StableName %ld (addr=%p)",
                                (long)(p - stable_name_table), p->addr);
                     freeSnEntry(p);
-                    /* Can't "continue", so use goto */
-                    goto next_stable_name;
+                } else if (p->addr != NULL) {
+                    // sn_obj is alive, update pointee
+                    p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
+                    if (p->addr == NULL) {
+                        // Pointee died
+                        debugTrace(DEBUG_stable, "GC'd pointee %ld",
+                                   (long)(p - stable_name_table));
+                    }
                 }
             }
-            /* If sn_obj became NULL, the object died, and addr is now
-             * invalid. But if sn_obj was null, then the StableName
-             * object may not have been created yet, while the pointee
-             * already exists and must be updated to new location. */
-            if (p->addr != NULL) {
-                p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-                if(p->addr == NULL) {
-                    // StableName pointee died
-                    debugTrace(DEBUG_stable, "GC'd pointee %ld",
-                               (long)(p - stable_name_table));
-                }
-            }
-    next_stable_name:
-            if (0) {}
         });
 }
 

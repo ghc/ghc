@@ -530,14 +530,15 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- (see TcRnTypes.insolubleWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("custom_error", is_user_type_error,True, mkUserTypeErrorReporter)
+    report1 = [ ("Out of scope", is_out_of_scope, out_of_scope_killer, mkHoleReporter tidy_cts)
+              , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
+              , ("custom_error", is_user_type_error, True, mkUserTypeErrorReporter)
+
               , given_eq_spec
               , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
               , ("skolem eq1",   very_wrong,     True, mkSkolReporter)
               , ("skolem eq2",   skolem_eq,      True, mkSkolReporter)
               , ("non-tv eq",    non_tv_eq,      True, mkSkolReporter)
-              , ("Out of scope", is_out_of_scope,True, mkHoleReporter tidy_cts)
-              , ("Holes",        is_hole,        False, mkHoleReporter tidy_cts)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
@@ -551,6 +552,15 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
+
+    out_of_scope_killer :: Bool
+    out_of_scope_killer
+      = case cec_out_of_scope_holes ctxt of
+          HoleError -> True  -- Makes scope errors suppress type errors
+          _         -> False -- But if the scope-errors are warnings or deferred,
+                             -- do not suppress type errors; else you get an exit
+                             -- code of "success" even though there is
+                             -- a type error!
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_hole, is_dict,
@@ -790,6 +800,8 @@ reportGroup mk_err ctxt cts =
             _otherwise           -> False
 
 maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
+-- Unlike maybeReportError, these "hole" errors are
+-- /not/ suppressed by cec_suppress.  We want to see them!
 maybeReportHoleError ctxt ct err
   -- When -XPartialTypeSignatures is on, warnings (instead of errors) are
   -- generated for holes in partial type signatures.

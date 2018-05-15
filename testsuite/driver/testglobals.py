@@ -109,6 +109,12 @@ class TestConfig:
         # Do we have SMP support?
         self.have_smp = False
 
+        # Is gdb avaliable?
+        self.have_gdb = False
+
+        # Is readelf available?
+        self.have_readelf = False
+
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 

@@ -1,0 +1,11 @@
+#define CATCH_FRAME 34
+
+#define SIZEOF_StgCatchFrame (SIZEOF_StgHeader+16)
+
+INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
+               bits64 info_ptr, bits64 exceptions_blocked, gcptr handler)
+    return (gcptr ret)
+{
+    return (ret);
+}
+

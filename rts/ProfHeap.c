@@ -127,8 +127,8 @@ closureIdentity( const StgClosure *p )
             return retainerSetOf(p);
         else
             return NULL;
+#endif
 
-#else
     case HEAP_BY_CLOSURE_TYPE:
     {
         const StgInfoTable *info;
@@ -147,7 +147,6 @@ closureIdentity( const StgClosure *p )
         }
     }
 
-#endif
     default:
         barf("closureIdentity");
     }
@@ -815,7 +814,6 @@ dumpCensus( Census *census )
 
         if (count == 0) continue;
 
-#if !defined(PROFILING)
         switch (RtsFlags.ProfFlags.doHeapProfile) {
         case HEAP_BY_CLOSURE_TYPE:
             fprintf(hp_file, "%s", (char *)ctr->identity);
@@ -823,7 +821,6 @@ dumpCensus( Census *census )
                                       count * sizeof(W_));
             break;
         }
-#endif
 
 #if defined(PROFILING)
         switch (RtsFlags.ProfFlags.doHeapProfile) {

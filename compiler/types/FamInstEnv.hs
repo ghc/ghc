@@ -53,7 +53,7 @@ import PrelNames ( eqPrimTyConKey )
 import UniqDFM
 import Outputable
 import Maybes
-import TrieMap
+import CoreMap
 import Unique
 import Util
 import Var

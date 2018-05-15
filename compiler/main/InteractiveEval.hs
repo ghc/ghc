@@ -810,7 +810,7 @@ isDecl dflags stmt = do
   case parseThing Parser.parseDeclaration dflags stmt of
     Lexer.POk _ thing ->
       case unLoc thing of
-        SpliceD _ -> False
+        SpliceD _ _ -> False
         _ -> True
     Lexer.PFailed _ _ _ -> False
 
@@ -870,7 +870,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
-      let_stmt = L loc . LetStmt . L loc . (HsValBinds noExt) $
+      let_stmt = L loc . LetStmt noExt . L loc . (HsValBinds noExt) $
         ValBinds noExt
                      (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 

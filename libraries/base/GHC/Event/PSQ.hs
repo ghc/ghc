@@ -28,7 +28,7 @@ module GHC.Event.PSQ
     , singleton
 
     -- * Insertion
-    , insert
+    , unsafeInsertNew
 
     -- * Delete/Update
     , delete
@@ -36,7 +36,6 @@ module GHC.Event.PSQ
 
     -- * Conversion
     , toList
-    , fromList
 
     -- * Min
     , findMin
@@ -213,14 +212,7 @@ singleton = Tip
 -- Insertion
 ------------------------------------------------------------------------------
 
--- | /O(min(n,W))/ Insert a new key, priority and value into the queue. If the key
--- is already present in the queue, the associated priority and value are
--- replaced with the supplied priority and value.
-insert :: Key -> Prio -> v -> IntPSQ v -> IntPSQ v
-insert k p x t0 = unsafeInsertNew k p x (delete k t0)
-
--- | Internal function to insert a key that is *not* present in the priority
--- queue.
+-- | /O(min(n,W))/ Insert a new key that is *not* present in the priority queue.
 {-# INLINABLE unsafeInsertNew #-}
 unsafeInsertNew :: Key -> Prio -> v -> IntPSQ v -> IntPSQ v
 unsafeInsertNew k p x = go
@@ -339,13 +331,6 @@ binShrinkR k p x m l r   = Bin k p x m l r
 ------------------------------------------------------------------------------
 -- Lists
 ------------------------------------------------------------------------------
-
--- | /O(n*min(n,W))/ Build a queue from a list of (key, priority, value) tuples.
--- If the list contains more than one priority and value for the same key, the
--- last priority and value for the key is retained.
-{-# INLINABLE fromList #-}
-fromList :: [Elem v] -> IntPSQ v
-fromList = foldr (\(E k p x) im -> insert k p x im) empty
 
 -- | /O(n)/ Convert a queue to a list of (key, priority, value) tuples. The
 -- order of the list is not specified.

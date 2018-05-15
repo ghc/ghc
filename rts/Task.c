@@ -416,7 +416,7 @@ workerTaskStop (Task *task)
 
 #if defined(THREADED_RTS)
 
-static void OSThreadProcAttr
+static void* OSThreadProcAttr
 workerStart(Task *task)
 {
     Capability *cap;
@@ -442,6 +442,8 @@ workerStart(Task *task)
     traceTaskCreate(task, cap);
 
     scheduleWorker(cap,task);
+
+    return NULL;
 }
 
 /* N.B. must take all_tasks_mutex */

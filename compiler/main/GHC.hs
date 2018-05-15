@@ -472,7 +472,6 @@ withCleanupSession ghc = ghc `gfinally` cleanup
           cleanTempFiles dflags
           cleanTempDirs dflags
           stopIServ hsc_env -- shut down the IServ
-          log_finaliser dflags dflags
           --  exceptions will be blocked while we clean the temporary files,
           -- so there shouldn't be any difficulty if we receive further
           -- signals.
@@ -592,12 +591,11 @@ setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 -- | Set the action taken when the compiler produces a message.  This
 -- can also be accomplished using 'setProgramDynFlags', but using
 -- 'setLogAction' avoids invalidating the cached module graph.
-setLogAction :: GhcMonad m => LogAction -> LogFinaliser -> m ()
-setLogAction action finaliser = do
+setLogAction :: GhcMonad m => LogAction -> m ()
+setLogAction action = do
   dflags' <- getProgramDynFlags
   void $ setProgramDynFlags_ False $
-    dflags' { log_action = action
-            , log_finaliser = finaliser }
+    dflags' { log_action = action }
 
 setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [InstalledUnitId]
 setProgramDynFlags_ invalidate_needed dflags = do

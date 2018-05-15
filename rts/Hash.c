@@ -77,8 +77,9 @@ hashWord(const HashTable *table, StgWord key)
 }
 
 int
-hashStr(const HashTable *table, char *key)
+hashStr(const HashTable *table, StgWord w)
 {
+    const char *key = (char*) w;
 #ifdef x86_64_HOST_ARCH
     StgWord h = XXH64 (key, strlen(key), 1048583);
 #else
@@ -440,8 +441,7 @@ allocHashTable(void)
 HashTable *
 allocStrHashTable(void)
 {
-    return allocHashTable_((HashFunction *)hashStr,
-                           (CompareFunction *)compareStr);
+    return allocHashTable_(hashStr, compareStr);
 }
 
 void

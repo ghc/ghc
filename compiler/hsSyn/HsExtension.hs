@@ -21,17 +21,11 @@ import GhcPrelude
 import GHC.Exts (Constraint)
 import Data.Data hiding ( Fixity )
 import PlaceHolder
-import BasicTypes
-import ConLike
-import NameSet
 import Name
 import RdrName
 import Var
-import Type       ( Type )
 import Outputable
 import SrcLoc (Located)
-import Coercion
-import TcEvidence
 
 {-
 Note [Trees that grow]
@@ -58,9 +52,16 @@ haskell-src-exts ASTs as well.
 
 -}
 
+-- | used as place holder in TTG values
+data NoExt = NoExt
+  deriving (Data,Eq,Ord)
+
+instance Outputable NoExt where
+  ppr _ = text "NoExt"
+
 -- | Used when constructing a term with an unused extension point.
-noExt :: PlaceHolder
-noExt = PlaceHolder
+noExt :: NoExt
+noExt = NoExt
 
 -- | Used as a data type index for the hsSyn AST
 data GhcPass (c :: Pass)
@@ -75,19 +76,6 @@ type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
 type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
 type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
 type GhcTcId = GhcTc                -- Old 'TcId' type param
-
-
--- | Types that are not defined until after type checking
-type family PostTc x ty -- Note [Pass sensitive types] in PlaceHolder
-type instance PostTc GhcPs ty = PlaceHolder
-type instance PostTc GhcRn ty = PlaceHolder
-type instance PostTc GhcTc ty = ty
-
--- | Types that are not defined until after renaming
-type family PostRn x ty  -- Note [Pass sensitive types] in PlaceHolder
-type instance PostRn GhcPs ty = PlaceHolder
-type instance PostRn GhcRn ty = ty
-type instance PostRn GhcTc ty = ty
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p
@@ -217,8 +205,300 @@ type ForallXFixitySig (c :: * -> Constraint) (x :: *) =
 -- =====================================================================
 -- Type families for the HsDecls extension points
 
+-- HsDecl type families
+type family XTyClD       x
+type family XInstD       x
+type family XDerivD      x
+type family XValD        x
+type family XSigD        x
+type family XDefD        x
+type family XForD        x
+type family XWarningD    x
+type family XAnnD        x
+type family XRuleD       x
+type family XVectD       x
+type family XSpliceD     x
+type family XDocD        x
+type family XRoleAnnotD  x
+type family XXHsDecl     x
 
--- TODO
+type ForallXHsDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XTyClD       x)
+       , c (XInstD       x)
+       , c (XDerivD      x)
+       , c (XValD        x)
+       , c (XSigD        x)
+       , c (XDefD        x)
+       , c (XForD        x)
+       , c (XWarningD    x)
+       , c (XAnnD        x)
+       , c (XRuleD       x)
+       , c (XVectD       x)
+       , c (XSpliceD     x)
+       , c (XDocD        x)
+       , c (XRoleAnnotD  x)
+       , c (XXHsDecl    x)
+       )
+
+-- -------------------------------------
+-- HsGroup type families
+type family XCHsGroup      x
+type family XXHsGroup      x
+
+type ForallXHsGroup (c :: * -> Constraint) (x :: *) =
+       ( c (XCHsGroup       x)
+       , c (XXHsGroup       x)
+       )
+
+-- -------------------------------------
+-- SpliceDecl type families
+type family XSpliceDecl       x
+type family XXSpliceDecl      x
+
+type ForallXSpliceDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XSpliceDecl        x)
+       , c (XXSpliceDecl       x)
+       )
+
+-- -------------------------------------
+-- TyClDecl type families
+type family XFamDecl       x
+type family XSynDecl       x
+type family XDataDecl      x
+type family XClassDecl     x
+type family XXTyClDecl     x
+
+type ForallXTyClDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XFamDecl       x)
+       , c (XSynDecl       x)
+       , c (XDataDecl      x)
+       , c (XClassDecl     x)
+       , c (XXTyClDecl     x)
+       )
+
+-- -------------------------------------
+-- TyClGroup type families
+type family XCTyClGroup      x
+type family XXTyClGroup      x
+
+type ForallXTyClGroup (c :: * -> Constraint) (x :: *) =
+       ( c (XCTyClGroup       x)
+       , c (XXTyClGroup       x)
+       )
+
+-- -------------------------------------
+-- FamilyResultSig type families
+type family XNoSig            x
+type family XCKindSig         x -- Clashes with XKindSig above
+type family XTyVarSig         x
+type family XXFamilyResultSig x
+
+type ForallXFamilyResultSig (c :: * -> Constraint) (x :: *) =
+       ( c (XNoSig            x)
+       , c (XCKindSig         x)
+       , c (XTyVarSig         x)
+       , c (XXFamilyResultSig x)
+       )
+
+-- -------------------------------------
+-- FamilyDecl type families
+type family XCFamilyDecl      x
+type family XXFamilyDecl      x
+
+type ForallXFamilyDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XCFamilyDecl       x)
+       , c (XXFamilyDecl       x)
+       )
+
+-- -------------------------------------
+-- HsDataDefn type families
+type family XCHsDataDefn      x
+type family XXHsDataDefn      x
+
+type ForallXHsDataDefn (c :: * -> Constraint) (x :: *) =
+       ( c (XCHsDataDefn       x)
+       , c (XXHsDataDefn       x)
+       )
+
+-- -------------------------------------
+-- HsDerivingClause type families
+type family XCHsDerivingClause      x
+type family XXHsDerivingClause      x
+
+type ForallXHsDerivingClause (c :: * -> Constraint) (x :: *) =
+       ( c (XCHsDerivingClause       x)
+       , c (XXHsDerivingClause       x)
+       )
+
+-- -------------------------------------
+-- ConDecl type families
+type family XConDeclGADT   x
+type family XConDeclH98    x
+type family XXConDecl      x
+
+type ForallXConDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XConDeclGADT    x)
+       , c (XConDeclH98     x)
+       , c (XXConDecl       x)
+       )
+
+-- -------------------------------------
+-- FamEqn type families
+type family XCFamEqn      x p r
+type family XXFamEqn      x p r
+
+type ForallXFamEqn (c :: * -> Constraint) (x :: *) (p :: *) (r :: *) =
+       ( c (XCFamEqn       x p r)
+       , c (XXFamEqn       x p r)
+       )
+
+-- -------------------------------------
+-- ClsInstDecl type families
+type family XCClsInstDecl      x
+type family XXClsInstDecl      x
+
+type ForallXClsInstDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XCClsInstDecl       x)
+       , c (XXClsInstDecl       x)
+       )
+
+-- -------------------------------------
+-- ClsInstDecl type families
+type family XClsInstD      x
+type family XDataFamInstD  x
+type family XTyFamInstD    x
+type family XXInstDecl     x
+
+type ForallXInstDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XClsInstD       x)
+       , c (XDataFamInstD   x)
+       , c (XTyFamInstD     x)
+       , c (XXInstDecl      x)
+       )
+
+-- -------------------------------------
+-- DerivDecl type families
+type family XCDerivDecl      x
+type family XXDerivDecl      x
+
+type ForallXDerivDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XCDerivDecl       x)
+       , c (XXDerivDecl       x)
+       )
+
+-- -------------------------------------
+-- DefaultDecl type families
+type family XCDefaultDecl      x
+type family XXDefaultDecl      x
+
+type ForallXDefaultDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XCDefaultDecl       x)
+       , c (XXDefaultDecl       x)
+       )
+
+-- -------------------------------------
+-- DefaultDecl type families
+type family XForeignImport     x
+type family XForeignExport     x
+type family XXForeignDecl      x
+
+type ForallXForeignDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XForeignImport      x)
+       , c (XForeignExport      x)
+       , c (XXForeignDecl       x)
+       )
+
+-- -------------------------------------
+-- RuleDecls type families
+type family XCRuleDecls      x
+type family XXRuleDecls      x
+
+type ForallXRuleDecls (c :: * -> Constraint) (x :: *) =
+       ( c (XCRuleDecls       x)
+       , c (XXRuleDecls       x)
+       )
+
+
+-- -------------------------------------
+-- RuleDecl type families
+type family XHsRule         x
+type family XXRuleDecl      x
+
+type ForallXRuleDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XHsRule          x)
+       , c (XXRuleDecl       x)
+       )
+
+-- -------------------------------------
+-- RuleBndr type families
+type family XCRuleBndr      x
+type family XRuleBndrSig    x
+type family XXRuleBndr      x
+
+type ForallXRuleBndr (c :: * -> Constraint) (x :: *) =
+       ( c (XCRuleBndr       x)
+       , c (XRuleBndrSig     x)
+       , c (XXRuleBndr       x)
+       )
+
+-- -------------------------------------
+-- RuleBndr type families
+type family XHsVect          x
+type family XHsNoVect        x
+type family XHsVectType      x
+type family XHsVectClass     x
+type family XHsVectInst      x
+type family XXVectDecl       x
+
+type ForallXVectDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XHsVect          x)
+       , c (XHsNoVect        x)
+       , c (XHsVectType      x)
+       , c (XHsVectClass     x)
+       , c (XHsVectInst      x)
+       , c (XXVectDecl       x)
+       , c (XXVectDecl       x)
+       )
+
+-- -------------------------------------
+-- WarnDecls type families
+type family XWarnings        x
+type family XXWarnDecls      x
+
+type ForallXWarnDecls (c :: * -> Constraint) (x :: *) =
+       ( c (XWarnings        x)
+       , c (XXWarnDecls      x)
+       )
+
+-- -------------------------------------
+-- AnnDecl type families
+type family XWarning        x
+type family XXWarnDecl      x
+
+type ForallXWarnDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XWarning        x)
+       , c (XXWarnDecl      x)
+       )
+
+-- -------------------------------------
+-- AnnDecl type families
+type family XHsAnnotation  x
+type family XXAnnDecl      x
+
+type ForallXAnnDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XHsAnnotation  x)
+       , c (XXAnnDecl      x)
+       )
+
+-- -------------------------------------
+-- RoleAnnotDecl type families
+type family XCRoleAnnotDecl  x
+type family XXRoleAnnotDecl  x
+
+type ForallXRoleAnnotDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XCRoleAnnotDecl  x)
+       , c (XXRoleAnnotDecl  x)
+       )
 
 -- =====================================================================
 -- Type families for the HsExpr extension points
@@ -398,6 +678,70 @@ type ForallXCmdTop (c :: * -> Constraint) (x :: *) =
        , c (XXCmdTop x)
        )
 
+-- -------------------------------------
+
+type family XMG           x b
+type family XXMatchGroup  x b
+
+type ForallXMatchGroup (c :: * -> Constraint) (x :: *) (b :: *) =
+       ( c (XMG          x b)
+       , c (XXMatchGroup x b)
+       )
+
+-- -------------------------------------
+
+type family XCMatch  x b
+type family XXMatch  x b
+
+type ForallXMatch (c :: * -> Constraint) (x :: *) (b :: *) =
+       ( c (XCMatch  x b)
+       , c (XXMatch  x b)
+       )
+
+-- -------------------------------------
+
+type family XCGRHSs  x b
+type family XXGRHSs  x b
+
+type ForallXGRHSs (c :: * -> Constraint) (x :: *) (b :: *) =
+       ( c (XCGRHSs  x b)
+       , c (XXGRHSs  x b)
+       )
+
+-- -------------------------------------
+
+type family XCGRHS  x b
+type family XXGRHS  x b
+
+type ForallXGRHS (c :: * -> Constraint) (x :: *) (b :: *) =
+       ( c (XCGRHS  x b)
+       , c (XXGRHS  x b)
+       )
+
+-- -------------------------------------
+
+type family XLastStmt        x x' b
+type family XBindStmt        x x' b
+type family XApplicativeStmt x x' b
+type family XBodyStmt        x x' b
+type family XLetStmt         x x' b
+type family XParStmt         x x' b
+type family XTransStmt       x x' b
+type family XRecStmt         x x' b
+type family XXStmtLR         x x' b
+
+type ForallXStmtLR (c :: * -> Constraint) (x :: *)  (x' :: *) (b :: *) =
+       ( c (XLastStmt         x x' b)
+       , c (XBindStmt         x x' b)
+       , c (XApplicativeStmt  x x' b)
+       , c (XBodyStmt         x x' b)
+       , c (XLetStmt          x x' b)
+       , c (XParStmt          x x' b)
+       , c (XTransStmt        x x' b)
+       , c (XRecStmt          x x' b)
+       , c (XXStmtLR          x x' b)
+       )
+
 -- ---------------------------------------------------------------------
 
 type family XCmdArrApp  x
@@ -434,6 +778,18 @@ type family XXParStmtBlock x x'
 type ForallXParStmtBlock (c :: * -> Constraint) (x :: *) (x' :: *) =
        ( c (XParStmtBlock  x x')
        , c (XXParStmtBlock x x')
+       )
+
+-- ---------------------------------------------------------------------
+
+type family XApplicativeArgOne   x
+type family XApplicativeArgMany  x
+type family XXApplicativeArg     x
+
+type ForallXApplicativeArg (c :: * -> Constraint) (x :: *) =
+       ( c (XApplicativeArgOne   x)
+       , c (XApplicativeArgMany  x)
+       , c (XXApplicativeArg     x)
        )
 
 -- =====================================================================
@@ -536,6 +892,36 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
 -- =====================================================================
 -- Type families for the HsTypes type families
 
+type family XHsQTvs       x
+type family XXLHsQTyVars  x
+
+type ForallXLHsQTyVars (c :: * -> Constraint) (x :: *) =
+       ( c (XHsQTvs       x)
+       , c (XXLHsQTyVars  x)
+       )
+
+-- -------------------------------------
+
+type family XHsIB              x b
+type family XXHsImplicitBndrs  x b
+
+type ForallXHsImplicitBndrs (c :: * -> Constraint) (x :: *) (b :: *) =
+       ( c (XHsIB              x b)
+       , c (XXHsImplicitBndrs  x b)
+       )
+
+-- -------------------------------------
+
+type family XHsWC              x b
+type family XXHsWildCardBndrs  x b
+
+type ForallXHsWildCardBndrs(c :: * -> Constraint) (x :: *) (b :: *) =
+       ( c (XHsWC              x b)
+       , c (XXHsWildCardBndrs  x b)
+       )
+
+-- -------------------------------------
+
 type family XForAllTy        x
 type family XQualTy          x
 type family XTyVar           x
@@ -616,6 +1002,16 @@ type ForallXAppType (c :: * -> Constraint) (x :: *) =
 
 -- ---------------------------------------------------------------------
 
+type family XConDeclField  x
+type family XXConDeclField x
+
+type ForallXConDeclField (c :: * -> Constraint) (x :: *) =
+       ( c (XConDeclField  x)
+       , c (XXConDeclField x)
+       )
+
+-- ---------------------------------------------------------------------
+
 type family XFieldOcc  x
 type family XXFieldOcc x
 
@@ -623,6 +1019,44 @@ type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
        ( c (XFieldOcc  x)
        , c (XXFieldOcc x)
        )
+
+
+-- =====================================================================
+-- Type families for the HsImpExp type families
+
+type family XCImportDecl       x
+type family XXImportDecl       x
+
+type ForallXImportDecl (c :: * -> Constraint) (x :: *) =
+       ( c (XCImportDecl x)
+       , c (XXImportDecl x)
+       )
+
+-- -------------------------------------
+
+type family XIEVar             x
+type family XIEThingAbs        x
+type family XIEThingAll        x
+type family XIEThingWith       x
+type family XIEModuleContents  x
+type family XIEGroup           x
+type family XIEDoc             x
+type family XIEDocNamed        x
+type family XXIE               x
+
+type ForallXIE (c :: * -> Constraint) (x :: *) =
+       ( c (XIEVar x)
+       , c (XIEThingAbs        x)
+       , c (XIEThingAll        x)
+       , c (XIEThingWith       x)
+       , c (XIEModuleContents  x)
+       , c (XIEGroup           x)
+       , c (XIEDoc             x)
+       , c (XIEDocNamed        x)
+       , c (XXIE               x)
+       )
+
+-- -------------------------------------
 
 
 -- =====================================================================
@@ -661,29 +1095,34 @@ type ConvertIdX a b =
 
 -- ----------------------------------------------------------------------
 
+-- Note [OutputableX]
+-- ~~~~~~~~~~~~~~~~~~
+--
+-- is required because the type family resolution
+-- process cannot determine that all cases are handled for a `GhcPass p`
+-- case where the cases are listed separately.
+--
+-- So
+--
+--   type instance XXHsIPBinds    (GhcPass p) = NoExt
+--
+-- will correctly deduce Outputable for (GhcPass p), but
+--
+--   type instance XIPBinds       GhcPs = NoExt
+--   type instance XIPBinds       GhcRn = NoExt
+--   type instance XIPBinds       GhcTc = TcEvBinds
+--
+-- will not.
+
+
 -- | Provide a summary constraint that gives all am Outputable constraint to
 -- extension points needing one
-type OutputableX p =
-  ( Outputable (XXPat p)
-  , Outputable (XXPat GhcRn)
-
-  , Outputable (XSigPat p)
+type OutputableX p = -- See Note [OutputableX]
+  (
+    Outputable (XSigPat p)
   , Outputable (XSigPat GhcRn)
 
-  , Outputable (XXLit p)
-
-  , Outputable (XXOverLit p)
-
-  , Outputable (XXType p)
-
-  , Outputable (XXABExport p)
-
   , Outputable (XIPBinds    p)
-  , Outputable (XXHsIPBinds p)
-  , Outputable (XXIPBind    p)
-  , Outputable (XXIPBind    GhcRn)
-  , Outputable (XXSig       p)
-  , Outputable (XXFixitySig p)
 
   , Outputable (XExprWithTySig p)
   , Outputable (XExprWithTySig GhcRn)
@@ -691,95 +1130,19 @@ type OutputableX p =
   , Outputable (XAppTypeE p)
   , Outputable (XAppTypeE GhcRn)
 
-  -- , Outputable (XXParStmtBlock (GhcPass idL) idR)
+  , Outputable (XHsVectType p)
+  , Outputable (XHsVectType GhcRn)
+
+  , Outputable (XHsVectClass p)
+  , Outputable (XHsVectClass GhcRn)
+
+  , Outputable (XHsVectInst p)
+  , Outputable (XHsVectInst GhcRn)
+
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
 -- ----------------------------------------------------------------------
-
---
-type DataId p =
-  ( Data p
-
-  , ForallXHsLit Data p
-  , ForallXPat   Data p
-
-  -- Th following GhcRn constraints should go away once TTG is fully implemented
-  , ForallXPat     Data GhcRn
-  , ForallXType    Data GhcRn
-  , ForallXExpr    Data GhcRn
-  , ForallXTupArg  Data GhcRn
-  , ForallXSplice  Data GhcRn
-  , ForallXBracket Data GhcRn
-  , ForallXCmdTop  Data GhcRn
-  , ForallXCmd     Data GhcRn
-
-  , ForallXOverLit           Data p
-  , ForallXType              Data p
-  , ForallXTyVarBndr         Data p
-  , ForallXAppType           Data p
-  , ForallXFieldOcc          Data p
-  , ForallXAmbiguousFieldOcc Data p
-
-  , ForallXExpr      Data p
-  , ForallXTupArg    Data p
-  , ForallXSplice    Data p
-  , ForallXBracket   Data p
-  , ForallXCmdTop    Data p
-  , ForallXCmd       Data p
-  , ForallXABExport  Data p
-  , ForallXHsIPBinds Data p
-  , ForallXIPBind    Data p
-  , ForallXSig       Data p
-  , ForallXFixitySig Data p
-
-  , Data (NameOrRdrName (IdP p))
-
-  , Data (IdP p)
-  , Data (PostRn p (IdP p))
-  , Data (PostRn p (Located Name))
-  , Data (PostRn p Bool)
-  , Data (PostRn p Fixity)
-  , Data (PostRn p NameSet)
-  , Data (PostRn p [Name])
-
-  , Data (PostTc p (IdP p))
-  , Data (PostTc p Coercion)
-  , Data (PostTc p ConLike)
-  , Data (PostTc p HsWrapper)
-  , Data (PostTc p Type)
-  , Data (PostTc p [ConLike])
-  , Data (PostTc p [Type])
-  )
-
-type DataIdLR pL pR =
-  ( DataId pL
-  , DataId pR
-
-  , ForallXHsLocalBindsLR Data pL pR
-  , ForallXHsLocalBindsLR Data pL pL
-  , ForallXHsLocalBindsLR Data pR pR
-
-  , ForallXValBindsLR     Data pL pR
-  , ForallXValBindsLR     Data pL pL
-  , ForallXValBindsLR     Data pR pR
-
-  , ForallXHsBindsLR      Data pL pR
-  , ForallXHsBindsLR      Data pL pL
-  , ForallXHsBindsLR      Data pR pR
-
-  , ForallXPatSynBind     Data pL pR
-  , ForallXPatSynBind     Data pL pL
-  , ForallXPatSynBind     Data pR pR
-  -- , ForallXPatSynBind     Data GhcPs GhcRn
-  -- , ForallXPatSynBind     Data GhcRn GhcRn
-
-  , ForallXParStmtBlock   Data pL pR
-  , ForallXParStmtBlock   Data pL pL
-  , ForallXParStmtBlock   Data pR pR
-
-  , ForallXParStmtBlock Data GhcRn GhcRn
-  )
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
 -- the @id@ and the 'NameOrRdrName' type for it

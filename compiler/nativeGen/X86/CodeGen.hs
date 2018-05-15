@@ -2229,6 +2229,8 @@ genCCall _ is32Bit target dest_regs args = do
                           ADC format (OpImm (ImmInteger 0)) (OpReg reg_h)
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for add2"
+    (PrimTarget (MO_AddWordC width), [res_r, res_c]) ->
+        addSubIntC platform ADD_CC (const Nothing) CARRY width res_r res_c args
     (PrimTarget (MO_SubWordC width), [res_r, res_c]) ->
         addSubIntC platform SUB_CC (const Nothing) CARRY width res_r res_c args
     (PrimTarget (MO_AddIntC width), [res_r, res_c]) ->
@@ -2788,6 +2790,7 @@ outOfLineCmmOp mop res args
               MO_Add2 {}       -> unsupported
               MO_AddIntC {}    -> unsupported
               MO_SubIntC {}    -> unsupported
+              MO_AddWordC {}   -> unsupported
               MO_SubWordC {}   -> unsupported
               MO_U_Mul2 {}     -> unsupported
               MO_WriteBarrier  -> unsupported

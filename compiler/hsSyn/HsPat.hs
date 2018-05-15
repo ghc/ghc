@@ -18,6 +18,7 @@
 
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
+        ListPatTc(..),
 
         HsConPatDetails, hsConPatArgs,
         HsRecFields(..), HsRecField'(..), LHsRecField',
@@ -30,8 +31,7 @@ module HsPat (
 
         looksLazyPatBind,
         isBangedLPat,
-        hsPatNeedsParens,
-        isCompoundPat, parenthesizeCompoundPat,
+        patNeedsParens, parenthesizePat,
         isIrrefutableHsPat,
 
         collectEvVarsPats,
@@ -50,7 +50,6 @@ import HsExtension
 import HsTypes
 import TcEvidence
 import BasicTypes
-import PlaceHolder
 -- others:
 import PprCore          ( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
@@ -117,8 +116,6 @@ data Pat p
         ------------ Lists, tuples, arrays ---------------
   | ListPat     (XListPat p)
                 [LPat p]
-                (PostTc p Type)                      -- The type of the elements
-                (Maybe (PostTc p Type, SyntaxExpr p)) -- For rebindable syntax
                    -- For OverloadedLists a Just (ty,fn) gives
                    -- overall type of the pattern, and the toList
 -- function to convert the scrutinee to a list value
@@ -282,54 +279,61 @@ data Pat p
 
 -- ---------------------------------------------------------------------
 
-type instance XWildPat GhcPs = PlaceHolder
-type instance XWildPat GhcRn = PlaceHolder
+data ListPatTc
+  = ListPatTc
+      Type                             -- The type of the elements
+      (Maybe (Type, SyntaxExpr GhcTc)) -- For rebindable syntax
+
+type instance XWildPat GhcPs = NoExt
+type instance XWildPat GhcRn = NoExt
 type instance XWildPat GhcTc = Type
 
-type instance XVarPat  (GhcPass _) = PlaceHolder
-type instance XLazyPat (GhcPass _) = PlaceHolder
-type instance XAsPat   (GhcPass _) = PlaceHolder
-type instance XParPat  (GhcPass _) = PlaceHolder
-type instance XBangPat (GhcPass _) = PlaceHolder
+type instance XVarPat  (GhcPass _) = NoExt
+type instance XLazyPat (GhcPass _) = NoExt
+type instance XAsPat   (GhcPass _) = NoExt
+type instance XParPat  (GhcPass _) = NoExt
+type instance XBangPat (GhcPass _) = NoExt
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
 -- compiler, as it triggers https://ghc.haskell.org/trac/ghc/ticket/14396 for
 -- `SyntaxExpr`
-type instance XListPat (GhcPass _) = PlaceHolder
+type instance XListPat GhcPs = NoExt
+type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
+type instance XListPat GhcTc = ListPatTc
 
-type instance XTuplePat GhcPs = PlaceHolder
-type instance XTuplePat GhcRn = PlaceHolder
+type instance XTuplePat GhcPs = NoExt
+type instance XTuplePat GhcRn = NoExt
 type instance XTuplePat GhcTc = [Type]
 
-type instance XSumPat GhcPs = PlaceHolder
-type instance XSumPat GhcRn = PlaceHolder
+type instance XSumPat GhcPs = NoExt
+type instance XSumPat GhcRn = NoExt
 type instance XSumPat GhcTc = [Type]
 
-type instance XPArrPat GhcPs = PlaceHolder
-type instance XPArrPat GhcRn = PlaceHolder
+type instance XPArrPat GhcPs = NoExt
+type instance XPArrPat GhcRn = NoExt
 type instance XPArrPat GhcTc = Type
 
-type instance XViewPat GhcPs = PlaceHolder
-type instance XViewPat GhcRn = PlaceHolder
+type instance XViewPat GhcPs = NoExt
+type instance XViewPat GhcRn = NoExt
 type instance XViewPat GhcTc = Type
 
-type instance XSplicePat (GhcPass _) = PlaceHolder
-type instance XLitPat    (GhcPass _) = PlaceHolder
+type instance XSplicePat (GhcPass _) = NoExt
+type instance XLitPat    (GhcPass _) = NoExt
 
-type instance XNPat GhcPs = PlaceHolder
-type instance XNPat GhcRn = PlaceHolder
+type instance XNPat GhcPs = NoExt
+type instance XNPat GhcRn = NoExt
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = PlaceHolder
-type instance XNPlusKPat GhcRn = PlaceHolder
+type instance XNPlusKPat GhcPs = NoExt
+type instance XNPlusKPat GhcRn = NoExt
 type instance XNPlusKPat GhcTc = Type
 
 type instance XSigPat GhcPs = (LHsSigWcType GhcPs)
 type instance XSigPat GhcRn = (LHsSigWcType GhcRn)
 type instance XSigPat GhcTc = Type
 
-type instance XCoPat  (GhcPass _) = PlaceHolder
-type instance XXPat   (GhcPass _) = PlaceHolder
+type instance XCoPat  (GhcPass _) = NoExt
+type instance XXPat   (GhcPass _) = NoExt
 
 -- ---------------------------------------------------------------------
 
@@ -436,11 +440,11 @@ data HsRecField' id arg = HsRecField {
 --
 -- The parsed HsRecUpdField corresponding to the record update will have:
 --
---     hsRecFieldLbl = Unambiguous "x" PlaceHolder :: AmbiguousFieldOcc RdrName
+--     hsRecFieldLbl = Unambiguous "x" NoExt :: AmbiguousFieldOcc RdrName
 --
 -- After the renamer, this will become:
 --
---     hsRecFieldLbl = Ambiguous   "x" PlaceHolder :: AmbiguousFieldOcc Name
+--     hsRecFieldLbl = Ambiguous   "x" NoExt :: AmbiguousFieldOcc Name
 --
 -- (note that the Unambiguous constructor is not type-correct here).
 -- The typechecker will determine the particular selector:
@@ -492,18 +496,20 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
     else
         pprPrefixOcc var
 
-pprParendLPat :: (OutputableBndrId (GhcPass p)) => LPat (GhcPass p) -> SDoc
-pprParendLPat (L _ p) = pprParendPat p
+pprParendLPat :: (OutputableBndrId (GhcPass p))
+              => PprPrec -> LPat (GhcPass p) -> SDoc
+pprParendLPat p (L _ pat) = pprParendPat p pat
 
-pprParendPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
-pprParendPat p = sdocWithDynFlags $ \ dflags ->
-                 if need_parens dflags p
-                 then parens (pprPat p)
-                 else  pprPat p
+pprParendPat :: (OutputableBndrId (GhcPass p))
+             => PprPrec -> Pat (GhcPass p) -> SDoc
+pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
+                     if need_parens dflags pat
+                     then parens (pprPat pat)
+                     else  pprPat pat
   where
-    need_parens dflags p
-      | CoPat {} <- p = gopt Opt_PrintTypecheckerElaboration dflags
-      | otherwise     = hsPatNeedsParens p
+    need_parens dflags pat
+      | CoPat {} <- pat = gopt Opt_PrintTypecheckerElaboration dflags
+      | otherwise       = patNeedsParens p pat
       -- For a CoPat we need parens if we are going to show it, which
       -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
       -- But otherwise the CoPat is discarded, so it
@@ -512,10 +518,10 @@ pprParendPat p = sdocWithDynFlags $ \ dflags ->
 pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ (L _ var))     = pprPatBndr var
 pprPat (WildPat _)              = char '_'
-pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat pat
-pprPat (BangPat _ pat)          = char '!' <> pprParendLPat pat
+pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
+pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
 pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
-                                        pprParendLPat pat]
+                                        pprParendLPat appPrec pat]
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat _ pat)           = parens (ppr pat)
 pprPat (LitPat _ s)             = ppr s
@@ -523,12 +529,12 @@ pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (CoPat _ co pat _)       = pprHsWrapper co (\parens
-                                                   -> if parens
-                                                        then pprParendPat pat
-                                                        else pprPat pat)
+pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
+                                            -> if parens
+                                                 then pprParendPat appPrec pat
+                                                 else pprPat pat
 pprPat (SigPat ty pat)          = ppr pat <+> dcolon <+> ppr ty
-pprPat (ListPat _ pats _ _)     = brackets (interpp'SP pats)
+pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (PArrPat _ pats)         = paBrackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)     = tupleParens (boxityTupleSort bx)
                                               (pprWithCommas ppr pats)
@@ -556,8 +562,9 @@ pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
 pprConArgs :: (OutputableBndrId (GhcPass p))
            => HsConPatDetails (GhcPass p) -> SDoc
-pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
-pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
+pprConArgs (PrefixCon pats) = sep (map (pprParendLPat appPrec) pats)
+pprConArgs (InfixCon p1 p2) = sep [ pprParendLPat appPrec p1
+                                  , pprParendLPat appPrec p2 ]
 pprConArgs (RecCon rpats)   = ppr rpats
 
 instance (Outputable arg)
@@ -596,7 +603,7 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
 mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
 mkCharLitPat src c = mkPrefixConPat charDataCon
-                          [noLoc $ LitPat PlaceHolder (HsCharPrim src c)] []
+                          [noLoc $ LitPat NoExt (HsCharPrim src c)] []
 
 {-
 ************************************************************************
@@ -730,86 +737,47 @@ case in foo to be unreachable, as GHC would mistakenly believe that Nothing'
 is the only thing that could possibly be matched!
 -}
 
--- | Returns 'True' if a pattern must be parenthesized in order to parse
--- (e.g., the @(x :: Int)@ in @f (x :: Int) = x@).
-hsPatNeedsParens :: Pat a -> Bool
-hsPatNeedsParens (NPlusKPat {})      = True
-hsPatNeedsParens (SplicePat {})      = False
-hsPatNeedsParens (ConPatIn _ ds)     = conPatNeedsParens ds
-hsPatNeedsParens p@(ConPatOut {})    = conPatNeedsParens (pat_args p)
-hsPatNeedsParens (SigPat {})         = True
-hsPatNeedsParens (ViewPat {})        = True
-hsPatNeedsParens (CoPat _ _ p _)     = hsPatNeedsParens p
-hsPatNeedsParens (WildPat {})        = False
-hsPatNeedsParens (VarPat {})         = False
-hsPatNeedsParens (LazyPat {})        = False
-hsPatNeedsParens (BangPat {})        = False
-hsPatNeedsParens (ParPat {})         = False
-hsPatNeedsParens (AsPat {})          = False
-hsPatNeedsParens (TuplePat {})       = False
-hsPatNeedsParens (SumPat {})         = False
-hsPatNeedsParens (ListPat {})        = False
-hsPatNeedsParens (PArrPat {})        = False
-hsPatNeedsParens (LitPat {})         = False
-hsPatNeedsParens (NPat {})           = False
-hsPatNeedsParens (XPat {})           = True -- conservative default
+-- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
+-- parentheses under precedence @p@.
+patNeedsParens :: PprPrec -> Pat p -> Bool
+patNeedsParens p = go
+  where
+    go (NPlusKPat {})         = p > opPrec
+    go (SplicePat {})         = False
+    go (ConPatIn _ ds)        = conPatNeedsParens p ds
+    go cp@(ConPatOut {})      = conPatNeedsParens p (pat_args cp)
+    go (SigPat {})            = p > topPrec
+    go (ViewPat {})           = True
+    go (CoPat _ _ p _)        = go p
+    go (WildPat {})           = False
+    go (VarPat {})            = False
+    go (LazyPat {})           = False
+    go (BangPat {})           = False
+    go (ParPat {})            = False
+    go (AsPat {})             = False
+    go (TuplePat {})          = False
+    go (SumPat {})            = False
+    go (ListPat {})           = False
+    go (PArrPat {})           = False
+    go (LitPat _ l)           = hsLitNeedsParens p l
+    go (NPat _ (L _ ol) _ _)  = hsOverLitNeedsParens p ol
+    go (XPat {})              = True -- conservative default
 
--- | Returns 'True' if a constructor pattern must be parenthesized in order
--- to parse.
-conPatNeedsParens :: HsConDetails a b -> Bool
-conPatNeedsParens (PrefixCon {}) = False
-conPatNeedsParens (InfixCon {})  = True
-conPatNeedsParens (RecCon {})    = False
+-- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
+-- needs parentheses under precedence @p@.
+conPatNeedsParens :: PprPrec -> HsConDetails a b -> Bool
+conPatNeedsParens p = go
+  where
+    go (PrefixCon args) = p >= appPrec && not (null args)
+    go (InfixCon {})    = p >= opPrec
+    go (RecCon {})      = False
 
--- | Returns 'True' for compound patterns that need parentheses when used in
--- an argument position.
---
--- Note that this is different from 'hsPatNeedsParens', which only says if
--- a pattern needs to be parenthesized to parse in /any/ position, whereas
--- 'isCompountPat' says if a pattern needs to be parenthesized in an /argument/
--- position. In other words, @'hsPatNeedsParens' x@ implies
--- @'isCompoundPat' x@, but not necessarily the other way around.
-isCompoundPat :: Pat a -> Bool
-isCompoundPat (NPlusKPat {})       = True
-isCompoundPat (SplicePat {})       = False
-isCompoundPat (ConPatIn _ ds)      = isCompoundConPat ds
-isCompoundPat p@(ConPatOut {})     = isCompoundConPat (pat_args p)
-isCompoundPat (SigPat {})          = True
-isCompoundPat (ViewPat {})         = True
-isCompoundPat (CoPat _ _ p _)      = isCompoundPat p
-isCompoundPat (WildPat {})         = False
-isCompoundPat (VarPat {})          = False
-isCompoundPat (LazyPat {})         = False
-isCompoundPat (BangPat {})         = False
-isCompoundPat (ParPat {})          = False
-isCompoundPat (AsPat {})           = False
-isCompoundPat (TuplePat {})        = False
-isCompoundPat (SumPat {})          = False
-isCompoundPat (ListPat {})         = False
-isCompoundPat (PArrPat {})         = False
-isCompoundPat (LitPat _ p)         = isCompoundHsLit p
-isCompoundPat (NPat _ (L _ p) _ _) = isCompoundHsOverLit p
-isCompoundPat (XPat {})            = False -- Assumption
-
--- | Returns 'True' for compound constructor patterns that need parentheses
--- when used in an argument position.
---
--- Note that this is different from 'conPatNeedsParens', which only says if
--- a constructor pattern needs to be parenthesized to parse in /any/ position,
--- whereas 'isCompountConPat' says if a pattern needs to be parenthesized in an
--- /argument/ position. In other words, @'conPatNeedsParens' x@ implies
--- @'isCompoundConPat' x@, but not necessarily the other way around.
-isCompoundConPat :: HsConDetails a b -> Bool
-isCompoundConPat (PrefixCon args) = not (null args)
-isCompoundConPat (InfixCon {})    = True
-isCompoundConPat (RecCon {})      = False
-
--- | @'parenthesizeCompoundPat' p@ checks if @'isCompoundPat' p@ is true, and
--- if so, surrounds @p@ with a 'ParPat'. Otherwise, it simply returns @p@.
-parenthesizeCompoundPat :: LPat (GhcPass p) -> LPat (GhcPass p)
-parenthesizeCompoundPat lp@(L loc p)
-  | isCompoundPat p = L loc (ParPat PlaceHolder lp)
-  | otherwise       = lp
+-- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
+-- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
+parenthesizePat :: PprPrec -> LPat (GhcPass p) -> LPat (GhcPass p)
+parenthesizePat p lpat@(L loc pat)
+  | patNeedsParens p pat = L loc (ParPat NoExt lpat)
+  | otherwise            = lpat
 
 {-
 % Collect all EvVars from all constructor patterns
@@ -829,7 +797,7 @@ collectEvVarsPat pat =
     AsPat _ _ p      -> collectEvVarsLPat p
     ParPat  _ p      -> collectEvVarsLPat p
     BangPat _ p      -> collectEvVarsLPat p
-    ListPat _ ps _ _ -> unionManyBags $ map collectEvVarsLPat ps
+    ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
     SumPat _ p _ _   -> collectEvVarsLPat p
     PArrPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps

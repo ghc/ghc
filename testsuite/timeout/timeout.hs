@@ -1,4 +1,5 @@
 {-# OPTIONS -cpp #-}
+{-# LANGUAGE LambdaCase #-}
 module Main where
 
 import Control.Concurrent (forkIO, threadDelay)
@@ -21,6 +22,7 @@ import WinCBindings
 import Foreign
 import System.Win32.DebugApi
 import System.Win32.Types
+import System.Win32.Console.CtrlHandler
 #endif
 
 main :: IO ()
@@ -129,28 +131,35 @@ run secs cmd =
 
        let handleInterrupt action =
                action `onException` terminateJobObject job 99
+           handleCtrl _ = do
+               terminateJobObject job 99
+               closeHandle ioPort
+               closeHandle job
+               exitWith (ExitFailure 99)
+               return True
 
-       handleInterrupt $ do
-          resumeThread (piThread pi)
-          -- The program is now running
-          let handle = piProcess pi
-          let millisecs = secs * 1000
-          rc <- waitForJobCompletion job ioPort (fromIntegral millisecs)
-          closeHandle ioPort
+       withConsoleCtrlHandler handleCtrl $
+           handleInterrupt $ do
+              resumeThread (piThread pi)
+              -- The program is now running
+              let handle = piProcess pi
+              let millisecs = secs * 1000
+              rc <- waitForJobCompletion job ioPort (fromIntegral millisecs)
+              closeHandle ioPort
 
-          if not rc
-              then do terminateJobObject job 99
-                      closeHandle job
-                      exitWith (ExitFailure 99)
-              else alloca $ \p_exitCode ->
-                    do terminateJobObject job 0 -- Ensure it's all really dead.
-                       closeHandle job
-                       r <- getExitCodeProcess handle p_exitCode
-                       if r then do ec <- peek p_exitCode
-                                    let ec' = if ec == 0
-                                              then ExitSuccess
-                                              else ExitFailure $ fromIntegral ec
-                                    exitWith ec'
-                            else errorWin "getExitCodeProcess"
+              if not rc
+                then do terminateJobObject job 99
+                        closeHandle job
+                        exitWith (ExitFailure 99)
+                else alloca $ \p_exitCode ->
+                      do terminateJobObject job 0
+                         -- Ensured it's all really dead.
+                         closeHandle job
+                         r <- getExitCodeProcess handle p_exitCode
+                         if r
+                           then peek p_exitCode >>= \case
+                                   0 -> exitWith ExitSuccess
+                                   e -> exitWith $ ExitFailure (fromIntegral e)
+                           else errorWin "getExitCodeProcess"
 #endif
 

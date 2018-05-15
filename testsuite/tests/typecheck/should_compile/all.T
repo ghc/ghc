@@ -577,7 +577,7 @@ test('T13915a', normal, multimod_compile, ['T13915a', '-v0'])
 test('T13915b', normal, compile, [''])
 test('T13984', normal, compile, [''])
 test('T14128', normal, multimod_compile, ['T14128Main', '-v0'])
-test('T14149', normal, compile, [''])
+test('T14149', normal, compile_fail, [''])
 test('T14154', normal, compile, [''])
 test('T14158', normal, compile, [''])
 test('T13943', normal, compile, ['-fsolve-constant-dicts'])
@@ -591,7 +591,11 @@ test('MissingExportList01', normal, compile, [''])
 test('MissingExportList02', normal, compile, [''])
 test('T14488', normal, compile, [''])
 test('T14590', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
-test('T13032', omit_ways(['hpc']), compile, [''])
+# We omit the hpc/profasm ways because this test checks the
+# desugarer's output and these ways add some
+# annotations/ticks that prevent it from giving the exact
+# output we expect (T13032.stderr).
+test('T13032', omit_ways(['hpc', 'profasm']), compile, [''])
 test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
 test('T14732', normal, compile, [''])
 test('T14774', [], run_command, ['$MAKE -s --no-print-directory T14774'])

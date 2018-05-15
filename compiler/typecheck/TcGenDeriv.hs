@@ -1719,7 +1719,8 @@ nlHsAppType e s = noLoc (HsAppType hs_ty e)
     hs_ty = mkHsWildCardBndrs $ nlHsParTy (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc (ExprWithTySig hs_ty e)
+nlExprWithTySig e s = noLoc $ ExprWithTySig hs_ty
+                            $ parenthesizeHsExpr sigPrec e
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 
@@ -1865,7 +1866,7 @@ mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L loc fun) matches
   where
     matches = [mkMatch (mkPrefixFunRhs (L loc fun))
-                               (map parenthesizeCompoundPat p) e
+                               (map (parenthesizePat appPrec) p) e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
@@ -1886,7 +1887,7 @@ mkFunBindEC arity loc fun catch_all pats_and_exprs
   = mkRdrFunBindEC arity catch_all (L loc fun) matches
   where
     matches = [ mkMatch (mkPrefixFunRhs (L loc fun))
-                                (map parenthesizeCompoundPat p) e
+                                (map (parenthesizePat appPrec) p) e
                                 (noLoc emptyLocalBinds)
               | (p,e) <- pats_and_exprs ]
 

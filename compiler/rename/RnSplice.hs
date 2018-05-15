@@ -620,13 +620,15 @@ rnSplicePat splice
 
 ----------------------
 rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
-rnSpliceDecl (SpliceDecl (L loc splice) flg)
+rnSpliceDecl (SpliceDecl _ (L loc splice) flg)
   = rnSpliceGen run_decl_splice pend_decl_splice splice
   where
     pend_decl_splice rn_splice
-       = (makePending UntypedDeclSplice rn_splice, SpliceDecl (L loc rn_splice) flg)
+       = ( makePending UntypedDeclSplice rn_splice
+         , SpliceDecl noExt (L loc rn_splice) flg)
 
     run_decl_splice rn_splice = pprPanic "rnSpliceDecl" (ppr rn_splice)
+rnSpliceDecl (XSpliceDecl _) = panic "rnSpliceDecl"
 
 rnTopSpliceDecls :: HsSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module

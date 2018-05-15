@@ -1,0 +1,6 @@
+
+<no location info>:
+    Could not find module ‘GHC’
+    It is a member of the hidden package ‘ghc-8.5’.
+    You can run ‘:set -package ghc’ to expose it.
+    (Note: this unloads all the modules in the current scope.)

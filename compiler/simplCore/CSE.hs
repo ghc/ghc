@@ -28,7 +28,7 @@ import Outputable
 import BasicTypes       ( TopLevelFlag(..), isTopLevel
                         , isAlwaysActive, isAnyInlinePragma,
                           inlinePragmaSpec, noUserInlineSpec )
-import TrieMap
+import CoreMap
 import Util
 import Data.List        ( mapAccumL )
 

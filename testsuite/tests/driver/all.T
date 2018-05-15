@@ -273,4 +273,8 @@ test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normal, compile, ['-ddump-types -ddump-json'])
 test('T13604', [], run_command, ['$MAKE -s --no-print-directory T13604'])
 test('T13604a', [], run_command, ['$MAKE -s --no-print-directory T13604a'])
-test('inline-check', normal, compile, ['-dinline-check foo -O -ddebug-output'])
+# omitting hpc and profasm because they affect the
+# inlining and unfoldings
+test('inline-check', omit_ways(['hpc', 'profasm'])
+                   , compile
+		   , ['-dinline-check foo -O -ddebug-output'])

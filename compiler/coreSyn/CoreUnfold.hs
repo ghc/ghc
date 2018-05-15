@@ -1151,11 +1151,11 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
       -- be a loop breaker  (maybe the knot is not yet untied)
-        CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top
+        CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding -> tryUnfolding dflags id lone_variable
-                                    arg_infos cont_info unf_template is_top
+                                    arg_infos cont_info unf_template
                                     is_wf is_exp guidance
           | otherwise -> traceInline dflags id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
@@ -1175,10 +1175,10 @@ traceInline dflags inline_id str doc result
  = result
 
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
-             -> CoreExpr -> Bool -> Bool -> Bool -> UnfoldingGuidance
+             -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
              -> Maybe CoreExpr
 tryUnfolding dflags id lone_variable
-             arg_infos cont_info unf_template is_top
+             arg_infos cont_info unf_template
              is_wf is_exp guidance
  = case guidance of
      UnfNever -> traceInline dflags id str (text "UnfNever") Nothing
@@ -1250,10 +1250,10 @@ tryUnfolding dflags id lone_variable
               CaseCtxt   -> not (lone_variable && is_exp)  -- Note [Lone variables]
               ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
-              DiscArgCtxt -> uf_arity > 0  --
+              DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
               RhsCtxt     -> uf_arity > 0  --
-              _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
-                                                      -- Note [Inlining in ArgCtxt]
+              _other      -> False         -- See Note [Nested functions]
+
 
 {-
 Note [Unfold into lazy contexts], Note [RHS of lets]
@@ -1323,18 +1323,17 @@ However for worker/wrapper it may be worth inlining even if the
 arity is not satisfied (as we do in the CoreUnfolding case) so we don't
 require saturation.
 
-
 Note [Nested functions]
 ~~~~~~~~~~~~~~~~~~~~~~~
-If a function has a nested defn we also record some-benefit, on the
-grounds that we are often able to eliminate the binding, and hence the
-allocation, for the function altogether; this is good for join points.
-But this only makes sense for *functions*; inlining a constructor
-doesn't help allocation unless the result is scrutinised.  UNLESS the
-constructor occurs just once, albeit possibly in multiple case
-branches.  Then inlining it doesn't increase allocation, but it does
-increase the chance that the constructor won't be allocated at all in
-the branches that don't use it.
+At one time we treated a call of a non-top-level function as
+"interesting" (regardless of how boring the context) in the hope
+that inlining it would eliminate the binding, and its allocation.
+Specifically, in the default case of interesting_call we had
+   _other -> not is_top && uf_arity > 0
+
+But actually postInlineUnconditionally does some of this and overall
+it makes virtually no difference to nofib.  So I simplified away this
+special case
 
 Note [Cast then apply]
 ~~~~~~~~~~~~~~~~~~~~~~

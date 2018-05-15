@@ -156,6 +156,7 @@ import Util
 import Unique( tyConRepNameUnique, dataConRepNameUnique )
 import UniqSet
 import Module
+import {-# SOURCE #-} DataCon
 
 import qualified Data.Data as Data
 
@@ -1192,7 +1193,10 @@ tyConRepName_maybe (AlgTyCon { algTcParent = parent })
   | UnboxedAlgTyCon rep_nm <- parent = rep_nm
 tyConRepName_maybe (FamilyTyCon { famTcFlav = DataFamilyTyCon rep_nm })
   = Just rep_nm
-tyConRepName_maybe (PromotedDataCon { tcRepName = rep_nm })
+tyConRepName_maybe (PromotedDataCon { dataCon = dc, tcRepName = rep_nm })
+  | isUnboxedSumCon dc   -- see #13276
+  = Nothing
+  | otherwise
   = Just rep_nm
 tyConRepName_maybe _ = Nothing
 

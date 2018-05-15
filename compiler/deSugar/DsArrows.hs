@@ -451,8 +451,9 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
 --              ---> premap (\ ((xs), (p1, ... (pk,stk)...)) -> ((ys),stk)) cmd
 
 dsCmd ids local_vars stack_ty res_ty
-        (HsCmdLam _ (MG { mg_alts = L _ [L _ (Match { m_pats  = pats
-                                                  , m_grhss = GRHSs [L _ (GRHS [] body)] _ })] }))
+        (HsCmdLam _ (MG { mg_alts
+          = L _ [L _ (Match { m_pats  = pats
+                            , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })] }))
         env_ids = do
     let pat_vars = mkVarSet (collectPatsBinders pats)
     let
@@ -555,7 +556,8 @@ case bodies, containing the following fields:
 -}
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdCase _ exp (MG { mg_alts = L l matches, mg_arg_tys = arg_tys
+      (HsCmdCase _ exp (MG { mg_alts = L l matches
+                           , mg_ext = MatchGroupTc arg_tys _ _
                            , mg_origin = origin }))
       env_ids = do
     stack_id <- newSysLocalDs Omega stack_ty -- TODO: arnaud: handle arrows correctly
@@ -603,9 +605,9 @@ dsCmd ids local_vars stack_ty res_ty
 
     core_body <- dsExpr (HsCase noExt exp
                          (MG { mg_alts = L l matches'
-                             , mg_arg_tys = arg_tys
-                             , mg_res_ty = sum_ty, mg_origin = origin
-                             , mg_weight = Omega })) -- TODO: MattP check this multiplicity is correct
+                             , mg_ext = MatchGroupTc arg_tys sum_ty Omega
+                             , mg_origin = origin }))
+                             --TODO: MattP check this multiplicity is correct
         -- Note that we replace the HsCase result type by sum_ty,
         -- which is the type of matches'
 
@@ -760,7 +762,7 @@ dsCmdDo _ _ _ [] _ = panic "dsCmdDo"
 --
 --              ---> premap (\ (xs) -> ((xs), ())) c
 
-dsCmdDo ids local_vars res_ty [L loc (LastStmt body _ _)] env_ids = do
+dsCmdDo ids local_vars res_ty [L loc (LastStmt _ body _ _)] env_ids = do
     putSrcSpanDs loc $ dsNoLevPoly res_ty
                          (text "In the command:" <+> ppr body)
     (core_body, env_ids') <- dsLCmd ids local_vars unitTy res_ty body env_ids
@@ -818,7 +820,7 @@ dsCmdStmt
 --              ---> premap (\ ((xs)) -> (((xs1),()),(xs')))
 --                      (first c >>> arr snd) >>> ss
 
-dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
+dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy c_ty cmd
     core_mux <- matchEnv env_ids
         (mkCorePairExpr
@@ -849,7 +851,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt cmd _ _ c_ty) env_ids = do
 -- It would be simpler and more consistent to do this using second,
 -- but that's likely to be defined in terms of first.
 
-dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
+dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd _ _) env_ids = do
     let pat_ty = hsLPatType pat
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
     let pat_vars = mkVarSet (collectPatBinders pat)
@@ -900,7 +902,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
 --
 --              ---> arr (\ (xs) -> let binds in (xs')) >>> ss
 
-dsCmdStmt ids local_vars out_ids (LetStmt binds) env_ids = do
+dsCmdStmt ids local_vars out_ids (LetStmt _ binds) env_ids = do
     -- build a new environment using the let bindings
     core_binds <- dsLocalBinds binds (mkBigCoreVarTup out_ids)
     -- match the old environment against the input
@@ -928,7 +930,8 @@ dsCmdStmt ids local_vars out_ids (LetStmt binds) env_ids = do
 dsCmdStmt ids local_vars out_ids
         (RecStmt { recS_stmts = stmts
                  , recS_later_ids = later_ids, recS_rec_ids = rec_ids
-                 , recS_later_rets = later_rets, recS_rec_rets = rec_rets })
+                 , recS_ext = RecStmtTc { recS_later_rets = later_rets
+                                        , recS_rec_rets = rec_rets } })
         env_ids = do
     let
         later_ids_set = mkVarSet later_ids
@@ -1118,7 +1121,7 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 
 leavesMatch :: LMatch GhcTc (Located (body GhcTc))
             -> [(Located (body GhcTc), IdSet)]
-leavesMatch (L _ (Match { m_pats = pats, m_grhss = GRHSs grhss (L _ binds) }))
+leavesMatch (L _ (Match { m_pats = pats, m_grhss = GRHSs _ grhss (L _ binds) }))
   = let
         defined_vars = mkVarSet (collectPatsBinders pats)
                         `unionVarSet`
@@ -1127,7 +1130,9 @@ leavesMatch (L _ (Match { m_pats = pats, m_grhss = GRHSs grhss (L _ binds) }))
     [(body,
       mkVarSet (collectLStmtsBinders stmts)
         `unionVarSet` defined_vars)
-    | L _ (GRHS stmts body) <- grhss]
+    | L _ (GRHS _ stmts body) <- grhss]
+leavesMatch (L _ (Match _ _ _ (XGRHSs _))) = panic "leavesMatch"
+leavesMatch (L _ (XMatch _)) = panic "leavesMatch"
 
 -- Replace the leaf commands in a match
 
@@ -1137,19 +1142,24 @@ replaceLeavesMatch
         -> LMatch GhcTc (Located (body GhcTc))  -- the matches of a case command
         -> ([Located (body' GhcTc)],            -- remaining leaf expressions
             LMatch GhcTc (Located (body' GhcTc))) -- updated match
-replaceLeavesMatch _res_ty leaves (L loc match@(Match { m_grhss = GRHSs grhss binds }))
+replaceLeavesMatch _res_ty leaves
+                        (L loc match@(Match { m_grhss = GRHSs x grhss binds }))
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (match { m_grhss = GRHSs grhss' binds }))
+    (leaves', L loc (match { m_ext = noExt, m_grhss = GRHSs x grhss' binds }))
+replaceLeavesMatch _ _ (L _ (Match _ _ _ (XGRHSs _)))
+  = panic "replaceLeavesMatch"
+replaceLeavesMatch _ _ (L _ (XMatch _)) = panic "replaceLeavesMatch"
 
 replaceLeavesGRHS
         :: [Located (body' GhcTc)]  -- replacement leaf expressions of that type
         -> LGRHS GhcTc (Located (body GhcTc))     -- rhss of a case command
         -> ([Located (body' GhcTc)],              -- remaining leaf expressions
             LGRHS GhcTc (Located (body' GhcTc)))  -- updated GRHS
-replaceLeavesGRHS (leaf:leaves) (L loc (GRHS stmts _))
-  = (leaves, L loc (GRHS stmts leaf))
+replaceLeavesGRHS (leaf:leaves) (L loc (GRHS x stmts _))
+  = (leaves, L loc (GRHS x stmts leaf))
+replaceLeavesGRHS _ (L _ (XGRHS _)) = panic "replaceLeavesGRHS"
 replaceLeavesGRHS [] _ = panic "replaceLeavesGRHS []"
 
 -- Balanced fold of a non-empty list.
@@ -1204,7 +1214,7 @@ collectl (L _ pat) bndrs
     go (AsPat _ (L _ a) pat)      = a : collectl pat bndrs
     go (ParPat _ pat)             = collectl pat bndrs
 
-    go (ListPat _ pats _ _)       = foldr collectl bndrs pats
+    go (ListPat _ pats)           = foldr collectl bndrs pats
     go (PArrPat _ pats)           = foldr collectl bndrs pats
     go (TuplePat _ pats _)        = foldr collectl bndrs pats
     go (SumPat _ pat _ _)         = collectl pat bndrs

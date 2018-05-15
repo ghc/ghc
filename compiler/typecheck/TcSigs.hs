@@ -258,7 +258,8 @@ completeSigFromId ctxt id
 
 isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 -- ^ If there are no wildcards, return a LHsSigType
-isCompleteHsSig (HsWC { hswc_wcs = wcs }) = null wcs
+isCompleteHsSig (HsWC { hswc_ext = wcs }) = null wcs
+isCompleteHsSig (XHsWildCardBndrs _) = panic "isCompleteHsSig"
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -309,7 +310,7 @@ tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 -- See Note [Pattern synonym signatures]
 -- See Note [Recipe for checking a signature] in TcHsType
 tcPatSynSig name sig_ty
-  | HsIB { hsib_vars = implicit_hs_tvs
+  | HsIB { hsib_ext = HsIBRn { hsib_vars = implicit_hs_tvs }
          , hsib_body = hs_ty }  <- sig_ty
   , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTy hs_ty
   , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
@@ -390,6 +391,7 @@ tcPatSynSig name sig_ty
         mkSpecForAllTys ex $
         mkFunTys (map unrestricted prov) $
         body
+tcPatSynSig _ (XHsImplicitBndrs _) = panic "tcPatSynSig"
 
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)

@@ -31,6 +31,15 @@ test('T10359',
      compile_and_run,
      ['-O'])
 
+test('T14955',
+     [stats_num_field('bytes allocated',
+          [(wordsize(64), 48050760, 5),
+           (wordsize(32), 351508, 5)]),
+      only_ways(['normal'])
+      ],
+     multimod_compile_and_run,
+     ['T14955', '-O'])
+
 # fortunately the values here are mostly independent of the wordsize,
 # because the test allocates an unboxed array of doubles.
 test('T3586',

@@ -70,7 +70,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import Data.List        ( isSuffixOf, intercalate )
+import Data.List        ( isInfixOf, isSuffixOf, intercalate )
 import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
@@ -266,8 +266,7 @@ compileOne' m_tc_result mHscMessage
        prevailing_dflags = hsc_dflags hsc_env0
        dflags =
           dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
-                  , log_action = log_action prevailing_dflags
-                  , log_finaliser = log_finaliser prevailing_dflags }
+                  , log_action = log_action prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
                   -- not the one cached in the summary.  This is so
                   -- that we can change the log_action without having
@@ -823,7 +822,8 @@ llvmOptions dflags =
     ++ [("", "-filetype=obj") | fastLlvmPipeline dflags ]
 
     -- Additional llc flags
-    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu) ]
+    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
+                                 , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
 
   where target = LLVM_TARGET

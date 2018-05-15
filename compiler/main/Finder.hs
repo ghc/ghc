@@ -667,14 +667,19 @@ cantFindErr cannot_find _ dflags mod_name find_result
         <+> quotes (ppr pkgid)
         --FIXME: we don't really want to show the unit id here we should
         -- show the source package id or installed package id if it's ambiguous
-        <> dot $$ cabal_pkg_hidden_hint pkgid
-    cabal_pkg_hidden_hint pkgid
+        <> dot $$ pkg_hidden_hint pkgid
+    pkg_hidden_hint pkgid
      | gopt Opt_BuildingCabalPackage dflags
         = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
            in text "Perhaps you need to add" <+>
               quotes (ppr (packageName pkg)) <+>
               text "to the build-depends in your .cabal file."
-     | otherwise = Outputable.empty
+     | otherwise
+         = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
+           in text "You can run" <+>
+              quotes (text ":set -package " <> ppr (packageName pkg)) <+>
+              text "to expose it." $$
+              text "(Note: this unloads all the modules in the current scope.)"
 
     mod_hidden pkg =
         text "it is a hidden module in the package" <+> quotes (ppr pkg)

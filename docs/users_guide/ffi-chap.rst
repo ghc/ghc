@@ -35,16 +35,21 @@ GHC differences to the FFI Chapter
 Guaranteed call safety
 ~~~~~~~~~~~~~~~~~~~~~~
 
-The FFI addendum stipulates that an implementation is free to implement an
-``unsafe`` call by performing a ``safe`` call (and therefore may run in an
-arbitrary thread and may be subject to concurrent garbage collection). This
-greatly constrains library authors since it implies that it is never safe to
-pass any heap object reference to a foreign function, even if invoked with an
-``unsafe`` call. For instance, it is often desirable to pass an unpinned
-``ByteArray#``\s directly to native code to avoid making an
-otherwise-unnecessary copy. However, this can only be done safely under
-``unsafe`` call semantics as otherwise the array may be moved by the garbage
+The Haskell 2010 Report specifies that ``safe`` FFI calls must allow foreign
+calls to safely call into Haskell code. In practice, this means that the
+garbage collector must be able to run while these calls are in progress,
+moving heap-allocated Haskell values around arbitrarily.
+
+This greatly constrains library authors since it implies that it is not safe to
+pass any heap object reference to a ``safe`` foreign function call.  For
+instance, it is often desirable to pass an unpinned ``ByteArray#``\s directly
+to native code to avoid making an otherwise-unnecessary copy. However, this can
+only be done safely if the array is guaranteed not to be moved by the garbage
 collector in the middle of the call.
+
+The Chapter does *not* require implementations to refrain from doing the
+same for ``unsafe`` calls, so strictly Haskell 2010-conforming programs
+cannot pass heap-allocated references to ``unsafe`` FFI calls either.
 
 In previous releases, GHC would take advantage of the freedom afforded by the
 Chapter by performing ``safe`` foreign calls in place of ``unsafe`` calls in
@@ -53,7 +58,8 @@ compiled would fail under GHCi (e.g. :ghc-ticket:`13730`).
 
 However, since version 8.4 this is no longer the case: GHC **guarantees** that
 garbage collection will never occur during an ``unsafe`` call, even in the
-bytecode interpreter.
+bytecode interpreter, and further guarantees that ``unsafe`` calls will be
+performed in the calling thread.
 
 
 .. _ffi-ghcexts:

@@ -63,7 +63,7 @@ module TyCoRep (
         pprTyVar, pprTyVars,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-        TyPrec(..), maybeParen,
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
         pprDataCons, ppSuggestExplicitKinds,
 
         pprCo, pprParendCo,
@@ -168,7 +168,8 @@ import CoAxiom
 import FV
 
 -- others
-import BasicTypes ( LeftOrRight(..), TyPrec(..), maybeParen, pickLR )
+import BasicTypes ( LeftOrRight(..), PprPrec(..), topPrec, sigPrec, opPrec
+                  , funPrec, appPrec, maybeParen, pickLR )
 import PrelNames
 import Outputable
 import DynFlags
@@ -2652,10 +2653,10 @@ See Note [Precedence in types] in BasicTypes.
 ------------------
 
 pprType, pprParendType :: Type -> SDoc
-pprType       = pprPrecType TopPrec
-pprParendType = pprPrecType TyConPrec
+pprType       = pprPrecType topPrec
+pprParendType = pprPrecType appPrec
 
-pprPrecType :: TyPrec -> Type -> SDoc
+pprPrecType :: PprPrec -> Type -> SDoc
 pprPrecType prec ty
   = getPprStyle $ \sty ->
     if debugStyle sty           -- Use pprDebugType when in
@@ -2716,10 +2717,10 @@ pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
 ------------
 pprTheta :: ThetaType -> SDoc
-pprTheta = pprIfaceContext TopPrec . map tidyToIfaceType
+pprTheta = pprIfaceContext topPrec . map tidyToIfaceType
 
 pprParendTheta :: ThetaType -> SDoc
-pprParendTheta = pprIfaceContext TyConPrec . map tidyToIfaceType
+pprParendTheta = pprIfaceContext appPrec . map tidyToIfaceType
 
 pprThetaArrowTy :: ThetaType -> SDoc
 pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
@@ -2779,9 +2780,9 @@ debugPprType :: Type -> SDoc
 -- be useful for debugging.  E.g. with -dppr-debug it prints the
 -- kind on type-variable /occurrences/ which the normal route
 -- fundamentally cannot do.
-debugPprType ty = debug_ppr_ty TopPrec ty
+debugPprType ty = debug_ppr_ty topPrec ty
 
-debug_ppr_ty :: TyPrec -> Type -> SDoc
+debug_ppr_ty :: PprPrec -> Type -> SDoc
 debug_ppr_ty _ (LitTy l)
   = ppr l
 
@@ -2795,21 +2796,21 @@ debug_ppr_ty prec (FunTy weight arg res)
                 One -> text "⊸"
                 Omega -> arrow
     in
-      maybeParen prec FunPrec $
-      sep [debug_ppr_ty FunPrec arg, arr <+> debug_ppr_ty prec res]
+      maybeParen prec funPrec $
+      sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
 
 debug_ppr_ty prec (TyConApp tc tys)
   | null tys  = ppr tc
-  | otherwise = maybeParen prec TyConPrec $
-                hang (ppr tc) 2 (sep (map (debug_ppr_ty TyConPrec) tys))
+  | otherwise = maybeParen prec appPrec $
+                hang (ppr tc) 2 (sep (map (debug_ppr_ty appPrec) tys))
 
 debug_ppr_ty prec (AppTy t1 t2)
   = hang (debug_ppr_ty prec t1)
-       2 (debug_ppr_ty TyConPrec t2)
+       2 (debug_ppr_ty appPrec t2)
 
 debug_ppr_ty prec (CastTy ty co)
-  = maybeParen prec TopPrec $
-    hang (debug_ppr_ty TopPrec ty)
+  = maybeParen prec topPrec $
+    hang (debug_ppr_ty topPrec ty)
        2 (text "|>" <+> ppr co)
 
 debug_ppr_ty _ (CoercionTy co)
@@ -2817,7 +2818,7 @@ debug_ppr_ty _ (CoercionTy co)
 
 debug_ppr_ty prec ty@(ForAllTy {})
   | (tvs, body) <- split ty
-  = maybeParen prec FunPrec $
+  = maybeParen prec funPrec $
     hang (text "forall" <+> fsep (map ppr tvs) <> dot)
          -- The (map ppr tvs) will print kind-annotated
          -- tvs, because we are (usually) in debug-style
@@ -2885,7 +2886,7 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
 
 pprTypeApp :: TyCon -> [Type] -> SDoc
 pprTypeApp tc tys
-  = pprIfaceTypeApp TopPrec (toIfaceTyCon tc)
+  = pprIfaceTypeApp topPrec (toIfaceTyCon tc)
                             (toIfaceTcArgs tc tys)
     -- TODO: toIfaceTcArgs seems rather wasteful here
 

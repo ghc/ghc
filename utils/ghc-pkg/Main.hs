@@ -30,6 +30,7 @@ module Main (main) where
 import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
+import GHC.HandleEncoding
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
@@ -120,6 +121,7 @@ anyM p (x:xs) = do
 
 main :: IO ()
 main = do
+  configureHandleEncoding
   args <- getArgs
 
   case getOpt Permute (flags ++ deprecFlags) args of

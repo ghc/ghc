@@ -2699,9 +2699,12 @@ doFunTy clas ty (Weighted _ arg_ty) ret_ty -- arnaud: TODO: bug here, where line
 -- of monomorphic kind (e.g. all kind variables have been instantiated).
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcS LookupInstResult
 doTyConApp clas ty tc kind_args
+  | Just _ <- tyConRepName_maybe tc
   = return $ GenInst (map (mk_typeable_pred clas) kind_args)
                      (\kinds -> evTypeable ty $ EvTypeableTyCon tc (map EvExpr kinds))
                      True
+  | otherwise
+  = return NoInstance
 
 -- | Representation for TyCon applications of a concrete kind. We just use the
 -- kind itself, but first we must make sure that we've instantiated all kind-

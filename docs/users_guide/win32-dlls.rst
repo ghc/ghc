@@ -97,6 +97,52 @@ Windows.
    ``IOExts.hSetBinaryMode``. The ``IOExts`` module is part of the
    ``lang`` package.
 
+.. _windows-file-paths:
+
+File paths under Windows
+------------------------
+
+Windows paths are not all the same. The different kinds of paths each have
+different meanings. The ``MAX_PATH`` limitation is not a limitation of the operating
+system nor the file system. It is a limitation of the default namespace enforced
+by the Win32 API for backwards compatibility.
+
+The NT kernel however allows you ways to opt out of this path preprocessing by
+the Win32 APIs. This is done by explicitly using the desired namespace in the
+path.
+
+The namespaces are:
+
+ - file namespace: ``\\?\``
+ - device namespace: ``\\.\``
+ - NT namespace: ``\``
+
+Each of these turn off path processing completely by the Win32 API and the paths
+are passed untouched to the filesystem.
+
+Paths with a drive letter are *legacy* paths. The drive letters are actually
+meaningless to the kernel. Just like Unix operating systems, drive letters are
+just a mount point. You can view your mount points by using the :command:`mountvol`
+command.
+
+Since GHC 8.6.1, the Haskell I/O manager automatically promotes paths in the legacy
+format to Win32 file namespace. By default the I/O manager will do two things to
+your paths:
+
+  - replace ``\`` with ``\\``
+  - expand relative paths to absolute paths
+
+If you want to opt out of all preprocessing just expliticly use namespaces in
+your paths. Due to this change, if you need to open raw devices (e.g. COM ports)
+you need to use the device namespace explicitly. (e.g. ``\\.\COM1``). GHC and
+Haskell programs in general no longer support opening devices in the legacy
+format.
+
+See the
+`Windows documentation <https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx>`_
+for more details.
+
+
 .. _ghci-cygwin:
 
 Using GHC (and other GHC-compiled executables) with Cygwin

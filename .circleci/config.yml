@@ -34,7 +34,7 @@ aliases:
     run:
       name: Configure
       command: |
-        setarch i386 ./configure --with-ghc=/opt/ghc-i386/8.2.2/bin/ghc
+        setarch i386 ./configure --with-ghc=/opt/ghc-i386/8.4.2/bin/ghc
   - &configure_bsd
     run:
       name: Configure
@@ -56,7 +56,12 @@ aliases:
   - &test
     run:
       name: Test
-      command: make test SKIP_PERF_TESTS=YES
+      command: |
+        mkdir -p test-results
+        make test SKIP_PERF_TESTS=YES JUNIT_FILE=../../test-results/junit.xml
+  - &store_test_results
+    store_test_results:
+      path: test-results
   - &slowtest
     run:
       name: Full Test
@@ -84,7 +89,7 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: mrkkrp/ghcci-x86_64-linux:0.0.6
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux
@@ -98,6 +103,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
@@ -117,6 +123,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-x86_64-darwin":
     macos:
@@ -138,11 +145,12 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.1
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       <<: *buildenv
     steps:
@@ -156,7 +164,7 @@ jobs:
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.1
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       <<: *buildenv
     steps:
@@ -167,11 +175,12 @@ jobs:
       - *configure_unreg
       - *make
       - *test
+      - *store_test_results
 
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.1
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
@@ -196,7 +205,7 @@ jobs:
   "validate-x86_64-linux-debug":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.1
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       BUILD_FLAVOUR: devel2
       <<: *buildenv
@@ -208,11 +217,12 @@ jobs:
       - *configure_unreg
       - *make
       - *test
+      - *store_test_results
 
   "validate-i386-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/i386-linux:0.0.1
+      - image: ghcci/i386-linux:0.0.2
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: i386-linux
@@ -226,11 +236,12 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
   "validate-x86_64-fedora":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux-fedora:0.0.2
+      - image: ghcci/x86_64-linux-fedora:0.0.3
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-fedora
@@ -244,6 +255,7 @@ jobs:
       - *bindist
       - *storeartifacts
       - *test
+      - *store_test_results
 
 workflows:
   version: 2

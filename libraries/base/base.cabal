@@ -270,6 +270,7 @@ Library
         GHC.Read
         GHC.Real
         GHC.Records
+        GHC.ResponseFile
         GHC.RTS.Flags
         GHC.ST
         GHC.StaticPtr
@@ -397,3 +398,6 @@ Library
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id base
+
+    -- Make sure we don't accidentally regress into anti-patterns
+    ghc-options: -Wcompat -Wnoncanonical-monad-instances

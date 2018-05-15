@@ -111,6 +111,33 @@ testIntArray name0 index read write val0 len = do
     (intToBytes val len)
     len
 
+#if WORD_SIZE_IN_BITS == 64
+testInt64Array = testIntArray
+#else
+testInt64Array ::
+     String
+  -> (ByteArray# -> Int# -> Int64#)
+  -> (MutableByteArray# RealWorld -> Int# -> State# RealWorld
+        -> (# State# RealWorld, Int64# #))
+  -> (MutableByteArray# RealWorld -> Int# -> Int64# -> State# RealWorld
+        -> State# RealWorld)
+  -> Int
+  -> Int
+  -> IO ()
+testInt64Array name0 index read write val0 len = do
+  doOne (name0 ++ " positive") val0
+  doOne (name0 ++ " negative") (negate val0)
+ where
+  doOne name val = test
+    name
+    (\arr i -> I64# (index arr i))
+    (\arr i s -> case read arr i s of (# s', a #) -> (# s', I# a #))
+    (\arr i (I64# a) s -> write arr i a s)
+    val
+    (intToBytes val len)
+    len
+#endif
+
 testWordArray ::
      String
   -> (ByteArray# -> Int# -> Word#)
@@ -172,7 +199,7 @@ main = do
   testIntArray "Int32#"
     indexWord8ArrayAsInt32# readWord8ArrayAsInt32# writeWord8ArrayAsInt32#
     12345678 4
-  testIntArray "Int64#"
+  testInt64Array "Int64#"
     indexWord8ArrayAsInt64# readWord8ArrayAsInt64# writeWord8ArrayAsInt64#
     1234567890123 8
   testIntArray "Int#"

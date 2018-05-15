@@ -1,0 +1,24 @@
+T14875.hs:(5,3)-(14,6): Splicing declarations
+    [d| f :: Bool -> Bool
+        f x
+          = case x of
+              (True :: Bool) -> True
+              (False :: Bool) -> False
+        g :: Bool -> Bool
+        g x
+          = (case x of
+               True -> True
+               False -> False) ::
+              Bool |]
+  ======>
+    f :: Bool -> Bool
+    f x
+      = case x of
+          (True :: Bool) -> True
+          (False :: Bool) -> False
+    g :: Bool -> Bool
+    g x
+      = (case x of
+           True -> True
+           False -> False) ::
+          Bool

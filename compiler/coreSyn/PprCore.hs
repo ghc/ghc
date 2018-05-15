@@ -128,10 +128,18 @@ ppr_binding ann (val_bdr, expr)
       -- lambda (the first rendering looks like a nullary join point returning
       -- an n-argument function).
     pp_join_bind join_arity
+      | bndrs `lengthAtLeast` join_arity
       = hang (ppr val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs))
            2 (equals <+> pprCoreExpr rhs)
+      | otherwise -- Yikes!  A join-binding with too few lambda
+                  -- Lint will complain, but we don't want to crash
+                  -- the pretty-printer else we can't see what's wrong
+                  -- So refer to printing  j = e
+      = pp_normal_bind
       where
-        (lhs_bndrs, rhs) = collectNBinders join_arity expr
+        (bndrs, body) = collectBinders expr
+        lhs_bndrs = take join_arity bndrs
+        rhs       = mkLams (drop join_arity bndrs) body
 
 pprParendExpr expr = ppr_expr parens expr
 pprCoreExpr   expr = ppr_expr noParens expr

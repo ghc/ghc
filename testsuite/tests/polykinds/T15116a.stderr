@@ -1,0 +1,7 @@
+
+T15116a.hs:6:21: error:
+    • Data constructor ‘MkB’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the first argument of ‘Proxy’, namely ‘ 'MkB’
+      In the type ‘(Proxy  'MkB)’
+      In the definition of data constructor ‘MkB’

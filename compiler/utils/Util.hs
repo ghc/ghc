@@ -98,7 +98,6 @@ module Util (
         doesDirNameExist,
         getModificationUTCTime,
         modificationTimeIfExists,
-        hSetTranslit,
 
         global, consIORef, globalM,
         sharedGlobal, sharedGlobalM,
@@ -145,9 +144,7 @@ import GHC.Stack (HasCallStack)
 
 import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM, guard )
-import GHC.IO.Encoding (mkTextEncoding, textEncodingName)
 import GHC.Conc.Sync ( sharedCAF )
-import System.IO (Handle, hGetEncoding, hSetEncoding)
 import System.IO.Error as IO ( isDoesNotExistError )
 import System.Directory ( doesDirectoryExist, getModificationTime )
 import System.FilePath
@@ -1256,18 +1253,6 @@ modificationTimeIfExists f = do
                         else ioError e
 
 -- --------------------------------------------------------------
--- Change the character encoding of the given Handle to transliterate
--- on unsupported characters instead of throwing an exception
-
-hSetTranslit :: Handle -> IO ()
-hSetTranslit h = do
-    menc <- hGetEncoding h
-    case fmap textEncodingName menc of
-        Just name | '/' `notElem` name -> do
-            enc' <- mkTextEncoding $ name ++ "//TRANSLIT"
-            hSetEncoding h enc'
-        _ -> return ()
-
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string
 -- up (but not including) the last character for which 'pred' returned

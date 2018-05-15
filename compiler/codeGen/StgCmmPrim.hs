@@ -907,6 +907,11 @@ callishPrimOpSupported dflags op
                          || llvm      -> Left (MO_Add2       (wordWidth dflags))
                      | otherwise      -> Right genericWordAdd2Op
 
+      WordAddCOp     | (ncg && (x86ish
+                                || ppc))
+                         || llvm      -> Left (MO_AddWordC   (wordWidth dflags))
+                     | otherwise      -> Right genericWordAddCOp
+
       WordSubCOp     | (ncg && (x86ish
                                 || ppc))
                          || llvm      -> Left (MO_SubWordC   (wordWidth dflags))
@@ -1043,17 +1048,64 @@ genericWordAdd2Op [res_h, res_l] [arg_x, arg_y]
                    (bottomHalf (CmmReg (CmmLocal r1))))]
 genericWordAdd2Op _ _ = panic "genericWordAdd2Op"
 
+-- | Implements branchless recovery of the carry flag @c@ by checking the
+-- leftmost bits of both inputs @a@ and @b@ and result @r = a + b@:
+--
+-- @
+--    c = a&b | (a|b)&~r
+-- @
+--
+-- https://brodowsky.it-sky.net/2015/04/02/how-to-recover-the-carry-bit/
+genericWordAddCOp :: GenericOp
+genericWordAddCOp [res_r, res_c] [aa, bb]
+ = do dflags <- getDynFlags
+      emit $ catAGraphs [
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordAdd dflags) [aa,bb]),
+        mkAssign (CmmLocal res_c) $
+          CmmMachOp (mo_wordUShr dflags) [
+            CmmMachOp (mo_wordOr dflags) [
+              CmmMachOp (mo_wordAnd dflags) [aa,bb],
+              CmmMachOp (mo_wordAnd dflags) [
+                CmmMachOp (mo_wordOr dflags) [aa,bb],
+                CmmMachOp (mo_wordNot dflags) [CmmReg (CmmLocal res_r)]
+              ]
+            ],
+            mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+          ]
+        ]
+genericWordAddCOp _ _ = panic "genericWordAddCOp"
+
+-- | Implements branchless recovery of the carry flag @c@ by checking the
+-- leftmost bits of both inputs @a@ and @b@ and result @r = a - b@:
+--
+-- @
+--    c = ~a&b | (~a|b)&r
+-- @
+--
+-- https://brodowsky.it-sky.net/2015/04/02/how-to-recover-the-carry-bit/
 genericWordSubCOp :: GenericOp
-genericWordSubCOp [res_r, res_c] [aa, bb] = do
-  dflags <- getDynFlags
-  emit $ catAGraphs
-    [ -- Put the result into 'res_r'.
-      mkAssign (CmmLocal res_r) $
-        CmmMachOp (mo_wordSub dflags) [aa, bb]
-      -- Set 'res_c' to 1 if 'bb > aa' and to 0 otherwise.
-    , mkAssign (CmmLocal res_c) $
-        CmmMachOp (mo_wordUGt dflags) [bb, aa]
-    ]
+genericWordSubCOp [res_r, res_c] [aa, bb]
+ = do dflags <- getDynFlags
+      emit $ catAGraphs [
+        mkAssign (CmmLocal res_r) (CmmMachOp (mo_wordSub dflags) [aa,bb]),
+        mkAssign (CmmLocal res_c) $
+          CmmMachOp (mo_wordUShr dflags) [
+            CmmMachOp (mo_wordOr dflags) [
+              CmmMachOp (mo_wordAnd dflags) [
+                CmmMachOp (mo_wordNot dflags) [aa],
+                bb
+              ],
+              CmmMachOp (mo_wordAnd dflags) [
+                CmmMachOp (mo_wordOr dflags) [
+                  CmmMachOp (mo_wordNot dflags) [aa],
+                  bb
+                ],
+                CmmReg (CmmLocal res_r)
+              ]
+            ],
+            mkIntExpr dflags (wORD_SIZE_IN_BITS dflags - 1)
+          ]
+        ]
 genericWordSubCOp _ _ = panic "genericWordSubCOp"
 
 genericIntAddCOp :: GenericOp

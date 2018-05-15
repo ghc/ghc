@@ -464,6 +464,8 @@ tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
   = do { (insts, fam_insts, deriv_infos) <- tcClsInstDecl (L loc decl)
        ; return (insts, fam_insts, deriv_infos) }
 
+tcLocalInstDecl (L _ (XInstDecl _)) = panic "tcLocalInstDecl"
+
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
 -- The returned DerivInfos are for any associated data families
@@ -518,7 +520,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts
                  , deriv_infos ) }
-
+tcClsInstDecl (L _ (XClsInstDecl _)) = panic "tcClsInstDecl"
 
 doClsInstErrorChecks :: InstInfo GhcRn -> TcM ()
 doClsInstErrorChecks inst_info
@@ -631,8 +633,9 @@ tcDataFamInstDecl :: Maybe ClsInstInfo
                   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo
-    (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_vars = tv_names
-                                                   , hsib_body =
+    (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_ext
+                                               = HsIBRn { hsib_vars = tv_names }
+                                 , hsib_body =
       FamEqn { feqn_pats   = pats
              , feqn_tycon  = fam_tc_name
              , feqn_fixity = fixity
@@ -755,6 +758,16 @@ tcDataFamInstDecl mb_clsinfo
     go pats etad_tvs = (reverse pats, etad_tvs)
 
     pp_hs_pats = pprFamInstLHS fam_tc_name pats fixity (unLoc ctxt) m_ksig
+
+tcDataFamInstDecl _
+    (L _ (DataFamInstDecl
+         { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = XHsDataDefn _ }}}))
+  = panic "tcDataFamInstDecl"
+tcDataFamInstDecl _ (L _ (DataFamInstDecl (XHsImplicitBndrs _)))
+  = panic "tcDataFamInstDecl"
+tcDataFamInstDecl _ (L _ (DataFamInstDecl (HsIB _ (XFamEqn _))))
+  = panic "tcDataFamInstDecl"
+
 
 {- *********************************************************************
 *                                                                      *

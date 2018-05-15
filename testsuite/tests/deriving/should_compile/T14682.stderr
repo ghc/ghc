@@ -61,14 +61,14 @@ Derived class instances:
            c1 <- GHC.Arr.range (a1, b1), c2 <- GHC.Arr.range (a2, b2)]
     GHC.Arr.unsafeIndex
       (T14682.Foo a1 a2, T14682.Foo b1 b2)
-      T14682.Foo c1 c2
+      (T14682.Foo c1 c2)
       = (GHC.Arr.unsafeIndex (a2, b2) c2
            GHC.Num.+
              (GHC.Arr.unsafeRangeSize (a2, b2)
                 GHC.Num.* GHC.Arr.unsafeIndex (a1, b1) c1))
     GHC.Arr.inRange
       (T14682.Foo a1 a2, T14682.Foo b1 b2)
-      T14682.Foo c1 c2
+      (T14682.Foo c1 c2)
       = (GHC.Arr.inRange (a1, b1) c1
            GHC.Classes.&& GHC.Arr.inRange (a2, b2) c2)
   

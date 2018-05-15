@@ -4,6 +4,7 @@
 module Main where
 
 
+import Data.Int
 import GHC.Types
 
 
@@ -16,7 +17,9 @@ foo = \i j -> sfoldl' (+) 0 $ xs i j +++ ys i j
 {-# Inline foo #-}
 
 
-main = do { n <- foo 1 1; print n }
+-- We narrow the result to 32-bits to account for the fact that this overflows
+-- on 32-bit machines.
+main = do { n <- foo 1 1; print (fromIntegral n :: Int32) }
 
 
 

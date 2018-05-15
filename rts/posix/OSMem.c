@@ -591,6 +591,15 @@ void osReleaseHeapMemory(void)
 
 #endif
 
+bool osBuiltWithNumaSupport(void)
+{
+#if HAVE_LIBNUMA
+    return true;
+#else
+    return false;
+#endif
+}
+
 bool osNumaAvailable(void)
 {
 #if HAVE_LIBNUMA
