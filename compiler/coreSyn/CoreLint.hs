@@ -1226,7 +1226,13 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
         -- type variables of the data constructor
         -- We've already check
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
-    ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys }
+    ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
+          ; (_, pred, con_args, _) = dataConSig con
+          ; ex_tvs = dataConExTyVars con
+          -- Weights of the things that the data con brings into scope
+          -- MattP: TODO: Move this into DataCon
+          ; weights = (replicate (length ex_tvs + length pred) Omega)
+                        ++ map weightedWeight (con_args) }
 
         -- And now bring the new binders into scope
     ; lintBinders CasePatBind args $ \ args' -> do
@@ -1235,10 +1241,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
     let scrut_usage = lookup_scrut rhs_ue
     -- This goes wrong, see GADT1 test, not sure if weight even matters
     -- here
-    -- ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" con_weights  args')) ;
-    --
-    --
-    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (map (\b -> (Omega, b)) args')) ;
+    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
     return rhs_ue
     } }
 
