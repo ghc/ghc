@@ -20,6 +20,8 @@ flag mingwex
   default: @CabalMingwex@
 flag libdw
   default: @CabalHaveLibdw@
+flag libnuma
+  default: @CabalHaveLibNuma@
 flag 64bit
   default: @Cabal64bit@
 flag leading-underscore
@@ -88,6 +90,8 @@ library
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw
+    if flag(libnuma)
+       extra-libraries: numa
     if !flag(smp)
        cpp-options: -DNOSMP
 
