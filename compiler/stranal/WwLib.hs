@@ -817,7 +817,8 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
   = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
        ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- This case can always be linear because the variables introduced by the pattern are only used as argument to a constructor
-             args        = zipWith mk_ww_local uniqs arg_tys
+             args        = zipWith mk_ww_local uniqs (map (\(ty, s) -> (scaleWeighted Omega ty, s)) arg_tys) -- TODO: MattP: This is like this becuase we are making an Omega case, it will have to
+          -- be changed later when we don't always generate an Omega case.
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
