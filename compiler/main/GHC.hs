@@ -492,8 +492,8 @@ initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
   = do { env <- liftIO $
                 do { mySettings <- initSysTools mb_top_dir
-                   ; myLlvmTargets <- initLlvmTargets mb_top_dir
-                   ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmTargets)
+                   ; myLlvmConfig <- initLlvmConfig mb_top_dir
+                   ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags
                       -- c.f. DynFlags.parseDynamicFlagsFull, which
