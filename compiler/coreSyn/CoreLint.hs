@@ -1250,7 +1250,7 @@ lintLinearBinder doc actual_usage described_usage
   = lintL (actual_usage == described_usage)
           err_msg
     where
-      err_msg = (text "Weight of variable does agree with its context"
+      err_msg = (text "Multiplicity of variable does agree with its context"
                 $$ doc
                 $$ ppr actual_usage
                 $$ text "Annotation:" <+> ppr described_usage)
