@@ -9,9 +9,8 @@ import GhcPrelude
 import GHCi.InfoTable
 import CmmInfo ( stdInfoTableSizeB )
 import DynFlags
+import HscTypes
 import FastString
-import TcRnTypes
-import TcRnMonad
 import IfaceEnv
 import Module
 import OccName
@@ -35,21 +34,20 @@ import Data.List
 --   We use this string to lookup the interpreter's internal representation of the name
 --   using the lookupOrig.
 --
-dataConInfoPtrToName :: Ptr () -> TcM (Either String Name)
-dataConInfoPtrToName x = do
-   dflags <- getDynFlags
-   theString <- liftIO $ do
-      let ptr = castPtr x :: Ptr StgInfoTable
-      conDescAddress <- getConDescAddress dflags ptr
-      peekArray0 0 conDescAddress
+dataConInfoPtrToName :: HscEnv -> Ptr () -> IO Name
+dataConInfoPtrToName hsc_env x = do
+   let dflags = hsc_dflags hsc_env
+   theString <- do
+     let ptr = castPtr x :: Ptr StgInfoTable
+     conDescAddress <- getConDescAddress dflags ptr
+     peekArray0 0 conDescAddress
    let (pkg, mod, occ) = parse theString
        pkgFS = mkFastStringByteList pkg
        modFS = mkFastStringByteList mod
        occFS = mkFastStringByteList occ
        occName = mkOccNameFS OccName.dataName occFS
        modName = mkModule (fsToUnitId pkgFS) (mkModuleNameFS modFS)
-   return (Left $ showSDoc dflags $ ppr modName <> dot <> ppr occName)
-    `recoverM` (Right `fmap` lookupOrig modName occName)
+   lookupOrigIO hsc_env modName occName
 
    where
 

@@ -106,7 +106,7 @@ module HscTypes (
         -- * Information on imports and exports
         WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
-        updNameCacheIO,
+        updNameCache,
         IfaceExport,
 
         -- * Warnings
@@ -2612,10 +2612,10 @@ interface file); so we give it 'noSrcLoc' then.  Later, when we find
 its binding site, we fix it up.
 -}
 
-updNameCacheIO :: HscEnv
-               -> (NameCache -> (NameCache, c))  -- The updating function
-               -> IO c
-updNameCacheIO hsc_env upd_fn
+updNameCache :: HscEnv
+             -> (NameCache -> (NameCache, c))  -- The updating function
+             -> IO c
+updNameCache hsc_env upd_fn
   = atomicModifyIORef' (hsc_NC hsc_env) upd_fn
 
 mkSOName :: Platform -> FilePath -> FilePath

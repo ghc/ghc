@@ -54,13 +54,10 @@ chaseConstructor !hv = do
   case tipe closure  of
     Indirection _ -> chaseConstructor (ptrs closure ! 0)
     Constr -> do
-      withSession $ \hscEnv -> liftIO $ initTcForLookup hscEnv $ do
-        eDcname <- dataConInfoPtrToName (infoPtr closure)
-        case eDcname of
-          Left _       -> return ()
-          Right dcName -> do
-            liftIO $ putStrLn $ "Name: "      ++ showPpr dflags dcName
-            liftIO $ putStrLn $ "OccString: " ++ "'" ++ getOccString dcName ++ "'"
-            dc <- tcLookupDataCon dcName
-            liftIO $ putStrLn $ "DataCon: "   ++ showPpr dflags dc
+      withSession $ \hscEnv -> liftIO $ do
+        dcName <- dataConInfoPtrToName hscEnv (infoPtr closure)
+        putStrLn $ "Name: "      ++ showPpr dflags dcName
+        putStrLn $ "OccString: " ++ "'" ++ getOccString dcName ++ "'"
+        dc <- ioLookupDataCon hscEnv dcName
+        putStrLn $ "DataCon: "   ++ showPpr dflags dc
     _ -> return ()
