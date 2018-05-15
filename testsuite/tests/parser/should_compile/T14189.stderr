@@ -15,17 +15,17 @@
      [({ T14189.hs:6:1-42 }
        (DataDecl
         (DataDeclRn
-          (True)
-          {NameSet:
-           [{Name: GHC.Types.Int}]})
+         (True)
+         {NameSet:
+          [{Name: GHC.Types.Int}]})
         ({ T14189.hs:6:6-11 }
          {Name: T14189.MyType})
         (HsQTvs
          (HsQTvsRn
-         []
-         {NameSet:
-          []})
-          [])
+          []
+          {NameSet:
+           []})
+         [])
         (Prefix)
         (HsDataDefn
          (NoExt)
@@ -43,30 +43,14 @@
             []
             (Nothing)
             (PrefixCon
-<<<<<<< HEAD
              [(Weighted
                (One)
                ({ T14189.hs:6:18-20 }
                 (HsTyVar
-                 (PlaceHolder)
+                 (NoExt)
                  (NotPromoted)
                  ({ T14189.hs:6:18-20 }
                   {Name: GHC.Types.Int}))))])
-||||||| merged common ancestors
-             [({ T14189.hs:6:18-20 }
-               (HsTyVar
-                (PlaceHolder)
-                (NotPromoted)
-                ({ T14189.hs:6:18-20 }
-                 {Name: GHC.Types.Int})))])
-=======
-             [({ T14189.hs:6:18-20 }
-               (HsTyVar
-                (NoExt)
-                (NotPromoted)
-                ({ T14189.hs:6:18-20 }
-                 {Name: GHC.Types.Int})))])
->>>>>>> origin/master
             (Nothing)))
          ,({ T14189.hs:6:24-25 }
            (ConDeclH98

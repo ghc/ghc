@@ -329,7 +329,8 @@
            ({abstract:TyCon})
            [(TyConApp
              ({abstract:TyCon})
-             [])]))
+             [])])
+          (Omega))
          ({ DumpTypecheckedAst.hs:11:1-23 }
           [({ DumpTypecheckedAst.hs:11:1-23 }
             (Match
@@ -363,26 +364,7 @@
                       {FastString: "hello"})))))))]
               ({ <no location info> }
                (EmptyLocalBinds
-<<<<<<< HEAD
-                (PlaceHolder))))))])
-         []
-         (TyConApp
-          ({abstract:TyCon})
-          [(TyConApp
-            ({abstract:TyCon})
-            [])])
-         (Omega)
-||||||| merged common ancestors
-                (PlaceHolder))))))])
-         []
-         (TyConApp
-          ({abstract:TyCon})
-          [(TyConApp
-            ({abstract:TyCon})
-            [])])
-=======
                 (NoExt))))))])
->>>>>>> origin/master
          (FromSource))
         (WpHole)
         []))]}
