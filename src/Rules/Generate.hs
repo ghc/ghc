@@ -164,6 +164,7 @@ copyRules = do
         prefix -/- "ghc-usage.txt"     <~ return "driver"
         prefix -/- "ghci-usage.txt"    <~ return "driver"
         prefix -/- "llvm-targets"      <~ return "."
+        prefix -/- "llvm-passes"       <~ return "."
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "settings"          <~ return "."
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)

@@ -111,6 +111,7 @@ ghcDeps stage = mapM (\f -> stageLibPath stage <&> (-/- f))
       [ "ghc-usage.txt"
       , "ghci-usage.txt"
       , "llvm-targets"
+      , "llvm-passes"
       , "platformConstants"
       , "settings" ]
 

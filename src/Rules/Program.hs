@@ -45,7 +45,8 @@ buildProgram rs = do
                         need [template]
                     when (package == ghc) $ do
                         -- GHC depends on @settings@, @platformConstants@,
-                        -- @llvm-targets@, @ghc-usage.txt@, @ghci-usage.txt@.
+                        -- @llvm-targets@, @ghc-usage.txt@, @ghci-usage.txt@,
+                        -- @llvm-passes@.
                         need =<< ghcDeps stage
 
                     cross <- crossCompiling
