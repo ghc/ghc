@@ -1,3 +1,6 @@
+-- CI Failures but not locally #85
+sc002
+T3001-2
 -- ETA-expansion tests
 cgrun075
 cgrun076
