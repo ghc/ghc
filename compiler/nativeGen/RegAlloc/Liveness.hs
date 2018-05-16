@@ -1008,5 +1008,3 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             r_dying_br  = nonDetEltsUniqSet (mkUniqSet r_dying `unionUniqSets`
                                              live_branch_only)
                           -- See Note [Unique Determinism and code generation]
-
-

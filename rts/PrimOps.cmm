@@ -160,8 +160,9 @@ stg_isByteArrayPinnedzh ( gcptr ba )
     // Pinned byte arrays live in blocks with the BF_PINNED flag set.
     // We also consider BF_LARGE objects to be immovable. See #13894.
     // See the comment in Storage.c:allocatePinned.
+    // We also consider BF_COMPACT objects to be immovable. See #14900.
     flags = TO_W_(bdescr_flags(bd));
-    return (flags & (BF_PINNED | BF_LARGE) != 0);
+    return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
 }
 
 stg_isMutableByteArrayPinnedzh ( gcptr mba )
@@ -2490,3 +2491,23 @@ stg_traceMarkerzh ( W_ msg )
     return ();
 }
 
+
+stg_getThreadAllocationCounterzh ()
+{
+    // Account for the allocation in the current block
+    W_ offset;
+    offset = Hp - bdescr_start(CurrentNursery);
+    return (StgTSO_alloc_limit(CurrentTSO) - TO_I64(offset));
+}
+
+stg_setThreadAllocationCounterzh ( I64 counter )
+{
+    // Allocation in the current block will be subtracted by
+    // getThreadAllocationCounter#, so we have to offset any existing
+    // allocation here.  See also openNursery/closeNursery in
+    // compiler/codeGen/StgCmmForeign.hs.
+    W_ offset;
+    offset = Hp - bdescr_start(CurrentNursery);
+    StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
+    return ();
+}

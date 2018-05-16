@@ -1026,14 +1026,26 @@ canShortcut _                    = Nothing
 -- The blockset helps avoid following cycles.
 shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
 shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
-  where shortcutJump' fn seen insn@(JXX cc id) =
-          if setMember id seen then insn
-          else case fn id of
-                 Nothing                -> insn
-                 Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
-                 Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
-               where seen' = setInsert id seen
-        shortcutJump' _ _ other = other
+  where
+    shortcutJump' :: (BlockId -> Maybe JumpDest) -> LabelSet -> Instr -> Instr
+    shortcutJump' fn seen insn@(JXX cc id) =
+        if setMember id seen then insn
+        else case fn id of
+            Nothing                -> insn
+            Just (DestBlockId id') -> shortcutJump' fn seen' (JXX cc id')
+            Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
+        where seen' = setInsert id seen
+    shortcutJump' fn _ (JMP_TBL addr blocks section tblId) =
+        let updateBlock Nothing     = Nothing
+            updateBlock (Just bid)  =
+                case fn bid of
+                    Nothing                 -> Just bid
+                    Just (DestBlockId bid') -> Just bid'
+                    Just (DestImm _)        ->
+                        panic "Can't shortcut jump table to immediate"
+            blocks' = map updateBlock blocks
+        in  JMP_TBL addr blocks' section tblId
+    shortcutJump' _ _ other = other
 
 -- Here because it knows about JumpDest
 shortcutStatics :: (BlockId -> Maybe JumpDest) -> (Alignment, CmmStatics) -> (Alignment, CmmStatics)
@@ -1050,8 +1062,8 @@ shortcutLabel fn lab
 shortcutStatic :: (BlockId -> Maybe JumpDest) -> CmmStatic -> CmmStatic
 shortcutStatic fn (CmmStaticLit (CmmLabel lab))
   = CmmStaticLit (CmmLabel (shortcutLabel fn lab))
-shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off))
-  = CmmStaticLit (CmmLabelDiffOff (shortcutLabel fn lbl1) lbl2 off)
+shortcutStatic fn (CmmStaticLit (CmmLabelDiffOff lbl1 lbl2 off w))
+  = CmmStaticLit (CmmLabelDiffOff (shortcutLabel fn lbl1) lbl2 off w)
         -- slightly dodgy, we're ignoring the second label, but this
         -- works with the way we use CmmLabelDiffOff for jump tables now.
 shortcutStatic _ other_static

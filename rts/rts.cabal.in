@@ -20,6 +20,8 @@ flag mingwex
   default: @CabalMingwex@
 flag libdw
   default: @CabalHaveLibdw@
+flag libnuma
+  default: @CabalHaveLibNuma@
 flag 64bit
   default: @Cabal64bit@
 flag leading-underscore
@@ -34,7 +36,10 @@ library
     -- expects the unit-id to be
     -- set without version
     ghc-options: -this-unit-id rts
-    extra-bundled-libraries: Cffi
+    if os(windows)
+      extra-bundled-libraries: Cffi-6
+    else
+      extra-bundled-libraries: Cffi
     -- the rts comes in a variety of flavours that ar built outside
     -- of cabal.  The combination of extra-bundled-libraries and
     -- extra-library-flavours results in the following libraries to
@@ -85,6 +90,8 @@ library
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw
+    if flag(libnuma)
+       extra-libraries: numa
     if !flag(smp)
        cpp-options: -DNOSMP
 
@@ -190,6 +197,7 @@ library
          "-Wl,-u,_base_GHCziIOziException_cannotCompactFunction_closure"
          "-Wl,-u,_base_GHCziIOziException_cannotCompactPinned_closure"
          "-Wl,-u,_base_GHCziIOziException_cannotCompactMutable_closure"
+         "-Wl,-u,_base_ControlziExceptionziBase_absentSumFieldError_closure"
          "-Wl,-u,_base_ControlziExceptionziBase_nonTermination_closure"
          "-Wl,-u,_base_ControlziExceptionziBase_nestedAtomically_closure"
          "-Wl,-u,_base_GHCziEventziThread_blockedOnBadFD_closure"
@@ -242,6 +250,9 @@ library
          "-Wl,-u,_hs_atomicwrite8"
          "-Wl,-u,_hs_atomicwrite16"
          "-Wl,-u,_hs_atomicwrite32"
+         -- This symbol is useful in gdb, but not referred to anywhere,
+         -- so we need to force it to be included in the binary.
+         "-Wl,-u,_findPtr"
     else
       ld-options:
          "-Wl,-u,base_GHCziTopHandler_runIO_closure"
@@ -259,6 +270,7 @@ library
          "-Wl,-u,base_GHCziIOziException_cannotCompactFunction_closure"
          "-Wl,-u,base_GHCziIOziException_cannotCompactPinned_closure"
          "-Wl,-u,base_GHCziIOziException_cannotCompactMutable_closure"
+         "-Wl,-u,base_ControlziExceptionziBase_absentSumFieldError_closure"
          "-Wl,-u,base_ControlziExceptionziBase_nonTermination_closure"
          "-Wl,-u,base_ControlziExceptionziBase_nestedAtomically_closure"
          "-Wl,-u,base_GHCziEventziThread_blockedOnBadFD_closure"
@@ -311,6 +323,9 @@ library
          "-Wl,-u,hs_atomicwrite8"
          "-Wl,-u,hs_atomicwrite16"
          "-Wl,-u,hs_atomicwrite32"
+         -- This symbol is useful in gdb, but not referred to anywhere,
+         -- so we need to force it to be included in the binary.
+         "-Wl,-u,findPtr"
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
@@ -429,6 +444,7 @@ library
                sm/Storage.c
                sm/Sweep.c
                xxhash.c
+               fs.c
                -- I wish we had wildcards..., this would be:
                -- *.c hooks/**/*.c sm/**/*.c eventlog/**/*.c linker/**/*.c
     if os(windows)

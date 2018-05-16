@@ -166,7 +166,7 @@ extern OSThreadId osThreadId      ( void );
 extern void shutdownThread        ( void )   GNUC3_ATTRIBUTE(__noreturn__);
 extern void yieldThread           ( void );
 
-typedef void OSThreadProcAttr OSThreadProc(void *);
+typedef void* OSThreadProcAttr OSThreadProc(void *);
 
 extern int  createOSThread        ( OSThreadId* tid, char *name,
                                     OSThreadProc *startProc, void *param);

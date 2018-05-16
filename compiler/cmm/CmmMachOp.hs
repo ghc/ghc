@@ -556,6 +556,7 @@ data CallishMachOp
   | MO_U_QuotRem Width
   | MO_U_QuotRem2 Width
   | MO_Add2      Width
+  | MO_AddWordC  Width
   | MO_SubWordC  Width
   | MO_AddIntC   Width
   | MO_SubIntC   Width

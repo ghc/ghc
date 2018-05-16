@@ -351,6 +351,7 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs, pat_rhs = rhs }))) = do
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
+addTickLHsBind bind@(L _ (XHsBindsLR {})) = return bind
 
 
 bindTick
@@ -451,15 +452,15 @@ addTickLHsExprNever (L pos e0) = do
 -- general heuristic: expressions which do not denote values are good
 -- break points
 isGoodBreakExpr :: HsExpr GhcTc -> Bool
-isGoodBreakExpr (HsApp {})        = True
-isGoodBreakExpr (HsAppTypeOut {}) = True
-isGoodBreakExpr (OpApp {})        = True
-isGoodBreakExpr _other            = False
+isGoodBreakExpr (HsApp {})     = True
+isGoodBreakExpr (HsAppType {}) = True
+isGoodBreakExpr (OpApp {})     = True
+isGoodBreakExpr _other         = False
 
 isCallSite :: HsExpr GhcTc -> Bool
-isCallSite HsApp{}        = True
-isCallSite HsAppTypeOut{} = True
-isCallSite OpApp{}        = True
+isCallSite HsApp{}     = True
+isCallSite HsAppType{} = True
+isCallSite OpApp{}     = True
 isCallSite _ = False
 
 addTickLHsExprOptAlt :: Bool -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
@@ -481,55 +482,58 @@ addBinTickLHsExpr boxLabel (L pos e0)
 -- in the addTickLHsExpr family of functions.)
 
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpr e@(HsVar (L _ id)) = do freeVar id; return e
-addTickHsExpr (HsUnboundVar {})  = panic "addTickHsExpr.HsUnboundVar"
-addTickHsExpr e@(HsConLikeOut con)
+addTickHsExpr e@(HsVar _ (L _ id)) = do freeVar id; return e
+addTickHsExpr (HsUnboundVar {})    = panic "addTickHsExpr.HsUnboundVar"
+addTickHsExpr e@(HsConLikeOut _ con)
   | Just id <- conLikeWrapId_maybe con = do freeVar id; return e
-addTickHsExpr e@(HsIPVar _)      = return e
-addTickHsExpr e@(HsOverLit _)    = return e
-addTickHsExpr e@(HsOverLabel{})  = return e
-addTickHsExpr e@(HsLit _)        = return e
-addTickHsExpr (HsLam matchgroup) = liftM HsLam (addTickMatchGroup True matchgroup)
-addTickHsExpr (HsLamCase mgs)    = liftM HsLamCase (addTickMatchGroup True mgs)
-addTickHsExpr (HsApp e1 e2)      = liftM2 HsApp (addTickLHsExprNever e1)
-                                                (addTickLHsExpr      e2)
-addTickHsExpr (HsAppTypeOut e ty) = liftM2 HsAppTypeOut (addTickLHsExprNever e)
-                                                        (return ty)
+addTickHsExpr e@(HsIPVar {})       = return e
+addTickHsExpr e@(HsOverLit {})     = return e
+addTickHsExpr e@(HsOverLabel{})    = return e
+addTickHsExpr e@(HsLit {})         = return e
+addTickHsExpr (HsLam x matchgroup) = liftM (HsLam x)
+                                           (addTickMatchGroup True matchgroup)
+addTickHsExpr (HsLamCase x mgs)    = liftM (HsLamCase x)
+                                           (addTickMatchGroup True mgs)
+addTickHsExpr (HsApp x e1 e2)      = liftM2 (HsApp x) (addTickLHsExprNever e1)
+                                                      (addTickLHsExpr      e2)
+addTickHsExpr (HsAppType ty e)   = liftM2 HsAppType (return ty)
+                                                    (addTickLHsExprNever e)
 
-addTickHsExpr (OpApp e1 e2 fix e3) =
+
+addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
+                (return fix)
                 (addTickLHsExpr e1)
                 (addTickLHsExprNever e2)
-                (return fix)
                 (addTickLHsExpr e3)
-addTickHsExpr (NegApp e neg) =
-        liftM2 NegApp
+addTickHsExpr (NegApp x e neg) =
+        liftM2 (NegApp x)
                 (addTickLHsExpr e)
                 (addTickSyntaxExpr hpcSrcSpan neg)
-addTickHsExpr (HsPar e) =
-        liftM HsPar (addTickLHsExprEvalInner e)
-addTickHsExpr (SectionL e1 e2) =
-        liftM2 SectionL
+addTickHsExpr (HsPar x e) =
+        liftM (HsPar x) (addTickLHsExprEvalInner e)
+addTickHsExpr (SectionL x e1 e2) =
+        liftM2 (SectionL x)
                 (addTickLHsExpr e1)
                 (addTickLHsExprNever e2)
-addTickHsExpr (SectionR e1 e2) =
-        liftM2 SectionR
+addTickHsExpr (SectionR x e1 e2) =
+        liftM2 (SectionR x)
                 (addTickLHsExprNever e1)
                 (addTickLHsExpr e2)
-addTickHsExpr (ExplicitTuple es boxity) =
-        liftM2 ExplicitTuple
+addTickHsExpr (ExplicitTuple x es boxity) =
+        liftM2 (ExplicitTuple x)
                 (mapM addTickTupArg es)
                 (return boxity)
-addTickHsExpr (ExplicitSum tag arity e ty) = do
+addTickHsExpr (ExplicitSum ty tag arity e) = do
         e' <- addTickLHsExpr e
-        return (ExplicitSum tag arity e' ty)
-addTickHsExpr (HsCase e mgs) =
-        liftM2 HsCase
+        return (ExplicitSum ty tag arity e')
+addTickHsExpr (HsCase x e mgs) =
+        liftM2 (HsCase x)
                 (addTickLHsExpr e) -- not an EvalInner; e might not necessarily
                                    -- be evaluated.
                 (addTickMatchGroup False mgs)
-addTickHsExpr (HsIf cnd e1 e2 e3) =
-        liftM3 (HsIf cnd)
+addTickHsExpr (HsIf x cnd e1 e2 e3) =
+        liftM3 (HsIf x cnd)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsExprOptAlt True e2)
                 (addTickLHsExprOptAlt True e3)
@@ -537,14 +541,14 @@ addTickHsExpr (HsMultiIf ty alts)
   = do { let isOneOfMany = case alts of [_] -> False; _ -> True
        ; alts' <- mapM (liftL $ addTickGRHS isOneOfMany False) alts
        ; return $ HsMultiIf ty alts' }
-addTickHsExpr (HsLet (L l binds) e) =
+addTickHsExpr (HsLet x (L l binds) e) =
         bindLocals (collectLocalBinders binds) $
-          liftM2 (HsLet . L l)
+          liftM2 (HsLet x . L l)
                   (addTickHsLocalBinds binds) -- to think about: !patterns.
                   (addTickLHsExprLetBody e)
-addTickHsExpr (HsDo cxt (L l stmts) srcloc)
+addTickHsExpr (HsDo srcloc cxt (L l stmts))
   = do { (stmts', _) <- addTickLStmts' forQual stmts (return ())
-       ; return (HsDo cxt (L l stmts') srcloc) }
+       ; return (HsDo srcloc cxt (L l stmts')) }
   where
         forQual = case cxt of
                     ListComp -> Just $ BinBox QualBinBox
@@ -574,12 +578,12 @@ addTickHsExpr expr@(RecordUpd { rupd_expr = e, rupd_flds = flds })
        ; flds' <- mapM addTickHsRecField flds
        ; return (expr { rupd_expr = e', rupd_flds = flds' }) }
 
-addTickHsExpr (ExprWithTySig e ty) =
+addTickHsExpr (ExprWithTySig ty e) =
         liftM2 ExprWithTySig
-                (addTickLHsExprNever e) -- No need to tick the inner expression
-                                    -- for expressions with signatures
                 (return ty)
-addTickHsExpr (ArithSeq  ty wit arith_seq) =
+                (addTickLHsExprNever e) -- No need to tick the inner expression
+                                        -- for expressions with signatures
+addTickHsExpr (ArithSeq ty wit arith_seq) =
         liftM3 ArithSeq
                 (return ty)
                 (addTickWit wit)
@@ -589,26 +593,26 @@ addTickHsExpr (ArithSeq  ty wit arith_seq) =
                                              return (Just fl')
 
 -- We might encounter existing ticks (multiple Coverage passes)
-addTickHsExpr (HsTick t e) =
-        liftM (HsTick t) (addTickLHsExprNever e)
-addTickHsExpr (HsBinTick t0 t1 e) =
-        liftM (HsBinTick t0 t1) (addTickLHsExprNever e)
+addTickHsExpr (HsTick x t e) =
+        liftM (HsTick x t) (addTickLHsExprNever e)
+addTickHsExpr (HsBinTick x t0 t1 e) =
+        liftM (HsBinTick x t0 t1) (addTickLHsExprNever e)
 
-addTickHsExpr (HsTickPragma _ _ _ (L pos e0)) = do
+addTickHsExpr (HsTickPragma _ _ _ _ (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) False False pos $
                 addTickHsExpr e0
     return $ unLoc e2
-addTickHsExpr (PArrSeq   ty arith_seq) =
+addTickHsExpr (PArrSeq ty arith_seq) =
         liftM2 PArrSeq
                 (return ty)
                 (addTickArithSeqInfo arith_seq)
-addTickHsExpr (HsSCC src nm e) =
-        liftM3 HsSCC
+addTickHsExpr (HsSCC x src nm e) =
+        liftM3 (HsSCC x)
                 (return src)
                 (return nm)
                 (addTickLHsExpr e)
-addTickHsExpr (HsCoreAnn src nm e) =
-        liftM3 HsCoreAnn
+addTickHsExpr (HsCoreAnn x src nm e) =
+        liftM3 (HsCoreAnn x)
                 (return src)
                 (return nm)
                 (addTickLHsExpr e)
@@ -616,27 +620,23 @@ addTickHsExpr e@(HsBracket     {})   = return e
 addTickHsExpr e@(HsTcBracketOut  {}) = return e
 addTickHsExpr e@(HsRnBracketOut  {}) = return e
 addTickHsExpr e@(HsSpliceE  {})      = return e
-addTickHsExpr (HsProc pat cmdtop) =
-        liftM2 HsProc
+addTickHsExpr (HsProc x pat cmdtop) =
+        liftM2 (HsProc x)
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
-addTickHsExpr (HsWrap w e) =
-        liftM2 HsWrap
+addTickHsExpr (HsWrap x w e) =
+        liftM2 (HsWrap x)
                 (return w)
                 (addTickHsExpr e)       -- Explicitly no tick on inside
-
-addTickHsExpr (ExprWithTySigOut e ty) =
-        liftM2 ExprWithTySigOut
-               (addTickLHsExprNever e) -- No need to tick the inner expression
-               (return ty)             -- for expressions with signatures
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
 addTickTupArg :: LHsTupArg GhcTc -> TM (LHsTupArg GhcTc)
-addTickTupArg (L l (Present e))  = do { e' <- addTickLHsExpr e
-                                      ; return (L l (Present e')) }
+addTickTupArg (L l (Present x e))  = do { e' <- addTickLHsExpr e
+                                      ; return (L l (Present x e')) }
 addTickTupArg (L l (Missing ty)) = return (L l (Missing ty))
+addTickTupArg (L _ (XTupArg _)) = panic "addTickTupArg"
 
 addTickMatchGroup :: Bool{-is lambda-} -> MatchGroup GhcTc (LHsExpr GhcTc)
                   -> TM (MatchGroup GhcTc (LHsExpr GhcTc))
@@ -644,6 +644,7 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany is_lam)) matches
   return $ mg { mg_alts = L l matches' }
+addTickMatchGroup _ (XMatchGroup _) = panic "addTickMatchGroup"
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
@@ -651,23 +652,26 @@ addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats, m_grhss = gRHSs 
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
     return $ match { m_grhss = gRHSs' }
+addTickMatch _ _ (XMatch _) = panic "addTickMatch"
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
-addTickGRHSs isOneOfMany isLambda (GRHSs guarded (L l local_binds)) = do
+addTickGRHSs isOneOfMany isLambda (GRHSs x guarded (L l local_binds)) = do
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (liftL (addTickGRHS isOneOfMany isLambda)) guarded
-    return $ GRHSs guarded' (L l local_binds')
+    return $ GRHSs x guarded' (L l local_binds')
   where
     binders = collectLocalBinders local_binds
+addTickGRHSs _ _ (XGRHSs _) = panic "addTickGRHSs"
 
 addTickGRHS :: Bool -> Bool -> GRHS GhcTc (LHsExpr GhcTc)
             -> TM (GRHS GhcTc (LHsExpr GhcTc))
-addTickGRHS isOneOfMany isLambda (GRHS stmts expr) = do
+addTickGRHS isOneOfMany isLambda (GRHS x stmts expr) = do
   (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
                         (addTickGRHSBody isOneOfMany isLambda expr)
-  return $ GRHS stmts' expr'
+  return $ GRHS x stmts' expr'
+addTickGRHS _ _ (XGRHS _) = panic "addTickGRHS"
 
 addTickGRHSBody :: Bool -> Bool -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTickGRHSBody isOneOfMany isLambda expr@(L pos e0) = do
@@ -697,36 +701,33 @@ addTickLStmts' isGuard lstmts res
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt GhcTc (LHsExpr GhcTc)
             -> TM (Stmt GhcTc (LHsExpr GhcTc))
-addTickStmt _isGuard (LastStmt e noret ret) = do
-        liftM3 LastStmt
+addTickStmt _isGuard (LastStmt x e noret ret) = do
+        liftM3 (LastStmt x)
                 (addTickLHsExpr e)
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
-addTickStmt _isGuard (BindStmt pat e bind fail ty) = do
-        liftM5 BindStmt
+addTickStmt _isGuard (BindStmt x pat e bind fail) = do
+        liftM4 (BindStmt x)
                 (addTickLPat pat)
                 (addTickLHsExprRHS e)
                 (addTickSyntaxExpr hpcSrcSpan bind)
                 (addTickSyntaxExpr hpcSrcSpan fail)
-                (return ty)
-addTickStmt isGuard (BodyStmt e bind' guard' ty) = do
-        liftM4 BodyStmt
+addTickStmt isGuard (BodyStmt x e bind' guard') = do
+        liftM3 (BodyStmt x)
                 (addTick isGuard e)
                 (addTickSyntaxExpr hpcSrcSpan bind')
                 (addTickSyntaxExpr hpcSrcSpan guard')
-                (return ty)
-addTickStmt _isGuard (LetStmt (L l binds)) = do
-        liftM (LetStmt . L l)
+addTickStmt _isGuard (LetStmt x (L l binds)) = do
+        liftM (LetStmt x . L l)
                 (addTickHsLocalBinds binds)
-addTickStmt isGuard (ParStmt pairs mzipExpr bindExpr ty) = do
-    liftM4 ParStmt
+addTickStmt isGuard (ParStmt x pairs mzipExpr bindExpr) = do
+    liftM3 (ParStmt x)
         (mapM (addTickStmtAndBinders isGuard) pairs)
         (unLoc <$> addTickLHsExpr (L hpcSrcSpan mzipExpr))
         (addTickSyntaxExpr hpcSrcSpan bindExpr)
-        (return ty)
-addTickStmt isGuard (ApplicativeStmt args mb_join body_ty) = do
+addTickStmt isGuard (ApplicativeStmt body_ty args mb_join) = do
     args' <- mapM (addTickApplicativeArg isGuard) args
-    return (ApplicativeStmt args' mb_join body_ty)
+    return (ApplicativeStmt body_ty args' mb_join)
 
 addTickStmt isGuard stmt@(TransStmt { trS_stmts = stmts
                                     , trS_by = by, trS_using = using
@@ -749,66 +750,75 @@ addTickStmt isGuard stmt@(RecStmt {})
        ; return (stmt { recS_stmts = stmts', recS_ret_fn = ret'
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 
+addTickStmt _ (XStmtLR _) = panic "addTickStmt"
+
 addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr GhcTc -> TM (LHsExpr GhcTc)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
                   | otherwise          = addTickLHsExprRHS e
 
 addTickApplicativeArg
-  :: Maybe (Bool -> BoxLabel) -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc GhcTc)
-  -> TM (SyntaxExpr GhcTc, ApplicativeArg GhcTc GhcTc)
+  :: Maybe (Bool -> BoxLabel) -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
+  -> TM (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
-  addTickArg (ApplicativeArgOne pat expr isBody) =
-    ApplicativeArgOne
+  addTickArg (ApplicativeArgOne x pat expr isBody) =
+    (ApplicativeArgOne x)
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
-  addTickArg (ApplicativeArgMany stmts ret pat) =
-    ApplicativeArgMany
+  addTickArg (ApplicativeArgMany x stmts ret pat) =
+    (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (L hpcSrcSpan ret))
       <*> addTickLPat pat
+  addTickArg (XApplicativeArg _) = panic "addTickApplicativeArg"
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)
-addTickStmtAndBinders isGuard (ParStmtBlock stmts ids returnExpr) =
-    liftM3 ParStmtBlock
+addTickStmtAndBinders isGuard (ParStmtBlock x stmts ids returnExpr) =
+    liftM3 (ParStmtBlock x)
         (addTickLStmts isGuard stmts)
         (return ids)
         (addTickSyntaxExpr hpcSrcSpan returnExpr)
+addTickStmtAndBinders _ (XParStmtBlock{}) = panic "addTickStmtAndBinders"
 
 addTickHsLocalBinds :: HsLocalBinds GhcTc -> TM (HsLocalBinds GhcTc)
-addTickHsLocalBinds (HsValBinds binds) =
-        liftM HsValBinds
+addTickHsLocalBinds (HsValBinds x binds) =
+        liftM (HsValBinds x)
                 (addTickHsValBinds binds)
-addTickHsLocalBinds (HsIPBinds binds)  =
-        liftM HsIPBinds
+addTickHsLocalBinds (HsIPBinds x binds)  =
+        liftM (HsIPBinds x)
                 (addTickHsIPBinds binds)
-addTickHsLocalBinds (EmptyLocalBinds)  = return EmptyLocalBinds
+addTickHsLocalBinds (EmptyLocalBinds x)  = return (EmptyLocalBinds x)
+addTickHsLocalBinds (XHsLocalBindsLR x)  = return (XHsLocalBindsLR x)
 
-addTickHsValBinds :: HsValBindsLR GhcTc a -> TM (HsValBindsLR GhcTc b)
-addTickHsValBinds (ValBindsOut binds sigs) =
-        liftM2 ValBindsOut
+addTickHsValBinds :: HsValBindsLR GhcTc (GhcPass a)
+                  -> TM (HsValBindsLR GhcTc (GhcPass b))
+addTickHsValBinds (XValBindsLR (NValBinds binds sigs)) = do
+        b <- liftM2 NValBinds
                 (mapM (\ (rec,binds') ->
                                 liftM2 (,)
                                         (return rec)
                                         (addTickLHsBinds binds'))
                         binds)
                 (return sigs)
+        return $ XValBindsLR b
 addTickHsValBinds _ = panic "addTickHsValBinds"
 
 addTickHsIPBinds :: HsIPBinds GhcTc -> TM (HsIPBinds GhcTc)
-addTickHsIPBinds (IPBinds ipbinds dictbinds) =
+addTickHsIPBinds (IPBinds dictbinds ipbinds) =
         liftM2 IPBinds
-                (mapM (liftL (addTickIPBind)) ipbinds)
                 (return dictbinds)
+                (mapM (liftL (addTickIPBind)) ipbinds)
+addTickHsIPBinds (XHsIPBinds x) = return (XHsIPBinds x)
 
 addTickIPBind :: IPBind GhcTc -> TM (IPBind GhcTc)
-addTickIPBind (IPBind nm e) =
-        liftM2 IPBind
+addTickIPBind (IPBind x nm e) =
+        liftM2 (IPBind x)
                 (return nm)
                 (addTickLHsExpr e)
+addTickIPBind (XCIPBind x) = return (XCIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)
@@ -820,12 +830,11 @@ addTickLPat :: LPat GhcTc -> TM (LPat GhcTc)
 addTickLPat pat = return pat
 
 addTickHsCmdTop :: HsCmdTop GhcTc -> TM (HsCmdTop GhcTc)
-addTickHsCmdTop (HsCmdTop cmd tys ty syntaxtable) =
-        liftM4 HsCmdTop
+addTickHsCmdTop (HsCmdTop x cmd) =
+        liftM2 HsCmdTop
+                (return x)
                 (addTickLHsCmd cmd)
-                (return tys)
-                (return ty)
-                (return syntaxtable)
+addTickHsCmdTop (XCmdTop{}) = panic "addTickHsCmdTop"
 
 addTickLHsCmd ::  LHsCmd GhcTc -> TM (LHsCmd GhcTc)
 addTickLHsCmd (L pos c0) = do
@@ -833,10 +842,10 @@ addTickLHsCmd (L pos c0) = do
         return $ L pos c1
 
 addTickHsCmd :: HsCmd GhcTc -> TM (HsCmd GhcTc)
-addTickHsCmd (HsCmdLam matchgroup) =
-        liftM HsCmdLam (addTickCmdMatchGroup matchgroup)
-addTickHsCmd (HsCmdApp c e) =
-        liftM2 HsCmdApp (addTickLHsCmd c) (addTickLHsExpr e)
+addTickHsCmd (HsCmdLam x matchgroup) =
+        liftM (HsCmdLam x) (addTickCmdMatchGroup matchgroup)
+addTickHsCmd (HsCmdApp x c e) =
+        liftM2 (HsCmdApp x) (addTickLHsCmd c) (addTickLHsExpr e)
 {-
 addTickHsCmd (OpApp e1 c2 fix c3) =
         liftM4 OpApp
@@ -845,41 +854,43 @@ addTickHsCmd (OpApp e1 c2 fix c3) =
                 (return fix)
                 (addTickLHsCmd c3)
 -}
-addTickHsCmd (HsCmdPar e) = liftM HsCmdPar (addTickLHsCmd e)
-addTickHsCmd (HsCmdCase e mgs) =
-        liftM2 HsCmdCase
+addTickHsCmd (HsCmdPar x e) = liftM (HsCmdPar x) (addTickLHsCmd e)
+addTickHsCmd (HsCmdCase x e mgs) =
+        liftM2 (HsCmdCase x)
                 (addTickLHsExpr e)
                 (addTickCmdMatchGroup mgs)
-addTickHsCmd (HsCmdIf cnd e1 c2 c3) =
-        liftM3 (HsCmdIf cnd)
+addTickHsCmd (HsCmdIf x cnd e1 c2 c3) =
+        liftM3 (HsCmdIf x cnd)
                 (addBinTickLHsExpr (BinBox CondBinBox) e1)
                 (addTickLHsCmd c2)
                 (addTickLHsCmd c3)
-addTickHsCmd (HsCmdLet (L l binds) c) =
+addTickHsCmd (HsCmdLet x (L l binds) c) =
         bindLocals (collectLocalBinders binds) $
-          liftM2 (HsCmdLet . L l)
+          liftM2 (HsCmdLet x . L l)
                    (addTickHsLocalBinds binds) -- to think about: !patterns.
                    (addTickLHsCmd c)
-addTickHsCmd (HsCmdDo (L l stmts) srcloc)
+addTickHsCmd (HsCmdDo srcloc (L l stmts))
   = do { (stmts', _) <- addTickLCmdStmts' stmts (return ())
-       ; return (HsCmdDo (L l stmts') srcloc) }
+       ; return (HsCmdDo srcloc (L l stmts')) }
 
-addTickHsCmd (HsCmdArrApp   e1 e2 ty1 arr_ty lr) =
+addTickHsCmd (HsCmdArrApp  arr_ty e1 e2 ty1 lr) =
         liftM5 HsCmdArrApp
+               (return arr_ty)
                (addTickLHsExpr e1)
                (addTickLHsExpr e2)
                (return ty1)
-               (return arr_ty)
                (return lr)
-addTickHsCmd (HsCmdArrForm e f fix cmdtop) =
-        liftM4 HsCmdArrForm
+addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
+        liftM4 (HsCmdArrForm x)
                (addTickLHsExpr e)
                (return f)
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdWrap w cmd)
-  = liftM2 HsCmdWrap (return w) (addTickHsCmd cmd)
+addTickHsCmd (HsCmdWrap x w cmd)
+  = liftM2 (HsCmdWrap x) (return w) (addTickHsCmd cmd)
+
+addTickHsCmd e@(XCmd {})  = pprPanic "addTickHsCmd" (ppr e)
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)
@@ -889,29 +900,33 @@ addTickCmdMatchGroup :: MatchGroup GhcTc (LHsCmd GhcTc)
 addTickCmdMatchGroup mg@(MG { mg_alts = L l matches }) = do
   matches' <- mapM (liftL addTickCmdMatch) matches
   return $ mg { mg_alts = L l matches' }
+addTickCmdMatchGroup (XMatchGroup _) = panic "addTickCmdMatchGroup"
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
 addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
     return $ match { m_grhss = gRHSs' }
+addTickCmdMatch (XMatch _) = panic "addTickCmdMatch"
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
-addTickCmdGRHSs (GRHSs guarded (L l local_binds)) = do
+addTickCmdGRHSs (GRHSs x guarded (L l local_binds)) = do
   bindLocals binders $ do
     local_binds' <- addTickHsLocalBinds local_binds
     guarded' <- mapM (liftL addTickCmdGRHS) guarded
-    return $ GRHSs guarded' (L l local_binds')
+    return $ GRHSs x guarded' (L l local_binds')
   where
     binders = collectLocalBinders local_binds
+addTickCmdGRHSs (XGRHSs _) = panic "addTickCmdGRHSs"
 
 addTickCmdGRHS :: GRHS GhcTc (LHsCmd GhcTc) -> TM (GRHS GhcTc (LHsCmd GhcTc))
 -- The *guards* are *not* Cmds, although the body is
 -- C.f. addTickGRHS for the BinBox stuff
-addTickCmdGRHS (GRHS stmts cmd)
+addTickCmdGRHS (GRHS x stmts cmd)
   = do { (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox)
                                    stmts (addTickLHsCmd cmd)
-       ; return $ GRHS stmts' expr' }
+       ; return $ GRHS x stmts' expr' }
+addTickCmdGRHS (XGRHS _) = panic "addTickCmdGRHS"
 
 addTickLCmdStmts :: [LStmt GhcTc (LHsCmd GhcTc)]
                  -> TM [LStmt GhcTc (LHsCmd GhcTc)]
@@ -930,26 +945,24 @@ addTickLCmdStmts' lstmts res
         binders = collectLStmtsBinders lstmts
 
 addTickCmdStmt :: Stmt GhcTc (LHsCmd GhcTc) -> TM (Stmt GhcTc (LHsCmd GhcTc))
-addTickCmdStmt (BindStmt pat c bind fail ty) = do
-        liftM5 BindStmt
+addTickCmdStmt (BindStmt x pat c bind fail) = do
+        liftM4 (BindStmt x)
                 (addTickLPat pat)
                 (addTickLHsCmd c)
                 (return bind)
                 (return fail)
-                (return ty)
-addTickCmdStmt (LastStmt c noret ret) = do
-        liftM3 LastStmt
+addTickCmdStmt (LastStmt x c noret ret) = do
+        liftM3 (LastStmt x)
                 (addTickLHsCmd c)
                 (pure noret)
                 (addTickSyntaxExpr hpcSrcSpan ret)
-addTickCmdStmt (BodyStmt c bind' guard' ty) = do
-        liftM4 BodyStmt
+addTickCmdStmt (BodyStmt x c bind' guard') = do
+        liftM3 (BodyStmt x)
                 (addTickLHsCmd c)
                 (addTickSyntaxExpr hpcSrcSpan bind')
                 (addTickSyntaxExpr hpcSrcSpan guard')
-                (return ty)
-addTickCmdStmt (LetStmt (L l binds)) = do
-        liftM (LetStmt . L l)
+addTickCmdStmt (LetStmt x (L l binds)) = do
+        liftM (LetStmt x . L l)
                 (addTickHsLocalBinds binds)
 addTickCmdStmt stmt@(RecStmt {})
   = do { stmts' <- addTickLCmdStmts (recS_stmts stmt)
@@ -960,6 +973,8 @@ addTickCmdStmt stmt@(RecStmt {})
                       , recS_mfix_fn = mfix', recS_bind_fn = bind' }) }
 addTickCmdStmt ApplicativeStmt{} =
   panic "ToDo: addTickCmdStmt ApplicativeLastStmt"
+addTickCmdStmt XStmtLR{} =
+  panic "addTickCmdStmt XStmtLR"
 
 -- Others should never happen in a command context.
 addTickCmdStmt stmt  = pprPanic "addTickHsCmd" (ppr stmt)
@@ -1160,7 +1175,7 @@ allocTickBox boxLabel countEntries topOnly pos m =
     (fvs, e) <- getFreeVars m
     env <- getEnv
     tickish <- mkTickish boxLabel countEntries topOnly pos fvs (declPath env)
-    return (L pos (HsTick tickish (L pos e)))
+    return (L pos (HsTick noExt tickish (L pos e)))
   ) (do
     e <- m
     return (L pos e)
@@ -1247,13 +1262,14 @@ mkBinTickBoxHpc boxLabel pos e =
       c = tickBoxCount st
       mes = mixEntries st
   in
-             ( L pos $ HsTick (HpcTick (this_mod env) c) $ L pos $ HsBinTick (c+1) (c+2) e
-           -- notice that F and T are reversed,
-           -- because we are building the list in
-           -- reverse...
-             , noFVs
-             , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
-             )
+     ( L pos $ HsTick noExt (HpcTick (this_mod env) c)
+          $ L pos $ HsBinTick noExt (c+1) (c+2) e
+   -- notice that F and T are reversed,
+   -- because we are building the list in
+   -- reverse...
+     , noFVs
+     , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
+     )
 
 mkHpcPos :: SrcSpan -> HpcPos
 mkHpcPos pos@(RealSrcSpan s)
@@ -1274,7 +1290,10 @@ hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 matchesOneOfMany :: [LMatch GhcTc body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
-        matchCount (L _ (Match { m_grhss = GRHSs grhss _binds })) = length grhss
+        matchCount (L _ (Match { m_grhss = GRHSs _ grhss _ })) = length grhss
+        matchCount (L _ (Match { m_grhss = XGRHSs _ }))
+          = panic "matchesOneOfMany"
+        matchCount (L _ (XMatch _)) = panic "matchesOneOfMany"
 
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 

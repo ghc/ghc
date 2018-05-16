@@ -74,7 +74,7 @@ lvl = T13143.$wf @ Int GHC.Prim.void#
 
 Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
-T13143.$wg [InlPrag=NOUSERINLINE[0], Occ=LoopBreaker]
+T13143.$wg [InlPrag=NOUSERINLINE[2], Occ=LoopBreaker]
   :: Bool -> Bool -> GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=3, Str=<S,1*U><S,1*U><S,U>, Unf=OtherCon []]
 T13143.$wg
@@ -94,7 +94,7 @@ T13143.$wg
 end Rec }
 
 -- RHS size: {terms: 14, types: 6, coercions: 0, joins: 0/0}
-g [InlPrag=NOUSERINLINE[0]] :: Bool -> Bool -> Int -> Int
+g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
 [GblId,
  Arity=3,
  Str=<S,1*U><S,1*U><S(S),1*U(U)>m,

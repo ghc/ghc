@@ -667,6 +667,7 @@ outOfLineMachOp_table mop
         MO_U_QuotRem {}  -> unsupported
         MO_U_QuotRem2 {} -> unsupported
         MO_Add2 {}       -> unsupported
+        MO_AddWordC {}   -> unsupported
         MO_SubWordC {}   -> unsupported
         MO_AddIntC {}    -> unsupported
         MO_SubIntC {}    -> unsupported

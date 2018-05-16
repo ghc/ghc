@@ -1,0 +1,7 @@
+
+T15116.hs:7:12: error:
+    • Data constructor ‘MkA’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the first argument of ‘A’, namely ‘MkA’
+      In the type ‘A MkA’
+      In the definition of data constructor ‘MkA’

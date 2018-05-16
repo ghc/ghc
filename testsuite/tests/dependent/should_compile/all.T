@@ -10,10 +10,14 @@ test('RaeBlogPost', normal, compile, [''])
 test('mkGADTVars', normal, compile, [''])
 test('TypeLevelVec',normal,compile, [''])
 test('T9632', normal, compile, [''])
-# Simon says in #11330: The "simplifier ticks exhausted" error is expected;
-# see Section 7 of the paper:
-# http://research.microsoft.com/en-us/um/people/simonpj/papers/haskell-dynamic/
-test('dynamic-paper', expect_fail_for(['optasm', 'optllvm']), compile, [''])
+# The dynamic-paper test fails in the profasm way if we don't increase
+# the simplifier tick limit. If we do, we run out of stack
+# space. If we increase the stack size enough with -K,
+# we run out of simplifier ticks again. This is
+# discussed in #11330.
+test('dynamic-paper',
+     expect_broken_for(11330, ['profasm']),
+     compile, [''])
 test('T11311', normal, compile, [''])
 test('T11405', normal, compile, [''])
 test('T11241', normal, compile, [''])
@@ -25,7 +29,13 @@ test('T11966', normal, compile, [''])
 test('T12442', normal, compile, [''])
 test('T13538', normal, compile, [''])
 test('T12176', normal, compile, [''])
-test('T14038', expect_broken(14038), compile, [''])
+test('T14038', normal, compile, [''])
 test('T12742', normal, compile, [''])
-test('T13910', expect_broken(13910), compile, [''])
-test('T13938', expect_broken(13938), compile, [''])
+test('T13910', normal, compile, [''])
+test('T13938', [extra_files(['T13938a.hs'])], run_command,
+     ['$MAKE -s --no-print-directory T13938'])
+test('T14556', normal, compile, [''])
+test('T14720', normal, compile, [''])
+test('T14066a', normal, compile, [''])
+test('T14749', normal, compile, [''])
+test('T14991', normal, compile, [''])

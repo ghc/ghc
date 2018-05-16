@@ -222,3 +222,6 @@ test('T3474',
       only_ways(['normal'])],
      compile_and_run, ['-O'])
 test('T14425', normal, compile_and_run, [''])
+test('T10412', normal, compile_and_run, [''])
+test('T13896', normal, compile_and_run, [''])
+test('T13167', normal, compile_and_run, [''])

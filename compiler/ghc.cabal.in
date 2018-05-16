@@ -59,7 +59,7 @@ Library
                    containers >= 0.5 && < 0.6,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
-                   template-haskell == 2.13.*,
+                   template-haskell == 2.14.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
@@ -71,7 +71,7 @@ Library
     else
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*
-        Build-Depends: unix   == 2.7.*
+        Build-Depends: unix   >= 2.7 && < 2.9
 
     GHC-Options: -Wall
                  -Wno-name-shadowing
@@ -290,6 +290,7 @@ Library
         CoreTidy
         CoreUnfold
         CoreUtils
+        CoreMap
         CoreSeq
         CoreStats
         MkCore
@@ -320,6 +321,7 @@ Library
         HsLit
         PlaceHolder
         HsExtension
+        HsInstances
         HsPat
         HsSyn
         HsTypes

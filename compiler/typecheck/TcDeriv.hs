@@ -26,6 +26,7 @@ import TcValidity( allDistinctTyVars )
 import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
+import TcValidity
 import InstEnv
 import Inst
 import FamInstEnv
@@ -336,7 +337,7 @@ renameDeriv is_boot inst_infos bagBinds
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
-        ; let aux_val_binds = ValBindsIn aux_binds (bagToList aux_sigs)
+        ; let aux_val_binds = ValBinds noExt aux_binds (bagToList aux_sigs)
         ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
         ; let bndrs = collectHsValBinders rn_aux_lhs
         ; envs <- extendGlobalRdrEnvRn (map avail bndrs) emptyFsEnv ;
@@ -606,17 +607,18 @@ deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
 --
 -- This returns a Maybe because the user might try to derive Typeable, which is
 -- a no-op nowadays.
-deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
+deriveStandalone (L loc (DerivDecl _ deriv_ty deriv_strat' overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let deriv_strat = fmap unLoc deriv_strat'
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr deriv_strat, ppr deriv_ty]
-       ; (tvs, theta, cls, inst_tys) <- tcHsClsInstType TcType.InstDeclCtxt deriv_ty
+       ; (tvs, deriv_ctxt, cls, inst_tys)
+           <- tcStandaloneDerivInstType deriv_ty
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs:" <+> ppr tvs
-              , text "theta:" <+> ppr theta
+              , text "deriv_ctxt:" <+> ppr deriv_ctxt
               , text "cls:" <+> ppr cls
               , text "tys:" <+> ppr inst_tys ]
                 -- C.f. TcInstDcls.tcLocalInstDecl1
@@ -641,12 +643,64 @@ deriveStandalone (L loc (DerivDecl deriv_ty deriv_strat' overlap_mode))
               | otherwise
               -> Just <$> mkEqnHelp (fmap unLoc overlap_mode)
                                     tvs cls cls_tys tc tc_args
-                                    (Just theta) deriv_strat
+                                    deriv_ctxt deriv_strat
 
            _  -> -- Complain about functions, primitive types, etc,
                  bale_out $
                  text "The last argument of the instance must be a data or newtype application"
         }
+deriveStandalone (L _ (XDerivDecl _)) = panic "deriveStandalone"
+
+-- Typecheck the type in a standalone deriving declaration.
+--
+-- This may appear dense, but it's mostly huffing and puffing to recognize
+-- the special case of a type with an extra-constraints wildcard context, e.g.,
+--
+--   deriving instance _ => Eq (Foo a)
+--
+-- If there is such a wildcard, we typecheck this as if we had written
+-- @deriving instance Eq (Foo a)@, and return @'InferContext' ('Just' loc)@,
+-- as the 'DerivContext', where loc is the location of the wildcard used for
+-- error reporting. This indicates that we should infer the context as if we
+-- were deriving Eq via a deriving clause
+-- (see Note [Inferring the instance context] in TcDerivInfer).
+--
+-- If there is no wildcard, then proceed as normal, and instead return
+-- @'SupplyContext' theta@, where theta is the typechecked context.
+--
+-- Note that this will never return @'InferContext' 'Nothing'@, as that can
+-- only happen with @deriving@ clauses.
+tcStandaloneDerivInstType
+  :: LHsSigWcType GhcRn
+  -> TcM ([TyVar], DerivContext, Class, [Type])
+tcStandaloneDerivInstType
+    (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = HsIBRn
+                                                        { hsib_vars   = vars
+                                                        , hsib_closed = closed }
+                                       , hsib_body   = deriv_ty_body })})
+  | (tvs, theta, rho) <- splitLHsSigmaTy deriv_ty_body
+  , L _ [wc_pred] <- theta
+  , L _ (HsWildCardTy (AnonWildCard (L wc_span _))) <- ignoreParens wc_pred
+  = do (deriv_tvs, _deriv_theta, deriv_cls, deriv_inst_tys)
+         <- tc_hs_cls_inst_ty $
+            HsIB { hsib_ext = HsIBRn { hsib_vars = vars
+                                     , hsib_closed = closed }
+                 , hsib_body
+                     = L (getLoc deriv_ty_body) $
+                       HsForAllTy { hst_bndrs = tvs
+                                  , hst_xforall = noExt
+                                  , hst_body  = rho }}
+       pure (deriv_tvs, InferContext (Just wc_span), deriv_cls, deriv_inst_tys)
+  | otherwise
+  = do (deriv_tvs, deriv_theta, deriv_cls, deriv_inst_tys)
+         <- tc_hs_cls_inst_ty deriv_ty
+       pure (deriv_tvs, SupplyContext deriv_theta, deriv_cls, deriv_inst_tys)
+  where
+    tc_hs_cls_inst_ty = tcHsClsInstType TcType.InstDeclCtxt
+tcStandaloneDerivInstType (HsWC _ (XHsImplicitBndrs _))
+  = panic "tcStandaloneDerivInstType"
+tcStandaloneDerivInstType (XHsWildCardBndrs _)
+  = panic "tcStandaloneDerivInstType"
 
 warnUselessTypeable :: TcM ()
 warnUselessTypeable
@@ -659,7 +713,7 @@ warnUselessTypeable
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
                                              --   Can be a data instance, hence [Type] args
              -> Maybe DerivStrategy          -- The optional deriving strategy
-             -> LHsSigType GhcRn             -- The deriving predicate
+             -> LHsSigType GhcRn           -- The deriving predicate
              -> TcM (Maybe EarlyDerivSpec)
 -- The deriving clause of a data or newtype declaration
 -- I.e. not standalone deriving
@@ -667,8 +721,12 @@ deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
 -- This returns a Maybe because the user might try to derive Typeable, which is
 -- a no-op nowadays.
 deriveTyData tvs tc tc_args deriv_strat deriv_pred
-  = setSrcSpan (getLoc (hsSigType deriv_pred)) $  -- Use loc of the 'deriving' item
+  = setSrcSpan (getLoc (hsSigType deriv_pred)) $
+    -- Use loc of the 'deriving' item
     do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
+                   -- Why not scopeTyVars? Because these are *TyVar*s, not TcTyVars.
+                   -- Their kinds are fully settled. No need to worry about skolem
+                   -- escape.
                 <- tcExtendTyVarEnv tvs $
                    tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention
@@ -735,8 +793,9 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
 
         ; traceTc "derivTyData2" (vcat [ ppr tkvs ])
 
+        ; let final_tc_app = mkTyConApp tc final_tc_args
         ; checkTc (allDistinctTyVars (mkVarSet tkvs) args_to_drop)     -- (a, b, c)
-                  (derivingEtaErr cls final_cls_tys (mkTyConApp tc final_tc_args))
+                  (derivingEtaErr cls final_cls_tys final_tc_app)
                 -- Check that
                 --  (a) The args to drop are all type variables; eg reject:
                 --              data instance T a Int = .... deriving( Monad )
@@ -752,9 +811,14 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                 -- expand any type synonyms.
                 -- See Note [Eta-reducing type synonyms]
 
+        ; checkValidInstHead DerivClauseCtxt cls $
+                             final_cls_tys ++ [final_tc_app]
+                -- Check that we aren't deriving an instance of a magical
+                -- type like (~) or Coercible (#14916).
+
         ; spec <- mkEqnHelp Nothing tkvs
                             cls final_cls_tys tc final_tc_args
-                            Nothing deriv_strat
+                            (InferContext Nothing) deriv_strat
         ; traceTc "derivTyData" (ppr spec)
         ; return $ Just spec } }
 
@@ -932,8 +996,10 @@ mkEqnHelp :: Maybe OverlapMode
           -> [TyVar]
           -> Class -> [Type]
           -> TyCon -> [Type]
-          -> DerivContext       -- Just    => context supplied (standalone deriving)
-                                -- Nothing => context inferred (deriving on data decl)
+          -> DerivContext
+               -- SupplyContext => context supplied (standalone deriving)
+               -- InferContext  => context inferred (deriving on data decl, or
+               --                  standalone deriving decl with a wildcard)
           -> Maybe DerivStrategy
           -> TcRn EarlyDerivSpec
 -- Make the EarlyDerivSpec for an instance
@@ -941,7 +1007,7 @@ mkEqnHelp :: Maybe OverlapMode
 -- where the 'theta' is optional (that's the Maybe part)
 -- Assumes that this declaration is well-kinded
 
-mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta deriv_strat
+mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args deriv_ctxt deriv_strat
   = do {      -- Find the instance of a data family
               -- Note [Looking up family instances for deriving]
          fam_envs <- tcGetFamInstEnvs
@@ -963,7 +1029,7 @@ mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args mtheta deriv_strat
                          , denv_tc_args      = tc_args
                          , denv_rep_tc       = rep_tc
                          , denv_rep_tc_args  = rep_tc_args
-                         , denv_mtheta       = mtheta
+                         , denv_ctxt         = deriv_ctxt
                          , denv_strat        = deriv_strat }
        ; flip runReaderT deriv_env $
          if isNewTyCon rep_tc then mkNewTypeEqn else mkDataTypeEqn }
@@ -1063,14 +1129,14 @@ mk_data_eqn mechanism
                 , denv_rep_tc       = rep_tc
                 , denv_cls          = cls
                 , denv_cls_tys      = cls_tys
-                , denv_mtheta       = mtheta } <- ask
+                , denv_ctxt         = deriv_ctxt } <- ask
        let inst_ty  = mkTyConApp tc tc_args
            inst_tys = cls_tys ++ [inst_ty]
        doDerivInstErrorChecks1 mechanism
        loc       <- lift getSrcSpanM
        dfun_name <- lift $ newDFunName' cls tc
-       case mtheta of
-        Nothing -> -- Infer context
+       case deriv_ctxt of
+        InferContext wildcard ->
           do { (inferred_constraints, tvs', inst_tys')
                  <- inferConstraints mechanism
              ; return $ InferTheta $ DS
@@ -1080,9 +1146,10 @@ mk_data_eqn mechanism
                    , ds_tc = rep_tc
                    , ds_theta = inferred_constraints
                    , ds_overlap = overlap_mode
+                   , ds_standalone_wildcard = wildcard
                    , ds_mechanism = mechanism } }
 
-        Just theta -> do -- Specified context
+        SupplyContext theta ->
             return $ GivenTheta $ DS
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs
@@ -1090,6 +1157,7 @@ mk_data_eqn mechanism
                    , ds_tc = rep_tc
                    , ds_theta = theta
                    , ds_overlap = overlap_mode
+                   , ds_standalone_wildcard = Nothing
                    , ds_mechanism = mechanism }
 
 mk_eqn_stock :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
@@ -1100,9 +1168,9 @@ mk_eqn_stock go_for_it bale_out
                 , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
                 , denv_cls_tys = cls_tys
-                , denv_mtheta  = mtheta } <- ask
+                , denv_ctxt    = deriv_ctxt } <- ask
        dflags <- getDynFlags
-       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
+       case checkSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc of
          CanDerive gen_fn        -> go_for_it $ DerivSpecStock gen_fn
          DerivableClassError msg -> bale_out msg
          _                       -> bale_out (nonStdErr cls)
@@ -1124,7 +1192,7 @@ mk_eqn_no_mechanism go_for_it bale_out
                 , denv_rep_tc  = rep_tc
                 , denv_cls     = cls
                 , denv_cls_tys = cls_tys
-                , denv_mtheta  = mtheta } <- ask
+                , denv_ctxt    = deriv_ctxt } <- ask
        dflags <- getDynFlags
 
            -- See Note [Deriving instances for classes themselves]
@@ -1136,7 +1204,7 @@ mk_eqn_no_mechanism go_for_it bale_out
              | otherwise
              = nonStdErr cls $$ msg
 
-       case checkSideConditions dflags mtheta cls cls_tys tc rep_tc of
+       case checkSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc of
            -- NB: pass the *representation* tycon to checkSideConditions
            NonDerivableClass   msg -> bale_out (dac_error msg)
            DerivableClassError msg -> bale_out msg
@@ -1162,8 +1230,9 @@ mkNewTypeEqn
                 , denv_rep_tc_args  = rep_tc_args
                 , denv_cls          = cls
                 , denv_cls_tys      = cls_tys
-                , denv_mtheta       = mtheta
+                , denv_ctxt         = deriv_ctxt
                 , denv_strat        = mb_strat } <- ask
+       sa_wildcard <- isStandaloneWildcardDeriv
        dflags <- getDynFlags
 
        let newtype_deriving  = xopt LangExt.GeneralizedNewtypeDeriving dflags
@@ -1175,22 +1244,24 @@ mkNewTypeEqn
              doDerivInstErrorChecks1 mechanism
              dfun_name <- lift $ newDFunName' cls tycon
              loc       <- lift getSrcSpanM
-             case mtheta of
-              Just theta -> return $ GivenTheta $ DS
+             case deriv_ctxt of
+              SupplyContext theta -> return $ GivenTheta $ DS
                   { ds_loc = loc
                   , ds_name = dfun_name, ds_tvs = tvs
                   , ds_cls = cls, ds_tys = inst_tys
                   , ds_tc = rep_tycon
                   , ds_theta = theta
                   , ds_overlap = overlap_mode
+                  , ds_standalone_wildcard = Nothing
                   , ds_mechanism = mechanism }
-              Nothing -> return $ InferTheta $ DS
+              InferContext wildcard -> return $ InferTheta $ DS
                   { ds_loc = loc
                   , ds_name = dfun_name, ds_tvs = tvs
                   , ds_cls = cls, ds_tys = inst_tys
                   , ds_tc = rep_tycon
                   , ds_theta = all_thetas
                   , ds_overlap = overlap_mode
+                  , ds_standalone_wildcard = wildcard
                   , ds_mechanism = mechanism }
            bale_out        = bale_out' newtype_deriving
            bale_out' b msg = do err <- derivingThingErrM b msg
@@ -1250,7 +1321,7 @@ mkNewTypeEqn
            rep_inst_ty = newTyConInstRhs rep_tycon rep_tc_args
            rep_tys     = cls_tys ++ [rep_inst_ty]
            rep_pred    = mkClassPred cls rep_tys
-           rep_pred_o  = mkPredOrigin DerivOrigin TypeLevel rep_pred
+           rep_pred_o  = mkPredOrigin deriv_origin TypeLevel rep_pred
                    -- rep_pred is the representation dictionary, from where
                    -- we are gong to get all the methods for the newtype
                    -- dictionary
@@ -1261,9 +1332,10 @@ mkNewTypeEqn
            cls_tyvars = classTyVars cls
            inst_ty    = mkTyConApp tycon tc_args
            inst_tys   = cls_tys ++ [inst_ty]
-           sc_preds   = map (mkPredOrigin DerivOrigin TypeLevel) $
+           sc_preds   = map (mkPredOrigin deriv_origin TypeLevel) $
                         substTheta (zipTvSubst cls_tyvars inst_tys) $
                         classSCTheta cls
+           deriv_origin = mkDerivOrigin sa_wildcard
 
            -- Next we collect constraints for the class methods
            -- If there are no methods, we don't need any constraints
@@ -1275,8 +1347,8 @@ mkNewTypeEqn
                                         -- (Trac #12814)
                       | otherwise = rep_pred_o : coercible_constraints
            coercible_constraints
-             = [ mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
-                              (mkReprPrimEqPred t1 t2)
+             = [ mkPredOrigin (DerivOriginCoerce meth t1 t2 sa_wildcard)
+                              TypeLevel (mkReprPrimEqPred t1 t2)
                | meth <- meths
                , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
                                             inst_tys rep_inst_ty meth ]
@@ -1367,7 +1439,7 @@ mkNewTypeEqn
                   || std_class_via_coercible cls)
           -> go_for_it_gnd
            | otherwise
-          -> case checkSideConditions dflags mtheta cls cls_tys
+          -> case checkSideConditions dflags deriv_ctxt cls cls_tys
                                       tycon rep_tycon of
                DerivableClassError msg
                  -- There's a particular corner case where
@@ -1629,13 +1701,14 @@ genInst :: DerivSpec theta
 -- See Note [Staging of tcDeriving]
 genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                  , ds_mechanism = mechanism, ds_tys = tys
-                 , ds_cls = clas, ds_loc = loc })
+                 , ds_cls = clas, ds_loc = loc
+                 , ds_standalone_wildcard = wildcard })
   = do (meth_binds, deriv_stuff, unusedNames)
          <- set_span_and_ctxt $
             genDerivStuff mechanism loc clas rep_tycon tys tvs
        let mk_inst_info theta = set_span_and_ctxt $ do
              inst_spec <- newDerivClsInst theta spec
-             doDerivInstErrorChecks2 clas inst_spec mechanism
+             doDerivInstErrorChecks2 clas inst_spec theta wildcard mechanism
              traceTc "newder" (ppr inst_spec)
              return $ InstInfo
                        { iSpec   = inst_spec
@@ -1662,14 +1735,14 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
 doDerivInstErrorChecks1 :: DerivSpecMechanism -> DerivM ()
 doDerivInstErrorChecks1 mechanism = do
     DerivEnv { denv_tc      = tc
-             , denv_rep_tc  = rep_tc
-             , denv_mtheta  = mtheta } <- ask
+             , denv_rep_tc  = rep_tc } <- ask
+    standalone <- isStandaloneDeriv
     let anyclass_strategy = isDerivSpecAnyClass mechanism
         bale_out msg = do err <- derivingThingErrMechanism mechanism msg
                           lift $ failWithTc err
 
-    -- For standalone deriving (mtheta /= Nothing),
-    -- check that all the data constructors are in scope...
+    -- For standalone deriving, check that all the data constructors are in
+    -- scope...
     rdr_env <- lift getGlobalRdrEnv
     let data_con_names = map dataConName (tyConDataCons rep_tc)
         hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
@@ -1682,13 +1755,28 @@ doDerivInstErrorChecks1 mechanism = do
     -- ...however, we don't perform this check if we're using DeriveAnyClass,
     -- since it doesn't generate any code that requires use of a data
     -- constructor.
-    unless (anyclass_strategy || isNothing mtheta || not hidden_data_cons) $
+    unless (anyclass_strategy || not standalone || not hidden_data_cons) $
            bale_out $ derivingHiddenErr tc
 
-doDerivInstErrorChecks2 :: Class -> ClsInst -> DerivSpecMechanism -> TcM ()
-doDerivInstErrorChecks2 clas clas_inst mechanism
+doDerivInstErrorChecks2 :: Class -> ClsInst -> ThetaType -> Maybe SrcSpan
+                        -> DerivSpecMechanism -> TcM ()
+doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
   = do { traceTc "doDerivInstErrorChecks2" (ppr clas_inst)
        ; dflags <- getDynFlags
+       ; xpartial_sigs <- xoptM LangExt.PartialTypeSignatures
+       ; wpartial_sigs <- woptM Opt_WarnPartialTypeSignatures
+
+         -- Error if PartialTypeSignatures isn't enabled when a user tries
+         -- to write @deriving instance _ => Eq (Foo a)@. Or, if that
+         -- extension is enabled, give a warning if -Wpartial-type-signatures
+         -- is enabled.
+       ; case wildcard of
+           Nothing -> pure ()
+           Just span -> setSrcSpan span $ do
+             checkTc xpartial_sigs (hang partial_sig_msg 2 pts_suggestion)
+             warnTc (Reason Opt_WarnPartialTypeSignatures)
+                    wpartial_sigs partial_sig_msg
+
          -- Check for Generic instances that are derived with an exotic
          -- deriving strategy like DAC
          -- See Note [Deriving strategies]
@@ -1699,6 +1787,12 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
     exotic_mechanism = case mechanism of
       DerivSpecStock{} -> False
       _                -> True
+
+    partial_sig_msg = text "Found type wildcard" <+> quotes (char '_')
+                  <+> text "standing for" <+> quotes (pprTheta theta)
+
+    pts_suggestion
+      = text "To use the inferred type, enable PartialTypeSignatures"
 
     gen_inst_err = text "Generic instances can only be derived in"
                <+> text "Safe Haskell using the stock strategy."
@@ -1951,6 +2045,6 @@ derivingHiddenErr tc
   = hang (text "The data constructors of" <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
        2 (text "so you cannot derive an instance for it")
 
-standaloneCtxt :: LHsSigType GhcRn -> SDoc
+standaloneCtxt :: LHsSigWcType GhcRn -> SDoc
 standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))

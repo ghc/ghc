@@ -677,7 +677,7 @@ checkStaticObjects ( StgClosure* static_objects )
       break;
 
     case FUN_STATIC:
-      p = *FUN_STATIC_LINK((StgClosure *)p);
+      p = *STATIC_LINK(info,(StgClosure *)p);
       break;
 
     case CONSTR:
@@ -859,7 +859,7 @@ void findSlop(bdescr *bd)
         slop = (bd->blocks * BLOCK_SIZE_W) - (bd->free - bd->start);
         if (slop > (1024/sizeof(W_))) {
             debugBelch("block at %p (bdescr %p) has %" FMT_Word "KB slop\n",
-                       bd->start, bd, slop / (1024/sizeof(W_)));
+                       bd->start, bd, slop / (1024/(W_)sizeof(W_)));
         }
     }
 }

@@ -288,6 +288,20 @@ subexpression elimination pass.
     ``-drule-check=SPEC`` will check whether there are any applications which
     might be subject to a rule created by specialisation.
 
+.. ghc-flag:: -dinline-check=⟨str⟩
+    :shortdesc: Dump information about inlining decisions
+    :type: dynamic
+
+    This flag is useful for debugging why a definition is not inlined.
+
+    When a string is passed to this flag we report information
+    about all functions whose name shares a prefix with the string.
+
+    For example, if you are inspecting the core of your program and you observe
+    that ``foo`` is not being inlined. You can pass ``-dinline-check foo`` and
+    you will see a report about why ``foo`` is not inlined.
+
+
 .. ghc-flag:: -ddump-vect
     :shortdesc: Dump vectoriser input and output
     :type: dynamic
@@ -587,6 +601,20 @@ Formatting dumps
     Print single alternative case expressions as though they were strict
     let expressions. This is helpful when your code does a lot of
     unboxing.
+
+.. ghc-flag:: -dhex-word-literals
+    :shortdesc: Print values of type `Word#` in hexadecimal.
+    :type: dynamic
+
+    Print values of type `Word#` and `Word64#` (but not values of
+    type `Int#` and `Int64#`) in hexadecimal instead of decimal.
+    The hexadecimal is zero-padded to make the length of the
+    representation a power of two. For example: `0x0A0A##`,
+    `0x000FFFFF##`, `0xC##`. This flag may be helpful when you
+    are producing a bit pattern that to expect to work correctly on a 32-bit
+    or a 64-bit architecture. Dumping hexadecimal literals after
+    optimizations and constant folding makes it easier to confirm
+    that the generated bit pattern is correct.
 
 .. ghc-flag:: -dno-debug-output
     :shortdesc: Suppress unsolicited debugging output

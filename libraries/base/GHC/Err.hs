@@ -30,7 +30,9 @@ import GHC.Prim
 import GHC.Integer ()   -- Make sure Integer is compiled first
                         -- because GHC depends on it in a wired-in way
                         -- so the build system doesn't see the dependency
-import {-# SOURCE #-} GHC.Exception( errorCallWithCallStackException )
+import {-# SOURCE #-} GHC.Exception
+  ( errorCallWithCallStackException
+  , errorCallException )
 
 -- | 'error' stops execution and displays an error message.
 error :: forall (r :: RuntimeRep). forall (a :: TYPE r).
@@ -46,10 +48,7 @@ error s = raise# (errorCallWithCallStackException s ?callStack)
 -- @since 4.9.0.0
 errorWithoutStackTrace :: forall (r :: RuntimeRep). forall (a :: TYPE r).
                           [Char] -> a
-errorWithoutStackTrace s =
-  -- we don't have withFrozenCallStack yet, so we just inline the definition
-  let ?callStack = freezeCallStack emptyCallStack
-  in error s
+errorWithoutStackTrace s = raise# (errorCallException s)
 
 
 -- Note [Errors in base]

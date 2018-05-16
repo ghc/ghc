@@ -685,8 +685,8 @@ of ``-W(no-)*``.
     Similar warnings are given for a redundant constraint in an instance
     declaration.
 
-    This option is on by default. As usual you can suppress it on a
-    per-module basis with :ghc-flag:`-Wno-redundant-constraints <-Wredundant-constraints>`.
+    When turning on, you can suppress it on a per-module basis with 
+    :ghc-flag:`-Wno-redundant-constraints <-Wredundant-constraints>`.
     Occasionally you may specifically want a function to have a more
     constrained signature than necessary, perhaps to leave yourself
     wiggle-room for changing the implementation without changing the
@@ -924,18 +924,6 @@ of ``-W(no-)*``.
     This option is on by default, and warns you whenever an instance
     declaration is missing one or more methods, and the corresponding
     class declaration has no default declaration for them.
-
-    The warning is suppressed if the method name begins with an
-    underscore. Here's an example where this is useful: ::
-
-        class C a where
-            _simpleFn :: a -> String
-            complexFn :: a -> a -> String
-            complexFn x y = ... _simpleFn ...
-
-    The idea is that: (a) users of the class will only call
-    ``complexFn``; never ``_simpleFn``; and (b) instance declarations
-    can define either ``complexFn`` or ``_simpleFn``.
 
     The ``MINIMAL`` pragma can be used to change which combination of
     methods will be required for instances of a particular class. See

@@ -35,7 +35,7 @@ import Outputable
 import PprCore         ()
 import PprCmmExpr      ( pprExpr )
 import SrcLoc
-import Util
+import Util            ( seqList )
 
 import Hoopl.Block
 import Hoopl.Collections
@@ -46,6 +46,7 @@ import Data.Maybe
 import Data.List     ( minimumBy, nubBy )
 import Data.Ord      ( comparing )
 import qualified Data.Map as Map
+import Data.Either   ( partitionEithers )
 
 -- | Debug information about a block of code. Ticks scope over nested
 -- blocks.
@@ -100,7 +101,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
       -- Analyse tick scope structure: Each one is either a top-level
       -- tick scope, or the child of another.
       (topScopes, childScopes)
-        = splitEithers $ map (\a -> findP a a) $ Map.keys blockCtxs
+        = partitionEithers $ map (\a -> findP a a) $ Map.keys blockCtxs
       findP tsc GlobalScope = Left tsc -- top scope
       findP tsc scp | scp' `Map.member` blockCtxs = Right (scp', tsc)
                     | otherwise                   = findP tsc scp'
@@ -348,8 +349,8 @@ in addition to the usual beginning-of-block statement,
            unwind Sp = Just Sp + 0;
            I64[Sp - 8] = c2dD;
            R1 = v :: P64;
-           unwind Sp = Just Sp + 8;
            Sp = Sp - 8;
+           unwind Sp = Just Sp + 8;
            if (R1 & 7 != 0) goto c2dD; else goto c2dE;
 
 The remaining blocks are simple,
@@ -391,10 +392,95 @@ The flow of unwinding information through the compiler is a bit convoluted:
 
  * This unwind information is converted to DebugBlocks by Debug.cmmDebugGen
 
- * These DebugBlcosk are then converted to, e.g., DWARF unwinding tables
+ * These DebugBlocks are then converted to, e.g., DWARF unwinding tables
    (by the Dwarf module) and emitted in the final object.
 
-See also: Note [Unwinding information in the NCG] in AsmCodeGen.
+See also:
+  Note [Unwinding information in the NCG] in AsmCodeGen,
+  Note [Unwind pseudo-instruction in Cmm],
+  Note [Debugging DWARF unwinding info].
+
+
+Note [Debugging DWARF unwinding info]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For debugging generated unwinding info I've found it most useful to dump the
+disassembled binary with objdump -D and dump the debug info with
+readelf --debug-dump=frames-interp.
+
+You should get something like this:
+
+  0000000000000010 <stg_catch_frame_info>:
+    10:   48 83 c5 18             add    $0x18,%rbp
+    14:   ff 65 00                jmpq   *0x0(%rbp)
+
+and:
+
+  Contents of the .debug_frame section:
+
+  00000000 0000000000000014 ffffffff CIE "" cf=1 df=-8 ra=16
+     LOC           CFA      rbp   rsp   ra
+  0000000000000000 rbp+0    v+0   s     c+0
+
+  00000018 0000000000000024 00000000 FDE cie=00000000 pc=000000000000000f..0000000000000017
+     LOC           CFA      rbp   rsp   ra
+  000000000000000f rbp+0    v+0   s     c+0
+  000000000000000f rbp+24   v+0   s     c+0
+
+To read it http://www.dwarfstd.org/doc/dwarf-2.0.0.pdf has a nice example in
+Appendix 5 (page 101 of the pdf) and more details in the relevant section.
+
+The key thing to keep in mind is that the value at LOC is the value from
+*before* the instruction at LOC executes. In other words it answers the
+question: if my $rip is at LOC, how do I get the relevant values given the
+values obtained through unwinding so far.
+
+If the readelf --debug-dump=frames-interp output looks wrong, it may also be
+useful to look at readelf --debug-dump=frames, which is closer to the
+information that GHC generated.
+
+It's also useful to dump the relevant Cmm with -ddump-cmm -ddump-opt-cmm
+-ddump-cmm-proc -ddump-cmm-verbose. Note [Unwind pseudo-instruction in Cmm]
+explains how to interpret it.
+
+Inside gdb there are a couple useful commands for inspecting frames.
+For example:
+
+  gdb> info frame <num>
+
+It shows the values of registers obtained through unwinding.
+
+Another useful thing to try when debugging the DWARF unwinding is to enable
+extra debugging output in GDB:
+
+  gdb> set debug frame 1
+
+This makes GDB produce a trace of its internal workings. Having gone this far,
+it's just a tiny step to run GDB in GDB. Make sure you install debugging
+symbols for gdb if you obtain it through a package manager.
+
+Keep in mind that the current release of GDB has an instruction pointer handling
+heuristic that works well for C-like languages, but doesn't always work for
+Haskell. See Note [Info Offset] in Dwarf.Types for more details.
+
+Note [Unwind pseudo-instruction in Cmm]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+One of the possible CmmNodes is a CmmUnwind pseudo-instruction. It doesn't
+generate any assembly, but controls what DWARF unwinding information gets
+generated.
+
+It's important to understand what ranges of code the unwind pseudo-instruction
+refers to.
+For a sequence of CmmNodes like:
+
+  A // starts at addr X and ends at addr Y-1
+  unwind Sp = Just Sp + 16;
+  B // starts at addr Y and ends at addr Z
+
+the unwind statement reflects the state after A has executed, but before B
+has executed. If you consult the Note [Debugging DWARF unwinding info], the
+LOC this information will end up in is Y.
 -}
 
 -- | A label associated with an 'UnwindTable'

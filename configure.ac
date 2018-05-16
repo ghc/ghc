@@ -55,13 +55,14 @@ AC_SUBST([release], [1])
 # First off, a distrib sanity check..
 AC_CONFIG_SRCDIR([mk/config.mk.in])
 
-dnl * We require autoconf version 2.60
-dnl We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
-dnl We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
-dnl Using autoconf 2.59 started to give nonsense like this
-dnl  #define SIZEOF_CHAR 0
-dnl recently.
-AC_PREREQ([2.60])
+dnl * We require autoconf version 2.69 due to
+dnl   https://bugs.ruby-lang.org/issues/8179. Also see #14910.
+dnl * We need 2.50 due to the use of AC_SYS_LARGEFILE and AC_MSG_NOTICE.
+dnl * We need 2.52 due to the use of AS_TR_CPP and AS_TR_SH.
+dnl * Using autoconf 2.59 started to give nonsense like this
+dnl     #define SIZEOF_CHAR 0
+dnl   recently.
+AC_PREREQ([2.69])
 
 # -------------------------------------------------------------------------
 # Prepare to generate the following header files
@@ -158,8 +159,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.0],
-    [AC_MSG_ERROR([GHC version 8.0 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.2],
+    [AC_MSG_ERROR([GHC version 8.2 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -669,6 +670,15 @@ dnl --------------------------------------------------------------
 dnl End of configure script option section
 dnl --------------------------------------------------------------
 
+dnl ** Copy the files from the "fs" utility into the right folders.
+dnl --------------------------------------------------------------
+AC_MSG_NOTICE([Creating links for in-tree file handling routines.])
+ln -f -v utils/fs/fs.* utils/lndir/
+ln -f -v utils/fs/fs.* utils/unlit/
+ln -f -v utils/fs/fs.* rts/
+ln -f -v utils/fs/fs.h libraries/base/include/
+ln -f -v utils/fs/fs.c libraries/base/cbits/
+AC_MSG_NOTICE([Routines in place. Packages can now be build normally.])
 
 dnl --------------------------------------------------------------
 dnl ** Can the unix package be built?
@@ -796,13 +806,23 @@ dnl if GNU patch is named gpatch, look for it first
 AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
 
 dnl ** check for dtrace (currently only implemented for Mac OS X)
+AC_ARG_ENABLE(dtrace,
+    [AC_HELP_STRING([--enable-dtrace],
+        [Enable DTrace])],
+    EnableDtrace=$enableval,
+    EnableDtrace=yes
+)
+
 HaveDtrace=NO
+
 AC_PATH_PROG(DtraceCmd,dtrace)
-if test -n "$DtraceCmd"; then
-  if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
-		-o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
-		-o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
-    HaveDtrace=YES
+if test "x$EnableDtrace" = "xyes"; then
+  if test -n "$DtraceCmd"; then
+    if test "x$TargetOS_CPP-$TargetVendor_CPP" = "xdarwin-apple" \
+      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xfreebsd-portbld" \
+      -o "x$TargetOS_CPP-$TargetVendor_CPP" = "xsolaris2-unknown"; then
+      HaveDtrace=YES
+    fi
   fi
 fi
 AC_SUBST(HaveDtrace)
@@ -1189,7 +1209,7 @@ case ${TargetOS} in
     linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
         RtsLinkerUseMmap=1
         ;;
-    darwin|ios)
+    darwin|ios|watchos|tvos)
         # Don't use mmap on powerpc/darwin as the mmap there doesn't support
         # reallocating. Reallocating is needed to allocate jump islands just
         # after each object image. Jumps to these jump islands use relative
@@ -1238,6 +1258,12 @@ if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
     AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
 fi
 AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
+if test $HaveLibNuma = "YES" ; then
+  AC_SUBST([CabalHaveLibNuma],[True])
+else
+  AC_SUBST([CabalHaveLibNuma],[False])
+fi
+
 
 dnl ** Documentation
 dnl --------------------------------------------------------------

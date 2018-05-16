@@ -495,7 +495,7 @@ pprLit lit = case lit of
     CmmHighStackMark   -> panic "PprC printing high stack mark"
     CmmLabel clbl      -> mkW_ <> pprCLabelAddr clbl
     CmmLabelOff clbl i -> mkW_ <> pprCLabelAddr clbl <> char '+' <> int i
-    CmmLabelDiffOff clbl1 _ i
+    CmmLabelDiffOff clbl1 _ i _   -- non-word widths not supported via C
         -- WARNING:
         --  * the lit must occur in the info table clbl2
         --  * clbl1 must be an SRT, a slow entry point or a large bitmap
@@ -506,7 +506,7 @@ pprLit lit = case lit of
 
 pprLit1 :: CmmLit -> SDoc
 pprLit1 lit@(CmmLabelOff _ _) = parens (pprLit lit)
-pprLit1 lit@(CmmLabelDiffOff _ _ _) = parens (pprLit lit)
+pprLit1 lit@(CmmLabelDiffOff _ _ _ _) = parens (pprLit lit)
 pprLit1 lit@(CmmFloat _ _)    = parens (pprLit lit)
 pprLit1 other = pprLit other
 
@@ -803,6 +803,7 @@ pprCallishMachOp_for_C mop
         MO_U_QuotRem  {} -> unsupported
         MO_U_QuotRem2 {} -> unsupported
         MO_Add2       {} -> unsupported
+        MO_AddWordC   {} -> unsupported
         MO_SubWordC   {} -> unsupported
         MO_AddIntC    {} -> unsupported
         MO_SubIntC    {} -> unsupported
@@ -1082,7 +1083,7 @@ te_BB block = mapM_ te_Stmt (blockToList mid) >> te_Stmt last
 te_Lit :: CmmLit -> TE ()
 te_Lit (CmmLabel l) = te_lbl l
 te_Lit (CmmLabelOff l _) = te_lbl l
-te_Lit (CmmLabelDiffOff l1 _ _) = te_lbl l1
+te_Lit (CmmLabelDiffOff l1 _ _ _) = te_lbl l1
 te_Lit _ = return ()
 
 te_Stmt :: CmmNode e x -> TE ()

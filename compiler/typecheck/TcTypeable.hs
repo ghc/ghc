@@ -12,7 +12,7 @@ module TcTypeable(mkTypeableBinds) where
 
 import GhcPrelude
 
-import BasicTypes ( Boxity(..), neverInlinePragma )
+import BasicTypes ( Boxity(..), neverInlinePragma, SourceText(..) )
 import TcBinds( addTypecheckedBinds )
 import IfaceEnv( newGlobalBinder )
 import TyCoRep( Type(..), TyLit(..) )
@@ -37,7 +37,7 @@ import HsSyn
 import DynFlags
 import Bag
 import Var ( TyVarBndr(..) )
-import TrieMap
+import CoreMap
 import Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import Outputable
@@ -631,12 +631,12 @@ mkTyConRepTyConRHS (Stuff {..}) todo tycon kind_rep
                                                    ]
 
     int :: Int -> HsLit GhcTc
-    int n = HsIntPrim (sourceText $ show n) (toInteger n)
+    int n = HsIntPrim (SourceText $ show n) (toInteger n)
 
 word64 :: DynFlags -> Word64 -> HsLit GhcTc
 word64 dflags n
-  | wORD_SIZE dflags == 4 = HsWord64Prim noSourceText (toInteger n)
-  | otherwise             = HsWordPrim   noSourceText (toInteger n)
+  | wORD_SIZE dflags == 4 = HsWord64Prim NoSourceText (toInteger n)
+  | otherwise             = HsWordPrim   NoSourceText (toInteger n)
 
 {-
 Note [Representing TyCon kinds: KindRep]

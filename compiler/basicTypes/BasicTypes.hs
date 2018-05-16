@@ -52,7 +52,7 @@ module BasicTypes(
 
         Boxity(..), isBoxed,
 
-        TyPrec(..), maybeParen,
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
@@ -442,7 +442,7 @@ compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
 -- |Captures the fixity of declarations as they are parsed. This is not
 -- necessarily the same as the fixity declaration, as the normal fixity may be
 -- overridden using parens or backticks.
-data LexicalFixity = Prefix | Infix deriving (Typeable,Data,Eq)
+data LexicalFixity = Prefix | Infix deriving (Data,Eq)
 
 instance Outputable LexicalFixity where
   ppr Prefix = text "Prefix"
@@ -692,40 +692,25 @@ pprSafeOverlap False = empty
 {-
 ************************************************************************
 *                                                                      *
-                Type precedence
+                Precedence
 *                                                                      *
 ************************************************************************
 -}
 
-data TyPrec   -- See Note [Precedence in types] in TyCoRep.hs
-  = TopPrec         -- No parens
-  | FunPrec         -- Function args; no parens for tycon apps
-  | TyOpPrec        -- Infix operator
-  | TyConPrec       -- Tycon args; no parens for atomic
+-- | A general-purpose pretty-printing precedence type.
+newtype PprPrec = PprPrec Int deriving (Eq, Ord, Show)
+-- See Note [Precedence in types]
 
-instance Eq TyPrec where
-  (==) a b = case compare a b of
-               EQ -> True
-               _  -> False
+topPrec, sigPrec, funPrec, opPrec, appPrec :: PprPrec
+topPrec = PprPrec 0 -- No parens
+sigPrec = PprPrec 1 -- Explicit type signatures
+funPrec = PprPrec 2 -- Function args; no parens for constructor apps
+                    -- See [Type operator precedence] for why both
+                    -- funPrec and opPrec exist.
+opPrec  = PprPrec 2 -- Infix operator
+appPrec = PprPrec 3 -- Constructor args; no parens for atomic
 
-instance Ord TyPrec where
-  compare TopPrec TopPrec  = EQ
-  compare TopPrec _        = LT
-
-  compare FunPrec TopPrec   = GT
-  compare FunPrec FunPrec   = EQ
-  compare FunPrec TyOpPrec  = EQ   -- See Note [Type operator precedence]
-  compare FunPrec TyConPrec = LT
-
-  compare TyOpPrec TopPrec   = GT
-  compare TyOpPrec FunPrec   = EQ  -- See Note [Type operator precedence]
-  compare TyOpPrec TyOpPrec  = EQ
-  compare TyOpPrec TyConPrec = LT
-
-  compare TyConPrec TyConPrec = EQ
-  compare TyConPrec _         = GT
-
-maybeParen :: TyPrec -> TyPrec -> SDoc -> SDoc
+maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise              = parens pretty
@@ -733,12 +718,12 @@ maybeParen ctxt_prec inner_prec pretty
 {- Note [Precedence in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Many pretty-printing functions have type
-    ppr_ty :: TyPrec -> Type -> SDoc
+    ppr_ty :: PprPrec -> Type -> SDoc
 
-The TyPrec gives the binding strength of the context.  For example, in
+The PprPrec gives the binding strength of the context.  For example, in
    T ty1 ty2
 we will pretty-print 'ty1' and 'ty2' with the call
-  (ppr_ty TyConPrec ty)
+  (ppr_ty appPrec ty)
 to indicate that the context is that of an argument of a TyConApp.
 
 We use this consistently for Type and HsType.
@@ -751,16 +736,16 @@ pretty printer follows the following precedence order:
    TyConPrec         Type constructor application
    TyOpPrec/FunPrec  Operator application and function arrow
 
-We have FunPrec and TyOpPrec to represent the precedence of function
+We have funPrec and opPrec to represent the precedence of function
 arrow and type operators respectively, but currently we implement
-FunPred == TyOpPrec, so that we don't distinguish the two. Reason:
+funPrec == opPrec, so that we don't distinguish the two. Reason:
 it's hard to parse a type like
     a ~ b => c * d -> e - f
 
-By treating TyOpPrec = FunPrec we end up with more parens
+By treating opPrec = funPrec we end up with more parens
     (a ~ b) => (c * d) -> (e - f)
 
-But the two are different constructors of TyPrec so we could make
+But the two are different constructors of PprPrec so we could make
 (->) bind more or less tightly if we wanted.
 -}
 
@@ -1220,10 +1205,10 @@ data InlinePragma            -- Note [InlinePragma]
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
-  = Inline
-  | Inlinable
-  | NoInline
-  | NoUserInline -- Used when the pragma did not come from the user,
+  = Inline       -- User wrote INLINE
+  | Inlinable    -- User wrote INLINABLE
+  | NoInline     -- User wrote NOINLINE
+  | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
                  -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
         -- Show needed for Lexer.x
@@ -1395,7 +1380,9 @@ pprInline = pprInline' True
 pprInlineDebug :: InlinePragma -> SDoc
 pprInlineDebug = pprInline' False
 
-pprInline' :: Bool -> InlinePragma -> SDoc
+pprInline' :: Bool           -- True <=> do not display the inl_inline field
+           -> InlinePragma
+           -> SDoc
 pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
                                     , inl_rule = info, inl_sat = mb_arity })
     = pp_inl inline <> pp_act inline activation <+> pp_sat <+> pp_info

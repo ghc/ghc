@@ -31,3 +31,11 @@ test('T3333',
       unless(opsys('linux') or opsys('darwin') or ghc_dynamic(),
              expect_broken(3333))],
      run_command, ['$MAKE -s --no-print-directory T3333'])
+
+test('T14708',
+     [extra_files(['T14708.hs', 'add.c']),
+      unless(doing_ghci, skip),
+      unless(ghc_dynamic(), skip),
+      extra_clean(['T14708scratch/*', 'T14708'])],
+     run_command,
+     ['$MAKE -s --no-print-directory T14708'])

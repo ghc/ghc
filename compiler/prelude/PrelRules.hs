@@ -94,6 +94,11 @@ primOpRules nm IntAddOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
 primOpRules nm IntSubOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (-))
                                                , rightIdentityDynFlags zeroi
                                                , equalArgs >> retLit zeroi ]
+primOpRules nm IntAddCOp   = mkPrimOpRule nm 2 [ binaryLit (intOpC2 (+))
+                                               , identityCDynFlags zeroi ]
+primOpRules nm IntSubCOp   = mkPrimOpRule nm 2 [ binaryLit (intOpC2 (-))
+                                               , rightIdentityCDynFlags zeroi
+                                               , equalArgs >> retLitNoC zeroi ]
 primOpRules nm IntMulOp    = mkPrimOpRule nm 2 [ binaryLit (intOp2 (*))
                                                , zeroElem zeroi
                                                , identityDynFlags onei ]
@@ -135,6 +140,11 @@ primOpRules nm WordAddOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (+))
 primOpRules nm WordSubOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (-))
                                                , rightIdentityDynFlags zerow
                                                , equalArgs >> retLit zerow ]
+primOpRules nm WordAddCOp  = mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (+))
+                                               , identityCDynFlags zerow ]
+primOpRules nm WordSubCOp  = mkPrimOpRule nm 2 [ binaryLit (wordOpC2 (-))
+                                               , rightIdentityCDynFlags zerow
+                                               , equalArgs >> retLitNoC zerow ]
 primOpRules nm WordMulOp   = mkPrimOpRule nm 2 [ binaryLit (wordOp2 (*))
                                                , identityDynFlags onew ]
 primOpRules nm WordQuotOp  = mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (wordOp2 quot)
@@ -398,6 +408,13 @@ intOp2' op dflags (MachInt i1) (MachInt i2) =
   in  intResult dflags (fromInteger i1 `o` fromInteger i2)
 intOp2' _  _      _            _            = Nothing  -- Could find LitLit
 
+intOpC2 :: (Integral a, Integral b)
+        => (a -> b -> Integer)
+        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
+intOpC2 op dflags (MachInt i1) (MachInt i2) = do
+  intCResult dflags (fromInteger i1 `op` fromInteger i2)
+intOpC2 _  _      _            _            = Nothing  -- Could find LitLit
+
 shiftRightLogical :: DynFlags -> Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
 -- Do this by converting to Word and back.  Obviously this won't work for big
@@ -412,12 +429,25 @@ retLit :: (DynFlags -> Literal) -> RuleM CoreExpr
 retLit l = do dflags <- getDynFlags
               return $ Lit $ l dflags
 
+retLitNoC :: (DynFlags -> Literal) -> RuleM CoreExpr
+retLitNoC l = do dflags <- getDynFlags
+                 let lit = l dflags
+                 let ty = literalType lit
+                 return $ mkCoreUbxTup [ty, ty] [Lit lit, Lit (zeroi dflags)]
+
 wordOp2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
         -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
 wordOp2 op dflags (MachWord w1) (MachWord w2)
     = wordResult dflags (fromInteger w1 `op` fromInteger w2)
 wordOp2 _ _ _ _ = Nothing  -- Could find LitLit
+
+wordOpC2 :: (Integral a, Integral b)
+        => (a -> b -> Integer)
+        -> DynFlags -> Literal -> Literal -> Maybe CoreExpr
+wordOpC2 op dflags (MachWord w1) (MachWord w2) =
+  wordCResult dflags (fromInteger w1 `op` fromInteger w2)
+wordOpC2 _ _ _ _ = Nothing  -- Could find LitLit
 
 shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
                  -- Shifts take an Int; hence third arg of op is Int
@@ -550,10 +580,30 @@ isMaxBound _      _              = False
 intResult :: DynFlags -> Integer -> Maybe CoreExpr
 intResult dflags result = Just (Lit (mkMachIntWrap dflags result))
 
+-- | Create an unboxed pair of an Int literal expression, ensuring the given
+-- Integer is in the target Int range and the corresponding overflow flag
+-- (@0#@/@1#@) if it wasn't.
+intCResult :: DynFlags -> Integer -> Maybe CoreExpr
+intCResult dflags result = Just (mkPair [Lit lit, Lit c])
+  where
+    mkPair = mkCoreUbxTup [intPrimTy, intPrimTy]
+    (lit, b) = mkMachIntWrapC dflags result
+    c = if b then onei dflags else zeroi dflags
+
 -- | Create a Word literal expression while ensuring the given Integer is in the
 -- target Word range
 wordResult :: DynFlags -> Integer -> Maybe CoreExpr
 wordResult dflags result = Just (Lit (mkMachWordWrap dflags result))
+
+-- | Create an unboxed pair of a Word literal expression, ensuring the given
+-- Integer is in the target Word range and the corresponding carry flag
+-- (@0#@/@1#@) if it wasn't.
+wordCResult :: DynFlags -> Integer -> Maybe CoreExpr
+wordCResult dflags result = Just (mkPair [Lit lit, Lit c])
+  where
+    mkPair = mkCoreUbxTup [wordPrimTy, intPrimTy]
+    (lit, b) = mkMachWordWrapC dflags result
+    c = if b then onei dflags else zeroi dflags
 
 inversePrimOp :: PrimOp -> RuleM CoreExpr
 inversePrimOp primop = do
@@ -738,6 +788,16 @@ leftIdentityDynFlags id_lit = do
   guard $ l1 == id_lit dflags
   return e2
 
+-- | Left identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in
+-- addition to the result, we have to indicate that no carry/overflow occured.
+leftIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
+leftIdentityCDynFlags id_lit = do
+  dflags <- getDynFlags
+  [Lit l1, e2] <- getArgs
+  guard $ l1 == id_lit dflags
+  let no_c = Lit (zeroi dflags)
+  return (mkCoreUbxTup [exprType e2, intPrimTy] [e2, no_c])
+
 rightIdentityDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 rightIdentityDynFlags id_lit = do
   dflags <- getDynFlags
@@ -745,8 +805,25 @@ rightIdentityDynFlags id_lit = do
   guard $ l2 == id_lit dflags
   return e1
 
+-- | Right identity rule for PrimOps like 'IntSubC' and 'WordSubC', where, in
+-- addition to the result, we have to indicate that no carry/overflow occured.
+rightIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
+rightIdentityCDynFlags id_lit = do
+  dflags <- getDynFlags
+  [e1, Lit l2] <- getArgs
+  guard $ l2 == id_lit dflags
+  let no_c = Lit (zeroi dflags)
+  return (mkCoreUbxTup [exprType e1, intPrimTy] [e1, no_c])
+
 identityDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
-identityDynFlags lit = leftIdentityDynFlags lit `mplus` rightIdentityDynFlags lit
+identityDynFlags lit =
+  leftIdentityDynFlags lit `mplus` rightIdentityDynFlags lit
+
+-- | Identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in addition
+-- to the result, we have to indicate that no carry/overflow occured.
+identityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
+identityCDynFlags lit =
+  leftIdentityCDynFlags lit `mplus` rightIdentityCDynFlags lit
 
 leftZero :: (DynFlags -> Literal) -> RuleM CoreExpr
 leftZero zero = do
@@ -942,7 +1019,56 @@ dataToTagRule = a `mplus` b
 ************************************************************************
 -}
 
--- seq# :: forall a s . a -> State# s -> (# State# s, a #)
+{- Note [seq# magic]
+~~~~~~~~~~~~~~~~~~~~
+The primop
+   seq# :: forall a s . a -> State# s -> (# State# s, a #)
+
+is /not/ the same as the Prelude function seq :: a -> b -> b
+as you can see from its type.  In fact, seq# is the implementation
+mechanism for 'evaluate'
+
+   evaluate :: a -> IO a
+   evaluate a = IO $ \s -> seq# a s
+
+The semantics of seq# is
+  * evaluate its first argument
+  * and return it
+
+Things to note
+
+* Why do we need a primop at all?  That is, instead of
+      case seq# x s of (# x, s #) -> blah
+  why not instead say this?
+      case x of { DEFAULT -> blah)
+
+  Reason (see Trac #5129): if we saw
+    catch# (\s -> case x of { DEFAULT -> raiseIO# exn s }) handler
+
+  then we'd drop the 'case x' because the body of the case is bottom
+  anyway. But we don't want to do that; the whole /point/ of
+  seq#/evaluate is to evaluate 'x' first in the IO monad.
+
+  In short, we /always/ evaluate the first argument and never
+  just discard it.
+
+* Why return the value?  So that we can control sharing of seq'd
+  values: in
+     let x = e in x `seq` ... x ...
+  We don't want to inline x, so better to represent it as
+       let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
+  also it matches the type of rseq in the Eval monad.
+
+Implementing seq#.  The compiler has magic for SeqOp in
+
+- PrelRules.seqRule: eliminate (seq# <whnf> s)
+
+- StgCmmExpr.cgExpr, and cgCase: special case for seq#
+
+- CoreUtils.exprOkForSpeculation;
+  see Note [seq# and expr_ok] in CoreUtils
+-}
+
 seqRule :: RuleM CoreExpr
 seqRule = do
   [Type ty_a, Type _ty_s, a, s] <- getArgs
@@ -1103,7 +1229,7 @@ builtinIntegerRules =
                            ru_try = match_Integer_unop op }
           rule_bitInteger str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_IntToInteger_unop (bit . fromIntegral) }
+                           ru_try = match_bitInteger }
           rule_binop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop op }
@@ -1258,22 +1384,8 @@ match_Word64ToInteger _ id_unf id [xl]
 match_Word64ToInteger _ _ _ _ = Nothing
 
 -------------------------------------------------
-match_Integer_convert :: Num a
-                      => (DynFlags -> a -> Expr CoreBndr)
-                      -> RuleFun
-match_Integer_convert convert dflags id_unf _ [xl]
-  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
-  = Just (convert dflags (fromInteger x))
-match_Integer_convert _ _ _ _ _ = Nothing
-
-match_Integer_unop :: (Integer -> Integer) -> RuleFun
-match_Integer_unop unop _ id_unf _ [xl]
-  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
-  = Just (Lit (LitInteger (unop x) i))
-match_Integer_unop _ _ _ _ _ = Nothing
-
 {- Note [Rewriting bitInteger]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For most types the bitInteger operation can be implemented in terms of shifts.
 The integer-gmp package, however, can do substantially better than this if
 allowed to provide its own implementation. However, in so doing it previously lost
@@ -1287,6 +1399,40 @@ This will behave a bit funny for constants larger than the word size, but the us
 should expect some funniness given that they will have at very least ignored a
 warning in this case.
 -}
+
+match_bitInteger :: RuleFun
+-- Just for GHC.Integer.Type.bitInteger :: Int# -> Integer
+match_bitInteger dflags id_unf fn [arg]
+  | Just (MachInt x) <- exprIsLiteral_maybe id_unf arg
+  , x >= 0
+  , x <= (wordSizeInBits dflags - 1)
+    -- Make sure x is small enough to yield a decently small iteger
+    -- Attempting to construct the Integer for
+    --    (bitInteger 9223372036854775807#)
+    -- would be a bad idea (Trac #14959)
+  , let x_int = fromIntegral x :: Int
+  = case splitFunTy_maybe (idType fn) of
+    Just (_, integerTy)
+      -> Just (Lit (LitInteger (bit x_int) integerTy))
+    _ -> panic "match_IntToInteger_unop: Id has the wrong type"
+
+match_bitInteger _ _ _ _ = Nothing
+
+
+-------------------------------------------------
+match_Integer_convert :: Num a
+                      => (DynFlags -> a -> Expr CoreBndr)
+                      -> RuleFun
+match_Integer_convert convert dflags id_unf _ [xl]
+  | Just (LitInteger x _) <- exprIsLiteral_maybe id_unf xl
+  = Just (convert dflags (fromInteger x))
+match_Integer_convert _ _ _ _ _ = Nothing
+
+match_Integer_unop :: (Integer -> Integer) -> RuleFun
+match_Integer_unop unop _ id_unf _ [xl]
+  | Just (LitInteger x i) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (LitInteger (unop x) i))
+match_Integer_unop _ _ _ _ _ = Nothing
 
 match_IntToInteger_unop :: (Integer -> Integer) -> RuleFun
 match_IntToInteger_unop unop _ id_unf fn [xl]

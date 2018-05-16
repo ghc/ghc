@@ -114,9 +114,16 @@ test('TypeOf', normal, compile_and_run, [''])
 test('TypeRep', normal, compile_and_run, [''])
 test('T11120', normal, compile_and_run, [''])
 test('KindInvariant', normal, ghci_script, ['KindInvariant.script'])
-test('StrictPats', normal, compile_and_run, [''])
-test('T12809', normal, compile_and_run, [''])
-test('EtaExpandLevPoly', normal, compile_and_run, [''])
+
+# We omit the ghci way in these 3 tests because they use
+# unboxed sums and ghci does not support those yet.
+test('StrictPats', omit_ways(['ghci']), compile_and_run, [''])
+test('T12809', omit_ways(['ghci']), compile_and_run, [''])
+test('EtaExpandLevPoly', [ omit_ways(['ghci'])
+                         # triggers a core lint error in profiled ways
+			 , expect_broken_for(15066, ['profasm', 'profthreaded'])
+			 ], compile_and_run, [''])
+
 test('TestTypeableBinary', normal, compile_and_run, [''])
 test('Typeable1', normal, compile_fail, [''])
 test('TypeableEq', normal, compile_and_run, [''])
@@ -125,3 +132,4 @@ test('T11715', exit_code(1), compile_and_run, [''])
 test('T13594a', normal, ghci_script, ['T13594a.script'])
 test('T14218', normal, compile_and_run, [''])
 test('T14236', normal, compile_and_run, [''])
+test('T14925', normal, compile_and_run, [''])

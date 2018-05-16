@@ -322,7 +322,6 @@ unipred(u_iswalpha,(GENCAT_LL|GENCAT_LU|GENCAT_LT|GENCAT_LM|GENCAT_LO))
 unipred(u_iswdigit,GENCAT_ND)
 
 unipred(u_iswalnum,(GENCAT_LT|GENCAT_LU|GENCAT_LL|GENCAT_LM|GENCAT_LO|
-		    GENCAT_MC|GENCAT_ME|GENCAT_MN|
 		    GENCAT_NO|GENCAT_ND|GENCAT_NL))
 
 #define caseconv(p,to) \\
@@ -341,5 +340,4 @@ HsInt u_gencat(HsInt c)
 {
 	return getrule(allchars,NUM_BLOCKS,c)->catnumber;
 }
-
 EOF

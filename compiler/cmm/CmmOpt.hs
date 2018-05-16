@@ -422,14 +422,6 @@ That's what the constant-folding operations on comparison operators do above.
 -- -----------------------------------------------------------------------------
 -- Utils
 
-isLit :: CmmExpr -> Bool
-isLit (CmmLit _) = True
-isLit _          = False
-
-isComparisonExpr :: CmmExpr -> Bool
-isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
-isComparisonExpr _                  = False
-
 isPicReg :: CmmExpr -> Bool
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
 isPicReg _ = False

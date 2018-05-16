@@ -62,7 +62,7 @@ opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
 opt_transList is = zipWith (opt_trans is)
 
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
-opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
+opt_trans_rule is in_co1@(NthCo r1 d1 co1) in_co2@(NthCo r2 d2 co2)
   | d1 == d2
   , co1 `compatible_co` co2 = undefined
 

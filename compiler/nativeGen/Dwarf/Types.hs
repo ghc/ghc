@@ -415,6 +415,12 @@ pprFrameBlock (DwarfFrameBlock hasInfo uws0) =
 -- Note that this will not prevent GDB from failing to look-up the
 -- correct function name for the frame, as that uses the symbol table,
 -- which we can not manipulate as easily.
+--
+-- There's a GDB patch to address this at [1]. At the moment of writing
+-- it's not merged, so I recommend building GDB with the patch if you
+-- care about unwinding. The hack above doesn't cover every case.
+--
+-- [1] https://sourceware.org/ml/gdb-patches/2018-02/msg00055.html
 
 -- | Get DWARF register ID for a given GlobalReg
 dwarfGlobalRegNo :: Platform -> GlobalReg -> Word8
@@ -492,9 +498,11 @@ pprUnwindExpr spIsCFA expr
         pprE (UwPlus u1 u2)   = pprE u1 $$ pprE u2 $$ pprByte dW_OP_plus
         pprE (UwMinus u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_minus
         pprE (UwTimes u1 u2)  = pprE u1 $$ pprE u2 $$ pprByte dW_OP_mul
-    in text "\t.uleb128 1f-.-1" $$ -- DW_FORM_block length
+    in text "\t.uleb128 2f-1f" $$ -- DW_FORM_block length
+       -- computed as the difference of the following local labels 2: and 1:
+       text "1:" $$
        pprE expr $$
-       text "1:"
+       text "2:"
 
 -- | Generate code for re-setting the unwind information for a
 -- register to @undefined@

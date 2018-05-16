@@ -122,8 +122,10 @@ typedef struct {
 typedef struct {
     StgHeader     header;
     StgClosure   *indirectee;
-    StgClosure   *static_link;
+    StgClosure   *static_link; // See Note [CAF lists]
     const StgInfoTable *saved_info;
+        // `saved_info` also used for the link field for `debug_caf_list`,
+        // see `newCAF` and Note [CAF lists] in rts/sm/Storage.h.
 } StgIndStatic;
 
 typedef struct StgBlockingQueue_ {

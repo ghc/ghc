@@ -46,7 +46,7 @@ module MkCore (
         rEC_CON_ERROR_ID, rUNTIME_ERROR_ID,
         nON_EXHAUSTIVE_GUARDS_ERROR_ID, nO_METHOD_BINDING_ERROR_ID,
         pAT_ERROR_ID, rEC_SEL_ERROR_ID, aBSENT_ERROR_ID,
-        tYPE_ERROR_ID,
+        tYPE_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID
     ) where
 
 #include "HsVersions.h"
@@ -708,9 +708,12 @@ recSelErrorName, runtimeErrorName, absentErrorName :: Name
 recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
+absentSumFieldErrorName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
+absentSumFieldErrorName = err_nm "absentSumFieldError"  absentSumFieldErrorIdKey
+                            aBSENT_SUM_FIELD_ERROR_ID
 runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
 recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
 patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
@@ -726,7 +729,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
-tYPE_ERROR_ID, aBSENT_ERROR_ID :: Id
+tYPE_ERROR_ID, aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
@@ -734,6 +737,35 @@ pAT_ERROR_ID                    = mkRuntimeErrorId patErrorName
 nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
 tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
+
+-- Note [aBSENT_SUM_FIELD_ERROR_ID]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Absent argument error for unused unboxed sum fields are different than absent
+-- error used in dummy worker functions (see `mkAbsentErrorApp`):
+--
+-- - `absentSumFieldError` can't take arguments because it's used in unarise for
+--   unused pointer fields in unboxed sums, and applying an argument would
+--   require allocating a thunk.
+--
+-- - `absentSumFieldError` can't be CAFFY because that would mean making some
+--   non-CAFFY definitions that use unboxed sums CAFFY in unarise.
+--
+--   To make `absentSumFieldError` non-CAFFY we get a stable pointer to it in
+--   RtsStartup.c and mark it as non-CAFFY here.
+--
+-- Getting this wrong causes hard-to-debug runtime issues, see #15038.
+--
+-- TODO: Remove stable pointer hack after fixing #9718.
+--       However, we should still be careful about not making things CAFFY just
+--       because they use unboxed sums. Unboxed objects are supposed to be
+--       efficient, and none of the other unboxed literals make things CAFFY.
+
+aBSENT_SUM_FIELD_ERROR_ID
+  = mkVanillaGlobalWithInfo absentSumFieldErrorName
+      (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
+      (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] exnRes
+                     `setArityInfo` 0
+                     `setCafInfo` NoCafRefs) -- #15038
 
 mkRuntimeErrorId :: Name -> Id
 -- Error function
@@ -824,40 +856,43 @@ Yikes!  That bogusly appears to evaluate the absentError!
 
 This is extremely tiresome.  Another way to think of this is that, in
 Core, it is an invariant that a strict data contructor, like MkT, must
-be be applied only to an argument in HNF. so (absentError "blah") had
+be applied only to an argument in HNF. So (absentError "blah") had
 better be non-bottom.
 
-So the "solution" is to make absentError behave like a data constructor,
-to respect this invariant.  Rather than have a special case in exprIsHNF,
-I eneded up doing this:
+So the "solution" is to add a special case for absentError to exprIsHNFlike.
+This allows Simplify.rebuildCase, in the Note [Case to let transformation]
+branch, to convert the case on absentError into a let. We also make
+absentError *not* be diverging, unlike the other error-ids, so that we
+can be sure not to remove the case branches before converting the case to
+a let.
 
- * Make absentError claim to be ConLike
-
- * Make exprOkForSpeculation/exprOkForSideEffects
-   return True for ConLike things
-
-  * In Simplify.rebuildCase, make the
-        Note [Case to let transformation]
-    branch use exprOkForSpeculation rather than exprIsHNF, so that
-    it converts the absentError case to a let.
-
-On the other hand if, by some bug or bizarre happenstance, we ever call
-absentError, we should thow an exception.  This should never happen, of
-course, but we definitely can't return anything.  e.g. if somehow we had
+If, by some bug or bizarre happenstance, we ever call absentError, we should
+throw an exception.  This should never happen, of course, but we definitely
+can't return anything.  e.g. if somehow we had
     case absentError "foo" of
        Nothing -> ...
        Just x  -> ...
 then if we return, the case expression will select a field and continue.
-Seg fault city. Better to throw an exception.  (Even though we've said
-it is ConLike :-)
+Seg fault city. Better to throw an exception. (Even though we've said
+it is in HNF :-)
+
+It might seem a bit surprising that seq on absentError is simply erased
+
+    absentError "foo" `seq` x ==> x
+
+but that should be okay; since there's no pattern match we can't really
+be relying on anything from it.
 -}
 
 aBSENT_ERROR_ID
- = mkVanillaGlobal absentErrorName absent_ty
+ = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
  where
    absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in WwLib
+   arity_info = vanillaIdInfo `setArityInfo` 1
+   -- NB: no bottoming strictness info, unlike other error-ids.
+   -- See Note [aBSENT_ERROR_ID]
 
 mkAbsentErrorApp :: Type         -- The type to instantiate 'a'
                  -> String       -- The string to print

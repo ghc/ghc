@@ -11,8 +11,6 @@ mod71.hs:4:9: error:
         x :: t1 -> t -> t2 (bound at mod71.hs:4:3)
         f :: (t1 -> t -> t2) -> t2 (bound at mod71.hs:4:1)
       Valid substitutions include
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at mod71.hs:3:8
            (and originally defined in ‘GHC.Err’))

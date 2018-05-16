@@ -424,7 +424,7 @@ find_srt( stackPos *info )
  *  push() pushes a stackElement representing the next child of *c
  *  onto the traverse stack. If *c has no child, *first_child is set
  *  to NULL and nothing is pushed onto the stack. If *c has only one
- *  child, *c_chlid is set to that child and nothing is pushed onto
+ *  child, *c_child is set to that child and nothing is pushed onto
  *  the stack.  If *c has more than two children, *first_child is set
  *  to the first child and a stackElement representing the second
  *  child is pushed onto the stack.
@@ -631,7 +631,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     case IND:
     case INVALID_OBJECT:
     default:
-        barf("Invalid object *c in push()");
+        barf("Invalid object *c in push(): %d", get_itbl(c)->type);
         return;
     }
 
@@ -1695,6 +1695,15 @@ inner_loop:
         goto loop;
     }
 
+    case BLOCKING_QUEUE:
+    {
+        StgBlockingQueue *bq = (StgBlockingQueue *)c;
+        retainClosure((StgClosure*) bq->link,           c, c_child_r);
+        retainClosure((StgClosure*) bq->bh,             c, c_child_r);
+        retainClosure((StgClosure*) bq->owner,          c, c_child_r);
+        goto loop;
+    }
+
     case PAP:
     {
         StgPAP *pap = (StgPAP *)c;
@@ -1899,7 +1908,7 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
             break;
         case FUN_STATIC:
             maybeInitRetainerSet(p);
-            p = (StgClosure*)*FUN_STATIC_LINK(p);
+            p = (StgClosure*)*STATIC_LINK(p);
             break;
         case CONSTR:
         case CONSTR_1_0:
@@ -2068,7 +2077,7 @@ retainerProfile(void)
 #if defined(DEBUG_RETAINER)
 
 #define LOOKS_LIKE_PTR(r) ((LOOKS_LIKE_STATIC_CLOSURE(r) || \
-        ((HEAP_ALLOCED(r) && ((Bdescr((P_)r)->flags & BF_FREE) == 0)))) && \
+        (HEAP_ALLOCED(r))) && \
         ((StgWord)(*(StgPtr)r)!=(StgWord)0xaaaaaaaaaaaaaaaaULL))
 
 static uint32_t

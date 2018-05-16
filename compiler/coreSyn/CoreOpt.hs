@@ -359,13 +359,24 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
   = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
 
   | otherwise
-  = simple_out_bind_pair env in_bndr mb_out_bndr
-                         (simple_opt_clo env clo)
+  = simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
                          occ active stable_unf
   where
     stable_unf = isStableUnfolding (idUnfolding in_bndr)
     active     = isAlwaysActive (idInlineActivation in_bndr)
     occ        = idOccInfo in_bndr
+
+    out_rhs | Just join_arity <- isJoinId_maybe in_bndr
+            = simple_join_rhs join_arity
+            | otherwise
+            = simple_opt_clo env clo
+
+    simple_join_rhs join_arity -- See Note [Preserve join-binding arity]
+      = mkLams join_bndrs' (simple_opt_expr env_body join_body)
+      where
+        env0 = soeSetInScope env rhs_env
+        (join_bndrs, join_body) = collectNBinders join_arity in_rhs
+        (env_body, join_bndrs') = subst_opt_bndrs env0 join_bndrs
 
     pre_inline_unconditionally :: Bool
     pre_inline_unconditionally
@@ -451,6 +462,14 @@ trivial ones.  But we do here!  Why?  In the simple optimiser
 Those differences obviate the reasons for not inlining a trivial rhs,
 and increase the benefit for doing so.  So we unconditionally inline trivial
 rhss here.
+
+Note [Preserve join-binding arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Be careful /not/ to eta-reduce the RHS of a join point, lest we lose
+the join-point arity invariant.  Trac #15108 was caused by simplifying
+the RHS with simple_opt_expr, which does eta-reduction.  Solution:
+simplify the RHS of a join point by simplifying under the lambdas
+(which of course should be there).
 -}
 
 ----------------------
@@ -732,9 +751,11 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     go subst (Tick t expr) cont
        | not (tickishIsCode t) = go subst expr cont
     go subst (Cast expr co1) (CC args co2)
-       | Just (args', co1') <- pushCoArgs (subst_co subst co1) args
+       | Just (args', m_co1') <- pushCoArgs (subst_co subst co1) args
             -- See Note [Push coercions in exprIsConApp_maybe]
-       = go subst expr (CC args' (co1' `mkTransCo` co2))
+       = case m_co1' of
+           Just co1' -> go subst expr (CC args' (co1' `mkTransCo` co2))
+           Nothing   -> go subst expr (CC args' co2)
     go subst (App fun arg) (CC args co)
        = go subst fun (CC (subst_arg subst arg : args) co)
     go subst (Lam var body) (CC (arg:args) co)
@@ -928,36 +949,45 @@ Here we implement the "push rules" from FC papers:
   by pushing the coercion into the arguments
 -}
 
-pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Coercion)
-pushCoArgs co []         = return ([], co)
-pushCoArgs co (arg:args) = do { (arg',  co1) <- pushCoArg  co  arg
-                              ; (args', co2) <- pushCoArgs co1 args
-                              ; return (arg':args', co2) }
+pushCoArgs :: CoercionR -> [CoreArg] -> Maybe ([CoreArg], Maybe Coercion)
+pushCoArgs co []         = return ([], Just co)
+pushCoArgs co (arg:args) = do { (arg',  m_co1) <- pushCoArg  co  arg
+                              ; case m_co1 of
+                                  Just co1 -> do { (args', m_co2) <- pushCoArgs co1 args
+                                                 ; return (arg':args', m_co2) }
+                                  Nothing  -> return (arg':args, Nothing) }
 
-pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
+pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, Maybe Coercion)
 -- We have (fun |> co) arg, and we want to transform it to
 --         (fun arg) |> co
 -- This may fail, e.g. if (fun :: N) where N is a newtype
 -- C.f. simplCast in Simplify.hs
 -- 'co' is always Representational
+-- If the returned coercion is Nothing, then it would have been reflexive
+pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty
+                            ; return (Type ty', m_co') }
+pushCoArg co val_arg   = do { (arg_co, m_co') <- pushCoValArg co
+                            ; return (val_arg `mkCast` arg_co, m_co') }
 
-pushCoArg co (Type ty) = do { (ty', co') <- pushCoTyArg co ty
-                            ; return (Type ty', co') }
-pushCoArg co val_arg   = do { (arg_co, co') <- pushCoValArg co
-                            ; return (mkCast val_arg arg_co, co') }
-
-pushCoTyArg :: Coercion -> Type -> Maybe (Type, Coercion)
+pushCoTyArg :: CoercionR -> Type -> Maybe (Type, Maybe CoercionR)
 -- We have (fun |> co) @ty
 -- Push the coercion through to return
 --         (fun @ty') |> co'
 -- 'co' is always Representational
+-- If the returned coercion is Nothing, then it would have been reflexive;
+-- it's faster not to compute it, though.
 pushCoTyArg co ty
-  | tyL `eqType` tyR
-  = Just (ty, mkRepReflCo (piResultTy tyR ty))
+  -- The following is inefficient - don't do `eqType` here, the coercion
+  -- optimizer will take care of it. See Trac #14737.
+  -- -- | tyL `eqType` tyR
+  -- -- = Just (ty, Nothing)
+
+  | isReflCo co
+  = Just (ty, Nothing)
 
   | isForAllTy tyL
   = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
-    Just (ty `mkCastTy` mkSymCo co1, co2)
+    Just (ty `mkCastTy` mkSymCo co1, Just co2)
 
   | otherwise
   = Nothing
@@ -967,7 +997,7 @@ pushCoTyArg co ty
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2
 
-    co1 = mkNthCo 0 co
+    co1 = mkNthCo Nominal 0 co
        -- co1 :: k1 ~N k2
        -- Note that NthCo can extract a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
@@ -977,31 +1007,38 @@ pushCoTyArg co ty
         -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
         -- Arg of mkInstCo is always nominal, hence mkNomReflCo
 
-pushCoValArg :: Coercion -> Maybe (Coercion, Coercion)
+pushCoValArg :: CoercionR -> Maybe (Coercion, Maybe Coercion)
 -- We have (fun |> co) arg
 -- Push the coercion through to return
 --         (fun (arg |> co_arg)) |> co_res
 -- 'co' is always Representational
+-- If the second returned Coercion is actually Nothing, then no cast is necessary;
+-- the returned coercion would have been reflexive.
 pushCoValArg co
-  | tyL `eqType` tyR
-  = Just (mkRepReflCo arg, mkRepReflCo res)
+  -- The following is inefficient - don't do `eqType` here, the coercion
+  -- optimizer will take care of it. See Trac #14737.
+  -- -- | tyL `eqType` tyR
+  -- -- = Just (mkRepReflCo arg, Nothing)
+
+  | isReflCo co
+  = Just (mkRepReflCo arg, Nothing)
 
   | isFunTy tyL
-  , (co1, co2) <- decomposeFunCo co
+  , (co1, co2) <- decomposeFunCo Representational co
               -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
   = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
-    Just (mkSymCo co1, co2)
+    Just (mkSymCo co1, Just co2)
 
   | otherwise
   = Nothing
   where
-    (arg, res)   = splitFunTy tyR
+    arg = funArgTy tyR
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
-    :: InScopeSet -> Var -> CoreExpr -> Coercion -> Maybe (Var, CoreExpr)
+    :: InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
 -- This implements the Push rule from the paper on coercions
 --    (\x. e) |> co
 -- ===>
@@ -1011,7 +1048,7 @@ pushCoercionIntoLambda in_scope x e co
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_s1,_s2) <- splitFunTy_maybe s1s2
     , Just (t1,_t2) <- splitFunTy_maybe t1t2
-    = let (co1, co2) = decomposeFunCo co
+    = let (co1, co2) = decomposeFunCo Representational co
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
           x' = x `setIdType` t1
@@ -1057,7 +1094,7 @@ pushCoDataCon dc dc_args co
         (ex_args, val_args) = splitAtList dc_ex_tyvars non_univ_args
 
         -- Make the "Psi" from the paper
-        omegas = decomposeCo tc_arity co
+        omegas = decomposeCo tc_arity co (tyConRolesRepresentational to_tc)
         (psi_subst, to_ex_arg_tys)
           = liftCoSubstWithEx Representational
                               dc_univ_tyvars
@@ -1104,7 +1141,7 @@ collectBindersPushingCo e
     go bs e           = (reverse bs, e)
 
     -- We are in a cast; peel off casts until we hit a lambda.
-    go_c :: [Var] -> CoreExpr -> Coercion -> ([Var], CoreExpr)
+    go_c :: [Var] -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
     -- (go_c bs e c) is same as (go bs e (e |> c))
     go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCo` co2)
     go_c bs (Lam b e)    co  = go_lam bs b e co
@@ -1112,20 +1149,20 @@ collectBindersPushingCo e
 
     -- We are in a lambda under a cast; peel off lambdas and build a
     -- new coercion for the body.
-    go_lam :: [Var] -> Var -> CoreExpr -> Coercion -> ([Var], CoreExpr)
+    go_lam :: [Var] -> Var -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
     -- (go_lam bs b e c) is same as (go_c bs (\b.e) c)
     go_lam bs b e co
       | isTyVar b
       , let Pair tyL tyR = coercionKind co
       , ASSERT( isForAllTy tyL )
         isForAllTy tyR
-      , isReflCo (mkNthCo 0 co)  -- See Note [collectBindersPushingCo]
+      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
 
       | isId b
       , let Pair tyL tyR = coercionKind co
       , ASSERT( isFunTy tyL) isFunTy tyR
-      , (co_arg, co_res) <- decomposeFunCo co
+      , (co_arg, co_res) <- decomposeFunCo Representational co
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res
 

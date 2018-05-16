@@ -413,6 +413,12 @@ def compiler_profiled( ):
 def compiler_debugged( ):
     return config.compiler_debugged
 
+def have_gdb( ):
+    return config.have_gdb
+
+def have_readelf( ):
+    return config.have_readelf
+
 # ---
 
 def high_memory_usage(name, opts):
@@ -1597,7 +1603,17 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
             return 0
         elif config.accept and actual_raw:
-            if_verbose(1, 'Accepting new output.')
+            if config.accept_platform:
+                if_verbose(1, 'Accepting new output for platform "'
+                              + config.platform + '".')
+                expected_path += '-' + config.platform
+            elif config.accept_os:
+                if_verbose(1, 'Accepting new output for os "'
+                              + config.os + '".')
+                expected_path += '-' + config.os
+            else:
+                if_verbose(1, 'Accepting new output.')
+
             write_file(expected_path, actual_raw)
             return 1
         elif config.accept:
@@ -1914,7 +1930,7 @@ def in_srcdir(name, suffix=''):
 
 # Finding the sample output.  The filename is of the form
 #
-#   <test>.stdout[-ws-<wordsize>][-<platform>]
+#   <test>.stdout[-ws-<wordsize>][-<platform>|-<os>]
 #
 def find_expected_file(name, suff):
     basename = add_suffix(name, suff)

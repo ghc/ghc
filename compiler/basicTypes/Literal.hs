@@ -13,8 +13,8 @@ module Literal
           Literal(..)           -- Exported to ParseIface
 
         -- ** Creating Literals
-        , mkMachInt, mkMachIntWrap
-        , mkMachWord, mkMachWordWrap
+        , mkMachInt, mkMachIntWrap, mkMachIntWrapC
+        , mkMachWord, mkMachWordWrap, mkMachWordWrapC
         , mkMachInt64, mkMachInt64Wrap
         , mkMachWord64, mkMachWord64Wrap
         , mkMachFloat, mkMachDouble
@@ -247,30 +247,54 @@ mkMachInt :: DynFlags -> Integer -> Literal
 mkMachInt dflags x   = ASSERT2( inIntRange dflags x,  integer x )
                        MachInt x
 
+wrapInt :: DynFlags -> Integer -> Integer
+wrapInt dflags i
+ = case platformWordSize (targetPlatform dflags) of
+   4 -> toInteger (fromIntegral i :: Int32)
+   8 -> toInteger (fromIntegral i :: Int64)
+   w -> panic ("toIntRange: Unknown platformWordSize: " ++ show w)
+
 -- | Creates a 'Literal' of type @Int#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
 mkMachIntWrap :: DynFlags -> Integer -> Literal
-mkMachIntWrap dflags i
- = MachInt $ case platformWordSize (targetPlatform dflags) of
-   4 -> toInteger (fromIntegral i :: Int32)
-   8 -> toInteger (fromIntegral i :: Int64)
-   w -> panic ("toIntRange: Unknown platformWordSize: " ++ show w)
+mkMachIntWrap dflags i = MachInt (wrapInt dflags i)
+
+-- | Creates a 'Literal' of type @Int#@, as well as a 'Bool'ean flag indicating
+--   overflow. That is, if the argument is out of the (target-dependent) range
+--   the argument is wrapped and the overflow flag will be set.
+--   See Note [Word/Int underflow/overflow]
+mkMachIntWrapC :: DynFlags -> Integer -> (Literal, Bool)
+mkMachIntWrapC dflags i = (MachInt i', i /= i')
+  where
+    i' = wrapInt dflags i
 
 -- | Creates a 'Literal' of type @Word#@
 mkMachWord :: DynFlags -> Integer -> Literal
 mkMachWord dflags x   = ASSERT2( inWordRange dflags x, integer x )
                         MachWord x
 
+wrapWord :: DynFlags -> Integer -> Integer
+wrapWord dflags i
+ = case platformWordSize (targetPlatform dflags) of
+   4 -> toInteger (fromIntegral i :: Word32)
+   8 -> toInteger (fromIntegral i :: Word64)
+   w -> panic ("toWordRange: Unknown platformWordSize: " ++ show w)
+
 -- | Creates a 'Literal' of type @Word#@.
 --   If the argument is out of the (target-dependent) range, it is wrapped.
 --   See Note [Word/Int underflow/overflow]
 mkMachWordWrap :: DynFlags -> Integer -> Literal
-mkMachWordWrap dflags i
- = MachWord $ case platformWordSize (targetPlatform dflags) of
-   4 -> toInteger (fromInteger i :: Word32)
-   8 -> toInteger (fromInteger i :: Word64)
-   w -> panic ("toWordRange: Unknown platformWordSize: " ++ show w)
+mkMachWordWrap dflags i = MachWord (wrapWord dflags i)
+
+-- | Creates a 'Literal' of type @Word#@, as well as a 'Bool'ean flag indicating
+--   carry. That is, if the argument is out of the (target-dependent) range
+--   the argument is wrapped and the carry flag will be set.
+--   See Note [Word/Int underflow/overflow]
+mkMachWordWrapC :: DynFlags -> Integer -> (Literal, Bool)
+mkMachWordWrapC dflags i = (MachWord i', i /= i')
+  where
+    i' = wrapWord dflags i
 
 -- | Creates a 'Literal' of type @Int64#@
 mkMachInt64 :: Integer -> Literal

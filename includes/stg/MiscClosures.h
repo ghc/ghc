@@ -153,6 +153,22 @@ RTS_ENTRY(stg_END_STM_CHUNK_LIST);
 RTS_ENTRY(stg_NO_TREC);
 RTS_ENTRY(stg_COMPACT_NFDATA_CLEAN);
 RTS_ENTRY(stg_COMPACT_NFDATA_DIRTY);
+RTS_ENTRY(stg_SRT_1);
+RTS_ENTRY(stg_SRT_2);
+RTS_ENTRY(stg_SRT_3);
+RTS_ENTRY(stg_SRT_4);
+RTS_ENTRY(stg_SRT_5);
+RTS_ENTRY(stg_SRT_6);
+RTS_ENTRY(stg_SRT_7);
+RTS_ENTRY(stg_SRT_8);
+RTS_ENTRY(stg_SRT_9);
+RTS_ENTRY(stg_SRT_10);
+RTS_ENTRY(stg_SRT_11);
+RTS_ENTRY(stg_SRT_12);
+RTS_ENTRY(stg_SRT_13);
+RTS_ENTRY(stg_SRT_14);
+RTS_ENTRY(stg_SRT_15);
+RTS_ENTRY(stg_SRT_16);
 
 /* closures */
 
@@ -468,6 +484,9 @@ RTS_FUN_DECL(stg_traceCcszh);
 RTS_FUN_DECL(stg_clearCCSzh);
 RTS_FUN_DECL(stg_traceEventzh);
 RTS_FUN_DECL(stg_traceMarkerzh);
+RTS_FUN_DECL(stg_getThreadAllocationCounterzh);
+RTS_FUN_DECL(stg_setThreadAllocationCounterzh);
+
 
 /* Other misc stuff */
 // See wiki:Commentary/Compiler/Backends/PprC#Prototypes

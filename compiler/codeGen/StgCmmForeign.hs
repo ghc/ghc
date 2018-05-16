@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -----------------------------------------------------------------------------
 --
 -- Code generation for foreign calls.
@@ -19,8 +17,6 @@ module StgCmmForeign (
   emitOpenNursery,
   emitCloseNursery,
  ) where
-
-#include "HsVersions.h"
 
 import GhcPrelude hiding( succ, (<*>) )
 
@@ -408,8 +404,8 @@ Opening the nursery corresponds to the following code:
 @
    tso = CurrentTSO;
    cn = CurrentNursery;
-   bdfree = CurrentNuresry->free;
-   bdstart = CurrentNuresry->start;
+   bdfree = CurrentNursery->free;
+   bdstart = CurrentNursery->start;
 
    // We *add* the currently occupied portion of the nursery block to
    // the allocation limit, because we will subtract it again in

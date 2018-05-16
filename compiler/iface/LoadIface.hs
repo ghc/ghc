@@ -25,6 +25,7 @@ module LoadIface (
         loadDecls,      -- Should move to TcIface and be renamed
         initExternalPackageState,
         moduleFreeHolesPrecise,
+        needWiredInHomeIface, loadWiredInHomeIface,
 
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface

@@ -70,6 +70,8 @@ import RepType     ( typePrimRep1 )
 import Unique      ( Unique )
 import Util
 
+import Data.List.NonEmpty ( NonEmpty, toList )
+
 {-
 ************************************************************************
 *                                                                      *
@@ -221,7 +223,7 @@ finished it encodes (\x -> e) as (let f = \x -> e in f)
 -}
 
   | StgLam
-        [bndr]
+        (NonEmpty bndr)
         StgExpr    -- Body of lambda
 
 {-
@@ -721,7 +723,7 @@ pprStgExpr (StgOpApp op args _)
   = hsep [ pprStgOp op, brackets (interppSP args)]
 
 pprStgExpr (StgLam bndrs body)
-  = sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) bndrs)
+  = sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
             <+> text "->",
          pprStgExpr body ]
   where ppr_list = brackets . fsep . punctuate comma

@@ -332,7 +332,7 @@ endif
 
 STANDARD_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS)) -Irts -Irts/dist/build
 # COMPILING_RTS is only used when building Win32 DLL support.
-STANDARD_OPTS += -DCOMPILING_RTS
+STANDARD_OPTS += -DCOMPILING_RTS -DFS_NAMESPACE=rts
 
 # HC_OPTS is included in both .c and .cmm compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which
@@ -483,7 +483,6 @@ rts/sm/Compact_CC_OPTS += -Wno-inline
 rts/StgCRun_CC_OPTS += -w
 
 rts/RetainerProfile_CC_OPTS += -w
-rts/RetainerSet_CC_OPTS += -Wno-format
 # On Windows:
 rts/win32/ConsoleHandler_CC_OPTS += -w
 rts/win32/ThrIOManager_CC_OPTS += -w

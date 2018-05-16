@@ -2,6 +2,8 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Hoopl.Collections
     ( IsSet(..)
     , setInsertList, setDeleteList, setUnions
@@ -12,7 +14,7 @@ module Hoopl.Collections
 
 import GhcPrelude
 
-import qualified Data.IntMap as M
+import qualified Data.IntMap.Strict as M
 import qualified Data.IntSet as S
 
 import Data.List (foldl', foldl1')
@@ -66,6 +68,7 @@ class IsMap map where
   mapInsert :: KeyOf map -> a -> map a -> map a
   mapInsertWith :: (a -> a -> a) -> KeyOf map -> a -> map a -> map a
   mapDelete :: KeyOf map -> map a -> map a
+  mapAlter :: (Maybe a -> Maybe a) -> KeyOf map -> map a -> map a
 
   mapUnion :: map a -> map a -> map a
   mapUnionWithKey :: (KeyOf map -> a -> a -> a) -> map a -> map a -> map a
@@ -143,6 +146,7 @@ instance IsMap UniqueMap where
   mapInsert k v (UM m) = UM (M.insert k v m)
   mapInsertWith f k v (UM m) = UM (M.insertWith f k v m)
   mapDelete k (UM m) = UM (M.delete k m)
+  mapAlter f k (UM m) = UM (M.alter f k m)
 
   mapUnion (UM x) (UM y) = UM (M.union x y)
   mapUnionWithKey f (UM x) (UM y) = UM (M.unionWithKey f x y)

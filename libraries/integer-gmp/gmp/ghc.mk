@@ -27,7 +27,6 @@ endif
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
   libraries/integer-gmp/include/ghc-gmp.h \
-  libraries/integer-gmp/gmp/config.mk \
   libraries/integer-gmp/gmp/libgmp.a \
   libraries/integer-gmp/gmp/gmp.h \
   libraries/integer-gmp/gmp/gmpbuild \
@@ -53,10 +52,10 @@ endif
 ifeq "$(phase)" "final"
 
 ifneq "$(CLEANING)" "YES"
-# Hack. The file gmp/config.mk doesn't exist yet after running ./configure in
+# Hack. The file config.mk doesn't exist yet after running ./configure in
 # the toplevel (ghc) directory. To let some toplevel make commands such as
 # sdist go through, right after ./configure, don't consider this an error.
--include libraries/integer-gmp/dist-install/build/gmp/config.mk
+-include libraries/integer-gmp/dist-install/build/config.mk
 endif
 
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))

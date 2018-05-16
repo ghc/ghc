@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <fs_rts.h>
 
 #define FAIL(...) do {\
    errorBelch("loadArchive: "__VA_ARGS__); \
@@ -260,7 +261,7 @@ static HsInt loadArchive_ (pathchar *path)
     int misalignment = 0;
 
     DEBUG_LOG("start\n");
-    DEBUG_LOG("Loading archive `%" PATH_FMT" '\n", path);
+    DEBUG_LOG("Loading archive `%" PATH_FMT "'\n", path);
 
     /* Check that we haven't already loaded this archive.
        Ignore requests to load multiple times */

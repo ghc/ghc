@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs, UnboxedTuples, BangPatterns #-}
+{-# LANGUAGE GADTs, UnboxedTuples #-}
 
 -----------------------------------------------------------------------------
 --
@@ -59,8 +59,6 @@ module StgCmmMonad (
         CgInfoDownwards(..), CgState(..)        -- non-abstract
     ) where
 
-#include "HsVersions.h"
-
 import GhcPrelude hiding( sequence, succ )
 
 import Cmm
@@ -80,6 +78,7 @@ import Unique
 import UniqSupply
 import FastString
 import Outputable
+import Util
 
 import Control.Monad
 import Data.List
@@ -218,17 +217,17 @@ data ReturnKind
   = AssignedDirectly
   | Returning [CmmType]
   | ReturnedTo BlockId ByteOff [GlobalReg]
-  
+
 -- Note [cmm return types]
 -- We need to know the type of values returned by a CmmProc in order to use LLVM.
 -- During the codegen of a STG function body, we bubble up the needed information using
 -- the ReturnKind. Here is what each ReturnKind means in the context of determining
 -- the return type:
 --
--- * AssignedDirectly indicates that either we have no information about the type of 
+-- * AssignedDirectly indicates that either we have no information about the type of
 --   the result values, or that we do not need the information.
 --
--- * Returning means exactly the same thing as AssignedDirectly, but carries the needed 
+-- * Returning means exactly the same thing as AssignedDirectly, but carries the needed
 --   type information.
 --
 -- * ReturnedTo indicates that the expression has not finished with a result, so it is
@@ -243,26 +242,26 @@ combineReturnKinds rks = foldl combine AssignedDirectly rks
         combine (Returning a) (Returning b) = Returning $ check a b
         combine _             (Returning b) = Returning b
         combine acc           _             = acc
-        
-        check a b 
+
+        check a b
             | a `equals` b  = a
             | otherwise     = panic "combineReturnKinds: non-matching return kind!"
-        
+
         -- CmmType does not derive Eq
         equals [] []         = True
         equals (x:xs) (y:ys) = cmmEqType_ignoring_ptrhood x y && equals xs ys
         equals _ _           = False
-        
+
         -- debugging only XXX(kavon)
         cmmTy2String :: [CmmType] -> String
         cmmTy2String tys = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
-        
+
         -- debugging only XXX(kavon)
         tryCheck a b = res
             where
                 !x = trace ("\ntrying to combine: \n\t[" ++ cmmTy2String a ++ "]\n\t[" ++ cmmTy2String b ++ "]\n") ()
                 res = check a b
-        
+
 
 -- Note [sharing continuations]
 --
@@ -356,7 +355,7 @@ initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA
 data CgState
   = MkCgState {
      cgs_stmts :: CmmAGraph,          -- Current procedure
-     
+
      cgs_ret_ty :: CmmRetTy,          -- Current procedure's return type.
 
      cgs_tops  :: OrdList CmmDeclPlus,
@@ -496,7 +495,7 @@ setBinds :: CgBindings -> FCode ()
 setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
-        
+
 getRetTy :: FCode CmmRetTy
 getRetTy = do
         state <- getState
@@ -507,7 +506,7 @@ updateRetTy new_ty = do
         state <- getState
         case cgs_ret_ty state of
             Nothing -> setState $ state {cgs_ret_ty = new_ty}
-            Just _ -> panic "updateRetTy: already have retTy info" 
+            Just _ -> panic "updateRetTy: already have retTy info"
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state ->
@@ -759,11 +758,9 @@ emitLabel id = do tscope <- getTickScope
                   emitCgStmt (CgLabel id tscope)
 
 emitComment :: FastString -> FCode ()
-#if 0 /* def DEBUG */
-emitComment s = emitCgStmt (CgStmt (CmmComment s))
-#else
-emitComment _ = return ()
-#endif
+emitComment s
+  | debugIsOn = emitCgStmt (CgStmt (CmmComment s))
+  | otherwise = return ()
 
 emitTick :: CmmTickish -> FCode ()
 emitTick = emitCgStmt . CgStmt . CmmTick

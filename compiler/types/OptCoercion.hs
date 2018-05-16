@@ -93,8 +93,8 @@ optCoercion env co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
         (Pair out_ty1 out_ty2, out_role) = coercionKindRole out_co
     in
-    ASSERT2( substTyUnchecked env in_ty1 `eqType` out_ty1 &&
-             substTyUnchecked env in_ty2 `eqType` out_ty2 &&
+    ASSERT2( substTy env in_ty1 `eqType` out_ty1 &&
+             substTy env in_ty2 `eqType` out_ty2 &&
              in_role == out_role
            , text "optCoercion changed types!"
              $$ hang (text "in_co:") 2 (ppr co)
@@ -269,9 +269,40 @@ opt_co4 env sym rep r (TransCo co1 co2)
     co2' = opt_co4_wrap env sym rep r co2
     in_scope = lcInScopeSet env
 
+opt_co4 env _sym rep r (NthCo _r n (Refl _r2 ty))
+  | Just (_tc, args) <- ASSERT( r == _r )
+                        splitTyConApp_maybe ty
+  = liftCoSubst (chooseRole rep r) env (args `getNth` n)
+  | n == 0
+  , Just (tv, _) <- splitForAllTy_maybe ty
+  = liftCoSubst (chooseRole rep r) env (tyVarKind tv)
 
-opt_co4 env sym rep r co@(NthCo {})
-  = opt_nth_co env sym rep r co
+opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
+  = ASSERT( r == r1 )
+    opt_co4_wrap env sym rep r (cos `getNth` n)
+
+opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
+  = ASSERT( r == _r )
+    ASSERT( n == 0 )
+    opt_co4_wrap env sym rep Nominal eta
+
+opt_co4 env sym rep r (NthCo _r n co)
+  | TyConAppCo _ _ cos <- co'
+  , let nth_co = cos `getNth` n
+  = if rep && (r == Nominal)
+      -- keep propagating the SubCo
+    then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
+    else nth_co
+
+  | ForAllCo _ eta _ <- co'
+  = if rep
+    then opt_co4_wrap (zapLiftingContext env) False True Nominal eta
+    else eta
+
+  | otherwise
+  = wrapRole rep r $ NthCo r n co'
+  where
+    co' = opt_co1 env sym co
 
 opt_co4 env sym rep r (LRCo lr co)
   | Just pr_co <- splitAppCo_maybe co
@@ -435,62 +466,6 @@ opt_univ env sym prov role oty1 oty2
       PluginProv _       -> prov
 
 -------------
--- NthCo must be handled separately, because it's the one case where we can't
--- tell quickly what the component coercion's role is from the containing
--- coercion. To avoid repeated coercionRole calls as opt_co1 calls opt_co2,
--- we just look for nested NthCo's, which can happen in practice.
-opt_nth_co :: LiftingContext -> SymFlag -> ReprFlag -> Role -> Coercion -> NormalCo
-opt_nth_co env sym rep r = go []
-  where
-    go ns (NthCo n co) = go (n:ns) co
-      -- previous versions checked if the tycon is decomposable. This
-      -- is redundant, because a non-decomposable tycon under an NthCo
-      -- is entirely bogus. See docs/core-spec/core-spec.pdf.
-    go ns co
-      = opt_nths ns co
-
-      -- try to resolve 1 Nth
-    push_nth n (Refl r1 ty)
-      | Just (tc, args) <- splitTyConApp_maybe ty
-      = Just (Refl (nthRole r1 tc n) (args `getNth` n))
-      | n == 0
-      , Just (tv, _) <- splitForAllTy_maybe ty
-      = Just (Refl Nominal (tyVarKind tv))
-    push_nth n (TyConAppCo _ _ cos)
-      = Just (cos `getNth` n)
-    push_nth 0 (ForAllCo _ eta _)
-      = Just eta
-    push_nth _ _ = Nothing
-
-      -- input coercion is *not* yet sym'd or opt'd
-    opt_nths [] co = opt_co4_wrap env sym rep r co
-    opt_nths (n:ns) co
-      | Just co' <- push_nth n co
-      = opt_nths ns co'
-
-      -- here, the co isn't a TyConAppCo, so we opt it, hoping to get
-      -- a TyConAppCo as output. We don't know the role, so we use
-      -- opt_co1. This is slightly annoying, because opt_co1 will call
-      -- coercionRole, but as long as we don't have a long chain of
-      -- NthCo's interspersed with some other coercion former, we should
-      -- be OK.
-    opt_nths ns co = opt_nths' ns (opt_co1 env sym co)
-
-      -- input coercion *is* sym'd and opt'd
-    opt_nths' [] co
-      = if rep && (r == Nominal)
-            -- propagate the SubCo:
-        then opt_co4_wrap (zapLiftingContext env) False True r co
-        else co
-    opt_nths' (n:ns) co
-      | Just co' <- push_nth n co
-      = opt_nths' ns co'
-    opt_nths' ns co = wrapRole rep r (mk_nths ns co)
-
-    mk_nths [] co = co
-    mk_nths (n:ns) co = mk_nths ns (mkNthCo n co)
-
--------------
 opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
 opt_transList is = zipWith (opt_trans is)
 
@@ -529,11 +504,13 @@ opt_trans2 _ co1 co2
 opt_trans_rule :: InScopeSet -> NormalNonIdCo -> NormalNonIdCo -> Maybe NormalCo
 
 -- Push transitivity through matching destructors
-opt_trans_rule is in_co1@(NthCo d1 co1) in_co2@(NthCo d2 co2)
+opt_trans_rule is in_co1@(NthCo r1 d1 co1) in_co2@(NthCo r2 d2 co2)
   | d1 == d2
+  , coercionRole co1 == coercionRole co2
   , co1 `compatible_co` co2
-  = fireTransRule "PushNth" in_co1 in_co2 $
-    mkNthCo d1 (opt_trans is co1 co2)
+  = ASSERT( r1 == r2 )
+    fireTransRule "PushNth" in_co1 in_co2 $
+    mkNthCo r1 d1 (opt_trans is co1 co2)
 
 opt_trans_rule is in_co1@(LRCo d1 co1) in_co2@(LRCo d2 co2)
   | d1 == d2
@@ -577,9 +554,8 @@ opt_trans_rule is in_co1@(FunCo r1 co1a co1b) in_co2@(FunCo r2 co2a co2b)
     mkFunCo r1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
-  = fireTransRule "TrPushApp" in_co1 in_co2 $
-    mkAppCo (opt_trans is co1a co2a)
-            (opt_trans is co1b co2b)
+  -- Must call opt_trans_rule_app; see Note [EtaAppCo]
+  = opt_trans_rule_app is in_co1 in_co2 co1a [co1b] co2a [co2b]
 
 -- Eta rules
 opt_trans_rule is co1@(TyConAppCo r tc cos1) co2
@@ -596,15 +572,11 @@ opt_trans_rule is co1 co2@(TyConAppCo r tc cos2)
 
 opt_trans_rule is co1@(AppCo co1a co1b) co2
   | Just (co2a,co2b) <- etaAppCo_maybe co2
-  = fireTransRule "EtaAppL" co1 co2 $
-    mkAppCo (opt_trans is co1a co2a)
-            (opt_trans is co1b co2b)
+  = opt_trans_rule_app is co1 co2 co1a [co1b] co2a [co2b]
 
 opt_trans_rule is co1 co2@(AppCo co2a co2b)
   | Just (co1a,co1b) <- etaAppCo_maybe co1
-  = fireTransRule "EtaAppR" co1 co2 $
-    mkAppCo (opt_trans is co1a co2a)
-            (opt_trans is co1b co2b)
+  = opt_trans_rule_app is co1 co2 co1a [co1b] co2a [co2b]
 
 -- Push transitivity inside forall
 opt_trans_rule is co1 co2
@@ -698,10 +670,45 @@ opt_trans_rule _ co1 co2        -- Identity rule
 
 opt_trans_rule _ _ _ = Nothing
 
+-- See Note [EtaAppCo]
+opt_trans_rule_app :: InScopeSet
+                   -> Coercion   -- original left-hand coercion (printing only)
+                   -> Coercion   -- original right-hand coercion (printing only)
+                   -> Coercion   -- left-hand coercion "function"
+                   -> [Coercion] -- left-hand coercion "args"
+                   -> Coercion   -- right-hand coercion "function"
+                   -> [Coercion] -- right-hand coercion "args"
+                   -> Maybe Coercion
+opt_trans_rule_app is orig_co1 orig_co2 co1a co1bs co2a co2bs
+  | AppCo co1aa co1ab <- co1a
+  , Just (co2aa, co2ab) <- etaAppCo_maybe co2a
+  = opt_trans_rule_app is orig_co1 orig_co2 co1aa (co1ab:co1bs) co2aa (co2ab:co2bs)
+
+  | AppCo co2aa co2ab <- co2a
+  , Just (co1aa, co1ab) <- etaAppCo_maybe co1a
+  = opt_trans_rule_app is orig_co1 orig_co2 co1aa (co1ab:co1bs) co2aa (co2ab:co2bs)
+
+  | otherwise
+  = ASSERT( co1bs `equalLength` co2bs )
+    fireTransRule ("EtaApps:" ++ show (length co1bs)) orig_co1 orig_co2 $
+    let Pair _ rt1a = coercionKind co1a
+        Pair lt2a _ = coercionKind co2a
+
+        Pair _ rt1bs = traverse coercionKind co1bs
+        Pair lt2bs _ = traverse coercionKind co2bs
+
+        kcoa = mkKindCo $ buildCoercion lt2a rt1a
+        kcobs = map mkKindCo $ zipWith buildCoercion lt2bs rt1bs
+
+        co2a' = mkCoherenceLeftCo co2a kcoa
+        co2bs' = zipWith mkCoherenceLeftCo co2bs kcobs
+    in
+    mkAppCos (opt_trans is co1a co2a')
+             (zipWith (opt_trans is) co1bs co2bs')
+
 fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
 fireTransRule _rule _co1 _co2 res
-  = -- pprTrace ("Trans rule fired: " ++ _rule) (vcat [ppr _co1, ppr _co2, ppr res]) $
-    Just res
+  = Just res
 
 {-
 Note [Conflict checking with AxiomInstCo]
@@ -758,6 +765,65 @@ that (Id Int) and (Id Bool) are Surely Apart, as they're headed by type
 families. At the time of writing, I (Richard Eisenberg) couldn't think of
 a way of detecting this any more efficient than just building the optimised
 coercion and checking.
+
+Note [EtaAppCo]
+~~~~~~~~~~~~~~~
+Suppose we're trying to optimize (co1a co1b ; co2a co2b). Ideally, we'd
+like to rewrite this to (co1a ; co2a) (co1b ; co2b). The problem is that
+the resultant coercions might not be well kinded. Here is an example (things
+labeled with x don't matter in this example):
+
+  k1 :: Type
+  k2 :: Type
+
+  a :: k1 -> Type
+  b :: k1
+
+  h :: k1 ~ k2
+
+  co1a :: x1 ~ (a |> (h -> <Type>)
+  co1b :: x2 ~ (b |> h)
+
+  co2a :: a ~ x3
+  co2b :: b ~ x4
+
+First, convince yourself of the following:
+
+  co1a co1b :: x1 x2 ~ (a |> (h -> <Type>)) (b |> h)
+  co2a co2b :: a b   ~ x3 x4
+
+  (a |> (h -> <Type>)) (b |> h) `eqType` a b
+
+That last fact is due to Note [Non-trivial definitional equality] in TyCoRep,
+where we ignore coercions in types as long as two types' kinds are the same.
+In our case, we meet this last condition, because
+
+  (a |> (h -> <Type>)) (b |> h) :: Type
+    and
+  a b :: Type
+
+So the input coercion (co1a co1b ; co2a co2b) is well-formed. But the
+suggested output coercions (co1a ; co2a) and (co1b ; co2b) are not -- the
+kinds don't match up.
+
+The solution here is to twiddle the kinds in the output coercions. First, we
+need to find coercions
+
+  ak :: kind(a |> (h -> <Type>)) ~ kind(a)
+  bk :: kind(b |> h)             ~ kind(b)
+
+This can be done with mkKindCo and buildCoercion. The latter assumes two
+types are identical modulo casts and builds a coercion between them.
+
+Then, we build (co1a ; co2a |> sym ak) and (co1b ; co2b |> sym bk) as the
+output coercions. These are well-kinded. (We cast the right-hand coercion
+because mkCoherenceLeftCo is smaller than mkCoherenceRightCo.)
+
+Also, note that all of this is done after accumulated any nested AppCo
+parameters. This step is to avoid quadratic behavior in calling coercionKind.
+
+The problem described here was first found in dependent/should_compile/dynamic-paper.
+
 -}
 
 -- | Check to make sure that an AxInstCo is internally consistent.
@@ -895,7 +961,7 @@ etaForAllCo_maybe co
   | Pair ty1 ty2  <- coercionKind co
   , Just (tv1, _) <- splitForAllTy_maybe ty1
   , isForAllTy ty2
-  , let kind_co = mkNthCo 0 co
+  , let kind_co = mkNthCo Nominal 0 co
   = Just ( tv1, kind_co
          , mkInstCo co (mkNomReflCo (TyVarTy tv1) `mkCoherenceRightCo` kind_co) )
 
@@ -938,7 +1004,7 @@ etaTyConAppCo_maybe tc co
                            -- E.g. T a ~# T a b
                            -- Trac #14607
   = ASSERT( tc == tc1 )
-    Just (decomposeCo n co)
+    Just (decomposeCo n co (tyConRolesX r tc1))
     -- NB: n might be <> tyConArity tc
     -- e.g.   data family T a :: * -> *
     --        g :: T a b ~ T c d

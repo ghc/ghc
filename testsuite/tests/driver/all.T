@@ -172,8 +172,8 @@ fobject_code = when(doing_ghci(), extra_hc_opts('-fobject-code'))
 
 test( 'T4114a', fobject_code, compile_and_run, ['-cpp'])
 test( 'T4114b', fobject_code, compile_and_run, ['-no-keep-hi-files'])
-test( 'T4114c', fobject_code, compile_and_run, ['-no-keep-o-files'])
-test( 'T4114d', fobject_code, compile_and_run,
+test( 'T4114c', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_run, ['-no-keep-o-files'])
+test( 'T4114d', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_run,
      ['-hisuf .myhi -osuf .myo -no-keep-o-files'])
 
 test('T5584', [], run_command, ['$MAKE -s --no-print-directory T5584'])
@@ -273,3 +273,8 @@ test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normal, compile, ['-ddump-types -ddump-json'])
 test('T13604', [], run_command, ['$MAKE -s --no-print-directory T13604'])
 test('T13604a', [], run_command, ['$MAKE -s --no-print-directory T13604a'])
+# omitting hpc and profasm because they affect the
+# inlining and unfoldings
+test('inline-check', omit_ways(['hpc', 'profasm'])
+                   , compile
+		   , ['-dinline-check foo -O -ddebug-output'])

@@ -1,0 +1,13 @@
+
+T15067.hs:9:14:
+     No instance for (Typeable (# 'GHC.Types.LiftedRep #))
+        arising from a use of ‘typeRep’
+        GHC can't yet do polykinded
+          Typeable ((# 'GHC.Types.LiftedRep #) :: *
+                                                  -> *
+                                                  -> TYPE
+                                                       ('GHC.Types.SumRep
+                                                          '['GHC.Types.LiftedRep,
+                                                            'GHC.Types.LiftedRep]))
+     In the expression: typeRep
+      In an equation for ‘floopadoop’: floopadoop = typeRep

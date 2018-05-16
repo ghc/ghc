@@ -1,4 +1,4 @@
-# 
+#
 # (c) Simon Marlow 2002
 #
 
@@ -9,7 +9,7 @@
 # variable config below.  The fields of the structure are filled in by
 # the appropriate config script(s) for this compiler/platform, in
 # ../config.
-# 
+#
 # Bits of the structure may also be filled in from the command line,
 # via the build system, using the '-e' option to runtests.
 
@@ -28,6 +28,8 @@ class TestConfig:
 
         # Accept new output which differs from the sample?
         self.accept = 0
+        self.accept_platform = 0
+        self.accept_os = 0
 
         # File in which to save the summary
         self.summary_file = ''
@@ -70,7 +72,7 @@ class TestConfig:
 
         # Flags we always give to this compiler
         self.compiler_always_flags = []
-        
+
         # Which ways to run tests (when compiling and running respectively)
         # Other ways are added from the command line if we have the appropriate
         # libraries.
@@ -103,13 +105,19 @@ class TestConfig:
         # Do we have SMP support?
         self.have_smp = False
 
+        # Is gdb avaliable?
+        self.have_gdb = False
+
+        # Is readelf available?
+        self.have_readelf = False
+
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
-        
+
         # threads
         self.threads = 1
         self.use_threads = 0

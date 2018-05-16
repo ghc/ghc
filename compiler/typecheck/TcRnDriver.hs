@@ -13,6 +13,7 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
@@ -508,9 +509,10 @@ tc_rn_src_decls ds
             else do { (th_group, th_group_tail) <- findSplice th_ds
                     ; case th_group_tail of
                         { Nothing -> return () ;
-                        ; Just (SpliceDecl (L loc _) _, _)
+                        ; Just (SpliceDecl _ (L loc _) _, _)
                             -> setSrcSpan loc $
                                addErr (text "Declaration splices are not permitted inside top-level declarations added with addTopDecls")
+                        ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
                         } ;
 
                     -- Rename TH-generated top-level declarations
@@ -537,7 +539,7 @@ tc_rn_src_decls ds
           { Nothing -> return (tcg_env, tcl_env)
 
             -- If there's a splice, we must carry on
-          ; Just (SpliceDecl (L loc splice) _, rest_ds) ->
+          ; Just (SpliceDecl _ (L loc splice) _, rest_ds) ->
             do { recordTopLevelSpliceLoc loc
 
                  -- Rename the splice expression, and get its supporting decls
@@ -548,6 +550,7 @@ tc_rn_src_decls ds
                ; setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
                  tc_rn_src_decls (spliced_decls ++ rest_ds)
                }
+          ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
           }
       }
 
@@ -572,7 +575,8 @@ tcRnHsBootDecls hsc_src decls
                             , hs_ruleds = rule_decls
                             , hs_vects  = vect_decls
                             , hs_annds  = _
-                            , hs_valds  = ValBindsOut val_binds val_sigs })
+                            , hs_valds
+                                 = XValBindsLR (NValBinds val_binds val_sigs) })
               <- rnTopSrcDecls first_group
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
@@ -581,7 +585,8 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Check for illegal declarations
         ; case group_tail of
-             Just (SpliceDecl d _, _) -> badBootDecl hsc_src "splice" d
+             Just (SpliceDecl _ d _, _) -> badBootDecl hsc_src "splice" d
+             Just (XSpliceDecl _, _) -> panic "tcRnHsBootDecls"
              Nothing                  -> return ()
         ; mapM_ (badBootDecl hsc_src "foreign") for_decls
         ; mapM_ (badBootDecl hsc_src "default") def_decls
@@ -1318,7 +1323,8 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
                          hs_vects  = vect_decls,
-                         hs_valds  = hs_val_binds@(ValBindsOut val_binds val_sigs) })
+                         hs_valds  = hs_val_binds@(XValBindsLR
+                                              (NValBinds val_binds val_sigs)) })
  = do {         -- Type-check the type and class decls, and all imported decls
                 -- The latter come in via tycl_decls
         traceTc "Tc2 (src)" empty ;
@@ -1326,7 +1332,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Source-language instances, including derivings,
                 -- and import the supporting declarations
         traceTc "Tc3" empty ;
-        (tcg_env, inst_infos, ValBindsOut deriv_binds deriv_sigs)
+        (tcg_env, inst_infos, XValBindsLR (NValBinds deriv_binds deriv_sigs))
             <- tcTyClsInstDecls tycl_decls deriv_decls val_binds ;
 
         setGblEnv tcg_env       $ do {
@@ -1671,7 +1677,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (L loc (HsVar (L loc main_name)))
+                  tcMonoExpr (L loc (HsVar noExt (L loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -1975,7 +1981,7 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (L loc (BodyStmt expr _ _ _))
+tcUserStmt (L loc (BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
@@ -1985,40 +1991,45 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
               matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }
+              the_bind  = L loc $ (mkTopFunBind FromSource
+                                     (L loc fresh_it) matches) { fun_ext = fvs }
                           -- Care here!  In GHCi the expression might have
                           -- free variables, and they in turn may have free type variables
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt $ noLoc $ HsValBinds $
-                          ValBindsOut [(NonRecursive,unitBag the_bind)] []
+              let_stmt  = L loc $ LetStmt noExt $ noLoc $ HsValBinds noExt
+                           $ XValBindsLR
+                               (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt (L loc (VarPat (L loc fresh_it)))
-                                           (nlHsApp ghciStep rn_expr)
-                                           (mkRnSyntaxExpr bindIOName)
-                                           noSyntaxExpr
-                                           PlaceHolder
+              bind_stmt = L loc $ BindStmt noExt
+                                       (L loc (VarPat noExt (L loc fresh_it)))
+                                       (nlHsApp ghciStep rn_expr)
+                                       (mkRnSyntaxExpr bindIOName)
+                                       noSyntaxExpr
 
               -- [; print it]
-              print_it  = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) (nlHsVar fresh_it))
+              print_it  = L loc $ BodyStmt noExt
+                                           (nlHsApp (nlHsVar interPrintName)
+                                           (nlHsVar fresh_it))
                                            (mkRnSyntaxExpr thenIOName)
-                                                  noSyntaxExpr placeHolderType
+                                                  noSyntaxExpr
 
               -- NewA
-              no_it_a = L loc $ BodyStmt (nlHsApps bindIOName
+              no_it_a = L loc $ BodyStmt noExt (nlHsApps bindIOName
                                        [rn_expr , nlHsVar interPrintName])
                                        (mkRnSyntaxExpr thenIOName)
-                                       noSyntaxExpr placeHolderType
+                                       noSyntaxExpr
 
-              no_it_b = L loc $ BodyStmt (rn_expr)
+              no_it_b = L loc $ BodyStmt noExt (rn_expr)
                                        (mkRnSyntaxExpr thenIOName)
-                                       noSyntaxExpr placeHolderType
+                                       noSyntaxExpr
 
-              no_it_c = L loc $ BodyStmt (nlHsApp (nlHsVar interPrintName) rn_expr)
-                                       (mkRnSyntaxExpr thenIOName)
-                                       noSyntaxExpr placeHolderType
+              no_it_c = L loc $ BodyStmt noExt
+                                      (nlHsApp (nlHsVar interPrintName) rn_expr)
+                                      (mkRnSyntaxExpr thenIOName)
+                                      noSyntaxExpr
 
               -- See Note [GHCi Plans]
 
@@ -2074,8 +2085,8 @@ tcUserStmt rdr_stmt@(L loc _)
 
        ; ghciStep <- getGhciStepIO
        ; let gi_stmt
-               | (L loc (BindStmt pat expr op1 op2 ty)) <- rn_stmt
-                           = L loc $ BindStmt pat (nlHsApp ghciStep expr) op1 op2 ty
+               | (L loc (BindStmt ty pat expr op1 op2)) <- rn_stmt
+                     = L loc $ BindStmt ty pat (nlHsApp ghciStep expr) op1 op2
                | otherwise = rn_stmt
 
        ; opt_pr_flag <- goptM Opt_PrintBindResult
@@ -2097,9 +2108,9 @@ tcUserStmt rdr_stmt@(L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = L loc $ BodyStmt (nlHsApp (nlHsVar printName) (nlHsVar v))
+        print_v  = L loc $ BodyStmt noExt (nlHsApp (nlHsVar printName)
+                                    (nlHsVar v))
                                     (mkRnSyntaxExpr thenIOName) noSyntaxExpr
-                                    placeHolderType
 
 {-
 Note [GHCi Plans]
@@ -2162,7 +2173,8 @@ tcGhciStmts stmts
                 -- get their *polymorphic* values.  (And we'd get ambiguity errs
                 -- if they were overloaded, since they aren't applied to anything.)
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
-                       (noLoc $ ExplicitList unitTy Nothing (map mk_item ids)) ;
+                       (noLoc $ ExplicitList unitTy Nothing
+                                                            (map mk_item ids)) ;
             mk_item id = let ty_args = [idType id, unitTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
                                    (map getRuntimeRep ty_args ++ ty_args))
@@ -2170,7 +2182,7 @@ tcGhciStmts stmts
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
         return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo GhciStmtCtxt (noLoc stmts) io_ret_ty))
+                     noLoc (HsDo io_ret_ty GhciStmtCtxt (noLoc stmts)))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
@@ -2181,13 +2193,15 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar (noLoc a_tv)]
-                                     , hst_body  = nlHsFunTy ghciM ioM }
+        step_ty = noLoc $ HsForAllTy
+                     { hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
+                     , hst_xforall = noExt
+                     , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig (nlHsVar ghciStepIoMName) stepTy)
+    return (noLoc $ ExprWithTySig stepTy (nlHsVar ghciStepIoMName))
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2288,7 +2302,7 @@ tcRnType :: HscEnv
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
-    do { (HsWC { hswc_wcs = wcs, hswc_body = rn_type }, _fvs)
+    do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
                <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
                   -- The type can have wild cards, but no implicit
                   -- generalisation; e.g.   :kind (T _)
@@ -2299,10 +2313,11 @@ tcRnType hsc_env normalise rdr_type
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; (ty, kind) <- solveEqualities $
-                       tcWildCardBinders wcs  $ \ _ ->
+                       tcWildCardBinders (SigTypeSkol GhciCtxt) wcs $ \ _ ->
                        tcLHsTypeUnsaturated rn_type
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
+       ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType emptyZonkEnv ty
 

@@ -48,6 +48,7 @@ module RdrName (
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
         lookupGRE_RdrName, lookupGRE_Name, lookupGRE_FieldLabel,
+        lookupGRE_Name_OccName,
         getGRE_NameQualifier_maybes,
         transformGREs, pickGREs, pickGREsModExp,
 
@@ -473,7 +474,7 @@ data Parent = NoParent
             | ParentIs  { par_is :: Name }
             | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
               -- ^ See Note [Parents for record fields]
-            deriving (Eq, Data, Typeable)
+            deriving (Eq, Data)
 
 instance Outputable Parent where
    ppr NoParent        = empty

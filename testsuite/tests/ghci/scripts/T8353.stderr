@@ -18,9 +18,7 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Err’))
 
@@ -43,9 +41,7 @@ Defer03.hs:7:5: error:
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Err’))
 
@@ -68,9 +64,7 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Err’))
 
@@ -93,9 +87,7 @@ Defer03.hs:7:5: error:
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Err’))
 
@@ -118,8 +110,6 @@ Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at Defer03.hs:1:8-11
            (and originally defined in ‘GHC.Err’))

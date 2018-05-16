@@ -31,3 +31,7 @@ doneWithMsgThrowTo (MessageThrowTo *m)
 }
 
 #include "EndPrivate.h"
+
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+extern volatile StgWord64 whitehole_executeMessage_spin;
+#endif

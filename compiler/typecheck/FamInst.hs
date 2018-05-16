@@ -19,6 +19,7 @@ import HscTypes
 import FamInstEnv
 import InstEnv( roughMatchTcs )
 import Coercion
+import CoreLint
 import TcEvidence
 import LoadIface
 import TcRnMonad
@@ -45,10 +46,8 @@ import Control.Monad
 
 #include "HsVersions.h"
 
-{-
-
-Note [The type family instance consistency story]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [The type family instance consistency story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To preserve type safety we must ensure that for any given module, all
 the type family instances used either in that module or in any module
@@ -160,13 +159,24 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
     ASSERT2( lhs_kind `eqType` rhs_kind, text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
     do { (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
+       ; dflags <- getDynFlags
+       ; let lhs'     = substTys subst lhs
+             rhs'     = substTy  subst rhs
+             tcvs'    = tvs' ++ cvs'
+       ; when (gopt Opt_DoCoreLinting dflags) $
+           -- Check that the types involved in this instance are well formed.
+           -- Do /not/ expand type synonyms, for the reasons discussed in
+           -- Note [Linting type synonym applications].
+           case lintTypes dflags tcvs' (rhs':lhs') of
+             Nothing       -> pure ()
+             Just fail_msg -> pprPanic "Core Lint error" fail_msg
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
                          , fi_tvs      = tvs'
                          , fi_cvs      = cvs'
-                         , fi_tys      = substTys subst lhs
-                         , fi_rhs      = substTy  subst rhs
+                         , fi_tys      = lhs'
+                         , fi_rhs      = rhs'
                          , fi_axiom    = axiom }) }
   where
     lhs_kind = typeKind (mkTyConApp fam_tc lhs)
@@ -576,37 +586,56 @@ tcExtendLocalFamInstEnv [] thing_inside = thing_inside
 
 -- Otherwise proceed...
 tcExtendLocalFamInstEnv fam_insts thing_inside
- = do { env <- getGblEnv
-      ; let this_mod = tcg_mod env
-            imports = tcg_imports env
+ = do { -- Load family-instance modules "below" this module, so that
+        -- allLocalFamInst can check for consistency with them
+        -- See Note [The type family instance consistency story]
+        loadDependentFamInstModules fam_insts
 
-            -- Optimization: If we're only defining type family instances
-            -- for type families *defined in the home package*, then we
-            -- only have to load interface files that belong to the home
-            -- package. The reason is that there's no recursion between
-            -- packages, so modules in other packages can't possibly define
-            -- instances for our type families.
-            --
-            -- (Within the home package, we could import a module M that
-            -- imports us via an hs-boot file, and thereby defines an
-            -- instance of a type family defined in this module. So we can't
-            -- apply the same logic to avoid reading any interface files at
-            -- all, when we define an instances for type family defined in
-            -- the current module.)
-            home_fams_only = all (nameIsHomePackage this_mod . fi_fam) fam_insts
-            want_module mod
-              | mod == this_mod = False
-              | home_fams_only  = moduleUnitId mod == moduleUnitId this_mod
-              | otherwise       = True
-      ; loadModuleInterfaces (text "Loading family-instance modules")
-                             (filter want_module (imp_finsts imports))
+        -- Now add the instances one by one
+      ; env <- getGblEnv
       ; (inst_env', fam_insts') <- foldlM addLocalFamInst
                                        (tcg_fam_inst_env env, tcg_fam_insts env)
                                        fam_insts
+
       ; let env' = env { tcg_fam_insts    = fam_insts'
                        , tcg_fam_inst_env = inst_env' }
       ; setGblEnv env' thing_inside
       }
+
+loadDependentFamInstModules :: [FamInst] -> TcM ()
+-- Load family-instance modules "below" this module, so that
+-- allLocalFamInst can check for consistency with them
+-- See Note [The type family instance consistency story]
+loadDependentFamInstModules fam_insts
+ = do { env <- getGblEnv
+      ; let this_mod = tcg_mod env
+            imports  = tcg_imports env
+
+            want_module mod  -- See Note [Home package family instances]
+              | mod == this_mod = False
+              | home_fams_only  = moduleUnitId mod == moduleUnitId this_mod
+              | otherwise       = True
+            home_fams_only = all (nameIsHomePackage this_mod . fi_fam) fam_insts
+
+      ; loadModuleInterfaces (text "Loading family-instance modules") $
+        filter want_module (imp_finsts imports) }
+
+{- Note [Home package family instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Optimization: If we're only defining type family instances
+for type families *defined in the home package*, then we
+only have to load interface files that belong to the home
+package. The reason is that there's no recursion between
+packages, so modules in other packages can't possibly define
+instances for our type families.
+
+(Within the home package, we could import a module M that
+imports us via an hs-boot file, and thereby defines an
+instance of a type family defined in this module. So we can't
+apply the same logic to avoid reading any interface files at
+all, when we define an instances for type family defined in
+the current module.
+-}
 
 -- Check that the proposed new instance is OK,
 -- and then add it to the home inst env

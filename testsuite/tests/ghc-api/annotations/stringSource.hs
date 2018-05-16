@@ -62,8 +62,8 @@ testOneFile libdir fileName = do
 
      doImportDecl :: ImportDecl GhcPs
                   -> [(String,[Located (SourceText,FastString)])]
-     doImportDecl (ImportDecl _ _ Nothing _ _ _ _ _ _) = []
-     doImportDecl (ImportDecl _ _ (Just ss) _ _ _ _ _ _)
+     doImportDecl (ImportDecl _ _ _ Nothing _ _ _ _ _ _) = []
+     doImportDecl (ImportDecl _ _ _ (Just ss) _ _ _ _ _ _)
                                                      = [("i",[conv (noLoc ss)])]
 
      doCType :: CType -> [(String,[Located (SourceText,FastString)])]
@@ -73,16 +73,16 @@ testOneFile libdir fileName = do
 
      doRuleDecl :: RuleDecl GhcPs
                 -> [(String,[Located (SourceText,FastString)])]
-     doRuleDecl (HsRule ss _ _ _ _ _ _) = [("r",[ss])]
+     doRuleDecl (HsRule _ ss _ _ _ _) = [("r",[ss])]
 
      doCCallTarget :: CCallTarget
                    -> [(String,[Located (SourceText,FastString)])]
      doCCallTarget (StaticTarget s f _ _) = [("st",[(noLoc (s,f))])]
 
      doHsExpr :: HsExpr GhcPs -> [(String,[Located (SourceText,FastString)])]
-     doHsExpr (HsCoreAnn src ss _) = [("co",[conv (noLoc ss)])]
-     doHsExpr (HsSCC     src ss _) = [("sc",[conv (noLoc ss)])]
-     doHsExpr (HsTickPragma src (ss,_,_) _ss2 _) = [("tp",[conv (noLoc ss)])]
+     doHsExpr (HsCoreAnn _ src ss _) = [("co",[conv (noLoc ss)])]
+     doHsExpr (HsSCC     _ src ss _) = [("sc",[conv (noLoc ss)])]
+     doHsExpr (HsTickPragma _ src (ss,_,_) _ss2 _) = [("tp",[conv (noLoc ss)])]
      doHsExpr _ = []
 
      conv (GHC.L l (StringLiteral st fs)) = GHC.L l (st,fs)

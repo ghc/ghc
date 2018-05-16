@@ -331,7 +331,29 @@ printClosure( const StgClosure *obj )
     case MVAR_DIRTY:
         {
           StgMVar* mv = (StgMVar*)obj;
-          debugBelch("MVAR(head=%p, tail=%p, value=%p)\n", mv->head, mv->tail, mv->value);
+
+          debugBelch("MVAR(head=");
+          if ((StgClosure*)mv->head == &stg_END_TSO_QUEUE_closure) {
+              debugBelch("END_TSO_QUEUE");
+          } else {
+              debugBelch("%p", mv->head);
+          }
+
+          debugBelch(", tail=");
+          if ((StgClosure*)mv->tail == &stg_END_TSO_QUEUE_closure) {
+              debugBelch("END_TSO_QUEUE");
+          } else {
+              debugBelch("%p", mv->tail);
+          }
+
+          debugBelch(", value=");
+          if ((StgClosure*)mv->value == &stg_END_TSO_QUEUE_closure) {
+              debugBelch("END_TSO_QUEUE");
+          } else {
+              debugBelch("%p", mv->value);
+          }
+          debugBelch(")\n");
+
           break;
         }
 
@@ -358,7 +380,7 @@ printClosure( const StgClosure *obj )
 
     case WEAK:
             debugBelch("WEAK(");
-            debugBelch(" key=%p value=%p finalizer=%p",
+            debugBelch("key=%p value=%p finalizer=%p",
                     (StgPtr)(((StgWeak*)obj)->key),
                     (StgPtr)(((StgWeak*)obj)->value),
                     (StgPtr)(((StgWeak*)obj)->finalizer));
@@ -373,7 +395,7 @@ printClosure( const StgClosure *obj )
       break;
 
     case STACK:
-      debugBelch("STACK");
+      debugBelch("STACK\n");
       break;
 
 #if 0
@@ -387,7 +409,7 @@ printClosure( const StgClosure *obj )
 
     case COMPACT_NFDATA:
         debugBelch("COMPACT_NFDATA(size=%" FMT_Word ")\n",
-                   (W_)((StgCompactNFData *)obj)->totalW * sizeof(W_));
+                   (W_)((StgCompactNFData *)obj)->totalW * (W_)sizeof(W_));
         break;
 
 
@@ -520,6 +542,18 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
                 debugBelch("stg_ap_ppppp_info\n" );
             } else if (c == (StgWord)&stg_ap_pppppp_info) {
                 debugBelch("stg_ap_pppppp_info\n" );
+            } else if (c == (StgWord)&stg_ret_v_info) {
+                debugBelch("stg_ret_v_info\n" );
+            } else if (c == (StgWord)&stg_ret_p_info) {
+                debugBelch("stg_ret_p_info\n" );
+            } else if (c == (StgWord)&stg_ret_n_info) {
+                debugBelch("stg_ret_n_info\n" );
+            } else if (c == (StgWord)&stg_ret_f_info) {
+                debugBelch("stg_ret_f_info\n" );
+            } else if (c == (StgWord)&stg_ret_d_info) {
+                debugBelch("stg_ret_d_info\n" );
+            } else if (c == (StgWord)&stg_ret_l_info) {
+                debugBelch("stg_ret_l_info\n" );
 #if defined(PROFILING)
             } else if (c == (StgWord)&stg_restore_cccs_info) {
                 debugBelch("stg_restore_cccs_info\n" );

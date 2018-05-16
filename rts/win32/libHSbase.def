@@ -42,6 +42,7 @@ EXPORTS
         base_GHCziIOziException_cannotCompactPinned_closure
         base_GHCziIOziException_cannotCompactMutable_closure
 
+	base_ControlziExceptionziBase_absentSumFieldError_closure
 	base_ControlziExceptionziBase_nonTermination_closure
 	base_ControlziExceptionziBase_nestedAtomically_closure
 	base_GHCziEventziThread_blockedOnBadFD_closure

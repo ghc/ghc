@@ -1,6 +1,6 @@
 {-# Language TypeInType #-}
 {-# Language RankNTypes, KindSignatures, PolyKinds #-}
-
+{-# OPTIONS_GHC -fprint-explicit-runtime-reps #-}
 import GHC.Types (TYPE)
 import Data.Kind
 

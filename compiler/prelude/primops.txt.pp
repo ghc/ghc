@@ -265,6 +265,7 @@ primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
           nonzero if overflow occurred (the sum is either too large
           or too small to fit in an {\tt Int#}).}
    with code_size = 2
+        commutable = True
 
 primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
          {Subtract signed integers reporting overflow.
@@ -328,15 +329,25 @@ primtype Word#
 primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
 
+primop   WordAddCOp   "addWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
+         {Add unsigned integers reporting overflow.
+          The first element of the pair is the result.  The second element is
+          the carry flag, which is nonzero on overflow. See also {\tt plusWord2#}.}
+   with code_size = 2
+        commutable = True
+
 primop   WordSubCOp   "subWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
          {Subtract unsigned integers reporting overflow.
           The first element of the pair is the result.  The second element is
           the carry flag, which is nonzero on overflow.}
+   with code_size = 2
 
--- Returns (# high, low #) (or equivalently, (# carry, low #))
-primop   WordAdd2Op  "plusWord2#"  GenPrimOp
-   Word# -> Word# -> (# Word#, Word# #)
-   with commutable = True
+primop   WordAdd2Op   "plusWord2#"   GenPrimOp   Word# -> Word# -> (# Word#, Word# #)
+         {Add unsigned integers, with the high part (carry) in the first
+          component of the returned pair and the low part in the second
+          component of the pair. See also {\tt addWordC#}.}
+   with code_size = 2
+        commutable = True
 
 primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
 
@@ -1254,6 +1265,76 @@ primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
    {Read 64-bit word; offset in 64-bit words.}
    with can_fail = True
 
+primop IndexByteArrayOp_Word8AsChar "indexWord8ArrayAsChar#" GenPrimOp
+   ByteArray# -> Int# -> Char#
+   {Read 8-bit character; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsWideChar "indexWord8ArrayAsWideChar#" GenPrimOp
+   ByteArray# -> Int# -> Char#
+   {Read 31-bit character; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsAddr "indexWord8ArrayAsAddr#" GenPrimOp
+   ByteArray# -> Int# -> Addr#
+   {Read address; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsFloat "indexWord8ArrayAsFloat#" GenPrimOp
+   ByteArray# -> Int# -> Float#
+   {Read float; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsDouble "indexWord8ArrayAsDouble#" GenPrimOp
+   ByteArray# -> Int# -> Double#
+   {Read double; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsStablePtr "indexWord8ArrayAsStablePtr#" GenPrimOp
+   ByteArray# -> Int# -> StablePtr# a
+   {Read stable pointer; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsInt16 "indexWord8ArrayAsInt16#" GenPrimOp
+   ByteArray# -> Int# -> Int#
+   {Read 16-bit int; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsInt32 "indexWord8ArrayAsInt32#" GenPrimOp
+   ByteArray# -> Int# -> INT32
+   {Read 32-bit int; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsInt64 "indexWord8ArrayAsInt64#" GenPrimOp
+   ByteArray# -> Int# -> INT64
+   {Read 64-bit int; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsInt "indexWord8ArrayAsInt#" GenPrimOp
+   ByteArray# -> Int# -> Int#
+   {Read int; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsWord16 "indexWord8ArrayAsWord16#" GenPrimOp
+   ByteArray# -> Int# -> Word#
+   {Read 16-bit word; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsWord32 "indexWord8ArrayAsWord32#" GenPrimOp
+   ByteArray# -> Int# -> WORD32
+   {Read 32-bit word; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsWord64 "indexWord8ArrayAsWord64#" GenPrimOp
+   ByteArray# -> Int# -> WORD64
+   {Read 64-bit word; offset in bytes.}
+   with can_fail = True
+
+primop IndexByteArrayOp_Word8AsWord "indexWord8ArrayAsWord#" GenPrimOp
+   ByteArray# -> Int# -> Word#
+   {Read word; offset in bytes.}
+   with can_fail = True
+
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 8-bit character; offset in bytes.}
@@ -1338,6 +1419,76 @@ primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
    with has_side_effects = True
         can_fail = True
 
+primop  ReadByteArrayOp_Word8AsChar "readWord8ArrayAsChar#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsWideChar "readWord8ArrayAsWideChar#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsAddr "readWord8ArrayAsAddr#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsFloat "readWord8ArrayAsFloat#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsDouble "readWord8ArrayAsDouble#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsStablePtr "readWord8ArrayAsStablePtr#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsInt16 "readWord8ArrayAsInt16#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsInt32 "readWord8ArrayAsInt32#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsInt64 "readWord8ArrayAsInt64#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsInt "readWord8ArrayAsInt#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsWord16 "readWord8ArrayAsWord16#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsWord32 "readWord8ArrayAsWord32#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsWord64 "readWord8ArrayAsWord64#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   with has_side_effects = True
+        can_fail = True
+
+primop  ReadByteArrayOp_Word8AsWord "readWord8ArrayAsWord#" GenPrimOp
+   MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+   with has_side_effects = True
+        can_fail = True
+
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 8-bit character; offset in bytes.}
@@ -1417,6 +1568,76 @@ primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsChar "writeWord8ArrayAsChar#" GenPrimOp
+   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsWideChar "writeWord8ArrayAsWideChar#" GenPrimOp
+   MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsAddr "writeWord8ArrayAsAddr#" GenPrimOp
+   MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsFloat "writeWord8ArrayAsFloat#" GenPrimOp
+   MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsDouble "writeWord8ArrayAsDouble#" GenPrimOp
+   MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsStablePtr "writeWord8ArrayAsStablePtr#" GenPrimOp
+   MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsInt16 "writeWord8ArrayAsInt16#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsInt32 "writeWord8ArrayAsInt32#" GenPrimOp
+   MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsInt64 "writeWord8ArrayAsInt64#" GenPrimOp
+   MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsInt "writeWord8ArrayAsInt#" GenPrimOp
+   MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsWord16 "writeWord8ArrayAsWord16#" GenPrimOp
+   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsWord32 "writeWord8ArrayAsWord32#" GenPrimOp
+   MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsWord64 "writeWord8ArrayAsWord64#" GenPrimOp
+   MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
+   with has_side_effects = True
+        can_fail = True
+
+primop  WriteByteArrayOp_Word8AsWord "writeWord8ArrayAsWord#" GenPrimOp
+   MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
         can_fail = True
 
@@ -2167,7 +2388,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply1Dmd
                                                  , topDmd ] topRes }
                  -- See Note [Strictness for mask/unmask/catch]
@@ -2697,13 +2918,7 @@ primop SparkOp "spark#" GenPrimOp
 
 primop SeqOp "seq#" GenPrimOp
    a -> State# s -> (# State# s, a #)
-
-   -- why return the value?  So that we can control sharing of seq'd
-   -- values: in
-   --    let x = e in x `seq` ... x ...
-   -- we don't want to inline x, so better to represent it as
-   --    let x = e in case seq# x RW of (# _, x' #) -> ... x' ...
-   -- also it matches the type of rseq in the Eval monad.
+   -- See Note [seq# magic] in PrelRules
 
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
@@ -2938,6 +3153,20 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
      of the event is the zero-terminated byte string passed as the first
      argument.  The event will be emitted either to the .eventlog file,
      or to stderr, depending on the runtime RTS flags. }
+   with
+   has_side_effects = True
+   out_of_line      = True
+
+primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, INT64 #)
+   { Retrieves the allocation counter for the current thread. }
+   with
+   has_side_effects = True
+   out_of_line      = True
+
+primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
+   INT64 -> State# RealWorld -> State# RealWorld
+   { Sets the allocation counter for the current thread to the given value. }
    with
    has_side_effects = True
    out_of_line      = True

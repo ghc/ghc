@@ -11,7 +11,7 @@ A ``lint'' pass to check for Core correctness
 module CoreLint (
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintInteractiveExpr, lintExpr,
-    lintAnnots,
+    lintAnnots, lintTypes,
 
     -- ** Debug output
     endPass, endPassIO,
@@ -407,7 +407,8 @@ lintCoreBindings dflags pass local_in_scope binds
   where
     in_scope_set = mkInScopeSet (mkVarSet local_in_scope)
 
-    flags = LF { lf_check_global_ids = check_globals
+    flags = defaultLintFlags
+               { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
                , lf_check_static_ptrs = check_static_ptrs }
 
@@ -1275,6 +1276,19 @@ lintIdBndr top_lvl bind_site id linterF
 %************************************************************************
 -}
 
+lintTypes :: DynFlags
+          -> [TyCoVar]   -- Treat these as in scope
+          -> [Type]
+          -> Maybe MsgDoc -- Nothing => OK
+lintTypes dflags vars tys
+  | isEmptyBag errs = Nothing
+  | otherwise       = Just (pprMessageBag errs)
+  where
+    in_scope = emptyInScopeSet
+    (_warns, errs) = initL dflags defaultLintFlags in_scope linter
+    linter = lintBinders LambdaBind vars $ \_ ->
+             mapM_ lintInTy tys
+
 lintInTy :: InType -> LintM (LintedType, LintedKind)
 -- Types only, not kinds
 -- Check the type, and apply the substitution to it
@@ -1311,25 +1325,25 @@ lintType ty@(AppTy t1 t2)
        ; lint_ty_app ty k1 [(t2,k2)] }
 
 lintType ty@(TyConApp tc tys)
-  | Just ty' <- coreView ty
-  = lintType ty'   -- Expand type synonyms, so that we do not bogusly complain
-                   --  about un-saturated type synonyms
+  | isTypeSynonymTyCon tc
+  = do { report_unsat <- lf_report_unsat_syns <$> getLintFlags
+       ; lintTySynApp report_unsat ty tc tys }
 
-  -- We should never see a saturated application of funTyCon; such applications
-  -- should be represented with the FunTy constructor. See Note [Linting
-  -- function types] and Note [Representation of function types].
   | isFunTyCon tc
   , tys `lengthIs` 4
+    -- We should never see a saturated application of funTyCon; such
+    -- applications should be represented with the FunTy constructor.
+    -- See Note [Linting function types] and
+    -- Note [Representation of function types].
   = failWithL (hang (text "Saturated application of (->)") 2 (ppr ty))
 
-  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
-       -- Also type synonyms and type families
+  | isTypeFamilyTyCon tc -- Check for unsaturated type family
   , tys `lengthLessThan` tyConArity tc
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
   | otherwise
   = do { checkTyCon tc
-       ; ks <- mapM lintType tys
+       ; ks <- setReportUnsat True (mapM lintType tys)
        ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
@@ -1361,6 +1375,29 @@ lintType (CoercionTy co)
   = do { (k1, k2, ty1, ty2, r) <- lintCoercion co
        ; return $ mkHeteroCoercionType r k1 k2 ty1 ty2 }
 
+-----------------
+lintTySynApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind
+-- See Note [Linting type synonym applications]
+lintTySynApp report_unsat ty tc tys
+  | report_unsat   -- Report unsaturated only if report_unsat is on
+  , tys `lengthLessThan` tyConArity tc
+  = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
+
+  | otherwise
+  = do { ks <- setReportUnsat False (mapM lintType tys)
+
+       ; when report_unsat $
+         case expandSynTyCon_maybe tc tys of
+            Nothing -> pprPanic "lintTySynApp" (ppr tc <+> ppr tys)
+                       -- Previous guards should have made this impossible
+            Just (tenv, rhs, tys') -> do { _ <- lintType expanded_ty
+                                         ; return () }
+                where
+                  expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+
+       ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
+
+-----------------
 lintKind :: OutKind -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -1369,6 +1406,7 @@ lintKind k = do { sk <- lintType k
                          (addErrL (hang (text "Ill-kinded kind:" <+> ppr k)
                                       2 (text "has kind:" <+> ppr sk))) }
 
+-----------------
 -- confirms that a type is really *
 lintStar :: SDoc -> OutKind -> LintM ()
 lintStar doc k
@@ -1376,6 +1414,7 @@ lintStar doc k
           (text "Non-*-like kind when *-like expected:" <+> ppr k $$
            text "when checking" <+> doc)
 
+-----------------
 lintArrow :: SDoc -> LintedKind -> LintedKind -> LintM LintedKind
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -1390,6 +1429,7 @@ lintArrow what k1 k2   -- Eg lintArrow "type or kind `blah'" k1 k2
                   2 (text "in" <+> what)
              , what <+> text "kind:" <+> ppr k ]
 
+-----------------
 lint_ty_app :: Type -> LintedKind -> [(LintedType,LintedKind)] -> LintM LintedKind
 lint_ty_app ty k tys
   = lint_app (text "type" <+> quotes (ppr ty)) k tys
@@ -1732,12 +1772,13 @@ lintCoercion co@(TransCo co1 co2)
        ; lintRole co r1 r2
        ; return (k1a, k2b, ty1a, ty2b, r1) }
 
-lintCoercion the_co@(NthCo n co)
+lintCoercion the_co@(NthCo r0 n co)
   = do { (_, _, s, t, r) <- lintCoercion co
        ; case (splitForAllTy_maybe s, splitForAllTy_maybe t) of
          { (Just (tv_s, _ty_s), Just (tv_t, _ty_t))
              |  n == 0
-             -> return (ks, kt, ts, tt, Nominal)
+             -> do { lintRole the_co Nominal r0
+                   ; return (ks, kt, ts, tt, r0) }
              where
                ts = tyVarKind tv_s
                tt = tyVarKind tv_t
@@ -1751,7 +1792,8 @@ lintCoercion the_co@(NthCo n co)
                  -- see Note [NthCo and newtypes] in TyCoRep
              , tys_s `equalLength` tys_t
              , tys_s `lengthExceeds` n
-             -> return (ks, kt, ts, tt, tr)
+             -> do { lintRole the_co tr r0
+                   ; return (ks, kt, ts, tt, r0) }
              where
                ts = getNth tys_s n
                tt = getNth tys_t n
@@ -1910,8 +1952,8 @@ data LintEnv
 data LintFlags
   = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
        , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
-       , lf_check_static_ptrs          :: StaticPtrCheck
-                                             -- ^ See Note [Checking StaticPtrs]
+       , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
+       , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
     }
 
 -- See Note [Checking StaticPtrs]
@@ -1928,6 +1970,7 @@ defaultLintFlags :: LintFlags
 defaultLintFlags = LF { lf_check_global_ids = False
                       , lf_check_inline_loop_breakers = True
                       , lf_check_static_ptrs = AllowAnywhere
+                      , lf_report_unsat_syns = True
                       }
 
 newtype LintM a =
@@ -1972,6 +2015,37 @@ rename type binders as we go, maintaining a substitution.
 The same substitution also supports let-type, current expressed as
         (/\(a:*). body) ty
 Here we substitute 'ty' for 'a' in 'body', on the fly.
+
+Note [Linting type synonym applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When lining a type-synonym application
+  S ty1 .. tyn
+we behave as follows (Trac #15057):
+
+* If lf_report_unsat_syns = True, and S has arity < n,
+  complain about an unsaturated type synonym.
+
+* Switch off lf_report_unsat_syns, and lint ty1 .. tyn.
+
+  Reason: catch out of scope variables or other ill-kinded gubbins,
+  even if S discards that argument entirely. E.g. (#15012):
+     type FakeOut a = Int
+     type family TF a
+     type instance TF Int = FakeOut a
+  Here 'a' is out of scope; but if we expand FakeOut, we conceal
+  that out-of-scope error.
+
+  Reason for switching off lf_report_unsat_syns: with
+  LiberalTypeSynonyms, GHC allows unsaturated synonyms provided they
+  are saturated when the type is expanded. Example
+     type T f = f Int
+     type S a = a -> a
+     type Z = T S
+  In Z's RHS, S appears unsaturated, but it is saturated when T is expanded.
+
+* If lf_report_unsat_syns is on, expand the synonym application and
+  lint the result.  Reason: want to check that synonyms are saturated
+  when the type is expanded.
 -}
 
 instance Functor LintM where
@@ -2019,6 +2093,13 @@ initL dflags flags in_scope m
              , le_joins = emptyVarSet
              , le_loc = []
              , le_dynflags = dflags }
+
+setReportUnsat :: Bool -> LintM a -> LintM a
+-- Switch off lf_report_unsat_syns
+setReportUnsat ru thing_inside
+  = LintM $ \ env errs ->
+    let env' = env { le_flags = (le_flags env) { lf_report_unsat_syns = ru } }
+    in unLintM thing_inside env' errs
 
 getLintFlags :: LintM LintFlags
 getLintFlags = LintM $ \ env errs -> (Just (le_flags env), errs)

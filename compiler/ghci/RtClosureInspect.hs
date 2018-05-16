@@ -750,8 +750,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                       if monomorphic
                         then parens (text "already monomorphic: " <> ppr my_ty)
                         else Ppr.empty)
-        Right dcname <- dataConInfoPtrToName (infoPtr clos)
-        (_,mb_dc)    <- tryTc (tcLookupDataCon dcname)
+        dcname    <- liftIO $ dataConInfoPtrToName hsc_env (infoPtr clos)
+        (_,mb_dc) <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing -> do -- This can happen for private constructors compiled -O0
                         -- where the .hi descriptor does not export them
@@ -923,9 +923,9 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
          addConstraint my_ty (mkTyConApp mutVarPrimTyCon [world,tv'])
          return [(tv', contents)]
       Constr -> do
-        Right dcname <- dataConInfoPtrToName (infoPtr clos)
+        dcname    <- liftIO $ dataConInfoPtrToName hsc_env (infoPtr clos)
         traceTR (text "Constr1" <+> ppr dcname)
-        (_,mb_dc)    <- tryTc (tcLookupDataCon dcname)
+        (_,mb_dc) <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing-> do
             forM (elems $ ptrs clos) $ \a -> do

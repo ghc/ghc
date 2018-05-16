@@ -51,7 +51,7 @@ tcAnnotations' :: [LAnnDecl GhcRn] -> TcM [Annotation]
 tcAnnotations' anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl GhcRn -> TcM Annotation
-tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
+tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
     -- Work out what the full target of this annotation was
     mod <- getModule
     let target = annProvenanceToTarget mod provenance
@@ -65,6 +65,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
     where
       safeHsErr = vcat [ text "Annotations are not compatible with Safe Haskell."
                   , text "See https://ghc.haskell.org/trac/ghc/ticket/10826" ]
+tcAnnotation (L _ (XAnnDecl _)) = panic "tcAnnotation"
 
 annProvenanceToTarget :: Module -> AnnProvenance Name
                       -> AnnTarget Name
@@ -72,6 +73,6 @@ annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 
-annCtxt :: (SourceTextX p, OutputableBndrId p) => AnnDecl p -> SDoc
+annCtxt :: (OutputableBndrId (GhcPass p)) => AnnDecl (GhcPass p) -> SDoc
 annCtxt ann
   = hang (text "In the annotation:") 2 (ppr ann)

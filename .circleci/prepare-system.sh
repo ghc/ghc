@@ -9,7 +9,7 @@ fail() {
 
 echo 'BUILD_SPHINX_HTML = NO' > mk/validate.mk
 echo 'BUILD_SPHINX_PDF = NO' >> mk/validate.mk
-hackage_index_state="@1511758800"
+hackage_index_state="@1522046735"
 
 cat > mk/build.mk <<EOF
 V=1
@@ -42,23 +42,25 @@ case "$(uname)" in
         fail "TARGET=$target not supported"
       fi
     else
-      # assuming Ubuntu
-      apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 patch
       cabal update
-      cabal install --reinstall hscolour --index-state=$hackage_index_state
+      cabal install --reinstall hscolour
+      sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     fi
     ;;
   Darwin)
     if [[ -n ${TARGET:-} ]]; then
       fail "uname=$(uname) not supported for cross-compilation"
     fi
-    brew install ghc cabal-install python3 ncurses gmp
+    # It looks like we already have python2 here and just installing python3
+    # does not work.
+    brew upgrade python
+    brew install ghc cabal-install ncurses gmp
     cabal update
     cabal install --reinstall alex happy haddock hscolour --index-state=$hackage_index_state
     # put them on the $PATH, don't fail if already installed
     ln -s $HOME/.cabal/bin/alex /usr/local/bin/alex || true
     ln -s $HOME/.cabal/bin/happy /usr/local/bin/happy || true
-    ln -s $HOME/.cabal/bin/hscolour /usr/local/bin/hscolour || true
+    ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     ;;
   *)
     fail "uname=$(uname) not supported"

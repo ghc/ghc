@@ -263,7 +263,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
           -- we need HsType Id hence the undefined
        ; let fi_decl = ForeignImport { fd_name = L nloc id
                                      , fd_sig_ty = undefined
-                                     , fd_co = mkSymCo norm_co
+                                     , fd_i_ext = mkSymCo norm_co
                                      , fd_fi = imp_decl' }
        ; return (id, L dloc fi_decl, gres) }
 tcFImport d = pprPanic "tcFImport" (ppr d)
@@ -409,7 +409,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     return ( mkVarBind id rhs
            , ForeignExport { fd_name = L loc id
                            , fd_sig_ty = undefined
-                           , fd_co = norm_co, fd_fe = spec' }
+                           , fd_e_ext = norm_co, fd_fe = spec' }
            , gres)
 tcFExport d = pprPanic "tcFExport" (ppr d)
 

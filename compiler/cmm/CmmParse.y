@@ -472,7 +472,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                               []) }
         
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
@@ -488,7 +488,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                               []) }
                 -- we leave most of the fields zero here.  This is only used
                 -- to generate the BCO info table in the RTS at the moment.
@@ -506,7 +506,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_prof = prof, cit_srt = Nothing,cit_clo = Nothing },
                               []) }
 
                      -- If profiling is on, this string gets duplicated,
@@ -523,7 +523,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       return (mkCmmEntryLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmInfoLabel pkg $3
                                            , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                               []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ')'
@@ -534,7 +534,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       return (mkCmmRetLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
                                            , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                               []) }
 
         | 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
@@ -549,7 +549,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       return (mkCmmRetLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3
                                            , cit_rep = rep
-                                           , cit_prof = prof, cit_srt = NoC_SRT },
+                                           , cit_prof = prof, cit_srt = Nothing, cit_clo = Nothing },
                               live) }
 
 body    :: { CmmParse () }

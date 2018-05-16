@@ -39,7 +39,6 @@ import Control.Exception
 import System.Directory
 import System.FilePath
 import System.IO
-import Control.Monad (forM)
 
 {-
 ************************************************************************
@@ -54,7 +53,7 @@ codeOutput :: DynFlags
            -> FilePath
            -> ModLocation
            -> ForeignStubs
-           -> [(ForeignSrcLang, String)]
+           -> [(ForeignSrcLang, FilePath)]
            -- ^ additional files to be compiled with with the C compiler
            -> [InstalledUnitId]
            -> Stream IO RawCmmGroupPlus ()                   -- Compiled C--
@@ -63,7 +62,7 @@ codeOutput :: DynFlags
                   [(ForeignSrcLang, FilePath)],{-foreign_fps-}
                   ManglerInfo)
 
-codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
+codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
   cmm_stream
   =
     do  {
@@ -72,8 +71,8 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
                  if gopt Opt_DoCmmLinting dflags
                     then Stream.mapM do_lint cmm_stream
                     else cmm_stream
-              
-              linted_cmm_stream =  
+
+              linted_cmm_stream =
                   Stream.map discardRetTys linted_cmmPlus_stream
 
               do_lint cmm = withTiming (pure dflags)
@@ -94,17 +93,13 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-        ; foreign_fps <- forM foreign_files $ \(lang, file_contents) -> do
-            { fp <- outputForeignFile dflags lang file_contents;
-            ; return (lang, fp);
-            }
-        ; info <- case hscTarget dflags of {
-                     HscAsm         -> outputAsm dflags this_mod location filenm
-                                                 linted_cmm_stream;
-                     HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
-                     HscLlvm        -> outputLlvm dflags filenm linted_cmmPlus_stream;
-                     HscInterpreted -> panic "codeOutput: HscInterpreted";
-                     HscNothing     -> panic "codeOutput: HscNothing"
+        ; case hscTarget dflags of {
+             HscAsm         -> outputAsm dflags this_mod location filenm
+                                         linted_cmm_stream;
+             HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
+             HscLlvm        -> outputLlvm dflags filenm linted_cmmPlus_stream;
+             HscInterpreted -> panic "codeOutput: HscInterpreted";
+             HscNothing     -> panic "codeOutput: HscNothing"
           }
         ; return (filenm, stubs_exist, foreign_fps, info)
         }
@@ -153,7 +148,7 @@ outputC dflags filenm cmm_stream packages
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
           hPutStr h cc_injects
           writeCs dflags h rawcmms
-          
+
        return Nothing
 
 {-
@@ -276,15 +271,3 @@ outputForeignStubs_help _fname ""      _header _footer = return False
 outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
-
-outputForeignFile :: DynFlags -> ForeignSrcLang -> String -> IO FilePath
-outputForeignFile dflags lang file_contents
- = do
-   extension <- case lang of
-     LangC -> return "c"
-     LangCxx -> return "cpp"
-     LangObjc -> return "m"
-     LangObjcxx -> return "mm"
-   fp <- newTempName dflags TFL_CurrentModule extension
-   writeFile fp file_contents
-   return fp

@@ -64,7 +64,9 @@ elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate mapEmpty blocks_with_key
-     groups = groupByInt hash_block (postorderDfs g)
+     -- The order of blocks doesn't matter here, but revPostorder also drops any
+     -- unreachable blocks, which is useful.
+     groups = groupByInt hash_block (revPostorder g)
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 
 -- Invariant: The blocks in the list are pairwise distinct
@@ -167,7 +169,7 @@ hash_block block =
         hash_lit (CmmVec ls) = hash_list hash_lit ls
         hash_lit (CmmLabel _) = 119 -- ugh
         hash_lit (CmmLabelOff _ i) = cvt $ 199 + i
-        hash_lit (CmmLabelDiffOff _ _ i) = cvt $ 299 + i
+        hash_lit (CmmLabelDiffOff _ _ i _) = cvt $ 299 + i
         hash_lit (CmmBlock _) = 191 -- ugh
         hash_lit (CmmHighStackMark) = cvt 313
 

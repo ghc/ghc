@@ -2,9 +2,13 @@
 package06e.hs:2:1: error:
     Could not find module ‘HsTypes’
     It is a member of the hidden package ‘ghc-8.1’.
+    You can run ‘:set -package ghc’ to expose it.
+    (Note: this unloads all the modules in the current scope.)
     Use -v to see a list of the files searched for.
 
 package06e.hs:3:1: error:
     Could not find module ‘UniqFM’
     It is a member of the hidden package ‘ghc-8.1’.
+    You can run ‘:set -package ghc’ to expose it.
+    (Note: this unloads all the modules in the current scope.)
     Use -v to see a list of the files searched for.

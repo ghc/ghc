@@ -11,8 +11,6 @@ valid_substitutions_interactions.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)
           (defined at valid_substitutions_interactions.hs:15:1)
         STrue :: SBool 'True
           (defined at valid_substitutions_interactions.hs:12:3)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions_interactions.hs:5:8-28
            (and originally defined in ‘GHC.Err’))

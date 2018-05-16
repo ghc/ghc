@@ -92,7 +92,7 @@ Library
    if os(windows)
        Cpp-Options: -DWINDOWS
    else
-       Build-Depends: unix   >= 2.7 && < 2.8
+       Build-Depends: unix   >= 2.7 && < 2.9
 
 Executable iserv
     Default-Language: Haskell2010
@@ -117,7 +117,7 @@ Executable iserv
     if os(windows)
         Cpp-Options: -DWINDOWS
     else
-        Build-Depends: unix   >= 2.7 && < 2.8
+        Build-Depends: unix   >= 2.7 && < 2.9
 
 Executable iserv-proxy
    If flag(proxy)

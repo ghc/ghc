@@ -217,6 +217,23 @@ by saying ``-fno-wombat``.
     to their usage sites. It also inlines simple expressions like
     literals or registers.
 
+.. ghc-flag:: -fasm-shortcutting
+    :shortdesc: Enable shortcutting on assembly. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-asm-shortcutting
+    :category:
+
+    :default: off
+
+    This enables shortcutting at the assembly stage of the code generator.
+    In simpler terms shortcutting means if a block of instructions A only consists
+    of a unconditionally jump, we replace all jumps to A by jumps to the successor
+    of A.
+
+    This is mostly done during Cmm passes. However this can miss corner cases. So at -O2
+    we run the pass again at the asm stage to catch these.
+
+
 .. ghc-flag:: -fcpr-anal
     :shortdesc: Turn on CPR analysis in the demand analyser. Implied by :ghc-flag:`-O`.
     :type: dynamic
@@ -883,6 +900,22 @@ by saying ``-fno-wombat``.
     type-class-overloaded functions imported from other modules for the types at
     which they are called in this module. Note that specialisation must be
     enabled (by ``-fspecialise``) for this to have any effect.
+
+.. ghc-flag:: -flate-specialise
+    :shortdesc: Run a late specialisation pass
+    :type: dynamic
+    :reverse: -fno-late-specialise
+    :category:
+
+    :default: off
+
+    Runs another specialisation pass towards the end of the optimisation
+    pipeline. This can catch specialisation opportunities which arose from
+    the previous specialisation pass or other inlining.
+
+    You might want to use this if you are you have a type class method
+    which returns a constrained type. For example, a type class where one
+    of the methods implements a traversal.
 
 .. ghc-flag:: -fsolve-constant-dicts
     :shortdesc: When solving constraints, try to eagerly solve

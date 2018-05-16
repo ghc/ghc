@@ -31,6 +31,8 @@
 #include <sys/types.h>
 #endif
 
+#include <fs_rts.h>
+
 // Flag Structure
 RTS_FLAGS RtsFlags;
 
@@ -232,6 +234,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
 
 #if defined(THREADED_RTS)
@@ -341,6 +344,8 @@ usage_text[] = {
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 #endif /* PROFILING */
+"",
+"  -hT            Produce a heap profile grouped by closure type"
 
 #if defined(TRACING)
 "",
@@ -377,7 +382,7 @@ usage_text[] = {
 "            Default: 0.02 sec.",
 "  -V<secs>  Master tick interval in seconds (0 == disable timer).",
 "            This sets the resolution for -C and the heap profile timer -i,",
-"            and is the frequence of time profile samples.",
+"            and is the frequency of time profile samples.",
 #if defined(PROFILING)
 "            Default: 0.001 sec.",
 #else
@@ -888,6 +893,11 @@ error = true;
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.machineReadable = true;
                   }
+                  else if (strequal("internal-counters",
+                                    &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.MiscFlags.internalCounters = true;
+                  }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
@@ -896,6 +906,12 @@ error = true;
                   }
 #if defined(THREADED_RTS)
                   else if (!strncmp("numa", &rts_argv[arg][2], 4)) {
+                      if (!osBuiltWithNumaSupport()) {
+                          errorBelch("%s: This GHC build was compiled without NUMA support.",
+                                     rts_argv[arg]);
+                          error = true;
+                          break;
+                      }
                       OPTION_SAFE;
                       StgWord mask;
                       if (rts_argv[arg][6] == '=') {
@@ -1691,7 +1707,7 @@ openStatsFile (char *filename,           // filename, or NULL
         f = NULL; /* NULL means use debugBelch */
     } else {
         if (*filename != '\0') {  /* stats file specified */
-            f = fopen(filename,"w");
+            f = __rts_fopen (filename,"w");
         } else {
             if (filename_fmt == NULL) {
                 errorBelch("Invalid stats filename format (NULL)\n");
@@ -1701,7 +1717,7 @@ openStatsFile (char *filename,           // filename, or NULL
             char stats_filename[STATS_FILENAME_MAXLEN];
             snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
                 prog_name);
-            f = fopen(stats_filename,"w");
+            f = __rts_fopen (stats_filename,"w");
         }
         if (f == NULL) {
             errorBelch("Can't open stats file %s\n", filename);
@@ -1944,6 +1960,9 @@ static bool read_heap_profiling_flag(const char *arg)
         case 'B':
         case 'b':
             RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_LDV;
+            break;
+        case 'T':
+            RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
             break;
         }
         break;

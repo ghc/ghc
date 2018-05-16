@@ -1,0 +1,94 @@
+.. _release-8-4-2:
+
+Release notes for version 8.4.2
+===============================
+
+TODO
+
+Highlights
+----------
+
+The highlights, since the 8.4.1 release, are:
+
+- TODO
+
+
+Full details
+------------
+
+
+Language
+~~~~~~~~
+
+- Fix a regression in which derived ``Read`` instances for record data types
+  with field names ending with ``#`` (by way of :ghc-flag:`-XMagicHash`) would
+  no longer parse valid output.
+
+Compiler
+~~~~~~~~
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Add the ``readFieldHash`` function to ``GHC.Read`` which behaves like
+  ``readField``, but for a field that ends with a ``#`` symbol.
+
+``integer-gmp`` library
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- Define ``powModSecInteger``, a "secure" version of ``powModInteger`` using
+  the ``mpz_powm_sec`` function.
+
+Build system
+~~~~~~~~~~~~
+
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Deppendency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable

@@ -110,7 +110,7 @@ mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
                        -> [TcCoercion] -> TcCoercionR
 mkTcForAllCo           :: TyVar -> TcCoercionN -> TcCoercion -> TcCoercion
 mkTcForAllCos          :: [(TyVar, TcCoercionN)] -> TcCoercion -> TcCoercion
-mkTcNthCo              :: Int -> TcCoercion -> TcCoercion
+mkTcNthCo              :: Role -> Int -> TcCoercion -> TcCoercion
 mkTcLRCo               :: LeftOrRight -> TcCoercion -> TcCoercion
 mkTcSubCo              :: TcCoercionN -> TcCoercionR
 maybeTcSubCo           :: EqRel -> TcCoercion -> TcCoercion
@@ -399,6 +399,14 @@ data EvBindsVar
       -- variable); but we keep their free variables
       -- so that we can report unused given constraints
       -- See Note [Tracking redundant constraints] in TcSimplify
+    }
+
+  | NoEvBindsVar {  -- used when we're solving only for equalities,
+                    -- which don't have bindings
+
+        -- see above for comments
+      ebv_uniq :: Unique,
+      ebv_tcvs :: IORef CoVarSet
     }
 
 instance Data.Data TcEvBinds where
@@ -760,11 +768,6 @@ isEmptyTcEvBinds (TcEvBinds {}) = panic "isEmptyTcEvBinds"
 evTermCoercion :: EvTerm -> TcCoercion
 -- Applied only to EvTerms of type (s~t)
 -- See Note [Coercion evidence terms]
-evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
-evTermCoercion (EvExpr (Coercion co)) = co
-evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
-evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
-
 
 {-
 ************************************************************************
@@ -791,6 +794,11 @@ findNeededEvVars ev_binds seeds
      = evVarsOfTerm rhs `unionVarSet` needs
      | otherwise
      = needs
+
+evTermCoercion (EvExpr (Var v))       = mkCoVarCo v
+evTermCoercion (EvExpr (Coercion co)) = co
+evTermCoercion (EvExpr (Cast tm co))  = mkCoCast (evTermCoercion (EvExpr tm)) co
+evTermCoercion tm                     = pprPanic "evTermCoercion" (ppr tm)
 
 evVarsOfTerm :: EvTerm -> VarSet
 evVarsOfTerm (EvExpr e)         = exprSomeFreeVars isEvVar e
@@ -873,9 +881,11 @@ instance Outputable TcEvBinds where
 instance Outputable EvBindsVar where
   ppr (EvBindsVar { ebv_uniq = u })
      = text "EvBindsVar" <> angleBrackets (ppr u)
+  ppr (NoEvBindsVar { ebv_uniq = u })
+     = text "NoEvBindsVar" <> angleBrackets (ppr u)
 
 instance Uniquable EvBindsVar where
-  getUnique (EvBindsVar { ebv_uniq = u }) = u
+  getUnique = ebv_uniq
 
 instance Outputable EvBind where
   ppr (EvBind { eb_lhs = v, eb_rhs = e, eb_is_given = is_given })

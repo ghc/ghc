@@ -21,23 +21,24 @@ static Mutex spt_lock;
 #endif
 
 /// Hash function for the SPT.
-static int hashFingerprint(HashTable *table, StgWord64 key[2]) {
+static int hashFingerprint(const HashTable *table, StgWord key) {
+  const StgWord64* ptr = (StgWord64*) key;
   // Take half of the key to compute the hash.
-  return hashWord(table, (StgWord)key[1]);
+  return hashWord(table, *(ptr + 1));
 }
 
 /// Comparison function for the SPT.
-static int compareFingerprint(StgWord64 ptra[2], StgWord64 ptrb[2]) {
-  return ptra[0] == ptrb[0] && ptra[1] == ptrb[1];
+static int compareFingerprint(StgWord a, StgWord b) {
+  const StgWord64* ptra = (StgWord64*) a;
+  const StgWord64* ptrb = (StgWord64*) b;
+  return *ptra == *ptrb && *(ptra + 1) == *(ptrb + 1);
 }
 
 void hs_spt_insert_stableptr(StgWord64 key[2], StgStablePtr *entry) {
   // hs_spt_insert is called from constructor functions, so
   // the SPT needs to be initialized here.
   if (spt == NULL) {
-    spt = allocHashTable_( (HashFunction *)hashFingerprint
-                         , (CompareFunction *)compareFingerprint
-                         );
+    spt = allocHashTable_(hashFingerprint, compareFingerprint);
 #if defined(THREADED_RTS)
     initMutex(&spt_lock);
 #endif

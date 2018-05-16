@@ -525,11 +525,8 @@ instance, the binary integer literal ``0b11001001`` will be desugared into
 Hexadecimal floating point literals
 -----------------------------------
 
-.. ghc-flag:: -XHexFloatLiterals
+.. extension:: HexFloatLiterals
     :shortdesc: Enable support for :ref:`hexadecimal floating point literals <hex-float-literals>`.
-    :type: dynamic
-    :reverse: -XNoHexFloatLIterals
-    :category:
 
     :since: 8.4.1
 
@@ -569,11 +566,8 @@ by one bit left (negative) or right (positive).  Here are some examples:
 Numeric underscores
 -------------------
 
-.. ghc-flag:: -XNumericUnderscores
+.. extension:: NumericUnderscores
     :shortdesc: Enable support for :ref:`numeric underscores <numeric-underscores>`.
-    :type: dynamic
-    :reverse: -XNoNumericUnderscores
-    :category:
 
     :since: 8.6.1
 
@@ -582,12 +576,12 @@ Numeric underscores
 GHC allows for numeric literals to be given in decimal, octal, hexadecimal,
 binary, or float notation.
 
-The language extension :ghc-flag:`-XNumericUnderscores` adds support for expressing
+The language extension :extension:`NumericUnderscores` adds support for expressing
 underscores in numeric literals.
 For instance, the numeric literal ``1_000_000`` will be parsed into
-``1000000`` when :ghc-flag:`-XNumericUnderscores` is enabled.
+``1000000`` when :extension:`NumericUnderscores` is enabled.
 That is, underscores in numeric literals are ignored when
-:ghc-flag:`-XNumericUnderscores` is enabled.
+:extension:`NumericUnderscores` is enabled.
 See also :ghc-ticket:`14473`.
 
 For example: ::
@@ -3908,10 +3902,20 @@ number of important ways:
    module as the data type declaration. (But be aware of the dangers of
    orphan instances (:ref:`orphan-modules`).
 
--  You must supply an explicit context (in the example the context is
-   ``(Eq a)``), exactly as you would in an ordinary instance
+-  In most cases, you must supply an explicit context (in the example the
+   context is ``(Eq a)``), exactly as you would in an ordinary instance
    declaration. (In contrast, in a ``deriving`` clause attached to a
    data type declaration, the context is inferred.)
+
+   The exception to this rule is that the context of a standalone deriving
+   declaration can infer its context when a single, extra-wildcards constraint
+   is used as the context, such as in: ::
+
+         deriving instance _ => Eq (Foo a)
+
+   This is essentially the same as if you had written ``deriving Foo`` after
+   the declaration for ``data Foo a``. Using this feature requires the use of
+   :extension:`PartialTypeSignatures` (:ref:`partial-type-signatures`).
 
 -  Unlike a ``deriving`` declaration attached to a ``data`` declaration,
    the instance can be more specific than the data type (assuming you
@@ -5155,7 +5159,7 @@ Pattern synonyms
 
 Pattern synonyms are enabled by the language extension :extension:`PatternSynonyms`, which is
 required for defining them, but *not* for using them. More information and
-examples of view patterns can be found on the `Wiki page <PatternSynonyms>`.
+examples of pattern synonyms can be found on the :ghc-wiki:`Wiki page <PatternSynonyms>`.
 
 Pattern synonyms enable giving names to parametrized pattern schemes.
 They can also be thought of as abstract constructors that don't have a
@@ -5586,6 +5590,24 @@ Matching of pattern synonyms
 
 A pattern synonym occurrence in a pattern is evaluated by first matching
 against the pattern synonym itself, and then on the argument patterns.
+
+More precisely, the semantics of pattern matching is given in
+`Section 3.17 of the Haskell 2010 report <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-580003.17>`__.   To the informal semantics in Section 3.17.2 we add this extra rule:
+
+* If the pattern is a constructor pattern ``(P p1 ... pn)``, where ``P`` is
+  a pattern synonym defined by ``P x1 ... xn = p`` or ``P x1 ... xn <- p``, then:
+
+  (a) Match the value ``v`` against ``p``. If this match fails or diverges,
+      so does the whole (pattern synonym) match.   Otherwise the match
+      against ``p`` must bind the variables ``x1 ... xn``; let them be bound to values ``v1 ... vn``.
+
+  (b) Match ``v1`` against ``p1``, ``v2`` against ``p2`` and so on.
+      If any of these matches fail or diverge, so does the whole match.
+
+  (c) If all the matches against the ``pi`` succeed, the match succeeds,
+      binding the variables bound by the ``pi`` . (The ``xi`` are not
+      bound; they remain local to the pattern synonym declaration.)
+
 For example, in the following program, ``f`` and ``f'`` are equivalent: ::
 
     pattern Pair x y <- [x, y]
@@ -8456,7 +8478,7 @@ Haskell.
 
 .. note::
     The declaration for ``HCons`` also requires :extension:`TypeOperators`
-    because of infix type operator ``(:')``
+    because of infix type operator ``(':)``
 
 
 .. _promotion-existentials:
@@ -8613,7 +8635,8 @@ Principles of kind inference
 
 Generally speaking, when :extension:`PolyKinds` is on, GHC tries to infer the
 most general kind for a declaration.
-In this case the definition has a right-hand side to inform kind
+In many cases (for example, in a datatype declaration)
+the definition has a right-hand side to inform kind
 inference. But that is not always the case. Consider ::
 
     type family F a
@@ -9048,6 +9071,30 @@ system does not have principal types) or merely practical (inferring this
 dependency is hard, given GHC's implementation). So, GHC takes the easy
 way out and requires a little help from the user.
 
+Inferring dependency in user-written ``forall``\s
+-------------------------------------------------
+
+A programmer may use ``forall`` in a type to introduce new quantified type
+variables. These variables may depend on each other, even in the same
+``forall``. However, GHC requires that the dependency be inferrable from
+the body of the ``forall``. Here are some examples::
+
+  data Proxy k (a :: k) = MkProxy   -- just to use below
+  
+  f :: forall k a. Proxy k a        -- This is just fine. We see that (a :: k).
+  f = undefined
+
+  g :: Proxy k a -> ()              -- This is to use below.
+  g = undefined
+
+  data Sing a
+  h :: forall k a. Sing k -> Sing a -> ()  -- No obvious relationship between k and a
+  h _ _ = g (MkProxy :: Proxy k a)  -- This fails. We didn't know that a should have kind k.
+
+Note that in the last example, it's impossible to learn that ``a`` depends on ``k`` in the
+body of the ``forall`` (that is, the ``Sing k -> Sing a -> ()``). And so GHC rejects
+the program.
+
 Kind defaulting without :extension:`PolyKinds`
 -----------------------------------------------
 
@@ -9442,7 +9489,7 @@ The following things have kind ``Constraint``:
 -  Anything whose form is not yet known, but the user has declared to
    have kind ``Constraint`` (for which they need to import it from
    ``GHC.Exts``). So for example
-   ``type Foo (f :: \* -> Constraint) = forall b. f b => b -> b``
+   ``type Foo (f :: * -> Constraint) = forall b. f b => b -> b``
    is allowed, as well as examples involving type families: ::
 
        type family Typ a b :: Constraint
@@ -11139,7 +11186,7 @@ configurable by a few flags.
                 (and originally defined in ‘GHC.List’))
 
     where the substitutions are ordered by the order they were defined and
-    imported in, with all local bindings before global bindings. 
+    imported in, with all local bindings before global bindings.
 
 .. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
     :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
@@ -11215,7 +11262,7 @@ it will additionally offer up a list of refinement substitutions, in this case: 
 
 Which shows that the hole could be replaced with e.g. ``foldl1 _``. While not
 fixing the hole, this can help users understand what options they have.
- 
+
 .. ghc-flag:: -frefinement-level-substitutions=⟨n⟩
     :shortdesc: *default: off.* Sets the level of refinement of the
          refinement substitutions, where level ``n`` means that substitutions
@@ -11549,6 +11596,15 @@ Anonymous wildcards are also allowed in visible type applications
 (:ref:`visible-type-application`). If you want to specify only the second type
 argument to ``wurble``, then you can say ``wurble @_ @Int`` where the first
 argument is a wildcard.
+
+Standalone ``deriving`` declarations permit the use of a single,
+extra-constraints wildcard, like so: ::
+
+   deriving instance _ => Eq (Foo a)
+
+This denotes a derived ``Eq (Foo a)`` instance where the context is inferred,
+in much the same way that ordinary ``deriving`` clauses do. Any other use of
+wildcards in a standalone ``deriving`` declaration is prohibited.
 
 In all other contexts, type wildcards are disallowed, and a named wildcard is treated
 as an ordinary type variable.  For example: ::
@@ -13778,9 +13834,8 @@ Conjunction binds stronger than disjunction.
 
 If no ``MINIMAL`` pragma is given in the class declaration, it is just as if
 a pragma ``{-# MINIMAL op1, op2, ..., opn #-}`` was given, where the
-``opi`` are the methods (a) that lack a default method in the class
-declaration, and (b) whose name that does not start with an underscore
-(c.f. :ghc-flag:`-Wmissing-methods`, :ref:`options-sanity`).
+``opi`` are the methods that lack a default method in the class
+declaration (c.f. :ghc-flag:`-Wmissing-methods`, :ref:`options-sanity`).
 
 This warning can be turned off with the flag
 :ghc-flag:`-Wno-missing-methods <-Wmissing-methods>`.
@@ -14351,11 +14406,8 @@ See also the :ghc-flag:`-funbox-strict-fields` flag, which essentially has the
 effect of adding ``{-# UNPACK #-}`` to every strict constructor field.
 
 .. [1]
-   in fact, UNPACK has no effect without
-   -O
-   , for technical reasons (see
-   tick 5252
-   )
+   In fact, ``UNPACK`` has no effect without :ghc-flag:`-O`, for technical
+   reasons (see :ghc-ticket:`5252`).
 
 .. _nounpack-pragma:
 

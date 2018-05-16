@@ -11,8 +11,6 @@ T12468.hs:9:7: error:
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at T12468.hs:3:8-13
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at T12468.hs:3:8-13
            (and originally defined in ‘GHC.Err’))

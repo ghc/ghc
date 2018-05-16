@@ -123,8 +123,7 @@ mkWwBodies :: DynFlags
            -> FamInstEnvs
            -> VarSet         -- Free vars of RHS
                              -- See Note [Freshen WW arguments]
-           -> Maybe JoinArity -- Just ar <=> is join point with join arity ar
-           -> Type           -- Type of original function
+           -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
            -> DmdResult      -- Info about function result
            -> UniqSM (Maybe WwResult)
@@ -140,12 +139,14 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs mb_join_arity fun_ty demands res_info
+mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
-        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs empty_subst fun_ty demands
-        ; (useful1, work_args, wrap_fn_str, work_fn_str) <- mkWWstr dflags fam_envs wrap_args
+        ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
+             <- mkWWargs empty_subst fun_ty demands
+        ; (useful1, work_args, wrap_fn_str, work_fn_str)
+             <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
@@ -158,7 +159,7 @@ mkWwBodies dflags fam_envs rhs_fvs mb_join_arity fun_ty demands res_info
 
         ; if isWorkerSmallEnough dflags work_args
              && not (too_many_args_for_join_point wrap_args)
-             && (useful1 && not only_one_void_argument || useful2)
+             && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
                        wrapper_body, worker_body))
           else return Nothing
@@ -171,6 +172,11 @@ mkWwBodies dflags fam_envs rhs_fvs mb_join_arity fun_ty demands res_info
         -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
         -- fw from being inlined into f's RHS
   where
+    fun_ty        = idType fun_id
+    mb_join_arity = isJoinId_maybe fun_id
+    has_inlineable_prag = isStableUnfolding (realIdUnfolding fun_id)
+                          -- See Note [Do not unpack class dictionaries]
+
     -- Note [Do not split void functions]
     only_one_void_argument
       | [d] <- demands
@@ -490,6 +496,8 @@ To avoid this:
 
 mkWWstr :: DynFlags
         -> FamInstEnvs
+        -> Bool    -- True <=> INLINEABLE pragama on this function defn
+                   -- See Note [Do not unpack class dictionaries]
         -> [Var]                                -- Wrapper args; have their demand info on them
                                                 --  *Includes type variables*
         -> UniqSM (Bool,                        -- Is this useful
@@ -501,13 +509,18 @@ mkWWstr :: DynFlags
                    CoreExpr -> CoreExpr)        -- Worker body, lacking the original body of the function,
                                                 -- and lacking its lambdas.
                                                 -- This fn does the reboxing
-mkWWstr _ _ []
-  = return (False, [], nop_fn, nop_fn)
+mkWWstr dflags fam_envs has_inlineable_prag args
+  = go args
+  where
+    go_one arg = mkWWstr_one dflags fam_envs has_inlineable_prag arg
 
-mkWWstr dflags fam_envs (arg : args) = do
-    (useful1, args1, wrap_fn1, work_fn1) <- mkWWstr_one dflags fam_envs arg
-    (useful2, args2, wrap_fn2, work_fn2) <- mkWWstr dflags fam_envs args
-    return (useful1 || useful2, args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
+    go []           = return (False, [], nop_fn, nop_fn)
+    go (arg : args) = do { (useful1, args1, wrap_fn1, work_fn1) <- go_one arg
+                         ; (useful2, args2, wrap_fn2, work_fn2) <- go args
+                         ; return ( useful1 || useful2
+                                  , args1 ++ args2
+                                  , wrap_fn1 . wrap_fn2
+                                  , work_fn1 . work_fn2) }
 
 {-
 Note [Unpacking arguments with product and polymorphic demands]
@@ -544,9 +557,12 @@ as-yet-un-filled-in pkgState files.
 --        brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --        brings into scope wrap_arg (via lets)
-mkWWstr_one :: DynFlags -> FamInstEnvs -> Var
-    -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
-mkWWstr_one dflags fam_envs arg
+mkWWstr_one :: DynFlags -> FamInstEnvs
+            -> Bool    -- True <=> INLINEABLE pragama on this function defn
+                       -- See Note [Do not unpack class dictionaries]
+            -> Var
+            -> UniqSM (Bool, [Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
+mkWWstr_one dflags fam_envs has_inlineable_prag arg
   | isTyVar arg
   = return (False, [arg],  nop_fn, nop_fn)
 
@@ -581,8 +597,10 @@ mkWWstr_one dflags fam_envs arg
   | isStrictDmd dmd
   , Just cs <- splitProdDmd_maybe dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
+  , not (has_inlineable_prag && isClassPred arg_ty)
+      -- See Note [Do not unpack class dictionaries]
   , Just (data_con, inst_tys, inst_con_arg_tys, co)
-             <- deepSplitProductType_maybe fam_envs (idType arg)
+             <- deepSplitProductType_maybe fam_envs arg_ty
   , cs `equalLength` inst_con_arg_tys
       -- See Note [mkWWstr and unsafeCoerce]
   = do { (uniq1:uniqs) <- getUniquesM
@@ -594,7 +612,7 @@ mkWWstr_one dflags fam_envs arg
                              -- in Simplify.hs; and see Trac #13890
                 rebox_fn   = Let (NonRec arg_no_unf con_app)
                 con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
-         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs unpk_args
+         ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False unpk_args
          ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                            -- Don't pass the arg, rebox instead
 
@@ -602,7 +620,8 @@ mkWWstr_one dflags fam_envs arg
   = return (False, [arg], nop_fn, nop_fn)
 
   where
-    dmd = idDemandInfo arg
+    arg_ty = idType arg
+    dmd    = idDemandInfo arg
     mk_ww_arg uniq ty sub_dmd = setIdDemandInfo (mk_ww_local uniq ty) sub_dmd
 
 ----------------------
@@ -680,10 +699,12 @@ BUT if f is strict in the Ord dictionary, we might unpack it, to get
 and the type-class specialiser can't specialise that.  An example is
 Trac #6056.
 
-Moreover, dictionaries can have a lot of fields, so unpacking them can
-increase closure sizes.
+But in any other situation a dictionary is just an ordinary value,
+and can be unpacked.  So we track the INLINABLE pragma, and switch
+off the unpacking in mkWWstr_one (see the isClassPred test).
 
-Conclusion: don't unpack dictionaries.
+Historical note: Trac #14955 describes how I got this fix wrong
+the first time.
 -}
 
 deepSplitProductType_maybe
@@ -699,7 +720,6 @@ deepSplitProductType_maybe fam_envs ty
                     `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
-  , not (isClassTyCon tc)  -- See Note [Do not unpack class dictionaries]
   , let arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dspt" arg_tys strict_marks, co)

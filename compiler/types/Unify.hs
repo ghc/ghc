@@ -517,6 +517,7 @@ tc_unify_tys bind_fn unif inj_check match_kis rn_env tv_env cv_env tys1 tys2
        ; (,) <$> getTvSubstEnv <*> getCvSubstEnv }
   where
     env = UMEnv { um_bind_fun = bind_fn
+                , um_skols    = emptyVarSet
                 , um_unif     = unif
                 , um_inj_tf   = inj_check
                 , um_rn_env   = rn_env }
@@ -861,7 +862,7 @@ type AmIUnifying = Bool   -- True  <=> Unifying
 
 unify_ty :: UMEnv
          -> Type -> Type  -- Types to be unified and a co
-         -> Coercion      -- A coercion between their kinds
+         -> CoercionN     -- A coercion between their kinds
                           -- See Note [Kind coercions in Unify]
          -> UM ()
 -- See Note [Specification of unification]
@@ -951,9 +952,9 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
            CoVarCo cv
              | not (um_unif env)
              , not (cv `elemVarEnv` c_subst)
-             , BindMe <- tvBindFlagL env cv
-             -> do { checkRnEnvRCo env co2
-                   ; let (co_l, co_r) = decomposeFunCo kco
+             , BindMe <- tvBindFlag env cv
+             -> do { checkRnEnv env (tyCoVarsOfCo co2)
+                   ; let (co_l, co_r) = decomposeFunCo Nominal kco
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1
@@ -992,15 +993,18 @@ unify_tys env orig_xs orig_ys
 
 ---------------------------------
 uVar :: UMEnv
-     -> TyVar           -- Variable to be unified
+     -> InTyVar         -- Variable to be unified
      -> Type            -- with this Type
      -> Coercion        -- :: kind tv ~N kind ty
      -> UM ()
 
 uVar env tv1 ty kco
- = do { -- Check to see whether tv1 is refined by the substitution
-        subst <- getTvSubstEnv
-      ; case (lookupVarEnv subst tv1) of
+ = do { -- Apply the ambient renaming
+        let tv1' = umRnOccL env tv1
+
+        -- Check to see whether tv1 is refined by the substitution
+      ; subst <- getTvSubstEnv
+      ; case (lookupVarEnv subst tv1') of
           Just ty' | um_unif env                -- Unifying, so call
                    -> unify_ty env ty' ty kco   -- back into unify
                    | otherwise
@@ -1009,10 +1013,10 @@ uVar env tv1 ty kco
                       -- type, not the template type. So, just check for
                       -- normal type equality.
                       guard ((ty' `mkCastTy` kco) `eqType` ty)
-          Nothing  -> uUnrefined env tv1 ty ty kco } -- No, continue
+          Nothing  -> uUnrefined env tv1' ty ty kco } -- No, continue
 
 uUnrefined :: UMEnv
-           -> TyVar             -- variable to be unified
+           -> OutTyVar          -- variable to be unified
            -> Type              -- with this Type
            -> Type              -- (version w/ expanded synonyms)
            -> Coercion          -- :: kind tv ~N kind ty
@@ -1020,16 +1024,15 @@ uUnrefined :: UMEnv
 
 -- We know that tv1 isn't refined
 
-uUnrefined env tv1 ty2 ty2' kco
+uUnrefined env tv1' ty2 ty2' kco
   | Just ty2'' <- coreView ty2'
-  = uUnrefined env tv1 ty2 ty2'' kco    -- Unwrap synonyms
+  = uUnrefined env tv1' ty2 ty2'' kco    -- Unwrap synonyms
                 -- This is essential, in case we have
                 --      type Foo a = a
                 -- and then unify a ~ Foo a
 
   | TyVarTy tv2 <- ty2'
-  = do { let tv1' = umRnOccL env tv1
-             tv2' = umRnOccR env tv2
+  = do { let tv2' = umRnOccR env tv2
        ; unless (tv1' == tv2' && um_unif env) $ do
            -- If we are unifying a ~ a, just return immediately
            -- Do not extend the substitution
@@ -1038,16 +1041,16 @@ uUnrefined env tv1 ty2 ty2' kco
           -- Check to see whether tv2 is refined
        { subst <- getTvSubstEnv
        ; case lookupVarEnv subst tv2 of
-         {  Just ty' | um_unif env -> uUnrefined env tv1 ty' ty' kco
+         {  Just ty' | um_unif env -> uUnrefined env tv1' ty' ty' kco
          ;  _ ->
 
     do {   -- So both are unrefined
            -- Bind one or the other, depending on which is bindable
-       ; let b1  = tvBindFlagL env tv1
-             b2  = tvBindFlagR env tv2
-             ty1 = mkTyVarTy tv1
+       ; let b1  = tvBindFlag env tv1'
+             b2  = tvBindFlag env tv2'
+             ty1 = mkTyVarTy tv1'
        ; case (b1, b2) of
-           (BindMe, _) -> bindTv env tv1 (ty2 `mkCastTy` mkSymCo kco)
+           (BindMe, _) -> bindTv env tv1' (ty2 `mkCastTy` mkSymCo kco)
            (_, BindMe) | um_unif env
                        -> bindTv (umSwapRn env) tv2 (ty1 `mkCastTy` kco)
 
@@ -1058,12 +1061,12 @@ uUnrefined env tv1 ty2 ty2' kco
            _ -> maybeApart -- See Note [Unification with skolems]
   }}}}
 
-uUnrefined env tv1 ty2 _ kco -- ty2 is not a type variable
-  = case tvBindFlagL env tv1 of
+uUnrefined env tv1' ty2 _ kco -- ty2 is not a type variable
+  = case tvBindFlag env tv1' of
       Skolem -> maybeApart  -- See Note [Unification with skolems]
-      BindMe -> bindTv env tv1 (ty2 `mkCastTy` mkSymCo kco)
+      BindMe -> bindTv env tv1' (ty2 `mkCastTy` mkSymCo kco)
 
-bindTv :: UMEnv -> TyVar -> Type -> UM ()
+bindTv :: UMEnv -> OutTyVar -> Type -> UM ()
 -- OK, so we want to extend the substitution with tv := ty
 -- But first, we must do a couple of checks
 bindTv env tv1 ty2
@@ -1072,7 +1075,7 @@ bindTv env tv1 ty2
         -- Make sure tys mentions no local variables
         -- E.g.  (forall a. b) ~ (forall a. [a])
         -- We should not unify b := [a]!
-        ; checkRnEnvR env free_tvs2
+        ; checkRnEnv env free_tvs2
 
         -- Occurs check, see Note [Fine-grained unification]
         -- Make sure you include 'kco' (which ty2 does) Trac #14846
@@ -1113,12 +1116,27 @@ data BindFlag
 ************************************************************************
 -}
 
-data UMEnv = UMEnv { um_bind_fun :: TyVar -> BindFlag
-                                       -- User-supplied BindFlag function
-                   , um_unif     :: AmIUnifying
-                   , um_inj_tf   :: Bool         -- Checking for injectivity?
-                          -- See (end of) Note [Specification of unification]
-                   , um_rn_env   :: RnEnv2 }
+data UMEnv
+  = UMEnv { um_unif :: AmIUnifying
+
+          , um_inj_tf :: Bool
+            -- Checking for injectivity?
+            -- See (end of) Note [Specification of unification]
+
+          , um_rn_env :: RnEnv2
+            -- Renaming InTyVars to OutTyVars; this eliminates
+            -- shadowing, and lines up matching foralls on the left
+            -- and right
+
+          , um_skols :: TyVarSet
+            -- OutTyVars bound by a forall in this unification;
+            -- Do not bind these in the substitution!
+            -- See the function tvBindFlag
+
+          , um_bind_fun :: TyVar -> BindFlag
+            -- User-supplied BindFlag function,
+            -- for variables not in um_skols
+          }
 
 data UMState = UMState
                    { um_tv_env   :: TvSubstEnv
@@ -1163,15 +1181,10 @@ initUM subst_env cv_subst_env um
     state = UMState { um_tv_env = subst_env
                     , um_cv_env = cv_subst_env }
 
-tvBindFlagL :: UMEnv -> TyVar -> BindFlag
-tvBindFlagL env tv
-  | inRnEnvL (um_rn_env env) tv = Skolem
-  | otherwise                   = um_bind_fun env tv
-
-tvBindFlagR :: UMEnv -> TyVar -> BindFlag
-tvBindFlagR env tv
-  | inRnEnvR (um_rn_env env) tv = Skolem
-  | otherwise                   = um_bind_fun env tv
+tvBindFlag :: UMEnv -> OutTyVar -> BindFlag
+tvBindFlag env tv
+  | tv `elemVarSet` um_skols env = Skolem
+  | otherwise                    = um_bind_fun env tv
 
 getTvSubstEnv :: UM TvSubstEnv
 getTvSubstEnv = UM $ \state -> Unifiable (state, um_tv_env state)
@@ -1195,18 +1208,22 @@ extendCvEnv cv co = UM $ \state ->
 
 umRnBndr2 :: UMEnv -> TyCoVar -> TyCoVar -> UMEnv
 umRnBndr2 env v1 v2
-  = env { um_rn_env = rnBndr2 (um_rn_env env) v1 v2 }
+  = env { um_rn_env = rn_env', um_skols = um_skols env `extendVarSet` v' }
+  where
+    (rn_env', v') = rnBndr2_var (um_rn_env env) v1 v2
 
-checkRnEnv :: (RnEnv2 -> VarEnv Var) -> UMEnv -> VarSet -> UM ()
-checkRnEnv get_set env varset = UM $ \ state ->
-  let env_vars = get_set (um_rn_env env) in
-  if isEmptyVarEnv env_vars || (getUniqSet varset `disjointVarEnv` env_vars)
-     -- NB: That isEmptyVarSet is a critical optimization; it
-     -- means we don't have to calculate the free vars of
-     -- the type, often saving quite a bit of allocation.
-  then Unifiable  (state, ())
-  else MaybeApart (state, ())   -- ToDo: why MaybeApart
-                                -- I think SurelyApart would be right
+checkRnEnv :: UMEnv -> VarSet -> UM ()
+checkRnEnv env varset
+  | isEmptyVarSet skol_vars           = return ()
+  | varset `disjointVarSet` skol_vars = return ()
+  | otherwise                         = maybeApart
+               -- ToDo: why MaybeApart?
+               -- I think SurelyApart would be right
+  where
+    skol_vars = um_skols env
+    -- NB: That isEmptyVarSet guard is a critical optimization;
+    -- it means we don't have to calculate the free vars of
+    -- the type, often saving quite a bit of allocation.
 
 -- | Converts any SurelyApart to a MaybeApart
 don'tBeSoSure :: UM () -> UM ()
@@ -1214,12 +1231,6 @@ don'tBeSoSure um = UM $ \ state ->
   case unUM um state of
     SurelyApart -> MaybeApart (state, ())
     other       -> other
-
-checkRnEnvR :: UMEnv -> VarSet -> UM ()
-checkRnEnvR env fvs = checkRnEnv rnEnvR env fvs
-
-checkRnEnvRCo :: UMEnv -> Coercion -> UM ()
-checkRnEnvRCo env co = checkRnEnv rnEnvR env (tyCoVarsOfCo co)
 
 umRnOccL :: UMEnv -> TyVar -> TyVar
 umRnOccL env v = rnOccL (um_rn_env env) v
@@ -1317,7 +1328,13 @@ ty_co_match menv subst ty co lkco rkco
 
 ty_co_match menv subst ty co lkco rkco
   | CastTy ty' co' <- ty
-  = ty_co_match menv subst ty' co (co' `mkTransCo` lkco) (co' `mkTransCo` rkco)
+     -- See Note [Matching in the presence of casts]
+  = let empty_subst  = mkEmptyTCvSubst (rnInScopeSet (me_env menv))
+        substed_co_l = substCo (liftEnvSubstLeft empty_subst subst)  co'
+        substed_co_r = substCo (liftEnvSubstRight empty_subst subst) co'
+    in
+    ty_co_match menv subst ty' co (substed_co_l `mkTransCo` lkco)
+                                  (substed_co_r `mkTransCo` rkco)
 
   | CoherenceCo co1 co2 <- co
   = ty_co_match menv subst ty co1 (lkco `mkTransCo` mkSymCo co2) rkco

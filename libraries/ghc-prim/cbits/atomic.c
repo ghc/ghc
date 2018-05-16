@@ -107,7 +107,44 @@ hs_atomic_and64(StgWord x, StgWord64 val)
 
 // FetchNandByteArrayOp_Int
 
-// Workaround for http://llvm.org/bugs/show_bug.cgi?id=8842
+// Note [__sync_fetch_and_nand usage]
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//
+// The __sync_fetch_and_nand builtin is a bit of a disaster. It was introduced
+// in GCC long ago with silly semantics. Specifically:
+//
+//    *ptr = ~(tmp & value)
+//
+// Clang introduced the builtin with the same semantics.
+//
+// In GCC 4.4 the operation's semantics were rightly changed to,
+//
+//    *ptr = ~tmp & value
+//
+// and the -Wsync-nand warning was added warning users of the operation about
+// the change.
+//
+// Clang took this change as a reason to remove support for the
+// builtin in 2010. Then, in 2014 Clang re-added support with the new
+// semantics. However, the warning flag was given a different name
+// (-Wsync-fetch-and-nand-semantics-changed) for added fun.
+//
+// Consequently, we are left with a bit of a mess: GHC requires GCC >4.4
+// (enforced by the FP_GCC_VERSION autoconf check), so we thankfully don't need
+// to support the operation's older broken semantics. However, we need to take
+// care to explicitly disable -Wsync-nand wherever possible, lest the build
+// fails with -Werror.  Furthermore, we need to emulate the operation when
+// building with some Clang versions (shipped by some Mac OS X releases) which
+// lack support for the builtin.
+//
+// In the words of Bob Dylan: everything is broken.
+//
+// See also:
+//
+//  * https://bugs.llvm.org/show_bug.cgi?id=8842
+//  * https://ghc.haskell.org/trac/ghc/ticket/9678
+//
+
 #define CAS_NAND(x, val)                                            \
   {                                                                 \
     __typeof__ (*(x)) tmp = *(x);                                   \
@@ -117,14 +154,33 @@ hs_atomic_and64(StgWord x, StgWord64 val)
     return tmp;                                                     \
   }
 
+// N.B. __has_builtin is only provided by clang
+#if !defined(__has_builtin)
+#define __has_builtin(x) 0
+#endif
+
+#if defined(__clang__) && !__has_builtin(__sync_fetch_and_nand)
+#define USE_SYNC_FETCH_AND_NAND 0
+#else
+#define USE_SYNC_FETCH_AND_NAND 1
+#endif
+
+// Otherwise this fails with -Werror
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wsync-fetch-and-nand-semantics-changed"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wsync-nand"
+#endif
+
 extern StgWord hs_atomic_nand8(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand8(StgWord x, StgWord val)
 {
-#ifdef __clang__
-  CAS_NAND((volatile StgWord8 *) x, (StgWord8) val)
-#else
+#if USE_SYNC_FETCH_AND_NAND
   return __sync_fetch_and_nand((volatile StgWord8 *) x, (StgWord8) val);
+#else
+  CAS_NAND((volatile StgWord8 *) x, (StgWord8) val)
 #endif
 }
 
@@ -132,10 +188,10 @@ extern StgWord hs_atomic_nand16(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand16(StgWord x, StgWord val)
 {
-#ifdef __clang__
-  CAS_NAND((volatile StgWord16 *) x, (StgWord16) val);
-#else
+#if USE_SYNC_FETCH_AND_NAND
   return __sync_fetch_and_nand((volatile StgWord16 *) x, (StgWord16) val);
+#else
+  CAS_NAND((volatile StgWord16 *) x, (StgWord16) val);
 #endif
 }
 
@@ -143,10 +199,10 @@ extern StgWord hs_atomic_nand32(StgWord x, StgWord val);
 StgWord
 hs_atomic_nand32(StgWord x, StgWord val)
 {
-#ifdef __clang__
-  CAS_NAND((volatile StgWord32 *) x, (StgWord32) val);
-#else
+#if USE_SYNC_FETCH_AND_NAND
   return __sync_fetch_and_nand((volatile StgWord32 *) x, (StgWord32) val);
+#else
+  CAS_NAND((volatile StgWord32 *) x, (StgWord32) val);
 #endif
 }
 
@@ -155,13 +211,15 @@ extern StgWord64 hs_atomic_nand64(StgWord x, StgWord64 val);
 StgWord64
 hs_atomic_nand64(StgWord x, StgWord64 val)
 {
-#ifdef __clang__
-  CAS_NAND((volatile StgWord64 *) x, val);
-#else
+#if USE_SYNC_FETCH_AND_NAND
   return __sync_fetch_and_nand((volatile StgWord64 *) x, val);
+#else
+  CAS_NAND((volatile StgWord64 *) x, val);
 #endif
 }
 #endif
+
+#pragma GCC diagnostic pop
 
 // FetchOrByteArrayOp_Int
 

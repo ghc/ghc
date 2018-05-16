@@ -143,8 +143,6 @@ typedef struct bdescr_ {
 #define BF_PINNED    4
 /* Block is to be marked, not copied */
 #define BF_MARKED    8
-/* Block is free, and on the free list  (TODO: is this used?) */
-#define BF_FREE      16
 /* Block is executable */
 #define BF_EXEC      32
 /* Block contains only a small amount of live data */
@@ -337,15 +335,6 @@ round_to_mblocks(StgWord words)
 
         words -= FIRST_BLOCK_OFF/sizeof(W_);
     }
-    return words;
-}
-
-INLINE_HEADER StgWord
-round_up_to_mblocks(StgWord words)
-{
-    words += FIRST_BLOCK_OFF/sizeof(W_);
-    words = ((words / MBLOCK_SIZE_W) + 1) * MBLOCK_SIZE_W;
-    words -= FIRST_BLOCK_OFF/sizeof(W_);
     return words;
 }
 

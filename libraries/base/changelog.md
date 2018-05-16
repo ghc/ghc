@@ -1,6 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.12.0.0 *TBA*
+  * Bundled with GHC *TBA*
+
+  * Add a new module `GHC.ResponseFile` (previously defined in the `haddock`
+    package). (#13896)
+
   * Move the module `Data.Functor.Contravariant` from the
     `contravariant` package to `base`.
 
@@ -8,6 +13,18 @@
 
   * Add `Applicative` (for `K1`), `Semigroup` and `Monoid` instances in
     `GHC.Generics`. (#14849)
+
+  * `asinh` for `Float` and `Double` is now numerically stable in the face of
+    non-small negative arguments and enormous arguments of either sign. (#14927)
+
+  * `Numeric.showEFloat (Just 0)` now respects the user's requested precision.
+    (#15115)
+
+## 4.11.1.0 *TBA*
+  * Bundled with GHC 8.4.2
+
+  * Add the `readFieldHash` function to `GHC.Read` which behaves like
+    `readField`, but for a field that ends with a `#` symbol (#14918).
 
 ## 4.11.0.0 *TBA*
   * Bundled with GHC 8.4.1
@@ -86,6 +103,10 @@
 
   * Deprecated STM invariant checking primitives (`checkInv`, `always`, and
     `alwaysSucceeds`) in `GHC.Conc.Sync` (#14324).
+
+  * Add a `FixIOException` data type to `Control.Exception.Base`, and change
+    `fixIO` to throw that instead of a `BlockedIndefinitelyOnMVar` exception
+    (#14356).
 
 ## 4.10.1.0 *November 2017*
   * Bundled with GHC 8.2.2

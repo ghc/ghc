@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
@@ -14,11 +15,12 @@ module Hoopl.Graph
     , labelsDefined
     , mapGraph
     , mapGraphBlocks
-    , postorder_dfs_from
+    , revPostorderFrom
     ) where
 
 
 import GhcPrelude
+import Util
 
 import Hoopl.Label
 import Hoopl.Block
@@ -51,13 +53,14 @@ emptyBody = mapEmpty
 bodyList :: Body' block n -> [(Label,block n C C)]
 bodyList body = mapToList body
 
-addBlock :: NonLocal thing
-         => thing C C -> LabelMap (thing C C)
-         -> LabelMap (thing C C)
-addBlock b body
-  | mapMember lbl body = error $ "duplicate label " ++ show lbl ++ " in graph"
-  | otherwise          = mapInsert lbl b body
-  where lbl = entryLabel b
+addBlock
+    :: (NonLocal block, HasDebugCallStack)
+    => block C C -> LabelMap (block C C) -> LabelMap (block C C)
+addBlock block body = mapAlter add lbl body
+  where
+    lbl = entryLabel block
+    add Nothing = Just block
+    add _ = error $ "duplicate label " ++ show lbl ++ " in graph"
 
 
 -- ---------------------------------------------------------------------------
@@ -119,22 +122,10 @@ labelsDefined (GMany _ body x) = mapFoldlWithKey addEntry (exitLabel x) body
 
 ----------------------------------------------------------------
 
-class LabelsPtr l where
-  targetLabels :: l -> [Label]
-
-instance NonLocal n => LabelsPtr (n e C) where
-  targetLabels n = successors n
-
-instance LabelsPtr Label where
-  targetLabels l = [l]
-
-instance LabelsPtr LabelSet where
-  targetLabels = setElems
-
-instance LabelsPtr l => LabelsPtr [l] where
-  targetLabels = concatMap targetLabels
-
--- | This is the most important traversal over this data structure.  It drops
+-- | Returns a list of blocks reachable from the provided Labels in the reverse
+-- postorder.
+--
+-- This is the most important traversal over this data structure.  It drops
 -- unreachable code and puts blocks in an order that is good for solving forward
 -- dataflow problems quickly.  The reverse order is good for solving backward
 -- dataflow problems quickly.  The forward order is also reasonably good for
@@ -143,59 +134,52 @@ instance LabelsPtr l => LabelsPtr [l] where
 -- that you would need a more serious analysis, probably based on dominators, to
 -- identify loop headers.
 --
--- The ubiquity of 'postorder_dfs' is one reason for the ubiquity of the 'LGraph'
--- representation, when for most purposes the plain 'Graph' representation is
--- more mathematically elegant (but results in more complicated code).
---
--- Here's an easy way to go wrong!  Consider
+-- For forward analyses we want reverse postorder visitation, consider:
 -- @
 --      A -> [B,C]
 --      B -> D
 --      C -> D
 -- @
--- Then ordinary dfs would give [A,B,D,C] which has a back ref from C to D.
--- Better to get [A,B,C,D]
+-- Postorder: [D, C, B, A] (or [D, B, C, A])
+-- Reverse postorder: [A, B, C, D] (or [A, C, B, D])
+-- This matters for, e.g., forward analysis, because we want to analyze *both*
+-- B and C before we analyze D.
+revPostorderFrom
+  :: forall block.  (NonLocal block)
+  => LabelMap (block C C) -> Label -> [block C C]
+revPostorderFrom graph start = go start_worklist setEmpty []
+  where
+    start_worklist = lookup_for_descend start Nil
 
+    -- To compute the postorder we need to "visit" a block (mark as done)
+    -- *after* visiting all its successors. So we need to know whether we
+    -- already processed all successors of each block (and @NonLocal@ allows
+    -- arbitrary many successors). So we use an explicit stack with an extra bit
+    -- of information:
+    -- * @ConsTodo@ means to explore the block if it wasn't visited before
+    -- * @ConsMark@ means that all successors were already done and we can add
+    --   the block to the result.
+    --
+    -- NOTE: We add blocks to the result list in postorder, but we *prepend*
+    -- them (i.e., we use @(:)@), which means that the final list is in reverse
+    -- postorder.
+    go :: DfsStack (block C C) -> LabelSet -> [block C C] -> [block C C]
+    go Nil                      !_           !result = result
+    go (ConsMark block rest)    !wip_or_done !result =
+        go rest wip_or_done (block : result)
+    go (ConsTodo block rest)    !wip_or_done !result
+        | entryLabel block `setMember` wip_or_done = go rest wip_or_done result
+        | otherwise =
+            let new_worklist =
+                    foldr lookup_for_descend
+                          (ConsMark block rest)
+                          (successors block)
+            in go new_worklist (setInsert (entryLabel block) wip_or_done) result
 
--- | Traversal: 'postorder_dfs' returns a list of blocks reachable
--- from the entry of enterable graph. The entry and exit are *not* included.
--- The list has the following property:
---
---      Say a "back reference" exists if one of a block's
---      control-flow successors precedes it in the output list
---
---      Then there are as few back references as possible
---
--- The output is suitable for use in
--- a forward dataflow problem.  For a backward problem, simply reverse
--- the list.  ('postorder_dfs' is sufficiently tricky to implement that
--- one doesn't want to try and maintain both forward and backward
--- versions.)
+    lookup_for_descend :: Label -> DfsStack (block C C) -> DfsStack (block C C)
+    lookup_for_descend label wl
+      | Just b <- mapLookup label graph = ConsTodo b wl
+      | otherwise =
+           error $ "Label that doesn't have a block?! " ++ show label
 
-postorder_dfs_from_except :: forall block e . (NonLocal block, LabelsPtr e)
-                          => LabelMap (block C C) -> e -> LabelSet -> [block C C]
-postorder_dfs_from_except blocks b visited =
- vchildren (get_children b) (\acc _visited -> acc) [] visited
- where
-   vnode :: block C C -> ([block C C] -> LabelSet -> a) -> [block C C] -> LabelSet -> a
-   vnode block cont acc visited =
-        if setMember id visited then
-            cont acc visited
-        else
-            let cont' acc visited = cont (block:acc) visited in
-            vchildren (get_children block) cont' acc (setInsert id visited)
-      where id = entryLabel block
-   vchildren :: forall a. [block C C] -> ([block C C] -> LabelSet -> a) -> [block C C] -> LabelSet -> a
-   vchildren bs cont acc visited = next bs acc visited
-      where next children acc visited =
-                case children of []     -> cont acc visited
-                                 (b:bs) -> vnode b (next bs) acc visited
-   get_children :: forall l. LabelsPtr l => l -> [block C C]
-   get_children block = foldr add_id [] $ targetLabels block
-   add_id id rst = case lookupFact id blocks of
-                      Just b -> b : rst
-                      Nothing -> rst
-
-postorder_dfs_from
-    :: (NonLocal block, LabelsPtr b) => LabelMap (block C C) -> b -> [block C C]
-postorder_dfs_from blocks b = postorder_dfs_from_except blocks b setEmpty
+data DfsStack a = ConsTodo a (DfsStack a) | ConsMark a (DfsStack a) | Nil

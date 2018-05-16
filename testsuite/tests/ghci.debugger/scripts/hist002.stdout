@@ -12,7 +12,6 @@ Logged breakpoint at Test3.hs:2:22-31
 _result :: [a]
 f :: t -> a
 xs :: [t]
-Ghci1._result :: [a] = _
 xs :: [t] = []
 f :: t -> a = _
 _result :: [a] = _
@@ -20,12 +19,9 @@ Logged breakpoint at Test3.hs:2:18-20
 _result :: a
 f :: Integer -> a
 x :: Integer
-Ghci1._result :: [a] = _
 xs :: [t] = []
-Ghci2.f :: t -> a = _
-Ghci2._result :: [a] = _
-x :: Integer = 2
 f :: Integer -> a = _
+x :: Integer = 2
 _result :: a = _
 _result = 3
 Logged breakpoint at Test3.hs:2:18-31

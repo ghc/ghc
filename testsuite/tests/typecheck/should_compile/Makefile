@@ -70,3 +70,8 @@ T13585:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13585a.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13585b.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13585.hs  -O
+
+T14934:
+	$(RM) -f T14934a.o T14934a.hi T14934.o T14934.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934a.hs -O
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934.hs  -O

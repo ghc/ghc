@@ -420,7 +420,15 @@ tc_mkRepFamInsts gk tycon inst_tys =
        -- type arguments before generating the Rep/Rep1 instance, since some
        -- of the tyvars might have been instantiated when deriving.
        -- See Note [Generating a correctly typed Rep instance].
-     ; let env        = zipTyEnv tyvars inst_args
+     ; let (env_tyvars, env_inst_args)
+             = case gk_ of
+                 Gen0_ -> (tyvars, inst_args)
+                 Gen1_ last_tv
+                          -- See the "wrinkle" in
+                          -- Note [Generating a correctly typed Rep instance]
+                       -> ( last_tv : tyvars
+                          , anyTypeOfKind (tyVarKind last_tv) : inst_args )
+           env        = zipTyEnv env_tyvars env_inst_args
            in_scope   = mkInScopeSet (tyCoVarsOfTypes inst_tys)
            subst      = mkTvSubst in_scope env
            repTy'     = substTy  subst repTy
@@ -922,6 +930,32 @@ a Rep(1) instance. To do so, we create a type variable substitution that maps
 the tyConTyVars of the TyCon to their counterparts in the fully instantiated
 type. (For example, using T above as example, you'd map a :-> Int.) We then
 apply the substitution to the RHS before generating the instance.
+
+A wrinkle in all of this: when forming the type variable substitution for
+Generic1 instances, we map the last type variable of the tycon to Any. Why?
+It's because of wily data types like this one (#15012):
+
+   data T a = MkT (FakeOut a)
+   type FakeOut a = Int
+
+If we ignore a, then we'll produce the following Rep1 instance:
+
+   instance Generic1 T where
+     type Rep1 T = ... (Rec0 (FakeOut a))
+     ...
+
+Oh no! Now we have `a` on the RHS, but it's completely unbound. Instead, we
+ensure that `a` is mapped to Any:
+
+   instance Generic1 T where
+     type Rep1 T = ... (Rec0 (FakeOut Any))
+     ...
+
+And now all is good.
+
+Alternatively, we could have avoided this problem by expanding all type
+synonyms on the RHSes of Rep1 instances. But we might blow up the size of
+these types even further by doing this, so we choose not to do so.
 
 Note [Handling kinds in a Rep instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

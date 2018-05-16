@@ -1,1 +1,11 @@
- 
+==================== Strictness signatures ====================
+Foo.$trModule: m
+Foo.f: <S(S),1*U(1*U)><S(S),1*U(U)><S(S),1*U(U)>m
+Foo.g: <S(S(S)S(S)),1*U(1*U(U),1*U(U))>m
+
+
+
+==================== Strictness signatures ====================
+Foo.$trModule: m
+Foo.f: <S(S),1*U(1*U)><S(S),1*U(U)><S(S),1*U(U)>m
+Foo.g: <S(S(S)S(S)),1*U(1*U(U),1*U(U))>m

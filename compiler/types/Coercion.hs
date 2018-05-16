@@ -11,7 +11,8 @@
 module Coercion (
         -- * Main data type
         Coercion, CoercionN, CoercionR, CoercionP,
-        UnivCoProvenance, CoercionHole, LeftOrRight(..),
+        UnivCoProvenance, CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
+        LeftOrRight(..),
         Var, CoVar, TyCoVar,
         Role(..), ltRole,
 
@@ -29,8 +30,8 @@ module Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkTransAppCo,
-        mkNthCo, mkLRCo,
-        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
+        mkNthCo, nthCoRole, mkLRCo,
+        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
         mkPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
@@ -48,7 +49,7 @@ module Coercion (
         mapStepResult, unwrapNewTypeStepper,
         topNormaliseNewType_maybe, topNormaliseTypeX,
 
-        decomposeCo, decomposeFunCo, getCoVar_maybe,
+        decomposeCo, decomposeFunCo, decomposePiCos, getCoVar_maybe,
         splitTyConAppCo_maybe,
         splitAppCo_maybe,
         splitFunCo_maybe,
@@ -79,7 +80,7 @@ module Coercion (
 
         -- ** Lifting
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,
-        emptyLiftingContext, extendLiftingContext,
+        emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
         liftCoSubstVarBndrCallback, isMappedByLC,
 
         mkSubstLiftingContext, zapLiftingContext,
@@ -102,7 +103,7 @@ module Coercion (
         tidyCo, tidyCos,
 
         -- * Other
-        promoteCoercion
+        promoteCoercion, buildCoercion
        ) where
 
 #include "HsVersions.h"
@@ -115,6 +116,7 @@ import TyCon
 import CoAxiom
 import Var
 import VarEnv
+import VarSet
 import Name hiding ( varName )
 import Util
 import BasicTypes
@@ -128,8 +130,7 @@ import ListSetOps
 import Maybes
 import UniqFM
 
-import Control.Monad (foldM)
-import Control.Arrow ( first )
+import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
 
 {-
@@ -228,21 +229,86 @@ where co_rep1, co_rep2 are the coercions on the representations.
 -- | This breaks a 'Coercion' with type @T A B C ~ T D E F@ into
 -- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @E ~ F@. Hence:
 --
--- > decomposeCo 3 c = [nth 0 c, nth 1 c, nth 2 c]
-decomposeCo :: Arity -> Coercion -> [Coercion]
-decomposeCo arity co
-  = [mkNthCo n co | n <- [0..(arity-1)] ]
+-- > decomposeCo 3 c [r1, r2, r3] = [nth r1 0 c, nth r2 1 c, nth r3 2 c]
+decomposeCo :: Arity -> Coercion
+            -> [Role]  -- the roles of the output coercions
+                       -- this must have at least as many
+                       -- entries as the Arity provided
+            -> [Coercion]
+decomposeCo arity co rs
+  = [mkNthCo r n co | (n,r) <- [0..(arity-1)] `zip` rs ]
            -- Remember, Nth is zero-indexed
 
-decomposeFunCo :: Coercion -> (Coercion, Coercion)
+decomposeFunCo :: HasDebugCallStack
+               => Role      -- Role of the input coercion
+               -> Coercion  -- Input coercion
+               -> (Coercion, Coercion)
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
 -- See Note [Function coercions] for the "2" and "3"
-decomposeFunCo co = ASSERT2( all_ok, ppr co )
-                    (mkNthCo 2 co, mkNthCo 3 co)
+decomposeFunCo r co = ASSERT2( all_ok, ppr co )
+                      (mkNthCo r 2 co, mkNthCo r 3 co)
   where
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
+
+-- | Decompose a function coercion, either a dependent one or a non-dependent one.
+-- This is useful when you are trying to build (ty1 |> co) ty2 ty3 ... tyn, but
+-- you are pulling the coercions to the right. For example of why you might want
+-- to do so, see Note [Respecting definitional equality] in TyCoRep.
+-- This might return *fewer* coercions than there are arguments, if the kind provided
+-- doesn't have enough binders.
+-- The types passed in are the ty2 ... tyn. If the results are (arg_cos, res_co),
+-- then you should build
+-- @(ty1 (ty2 |> arg_cos1) (ty3 |> arg_cos2) ... (tym |> arg_com)|> res_co) tym+1 ... tyn@.
+decomposePiCos :: Kind  -- of the function (ty1), used only to tell -> from ∀ from other
+               -> [Type] -> CoercionN -> ([CoercionN], CoercionN)
+decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_args orig_co
+  where
+    orig_subst = mkEmptyTCvSubst $ mkInScopeSet $ tyCoVarsOfTypes (orig_kind : orig_args)
+                                                  `unionVarSet` tyCoVarsOfCo orig_co
+
+    go :: [CoercionN]   -- accumulator for argument coercions, reversed
+       -> TCvSubst      -- instantiating substitution
+       -> Kind          -- of the function being applied (unsubsted)
+       -> [Type]        -- arguments to that function
+       -> CoercionN     -- coercion originally applied to the function
+       -> ([CoercionN], Coercion)
+    go acc_arg_cos subst  ki  (ty:tys) co
+      | Just (kv, inner_ki) <- splitForAllTy_maybe ki
+        -- know     co :: (forall a:s1.t1) ~ (forall b:s2.t2)
+        --    function :: forall a:s1.t1   (the function is not passed to decomposePiCos)
+        --          ty :: s2
+        -- need arg_co :: s2 ~ s1
+        --      res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
+      = let arg_co = mkNthCo Nominal 0 (mkSymCo co)
+            res_co = mkInstCo co (mkNomReflCo ty `mkCoherenceLeftCo` arg_co)
+            subst' = extendTCvSubst subst kv ty
+        in
+        go (arg_co : acc_arg_cos) subst' inner_ki tys res_co
+
+      | Just (_arg_ki, res_ki) <- splitFunTy_maybe ki
+        -- know     co :: (s1 -> t1) ~ (s2 -> t2)
+        --    function :: s1 -> t1
+        --          ty :: s2
+        -- need arg_co :: s2 ~ s1
+        --      res_co :: t1 ~ t2
+      = let (sym_arg_co, res_co) = decomposeFunCo Nominal co
+            arg_co               = mkSymCo sym_arg_co
+        in
+        go (arg_co : acc_arg_cos) subst res_ki tys res_co
+
+      | let substed_ki = substTy subst ki
+      , isPiTy substed_ki
+        -- This might happen if we have to substitute in order to see that the kind
+        -- is a Π-type.
+      = let subst'     = zapTCvSubst subst
+        in
+        go acc_arg_cos subst' substed_ki (ty:tys) co
+
+      -- tys might not be empty, if the left-hand type of the original coercion
+      -- didn't have enough binders
+    go acc_arg_cos _subst _ki _tys co = (reverse acc_arg_cos, co)
 
 -- | Attempts to obtain the type variable underlying a 'Coercion'
 getCoVar_maybe :: Coercion -> Maybe CoVar
@@ -266,10 +332,14 @@ splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
 -- ^ Attempt to take a coercion application apart.
 splitAppCo_maybe (AppCo co arg) = Just (co, arg)
 splitAppCo_maybe (TyConAppCo r tc args)
-  | mightBeUnsaturatedTyCon tc || args `lengthExceeds` tyConArity tc
+  | args `lengthExceeds` tyConArity tc
+  , Just (args', arg') <- snocView args
+  = Just ( mkTyConAppCo r tc args', arg' )
+
+  | mightBeUnsaturatedTyCon tc
     -- Never create unsaturated type family apps!
   , Just (args', arg') <- snocView args
-  , Just arg'' <- setNominalRole_maybe arg'
+  , Just arg'' <- setNominalRole_maybe (nthRole r tc (length args')) arg'
   = Just ( mkTyConAppCo r tc args', arg'' )
        -- Use mkTyConAppCo to preserve the invariant
        --  that identity coercions are always represented by Refl
@@ -345,7 +415,7 @@ mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
 -- produce a coercion @rep_co :: r1 ~ r2@.
 mkRuntimeRepCo :: HasDebugCallStack => Coercion -> Coercion
 mkRuntimeRepCo co
-  = mkNthCo 0 kind_co
+  = mkNthCo Nominal 0 kind_co
   where
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
                            -- (up to silliness with Constraint)
@@ -449,41 +519,6 @@ One might ask: shouldn't downgradeRole_maybe just use setNominalRole_maybe as
 appropriate? I (Richard E.) have decided not to do this, because upgrading a
 role is bizarre and a caller should have to ask for this behavior explicitly.
 
-Note [mkTransAppCo]
-~~~~~~~~~~~~~~~~~~~
-Suppose we have
-
-  co1 :: a ~R Maybe
-  co2 :: b ~R Int
-
-and we want
-
-  co3 :: a b ~R Maybe Int
-
-This seems sensible enough. But, we can't let (co3 = co1 co2), because
-that's ill-roled! Note that mkAppCo requires a *nominal* second coercion.
-
-The way around this is to use transitivity:
-
-  co3 = (co1 <b>_N) ; (Maybe co2) :: a b ~R Maybe Int
-
-Or, it's possible everything is the other way around:
-
-  co1' :: Maybe ~R a
-  co2' :: Int   ~R b
-
-and we want
-
-  co3' :: Maybe Int ~R a b
-
-then
-
-  co3' = (Maybe co2') ; (co1' <b>_N)
-
-This is exactly what `mkTransAppCo` builds for us. Information for all
-the arguments tends to be to hand at call sites, so it's quicker than
-using, say, coercionKind.
-
 -}
 
 mkReflCo :: Role -> Type -> Coercion
@@ -528,10 +563,6 @@ mkFunCo r co1 co2
   = Refl r (mkFunTy ty1 ty2)
   | otherwise = FunCo r co1 co2
 
--- | Make nested function 'Coercion's
-mkFunCos :: Role -> [Coercion] -> Coercion -> Coercion
-mkFunCos r cos res_co = foldr (mkFunCo r) res_co cos
-
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
 -- If the first is Phantom, then the second can be either Phantom or Nominal.
@@ -569,7 +600,7 @@ mkAppCos :: Coercion
          -> Coercion
 mkAppCos co1 cos = foldl mkAppCo co1 cos
 
--- | Like `mkAppCo`, but allows the second coercion to be other than
+-- | Like 'mkAppCo', but allows the second coercion to be other than
 -- nominal. See Note [mkTransAppCo]. Role r3 cannot be more stringent
 -- than either r1 or r2.
 mkTransAppCo :: Role         -- ^ r1
@@ -594,7 +625,7 @@ mkTransAppCo r1 co1 ty1a ty1b r2 co2 ty2a ty2b r3
               -- ty1a ty2a :: k2a
               -- ty1b ty2b :: k2b
               kind_co1 = mkKindCo co1        -- :: k1a -> k2a ~N k1b -> k2b
-              kind_co  = mkNthCo 1 kind_co1  -- :: k2a ~N k2b
+              kind_co  = mkNthCo Nominal 1 kind_co1  -- :: k2a ~N k2b
 
       (_,                _,                Nominal)
         -> ASSERT( r1 == Nominal && r2 == Nominal )
@@ -804,49 +835,126 @@ mkTransCo co1 (Refl {}) = co1
 mkTransCo (Refl {}) co2 = co2
 mkTransCo co1 co2       = TransCo co1 co2
 
-mkNthCo :: Int -> Coercion -> Coercion
-mkNthCo 0 (Refl _ ty)
-  | Just (tv, _) <- splitForAllTy_maybe ty
-  = Refl Nominal (tyVarKind tv)
-mkNthCo n (Refl r ty)
-  = ASSERT2( ok_tc_app ty n, ppr n $$ ppr ty )
-    mkReflCo r' (tyConAppArgN n ty)
-  where tc = tyConAppTyCon ty
-        r' = nthRole r tc n
+mkNthCo :: HasDebugCallStack
+        => Role  -- the role of the coercion you're creating
+        -> Int
+        -> Coercion
+        -> Coercion
+mkNthCo r n co
+  = ASSERT2( good_call, bad_call_msg )
+    go r n co
+  where
+    Pair ty1 ty2 = coercionKind co
 
-        ok_tc_app :: Type -> Int -> Bool
-        ok_tc_app ty n
-          | Just (_, tys) <- splitTyConApp_maybe ty
-          = tys `lengthExceeds` n
-          | isForAllTy ty  -- nth:0 pulls out a kind coercion from a hetero forall
-          = n == 0
-          | otherwise
-          = False
+    go r 0 (Refl _ ty)
+      | Just (tv, _) <- splitForAllTy_maybe ty
+      = ASSERT( r == Nominal )
+        Refl r (tyVarKind tv)
+    go r n (Refl r0 ty)
+      = ASSERT2( ok_tc_app ty n, ppr n $$ ppr ty )
+        ASSERT( nthRole r0 tc n == r )
+        mkReflCo r (tyConAppArgN n ty)
+      where tc = tyConAppTyCon ty
 
-mkNthCo 0 (ForAllCo _ kind_co _) = kind_co
-  -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
-  -- then (nth 0 co :: k1 ~ k2)
+            ok_tc_app :: Type -> Int -> Bool
+            ok_tc_app ty n
+              | Just (_, tys) <- splitTyConApp_maybe ty
+              = tys `lengthExceeds` n
+              | isForAllTy ty  -- nth:0 pulls out a kind coercion from a hetero forall
+              = n == 0
+              | otherwise
+              = False
 
-mkNthCo n co@(FunCo _ arg res)
-  -- See Note [Function coercions]
-  -- If FunCo _ arg_co res_co ::   (s1:TYPE sk1 -> s2:TYPE sk2)
-  --                             ~ (t1:TYPE tk1 -> t2:TYPE tk2)
-  -- Then we want to behave as if co was
-  --    TyConAppCo argk_co resk_co arg_co res_co
-  -- where
-  --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
-  --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
-  --                             i.e. mkRuntimeRepCo
-  = case n of
-      0 -> mkRuntimeRepCo arg
-      1 -> mkRuntimeRepCo res
-      2 -> arg
-      3 -> res
-      _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr co)
+    go r 0 (ForAllCo _ kind_co _)
+      = ASSERT( r == Nominal )
+        kind_co
+      -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
+      -- then (nth 0 co :: k1 ~N k2)
 
-mkNthCo n (TyConAppCo _ _ arg_cos) = arg_cos `getNth` n
+    go r n co@(FunCo r0 arg res)
+      -- See Note [Function coercions]
+      -- If FunCo _ arg_co res_co ::   (s1:TYPE sk1 -> s2:TYPE sk2)
+      --                             ~ (t1:TYPE tk1 -> t2:TYPE tk2)
+      -- Then we want to behave as if co was
+      --    TyConAppCo argk_co resk_co arg_co res_co
+      -- where
+      --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
+      --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
+      --                             i.e. mkRuntimeRepCo
+      = case n of
+          0 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
+          1 -> ASSERT( r == Nominal ) mkRuntimeRepCo res
+          2 -> ASSERT( r == r0 )      arg
+          3 -> ASSERT( r == r0 )      res
+          _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr co)
 
-mkNthCo n co = NthCo n co
+    go r n (TyConAppCo r0 tc arg_cos) = ASSERT2( r == nthRole r0 tc n
+                                                    , (vcat [ ppr tc
+                                                            , ppr arg_cos
+                                                            , ppr r0
+                                                            , ppr n
+                                                            , ppr r ]) )
+                                             arg_cos `getNth` n
+
+    go r n co =
+      NthCo r n co
+
+    -- Assertion checking
+    bad_call_msg = vcat [ text "Coercion =" <+> ppr co
+                        , text "LHS ty =" <+> ppr ty1
+                        , text "RHS ty =" <+> ppr ty2
+                        , text "n =" <+> ppr n, text "r =" <+> ppr r
+                        , text "coercion role =" <+> ppr (coercionRole co) ]
+    good_call
+      -- If the Coercion passed in is between forall-types, then the Int must
+      -- be 0 and the role must be Nominal.
+      | Just (_tv1, _) <- splitForAllTy_maybe ty1
+      , Just (_tv2, _) <- splitForAllTy_maybe ty2
+      = n == 0 && r == Nominal
+
+      -- If the Coercion passed in is between T tys and T tys', then the Int
+      -- must be less than the length of tys/tys' (which must be the same
+      -- lengths).
+      --
+      -- If the role of the Coercion is nominal, then the role passed in must
+      -- be nominal. If the role of the Coercion is representational, then the
+      -- role passed in must be tyConRolesRepresentational T !! n. If the role
+      -- of the Coercion is Phantom, then the role passed in must be Phantom.
+      --
+      -- See also Note [NthCo Cached Roles] if you're wondering why it's
+      -- blaringly obvious that we should be *computing* this role instead of
+      -- passing it in.
+      | Just (tc1, tys1) <- splitTyConApp_maybe ty1
+      , Just (tc2, tys2) <- splitTyConApp_maybe ty2
+      , tc1 == tc2
+      = let len1 = length tys1
+            len2 = length tys2
+            good_role = case coercionRole co of
+                          Nominal -> r == Nominal
+                          Representational -> r == (tyConRolesRepresentational tc1 !! n)
+                          Phantom -> r == Phantom
+        in len1 == len2 && n < len1 && good_role
+
+      | otherwise
+      = True
+
+
+
+-- | If you're about to call @mkNthCo r n co@, then @r@ should be
+-- whatever @nthCoRole n co@ returns.
+nthCoRole :: Int -> Coercion -> Role
+nthCoRole n co
+  | Just (tc, _) <- splitTyConApp_maybe lty
+  = nthRole r tc n
+
+  | Just _ <- splitForAllTy_maybe lty
+  = Nominal
+
+  | otherwise
+  = pprPanic "nthCoRole" (ppr co)
+
+  where
+    (Pair lty _, r) = coercionKindRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr (Refl eq ty) = Refl eq (pickLR lr (splitAppTy ty))
@@ -973,40 +1081,45 @@ mkProofIrrelCo r kco       g1 g2 = mkUnivCo (ProofIrrelProv kco) r
 
 -- | Converts a coercion to be nominal, if possible.
 -- See Note [Role twiddling functions]
-setNominalRole_maybe :: Coercion -> Maybe Coercion
-setNominalRole_maybe co
-  | Nominal <- coercionRole co = Just co
-setNominalRole_maybe (SubCo co)  = Just co
-setNominalRole_maybe (Refl _ ty) = Just $ Refl Nominal ty
-setNominalRole_maybe (TyConAppCo Representational tc cos)
-  = do { cos' <- mapM setNominalRole_maybe cos
-       ; return $ TyConAppCo Nominal tc cos' }
-setNominalRole_maybe (FunCo Representational co1 co2)
-  = do { co1' <- setNominalRole_maybe co1
-       ; co2' <- setNominalRole_maybe co2
-       ; return $ FunCo Nominal co1' co2'
-       }
-setNominalRole_maybe (SymCo co)
-  = SymCo <$> setNominalRole_maybe co
-setNominalRole_maybe (TransCo co1 co2)
-  = TransCo <$> setNominalRole_maybe co1 <*> setNominalRole_maybe co2
-setNominalRole_maybe (AppCo co1 co2)
-  = AppCo <$> setNominalRole_maybe co1 <*> pure co2
-setNominalRole_maybe (ForAllCo tv kind_co co)
-  = ForAllCo tv kind_co <$> setNominalRole_maybe co
-setNominalRole_maybe (NthCo n co)
-  = NthCo n <$> setNominalRole_maybe co
-setNominalRole_maybe (InstCo co arg)
-  = InstCo <$> setNominalRole_maybe co <*> pure arg
-setNominalRole_maybe (CoherenceCo co1 co2)
-  = CoherenceCo <$> setNominalRole_maybe co1 <*> pure co2
-setNominalRole_maybe (UnivCo prov _ co1 co2)
-  | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
-                 PhantomProv _    -> False  -- should always be phantom
-                 ProofIrrelProv _ -> True   -- it's always safe
-                 PluginProv _     -> False  -- who knows? This choice is conservative.
-  = Just $ UnivCo prov Nominal co1 co2
-setNominalRole_maybe _ = Nothing
+setNominalRole_maybe :: Role -- of input coercion
+                     -> Coercion -> Maybe Coercion
+setNominalRole_maybe r co
+  | r == Nominal = Just co
+  | otherwise = setNominalRole_maybe_helper co
+  where
+    setNominalRole_maybe_helper (SubCo co)  = Just co
+    setNominalRole_maybe_helper (Refl _ ty) = Just $ Refl Nominal ty
+    setNominalRole_maybe_helper (TyConAppCo Representational tc cos)
+      = do { cos' <- zipWithM setNominalRole_maybe (tyConRolesX Representational tc) cos
+           ; return $ TyConAppCo Nominal tc cos' }
+    setNominalRole_maybe_helper (FunCo Representational co1 co2)
+      = do { co1' <- setNominalRole_maybe Representational co1
+           ; co2' <- setNominalRole_maybe Representational co2
+           ; return $ FunCo Nominal co1' co2'
+           }
+    setNominalRole_maybe_helper (SymCo co)
+      = SymCo <$> setNominalRole_maybe_helper co
+    setNominalRole_maybe_helper (TransCo co1 co2)
+      = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
+    setNominalRole_maybe_helper (AppCo co1 co2)
+      = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper (ForAllCo tv kind_co co)
+      = ForAllCo tv kind_co <$> setNominalRole_maybe_helper co
+    setNominalRole_maybe_helper (NthCo _r n co)
+      -- NB, this case recurses via setNominalRole_maybe, not
+      -- setNominalRole_maybe_helper!
+      = NthCo Nominal n <$> setNominalRole_maybe (coercionRole co) co
+    setNominalRole_maybe_helper (InstCo co arg)
+      = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
+    setNominalRole_maybe_helper (CoherenceCo co1 co2)
+      = CoherenceCo <$> setNominalRole_maybe_helper co1 <*> pure co2
+    setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
+      | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
+                     PhantomProv _    -> False  -- should always be phantom
+                     ProofIrrelProv _ -> True   -- it's always safe
+                     PluginProv _     -> False  -- who knows? This choice is conservative.
+      = Just $ UnivCo prov Nominal co1 co2
+    setNominalRole_maybe_helper _ = Nothing
 
 -- | Make a phantom coercion between two types. The coercion passed
 -- in must be a nominal coercion between the kinds of the
@@ -1055,7 +1168,7 @@ ltRole Nominal          _       = True
 
 -- | like mkKindCo, but aggressively & recursively optimizes to avoid using
 -- a KindCo constructor. The output role is nominal.
-promoteCoercion :: Coercion -> Coercion
+promoteCoercion :: Coercion -> CoercionN
 
 -- First cases handles anything that should yield refl.
 promoteCoercion co = case co of
@@ -1104,7 +1217,7 @@ promoteCoercion co = case co of
     TransCo co1 co2
       -> mkTransCo (promoteCoercion co1) (promoteCoercion co2)
 
-    NthCo n co1
+    NthCo _ n co1
       | Just (_, args) <- splitTyConAppCo_maybe co1
       , args `lengthExceeds` n
       -> promoteCoercion (args !! n)
@@ -1147,22 +1260,22 @@ promoteCoercion co = case co of
 -- where @g' = promoteCoercion (h w)@.
 -- fails if this is not possible, if @g@ coerces between a forall and an ->
 -- or if second parameter has a representational role and can't be used
--- with an InstCo. The result role matches is representational.
+-- with an InstCo.
 instCoercion :: Pair Type -- type of the first coercion
-             -> Coercion  -- ^ must be nominal
+             -> CoercionN  -- ^ must be nominal
              -> Coercion
-             -> Maybe Coercion
+             -> Maybe CoercionN
 instCoercion (Pair lty rty) g w
   | isForAllTy lty && isForAllTy rty
-  , Just w' <- setNominalRole_maybe w
+  , Just w' <- setNominalRole_maybe (coercionRole w) w
   = Just $ mkInstCo g w'
   | isFunTy lty && isFunTy rty
-  = Just $ mkNthCo 3 g -- extract result type, which is the 4th argument to (->)
+  = Just $ mkNthCo Nominal 3 g -- extract result type, which is the 4th argument to (->)
   | otherwise -- one forall, one funty...
   = Nothing
-  where
 
-instCoercions :: Coercion -> [Coercion] -> Maybe Coercion
+-- | Repeated use of 'instCoercion'
+instCoercions :: CoercionN -> [Coercion] -> Maybe CoercionN
 instCoercions g ws
   = let arg_ty_pairs = map coercionKind ws in
     snd <$> foldM go (coercionKind g, g) (zip arg_ty_pairs ws)
@@ -1191,22 +1304,26 @@ mkPiCo  :: Role -> Var -> Coercion -> Coercion
 mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
               | otherwise = mkFunCo r (mkReflCo r (varType v)) co
 
--- The second coercion is sometimes lifted (~) and sometimes unlifted (~#).
--- So, we have to make sure to supply the right parameter to decomposeCo.
--- mkCoCast (c :: s1 ~# t1) (g :: (s1 ~# s2) ~# (t1 ~# t2)) :: s2 ~# t2
--- Both coercions *must* have the same role.
-mkCoCast :: Coercion -> Coercion -> Coercion
+-- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
+-- The first coercion might be lifted or unlifted; thus the ~? above
+-- Lifted and unlifted equalities take different numbers of arguments,
+-- so we have to make sure to supply the right parameter to decomposeCo.
+-- Also, note that the role of the first coercion is the same as the role of
+-- the equalities related by the second coercion. The second coercion is
+-- itself always representational.
+mkCoCast :: Coercion -> CoercionR -> Coercion
 mkCoCast c g
+  | (g2:g1:_) <- reverse co_list
   = mkSymCo g1 `mkTransCo` c `mkTransCo` g2
+
+  | otherwise
+  = pprPanic "mkCoCast" (ppr g $$ ppr (coercionKind g))
   where
-       -- g  :: (s1 ~# s2) ~# (t1 ~#  t2)
-       -- g1 :: s1 ~# t1
-       -- g2 :: s2 ~# t2
-    (_, args) = splitTyConApp (pFst $ coercionKind g)
-    n_args = length args
-    co_list = decomposeCo n_args g
-    g1 = co_list `getNth` (n_args - 2)
-    g2 = co_list `getNth` (n_args - 1)
+    -- g  :: (s1 ~# t1) ~# (s2 ~# t2)
+    -- g1 :: s1 ~# s2
+    -- g2 :: t1 ~# t2
+    (tc, _) = splitTyConApp (pFst $ coercionKind g)
+    co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
 
 {-
 %************************************************************************
@@ -1444,9 +1561,19 @@ extendLiftingContext :: LiftingContext  -- ^ original LC
                      -> TyVar           -- ^ new variable to map...
                      -> Coercion        -- ^ ...to this lifted version
                      -> LiftingContext
+    -- mappings to reflexive coercions are just substitutions
+extendLiftingContext (LC subst env) tv (Refl _ ty) = LC (extendTvSubst subst tv ty) env
 extendLiftingContext (LC subst env) tv arg
   = ASSERT( isTyVar tv )
     LC subst (extendVarEnv env tv arg)
+
+-- | Extend a lifting context with a new mapping, and extend the in-scope set
+extendLiftingContextAndInScope :: LiftingContext  -- ^ Original LC
+                               -> TyVar           -- ^ new variable to map...
+                               -> Coercion        -- ^ to this coercion
+                               -> LiftingContext
+extendLiftingContextAndInScope (LC subst env) tv co
+  = extendLiftingContext (LC (extendTCvInScopeSet subst (tyCoVarsOfCo co)) env) tv co
 
 -- | Extend a lifting context with existential-variable bindings.
 -- This follows the lifting context extension definition in the
@@ -1642,7 +1769,7 @@ seqCo (UnivCo p r t1 t2)
   = seqProv p `seq` r `seq` seqType t1 `seq` seqType t2
 seqCo (SymCo co)                = seqCo co
 seqCo (TransCo co1 co2)         = seqCo co1 `seq` seqCo co2
-seqCo (NthCo n co)              = n `seq` seqCo co
+seqCo (NthCo r n co)            = r `seq` n `seq` seqCo co
 seqCo (LRCo lr co)              = lr `seq` seqCo co
 seqCo (InstCo co arg)           = seqCo co `seq` seqCo arg
 seqCo (CoherenceCo co1 co2)     = seqCo co1 `seq` seqCo co2
@@ -1694,7 +1821,6 @@ coercionType co = case coercionKindRole co of
 
 coercionKind :: Coercion -> Pair Type
 coercionKind co =
-  {-# SCC "coercionKind" #-}
   go co
   where
     go (Refl _ ty)          = Pair ty ty
@@ -1727,7 +1853,7 @@ coercionKind co =
     go (UnivCo _ _ ty1 ty2)   = Pair ty1 ty2
     go (SymCo co)             = swap $ go co
     go (TransCo co1 co2)      = Pair (pFst $ go co1) (pSnd $ go co2)
-    go g@(NthCo d co)
+    go g@(NthCo _ d co)
       | Just argss <- traverse tyConAppArgs_maybe tys
       = ASSERT( and $ (`lengthExceeds` d) <$> argss )
         (`getNth` d) <$> argss
@@ -1792,77 +1918,30 @@ coercionKinds tys = sequenceA $ map coercionKind tys
 -- | Get a coercion's kind and role.
 -- Why both at once?  See Note [Computing a coercion kind and role]
 coercionKindRole :: Coercion -> (Pair Type, Role)
-coercionKindRole = go
-  where
-    go (Refl r ty) = (Pair ty ty, r)
-    go (TyConAppCo r tc cos)
-      = (mkTyConApp tc <$> (sequenceA $ map coercionKind cos), r)
-    go (AppCo co1 co2)
-      = let (tys1, r1) = go co1 in
-        (mkAppTy <$> tys1 <*> coercionKind co2, r1)
-    go (ForAllCo tv1 k_co co)
-      = let Pair _ k2          = coercionKind k_co
-            tv2                = setTyVarKind tv1 k2
-            (Pair ty1 ty2, r)  = go co
-            subst = zipTvSubst [tv1] [TyVarTy tv2 `mkCastTy` mkSymCo k_co]
-            ty2' = substTyAddInScope subst ty2 in
-            -- We need free vars of ty2 in scope to satisfy the invariant
-            -- from Note [The substitution invariant]
-            -- This is doing repeated substitutions and probably doesn't
-            -- need to, see #11735
-        (mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2', r)
-    go (FunCo r co1 co2)
-      = (mkFunTy <$> coercionKind co1 <*> coercionKind co2, r)
-    go (CoVarCo cv) = go_var cv
-    go (HoleCo h)   = go_var (coHoleCoVar h)
-    go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
-    go (UnivCo _ r ty1 ty2)  = (Pair ty1 ty2, r)
-    go (SymCo co) = first swap $ go co
-    go (TransCo co1 co2)
-      = let (tys1, r) = go co1 in
-        (Pair (pFst tys1) (pSnd $ coercionKind co2), r)
-    go (NthCo d co)
-      | Just (tv1, _) <- splitForAllTy_maybe ty1
-      = ASSERT( d == 0 )
-        let (tv2, _) = splitForAllTy ty2 in
-        (tyVarKind <$> Pair tv1 tv2, Nominal)
-
-      | otherwise
-      = let (tc1,  args1) = splitTyConApp ty1
-            (_tc2, args2) = splitTyConApp ty2
-        in
-        ASSERT2( tc1 == _tc2, ppr d $$ ppr tc1 $$ ppr _tc2 )
-        ((`getNth` d) <$> Pair args1 args2, nthRole r tc1 d)
-
-      where
-        (Pair ty1 ty2, r) = go co
-    go co@(LRCo {}) = (coercionKind co, Nominal)
-    go (InstCo co arg) = go_app co [arg]
-    go (CoherenceCo co1 co2)
-      = let (Pair t1 t2, r) = go co1 in
-        (Pair (t1 `mkCastTy` co2) t2, r)
-    go co@(KindCo {}) = (coercionKind co, Nominal)
-    go (SubCo co) = (coercionKind co, Representational)
-    go co@(AxiomRuleCo ax _) = (coercionKind co, coaxrRole ax)
-
-    -------------
-    go_var cv = (coVarTypes cv, coVarRole cv)
-
-    -------------
-    go_app :: Coercion -> [Coercion] -> (Pair Type, Role)
-    -- Collect up all the arguments and apply all at once
-    -- See Note [Nested InstCos]
-    go_app (InstCo co arg) args = go_app co (arg:args)
-    go_app co              args
-      = let (pair, r) = go co in
-        (piResultTys <$> pair <*> (sequenceA $ map coercionKind args), r)
+coercionKindRole co = (coercionKind co, coercionRole co)
 
 -- | Retrieve the role from a coercion.
 coercionRole :: Coercion -> Role
-coercionRole = snd . coercionKindRole
-  -- There's not a better way to do this, because NthCo needs the *kind*
-  -- and role of its argument. Luckily, laziness should generally avoid
-  -- the need for computing kinds in other cases.
+coercionRole = go
+  where
+    go (Refl r _) = r
+    go (TyConAppCo r _ _) = r
+    go (AppCo co1 _) = go co1
+    go (ForAllCo _ _ co) = go co
+    go (FunCo r _ _) = r
+    go (CoVarCo cv) = coVarRole cv
+    go (HoleCo h)   = coVarRole (coHoleCoVar h)
+    go (AxiomInstCo ax _ _) = coAxiomRole ax
+    go (UnivCo _ r _ _)  = r
+    go (SymCo co) = go co
+    go (TransCo co1 _co2) = go co1
+    go (NthCo r _d _co) = r
+    go (LRCo {}) = Nominal
+    go (InstCo co _) = go co
+    go (CoherenceCo co1 _) = go co1
+    go (KindCo {}) = Nominal
+    go (SubCo _) = Representational
+    go (AxiomRuleCo ax _) = coaxrRole ax
 
 {-
 Note [Nested InstCos]
@@ -1880,3 +1959,64 @@ So it's very important to do the substitution simultaneously;
 cf Type.piResultTys (which in fact we call here).
 
 -}
+
+-- | Assuming that two types are the same, ignoring coercions, find
+-- a nominal coercion between the types. This is useful when optimizing
+-- transitivity over coercion applications, where splitting two
+-- AppCos might yield different kinds. See Note [EtaAppCo] in OptCoercion.
+buildCoercion :: Type -> Type -> CoercionN
+buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
+  where
+    go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
+               | Just ty2' <- coreView ty2 = go ty1 ty2'
+
+    go (CastTy ty1 co) ty2
+      = go ty1 ty2 `mkCoherenceLeftCo` co
+
+    go ty1 (CastTy ty2 co)
+      = go ty1 ty2 `mkCoherenceRightCo` co
+
+    go ty1@(TyVarTy tv1) _tyvarty
+      = ASSERT( case _tyvarty of
+                  { TyVarTy tv2 -> tv1 == tv2
+                  ; _           -> False      } )
+        mkNomReflCo ty1
+
+    go (FunTy arg1 res1) (FunTy arg2 res2)
+      = mkFunCo Nominal (go arg1 arg2) (go res1 res2)
+
+    go (TyConApp tc1 args1) (TyConApp tc2 args2)
+      = ASSERT( tc1 == tc2 )
+        mkTyConAppCo Nominal tc1 (zipWith go args1 args2)
+
+    go (AppTy ty1a ty1b) ty2
+      | Just (ty2a, ty2b) <- repSplitAppTy_maybe ty2
+      = mkAppCo (go ty1a ty2a) (go ty1b ty2b)
+
+    go ty1 (AppTy ty2a ty2b)
+      | Just (ty1a, ty1b) <- repSplitAppTy_maybe ty1
+      = mkAppCo (go ty1a ty2a) (go ty1b ty2b)
+
+    go (ForAllTy (TvBndr tv1 _flag1) ty1) (ForAllTy (TvBndr tv2 _flag2) ty2)
+      = let kind_co  = go (tyVarKind tv1) (tyVarKind tv2)
+            in_scope = mkInScopeSet $ tyCoVarsOfType ty2 `unionVarSet` tyCoVarsOfCo kind_co
+            ty2'     = substTyWithInScope in_scope [tv2]
+                                                   [mkTyVarTy tv1 `mkCastTy` kind_co]
+                                                   ty2
+        in
+        mkForAllCo tv1 kind_co (go ty1 ty2')
+
+    go ty1@(LitTy lit1) _lit2
+      = ASSERT( case _lit2 of
+                  { LitTy lit2 -> lit1 == lit2
+                  ; _          -> False        } )
+        mkNomReflCo ty1
+
+    go (CoercionTy co1) (CoercionTy co2)
+      = mkProofIrrelCo Nominal kind_co co1 co2
+      where
+        kind_co = go (coercionType co1) (coercionType co2)
+
+    go ty1 ty2
+      = pprPanic "buildKindCoercion" (vcat [ ppr orig_ty1, ppr orig_ty2
+                                           , ppr ty1, ppr ty2 ])

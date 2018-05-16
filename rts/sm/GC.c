@@ -95,6 +95,8 @@
  *
  * We build up a static object list while collecting generations 0..N,
  * which is then appended to the static object list of generation N+1.
+ *
+ * See also: Note [STATIC_LINK fields] in Storage.h.
  */
 
 /* N is the oldest generation being collected, where the generations
@@ -139,6 +141,9 @@ uint32_t n_gc_threads;
 static long copied;        // *words* copied & scavenged during this GC
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
+// spin and yield counts for the quasi-SpinLock in waitForGcThreads
+volatile StgWord64 waitForGcThreads_spin = 0;
+volatile StgWord64 waitForGcThreads_yield = 0;
 volatile StgWord64 whitehole_gc_spin = 0;
 #endif
 
@@ -198,7 +203,9 @@ GarbageCollect (uint32_t collect_gen,
 {
   bdescr *bd;
   generation *gen;
-  StgWord live_blocks, live_words, par_max_copied, par_balanced_copied;
+  StgWord live_blocks, live_words, par_max_copied, par_balanced_copied,
+      gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
+      any_work, no_work, scav_find_work;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -395,11 +402,6 @@ GarbageCollect (uint32_t collect_gen,
 
   markScheduler(mark_root, gct);
 
-#if defined(RTS_USER_SIGNALS)
-  // mark the signal handlers (signals should be already blocked)
-  markSignalHandlers(mark_root, gct);
-#endif
-
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
   initWeakForGC();
@@ -471,32 +473,53 @@ GarbageCollect (uint32_t collect_gen,
   copied = 0;
   par_max_copied = 0;
   par_balanced_copied = 0;
+  gc_spin_spin = 0;
+  gc_spin_yield = 0;
+  mut_spin_spin = 0;
+  mut_spin_yield = 0;
+  any_work = 0;
+  no_work = 0;
+  scav_find_work = 0;
   {
       uint32_t i;
       uint64_t par_balanced_copied_acc = 0;
+      const gc_thread* thread;
 
       for (i=0; i < n_gc_threads; i++) {
           copied += gc_threads[i]->copied;
       }
       for (i=0; i < n_gc_threads; i++) {
+          thread = gc_threads[i];
           if (n_gc_threads > 1) {
               debugTrace(DEBUG_gc,"thread %d:", i);
-              debugTrace(DEBUG_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
-              debugTrace(DEBUG_gc,"   scanned          %ld", gc_threads[i]->scanned * sizeof(W_));
-              debugTrace(DEBUG_gc,"   any_work         %ld", gc_threads[i]->any_work);
-              debugTrace(DEBUG_gc,"   no_work          %ld", gc_threads[i]->no_work);
-              debugTrace(DEBUG_gc,"   scav_find_work %ld",   gc_threads[i]->scav_find_work);
+              debugTrace(DEBUG_gc,"   copied           %ld",
+                         thread->copied * sizeof(W_));
+              debugTrace(DEBUG_gc,"   scanned          %ld",
+                         thread->scanned * sizeof(W_));
+              debugTrace(DEBUG_gc,"   any_work         %ld",
+                         thread->any_work);
+              debugTrace(DEBUG_gc,"   no_work          %ld",
+                         thread->no_work);
+              debugTrace(DEBUG_gc,"   scav_find_work %ld",
+                         thread->scav_find_work);
+
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+              gc_spin_spin += thread->gc_spin.spin;
+              gc_spin_yield += thread->gc_spin.yield;
+              mut_spin_spin += thread->mut_spin.spin;
+              mut_spin_yield += thread->mut_spin.yield;
+#endif
+
+              any_work += thread->any_work;
+              no_work += thread->no_work;
+              scav_find_work += thread->scav_find_work;
+
+              par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
+              par_balanced_copied_acc +=
+                  stg_min(n_gc_threads * gc_threads[i]->copied, copied);
           }
-          par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
-          par_balanced_copied_acc +=
-            stg_min(n_gc_threads * gc_threads[i]->copied, copied);
       }
-      if (n_gc_threads == 1) {
-          par_max_copied = 0;
-          par_balanced_copied = 0;
-      }
-      else
-      {
+      if (n_gc_threads > 1) {
           // See Note [Work Balance] for an explanation of this computation
           par_balanced_copied =
               (par_balanced_copied_acc - copied + (n_gc_threads - 1) / 2) /
@@ -834,7 +857,9 @@ GarbageCollect (uint32_t collect_gen,
   // ok, GC over: tell the stats department what happened.
   stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
-             N, n_gc_threads, par_max_copied, par_balanced_copied);
+             N, n_gc_threads, par_max_copied, par_balanced_copied,
+             gc_spin_spin, gc_spin_yield, mut_spin_spin, mut_spin_yield,
+             any_work, no_work, scav_find_work);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -1186,6 +1211,9 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
                 }
             }
             if (!retry) break;
+#if defined(PROF_SPIN)
+            waitForGcThreads_yield++;
+#endif
             yieldThread();
         }
 
@@ -1195,6 +1223,14 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
             /* call this every longGCSync of delay */
             rtsConfig.longGCSync(cap->no, t2 - t0);
             t1 = t2;
+        }
+        if (retry) {
+#if defined(PROF_SPIN)
+            // This is a bit strange, we'll get more yields than spins.
+            // I guess that means it's not a spin-lock at all, but these
+            // numbers are still useful (I think).
+            waitForGcThreads_spin++;
+#endif
         }
     }
 
@@ -1494,9 +1530,6 @@ collect_gct_blocks (void)
    take a global lock.  Here we collect those blocks from the
    cap->pinned_object_blocks lists and put them on the
    main g0->large_object list.
-
-   Returns: the number of words allocated this way, for stats
-   purposes.
    -------------------------------------------------------------------------- */
 
 static void
@@ -1792,8 +1825,8 @@ resize_nursery (void)
    Sanity code for CAF garbage collection.
 
    With DEBUG turned on, we manage a CAF list in addition to the SRT
-   mechanism.  After GC, we run down the CAF list and blackhole any
-   CAFs which have been garbage collected.  This means we get an error
+   mechanism.  After GC, we run down the CAF list and make any
+   CAFs which have been garbage collected GCD_CAF.  This means we get an error
    whenever the program tries to enter a garbage collected CAF.
 
    Any garbage collected CAFs are taken off the CAF list at the same
@@ -1836,3 +1869,28 @@ static void gcCAFs(void)
     debugTrace(DEBUG_gccafs, "%d CAFs live", i);
 }
 #endif
+
+
+/* -----------------------------------------------------------------------------
+   The GC can leave some work for the mutator to do before the next
+   GC, provided the work can be safely overlapped with mutation.  This
+   can help reduce the GC pause time.
+
+   The mutator can call doIdleGCWork() any time it likes, but
+   preferably when it is idle.  It's safe for multiple capabilities to
+   call doIdleGCWork().
+
+   When 'all' is
+     * false: doIdleGCWork() should only take a short, bounded, amount
+       of time.
+     * true: doIdleGCWork() will complete all the outstanding GC work.
+
+   The return value is
+     * true if there's more to do (only if 'all' is false).
+     * false otherwise.
+  -------------------------------------------------------------------------- */
+
+bool doIdleGCWork(Capability *cap STG_UNUSED, bool all)
+{
+    return runSomeFinalizers(all);
+}

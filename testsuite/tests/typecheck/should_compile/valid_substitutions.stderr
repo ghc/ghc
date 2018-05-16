@@ -30,9 +30,7 @@ valid_substitutions.hs:17:17: warning: [-Wtyped-holes (in -Wdefault)]
         pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
 
@@ -54,9 +52,7 @@ valid_substitutions.hs:21:8: warning: [-Wtyped-holes (in -Wdefault)]
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
 
@@ -73,9 +69,7 @@ valid_substitutions.hs:24:9: warning: [-Wtyped-holes (in -Wdefault)]
         ValidSubs.Moo :: Integer -> ValidSubs.Moo
           (imported qualified from ‘ValidSubs’ at valid_substitutions.hs:6:1-26
            (and originally defined at ValidSubs.hs:4:12-22))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
 
@@ -96,9 +90,7 @@ valid_substitutions.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
         pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
 
@@ -226,9 +218,7 @@ valid_substitutions.hs:34:14: warning: [-Wtyped-holes (in -Wdefault)]
         minBound :: forall a. Bounded a => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Enum’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
 
@@ -251,12 +241,10 @@ valid_substitutions.hs:37:8: warning: [-Wtyped-holes (in -Wdefault)]
         fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        error :: forall (a :: TYPE r).
-                 GHC.Stack.Types.HasCallStack =>
-                 [Char] -> a
+        error :: forall a. GHC.Stack.Types.HasCallStack => [Char] -> a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
-        errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
+        errorWithoutStackTrace :: forall a. [Char] -> a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))
         print :: forall a. Show a => a -> IO ()
@@ -265,8 +253,6 @@ valid_substitutions.hs:37:8: warning: [-Wtyped-holes (in -Wdefault)]
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at valid_substitutions.hs:3:1-40
            (and originally defined in ‘GHC.Err’))

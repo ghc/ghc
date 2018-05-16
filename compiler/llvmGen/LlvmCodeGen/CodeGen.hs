@@ -392,6 +392,9 @@ genCall t@(PrimTarget (MO_SubIntC w)) [dstV, dstO] [lhs, rhs] =
 genCall t@(PrimTarget (MO_Add2 w)) [dstO, dstV] [lhs, rhs] =
     genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
 
+genCall t@(PrimTarget (MO_AddWordC w)) [dstV, dstO] [lhs, rhs] =
+    genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
+
 genCall t@(PrimTarget (MO_SubWordC w)) [dstV, dstO] [lhs, rhs] =
     genCallWithOverflow t w [dstV, dstO] [lhs, rhs]
 
@@ -505,6 +508,7 @@ genCallWithOverflow t@(PrimTarget op) w [dstV, dstO] [lhs, rhs] = do
     let valid = op `elem`   [ MO_Add2 w
                             , MO_AddIntC w
                             , MO_SubIntC w
+                            , MO_AddWordC w
                             , MO_SubWordC w
                             ]
     MASSERT(valid)
@@ -814,6 +818,8 @@ cmmPrimOpFunctions mop = do
     MO_SubIntC w    -> fsLit $ "llvm.ssub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
+                             ++ showSDoc dflags (ppr $ widthToLlvmInt w)
+    MO_AddWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
@@ -1807,7 +1813,7 @@ genLit opt (CmmLabelOff label off) = do
     (v1, s1) <- doExpr (getVarType vlbl) $ LlvmOp LM_MO_Add vlbl voff
     return (v1, stmts `snocOL` s1, stat)
 
-genLit opt (CmmLabelDiffOff l1 l2 off) = do
+genLit opt (CmmLabelDiffOff l1 l2 off w) = do
     dflags <- getDynFlags
     (vl1, stmts1, stat1) <- genLit opt (CmmLabel l1)
     (vl2, stmts2, stat2) <- genLit opt (CmmLabel l2)
@@ -1816,13 +1822,17 @@ genLit opt (CmmLabelDiffOff l1 l2 off) = do
     let ty2 = getVarType vl2
     if (isInt ty1) && (isInt ty2)
        && (llvmWidthInBits dflags ty1 == llvmWidthInBits dflags ty2)
-
        then do
             (v1, s1) <- doExpr (getVarType vl1) $ LlvmOp LM_MO_Sub vl1 vl2
             (v2, s2) <- doExpr (getVarType v1 ) $ LlvmOp LM_MO_Add v1 voff
-            return (v2, stmts1 `appOL` stmts2 `snocOL` s1 `snocOL` s2,
-                        stat1 ++ stat2)
-
+            let ty = widthToLlvmInt w
+            let stmts = stmts1 `appOL` stmts2 `snocOL` s1 `snocOL` s2
+            if w /= wordWidth dflags
+              then do
+                (v3, s3) <- doExpr ty $ Cast LM_Trunc v2 ty
+                return (v3, stmts `snocOL` s3, stat1 ++ stat2)
+              else
+                return (v2, stmts, stat1 ++ stat2)
         else
             panic "genLit: CmmLabelDiffOff encountered with different label ty!"
 

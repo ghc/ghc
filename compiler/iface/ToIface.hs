@@ -74,9 +74,13 @@ import Data.Maybe ( catMaybes )
 
 ----------------
 toIfaceTvBndr :: TyVar -> IfaceTvBndr
-toIfaceTvBndr tyvar   = ( occNameFS (getOccName tyvar)
-                        , toIfaceKind (tyVarKind tyvar)
-                        )
+toIfaceTvBndr = toIfaceTvBndrX emptyVarSet
+
+toIfaceTvBndrX :: VarSet -> TyVar -> IfaceTvBndr
+toIfaceTvBndrX fr tyvar = ( occNameFS (getOccName tyvar)
+                          , toIfaceTypeX fr (tyVarKind tyvar)
+                          )
+
 
 toIfaceIdBndr :: Id -> (IfLclName, IfaceType)
 toIfaceIdBndr id      = (occNameFS (getOccName id),    toIfaceType (idType id))
@@ -120,7 +124,7 @@ toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in IfaceType
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
 toIfaceTypeX fr (AppTy t1 t2)  = IfaceAppTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
-toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndr b)
+toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy t1 t2)
   | isPredTy t1                 = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
@@ -160,7 +164,10 @@ toIfaceCoVar :: CoVar -> FastString
 toIfaceCoVar = occNameFS . getOccName
 
 toIfaceForAllBndr :: TyVarBinder -> IfaceForAllBndr
-toIfaceForAllBndr (TvBndr v vis) = TvBndr (toIfaceTvBndr v) vis
+toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
+
+toIfaceForAllBndrX :: VarSet -> TyVarBinder -> IfaceForAllBndr
+toIfaceForAllBndrX fr (TvBndr v vis) = TvBndr (toIfaceTvBndrX fr v) vis
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
@@ -224,7 +231,7 @@ toIfaceCoercionX fr co
     go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
     go (SymCo co)           = IfaceSymCo (go co)
     go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
-    go (NthCo d co)         = IfaceNthCo d (go co)
+    go (NthCo _r d co)      = IfaceNthCo d (go co)
     go (LRCo lr co)         = IfaceLRCo lr (go co)
     go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
     go (CoherenceCo c1 c2)  = IfaceCoherenceCo (go c1) (go c2)

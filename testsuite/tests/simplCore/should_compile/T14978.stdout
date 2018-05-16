@@ -1,0 +1,2 @@
+foo :: Goof Int
+foo = T14978.Goof @ Int @~ <Co:1>

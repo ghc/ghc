@@ -45,6 +45,7 @@ import GHC.Conc.IO
 import GHC.IO.Exception
 #if defined(mingw32_HOST_OS)
 import GHC.Windows
+import Data.Bool
 #endif
 
 import Foreign
@@ -589,8 +590,10 @@ asyncReadRawBufferPtr loc !fd !buf !off !len = do
     (l, rc) <- asyncRead (fromIntegral (fdFD fd)) (fdIsSocket_ fd)
                         (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
-      then
-        ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+      then let sock_errno = c_maperrno_func (fromIntegral rc)
+               non_sock_errno = Errno (fromIntegral rc)
+               errno = bool non_sock_errno sock_errno (fdIsSocket fd)
+           in  ioError (errnoToIOError loc errno Nothing Nothing)
       else return (fromIntegral l)
 
 asyncWriteRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
@@ -598,34 +601,46 @@ asyncWriteRawBufferPtr loc !fd !buf !off !len = do
     (l, rc) <- asyncWrite (fromIntegral (fdFD fd)) (fdIsSocket_ fd)
                   (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
-      then
-        ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+      then let sock_errno = c_maperrno_func (fromIntegral rc)
+               non_sock_errno = Errno (fromIntegral rc)
+               errno = bool non_sock_errno sock_errno (fdIsSocket fd)
+           in  ioError (errnoToIOError loc errno Nothing Nothing)
       else return (fromIntegral l)
 
 -- Blocking versions of the read/write primitives, for the threaded RTS
 
 blockingReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
 blockingReadRawBufferPtr loc !fd !buf !off !len
-  = throwErrnoIfMinus1Retry loc $
-        if fdIsSocket fd
-           then c_safe_recv (fdFD fd) (buf `plusPtr` off) (fromIntegral len) 0
-           else c_safe_read (fdFD fd) (buf `plusPtr` off) (fromIntegral len)
+  = throwErrnoIfMinus1Retry loc $ do
+        let start_ptr = buf `plusPtr` off
+            recv_ret = c_safe_recv (fdFD fd) start_ptr (fromIntegral len) 0
+            read_ret = c_safe_read (fdFD fd) start_ptr (fromIntegral len)
+        r <- bool read_ret recv_ret (fdIsSocket fd)
+        when ((fdIsSocket fd) && (r == -1)) c_maperrno
+        return r
+      -- We trust read() to give us the correct errno but recv(), as a
+      -- Winsock function, doesn't do the errno conversion so if the fd
+      -- is for a socket, we do it from GetLastError() ourselves.
 
 blockingWriteRawBufferPtr :: String -> FD -> Ptr Word8-> Int -> CSize -> IO CInt
 blockingWriteRawBufferPtr loc !fd !buf !off !len
-  = throwErrnoIfMinus1Retry loc $
-        if fdIsSocket fd
-           then c_safe_send  (fdFD fd) (buf `plusPtr` off) (fromIntegral len) 0
-           else do
-             r <- c_safe_write (fdFD fd) (buf `plusPtr` off) (fromIntegral len)
-             when (r == -1) c_maperrno
-             return r
-      -- we don't trust write() to give us the correct errno, and
+  = throwErrnoIfMinus1Retry loc $ do
+        let start_ptr = buf `plusPtr` off
+            send_ret = c_safe_send  (fdFD fd) start_ptr (fromIntegral len) 0
+            write_ret = c_safe_write (fdFD fd) start_ptr (fromIntegral len)
+        r <- bool write_ret send_ret (fdIsSocket fd)
+        when (r == -1) c_maperrno
+        return r
+      -- We don't trust write() to give us the correct errno, and
       -- instead do the errno conversion from GetLastError()
-      -- ourselves.  The main reason is that we treat ERROR_NO_DATA
+      -- ourselves. The main reason is that we treat ERROR_NO_DATA
       -- (pipe is closing) as EPIPE, whereas write() returns EINVAL
-      -- for this case.  We need to detect EPIPE correctly, because it
+      -- for this case. We need to detect EPIPE correctly, because it
       -- shouldn't be reported as an error when it happens on stdout.
+      -- As for send()'s case, Winsock functions don't do errno
+      -- conversion in any case so we have to do it ourselves.
+      -- That means we're doing the errno conversion no matter if the
+      -- fd is from a socket or not.
 
 -- NOTE: "safe" versions of the read/write calls for use by the threaded RTS.
 -- These calls may block, but that's ok.

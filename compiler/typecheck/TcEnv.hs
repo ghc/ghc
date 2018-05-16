@@ -23,7 +23,7 @@ module TcEnv(
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
-        lookupGlobal,
+        lookupGlobal, ioLookupDataCon,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -106,13 +106,14 @@ import Outputable
 import Encoding
 import FastString
 import ListSetOps
+import ErrUtils
 import Util
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Data.List
-
+import Control.Monad
 
 {- *********************************************************************
 *                                                                      *
@@ -121,14 +122,69 @@ import Data.List
 ********************************************************************* -}
 
 lookupGlobal :: HscEnv -> Name -> IO TyThing
--- An IO version, used outside the typechecker
--- It's more complicated than it looks, because it may
--- need to suck in an interface file
+-- A variant of lookupGlobal_maybe for the clients which are not
+-- interested in recovering from lookup failure and accept panic.
 lookupGlobal hsc_env name
-  = initTcForLookup hsc_env (tcLookupGlobal name)
-    -- This initTcForLookup stuff is massive overkill
-    -- but that's how it is right now, and at least
-    -- this function localises it
+  = do  {
+          mb_thing <- lookupGlobal_maybe hsc_env name
+        ; case mb_thing of
+            Succeeded thing -> return thing
+            Failed msg      -> pprPanic "lookupGlobal" msg
+        }
+
+lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
+-- This may look up an Id that one one has previously looked up.
+-- If so, we are going to read its interface file, and add its bindings
+-- to the ExternalPackageTable.
+lookupGlobal_maybe hsc_env name
+  = do  {    -- Try local envt
+          let mod = icInteractiveModule (hsc_IC hsc_env)
+              dflags = hsc_dflags hsc_env
+              tcg_semantic_mod = canonicalizeModuleIfHome dflags mod
+
+        ; if nameIsLocalOrFrom tcg_semantic_mod name
+              then (return
+                (Failed (text "Can't find local name: " <+> ppr name)))
+                  -- Internal names can happen in GHCi
+              else
+           -- Try home package table and external package table
+          lookupImported_maybe hsc_env name
+        }
+
+lookupImported_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
+-- Returns (Failed err) if we can't find the interface file for the thing
+lookupImported_maybe hsc_env name
+  = do  { mb_thing <- lookupTypeHscEnv hsc_env name
+        ; case mb_thing of
+            Just thing -> return (Succeeded thing)
+            Nothing    -> importDecl_maybe hsc_env name
+            }
+
+importDecl_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
+importDecl_maybe hsc_env name
+  | Just thing <- wiredInNameTyThing_maybe name
+  = do  { when (needWiredInHomeIface thing)
+               (initIfaceLoad hsc_env (loadWiredInHomeIface name))
+                -- See Note [Loading instances for wired-in things]
+        ; return (Succeeded thing) }
+  | otherwise
+  = initIfaceLoad hsc_env (importDecl name)
+
+ioLookupDataCon :: HscEnv -> Name -> IO DataCon
+ioLookupDataCon hsc_env name = do
+  mb_thing <- ioLookupDataCon_maybe hsc_env name
+  case mb_thing of
+    Succeeded thing -> return thing
+    Failed msg      -> pprPanic "lookupDataConIO" msg
+
+ioLookupDataCon_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc DataCon)
+ioLookupDataCon_maybe hsc_env name = do
+    thing <- lookupGlobal hsc_env name
+    return $ case thing of
+        AConLike (RealDataCon con) -> Succeeded con
+        _                          -> Failed $
+          pprTcTyThingCategory (AGlobal thing) <+> quotes (ppr name) <+>
+                text "used as a data constructor"
 
 {-
 ************************************************************************
@@ -401,10 +457,18 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
+-- Before using this function, consider using TcHsType.scopeTyVars, which
+-- bumps the TcLevel and thus prevents any of these TyVars from appearing
+-- in kinds of tyvars in an outer scope.
+-- Indeed, you should always use scopeTyVars unless some other code nearby
+-- bumps the TcLevel.
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
   = tcExtendTyVarEnv2 (mkTyVarNamePairs tvs) thing_inside
 
+-- Before using this function, consider using TcHsType.scopeTyVars2, which
+-- bumps the TcLevel and thus prevents any of these TyVars from appearing
+-- in kinds of tyvars in an outer scope.
 tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendTyVarEnv2 binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
@@ -633,11 +697,18 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
     get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
     get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
       = concatMap (get_fi_cons . unLoc) fids
+    get_cons (L _ (ClsInstD _ (XClsInstDecl _))) = panic "get_cons"
+    get_cons (L _ (XInstDecl _)) = panic "get_cons"
 
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                   FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }}})
       = map unLoc $ concatMap (getConNames . unLoc) cons
+    get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
+                  FamEqn { feqn_rhs = XHsDataDefn _ }}})
+      = panic "get_fi_cons"
+    get_fi_cons (DataFamInstDecl (HsIB _ (XFamEqn _))) = panic "get_fi_cons"
+    get_fi_cons (DataFamInstDecl (XHsImplicitBndrs _)) = panic "get_fi_cons"
 
 
 tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a
@@ -655,8 +726,8 @@ getTypeSigNames sigs
     get_type_sig :: LSig GhcRn -> NameSet -> NameSet
     get_type_sig sig ns =
       case sig of
-        L _ (TypeSig names _) -> extendNameSetList ns (map unLoc names)
-        L _ (PatSynSig names _) -> extendNameSetList ns (map unLoc names)
+        L _ (TypeSig _ names _) -> extendNameSetList ns (map unLoc names)
+        L _ (PatSynSig _ names _) -> extendNameSetList ns (map unLoc names)
         _ -> ns
 
 
@@ -890,10 +961,12 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance (SourceTextX a, OutputableBndrId a) => Outputable (InstInfo a) where
+instance (OutputableBndrId (GhcPass a))
+       => Outputable (InstInfo (GhcPass a)) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: (SourceTextX a, OutputableBndrId a) => InstInfo a -> SDoc
+pprInstInfoDetails :: (OutputableBndrId (GhcPass a))
+                   => InstInfo (GhcPass a) -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
         2 (details (iBinds info))

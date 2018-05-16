@@ -15,4 +15,5 @@ test('ghci', just_ghci, ghci_script, ['ghci.script'])
 test('T11985', just_ghci, ghci_script, ['T11985.script'])
 test('T11224', normal, compile_and_run, [''])
 test('T13688', normal, multimod_compile_and_run, ['T13688', '-v0'])
-test('T14228', normal, compile_and_run, [''])
+# Requires UnboxedSums, which GHCi does not support.
+test('T14228', omit_ways(['ghci']), compile_and_run, [''])

@@ -1,8 +1,10 @@
 
-InferDependency.hs:6:1: error:
-    • Invalid declaration for ‘Proxy2’; you must explicitly
-      declare which variables are dependent on which others.
-      Inferred variable kinds:
+InferDependency.hs:6:13: error:
+    • Type constructor argument ‘k’ is used dependently.
+      Any dependent arguments must be obviously so, not inferred
+      by the type-checker.
+      Inferred argument kinds:
         k :: *
         a :: k
+      Suggestion: use ‘k’ in a kind to make the dependency clearer.
     • In the data type declaration for ‘Proxy2’

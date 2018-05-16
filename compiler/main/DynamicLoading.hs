@@ -57,6 +57,7 @@ import Outputable
 import Exception
 import Hooks
 
+import Control.Monad     ( when, unless )
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
 
@@ -96,7 +97,9 @@ initializePlugins hsc_env df
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
-  = do { plugins <- mapM (loadPlugin hsc_env) to_load
+  = do { unless (null to_load) $
+           checkExternalInterpreter hsc_env
+       ; plugins <- mapM loadPlugin to_load
        ; return $ zipWith attachOptions to_load plugins }
   where
     dflags  = hsc_dflags hsc_env
@@ -107,11 +110,22 @@ loadPlugins hsc_env
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
 
-loadPlugin :: HscEnv -> ModuleName -> IO Plugin
-loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName
+    loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName hsc_env
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO FrontendPlugin
-loadFrontendPlugin = loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+loadFrontendPlugin hsc_env mod_name = do
+    checkExternalInterpreter hsc_env
+    loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+                hsc_env mod_name
+
+-- #14335
+checkExternalInterpreter :: HscEnv -> IO ()
+checkExternalInterpreter hsc_env =
+    when (gopt Opt_ExternalInterpreter dflags) $
+      throwCmdLineError $ showSDoc dflags $
+        text "Plugins require -fno-external-interpreter"
+  where
+    dflags = hsc_dflags hsc_env
 
 loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO a
 loadPlugin' occ_name plugin_name hsc_env mod_name

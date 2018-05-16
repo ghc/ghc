@@ -1,8 +1,1 @@
-
-json.hs:6:7: error:
-    • No instance for (Num (a -> a)) arising from the literal ‘5’
-        (maybe you haven't applied a function to enough arguments?)
-    • In the expression: 5
-      In an equation for ‘id1’: id1 = 5
-[
- {"span": {"file": "json.hs","startLine": 6,"startCol": 7,"endLine": 6,"endCol": 8},"doc": "\u2022 No instance for (Num (a -> a)) arising from the literal \u20185\u2019\n    (maybe you haven't applied a function to enough arguments?)\n\u2022 In the expression: 5\n  In an equation for \u2018id1\u2019: id1 = 5","severity": "SevError","reason": null}]
+{"span": {"file": "json.hs","startLine": 6,"startCol": 7,"endLine": 6,"endCol": 8},"doc": "\u2022 No instance for (Num (a -> a)) arising from the literal \u20185\u2019\n    (maybe you haven't applied a function to enough arguments?)\n\u2022 In the expression: 5\n  In an equation for \u2018id1\u2019: id1 = 5","severity": "SevError","reason": null}

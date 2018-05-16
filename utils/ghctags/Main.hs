@@ -254,7 +254,7 @@ boundValues :: ModuleName -> HsGroup GhcRn -> [FoundThing]
 -- ^Finds all the top-level definitions in a module
 boundValues mod group =
   let vals = case hs_valds group of
-               ValBindsOut nest _sigs ->
+               XValBindsLR (NValBinds nest _sigs) ->
                    [ x | (_rec, binds) <- nest
                        , bind <- bagToList binds
                        , x <- boundThings mod bind ]
@@ -264,8 +264,9 @@ boundValues mod group =
                 , n <- map found ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
-                                      ForeignImport n _ _ _ -> [found n]
+                                      ForeignImport _ n _ _ -> [found n]
                                       ForeignExport { } -> []
+                                      XForeignDecl { } -> []
   in vals ++ tys ++ fors
   where found = foundOfLName mod
 
@@ -284,28 +285,29 @@ boundThings modname lbinding =
     PatBind { pat_lhs = lhs } -> patThings lhs []
     VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
     AbsBinds { }    -> [] -- nothing interesting in a type abstraction
-    PatSynBind PSB{ psb_id = id } -> [thing id]
+    PatSynBind _ PSB{ psb_id = id } -> [thing id]
+    PatSynBind _ (XPatSynBind _) -> []
+    XHsBindsLR _    -> []
   where thing = foundOfLName modname
         patThings lpat tl =
           let loc = startOfLocated lpat
               lid id = FoundThing modname (getOccString id) loc
           in case unLoc lpat of
                WildPat _ -> tl
-               VarPat (L _ name) -> lid name : tl
-               LazyPat p -> patThings p tl
-               AsPat id p -> patThings p (thing id : tl)
-               ParPat p -> patThings p tl
-               BangPat p -> patThings p tl
-               ListPat ps _ _ -> foldr patThings tl ps
-               TuplePat ps _ _ -> foldr patThings tl ps
-               PArrPat ps _ -> foldr patThings tl ps
+               VarPat _ (L _ name) -> lid name : tl
+               LazyPat _ p -> patThings p tl
+               AsPat _ id p -> patThings p (thing id : tl)
+               ParPat _ p -> patThings p tl
+               BangPat _ p -> patThings p tl
+               ListPat _ ps -> foldr patThings tl ps
+               TuplePat _ ps _  -> foldr patThings tl ps
+               PArrPat _ ps -> foldr patThings tl ps
                ConPatIn _ conargs -> conArgs conargs tl
                ConPatOut{ pat_args = conargs } -> conArgs conargs tl
-               LitPat _ -> tl
+               LitPat _ _ -> tl
                NPat {} -> tl -- form of literal pattern?
-               NPlusKPat id _ _ _ _ _ -> thing id : tl
-               SigPatIn p _ -> patThings p tl
-               SigPatOut p _ -> patThings p tl
+               NPlusKPat _ id _ _ _ _ -> thing id : tl
+               SigPat _ p -> patThings p tl
                _ -> error "boundThings"
         conArgs (PrefixCon ps) tl = foldr patThings tl ps
         conArgs (RecCon (HsRecFields { rec_flds = flds })) tl

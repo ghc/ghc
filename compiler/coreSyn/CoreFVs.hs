@@ -379,7 +379,7 @@ orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orph
 orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
 orphNamesOfCo (SymCo co)            = orphNamesOfCo co
 orphNamesOfCo (TransCo co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
-orphNamesOfCo (NthCo _ co)          = orphNamesOfCo co
+orphNamesOfCo (NthCo _ _ co)        = orphNamesOfCo co
 orphNamesOfCo (LRCo  _ co)          = orphNamesOfCo co
 orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesOfCo arg
 orphNamesOfCo (CoherenceCo co1 co2) = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
@@ -537,14 +537,23 @@ The free variable pass annotates every node in the expression with its
 NON-GLOBAL free variables and type variables.
 -}
 
-type FVAnn = DVarSet
+type FVAnn = DVarSet  -- See Note [The FVAnn invariant]
+
+{- Note [The FVAnn invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant: a FVAnn, say S, is closed:
+  That is: if v is in S,
+           then freevars( v's type/kind ) is also in S
+-}
 
 -- | Every node in a binding group annotated with its
 -- (non-global) free variables, both Ids and TyVars, and type.
 type CoreBindWithFVs = AnnBind Id FVAnn
+
 -- | Every node in an expression annotated with its
 -- (non-global) free variables, both Ids and TyVars, and type.
-type CoreExprWithFVs  = AnnExpr Id FVAnn
+-- NB: see Note [The FVAnn invariant]
+type CoreExprWithFVs  = AnnExpr  Id FVAnn
 type CoreExprWithFVs' = AnnExpr' Id FVAnn
 
 -- | Every node in an expression annotated with its
@@ -698,12 +707,14 @@ freeVarsBind (Rec binds) body_fvs
     rhss2        = map freeVars rhss
     rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
     binders_fvs  = fvDVarSet $ mapUnionFV bndrRuleAndUnfoldingFVs binders
+                   -- See Note [The FVAnn invariant]
     all_fvs      = rhs_body_fvs `unionFVs` binders_fvs
             -- The "delBinderFV" happens after adding the idSpecVars,
             -- since the latter may add some of the binders as fvs
 
 freeVars :: CoreExpr -> CoreExprWithFVs
--- ^ Annotate a 'CoreExpr' with its (non-global) free type and value variables at every tree node
+-- ^ Annotate a 'CoreExpr' with its (non-global) free type
+--   and value variables at every tree node.
 freeVars = go
   where
     go :: CoreExpr -> CoreExprWithFVs
@@ -711,7 +722,8 @@ freeVars = go
       | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
-        ty_fvs = dVarTypeTyCoVars v  -- Do we need this?
+        ty_fvs = dVarTypeTyCoVars v
+                 -- See Note [The FVAnn invariant]
 
     go (Lit lit) = (emptyDVarSet, AnnLit lit)
     go (Lam b body)
@@ -721,6 +733,7 @@ freeVars = go
         body'@(body_fvs, _) = go body
         b_ty  = idType b
         b_fvs = tyCoVarsOfTypeDSet b_ty
+                -- See Note [The FVAnn invariant]
 
     go (App fun arg)
       = ( freeVarsOf fun' `unionFVs` freeVarsOf arg'
@@ -733,8 +746,8 @@ freeVars = go
       = ( (bndr `delBinderFV` alts_fvs)
            `unionFVs` freeVarsOf scrut2
            `unionFVs` tyCoVarsOfTypeDSet ty
-          -- don't need to look at (idType bndr)
-          -- b/c that's redundant with scrut
+          -- Don't need to look at (idType bndr)
+          -- because that's redundant with scrut
         , AnnCase scrut2 bndr ty alts2 )
       where
         scrut2 = go scrut

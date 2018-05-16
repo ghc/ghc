@@ -32,11 +32,11 @@
 /* -----------------------------------------------------------------------------
    Weak Pointers
 
-   traverse_weak_ptr_list is called possibly many times during garbage
+   traverseWeakPtrList is called possibly many times during garbage
    collection.  It returns a flag indicating whether it did any work
    (i.e. called evacuate on any live pointers).
 
-   Invariant: traverse_weak_ptr_list is called when the heap is in an
+   Invariant: traverseWeakPtrList is called when the heap is in an
    idempotent state.  That means that there are no pending
    evacuate/scavenge operations.  This invariant helps the weak
    pointer code decide which weak pointers are dead - if there are no
@@ -60,7 +60,7 @@
 
      Now, we discover which *threads* are still alive.  Pointers to
      threads from the all_threads and main thread lists are the
-     weakest of all: a pointers from the finalizer of a dead weak
+     weakest of all: a pointer from the finalizer of a dead weak
      pointer can keep a thread alive.  Any threads found to be unreachable
      are evacuated and placed on the resurrected_threads list so we
      can send them a signal later.
@@ -72,7 +72,7 @@
    -------------------------------------------------------------------------- */
 
 /* Which stage of processing various kinds of weak pointer are we at?
- * (see traverse_weak_ptr_list() below for discussion).
+ * (see traverseWeakPtrList() below for discussion).
  */
 typedef enum { WeakPtrs, WeakThreads, WeakDone } WeakStage;
 static WeakStage weak_stage;
@@ -185,7 +185,7 @@ traverseWeakPtrList(void)
   }
 
   default:
-      barf("traverse_weak_ptr_list");
+      barf("traverseWeakPtrList");
       return true;
   }
 }
@@ -378,14 +378,13 @@ static void checkWeakPtrSanity(StgWeak *hd, StgWeak *tl)
 void collectFreshWeakPtrs()
 {
     uint32_t i;
-    generation *gen = &generations[0];
     // move recently allocated weak_ptr_list to the old list as well
     for (i = 0; i < n_capabilities; i++) {
         Capability *cap = capabilities[i];
         if (cap->weak_ptr_list_tl != NULL) {
             IF_DEBUG(sanity, checkWeakPtrSanity(cap->weak_ptr_list_hd, cap->weak_ptr_list_tl));
-            cap->weak_ptr_list_tl->link = gen->weak_ptr_list;
-            gen->weak_ptr_list = cap->weak_ptr_list_hd;
+            cap->weak_ptr_list_tl->link = g0->weak_ptr_list;
+            g0->weak_ptr_list = cap->weak_ptr_list_hd;
             cap->weak_ptr_list_tl = NULL;
             cap->weak_ptr_list_hd = NULL;
         } else {

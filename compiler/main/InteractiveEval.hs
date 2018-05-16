@@ -810,7 +810,7 @@ isDecl dflags stmt = do
   case parseThing Parser.parseDeclaration dflags stmt of
     Lexer.POk _ thing ->
       case unLoc thing of
-        SpliceD _ -> False
+        SpliceD _ _ -> False
         _ -> True
     Lexer.PFailed _ _ _ -> False
 
@@ -870,8 +870,9 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
-      let_stmt = L loc . LetStmt . L loc . HsValBinds $
-        ValBindsIn (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
+      let_stmt = L loc . LetStmt noExt . L loc . (HsValBinds noExt) $
+        ValBinds noExt
+                     (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 
   Just ([_id], hvals_io, fix_env) <- liftIO $ hscParsedStmt hsc_env let_stmt
   updateFixityEnv fix_env
@@ -894,7 +895,7 @@ dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
   let loc = getLoc parsed_expr
-      to_dyn_expr = mkHsApp (L loc . HsVar . L loc $ getRdrName toDynName)
+      to_dyn_expr = mkHsApp (L loc . HsVar noExt . L loc $ getRdrName toDynName)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
   return (unsafeCoerce# hval :: Dynamic)

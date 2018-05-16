@@ -70,18 +70,18 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     trim ls    = takeWhile (not.isSpace) (dropWhile isSpace ls)
 
     (fixity_sigs, bind_tys, bind_specs, bind_inlines, generic_sigs)
-        = count_sigs [d | SigD d <- decls]
+        = count_sigs [d | SigD _ d <- decls]
                 -- NB: this omits fixity decls on local bindings and
                 -- in class decls. ToDo
 
-    tycl_decls = [d | TyClD d <- decls]
+    tycl_decls = [d | TyClD _ d <- decls]
     (class_ds, type_ds, data_ds, newt_ds, type_fam_ds) =
       countTyClDecls tycl_decls
 
-    inst_decls = [d | InstD d <- decls]
+    inst_decls = [d | InstD _ d <- decls]
     inst_ds    = length inst_decls
     default_ds = count (\ x -> case x of { DefD{} -> True; _ -> False}) decls
-    val_decls  = [d | ValD d <- decls]
+    val_decls  = [d | ValD _ d <- decls]
 
     real_exports = case exports of { Nothing -> []; Just (L _ es) -> es }
     n_exports    = length real_exports
@@ -102,7 +102,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
         = sum5 (map inst_info inst_decls)
 
-    count_bind (PatBind { pat_lhs = L _ (VarPat _) }) = (1,0,0)
+    count_bind (PatBind { pat_lhs = L _ (VarPat{}) }) = (1,0,0)
     count_bind (PatBind {})                           = (0,1,0)
     count_bind (FunBind {})                           = (0,1,0)
     count_bind (PatSynBind {})                        = (0,0,1)
@@ -120,6 +120,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
                                  , ideclAs = as, ideclHiding = spec }))
         = add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
+    import_info (L _ (XImportDecl _)) = panic "import_info"
     safe_info = qual_info
     qual_info False  = 0
     qual_info True   = 1
@@ -155,6 +156,8 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
                    ss, is, length ats, length adts)
       where
         methods = map unLoc $ bagToList inst_meths
+    inst_info (ClsInstD _ (XClsInstDecl _)) = panic "inst_info"
+    inst_info (XInstDecl _)                 = panic "inst_info"
 
     -- TODO: use Sum monoid
     addpr :: (Int,Int,Int) -> Int

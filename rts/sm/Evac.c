@@ -536,14 +536,14 @@ loop:
       switch (info->type) {
 
       case THUNK_STATIC:
-          if (info->srt_bitmap != 0) {
+          if (info->srt != 0) {
               evacuate_static_object(THUNK_STATIC_LINK((StgClosure *)q), q);
           }
           return;
 
       case FUN_STATIC:
-          if (info->srt_bitmap != 0) {
-              evacuate_static_object(FUN_STATIC_LINK((StgClosure *)q), q);
+          if (info->srt != 0 || info->layout.payload.ptrs != 0) {
+              evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
           }
           return;
 
@@ -747,6 +747,19 @@ loop:
               copy(p,info,q,sizeofW(StgInd),gen_no);
               return;
           }
+          // Note [BLACKHOLE pointing to IND]
+          //
+          // BLOCKING_QUEUE can be overwritten by IND (see
+          // wakeBlockingQueue()). However, when this happens we must
+          // be updating the BLACKHOLE, so the BLACKHOLE's indirectee
+          // should now point to the value.
+          //
+          // The mutator might observe an inconsistent state, because
+          // the writes are happening in another thread, so it's
+          // possible for the mutator to follow an indirectee and find
+          // an IND. But this should never happen in the GC, because
+          // the mutators are all stopped and the writes have
+          // completed.
           ASSERT(i != &stg_IND_info);
       }
       q = r;
@@ -1058,9 +1071,14 @@ selector_chain:
     // In threaded mode, we'll use WHITEHOLE to lock the selector
     // thunk while we evaluate it.
     {
-        do {
+        while(true) {
             info_ptr = xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
-        } while (info_ptr == (W_)&stg_WHITEHOLE_info);
+            if (info_ptr != (W_)&stg_WHITEHOLE_info) { break; }
+#if defined(PROF_SPIN)
+            ++whitehole_gc_spin;
+#endif
+            busy_wait_nop();
+        }
 
         // make sure someone else didn't get here first...
         if (IS_FORWARDING_PTR(info_ptr) ||

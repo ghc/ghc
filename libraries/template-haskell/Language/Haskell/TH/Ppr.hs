@@ -20,10 +20,11 @@ nestDepth :: Int
 nestDepth = 4
 
 type Precedence = Int
-appPrec, unopPrec, opPrec, noPrec :: Precedence
-appPrec  = 3    -- Argument of a function application
-opPrec   = 2    -- Argument of an infix operator
-unopPrec = 1    -- Argument of an unresolved infix operator
+appPrec, opPrec, unopPrec, sigPrec, noPrec :: Precedence
+appPrec  = 4    -- Argument of a function application
+opPrec   = 3    -- Argument of an infix operator
+unopPrec = 2    -- Argument of an unresolved infix operator
+sigPrec  = 1    -- Argument of an explicit type signature
 noPrec   = 0    -- Others
 
 parensIf :: Bool -> Doc -> Doc
@@ -194,7 +195,8 @@ pprExp _ (CompE ss) =
         ss' = init ss
 pprExp _ (ArithSeqE d) = ppr d
 pprExp _ (ListE es) = brackets (commaSep es)
-pprExp i (SigE e t) = parensIf (i > noPrec) $ ppr e <+> dcolon <+> ppr t
+pprExp i (SigE e t) = parensIf (i > noPrec) $ pprExp sigPrec e
+                                          <+> dcolon <+> ppr t
 pprExp _ (RecConE nm fs) = ppr nm <> braces (pprFields fs)
 pprExp _ (RecUpdE e fs) = pprExp appPrec e <> braces (pprFields fs)
 pprExp i (StaticE e) = parensIf (i >= appPrec) $
@@ -219,8 +221,13 @@ instance Ppr Stmt where
 
 ------------------------------
 instance Ppr Match where
-    ppr (Match p rhs ds) = ppr p <+> pprBody False rhs
+    ppr (Match p rhs ds) = pprMatchPat p <+> pprBody False rhs
                         $$ where_clause ds
+
+pprMatchPat :: Pat -> Doc
+-- Everything except pattern signatures bind more tightly than (->)
+pprMatchPat p@(SigP {}) = parens (ppr p)
+pprMatchPat p           = ppr p
 
 ------------------------------
 pprGuarded :: Doc -> (Guard, Exp) -> Doc

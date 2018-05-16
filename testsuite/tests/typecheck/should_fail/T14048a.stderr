@@ -1,0 +1,5 @@
+
+T14048a.hs:6:1: error:
+    • Kind signature on data type declaration has non-* return kind
+        Constraint
+    • In the data declaration for ‘Foo’

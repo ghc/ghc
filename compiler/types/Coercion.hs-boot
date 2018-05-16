@@ -25,7 +25,7 @@ mkUnsafeCo :: Role -> Type -> Type -> Coercion
 mkUnivCo :: UnivCoProvenance -> Role -> Type -> Type -> Coercion
 mkSymCo :: Coercion -> Coercion
 mkTransCo :: Coercion -> Coercion -> Coercion
-mkNthCo :: Int -> Coercion -> Coercion
+mkNthCo :: HasDebugCallStack => Role -> Int -> Coercion -> Coercion
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkInstCo :: Coercion -> Coercion -> Coercion
 mkCoherenceCo :: Coercion -> Coercion -> Coercion
@@ -33,10 +33,9 @@ mkKindCo :: Coercion -> Coercion
 mkSubCo :: Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 
-mkFunCos :: Role -> [Coercion] -> Coercion -> Coercion
-
 isReflCo :: Coercion -> Bool
 isReflexiveCo :: Coercion -> Bool
+decomposePiCos :: Kind -> [Type] -> Coercion -> ([Coercion], Coercion)
 coVarKindsTypesRole :: CoVar -> (Kind, Kind, Type, Type, Role)
 coVarRole :: CoVar -> Role
 

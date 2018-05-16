@@ -48,13 +48,13 @@ T5423:
 .PHONY: T9405
 T9405:
 	@'$(TEST_HC)' $(TEST_HC_OPTS) -ticky -rtsopts T9405.hs; \
-    ./T9405 +RTS -rT9405.ticky & \
-    sleep 0.2; \
-    kill -2 $$!; \
-    wait $$!; \
-    [ -e T9405.ticky ] || echo "Error: Ticky profile doesn't exist"; \
-    [ -s T9405.ticky ] || echo "Error: Ticky profile is empty"; \
-    echo Ticky-Ticky;
+		./T9405 +RTS -rT9405.ticky & \
+		sleep 0.2; \
+		kill -2 $$!; \
+		wait $$!; \
+		[ -e T9405.ticky ] || echo "Error: Ticky profile doesn't exist"; \
+		[ -s T9405.ticky ] || echo "Error: Ticky profile is empty"; \
+		echo Ticky-Ticky;
 
 # Naming convention: 'T5423_' obj-way '_' obj-src
 # obj-way ::= v | dyn
@@ -64,7 +64,7 @@ T9405:
 
 define run_T5435_v
 $(RM) T5435_load_v_$(1) T5435_v_$(1)$(exeext)
-'$(TEST_HC)' $(TEST_HC_OPTS) -optc-D$(HostOS)_HOST_OS -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
+'$(TEST_HC)' $(TEST_HC_OPTS) -optc-D$(HostOS)_HOST_OS -optc-DLOAD_CONSTR=$(2) -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
 '$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_v_$(1)_o -o T5435_v_$(1)$(exeext)
 ./T5435_v_$(1) v ./T5435_load_v_$(1).o
 endef
@@ -78,11 +78,13 @@ endef
 
 .PHONY: T5435_v_gcc
 T5435_v_gcc :
-	$(call run_T5435_v,gcc)
+	$(call run_T5435_v,gcc,0)
 
-.PHONY: T5435_v_asm
-T5435_v_asm :
-	$(call run_T5435_v,asm)
+.PHONY: T5435_v_asm_a T5435_v_asm_b
+T5435_v_asm_a :
+	$(call run_T5435_v,asm,0)
+T5435_v_asm_b :
+	$(call run_T5435_v,asm,1)
 
 .PHONY: T5435_dyn_gcc
 T5435_dyn_gcc :
@@ -178,3 +180,8 @@ T12497:
 .PHONY: T14695
 T14695:
 	echo ":quit" | LD_LIBRARY_PATH="foo:" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE))
+
+.PHONY: InternalCounters
+InternalCounters:
+	"$(TEST_HC)" +RTS -s --internal-counters -RTS 2>&1 | grep "Internal Counters"
+	-"$(TEST_HC)" +RTS -s -RTS 2>&1 | grep "Internal Counters"

@@ -4,63 +4,78 @@
 (Just
  ((,,,)
   (HsGroup
-   (ValBindsOut
-    [((,)
-      (NonRecursive)
-      {Bag(Located (HsBind Name)):
-       [({ DumpRenamedAst.hs:18:1-23 }
-         (FunBind
-          ({ DumpRenamedAst.hs:18:1-4 }
-           {Name: DumpRenamedAst.main})
-          (MG
-           ({ DumpRenamedAst.hs:18:1-23 }
-            [({ DumpRenamedAst.hs:18:1-23 }
-              (Match
-               (FunRhs
-                ({ DumpRenamedAst.hs:18:1-4 }
-                 {Name: DumpRenamedAst.main})
-                (Prefix)
-                (NoSrcStrict))
-               []
-               (GRHSs
-                [({ DumpRenamedAst.hs:18:6-23 }
-                  (GRHS
-                   []
-                   ({ DumpRenamedAst.hs:18:8-23 }
-                    (HsApp
-                     ({ DumpRenamedAst.hs:18:8-15 }
-                      (HsVar
-                       ({ DumpRenamedAst.hs:18:8-15 }
-                        {Name: System.IO.putStrLn})))
-                     ({ DumpRenamedAst.hs:18:17-23 }
-                      (HsLit
-                       (HsString
-                        (SourceText
-                         "\"hello\"")
-                        {FastString: "hello"})))))))]
-                ({ <no location info> }
-                 (EmptyLocalBinds)))))])
-           []
-           (PlaceHolder)
-           (FromSource))
-          (WpHole)
-          {NameSet:
-           []}
-          []))]})]
-    [])
+   (NoExt)
+   (XValBindsLR
+    (NValBinds
+     [((,)
+       (NonRecursive)
+       {Bag(Located (HsBind Name)):
+        [({ DumpRenamedAst.hs:18:1-23 }
+          (FunBind
+           {NameSet:
+            []}
+           ({ DumpRenamedAst.hs:18:1-4 }
+            {Name: DumpRenamedAst.main})
+           (MG
+            (NoExt)
+            ({ DumpRenamedAst.hs:18:1-23 }
+             [({ DumpRenamedAst.hs:18:1-23 }
+               (Match
+                (NoExt)
+                (FunRhs
+                 ({ DumpRenamedAst.hs:18:1-4 }
+                  {Name: DumpRenamedAst.main})
+                 (Prefix)
+                 (NoSrcStrict))
+                []
+                (GRHSs
+                 (NoExt)
+                 [({ DumpRenamedAst.hs:18:6-23 }
+                   (GRHS
+                    (NoExt)
+                    []
+                    ({ DumpRenamedAst.hs:18:8-23 }
+                     (HsApp
+                      (NoExt)
+                      ({ DumpRenamedAst.hs:18:8-15 }
+                       (HsVar
+                        (NoExt)
+                        ({ DumpRenamedAst.hs:18:8-15 }
+                         {Name: System.IO.putStrLn})))
+                      ({ DumpRenamedAst.hs:18:17-23 }
+                       (HsLit
+                        (NoExt)
+                        (HsString
+                         (SourceText
+                          "\"hello\"")
+                         {FastString: "hello"})))))))]
+                 ({ <no location info> }
+                  (EmptyLocalBinds
+                   (NoExt))))))])
+            (FromSource))
+           (WpHole)
+           []))]})]
+     []))
    []
    [(TyClGroup
+     (NoExt)
      [({ DumpRenamedAst.hs:6:1-30 }
        (DataDecl
+        (DataDeclRn
+         (True)
+         {NameSet:
+          [{Name: DumpRenamedAst.Peano}]})
         ({ DumpRenamedAst.hs:6:6-10 }
          {Name: DumpRenamedAst.Peano})
         (HsQTvs
-         []
+         (HsQTvsRn
          []
          {NameSet:
           []})
+          [])
         (Prefix)
         (HsDataDefn
+         (NoExt)
          (DataType)
          ({ <no location info> }
           [])
@@ -68,6 +83,7 @@
          (Nothing)
          [({ DumpRenamedAst.hs:6:14-17 }
            (ConDeclH98
+            (NoExt)
             ({ DumpRenamedAst.hs:6:14-17 }
              {Name: DumpRenamedAst.Zero})
             (False)
@@ -78,6 +94,7 @@
             (Nothing)))
          ,({ DumpRenamedAst.hs:6:21-30 }
            (ConDeclH98
+            (NoExt)
             ({ DumpRenamedAst.hs:6:21-24 }
              {Name: DumpRenamedAst.Succ})
             (False)
@@ -86,36 +103,43 @@
             (PrefixCon
              [({ DumpRenamedAst.hs:6:26-30 }
                (HsTyVar
+                (NoExt)
                 (NotPromoted)
                 ({ DumpRenamedAst.hs:6:26-30 }
                  {Name: DumpRenamedAst.Peano})))])
             (Nothing)))]
          ({ <no location info> }
-          []))
-        (True)
-        {NameSet:
-         [{Name: DumpRenamedAst.Peano}]}))]
+          []))))]
      []
      [])
    ,(TyClGroup
+     (NoExt)
      [({ DumpRenamedAst.hs:8:1-39 }
        (FamDecl
+        (NoExt)
         (FamilyDecl
+         (NoExt)
          (ClosedTypeFamily
           (Just
            [({ DumpRenamedAst.hs:9:3-36 }
              (HsIB
+              (HsIBRn
               [{Name: a}
               ,{Name: as}]
+               (True))
               (FamEqn
+               (NoExt)
                ({ DumpRenamedAst.hs:9:3-8 }
                 {Name: DumpRenamedAst.Length})
                [({ DumpRenamedAst.hs:9:10-17 }
                  (HsParTy
+                  (NoExt)
                   ({ DumpRenamedAst.hs:9:11-16 }
                    (HsOpTy
+                    (NoExt)
                     ({ DumpRenamedAst.hs:9:11 }
                      (HsTyVar
+                      (NoExt)
                       (NotPromoted)
                       ({ DumpRenamedAst.hs:9:11 }
                        {Name: a})))
@@ -123,72 +147,87 @@
                      {Name: :})
                     ({ DumpRenamedAst.hs:9:15-16 }
                      (HsTyVar
+                      (NoExt)
                       (NotPromoted)
                       ({ DumpRenamedAst.hs:9:15-16 }
                        {Name: as})))))))]
                (Prefix)
                ({ DumpRenamedAst.hs:9:21-36 }
                 (HsAppTy
+                 (NoExt)
                  ({ DumpRenamedAst.hs:9:21-24 }
                   (HsTyVar
+                   (NoExt)
                    (NotPromoted)
                    ({ DumpRenamedAst.hs:9:21-24 }
                     {Name: DumpRenamedAst.Succ})))
                  ({ DumpRenamedAst.hs:9:26-36 }
                   (HsParTy
+                   (NoExt)
                    ({ DumpRenamedAst.hs:9:27-35 }
                     (HsAppTy
+                     (NoExt)
                      ({ DumpRenamedAst.hs:9:27-32 }
                       (HsTyVar
+                       (NoExt)
                        (NotPromoted)
                        ({ DumpRenamedAst.hs:9:27-32 }
                         {Name: DumpRenamedAst.Length})))
                      ({ DumpRenamedAst.hs:9:34-35 }
                       (HsTyVar
+                       (NoExt)
                        (NotPromoted)
                        ({ DumpRenamedAst.hs:9:34-35 }
-                        {Name: as}))))))))))
-              (True)))
+                        {Name: as}))))))))))))
            ,({ DumpRenamedAst.hs:10:3-24 }
              (HsIB
+              (HsIBRn
               []
+               (True))
               (FamEqn
+               (NoExt)
                ({ DumpRenamedAst.hs:10:3-8 }
                 {Name: DumpRenamedAst.Length})
                [({ DumpRenamedAst.hs:10:10-12 }
                  (HsExplicitListTy
+                  (NoExt)
                   (Promoted)
-                  (PlaceHolder)
                   []))]
                (Prefix)
                ({ DumpRenamedAst.hs:10:21-24 }
                 (HsTyVar
+                 (NoExt)
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:10:21-24 }
-                  {Name: DumpRenamedAst.Zero}))))
-              (True)))]))
+                  {Name: DumpRenamedAst.Zero}))))))]))
          ({ DumpRenamedAst.hs:8:13-18 }
           {Name: DumpRenamedAst.Length})
          (HsQTvs
+          (HsQTvsRn
           [{Name: k}]
+           {NameSet:
+            []})
           [({ DumpRenamedAst.hs:8:20-30 }
             (KindedTyVar
+             (NoExt)
              ({ DumpRenamedAst.hs:8:21-22 }
               {Name: as})
              ({ DumpRenamedAst.hs:8:27-29 }
               (HsListTy
+               (NoExt)
                ({ DumpRenamedAst.hs:8:28 }
                 (HsTyVar
+                 (NoExt)
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:8:28 }
-                  {Name: k})))))))]
-          {NameSet:
-           []})
+                  {Name: k})))))))])
          (Prefix)
          ({ DumpRenamedAst.hs:8:32-39 }
           (KindSig
+           (NoExt)
            ({ DumpRenamedAst.hs:8:35-39 }
             (HsTyVar
+             (NoExt)
              (NotPromoted)
              ({ DumpRenamedAst.hs:8:35-39 }
               {Name: DumpRenamedAst.Peano})))))
@@ -196,36 +235,46 @@
      []
      [])
    ,(TyClGroup
+     (NoExt)
      [({ DumpRenamedAst.hs:12:1-30 }
        (FamDecl
+        (NoExt)
         (FamilyDecl
+         (NoExt)
          (DataFamily)
          ({ DumpRenamedAst.hs:12:13-15 }
           {Name: DumpRenamedAst.Nat})
          (HsQTvs
+          (HsQTvsRn
           [{Name: k}]
-          []
           {NameSet:
            []})
+           [])
          (Prefix)
          ({ DumpRenamedAst.hs:12:17-30 }
           (KindSig
+           (NoExt)
            ({ DumpRenamedAst.hs:12:20-30 }
             (HsFunTy
+             (NoExt)
              ({ DumpRenamedAst.hs:12:20 }
               (HsTyVar
+               (NoExt)
                (NotPromoted)
                ({ DumpRenamedAst.hs:12:20 }
                 {Name: k})))
              ({ DumpRenamedAst.hs:12:25-30 }
               (HsFunTy
+               (NoExt)
                ({ DumpRenamedAst.hs:12:25 }
                 (HsTyVar
+                 (NoExt)
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:12:25 }
                   {Name: k})))
                ({ DumpRenamedAst.hs:12:30 }
                 (HsTyVar
+                 (NoExt)
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:12:30 }
                   {Name: GHC.Types.*})))))))))
@@ -233,34 +282,44 @@
      []
      [({ DumpRenamedAst.hs:(15,1)-(16,45) }
        (DataFamInstD
+        (NoExt)
         (DataFamInstDecl
          (HsIB
+          (HsIBRn
           [{Name: k}
           ,{Name: a}]
+           (True))
           (FamEqn
+           (NoExt)
            ({ DumpRenamedAst.hs:15:18-20 }
             {Name: DumpRenamedAst.Nat})
            [({ DumpRenamedAst.hs:15:22-34 }
              (HsKindSig
+              (NoExt)
               ({ DumpRenamedAst.hs:15:23 }
                (HsTyVar
+                (NoExt)
                 (NotPromoted)
                 ({ DumpRenamedAst.hs:15:23 }
                  {Name: a})))
               ({ DumpRenamedAst.hs:15:28-33 }
                (HsFunTy
+                (NoExt)
                 ({ DumpRenamedAst.hs:15:28 }
                  (HsTyVar
+                  (NoExt)
                   (NotPromoted)
                   ({ DumpRenamedAst.hs:15:28 }
                    {Name: k})))
                 ({ DumpRenamedAst.hs:15:33 }
                  (HsTyVar
+                  (NoExt)
                   (NotPromoted)
                   ({ DumpRenamedAst.hs:15:33 }
                    {Name: GHC.Types.*})))))))]
            (Prefix)
            (HsDataDefn
+            (NoExt)
             (NewType)
             ({ <no location info> }
              [])
@@ -268,95 +327,117 @@
             (Just
              ({ DumpRenamedAst.hs:15:39-51 }
               (HsFunTy
+               (NoExt)
                ({ DumpRenamedAst.hs:15:39-46 }
                 (HsParTy
+                 (NoExt)
                  ({ DumpRenamedAst.hs:15:40-45 }
                   (HsFunTy
+                   (NoExt)
                    ({ DumpRenamedAst.hs:15:40 }
                     (HsTyVar
+                     (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:15:40 }
                       {Name: k})))
                    ({ DumpRenamedAst.hs:15:45 }
                     (HsTyVar
+                     (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:15:45 }
                       {Name: GHC.Types.*})))))))
                ({ DumpRenamedAst.hs:15:51 }
                 (HsTyVar
+                 (NoExt)
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:15:51 }
                   {Name: GHC.Types.*}))))))
             [({ DumpRenamedAst.hs:16:3-45 }
               (ConDeclGADT
+               (NoExt)
                [({ DumpRenamedAst.hs:16:3-5 }
                  {Name: DumpRenamedAst.Nat})]
                (False)
                (HsQTvs
+                (HsQTvsRn
                 [{Name: f}
                 ,{Name: g}]
-                []
                 {NameSet:
                  []})
+                 [])
                (Nothing)
                (PrefixCon
                 [({ DumpRenamedAst.hs:16:10-34 }
                   (HsParTy
+                   (NoExt)
                    ({ DumpRenamedAst.hs:16:11-33 }
                     (HsForAllTy
+                     (NoExt)
                      [({ DumpRenamedAst.hs:16:18-19 }
                        (UserTyVar
+                        (NoExt)
                         ({ DumpRenamedAst.hs:16:18-19 }
                          {Name: xx})))]
                      ({ DumpRenamedAst.hs:16:22-33 }
                       (HsFunTy
+                       (NoExt)
                        ({ DumpRenamedAst.hs:16:22-25 }
                         (HsAppTy
+                         (NoExt)
                          ({ DumpRenamedAst.hs:16:22 }
                           (HsTyVar
+                           (NoExt)
                            (NotPromoted)
                            ({ DumpRenamedAst.hs:16:22 }
                             {Name: f})))
                          ({ DumpRenamedAst.hs:16:24-25 }
                           (HsTyVar
+                           (NoExt)
                            (NotPromoted)
                            ({ DumpRenamedAst.hs:16:24-25 }
                             {Name: xx})))))
                        ({ DumpRenamedAst.hs:16:30-33 }
                         (HsAppTy
+                         (NoExt)
                          ({ DumpRenamedAst.hs:16:30 }
                           (HsTyVar
+                           (NoExt)
                            (NotPromoted)
                            ({ DumpRenamedAst.hs:16:30 }
                             {Name: g})))
                          ({ DumpRenamedAst.hs:16:32-33 }
                           (HsTyVar
+                           (NoExt)
                            (NotPromoted)
                            ({ DumpRenamedAst.hs:16:32-33 }
                             {Name: xx})))))))))))])
                ({ DumpRenamedAst.hs:16:39-45 }
                 (HsAppTy
+                 (NoExt)
                  ({ DumpRenamedAst.hs:16:39-43 }
                   (HsAppTy
+                   (NoExt)
                    ({ DumpRenamedAst.hs:16:39-41 }
                     (HsTyVar
+                     (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:16:39-41 }
                       {Name: DumpRenamedAst.Nat})))
                    ({ DumpRenamedAst.hs:16:43 }
                     (HsTyVar
+                     (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:16:43 }
                       {Name: f})))))
                  ({ DumpRenamedAst.hs:16:45 }
                   (HsTyVar
+                   (NoExt)
                    (NotPromoted)
                    ({ DumpRenamedAst.hs:16:45 }
                     {Name: g})))))
                (Nothing)))]
             ({ <no location info> }
-             [])))
-          (True)))))])]
+             [])))))))])]
    []
    []
    []
@@ -368,6 +449,7 @@
    [])
   [({ DumpRenamedAst.hs:4:8-21 }
     (ImportDecl
+     (NoExt)
      (NoSourceText)
      ({ DumpRenamedAst.hs:4:8-21 }
       {ModuleName: Prelude})

@@ -70,9 +70,10 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import Data.List        ( isSuffixOf, intercalate )
+import Data.List        ( isInfixOf, isSuffixOf, intercalate )
 import Data.Maybe
 import Data.Version
+import Data.Either      ( partitionEithers )
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -265,8 +266,7 @@ compileOne' m_tc_result mHscMessage
        prevailing_dflags = hsc_dflags hsc_env0
        dflags =
           dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
-                  , log_action = log_action prevailing_dflags
-                  , log_finaliser = log_finaliser prevailing_dflags }
+                  , log_action = log_action prevailing_dflags }
                   -- use the prevailing log_action / log_finaliser,
                   -- not the one cached in the summary.  This is so
                   -- that we can change the log_action without having
@@ -301,12 +301,14 @@ compileOne' m_tc_result mHscMessage
 -- useful to implement facilities such as inline-c.
 
 compileForeign :: HscEnv -> ForeignSrcLang -> FilePath -> IO FilePath
+compileForeign _ RawObject object_file = return object_file
 compileForeign hsc_env lang stub_c = do
         let phase = case lang of
               LangC -> Cc
               LangCxx -> Ccxx
               LangObjc -> Cobjc
               LangObjcxx -> Cobjcxx
+              RawObject -> panic "compileForeign: should be unreachable"
         (_, stub_o) <- runPipeline StopLn hsc_env
                        (stub_c, Just (RealPhase phase))
                        Nothing (Temporary TFL_GhcSession)
@@ -453,7 +455,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         -- first check object files and extra_ld_inputs
         let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
         e_extra_times <- mapM (tryIO . getModificationUTCTime) extra_ld_inputs
-        let (errs,extra_times) = splitEithers e_extra_times
+        let (errs,extra_times) = partitionEithers e_extra_times
         let obj_times =  map linkableTime linkables ++ extra_times
         if not (null errs) || any (t <) obj_times
             then return True
@@ -469,7 +471,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
         if any isNothing pkg_libfiles then return True else do
         e_lib_times <- mapM (tryIO . getModificationUTCTime)
                           (catMaybes pkg_libfiles)
-        let (lib_errs,lib_times) = splitEithers e_lib_times
+        let (lib_errs,lib_times) = partitionEithers e_lib_times
         if not (null lib_errs) || any (t <) lib_times
            then return True
            else checkLinkInfo dflags pkg_deps exe_file
@@ -823,7 +825,8 @@ llvmOptions dflags =
     ++ [("", "-filetype=obj") | fastLlvmPipeline dflags ]
 
     -- Additional llc flags
-    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu) ]
+    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu)
+                                 , not (any (isInfixOf "-mcpu") (getOpts dflags opt_lc)) ]
     ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
 
   where target = LLVM_TARGET

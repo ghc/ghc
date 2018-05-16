@@ -16,7 +16,9 @@ test('dsrun010', normal, compile_and_run, [''])
 test('dsrun011', when(fast(), skip), compile_and_run, [''])
 test('dsrun012', when(fast(), skip), compile_and_run, [''])
 test('dsrun013', normal, compile_and_run, [''])
-test('dsrun014', normal, compile_and_run, ['-fobject-code'])
+test('dsrun014', expect_broken_for(14901,
+                   ['hpc', 'dyn', 'optasm', 'optllvm', 'threaded2']
+		 ), compile_and_run, ['-fobject-code'])
 test('dsrun015', normal, compile_and_run, [''])
 test('dsrun016', normal, compile_and_run, [''])
 test('dsrun017', normal, compile_and_run, [''])

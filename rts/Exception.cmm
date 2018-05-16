@@ -370,7 +370,6 @@ INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
                                   exceptions_blocked,handler))
     return (P_ ret)
 {
-    unwind Sp = Sp + SIZEOF_StgCatchFrame;
     return (ret);
 }
 
@@ -532,7 +531,7 @@ retry_pop_stack:
             Sp(8) = exception;
             Sp(7) = stg_raise_ret_info;
             Sp(6) = exception;
-            Sp(5) = ghczmprim_GHCziTypes_True_closure; // True <=> a breakpoint
+            Sp(5) = ghczmprim_GHCziTypes_True_closure; // True <=> an exception
             Sp(4) = stg_ap_ppv_info;
             Sp(3) = 0;
             Sp(2) = stg_ap_n_info;

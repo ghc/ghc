@@ -174,10 +174,9 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
        | otherwise
        = (entry_id, shortcut_map)
 
-     -- blocks is a list of blocks in DFS postorder, while blockmap is
-     -- a map of blocks. We process each element from blocks and update
-     -- blockmap accordingly
-     blocks = postorderDfs g
+     -- blocks are sorted in reverse postorder, but we want to go from the exit
+     -- towards beginning, so we use foldr below.
+     blocks = revPostorder g
      blockmap = foldl' (flip addBlock) emptyBody blocks
 
      -- Accumulator contains three components:
@@ -435,7 +434,7 @@ removeUnreachableBlocksProc proc@(CmmProc (info, rty) lbl live g)
                   | otherwise               = env
 
      used_blocks :: [CmmBlock]
-     used_blocks = postorderDfs g
+     used_blocks = revPostorder g
 
      used_lbls :: LabelSet
      used_lbls = setFromList $ map entryLabel used_blocks

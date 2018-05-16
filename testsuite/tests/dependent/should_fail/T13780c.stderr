@@ -2,7 +2,7 @@
 [2 of 2] Compiling T13780c          ( T13780c.hs, T13780c.o )
 
 T13780c.hs:11:16: error:
-    • Expected kind ‘Sing _’, but ‘SFalse’ has kind ‘Sing 'False’
+    • Expected kind ‘Sing _1’, but ‘SFalse’ has kind ‘Sing 'False’
     • In the third argument of ‘ElimBool’, namely ‘SFalse’
       In the type family declaration for ‘ElimBool’
 

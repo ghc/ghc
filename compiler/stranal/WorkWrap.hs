@@ -242,8 +242,8 @@ NOINLINE pragma to the worker.
 
 (See Trac #13143 for a real-world example.)
 
-Note [Activation for workers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Worker activation]
+~~~~~~~~~~~~~~~~~~~~~~~~
 Follows on from Note [Worker-wrapper for INLINABLE functions]
 
 It is *vital* that if the worker gets an INLINABLE pragma (from the
@@ -260,7 +260,9 @@ original activation. Consider
 
   f y = let z = expensive y in ...
 
-If expensive's worker inherits the wrapper's activation, we'll get
+If expensive's worker inherits the wrapper's activation,
+we'll get this (because of the compromise in point (2) of
+Note [Wrapper activation])
 
   {-# NOINLINE[0] $wexpensive #-}
   $wexpensive x = x + 1
@@ -346,40 +348,63 @@ call:
 
 Note [Wrapper activation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-When should the wrapper inlining be active?  It must not be active
-earlier than the current Activation of the Id (eg it might have a
-NOINLINE pragma).  But in fact strictness analysis happens fairly
-late in the pipeline, and we want to prioritise specialisations over
-strictness.  Eg if we have
-  module Foo where
-    f :: Num a => a -> Int -> a
-    f n 0 = n              -- Strict in the Int, hence wrapper
-    f n x = f (n+n) (x-1)
+When should the wrapper inlining be active?
 
-    g :: Int -> Int
-    g x = f x x            -- Provokes a specialisation for f
+1. It must not be active earlier than the current Activation of the
+   Id
 
-  module Bar where
-    import Foo
+2. It should be active at some point, despite (1) because of
+   Note [Worker-wrapper for NOINLINE functions]
 
-    h :: Int -> Int
-    h x = f 3 x
+3. For ordinary functions with no pragmas we want to inline the
+   wrapper as early as possible (Trac #15056).  Suppose another module
+   defines    f x = g x x
+   and suppose there is some RULE for (g True True).  Then if we have
+   a call (f True), we'd expect to inline 'f' and the RULE will fire.
+   But if f is w/w'd (which it might be), we want the inlining to
+   occur just as if it hadn't been.
 
-Then we want the specialisation for 'f' to kick in before the wrapper does.
+   (This only matters if f's RHS is big enough to w/w, but small
+   enough to inline given the call site, but that can happen.)
 
-Now in fact the 'gentle' simplification pass encourages this, by
-having rules on, but inlinings off.  But that's kind of lucky. It seems
-more robust to give the wrapper an Activation of (ActiveAfter 0),
-so that it becomes active in an importing module at the same time that
-it appears in the first place in the defining module.
+4. We do not want to inline the wrapper before specialisation.
+         module Foo where
+           f :: Num a => a -> Int -> a
+           f n 0 = n              -- Strict in the Int, hence wrapper
+           f n x = f (n+n) (x-1)
 
-At one stage I tried making the wrapper inlining always-active, and
-that had a very bad effect on nofib/imaginary/x2n1; a wrapper was
-inlined before the specialisation fired.
+           g :: Int -> Int
+           g x = f x x            -- Provokes a specialisation for f
 
-The use an inl_inline of NoUserInline to distinguish this pragma from one
-that was given by the user. In particular, CSE will not happen if there is a
-user-specified pragma, but should happen for w/w’ed things (#14186).
+         module Bar where
+           import Foo
+
+           h :: Int -> Int
+           h x = f 3 x
+
+   In module Bar we want to give specialisations a chance to fire
+   before inlining f's wrapper.
+
+Reminder: Note [Don't w/w INLINE things], so we don't need to worry
+          about INLINE things here.
+
+Conclusion:
+  - If the user said NOINLINE[n], respect that
+  - If the user said NOINLINE, inline the wrapper as late as
+    poss (phase 0). This is a compromise driven by (2) above
+  - Otherwise inline wrapper in phase 2.  That allows the
+    'gentle' simplification pass to apply specialisation rules
+
+Historical note: At one stage I tried making the wrapper inlining
+always-active, and that had a very bad effect on nofib/imaginary/x2n1;
+a wrapper was inlined before the specialisation fired.
+
+Note [Wrapper NoUserInline]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The use an inl_inline of NoUserInline on the wrapper distinguishes
+this pragma from one that was given by the user. In particular, CSE
+will not happen if there is a user-specified pragma, but should happen
+for w/w’ed things (#14186).
 -}
 
 tryWW   :: DynFlags
@@ -469,29 +494,29 @@ splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> DmdResult -> 
 splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
   = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
     -- The arity should match the signature
-    stuff <- mkWwBodies dflags fam_envs rhs_fvs mb_join_arity fun_ty
-                        wrap_dmds use_res_info
+    stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_res_info
     case stuff of
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
-            work_inline = inl_inline inl_prag
-            work_act = case work_inline of
-              -- See Note [Activation for workers]
-              NoInline -> inl_act inl_prag
-              _        -> wrap_act
+            work_act = case fn_inline_spec of  -- See Note [Worker activation]
+                          NoInline -> fn_act
+                          _        -> wrap_act
+
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                     , inl_inline = work_inline
+                                     , inl_inline = fn_inline_spec
                                      , inl_sat    = Nothing
                                      , inl_act    = work_act
                                      , inl_rule   = FunLike }
-              -- idl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
-              -- idl_act: see Note [Activation for workers]
-              -- inl_rule: it does not make sense for workers to be constructorlike.
+              -- inl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
+              -- inl_act:    see Note [Worker activation]
+              -- inl_rule:   it does not make sense for workers to be constructorlike.
+
             work_join_arity | isJoinId fn_id = Just join_arity
                             | otherwise      = Nothing
               -- worker is join point iff wrapper is join point
               -- (see Note [Don't CPR join points])
+
             work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info
                                 -- Copy over occurrence info from parent
@@ -501,7 +526,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
 
                         `setInlinePragma` work_prag
 
-                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn (unfoldingInfo fn_info)
+                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
                                 -- See Note [Worker-wrapper for INLINABLE functions]
 
                         `setIdStrictness` mkClosedStrictSig work_demands work_res_info
@@ -523,16 +548,19 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
             worker_demand | single_call = mkWorkerDemand work_arity
                           | otherwise   = topDmd
 
-
-            wrap_act  = ActiveAfter NoSourceText 0
             wrap_rhs  = wrap_fn work_id
-            wrap_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
+            wrap_act  = case fn_act of  -- See Note [Wrapper activation]
+                           ActiveAfter {} -> fn_act
+                           NeverActive    -> ActiveAfter NoSourceText 0
+                           _              -> ActiveAfter NoSourceText 2
+            wrap_prag = InlinePragma { inl_src    = SourceText "{-# INLINE"
                                      , inl_inline = NoUserInline
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
                                      , inl_rule   = rule_match_info }
-                -- See Note [Wrapper activation]
-                -- The RuleMatchInfo is (and must be) unaffected
+                -- inl_act:    see Note [Wrapper activation]
+                -- inl_inline: see Note [Wrapper NoUserInline]
+                -- inl_rule:   RuleMatchInfo is (and must be) unaffected
 
             wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule wrap_rhs arity
                               `setInlinePragma` wrap_prag
@@ -547,11 +575,12 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
 
       Nothing -> return [(fn_id, rhs)]
   where
-    mb_join_arity   = isJoinId_maybe fn_id
     rhs_fvs         = exprFreeVars rhs
-    fun_ty          = idType fn_id
-    inl_prag        = inlinePragInfo fn_info
-    rule_match_info = inlinePragmaRuleMatchInfo inl_prag
+    fn_inl_prag     = inlinePragInfo fn_info
+    fn_inline_spec  = inl_inline fn_inl_prag
+    fn_act          = inl_act fn_inl_prag
+    rule_match_info = inlinePragmaRuleMatchInfo fn_inl_prag
+    fn_unfolding    = unfoldingInfo fn_info
     arity           = arityInfo fn_info
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
@@ -660,7 +689,7 @@ then the splitting will go deeper too.
 splitThunk :: DynFlags -> FamInstEnvs -> RecFlag -> Var -> Expr Var -> UniqSM [(Var, Expr Var)]
 splitThunk dflags fam_envs is_rec fn_id rhs
   = ASSERT(not (isJoinId fn_id))
-    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs [fn_id]
+    do { (useful,_, wrap_fn, work_fn) <- mkWWstr dflags fam_envs False [fn_id]
        ; let res = [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
        ; if useful then ASSERT2( isNonRec is_rec, ppr fn_id ) -- The thunk must be non-recursive
                    return res

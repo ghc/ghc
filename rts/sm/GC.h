@@ -26,6 +26,8 @@ typedef void (*evac_fn)(void *user, StgClosure **root);
 StgClosure * isAlive      ( StgClosure *p );
 void         markCAFs     ( evac_fn evac, void *user );
 
+bool doIdleGCWork(Capability *cap, bool all);
+
 extern uint32_t N;
 extern bool major_gc;
 
@@ -47,6 +49,8 @@ extern uint32_t mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS,
 
 #if defined(PROF_SPIN) && defined(THREADED_RTS)
 extern volatile StgWord64 whitehole_gc_spin;
+extern volatile StgWord64 waitForGcThreads_spin;
+extern volatile StgWord64 waitForGcThreads_yield;
 #endif
 
 void gcWorkerThread (Capability *cap);

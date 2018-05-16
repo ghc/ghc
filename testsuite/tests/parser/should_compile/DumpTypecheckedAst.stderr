@@ -4,233 +4,311 @@
 {Bag(Located (HsBind Var)):
  [({ <no location info> }
    (VarBind
+    (NoExt)
     {Var: DumpTypecheckedAst.$tcPeano}
     ({ <no location info> }
      (HsApp
+      (NoExt)
       ({ <no location info> }
        (HsApp
+        (NoExt)
         ({ <no location info> }
          (HsApp
+          (NoExt)
           ({ <no location info> }
            (HsApp
+            (NoExt)
             ({ <no location info> }
              (HsApp
+              (NoExt)
               ({ <no location info> }
                (HsApp
+                (NoExt)
                 ({ <no location info> }
                  (HsConLikeOut
+                  (NoExt)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
+                  (NoExt)
                   {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
+                (NoExt)
                 {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
+              (NoExt)
               ({ <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
+            (NoExt)
             ({ <no location info> }
              (HsApp
+              (NoExt)
               ({ <no location info> }
                (HsConLikeOut
+                (NoExt)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
+                (NoExt)
                 (HsStringPrim
                  (NoSourceText)
                  "Peano")))))))))
         ({ <no location info> }
          (HsLit
+          (NoExt)
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       ({ <no location info> }
        (HsVar
+        (NoExt)
         ({ <no location info> }
          {Var: GHC.Types.krep$*})))))
     (False)))
  ,({ <no location info> }
    (VarBind
+    (NoExt)
     {Var: DumpTypecheckedAst.$tc'Zero}
     ({ <no location info> }
      (HsApp
+      (NoExt)
       ({ <no location info> }
        (HsApp
+        (NoExt)
         ({ <no location info> }
          (HsApp
+          (NoExt)
           ({ <no location info> }
            (HsApp
+            (NoExt)
             ({ <no location info> }
              (HsApp
+              (NoExt)
               ({ <no location info> }
                (HsApp
+                (NoExt)
                 ({ <no location info> }
                  (HsConLikeOut
+                  (NoExt)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
+                  (NoExt)
                   {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
+                (NoExt)
                 {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
+              (NoExt)
               ({ <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
+            (NoExt)
             ({ <no location info> }
              (HsApp
+              (NoExt)
               ({ <no location info> }
                (HsConLikeOut
+                (NoExt)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
+                (NoExt)
                 (HsStringPrim
                  (NoSourceText)
                  "'Zero")))))))))
         ({ <no location info> }
          (HsLit
+          (NoExt)
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       ({ <no location info> }
        (HsVar
+        (NoExt)
         ({ <no location info> }
          {Var: $krep})))))
     (False)))
  ,({ <no location info> }
    (VarBind
+    (NoExt)
     {Var: DumpTypecheckedAst.$tc'Succ}
     ({ <no location info> }
      (HsApp
+      (NoExt)
       ({ <no location info> }
        (HsApp
+        (NoExt)
         ({ <no location info> }
          (HsApp
+          (NoExt)
           ({ <no location info> }
            (HsApp
+            (NoExt)
             ({ <no location info> }
              (HsApp
+              (NoExt)
               ({ <no location info> }
                (HsApp
+                (NoExt)
                 ({ <no location info> }
                  (HsConLikeOut
+                  (NoExt)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
+                  (NoExt)
                   {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
+                (NoExt)
                 {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
+              (NoExt)
               ({ <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
+            (NoExt)
             ({ <no location info> }
              (HsApp
+              (NoExt)
               ({ <no location info> }
                (HsConLikeOut
+                (NoExt)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
+                (NoExt)
                 (HsStringPrim
                  (NoSourceText)
                  "'Succ")))))))))
         ({ <no location info> }
          (HsLit
+          (NoExt)
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       ({ <no location info> }
        (HsVar
+        (NoExt)
         ({ <no location info> }
          {Var: $krep})))))
     (False)))
  ,({ <no location info> }
    (VarBind
+    (NoExt)
     {Var: $krep}
     ({ <no location info> }
      (HsApp
+      (NoExt)
       ({ <no location info> }
        (HsApp
+        (NoExt)
         ({ <no location info> }
          (HsConLikeOut
+          (NoExt)
           ({abstract:ConLike})))
         ({ <no location info> }
          (HsVar
+          (NoExt)
           ({ <no location info> }
            {Var: $krep})))))
       ({ <no location info> }
        (HsVar
+        (NoExt)
         ({ <no location info> }
          {Var: $krep})))))
     (False)))
  ,({ <no location info> }
    (VarBind
+    (NoExt)
     {Var: $krep}
     ({ <no location info> }
      (HsApp
+      (NoExt)
       ({ <no location info> }
        (HsApp
+        (NoExt)
         ({ <no location info> }
          (HsConLikeOut
+          (NoExt)
           ({abstract:ConLike})))
         ({ <no location info> }
          (HsVar
+          (NoExt)
           ({ <no location info> }
            {Var: DumpTypecheckedAst.$tcPeano})))))
       ({ <no location info> }
        (HsWrap
+        (NoExt)
         (WpTyApp
          (TyConApp
           ({abstract:TyCon})
           []))
         (HsConLikeOut
+         (NoExt)
          ({abstract:ConLike}))))))
     (False)))
  ,({ <no location info> }
    (VarBind
+    (NoExt)
     {Var: DumpTypecheckedAst.$trModule}
     ({ <no location info> }
      (HsApp
+      (NoExt)
       ({ <no location info> }
        (HsApp
+        (NoExt)
         ({ <no location info> }
          (HsConLikeOut
+          (NoExt)
           ({abstract:ConLike})))
         ({ <no location info> }
          (HsPar
+          (NoExt)
           ({ <no location info> }
            (HsApp
+            (NoExt)
             ({ <no location info> }
              (HsConLikeOut
+              (NoExt)
               ({abstract:ConLike})))
             ({ <no location info> }
              (HsLit
+              (NoExt)
               (HsStringPrim
                (NoSourceText)
                "main")))))))))
       ({ <no location info> }
        (HsPar
+        (NoExt)
         ({ <no location info> }
          (HsApp
+          (NoExt)
           ({ <no location info> }
            (HsConLikeOut
+            (NoExt)
             ({abstract:ConLike})))
           ({ <no location info> }
            (HsLit
+            (NoExt)
             (HsStringPrim
              (NoSourceText)
              "DumpTypecheckedAst")))))))))
     (False)))
  ,({ DumpTypecheckedAst.hs:11:1-23 }
    (AbsBinds
+    (NoExt)
     []
     []
     [(ABE
+      (NoExt)
       {Var: main}
       {Var: main}
       (WpHole)
@@ -240,12 +318,22 @@
     {Bag(Located (HsBind Var)):
      [({ DumpTypecheckedAst.hs:11:1-23 }
        (FunBind
+        {NameSet:
+         []}
         ({ DumpTypecheckedAst.hs:11:1-4 }
          {Var: main})
         (MG
+         (MatchGroupTc
+          []
+          (TyConApp
+           ({abstract:TyCon})
+           [(TyConApp
+             ({abstract:TyCon})
+             [])]))
          ({ DumpTypecheckedAst.hs:11:1-23 }
           [({ DumpTypecheckedAst.hs:11:1-23 }
             (Match
+             (NoExt)
              (FunRhs
               ({ DumpTypecheckedAst.hs:11:1-4 }
                {Name: main})
@@ -253,33 +341,31 @@
               (NoSrcStrict))
              []
              (GRHSs
+              (NoExt)
               [({ DumpTypecheckedAst.hs:11:6-23 }
                 (GRHS
+                 (NoExt)
                  []
                  ({ DumpTypecheckedAst.hs:11:8-23 }
                   (HsApp
+                   (NoExt)
                    ({ DumpTypecheckedAst.hs:11:8-15 }
                     (HsVar
+                     (NoExt)
                      ({ <no location info> }
                       {Var: putStrLn})))
                    ({ DumpTypecheckedAst.hs:11:17-23 }
                     (HsLit
+                     (NoExt)
                      (HsString
                       (SourceText
                        "\"hello\"")
                       {FastString: "hello"})))))))]
               ({ <no location info> }
-               (EmptyLocalBinds)))))])
-         []
-         (TyConApp
-          ({abstract:TyCon})
-          [(TyConApp
-            ({abstract:TyCon})
-            [])])
+               (EmptyLocalBinds
+                (NoExt))))))])
          (FromSource))
         (WpHole)
-        {NameSet:
-         []}
         []))]}
     (False)))]}
 

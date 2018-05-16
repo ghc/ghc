@@ -200,8 +200,8 @@ rnImports imports = do
       new_finsts = imp_finsts imp_avails1
 
 {-
-Note [Combine ImportAvails]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Combining ImportAvails]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 imp_finsts in ImportAvails is a list of family instance modules
 transitively depended on by an import. imp_finsts for a currently
 compiled module is a union of all the imp_finsts of imports.
@@ -261,7 +261,9 @@ Running generateModules from Trac #14693 with DEPTH=16, WIDTH=30 finishes in
 rnImportDecl  :: Module -> LImportDecl GhcPs
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
-             (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
+             (L loc decl@(ImportDecl { ideclExt = noExt
+                                     , ideclName = loc_imp_mod_name
+                                     , ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_only, ideclImplicit = implicit
                                      , ideclAs = as_mod, ideclHiding = imp_details }))
@@ -370,10 +372,11 @@ rnImportDecl this_mod
           _           -> return ()
      )
 
-    let new_imp_decl = L loc (decl { ideclSafe = mod_safe'
+    let new_imp_decl = L loc (decl { ideclExt = noExt, ideclSafe = mod_safe'
                                    , ideclHiding = new_imp_details })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
+rnImportDecl _ (L _ (XImportDecl _)) = panic "rnImportDecl"
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
@@ -659,7 +662,7 @@ getLocalNonValBinders fixity_env
         ; traceRn "getLocalNonValBinders 3" (vcat [ppr flds, ppr field_env])
         ; return (envs, new_bndrs) } }
   where
-    ValBindsIn _val_binds val_sigs = binds
+    ValBinds _ _val_binds val_sigs = binds
 
     for_hs_bndrs :: [Located RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
@@ -667,7 +670,7 @@ getLocalNonValBinders fixity_env
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
     hs_boot_sig_bndrs = [ L decl_loc (unLoc n)
-                        | L decl_loc (TypeSig ns _) <- val_sigs, n <- ns]
+                        | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name
@@ -712,20 +715,21 @@ getLocalNonValBinders fixity_env
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
 
-        find_con_decl_fld  (L _ (FieldOcc (L _ rdr) _))
+        find_con_decl_fld  (L _ (FieldOcc _ (L _ rdr)))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
+        find_con_decl_fld (L _ (XFieldOcc _)) = panic "getLocalNonValBinders"
 
     new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
     new_assoc _ (L _ (TyFamInstD {})) = return ([], [])
       -- type instances don't bind new names
 
-    new_assoc overload_ok (L _ (DataFamInstD d))
+    new_assoc overload_ok (L _ (DataFamInstD _ d))
       = do { (avail, flds) <- new_di overload_ok Nothing d
            ; return ([avail], flds) }
-    new_assoc overload_ok (L _ (ClsInstD (ClsInstDecl { cid_poly_ty = inst_ty
+    new_assoc overload_ok (L _ (ClsInstD _ (ClsInstDecl { cid_poly_ty = inst_ty
                                                       , cid_datafam_insts = adts })))
       | Just (L loc cls_rdr) <- getLHsInstDeclClass_maybe inst_ty
       = do { cls_nm <- setSrcSpan loc $ lookupGlobalOccRn cls_rdr
@@ -735,6 +739,8 @@ getLocalNonValBinders fixity_env
       | otherwise
       = return ([], [])    -- Do not crash on ill-formed instances
                            -- Eg   instance !Show Int   Trac #3811c
+    new_assoc _ (L _ (ClsInstD _ (XClsInstDecl _))) = panic "new_assoc"
+    new_assoc _ (L _ (XInstDecl _))                 = panic "new_assoc"
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
@@ -748,14 +754,17 @@ getLocalNonValBinders fixity_env
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
+    new_di _ _ (DataFamInstDecl (XHsImplicitBndrs _)) = panic "new_di"
 
     new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
+getLocalNonValBinders _ (XHsGroup _) = panic "getLocalNonValBinders"
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
+newRecordSelector _ _ (L _ (XFieldOcc _)) = panic "newRecordSelector"
+newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
   where
@@ -933,12 +942,12 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
               -> IELookupM ([(IE GhcRn, AvailInfo)], [IELookupWarning])
     lookup_ie ie = handle_bad_import $ do
       case ie of
-        IEVar (L l n) -> do
+        IEVar _ (L l n) -> do
             (name, avail, _) <- lookup_name $ ieWrappedName n
-            return ([(IEVar (L l (replaceWrappedName n name)),
+            return ([(IEVar noExt (L l (replaceWrappedName n name)),
                                                   trimAvail avail name)], [])
 
-        IEThingAll (L l tc) -> do
+        IEThingAll _ (L l tc) -> do
             (name, avail, mb_parent) <- lookup_name $ ieWrappedName tc
             let warns = case avail of
                           Avail {}                     -- e.g. f(..)
@@ -954,7 +963,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                             | otherwise
                             -> []
 
-                renamed_ie = IEThingAll (L l (replaceWrappedName tc name))
+                renamed_ie = IEThingAll noExt (L l (replaceWrappedName tc name))
                 sub_avails = case avail of
                                Avail {}              -> []
                                AvailTC name2 subs fs -> [(renamed_ie, AvailTC name2 (subs \\ [name]) fs)]
@@ -964,7 +973,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
               Just parent -> return ((renamed_ie, AvailTC parent [name] []) : sub_avails, warns)
                              -- associated type
 
-        IEThingAbs (L l tc')
+        IEThingAbs _ (L l tc')
             | want_hiding   -- hiding ( C )
                        -- Here the 'C' can be a data constructor
                        --  *or* a type/class, or even both
@@ -980,7 +989,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                   return ([mkIEThingAbs tc' l nameAvail]
                          , [])
 
-        IEThingWith (L l rdr_tc) wc rdr_ns' rdr_fs ->
+        IEThingWith _ (L l rdr_tc) wc rdr_ns' rdr_fs ->
           ASSERT2(null rdr_fs, ppr rdr_fs) do
            (name, AvailTC _ ns subflds, mb_parent)
                                          <- lookup_name (ieWrappedName rdr_tc)
@@ -998,8 +1007,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                case mb_parent of
                  -- non-associated ty/cls
                  Nothing
-                   -> return ([(IEThingWith (L l name') wc childnames'
-                                                           childflds,
+                   -> return ([(IEThingWith noExt (L l name') wc childnames'
+                                                                 childflds,
                                AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
                               [])
                    where name' = replaceWrappedName rdr_tc name
@@ -1007,10 +1016,10 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                          -- childnames' = postrn_ies childnames
                  -- associated ty
                  Just parent
-                   -> return ([(IEThingWith (L l name') wc childnames'
+                   -> return ([(IEThingWith noExt (L l name') wc childnames'
                                                            childflds,
                                 AvailTC name (map unLoc childnames) (map unLoc childflds)),
-                               (IEThingWith (L l name') wc childnames'
+                               (IEThingWith noExt (L l name') wc childnames'
                                                            childflds,
                                 AvailTC parent [name] [])],
                               [])
@@ -1023,9 +1032,10 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
       where
         mkIEThingAbs tc l (n, av, Nothing    )
-          = (IEThingAbs (L l (replaceWrappedName tc n)), trimAvail av n)
+          = (IEThingAbs noExt (L l (replaceWrappedName tc n)), trimAvail av n)
         mkIEThingAbs tc l (n, _,  Just parent)
-          = (IEThingAbs (L l (replaceWrappedName tc n)), AvailTC parent [n] [])
+          = (IEThingAbs noExt (L l (replaceWrappedName tc n))
+             , AvailTC parent [n] [])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport | want_hiding -> return ([], [BadImportW])
@@ -1069,8 +1079,8 @@ gresFromIE decl_spec (L loc ie, avail)
   = gresFromAvail prov_fn avail
   where
     is_explicit = case ie of
-                    IEThingAll (L _ name) -> \n -> n == ieWrappedName name
-                    _                     -> \_ -> True
+                    IEThingAll _ (L _ name) -> \n -> n == ieWrappedName name
+                    _                       -> \_ -> True
     prov_fn name
       = Just (ImpSpec { is_decl = decl_spec, is_item = item_spec })
       where
@@ -1326,13 +1336,13 @@ findImportUsage imports used_gres
               _other -> emptyNameSet -- No explicit import list => no unused-name list
 
         add_unused :: IE GhcRn -> NameSet -> NameSet
-        add_unused (IEVar (L _ n))      acc
+        add_unused (IEVar _ (L _ n))      acc
                                        = add_unused_name (ieWrappedName n) acc
-        add_unused (IEThingAbs (L _ n)) acc
+        add_unused (IEThingAbs _ (L _ n)) acc
                                        = add_unused_name (ieWrappedName n) acc
-        add_unused (IEThingAll (L _ n)) acc
+        add_unused (IEThingAll _ (L _ n)) acc
                                        = add_unused_all  (ieWrappedName n) acc
-        add_unused (IEThingWith (L _ p) wc ns fs) acc =
+        add_unused (IEThingWith _ (L _ p) wc ns fs) acc =
           add_wc_all (add_unused_with (ieWrappedName p) xs acc)
           where xs = map (ieWrappedName . unLoc) ns
                           ++ map (flSelector . unLoc) fs
@@ -1356,6 +1366,7 @@ findImportUsage imports used_gres
        -- If you use 'signum' from Num, then the user may well have
        -- imported Num(signum).  We don't want to complain that
        -- Num is not itself mentioned.  Hence the two cases in add_unused_with.
+    unused_decl (L _ (XImportDecl _)) = panic "unused_decl"
 
 extendImportMap :: GlobalRdrElt -> ImportMap -> ImportMap
 -- For each of a list of used GREs, find all the import decls that brought
@@ -1401,9 +1412,12 @@ warnUnusedImport flag fld_env (L loc decl, used, unused)
     pp_mod      = ppr (unLoc (ideclName decl))
     pp_not_used = text "is redundant"
 
+    -- In warning message, pretty-print identifiers unqualified unconditionally
+    -- to improve the consistent for ambiguous/unambiguous identifiers.
+    -- See trac#14881.
     ppr_possible_field n = case lookupNameEnv fld_env n of
-                               Just (fld, p) -> ppr p <> parens (ppr fld)
-                               Nothing  -> ppr n
+                               Just (fld, p) -> pprNameUnqualified p <> parens (ppr fld)
+                               Nothing  -> pprNameUnqualified n
 
     -- Print unused names in a deterministic (lexicographic) order
     sort_unused = pprWithCommas ppr_possible_field $
@@ -1473,25 +1487,25 @@ printMinimalImports imports_w_usage
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie _ (Avail n)
-       = [IEVar (to_ie_post_rn $ noLoc n)]
+       = [IEVar noExt (to_ie_post_rn $ noLoc n)]
     to_ie _ (AvailTC n [m] [])
-       | n==m = [IEThingAbs (to_ie_post_rn $ noLoc n)]
+       | n==m = [IEThingAbs noExt (to_ie_post_rn $ noLoc n)]
     to_ie iface (AvailTC n ns fs)
       = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
-           [xs] | all_used xs -> [IEThingAll (to_ie_post_rn $ noLoc n)]
+           [xs] | all_used xs -> [IEThingAll noExt (to_ie_post_rn $ noLoc n)]
                 | otherwise   ->
-                   [IEThingWith (to_ie_post_rn $ noLoc n) NoIEWildcard
+                   [IEThingWith noExt (to_ie_post_rn $ noLoc n) NoIEWildcard
                                 (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
                                 (map noLoc fs)]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
-                              -> map (IEVar . to_ie_post_rn_var . noLoc) $ ns
+                           -> map (IEVar noExt . to_ie_post_rn_var . noLoc) $ ns
                                  ++ map flSelector fs
                   | otherwise ->
-                      [IEThingWith (to_ie_post_rn $ noLoc n) NoIEWildcard
+                      [IEThingWith noExt (to_ie_post_rn $ noLoc n) NoIEWildcard
                                 (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
                                 (map noLoc fs)]
         where
@@ -1632,10 +1646,10 @@ dodgyMsg kind tc ie
           quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
           text "but it has none" ]
 
-dodgyMsgInsert :: forall p . IdP p -> IE p
-dodgyMsgInsert tc = IEThingAll ii
+dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
+dodgyMsgInsert tc = IEThingAll noExt ii
   where
-    ii :: LIEWrappedName (IdP p)
+    ii :: LIEWrappedName (IdP (GhcPass p))
     ii = noLoc (IEName $ noLoc tc)
 
 

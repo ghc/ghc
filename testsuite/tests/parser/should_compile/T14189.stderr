@@ -4,22 +4,31 @@
 (Just
  ((,,,)
   (HsGroup
-   (ValBindsOut
-    []
-    [])
+   (NoExt)
+   (XValBindsLR
+    (NValBinds
+      []
+      []))
    []
    [(TyClGroup
+     (NoExt)
      [({ T14189.hs:6:1-42 }
        (DataDecl
+        (DataDeclRn
+          (True)
+          {NameSet:
+           [{Name: GHC.Types.Int}]})
         ({ T14189.hs:6:6-11 }
          {Name: T14189.MyType})
         (HsQTvs
-         []
+         (HsQTvsRn
          []
          {NameSet:
           []})
+          [])
         (Prefix)
         (HsDataDefn
+         (NoExt)
          (DataType)
          ({ <no location info> }
           [])
@@ -27,6 +36,7 @@
          (Nothing)
          [({ T14189.hs:6:15-20 }
            (ConDeclH98
+            (NoExt)
             ({ T14189.hs:6:15-16 }
              {Name: T14189.MT})
             (False)
@@ -35,12 +45,14 @@
             (PrefixCon
              [({ T14189.hs:6:18-20 }
                (HsTyVar
+                (NoExt)
                 (NotPromoted)
                 ({ T14189.hs:6:18-20 }
                  {Name: GHC.Types.Int})))])
             (Nothing)))
          ,({ T14189.hs:6:24-25 }
            (ConDeclH98
+            (NoExt)
             ({ T14189.hs:6:24-25 }
              {Name: T14189.NT})
             (False)
@@ -51,6 +63,7 @@
             (Nothing)))
          ,({ T14189.hs:6:29-42 }
            (ConDeclH98
+            (NoExt)
             ({ T14189.hs:6:29 }
              {Name: T14189.F})
             (False)
@@ -60,24 +73,23 @@
              ({ T14189.hs:6:31-42 }
               [({ T14189.hs:6:33-40 }
                 (ConDeclField
+                 (NoExt)
                  [({ T14189.hs:6:33 }
                    (FieldOcc
+                    {Name: T14189.f}
                     ({ T14189.hs:6:33 }
                      (Unqual
-                      {OccName: f}))
-                    {Name: T14189.f}))]
+                      {OccName: f}))))]
                  ({ T14189.hs:6:38-40 }
                   (HsTyVar
+                   (NoExt)
                    (NotPromoted)
                    ({ T14189.hs:6:38-40 }
                     {Name: GHC.Types.Int})))
                  (Nothing)))]))
             (Nothing)))]
          ({ <no location info> }
-          []))
-        (True)
-        {NameSet:
-         [{Name: GHC.Types.Int}]}))]
+          []))))]
      []
      [])]
    []
@@ -91,6 +103,7 @@
    [])
   [({ T14189.hs:1:8-13 }
     (ImportDecl
+     (NoExt)
      (NoSourceText)
      ({ T14189.hs:1:8-13 }
       {ModuleName: Prelude})
@@ -105,6 +118,7 @@
    [((,)
      ({ T14189.hs:3:3-15 }
       (IEThingWith
+       (NoExt)
        ({ T14189.hs:3:3-8 }
         (IEName
          ({ T14189.hs:3:3-8 }

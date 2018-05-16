@@ -32,7 +32,7 @@ module TcType (
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
   strictlyDeeperThan, sameDepthAs, fmvTcLevel,
   tcTypeLevel, tcTyVarLevel, maxTcLevel,
-
+  promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
   -- MetaDetails
   UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
@@ -108,9 +108,6 @@ module TcType (
   candidateQTyVarsOfType, candidateQTyVarsOfTypes, CandidatesQTvs(..),
   anyRewritableTyVar,
 
-  -- * Extracting bound variables
-  allBoundVariables, allBoundVariabless,
-
   ---------------------------------
   -- Foreign import and export
   isFFIArgumentTy,     -- :: DynFlags -> Safety -> Type -> Bool
@@ -151,7 +148,7 @@ module TcType (
 
   -- Type substitutions
   TCvSubst(..),         -- Representation visible to a few friends
-  TvSubstEnv, emptyTCvSubst,
+  TvSubstEnv, emptyTCvSubst, mkEmptyTCvSubst,
   zipTvSubst,
   mkTvSubstPrs, notElemTCvSubst, unionTCvSubst,
   getTvSubstEnv, setTvSubstEnv, getTCvInScope, extendTCvInScope,
@@ -231,9 +228,9 @@ import ListSetOps ( getNth, findDupsEq )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
-import FV
 import qualified GHC.LanguageExtensions as LangExt
 
+import Data.List  ( mapAccumL )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import Data.Functor.Identity
@@ -329,7 +326,6 @@ GHC Trac #12785.
 -}
 
 -- See Note [TcTyVars in the typechecker]
-type TcTyVar = TyVar    -- Used only during type inference
 type TcCoVar = CoVar    -- Used only during type inference
 type TcType = Type      -- A TcType can have mutable type variables
 type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
@@ -617,6 +613,11 @@ data UserTypeCtxt
                         --      f :: <S> => a -> a
   | DataTyCtxt Name     -- The "stupid theta" part of a data decl
                         --      data <S> => T a = MkT a
+  | DerivClauseCtxt     -- A 'deriving' clause
+  | TyVarBndrKindCtxt Name  -- The kind of a type variable being bound
+  | DataKindCtxt Name   -- The kind of a data/newtype (instance)
+  | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
+  | TyFamResKindCtxt Name   -- The result kind of a type family
 
 {-
 -- Notes re TySynCtxt
@@ -652,6 +653,11 @@ pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes
 pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
 pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
 pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
+pprUserTypeCtxt (DerivClauseCtxt) = text "a `deriving' clause"
+pprUserTypeCtxt (TyVarBndrKindCtxt n) = text "the kind annotation on the type variable" <+> quotes (ppr n)
+pprUserTypeCtxt (DataKindCtxt n)  = text "the kind annotation on the declaration for" <+> quotes (ppr n)
+pprUserTypeCtxt (TySynKindCtxt n) = text "the kind annotation on the declaration for" <+> quotes (ppr n)
+pprUserTypeCtxt (TyFamResKindCtxt n) = text "the result kind for" <+> quotes (ppr n)
 
 isSigMaybe :: UserTypeCtxt -> Maybe Name
 isSigMaybe (FunSigCtxt n _) = Just n
@@ -793,6 +799,7 @@ tcTyVarLevel tv
           SkolemTv tv_lvl _             -> tv_lvl
           RuntimeUnk                    -> topTcLevel
 
+
 tcTypeLevel :: TcType -> TcLevel
 -- Max level of any free var of the type
 tcTypeLevel ty
@@ -800,10 +807,36 @@ tcTypeLevel ty
   where
     add v lvl
       | isTcTyVar v = lvl `maxTcLevel` tcTyVarLevel v
-      | otherwise   = lvl
+      | otherwise = lvl
 
 instance Outputable TcLevel where
   ppr (TcLevel us) = ppr us
+
+promoteSkolem :: TcLevel -> TcTyVar -> TcTyVar
+promoteSkolem tclvl skol
+  | tclvl < tcTyVarLevel skol
+  = ASSERT( isTcTyVar skol && isSkolemTyVar skol )
+    setTcTyVarDetails skol (SkolemTv tclvl (isOverlappableTyVar skol))
+
+  | otherwise
+  = skol
+
+-- | Change the TcLevel in a skolem, extending a substitution
+promoteSkolemX :: TcLevel -> TCvSubst -> TcTyVar -> (TCvSubst, TcTyVar)
+promoteSkolemX tclvl subst skol
+  = ASSERT( isTcTyVar skol && isSkolemTyVar skol )
+    (new_subst, new_skol)
+  where
+    new_skol
+      | tclvl < tcTyVarLevel skol
+      = setTcTyVarDetails (updateTyVarKind (substTy subst) skol)
+                          (SkolemTv tclvl (isOverlappableTyVar skol))
+      | otherwise
+      = updateTyVarKind (substTy subst) skol
+    new_subst = extendTvSubstWithClone subst skol new_skol
+
+promoteSkolemsX :: TcLevel -> TCvSubst -> [TcTyVar] -> (TCvSubst, [TcTyVar])
+promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 
 {- *********************************************************************
 *                                                                      *
@@ -908,7 +941,7 @@ exactTyCoVarsOfType ty
     goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
     goCo (SymCo co)          = goCo co
     goCo (TransCo co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (NthCo _ co)        = goCo co
+    goCo (NthCo _ _ co)      = goCo co
     goCo (LRCo _ co)         = goCo co
     goCo (InstCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (CoherenceCo c1 c2) = goCo c1 `unionVarSet` goCo c2
@@ -983,33 +1016,6 @@ Moreover, if we were to kick out the inert item the exact same situation
 would re-occur and we end up with an infinite loop in which each kicks
 out the other (Trac #14363).
 -}
-
-{- *********************************************************************
-*                                                                      *
-          Bound variables in a type
-*                                                                      *
-********************************************************************* -}
-
--- | Find all variables bound anywhere in a type.
--- See also Note [Scope-check inferred kinds] in TcHsType
-allBoundVariables :: Type -> TyVarSet
-allBoundVariables ty = fvVarSet $ go ty
-  where
-    go :: Type -> FV
-    go (TyVarTy tv)     = go (tyVarKind tv)
-    go (TyConApp _ tys) = mapUnionFV go tys
-    go (AppTy t1 t2)    = go t1 `unionFV` go t2
-    go (FunTy t1 t2)    = go t1 `unionFV` go t2
-    go (ForAllTy (TvBndr tv _) t2) = FV.unitFV tv `unionFV`
-                                    go (tyVarKind tv) `unionFV` go t2
-    go (LitTy {})       = emptyFV
-    go (CastTy ty _)    = go ty
-    go (CoercionTy {})  = emptyFV
-      -- any types mentioned in a coercion should also be mentioned in
-      -- a type.
-
-allBoundVariabless :: [Type] -> TyVarSet
-allBoundVariabless = mapUnionVarSet allBoundVariables
 
 {- *********************************************************************
 *                                                                      *

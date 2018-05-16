@@ -13,6 +13,13 @@ Highlights
 
 The highlights, since the 8.4.1 release, are:
 
+- Programs are no longer constrained by the Windows ``MAX_PATH`` file path
+  length limit. The file path limit is now approximately 32,767 characters. Note
+  that GHC itself is still somewhat limited due to GCC not supporting file
+  namespaced paths. Paths that are passed directly to the compiler, linker or
+  other GNU tools are currently still constrained. See :ref:`windows-file-paths`
+  for details.
+
 - Many, many bug fixes.
 
 
@@ -21,6 +28,16 @@ Full details
 
 Language
 ~~~~~~~~
+- GHC now permits the use of a wildcard type as the context of a standalone
+  ``deriving`` declaration with the use of the
+  :extension:`PartialTypeSignatures` language extension. For instance, this
+  declaration: ::
+
+    deriving instance _ => Eq (Foo a)
+
+  Denotes a derived ``Eq (Foo a)`` instance, where the context is inferred in
+  much the same way as ordinary ``deriving`` clauses do.
+  See :ref:`partial-type-signatures`.
 
 - Data declarations with empty ``where`` clauses are no longer valid without the
   extension :extension:`GADTSyntax` enabled. For instance, consider the
@@ -47,6 +64,38 @@ Language
 
   See :ghc-ticket:`14773`.
 
+- Scoped type variables now work in default methods of class declarations
+  and in pattern synonyms in Template Haskell. See :ghc-ticket:`14885`.
+
+- ``do`` expressions, lambda expressions, etc. to be directly used as
+  a function argument, enabled with :extension:`BlockArguments`.
+  See :ref:`More liberal syntax for function arguments <block-arguments>`
+  for the full details.
+
+- Underscores in numeric literals (e.g. ``1_000_000``), enabled with
+  :extension:`NumericUnderscores`.
+  See :ref:`Numeric underscores <numeric-underscores>`
+  for the full details.
+
+- GHC is now more diligent about catching illegal uses of kind polymorphism.
+  For instance, this used to be accepted without :extension:`PolyKinds`: ::
+
+    class C a where
+      c :: Proxy (x :: a)
+
+  Despite the fact that ``a`` is used as a kind variable in the type signature
+  for ``c``. This is now an error unless :extension:`PolyKinds` is explicitly
+  enabled.
+
+  Moreover, GHC 8.4 would accept the following without the use of
+  :extension:`TypeInType` (or even :extension:`PolyKinds`!): ::
+
+    f :: forall k (a :: k). Proxy a
+    f = Proxy
+
+  Despite the fact that ``k`` is used as both a type and kind variable. This is
+  now an error unless :extension:`TypeInType` is explicitly enabled.
+
 Compiler
 ~~~~~~~~
 
@@ -56,6 +105,15 @@ Compiler
 
 - GHC now supports British spelling of :extension:`GeneralizedNewtypeDeriving`.
 
+- GHC now does significantly more constant folding in its core-to-core optimiser.
+  This will result in significantly better code being generated for some
+  programs. See :ghc-ticket:`9136`.
+
+- The code-generation effects of :ghc-flag:`-dynamic` can now be
+  enabled independently by the flag
+  :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
+  need this, you don't need it.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -64,12 +122,17 @@ Runtime system
   else. This fixes ``iuuc`` on Windows given the proper search directories (e.g
   ``-L/mingw64/lib``).
 
-	- The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
-	  searches ``LD_LIBRARY_PATH``.
+- The GHC runtime linker now uses ``LIBRARY_PATH`` and the runtime loader now also
+  searches ``LD_LIBRARY_PATH``.
+
+- The GHC runtime on Windows is no longer constrained by the ``MAX_PATH`` file path
+  length limitation. See :ref:`windows-file-paths`.
+
+- The runtime now allows use of the :rts-flag:`-hT` profiling variety on
+  programs built with :ghc-flag:`-prof`.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
-
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
@@ -81,10 +144,16 @@ Template Haskell
 - ``($!)`` is now representation-polymorphic like ``($)``.
 
 - The module ``Data.Functor.Contravariant`` has been moved from the
-  ``contravariant`` package into base. All the other modules in
+  ``contravariant`` package into ``base``. All the other modules in
   ``contravariant`` (``Data.Functor.Contravariant.Divisible``, etc.)
   have not been moved to ``base``, and they still reside in ``contravariant``.
 
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+-  Version number 0.5.2.1 (was 0.5.2.0)
+
+-  Added new ``addWordC#`` operation for unsigned addition with carry.
 
 Build system
 ~~~~~~~~~~~~

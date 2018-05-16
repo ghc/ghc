@@ -106,6 +106,8 @@ test('T8501a', normal, compile_fail, [''])
 test('T8501b', normal, compile_fail, [''])
 test('T8501c', normal, compile_fail, [''])
 test('T12610', normal, compile_fail, [''])
+test('T13450', normal, compile_fail, [''])
+test('T13450TH', normal, compile_fail, [''])
 test('T14588', normal, compile_fail, [''])
 test('T14740', normal, compile_fail, [''])
 
@@ -115,3 +117,5 @@ test('NumericUnderscoresFail0',
      grep_errmsg(r'^NumericUnderscoresFail0.hs:'), compile_fail, [''])
 test('NumericUnderscoresFail1',
      grep_errmsg(r'^NumericUnderscoresFail1.hs:'), compile_fail, [''])
+
+test('InfixAppPatErr', normal, compile_fail, [''])

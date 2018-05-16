@@ -302,6 +302,7 @@ retry:
         // This could happen, if e.g. we got a BLOCKING_QUEUE that has
         // just been replaced with an IND by another thread in
         // wakeBlockingQueue().
+        // See Note [BLACKHOLE pointing to IND] in sm/Evac.c
         goto retry;
     }
 
@@ -375,11 +376,21 @@ loop:
     // spin until the WHITEHOLE is updated
     info = StgHeader_info(node);
     if (info == stg_WHITEHOLE_info) {
+#if defined(PROF_SPIN)
+        W_[whitehole_lockClosure_spin] =
+            W_[whitehole_lockClosure_spin] + 1;
+#endif
         i = i + 1;
         if (i == SPIN_COUNT) {
             i = 0;
+#if defined(PROF_SPIN)
+            W_[whitehole_lockClosure_yield] =
+                W_[whitehole_lockClosure_yield] + 1;
+#endif
             ccall yieldThread();
         }
+        // TODO: We should busy_wait_nop() here, but that's not currently
+        // defined in CMM.
         goto loop;
     }
     jump %ENTRY_CODE(info) (node);
@@ -507,7 +518,60 @@ CLOSURE(stg_END_STM_CHUNK_LIST_closure,stg_END_STM_CHUNK_LIST);
 CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
 
 /* ----------------------------------------------------------------------------
-   Messages
+   SRTs
+
+   See Note [SRTs] in compiler/cmm/CmmBuildInfoTable.hs
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(stg_SRT_1, 1, 0, 0, CONSTR, "SRT_1", "SRT_1")
+{ foreign "C" barf("SRT_1 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_2, 2, 0, 0, CONSTR, "SRT_2", "SRT_2")
+{ foreign "C" barf("SRT_2 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_3, 3, 0, 0, CONSTR, "SRT_3", "SRT_3")
+{ foreign "C" barf("SRT_3 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_4, 4, 0, 0, CONSTR, "SRT_4", "SRT_4")
+{ foreign "C" barf("SRT_4 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_5, 5, 0, 0, CONSTR, "SRT_5", "SRT_5")
+{ foreign "C" barf("SRT_5 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_6, 6, 0, 0, CONSTR, "SRT_6", "SRT_6")
+{ foreign "C" barf("SRT_6 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_7, 7, 0, 0, CONSTR, "SRT_7", "SRT_7")
+{ foreign "C" barf("SRT_7 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_8, 8, 0, 0, CONSTR, "SRT_8", "SRT_8")
+{ foreign "C" barf("SRT_8 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_9, 9, 0, 0, CONSTR, "SRT_9", "SRT_9")
+{ foreign "C" barf("SRT_9 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_10, 10, 0, 0, CONSTR, "SRT_10", "SRT_10")
+{ foreign "C" barf("SRT_10 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_11, 11, 0, 0, CONSTR, "SRT_11", "SRT_11")
+{ foreign "C" barf("SRT_11 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_12, 12, 0, 0, CONSTR, "SRT_12", "SRT_12")
+{ foreign "C" barf("SRT_12 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_13, 13, 0, 0, CONSTR, "SRT_13", "SRT_13")
+{ foreign "C" barf("SRT_13 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_14, 14, 0, 0, CONSTR, "SRT_14", "SRT_14")
+{ foreign "C" barf("SRT_14 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_15, 15, 0, 0, CONSTR, "SRT_15", "SRT_15")
+{ foreign "C" barf("SRT_15 object entered!") never returns; }
+
+INFO_TABLE_CONSTR(stg_SRT_16, 16, 0, 0, CONSTR, "SRT_16", "SRT_16")
+{ foreign "C" barf("SRT_16 object entered!") never returns; }
+
+/* ---------------------------------------------------------------------------   Messages
    ------------------------------------------------------------------------- */
 
 // PRIM rather than CONSTR, because PRIM objects cannot be duplicated by the GC.

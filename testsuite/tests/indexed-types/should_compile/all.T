@@ -192,8 +192,14 @@ test('T7489', normal, compile, [''])
 test('T7585', normal, compile, [''])
 test('T7282', normal, compile, [''])
 test('T7804', normal, compile, [''])
-test('T7837', expect_broken_for(9406, prof_ways), compile,
+
+# This test has sometimes been marked as
+# expect_broken_for(9406, prof_ways),
+# so ticket #9406 can be used to track
+# future failures as well.
+test('T7837', normal, compile,
      ['-O -ddump-rule-firings'])
+
 test('T4185', normal, compile, [''])
 
 # Caused infinite loop in the compiler
@@ -273,3 +279,4 @@ test('T14162', normal, compile, [''])
 test('T14237', normal, compile, [''])
 test('T14554', normal, compile, [''])
 test('T14680', normal, compile, [''])
+test('T15057', normal, compile, [''])
