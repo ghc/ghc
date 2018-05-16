@@ -988,4 +988,7 @@ mk_ww_local :: Unique -> (Weighted Type, StrictnessMark) -> Id
 -- See Note [Record evaluated-ness in worker/wrapper]
 mk_ww_local uniq (Weighted w ty,str)
   = setCaseBndrEvald str $
-    mkSysLocalOrCoVar (fsLit "ww") uniq w ty
+    mkSysLocalOrCoVar (fsLit "ww") uniq Omega ty
+    -- MattP: TODO - Imprecise and should be passed from call sites
+    -- but for now, we need to do this as we just generating unrestricted
+    -- wws so all binders also need to be unrestricted.
