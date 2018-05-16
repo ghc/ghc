@@ -335,7 +335,7 @@ typedef struct StgConInfoTable_ {
  * info must be a Stg[Ret|Thunk]InfoTable* (an info table that has a SRT)
  */
 #if defined(TABLES_NEXT_TO_CODE)
-#if x86_64_TARGET_ARCH
+#if defined(x86_64_TARGET_ARCH)
 #define GET_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
 #else
@@ -362,7 +362,7 @@ typedef struct StgConInfoTable_ {
  * info must be a StgFunInfoTable*
  */
 #if defined(TABLES_NEXT_TO_CODE)
-#if x86_64_TARGET_ARCH
+#if defined(x86_64_TARGET_ARCH)
 #define GET_FUN_SRT(info) \
   ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
 #else
