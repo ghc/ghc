@@ -195,7 +195,7 @@ cvtForMangler (Statics _ datum) = do
         --  its corresponding byte string.
         cvtLit (CmmLabelDiffOff srt _ off w) = do
             srtVar <- getGlobalPtr =<< strCLabel_llvm srt
-            let srtLab = asmNameOf srtVar
+            srtLab <- asmNameOf srtVar
             return $ mkDiffOff srtLab off w
 
         cvtLit _ = error "cvtForMangler: unexpected lit."
@@ -220,11 +220,12 @@ cvtForMangler (Statics _ datum) = do
                 eol
             ]
 
-        -- TODO(kavon): consult dflags to put the right number of underscores on the name
-        asmNameOf (LMGlobalVar fs _ _ _ _ _) = let
-                llName = "_" ++ unpackFS fs
-            in
-                B.pack llName
+        asmNameOf (LMGlobalVar fs _ _ _ _ _) = do
+            dflags <- getDynFlags
+            return $ B.pack $ case platformOS (targetPlatform dflags) of
+              OSDarwin -> "_" ++ unpackFS fs
+              OSLinux  -> unpackFS fs
+              _        -> panic "please update cvtForMangler"
 
         asmNameOf _ = error "asmNameOf -- unexpected name kind"
 
