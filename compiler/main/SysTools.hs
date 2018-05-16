@@ -114,16 +114,16 @@ initLlvmConfig :: Maybe String
                 -> IO LlvmConfig
 initLlvmConfig mbMinusB
   = do
-      tgts <- readAndParse "llvm-targets" mkLlvmTarget
+      targets <- readAndParse "llvm-targets" mkLlvmTarget
       passes <- readAndParse "llvm-passes" id
-      return (tgts, passes)
+      return (targets, passes)
   where
-    readAndParse name bldr =
+    readAndParse name builder =
       do top_dir <- findTopDir mbMinusB
          let llvmConfigFile = top_dir </> name
          llvmConfigStr <- readFile llvmConfigFile
          case maybeReadFuzzy llvmConfigStr of
-           Just s -> return (fmap bldr <$> s)
+           Just s -> return (fmap builder <$> s)
            Nothing -> pgmError ("Can't parse " ++ show llvmConfigFile)
 
     mkLlvmTarget :: (String, String, String) -> LlvmTarget

@@ -1474,7 +1474,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
   where
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        optIdx = min 2 $ max 0 $ optLevel dflags  -- ensure we're in [0,2]
+        optIdx = max 0 $ min 2 $ optLevel dflags  -- ensure we're in [0,2]
         llvmOpts = case lookup optIdx $ llvmPasses dflags of
                     Just passes -> passes
                     Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
