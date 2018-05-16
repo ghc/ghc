@@ -66,7 +66,7 @@ aliases:
   - &slowtest
     run:
       name: Full Test
-      command: make slowtest SKIP_PERF_TESTS=YES
+      command: make slowtest TEST="PatternSplice T12903 T13688 T13910 T13949 T14137 T14298 T14441 T14497 T14732 T15056 T7944 T8025 T8089 compact_share ghcpkg05 scc001" SKIP_PERF_TESTS=YES
   - &bindist
     run:
       name: Create bindist
