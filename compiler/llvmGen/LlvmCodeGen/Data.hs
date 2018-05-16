@@ -164,7 +164,7 @@ genStaticLit (CmmBlock b) = genStaticLit $ CmmLabel $ infoTblLbl b
 
 genStaticLit (CmmHighStackMark)
     = panic "genStaticLit: CmmHighStackMark unsupported!"
-    
+
 
 -- | Convert a CmmStatic into a byte string for the LLVM mangler.
 -- The mangler will insert the ManglerStr representations of the
@@ -178,38 +178,39 @@ cvtForMangler (Statics _ datum) = do
         cvtStatic :: CmmStatic -> LlvmM (B.ByteString -> B.ByteString)
         cvtStatic (CmmStaticLit lit) = cvtLit lit
         cvtStatic _ = error "cvtStatic -- unexpected static kind"
-        
+
         cvtLit (CmmInt i w) = return $ just $ B.concat [
                 szName w,
                 B.pack $ show i,
                 eol
             ]
-            
+
         -- NB: we do not check label2 of this lit because of the
         -- limitations described in CmmExpr.hs. What that boils down
         -- to is, for an info table of this form:
-        --  
+        --
         --     Statics a [..., (CmmLabelDiff _ b _), ...]
         --
         --  then a == b. We rely on this property when creating
         --  its corresponding byte string.
-        cvtLit (CmmLabelDiffOff srt _ off) = do
+        cvtLit (CmmLabelDiffOff srt _ off w) = do
             srtVar <- getGlobalPtr =<< strCLabel_llvm srt
             let srtLab = asmNameOf srtVar
-            return $ mkDiffOff srtLab off
-            
-        cvtLit _ = return $ dbg (B.pack "## some other lit for ")
-        
-        mkDiffOff srt 0 mine = B.concat [
-                szName W64,
+            return $ mkDiffOff srtLab off w
+
+        cvtLit _ = error "cvtForMangler: unexpected lit."
+        -- return $ dbg (B.pack "## some other lit for ")
+
+        mkDiffOff srt 0 w mine = B.concat [
+                szName w,
                 srt,
                 B.pack "-",
                 mine,
                 eol
             ]
-        
-        mkDiffOff srt off mine = B.concat [
-                szName W64,
+
+        mkDiffOff srt off w mine = B.concat [
+                szName w,
                 B.pack "(",
                 srt,
                 B.pack "-",
@@ -218,38 +219,38 @@ cvtForMangler (Statics _ datum) = do
                 B.pack ("+" ++ show off),
                 eol
             ]
-        
+
         -- TODO(kavon): consult dflags to put the right number of underscores on the name
         asmNameOf (LMGlobalVar fs _ _ _ _ _) = let
                 llName = "_" ++ unpackFS fs
             in
                 B.pack llName
-                
+
         asmNameOf _ = error "asmNameOf -- unexpected name kind"
-        
-        
-        
-        
-        -- XXX delete me later
-        dbg bstr lab = B.concat [bstr, lab, eol]
-            
+
+
+
+
+        -- XXX(kavon) delete me later
+        -- dbg bstr lab = B.concat [bstr, lab, eol]
+
         szName :: Width -> B.ByteString
         szName W8 = B.pack "\t.byte\t"
         szName W16 = B.pack "\t.value\t"
         szName W32 = B.pack "\t.long\t"
         szName W64 = B.pack "\t.quad\t"
         szName _ = error "szName -- invalid CmmInt width"
-        
+
         eol = B.pack "\n"
         align = B.pack "\t.p2align\t4, 0x90\n"
         just bstr _ = bstr
-        
+
         -- eol = "\n"
-        -- 
-        -- emitInfo label (Statics _ statics) = 
+        --
+        -- emitInfo label (Statics _ statics) =
         --     -- TODO(kavon): maybe put an alignment directive first?
         --     B.concat $ (map staticToByteStr statics) ++ [label]
-        --     
+        --
         -- staticToByteStr :: CmmStatic -> B.ByteString
         -- staticToByteStr (CmmUninitialised sz) = let
         --         width = gcd sz 8
@@ -257,13 +258,11 @@ cvtForMangler (Statics _ datum) = do
         --         name = szName width
         --     in
         --         B.pack $ name ++ (intersperse ',' zeroes) ++ eol
-        -- 
+        --
         -- staticToByteStr (CmmStaticLit (CmmLabelDiffOff _ _ _)) = B.pack "# label diff static\n"
-        --         
+        --
         -- staticToByteStr _ = B.pack "# todo: other static\n"
-        --         
+        --
         -- -- TODO(kavon): does this change on ARM?
         -- -- translate a size (in bytes) to its assembly directive, followed by a space.
-        -- 
-        
-        
+        --
