@@ -143,6 +143,7 @@ library
                       rts/storage/ClosureTypes.h
                       rts/storage/Closures.h
                       rts/storage/FunTypes.h
+                      rts/storage/Heap.h
                       rts/storage/GC.h
                       rts/storage/InfoTables.h
                       rts/storage/MBlock.h
@@ -358,6 +359,7 @@ library
                FileLock.c
                Globals.c
                Hash.c
+               Heap.c
                Hpc.c
                HsFFI.c
                Inlines.c

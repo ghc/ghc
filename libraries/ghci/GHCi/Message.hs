@@ -23,12 +23,12 @@ module GHCi.Message
   ) where
 
 import GHCi.RemoteTypes
-import GHCi.InfoTable (StgInfoTable)
 import GHCi.FFI
 import GHCi.TH.Binary ()
 import GHCi.BreakArray
 
 import GHC.LanguageExtensions
+import GHC.Exts.Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
 import Control.Concurrent

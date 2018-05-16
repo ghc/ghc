@@ -2020,70 +2020,44 @@ stg_mkApUpd0zh ( P_ bco )
 
 stg_unpackClosurezh ( P_ closure )
 {
-    W_ clos, info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
-    clos  = UNTAG(closure);
-    info  = %GET_STD_INFO(clos);
+    W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
+    info  = %GET_STD_INFO(UNTAG(closure));
 
-    // Some closures have non-standard layout, so we omit those here.
-    W_ type;
-    type = TO_W_(%INFO_TYPE(info));
-    switch [0 .. N_CLOSURE_TYPES] type {
-    case THUNK_SELECTOR : {
-        ptrs = 1;
-        nptrs = 0;
-        goto out;
-    }
-    case THUNK, THUNK_1_0, THUNK_0_1, THUNK_2_0, THUNK_1_1,
-         THUNK_0_2, THUNK_STATIC, AP, PAP, AP_STACK, BCO : {
-        ptrs = 0;
-        nptrs = 0;
-        goto out;
-    }
-    default: {
-        ptrs  = TO_W_(%INFO_PTRS(info));
-        nptrs = TO_W_(%INFO_NPTRS(info));
-        goto out;
-    }}
+    ptrs  = TO_W_(%INFO_PTRS(info));
+    nptrs = TO_W_(%INFO_NPTRS(info));
 
-out:
-    W_ ptrs_arr_sz, ptrs_arr_cards, nptrs_arr_sz;
-    nptrs_arr_sz = SIZEOF_StgArrBytes   + WDS(nptrs);
-    ptrs_arr_cards = mutArrPtrsCardWords(ptrs);
-    ptrs_arr_sz  = SIZEOF_StgMutArrPtrs + WDS(ptrs) + WDS(ptrs_arr_cards);
+    W_ clos;
+    clos = UNTAG(closure);
 
-    ALLOC_PRIM_P (ptrs_arr_sz + nptrs_arr_sz, stg_unpackClosurezh, closure);
+    W_ len;
+    // The array returned is the raw data for the entire closure.
+    // The length is variable based upon the closure type, ptrs, and non-ptrs
+    (len) = foreign "C" heap_view_closureSize(clos "ptr");
 
-    ptrs_arr  = Hp - nptrs_arr_sz - ptrs_arr_sz + WDS(1);
-    nptrs_arr = Hp - nptrs_arr_sz + WDS(1);
+    W_ ptrs_arr_sz, ptrs_arr_cards, dat_arr_sz;
+    dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
 
-    SET_HDR(ptrs_arr, stg_MUT_ARR_PTRS_FROZEN_info, CCCS);
-    StgMutArrPtrs_ptrs(ptrs_arr) = ptrs;
-    StgMutArrPtrs_size(ptrs_arr) = ptrs + ptrs_arr_cards;
+    ALLOC_PRIM_P (dat_arr_sz, stg_unpackClosurezh, closure);
 
+    dat_arr = Hp - dat_arr_sz + WDS(1);
+
+
+    SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(dat_arr) = WDS(len);
     p = 0;
-
-write_ptrs:
-    if(p < ptrs) {
-         W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(clos,p);
+for:
+    if(p < len) {
+         W_[BYTE_ARR_CTS(dat_arr) + WDS(p)] = W_[clos + WDS(p)];
          p = p + 1;
-         goto write_ptrs;
-    }
-    /* We can leave the card table uninitialised, since the array is
-       allocated in the nursery.  The GC will fill it in if/when the array
-       is promoted. */
-
-    SET_HDR(nptrs_arr, stg_ARR_WORDS_info, CCCS);
-    StgArrBytes_bytes(nptrs_arr) = WDS(nptrs);
-    p = 0;
-
-write_nptrs:
-    if(p < nptrs) {
-         W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(clos, p+ptrs);
-         p = p + 1;
-         goto write_nptrs;
+         goto for;
     }
 
-    return (info, ptrs_arr, nptrs_arr);
+    W_ ptrArray;
+
+    // Follow the pointers
+    ("ptr" ptrArray) = foreign "C" heap_view_closurePtrs(MyCapability() "ptr", clos "ptr");
+
+    return (info, dat_arr, ptrArray);
 }
 
 /* -----------------------------------------------------------------------------

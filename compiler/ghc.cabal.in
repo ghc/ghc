@@ -64,6 +64,7 @@ Library
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
+                   ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
     if os(windows)
@@ -643,5 +644,4 @@ Library
             Debugger
             Linker
             RtClosureInspect
-            DebuggerUtils
             GHCi
