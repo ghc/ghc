@@ -93,7 +93,7 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-        ; case hscTarget dflags of {
+        ; info <- case hscTarget dflags of {
              HscAsm         -> outputAsm dflags this_mod location filenm
                                          linted_cmm_stream;
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
