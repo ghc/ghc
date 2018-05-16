@@ -252,16 +252,6 @@ combineReturnKinds rks = foldl combine AssignedDirectly rks
         equals (x:xs) (y:ys) = cmmEqType_ignoring_ptrhood x y && equals xs ys
         equals _ _           = False
 
-        -- debugging only XXX(kavon)
-        cmmTy2String :: [CmmType] -> String
-        cmmTy2String tys = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
-
-        -- debugging only XXX(kavon)
-        tryCheck a b = res
-            where
-                !x = trace ("\ntrying to combine: \n\t[" ++ cmmTy2String a ++ "]\n\t[" ++ cmmTy2String b ++ "]\n") ()
-                res = check a b
-
 
 -- Note [sharing continuations]
 --
