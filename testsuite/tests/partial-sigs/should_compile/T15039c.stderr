@@ -1,0 +1,55 @@
+
+T15039c.hs:19:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Dict (a ~ b)’
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 ex1 :: forall a b. Dict (a ~ b) -> ()
+               at T15039c.hs:18:1-39
+    • In a pattern type signature: _
+      In the pattern: Dict :: _
+      In an equation for ‘ex1’: ex1 (Dict :: _) = ()
+    • Relevant bindings include
+        ex1 :: Dict (a ~ b) -> () (bound at T15039c.hs:19:1)
+
+T15039c.hs:22:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Dict (a ~~ b)’
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 ex2 :: forall a b. Dict (a ~~ b) -> ()
+               at T15039c.hs:21:1-40
+    • In a pattern type signature: _
+      In the pattern: Dict :: _
+      In an equation for ‘ex2’: ex2 (Dict :: _) = ()
+    • Relevant bindings include
+        ex2 :: Dict (a ~~ b) -> () (bound at T15039c.hs:22:1)
+
+T15039c.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Dict (a ~~ b)’
+      Where: ‘a’, ‘b’, ‘k’ are rigid type variables bound by
+               the type signature for:
+                 ex3 :: forall k a (b :: k). Dict (a ~~ b) -> ()
+               at T15039c.hs:24:1-40
+    • In a pattern type signature: _
+      In the pattern: Dict :: _
+      In an equation for ‘ex3’: ex3 (Dict :: _) = ()
+    • Relevant bindings include
+        ex3 :: Dict (a ~~ b) -> () (bound at T15039c.hs:25:1)
+
+T15039c.hs:33:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Dict (Coercible a b)’
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 ex6 :: forall a b. Dict (Coercible a b) -> ()
+               at T15039c.hs:32:1-47
+    • In a pattern type signature: _
+      In the pattern: Dict :: _
+      In an equation for ‘ex6’: ex6 (Dict :: _) = ()
+    • Relevant bindings include
+        ex6 :: Dict (Coercible a b) -> () (bound at T15039c.hs:33:1)
+
+T15039c.hs:35:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘a ~R# b’
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the inferred type of ex7 :: (a ~R# b) => Coercion a b
+               at T15039c.hs:36:1-14
+    • In the type signature: ex7 :: _ => Coercion (a :: *) (b :: *)

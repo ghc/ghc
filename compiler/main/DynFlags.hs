@@ -114,6 +114,7 @@ module DynFlags (
         setUnitId,
         interpretPackageEnv,
         canonicalizeHomeModule,
+        canonicalizeModuleIfHome,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -4864,6 +4865,12 @@ canonicalizeHomeModule dflags mod_name =
     case lookup mod_name (thisUnitIdInsts dflags) of
         Nothing  -> mkModule (thisPackage dflags) mod_name
         Just mod -> mod
+
+canonicalizeModuleIfHome :: DynFlags -> Module -> Module
+canonicalizeModuleIfHome dflags mod
+    = if thisPackage dflags == moduleUnitId mod
+                      then canonicalizeHomeModule dflags (moduleName mod)
+                      else mod
 
 
 -- -----------------------------------------------------------------------------

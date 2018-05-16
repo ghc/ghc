@@ -169,7 +169,7 @@ hash_block block =
         hash_lit (CmmVec ls) = hash_list hash_lit ls
         hash_lit (CmmLabel _) = 119 -- ugh
         hash_lit (CmmLabelOff _ i) = cvt $ 199 + i
-        hash_lit (CmmLabelDiffOff _ _ i) = cvt $ 299 + i
+        hash_lit (CmmLabelDiffOff _ _ i _) = cvt $ 299 + i
         hash_lit (CmmBlock _) = 191 -- ugh
         hash_lit (CmmHighStackMark) = cvt 313
 

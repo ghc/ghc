@@ -154,6 +154,7 @@ data LlvmStatic
   -- static expressions, could split out but leave
   -- for moment for ease of use. Not many of them.
 
+  | LMTrunc LlvmStatic LlvmType        -- ^ Truncate
   | LMBitc LlvmStatic LlvmType         -- ^ Pointer to Pointer conversion
   | LMPtoI LlvmStatic LlvmType         -- ^ Pointer to Integer conversion
   | LMAdd LlvmStatic LlvmStatic        -- ^ Constant addition operation
@@ -167,6 +168,8 @@ instance Outputable LlvmStatic where
   ppr (LMStaticArray d t) = ppr t <> text " [" <> ppCommaJoin d <> char ']'
   ppr (LMStaticStruc d t) = ppr t <> text "<{" <> ppCommaJoin d <> text "}>"
   ppr (LMStaticPointer v) = ppr v
+  ppr (LMTrunc v t)
+      = ppr t <> text " trunc (" <> ppr v <> text " to " <> ppr t <> char ')'
   ppr (LMBitc v t)
       = ppr t <> text " bitcast (" <> ppr v <> text " to " <> ppr t <> char ')'
   ppr (LMPtoI v t)
@@ -277,6 +280,7 @@ getStatType (LMStaticStr   _ t) = t
 getStatType (LMStaticArray _ t) = t
 getStatType (LMStaticStruc _ t) = t
 getStatType (LMStaticPointer v) = getVarType v
+getStatType (LMTrunc       _ t) = t
 getStatType (LMBitc        _ t) = t
 getStatType (LMPtoI        _ t) = t
 getStatType (LMAdd         t _) = getStatType t

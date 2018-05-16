@@ -1,0 +1,22 @@
+
+T15073.hs:8:12: error:
+    • Illegal unboxed tuple type as function argument: (# a #)
+      Perhaps you intended to use UnboxedTuples
+    • In the expression:
+        GHC.Prim.coerce
+          @(a
+            -> (Unit# a :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
+          @(Foo a
+            -> (Unit# (Foo a) :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
+          p
+      In an equation for ‘p’:
+          p = GHC.Prim.coerce
+                @(a
+                  -> (Unit# a :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
+                @(Foo a
+                  -> (Unit# (Foo a) :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
+                p
+      When typechecking the code for ‘p’
+        in a derived instance for ‘P (Foo a)’:
+        To see the code I am typechecking, use -ddump-deriv
+      In the instance declaration for ‘P (Foo a)’

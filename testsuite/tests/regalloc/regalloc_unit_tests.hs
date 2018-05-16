@@ -112,7 +112,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     -- print parser errors or warnings
     mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]
 
-    let initTopSRT = initUs_ usa emptySRT
+    let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fromJust parsedCmm
 
     rawCmms <- cmmToRawCmm dflags (Stream.yield cmmGroup)

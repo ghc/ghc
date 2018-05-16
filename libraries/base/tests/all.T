@@ -2,6 +2,7 @@
 test('readFloat', exit_code(1), compile_and_run, [''])
 test('enumDouble', normal, compile_and_run, [''])
 test('enumRatio', normal, compile_and_run, [''])
+test('enumNumeric', normal, compile_and_run, [''])
 test('tempfiles', normal, compile_and_run, [''])
 test('fixed', normal, compile_and_run, [''])
 test('quotOverflow', normal, compile_and_run, [''])
@@ -224,3 +225,4 @@ test('T3474',
 test('T14425', normal, compile_and_run, [''])
 test('T10412', normal, compile_and_run, [''])
 test('T13896', normal, compile_and_run, [''])
+test('T13167', normal, compile_and_run, [''])

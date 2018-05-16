@@ -52,7 +52,8 @@ module IfaceType (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
+import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
+                                 , liftedRepDataConTyCon )
 import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
 
 import DynFlags
@@ -220,26 +221,55 @@ Note [Equality predicates in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC has several varieties of type equality (see Note [The equality types story]
 in TysPrim for details).  In an effort to avoid confusing users, we suppress
-the differences during "normal" pretty printing.  Specifically we display them
-like this:
+the differences during pretty printing unless certain flags are enabled.
+Here is how each equality predicate* is printed in homogeneous and
+heterogeneous contexts, depending on which combination of the
+-fprint-explicit-kinds and -fprint-equality-relations flags is used:
 
- Predicate                         Pretty-printed as
-                          Homogeneous case        Heterogeneous case
- ----------------        -----------------        -------------------
- (~)    eqTyCon                 ~                  N/A
- (~~)   heqTyCon                ~                  ~~
- (~#)   eqPrimTyCon             ~#                 ~~
- (~R#)  eqReprPrimTyCon         Coercible          Coercible
+---------------------------------------------------------------------------------------
+|         Predicate             |        Neither flag        | -fprint-explicit-kinds |
+|-------------------------------|----------------------------|------------------------|
+| a ~ b         (homogeneous)   |        a ~ b               | (a :: *) ~  (b :: *)   |
+| a ~~ b,       homogeneously   |        a ~ b               | (a :: *) ~  (b :: *)   |
+| a ~~ b,       heterogeneously |        a ~~ c              | (a :: *) ~~ (c :: k)   |
+| a ~# b,       homogeneously   |        a ~ b               | (a :: *) ~  (b :: *)   |
+| a ~# b,       heterogeneously |        a ~~ c              | (a :: *) ~~ (c :: k)   |
+| Coercible a b (homogeneous)   |        Coercible a b       | Coercible * a b        |
+| a ~R# b,      homogeneously   |        Coercible a b       | Coercible * a b        |
+| a ~R# b,      heterogeneously |        a ~R# b             | (a :: *) ~R# (c :: k)  |
+|-------------------------------|----------------------------|------------------------|
+|         Predicate             | -fprint-equality-relations |      Both flags        |
+|-------------------------------|----------------------------|------------------------|
+| a ~ b         (homogeneous)   |        a ~  b              | (a :: *) ~  (b :: *)   |
+| a ~~ b,       homogeneously   |        a ~~ b              | (a :: *) ~~ (b :: *)   |
+| a ~~ b,       heterogeneously |        a ~~ c              | (a :: *) ~~ (c :: k)   |
+| a ~# b,       homogeneously   |        a ~# b              | (a :: *) ~# (b :: *)   |
+| a ~# b,       heterogeneously |        a ~# c              | (a :: *) ~# (c :: k)   |
+| Coercible a b (homogeneous)   |        Coercible a b       | Coercible * a b        |
+| a ~R# b,      homogeneously   |        a ~R# b             | (a :: *) ~R# (b :: *)  |
+| a ~R# b,      heterogeneously |        a ~R# b             | (a :: *) ~R# (c :: k)  |
+---------------------------------------------------------------------------------------
 
-By "homogeneeous case" we mean cases where a hetero-kinded equality
-(all but the first above) is actually applied to two identical kinds.
-Unfortunately, determining this from an IfaceType isn't possible since
-we can't see through type synonyms. Consequently, we need to record
-whether this particular application is homogeneous in IfaceTyConSort
+(* There is no heterogeneous, representational, lifted equality counterpart
+to (~~). There could be, but there seems to be no use for it.)
+
+This table adheres to the following rules:
+
+A. With -fprint-equality-relations, print the true equality relation.
+B. Without -fprint-equality-relations:
+     i. If the equality is representational and homogeneous, use Coercible.
+    ii. Otherwise, if the equality is representational, use ~R#.
+   iii. If the equality is nominal and homogeneous, use ~.
+    iv. Otherwise, if the equality is nominal, use ~~.
+C. With -fprint-explicit-kinds, print kinds on both sides of an infix operator,
+   as above; or print the kind with Coercible.
+D. Without -fprint-explicit-kinds, don't print kinds.
+
+A hetero-kinded equality is used homogeneously when it is applied to two
+identical kinds. Unfortunately, determining this from an IfaceType isn't
+possible since we can't see through type synonyms. Consequently, we need to
+record whether this particular application is homogeneous in IfaceTyConSort
 for the purposes of pretty-printing.
-
-All this suppresses information. To get the ground truth, use -dppr-debug
-(see 'print_eqs' in 'ppr_equality').
 
 See Note [The equality types story] in TysPrim.
 -}
@@ -1001,11 +1031,15 @@ ppr_equality ctxt_prec tc args
   | otherwise
   = Nothing
   where
-    homogeneous = case ifaceTyConSort $ ifaceTyConInfo tc of
-                    IfaceEqualityTyCon -> True
-                    _other             -> False
-       -- True <=> a heterogeneous equality whose arguments
-       --          are (in this case) of the same kind
+    homogeneous = tc_name `hasKey` eqTyConKey -- (~)
+               || hetero_tc_used_homogeneously
+      where
+        hetero_tc_used_homogeneously
+          = case ifaceTyConSort $ ifaceTyConInfo tc of
+                          IfaceEqualityTyCon -> True
+                          _other             -> False
+             -- True <=> a heterogeneous equality whose arguments
+             --          are (in this case) of the same kind
 
     tc_name = ifaceTyConName tc
     pp = ppr_ty
@@ -1013,30 +1047,47 @@ ppr_equality ctxt_prec tc args
     hetero_eq_tc = tc_name `hasKey` eqPrimTyConKey     -- (~#)
                 || tc_name `hasKey` eqReprPrimTyConKey -- (~R#)
                 || tc_name `hasKey` heqTyConKey        -- (~~)
+    nominal_eq_tc = tc_name `hasKey` heqTyConKey       -- (~~)
+                 || tc_name `hasKey` eqPrimTyConKey    -- (~#)
     print_equality args =
         sdocWithDynFlags $ \dflags ->
         getPprStyle      $ \style  ->
         print_equality' args style dflags
 
     print_equality' (ki1, ki2, ty1, ty2) style dflags
-      | print_eqs   -- No magic, just print the original TyCon
+      | -- If -fprint-equality-relations is on, just print the original TyCon
+        print_eqs
       = ppr_infix_eq (ppr tc)
 
-      | hetero_eq_tc
-      , print_kinds || not homogeneous
-      = ppr_infix_eq (text "~~")
+      | -- Homogeneous use of heterogeneous equality (ty1 ~~ ty2)
+        --                 or unlifted equality      (ty1 ~# ty2)
+        nominal_eq_tc, homogeneous
+      = ppr_infix_eq (text "~")
 
+      | -- Heterogeneous use of unlifted equality (ty1 ~# ty2)
+        not homogeneous
+      = ppr_infix_eq (ppr heqTyCon)
+
+      | -- Homogeneous use of representational unlifted equality (ty1 ~R# ty2)
+        tc_name `hasKey` eqReprPrimTyConKey, homogeneous
+      = let ki | print_kinds = [pp appPrec ki1]
+               | otherwise   = []
+        in pprIfacePrefixApp ctxt_prec (ppr coercibleTyCon)
+                            (ki ++ [pp appPrec ty1, pp appPrec ty2])
+
+        -- The other cases work as you'd expect
       | otherwise
-      = if tc_name `hasKey` eqReprPrimTyConKey
-        then pprIfacePrefixApp ctxt_prec (text "Coercible")
-                               [pp appPrec ty1, pp appPrec ty2]
-        else pprIfaceInfixApp ctxt_prec (char '~')
-                 (pp opPrec ty1) (pp opPrec ty2)
+      = ppr_infix_eq (ppr tc)
       where
-        ppr_infix_eq eq_op
-           = pprIfaceInfixApp ctxt_prec eq_op
-                 (parens (pp topPrec ty1 <+> dcolon <+> pp opPrec ki1))
-                 (parens (pp topPrec ty2 <+> dcolon <+> pp opPrec ki2))
+        ppr_infix_eq :: SDoc -> SDoc
+        ppr_infix_eq eq_op = pprIfaceInfixApp ctxt_prec eq_op
+                               (pp_ty_ki ty1 ki1) (pp_ty_ki ty2 ki2)
+          where
+            pp_ty_ki ty ki
+              | print_kinds
+              = parens (pp topPrec ty <+> dcolon <+> pp opPrec ki)
+              | otherwise
+              = pp opPrec ty
 
         print_kinds = gopt Opt_PrintExplicitKinds dflags
         print_eqs   = gopt Opt_PrintEqualityRelations dflags ||

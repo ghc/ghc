@@ -75,4 +75,8 @@ test('T14217', normal, compile_fail, [''])
 test('T14643', normal, compile, [''])
 test('T14643a', normal, compile, [''])
 test('T14715', normal, compile, [''])
-
+test('T15039a', normal, compile, [''])
+test('T15039b', normal, compile, ['-fprint-explicit-kinds'])
+test('T15039c', normal, compile, ['-fprint-equality-relations'])
+test('T15039d', normal, compile,
+                ['-fprint-explicit-kinds -fprint-equality-relations'])

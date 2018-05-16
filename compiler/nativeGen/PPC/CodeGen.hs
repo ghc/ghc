@@ -2109,7 +2109,8 @@ generateJumpTableForInstr dflags (BCTR ids (Just lbl)) =
                 where jumpTableEntryRel Nothing
                         = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)
-                        = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
+                        = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0
+                                         (wordWidth dflags))
                             where blockLabel = blockLbl blockid
     in Just (CmmData (Section ReadOnlyData lbl) (Statics lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
