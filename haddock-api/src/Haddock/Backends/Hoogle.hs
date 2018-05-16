@@ -223,13 +223,12 @@ ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
       concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
     where
 
-        -- GHC gives out "data Bar =", we want to delete the equals
-        -- also writes data : a b, when we want data (:) a b
-        showData d = unwords $ map f $ if last xs == "=" then init xs else xs
+        -- GHC gives out "data Bar =", we want to delete the equals.
+        -- There's no need to worry about parenthesizing infix data type names,
+        -- since this Outputable instance for TyClDecl gets this right already.
+        showData d = unwords $ if last xs == "=" then init xs else xs
             where
                 xs = words $ out dflags d
-                nam = out dflags $ tyClDeclLName d
-                f w = if w == nam then operator nam else w
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
