@@ -1045,7 +1045,7 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
                 , cit_rep  = sm_rep
                 , cit_prof = prof
                 , cit_srt  = Nothing
-                , cit_clo = Nothing }
+                , cit_clo  = Nothing }
  where
    name = dataConName data_con
    info_lbl = mkConInfoTableLabel name NoCafRefs
