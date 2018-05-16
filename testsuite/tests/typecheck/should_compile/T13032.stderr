@@ -4,7 +4,7 @@ Result size of Desugar (after optimization)
   = {terms: 13, types: 24, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 11, coercions: 0, joins: 0/0}
-f :: forall a b. ((a :: *) ~ (b :: *)) => a -> b -> Bool
+f :: forall a b. (a ~ b) => a -> b -> Bool
 [LclIdX]
 f = \ (@ a) (@ b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
       GHC.Types.True
