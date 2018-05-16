@@ -437,7 +437,7 @@ emptySRT mod =
 --   - the closure label for a top-level function (not a CAF)
 getLabelledBlocks :: CmmDeclPlus -> [(Label, CAFLabel)]
 getLabelledBlocks (CmmData _ _) = []
-getLabelledBlocks (CmmProc top_info _ _ _) =
+getLabelledBlocks (CmmProc (top_info,_) _ _ _) =
   [ (blockId, mkCAFLabel (cit_lbl info))
   | (blockId, info) <- mapToList (info_tbls top_info)
   , let rep = cit_rep info
@@ -454,7 +454,7 @@ getLabelledBlocks (CmmProc top_info _ _ _) =
 --    resolve references in the CAF's SRT.
 getCAFs :: CmmDeclPlus -> [(Label, CAFLabel)]
 getCAFs (CmmData _ _) = []
-getCAFs (CmmProc top_info topLbl _ g)
+getCAFs (CmmProc (top_info,_) topLbl _ g)
   | Just info <- mapLookup (g_entry g) (info_tbls top_info)
   , let rep = cit_rep info
   , isStaticRep rep && isThunkRep rep = [(g_entry g, mkCAFLabel topLbl)]
@@ -465,7 +465,7 @@ getCAFs (CmmProc top_info topLbl _ g)
 -- SRT we can merge it with the static closure. [FUN]
 getStaticFuns :: CmmDeclPlus -> [(BlockId, CLabel)]
 getStaticFuns (CmmData _ _) = []
-getStaticFuns (CmmProc top_info _ _ g)
+getStaticFuns (CmmProc (top_info,_) _ _ g)
   | Just info <- mapLookup (g_entry g) (info_tbls top_info)
   , let rep = cit_rep info
   , Just (id, _) <- cit_clo info
@@ -718,11 +718,11 @@ updInfoSRTs
   -> CmmDeclPlus
   -> [CmmDeclPlus]
 
-updInfoSRTs dflags srt_env funSRTEnv (CmmProc top_info top_l live g)
+updInfoSRTs dflags srt_env funSRTEnv (CmmProc (top_info, rty) top_l live g)
   | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
   | otherwise = [ proc ]
   where
-    proc = CmmProc top_info { info_tbls = newTopInfo } top_l live g
+    proc = CmmProc (top_info { info_tbls = newTopInfo }, rty) top_l live g
     newTopInfo = mapMapWithKey updInfoTbl (info_tbls top_info)
     updInfoTbl l info_tbl
       | l == g_entry g, Just (inf, _) <- maybeStaticClosure = inf
