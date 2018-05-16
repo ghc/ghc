@@ -50,21 +50,6 @@ TcCoercible
 T13233
 T13244
 -- #82
--- Iface lint
-T11232
-T3245
-T4003
-T5129
-T7649
-T7918
-T7924
-T9583
-dynamic004
-spec-inline
-simplrun010
-### Core Lint - Zip Equal
-T12757
-
 
 # 78
 T12944
