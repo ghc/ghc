@@ -1,6 +1,9 @@
 def normaliseDynlibNames(str):
     return re.sub('-ghc[0-9.]+\.', '-ghc<VERSION>.', str)
 
+def ignore_warnings(str):
+    return re.sub(r'Warning:.*\n', '', str)
+
 test('ghcpkg01', [extra_files(['test.pkg', 'test2.pkg', 'test3.pkg'])], run_command, ['$MAKE -s --no-print-directory ghcpkg01'])
 
 # Use ignore_stderr to prevent (when HADDOCK_DOCS=NO):
@@ -29,7 +32,7 @@ def normalise_haddock_junk( str ):
 
 test('ghcpkg05',
      [extra_files(['test2.pkg', 'test3.pkg']),
-      normalise_errmsg_fun(normalise_haddock_junk, normaliseDynlibNames)],
+      normalise_errmsg_fun(normalise_haddock_junk, normaliseDynlibNames, ignore_warnings)],
      run_command, ['$MAKE -s --no-print-directory ghcpkg05'])
 test('ghcpkg06', [extra_files(['test.pkg', 'testdup.pkg'])], run_command, ['$MAKE -s --no-print-directory ghcpkg06'])
 
