@@ -188,7 +188,8 @@ test('T9681', normal, compile_fail, [''])
 #   make an educated guess how long it needs to be guaranteed to reach the C
 #   call."
 test('T8089',
-     [exit_code(99), run_timeout_multiplier(0.01)],
+     [exit_code(99), run_timeout_multiplier(0.01),
+      expect_broken_for(15158, ['ghci', 'threaded1', 'threaded2', 'profthreaded'])],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])

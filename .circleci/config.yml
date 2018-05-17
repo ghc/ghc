@@ -66,7 +66,7 @@ aliases:
   - &slowtest
     run:
       name: Full Test
-      command: make slowtest SKIP_PERF_TESTS=YES
+      command: make slowtest TEST="PatternSplice T12903 T13688 T13910 T13949 T14137 T14298 T14441 T14497 T14732 T15056 T7944 T8025 T8089 compact_share ghcpkg05 scc001" SKIP_PERF_TESTS=YES
   - &bindist
     run:
       name: Create bindist
@@ -161,6 +161,22 @@ jobs:
       - *boot
       - *configure_unix
       - *build_hadrian
+
+  "slow-validate-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: ghcci/x86_64-linux:0.0.2
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-linux
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
 
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
@@ -262,18 +278,19 @@ workflows:
   version: 2
   validate:
     jobs:
-    - validate-x86_64-linux:
-        *trigger_on_tags
+    - slow-validate-x86_64-linux
+    # - validate-x86_64-linux:
+    #     *trigger_on_tags
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
-    - validate-x86_64-darwin:
-        *trigger_on_tags
-    - validate-x86_64-linux-llvm
-    - validate-i386-linux:
-        *trigger_on_tags
-    - validate-hadrian-x86_64-linux
-    - validate-x86_64-fedora:
-        *trigger_on_tags
+    # - validate-x86_64-darwin:
+    #     *trigger_on_tags
+    # - validate-x86_64-linux-llvm
+    # - validate-i386-linux:
+    #     *trigger_on_tags
+    # - validate-hadrian-x86_64-linux
+    # - validate-x86_64-fedora:
+    #    *trigger_on_tags
 
   nightly:
     triggers:
