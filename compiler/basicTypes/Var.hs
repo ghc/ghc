@@ -391,7 +391,8 @@ varWeightDef :: Id -> Rig
 varWeightDef = fromMaybe Omega . varWeightMaybe
 
 scaleVarBy :: Id -> Rig -> Id
-scaleVarBy id r = id { varWeight = r * (varWeight id) }
+scaleVarBy id r | isId id  = id { varWeight = r * (varWeight id) }
+scaleVarBy id _ = id
 
 {- *********************************************************************
 *                                                                      *

@@ -53,41 +53,6 @@ TcCoercible
 T13233
 T13244
 -- #82
--- Iface lint
-T11232
-T3245
-T4003
-T5129
-T7649
-T7918
-T7924
-T9583
-dynamic004
-spec-inline
-simplrun010
-### Desugaring - Looks like something to do with unlifted types
-T12622
-T12689a
-T13750
-T14290
-T14650
-T3736
-T3972
-T5603
-T5453
-T8221
-T8425
-bkprun09
-cg005
-determ008
-hClose002
-hClose003
-hDuplicateTo001
-spec001
-T4306
-### Core Lint - Zip Equal
-T12757
-
 
 # 78
 T12944
