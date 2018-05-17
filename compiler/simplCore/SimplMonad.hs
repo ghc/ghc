@@ -317,10 +317,7 @@ For now, I leave warnings and this message to my future self.
 readScaling :: SimplM a -> SimplM (a, Rig)
 readScaling (SM k) = SM (\st_env us sc -> do
                             (r, w, u, s) <- k st_env us sc
-                            pprTrace "readScaling" (ppr w) (return ())
                             return ((r, foldr (*) One (map idWeight w)), w, u, s))
 
 reportScaling :: Id -> SimplM ()
-reportScaling r =
-  pprTrace "reporting scaling" (ppr r <+> ppr (idWeight r))
-    $ SM (\_st_env us sc -> return ((), [r], us, sc))
+reportScaling r = SM (\_st_env us sc -> return ((), [r], us, sc))
