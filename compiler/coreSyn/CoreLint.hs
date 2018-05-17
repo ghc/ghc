@@ -1228,6 +1228,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
           ; ex_tvs_n = length (dataConExTyVars con)
+          -- See Note [Alt arg weights]
           ; weights = replicate ex_tvs_n Omega ++
                       map weightedWeight (dataConRepArgTys con) }
 
@@ -1253,6 +1254,15 @@ lintLinearBinder doc actual_usage described_usage
                 $$ doc
                 $$ ppr actual_usage
                 $$ text "Annotation:" <+> ppr described_usage)
+
+{- Note [Alt arg weights]
+It is necessary to use `dataConRepArgTys` so you get the arg tys from
+the wrapper if there is one.
+
+For some reason, you also need to add the existential ty vars as they
+are passed are arguments but not returned by `dataConRepArgTys`. Without
+this the test `GADT1` fails.
+-}
 
 {-
 ************************************************************************
