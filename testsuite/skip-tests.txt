@@ -55,19 +55,16 @@ T13244
 -- #82
 
 # 78
-T12944
+--T12944
 
 
 ### Simplifier
 T3591
 determ017
-drvrun008
 galois_raytrace
 T4945
-
 hpc_raytrace
 T5366
-
 joao-circular
 unboxedsums12
 ### PrepareRHS variable
