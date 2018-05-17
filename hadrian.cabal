@@ -62,6 +62,7 @@ executable hadrian
                        , Rules.Gmp
                        , Rules.Libffi
                        , Rules.Library
+                       , Rules.Nofib
                        , Rules.Program
                        , Rules.Register
                        , Rules.Selftest
