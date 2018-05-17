@@ -158,7 +158,16 @@ test('T7702',
      compile,
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])
 
-test('T7944', normal, compile, ['-O2'])
+# we omit profasm because it doesn't bring much to the table but
+# introduces its share of complexity, as the test as it is fails with
+# profasm:
+# T7944.hs:7:1: fatal:
+#     Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('T7944', omit_ways(['profasm']), compile, ['-O2'])
 test('T7995',
      # RULE doesn't seem to fire unless optimizations are turned on.
      # This seems reasonable, so I've required it for the test. -- EZY 20130720

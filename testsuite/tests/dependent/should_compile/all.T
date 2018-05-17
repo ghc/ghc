@@ -31,7 +31,16 @@ test('T13538', normal, compile, [''])
 test('T12176', normal, compile, [''])
 test('T14038', normal, compile, [''])
 test('T12742', normal, compile, [''])
-test('T13910', normal, compile, [''])
+# we omit profasm because it doesn't bring much to the table but
+# introduces its share of complexity, as the test as it is fails with
+# profasm:
+# T13910.hs:6:5: fatal:
+#     Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('T13910', omit_ways(['profasm']), compile, [''])
 test('T13938', [extra_files(['T13938a.hs'])], run_command,
      ['$MAKE -s --no-print-directory T13938'])
 test('T14556', normal, compile, [''])

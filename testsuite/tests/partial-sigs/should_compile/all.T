@@ -38,7 +38,16 @@ test('PatBind', normal, compile, ['-ddump-types -fno-warn-partial-type-signature
 # Bug
 test('PatBind2', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('PatternSig', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
-test('PatternSplice', [req_interp, normal], compile, ['-fno-warn-partial-type-signatures'])
+# we omit profasm because it doesn't bring much to the table but
+# introduces its share of complexity, as the test as it is fails with
+# profasm:
+# PatternSplice.hs:6:5: fatal:
+#     Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('PatternSplice', [req_interp, omit_ways(['profasm'])], compile, ['-fno-warn-partial-type-signatures'])
 test('Recursive', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcards', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
 test('ScopedNamedWildcardsGood', normal, compile, ['-ddump-types -fno-warn-partial-type-signatures'])
