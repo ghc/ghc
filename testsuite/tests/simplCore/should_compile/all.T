@@ -288,7 +288,8 @@ test('T14779b',
 test('T13708', normal, compile, [''])
 
 # thunk should inline here, so check whether or not it appears in the Core
-test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
+# (we skip profasm because it might not inline there)
+test('T14137', [ check_errmsg(r'thunk'), omit_ways(['profasm']) ], compile, ['-dsuppress-uniques -ddump-simpl'])
 # bar and foo should CSEd here, so check for that in the Core
 test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])
 
@@ -312,4 +313,5 @@ test('T14978',
      ['$MAKE -s --no-print-directory T14978'])
 test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
 test('T15005', normal, compile, ['-O'])
-test('T15056', [extra_files(['T15056a.hs'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])
+# we omit profiling because it affects the optimiser and makes the test fail
+test('T15056', [extra_files(['T15056a.hs']), omit_ways(['profasm'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])

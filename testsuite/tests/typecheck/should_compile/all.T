@@ -597,7 +597,7 @@ test('T14590', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutio
 # output we expect (T13032.stderr).
 test('T13032', omit_ways(['hpc', 'profasm']), compile, [''])
 test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
-test('T14732', normal, compile, [''])
+test('T14732', expect_broken_for(15163, ['profasm']), compile, [''])
 test('T14774', [], run_command, ['$MAKE -s --no-print-directory T14774'])
 test('T14763', normal, compile, [''])
 test('T14811', normal, compile, [''])
