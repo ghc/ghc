@@ -8,6 +8,7 @@
 
 #include "PosixSource.h"
 #include "Rts.h"
+#include "RtsUtils.h"
 
 #include "eventlog/EventLog.h"
 
@@ -131,9 +132,6 @@ isGUIApp(void)
   return (pPEHeader->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_GUI);
 }
 #endif
-
-#define xstr(s) str(s)
-#define str(s) #s
 
 void GNU_ATTRIBUTE(__noreturn__)
 rtsFatalInternalErrorFn(const char *s, va_list ap)
