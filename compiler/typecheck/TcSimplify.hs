@@ -1725,18 +1725,12 @@ neededEvVars :: Implication -> TcS Implication
 --   - From the 'needed' set, delete ev_bndrs, the binders of the
 --     evidence bindings, to give the final needed variables
 --
-neededEvVars implic@(Implic { ic_info = info
-                            , ic_given = givens
+neededEvVars implic@(Implic { ic_given = givens
                             , ic_binds = ev_binds_var
                             , ic_wanted = WC { wc_impl = implics }
                             , ic_need_inner = old_needs })
  = do { ev_binds <- TcS.getTcEvBindsMap ev_binds_var
       ; tcvs     <- TcS.getTcEvTyCoVars ev_binds_var
-
-        -- Check that there are no term-level evidence bindings
-        -- in the cases where we have no place to put them
-      ; MASSERT2( termEvidenceAllowed info || isEmptyEvBindMap ev_binds
-                , ppr info $$ ppr ev_binds )
 
       ; let seeds1        = foldrBag add_implic_seeds old_needs implics
             seeds2        = foldEvBindMap add_wanted seeds1 ev_binds

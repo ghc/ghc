@@ -636,9 +636,9 @@ tcPatSynMatcher (L loc name) lpat
                 (args, arg_tys) pat_ty
   = do { rr_name <- newNameAt (mkTyVarOcc "rep") loc
        ; tv_name <- newNameAt (mkTyVarOcc "r")   loc
-       ; let rr_tv  = mkTcTyVar rr_name runtimeRepTy vanillaSkolemTv
+       ; let rr_tv  = mkTyVar rr_name runtimeRepTy
              rr     = mkTyVarTy rr_tv
-             res_tv = mkTcTyVar tv_name (tYPE rr) vanillaSkolemTv
+             res_tv = mkTyVar tv_name (tYPE rr)
              res_ty = mkTyVarTy res_tv
              is_unlifted = null args && null prov_dicts
              (cont_args, cont_arg_tys)
@@ -686,7 +686,7 @@ tcPatSynMatcher (L loc name) lpat
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
-                             req_dicts body')
+                                       req_dicts body')
                              (noLoc (EmptyLocalBinds noExt))
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (getLoc match) [match]

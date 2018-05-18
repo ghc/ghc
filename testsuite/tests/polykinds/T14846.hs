@@ -34,6 +34,6 @@ data Hom :: Cat k -> Cat (Struct cls) where
 class Category (cat::Cat ob) where
   i :: StructI xx a => ríki a a
 
-instance Category ríki => Category (Hom ríki :: Cat (Struct cls)) where
-  i :: forall xx a. StructI xx a => Hom ríki a a
+instance Category riki => Category (Hom riki :: Cat (Struct cls)) where
+  i :: forall xx a. StructI xx a => Hom riki a a
   i = case struct :: AStruct (Structured a cls) of

@@ -1,11 +1,17 @@
 
 PushedInAsGivens.hs:10:31: error:
-    • Couldn't match expected type ‘a1’ with actual type ‘a’
-        because type variable ‘a1’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+    • Could not deduce: a1 ~ a
+      from the context: F Int ~ [a1]
+        bound by the type signature for:
+                   foo :: forall a1. (F Int ~ [a1]) => a1 -> Int
+        at PushedInAsGivens.hs:9:13-44
+      ‘a1’ is a rigid type variable bound by
         the type signature for:
           foo :: forall a1. (F Int ~ [a1]) => a1 -> Int
         at PushedInAsGivens.hs:9:13-44
+      ‘a’ is a rigid type variable bound by
+        the inferred type of bar :: a -> (a, Int)
+        at PushedInAsGivens.hs:(9,1)-(11,20)
     • In the expression: y
       In the first argument of ‘length’, namely ‘[x, y]’
       In the expression: length [x, y]

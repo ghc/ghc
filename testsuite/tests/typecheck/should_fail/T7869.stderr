@@ -1,11 +1,13 @@
 
 T7869.hs:3:12: error:
-    • Couldn't match type ‘b’ with ‘b1’
-        because type variable ‘b1’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+    • Couldn't match type ‘b1’ with ‘b’
+      ‘b1’ is a rigid type variable bound by
         an expression type signature:
           forall a1 b1. [a1] -> b1
         at T7869.hs:3:20-27
+      ‘b’ is a rigid type variable bound by
+        the inferred type of f :: [a] -> b
+        at T7869.hs:3:1-27
       Expected type: [a1] -> b1
         Actual type: [a] -> b
     • In the expression: f x

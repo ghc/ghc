@@ -1,8 +1,7 @@
 
 T13242a.hs:10:5: error:
     • Couldn't match expected type ‘a0’ with actual type ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a’ is a rigid type variable bound by
         a pattern with constructor: A :: forall a. Eq a => a -> T,
         in a pattern binding in
              'do' block
@@ -28,7 +27,7 @@ T13242a.hs:13:11: error:
       These potential instances exist:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         instance Eq Integer
-          -- Defined in ‘integer-gmp-1.0.1.0:GHC.Integer.Type’
+          -- Defined in ‘integer-gmp-1.0.2.0:GHC.Integer.Type’
         instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Base’
         ...plus 22 others
         ...plus six instances involving out-of-scope types

@@ -747,14 +747,9 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             empty_subst2 = mkEmptyTCvSubst (getTCvInScope subst1)
 
-      ; (implic, _ev_binds, all_co) <- buildImplication skol_info skol_tvs [] $
-                                       go skol_tvs empty_subst2 bndrs2
-           -- We have nowhere to put these bindings
-           -- but TcSimplify.setImplicationStatus
-           -- checks that we don't actually use them
-           -- when skol_info = UnifyForAllSkol
+      ; all_co <- checkConstraintsTcS skol_info skol_tvs $
+                  go skol_tvs empty_subst2 bndrs2
 
-      ; updWorkListTcS (extendWorkListImplic implic)
       ; setWantedEq orig_dest all_co
       ; stopWith ev "Deferred polytype equality" } }
 
@@ -1756,24 +1751,6 @@ canEqTyVarTyVar, are these
  * If one is a flatten-skolem, put it on the left so that it is
    substituted out  Note [Elminate flat-skols]
         fsk ~ a
-
-Note [Eliminate flat-skols]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have  [G] Num (F [a])
-then we flatten to
-     [G] Num fsk
-     [G] F [a] ~ fsk
-where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
-      type instance F [a] = a
-then we'll reduce the second constraint to
-     [G] a ~ fsk
-and then replace all uses of 'a' with fsk.  That's bad because
-in error messages intead of saying 'a' we'll say (F [a]).  In all
-places, including those where the programmer wrote 'a' in the first
-place.  Very confusing!  See Trac #7862.
-
-Solution: re-orient a~fsk to fsk~a, so that we preferentially eliminate
-the fsk.
 
 Note [Equalities with incompatible kinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -16,7 +16,7 @@ module TcSMonad (
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, setEvBindsTcS, buildImplication,
+    nestTcS, nestImplicTcS, setEvBindsTcS, checkConstraintsTcS,
 
     runTcPluginTcS, addUsedGRE, addUsedGREs,
 
@@ -1950,8 +1950,12 @@ getNoGivenEqs tclvl skol_tvs
                       -- outer context but were refined to an insoluble by
                       -- a local equality; so do /not/ add ct_given_here.
 
-       ; traceTcS "getNoGivenEqs" (vcat [ ppr has_given_eqs, ppr inerts
-                                        , ppr insols])
+       ; traceTcS "getNoGivenEqs" $
+         vcat [ if has_given_eqs then text "May have given equalities"
+                                 else text "No given equalities"
+              , text "Skols:" <+> ppr skol_tvs
+              , text "Inerts:" <+> ppr inerts
+              , text "Insols:" <+> ppr insols]
        ; return (not has_given_eqs, insols) }
   where
     eqs_given_here :: EqualCtList -> Bool
@@ -2094,6 +2098,10 @@ b) 'a' will have been completely substituted out in the inert set,
    returned as part of 'fsks'
 
 For an example, see Trac #9211.
+
+See also TcUnify Note [Deeper level on the left] for how we ensure
+that the right variable is on the left of the equality when both are
+tyvars.
 -}
 
 removeInertCts :: [Ct] -> InertCans -> InertCans
@@ -2704,40 +2712,40 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-buildImplication :: SkolemInfo
-                 -> [TcTyVar]        -- Skolems
-                 -> [EvVar]          -- Givens
-                 -> TcS result
-                 -> TcS (Bag Implication, TcEvBinds, result)
--- Just like TcUnify.buildImplication, but in the TcS monnad,
+checkConstraintsTcS :: SkolemInfo
+                    -> [TcTyVar]        -- Skolems
+                    -> TcS result
+                    -> TcS result
+-- Just like TcUnify.checkTvConstraints, but in the TcS monnad,
 -- using the work-list to gather the constraints
-buildImplication skol_info skol_tvs givens (TcS thing_inside)
-  = TcS $ \ env ->
+checkConstraintsTcS skol_info skol_tvs (TcS thing_inside)
+  = TcS $ \ tcs_env ->
     do { new_wl_var <- TcM.newTcRef emptyWorkList
-       ; tc_lvl <- TcM.getTcLevel
-       ; let new_tclvl = pushTcLevel tc_lvl
+       ; let new_tcs_env = tcs_env { tcs_worklist = new_wl_var }
 
-       ; res <- TcM.setTcLevel new_tclvl $
-                thing_inside (env { tcs_worklist = new_wl_var })
+       ; (res, new_tclvl) <- TcM.pushTcLevelM $
+                             thing_inside new_tcs_env
 
        ; wl@WL { wl_eqs = eqs } <- TcM.readTcRef new_wl_var
-       ; if null eqs
-         then return (emptyBag, emptyTcEvBinds, res)
-         else
-    do { env <- TcM.getLclEnv
-       ; ev_binds_var <- TcM.newTcEvBinds
-       ; let wc  = ASSERT2( null (wl_funeqs wl) && null (wl_rest wl) &&
-                            null (wl_implics wl), ppr wl )
-                   WC { wc_simple = listToCts eqs
-                      , wc_impl   = emptyBag }
-             imp = newImplication { ic_tclvl  = new_tclvl
-                                  , ic_skols  = skol_tvs
-                                  , ic_given  = givens
-                                  , ic_wanted = wc
-                                  , ic_binds  = ev_binds_var
-                                  , ic_env    = env
-                                  , ic_info   = skol_info }
-      ; return (unitBag imp, TcEvBinds ev_binds_var, res) } }
+       ; ASSERT2( null (wl_funeqs wl) && null (wl_rest wl) &&
+                  null (wl_implics wl), ppr wl )
+         unless (null eqs) $
+         do { tcl_env <- TcM.getLclEnv
+            ; ev_binds_var <- TcM.newNoTcEvBinds
+            ; let wc  = WC { wc_simple = listToCts eqs
+                           , wc_impl   = emptyBag }
+                  imp = newImplication { ic_tclvl  = new_tclvl
+                                       , ic_skols  = skol_tvs
+                                       , ic_wanted = wc
+                                       , ic_binds  = ev_binds_var
+                                       , ic_env    = tcl_env
+                                       , ic_info   = skol_info }
+
+           -- Add the implication to the work-list
+           ; TcM.updTcRef (tcs_worklist tcs_env)
+                          (extendWorkListImplic (unitBag imp)) }
+
+      ; return res }
 
 {-
 Note [Propagate the solved dictionaries]
@@ -2778,9 +2786,7 @@ getWorkListImplics
 updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
 updWorkListTcS f
   = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- wrapTcS (TcM.readTcRef wl_var)
-       ; let new_work = f wl_curr
-       ; wrapTcS (TcM.writeTcRef wl_var new_work) }
+       ; wrapTcS (TcM.updTcRef wl_var f)}
 
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs

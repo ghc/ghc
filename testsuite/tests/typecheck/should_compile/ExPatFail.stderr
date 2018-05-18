@@ -1,12 +1,14 @@
 
 ExPatFail.hs:12:15: error:
     • Couldn't match expected type ‘p’ with actual type ‘a’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a’ is a rigid type variable bound by
         a pattern with constructor:
           MkT :: forall a. Integral a => a -> Int -> T,
         in a pattern binding
         at ExPatFail.hs:12:11-17
+      ‘p’ is a rigid type variable bound by
+        the inferred type of f :: T -> p
+        at ExPatFail.hs:(12,1)-(13,10)
     • In the pattern: MkT y _
       In a pattern binding: MkT y _ = x
       In the expression: let MkT y _ = x in y

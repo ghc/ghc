@@ -1,11 +1,13 @@
 
 tcfail099.hs:9:20: error:
     • Couldn't match expected type ‘a’ with actual type ‘p’
-        because type variable ‘a’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a’ is a rigid type variable bound by
         a pattern with constructor: C :: forall a. (a -> Int) -> DS,
         in an equation for ‘call’
         at tcfail099.hs:9:7-9
+      ‘p’ is a rigid type variable bound by
+        the inferred type of call :: DS -> p -> Int
+        at tcfail099.hs:9:1-22
     • In the first argument of ‘f’, namely ‘arg’
       In the expression: f arg
       In an equation for ‘call’: call (C f) arg = f arg

@@ -106,7 +106,6 @@ module TcRnTypes(
 
 
         SkolemInfo(..), pprSigSkolInfo, pprSkolInfo,
-        termEvidenceAllowed,
 
         CtEvidence(..), TcEvDest(..),
         mkKindLoc, toKindLoc, mkGivenLoc,
@@ -3227,14 +3226,6 @@ data SkolemInfo
 
 instance Outputable SkolemInfo where
   ppr = pprSkolInfo
-
-termEvidenceAllowed :: SkolemInfo -> Bool
--- Whether an implication constraint with this SkolemInfo
--- is permitted to have term-level evidence.  There is
--- only one that is not, associated with unifiying
--- forall-types
-termEvidenceAllowed (UnifyForAllSkol {}) = False
-termEvidenceAllowed _                    = True
 
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."

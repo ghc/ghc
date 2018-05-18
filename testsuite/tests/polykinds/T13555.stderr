@@ -1,8 +1,7 @@
 
 T13555.hs:25:14: error:
-    • Couldn't match type ‘k0’ with ‘k2’
-        because type variable ‘k2’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+    • Couldn't match type ‘k2’ with ‘k0’
+      ‘k2’ is a rigid type variable bound by
         the type signature for:
           crtInfo :: forall k2 (m :: k2).
                      Reflects m Int =>
