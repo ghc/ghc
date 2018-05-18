@@ -154,6 +154,8 @@ instance Monoid (Last a) where
 
 -- | This data type witnesses the lifting of a monoid into an
 -- applicative pointwise.
+--
+-- @since 4.12.0.0
 newtype Ap f a = Ap { getAp :: f a }
         deriving ( Alternative -- ^ @since 4.12.0.0
                  , Applicative -- ^ @since 4.12.0.0
