@@ -154,6 +154,8 @@ solveLocalEqualities thing_inside
        ; traceTc "solveLocalEqualities: running solver }" (ppr reduced_wanted)
 
        ; emitConstraints reduced_wanted
+
+       ; traceTc "solveLocalEqualities end }" empty
        ; return result }
 
 -- | Type-check a thing that emits only equality constraints, then

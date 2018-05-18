@@ -213,7 +213,8 @@ tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- See Note [Recipe for checking a signature]
 tcHsSigType ctxt sig_ty
   = addSigCtxt ctxt (hsSigType sig_ty) $
-    do { kind <- case expectedKindInCtxt ctxt of
+    do { traceTc "tcHsSigType {" (ppr sig_ty)
+       ; kind <- case expectedKindInCtxt ctxt of
                     AnythingKind -> newMetaKindVar
                     TheKind k    -> return k
                     OpenKind     -> newOpenTypeKind
@@ -227,6 +228,7 @@ tcHsSigType ctxt sig_ty
                else tc_hs_sig_type         skol_info sig_ty kind
 
        ; checkValidType ctxt ty
+       ; traceTc "end tcHsSigType }" (ppr ty)
        ; return ty }
   where
     skol_info = SigTypeSkol ctxt

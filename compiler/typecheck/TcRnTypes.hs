@@ -2511,8 +2511,9 @@ instance Outputable Implication where
   ppr (Implic { ic_tclvl = tclvl, ic_skols = skols
               , ic_given = given, ic_no_eqs = no_eqs
               , ic_wanted = wanted, ic_status = status
-              , ic_binds = binds, ic_need_inner = need_in
-              , ic_need_outer = need_out, ic_info = info })
+              , ic_binds = binds
+--              , ic_need_inner = need_in, ic_need_outer = need_out
+              , ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
                , text "Skolems =" <+> pprTyVars skols
@@ -2521,8 +2522,8 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
-               , text "Needed inner =" <+> ppr need_in
-               , text "Needed outer =" <+> ppr need_out
+--               , text "Needed inner =" <+> ppr need_in
+--               , text "Needed outer =" <+> ppr need_out
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable ImplicStatus where
