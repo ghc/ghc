@@ -1600,8 +1600,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
 
        ; stopWith ev "Solved from inert" }
 
-  | ReprEq <- eq_rel   -- We never solve representational
-  = unsolved_inert     -- equalities by unification
+  | ReprEq <- eq_rel   -- See Note [Do not unify representational equalities]
+  = unsolved_inert
 
   | isGiven ev         -- See Note [Touchables and givens]
   = unsolved_inert
@@ -1671,6 +1671,22 @@ enforce this at canonicalization]
 See also Note [No touchables as FunEq RHS] in TcSMonad; avoiding
 double unifications is the main reason we disallow touchable
 unification variables as RHS of type family equations: F xis ~ alpha.
+
+Note [Do not unify representational equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   [W] alpha ~R# b
+where alpha is touchable. Should we unify alpha := b?
+
+Certainly not!  Unifying forces alpha and be to be the same; but they
+only need to be representationally equal types.
+
+For example, we might have another constraint [W] alpha ~# N b
+where
+  newtype N b = MkN b
+and we want to get alpha := N b.
+
+See also Trac #15144, which was caused by unifying a representational
+equality (in the unflattener).
 
 
 ************************************************************************

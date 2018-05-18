@@ -2015,7 +2015,10 @@ unflattenWanteds tv_eqs funeqs
     unflatten_eq :: TcLevel -> Ct -> Cts -> TcS Cts
     unflatten_eq tclvl ct@(CTyEqCan { cc_ev = ev, cc_tyvar = tv
                                     , cc_rhs = rhs, cc_eq_rel = eq_rel }) rest
-      | isFmvTyVar tv   -- Previously these fmvs were untouchable,
+
+      | NomEq <- eq_rel -- See Note [Do not unify representational equalities]
+                        --     in TcInteract
+      , isFmvTyVar tv   -- Previously these fmvs were untouchable,
                         -- but now they are touchable
                         -- NB: unlike unflattenFmv, filling a fmv here /does/
                         --     bump the unification count; it is "improvement"
