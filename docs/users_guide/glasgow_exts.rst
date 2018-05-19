@@ -10012,7 +10012,7 @@ signature may mention a type variable that is not in scope; in this
 case, *the signature brings that type variable into scope*. For example: ::
 
     -- same f and g as above, now assuming that 'a' is not already in scope
-    f = \(x::Int, y::a) -> x           -- 'a' is in scope on RHS
+    f = \(x::Int, y::a) -> x           -- 'a' is in scope on RHS of ->
 
     g (x::a) = x :: a
 
@@ -10042,7 +10042,6 @@ insists that the type variable is bound to a *rigid*, or fully-known,
 type variable. This means that any user-written type signature always
 stands for a completely known type.
 
-If all this seems a little odd, we think so too. 
 It does seem odd that the existentially-bound type variable *must not* 
 be already in scope. Contrast that usually name-bindings merely shadow 
 (make a 'hole') in a same-named outer variable's scope.
