@@ -9809,6 +9809,18 @@ Lexically scoped type variables
     Enable lexical scoping of type variables explicitly introduced with
     ``forall``.
 
+.. tip::
+
+    ``ScopedTypeVariables`` breaks GHC's usual rule that explicit ``forall`` is optional and doesn't affect semantics.
+    For the :ref:`decl-type-sigs` (or :ref:`exp-type-sigs`) examples in this section,
+    the explicit ``forall`` is required.
+    (If omitted, usually the program will not compile; in a few cases it will compile but the functions get a different signature.)
+    To trigger those forms of ``ScopedTypeVariables``, the ``forall`` must appear against the top-level signature (or outer expression)
+    but *not* against nested signatures referring to the same type variables.
+
+    Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent pattern-equiv-form` for the example in this section, or :ref:`pattern-type-sigs` .
+
+
 GHC supports *lexically scoped type variables*, without which some type
 signatures are simply impossible to write. For example: ::
 
@@ -9826,6 +9838,21 @@ scopes over the whole definition of ``f``, including over the type
 signature for ``ys``. In Haskell 98 it is not possible to declare a type
 for ``ys``; a major benefit of scoped type variables is that it becomes
 possible to do so.
+
+.. _pattern-equiv-form:
+
+An equivalent form for that example, avoiding explicit ``forall`` uses :ref:`pattern-type-sigs`: ::
+
+    f :: [a] -> [a]
+    f (xs :: [aa]) = xs ++ ys
+      where
+        ys :: [aa]
+        ys = reverse xs
+
+Unlike the ``forall`` form, type variable ``a`` from ``f``'s signature is not scoped over ``f``'s equation(s).
+Type variable ``aa`` bound by the pattern signature is scoped over the right-hand side of ``f``'s equation.
+(Therefore there is no need to use a distinct type variable; using ``a`` would be equivalent.)
+
 
 Overview
 --------
@@ -9925,10 +9952,12 @@ This only happens if:
          f3 :: forall a. [a] -> [a]
          Just f3 = Just (\(x:xs) -> xs ++ [ x :: a ])   -- Not OK!
 
-   The binding for ``f3`` is a pattern binding, and so its type
-   signature does not bring ``a`` into scope. However ``f1`` is a
-   function binding, and ``f2`` binds a bare variable; in both cases the
-   type signature brings ``a`` into scope.
+   ``f1`` is a function binding, and ``f2`` binds a bare variable;
+   in both cases the type signature brings ``a`` into scope.
+   However the binding for ``f3`` is a pattern binding,
+   and so ``f3`` is a fresh variable brought into scope by the pattern,
+   not connected with top level ``f3``.
+   Then type variable ``a`` is not in scope of the right-hand side of ``Just f3 = ...``.
 
 .. _exp-type-sigs:
 
@@ -9974,17 +10003,28 @@ example: ::
     f xs = (n, zs)
       where
         (ys::[a], n) = (reverse xs, length xs) -- OK
-        zs::[a] = xs ++ ys                     -- OK
+        (zs::[a])    = xs ++ ys                     -- OK
 
-        Just (v::b) = ...  -- Not OK; b is not in scope
+        Just (v::b)  = ...  -- Not OK; b is not in scope
 
 Here, the pattern signatures for ``ys`` and ``zs`` are fine, but the one
 for ``v`` is not because ``b`` is not in scope.
 
 However, in all patterns *other* than pattern bindings, a pattern type
 signature may mention a type variable that is not in scope; in this
-case, *the signature brings that type variable into scope*. This is
-particularly important for existential data constructors. For example: ::
+case, *the signature brings that type variable into scope*. For example: ::
+
+    -- same f and g as above, now assuming that 'a' is not already in scope
+    f = \(x::Int, y::a) -> x           -- 'a' is in scope on RHS of ->
+
+    g (x::a) = x :: a
+
+    hh (Just (v :: b)) = v :: b
+
+The pattern type signature makes the type variable available on the right-hand side of the equation.
+
+Bringing type variables into scope is particularly important
+for existential data constructors. For example: ::
 
     data T = forall a. MkT [a]
 
@@ -9992,28 +10032,30 @@ particularly important for existential data constructors. For example: ::
     k (MkT [t::a]) =
         MkT t3
       where
-        t3::[a] = [t,t,t]
+        (t3::[a]) = [t,t,t]
 
-Here, the pattern type signature ``(t::a)`` mentions a lexical type
-variable that is not already in scope. Indeed, it *cannot* already be in
-scope, because it is bound by the pattern match. GHC's rule is that in
-this situation (and only then), a pattern type signature can mention a
-type variable that is not already in scope; the effect is to bring it
-into scope, standing for the existentially-bound type variable.
+Here, the pattern type signature ``[t::a]`` mentions a lexical type
+variable that is not already in scope. Indeed, it *must not* already be in
+scope, because it is bound by the pattern match.
+The effect is to bring it into scope,
+standing for the existentially-bound type variable.
 
 When a pattern type signature binds a type variable in this way, GHC
 insists that the type variable is bound to a *rigid*, or fully-known,
 type variable. This means that any user-written type signature always
 stands for a completely known type.
 
-If all this seems a little odd, we think so too. But we must have *some*
-way to bring such type variables into scope, else we could not name
-existentially-bound type variables in subsequent type signatures.
+It does seem odd that the existentially-bound type variable *must not*
+be already in scope. Contrast that usually name-bindings merely shadow
+(make a 'hole') in a same-named outer variable's scope.
+But we must have *some* way to bring such type variables into scope,
+else we could not name existentially-bound type variables
+in subsequent type signatures.
 
-This is (now) the *only* situation in which a pattern type signature is
-allowed to mention a lexical variable that is not already in scope. For
-example, both ``f`` and ``g`` would be illegal if ``a`` was not already
-in scope.
+Compare the two (identical) definitions for examples ``f``, ``g``;
+they are both legal whether or not ``a`` is already in scope.
+They differ in that *if* ``a`` is already in scope, the signature constrains
+the pattern, rather than the pattern binding the variable.
 
 .. _cls-inst-scoped-tyvars:
 
@@ -15668,4 +15710,3 @@ compilation with ``-prof``. On the other hand, as the ``CallStack`` is
 built up explicitly via the ``HasCallStack`` constraints, it will
 generally not contain as much information as the simulated call-stacks
 maintained by the RTS.
-
