@@ -44,9 +44,9 @@ test('T3016', when(fast(), skip), compile, [''])
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 
 test('T3234',
-     only_ways(['optasm']),
-     compile,
-     ['-ddump-simpl-stats -dsuppress-uniques'])
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T3234'])
 
 test('T3717', only_ways(['optasm']),
               compile,

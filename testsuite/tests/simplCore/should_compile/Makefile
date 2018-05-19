@@ -13,6 +13,10 @@ T13468:
         # Expecting no output from the grep, hence "-"
         # If the case branch is not eliminated, we get a patError
 
+T3234:
+	$(RM) -f T3234.o T3234.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl-stats T3234.hs | grep 'fold/build'
+
 T3990:
 	$(RM) -f T3990.o T3990.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T3990.hs | grep 'test_case'
