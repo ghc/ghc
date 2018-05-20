@@ -1284,3 +1284,13 @@ test ('T9630',
       ],
       multimod_compile,
       ['T9630', '-v0 -O'])
+
+test ('T15164',
+      [ compiler_stats_num_field('bytes allocated',
+          [(platform('x86_64-unknown-mingw32'),  3424183288, 10),
+
+          (wordsize(64), 6824183288, 10)
+          ])
+      ],
+      compile,
+      ['-v0 -O'])

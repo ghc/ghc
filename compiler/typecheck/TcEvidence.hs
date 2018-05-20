@@ -16,7 +16,7 @@ module TcEvidence (
   lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
   isEmptyEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  sccEvBinds, evBindVar,
+  sccEvBinds, evBindVar, isNoEvBindsVar,
 
   -- EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
@@ -428,6 +428,10 @@ evidence bindings are allowed.  Notebly ():
 
   - When unifying forall-types
 -}
+
+isNoEvBindsVar :: EvBindsVar -> Bool
+isNoEvBindsVar (NoEvBindsVar {}) = True
+isNoEvBindsVar (EvBindsVar {})   = False
 
 -----------------
 newtype EvBindMap

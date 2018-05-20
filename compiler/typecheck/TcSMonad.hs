@@ -38,6 +38,7 @@ module TcSMonad (
     newEvVar, newGivenEvVar, newGivenEvVars,
     emitNewDeriveds, emitNewDerivedEq,
     checkReductionDepth,
+    getSolvedDicts, setSolvedDicts,
 
     getInstEnvs, getFamInstEnvs,                -- Getting the environments
     getTopEnv, getGblEnv, getLclEnv,
@@ -421,7 +422,7 @@ data InertSet
               -- NB: An ExactFunEqMap -- this doesn't match via loose types!
 
        , inert_solved_dicts   :: DictMap CtEvidence
-              -- Of form ev :: C t1 .. tn
+              -- All Wanteds, of form ev :: C t1 .. tn
               -- See Note [Solved dictionaries]
               -- and Note [Do not add superclasses of solved dictionaries]
        }
@@ -474,8 +475,10 @@ Other notes about solved dictionaries
 
 * See also Note [Do not add superclasses of solved dictionaries]
 
-* The inert_solved_dicts field is not rewritten by equalities, so it may
-  get out of date.
+* The inert_solved_dicts field is not rewritten by equalities,
+  so it may get out of date.
+
+* THe inert_solved_dicts are all Wanteds, never givens
 
 Note [Do not add superclasses of solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1778,6 +1781,15 @@ addSolvedDict item cls tys
   = do { traceTcS "updSolvedSetTcs:" $ ppr item
        ; updInertTcS $ \ ics ->
              ics { inert_solved_dicts = addDict (inert_solved_dicts ics) cls tys item } }
+
+getSolvedDicts :: TcS (DictMap CtEvidence)
+getSolvedDicts = do { ics <- getTcSInerts; return (inert_solved_dicts ics) }
+
+setSolvedDicts :: DictMap CtEvidence -> TcS ()
+setSolvedDicts solved_dicts
+  = updInertTcS $ \ ics ->
+    ics { inert_solved_dicts = solved_dicts }
+
 
 {- *********************************************************************
 *                                                                      *
