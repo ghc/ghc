@@ -1,3 +1,4 @@
+ignoring (possibly broken) abi-depends field for packages
 install1:
 bin
 lib

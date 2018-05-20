@@ -1209,7 +1209,18 @@ updateDBCache verbosity db = do
       pkgsCabalFormat = packages db
 
       pkgsGhcCacheFormat :: [PackageCacheFormat]
-      pkgsGhcCacheFormat = map convertPackageInfoToCacheFormat pkgsCabalFormat
+      pkgsGhcCacheFormat
+        = map (recomputeValidAbiDeps pkgsCabalFormat) -- Note [Recompute abi-depends]
+        $ map convertPackageInfoToCacheFormat
+          pkgsCabalFormat
+
+      hasAnyAbiDepends :: InstalledPackageInfo -> Bool
+      hasAnyAbiDepends x = length (abiDepends x) > 0
+
+  -- warn when we find any (possibly-)bogus abi-depends fields;
+  -- Note [Recompute abi-depends]
+  when (any hasAnyAbiDepends pkgsCabalFormat) $
+      infoLn "ignoring (possibly broken) abi-depends field for packages"
 
   when (verbosity > Normal) $
       infoLn ("writing cache " ++ filename)
@@ -1231,6 +1242,45 @@ type PackageCacheFormat = GhcPkg.InstalledPackageInfo
                             OpenUnitId
                             ModuleName
                             OpenModule
+
+{- Note [Recompute abi-depends]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Like most fields, `ghc-pkg` relies on who-ever is performing package
+registration to fill in fields; this includes the `abi-depends` field present
+for the package.
+
+However, this was likely a mistake, and is not very robust; in certain cases,
+versions of Cabal may use bogus abi-depends fields for a package when doing
+builds. Why? Because package database information is aggressively cached; it is
+possible to work Cabal into a situation where it uses a cached version of
+`abi-depends`, rather than the one in the actual database after it has been
+recomputed.
+
+However, there is an easy fix: ghc-pkg /already/ knows the `abi-depends` of a
+package, because they are the ABIs of the packages pointed at by the `depends`
+field. So it can simply look up the abi from the dependencies in the original
+database, and ignore whatever the system registering gave it.
+
+So, instead, we do two things here:
+
+  - We throw away the information for a registered package's `abi-depends` field.
+
+  - We recompute it: we simply look up the unit ID of the package in the original
+    database, and use *its* abi-depends.
+
+See Trac #14381, and Cabal issue #4728.
+
+-}
+
+recomputeValidAbiDeps :: [InstalledPackageInfo] -> PackageCacheFormat -> PackageCacheFormat
+recomputeValidAbiDeps db pkg = pkg { GhcPkg.abiDepends = catMaybes (newAbiDeps) }
+  where
+    newAbiDeps = flip map (GhcPkg.abiDepends pkg) $ \(k, _) ->
+      case filter (\d -> installedUnitId d == k) db of
+        []  -> Nothing
+        [x] -> Just (k, unAbiHash (abiHash x))
+        _   -> Nothing -- ???
 
 convertPackageInfoToCacheFormat :: InstalledPackageInfo -> PackageCacheFormat
 convertPackageInfoToCacheFormat pkg =
