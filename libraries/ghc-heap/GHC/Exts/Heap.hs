@@ -111,7 +111,7 @@ getClosureRaw x = do
 -- This is a hack to cover the bootstrap compiler using the old version of
 -- 'unpackClosure'. The new 'unpackClosure' return values are not merely
 -- a reordering, so using the old version would not work.
-#if MIN_VERSION_ghc_prim(0,5,2)
+#if MIN_VERSION_ghc_prim(0,5,3)
         (# iptr, dat, pointers #) -> do
 #else
         (# iptr, pointers, dat #) -> do

@@ -8,7 +8,7 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom Roles12.N:C2 :: C2 a = a -> a -- Defined at Roles14.hs:6:1
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.2.1,
+Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]
 
 ==================== Typechecker ====================

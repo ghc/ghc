@@ -1,9 +1,13 @@
-## 0.5.2.1 (edit as necessary)
+## 0.5.3 (edit as necessary)
 
 - Shipped with GHC 8.6.1
 
 - Added to `GHC.Prim`:
         addWordC# :: Word# -> Word# -> (# Word#, Int# #)
+
+- `unpackClosure#` can now unpack any valid Haskell closure.
+  Previously it returned empty pointer and non-pointer arrays
+  for thunks.
 
 ## 0.5.2.0
 
