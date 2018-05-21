@@ -63,12 +63,12 @@ import Data.Data hiding ( Fixity )
 -- | Haskell Module
 --
 -- All we actually declare here is the top-level structure for a module.
-data HsModule name
+data HsModule pass
   = HsModule {
       hsmodName :: Maybe (Located ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
-      hsmodExports :: Maybe (Located [LIE name]),
+      hsmodExports :: Maybe (Located [LIE pass]),
         -- ^ Export list
         --
         --  - @Nothing@: export list omitted, so export everything
@@ -82,11 +82,11 @@ data HsModule name
         --                                   ,'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-      hsmodImports :: [LImportDecl name],
+      hsmodImports :: [LImportDecl pass],
         -- ^ We snaffle interesting stuff out of the imported interfaces early
         -- on, adding that info to TyDecls/etc; so this list is often empty,
         -- downstream.
-      hsmodDecls :: [LHsDecl name],
+      hsmodDecls :: [LHsDecl pass],
         -- ^ Type, class, value, and interface signature decls
       hsmodDeprecMessage :: Maybe (Located WarningTxt),
         -- ^ reason\/explanation for warning/deprecation of this module
