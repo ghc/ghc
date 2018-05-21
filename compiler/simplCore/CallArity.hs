@@ -735,7 +735,7 @@ domRes (_, ae) = varEnvDom ae
 lookupCallArityRes :: CallArityRes -> Var -> (Arity, Bool)
 lookupCallArityRes (g, ae) v
     = case lookupVarEnv ae v of
-        Just a -> (a, not (v `elemUnVarSet` (neighbors g v)))
+        Just a -> (a, not (g `hasLoopAt` v))
         Nothing -> (0, False)
 
 calledWith :: CallArityRes -> Var -> UnVarSet
