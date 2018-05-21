@@ -3045,23 +3045,34 @@ demoteUnfilledFmv fmv
 
 -----------------------------
 dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFmv x fmv co ty)
+-- (dischargeFmv ev fmv co ty)
 --     [W] ev :: F tys ~ fmv
 --         co :: F tys ~ xi
 -- Precondition: fmv is not filled, and fmv `notElem` xi
---               ev is Wanted
+--               ev is Wanted or Derived
 --
--- Then set fmv := xi,
+-- Then for [W] or [WD], we actually fill in the fmv:
+--      set fmv := xi,
 --      set ev  := co
 --      kick out any inert things that are now rewritable
 --
--- Does not evaluate 'co' if 'ev' is Derived
+-- For [D], we instead emit an equality that must ultimately hold
+--      emit  xi ~ fmv
+--      Does not evaluate 'co' if 'ev' is Derived
+--
+-- See TcFlatten Note [The flattening story],
+-- especially "Ownership of fsk/fmv"
 dischargeFmv ev@(CtWanted { ctev_dest = dest }) fmv co xi
   = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
     do { setWantedEvTerm dest (EvExpr (evCoercion co))
        ; unflattenFmv fmv xi
        ; n_kicked <- kickOutAfterUnification fmv
        ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ pprKicked n_kicked) }
+
+dischargeFmv (CtDerived { ctev_loc = loc }) fmv _co xi
+  = emitNewDerivedEq loc Nominal xi (mkTyVarTy fmv)
+              -- FunEqs are always at Nominal role
+
 dischargeFmv ev _ _ _ = pprPanic "dischargeFmv" (ppr ev)
 
 pprKicked :: Int -> SDoc

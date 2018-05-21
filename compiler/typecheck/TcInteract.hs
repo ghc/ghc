@@ -1442,15 +1442,9 @@ reactFunEq from_this fsk1 solve_this fsk2
        ; new_ev <- newGivenEvVar loc (fsk_eq_pred, evCoercion fsk_eq_co)
        ; emitWorkNC [new_ev] }
 
-  | CtDerived { ctev_loc = loc } <- solve_this
-  = do { traceTcS "reactFunEq (Derived)" (ppr from_this $$ ppr fsk1 $$
-                                          ppr solve_this $$ ppr fsk2)
-       ; emitNewDerivedEq loc Nominal (mkTyVarTy fsk1) (mkTyVarTy fsk2) }
-              -- FunEqs are always at Nominal role
-
   | otherwise  -- Wanted
-  = do { traceTcS "reactFunEq" (ppr from_this $$ ppr fsk1 $$
-                                ppr solve_this $$ ppr fsk2)
+  = do { traceTcS "reactFunEq (Wanted/Derived)"
+            (vcat [ppr from_this, ppr fsk1, ppr solve_this, ppr fsk2])
        ; dischargeFmv solve_this fsk2 (ctEvCoercion from_this) (mkTyVarTy fsk1)
        ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fsk1 $$
                                      ppr solve_this $$ ppr fsk2) }

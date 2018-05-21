@@ -1690,8 +1690,8 @@ data Ct
         --    *never* over-saturated (because if so
         --    we should have decomposed)
 
-      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkolTv
-                            -- [Wanted] always a FlatMetaTv
+      cc_fsk    :: TcTyVar  -- [G]  always a FlatSkolTv
+                            -- [W], [WD], or [D] always a FlatMetaTv
         -- See Note [The flattening story] in TcFlatten
     }
 

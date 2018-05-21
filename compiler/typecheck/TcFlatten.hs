@@ -82,15 +82,17 @@ Note [The flattening story]
    - We unflatten Wanteds at the end of each attempt to simplify the
      wanteds; see unflattenWanteds, called from solveSimpleWanteds.
 
-* Each canonical [G], [W], or [WD] CFunEqCan x : F xis ~ fsk/fmv
-  has its own distinct evidence variable x and flatten-skolem fsk/fmv.
+* Ownership of fsk/fmv.  Each canonical [G], [W], or [WD]
+       CFunEqCan x : F xis ~ fsk/fmv
+  "owns" a distinct evidence variable x, and flatten-skolem fsk/fmv.
   Why? We make a fresh fsk/fmv when the constraint is born;
   and we never rewrite the RHS of a CFunEqCan.
 
-  In contrast a [D] CFunEqCan shares its fmv with its partner [W],
+  In contrast a [D] CFunEqCan /shares/ its fmv with its partner [W],
   but does not "own" it.  If we reduce a [D] F Int ~ fmv, where
   say type instance F Int = ty, then we don't discharge fmv := ty.
-  Rather we simply generate [D] fmv ~ ty (in TcInteract.reduce_top_fun_eq)
+  Rather we simply generate [D] fmv ~ ty (in TcInteract.reduce_top_fun_eq,
+  and dischargeFmv)
 
 * Inert set invariant: if F xis1 ~ fsk1, F xis2 ~ fsk2
                        then xis1 /= xis2
