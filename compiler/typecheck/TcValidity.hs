@@ -1405,8 +1405,10 @@ checkInstTermination tys theta
 
    check2 pred pred_size
      | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what)
+     | not (isTyFamFree pred) = addErrTc (nestedMsg what)
      | pred_size >= head_size = addErrTc (smallerMsg what)
      | otherwise              = return ()
+     -- isTyFamFree: see Note [Type families in instance contexts]
      where
         what    = text "constraint" <+> quotes (ppr pred)
         bad_tvs = fvType pred \\ head_fvs
@@ -1432,7 +1434,18 @@ undecidableMsg, constraintKindsMsg :: SDoc
 undecidableMsg     = text "Use UndecidableInstances to permit this"
 constraintKindsMsg = text "Use ConstraintKinds to permit this"
 
-{-
+{- Note [Type families in instance contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Are these OK?
+  type family F a
+  instance F a    => C (Maybe [a]) where ...
+  intance C (F a) => C [[[a]]]     where ...
+
+No: the type family in the instance head might blow up to an
+arbitrarily large type, depending on how 'a' is instantiated.
+So we require UndecidableInstances if we have a type family
+in the instance head.  Trac #15172.
+
 Note [Associated type instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow this:
