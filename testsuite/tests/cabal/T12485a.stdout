@@ -1,4 +1,3 @@
-ignoring (possibly broken) abi-depends field for packages
 should SUCCEED
 should SUCCEED
 should SUCCEED
