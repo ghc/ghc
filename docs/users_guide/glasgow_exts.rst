@@ -9811,13 +9811,14 @@ Lexically scoped type variables
 
 .. tip::
 
-    ``ScopedTypeVariables`` breaks ghc's usual rule that explicit ``forall`` is optional and doesn't affect semantics.
-    For the examples in this section, the explicit ``forall`` is required.
+    ``ScopedTypeVariables`` breaks GHC's usual rule that explicit ``forall`` is optional and doesn't affect semantics.
+    For the :ref:`decl-type-sigs` (or :ref:`exp-type-sigs`) examples in this section,
+    the explicit ``forall`` is required.
     (If omitted, usually the program will not compile; in a few cases it will compile but the functions get a different signature.)
-    To trigger ``ScopedTypeVariables``, the ``forall`` must appear against the top-level signature (or outer expression)
+    To trigger those forms of ``ScopedTypeVariables``, the ``forall`` must appear against the top-level signature (or outer expression)
     but *not* against nested signatures referring to the same type variables.
     
-    Explicit ``forall`` is not always required -- see the equivalent form for the example in this section, or :ref:`Pattern type signatures`.
+    Explicit ``forall`` is not always required -- see :ref:`pattern-equiv-form` for the example in this section, or :ref:`pattern-type-sigs`.
     
 
 GHC supports *lexically scoped type variables*, without which some type
@@ -9838,7 +9839,12 @@ signature for ``ys``. In Haskell 98 it is not possible to declare a type
 for ``ys``; a major benefit of scoped type variables is that it becomes
 possible to do so.
 
-An equivalent form for that example, avoiding explicit ``forall`` uses Pattern type signatures::
+.. _pattern-equiv-form:
+
+Pattern signature equivalent
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+An equivalent form for that example, avoiding explicit ``forall`` uses :ref:`pattern-type-sigs`::
 
     f :: [a] -> [a]
     f (xs :: [aa]) = xs ++ ys
@@ -10000,9 +10006,9 @@ example: ::
     f xs = (n, zs)
       where
         (ys::[a], n) = (reverse xs, length xs) -- OK
-        (zs::[a]) = xs ++ ys                     -- OK
+        (zs::[a])    = xs ++ ys                     -- OK
 
-        Just (v::b) = ...  -- Not OK; b is not in scope
+        Just (v::b)  = ...  -- Not OK; b is not in scope
 
 Here, the pattern signatures for ``ys`` and ``zs`` are fine, but the one
 for ``v`` is not because ``b`` is not in scope.
