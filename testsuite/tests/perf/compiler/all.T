@@ -1287,9 +1287,7 @@ test ('T9630',
 
 test ('T15164',
       [ compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'),  3424183288, 10),
-
-          (wordsize(64), 6824183288, 10)
+          [(wordsize(64), 3423873408, 10)
           ])
       ],
       compile,
