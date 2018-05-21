@@ -176,10 +176,6 @@ module TcType (
   noFreeVarsOfType,
 
   --------------------------------
-  -- Transforming Types to TcTypes
-  toTcType,    -- :: Type -> TcType
-  toTcTypeBag, -- :: Bag EvVar -> Bag EvVar
-
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
@@ -222,7 +218,6 @@ import TysWiredIn( coercibleClass, unitTyCon, unitTyConKey
                  , listTyCon, constraintKind )
 import BasicTypes
 import Util
-import Bag
 import Maybes
 import ListSetOps ( getNth, findDupsEq )
 import Outputable
@@ -233,7 +228,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.List  ( mapAccumL )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
-import Data.Functor.Identity
 import qualified Data.Semigroup as Semi
 
 {-
@@ -272,13 +266,20 @@ tau ::= tyvar
 -- In all cases, a (saturated) type synonym application is legal,
 -- provided it expands to the required form.
 
-Note [TcTyVars in the typechecker]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [TcTyVars and TyVars in the typechecker]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The typechecker uses a lot of type variables with special properties,
 notably being a unification variable with a mutable reference.  These
 use the 'TcTyVar' variant of Var.Var.
 
-However, the type checker and constraint solver can encounter type
+Note, though, that a /bound/ type variable can (and probably should)
+be a TyVar.  E.g
+    forall a. a -> a
+Here 'a' is really just a deBruijn-number; it certainly does not have
+a signficant TcLevel (as every TcTyVar does).  So a forall-bound type
+variable should be TyVars; and hence a TyVar can appear free in a TcType.
+
+The type checker and constraint solver can also encounter /free/ type
 variables that use the 'TyVar' variant of Var.Var, for a couple of
 reasons:
 
@@ -299,7 +300,8 @@ reasons:
     long afer TcTyVars have been zonked away
 
 It's convenient to simply treat these TyVars as skolem constants,
-which of course they are.  So
+which of course they are.  We give them a level number of "outermost",
+so they behave as global constants.  Specifically:
 
 * Var.tcTyVarDetails succeeds on a TyVar, returning
   vanillaSkolemTv, as well as on a TcTyVar.
@@ -326,7 +328,7 @@ for coercion variables--on the variable. Failing to do so led to
 GHC Trac #12785.
 -}
 
--- See Note [TcTyVars in the typechecker]
+-- See Note [TcTyVars and TyVars in the typechecker]
 type TcCoVar = CoVar    -- Used only during type inference
 type TcType = Type      -- A TcType can have mutable type variables
 type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
@@ -1172,7 +1174,7 @@ candidateQTyVarsOfTypes = foldl (split_dvs emptyVarSet) mempty
 -}
 
 tcIsTcTyVar :: TcTyVar -> Bool
--- See Note [TcTyVars in the typechecker]
+-- See Note [TcTyVars and TyVars in the typechecker]
 tcIsTcTyVar tv = isTyVar tv
 
 isTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
@@ -2319,56 +2321,6 @@ isRigidTy ty
   | isForAllTy ty                           = True
   | otherwise                               = False
 
-{-
-************************************************************************
-*                                                                      *
-\subsection{Transformation of Types to TcTypes}
-*                                                                      *
-************************************************************************
--}
-
-toTcType :: Type -> TcType
--- The constraint solver expects EvVars to have TcType, in which the
--- free type variables are TcTyVars. So we convert from Type to TcType here
--- A bit tiresome; but one day I expect the two types to be entirely separate
--- in which case we'll definitely need to do this
-toTcType = runIdentity . to_tc_type emptyVarSet
-
-toTcTypeBag :: Bag EvVar -> Bag EvVar -- All TyVars are transformed to TcTyVars
-toTcTypeBag evvars = mapBag (\tv -> setTyVarKind tv (toTcType (tyVarKind tv))) evvars
-
-to_tc_mapper :: TyCoMapper VarSet Identity
-to_tc_mapper
-  = TyCoMapper { tcm_smart    = False   -- more efficient not to use smart ctors
-               , tcm_tyvar    = tyvar
-               , tcm_covar    = covar
-               , tcm_hole     = hole
-               , tcm_tybinder = tybinder }
-  where
-    tyvar :: VarSet -> TyVar -> Identity Type
-    tyvar ftvs tv
-      | Just var <- lookupVarSet ftvs tv = return $ TyVarTy var
-      | isTcTyVar tv = TyVarTy <$> updateTyVarKindM (to_tc_type ftvs) tv
-      | otherwise
-      = do { kind' <- to_tc_type ftvs (tyVarKind tv)
-           ; return $ TyVarTy $ mkTcTyVar (tyVarName tv) kind' vanillaSkolemTv }
-
-    covar :: VarSet -> CoVar -> Identity Coercion
-    covar ftvs cv
-      | Just var <- lookupVarSet ftvs cv = return $ CoVarCo var
-      | otherwise = CoVarCo <$> updateVarTypeM (to_tc_type ftvs) cv
-
-    hole :: VarSet -> CoercionHole -> Identity Coercion
-    hole _ hole = pprPanic "toTcType: found a coercion hole" (ppr hole)
-
-    tybinder :: VarSet -> TyVar -> ArgFlag -> Identity (VarSet, TyVar)
-    tybinder ftvs tv _vis = do { kind' <- to_tc_type ftvs (tyVarKind tv)
-                               ; let tv' = mkTcTyVar (tyVarName tv) kind'
-                                                     vanillaSkolemTv
-                               ; return (ftvs `extendVarSet` tv', tv') }
-
-to_tc_type :: VarSet -> Type -> Identity TcType
-to_tc_type = mapType to_tc_mapper
 
 {-
 ************************************************************************
