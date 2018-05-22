@@ -947,12 +947,19 @@ foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 
 ----------------------------------------------
 -- | 'zip' takes two lists and returns a list of corresponding pairs.
+--
+-- > zip [1, 2] ['a', 'b'] = [(1, 'a'), (2, 'b')]
+--
 -- If one input list is short, excess elements of the longer list are
--- discarded.
+-- discarded:
+--
+-- > zip [1] ['a', 'b'] = [(1, 'a')]
+-- > zip [1, 2] ['a'] = [(1, 'a')]
 --
 -- 'zip' is right-lazy:
 --
 -- > zip [] _|_ = []
+-- > zip _|_ [] = _|_
 {-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
 zip []     _bs    = []
