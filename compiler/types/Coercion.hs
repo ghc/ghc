@@ -360,12 +360,12 @@ splitForAllCo_maybe _                     = Nothing
 -------------------------------------------------------
 -- and some coercion kind stuff
 
-coVarTypes :: CoVar -> Pair Type
+coVarTypes :: HasDebugCallStack => CoVar -> Pair Type
 coVarTypes cv
   | (_, _, ty1, ty2, _) <- coVarKindsTypesRole cv
   = Pair ty1 ty2
 
-coVarKindsTypesRole :: CoVar -> (Kind,Kind,Type,Type,Role)
+coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind,Kind,Type,Type,Role)
 coVarKindsTypesRole cv
  | Just (tc, [k1,k2,ty1,ty2]) <- splitTyConApp_maybe (varType cv)
  = let role
@@ -420,10 +420,12 @@ mkRuntimeRepCo co
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
                            -- (up to silliness with Constraint)
 
-isReflCoVar_maybe :: CoVar -> Maybe Coercion
+isReflCoVar_maybe :: Var -> Maybe Coercion
 -- If cv :: t~t then isReflCoVar_maybe cv = Just (Refl t)
+-- Works on all kinds of Vars, not just CoVars
 isReflCoVar_maybe cv
-  | Pair ty1 ty2 <- coVarTypes cv
+  | isCoVar cv
+  , Pair ty1 ty2 <- coVarTypes cv
   , ty1 `eqType` ty2
   = Just (Refl (coVarRole cv) ty1)
   | otherwise
