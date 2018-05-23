@@ -754,8 +754,7 @@ writeMetaTyVarRef tyvar ref ty
     tv_lvl = tcTyVarLevel tyvar
     ty_lvl = tcTypeLevel ty
 
-    level_check_ok = isFlattenTyVar tyvar
-                  || not (ty_lvl `strictlyDeeperThan` tv_lvl)
+    level_check_ok  = not (ty_lvl `strictlyDeeperThan` tv_lvl)
     level_check_msg = ppr ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
 
     double_upd_msg details = hang (text "Double update of meta tyvar")
