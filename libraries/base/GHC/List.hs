@@ -958,8 +958,8 @@ foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 --
 -- 'zip' is right-lazy:
 --
--- > zip [] undefined = []
--- > zip undefined [] = undefined
+-- > zip [] _|_ = []
+-- > zip _|_ [] = _|_
 {-# NOINLINE [1] zip #-}
 zip :: [a] -> [b] -> [(a,b)]
 zip []     _bs    = []
