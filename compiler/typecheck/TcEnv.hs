@@ -442,7 +442,7 @@ tcExtendKindEnvList :: [(Name, TcTyThing)] -> TcM r -> TcM r
 --      ATcTyCon or APromotionErr
 -- No need to update the global tyvars, or tcl_th_bndrs, or tcl_rdr
 tcExtendKindEnvList things thing_inside
-  = do { traceTc "txExtendKindEnvList" (ppr things)
+  = do { traceTc "tcExtendKindEnvList" (ppr things)
        ; updLclEnv upd_env thing_inside }
   where
     upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
@@ -450,7 +450,7 @@ tcExtendKindEnvList things thing_inside
 tcExtendKindEnv :: NameEnv TcTyThing -> TcM r -> TcM r
 -- A variant of tcExtendKindEvnList
 tcExtendKindEnv extra_env thing_inside
-  = do { traceTc "txExtendKindEnv" (ppr extra_env)
+  = do { traceTc "tcExtendKindEnv" (ppr extra_env)
        ; updLclEnv upd_env thing_inside }
   where
     upd_env env = env { tcl_env = tcl_env env `plusNameEnv` extra_env }
