@@ -32,6 +32,7 @@ import Instruction
 import Format
 import Reg
 import PprBase
+import Util (debugIsOn)
 
 
 import Hoopl.Collections
@@ -145,7 +146,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 
-pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, x, y])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -153,7 +154,8 @@ pprDatas (_, Statics alias [CmmStaticLit lit@(CmmLabel lbl), CmmStaticLit ind, _
   , Just ind' <- labelInd ind
   , not $ externallyVisibleCLabel ind' -- trips ld64 otherwise
   , let equate = pprGloblDecl alias $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-  = pprTrace "IndStaticInfo: pprDatas" (ppr alias <+> ppr lit <+> ppr ind') equate
+  = ASSERT( (case x of CmmStaticLit (CmmInt 0 _) -> True; _ -> False) && (case y of CmmStaticLit (CmmInt 0 _) -> True; _ -> False) )
+      pprTrace "IndStaticInfo: pprDatas" (ppr alias <+> ppr lit <+> ppr ind') equate
 
 pprDatas (align, (Statics lbl dats))
  = vcat (pprAlign align : pprLabel lbl : map pprData dats)
