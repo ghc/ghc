@@ -1,10 +1,10 @@
 
-SimpleFail11a.hs:6:15:
+SimpleFail11a.hs:6:15: error:
     Conflicting family instance declarations:
-      C9 Int Int = C9IntInt -- Defined at SimpleFail11a.hs:6:15
-      C9 Int Int = C9IntInt2 -- Defined at SimpleFail11a.hs:8:15
+      C9 Int Int -- Defined at SimpleFail11a.hs:6:15
+      C9 Int Int -- Defined at SimpleFail11a.hs:8:15
 
-SimpleFail11a.hs:11:15:
+SimpleFail11a.hs:11:15: error:
     Conflicting family instance declarations:
       D9 Int Int = Char -- Defined at SimpleFail11a.hs:11:15
       D9 Int Int = Int -- Defined at SimpleFail11a.hs:13:15

@@ -169,18 +169,22 @@ Defined here to avoid module loops. CoAxiom is loaded very early on.
 pprCoAxiom :: CoAxiom br -> SDoc
 pprCoAxiom ax@(CoAxiom { co_ax_branches = branches })
   = hang (text "axiom" <+> ppr ax <+> dcolon)
-       2 (vcat (map (ppr_co_ax_branch (const pprType) ax) $ fromBranches branches))
+       2 (vcat (map (ppr_co_ax_branch (\_ ty -> equals <+> pprType ty) ax) $
+                    fromBranches branches))
 
 pprCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 pprCoAxBranch = ppr_co_ax_branch pprRhs
   where
     pprRhs fam_tc rhs
-      | Just (tycon, _) <- splitTyConApp_maybe rhs
-      , isDataFamilyTyCon fam_tc
-      = pprDataCons tycon
+      | isDataFamilyTyCon fam_tc
+      = empty -- Don't bother printing anything for the RHS of a data family
+              -- instance...
 
       | otherwise
-      = ppr rhs
+      = equals <+> ppr rhs
+              -- ...but for a type family instance, do print out the RHS, since
+              -- it might be needed to disambiguate between duplicate instances
+              -- (#14179)
 
 pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
 pprCoAxBranchHdr ax index = pprCoAxBranch ax (coAxiomNthBranch ax index)
@@ -194,8 +198,8 @@ ppr_co_ax_branch ppr_rhs
                           , cab_rhs = rhs
                           , cab_loc = loc })
   = foldr1 (flip hangNotEmpty 2)
-        [ pprUserForAll (mkTyVarBinders Inferred (tvs ++ cvs))
-        , pprTypeApp fam_tc lhs <+> equals <+> ppr_rhs fam_tc rhs
+        [ pprUserForAll (mkTyVarBinders Inferred (ee_tvs ++ cvs))
+        , pprTypeApp fam_tc ee_lhs <+> ppr_rhs fam_tc rhs
         , text "-- Defined" <+> pprLoc loc ]
   where
         pprLoc loc
@@ -205,6 +209,21 @@ ppr_co_ax_branch ppr_rhs
           | otherwise
           = text "in" <+>
               quotes (ppr (nameModule name))
+
+        (ee_tvs, ee_lhs)
+          | Just (tycon, tc_args) <- splitTyConApp_maybe rhs
+          , isDataFamilyTyCon fam_tc
+          = -- Eta-expand LHS types, because sometimes data family instances
+            -- are eta-reduced.
+            -- See Note [Eta reduction for data family axioms] in TcInstDecls.
+            let tc_tvs           = tyConTyVars tycon
+                etad_tvs         = dropList tc_args tc_tvs
+                etad_tys         = mkTyVarTys etad_tvs
+                eta_expanded_tvs = tvs `chkAppend` etad_tvs
+                eta_expanded_lhs = lhs `chkAppend` etad_tys
+            in (eta_expanded_tvs, eta_expanded_lhs)
+          | otherwise
+          = (tvs, lhs)
 
 {-
 %************************************************************************

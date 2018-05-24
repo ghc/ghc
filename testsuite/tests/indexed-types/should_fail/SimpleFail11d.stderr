@@ -1,5 +1,5 @@
 
-SimpleFail11d.hs:8:15:
+SimpleFail11d.hs:8:15: error:
     Conflicting family instance declarations:
-      C9 [Int] [a] = C9ListList2 -- Defined at SimpleFail11d.hs:8:15
-      C9 [a] [Int] = C9ListList -- Defined at SimpleFail11d.hs:10:15
+      C9 [Int] [a] -- Defined at SimpleFail11d.hs:8:15
+      C9 [a] [Int] -- Defined at SimpleFail11d.hs:10:15
