@@ -2007,7 +2007,7 @@ isDllName :: DynFlags -> Module -> Name -> Bool
 -- the symbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
 isDllName dflags this_mod name
-  | WayDyn `notElem` ways dflags = False
+  | not (gopt Opt_ExternalDynamicRefs dflags) = False
   | Just mod <- nameModule_maybe name
     -- Issue #8696 - when GHC is dynamically linked, it will attempt
     -- to load the dynamic dependencies of object files at compile
