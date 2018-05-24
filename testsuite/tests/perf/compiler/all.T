@@ -1204,7 +1204,7 @@ test('ManyAlternatives',
 
 test('T13701',
      [ compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-apple-darwin'), 2217187888, 10),
+          [(platform('x86_64-apple-darwin'), 2549206272, 10),
            (platform('x86_64-unknown-linux'), 2413253392, 10),
            # initial:     2511285600
            # 2017-06-23:  2188045288    treat banged variable bindings as FunBinds
@@ -1235,9 +1235,10 @@ test('T13719',
 
 test('T14697',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 337290376, 10),
+          [(wordsize(64), 371030912, 10),
           # initial:    635573784
           # 2018-02-23: 337290376 Cache the fingerprint of sOpt_P
+          # 2018-05-24: 371030912 Unknown
           ]),
        # This generates too large of a command-line for poor Windows
        when(opsys('mingw32'), expect_broken(15072)),
