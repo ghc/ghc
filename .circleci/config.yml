@@ -258,6 +258,22 @@ jobs:
       - *test
       - *store_test_results
 
+  "slow-validate-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: ghcci/x86_64-linux:0.0.2
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-linux
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
+
 workflows:
   version: 2
   validate:
@@ -287,6 +303,7 @@ workflows:
     - validate-x86_64-linux-unreg
     - validate-x86_64-linux-llvm
     - validate-x86_64-linux-debug
+    - slow-validate-x86_64-linux
 
 notify:
   webhooks:
