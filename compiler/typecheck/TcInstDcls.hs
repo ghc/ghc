@@ -60,6 +60,7 @@ import DynFlags
 import ErrUtils
 import FastString
 import Id
+import ListSetOps
 import MkId
 import Name
 import NameSet
@@ -1306,6 +1307,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
        -- The lexical_tvs scope over the 'where' part
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; checkMinimalDefinition
+       ; checkMethBindMembership
        ; (ids, binds, mb_implics) <- set_exts exts $
                                      mapAndUnzip3M tc_item op_items
        ; return (ids, listToBag binds, listToBag (catMaybes mb_implics)) }
@@ -1367,6 +1369,41 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         warnUnsatisfiedMinimalDefinition
 
     methodExists meth = isJust (findMethodBind meth binds prag_fn)
+
+    ----------------------
+    -- Check if any method bindings do not correspond to the class.
+    -- See Note [Mismatched class methods and associated type families].
+    checkMethBindMembership
+      = let bind_nms         = map unLoc $ collectMethodBinders binds
+            cls_meth_nms     = map (idName . fst) op_items
+            mismatched_meths = bind_nms `minusList` cls_meth_nms
+        in forM_ mismatched_meths $ \mismatched_meth ->
+             addErrTc $ hsep
+             [ text "Class", quotes (ppr (className clas))
+             , text "does not have a method", quotes (ppr mismatched_meth)]
+
+{-
+Note [Mismatched class methods and associated type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's entirely possible for someone to put methods or associated type family
+instances inside of a class in which it doesn't belong. For instance, we'd
+want to fail if someone wrote this:
+
+  instance Eq () where
+    type Rep () = Maybe
+    compare = undefined
+
+Since neither the type family `Rep` nor the method `compare` belong to the
+class `Eq`. Normally, this is caught in the renamer when resolving RdrNames,
+since that would discover that the parent class `Eq` is incorrect.
+
+However, there is a scenario in which the renamer could fail to catch this:
+if the instance was generated through Template Haskell, as in #12387. In that
+case, Template Haskell will provide fully resolved names (e.g.,
+`GHC.Classes.compare`), so the renamer won't notice the sleight-of-hand going
+on. For this reason, we also put an extra validity check for this in the
+typechecker as a last resort.
+-}
 
 ------------------------
 tcMethodBody :: Class -> [TcTyVar] -> [EvVar] -> [TcType]

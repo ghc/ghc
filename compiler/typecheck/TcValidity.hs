@@ -1590,6 +1590,8 @@ checkConsistentFamInst
 checkConsistentFamInst Nothing _ _ _ = return ()
 checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pats
   = do { -- Check that the associated type indeed comes from this class
+         -- See [Mismatched class methods and associated type families]
+         -- in TcInstDecls.
          checkTc (Just clas == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
