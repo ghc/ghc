@@ -9818,7 +9818,7 @@ Lexically scoped type variables
     To trigger those forms of ``ScopedTypeVariables``, the ``forall`` must appear against the top-level signature (or outer expression)
     but *not* against nested signatures referring to the same type variables.
     
-    Explicit ``forall`` is not always required -- see :ref:`pattern-equiv-form` for the example in this section, or :ref:`pattern-type-sigs` .
+    Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent pattern-equiv-form` for the example in this section, or :ref:`pattern-type-sigs` .
     
 
 GHC supports *lexically scoped type variables*, without which some type
@@ -9840,9 +9840,6 @@ for ``ys``; a major benefit of scoped type variables is that it becomes
 possible to do so.
 
 .. _pattern-equiv-form:
-
-Pattern signature equivalent
-----------------------------
 
 An equivalent form for that example, avoiding explicit ``forall`` uses :ref:`pattern-type-sigs`: ::
 
