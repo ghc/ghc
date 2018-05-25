@@ -79,19 +79,9 @@ import Data.List
 --
 -- Some invariants apply to how you use the substitution:
 --
--- 1. #in_scope_invariant# The in-scope set contains at least those 'Id's and 'TyVar's that will be in scope /after/
--- applying the substitution to a term. Precisely, the in-scope set must be a superset of the free vars of the
--- substitution range that might possibly clash with locally-bound variables in the thing being substituted in.
+-- 1. Note [The substitution invariant] in TyCoRep
 --
--- 2. #apply_once# You may apply the substitution only /once/
---
--- There are various ways of setting up the in-scope set such that the first of these invariants hold:
---
--- * Arrange that the in-scope set really is all the things in scope
---
--- * Arrange that it's the free vars of the range of the substitution
---
--- * Make it empty, if you know that all the free vars of the substitution are fresh, and hence can't possibly clash
+-- 2. Note [Substitutions apply only once] in TyCoRep
 data Subst
   = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
                       -- applying the substitution
@@ -99,7 +89,7 @@ data Subst
           TvSubstEnv  -- Substitution from TyVars to Types
           CvSubstEnv  -- Substitution from CoVars to Coercions
 
-        -- INVARIANT 1: See #in_scope_invariant#
+        -- INVARIANT 1: See TyCORep Note [The substitution invariant]
         -- This is what lets us deal with name capture properly
         -- It's a hard invariant to check...
         --
@@ -181,7 +171,7 @@ mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 mkSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> IdSubstEnv -> Subst
 mkSubst in_scope tvs cvs ids = Subst in_scope ids tvs cvs
 
--- | Find the in-scope set: see "CoreSubst#in_scope_invariant"
+-- | Find the in-scope set: see TyCORep Note [The substitution invariant]
 substInScope :: Subst -> InScopeSet
 substInScope (Subst in_scope _ _ _) = in_scope
 
@@ -191,7 +181,8 @@ zapSubstEnv :: Subst -> Subst
 zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 
 -- | Add a substitution for an 'Id' to the 'Subst': you must ensure that the in-scope set is
--- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
+-- such that TyCORep Note [The substitution invariant]
+-- holds after extending the substitution like this
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
 extendIdSubst (Subst in_scope ids tvs cvs) v r
@@ -207,8 +198,8 @@ extendIdSubstList (Subst in_scope ids tvs cvs) prs
 -- | Add a substitution for a 'TyVar' to the 'Subst'
 -- The 'TyVar' *must* be a real TyVar, and not a CoVar
 -- You must ensure that the in-scope set is such that
--- the "CoreSubst#in_scope_invariant" is true after extending
--- the substitution like this.
+-- TyCORep Note [The substitution invariant] holds
+-- after extending the substitution like this.
 extendTvSubst :: Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
   = ASSERT( isTyVar tv )
@@ -221,8 +212,10 @@ extendTvSubstList subst vrs
   where
     extend subst (v, r) = extendTvSubst subst v r
 
--- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst': you must ensure that the in-scope set is
--- such that the "CoreSubst#in_scope_invariant" is true after extending the substitution like this
+-- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst':
+-- you must ensure that the in-scope set satisfies
+-- TyCORep Note [The substitution invariant]
+-- after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r
   = ASSERT( isCoVar v )
@@ -345,7 +338,8 @@ instance Outputable Subst where
 -}
 
 -- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only
--- apply the substitution /once/: see "CoreSubst#apply_once"
+-- apply the substitution /once/:
+-- see Note [Substitutions apply only once] in TyCoRep
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]
