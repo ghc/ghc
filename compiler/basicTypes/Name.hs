@@ -262,7 +262,7 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 --                 you can find details (type, fixity, instances) in the
 --                     TcGblEnv or TcLclEnv
 --
--- The isInteractiveModule part is because successive interactions of a GCHi session
+-- The isInteractiveModule part is because successive interactions of a GHCi session
 -- each give rise to a fresh module (Ghci1, Ghci2, etc), but they all come
 -- from the magic 'interactive' package; and all the details are kept in the
 -- TcLclEnv, TcGblEnv, NOT in the HPT or EPT.
@@ -295,7 +295,7 @@ nameIsHomePackageImport this_mod
     this_pkg = moduleUnitId this_mod
 
 -- | Returns True if the Name comes from some other package: neither this
--- pacakge nor the interactive package.
+-- package nor the interactive package.
 nameIsFromExternalPackage :: UnitId -> Name -> Bool
 nameIsFromExternalPackage this_pkg name
   | Just mod <- nameModule_maybe name
