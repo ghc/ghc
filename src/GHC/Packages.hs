@@ -13,8 +13,8 @@ ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabal, checkPpr, compareSizes, compiler
     , containers, deepseq, deriveConstants, directory, filepath, genapply
-    , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact, ghci, ghcPkg, ghcPrim
-    , ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
+    , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact, ghcHeap, ghci, ghcPkg
+    , ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
     , integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive
     , process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy
     , transformers, unlit, unix, win32, xhtml ]
@@ -44,6 +44,7 @@ ghcBoot             = hsLib  "ghc-boot"
 ghcBootTh           = hsLib  "ghc-boot-th"
 ghcCabal            = hsUtil "ghc-cabal"
 ghcCompact          = hsLib  "ghc-compact"
+ghcHeap             = hsLib  "ghc-heap"
 ghci                = hsLib  "ghci"
 ghcPkg              = hsUtil "ghc-pkg"
 ghcPrim             = hsLib  "ghc-prim"

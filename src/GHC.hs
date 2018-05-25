@@ -3,12 +3,12 @@ module GHC (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkPpr, compareSizes, compiler,
     containers, deepseq, deriveConstants, directory, filepath, genapply,
-    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci, ghcPkg,
-    ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin,
-    integerGmp, integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty,
-    primitive, process, rts, runGhc, stm, templateHaskell, terminfo, text, time,
-    touchy, transformers, unlit, unix, win32, xhtml, ghcPackages, isGhcPackage,
-    defaultPackages, testsuitePackages,
+    genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghcHeap, ghci,
+    ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hp2ps, hpc,
+    hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec, parallel,
+    pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo,
+    text, time, touchy, transformers, unlit, unix, win32, xhtml, ghcPackages,
+    isGhcPackage, defaultPackages, testsuitePackages,
 
     -- * Package information
     programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
@@ -46,6 +46,7 @@ stage0Packages = do
              , ghc
              , ghcBoot
              , ghcBootTh
+             , ghcHeap
              , ghci
              , ghcPkg
              , ghcTags
