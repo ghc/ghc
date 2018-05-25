@@ -918,7 +918,7 @@ hscCheckSafeImports tcg_env = do
 -- | Validate that safe imported modules are actually safe.  For modules in the
 -- HomePackage (the package the module we are compiling in resides) this just
 -- involves checking its trust type is 'Safe' or 'Trustworthy'. For modules
--- that reside in another package we also must check that the external pacakge
+-- that reside in another package we also must check that the external package
 -- is trusted. See the Note [Safe Haskell Trust Check] above for more
 -- information.
 --
