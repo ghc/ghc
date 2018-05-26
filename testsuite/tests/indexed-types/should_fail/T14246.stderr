@@ -1,0 +1,24 @@
+
+T14246.hs:18:5: error:
+    • Illegal polymorphic type: forall (t :: v). f t
+    • In the equations for closed type family ‘KLN’
+      In the type family declaration for ‘KLN’
+
+T14246.hs:22:27: error:
+    • Expected kind ‘Vect (KLN f) L’,
+        but ‘Cons (Label (t :: v)) l’ has kind ‘Vect ('S (KLN (f t))) *’
+    • In the second argument of ‘Reveal’, namely
+        ‘(Cons (Label (t :: v)) l)’
+      In the type family declaration for ‘Reveal’
+
+T14246.hs:22:67: error:
+    • Expected kind ‘Vect (KLN (f t)) L’,
+        but ‘l’ has kind ‘Vect (KLN (f t)) *’
+    • In the second argument of ‘Reveal’, namely ‘l’
+      In the type ‘Reveal (f t) l’
+      In the type family declaration for ‘Reveal’
+
+T14246.hs:23:21: error:
+    • Expected kind ‘Vect (KLN a) L’, but ‘Nil’ has kind ‘Vect 'Z L’
+    • In the second argument of ‘Reveal’, namely ‘Nil’
+      In the type family declaration for ‘Reveal’
