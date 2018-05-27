@@ -1692,8 +1692,12 @@ check_main dflags tcg_env explicit_mod_hdr
               ; root_main_id = Id.mkExportedVanillaId root_main_name
                                                       (mkTyConApp ioTyCon [res_ty])
               ; co  = mkWpTyApps [res_ty]
-              ; rhs = mkHsDictLet ev_binds $
-                      nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
+              -- The ev_binds of the `main` function may contain deferred
+              -- type error when type of `main` is not `IO a`. The `ev_binds`
+              -- must be put inside `runMainIO` to ensure the deferred type
+              -- error can be emitted correctly. See Trac #13838.
+              ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) $
+                        mkHsDictLet ev_binds main_expr
               ; main_bind = mkVarBind root_main_id rhs }
 
         ; return (tcg_env { tcg_main  = Just main_name,
