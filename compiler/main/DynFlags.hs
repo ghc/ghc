@@ -79,7 +79,7 @@ module DynFlags (
         unsafeFlags, unsafeFlagsForInfer,
 
         -- ** LLVM Targets
-        LlvmTarget(..), LlvmTargets,
+        LlvmTarget(..), LlvmTargets, LlvmPasses, LlvmConfig,
 
         -- ** System tool settings and locations
         Settings(..),
@@ -830,6 +830,7 @@ data DynFlags = DynFlags {
   hscTarget             :: HscTarget,
   settings              :: Settings,
   llvmTargets           :: LlvmTargets,
+  llvmPasses            :: LlvmPasses,
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -1146,6 +1147,8 @@ data LlvmTarget = LlvmTarget
   }
 
 type LlvmTargets = [(String, LlvmTarget)]
+type LlvmPasses = [(Int, String)]
+type LlvmConfig = (LlvmTargets, LlvmPasses)
 
 data Settings = Settings {
   sTargetPlatform        :: Platform,       -- Filled in by SysTools
@@ -1722,8 +1725,8 @@ initDynFlags dflags = do
 
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
 -- and must be fully initialized by 'GHC.runGhc' first.
-defaultDynFlags :: Settings -> LlvmTargets -> DynFlags
-defaultDynFlags mySettings myLlvmTargets =
+defaultDynFlags :: Settings -> LlvmConfig -> DynFlags
+defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
@@ -1818,6 +1821,7 @@ defaultDynFlags mySettings myLlvmTargets =
         splitInfo               = Nothing,
         settings                = mySettings,
         llvmTargets             = myLlvmTargets,
+        llvmPasses              = myLlvmPasses,
 
         -- ghc -M values
         depMakefile       = "Makefile",
@@ -5473,10 +5477,11 @@ makeDynFlagsConsistent dflags
 -- initialized.
 defaultGlobalDynFlags :: DynFlags
 defaultGlobalDynFlags =
-    (defaultDynFlags settings llvmTargets) { verbosity = 2 }
+    (defaultDynFlags settings (llvmTargets, llvmPasses)) { verbosity = 2 }
   where
     settings = panic "v_unsafeGlobalDynFlags: settings not initialised"
     llvmTargets = panic "v_unsafeGlobalDynFlags: llvmTargets not initialised"
+    llvmPasses = panic "v_unsafeGlobalDynFlags: llvmPasses not initialised"
 
 #if STAGE < 2
 GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)

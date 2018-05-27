@@ -1474,10 +1474,12 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
   where
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        llvmOpts = case optLevel dflags of
-          0 -> "-mem2reg -globalopt"
-          1 -> "-O1 -globalopt"
-          _ -> "-O2"
+        optIdx = max 0 $ min 2 $ optLevel dflags  -- ensure we're in [0,2]
+        llvmOpts = case lookup optIdx $ llvmPasses dflags of
+                    Just passes -> passes
+                    Nothing -> panic ("runPhase LlvmOpt: llvm-passes file "
+                                      ++ "is missing passes for level "
+                                      ++ show optIdx)
 
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
