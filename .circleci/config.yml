@@ -162,6 +162,22 @@ jobs:
       - *configure_unix
       - *build_hadrian
 
+  "slow-validate-x86_64-linux":
+    resource_class: xlarge
+    docker:
+      - image: haskell:8.2
+    environment:
+      <<: *buildenv
+    steps:
+      - *precheckout
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *slowtest
+
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
@@ -284,6 +300,7 @@ workflows:
               only:
                 - master
     jobs:
+    - slow-validate-x86_64-linux
     - validate-x86_64-linux-unreg
     - validate-x86_64-linux-llvm
     - validate-x86_64-linux-debug
