@@ -1,0 +1,39 @@
+
+subsumption_sort_hole_fits.hs:2:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [Char] -> [String]
+    • In the expression: _
+      In the expression: _ "hello, world"
+      In an equation for ‘f’: f = _ "hello, world"
+    • Relevant bindings include
+        f :: [String] (bound at subsumption_sort_hole_fits.hs:2:1)
+      Valid hole fits include
+        lines :: String -> [String]
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘base-4.12.0.0:Data.OldList’))
+        words :: String -> [String]
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘base-4.12.0.0:Data.OldList’))
+        read :: forall a. Read a => String -> a
+          with read @[String]
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘Text.Read’))
+        repeat :: forall a. a -> [a]
+          with repeat @String
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘GHC.List’))
+        mempty :: forall a. Monoid a => a
+          with mempty @([Char] -> [String])
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          with return @[] @String
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          with pure @[] @String
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘GHC.Base’))
+        fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+          with fail @[] @String
+          (imported from ‘Prelude’ at subsumption_sort_hole_fits.hs:1:1
+           (and originally defined in ‘GHC.Base’))

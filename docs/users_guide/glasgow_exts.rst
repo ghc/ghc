@@ -10932,10 +10932,7 @@ will fail with the following error: ::
         Relevant bindings include
           x :: a (bound at hole.hs:2:3)
           f :: a -> a (bound at hole.hs:2:1)
-        Valid substitutions include
-              undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-                (imported from ‘Prelude’ at hole.hs:1:1
-                (and originally defined in ‘GHC.Err’))
+        Valid hole fits include x :: a (bound at hole.hs:2:3)
 
 Here are some more details:
 
@@ -10981,25 +10978,25 @@ Here are some more details:
           Relevant bindings include
             z :: Bool (bound at Foo.hs:3:6)
           cons :: Bool -> [Bool] (bound at Foo.hs:3:1)
-          Valid substitutions include
+          Valid hole fits include
+            z :: Bool (bound at mpt.hs:2:6)
             otherwise :: Bool
-              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (imported from ‘Prelude’ at mpt.hs:1:8-10
               (and originally defined in ‘GHC.Base’))
             False :: Bool
-              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (imported from ‘Prelude’ at mpt.hs:1:8-10
               (and originally defined in ‘GHC.Types’))
             True :: Bool
-              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              (imported from ‘Prelude’ at mpt.hs:1:8-10
               (and originally defined in ‘GHC.Types’))
             maxBound :: forall a. Bounded a => a
-              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              with maxBound @Bool
+              (imported from ‘Prelude’ at mpt.hs:1:8-10
               (and originally defined in ‘GHC.Enum’))
             minBound :: forall a. Bounded a => a
-              (imported from ‘Prelude’ at Foo.hs:1:8-10
+              with minBound @Bool
+              (imported from ‘Prelude’ at mpt.hs:1:8-10
               (and originally defined in ‘GHC.Enum’))
-            undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-              (imported from ‘Prelude’ at Foo.hs:1:8-10
-              (and originally defined in ‘GHC.Err’))
 
        Foo.hs:3:26: error:
            Variable not in scope: y :: [Bool]
@@ -11027,10 +11024,6 @@ Here are some more details:
           In the expression: _x : _x
           In an equation for `cons': cons = _x : _x
           Relevant bindings include cons :: [a] (bound at unbound.hs:1:1)
-          Valid substitutions include
-            undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-            (imported from ‘Prelude’ at unbound.hs:1:8-11
-              (and originally defined in ‘GHC.Err’))
 
       unbound.hs:1:13:
           Found hole: _x :: [a]
@@ -11042,15 +11035,14 @@ Here are some more details:
           In the expression: _x : _x
           In an equation for ‘cons’: cons = _x : _x
           Relevant bindings include cons :: [a] (bound at unbound.hs:3:1)
-          Valid substitutions include
-            cons :: forall a. [a] (defined at unbound.hs:3:1)
+          Valid hole fits include
+            cons :: forall a. [a]
+              with cons @a
+              (defined at mpt.hs:3:1)
             mempty :: forall a. Monoid a => a
-              (imported from ‘Prelude’ at unbound.hs:1:8-11
+              with mempty @[a]
+              (imported from ‘Prelude’ at mpt.hs:1:8-10
               (and originally defined in ‘GHC.Base’))
-            undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-              (imported from ‘Prelude’ at unbound.hs:1:8-11
-              (and originally defined in ‘GHC.Err’))
-
 
    Notice the two different types reported for the two different
    occurrences of ``_x``.
@@ -11074,7 +11066,7 @@ Here are some more details:
    implementation terms, they are reported by the renamer rather than
    the type checker.)
 
-- The list of valid substitutions is found by checking which bindings in scope
+- The list of valid hole fits is found by checking which bindings in scope
   would fit into the hole. As an example, compiling the following module with
   GHC: ::
 
@@ -11088,48 +11080,47 @@ Here are some more details:
 
   .. code-block:: none
 
+
     • Found hole: _ :: [Char] -> [String]
     • In the expression: _
       In the expression: _ "hello, world"
-      In an equation for ‘f’: f = _ "hello, world"
-    • Relevant bindings include f :: [String] (bound at test.hs:6:1)
-      Valid substitutions include
+      In an equation for ‘g’: g = _ "hello, world"
+    • Relevant bindings include g :: [String] (bound at mpt.hs:6:1)
+      Valid hole fits include
         lines :: String -> [String]
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
         words :: String -> [String]
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
-        read :: forall a. Read a => String -> a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘Text.Read’))
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
         inits :: forall a. [a] -> [[a]]
-          (imported from ‘Data.List’ at test.hs:3:19-23
-          (and originally defined in ‘base-4.11.0.0:Data.OldList’))
+          with inits @Char
+          (imported from ‘Data.List’ at mpt.hs:4:19-23
+           (and originally defined in ‘base-4.11.0.0:Data.OldList’))
         repeat :: forall a. a -> [a]
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.List’))
-        mempty :: forall a. Monoid a => a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Base’))
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Base’))
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Base’))
+          with repeat @String
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘GHC.List’))
         fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Base’))
-        error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Err’))
-        errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Err’))
-        undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-          (imported from ‘Prelude’ at test.hs:1:8-11
-          (and originally defined in ‘GHC.Err’))
+          with fail @[] @String
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          with return @[] @String
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          with pure @[] @String
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘GHC.Base’))
+        read :: forall a. Read a => String -> a
+          with read @[String]
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘Text.Read’))
+        mempty :: forall a. Monoid a => a
+          with mempty @([Char] -> [String])
+          (imported from ‘Prelude’ at mpt.hs:3:8-9
+           (and originally defined in ‘GHC.Base’))
 
 There are a few flags for controlling the amount of context information shown
 for typed holes:
@@ -11157,236 +11148,302 @@ for typed holes:
               x :: a (bound at show_constraints.hs:4:3)
               f :: a -> Bool (bound at show_constraints.hs:4:1)
             Constraints include Eq a (from show_constraints.hs:3:1-22)
-            Valid substitutions include
+            Valid hole fits include
               otherwise :: Bool
-                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
-                (and originally defined in ‘GHC.Base’))
               False :: Bool
-                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
-                (and originally defined in ‘GHC.Types’))
               True :: Bool
-                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
-                (and originally defined in ‘GHC.Types’))
               maxBound :: forall a. Bounded a => a
-                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
-                (and originally defined in ‘GHC.Enum’))
+                with maxBound @Bool
               minBound :: forall a. Bounded a => a
-                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
-                (and originally defined in ‘GHC.Enum’))
-              undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-                (imported from ‘Prelude’ at show_constraints.hs:1:8-11
-                (and originally defined in ‘GHC.Err’))
+                with minBound @Bool
+ 
+.. _typed-hole-valid-hole-fits:
 
-.. _typed-hole-valid-substitutions:
-
-Valid Substitutions
+Valid Hole Fits
 -------------------
-GHC sometimes suggests valid substitutions for typed holes, which is
+GHC sometimes suggests valid hole fits for typed holes, which is
 configurable by a few flags.
 
-.. ghc-flag:: -fno-show-valid-substitutions
-    :shortdesc: Disables showing a list of valid substitutions for typed holes
+.. ghc-flag:: -fno-show-valid-hole-fits
+    :shortdesc: Disables showing a list of valid hole fits for typed holes
         in type error messages.
     :type: dynamic
     :category: verbosity
 
     :default: off
 
-    This flag can be toggled to turn off the display of valid substitutions
+    This flag can be toggled to turn off the display of valid hole fits
     entirely.
 
-.. ghc-flag:: -fno-sort-valid-substitutions
-    :shortdesc: Disables the sorting of the list of valid substitutions for typed holes
-        in type error messages.
-    :type: dynamic
-    :category: verbosity
-
-    :default: off
-
-    By default the valid substitutions are sorted by a topological sort on the
-    subsumption graph of the identified substitutions. However, this requires
-    checking relations between the found substitutions, which can be expensive
-    if there are many valid substitutions. Sorting can be toggled off with this
-    flag.
-
-    When sorting is off, the hole in ``g`` in the following as before ::
-
-      import Data.List (inits)
-
-      g :: [String]
-      g = _ "hello, world"
-
-    will yield an error:
-
-    .. code-block:: none
-
-      test.hs:6:5: error:
-          • Found hole: _ :: [Char] -> [String]
-          • In the expression: _
-            In the expression: _ "hello, world"
-            In an equation for ‘g’: g = _ "hello, world"
-          • Relevant bindings include f :: [String] (bound at test.hs:6:1)
-            Valid substitutions include
-              inits :: forall a. [a] -> [[a]]
-                (imported from ‘Data.List’ at test.hs:3:19-23
-                (and originally defined in ‘base-4.11.0.0:Data.OldList’))
-              return :: forall (m :: * -> *). Monad m => forall a. a -> m a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Base’))
-              fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Base’))
-              mempty :: forall a. Monoid a => a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Base’))
-              pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Base’))
-              read :: forall a. Read a => String -> a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘Text.Read’))
-              lines :: String -> [String]
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘base-4.11.0.0:Data.OldList’))
-              words :: String -> [String]
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘base-4.11.0.0:Data.OldList’))
-              error :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => [Char] -> a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Err’))
-              errorWithoutStackTrace :: forall (a :: TYPE r). [Char] -> a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Err’))
-              undefined :: forall (a :: TYPE r). GHC.Stack.Types.HasCallStack => a
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.Err’))
-              repeat :: forall a. a -> [a]
-                (imported from ‘Prelude’ at test.hs:1:8-11
-                (and originally defined in ‘GHC.List’))
-
-    where the substitutions are ordered by the order they were defined and
-    imported in, with all local bindings before global bindings.
-
-.. ghc-flag:: -fmax-valid-substitutions=⟨n⟩
-    :shortdesc: *default: 6.* Set the maximum number of valid substitutions for
+.. ghc-flag:: -fmax-valid-hole-fits=⟨n⟩
+    :shortdesc: *default: 6.* Set the maximum number of valid hole fits for
         typed holes to display in type error messages.
     :type: dynamic
-    :reverse: -fno-max-valid-substitutions
+    :reverse: -fno-max-valid-hole-fits
     :category: verbosity
 
     :default: 6
 
-    The list of valid substitutions is limited by displaying up to 6
-    substitutions per hole. The number of substitutions shown can be set by this
-    flag. Turning the limit off with :ghc-flag:`-fno-max-valid-substitutions`
-    displays all found substitutions.
+    The list of valid hole fits is limited by displaying up to 6
+    hole fits per hole. The number of hole fits shown can be set by this
+    flag. Turning the limit off with :ghc-flag:`-fno-max-valid-hole-fits`
+    displays all found hole fits.
 
-.. ghc-flag:: -funclutter-valid-substitutions
-    :shortdesc: Unclutter the list of valid substitutions by not showing
-        provenance of suggestion.
+
+.. ghc-flag:: -fshow-type-of-hole-fits
+    :shortdesc: Toggles whether to show the type of the valid hole fits
+       in the output.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-type-of-hole-fits
+
+    :default: on
+
+    By default, the hole fits show the type of the hole fit.
+    This can be turned off by the reverse of this flag.
+
+     
+
+.. ghc-flag:: -fshow-type-app-of-hole-fits
+    :shortdesc: Toggles whether to show the type application of the valid
+       hole fits in the output.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-type-app-of-hole-fits
+
+    :default: on
+
+    By default, the hole fits show the type application needed to make
+    this hole fit fit the type of the hole, e.g. for the hole
+    ``(_ :: Int -> [Int])``, ``mempty`` is a hole fit with
+    ``mempty @(Int -> [Int])``. This can be toggled off with
+    the reverse of this flag.
+
+.. ghc-flag:: -fshow-type-app-vars-of-hole-fits
+    :shortdesc: Toggles whether to show what type each quantified
+       variable takes in a valid hole fit.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-type-app-vars-of-hole-fits
+
+    :default: on
+
+    By default, the hole fits show the type application needed to make
+    this hole fit fit the type of the hole, e.g. for the hole
+    ``(_ :: Int -> [Int])``, ``mempty :: Monoid a => a`` is a hole fit
+    with ``mempty @(Int -> [Int])``. This flag toggles whether to show
+    ``a ~ (Int -> [Int])`` instead of ``mempty @(Int -> [Int])`` in the where
+    clause of the valid hole fit message.
+
+.. ghc-flag:: -fshow-provenance-of-hole-fits
+    :shortdesc: Toggles whether to show the provenance of the valid hole fits
+       in the output.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-provenance-of-hole-fits
+
+    :default: on
+
+    By default, each hole fit shows the provenance information of its
+    hole fit, i.e. where it was bound or defined, and what module
+    it was originally defined in if it was imported. This can be toggled
+    off using the reverse of this flag.
+           
+
+.. ghc-flag:: -funclutter-valid-hole-fits
+    :shortdesc: Unclutter the list of valid hole fits by not showing
+        provenance nor type applications of suggestions.
     :type: dynamic
     :category: verbosity
 
     :default: off
 
-    This flag can be toggled to decrease the verbosity of the valid
-    substitution suggestions by not showing the provenance the suggestions.
+    This flag can be toggled to decrease the verbosity of the valid hole fit
+    suggestions by not showing the provenance nor type application of the
+    suggestions.
 
-.. _typed-holes-refinement-substitutions:
 
-Refinement Substitutions
+
+.. _typed-holes-refinement-hole-fits:
+
+Refinement Hole Fits
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-When the flag :ghc-flag:`-frefinement-level-substitutions=⟨n⟩` is set to an
+When the flag :ghc-flag:`-frefinement-level-hole-fits=⟨n⟩` is set to an
 ``n`` larger than ``0``, GHC will offer up a list of valid refinement
-substitutions, which are valid substitutions that need up to ``n`` levels of
+hole fits, which are valid hole fits that need up to ``n`` levels of
 additional refinement to be complete, where each level represents an additional
-hole in the substitution that requires filling in.  As an example, consider the
+hole in the hole fit that requires filling in.  As an example, consider the
 hole in ::
 
   f :: [Integer] -> Integer
   f = _
 
-When the refinement level is not set, it will only offer valid substitutions
+When the refinement level is not set, it will only offer valid hole fits
 suggestions: ::
 
-  Valid substitutions include
+  Valid hole fits include
     f :: [Integer] -> Integer
-    product :: forall (t :: * -> *).
-              Foldable t => forall a. Num a => t a -> a
-    sum :: forall (t :: * -> *).
-          Foldable t => forall a. Num a => t a -> a
-    maximum :: forall (t :: * -> *).
-              Foldable t => forall a. Ord a => t a -> a
-    minimum :: forall (t :: * -> *).
-              Foldable t => forall a. Ord a => t a -> a
     head :: forall a. [a] -> a
-    (Some substitutions suppressed; use -fmax-valid-substitutions=N or -fno-max-valid-substitutions)
+      with head @Integer
+    last :: forall a. [a] -> a
+      with last @Integer
+    maximum :: forall (t :: * -> *).
+                Foldable t =>
+                forall a. Ord a => t a -> a
+      with maximum @[] @Integer
+    minimum :: forall (t :: * -> *).
+                Foldable t =>
+                forall a. Ord a => t a -> a
+      with minimum @[] @Integer
+    product :: forall (t :: * -> *).
+                Foldable t =>
+                forall a. Num a => t a -> a
+      with product @[] @Integer
+    sum :: forall (t :: * -> *).
+            Foldable t =>
+            forall a. Num a => t a -> a
+      with sum @[] @Integer
 
-However, with :ghc-flag:`-frefinement-level-substitutions=⟨n⟩` set to e.g. `1`,
-it will additionally offer up a list of refinement substitutions, in this case: ::
+However, with :ghc-flag:`-frefinement-level-hole-fits=⟨n⟩` set to e.g. `1`,
+it will additionally offer up a list of refinement hole fits, in this case: ::
 
-  Valid refinement substitutions include
-    foldl1 _ :: forall (t :: * -> *).
-                Foldable t => forall a. (a -> a -> a) -> t a -> a
-    foldr1 _ :: forall (t :: * -> *).
-                Foldable t => forall a. (a -> a -> a) -> t a -> a
-    head _ :: forall a. [a] -> a
-    last _ :: forall a. [a] -> a
-    error _ :: forall (a :: TYPE r).
-                GHC.Stack.Types.HasCallStack => [Char] -> a
-    errorWithoutStackTrace _ :: forall (a :: TYPE r). [Char] -> a
-    (Some refinement substitutions suppressed;
-      use -fmax-refinement-substitutions=N or -fno-max-refinement-substitutions)
+  Valid refinement hole fits include
+    foldl1 (_ :: Integer -> Integer -> Integer)
+      with foldl1 @[] @Integer
+      where foldl1 :: forall (t :: * -> *).
+                      Foldable t =>
+                      forall a. (a -> a -> a) -> t a -> a
+    foldr1 (_ :: Integer -> Integer -> Integer)
+      with foldr1 @[] @Integer
+      where foldr1 :: forall (t :: * -> *).
+                      Foldable t =>
+                      forall a. (a -> a -> a) -> t a -> a
+    const (_ :: Integer)
+      with const @Integer @[Integer]
+      where const :: forall a b. a -> b -> a
+    ($) (_ :: [Integer] -> Integer)
+      with ($) @'GHC.Types.LiftedRep @[Integer] @Integer
+      where ($) :: forall a b. (a -> b) -> a -> b
+    fail (_ :: String)
+      with fail @((->) [Integer]) @Integer
+      where fail :: forall (m :: * -> *).
+                    Monad m =>
+                    forall a. String -> m a
+    return (_ :: Integer)
+      with return @((->) [Integer]) @Integer
+      where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+    (Some refinement hole fits suppressed;
+      use -fmax-refinement-hole-fits=N or -fno-max-refinement-hole-fits)
 
 Which shows that the hole could be replaced with e.g. ``foldl1 _``. While not
 fixing the hole, this can help users understand what options they have.
-
-.. ghc-flag:: -frefinement-level-substitutions=⟨n⟩
+ 
+.. ghc-flag:: -frefinement-level-hole-fits=⟨n⟩
     :shortdesc: *default: off.* Sets the level of refinement of the
-         refinement substitutions, where level ``n`` means that substitutions
+         refinement hole fits, where level ``n`` means that hole fits
          of up to ``n`` holes will be considered.
     :type: dynamic
-    :reverse: -fno-refinement-level-substitutions
+    :reverse: -fno-refinement-level-hole-fits
     :category: verbosity
 
     :default: off
 
-    The list of valid refinement substitutions is generated by considering
-    substitutions with a varying amount of additional holes. The amount of
+    The list of valid refinement hole fits is generated by considering
+    hole fits with a varying amount of additional holes. The amount of
     holes in a refinement can be set by this flag. If the flag is set to 0
-    or not set at all, no valid refinement substitutions will be suggested.
+    or not set at all, no valid refinement hole fits will be suggested.
 
-.. ghc-flag:: -fabstract-refinement-substitutions
+.. ghc-flag:: -fabstract-refinement-hole-fits
     :shortdesc: *default: off.* Toggles whether refinements where one or more
          or more of the holes are abstract are reported.
     :type: dynamic
-    :reverse: -fno-abstract-refinement-substitutions
+    :reverse: -fno-abstract-refinement-hole-fits
     :category: verbosity
 
     :default: off
 
-    Valid list of valid refinement substitutions can often grow large when
+    Valid list of valid refinement hole fits can often grow large when
     the refinement level is ``>= 2``, with holes like ``head _ _`` or
     ``fst _ _``, which are valid refinements, but which are unlikely to be
     relevant since one or more of the holes are still completely open, in that
     neither the type nor kind of those holes are constrained by the proposed
     identifier at all. By default, such holes are not reported. By turning this
-    flag on, such holes are included in the list of valid refinement substitutions.
+    flag on, such holes are included in the list of valid refinement hole fits.
 
-.. ghc-flag:: -fmax-refinement-substitutions=⟨n⟩
-    :shortdesc: *default: 6.* Set the maximum number of refinement substitutions
+.. ghc-flag:: -fmax-refinement-hole-fits=⟨n⟩
+    :shortdesc: *default: 6.* Set the maximum number of refinement hole fits
          for typed holes to display in type error messages.
     :type: dynamic
-    :reverse: -fno-max-refinement-substitutions
+    :reverse: -fno-max-refinement-hole-fits
     :category: verbosity
 
     :default: 6
 
-    The list of valid refinement substitutions is limited by displaying up to 6
-    substitutions per hole. The number of substitutions shown can be set by this
-    flag. Turning the limit off with :ghc-flag:`-fno-max-refinement-substitutions`
-    displays all found substitutions.
+    The list of valid refinement hole fits is limited by displaying up to 6
+    hole fits per hole. The number of hole fits shown can be set by this
+    flag. Turning the limit off with :ghc-flag:`-fno-max-refinement-hole-fits`
+    displays all found hole fits.
+
+.. ghc-flag:: -fshow-hole-matches-of-hole-fits
+    :shortdesc: Toggles whether to show the type of the additional holes
+       in refinement hole fits.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-hole-matches-of-hole-fits
+
+    :default: on
+
+    The types of the additional holes in refinement hole fits are displayed
+    in the output, e.g. ``foldl1 (_ :: a -> a -> a)`` is a refinement
+    for the hole ``_ :: [a] -> a``. If this flag is toggled off, the output
+    will display only ``foldl1 _``, which can be used as a direct replacement
+    for the hole, without requiring ``-XScopedTypeVariables``.
+   
+          
+    
+
+Sorting Valid Hole Fits
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are currently two ways to sort valid hole fits.
+Sorting can be toggled with :ghc-flag:`-fsort-valid-hole-fits`
+
+.. ghc-flag:: -fno-sort-valid-hole-fits
+    :shortdesc: Disables the sorting of the list of valid hole fits for typed holes
+        in type error messages.
+    :type: dynamic
+    :category: verbosity
+
+    :default: off
+
+    By default the valid hole fits are sorted to show the most relevant
+    hole fits at the top of the list of valid hole fits. This can be
+    toggled off with this flag.
+
+.. ghc-flag:: -fsort-by-size-hole-fits
+    :shortdesc: Sort valid hole fits by size.
+    :type: dynamic
+    :reverse: -fno-sort-by-size-hole-fits
+
+    :default: on
+
+    Sorts by how big the types the quantified type variables in the type of the
+    function would have to be in order to match the type of the hole.
+
+
+.. ghc-flag:: -fsort-by-subsumption-hole-fits
+    :shortdesc: Sort valid hole fits by subsumption.
+    :type: dynamic
+    :reverse: -fno-sort-by-subsumption-hole-fits
+
+    :default: off
+
+    An alternative sort. Sorts by checking which hole fits subsume other
+    hole fits, such that if hole fit a could be used as hole fits for
+    hole fit b, then b appears before a in the output. It is more precise than
+    the default sort, but also a lot slower, since a subsumption check has to be
+    run for each pair of valid hole fits.
 
 .. _partial-type-signatures:
 

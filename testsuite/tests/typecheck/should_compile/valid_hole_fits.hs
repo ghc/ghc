@@ -3,7 +3,7 @@ module Foo where
 import Prelude hiding (putStr, putStrLn)
 import qualified System.IO (putStr, putStrLn)
 import Data.Maybe
-import qualified ValidSubs
+import qualified ValidHoleFits
 
 ps :: String -> IO ()
 ps = putStrLn
@@ -20,7 +20,7 @@ c _ = do { x <- a 0
 test :: [Maybe a] -> [a]
 test = _
 
-test2 :: Integer -> ValidSubs.Moo
+test2 :: Integer -> ValidHoleFits.Moo
 test2 = _
 
 k :: Maybe Integer

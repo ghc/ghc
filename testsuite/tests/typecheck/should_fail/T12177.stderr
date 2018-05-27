@@ -10,10 +10,6 @@ T12177.hs:3:19: error:
     • Relevant bindings include
         x :: p1 (bound at T12177.hs:3:14)
         bar :: p -> p1 -> t (bound at T12177.hs:3:1)
-      Valid substitutions include
-        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
-          (imported from ‘Prelude’ at T12177.hs:1:8-10
-           (and originally defined in ‘GHC.Err’))
 
 T12177.hs:5:37: error:
     • Found hole: _ :: t
@@ -28,7 +24,3 @@ T12177.hs:5:37: error:
         x :: p3 (bound at T12177.hs:5:26)
         y :: p1 (bound at T12177.hs:5:14)
         baz :: p -> p1 -> p2 -> p3 -> p4 -> t (bound at T12177.hs:5:1)
-      Valid substitutions include
-        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
-          (imported from ‘Prelude’ at T12177.hs:1:8-10
-           (and originally defined in ‘GHC.Err’))

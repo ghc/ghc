@@ -468,6 +468,7 @@ Library
         TcRnTypes
         TcRules
         TcSimplify
+        TcHoleErrors
         TcErrors
         TcTyClsDecls
         TcTyDecls

@@ -7,6 +7,3 @@
     • In the expression: _
       In an equation for ‘it’: it = _
     • Relevant bindings include it :: t (bound at <interactive>:1:1)
-      Valid substitutions include
-        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
-          (imported from ‘Prelude’ (and originally defined in ‘GHC.Err’))

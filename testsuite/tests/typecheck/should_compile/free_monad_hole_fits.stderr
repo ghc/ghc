@@ -1,0 +1,81 @@
+
+free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole:
+        _a :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b)
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 fmap :: forall a b. (a -> b) -> Free f a -> Free f b
+               at free_monad_hole_fits.hs:11:5-8
+             ‘f’ is a rigid type variable bound by
+               the instance declaration
+               at free_monad_hole_fits.hs:10:10-38
+      Or perhaps ‘_a’ is mis-spelled, or not in scope
+    • In the expression: _a
+      In the first argument of ‘Free’, namely ‘(_a go fa)’
+      In the expression: Free (_a go fa)
+    • Relevant bindings include
+        fa :: f (Free f a) (bound at free_monad_hole_fits.hs:14:16)
+        go :: Free f a -> Free f b (bound at free_monad_hole_fits.hs:12:7)
+        f :: a -> b (bound at free_monad_hole_fits.hs:11:10)
+        fmap :: (a -> b) -> Free f a -> Free f b
+          (bound at free_monad_hole_fits.hs:11:5)
+      Constraints include
+        Functor f (from free_monad_hole_fits.hs:10:10-38)
+      Valid hole fits include
+        fmap :: forall (f :: * -> *).
+                Functor f =>
+                forall a b. (a -> b) -> f a -> f b
+        (<$>) :: forall (f :: * -> *) a b.
+                 Functor f =>
+                 (a -> b) -> f a -> f b
+      Valid refinement hole fits include
+        ($) (_ :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b))
+          where ($) :: forall a b. (a -> b) -> a -> b
+        pure (_ :: f (Free f a) -> f (Free f b))
+          where pure :: forall (f :: * -> *).
+                        Applicative f =>
+                        forall a. a -> f a
+
+free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _a :: Free f a -> Free f b
+      Where: ‘a’, ‘b’ are rigid type variables bound by
+               the type signature for:
+                 (>>=) :: forall a b. Free f a -> (a -> Free f b) -> Free f b
+               at free_monad_hole_fits.hs:23:12-14
+             ‘f’ is a rigid type variable bound by
+               the instance declaration
+               at free_monad_hole_fits.hs:22:10-40
+      Or perhaps ‘_a’ is mis-spelled, or not in scope
+    • In the first argument of ‘fmap’, namely ‘_a’
+      In the first argument of ‘Free’, namely ‘(fmap _a f)’
+      In the expression: Free (fmap _a f)
+    • Relevant bindings include
+        g :: a -> Free f b (bound at free_monad_hole_fits.hs:25:16)
+        f :: f (Free f a) (bound at free_monad_hole_fits.hs:25:10)
+        (>>=) :: Free f a -> (a -> Free f b) -> Free f b
+          (bound at free_monad_hole_fits.hs:23:12)
+      Constraints include
+        Applicative f (from free_monad_hole_fits.hs:22:10-40)
+      Valid refinement hole fits include
+        fmap (_ :: a -> b)
+          where fmap :: forall (f :: * -> *).
+                        Functor f =>
+                        forall a b. (a -> b) -> f a -> f b
+        (<*>) (_ :: Free f (a -> b))
+          where (<*>) :: forall (f :: * -> *).
+                         Applicative f =>
+                         forall a b. f (a -> b) -> f a -> f b
+        (<$>) (_ :: a -> b)
+          where (<$>) :: forall (f :: * -> *) a b.
+                         Functor f =>
+                         (a -> b) -> f a -> f b
+        (=<<) (_ :: a -> Free f b)
+          where (=<<) :: forall (m :: * -> *) a b.
+                         Monad m =>
+                         (a -> m b) -> m a -> m b
+        ($) (_ :: Free f a -> Free f b)
+          where ($) :: forall a b. (a -> b) -> a -> b
+        pure (_ :: Free f b)
+          where pure :: forall (f :: * -> *).
+                        Applicative f =>
+                        forall a. a -> f a

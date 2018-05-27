@@ -5,15 +5,14 @@ T9497a-run: T9497a-run.hs:2:8: error:
       In an equation for ‘main’: main = _main
     • Relevant bindings include
         main :: IO () (bound at T9497a-run.hs:2:1)
-      Valid substitutions include
-        main :: IO () (defined at T9497a-run.hs:2:1)
+      Valid hole fits include
+        main :: IO () (bound at T9497a-run.hs:2:1)
         readLn :: forall a. Read a => IO a
+          with readLn @()
           (imported from ‘Prelude’ at T9497a-run.hs:1:1
            (and originally defined in ‘System.IO’))
         mempty :: forall a. Monoid a => a
+          with mempty @(IO ())
           (imported from ‘Prelude’ at T9497a-run.hs:1:1
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
-          (imported from ‘Prelude’ at T9497a-run.hs:1:1
-           (and originally defined in ‘GHC.Err’))
 (deferred type error)

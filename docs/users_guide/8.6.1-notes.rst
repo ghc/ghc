@@ -109,6 +109,10 @@ Compiler
   This will result in significantly better code being generated for some
   programs. See :ghc-ticket:`9136`.
 
+- GHC now offers significantly more information about typed holes such as valid
+  hole fits and refinement hole fits. See :ref:`Valid Hole Fits <typed-hole-valid-hole-fits>`
+  for more information.
+
 - The code-generation effects of :ghc-flag:`-dynamic` can now be
   enabled independently by the flag
   :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might

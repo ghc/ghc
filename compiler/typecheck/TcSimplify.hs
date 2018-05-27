@@ -10,8 +10,8 @@ module TcSimplify(
        solveEqualities, solveLocalEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
-       tcSubsumes,
-       tcCheckHoleFit,
+
+       simpl_top,
 
        promoteTyVar,
        promoteTyVarSet,
@@ -49,7 +49,6 @@ import TrieMap       () -- DV: for now
 import Type
 import TysWiredIn    ( liftedRepTy )
 import Unify         ( tcMatchTyKi )
-import TcUnify       ( tcSubType_NC )
 import Util
 import Var
 import VarSet
@@ -177,6 +176,8 @@ solveEqualities thing_inside
        ; traceTc "reportAllUnsolved }" empty
        ; return result }
 
+-- | Simplify top-level constraints, but without reporting any unsolved
+-- constraints nor unsafe overlapping.
 simpl_top :: WantedConstraints -> TcS WantedConstraints
     -- See Note [Top-level Defaulting Plan]
 simpl_top wanteds
@@ -510,31 +511,6 @@ simplifyDefault theta
        ; reportAllUnsolved unsolved
        ; traceTc "reportUnsolved }" empty
        ; return () }
-
--- | Reports whether first type (ty_a) subsumes the second type (ty_b),
--- discarding any errors. Subsumption here means that the ty_b can fit into the
--- ty_a, i.e. `tcSubsumes a b == True` if b is a subtype of a.
--- N.B.: Make sure that the types contain all the constraints
--- contained in any associated implications.
-tcSubsumes :: TcSigmaType -> TcSigmaType -> TcM Bool
-tcSubsumes = tcCheckHoleFit emptyBag
-
-
--- | A tcSubsumes which takes into account relevant constraints, to fix trac
--- #14273. Make sure that the constraints are cloned, since the simplifier may
--- perform unification.
-tcCheckHoleFit :: Cts -> TcSigmaType -> TcSigmaType -> TcM Bool
-tcCheckHoleFit _ hole_ty ty | hole_ty `eqType` ty = return True
-tcCheckHoleFit relevantCts hole_ty ty = discardErrs $
- do { (tclevel, wanted, _) <- pushLevelAndCaptureConstraints $
-                              tcSubType_NC ExprSigCtxt ty hole_ty
-    ; rem <- setTcLevel tclevel $ runTcSDeriveds $
-                                  simpl_top $ addSimples wanted relevantCts
-    -- We don't want any insoluble or simple constraints left,
-    -- but solved implications are ok (and neccessary for e.g. undefined)
-    ; return (isEmptyBag (wc_simple rem)
-              && allBag (isSolvedStatus . ic_status) (wc_impl rem))
-    }
 
 ------------------
 tcCheckSatisfiability :: Bag EvVar -> TcM Bool
@@ -1610,7 +1586,7 @@ setImplicationStatus implic@(Implic { ic_status    = status
                                     , ic_given     = givens })
  | ASSERT2( not (isSolvedStatus status ), ppr info )
    -- Precondition: we only set the status if it is not already solved
-   not all_solved
+   not (isSolvedWC pruned_wc)
  = do { traceTcS "setImplicationStatus(not-all-solved) {" (ppr implic)
 
       ; implic <- neededEvVars implic
@@ -1665,9 +1641,6 @@ setImplicationStatus implic@(Implic { ic_status    = status
    pruned_implics = filterBag keep_me implics
    pruned_wc = WC { wc_simple = pruned_simples
                   , wc_impl   = pruned_implics }
-
-   all_solved = isEmptyBag pruned_simples
-             && allBag (isSolvedStatus . ic_status) pruned_implics
 
    keep_me :: Implication -> Bool
    keep_me ic

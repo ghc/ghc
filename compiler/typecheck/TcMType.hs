@@ -65,7 +65,7 @@ module TcMType (
 
   --------------------------------
   -- Zonking and tidying
-  zonkTidyTcType, zonkTidyOrigin,
+  zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
   tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseRuntimeUnk,
   zonkTcTyVar, zonkTcTyVars,
@@ -1623,6 +1623,13 @@ zonkSigTyVarPairs prs
 zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
                            ; return (tidyOpenType env ty') }
+
+zonkTidyTcTypes :: TidyEnv -> [TcType] -> TcM (TidyEnv, [TcType])
+zonkTidyTcTypes = zonkTidyTcTypes' []
+  where zonkTidyTcTypes' zs env [] = return (env, reverse zs)
+        zonkTidyTcTypes' zs env (ty:tys)
+          = do { (env', ty') <- zonkTidyTcType env ty
+               ; zonkTidyTcTypes' (ty':zs) env' tys }
 
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
