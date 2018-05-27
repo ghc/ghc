@@ -1073,6 +1073,7 @@ pprModIface iface
         , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash iface))
         , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash iface))
         , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash iface))
+        , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash iface))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")

@@ -600,6 +600,63 @@ the plugin to create equality axioms for use in evidence terms, but GHC
 does not check their consistency, and inconsistent axiom sets may lead
 to segfaults or other runtime misbehaviour.
 
+.. _plugin_recompilation:
+
+Controlling Recompilation
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+By default, modules compiled with plugins are always recompiled even if the source file is
+unchanged. This most conservative option is taken due to the ability of plugins
+to perform arbitrary IO actions. In order to control the recompilation behaviour
+you can modify the ``pluginRecompile`` field in ``Plugin``. ::
+
+    plugin :: Plugin
+    plugin = defaultPlugin {
+      installCoreToDos = install,
+      pluginRecompile = purePlugin
+      }
+
+By inspecting the example ``plugin`` defined above, we can see that it is pure. This
+means that if the two modules have the same fingerprint then the plugin
+will always return the same result. Declaring a plugin as pure means that
+the plugin will never cause a module to be recompiled.
+
+In general, the ``pluginRecompile`` field has the following type::
+
+    pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
+
+The ``PluginRecompile`` data type is an enumeration determining how the plugin
+should affect recompilation. ::
+    data PluginRecompile = ForceRecompile | NoForceRecompile | MaybeRecompile Fingerprint
+
+A plugin which declares itself impure using ``ForceRecompile`` will always
+trigger a recompilation of the current module. ``NoForceRecompile`` is used
+for "pure" plugins which don't need to be rerun unless a module would ordinarily
+be recompiled. ``MaybeRecompile`` computes a ``Fingerprint`` and if this ``Fingerprint``
+is different to a previously computed ``Fingerprint`` for the plugin, then
+we recompile the module.
+
+As such, ``purePlugin`` is defined as a function which always returns ``NoForceRecompile``. ::
+
+  purePlugin :: [CommandLineOption] -> IO PluginRecompile
+  purePlugin _ = return NoForceRecompile
+
+Users can use the same functions that GHC uses internally to compute fingerprints.
+The `GHC.Fingerprint
+<https://hackage.haskell.org/package/base-4.10.1.0/docs/GHC-Fingerprint.html>`_ module provides useful functions for constructing fingerprints. For example, combining
+together ``fingerprintFingerprints`` and ``fingerprintString`` provides an easy to
+to naively fingerprint the arguments to a plugin. ::
+
+    pluginFlagRecompile :: [CommandLineOption] -> IO PluginRecompile
+    pluginFlagRecompile =
+      return . MaybeRecompile . fingerprintFingerprints . map fingerprintString . sort
+
+``defaultPlugin`` defines ``pluginRecompile`` to be ``impurePlugin`` which
+is the most conservative and backwards compatible option. ::
+
+    impurePlugin :: [CommandLineOption] -> IO PluginRecompile
+    impurePlugin _ = return ForceRecompile
+
 .. _frontend_plugins:
 
 Frontend plugins

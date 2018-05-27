@@ -52,7 +52,7 @@ import Vectorise        ( vectorise )
 import SrcLoc
 import Util
 import Module
-import Plugins          ( withPlugins,installCoreToDos )
+import Plugins          ( withPlugins, installCoreToDos )
 import DynamicLoading  -- ( initializePlugins )
 
 import Maybes
@@ -86,7 +86,8 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                               ; dflags' <- liftIO $ initializePlugins hsc_env'
                                                       (hsc_dflags hsc_env')
                               ; all_passes <- withPlugins dflags'
-                                                installCoreToDos builtin_passes
+                                                installCoreToDos
+                                                builtin_passes
                               ; runCorePasses all_passes guts }
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats

@@ -861,6 +861,7 @@ data ModIface
                                               -- excluding optimisation flags
         mi_opt_hash   :: !Fingerprint,        -- ^ Hash of optimisation flags
         mi_hpc_hash   :: !Fingerprint,        -- ^ Hash of hpc flags
+        mi_plugin_hash :: !Fingerprint,       -- ^ Hash of plugins
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
         mi_finsts     :: !WhetherHasFamInst,
@@ -1023,6 +1024,7 @@ instance Binary ModIface where
                  mi_flag_hash = flag_hash,
                  mi_opt_hash  = opt_hash,
                  mi_hpc_hash  = hpc_hash,
+                 mi_plugin_hash = plugin_hash,
                  mi_orphan    = orphan,
                  mi_finsts    = hasFamInsts,
                  mi_deps      = deps,
@@ -1051,6 +1053,7 @@ instance Binary ModIface where
         put_ bh flag_hash
         put_ bh opt_hash
         put_ bh hpc_hash
+        put_ bh plugin_hash
         put_ bh orphan
         put_ bh hasFamInsts
         lazyPut bh deps
@@ -1081,6 +1084,7 @@ instance Binary ModIface where
         flag_hash   <- get bh
         opt_hash    <- get bh
         hpc_hash    <- get bh
+        plugin_hash <- get bh
         orphan      <- get bh
         hasFamInsts <- get bh
         deps        <- lazyGet bh
@@ -1110,6 +1114,7 @@ instance Binary ModIface where
                  mi_flag_hash   = flag_hash,
                  mi_opt_hash    = opt_hash,
                  mi_hpc_hash    = hpc_hash,
+                 mi_plugin_hash = plugin_hash,
                  mi_orphan      = orphan,
                  mi_finsts      = hasFamInsts,
                  mi_deps        = deps,
@@ -1149,6 +1154,7 @@ emptyModIface mod
                mi_flag_hash   = fingerprint0,
                mi_opt_hash    = fingerprint0,
                mi_hpc_hash    = fingerprint0,
+               mi_plugin_hash = fingerprint0,
                mi_orphan      = False,
                mi_finsts      = False,
                mi_hsc_src     = HsSrcFile,

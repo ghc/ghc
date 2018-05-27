@@ -66,6 +66,7 @@ import OrdList
 import Data.List
 import Data.IORef
 import Control.Monad( when )
+import Plugins ( LoadedPlugin(..) )
 
 {-
 ************************************************************************
@@ -169,7 +170,10 @@ deSugar hsc_env
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
-        ; deps <- mkDependencies tcg_env
+              pluginModules =
+                map lpModule (plugins (hsc_dflags hsc_env))
+        ; deps <- mkDependencies (thisInstalledUnitId (hsc_dflags hsc_env))
+                                 pluginModules tcg_env
 
         ; used_th <- readIORef tc_splice_used
         ; dep_files <- readIORef dependent_files

@@ -105,17 +105,17 @@ loadPlugins hsc_env
     dflags  = hsc_dflags hsc_env
     to_load = pluginModNames dflags
 
-    attachOptions mod_nm plug = LoadedPlugin plug mod_nm (reverse options)
+    attachOptions mod_nm (plug, mod) = LoadedPlugin plug mod (reverse options)
       where
         options = [ option | (opt_mod_nm, option) <- pluginModNameOpts dflags
                             , opt_mod_nm == mod_nm ]
-
     loadPlugin = loadPlugin' (mkVarOcc "plugin") pluginTyConName hsc_env
+
 
 loadFrontendPlugin :: HscEnv -> ModuleName -> IO FrontendPlugin
 loadFrontendPlugin hsc_env mod_name = do
     checkExternalInterpreter hsc_env
-    loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
+    fst <$> loadPlugin' (mkVarOcc "frontendPlugin") frontendPluginTyConName
                 hsc_env mod_name
 
 -- #14335
@@ -127,7 +127,7 @@ checkExternalInterpreter hsc_env =
   where
     dflags = hsc_dflags hsc_env
 
-loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO a
+loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, Module)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
@@ -139,7 +139,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The module", ppr mod_name
                           , text "did not export the plugin name"
                           , ppr plugin_rdr_name ]) ;
-            Just name ->
+            Just (name, mod) ->
 
      do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
@@ -149,7 +149,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The value", ppr name
                           , text "did not have the type"
                           , ppr pluginTyConName, text "as required"])
-            Just plugin -> return plugin } } }
+            Just plugin -> return (plugin, mod) } } }
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
@@ -256,7 +256,9 @@ lessUnsafeCoerce dflags context what = do
 -- loaded very partially: just enough that it can be used, without its
 -- rules and instances affecting (and being linked from!) the module
 -- being compiled.  This was introduced by 57d6798.
-lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe Name)
+--
+-- Need the module as well to record information in the interface file
+lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe (Name, Module))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the package the module resides in by searching exposed packages and home modules
     found_module <- findPluginModule hsc_env mod_name
@@ -274,7 +276,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))
                     case lookupGRE_RdrName rdr_name env of
-                        [gre] -> return (Just (gre_name gre))
+                        [gre] -> return (Just (gre_name gre, mi_module iface))
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"
 

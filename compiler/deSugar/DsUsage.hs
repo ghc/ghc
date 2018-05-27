@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
 
 module DsUsage (
     -- * Dependency/fingerprinting code (used by MkIface)
@@ -49,17 +50,23 @@ its dep_orphs. This was the cause of Trac #14128.
 
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
-mkDependencies :: TcGblEnv -> IO Dependencies
-mkDependencies
-          TcGblEnv{ tcg_mod = mod,
+--
+-- The first argument is additional dependencies from plugins
+mkDependencies :: InstalledUnitId -> [Module] -> TcGblEnv -> IO Dependencies
+mkDependencies iuid pluginModules
+          (TcGblEnv{ tcg_mod = mod,
                     tcg_imports = imports,
                     tcg_th_used = th_var
-                  }
+                  })
  = do
       -- Template Haskell used?
+      let (mns, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
+          plugin_dep_mods = map (,False) mns
+          plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnitId) ms)
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
+                      ++ plugin_dep_mods
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -71,8 +78,10 @@ mkDependencies
                 -- We must also remove self-references from imp_orphs. See
                 -- Note [Module self-dependency]
 
-          pkgs | th_used   = Set.insert (toInstalledUnitId thUnitId) (imp_dep_pkgs imports)
-               | otherwise = imp_dep_pkgs imports
+          raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
+
+          pkgs | th_used   = Set.insert (toInstalledUnitId thUnitId) raw_pkgs
+               | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.
           -- See Note [RnNames . Tracking Trust Transitively]
