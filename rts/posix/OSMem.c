@@ -192,16 +192,18 @@ my_mmap (void *addr, W_ size, int operation)
         }
     }
 
-    if (operation & MEM_COMMIT) {
-        madvise(ret, size, MADV_WILLNEED);
+    if (ret != (void *)-1) {
+        if (operation & MEM_COMMIT) {
+            madvise(ret, size, MADV_WILLNEED);
 #if defined(MADV_DODUMP)
-        madvise(ret, size, MADV_DODUMP);
+            madvise(ret, size, MADV_DODUMP);
 #endif
-    } else {
-        madvise(ret, size, MADV_DONTNEED);
+        } else {
+            madvise(ret, size, MADV_DONTNEED);
 #if defined(MADV_DONTDUMP)
-        madvise(ret, size, MADV_DONTDUMP);
+            madvise(ret, size, MADV_DONTDUMP);
 #endif
+        }
     }
 
 #else
