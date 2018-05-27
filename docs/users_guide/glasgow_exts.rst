@@ -4666,7 +4666,7 @@ In this case the derived instance declaration is of the form ::
       instance Monad (State [tok] (Failure m)) => Monad (Parser tok m)
 
 Notice that, since ``Monad`` is a constructor class, the instance is a
-*partial application* of the new type, not the entire left hand side. We
+*partial application* of the newtype, not the entire left hand side. We
 can imagine that the type declaration is "eta-converted" to generate the
 context of the instance declaration.
 
@@ -4693,6 +4693,43 @@ As a result of this extension, all derived instances in newtype
 declarations are treated uniformly (and implemented just by reusing the
 dictionary for the representation type), *except* ``Show`` and ``Read``,
 which really behave differently for the newtype and its representation.
+
+.. note::
+
+    It is sometimes necessary to enable additional language extensions when
+    deriving instances via :extension:`GeneralizedNewtypeDeriving`. For instance,
+    consider a simple class and instance using :extension:`UnboxedTuples`
+    syntax: ::
+
+        {-# LANGUAGE UnboxedTuples #-}
+
+        module Lib where
+
+        class AClass a where
+          aMethod :: a -> (# Int, a #)
+
+        instance AClass Int where
+          aMethod x = (# x, x #)
+
+    The following will fail with an "Illegal unboxed tuple" error, since the
+    derived instance produced by the compiler makes use of unboxed tuple syntax,
+    ::
+
+        {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
+        import Lib
+        
+        newtype Int' = Int' Int
+                     deriving (AClass)
+
+    However, enabling the :extension:`UnboxedTuples` extension allows the module
+    to compile. Similar errors may occur with a variety of extensions,
+    including:
+
+      * :extension:`UnboxedTuples`
+      * :extension:`TypeInType`
+      * :extension:`MultiParamTypeClasses`
+      * :extension:`FlexibleContexts`
 
 .. _precise-gnd-specification:
 
