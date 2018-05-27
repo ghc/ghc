@@ -18,7 +18,7 @@ module CoreSyn (
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
                InBndr, InVar, InCoercion, InTyVar, InCoVar,
         OutId, OutBind, OutExpr, OutAlt, OutArg, OutType, OutKind,
-               OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar,
+               OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar, MOutCoercion,
 
         -- ** 'Expr' construction
         mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
@@ -793,6 +793,7 @@ type OutBind     = CoreBind
 type OutExpr     = CoreExpr
 type OutAlt      = CoreAlt
 type OutArg      = CoreArg
+type MOutCoercion = MCoercion
 
 
 {- *********************************************************************
