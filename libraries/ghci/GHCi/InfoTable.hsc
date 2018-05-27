@@ -320,11 +320,11 @@ data StgConInfoTable = StgConInfoTable {
 pokeConItbl
   :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
   -> IO ()
-pokeConItbl wr_ptr ex_ptr itbl = do
+pokeConItbl wr_ptr _ex_ptr itbl = do
 #if defined(TABLES_NEXT_TO_CODE)
   -- Write the offset to the con_desc from the end of the standard InfoTable
   -- at the first byte.
-  let con_desc_offset = conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB)
+  let con_desc_offset = conDesc itbl `minusPtr` (_ex_ptr `plusPtr` conInfoTableSizeB)
   (#poke StgConInfoTable, con_desc) wr_ptr con_desc_offset
 #else
   -- Write the con_desc address after the end of the info table.
