@@ -27,7 +27,7 @@ module StgCmmClosure (
         mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
         mkLFStringLit,
         lfDynTag,
-        maybeIsLFCon, isLFThunk, isLFReEntrant, lfUpdatable,
+        isLFThunk, isLFReEntrant, lfUpdatable,
 
         -- * Used by other modules
         CgLoc(..), SelfLoopInfo, CallMethod(..),
@@ -386,11 +386,6 @@ lfDynTag _      _other                      = 0
 -----------------------------------------------------------------------------
 --                Observing LambdaFormInfo
 -----------------------------------------------------------------------------
-
--------------
-maybeIsLFCon :: LambdaFormInfo -> Maybe DataCon
-maybeIsLFCon (LFCon con) = Just con
-maybeIsLFCon _ = Nothing
 
 ------------
 isLFThunk :: LambdaFormInfo -> Bool
