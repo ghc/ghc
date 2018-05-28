@@ -1065,6 +1065,7 @@ test('T12234',
           # initial:      83032768
           # 2017-02-19    89180624 (x64/Windows) - Unknown
           # 2017-02-25    79889200 (x64/Windows) - Early inline patch
+          # 2018-05-04    86938328 (x64/Windows) - Unknown and horrible
            (wordsize(64), 85961968, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
