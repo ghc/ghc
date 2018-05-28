@@ -56,7 +56,8 @@ data RTSStats = RTSStats {
   , major_gcs :: Word32
     -- | Total bytes allocated
   , allocated_bytes :: Word64
-    -- | Maximum live data (including large objects + compact regions)
+    -- | Maximum live data (including large objects + compact regions) in the
+    -- heap. Updated after a major GC.
   , max_live_bytes :: Word64
     -- | Maximum live data in large objects
   , max_large_objects_bytes :: Word64
@@ -120,7 +121,9 @@ data GCDetails = GCDetails {
   , gcdetails_threads :: Word32
     -- | Number of bytes allocated since the previous GC
   , gcdetails_allocated_bytes :: Word64
-    -- | Total amount of live data in the heap (incliudes large + compact data)
+    -- | Total amount of live data in the heap (incliudes large + compact data).
+    -- Updated after every GC. Data in uncollected generations (in minor GCs)
+    -- are considered live.
   , gcdetails_live_bytes :: Word64
     -- | Total amount of live data in large objects
   , gcdetails_large_objects_bytes :: Word64

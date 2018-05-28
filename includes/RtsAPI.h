@@ -127,7 +127,9 @@ typedef struct GCDetails_ {
   uint32_t threads;
     // Number of bytes allocated since the previous GC
   uint64_t allocated_bytes;
-    // Total amount of live data in the heap (incliudes large + compact data)
+    // Total amount of live data in the heap (incliudes large + compact data).
+    // Updated after every GC. Data in uncollected generations (in minor GCs)
+    // are considered live.
   uint64_t live_bytes;
     // Total amount of live data in large objects
   uint64_t large_objects_bytes;
@@ -165,7 +167,8 @@ typedef struct _RTSStats {
   uint32_t major_gcs;
     // Total bytes allocated
   uint64_t allocated_bytes;
-    // Maximum live data (including large objects + compact regions)
+    // Maximum live data (including large objects + compact regions) in the
+    // heap. Updated after a major GC.
   uint64_t max_live_bytes;
     // Maximum live data in large objects
   uint64_t max_large_objects_bytes;
