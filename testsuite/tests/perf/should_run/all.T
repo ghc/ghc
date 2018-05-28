@@ -563,12 +563,14 @@ test('T13623',
 
 test('T14052',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 2346183840, 10) ])],
+                      [ (wordsize(64), 2346183840, 15) ])],
      ghci_script,
      ['T14052.script'])
 
 test('T14936',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 51792, 5) ])],
+                      [(platform('x86_64-unknown-mingw32'),   47536, 10),
+                       # 2018-05-04     47536 unknown
+                       (wordsize(64), 51792, 5) ])],
      compile_and_run,
      ['-O2'])
