@@ -46,12 +46,12 @@ processDocStrings dflags gre strs = do
     x -> pure (Just x)
 
 processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
-processDocStringParas dflags gre (HsDocString fs) =
-  overDocF (rename dflags gre) $ parseParas dflags (unpackFS fs)
+processDocStringParas dflags gre hds =
+  overDocF (rename dflags gre) $ parseParas dflags (unpackHDS hds)
 
 processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
-processDocString dflags gre (HsDocString fs) =
-  rename dflags gre $ parseString dflags (unpackFS fs)
+processDocString dflags gre hds =
+  rename dflags gre $ parseString dflags (unpackHDS hds)
 
 processModuleHeader :: DynFlags -> GlobalRdrEnv -> SafeHaskellMode -> Maybe LHsDocString
                     -> ErrMsgM (HaddockModInfo Name, Maybe (MDoc Name))
@@ -59,8 +59,8 @@ processModuleHeader dflags gre safety mayStr = do
   (hmi, doc) <-
     case mayStr of
       Nothing -> return failure
-      Just (L _ (HsDocString fs)) -> do
-        let str = unpackFS fs
+      Just (L _ hds) -> do
+        let str = unpackHDS hds
             (hmi, doc) = parseModuleHeader dflags str
         !descr <- case hmi_description hmi of
                     Just hmi_descr -> Just <$> rename dflags gre hmi_descr
