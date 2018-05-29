@@ -106,20 +106,11 @@ writeChan (Chan _ writeVar) val = do
 -- thread holds a reference to the channel.
 readChan :: Chan a -> IO a
 readChan (Chan readVar _) = do
-  modifyMVarMasked readVar $ \read_end -> do -- Note [modifyMVarMasked]
+  modifyMVar readVar $ \read_end -> do
     (ChItem val new_read_end) <- readMVar read_end
         -- Use readMVar here, not takeMVar,
         -- else dupChan doesn't work
     return (new_read_end, val)
-
--- Note [modifyMVarMasked]
--- This prevents a theoretical deadlock if an asynchronous exception
--- happens during the readMVar while the MVar is empty.  In that case
--- the read_end MVar will be left empty, and subsequent readers will
--- deadlock.  Using modifyMVarMasked prevents this.  The deadlock can
--- be reproduced, but only by expanding readMVar and inserting an
--- artificial yield between its takeMVar and putMVar operations.
-
 
 -- |Duplicate a 'Chan': the duplicate channel begins empty, but data written to
 -- either channel from then on will be available from both.  Hence this creates
