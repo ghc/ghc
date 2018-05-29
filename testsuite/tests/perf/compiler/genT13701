@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
 # Generate $DEPTH layers of modules with $WIDTH modules on each layer
 # Every module on layer N imports all the modules on layer N-1
 # MultiLayerModules.hs imports all the modules from the last layer
