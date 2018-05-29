@@ -363,7 +363,7 @@ hscParse' mod_summary
                 srcs0 = nub $ filter (not . (tmpDir dflags `isPrefixOf`))
                             $ filter (not . (== n_hspp))
                             $ map FilePath.normalise
-                            $ filter (not . (isPrefixOf "<"))
+                            $ filter (not . isPrefixOf "<")
                             $ map unpackFS
                             $ srcfiles pst
                 srcs1 = case ml_hs_file (ms_location mod_summary) of
