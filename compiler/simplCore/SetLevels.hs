@@ -1648,7 +1648,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) rhs_ty
+      = mkSysLocalOrCoVar (mkFastString "lvl") uniq rhs_ty
 
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
