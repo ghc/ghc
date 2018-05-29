@@ -2358,6 +2358,7 @@ rebuildCase env scrut case_bndr alts cont
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
   = do  { tick (KnownBranch case_bndr)
+        ; reportScaling case_bndr
         ; case findAlt (LitAlt lit) alts of
             Nothing           -> missingAlt env case_bndr alts cont
             Just (_, bs, rhs) -> simple_rhs bs rhs }
@@ -2366,6 +2367,7 @@ rebuildCase env scrut case_bndr alts cont
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
   = do  { tick (KnownBranch case_bndr)
+        ; reportScaling case_bndr
         ; case findAlt (DataAlt con) alts of
             Nothing  -> missingAlt env case_bndr alts cont
             Just (DEFAULT, bs, rhs) -> simple_rhs bs rhs
@@ -2377,8 +2379,8 @@ rebuildCase env scrut case_bndr alts cont
                         do { (floats1, env') <- simplNonRecX env case_bndr scrut
                                -- scrut is a constructor application,
                                -- hence satisfies let/app invariant
-                           ; (floats2, expr') <- simplExprF env' rhs cont
-                           ; return (floats1 `addFloats` floats2, expr') }
+                           ; ((floats2, expr'), w) <- readScaling $ simplExprF env' rhs cont
+                           ; return ((scaleFloatsBy w floats1) `addFloats` floats2, expr') }
 
 
 --------------------------------------------------
@@ -2453,6 +2455,7 @@ reallyRebuildCase env scrut case_bndr alts cont
   = do { (floats, cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts (env `setInScopeFromF` floats)
                                 scrut case_bndr alts cont'
+       ; reportScaling case_bndr
        ; return (floats, case_expr) }
 
 {-
@@ -2771,8 +2774,8 @@ knownCon :: SimplEnv
 knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
   = do  { (floats1, env1)  <- bind_args env bs dc_args
         ; (floats2, env2) <- bind_case_bndr env1
-        ; (floats3, expr') <- simplExprF env2 rhs cont
-        ; return (floats1 `addFloats` floats2 `addFloats` floats3, expr') }
+        ; ((floats3, expr'), w) <- readScaling $ simplExprF env2 rhs cont
+        ; return (scaleFloatsBy w (floats1 `addFloats` floats2) `addFloats` floats3, expr') }
   where
     zap_occ = zapBndrOccInfo (isDeadBinder bndr)    -- bndr is an InId
 
