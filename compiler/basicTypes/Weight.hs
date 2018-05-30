@@ -19,12 +19,13 @@ import Data.String
 import Outputable
 import Name
 import NameEnv
+import {-# SOURCE #-} Var (Id)
 
 --
 -- * Core properties of weights
 --
 
-data Rig = Zero | One | Omega
+data Rig = Zero | One | Omega | RigVar Id
   deriving (Eq,Ord,Data)
 
 instance Num Rig where
