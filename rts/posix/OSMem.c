@@ -514,9 +514,14 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
         if (at == NULL) {
             // This means that mmap failed which we take to mean that we asked
             // for too much memory. This can happen due to POSIX resource
-            // limits. In this case we reduce our allocation request by a factor
-            // of two and try again.
-            *len /= 2;
+            // limits. In this case we reduce our allocation request by a
+            // fraction of the current size and try again.
+            //
+            // Note that the previously would instead decrease the request size
+            // by a factor of two; however, this meant that significant amounts
+            // of memory will be wasted (e.g. imagine a machine with 512GB of
+            // physical memory but a 511GB ulimit). See #14492.
+            *len -= *len / 8;
         } else if ((W_)at >= minimumAddress) {
             // Success! We were given a block of memory starting above the 8 GB
             // mark, which is what we were looking for.
