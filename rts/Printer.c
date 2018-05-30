@@ -412,6 +412,9 @@ printClosure( const StgClosure *obj )
                    (W_)((StgCompactNFData *)obj)->totalW * (W_)sizeof(W_));
         break;
 
+    case TREC_CHUNK:
+        debugBelch("TREC_CHUNK\n");
+        break;
 
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
