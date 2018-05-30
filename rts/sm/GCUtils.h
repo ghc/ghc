@@ -50,11 +50,6 @@ isPartiallyFull(bdescr *bd)
     return (bd->free + WORK_UNIT_WORDS < bd->start + BLOCK_SIZE_W);
 }
 
-
-#if defined(DEBUG)
-void printMutableList (bdescr *bd);
-#endif
-
 // Version of recordMutableGen for use during GC.  This uses the
 // mutable lists attached to the current gc_thread structure, which
 // are the same as the mutable lists on the Capability.

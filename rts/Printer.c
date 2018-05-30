@@ -425,6 +425,21 @@ printClosure( const StgClosure *obj )
     }
 }
 
+void
+printMutableList(bdescr *bd)
+{
+    StgPtr p;
+
+    debugBelch("mutable list %p: ", bd);
+
+    for (; bd != NULL; bd = bd->link) {
+        for (p = bd->start; p < bd->free; p++) {
+            debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
+        }
+    }
+    debugBelch("\n");
+}
+
 // If you know you have an UPDATE_FRAME, but want to know exactly which.
 const char *info_update_frame(const StgClosure *closure)
 {
@@ -443,13 +458,6 @@ const char *info_update_frame(const StgClosure *closure)
         return "ERROR: Not an update frame!!!";
     }
 }
-
-/*
-void printGraph( StgClosure *obj )
-{
- printClosure(obj);
-}
-*/
 
 static void
 printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap,

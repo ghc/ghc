@@ -24,6 +24,7 @@ const char  *      info_update_frame ( const StgClosure *closure );
 extern void        printClosure    ( const StgClosure *obj );
 extern void        printStackChunk ( StgPtr sp, StgPtr spLim );
 extern void        printTSO        ( StgTSO *tso );
+extern void        printMutableList( bdescr *bd );
 
 extern void DEBUG_LoadSymbols( const char *name );
 
