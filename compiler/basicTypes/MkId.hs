@@ -301,8 +301,8 @@ mkDictSelId name clas
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     sel_ty = mkForAllTys tyvars $
-             mkFunTy Omega (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
-             weightedThing (getNth arg_tys val_index)
+             mkFunTy COmega (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
+             coreWeightedThing (getNth arg_tys val_index)
 
     base_info = noCafIdInfo
                 `setArityInfo`          1
@@ -356,7 +356,7 @@ mkDictSelRhs clas val_index
     the_arg_id     = getNth arg_ids val_index
     pred           = mkClassPred clas (mkTyVarTys tyvars)
     dict_id        = mkTemplateLocal 1 pred
-    arg_ids        = mkTemplateLocalsNum 2 (map weightedThing arg_tys)
+    arg_ids        = mkTemplateLocalsNum 2 (map coreWeightedThing arg_tys)
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars) (Var dict_id)
              | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
@@ -740,15 +740,15 @@ being called, but the inliner should make swift work of that.
 -}
 
 -------------------------
-newLocal :: Weighted Type -> UniqSM Var
-newLocal (Weighted w ty) = do { uniq <- getUniqueM
+newLocal :: CoreWeighted Type -> UniqSM Var
+newLocal (CoreWeighted w ty) = do { uniq <- getUniqueM
                               ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang
    :: DynFlags
    -> FamInstEnvs
-   -> Weighted Type
+   -> CoreWeighted Type
    -> HsSrcBang
    -> HsImplBang
 
@@ -765,17 +765,17 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
 
 dataConSrcToImplBang dflags fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
-  | isUnliftedType (weightedThing arg_ty)
+  | isUnliftedType (coreWeightedThing arg_ty)
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
-  , let mb_co   = topNormaliseType_maybe fam_envs (weightedThing arg_ty)
+  , let mb_co   = topNormaliseType_maybe fam_envs (coreWeightedThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of { Just (_,ty) -> weightedSet arg_ty ty; Nothing -> arg_ty }
-  , isUnpackableType dflags fam_envs (weightedThing arg_ty')
+        arg_ty' = case mb_co of { Just (_,ty) -> coreWeightedSet arg_ty ty; Nothing -> arg_ty }
+  , isUnpackableType dflags fam_envs (coreWeightedThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
       NoSrcUnpack ->
@@ -794,9 +794,9 @@ dataConSrcToImplBang dflags fam_envs arg_ty
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
 dataConArgRep
-  :: Weighted Type
+  :: CoreWeighted Type
   -> HsImplBang
-  -> ([(Weighted Type,StrictnessMark)] -- Rep types
+  -> ([(CoreWeighted Type,StrictnessMark)] -- Rep types
      ,(Unboxer,Boxer))
 
 dataConArgRep arg_ty HsLazy
@@ -809,9 +809,9 @@ dataConArgRep arg_ty (HsUnpack Nothing)
   | (rep_tys, wrappers) <- dataConArgUnpack arg_ty
   = (rep_tys, wrappers)
 
-dataConArgRep (Weighted w _) (HsUnpack (Just co))
+dataConArgRep (CoreWeighted w _) (HsUnpack (Just co))
   | let co_rep_ty = pSnd (coercionKind co)
-  , (rep_tys, wrappers) <- dataConArgUnpack (Weighted w co_rep_ty)
+  , (rep_tys, wrappers) <- dataConArgUnpack (CoreWeighted w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -845,17 +845,17 @@ unitBoxer = UnitBox
 
 -------------------------
 dataConArgUnpack
-   :: Weighted Type
-   ->  ( [(Weighted Type, StrictnessMark)]   -- Rep types
+   :: CoreWeighted Type
+   ->  ( [(CoreWeighted Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack (Weighted arg_weight arg_ty)
+dataConArgUnpack (CoreWeighted arg_weight arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = map (scaleWeighted arg_weight) $ dataConInstArgTys con tc_args
+  , let rep_tys = map (scaleCoreWeighted arg_weight) $ dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyVars con) )  -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
@@ -897,7 +897,7 @@ isUnpackableType dflags fam_envs ty
          dc_name = getName con
          dcs' = dcs `extendNameSet` dc_name
 
-    ok_arg dcs (Weighted _ ty, bang)
+    ok_arg dcs (CoreWeighted _ ty, bang)
       = not (attempt_unpack bang) || ok_ty dcs norm_ty
       where
         norm_ty = topNormaliseType fam_envs ty
@@ -1246,7 +1246,7 @@ unsafeCoerceId
 
     [_, _, a, b] = mkTyVarTys bndrs
 
-    ty  = mkSpecForAllTys bndrs (mkFunTy Omega a b)
+    ty  = mkSpecForAllTys bndrs (mkFunTy COmega a b)
 
     [x] = mkTemplateLocals [a]
     rhs = mkLams (bndrs ++ [x]) $
@@ -1280,7 +1280,7 @@ seqId = pcMiscPrelId seqName ty info
                   -- see Note [seqId magic]
 
     ty  = mkSpecForAllTys [alphaTyVar,betaTyVar]
-                          (mkFunTy Omega alphaTy (mkFunTy Omega betaTy betaTy))
+                          (mkFunTy COmega alphaTy (mkFunTy COmega betaTy betaTy))
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
@@ -1290,13 +1290,13 @@ lazyId :: Id    -- See Note [lazyId magic]
 lazyId = pcMiscPrelId lazyIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy Omega alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy COmega alphaTy alphaTy)
 
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
     info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy Omega alphaTy alphaTy)
+    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy COmega alphaTy alphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
@@ -1305,8 +1305,8 @@ oneShotId = pcMiscPrelId oneShotName ty info
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
     ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
-                          (mkFunTy Omega fun_ty fun_ty)
-    fun_ty = mkFunTy Omega openAlphaTy openBetaTy
+                          (mkFunTy COmega fun_ty fun_ty)
+    fun_ty = mkFunTy COmega openAlphaTy openBetaTy
     [body, x] = mkTemplateLocals [fun_ty, openAlphaTy]
     x' = setOneShotLambda x  -- Here is the magic bit!
     rhs = mkLams [ runtimeRep1TyVar, runtimeRep2TyVar
@@ -1574,7 +1574,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
                              `setNeverLevPoly`  voidPrimTy)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Omega voidPrimTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey COmega voidPrimTy
 
 coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG

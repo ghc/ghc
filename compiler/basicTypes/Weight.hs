@@ -23,109 +23,92 @@ import NameEnv
 --
 -- * Core properties of weights
 --
+data CoreWeighted a = CoreWeighted {coreWeightedWeight :: CoreRig , coreWeightedThing :: a}
+  deriving (Functor,Foldable,Traversable,Data)
 
-data Rig = Zero | One | Omega
+data CoreRig = CZero | COne | COmega
   deriving (Eq,Ord,Data)
 
-instance Num Rig where
-  Zero * _ = Zero
-  _ * Zero = Zero
-  Omega * One = Omega
-  One * Omega = Omega
-  One * One   = One
-  Omega * Omega = Omega
+instance Num CoreRig where
+  CZero * _ = CZero
+  _ * CZero = CZero
+  COmega * COne = COmega
+  COne * COmega = COmega
+  COne * COne   = COne
+  COmega * COmega = COmega
 
-  Zero + x = x
-  x + Zero = x
-  _ + _ = Omega
+  CZero + x = x
+  x + CZero = x
+  _ + _ = COmega
 
-instance Outputable Rig where
-  ppr Zero = fromString "0"
-  ppr One = fromString "1"
-  ppr Omega = fromString "ω"
+instance Outputable CoreRig where
+  ppr CZero = fromString "0"
+  ppr COne = fromString "1"
+  ppr COmega = fromString "ω"
 
-instance Binary Rig where
-  put_ bh Zero = putByte bh 0
-  put_ bh One = putByte bh 1
-  put_ bh Omega = putByte bh 2
+instance Binary CoreRig where
+  put_ bh CZero = putByte bh 0
+  put_ bh COne = putByte bh 1
+  put_ bh COmega = putByte bh 2
 
   get bh = do
     h <- getByte bh
     case h of
-      0 -> return Zero
-      1 -> return One
-      2 -> return Omega
+      0 -> return CZero
+      1 -> return COne
+      2 -> return COmega
       _ -> fail "Invalid binary data for multiplicity found"
-
 
 -- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
-subweight :: Rig -> Rig -> Bool
-subweight _     Omega = True
-subweight Zero  Zero  = True
+subweightC :: CoreRig -> CoreRig -> Bool
+subweightC _     COmega = True
+subweightC CZero  CZero  = True
 -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
 -- used zero times cannot be used one time.
 -- Zero = {0}
 -- One  = {1}
 -- Omega = {0...}
-subweight One   One   = True
-subweight _     _     = False
+subweightC COne   COne   = True
+subweightC _     _     = False
 
 -- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
 -- and @w2@.
-sup :: Rig -> Rig -> Rig
-sup Zero  Zero  = Zero
-sup One   One   = One
-sup Omega Omega = Omega
-sup _     _     = Omega
+supC :: CoreRig -> CoreRig -> CoreRig
+supC CZero  CZero  = CZero
+supC COne   COne   = COne
+supC COmega COmega = COmega
+supC _     _     = COmega
 
+unrestricted :: a -> CoreWeighted a
+unrestricted a = CoreWeighted COmega a
 
---
--- * Utilities
---
+tyweight :: a -> CoreWeighted a
+tyweight a = CoreWeighted COmega a
 
--- | A shorthand for data with an attached 'Rig' element (the weight).
-data Weighted a = Weighted {weightedWeight :: Rig, weightedThing :: a}
-  deriving (Functor,Foldable,Traversable,Data)
+linear :: a -> CoreWeighted a
+linear a = CoreWeighted COne a
 
-unrestricted, linear, staticOnly, tyweight :: a -> Weighted a
-unrestricted = Weighted Omega
-linear = Weighted One
-staticOnly = Weighted Zero
+mkCoreWeighted :: CoreRig -> a -> CoreWeighted a
+mkCoreWeighted c a = CoreWeighted c a
 
--- Used for type arguments in core
-tyweight = Weighted Omega
-
-knownOmega :: Weighted a -> a
-knownOmega = weightedThing
-
-irrelevantWeight :: Weighted a -> a
-irrelevantWeight = weightedThing
-
-mkWeighted :: Rig -> a -> Weighted a
-mkWeighted = Weighted
-
-instance Outputable a => Outputable (Weighted a) where
-   ppr (Weighted cnt t) = -- ppr cnt <> ppr t
+instance Outputable a => Outputable (CoreWeighted a) where
+   ppr (CoreWeighted cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
--- MattP: For now we don't print the weight by default as it creeps into
--- error messages.
-
-instance Binary a => Binary (Weighted a) where
-  put_ bh (Weighted r x) = put_ bh r >> put_ bh x
+instance Binary a => Binary (CoreWeighted a) where
+  put_ bh (CoreWeighted r x) = put_ bh r >> put_ bh x
   get bh = do
     r <- get bh
     x <- get bh
-    return $ Weighted r x
+    return $ CoreWeighted r x
 
-weightedSet :: Weighted a -> b -> Weighted b
-weightedSet x b = fmap (\_->b) x
+coreWeightedSet :: CoreWeighted a -> b -> CoreWeighted b
+coreWeightedSet x b = fmap (\_->b) x
 
-scaleWeighted :: Rig -> Weighted a -> Weighted a
-scaleWeighted w x =
-  x { weightedWeight = w * weightedWeight x }
-
+scaleCoreWeighted :: CoreRig -> CoreWeighted a -> CoreWeighted a
+scaleCoreWeighted w x =
+  x { coreWeightedWeight = w * coreWeightedWeight x }
 
 --
 -- * Usage environments
@@ -144,58 +127,58 @@ scaleWeighted w x =
 -- much harder to get right. The module structure is the point-wise extension of
 -- the action of 'Rig' on itself, every absent name being considered to map to
 -- 'Zero'.
-newtype UsageEnv = UsageEnv (NameEnv Rig)
+newtype CoreUsageEnv = CoreUsageEnv (NameEnv CoreRig)
 
-unitUE :: NamedThing n => n -> Rig -> UsageEnv
-unitUE x w = UsageEnv $ unitNameEnv (getName x) w
+unitCUE :: NamedThing n => n -> CoreRig -> CoreUsageEnv
+unitCUE x w = CoreUsageEnv $ unitNameEnv (getName x) w
 
-mkUE :: [Weighted Name] -> UsageEnv
-mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (weightedThing wx,weightedWeight wx)) ws)
+mkCUE :: [CoreWeighted Name] -> CoreUsageEnv
+mkCUE ws = CoreUsageEnv $ mkNameEnv (map (\wx -> (coreWeightedThing wx,coreWeightedWeight wx)) ws)
 
-zeroUE, emptyUE :: UsageEnv
-zeroUE = UsageEnv emptyNameEnv
+zeroCUE, emptyCUE :: CoreUsageEnv
+zeroCUE = CoreUsageEnv emptyNameEnv
 
-emptyUE = zeroUE
+emptyCUE = zeroCUE
 
-addUE :: UsageEnv -> UsageEnv -> UsageEnv
-addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
+addCUE :: CoreUsageEnv -> CoreUsageEnv -> CoreUsageEnv
+addCUE (CoreUsageEnv e1) (CoreUsageEnv e2) = CoreUsageEnv $
   plusNameEnv_C (+) e1 e2
 
-addUEs :: [UsageEnv] -> UsageEnv
-addUEs = foldr addUE emptyUE
+addCUEs :: [CoreUsageEnv] -> CoreUsageEnv
+addCUEs = foldr addCUE emptyCUE
 
-scaleUE :: Rig -> UsageEnv -> UsageEnv
-scaleUE w (UsageEnv e) = UsageEnv $
+scaleCUE :: CoreRig -> CoreUsageEnv -> CoreUsageEnv
+scaleCUE w (CoreUsageEnv e) = CoreUsageEnv $
   mapNameEnv (w*) e
 
-supUE :: UsageEnv -> UsageEnv -> UsageEnv
-supUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
-  plusNameEnv_CD sup e1 Zero e2 Zero
+supCUE :: CoreUsageEnv -> CoreUsageEnv -> CoreUsageEnv
+supCUE (CoreUsageEnv e1) (CoreUsageEnv e2) = CoreUsageEnv $
+  plusNameEnv_CD supC e1 CZero e2 CZero
 
 -- TODO: arnaud: both delete function: unify argument order with existing similar functions.
 -- | @deleteUEAsserting w x env@ deletes the binding to @x@ in @env@ under one
 -- condition: if @x@ is bound to @w'@ in @env@, then @w'@ must be a subweight of
 -- @w@, if @x@ is not bound in @env@ then 'Zero' must be a subweight of @W@. If
 -- the condition is not met, then @Nothing@ is returned.
-deleteUEAsserting :: Rig -> Name -> UsageEnv -> Maybe UsageEnv
-deleteUEAsserting w x (UsageEnv e) | Just w' <- lookupNameEnv e x = do
-  guard (subweight w' w)
-  return $ UsageEnv (delFromNameEnv e x)
-deleteUEAsserting w _x (UsageEnv e) = do
-  guard (subweight Zero w)
-  return $ UsageEnv e
+deleteCUEAsserting :: CoreRig -> Name -> CoreUsageEnv -> Maybe CoreUsageEnv
+deleteCUEAsserting w x (CoreUsageEnv e) | Just w' <- lookupNameEnv e x = do
+  guard (subweightC w' w)
+  return $ CoreUsageEnv (delFromNameEnv e x)
+deleteCUEAsserting w _x (CoreUsageEnv e) = do
+  guard (subweightC CZero w)
+  return $ CoreUsageEnv e
 
-deleteUE :: Name -> UsageEnv -> UsageEnv
-deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e x
+deleteCUE :: Name -> CoreUsageEnv -> CoreUsageEnv
+deleteCUE x (CoreUsageEnv e) = CoreUsageEnv $ delFromNameEnv e x
 
 
 -- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
 -- bound in |env|, then returns |Zero|.
-lookupUE :: NamedThing n => UsageEnv -> n -> Rig
-lookupUE (UsageEnv e) x =
+lookupCUE :: NamedThing n => CoreUsageEnv -> n -> CoreRig
+lookupCUE (CoreUsageEnv e) x =
   case lookupNameEnv e (getName x) of
     Just w  -> w
-    Nothing -> Zero
+    Nothing -> CZero
 
-instance Outputable UsageEnv where
-  ppr (UsageEnv ne) = text "UsageEnv:" <+> ppr ne
+instance Outputable CoreUsageEnv where
+  ppr (CoreUsageEnv ne) = text "UsageEnv:" <+> ppr ne

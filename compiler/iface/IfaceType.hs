@@ -90,7 +90,7 @@ data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
 
-type IfaceIdBndr  = (Rig, IfLclName, IfaceType)
+type IfaceIdBndr  = (CoreRig, IfLclName, IfaceType)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
@@ -119,7 +119,7 @@ data IfaceType     -- A kind of universal type, used for types and kinds
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceType
-  | IfaceFunTy     Rig IfaceType IfaceType
+  | IfaceFunTy     CoreRig IfaceType IfaceType
   | IfaceDFunTy    IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceTcArgs  -- Not necessarily saturated
@@ -253,7 +253,7 @@ data IfaceTyConInfo   -- Used to guide pretty-printing
 
 data IfaceCoercion
   = IfaceReflCo       Role IfaceType
-  | IfaceFunCo        Role Rig IfaceCoercion IfaceCoercion
+  | IfaceFunCo        Role CoreRig IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
@@ -613,8 +613,8 @@ ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
     ppr_fun_tail wthis other_ty
       = [ppr_fun_arrow wthis <+> pprIfaceType other_ty]
 
-    ppr_fun_arrow Omega = arrow
-    ppr_fun_arrow One = lollipop
+    ppr_fun_arrow COmega = arrow
+    ppr_fun_arrow COne = lollipop
     ppr_fun_arrow _ = arrow -- arnaud: TODO: generic notation for non-1/ω multiplicities
 
 ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)

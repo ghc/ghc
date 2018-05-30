@@ -68,7 +68,8 @@ module TcEnv(
         newDFunName, newDFunName', newFamInstTyConName,
         newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
-        mkWrapperName
+        mkWrapperName,
+
   ) where
 
 #include "HsVersions.h"
@@ -413,6 +414,10 @@ tcExtendKindEnv extra_env thing_inside
 tcExtendTyVarEnv :: [Weighted TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
   = tcExtendTyVarEnv2 (mkTyVarNamePairs tvs) thing_inside
+
+mkTyVarNamePairs :: [Weighted TyVar] -> [(Name, Weighted TyVar)]
+-- Just pair each TyVar with its own name
+mkTyVarNamePairs tvs = [(tyVarName (weightedThing tv), tv) | tv <- tvs]
 
 -- Before using this function, consider using TcHsType.scopeTyVars2, which
 -- bumps the TcLevel and thus prevents any of these TyVars from appearing
@@ -1141,3 +1146,5 @@ in the type envt when we look for it in $(foo x).  So inside splices we
 report something missing from the type env as a staging error.
 See Trac #5752 and #5795.
 -}
+
+

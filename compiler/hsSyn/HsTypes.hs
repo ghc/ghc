@@ -15,6 +15,9 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module HsTypes (
         Rig(..),
@@ -29,6 +32,9 @@ module HsTypes (
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
+
+        Rig(..), LRig, Weighted(..), hsLinear, hsUnrestricted, sup, subweight,
+
         HsAppType(..),LHsAppType,
 
         LBangType, BangType,
@@ -85,7 +91,6 @@ import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
-import Weight
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -705,6 +710,13 @@ type instance XWildCardTy      GhcTc = HsWildCardInfo
 
 type instance XXType         (GhcPass _) = NewHsTypeX
 
+type LRig = Located Rig
+
+data Rig =
+  Zero
+  | One
+  | Omega
+  deriving Data
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
@@ -1084,15 +1096,20 @@ splitHsFunType (L _ (HsFunTy _ x weight y))
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == (funTyConName Omega) -- TODO: arnaud harder but should be done for all arity
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == (hsFunTyConName Omega) -- TODO: arnaud harder but should be done for all arity
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = ((unrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
+                                 = ((hsUnrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
     go _                     _   = ([], orig_ty)  -- Failure to match
 
 splitHsFunType other = ([], other)
+
+hsFunTyConName :: Rig -> Name
+hsFunTyConName Zero = funTyConName CZero
+hsFunTyConName One  = funTyConName COne
+hsFunTyConName Omega = funTyConName COmega
 
 --------------------------------
 -- | Retrieves the head of an HsAppsTy, if this can be done unambiguously,
@@ -1564,3 +1581,89 @@ parenthesizeHsType :: PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 parenthesizeHsType p lty@(L loc ty)
   | hsTypeNeedsParens p ty = L loc (HsParTy NoExt lty)
   | otherwise              = lty
+
+
+-- Things to do with Rig
+
+instance Num Rig where
+  Zero * _ = Zero
+  _ * Zero = Zero
+  Omega * One = Omega
+  One * Omega = Omega
+  One * One   = One
+  Omega * Omega = Omega
+
+  Zero + x = x
+  x + Zero = x
+  _ + _ = Omega
+
+instance Outputable Rig where
+  ppr Zero = text "0"
+  ppr One = text "1"
+  ppr Omega = text "ω"
+
+
+
+-- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
+-- value of weight @w2@ is expected. This is a partial order.
+subweight :: Rig -> Rig -> Bool
+subweight _     Omega = True
+subweight Zero  Zero  = True
+-- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
+-- used zero times cannot be used one time.
+-- Zero = {0}
+-- One  = {1}
+-- Omega = {0...}
+subweight One   One   = True
+subweight _     _     = False
+
+-- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
+-- and @w2@.
+sup :: Rig -> Rig -> Rig
+sup Zero  Zero  = Zero
+sup One   One   = One
+sup Omega Omega = Omega
+sup _     _     = Omega
+
+
+--
+-- * Utilities
+--
+
+-- | A shorthand for data with an attached 'Rig' element (the weight).
+data Weighted a = Weighted {weightedWeight :: Rig , weightedThing :: a}
+  deriving (Functor,Foldable,Traversable,Data)
+
+hsUnrestricted, hsLinear, hsStaticOnly, hsTyweight :: a -> Weighted a
+hsUnrestricted = Weighted Omega
+hsLinear = Weighted One
+hsStaticOnly = Weighted Zero
+
+-- Used for type arguments in core
+hsTyweight = Weighted Omega
+
+knownOmega :: Weighted a -> a
+knownOmega = weightedThing
+
+irrelevantWeight :: Weighted a -> a
+irrelevantWeight = weightedThing
+
+mkWeighted :: Rig -> a -> Weighted a
+mkWeighted = Weighted
+
+instance Outputable a => Outputable (Weighted a) where
+   ppr (Weighted cnt t) = -- ppr cnt <> ppr t
+                          ppr t
+
+-- MattP: For now we don't print the weight by default as it creeps into
+-- error messages.
+
+
+weightedSet :: Weighted a -> b -> Weighted b
+weightedSet x b = fmap (\_->b) x
+
+scaleWeighted :: Rig -> Weighted a -> Weighted a
+scaleWeighted w x =
+  x { weightedWeight = w * weightedWeight x }
+
+

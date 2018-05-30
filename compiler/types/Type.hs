@@ -15,7 +15,7 @@ module Type (
 
         -- $representation_types
         TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
-        Var, TyVar, isTyVar, TyCoVar, TyBinder, TyVarBinder, Rig(..),
+        Var, TyVar, isTyVar, TyCoVar, TyBinder, TyVarBinder, CoreRig(..),
 
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
@@ -938,35 +938,35 @@ See #11714.
 isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
-splitFunTy :: Type -> (Weighted Type, Type)
+splitFunTy :: Type -> (CoreWeighted Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
-splitFunTy (FunTy w arg res) = (Weighted w arg, res)
+splitFunTy (FunTy w arg res) = (CoreWeighted w arg, res)
 splitFunTy other           = pprPanic "splitFunTy" (ppr other)
 
-splitFunTy_maybe :: Type -> Maybe (Weighted Type, Type)
+splitFunTy_maybe :: Type -> Maybe (CoreWeighted Type, Type)
 -- ^ Attempts to extract the argument and result types from a type
 splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
-splitFunTy_maybe (FunTy w arg res) = Just (Weighted w arg, res)
+splitFunTy_maybe (FunTy w arg res) = Just (CoreWeighted w arg, res)
 splitFunTy_maybe _               = Nothing
 
-funTyWeight :: Type -> Rig
+funTyWeight :: Type -> CoreRig
 funTyWeight ty = case funTyWeight_maybe ty of
                     Just w -> w
                     Nothing -> pprPanic "funTyWeight" (ppr ty)
 
-funTyWeight_maybe :: Type -> Maybe Rig
+funTyWeight_maybe :: Type -> Maybe CoreRig
 funTyWeight_maybe ty | Just ty' <- coreView ty = funTyWeight_maybe ty'
 funTyWeight_maybe (FunTy w _ _) = Just w
 funTyWeight_maybe (ForAllTy _ ty) = funTyWeight_maybe ty
 funTyWeight_maybe _ = Nothing
 
-splitFunTys :: Type -> ([Weighted Type], Type)
+splitFunTys :: Type -> ([CoreWeighted Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
-    split args _       (FunTy w arg res) = split ((Weighted w arg):args) res res
+    split args _       (FunTy w arg res) = split ((CoreWeighted w arg):args) res res
     split args orig_ty _               = (reverse args, orig_ty)
 
 funResultTy :: Type -> Type
@@ -1391,7 +1391,7 @@ splitPiTy_maybe ty = go ty
   where
     go ty | Just ty' <- coreView ty = go ty'
     go (ForAllTy bndr ty) = Just (Named bndr, ty)
-    go (FunTy w arg res)  = Just (Anon (mkWeighted w arg), res)
+    go (FunTy w arg res)  = Just (Anon (mkCoreWeighted w arg), res)
     go _                  = Nothing
 
 -- | Takes a forall type apart, or panics
@@ -1409,7 +1409,7 @@ splitPiTys ty = split ty ty
     split _       (ForAllTy b res) = let (bs, ty) = split res res
                                      in  (Named b : bs, ty)
     split _       (FunTy w arg res)  = let (bs, ty) = split res res
-                                     in  (Anon (mkWeighted w arg) : bs, ty)
+                                     in  (Anon (mkCoreWeighted w arg) : bs, ty)
     split orig_ty _                = ([], orig_ty)
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
@@ -1421,7 +1421,7 @@ splitPiTysInvisible ty = split ty ty []
     split _       (ForAllTy b@(TvBndr _ vis) res) bs
       | isInvisibleArgFlag vis         = split res res (Named b  : bs)
     split _       (FunTy w arg res)  bs
-      | isPredTy arg                   = split res res (Anon (mkWeighted w arg) : bs)
+      | isPredTy arg                   = split res res (Anon (mkCoreWeighted w arg) : bs)
     split orig_ty _                bs  = (reverse bs, orig_ty)
 
 -- | Given a tycon and its arguments, filters out any invisible arguments
@@ -1482,7 +1482,7 @@ isTauTy (CoercionTy _)        = False  -- Not sure about this
 -}
 
 -- | Make an anonymous binder
-mkAnonBinder :: Weighted Type -> TyBinder
+mkAnonBinder :: CoreWeighted Type -> TyBinder
 mkAnonBinder = Anon
 
 -- | Does this binder bind a variable that is /not/ erased? Returns
@@ -1502,17 +1502,17 @@ tyBinderVar_maybe _          = Nothing
 tyBinderType :: TyBinder -> Type
 -- Barely used
 tyBinderType (Named tvb) = binderKind tvb
-tyBinderType (Anon ty)   = weightedThing ty
+tyBinderType (Anon ty)   = coreWeightedThing ty
 
 -- | Extract a relevant type, if there is one.
 binderRelevantType_maybe :: TyBinder -> Maybe Type
 binderRelevantType_maybe (Named {}) = Nothing
-binderRelevantType_maybe (Anon ty)  = Just (weightedThing ty)
+binderRelevantType_maybe (Anon ty)  = Just (coreWeightedThing ty)
 
 -- | Like 'maybe', but for binders.
 caseBinder :: TyBinder           -- ^ binder to scrutinize
            -> (TyVarBinder -> a) -- ^ named case
-           -> (Weighted Type -> a) -- ^ anonymous case
+           -> (CoreWeighted Type -> a) -- ^ anonymous case
            -> a
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t

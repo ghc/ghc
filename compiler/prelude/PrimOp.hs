@@ -612,7 +612,7 @@ commutableOp :: PrimOp -> Bool
 
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
 dyadic_fun_ty  ty = mkFunTys [unrestricted ty, unrestricted ty] ty
-monadic_fun_ty ty = mkFunTy Omega ty ty -- TODO: arnaud: understand
+monadic_fun_ty ty = mkFunTy COmega ty ty -- TODO: arnaud: understand
 compare_fun_ty ty = mkFunTys [unrestricted ty, unrestricted ty] intPrimTy
 
 -- Output stuff:

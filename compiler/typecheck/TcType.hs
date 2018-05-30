@@ -46,7 +46,7 @@ module TcType (
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar, isTouchableOrFmv,
   isFloatedTouchableMetaTyVar,
-  findDupSigTvs, mkTyVarNamePairs,
+  findDupSigTvs,
 
   --------------------------------
   -- Builders
@@ -424,11 +424,11 @@ data SyntaxOpType
 
 data SyntaxOpMultiplicity
   = SynAnyMult  -- ^ A multiplicity hole
-  | SynMult Rig -- ^ A known multiplicity
+  | SynMult CoreRig -- ^ A known multiplicity
 
 -- | Shortcut for unrestricted functions
 synFun :: SyntaxOpType -> SyntaxOpType -> SyntaxOpType
-synFun = SynFun (SynMult Omega)
+synFun = SynFun (SynMult COmega)
 infixr 0 `synFun`
 
 -- | Like 'SynType' but accepts a regular TcType
@@ -1340,9 +1340,6 @@ isRuntimeUnkSkol x
   | RuntimeUnk <- tcTyVarDetails x = True
   | otherwise                      = False
 
-mkTyVarNamePairs :: [Weighted TyVar] -> [(Name, Weighted TyVar)]
--- Just pair each TyVar with its own name
-mkTyVarNamePairs tvs = [(tyVarName (weightedThing tv), tv) | tv <- tvs]
 
 
 findDupSigTvs :: [(Name,TcTyVar)] -> [(Name,Name)]
@@ -1551,7 +1548,7 @@ tcSplitNestedSigmaTys ty
 
 -----------------------
 tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([Weighted TcType], [TyVar], ThetaType, TcSigmaType)
+  :: TcSigmaType -> Maybe ([CoreWeighted TcType], [TyVar], ThetaType, TcSigmaType)
 -- Looks for a *non-trivial* quantified type, under zero or more function arrows
 -- By "non-trivial" we mean either tyvars or constraints are non-empty
 
@@ -1616,16 +1613,16 @@ tcRepSplitTyConApp_maybe' _                          = Nothing
 
 
 -----------------------
-tcSplitFunTys :: Type -> ([Weighted Type], Type)
+tcSplitFunTys :: Type -> ([CoreWeighted Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
                         Nothing        -> ([], ty)
                         Just (arg,res) -> (arg:args, res')
                                        where
                                           (args,res') = tcSplitFunTys res
 
-tcSplitFunTy_maybe :: Type -> Maybe (Weighted Type, Type)
+tcSplitFunTy_maybe :: Type -> Maybe (CoreWeighted Type, Type)
 tcSplitFunTy_maybe ty | Just ty' <- tcView ty         = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy w arg res) | not (isPredTy arg) = Just (Weighted w arg, res)
+tcSplitFunTy_maybe (FunTy w arg res) | not (isPredTy arg) = Just (CoreWeighted w arg, res)
 tcSplitFunTy_maybe _                                    = Nothing
         -- Note the typeKind guard
         -- Consider     (?x::Int) => Bool
@@ -1638,7 +1635,7 @@ tcSplitFunTy_maybe _                                    = Nothing
 tcSplitFunTysN :: Arity                      -- N: Number of desired args
                -> TcRhoType
                -> Either Arity               -- Number of missing arrows
-                        ([Weighted TcSigmaType],-- Arg types (always N types)
+                        ([CoreWeighted TcSigmaType],-- Arg types (always N types)
                          TcSigmaType)        -- The rest of the type
 -- ^ Split off exactly the specified number argument types
 -- Returns
@@ -1654,10 +1651,10 @@ tcSplitFunTysN n ty
  | otherwise
  = Left n
 
-tcSplitFunTy :: Type -> (Weighted Type, Type)
+tcSplitFunTy :: Type -> (CoreWeighted Type, Type)
 tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
 
-tcFunArgTy :: Type -> Weighted Type
+tcFunArgTy :: Type -> CoreWeighted Type
 tcFunArgTy    ty = fst (tcSplitFunTy ty)
 
 tcFunResultTy :: Type -> Type
@@ -1737,7 +1734,7 @@ tcSplitDFunTy ty
   = case tcSplitForAllTys ty   of { (tvs, rho)    ->
     case splitFunTys rho       of { (theta, tau)  ->
     case tcSplitDFunHead tau   of { (clas, tys)   ->
-    (tvs, map weightedThing theta, clas, tys) }}}
+    (tvs, map coreWeightedThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys
@@ -1886,7 +1883,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
       = go vis env arg arg' <!> go vis env res res'
     eqFunTy vis env arg res ty@(AppTy{})
       | Just (tc, [_, _, arg', res']) <- get_args ty []
-      , tc == funTyCon Omega
+      , tc == funTyCon COmega
       = go vis env arg arg' <!> go vis env res res'
       where
         get_args :: Type -> [Type] -> Maybe (TyCon, [Type])

@@ -138,7 +138,7 @@ matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
-                    -> ([Weighted ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([CoreWeighted ExpSigmaType] -> ExpRhoType -> TcM a)
                           -- must fill in these ExpTypes here
                     -> TcM (a, HsWrapper)
 -- If    matchExpectedFunTys n ty = (_, wrap)

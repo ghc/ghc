@@ -62,7 +62,7 @@ import Id
 import Name
 import NameEnv
 import MkId
-import Weight           ( Rig(..) )
+import Weight           ( CoreRig(..) )
 import Outputable
 import TysPrim
 import TysWiredIn
@@ -122,7 +122,7 @@ knownKeyNames
   = all_names
   where
     all_names =
-      concat [ wired_tycon_kk_names (funTyCon Omega) -- TODO: arnaud at least for One too
+      concat [ wired_tycon_kk_names (funTyCon COmega) -- TODO: arnaud at least for One too
              , concatMap wired_tycon_kk_names primTyCons
 
              , concatMap wired_tycon_kk_names wiredInTyCons
@@ -253,7 +253,7 @@ ghcPrimExports
  = map (avail . idName) ghcPrimIds ++
    map (avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] []
-   | tc <- funTyCon Omega : primTyCons, let n = tyConName tc  ]
+   | tc <- funTyCon COmega : primTyCons, let n = tyConName tc  ]
 
 {-
 ************************************************************************

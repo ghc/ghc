@@ -103,7 +103,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> Rig -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> CoreRig -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -178,7 +178,7 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun Rig HsWrapper HsWrapper TcType SDoc
+  | WpFun CoreRig HsWrapper HsWrapper TcType SDoc
        -- (WpFun w wrap1 wrap2 t1)[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -264,7 +264,7 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: Rig -> HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty :: CoreRig -> HsWrapper -> HsWrapper -> TcType -> HsWrapper
 wpFunEmpty w c1 c2 t1 = WpFun w c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
@@ -272,7 +272,7 @@ WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-mkWpFun :: Rig -> Rig -- the multiplicities on the arrows of the wrappee and wrapper respectively
+mkWpFun :: CoreRig -> CoreRig -- the multiplicities on the arrows of the wrappee and wrapper respectively
         -> HsWrapper -> HsWrapper
         -> TcType    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
@@ -303,7 +303,7 @@ mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
     go [] res_ty res_wrap = (res_ty, res_wrap)
     go ((arg_ty, arg_wrap) : args) res_ty res_wrap
       = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkFunTyOm` tail_ty, mkWpFun Omega Omega arg_wrap tail_wrap arg_ty tail_ty doc)
+        (arg_ty `mkFunTyOm` tail_ty, mkWpFun COmega COmega arg_wrap tail_wrap arg_ty tail_ty doc)
         -- MattP: Looks suspicious but never called
 
 mkWpCastR :: TcCoercionR -> HsWrapper

@@ -1329,7 +1329,7 @@ getConArgs d = con_args d
 hsConDeclArgTys :: HsConDeclDetails pass -> [Weighted (LBangType pass)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
-hsConDeclArgTys (RecCon flds)      = map (linear . cd_fld_type . unLoc) (unLoc flds)
+hsConDeclArgTys (RecCon flds)      = map (hsLinear . cd_fld_type . unLoc) (unLoc flds)
   -- Remark: with the record syntax, constructors have all their argument
   -- linear, despite the fact that projections do not make sense on linear
   -- constructors. The design here is that the record projection themselves are
