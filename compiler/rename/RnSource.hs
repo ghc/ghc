@@ -52,7 +52,6 @@ import Avail
 import Outputable
 import Bag
 import BasicTypes       ( DerivStrategy, RuleName, pprRuleName )
-import Weight
 import FastString
 import SrcLoc
 import DynFlags
@@ -66,7 +65,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Control.Arrow ( first )
-import Data.Functor.Compose ( Compose(..) )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )

@@ -89,7 +89,6 @@ import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
-import Weight
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -720,13 +719,15 @@ data HsTyLit
 
 data HsRig pass = HsZero | HsOne | HsOmega | HsRigVar (IdP pass)
 
-hsRigToRig :: HsRig pass -> Rig
+hsRigToRig :: HsRig GhcTc -> Rig
 hsRigToRig c =
   case c of
     HsZero -> Zero
     HsOne  -> One
     HsOmega -> Omega
+    HsRigVar v -> RigVar v
 
+hsUnrestricted, hsLinear :: a -> HsWeighted pass a
 hsUnrestricted = HsWeighted HsOmega
 hsLinear = HsWeighted HsOne
 
@@ -738,13 +739,16 @@ isHsOmega _ = False
 -- TODO: This is going to change because (->) will have to take
 -- a multiplicity as an argument
 hsFunTyConName :: HsRig pass -> Name
-hsFunTyConName = funTyConName . hsRigToRig
+hsFunTyConName HsOne = funTyConName . hsRigToRig $ HsOne
+hsFunTyConName HsOmega = funTyConName . hsRigToRig $ HsOmega
+hsFunTyConName _ = panic "hsFunTyConName"
+
 
 data HsWeighted pass a = HsWeighted { hsWeight :: HsRig pass, hsThing :: a }
   deriving (Traversable, Functor, Foldable)
 
 instance Outputable a => Outputable (HsWeighted pass a) where
-   ppr (HsWeighted cnt t) = -- ppr cnt <> ppr t
+   ppr (HsWeighted _cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
 
@@ -1540,6 +1544,7 @@ ppr_fun_ty ty1 weight ty2
           HsZero -> "->_0"
           HsOne -> "⊸"
           HsOmega -> "->"
+          _ -> panic "ppr_fun_ty: polymorphism is not yet implemented"
     in
     sep [p1, text arr <+> p2]
 

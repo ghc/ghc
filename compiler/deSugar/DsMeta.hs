@@ -46,7 +46,6 @@ import NameEnv
 import NameSet
 import TcType
 import TyCon
-import Weight
 import TysWiredIn
 import CoreSyn
 import MkCore

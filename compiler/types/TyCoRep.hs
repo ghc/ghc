@@ -2795,6 +2795,7 @@ debug_ppr_ty prec (FunTy weight arg res)
                 Zero -> text "->0"
                 One -> text "⊸"
                 Omega -> arrow
+                _ -> panic "TODO: Polymorphism not yet implemented"
     in
       maybeParen prec funPrec $
       sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]

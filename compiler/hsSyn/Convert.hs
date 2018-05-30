@@ -30,7 +30,6 @@ import qualified Coercion ( Role(..) )
 import TysWiredIn
 import TysPrim (eqPrimTyCon)
 import BasicTypes as Hs
-import Weight
 import ForeignCall
 import Unique
 import ErrUtils

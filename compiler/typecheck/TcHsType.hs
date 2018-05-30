@@ -603,6 +603,7 @@ tc_weight r = return $ case r of
                          HsZero -> Zero
                          HsOne  -> One
                          HsOmega -> Omega
+                         _ -> panic "tc_weight: polymorphism"
 
 ------------------------------------------
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType

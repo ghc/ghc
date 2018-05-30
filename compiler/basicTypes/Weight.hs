@@ -15,7 +15,6 @@ import GhcPrelude
 import Binary
 import Control.Monad
 import Data.Data
-import Data.String
 import Outputable
 import Name
 import NameEnv
@@ -25,7 +24,8 @@ import {-# SOURCE #-} Var (Id)
 -- * Core properties of weights
 --
 
-data Rig = Zero | One | Omega | RigVar Id
+
+data Rig = Zero | One | Omega | RigVar Id | RigAdd Rig Rig | RigMul Rig Rig
   deriving (Eq,Ord,Data)
 
 instance Num Rig where
@@ -35,20 +35,28 @@ instance Num Rig where
   One * Omega = Omega
   One * One   = One
   Omega * Omega = Omega
+  p1 * p2 = RigMul p1 p2
 
   Zero + x = x
   x + Zero = x
-  _ + _ = Omega
+  One + One = Omega
+  One + Omega = Omega
+  Omega + One = Omega
+  m1 + m2 = RigAdd m1 m2
 
 instance Outputable Rig where
-  ppr Zero = fromString "0"
-  ppr One = fromString "1"
-  ppr Omega = fromString "ω"
+  ppr Zero = text "0"
+  ppr One = text "1"
+  ppr Omega = text "ω"
+  ppr (RigVar id) = ppr id
+  ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
+  ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
 
 instance Binary Rig where
   put_ bh Zero = putByte bh 0
   put_ bh One = putByte bh 1
   put_ bh Omega = putByte bh 2
+  put_ _bh _ = panic "TODO: Not implemented polymorphism"
 
   get bh = do
     h <- getByte bh
@@ -107,7 +115,7 @@ mkWeighted :: Rig -> a -> Weighted a
 mkWeighted = Weighted
 
 instance Outputable a => Outputable (Weighted a) where
-   ppr (Weighted cnt t) = -- ppr cnt <> ppr t
+   ppr (Weighted _cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
 -- MattP: For now we don't print the weight by default as it creeps into

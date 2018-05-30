@@ -331,6 +331,7 @@ funTyConName :: Rig -> Name
 funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon Zero)
 funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon One)
 funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon Omega)
+funTyConName _ = panic "funTyConName: Polymorphism not yet implemented"
 
 -- TODO: arnaud: without Rig, funTyCon (and funTyConName) was allocated a single
 -- time, now it's allocated at every call. It may be worth a bit of boilerplate

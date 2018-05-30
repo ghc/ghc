@@ -66,7 +66,6 @@ import Util
 import ListSetOps       ( deleteBys )
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
                           Fixity(..), FixityDirection(..), LexicalFixity(..) )
-import Weight
 import Outputable
 import FastString
 import Maybes
@@ -769,7 +768,7 @@ rnRig r =
     HsZero -> return HsZero
     HsOne  -> return HsOne
     HsOmega -> return HsOmega
-    HsRigVar r -> panic "TODO: Multiplicity polymorphism not implemented"
+    HsRigVar _r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name

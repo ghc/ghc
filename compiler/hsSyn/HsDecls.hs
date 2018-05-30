@@ -95,7 +95,6 @@ import HsBinds
 import HsTypes
 import HsDoc
 import TyCon
-import Weight
 import Name
 import BasicTypes
 import Coercion

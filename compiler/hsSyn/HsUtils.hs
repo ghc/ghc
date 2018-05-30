@@ -688,6 +688,7 @@ rigToHsRig :: Rig -> HsRig p
 rigToHsRig Zero = HsZero
 rigToHsRig One  = HsOne
 rigToHsRig Omega = HsOmega
+rigToHsRig _ = panic "rigToHsRig: polymorphism not yet implemented"
 {-
 Note [Kind signatures in typeToLHsType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

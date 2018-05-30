@@ -75,7 +75,6 @@ import GhcPrelude
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
-import Weight
 import DataCon          ( DataCon, dataConTyCon )
 import ConLike          ( ConLike(..) )
 import CoAxiom          ( Role, fsFromRole )

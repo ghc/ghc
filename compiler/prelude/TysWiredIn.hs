@@ -121,7 +121,13 @@ module TysWiredIn (
         int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-        doubleElemRepDataConTy
+        doubleElemRepDataConTy,
+
+        -- * Multiplicity and friends
+        multiplicityTyConName, oneDataConName, omegaDataConName, multiplicityTy,
+        multiplicityTyCon, oneDataCon, omegaDataCon
+
+
 
     ) where
 
