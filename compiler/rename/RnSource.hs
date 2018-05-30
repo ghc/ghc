@@ -2013,16 +2013,16 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (HsWeighted (LHsType GhcPs)) (Located [LConDeclField GhcPs])
-   -> RnM ((HsConDetails (HsWeighted (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
+   -> HsConDetails (HsWeighted GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails (HsWeighted GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
-  = do { (Compose new_tys, fvs) <- rnLHsTypes doc (Compose tys)
+  = do { (new_tys, fvs) <- mapFvRn (rnWeightedLHsType doc) tys
        ; return (PrefixCon new_tys, fvs) }
 
 rnConDeclDetails _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnLHsTypes doc ty1
-       ; (new_ty2, fvs2) <- rnLHsTypes doc ty2
+  = do { (new_ty1, fvs1) <- rnWeightedLHsType doc ty1
+       ; (new_ty2, fvs2) <- rnWeightedLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
 rnConDeclDetails con doc (RecCon (L l fields))

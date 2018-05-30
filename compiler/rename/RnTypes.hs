@@ -19,6 +19,8 @@ module RnTypes (
         rnConDeclFields,
         rnLTyVar,
 
+        rnWeightedLHsType,
+
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
         checkPrecMatch, checkSectionPrec,
@@ -494,6 +496,14 @@ rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 rnLHsTypes :: Traversable t => HsDocContext -> t (LHsType GhcPs) -> RnM (t (LHsType GhcRn), FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
+rnWeightedLHsType :: HsDocContext -> HsWeighted GhcPs (LHsType GhcPs)
+                                  -> RnM (HsWeighted GhcRn (LHsType GhcRn), FreeVars)
+rnWeightedLHsType doc (HsWeighted w ty) = do
+  w' <- rnRig w
+  (ty', fvs) <- rnLHsType doc ty
+  return (HsWeighted w' ty', fvs)
+
+
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 rnHsType ctxt ty = rnHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
@@ -591,10 +601,11 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; res_ty <- mkHsOpTyRn hs_fun_ty (hsFunTyConName weight) funTyFixity ty1' ty2'
+       ; weight' <- rnRig weight
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') (hsFunTyConName weight) funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2) }
   where
-    hs_fun_ty a b = HsFunTy noExt a weight b
+    hs_fun_ty w a b = HsFunTy noExt a w b
 
 rnHsTyKi env listTy@(HsListTy _ ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -751,6 +762,14 @@ rnHsTyKi env (HsWildCardTy _)
          -- emptyFVs: this occurrence does not refer to a
          --           user-written binding site, so don't treat
          --           it as a free variable
+
+rnRig :: HsRig GhcPs -> RnM (HsRig GhcRn)
+rnRig r =
+  case r of
+    HsZero -> return HsZero
+    HsOne  -> return HsOne
+    HsOmega -> return HsOmega
+    HsRigVar r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name

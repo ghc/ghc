@@ -496,7 +496,7 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: (XFunTy p ~ NoExt) => LHsType p -> HsRig -> LHsType p -> LHsType p
+nlHsFunTy :: (XFunTy p ~ NoExt) => LHsType p -> HsRig p -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
@@ -684,7 +684,7 @@ typeToLHsType ty
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
-rigToHsRig :: Rig -> HsRig
+rigToHsRig :: Rig -> HsRig p
 rigToHsRig Zero = HsZero
 rigToHsRig One  = HsOne
 rigToHsRig Omega = HsOmega

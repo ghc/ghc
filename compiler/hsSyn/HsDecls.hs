@@ -1315,7 +1315,7 @@ There's a wrinkle in ConDeclGADT
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
-   = HsConDetails (HsWeighted (LBangType pass)) (Located [LConDeclField pass])
+   = HsConDetails (HsWeighted pass (LBangType pass)) (Located [LConDeclField pass])
 
 getConNames :: ConDecl pass -> [Located (IdP pass)]
 getConNames ConDeclH98  {con_name  = name}  = [name]
@@ -1326,7 +1326,7 @@ getConNames XConDecl {} = panic "getConNames"
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
 
-hsConDeclArgTys :: HsConDeclDetails pass -> [HsWeighted (LBangType pass)]
+hsConDeclArgTys :: HsConDeclDetails pass -> [HsWeighted pass (LBangType pass)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (hsLinear . cd_fld_type . unLoc) (unLoc flds)

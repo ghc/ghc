@@ -21,7 +21,7 @@ HsTypes: Abstract syntax: user-defined types
 
 module HsTypes (
         Rig(..), HsRig(..), hsFunTyConName, HsWeighted(..),
-        hsLinear, hsUnrestricted,
+        hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..), HsQTvsRn(..),
@@ -507,7 +507,7 @@ data HsType pass
 
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
-                        HsRig
+                        (HsRig pass)
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
@@ -718,9 +718,9 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-data HsRig = HsZero | HsOne | HsOmega deriving (Data, Eq)
+data HsRig pass = HsZero | HsOne | HsOmega | HsRigVar (IdP pass)
 
-hsRigToRig :: HsRig -> Rig
+hsRigToRig :: HsRig pass -> Rig
 hsRigToRig c =
   case c of
     HsZero -> Zero
@@ -730,13 +730,20 @@ hsRigToRig c =
 hsUnrestricted = HsWeighted HsOmega
 hsLinear = HsWeighted HsOne
 
-hsFunTyConName :: HsRig -> Name
+isHsOmega :: HsRig pass -> Bool
+isHsOmega HsOmega = True
+isHsOmega _ = False
+
+
+-- TODO: This is going to change because (->) will have to take
+-- a multiplicity as an argument
+hsFunTyConName :: HsRig pass -> Name
 hsFunTyConName = funTyConName . hsRigToRig
 
-data HsWeighted a = HsWeighted { hsWeight :: HsRig , hsThing :: a }
-  deriving (Data, Traversable, Functor, Foldable)
+data HsWeighted pass a = HsWeighted { hsWeight :: HsRig pass, hsThing :: a }
+  deriving (Traversable, Functor, Foldable)
 
-instance Outputable a => Outputable (HsWeighted a) where
+instance Outputable a => Outputable (HsWeighted pass a) where
    ppr (HsWeighted cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
@@ -1101,7 +1108,7 @@ mkHsAppsTy app_tys                        = HsAppsTy NoExt app_tys
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
-splitHsFunType :: LHsType GhcRn -> ([HsWeighted (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsWeighted GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
@@ -1525,7 +1532,7 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> HsRig -> LHsType (GhcPass p) -> SDoc
+           => LHsType (GhcPass p) -> HsRig (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty ty1 weight ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2

@@ -583,7 +583,7 @@ tc_lhs_type mode (L span ty) exp_kind
     tc_hs_type mode ty exp_kind
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> HsRig -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
+tc_fun_type :: TcTyMode -> HsRig GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
@@ -598,7 +598,7 @@ tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
        ; weight' <- tc_weight weight
        ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
 
-tc_weight :: HsRig -> TcM Rig
+tc_weight :: HsRig GhcRn -> TcM Rig
 tc_weight r = return $ case r of
                          HsZero -> Zero
                          HsOne  -> One
@@ -644,7 +644,7 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
 
 ---------- Functions and applications
 tc_hs_type mode ty@(HsFunTy _ ty1 weight ty2) exp_kind
-  | mode_level mode == KindLevel && not (weight == HsOmega)
+  | mode_level mode == KindLevel && not (isHsOmega weight)
     = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
   | otherwise
     = tc_fun_type mode weight ty1 ty2 exp_kind
