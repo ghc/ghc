@@ -2282,11 +2282,11 @@ repConstr :: HsConDeclDetails GhcRn
           -> [Core TH.Name]
           -> DsM (Core TH.ConQ)
 repConstr (PrefixCon ps) Nothing [con]
-    = do arg_tys  <- repList bangTypeQTyConName repBangTy (map weightedThing ps)
+    = do arg_tys  <- repList bangTypeQTyConName repBangTy (map hsThing ps)
          rep2 normalCName [unC con, unC arg_tys]
 
 repConstr (PrefixCon ps) (Just (L _ res_ty)) cons
-    = do arg_tys     <- repList bangTypeQTyConName repBangTy (map weightedThing ps)
+    = do arg_tys     <- repList bangTypeQTyConName repBangTy (map hsThing ps)
          res_ty' <- repTy res_ty
          rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
 
@@ -2309,8 +2309,8 @@ repConstr (RecCon (L _ ips)) resTy cons
                           ; rep2 varBangTypeName [v,ty] }
 
 repConstr (InfixCon st1 st2) Nothing [con]
-    = do arg1 <- repBangTy (weightedThing st1)
-         arg2 <- repBangTy (weightedThing st2)
+    = do arg1 <- repBangTy (hsThing st1)
+         arg2 <- repBangTy (hsThing st2)
          rep2 infixCName [unC arg1, unC con, unC arg2]
 
 repConstr (InfixCon {}) (Just _) _ =

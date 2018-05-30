@@ -15,9 +15,13 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
 
 module HsTypes (
-        Rig(..),
+        Rig(..), HsRig(..), hsFunTyConName, HsWeighted(..),
+        hsLinear, hsUnrestricted,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..), HsQTvsRn(..),
@@ -503,7 +507,7 @@ data HsType pass
 
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
-                        Rig
+                        HsRig
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
@@ -713,6 +717,30 @@ data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
     deriving Data
+
+data HsRig = HsZero | HsOne | HsOmega deriving (Data, Eq)
+
+hsRigToRig :: HsRig -> Rig
+hsRigToRig c =
+  case c of
+    HsZero -> Zero
+    HsOne  -> One
+    HsOmega -> Omega
+
+hsUnrestricted = HsWeighted HsOmega
+hsLinear = HsWeighted HsOne
+
+hsFunTyConName :: HsRig -> Name
+hsFunTyConName = funTyConName . hsRigToRig
+
+data HsWeighted a = HsWeighted { hsWeight :: HsRig , hsThing :: a }
+  deriving (Data, Traversable, Functor, Foldable)
+
+instance Outputable a => Outputable (HsWeighted a) where
+   ppr (HsWeighted cnt t) = -- ppr cnt <> ppr t
+                          ppr t
+
+
 
 newtype HsWildCardInfo        -- See Note [The wildcard story for types]
     = AnonWildCard (Located Name)
@@ -1073,13 +1101,13 @@ mkHsAppsTy app_tys                        = HsAppsTy NoExt app_tys
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
-splitHsFunType :: LHsType GhcRn -> ([Weighted (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsWeighted (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
 splitHsFunType (L _ (HsFunTy _ x weight y))
   | (args, res) <- splitHsFunType y
-  = ((Weighted weight x):args, res)
+  = ((HsWeighted weight x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
@@ -1087,7 +1115,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
     go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == (funTyConName Omega) -- TODO: arnaud harder but should be done for all arity
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = ((unrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
+                                 = ((hsUnrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
     go _                     _   = ([], orig_ty)  -- Failure to match
@@ -1497,14 +1525,14 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> Rig -> LHsType (GhcPass p) -> SDoc
+           => LHsType (GhcPass p) -> HsRig -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty ty1 weight ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
         arr = case weight of
-          Zero -> "->_0"
-          One -> "⊸"
-          Omega -> "->"
+          HsZero -> "->_0"
+          HsOne -> "⊸"
+          HsOmega -> "->"
     in
     sep [p1, text arr <+> p2]
 

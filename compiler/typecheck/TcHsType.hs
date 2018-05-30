@@ -51,7 +51,9 @@ module TcHsType (
         zonkPromoteType,
 
         -- Pattern type signatures
-        tcHsPatSigType, tcPatSig, funAppCtxt
+        tcHsPatSigType, tcPatSig, funAppCtxt,
+        -- Weight
+        tc_weight
    ) where
 
 #include "HsVersions.h"
@@ -581,18 +583,26 @@ tc_lhs_type mode (L span ty) exp_kind
     tc_hs_type mode ty exp_kind
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> Rig -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
+tc_fun_type :: TcTyMode -> HsRig -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight ty1' ty2') liftedTypeKind exp_kind }
+       ; weight' <- tc_weight weight
+       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight ty1' ty2') liftedTypeKind exp_kind }
+       ; weight' <- tc_weight weight
+       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
+
+tc_weight :: HsRig -> TcM Rig
+tc_weight r = return $ case r of
+                         HsZero -> Zero
+                         HsOne  -> One
+                         HsOmega -> Omega
 
 ------------------------------------------
 tc_hs_type :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
@@ -634,14 +644,14 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
 
 ---------- Functions and applications
 tc_hs_type mode ty@(HsFunTy _ ty1 weight ty2) exp_kind
-  | mode_level mode == KindLevel && not (weight == Omega)
+  | mode_level mode == KindLevel && not (weight == HsOmega)
     = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
   | otherwise
     = tc_fun_type mode weight ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode Omega ty1 ty2 exp_kind -- TODO: arnaud: propagage weight of the type of operators somehow
+  = tc_fun_type mode HsOmega ty1 ty2 exp_kind -- TODO: arnaud: propagage weight of the type of operators somehow
 
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind

@@ -1966,7 +1966,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
           -- See Trac #14808.
-        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ (map irrelevantWeight arg_tys) ++ [res_ty])
+        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ (map hsThing arg_tys) ++ [res_ty])
         ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
 
         ; let ctxt    = ConDeclCtx new_names
@@ -2013,8 +2013,8 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (Weighted (LHsType GhcPs)) (Located [LConDeclField GhcPs])
-   -> RnM ((HsConDetails (Weighted (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
+   -> HsConDetails (HsWeighted (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails (HsWeighted (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
   = do { (Compose new_tys, fvs) <- rnLHsTypes doc (Compose tys)

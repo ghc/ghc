@@ -591,7 +591,7 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; res_ty <- mkHsOpTyRn hs_fun_ty (funTyConName weight) funTyFixity ty1' ty2'
+       ; res_ty <- mkHsOpTyRn hs_fun_ty (hsFunTyConName weight) funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2) }
   where
     hs_fun_ty a b = HsFunTy noExt a weight b
@@ -1803,7 +1803,7 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
                             , con_mb_cxt = ctxt, con_args = args }) acc
       = extract_hs_tv_bndrs ex_tvs acc =<<
         extract_mlctxt ctxt =<<
-        extract_ltys TypeLevel (map weightedThing $ hsConDeclArgTys args) emptyFKTV
+        extract_ltys TypeLevel (map hsThing $ hsConDeclArgTys args) emptyFKTV
     extract_con (XConDecl { }) _ = panic "extractDataDefnKindVars"
 extractDataDefnKindVars (XHsDataDefn _) = panic "extractDataDefnKindVars"
 

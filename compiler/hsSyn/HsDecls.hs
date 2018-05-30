@@ -1315,7 +1315,7 @@ There's a wrinkle in ConDeclGADT
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
-   = HsConDetails (Weighted (LBangType pass)) (Located [LConDeclField pass])
+   = HsConDetails (HsWeighted (LBangType pass)) (Located [LConDeclField pass])
 
 getConNames :: ConDecl pass -> [Located (IdP pass)]
 getConNames ConDeclH98  {con_name  = name}  = [name]
@@ -1326,10 +1326,10 @@ getConNames XConDecl {} = panic "getConNames"
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
 
-hsConDeclArgTys :: HsConDeclDetails pass -> [Weighted (LBangType pass)]
+hsConDeclArgTys :: HsConDeclDetails pass -> [HsWeighted (LBangType pass)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
-hsConDeclArgTys (RecCon flds)      = map (linear . cd_fld_type . unLoc) (unLoc flds)
+hsConDeclArgTys (RecCon flds)      = map (hsLinear . cd_fld_type . unLoc) (unLoc flds)
   -- Remark: with the record syntax, constructors have all their argument
   -- linear, despite the fact that projections do not make sense on linear
   -- constructors. The design here is that the record projection themselves are
@@ -1393,9 +1393,9 @@ pprConDecl (ConDeclH98 { con_name = L _ con
   where
     -- In ppr_details: let's not print the multiplicities (they are always 1, by
     -- definition) as they do not appear in an actual declaration.
-    ppr_details (InfixCon t1 t2) = hsep [ppr (weightedThing t1), pprInfixOcc con, ppr (weightedThing t2)]
+    ppr_details (InfixCon t1 t2) = hsep [ppr (hsThing t1), pprInfixOcc con, ppr (hsThing t2)]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprHsType . unLoc) (map weightedThing tys))
+                                   : map (pprHsType . unLoc) (map hsThing tys))
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe (noLoc []) mcxt
