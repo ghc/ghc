@@ -125,7 +125,7 @@ module Type (
         liftedTypeKind,
 
         -- * Type free variables
-        tyCoFVsOfType, tyCoFVsBndr,
+        tyCoFVsOfType,
         tyCoVarsOfType, tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet,
         coVarsOfType,

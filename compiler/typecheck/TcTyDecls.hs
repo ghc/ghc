@@ -631,7 +631,8 @@ markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
     get_ty_vars (FunTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
     get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
-    get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
+    get_ty_vars (ForAllTy tvb ty) = FV.delFV (binderVar tvb) (get_ty_vars ty)
+                                    `unionFV` tyCoFVsOfType (binderKind tvb)
     get_ty_vars (LitTy {})        = emptyFV
     get_ty_vars (CastTy ty _)     = get_ty_vars ty
     get_ty_vars (CoercionTy _)    = emptyFV
