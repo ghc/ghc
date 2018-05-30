@@ -653,7 +653,7 @@ typeToLHsType ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                         , hst_xqual = noExt
                         , hst_body = go tau })
-    go (FunTy weight arg res) = nlHsFunTy (go arg) (coreRigToRig weight) (go res)
+    go (FunTy weight arg res) = nlHsFunTy (go arg) weight (go res)
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
@@ -683,14 +683,6 @@ typeToLHsType ty
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
-
-coreRigToRig :: CoreRig -> Rig
-coreRigToRig cr =
-  case cr of
-    CZero -> Zero
-    COne  -> One
-    COmega -> Omega
-
 
 {-
 Note [Kind signatures in typeToLHsType]

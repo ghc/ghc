@@ -648,7 +648,7 @@ filterAlts _tycon inst_tys imposs_cons alts
 -- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
 -- See Note [Refine Default Alts]
 refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
-                 -> CoreRig               -- ^ Weight
+                 -> Rig               -- ^ Weight
                  -> TyCon             -- ^ Type constructor of scrutinee's type
                  -> [Type]            -- ^ Type arguments of scrutinee's type
                  -> [AltCon]          -- ^ Constructors that cannot match the DEFAULT (if any)
@@ -1366,7 +1366,7 @@ isExpandableApp fn n_val_args
        | Just (bndr, ty) <- splitPiTy_maybe ty
        = caseBinder bndr
            (\_tv -> all_pred_args n_val_args ty)
-           (\bndr_ty -> isPredTy (coreWeightedThing bndr_ty) && all_pred_args (n_val_args-1) ty)
+           (\bndr_ty -> isPredTy (weightedThing bndr_ty) && all_pred_args (n_val_args-1) ty)
 
        | otherwise
        = False
@@ -1558,7 +1558,7 @@ app_ok primop_ok fun args
     arg_ok :: TyBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty) arg        -- A term argument
-       | isUnliftedType (coreWeightedThing ty) = expr_ok primop_ok arg
+       | isUnliftedType (weightedThing ty) = expr_ok primop_ok arg
        | otherwise         = True  -- See Note [Primops with lifted arguments]
 
 -----------------------------
@@ -1870,15 +1870,15 @@ exprIsTickedString_maybe _ = Nothing
 These InstPat functions go here to avoid circularity between DataCon and Id
 -}
 
-dataConRepInstPat   ::                 [Unique] -> CoreRig -> DataCon -> [Type] -> ([TyVar], [Id])
-dataConRepFSInstPat :: [FastString] -> [Unique] -> CoreRig -> DataCon -> [Type] -> ([TyVar], [Id])
+dataConRepInstPat   ::                 [Unique] -> Rig -> DataCon -> [Type] -> ([TyVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> Rig -> DataCon -> [Type] -> ([TyVar], [Id])
 
 dataConRepInstPat   = dataConInstPat (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat
 
 dataConInstPat :: [FastString]          -- A long enough list of FSs to use for names
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
-               -> CoreRig                   -- The multiplicity annotation of the case expression: scales the multiplicity of variables
+               -> Rig                   -- The multiplicity annotation of the case expression: scales the multiplicity of variables
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
                -> ([TyVar], [Id])       -- Return instantiated variables
@@ -1941,7 +1941,7 @@ dataConInstPat fss uniqs weight con inst_tys
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
       -- Ignore the weights above, as there are Core ignores linearity at the moment.
-    mk_id_var uniq fs (CoreWeighted w ty) str
+    mk_id_var uniq fs (Weighted w ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkLocalIdOrCoVar name (weight * w) (Type.substTy full_subst ty)
       where
@@ -2379,13 +2379,13 @@ tryEtaReduce bndrs body
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let weight = idWeight v
-       , Just (CoreWeighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: arnaud: it is probably a bit slow to compute the type every time but it simplifies the implementation tremendously for now
+       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: arnaud: it is probably a bit slow to compute the type every time but it simplifies the implementation tremendously for now
        , weight == fun_weight -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
          in Just (mkFunCo Representational weight reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (CoreWeighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
+       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
        , bndr == v
        , fun_weight == idWeight v
        = Just (mkFunCo Representational (idWeight v) (mkSymCo co_arg) co, ticks)

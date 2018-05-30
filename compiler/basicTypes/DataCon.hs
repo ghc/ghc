@@ -374,7 +374,7 @@ data DataCon
                 -- the wrapper Id, because that makes it harder to use the wrap-id
                 -- to rebuild values after record selection or in generics.
 
-        dcOrigArgTys :: [CoreWeighted Type],-- Original argument types
+        dcOrigArgTys :: [Weighted Type],-- Original argument types
                                         -- (before unboxing and flattening of strict fields)
         dcOrigResTy :: Type,            -- Original result type, as seen by the user
                 -- NB: for a data instance, the original user result type may
@@ -548,7 +548,7 @@ data DataConRep
 
         , dcr_boxer   :: DataConBoxer
 
-        , dcr_arg_tys :: [CoreWeighted Type]  -- Final, representation argument types,
+        , dcr_arg_tys :: [Weighted Type]  -- Final, representation argument types,
                                           -- after unboxing and flattening,
                                           -- and *including* all evidence args
 
@@ -858,7 +858,7 @@ mkDataCon :: Name
                             --   See @Note [TyVarBinders in DataCons]@
           -> [EqSpec]       -- ^ GADT equalities
           -> ThetaType      -- ^ Theta-type occuring before the arguments proper
-          -> [CoreWeighted Type]-- ^ Original argument types
+          -> [Weighted Type]-- ^ Original argument types
           -> Type           -- ^ Original result type
           -> RuntimeRepInfo -- ^ See comments on 'TyCon.RuntimeRepInfo'
           -> TyCon          -- ^ Representation type constructor
@@ -940,7 +940,7 @@ mkDataCon name declared_infix prom_info
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
                     | TvBndr tv vis <- user_tvbs' ]
 
-    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ map coreWeightedThing orig_arg_tys)
+    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ map weightedThing orig_arg_tys)
     prom_res_kind  = orig_res_ty
     promoted       = mkPromotedDataCon con name prom_info
                                        (prom_tv_bndrs ++ prom_arg_bndrs)
@@ -1112,7 +1112,7 @@ dataConFieldType con label = case dataConFieldType_maybe con label of
 dataConFieldType_maybe :: DataCon -> FieldLabelString
                        -> Maybe (FieldLabel, Type)
 dataConFieldType_maybe con label
-  = find ((== label) . flLabel . fst) (dcFields con `zip` (coreWeightedThing <$> dcOrigArgTys con))
+  = find ((== label) . flLabel . fst) (dcFields con `zip` (weightedThing <$> dcOrigArgTys con))
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file
@@ -1170,7 +1170,7 @@ dataConBoxer _ = Nothing
 -- 3) The type arguments to the constructor with linearity annotations
 --
 -- 4) The /original/ result type of the 'DataCon'
-dataConSig :: DataCon -> ([TyVar], ThetaType, [CoreWeighted Type], Type)
+dataConSig :: DataCon -> ([TyVar], ThetaType, [Weighted Type], Type)
 dataConSig con@(MkData {dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (dataConUnivAndExTyVars con, dataConTheta con, arg_tys, res_ty)
 
@@ -1187,7 +1187,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
                univ_tys
   = ( ex_tvs'
     , substTheta subst (eqSpecPreds eq_spec ++ theta)
-    , substTys   subst (map coreWeightedThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
+    , substTys   subst (map weightedThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
   where
     univ_subst = zipTvSubst univ_tvs univ_tys
     (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst ex_tvs
@@ -1209,7 +1209,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
 --
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [CoreWeighted Type], Type)
+               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Weighted Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs,
                         dcEqSpec = eq_spec, dcOtherTheta = theta,
                         dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
@@ -1255,7 +1255,7 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                                 -- However, it can have a dcTheta (notably it can be a
                                 -- class dictionary, with superclasses)
                   -> [Type]     -- ^ Instantiated at these types
-                  -> [CoreWeighted Type]
+                  -> [Weighted Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyVars = ex_tvs}) inst_tys
  = ASSERT2( univ_tvs `equalLength` inst_tys
@@ -1269,7 +1269,7 @@ dataConInstOrigArgTys
         :: DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
-        -> [CoreWeighted Type]
+        -> [Weighted Type]
 -- For vanilla datacons, it's all quite straightforward
 -- But for the call in MatchCon, we really do want just the value args
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
@@ -1283,13 +1283,13 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
-dataConOrigArgTys :: DataCon -> [CoreWeighted Type]
+dataConOrigArgTys :: DataCon -> [Weighted Type]
 dataConOrigArgTys dc = dcOrigArgTys dc
 
 -- | Returns the arg types of the worker, including *all*
 -- evidence, after any flattening has been done and without substituting for
 -- any type variables
-dataConRepArgTys :: DataCon -> [CoreWeighted Type]
+dataConRepArgTys :: DataCon -> [Weighted Type]
 dataConRepArgTys (MkData { dcRep = rep
                          , dcEqSpec = eq_spec
                          , dcOtherTheta = theta
@@ -1423,7 +1423,7 @@ splitDataProductType_maybe
         -> Maybe (TyCon,                -- The type constructor
                   [Type],               -- Type args of the tycon
                   DataCon,              -- The data constructor
-                  [CoreWeighted Type])      -- Its /representation/ arg types
+                  [Weighted Type])      -- Its /representation/ arg types
 
         -- Rejecting existentials is conservative.  Maybe some things
         -- could be made to work with them, but I'm not going to sweat

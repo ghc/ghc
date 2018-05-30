@@ -22,10 +22,10 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConInstOrigArgTys  :: DataCon -> [Type] -> [CoreWeighted Type]
+dataConInstOrigArgTys  :: DataCon -> [Type] -> [Weighted Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [CoreWeighted Type], Type)
+               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Weighted Type], Type)
 isUnboxedSumCon :: DataCon -> Bool
 
 instance Eq DataCon

@@ -251,7 +251,7 @@ data IfaceConDecl
           -- See Note [DataCon user type variable binders] in DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
-        ifConArgTys  :: [CoreWeighted IfaceType],-- Arg types
+        ifConArgTys  :: [Weighted IfaceType],-- Arg types
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
@@ -869,7 +869,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                              , ex_msg
                              , pprIfaceContextArr prov_ctxt
-                             , pprIfaceType $ foldr (IfaceFunTy COmega) pat_ty arg_tys ])
+                             , pprIfaceType $ foldr (IfaceFunTy Omega) pat_ty arg_tys ])
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
         ex_msg   = pprUserIfaceForAll ex_bndrs
@@ -991,7 +991,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
-    tys_w_strs = zip stricts (map coreWeightedThing arg_tys) -- TODO: arnaud: don't drop linearity when printing
+    tys_w_strs = zip stricts (map weightedThing arg_tys) -- TODO: arnaud: don't drop linearity when printing
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     -- If we're pretty-printing a H98-style declaration with existential
@@ -1396,7 +1396,7 @@ freeNamesIfConDecl (IfCon { ifConExTvs   = ex_tvs, ifConCtxt = ctxt
                           , ifConStricts = bangs })
   = fnList freeNamesIfTvBndr ex_tvs &&&
     freeNamesIfContext ctxt &&&
-    fnList freeNamesIfType (map coreWeightedThing arg_tys) &&&
+    fnList freeNamesIfType (map weightedThing arg_tys) &&&
     mkNameSet (map flSelector flds) &&&
     fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
     fnList freeNamesIfBang bangs

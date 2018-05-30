@@ -241,7 +241,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
-        varWeight  :: CoreRig,
+        varWeight  :: Rig,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -383,14 +383,14 @@ updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
                          ; return (id { varType = ty' }) }
 
-varWeightMaybe :: Id -> Maybe CoreRig
+varWeightMaybe :: Id -> Maybe Rig
 varWeightMaybe (Id { varWeight = w }) = Just w
 varWeightMaybe _ = Nothing
 
-varWeightDef :: Id -> CoreRig
-varWeightDef = fromMaybe COmega . varWeightMaybe
+varWeightDef :: Id -> Rig
+varWeightDef = fromMaybe Omega . varWeightMaybe
 
-scaleVarBy :: Id -> CoreRig -> Id
+scaleVarBy :: Id -> Rig -> Id
 scaleVarBy id r | isId id  = id { varWeight = r * (varWeight id) }
 scaleVarBy id _ = id
 
@@ -573,26 +573,26 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name COmega ty GlobalId details info
+  = mk_id name Omega ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> CoreRig -> Type -> IdInfo -> Id
+mkLocalVar :: IdDetails -> Name -> Rig -> Type -> IdInfo -> Id
 mkLocalVar details name w ty info
   = mk_id name w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name COmega ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name Omega ty (LocalId NotExported) coVarDetails vanillaIdInfo
   -- TODO: arnaud: maybe coercions should have multiplicity 0? Them being entirely static.
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name COmega ty (LocalId Exported) details info
+  = mk_id name Omega ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> CoreRig -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id :: Name -> Rig -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),

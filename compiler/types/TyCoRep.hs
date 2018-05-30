@@ -28,7 +28,7 @@ module TyCoRep (
         KindOrType, Kind,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..),
-        CoreRig(..),
+        Rig(..),
 
         -- * Coercions
         Coercion(..),
@@ -297,7 +297,7 @@ data Type
         {-# UNPACK #-} !TyVarBinder
         Type            -- ^ A Π type.
 
-  | FunTy CoreRig Type Type     -- ^ t1 ->_p t2   Very common, so an important special case
+  | FunTy Rig Type Type     -- ^ t1 ->_p t2   Very common, so an important special case
 
     -- TODO: arnaud: also PI
     -- TODO: arnaud: ignored by Core. Nonetheless, maybe should update the Formalism
@@ -484,7 +484,7 @@ These invariants are all documented above, in the declaration for Type.
 -- See Note [TyBinders]
 data TyBinder
   = Named TyVarBinder   -- A type-lambda binder
-  | Anon (CoreWeighted Type)           -- A term-lambda binder
+  | Anon (Weighted Type)           -- A term-lambda binder
                         -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
@@ -496,7 +496,7 @@ delBinderVar vars (TvBndr tv _) = vars `delVarSet` tv
 -- | Does this binder bind an invisible argument?
 isInvisibleBinder :: TyBinder -> Bool
 isInvisibleBinder (Named (TvBndr _ vis)) = isInvisibleArgFlag vis
-isInvisibleBinder (Anon ty)              = isPredTy (coreWeightedThing ty)
+isInvisibleBinder (Anon ty)              = isPredTy (weightedThing ty)
 
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyBinder -> Bool
@@ -730,19 +730,19 @@ mkTyVarTys = map mkTyVarTy -- a common use of mkTyVarTy
 infixr 3 `mkFunTy`      -- Associates to the right
 infixr 3 `mkFunTyOm`
 -- | Make an arrow type
-mkFunTy :: CoreRig -> Type -> Type -> Type
+mkFunTy :: Rig -> Type -> Type -> Type
 mkFunTy weight arg res = FunTy weight arg res
 
-mkWeightedFunTy :: CoreWeighted Type -> Type -> Type
-mkWeightedFunTy (CoreWeighted weight arg) res = FunTy weight arg res
+mkWeightedFunTy :: Weighted Type -> Type -> Type
+mkWeightedFunTy (Weighted weight arg) res = FunTy weight arg res
 
 -- | Special, common, case: Arrow type with weight Omega
 mkFunTyOm :: Type -> Type -> Type
-mkFunTyOm = mkFunTy COmega
+mkFunTyOm = mkFunTy Omega
 
 -- | Make nested arrow types
-mkFunTys :: [CoreWeighted Type] -> Type -> Type
-mkFunTys tys ty = foldr (\(CoreWeighted w t) -> mkFunTy w t) ty tys
+mkFunTys :: [Weighted Type] -> Type -> Type
+mkFunTys tys ty = foldr (\(Weighted w t) -> mkFunTy w t) ty tys
 -- FIXME: arnaud: see at use-site how to best refine this. Probably the list argument should be of pairs `(Rig,Type)`.
 -- MattP: The unweighted one should be the default. there are lots of "bad"
 -- calls to this which map unrestricted over the argument first.
@@ -852,7 +852,7 @@ isLinearType :: Type -> Bool
 -- reduce an Id.
 -- TODO: MattP perhaps this should look through casts a well. Probably not.
 isLinearType ty = case ty of
-                      FunTy COne _ _ -> True
+                      FunTy One _ _ -> True
                       FunTy _ _ res -> isLinearType res
                       ForAllTy _ res -> isLinearType res
                       _ -> False
@@ -911,7 +911,7 @@ data Coercion
   | ForAllCo TyVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role CoreRig Coercion Coercion         -- lift FunTy
+  | FunCo Role Rig Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
 
   -- These are special
@@ -2792,9 +2792,9 @@ debug_ppr_ty _ (TyVarTy tv)
 debug_ppr_ty prec (FunTy weight arg res)
   =
     let arr = case weight of
-                CZero -> text "->0"
-                COne -> text "⊸"
-                COmega -> arrow
+                Zero -> text "->0"
+                One -> text "⊸"
+                Omega -> arrow
     in
       maybeParen prec funPrec $
       sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]
@@ -2881,7 +2881,7 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
     user_bndrs = dataConUserTyVarBinders dc
     forAllDoc  = pprUserForAll user_bndrs
     thetaDoc   = pprThetaArrowTy theta
-    argsDoc    = hsep (fmap pprParendType (map coreWeightedThing arg_tys)) -- TODO: arnaud: do I have to do something in order to print arrows correctly for linear constructor?
+    argsDoc    = hsep (fmap pprParendType (map weightedThing arg_tys)) -- TODO: arnaud: do I have to do something in order to print arrows correctly for linear constructor?
 
 
 pprTypeApp :: TyCon -> [Type] -> SDoc

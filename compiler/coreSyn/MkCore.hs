@@ -163,12 +163,12 @@ mkCoreApps fun args
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
 mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
-mk_val_app :: CoreExpr -> CoreExpr -> CoreWeighted Type -> Type -> CoreExpr
+mk_val_app :: CoreExpr -> CoreExpr -> Weighted Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [CoreSyn let/app invariant]
-mk_val_app fun arg (CoreWeighted w arg_ty) res_ty
+mk_val_app fun arg (Weighted w arg_ty) res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
 
@@ -187,20 +187,20 @@ mk_val_app fun arg (CoreWeighted w arg_ty) res_ty
 
 -----------
 mkWildEvBinder :: PredType -> EvVar
-mkWildEvBinder pred = mkWildValBinder COmega pred
+mkWildEvBinder pred = mkWildValBinder Omega pred
 
 -- | Make a /wildcard binder/. This is typically used when you need a binder
 -- that you expect to use only at a *binding* site.  Do not use it at
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 -- See Note [WildCard binders] in SimplEnv
-mkWildValBinder :: CoreRig -> Type -> Id
+mkWildValBinder :: Rig -> Type -> Id
 mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName w ty
 
-mkWildCase :: CoreExpr -> CoreWeighted Type -> Type -> [CoreAlt] -> CoreExpr
+mkWildCase :: CoreExpr -> Weighted Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts should not have any occurrences of WildId
-mkWildCase scrut (CoreWeighted w scrut_ty) res_ty alts
+mkWildCase scrut (Weighted w scrut_ty) res_ty alts
   = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
@@ -218,7 +218,7 @@ castBottomExpr :: CoreExpr -> Type -> CoreExpr
 -- See Note [Empty case alternatives] in CoreSyn
 castBottomExpr e res_ty
   | e_ty `eqType` res_ty = e
-  | otherwise            = Case e (mkWildValBinder COne e_ty) res_ty []
+  | otherwise            = Case e (mkWildValBinder One e_ty) res_ty []
   where
     e_ty = exprType e
 
@@ -524,7 +524,7 @@ mkTupleCase uniqs vars body scrut_var scrut
 
     one_tuple_case chunk_vars (us, vs, body)
       = let (uniq, us') = takeUniqFromSupply us
-            scrut_var = mkSysLocal (fsLit "ds") uniq COmega -- TODO: arnaud: I'll soon need to parametrise this by a multiplicity, rather than using Omega
+            scrut_var = mkSysLocal (fsLit "ds") uniq Omega -- TODO: arnaud: I'll soon need to parametrise this by a multiplicity, rather than using Omega
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us', scrut_var:vs, body')
@@ -618,7 +618,7 @@ mkBuildExpr elt_ty mk_build_inside = do
     [n_tyvar] <- newTyVars [alphaTyVar]
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkFunTys [unrestricted elt_ty, unrestricted n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") COmega c_ty, mkSysLocalM (fsLit "n") COmega n_ty]
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") Omega c_ty, mkSysLocalM (fsLit "n") Omega n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 
@@ -800,7 +800,7 @@ runtimeErrorTy :: Type
 -- forall (rr :: RuntimeRep) (a :: rr). Addr# -> a
 --   See Note [Error and friends have an "open-tyvar" forall]
 runtimeErrorTy = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
-                                 (mkFunTy COmega addrPrimTy openAlphaTy)
+                                 (mkFunTy Omega addrPrimTy openAlphaTy)
 
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -890,7 +890,7 @@ be relying on anything from it.
 aBSENT_ERROR_ID
  = mkVanillaGlobalWithInfo absentErrorName absent_ty arity_info
  where
-   absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy COmega addrPrimTy alphaTy)
+   absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy Omega addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in WwLib
    -- arnaud: check this Omega

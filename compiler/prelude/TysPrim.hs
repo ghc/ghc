@@ -327,12 +327,12 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 ************************************************************************
 -}
 
-funTyConName :: CoreRig -> Name
-funTyConName CZero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon CZero)
-funTyConName COne = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon COne)
-funTyConName COmega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon COmega)
+funTyConName :: Rig -> Name
+funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon Zero)
+funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon One)
+funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon Omega)
 
--- TODO: arnaud: without CoreRig, funTyCon (and funTyConName) was allocated a single
+-- TODO: arnaud: without Rig, funTyCon (and funTyConName) was allocated a single
 -- time, now it's allocated at every call. It may be worth a bit of boilerplate
 -- to make the allocation unique as it used to.
 -- | The @(->)@ type constructor.
@@ -341,7 +341,7 @@ funTyConName COmega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon 
 -- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
-funTyCon :: CoreRig -> TyCon
+funTyCon :: Rig -> TyCon
 funTyCon w = mkFunTyCon w (funTyConName w) tc_bndrs tc_rep_nm
   where
     tc_bndrs = [ TvBndr runtimeRep1TyVar (NamedTCB Inferred)

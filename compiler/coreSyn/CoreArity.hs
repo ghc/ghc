@@ -123,7 +123,7 @@ typeArity ty
       = go rec_nts ty'
 
       | Just (arg,res) <- splitFunTy_maybe ty
-      = typeOneShot (coreWeightedThing arg) : go rec_nts res
+      = typeOneShot (weightedThing arg) : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
       , Just (ty', _) <- instNewTyCon_maybe tc tys
@@ -1044,7 +1044,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        = go n subst' ty' (EtaVar tv' : eis)
 
        | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
-       , not (isTypeLevPoly (coreWeightedThing arg_ty))
+       , not (isTypeLevPoly (weightedThing arg_ty))
           -- See Note [Levity polymorphism invariants] in CoreSyn
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
@@ -1136,7 +1136,7 @@ etaBodyForJoinPoint need_args body
     init_subst e = mkEmptyTCvSubst (mkInScopeSet (exprFreeVars e))
 
 --------------
-freshEtaId :: Int -> TCvSubst -> CoreWeighted Type -> (TCvSubst, Id)
+freshEtaId :: Int -> TCvSubst -> Weighted Type -> (TCvSubst, Id)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
@@ -1147,7 +1147,7 @@ freshEtaId :: Int -> TCvSubst -> CoreWeighted Type -> (TCvSubst, Id)
 freshEtaId n subst ty
       = (subst', eta_id')
       where
-        ty'     = Type.substTy subst (coreWeightedThing ty)
+        ty'     = Type.substTy subst (weightedThing ty)
         eta_id' = uniqAway (getTCvInScope subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (coreWeightedWeight ty) ty'
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (weightedWeight ty) ty'
         subst'  = extendTCvInScope subst eta_id'

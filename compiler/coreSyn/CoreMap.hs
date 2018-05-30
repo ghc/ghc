@@ -758,7 +758,7 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
 -- We also need to do the same for linearity! The easiest way to do this is
 -- to store the linearity of a variable along with the payload and then
 -- check that they also match up when retrieving the value.
-data BndrMap a = BndrMap (TypeMapG (a, CoreRig))
+data BndrMap a = BndrMap (TypeMapG (a, Rig))
 
 instance TrieMap BndrMap where
    type Key BndrMap = Var
@@ -789,7 +789,7 @@ lkBndr env v (BndrMap tymap) = do
 
 xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
-  let xt' :: Maybe (a, CoreRig) -> Maybe (a, CoreRig)
+  let xt' :: Maybe (a, Rig) -> Maybe (a, Rig)
       xt' mv = (\a -> (a, varWeightDef v)) <$> xt (fst <$> mv)
   in BndrMap (xtG (D env (varType v)) xt' tymap)
 

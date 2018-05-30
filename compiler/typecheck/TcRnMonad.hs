@@ -644,15 +644,15 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> CoreRig -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId :: FastString -> Rig -> TcType -> TcRnIf gbl lcl TcId
 newSysLocalId fs w ty
   = do  { u <- newUnique
         ; return (mkSysLocalOrCoVar fs u w ty) }
 
-newSysLocalIds :: FastString -> [CoreWeighted TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds :: FastString -> [Weighted TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
-        ; let mkId' n (CoreWeighted w t) = mkSysLocalOrCoVar fs n w t
+        ; let mkId' n (Weighted w t) = mkSysLocalOrCoVar fs n w t
         ; return (zipWith mkId' (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where

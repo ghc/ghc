@@ -108,7 +108,7 @@ conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)
-conLikeInstOrigArgTys :: ConLike -> [Type] -> [CoreWeighted Type]
+conLikeInstOrigArgTys :: ConLike -> [Type] -> [Weighted Type]
 conLikeInstOrigArgTys (RealDataCon data_con) tys =
     dataConInstOrigArgTys data_con tys
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
@@ -167,7 +167,7 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 -- 7) The original result type
 conLikeFullSig :: ConLike
                -> ([TyVar], [TyVar], [EqSpec]
-                  , ThetaType, ThetaType, [CoreWeighted Type], Type)
+                  , ThetaType, ThetaType, [Weighted Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con
   -- Required theta is empty as normal data cons require no additional
