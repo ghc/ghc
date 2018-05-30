@@ -23,6 +23,12 @@ import GHC.Exts.Heap.Constants
 import GHC.Exts.Heap.InfoTableProf
 #else
 import GHC.Exts.Heap.InfoTable
+
+-- `ghc -M` currently doesn't properly account for ways when generating
+-- dependencies (#15197). This import ensures correct build-ordering between
+-- this module and GHC.Exts.Heap.InfoTableProf. It should be removed when #15197
+-- is fixed.
+import GHC.Exts.Heap.InfoTableProf ()
 #endif
 
 import Data.Bits
