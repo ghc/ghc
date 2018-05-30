@@ -105,7 +105,7 @@ test('T5424', [], multimod_compile, ['T5424', '-v0 -O0'])
 
 test('FloatEq', normal, compile, [''])
 test('T7205', normal, compile, [''])
-test('T7293', normal, compile_fail, [''])
+test('T7293', normal, compile_fail, ['-Werror'])
 test('T7294', normal, compile, [''])
 test('T7321', [], run_command, ['$MAKE -s --no-print-directory T7321'])
 test('T7974', normal, compile, [''])
