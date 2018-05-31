@@ -8,7 +8,7 @@
 --
 -----------------------------------------------------------------------------
 
-module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest,
+module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest(..),
                   getJumpDestBlockId, canShortcut, shortcutStatics,
                   shortcutJump, i386_insert_ffrees, allocMoreStack,
                   maxSpillSlots, archWordFormat)
@@ -322,7 +322,7 @@ data Instr
         | JXX_GBL     Cond Imm      -- non-local version of JXX
         -- Table jump
         | JMP_TBL     Operand   -- Address to jump to
-                      [Maybe BlockId] -- Blocks in the jump table
+                      [Maybe JumpDest] -- Targets of the jump table
                       Section   -- Data section jump table should be put in
                       CLabel    -- Label of jump table
         | CALL        (Either Imm Reg) [Reg]
@@ -704,7 +704,7 @@ x86_jumpDestsOfInstr
 x86_jumpDestsOfInstr insn
   = case insn of
         JXX _ id        -> [id]
-        JMP_TBL _ ids _ _ -> [id | Just id <- ids]
+        JMP_TBL _ ids _ _ -> [id | Just (DestBlockId id) <- ids]
         _               -> []
 
 
@@ -715,8 +715,12 @@ x86_patchJumpInstr insn patchF
   = case insn of
         JXX cc id       -> JXX cc (patchF id)
         JMP_TBL op ids section lbl
-          -> JMP_TBL op (map (fmap patchF) ids) section lbl
+          -> JMP_TBL op (map (fmap (patchJumpDest patchF)) ids) section lbl
         _               -> insn
+    where
+        patchJumpDest f (DestBlockId id) = DestBlockId (f id)
+        patchJumpDest _ dest             = dest
+
 
 
 
@@ -1036,13 +1040,11 @@ shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
             Just (DestImm imm)     -> shortcutJump' fn seen' (JXX_GBL cc imm)
         where seen' = setInsert id seen
     shortcutJump' fn _ (JMP_TBL addr blocks section tblId) =
-        let updateBlock Nothing     = Nothing
-            updateBlock (Just bid)  =
+        let updateBlock (Just (DestBlockId bid))  =
                 case fn bid of
-                    Nothing                 -> Just bid
-                    Just (DestBlockId bid') -> Just bid'
-                    Just (DestImm _)        ->
-                        panic "Can't shortcut jump table to immediate"
+                    Nothing   -> Just (DestBlockId bid )
+                    Just dest -> Just dest
+            updateBlock dest = dest
             blocks' = map updateBlock blocks
         in  JMP_TBL addr blocks' section tblId
     shortcutJump' _ _ other = other
