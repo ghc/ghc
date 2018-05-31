@@ -1696,6 +1696,7 @@ neededEvVars implic@(Implic { ic_given = givens
       ; traceTcS "neededEvVars" $
         vcat [ text "old_needs:" <+> ppr old_needs
              , text "seeds3:" <+> ppr seeds3
+             , text "tcvs:" <+> ppr tcvs
              , text "ev_binds:" <+> ppr ev_binds
              , text "live_ev_binds:" <+> ppr live_ev_binds ]
 
@@ -1755,6 +1756,9 @@ all done by neededEvVars.
 
 This led to a remarkable 25% overall compiler allocation decrease in
 test T12227.
+
+But we don't get to discard all redundant equality superclasses, alas;
+see Trac #15205.
 
 Note [Tracking redundant constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
