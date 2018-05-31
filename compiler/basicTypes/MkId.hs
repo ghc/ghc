@@ -569,10 +569,17 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
              wrap_unf = mkInlineUnfolding wrap_rhs
+
+             -- Newtype "workers" already have any family coercion applied
+             -- (see the definition of newtype_unf in mkDataConWorkId), so
+             -- we don't want to apply the coercion again.
+             casted_body | isNewTyCon tycon = wrap_body
+                         | otherwise        = wrapFamInstBody tycon res_ty_args $
+                                              wrap_body
+
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
-                        wrapFamInstBody tycon res_ty_args $
-                        wrap_body
+                        casted_body
 
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
