@@ -1884,6 +1884,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       ++ pkg_framework_opts
                       ++ debug_opts
                       ++ thread_opts
+                      ++ (if platformOS platform == OSDarwin
+                          then [ "-Wl,-dead_strip_dylibs" ]
+                          else [])
                     ))
 
 exeFileName :: Bool -> DynFlags -> FilePath

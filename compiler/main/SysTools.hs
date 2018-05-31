@@ -540,6 +540,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
                  ++ map Option pkg_framework_opts
+                 ++ [ Option "-Wl,-dead_strip_dylibs" ]
               )
         _ -> do
             -------------------------------------------------------------------
