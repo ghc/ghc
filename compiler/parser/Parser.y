@@ -3470,24 +3470,24 @@ bars :: { ([SrcSpan],Int) }     -- One or more bars
 -- Documentation comments
 
 docnext :: { LHsDocString }
-  : DOCNEXT {% return (sL1 $1 (HsDocString (mkFastString (getDOCNEXT $1)))) }
+  : DOCNEXT {% return (sL1 $1 (mkHsDocString (getDOCNEXT $1))) }
 
 docprev :: { LHsDocString }
-  : DOCPREV {% return (sL1 $1 (HsDocString (mkFastString (getDOCPREV $1)))) }
+  : DOCPREV {% return (sL1 $1 (mkHsDocString (getDOCPREV $1))) }
 
 docnamed :: { Located (String, HsDocString) }
   : DOCNAMED {%
       let string = getDOCNAMED $1
           (name, rest) = break isSpace string
-      in return (sL1 $1 (name, HsDocString (mkFastString rest))) }
+      in return (sL1 $1 (name, mkHsDocString rest)) }
 
 docsection :: { Located (Int, HsDocString) }
   : DOCSECTION {% let (n, doc) = getDOCSECTION $1 in
-        return (sL1 $1 (n, HsDocString (mkFastString doc))) }
+        return (sL1 $1 (n, mkHsDocString doc)) }
 
 moduleheader :: { Maybe LHsDocString }
         : DOCNEXT {% let string = getDOCNEXT $1 in
-                     return (Just (sL1 $1 (HsDocString (mkFastString string)))) }
+                     return (Just (sL1 $1 (mkHsDocString string))) }
 
 maybe_docprev :: { Maybe LHsDocString }
         : docprev                       { Just $1 }
