@@ -8,9 +8,9 @@
   [2 of 3] Compiling H[sig]           ( q/H.hsig, nothing )
   [3 of 3] Compiling C                ( q/C.hs, nothing )
 [3 of 6] Processing r
-  [1 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
-  [2 of 3] Compiling B[sig]           ( r/B.hsig, nothing )
-  [3 of 3] Compiling D                ( r/D.hs, nothing )
+  [1 of 3] Compiling B[sig]           ( r/B.hsig, nothing )
+  [2 of 3] Compiling D                ( r/D.hs, nothing )
+  [3 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
 [4 of 6] Processing s
   [1 of 2] Compiling H[sig]           ( s/H.hsig, nothing )
   [2 of 2] Compiling E                ( s/E.hs, nothing )

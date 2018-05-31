@@ -2,6 +2,6 @@
 T14066g.hs:9:1: error:
     • These kind and type variables: a (b :: a) (d :: SameKind c b)
       are out of dependency order. Perhaps try this ordering:
-        a (c :: a) (b :: a) (d :: SameKind c b)
+        a (b :: a) (c :: a) (d :: SameKind c b)
       NB: Implicitly declared variables come before others.
     • In the data type declaration for ‘Q’

@@ -15,13 +15,13 @@ T14040a.hs:21:18: error:
       Expected type: Sing wl
                      -> (forall y. p k1 w0 'WeirdNil)
                      -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
-                         Sing x -> Sing xs -> p k0 w1 xs -> p k2 w2 ('WeirdCons x xs))
-                     -> p k3 w3 wl
+                         Sing x -> Sing xs -> p k2 w1 xs -> p k3 w2 ('WeirdCons x xs))
+                     -> p k0 w3 wl
         Actual type: Sing wl
                      -> (forall y. p k1 w0 'WeirdNil)
                      -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
-                         Sing x -> Sing xs -> p k0 w1 xs -> p k2 w2 ('WeirdCons x xs))
-                     -> p k3 w3 wl
+                         Sing x -> Sing xs -> p k2 w1 xs -> p k3 w2 ('WeirdCons x xs))
+                     -> p k0 w3 wl
     • In the ambiguity check for ‘elimWeirdList’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:

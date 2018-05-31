@@ -14,7 +14,7 @@ module TcValidity (
   ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
   arityErr, badATErr,
-  checkValidTelescope,
+  checkValidTelescope, checkKvsToGeneralize,
   allDistinctTyVars
   ) where
 
@@ -1843,6 +1843,8 @@ The problem here is that we discover that a and b should have the same
 kind. But this kind mentions k, which is bound *after* a.
 (Testcase: dependent/should_fail/BadTelescope)
 
+This is checked in checkValidTelescope.
+
 2.  data T2 a (c :: Proxy b) (d :: Proxy a) (x :: SameKind b d)
 
 Note that b is not bound. Yet its kind mentions a. Because we have
@@ -1851,12 +1853,17 @@ this is bogus. (We could probably figure out to put b between a and c.
 But I think this is doing users a disservice, in the long run.)
 (Testcase: dependent/should_fail/BadTelescope4)
 
+This is checked in checkKvsToGeneralize.
+
 To catch these errors, we call checkValidTelescope during kind-checking
 datatype declarations. This must be done *before* kind-generalization,
 because kind-generalization might observe, say, T1, see that k is free
-in a's kind, and generalize over it, producing nonsense. It also must
-be done *after* kind-generalization, in order to catch the T2 case, which
-becomes apparent only after generalizing.
+in a's kind, and generalize over it, producing nonsense. We then
+call checkKvsToGeneralize after the call to kindGeneralize. In the case
+of T2, GHC will see that b is free, and then a is free in b's kind, and
+will try to generalize a.... even though a is already bound explicitly.
+So checkKvsToGeneralize will make sure that the kvs to generalize are
+distinct from those the user wrote.
 
 Note [Keeping scoped variables in order: Explicit] discusses how this
 check works for `forall x y z.` written in a type.
@@ -1874,19 +1881,12 @@ check works for `forall x y z.` written in a type.
 -- k in a's type.) See also Note [Bad telescopes].
 checkValidTelescope :: [TyConBinder]   -- explicit vars (zonked)
                     -> SDoc            -- original, user-written telescope
-                    -> SDoc            -- extra text to print
                     -> TcM ()
-checkValidTelescope tvbs user_tyvars extra
+checkValidTelescope tvbs user_tyvars
   = do { let tvs      = binderVars tvbs
-
-             (_, sorted_tidied_tvs) = tidyTyCoVarBndrs emptyTidyEnv $
-                                      toposortTyVars tvs
-       ; unless (go [] emptyVarSet (binderVars tvbs)) $
+       ; unless (go [] emptyVarSet tvs) $
          addErr $
-         vcat [ hang (text "These kind and type variables:" <+> user_tyvars $$
-                      text "are out of dependency order. Perhaps try this ordering:")
-                   2 (pprTyVars sorted_tidied_tvs)
-              , extra ] }
+         bad_telescope_err tvs user_tyvars }
 
   where
     go :: [TyVar]  -- misplaced variables
@@ -1900,6 +1900,34 @@ checkValidTelescope tvbs user_tyvars extra
       = let bad_tvs = filterOut (`elemVarSet` in_scope) $
                       tyCoVarsOfTypeList (tyVarKind tv)
         in go (bad_tvs ++ errs) (in_scope `extendVarSet` tv) tvs
+
+-- | We are about to generalize additional kind variables in a type decl.
+-- First, check to make sure none of these have already been written
+-- by the user. See point (2) in Note [Bad telescopes].
+checkKvsToGeneralize :: [TyVar] -> [TyConBinder] -> SDoc -- user-written tyvars
+                     -> TcM ()
+checkKvsToGeneralize kvs tc_binders user_tyvars
+  = when overlapping_kvs $
+    addErr $
+    bad_telescope_err all_tvs user_tyvars $$
+    text "NB: Implicitly declared variables come before others."
+  where
+    tvs = binderVars tc_binders
+
+    tv_set = mkDVarSet tvs
+    kv_set = mkDVarSet kvs
+
+    overlapping_kvs = tv_set `intersectsDVarSet` kv_set
+    all_tvs         = dVarSetElems $ tv_set `unionDVarSet` kv_set
+
+bad_telescope_err :: [TyVar] -> SDoc -> SDoc
+bad_telescope_err tvs user_tyvars
+  = hang (text "These kind and type variables:" <+> user_tyvars $$
+          text "are out of dependency order. Perhaps try this ordering:")
+       2 (pprTyVars sorted_tidied_tvs)
+  where
+    (_, sorted_tidied_tvs) = tidyTyCoVarBndrs emptyTidyEnv $
+                             toposortTyVars tvs
 
 {-
 ************************************************************************

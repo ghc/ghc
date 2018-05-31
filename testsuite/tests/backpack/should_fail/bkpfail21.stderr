@@ -5,8 +5,8 @@
   [1 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
   [2 of 2] Compiling C[sig]           ( q/C.hsig, nothing )
 [3 of 3] Processing r
-  [1 of 3] Compiling H2[sig]          ( r/H2.hsig, nothing )
-  [2 of 3] Compiling H1[sig]          ( r/H1.hsig, nothing )
+  [1 of 3] Compiling H1[sig]          ( r/H1.hsig, nothing )
+  [2 of 3] Compiling H2[sig]          ( r/H2.hsig, nothing )
   [3 of 3] Compiling H3[sig]          ( r/H3.hsig, nothing )
 
 bkpfail21.bkp:1:1: error:

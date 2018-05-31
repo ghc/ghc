@@ -73,7 +73,7 @@ module TyCoRep (
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
-        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
+        closeOverKindsDSet, closeOverKindsList,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo,
         tyCoVarsOfCo, tyCoVarsOfCos,
@@ -1473,9 +1473,12 @@ a VarSet that is closed over the types of its variables.  More precisely,
 
 Example: The tyCoVars of this ((a:* -> k) Int) is {a, k}.
 
-We could /not/ close over the kinds of the variable occurrences, and
+We could /not/ close over the kinds of the variables here, and
 instead do so at call sites, but it seems that we always want to do
-so, so it's easiest to do it here.
+so, so it's easiest to do it here. See Note [Closing over free variable kinds]
+
+Note [Closing over free variable kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Note that it's necessary to close over kinds at the /end/ of collecting
 the variables. This is for two reasons:
@@ -1518,7 +1521,10 @@ tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType ty = let unclosed = fvs_of_type ty in
-                   closeOverKindsFV (fvVarList unclosed)
+                   closeOverKindsFV unclosed
+
+-- FVNotClosed is *not* closed over kinds
+type FVNotClosed = FV
 
 -- | The worker for `tyCoFVsOfType` and `tyCoFVsOfTypeList`.
 -- The previous implementation used `unionVarSet` which is O(n+m) and can
@@ -1529,7 +1535,7 @@ tyCoFVsOfType ty = let unclosed = fvs_of_type ty in
 -- See Note [FV eta expansion] in FV for explanation.
 --
 -- This version is /not/ closed over kinds. See Note [Free variables of types]
-fvs_of_type :: Type -> FV
+fvs_of_type :: Type -> FVNotClosed
 fvs_of_type (TyVarTy v)        a b c = unitFV v a b c
 fvs_of_type (TyConApp _ tys)   a b c = fvs_of_types tys a b c
 fvs_of_type (LitTy {})         a b c = emptyFV a b c
@@ -1539,10 +1545,10 @@ fvs_of_type (ForAllTy bndr ty) a b c = fvs_of_bndr bndr (fvs_of_type ty)  a b c
 fvs_of_type (CastTy ty co)     a b c = (fvs_of_type ty `unionFV` fvs_of_co co) a b c
 fvs_of_type (CoercionTy co)    a b c = fvs_of_co co a b c
 
-fvs_of_types :: [Type] -> FV
+fvs_of_types :: [Type] -> FVNotClosed
 fvs_of_types = mapUnionFV fvs_of_type
 
-fvs_of_bndr :: TyVarBinder -> FV -> FV
+fvs_of_bndr :: TyVarBinder -> FVNotClosed -> FVNotClosed
 -- Free vars of (forall b. <thing with fvs>)
 fvs_of_bndr (TvBndr tv _) fvs = (delFV tv fvs)
                                 `unionFV` fvs_of_type (tyVarKind tv)
@@ -1599,9 +1605,9 @@ tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion
 -- See Note [Free variables of types]
 tyCoFVsOfCo co = let unclosed = fvs_of_co co in
-                 closeOverKindsFV (fvVarList unclosed)
+                 closeOverKindsFV unclosed
 
-fvs_of_co :: Coercion -> FV
+fvs_of_co :: Coercion -> FVNotClosed
 fvs_of_co (Refl _ ty)         fv_cand in_scope acc = fvs_of_type ty fv_cand in_scope acc
 fvs_of_co (TyConAppCo _ _ cos) fv_cand in_scope acc = fvs_of_cos cos fv_cand in_scope acc
 fvs_of_co (AppCo co arg) fv_cand in_scope acc
@@ -1629,10 +1635,10 @@ fvs_of_co (KindCo co)         fv_cand in_scope acc = fvs_of_co co fv_cand in_sco
 fvs_of_co (SubCo co)          fv_cand in_scope acc = fvs_of_co co fv_cand in_scope acc
 fvs_of_co (AxiomRuleCo _ cs)  fv_cand in_scope acc = fvs_of_cos cs fv_cand in_scope acc
 
-fvs_of_cos :: [Coercion] -> FV
+fvs_of_cos :: [Coercion] -> FVNotClosed
 fvs_of_cos = mapUnionFV fvs_of_co
 
-fvs_of_prov :: UnivCoProvenance -> FV
+fvs_of_prov :: UnivCoProvenance -> FVNotClosed
 fvs_of_prov UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 fvs_of_prov (PhantomProv co)    fv_cand in_scope acc = fvs_of_co co fv_cand in_scope acc
 fvs_of_prov (ProofIrrelProv co) fv_cand in_scope acc = fvs_of_co co fv_cand in_scope acc
@@ -1663,26 +1669,26 @@ coVarsOfCo = filterVarSet isCoVar . tyCoVarsOfCo
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+closeOverKinds = fvVarSet . closeOverKindsFV . mkFVs . nonDetEltsUniqSet
   -- It's OK to use nonDetEltsUniqSet here because we immediately forget
   -- about the ordering by returning a set.
 
 -- | Given a list of tyvars returns a deterministic FV computation that
 -- returns the given tyvars with the kind variables free in the kinds of the
 -- given tyvars.
-closeOverKindsFV :: [TyVar] -> FV
-closeOverKindsFV tvs =
-  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
+closeOverKindsFV :: FV -> FV
+closeOverKindsFV fvs =
+  mapUnionFV (tyCoFVsOfType . tyVarKind) (fvVarList fvs) `unionFV` fvs
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministically ordered list.
 closeOverKindsList :: [TyVar] -> [TyVar]
-closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
+closeOverKindsList tvs = fvVarList $ closeOverKindsFV $ mkFVs tvs
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a deterministic set.
 closeOverKindsDSet :: DTyVarSet -> DTyVarSet
-closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
+closeOverKindsDSet = fvDVarSet . closeOverKindsFV . mkFVs . dVarSetElems
 
 -- | Returns the free variables of a 'TyConBinder' that are in injective
 -- positions. (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an
@@ -1699,9 +1705,9 @@ injectiveVarsOfBinder (TvBndr tv vis) =
 -- (See @Note [Kind annotations on TyConApps]@ in "TcSplice" for an explanation
 -- of what an injective position is.)
 injectiveVarsOfType :: Type -> FV
-injectiveVarsOfType orig_ty = closeOverKindsFV (fvVarList $ go orig_ty)
+injectiveVarsOfType orig_ty = closeOverKindsFV (go orig_ty)
   where
-    go :: Type -> FV
+    go :: Type -> FVNotClosed
     go ty                | Just ty' <- coreView ty
                          = go ty'
     go (TyVarTy v)       = unitFV v

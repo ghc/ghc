@@ -2,7 +2,7 @@
 T12844.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
         standing for ‘(Foo rngs, Head rngs ~ '(r, r'))’
-      Where: ‘k1’, ‘k’, ‘rngs’, ‘r’, ‘r'’
+      Where: ‘rngs’, ‘k’, ‘k1’, ‘r’, ‘r'’
                are rigid type variables bound by
                the inferred type of
                  bar :: (Foo rngs, Head rngs ~ '(r, r')) => FooData rngs

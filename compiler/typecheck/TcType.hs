@@ -1048,6 +1048,7 @@ instance Outputable CandidatesQTvs where
                                 , text "dv_tvs =" <+> ppr tvs ])
 
 closeOverKindsCQTvs :: CandidatesQTvs -> CandidatesQTvs
+-- See Note [Closing over free variable kinds] in TyCoRep
 closeOverKindsCQTvs (DV { dv_kvs = kvs, dv_tvs = tvs })
   = DV { dv_kvs = closeOverKindsDSet kvs `unionDVarSet`
                   mapUnionDVarSet (tyCoVarsOfTypeDSet . tyVarKind) (dVarSetElems tvs)
@@ -1149,9 +1150,12 @@ as any other.
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
 candidateQTyVarsOfType :: Type -> CandidatesQTvs
+-- See Note [Closing over free variable kinds] in TyCoRep
 candidateQTyVarsOfType ty = closeOverKindsCQTvs $
                             split_dvs False emptyVarSet mempty ty
 
+-- NB: *not* closed over kinds
+-- See Note [Closing over free variable kinds] in TyCoRep
 split_dvs :: Bool  -- True <=> consider every fv in Type to be dependent
           -> VarSet -> CandidatesQTvs -> Type -> CandidatesQTvs
 split_dvs is_dep bound dvs ty
@@ -1192,6 +1196,7 @@ split_dvs is_dep bound dvs ty
 
 -- | Like 'candidateQTyVarsOfType', but over a list of types
 candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs
+-- See Note [Closing over free variable kinds] in TyCoRep
 candidateQTyVarsOfTypes tys = closeOverKindsCQTvs $
                               foldl' (split_dvs False emptyVarSet) mempty tys
 {-

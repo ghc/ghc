@@ -2,9 +2,9 @@
 T14350.hs:59:15: error:
     • Couldn't match expected type ‘Proxy a2
                                     -> Apply (Apply (c x3) 'Proxy) (Apply (g x3) 'Proxy)’
-                  with actual type ‘Sing (f x y @@ t0)’
+                  with actual type ‘Sing (f x1 y @@ t0)’
     • The function ‘applySing’ is applied to three arguments,
-      but its type ‘Sing (f x y) -> Sing t0 -> Sing (f x y @@ t0)’
+      but its type ‘Sing (f x1 y) -> Sing t0 -> Sing (f x1 y @@ t0)’
       has only two
       In the expression: applySing f Proxy Proxy
       In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy

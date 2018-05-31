@@ -71,19 +71,19 @@ Roman.foo_$s$wgo
         m = GHC.Prim.+#
               (GHC.Prim.+#
                  (GHC.Prim.+#
-                    (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc sc) sc) sc) sc)
-                 sc)
-              sc } in
-      case GHC.Prim.<=# sc1 0# of {
+                    (GHC.Prim.+# (GHC.Prim.+# (GHC.Prim.+# sc1 sc1) sc1) sc1) sc1)
+                 sc1)
+              sc1 } in
+      case GHC.Prim.<=# sc 0# of {
         __DEFAULT ->
-          case GHC.Prim.<# sc1 100# of {
+          case GHC.Prim.<# sc 100# of {
             __DEFAULT ->
-              case GHC.Prim.<# sc1 500# of {
+              case GHC.Prim.<# sc 500# of {
                 __DEFAULT ->
-                  Roman.foo_$s$wgo (GHC.Prim.+# m m) (GHC.Prim.-# sc1 1#);
-                1# -> Roman.foo_$s$wgo m (GHC.Prim.-# sc1 3#)
+                  Roman.foo_$s$wgo (GHC.Prim.-# sc 1#) (GHC.Prim.+# m m);
+                1# -> Roman.foo_$s$wgo (GHC.Prim.-# sc 3#) m
               };
-            1# -> Roman.foo_$s$wgo sc (GHC.Prim.-# sc1 2#)
+            1# -> Roman.foo_$s$wgo (GHC.Prim.-# sc 2#) sc1
           };
         1# -> 0#
       }
@@ -113,7 +113,7 @@ Roman.$wgo
                      ipv)
                   ipv } in
           case w of {
-            Nothing -> Roman.foo_$s$wgo m 10#;
+            Nothing -> Roman.foo_$s$wgo 10# m;
             Just n ->
               case n of { GHC.Types.I# x2 ->
               case GHC.Prim.<=# x2 0# of {
@@ -122,10 +122,10 @@ Roman.$wgo
                     __DEFAULT ->
                       case GHC.Prim.<# x2 500# of {
                         __DEFAULT ->
-                          Roman.foo_$s$wgo (GHC.Prim.+# m m) (GHC.Prim.-# x2 1#);
-                        1# -> Roman.foo_$s$wgo m (GHC.Prim.-# x2 3#)
+                          Roman.foo_$s$wgo (GHC.Prim.-# x2 1#) (GHC.Prim.+# m m);
+                        1# -> Roman.foo_$s$wgo (GHC.Prim.-# x2 3#) m
                       };
-                    1# -> Roman.foo_$s$wgo ipv (GHC.Prim.-# x2 2#)
+                    1# -> Roman.foo_$s$wgo (GHC.Prim.-# x2 2#) ipv
                   };
                 1# -> 0#
               }
@@ -183,15 +183,15 @@ foo :: Int -> Int
 foo
   = \ (n :: Int) ->
       case n of { GHC.Types.I# ipv ->
-      case Roman.foo_$s$wgo 6# ipv of ww { __DEFAULT -> GHC.Types.I# ww }
+      case Roman.foo_$s$wgo ipv 6# of ww { __DEFAULT -> GHC.Types.I# ww }
       }
 
 
 ------ Local rules for imported ids --------
 "SC:$wgo0" [2]
     forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
-      Roman.$wgo (GHC.Base.Just @ Int (GHC.Types.I# sc1))
-                 (GHC.Base.Just @ Int (GHC.Types.I# sc))
+      Roman.$wgo (GHC.Base.Just @ Int (GHC.Types.I# sc))
+                 (GHC.Base.Just @ Int (GHC.Types.I# sc1))
       = Roman.foo_$s$wgo sc sc1
 
 

@@ -3,6 +3,6 @@
   [2 of 2] Compiling B[sig]           ( ab-sigs/B.hsig, nothing )
 [2 of 2] Processing abcd-holes
   [1 of 4] Compiling C                ( abcd-holes/C.hs, nothing )
-  [2 of 4] Compiling B[sig]           ( abcd-holes/B.hsig, nothing )
-  [3 of 4] Compiling A[sig]           ( abcd-holes/A.hsig, nothing )
-  [4 of 4] Compiling D                ( abcd-holes/D.hs, nothing )
+  [2 of 4] Compiling A[sig]           ( abcd-holes/A.hsig, nothing )
+  [3 of 4] Compiling D                ( abcd-holes/D.hs, nothing )
+  [4 of 4] Compiling B[sig]           ( abcd-holes/B.hsig, nothing )
