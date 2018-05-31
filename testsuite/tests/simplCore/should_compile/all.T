@@ -315,3 +315,4 @@ test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
 test('T15005', normal, compile, ['-O'])
 # we omit profiling because it affects the optimiser and makes the test fail
 test('T15056', [extra_files(['T15056a.hs']), omit_ways(['profasm'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])
+test('T15186', expect_broken(15186), multimod_compile, ['T15186', '-v0'])
