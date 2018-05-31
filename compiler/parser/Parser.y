@@ -524,6 +524,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
  '⊸'           { L _ (ITlolly _) }
+ '->@{'           { L _ (ITlolly2) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
  '~#'           { L _ ITtildehsh }
@@ -1899,8 +1900,12 @@ type :: { LHsType GhcPs }
         : btype                        { $1 }
         | btype '->' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOmega $3)
                                               [mu AnnRarrow $2] }
+
         | btype '⊸' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
                                               [mu AnnRarrow $2] }
+
+mult :: { LHsType GhcPs }
+        : btype                  { $1 }
 
 
 typedoc :: { LHsType GhcPs }
@@ -1921,6 +1926,8 @@ typedoc :: { LHsType GhcPs }
                                                          HsOne
                                                          $4)
                                                 [mu AnnRarrow $3] }
+        | btype '->@{' '(' mult ')' ctypedoc  {% ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
+                                              [mu AnnRarrow $2] }
 
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }

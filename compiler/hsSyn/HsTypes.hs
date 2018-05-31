@@ -718,6 +718,7 @@ data HsTyLit
     deriving Data
 
 data HsRig pass = HsZero | HsOne | HsOmega | HsRigVar (IdP pass)
+                                           | HsRigTy (LHsType pass)
 
 hsRigToRig :: HsRig GhcTc -> Rig
 hsRigToRig c =
@@ -726,6 +727,7 @@ hsRigToRig c =
     HsOne  -> One
     HsOmega -> Omega
     HsRigVar v -> RigVar v
+    _ -> panic "hsRigToRig"
 
 hsUnrestricted, hsLinear :: a -> HsWeighted pass a
 hsUnrestricted = HsWeighted HsOmega
