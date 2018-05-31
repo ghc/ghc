@@ -24,6 +24,8 @@ module CoreMap(
    ListMap,
    -- * Maps over 'Literal's
    LiteralMap,
+   -- * Map for compressing leaves. See Note [Compressed TrieMap]
+   GenMap,
    -- * 'TrieMap' class
    TrieMap(..), insertTM, deleteTM,
    lkDFreeVar, xtDFreeVar,
