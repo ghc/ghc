@@ -216,11 +216,10 @@ subexpression elimination pass.
     :shortdesc: Dump desugarer output.
     :type: dynamic
 
-    Dump desugarer output. `-ddump-ds` dumps the output after the very simple
-    optimiser has run (which discards a lot of clutter and
-    hence is a sensible default.  `-ddump-ds-preopt` shows
-    the output after desugaring but before the very simple
-    optimiser.
+    Dump desugarer output. :ghc-flag:`-ddump-ds` dumps the output after the very
+    simple optimiser has run (which discards a lot of clutter and hence is a
+    sensible default. :ghc-flag:`-ddump-ds-preopt` shows the output after
+    desugaring but before the very simple optimiser.
 
 
 .. ghc-flag:: -ddump-simpl-iterations
@@ -228,15 +227,14 @@ subexpression elimination pass.
     :type: dynamic
 
     Show the output of each *iteration* of the simplifier (each run of
-    the simplifier has a maximum number of iterations, normally 4). This
-    outputs even more information than ``-ddump-simpl-phases``.
+    the simplifier has a maximum number of iterations, normally 4).
 
 .. ghc-flag:: -ddump-simpl-stats
     :shortdesc: Dump simplifier stats
     :type: dynamic
 
     Dump statistics about how many of each kind of transformation took
-    place. If you add ``-dppr-debug`` you get more detailed information.
+    place. If you add :ghc-flag:`-dppr-debug` you get more detailed information.
 
 .. ghc-flag:: -dverbose-core2core
     :shortdesc: Show output from each core-to-core pass
