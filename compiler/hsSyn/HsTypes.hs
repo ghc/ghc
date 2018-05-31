@@ -18,6 +18,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
         Rig(..), HsRig(..), hsFunTyConName, HsWeighted(..),
@@ -719,6 +720,16 @@ data HsTyLit
 
 data HsRig pass = HsZero | HsOne | HsOmega | HsRigVar (IdP pass)
                                            | HsRigTy (LHsType pass)
+
+instance
+      (OutputableBndrId (GhcPass pass)) =>
+      Outputable (HsRig (GhcPass pass)) where
+  ppr HsZero = text "0"
+  ppr HsOne = text "1"
+  ppr HsOmega = text "ω"
+  ppr (HsRigVar _id) = text "var"
+  ppr (HsRigTy p) = ppr p
+
 
 hsRigToRig :: HsRig GhcTc -> Rig
 hsRigToRig c =

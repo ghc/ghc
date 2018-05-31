@@ -498,7 +498,7 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 rnWeightedLHsType :: HsDocContext -> HsWeighted GhcPs (LHsType GhcPs)
                                   -> RnM (HsWeighted GhcRn (LHsType GhcRn), FreeVars)
 rnWeightedLHsType doc (HsWeighted w ty) = do
-  (w' , fvs_w) <- rnRig doc w
+  (w' , fvs_w) <- rnRig (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
   return (HsWeighted w' ty', fvs `plusFV` fvs_w)
 
@@ -600,10 +600,11 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
---       ; weight' <- rnRig weight
+       ; (weight', w_fvs) <- rnRig env weight
        -- TODO: Can linear arrows appear in kinds?
-       ; res_ty <- mkHsOpTyRn (hs_fun_ty HsOmega) (hsFunTyConName weight) funTyFixity ty1' ty2'
-       ; return (res_ty, fvs1 `plusFV` fvs2) }
+       ; pprTrace "rnHsTyKi" (ppr weight) (return ())
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') (hsFunTyConName weight) funTyFixity ty1' ty2'
+       ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
     hs_fun_ty w a b = HsFunTy noExt a w b
 
@@ -763,13 +764,13 @@ rnHsTyKi env (HsWildCardTy _)
          --           user-written binding site, so don't treat
          --           it as a free variable
 
-rnRig :: HsDocContext -> HsRig GhcPs -> RnM ((HsRig GhcRn), FreeVars)
-rnRig doc r =
+rnRig :: RnTyKiEnv -> HsRig GhcPs -> RnM ((HsRig GhcRn), FreeVars)
+rnRig env r =
   case r of
     HsZero -> return (HsZero, emptyFVs)
     HsOne  -> return (HsOne, emptyFVs)
     HsOmega -> return (HsOmega, emptyFVs)
-    HsRigTy ty -> (\(ty, fvs) -> (HsRigTy ty, fvs)) <$> rnLHsType doc ty
+    HsRigTy ty -> (\(ty, fvs) -> (HsRigTy ty, fvs)) <$> rnLHsTyKi env ty
     _r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
