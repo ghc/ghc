@@ -185,7 +185,8 @@ filterFV fv_cand2 fv fv_cand1 in_scope acc =
 mapUnionFV :: (a -> FV) -> [a] -> FV
 mapUnionFV _f [] _fv_cand _in_scope acc = acc
 mapUnionFV f (a:as) fv_cand in_scope acc =
-  mapUnionFV f as fv_cand in_scope $! f a fv_cand in_scope $! acc
+  f a fv_cand in_scope $! mapUnionFV f as fv_cand in_scope $! acc
+  -- NB: preserve ordering of the input list by treating a before as
 {-# INLINABLE mapUnionFV #-}
 
 -- | Union many free variable computations.

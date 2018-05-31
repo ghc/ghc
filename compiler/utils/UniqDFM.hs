@@ -81,7 +81,7 @@ import UniqFM (UniqFM, listToUFM_Directly, nonDetUFMToList, ufmToIntMap)
 -- order then `udfmToList` returns them in deterministic order.
 --
 -- There is an implementation cost: each element is given a serial number
--- as it is added, and `udfmToList` sorts it's result by this serial
+-- as it is added, and `udfmToList` sorts its result by this serial
 -- number. So you should only use `UniqDFM` if you need the deterministic
 -- property.
 --
@@ -195,7 +195,7 @@ plusUDFM_C :: (elt -> elt -> elt) -> UniqDFM elt -> UniqDFM elt -> UniqDFM elt
 plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
   -- we will use the upper bound on the tag as a proxy for the set size,
   -- to insert the smaller one into the bigger one
-  | i > j = insertUDFMIntoLeft_C f udfml udfmr
+  | i >= j = insertUDFMIntoLeft_C f udfml udfmr   -- See Note [Order of insertion]
   | otherwise = insertUDFMIntoLeft_C f udfmr udfml
 
 -- Note [Overflow on plusUDFM]
@@ -231,11 +231,18 @@ plusUDFM_C f udfml@(UDFM _ i) udfmr@(UDFM _ j)
 -- insertion order and O(m * min(n+m, W)) to insert them into the bigger
 -- set.
 
+-- Note [Order of insertion]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~
+-- When the two UDFMs have the same maximum tag, we choose to insert the
+-- right argument into the left. This preserves left-to-right ordering
+-- when unioning a bunch of one-element sets, for example. (If we inserted
+-- the left argument into the right one, then two elements are transposed.)
+
 plusUDFM :: UniqDFM elt -> UniqDFM elt -> UniqDFM elt
 plusUDFM udfml@(UDFM _ i) udfmr@(UDFM _ j)
   -- we will use the upper bound on the tag as a proxy for the set size,
   -- to insert the smaller one into the bigger one
-  | i > j = insertUDFMIntoLeft udfml udfmr
+  | i >= j = insertUDFMIntoLeft udfml udfmr -- See Note [Order of insertion]
   | otherwise = insertUDFMIntoLeft udfmr udfml
 
 insertUDFMIntoLeft :: UniqDFM elt -> UniqDFM elt -> UniqDFM elt

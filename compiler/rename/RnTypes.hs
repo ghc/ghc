@@ -924,9 +924,9 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              -- all these various things are doing
              bndrs, kv_occs, implicit_kvs :: [Located RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
-             kv_occs      = nubL (body_kv_occs ++ bndr_kv_occs)
+             kv_occs      = nubL (bndr_kv_occs ++ body_kv_occs)
              implicit_kvs = filter_occs rdr_env bndrs kv_occs
-                                 -- Deleting bndrs: See Note [Kind-variable ordering]
+                                 -- Deleting bndrs: See Note [Kind variable scoping]
              -- dep_bndrs is the subset of bndrs that are dependent
              --   i.e. appear in bndr/body_kv_occs
              -- Can't use implicit_kvs because we've deleted bndrs from that!
@@ -1735,6 +1735,7 @@ extractHsTysRdrTyVarsDups tys
 
 extractHsTyVarBndrsKVs :: [LHsTyVarBndr GhcPs] -> RnM [Located RdrName]
 -- Returns the free kind variables of any explictly-kinded binders
+-- in left-to-right order
 -- NB: Does /not/ delete the binders themselves.
 --     However duplicates are removed
 --     E.g. given  [k1, a:k1, b:k2]

@@ -1,7 +1,7 @@
 
 T14265.hs:7:12: error:
     • Found type wildcard ‘_’ standing for ‘w :: k’
-      Where: ‘w’, ‘k’ are rigid type variables bound by
+      Where: ‘k’, ‘w’ are rigid type variables bound by
                the inferred type of f :: proxy w -> ()
                at T14265.hs:8:1-8
       To use the inferred type, enable PartialTypeSignatures

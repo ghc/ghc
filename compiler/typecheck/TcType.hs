@@ -1143,7 +1143,8 @@ as any other.
 
 -}
 
--- | Worker for 'splitDepVarsOfType'. This might output the same var
+-- | Extract free vars from a type, split into dependent vars
+-- and non-dependent ones. This might output the same var
 -- in both sets, if it's used in both a type and a kind.
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
@@ -1167,7 +1168,7 @@ split_dvs is_dep bound dvs ty
       | is_bound tv
       = dv
       | otherwise
-      = insert_tv dv tv
+      = dv `mappend` unit_dv tv
 
     go dv (ForAllTy (TvBndr tv _) ty)
       = split_dvs is_dep (bound `extendVarSet` tv)
@@ -1185,24 +1186,11 @@ split_dvs is_dep bound dvs ty
     is_bound tv = tv `elemVarSet` bound ||
                   tyCoVarsOfType (tyVarKind tv) `intersectsVarSet` bound
 
-    insert_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
-      | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv }
-      | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv }
-    -- You might be tempted (like I was) to use unitDVarSet and mappend here.
-    -- However, the union algorithm for deterministic sets depends on (roughly)
-    -- the size of the sets. The elements from the smaller set end up to the
-    -- right of the elements from the larger one. When sets are equal, the
-    -- left-hand argument to `mappend` goes to the right of the right-hand
-    -- argument. In our case, if we use unitDVarSet and mappend, we learn that
-    -- the free variables of (a -> b -> c -> d) are [b, a, c, d], and we then
-    -- quantify over them in that order. (The a comes after the b because we
-    -- union the singleton sets as ({a} `mappend` {b}), producing {b, a}. Thereafter,
-    -- the size criterion works to our advantage.) This is just annoying to
-    -- users, so I use `extendDVarSet`, which unambiguously puts the new element
-    -- to the right. Note that the unitDVarSet/mappend implementation would not
-    -- be wrong against any specification -- just suboptimal and confounding to users.
+    unit_dv tv
+      | is_dep    = mempty { dv_kvs = unitDVarSet tv }
+      | otherwise = mempty { dv_tvs = unitDVarSet tv }
 
--- | Like 'splitDepVarsOfType', but over a list of types
+-- | Like 'candidateQTyVarsOfType', but over a list of types
 candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs
 candidateQTyVarsOfTypes tys = closeOverKindsCQTvs $
                               foldl' (split_dvs False emptyVarSet) mempty tys

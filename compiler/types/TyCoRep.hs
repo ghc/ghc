@@ -1523,8 +1523,6 @@ tyCoFVsOfType ty = let unclosed = fvs_of_type ty in
 -- | The worker for `tyCoFVsOfType` and `tyCoFVsOfTypeList`.
 -- The previous implementation used `unionVarSet` which is O(n+m) and can
 -- make the function quadratic.
--- It's exported, so that it can be composed with
--- other functions that compute free variables.
 -- See Note [FV naming conventions] in FV.
 --
 -- Eta-expanded because that makes it run faster (apparently)
