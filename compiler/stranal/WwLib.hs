@@ -269,10 +269,20 @@ mkWorkerArgs dflags args res_ty
     | otherwise
     = (args ++ [voidArgId], args ++ [voidPrimId])
     where
+      -- See "Making wrapper args" section above
       needsAValueLambda =
-        isUnliftedType res_ty
+        lifted
+        -- We may encounter a levity-polymorphic result, in which case we
+        -- conservatively assume that we have laziness that needs preservation.
+        -- See #15186.
         || not (gopt Opt_FunToThunk dflags)
            -- see Note [Protecting the last value argument]
+
+      -- Might the result be lifted?
+      lifted =
+        case isLiftedType_maybe res_ty of
+          Just lifted -> lifted
+          Nothing     -> True
 
 {-
 Note [Protecting the last value argument]
