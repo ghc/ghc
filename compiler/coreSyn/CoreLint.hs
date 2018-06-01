@@ -1296,7 +1296,8 @@ lintInTy ty
   = addLoc (InType ty) $
     do  { ty' <- applySubstTy ty
         ; k  <- lintType ty'
-        ; lintKind k
+        -- No need to lint k, because lintType
+        -- guarantees that k is linted
         ; return (ty', k) }
 
 checkTyCon :: TyCon -> LintM ()
@@ -1355,12 +1356,19 @@ lintType ty@(FunTy t1 t2)
 lintType t@(ForAllTy (TvBndr tv _vis) ty)
   = do { lintL (isTyVar tv) (text "Covar bound in type:" <+> ppr t)
        ; lintTyBndr tv $ \tv' ->
-          do { k <- lintType ty
-             ; lintL (not (tv' `elemVarSet` tyCoVarsOfType k))
-                     (text "Variable escape in forall:" <+> ppr t)
-             ; lintL (classifiesTypeWithValues k)
-                     (text "Non-* and non-# kind in forall:" <+> ppr t)
-             ; return k }}
+    do { k <- lintType ty
+       ; lintL (classifiesTypeWithValues k)
+               (text "Non-* and non-# kind in forall:" <+> ppr t)
+       ; if (not (tv' `elemVarSet` tyCoVarsOfType k))
+         then return k
+         else
+    do { -- See Note [Stupid type synonyms]
+         let k' = expandTypeSynonyms k
+       ; lintL (not (tv' `elemVarSet` tyCoVarsOfType k'))
+               (hang (text "Variable escape in forall:")
+                   2 (vcat [ text "type:" <+> ppr t
+                           , text "kind:" <+> ppr k' ]))
+       ; return k' }}}
 
 lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 
@@ -1373,6 +1381,21 @@ lintType (CastTy ty co)
 lintType (CoercionTy co)
   = do { (k1, k2, ty1, ty2, r) <- lintCoercion co
        ; return $ mkHeteroCoercionType r k1 k2 ty1 ty2 }
+
+{- Note [Stupid type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #14939)
+   type Alg cls ob = ob
+   f :: forall (cls :: * -> Constraint) (b :: Alg cls *). b
+
+Here 'cls' appears free in b's kind, which would usually be illegal
+(becuase in (forall a. ty), ty's kind should not mention 'a'). But
+#in this case (Alg cls *) = *, so all is well.  Currently we allow
+this, and make Lint expand synonyms where necessary to make it so.
+
+c.f. TcUnify.occCheckExpand and CoreUtils.coreAltsType which deal
+with the same problem. A single systematic solution eludes me.
+-}
 
 -----------------
 lintTySynApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind

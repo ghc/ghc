@@ -2311,10 +2311,12 @@ typeKind (TyConApp tc tys)     = piResultTys (tyConKind tc) tys
 typeKind (AppTy fun arg)       = typeKind_apps fun [arg]
 typeKind (LitTy l)             = typeLiteralKind l
 typeKind (FunTy {})            = liftedTypeKind
-typeKind (ForAllTy _ ty)       = typeKind ty
 typeKind (TyVarTy tyvar)       = tyVarKind tyvar
 typeKind (CastTy _ty co)       = pSnd $ coercionKind co
 typeKind (CoercionTy co)       = coercionType co
+typeKind (ForAllTy _ ty)       = typeKind ty -- Urk. See Note [Stupid type synonyms]
+                                             -- in CoreLint.  Maybe we should do
+                                             -- something similar here...
 
 typeKind_apps :: HasDebugCallStack => Type -> [Type] -> Kind
 -- The sole purpose of the function is to accumulate
