@@ -421,14 +421,16 @@ kcTyClGroup decls
                  user_tyvars = tcTyConUserTyVars tc
 
               -- See Note [checkValidDependency]
-           ; checkValidDependency tc_binders tc_res_kind
+           ; dependency_ok <- checkValidDependency tc_binders tc_res_kind
 
                -- See Note [Bad telescopes] in TcValidity
-           ; checkValidTelescope tc_binders user_tyvars
+           ; telescope_ok <- checkValidTelescope tc_binders user_tyvars
            ; kvs <- kindGeneralize (mkTyConKind tc_binders tc_res_kind)
 
                -- See Note [Bad telescopes] in TcValidity
-           ; checkKvsToGeneralize kvs tc_binders user_tyvars
+           ; when (telescope_ok && dependency_ok) $
+             -- avoid double-reporting trouble as in dependent/should_fail/BadTelescope3
+             checkKvsToGeneralize kvs tc_binders user_tyvars
 
            ; let all_binders = mkNamedTyConBinders Inferred kvs ++ tc_binders
 
@@ -3102,15 +3104,16 @@ Type -> k -> Type, where k is unbound. (It won't use a forall for a
 -- | See Note [checkValidDependency]
 checkValidDependency :: [TyConBinder]  -- zonked
                      -> TcKind         -- zonked (result kind)
-                     -> TcM ()
+                     -> TcM Bool       -- True <=> everything is ok
 checkValidDependency binders res_kind
-  = go (tyCoVarsOfType res_kind) (reverse binders)
+  = go (tyCoVarsOfType res_kind) (reverse binders) True
   where
     go :: TyCoVarSet     -- fvs from scope
        -> [TyConBinder]  -- binders, in reverse order
-       -> TcM ()
-    go _   []           = return ()  -- all set
-    go fvs (tcb : tcbs)
+       -> Bool           -- everything OK so far
+       -> TcM Bool
+    go _   []           ok = return ok  -- all set
+    go fvs (tcb : tcbs) ok
       | not (isNamedTyConBinder tcb) && tcb_var `elemVarSet` fvs
       = do { setSrcSpan (getSrcSpan tcb_var) $
              addErrTc (vcat [ text "Type constructor argument" <+> quotes (ppr tcb_var) <+>
@@ -3121,10 +3124,10 @@ checkValidDependency binders res_kind
                                  2 (vcat (map pp_binder binders))
                             , text "Suggestion: use" <+> quotes (ppr tcb_var) <+>
                               text "in a kind to make the dependency clearer." ])
-           ; go new_fvs tcbs }
+           ; go new_fvs tcbs False }
 
       | otherwise
-      = go new_fvs tcbs
+      = go new_fvs tcbs ok
       where
         new_fvs = fvs `delVarSet` tcb_var
                       `unionVarSet` tyCoVarsOfType tcb_kind

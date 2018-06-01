@@ -1881,14 +1881,17 @@ check works for `forall x y z.` written in a type.
 -- k in a's type.) See also Note [Bad telescopes].
 checkValidTelescope :: [TyConBinder]   -- explicit vars (zonked)
                     -> SDoc            -- original, user-written telescope
-                    -> TcM ()
+                    -> TcM Bool        -- True <=> everything is OK
 checkValidTelescope tvbs user_tyvars
-  = do { let tvs      = binderVars tvbs
-       ; unless (go [] emptyVarSet tvs) $
+  = do { unless all_ok $
          addErr $
-         bad_telescope_err tvs user_tyvars }
+         bad_telescope_err tvs user_tyvars
+       ; return all_ok }
 
   where
+    tvs    = binderVars tvbs
+    all_ok = go [] emptyVarSet tvs
+
     go :: [TyVar]  -- misplaced variables
        -> TyVarSet -> [TyVar] -> Bool
     go errs in_scope [] = null (filter (`elemVarSet` in_scope) errs)
