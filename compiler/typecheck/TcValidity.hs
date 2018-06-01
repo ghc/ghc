@@ -442,7 +442,7 @@ rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes or R
 tyConArgMonoType   = MonoType (text "GHC doesn't yet support impredicative polymorphism")
 synArgMonoType     = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
 constraintMonoType = MonoType (vcat [ text "A constraint must be a monotype"
-                                    , text "Perhpas you intended to use QuantifiedConstraints" ])
+                                    , text "Perhaps you intended to use QuantifiedConstraints" ])
 
 funArgResRank :: Rank -> (Rank, Rank)             -- Function argument and result
 funArgResRank (LimitedRank _ arg_rank) = (arg_rank, LimitedRank (forAllAllowed arg_rank) arg_rank)
@@ -1409,6 +1409,7 @@ checkInstTermination theta head_pred
            -> check2 foralld_tvs pred bogus_size
            where
               bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
+                               -- See Note [Invisible arguments and termination]
 
          ForAllPred tvs theta pred
            -> do { check (foralld_tvs `extendVarSetList` binderVars tvs) pred
@@ -1570,6 +1571,20 @@ Here the instance is kind-indexed and really looks like
       type F (k->k) (b::k->k) = Int
 But if the 'b' didn't scope, we would make F's instance too
 poly-kinded.
+
+Note [Invisible arguments and termination]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When checking the ​Paterson conditions for termination an instance
+declaration, we check for the number of "constructors and variables"
+in the instance head and constraints. Question: Do we look at
+
+ * All the arguments, visible or invisible?
+ * Just the visible arguments?
+
+I think both will ensure termination, provided we are consistent.
+Currently we are /not/ consistent, which is really a bug.  It's
+described in Trac #15177, which contains a number of examples.
+The suspicious bits are the calls to filterOutInvisibleTypes.
 -}
 
 -- | Extra information about the parent instance declaration, needed
@@ -2001,10 +2016,7 @@ sizeTypes = foldr ((+) . sizeType) 0
 
 sizeTyConAppArgs :: TyCon -> [Type] -> Int
 sizeTyConAppArgs _tc tys = sizeTypes tys -- (filterOutInvisibleTypes tc tys)
-
--- instance (Category w, Prelude.Monad m) => Monad (WriterT w m) where
---   Category * w_auL
---   Monad (WriterT w_auL m_auM)
+                           -- See Note [Invisible arguments and termination]
 
 -- Size of a predicate
 --
@@ -2020,10 +2032,11 @@ sizePred ty = goClass ty
     go (ClassPred cls tys')
       | isTerminatingClass cls = 0
       | otherwise = sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys')
-                    -- The filtering looks bogus: see Trac #15177
+                    -- The filtering looks bogus
+                    -- See Note [Invisible arguments and termination]
     go (EqPred {})           = 0
     go (IrredPred ty)        = sizeType ty
-    go (ForAllPred _ _ pred) = goClass pred  -- Is this right?
+    go (ForAllPred _ _ pred) = goClass pred
 
 -- | When this says "True", ignore this class constraint during
 -- a termination check

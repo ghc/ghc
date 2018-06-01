@@ -2041,7 +2041,6 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
   where
     deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
 
-
 {- Note [Top-level reductions for type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 c.f. Note [The flattening story] in TcFlatten

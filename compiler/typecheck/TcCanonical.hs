@@ -452,8 +452,11 @@ makeSuperClasses cts = concatMapM go cts
         (tvs, theta, cls, tys) = tcSplitDFunTy (ctEvPred ev)
     go ct = pprPanic "makeSuperClasses" (ppr ct)
 
-mkStrictSuperClasses :: CtEvidence -> [TyVar] -> ThetaType
-                     -> Class -> [Type] -> TcS [Ct]
+mkStrictSuperClasses
+    :: CtEvidence
+    -> [TyVar] -> ThetaType  -- These two args are non-empty only when taking
+                             -- superclasses of a /quantified/ constraint
+    -> Class -> [Type] -> TcS [Ct]
 -- Return constraints for the strict superclasses of
 --   ev :: forall as. theta => cls tys
 mkStrictSuperClasses ev tvs theta cls tys
