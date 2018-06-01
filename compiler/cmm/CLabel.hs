@@ -616,8 +616,6 @@ isSomeRODataLabel (IdLabel _ _ ConInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ InfoTable) = True
 isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ BlockInfoTable) = True
--- static reference tables defined in haskell (.hs)
-isSomeRODataLabel (SRTLabel _) = True
 -- info table defined in cmm (.cmm)
 isSomeRODataLabel (CmmLabel _ _ CmmInfo) = True
 isSomeRODataLabel _lbl = False
