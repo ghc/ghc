@@ -13,12 +13,13 @@ module VarSet (
         emptyVarSet, unitVarSet, mkVarSet,
         extendVarSet, extendVarSetList,
         elemVarSet, subVarSet,
-        unionVarSet, unionVarSets, mapUnionVarSet,
+        unionVarSet, unionVarSets, mapUnionVarSet, mapUnionVarSetSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
         minusVarSet, filterVarSet, mapVarSet,
         anyVarSet, allVarSet,
         transCloVarSet, fixVarSet,
+        nonDetFoldVarSet,
         lookupVarSet_Directly, lookupVarSet, lookupVarSetByName,
         sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
@@ -85,6 +86,9 @@ unionVarSets    :: [VarSet] -> VarSet
 mapUnionVarSet  :: (a -> VarSet) -> [a] -> VarSet
 -- ^ map the function over the list, and union the results
 
+mapUnionVarSetSet :: (Var -> VarSet) -> VarSet -> VarSet
+-- ^ map the function over the set, and union the results
+
 unitVarSet      :: Var -> VarSet
 extendVarSet    :: VarSet -> Var -> VarSet
 extendVarSetList:: VarSet -> [Var] -> VarSet
@@ -137,6 +141,8 @@ partitionVarSet = partitionUniqSet
 
 mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
 
+mapUnionVarSetSet get_set xs = nonDetFoldUniqSet (unionVarSet . get_set) emptyVarSet xs
+
 -- See comments with type signatures
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = disjointUFM (getUniqSet s1) (getUniqSet s2)
@@ -186,6 +192,12 @@ transCloVarSet fn seeds
        | otherwise            = go (acc `unionVarSet` new_vs) new_vs
        where
          new_vs = fn candidates `minusVarSet` acc
+
+-- | Fold an operation over a VarSet. This is non-deterministic,
+-- and thus the operation must be commutative for determinstic
+-- behavior.
+nonDetFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
+nonDetFoldVarSet = nonDetFoldUniqSet
 
 seqVarSet :: VarSet -> ()
 seqVarSet s = sizeVarSet s `seq` ()

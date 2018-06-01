@@ -2042,7 +2042,7 @@ isValidJoinPointType arity ty
   where
     valid_under tvs arity ty
       | arity == 0
-      = isEmptyVarSet (tvs `intersectVarSet` tyCoVarsOfType ty)
+      = tvs `intersectsVarSet` tyCoVarsOfType ty
       | Just (t, ty') <- splitForAllTy_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
       | Just (_, res_ty) <- splitFunTy_maybe ty
@@ -2184,7 +2184,7 @@ nonDetCmpType t1 t2
 nonDetCmpTypes :: [Type] -> [Type] -> Ordering
 nonDetCmpTypes ts1 ts2 = nonDetCmpTypesX rn_env ts1 ts2
   where
-    rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes (ts1 ++ ts2)))
+    rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes ts1 `unionVarSet` tyCoVarsOfTypes ts2))
 
 -- | An ordering relation between two 'Type's (known below as @t1 :: k1@
 -- and @t2 :: k2@)

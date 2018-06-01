@@ -56,7 +56,6 @@ import GHCi
 import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
-import FV
 import RnSplice( traceSplice, SpliceInfo(..) )
 import RdrName
 import HscTypes
@@ -1920,8 +1919,7 @@ reify_tc_app tc tys
               = splitAtList  tys tc_binders
             result_kind  = mkTyConKind remaining_binders tc_res_kind
             result_vars  = tyCoVarsOfType result_kind
-            dropped_vars = fvVarSet $
-                           mapUnionFV injectiveVarsOfBinder dropped_binders
+            dropped_vars = mapUnionVarSet injectiveVarsOfBinder dropped_binders
 
         in not (subVarSet result_vars dropped_vars)
 

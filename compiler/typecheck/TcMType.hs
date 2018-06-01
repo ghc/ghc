@@ -70,7 +70,7 @@ module TcMType (
   skolemiseRuntimeUnk,
   zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkSigTyVarPairs,
-  zonkTyCoVarsAndFV, zonkTcTypeAndFV,
+  zonkTyCoVarsAndFV,
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
   zonkQuantifiedTyVar, defaultTyVar,
@@ -1306,18 +1306,6 @@ tcGetGlobalTyCoVars
 -- is available for inspection within the type-checking knot.
 zonkTcTypeInKnot :: TcType -> TcM TcType
 zonkTcTypeInKnot = mapType (zonkTcTypeMapper { tcm_smart = False }) ()
-
-zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
--- Zonk a type and take its free variables
--- With kind polymorphism it can be essential to zonk *first*
--- so that we find the right set of free variables.  Eg
---    forall k1. forall (a:k2). a
--- where k2:=k1 is in the substitution.  We don't want
--- k2 to look free in this type!
--- NB: This might be called from within the knot, so don't use
--- smart constructors. See Note [Type-checking inside the knot] in TcHsType
-zonkTcTypeAndFV ty
-  = tyCoVarsOfTypeDSet <$> zonkTcTypeInKnot ty
 
 -- | Zonk a type and call 'candidateQTyVarsOfType' on it.
 -- Works within the knot.
