@@ -96,7 +96,7 @@
 	ignore = untracked
 [submodule "libraries/parallel"]
 	path = libraries/parallel
-	url = ../packages/parallel.git
+	url = https://github.com/treeowl/parallel.git
 	ignore = untracked
 [submodule "libraries/stm"]
 	path = libraries/stm
