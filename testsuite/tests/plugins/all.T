@@ -39,6 +39,42 @@ test('plugins08',
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins08 TOP={top}')],
      run_command, ['$MAKE -s --no-print-directory plugins08'])
 
+test('plugins09',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins09 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins09'])
+
+test('plugins10',
+     [expect_broken(15216),
+      extra_files(['simple-plugin/', 'QuasiQuotation.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins10 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins10'])
+
+test('plugins11',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins11 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins11'])
+
+test('plugins12',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins12 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins12'])
+
+test('plugins13',
+     [extra_files(['simple-plugin/', 'PluginFilteredExport.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins13 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins13'])
+
+test('plugins14',
+     [extra_files(['simple-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins14 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins14'])
+
+test('plugins15',
+     [extra_files(['simple-plugin/', 'MetaRemoveHelper.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins15 TOP={top}')],
+     run_command, ['$MAKE -s --no-print-directory plugins15'])
+
 test('T10420',
      [extra_files(['rule-defining-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C rule-defining-plugin package.T10420 TOP={top}')],

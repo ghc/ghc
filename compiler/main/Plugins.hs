@@ -1,21 +1,25 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 module Plugins (
-    FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction,
-    Plugin(..), CommandLineOption, LoadedPlugin(..), lpModuleName,
-    defaultPlugin, withPlugins, withPlugins_
+      FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction
+    , Plugin(..), CommandLineOption, LoadedPlugin(..), lpModuleName
+    , defaultPlugin, withPlugins, withPlugins_
     , PluginRecompile(..)
     , purePlugin, impurePlugin, flagRecompile
     ) where
 
 import GhcPrelude
 
-import CoreMonad ( CoreToDo, CoreM )
-import qualified TcRnTypes (TcPlugin)
+import {-# SOURCE #-} CoreMonad ( CoreToDo, CoreM )
+import qualified TcRnTypes
+import TcRnTypes ( TcGblEnv, IfM, TcM )
+import HsSyn
 import DynFlags
+import HscTypes
 import GhcMonad
 import DriverPhases
 import Module ( ModuleName, Module(moduleName))
+import Avail
 import Fingerprint
 import Data.List
 import Outputable (Outputable(..), text, (<+>))
@@ -50,14 +54,55 @@ data Plugin = Plugin {
     -- behaviour of the constraint solver.
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
+  , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
+                            -> Hsc HsParsedModule
+    -- ^ Modify the module when it is parsed. This is called by
+    -- HscMain when the parsing is successful.
+  , renamedResultAction :: Maybe ([CommandLineOption] -> ModSummary
+                                    -> RenamedSource -> Hsc ())
+    -- ^ Installs a read-only pass that receives the renamed syntax tree as an
+    -- argument when type checking is successful.
+  , typeCheckResultAction :: [CommandLineOption] -> ModSummary -> TcGblEnv
+                               -> Hsc TcGblEnv
+    -- ^ Modify the module when it is type checked. This is called by
+    -- HscMain when the type checking is successful.
+  , spliceRunAction :: [CommandLineOption] -> LHsExpr GhcTc
+                         -> TcM (LHsExpr GhcTc)
+    -- ^ Modify the TH splice or quasiqoute before it is run.
+  , interfaceLoadAction :: forall lcl . [CommandLineOption] -> ModIface
+                                          -> IfM lcl ModIface
+    -- ^ Modify an interface that have been loaded. This is called by
+    -- LoadIface when an interface is successfully loaded. Not applied to
+    -- the loading of the plugin interface. Tools that rely on information from
+    -- modules other than the currently compiled one should implement this
+    -- function.
   }
+
+-- Note [Source plugins]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The `Plugin` datatype have been extended by fields that allow access to the
+-- different inner representations that are generated during the compilation
+-- process. These fields are `parsedResultAction`, `needsRenamedSyntax` (for
+-- controlling when renamed representation is kept during typechecking),
+-- `typeCheckResultAction`, `spliceRunAction` and `interfaceLoadAction`.
+--
+-- The main purpose of these plugins is to help tool developers. They allow
+-- development tools to extract the information about the source code of a big
+-- Haskell project during the normal build procedure. In this case the plugin
+-- acts as the tools access point to the compiler that can be controlled by
+-- compiler flags. This is important because the manipulation of compiler flags
+-- is supported by most build environment.
+--
+-- For the full discussion, check the full proposal at:
+-- https://ghc.haskell.org/trac/ghc/wiki/ExtendedPluginsProposal
+
 
 -- | A plugin with its arguments. The result of loading the plugin.
 data LoadedPlugin = LoadedPlugin {
     lpPlugin :: Plugin
     -- ^ the actual callable plugin
   , lpModule :: Module
-    -- ^ The module the plugin is defined in
+    -- ^ the module containing the plugin
   , lpArguments :: [CommandLineOption]
     -- ^ command line arguments for the plugin
   }
@@ -101,13 +146,21 @@ flagRecompile =
 -- you should base all your plugin definitions on this default value.
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {
-        installCoreToDos = const return
-      , tcPlugin         = const Nothing
+        installCoreToDos      = const return
+      , tcPlugin              = const Nothing
       , pluginRecompile  = impurePlugin
+      , renamedResultAction   = Nothing
+      , parsedResultAction    = \_ _ -> return
+      , typeCheckResultAction = \_ _ -> return
+      , spliceRunAction       = \_ -> return
+      , interfaceLoadAction   = \_ -> return
     }
 
 type PluginOperation m a = Plugin -> [CommandLineOption] -> a -> m a
 type ConstPluginOperation m a = Plugin -> [CommandLineOption] -> a -> m ()
+
+type RenamedSource = ( HsGroup GhcRn, [LImportDecl GhcRn]
+                     , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString )
 
 -- | Perform an operation by using all of the plugins in turn.
 withPlugins :: Monad m => DynFlags -> PluginOperation m a -> a -> m a

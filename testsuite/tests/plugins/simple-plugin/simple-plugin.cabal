@@ -18,3 +18,5 @@ Library
         Simple.Plugin
         Simple.BadlyTypedPlugin
         Simple.DataStructures
+        Simple.SourcePlugin
+        Simple.RemovePlugin

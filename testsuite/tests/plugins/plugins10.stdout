@@ -1,0 +1,18 @@
+parsePlugin()
+interfacePlugin: Prelude
+interfacePlugin: Language.Haskell.TH
+interfacePlugin: Language.Haskell.TH.Quote
+interfacePlugin: GHC.Float
+interfacePlugin: GHC.Base
+interfacePlugin: Language.Haskell.TH.Syntax
+interfacePlugin: GHC.Types
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)
+interfacePlugin: GHC.Integer.Type
+parsePlugin(a)
+interfacePlugin: Language.Haskell.TH.Lib.Internal
+metaPlugin: return []
+metaPlugin: quoteExp stringify "x"
+interfacePlugin: GHC.CString
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)

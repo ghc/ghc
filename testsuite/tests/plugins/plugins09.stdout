@@ -1,0 +1,8 @@
+parsePlugin(a,b)
+interfacePlugin: Prelude
+interfacePlugin: GHC.Float
+interfacePlugin: GHC.Base
+interfacePlugin: GHC.Types
+typeCheckPlugin (rn)
+typeCheckPlugin (tc)
+interfacePlugin: GHC.Integer.Type

@@ -21,6 +21,34 @@ plugins08:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins08.hs -package-db simple-plugin/pkg.plugins08/local.package.conf
 	./plugins08
 
+.PHONY: plugins09
+plugins09:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins09.hs -package-db simple-plugin/pkg.plugins09/local.package.conf -fplugin Simple.SourcePlugin -fplugin-opt Simple.SourcePlugin:a -fplugin-opt Simple.SourcePlugin:b -plugin-package simple-plugin
+
+.PHONY: plugins10
+plugins10:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins10.hs QuasiQuotation.hs -package-db simple-plugin/pkg.plugins10/local.package.conf -fplugin Simple.SourcePlugin -plugin-package simple-plugin
+
+.PHONY: plugins11
+plugins11:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins11.hs -package-db simple-plugin/pkg.plugins11/local.package.conf -plugin-package simple-plugin
+
+.PHONY: plugins12
+plugins12:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins12.hs -package-db simple-plugin/pkg.plugins12/local.package.conf -plugin-package simple-plugin
+
+.PHONY: plugins13
+plugins13:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins13.hs PluginFilteredExport.hs -package-db simple-plugin/pkg.plugins13/local.package.conf -plugin-package simple-plugin
+
+.PHONY: plugins14
+plugins14:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins14.hs -package-db simple-plugin/pkg.plugins14/local.package.conf -plugin-package simple-plugin
+
+.PHONY: plugins15
+plugins15:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins15.hs MetaRemoveHelper.hs -package-db simple-plugin/pkg.plugins15/local.package.conf -plugin-package simple-plugin
+
 # -package (should work for backwards compatibility)
 .PHONY: T10420
 T10420:

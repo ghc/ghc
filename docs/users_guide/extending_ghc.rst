@@ -600,6 +600,209 @@ the plugin to create equality axioms for use in evidence terms, but GHC
 does not check their consistency, and inconsistent axiom sets may lead
 to segfaults or other runtime misbehaviour.
 
+.. _source-plugins:
+
+Source plugins
+~~~~~~~~~~~~~~
+
+In additional to core and type checker plugins, you can install plugins that can
+access different representations of the source code. The main purpose of these
+plugins is to make it easier to implement development tools.
+
+There are several different access points that you can use for defining plugins
+that access the representations. All these fields receive the list of 
+``CommandLineOption`` strings that are passed to the compiler using the 
+``-fplugin-opt`` flags.
+
+::
+
+    plugin :: Plugin
+    plugin = defaultPlugin { 
+        parsedResultAction = parsed
+      , typeCheckResultAction = typechecked
+      , spliceRunAction = spliceRun
+      , interfaceLoadAction = interfaceLoad
+      , renamedResultAction = renamed
+      }
+
+Parsed representation
+^^^^^^^^^^^^^^^^^^^^^
+
+When you want to define a plugin that uses the syntax tree of the source code,
+you would like to override the ``parsedResultAction`` field. This access point
+enables you to get access to information about the lexical tokens and comments 
+in the source code as well as the original syntax tree of the compiled module.
+
+::
+
+    parsed :: [CommandLineOption] -> ModSummary -> HsParsedModule 
+                -> Hsc HsParsedModule
+
+The ``ModSummary`` contains useful 
+meta-information about the compiled module. The ``HsParsedModule`` contains the
+lexical and syntactical information we mentioned before. The result that you
+return will change the result of the parsing. If you don't want to change the
+result, just return the ``HsParsedModule`` that you received as the argument.
+
+Type checked representation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When you want to define a plugin that needs semantic information about the 
+source code, use the ``typeCheckResultAction`` field. For example, if your 
+plugin have to decide if two names are referencing the same definition or it has
+to check the type of a function it is using semantic information. In this case 
+you need to access the renamed or type checked version of the syntax tree with 
+``typeCheckResultAction``
+
+::
+
+    typechecked :: [CommandLineOption] -> ModSummary -> TcGblEnv -> Hsc TcGblEnv
+
+By overriding the ``renamedResultAction`` field with a ``Just`` function, you 
+can request the compiler to keep the renamed syntax tree and give it to your
+processing function. This is important because some parts of the renamed 
+syntax tree (for example, imports) are not found in the typechecked one. 
+The ``renamedResultAction`` is set to ``Nothing`` by default.
+
+::
+
+    rename :: Maybe ([CommandLineOption] -> ModSummary -> Hsc ())
+
+
+Evaluated code
+^^^^^^^^^^^^^^
+
+When the compiler type checks the source code, :ref:`template-haskell` Splices 
+and :ref:`th-quasiquotation` will be replaced by the syntax tree fragments 
+generated from them. However for tools that operate on the source code the
+code generator is usually more interesting than the generated code. For this
+reason we included ``spliceRunAction``. This field is invoked on each expression
+before they are evaluated. The input is type checked, so semantic information is
+available for these syntax tree fragments. If you return a different expression
+you can change the code that is generated.
+
+
+::
+
+    spliceRun :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
+
+
+However take care that the generated definitions are still in the input of
+``typeCheckResultAction``. If your don't take care to filter the typechecked
+input, the behavior of your tool might be inconsistent.
+
+Interface files
+^^^^^^^^^^^^^^^
+
+Sometimes when you are writing a tool, knowing the source code is not enough,
+you also have to know details about the modules that you import. In this case we
+suggest using the ``interfaceLoadAction``. This will be called each time when 
+the code of an already compiled module is loaded. It will be invoked for modules
+from installed packages and even modules that are installed with GHC. It will
+NOT be invoked with your own modules.
+
+::
+
+    interfaceLoad :: forall lcl . [CommandLineOption] -> ModIface
+                                    -> IfM lcl ModIface
+
+In the ``ModIface`` datatype you can find lots of useful information, including
+the exported definitions and type class instances.
+
+
+Source plugin example
+^^^^^^^^^^^^^^^^^^^^^
+
+In this example, we inspect all available details of the compiled source code. 
+We don't change any of the representation, but write out the details to the 
+standard output. The pretty printed representation of the parsed, renamed and 
+type checked syntax tree will be in the output as well as the evaluated splices 
+and quasi quotes. The name of the interfaces that are loaded will also be
+displayed.
+
+::
+
+    module SourcePlugin where
+
+    import Control.Monad.IO.Class
+    import Plugins
+    import HscTypes
+    import TcRnTypes
+    import HsExtension
+    import HsExpr
+    import Outputable
+    import HsDoc
+
+    plugin :: Plugin
+    plugin = defaultPlugin { parsedResultAction = parsedPlugin
+                           , renamedResultAction = Just renamedAction
+                           , typeCheckResultAction = typecheckPlugin 
+                           , spliceRunAction = metaPlugin
+                           , interfaceLoadAction = interfaceLoadPlugin
+                           }
+
+    parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule -> Hsc HsParsedModule
+    parsedPlugin _ _ pm 
+      = do liftIO $ putStrLn $ "parsePlugin: \n" ++ (showSDocUnsafe $ ppr $ hpm_module pm)
+           return pm
+
+    renamedAction :: [CommandLineOption] -> ModSummary 
+                        -> ( HsGroup GhcRn, [LImportDecl GhcRn]
+                           , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString ) 
+                        -> Hsc ()
+    renamedAction _ _ ( gr, _, _, _ )
+      = liftIO $ putStrLn "typeCheckPlugin (rn): " ++ (showSDocUnsafe $ ppr gr)
+
+    typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> Hsc TcGblEnv
+    typecheckPlugin _ _ tc 
+      = do liftIO $ putStrLn $ "typeCheckPlugin (rn): \n" ++ (showSDocUnsafe $ ppr $ tcg_rn_decls tc)
+           liftIO $ putStrLn $ "typeCheckPlugin (tc): \n" ++ (showSDocUnsafe $ ppr $ tcg_binds tc)
+           return tc
+
+    metaPlugin :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
+    metaPlugin _ meta 
+      = do liftIO $ putStrLn $ "meta: " ++ (showSDocUnsafe $ ppr meta)
+           return meta
+
+    interfaceLoadPlugin :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
+    interfaceLoadPlugin _ iface 
+      = do liftIO $ putStrLn $ "interface loaded: " ++ (showSDocUnsafe $ ppr $ mi_module iface)
+           return iface
+
+When you compile a simple module that contains Template Haskell splice
+
+::
+
+    {-# LANGUAGE TemplateHaskell #-}
+    module A where
+
+    a = ()
+
+    $(return [])
+
+with the compiler flags ``-fplugin SourcePlugin`` it will give the following
+output:
+
+.. code-block:: none
+
+    parsePlugin: 
+    module A where
+    a = ()
+    $(return [])
+    interface loaded: Prelude
+    interface loaded: GHC.Float
+    interface loaded: GHC.Base
+    interface loaded: Language.Haskell.TH.Lib.Internal
+    interface loaded: Language.Haskell.TH.Syntax
+    interface loaded: GHC.Types
+    meta: return []
+    interface loaded: GHC.Integer.Type
+    typeCheckPlugin (rn): 
+    Just a = ()
+    typeCheckPlugin (tc): 
+    {$trModule = Module (TrNameS "main"#) (TrNameS "A"#), a = ()}
+
+
 .. _plugin_recompilation:
 
 Controlling Recompilation
