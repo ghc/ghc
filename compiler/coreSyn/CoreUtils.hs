@@ -2380,14 +2380,14 @@ tryEtaReduce bndrs body
        | bndr == v
        , let weight = idWeight v
        , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: arnaud: it is probably a bit slow to compute the type every time but it simplifies the implementation tremendously for now
-       , weight == fun_weight -- There is no change in multiplicity, otherwise we must abort
+       , weight `eqRig` fun_weight -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
          in Just (mkFunCo Representational weight reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
        , bndr == v
-       , fun_weight == idWeight v
+       , fun_weight `eqRig` idWeight v
        = Just (mkFunCo Representational (idWeight v) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here

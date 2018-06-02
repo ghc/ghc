@@ -19,6 +19,7 @@ import Outputable
 import Name
 import NameEnv
 import {-# SOURCE #-} Var (Id)
+import {-# SOURCE #-} TyCoRep
 
 --
 -- * Core properties of weights
@@ -26,7 +27,9 @@ import {-# SOURCE #-} Var (Id)
 
 
 data Rig = Zero | One | Omega | RigVar Id | RigAdd Rig Rig | RigMul Rig Rig
-  deriving (Eq,Ord,Data)
+                              | RigTy Type
+  deriving (Data)
+
 
 instance Num Rig where
   Zero * _ = Zero

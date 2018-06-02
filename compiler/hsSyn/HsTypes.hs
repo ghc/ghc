@@ -1554,12 +1554,13 @@ ppr_fun_ty ty1 weight ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
         arr = case weight of
-          HsZero -> "->_0"
-          HsOne -> "⊸"
-          HsOmega -> "->"
+          HsZero -> text "->_0"
+          HsOne -> text "⊸"
+          HsOmega -> text "->"
+          HsRigTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
           _ -> panic "ppr_fun_ty: polymorphism is not yet implemented"
     in
-    sep [p1, text arr <+> p2]
+    sep [p1, arr <+> p2]
 
 --------------------------
 ppr_app_ty :: (OutputableBndrId (GhcPass p)) => HsAppType (GhcPass p) -> SDoc

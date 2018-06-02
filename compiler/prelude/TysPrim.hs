@@ -94,7 +94,7 @@ import {-# SOURCE #-} TysWiredIn
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy )
+  , mkPromotedListTy, multiplicityTy )
 
 import Var              ( TyVar, TyVarBndr(TvBndr), mkTyVar )
 import Name
@@ -318,6 +318,9 @@ openAlphaTyVar, openBetaTyVar :: TyVar
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
+
+multiplicityTyVar :: TyVar
+multiplicityTyVar = mkTemplateTyVars [multiplicityTy] !! 0
 
 {-
 ************************************************************************

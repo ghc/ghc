@@ -1342,7 +1342,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
 
         -- Functions (or predicate functions) just check the two parts
-    go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2) | w1 == w2
+    go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2) | w1 `eqRig` w2
       = do { co_l <- uType t_or_k origin fun1 fun2
            ; co_r <- uType t_or_k origin arg1 arg2
            ; return $ mkFunCo Nominal w1 co_l co_r }

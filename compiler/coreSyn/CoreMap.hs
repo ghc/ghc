@@ -176,7 +176,8 @@ data CoreMapX a
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2) | varWeightMaybe v1 == varWeightMaybe v2
+    go (Var v1) (Var v2) | False -- varWeightMaybe v1 `eqRig` varWeightMaybe v2
+                                 -- TODO: Reinstate this
       = case (lookupCME env1 v1, lookupCME env2 v2) of
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
@@ -191,7 +192,8 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
-      && (varWeightMaybe b1) == (varWeightMaybe b2) -- MattP: Don't think that the env is necessary
+      -- MattP: TODO: Reinstate this
+      -- && (varWeightMaybe b1) == (varWeightMaybe b2) -- MattP: Don't think that the env is necessary
                                                     --        here without polymorphism
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
@@ -522,7 +524,7 @@ instance Eq (DeBruijn Type) where
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (FunTy w1 t1 t2, FunTy w1' t1' t2')
-            -> w1 == w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
+            -> w1 `eqRig` w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -783,7 +785,7 @@ fdBndrMap f (BndrMap tm) = foldTM (f . fst) tm
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
 lkBndr env v (BndrMap tymap) = do
   (a, w) <- lkG (D env (varType v)) tymap
-  guard (w == varWeightDef v)
+  guard (w `eqRig` varWeightDef v)
   return a
 
 

@@ -409,7 +409,7 @@ starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKind
 unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
 
 multiplicityTyConName :: Name
-multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multplicity")
+multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multiplicity")
                           multiplicityTyConKey multiplicityTyCon
 
 oneDataConName, omegaDataConName :: Name
@@ -1095,7 +1095,7 @@ mk_class tycon sc_pred sc_sel_id
 -- For information about the usage of the following type,
 -- see Note [TYPE and RuntimeRep] in module TysPrim
 multiplicityTy :: Type
-multiplicityTy = mkTyConTy runtimeRepTyCon
+multiplicityTy = mkTyConTy multiplicityTyCon
 
 multiplicityTyCon :: TyCon
 multiplicityTyCon = pcTyCon multiplicityTyConName Nothing []
@@ -1104,6 +1104,10 @@ multiplicityTyCon = pcTyCon multiplicityTyConName Nothing []
 oneDataCon, omegaDataCon :: DataCon
 oneDataCon = pcDataCon oneDataConName [] [] multiplicityTyCon
 omegaDataCon = pcDataCon omegaDataConName [] [] multiplicityTyCon
+
+oneDataConTy, omegaDataConTy :: Type
+oneDataConTy = mkTyConTy (promoteDataCon oneDataCon)
+omegaDataConTy = mkTyConTy (promoteDataCon omegaDataCon)
 
 {- *********************************************************************
 *                                                                      *

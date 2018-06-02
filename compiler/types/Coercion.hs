@@ -1984,7 +1984,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
         mkNomReflCo ty1
 
     go (FunTy w arg1 res1) (FunTy w1 arg2 res2)
-      = ASSERT( w == w1 )
+      = ASSERT( w `eqRig` w1 )
         mkFunCo Nominal w (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)

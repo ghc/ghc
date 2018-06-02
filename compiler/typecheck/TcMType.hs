@@ -24,6 +24,8 @@ module TcMType (
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
 
+  newMultiplicityVar,
+
   readMetaTyVar, writeMetaTyVar,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
@@ -832,6 +834,9 @@ At the moment we give a unification variable a System Name, which
 influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 -}
 
+newMultiplicityVar :: TcM TcType
+newMultiplicityVar = newFlexiTyVarTy multiplicityTy
+
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
 
@@ -1078,6 +1083,12 @@ defaultTyVar default_kind tv
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
+  {-
+  | isMultiplicityVar tv
+  = do { traceTc "Defaulting a Multiplicty var to Omega" (ppr tv)
+       ; writeMetaTyVar tv liftedRepTy
+       ; return True }
+       -}
 
   | default_kind                 -- -XNoPolyKinds and this is a kind var
   = do { default_kind_var tv     -- so default it to * if possible

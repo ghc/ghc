@@ -279,7 +279,7 @@ mkWpFun :: Rig -> Rig -- the multiplicities on the arrows of the wrappee and wra
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
-mkWpFun w1 w2 co1          co2          t1 _  d | w1 /= w2 = WpFun w2 co1 co2 t1 d
+mkWpFun w1 w2 co1          co2          t1 _  d | not (w1 `eqRig` w2) = WpFun w2 co1 co2 t1 d
 -- When the multiplicities are not the same, always make a proper wrapper.  We
 -- don't currently need to actually record the source multiplicity: it is just
 -- here to prevent making a coercion between two incoercible function arrow

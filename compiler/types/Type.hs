@@ -115,7 +115,9 @@ module Type (
         dropRuntimeRepArgs,
         getRuntimeRep, getRuntimeRepFromKind,
 
-        isLinearType,
+        -- Multiplicity
+
+        isLinearType, isOneMultiplicity, isOmegaMultiplicity,
 
         -- * Main data types representing Kinds
         Kind,
@@ -144,7 +146,7 @@ module Type (
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
         nonDetCmpTypesX, nonDetCmpTc,
-        eqVarBndrs,
+        eqVarBndrs, eqRig,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -228,7 +230,8 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
-                                 , typeSymbolKind, liftedTypeKind )
+                                 , typeSymbolKind, liftedTypeKind
+                                 , oneDataConTy, omegaDataConTy )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion
@@ -1916,6 +1919,19 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 {-
 ************************************************************************
 *                                                                      *
+\subsection{Multiplicity}
+*                                                                      *
+************************************************************************
+-}
+
+isOneMultiplicity, isOmegaMultiplicity :: Type -> Bool
+isOneMultiplicity ty = ty `eqType` oneDataConTy
+
+isOmegaMultiplicity ty = ty `eqType` omegaDataConTy
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Liftedness}
 *                                                                      *
 ************************************************************************
@@ -2273,7 +2289,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy w1 s1 t1) (FunTy w2 s2 t2)
-      = liftOrdering (compare w1 w2) `thenCmpTy`
+      = --liftOrdering (compare w1 w2) `thenCmpTy` TODO: MattP need to add this back in
         go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
@@ -2302,6 +2318,16 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     gos _   []         _          = TLT
     gos _   _          []         = TGT
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
+
+eqRig :: Rig -> Rig -> Bool
+eqRig Zero Zero = True
+eqRig One One = True
+eqRig Omega Omega = True
+eqRig (RigTy ty) (RigTy ty') = eqType ty ty'
+eqRig (RigVar i1) (RigVar i2) = i1 == i2
+eqRig (RigAdd r1 r2) (RigAdd r1' r2') = eqRig r1 r1' && eqRig r2 r2'
+eqRig (RigMul r1 r2) (RigMul r1' r2') = eqRig r1 r1' && eqRig r2 r2'
+eqRig _ _ = False
 
 -------------
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering

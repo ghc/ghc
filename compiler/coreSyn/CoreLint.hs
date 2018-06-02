@@ -1247,7 +1247,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
 
 lintLinearBinder :: SDoc -> Rig -> Rig -> LintM ()
 lintLinearBinder doc actual_usage described_usage
-  = lintL (actual_usage == described_usage)
+  = lintL (actual_usage `eqRig` described_usage)
           err_msg
     where
       err_msg = (text "Multiplicity of variable does agree with its context"

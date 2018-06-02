@@ -2051,7 +2051,7 @@ tcConArg :: HsWeighted GhcRn (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
 tcConArg (HsWeighted w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
-        ; w' <- tc_weight w
+        ; w' <- tcWeight w
              -- Newtypes can't have unboxed types, but we check
              -- that in checkValidDataCon; this tcConArg stuff
              -- doesn't happen for GADT-style declarations
