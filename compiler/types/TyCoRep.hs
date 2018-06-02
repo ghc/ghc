@@ -2401,7 +2401,7 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy w arg res) = ((FunTy $! w) $! go arg) $! go res
+    go (FunTy w arg res) = ((FunTy $! go_rig w) $! go arg) $! go res
     go (ForAllTy (TvBndr tv vis) ty)
                          = case substTyVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -2410,6 +2410,10 @@ subst_ty subst ty
     go (LitTy n)         = LitTy $! n
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
+
+    go_rig :: Rig -> Rig
+    go_rig (RigTy t) = RigTy (go t)
+    go_rig r = r
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
@@ -2796,7 +2800,7 @@ debug_ppr_ty prec (FunTy weight arg res)
                 Zero -> text "->0"
                 One -> text "⊸"
                 Omega -> arrow
-                _ -> panic "TODO: Polymorphism not yet implemented"
+                w -> ppr w
     in
       maybeParen prec funPrec $
       sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]

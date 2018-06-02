@@ -1868,8 +1868,9 @@ extract_lty t_or_k (L _ ty) acc
       HsPArrTy _ ty               -> extract_lty t_or_k ty acc
       HsTupleTy _ _ tys           -> extract_ltys t_or_k tys acc
       HsSumTy _ tys               -> extract_ltys t_or_k tys acc
-      HsFunTy _ ty1 _ ty2           -> extract_lty t_or_k ty1 =<<
-                                     extract_lty t_or_k ty2 acc
+      HsFunTy _ ty1 w ty2           -> extract_lty t_or_k ty1 =<<
+                                       extract_lty t_or_k ty2 =<<
+                                       extract_rig t_or_k w acc
       HsIParamTy _ _ ty           -> extract_lty t_or_k ty acc
       HsEqTy _ ty1 ty2            -> extract_lty t_or_k ty1 =<<
                                      extract_lty t_or_k ty2 acc
@@ -1893,6 +1894,11 @@ extract_lty t_or_k (L _ ty) acc
       XHsType {}                  -> return acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> return acc
+
+extract_rig :: TypeOrKind -> HsRig GhcPs -> FreeKiTyVarsWithDups ->
+               RnM FreeKiTyVarsWithDups
+extract_rig t_or_k (HsRigTy t) acc = extract_lty t_or_k t acc
+extract_rig t_or_k _ acc = return acc
 
 extract_apps :: TypeOrKind
              -> [LHsAppType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars

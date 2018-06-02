@@ -54,6 +54,7 @@ instance Outputable Rig where
   ppr (RigVar id) = ppr id
   ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
   ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
+  ppr (RigTy ty) = pprType ty
 
 instance Binary Rig where
   put_ bh Zero = putByte bh 0

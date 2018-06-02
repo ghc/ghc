@@ -767,9 +767,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go (FunTy act_weight act_arg act_res) (FunTy exp_weight exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
-      , subweight act_weight exp_weight
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
+        do { weight_wrap <- tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight
+           ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
            ; return (mkWpFun act_weight exp_weight arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
@@ -818,6 +818,11 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
+
+tc_sub_weight_ds :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM HsWrapper
+tc_sub_weight_ds eq_orig inst_orig ctxt w_actual w_expected =
+  tc_sub_type_ds eq_orig inst_orig ctxt (rigToType w_actual) (rigToType w_expected)
+
 
 -----------------
 -- needs both un-type-checked (for origins) and type-checked (for wrapping)
