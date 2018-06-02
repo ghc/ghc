@@ -629,7 +629,7 @@ identifier :: { Located RdrName }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
-    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName (funTyCon Omega))
+    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName funTyCon)
                                [mj AnnOpenP $1,mu AnnRarrow $2,mj AnnCloseP $3] }
 
 -----------------------------------------------------------------------------
@@ -3188,7 +3188,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
-        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName (funTyCon Omega))
+        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
         | '[:' ':]'             {% ams (sLL $1 $> $ parrTyCon_RDR) [mo $1,mc $2] }

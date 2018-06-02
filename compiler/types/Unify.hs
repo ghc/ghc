@@ -1382,7 +1382,7 @@ ty_co_match menv subst (FunTy w ty1 ty2) co _lkco _rkco
     -- runtime reps here; unifying the types themselves should be sufficient.
     -- See Note [Representation of function types].
   | Just (tc, [_,_,co1,co2]) <- splitTyConAppCo_maybe co
-  , tc == (funTyCon w)
+  , tc == funTyCon
   = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co1,co2]
     in ty_co_match_args menv subst [ty1, ty2] [co1, co2] lkcos rkcos
 
@@ -1450,7 +1450,7 @@ pushRefl (Refl Nominal (AppTy ty1 ty2))
 pushRefl (Refl r (FunTy w ty1 ty2))
   | Just rep1 <- getRuntimeRep_maybe ty1
   , Just rep2 <- getRuntimeRep_maybe ty2
-  = Just (TyConAppCo r (funTyCon w) [ mkReflCo r rep1, mkReflCo r rep2
+  = Just (TyConAppCo r funTyCon [ rigToCo w, mkReflCo r rep1, mkReflCo r rep2
                                 , mkReflCo r ty1,  mkReflCo r ty2 ])
 pushRefl (Refl r (TyConApp tc tys))
   = Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))

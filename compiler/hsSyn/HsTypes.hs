@@ -752,9 +752,7 @@ isHsOmega _ = False
 -- TODO: This is going to change because (->) will have to take
 -- a multiplicity as an argument
 hsFunTyConName :: HsRig pass -> Name
-hsFunTyConName HsOne = funTyConName . hsRigToRig $ HsOne
-hsFunTyConName HsOmega = funTyConName . hsRigToRig $ HsOmega
-hsFunTyConName _ = panic "hsFunTyConName"
+hsFunTyConName _ = funTyConName
 
 
 data HsWeighted pass a = HsWeighted { hsWeight :: HsRig pass, hsThing :: a }
@@ -1136,7 +1134,7 @@ splitHsFunType (L _ (HsFunTy _ x weight y))
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == (funTyConName Omega) -- TODO: arnaud harder but should be done for all arity
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName -- TODO: arnaud harder but should be done for all arity
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = ((hsUnrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted

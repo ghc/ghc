@@ -330,11 +330,10 @@ multiplicityTyVar = mkTemplateTyVars [multiplicityTy] !! 0
 ************************************************************************
 -}
 
-funTyConName :: Rig -> Name
-funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon Zero)
-funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon One)
-funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon Omega)
-funTyConName _ = panic "funTyConName: Polymorphism not yet implemented"
+funTyConName :: Name
+--funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon Zero)
+--funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon One)
+funTyConName = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey funTyCon
 
 -- TODO: arnaud: without Rig, funTyCon (and funTyConName) was allocated a single
 -- time, now it's allocated at every call. It may be worth a bit of boilerplate
@@ -345,16 +344,17 @@ funTyConName _ = panic "funTyConName: Polymorphism not yet implemented"
 -- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
-funTyCon :: Rig -> TyCon
-funTyCon w = mkFunTyCon w (funTyConName w) tc_bndrs tc_rep_nm
+funTyCon :: TyCon
+funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ TvBndr runtimeRep1TyVar (NamedTCB Inferred)
+    tc_bndrs = [ TvBndr multiplicityTyVar (NamedTCB Inferred)
+               , TvBndr runtimeRep1TyVar (NamedTCB Inferred)
                , TvBndr runtimeRep2TyVar (NamedTCB Inferred)
                ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
                                              ]
-    tc_rep_nm = mkPrelTyConRepName (funTyConName w)
+    tc_rep_nm = mkPrelTyConRepName funTyConName
 
 {-
 ************************************************************************

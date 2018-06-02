@@ -687,7 +687,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                       -- subterms with tyvars
                       zterm' <- mapTermTypeM
                                  (\ty -> case tcSplitTyConApp_maybe ty of
-                                           Just (tc, _:_) | tc /= (funTyCon Omega) -- TODO: arnaud: probably use a predicate instead of equality
+                                           Just (tc, _:_) | tc /= funTyCon
                                                -> newOpenVar
                                            _   -> return ty)
                                  term

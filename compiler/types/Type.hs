@@ -204,7 +204,9 @@ module Type (
         tidyTyVarOcc,
         tidyTopType,
         tidyKind,
-        tidyTyVarBinder, tidyTyVarBinders
+        tidyTyVarBinder, tidyTyVarBinders,
+
+        rigToType
     ) where
 
 #include "HsVersions.h"
@@ -717,12 +719,20 @@ splitAppTy_maybe ty | Just ty' <- coreView ty
                     = splitAppTy_maybe ty'
 splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
+rigToType :: Rig -> Type
+rigToType r =
+  case r of
+    One ->  oneDataConTy
+    Omega -> omegaDataConTy
+    RigTy ty -> ty
+    _ -> panic "rigToType"
+
 -------------
 repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy w ty1 ty2)
-  = Just (TyConApp (funTyCon w) [rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [rigToType w, rep1, rep2, ty1], ty2)
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -747,7 +757,7 @@ tcRepSplitAppTy_maybe (FunTy w ty1 ty2)
   | isConstraintKind (typeKind ty1)
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
   | otherwise
-  = Just (TyConApp (funTyCon w) [rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [rigToType w, rep1, rep2, ty1], ty2)
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -778,7 +788,7 @@ tcRepSplitTyConApp_maybe (TyConApp tc tys)
   = Just (tc, tys)
 
 tcRepSplitTyConApp_maybe (FunTy w arg res)
-  = Just (funTyCon w, [arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
   where
     arg_rep = getRuntimeRep arg
     res_rep = getRuntimeRep res
@@ -812,7 +822,7 @@ splitAppTys ty = split ty ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _   (FunTy w ty1 ty2) args
       = ASSERT( null args )
-        (TyConApp (funTyCon w) [], [rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], [rigToType w, rep1, rep2, ty1, ty2])
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -832,7 +842,7 @@ repSplitAppTys ty = split ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split (FunTy w ty1 ty2) args
       = ASSERT( null args )
-        (TyConApp (funTyCon w) [], [rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], [rigToType w, rep1, rep2, ty1, ty2])
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -1089,9 +1099,8 @@ applyTysX tvs body_ty arg_tys
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
-  | Just w <- isFunTyConWeight tycon
-  , [_rep1,_rep2,ty1,ty2] <- tys
-  = FunTy w ty1 ty2
+  | [w, _rep1,_rep2,ty1,ty2] <- tys
+  = FunTy (RigTy w) ty1 ty2
 
   | otherwise
   = TyConApp tycon tys
@@ -1104,7 +1113,7 @@ mkTyConApp tycon tys
 -- look through synonyms.
 tyConAppTyConPicky_maybe :: Type -> Maybe TyCon
 tyConAppTyConPicky_maybe (TyConApp tc _) = Just tc
-tyConAppTyConPicky_maybe (FunTy w _ _)   = Just (funTyCon w)
+tyConAppTyConPicky_maybe (FunTy w _ _)   = Just funTyCon
 tyConAppTyConPicky_maybe _               = Nothing
 
 
@@ -1112,7 +1121,7 @@ tyConAppTyConPicky_maybe _               = Nothing
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty | Just ty' <- coreView ty = tyConAppTyCon_maybe ty'
 tyConAppTyCon_maybe (TyConApp tc _) = Just tc
-tyConAppTyCon_maybe (FunTy w _ _)   = Just (funTyCon w)
+tyConAppTyCon_maybe (FunTy w _ _)   = Just funTyCon
 tyConAppTyCon_maybe _               = Nothing
 
 tyConAppTyCon :: Type -> TyCon
@@ -1159,7 +1168,7 @@ repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy w arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon w, [arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 
 -- | Attempts to tease a list type apart and gives the type of the elements if
@@ -2428,7 +2437,8 @@ tyConsOfType ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
-     go (FunTy w a b)               = go a `unionUniqSets` go b `unionUniqSets` go_tc (funTyCon w)
+     -- MattP: TODO get tycons from weight once it is just a type
+     go (FunTy w a b)               = go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
      go (ForAllTy (TvBndr tv _) ty) = go ty `unionUniqSets` go (tyVarKind tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co

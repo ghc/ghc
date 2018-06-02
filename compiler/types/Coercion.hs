@@ -103,7 +103,9 @@ module Coercion (
         tidyCo, tidyCos,
 
         -- * Other
-        promoteCoercion, buildCoercion
+        promoteCoercion, buildCoercion,
+
+        rigToCo
        ) where
 
 #include "HsVersions.h"
@@ -323,9 +325,14 @@ splitTyConAppCo_maybe (Refl r ty)
        ; let args = zipWith mkReflCo (tyConRolesX r tc) tys
        ; return (tc, args) }
 splitTyConAppCo_maybe (TyConAppCo _ tc cos) = Just (tc, cos)
-splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon w, cos)
-  where cos = [mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
+splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
+  where cos = [rigToCo w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
+
+-- TODO: This is wrong and should be ripped out when I change
+-- Rig to Coercion is FunCo
+rigToCo :: Rig -> Coercion
+rigToCo r = mkRepReflCo (rigToType r)
 
 -- first result has role equal to input; third result is Nominal
 splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
@@ -538,12 +545,11 @@ mkNomReflCo = mkReflCo Nominal
 -- caller's responsibility to get the roles correct on argument coercions.
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
-  | Just w <- isFunTyConWeight tc
-  , [_rep1, _rep2, co1, co2] <- cos   -- See Note [Function coercions]
+  | [w, _rep1, _rep2, co1, co2] <- cos   -- See Note [Function coercions]
   = -- (a :: TYPE ra) -> (b :: TYPE rb)  ~  (c :: TYPE rc) -> (d :: TYPE rd)
     -- rep1 :: ra  ~  rc        rep2 :: rb  ~  rd
     -- co1  :: a   ~  c         co2  :: b   ~  d
-    mkFunCo r w co1 co2
+    mkFunCo r Omega co1 co2 -- TODO: Change when changing Rig To Coercion in FunCo
 
                -- Expand type synonyms
   | Just (tv_co_prs, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos

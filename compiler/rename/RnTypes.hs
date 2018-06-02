@@ -1291,7 +1291,7 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExt ty21 op2 ty22))
 
 mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 weight ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
-                hs_fun_ty (funTyConName Omega) funTyFixity ty21 ty22 loc2
+                hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
   where
     hs_fun_ty a b = HsFunTy noExt a weight b
 

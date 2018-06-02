@@ -125,7 +125,7 @@ module TysWiredIn (
 
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, omegaDataConName, multiplicityTy,
-        multiplicityTyCon, oneDataCon, omegaDataCon
+        multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy
 
 
 
@@ -239,6 +239,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , liftedTypeKindTyCon
                 , starKindTyCon
                 , unicodeStarKindTyCon
+                , multiplicityTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name

@@ -1283,7 +1283,7 @@ cvtTypeKind ty_str ty
                           _                -> return x'
                  returnL (HsFunTy noExt x'' HsOmega y')
              | otherwise ->
-                  mk_apps (HsTyVar noExt NotPromoted (noLoc (getRdrName (funTyCon Omega)))) -- TODO: arnaud: fix when the above is done
+                  mk_apps (HsTyVar noExt NotPromoted (noLoc (getRdrName funTyCon))) -- TODO: arnaud: fix when the above is done
                           tys'
            ListT
              | [x']    <- tys' -> returnL (HsListTy noExt x')
