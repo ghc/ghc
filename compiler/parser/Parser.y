@@ -1903,6 +1903,8 @@ type :: { LHsType GhcPs }
 
         | btype '⊸' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
                                               [mu AnnRarrow $2] }
+        | btype '->@{' '(' mult ')' ctype  {% ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
+                                              [mu AnnRarrow $2] }
 
 mult :: { LHsType GhcPs }
         : btype                  { $1 }
