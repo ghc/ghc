@@ -149,6 +149,7 @@ import HscTypes
 import Module
 import RdrName
 import Name
+import UsageEnv
 import Weight
 import Type
 

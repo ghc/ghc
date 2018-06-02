@@ -80,6 +80,7 @@ import IfaceEnv
 import TcRnMonad
 import TcMType
 import Weight
+import UsageEnv
 import TcType
 import LoadIface
 import PrelNames

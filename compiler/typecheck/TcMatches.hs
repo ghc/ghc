@@ -30,6 +30,7 @@ import TcRnMonad
 import TcEnv
 import TcPat
 import Weight
+import UsageEnv
 import TcMType
 import TcType
 import TcBinds

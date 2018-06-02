@@ -40,6 +40,7 @@ import RnEnv            ( addUsedGRE )
 import RnUtils          ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
 import Weight
+import UsageEnv
 import TcArrows
 import TcMatches
 import TcHsType

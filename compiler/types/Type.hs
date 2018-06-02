@@ -529,7 +529,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go t@(TyConApp _ []) = return t  -- avoid allocation in this exceedingly
                                      -- common case (mostly, for *)
     go (TyConApp tc tys) = mktyconapp tc <$> mapM go tys
-    go (FunTy w arg res) = (\a b -> FunTy w a b) <$> go arg <*> go res
+    go (FunTy w arg res) = (\w' a b -> FunTy w' a b) <$> go_rig w <*> go arg <*> go res
     go (ForAllTy (TvBndr tv vis) inner)
       = do { (env', tv') <- tybinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -537,6 +537,9 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go ty@(LitTy {})   = return ty
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
+
+    go_rig (RigTy t) = RigTy <$> go t
+    go_rig t = pure t
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
@@ -725,7 +728,8 @@ rigToType r =
     One ->  oneDataConTy
     Omega -> omegaDataConTy
     RigTy ty -> ty
-    _ -> panic "rigToType"
+    r -> pprPanic "rigToType" (ppr r)
+
 
 -------------
 repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)

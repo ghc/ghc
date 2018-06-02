@@ -47,6 +47,7 @@ import SrcLoc
 import Kind
 import Type
 import Weight
+import UsageEnv
 import RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCon
