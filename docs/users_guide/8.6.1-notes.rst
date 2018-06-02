@@ -135,6 +135,11 @@ Runtime system
 - The runtime now allows use of the :rts-flag:`-hT` profiling variety on
   programs built with :ghc-flag:`-prof`.
 
+- The STM assertions mechanism (namely the ``always`` and ``alwaysSucceeds``
+  functions) has been removed. This happened a bit earlier than proposed in the
+  deprecation pragma included in GHC 8.4, but due to community feedback we
+  decided to move ahead with the early removal.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

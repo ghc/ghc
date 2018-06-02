@@ -489,11 +489,6 @@ retry_pop_stack:
       ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
       ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
 
-      if (outer != NO_TREC) {
-        ccall stmAbortTransaction(MyCapability() "ptr", outer "ptr");
-        ccall stmFreeAbortedTRec(MyCapability() "ptr", outer "ptr");
-      }
-
       StgTSO_trec(CurrentTSO) = NO_TREC;
       if (r != 0) {
         // Transaction was valid: continue searching for a catch frame

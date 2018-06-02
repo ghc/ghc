@@ -74,8 +74,6 @@ module GHC.Conc.Sync
         , orElse
         , throwSTM
         , catchSTM
-        , alwaysSucceeds
-        , always
         , TVar(..)
         , newTVar
         , newTVarIO
@@ -776,43 +774,6 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
       handler' e = case fromException e of
                      Just e' -> unSTM (handler e')
                      Nothing -> raiseIO# e
-
--- Invariant checking has been removed. See #14324 and
--- https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst
-{-# DEPRECATED checkInv, always, alwaysSucceeds
-    [ "The STM invariant-checking mechanism is deprecated in GHC 8.4"
-    , "and will be removed in GHC 8.10. See "
-    , "<https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst>."
-    , ""
-    , "Existing users are encouraged to encapsulate their STM"
-    , "operations in safe abstractions which can perform the invariant"
-    , "checking without help from the runtime system."
-    ] #-}
-
--- | Low-level primitive on which 'always' and 'alwaysSucceeds' are built.
--- 'checkInv' differs from these in that,
---
--- 1. the invariant is not checked when 'checkInv' is called, only at the end of
--- this and subsequent transactions
--- 2. the invariant failure is indicated by raising an exception.
-checkInv :: STM a -> STM ()
-checkInv (STM m) = STM (\s -> case (check# m) s of s' -> (# s', () #))
-
--- | 'alwaysSucceeds' adds a new invariant that must be true when passed
--- to 'alwaysSucceeds', at the end of the current transaction, and at
--- the end of every subsequent transaction.  If it fails at any
--- of those points then the transaction violating it is aborted
--- and the exception raised by the invariant is propagated.
-alwaysSucceeds :: STM a -> STM ()
-alwaysSucceeds i = do ( i >> retry ) `orElse` ( return () )
-                      checkInv i
-
--- | 'always' is a variant of 'alwaysSucceeds' in which the invariant is
--- expressed as an @STM Bool@ action that must return @True@.  Returning
--- @False@ or raising an exception are both treated as invariant failures.
-always :: STM Bool -> STM ()
-always i = alwaysSucceeds ( do v <- i
-                               if (v) then return () else ( errorWithoutStackTrace "Transactional invariant violation" ) )
 
 -- |Shared memory locations that support atomic memory transactions.
 data TVar a = TVar (TVar# RealWorld a)

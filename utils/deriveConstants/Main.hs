@@ -489,14 +489,7 @@ wanteds os = concat
 
           ,closureSize  C "StgAtomicallyFrame"
           ,closureField C "StgAtomicallyFrame" "code"
-          ,closureField C "StgAtomicallyFrame" "next_invariant_to_check"
           ,closureField C "StgAtomicallyFrame" "result"
-
-          ,closureField C "StgInvariantCheckQueue" "invariant"
-          ,closureField C "StgInvariantCheckQueue" "my_execution"
-          ,closureField C "StgInvariantCheckQueue" "next_queue_entry"
-
-          ,closureField C "StgAtomicInvariant" "code"
 
           ,closureField C "StgTRecHeader" "enclosing_trec"
 
