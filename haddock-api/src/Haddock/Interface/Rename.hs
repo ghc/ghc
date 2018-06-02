@@ -244,7 +244,6 @@ renameType t = case t of
     return (HsFunTy NoExt a' b')
 
   HsListTy _ ty -> return . (HsListTy NoExt) =<< renameLType ty
-  HsPArrTy _ ty -> return . (HsPArrTy NoExt) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy NoExt n) (renameLType ty)
   HsEqTy _ ty1 ty2 -> liftM2 (HsEqTy NoExt) (renameLType ty1) (renameLType ty2)
 

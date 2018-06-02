@@ -257,7 +257,6 @@ renameType (HsTyVar x ip name) = HsTyVar x ip <$> located renameName name
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
 renameType (HsFunTy x la lr) = HsFunTy x <$> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
-renameType (HsPArrTy x lt) = HsPArrTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
 renameType (HsOpTy x la lop lb) =

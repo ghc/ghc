@@ -1203,7 +1203,6 @@ ppr_mono_ty _         (HsSumTy _ tys) u q _ = sumParens (map (ppLType u q HideEm
 ppr_mono_ty _         (HsKindSig _ ty kind) u q e =
     parens (ppr_mono_lty pREC_TOP ty u q e <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy _ ty)       u q _ = brackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
-ppr_mono_ty _         (HsPArrTy _ ty)       u q _ = pabrackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
 ppr_mono_ty ctxt_prec (HsIParamTy _ (L _ n) ty) u q _ =
     maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q HideEmptyContexts
 ppr_mono_ty _         (HsSpliceTy {})     _ _ _ = error "ppr_mono_ty HsSpliceTy"

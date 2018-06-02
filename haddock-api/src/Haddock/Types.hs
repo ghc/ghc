@@ -675,7 +675,6 @@ type instance XAppsTy          DocNameI = NoExt
 type instance XAppTy           DocNameI = NoExt
 type instance XFunTy           DocNameI = NoExt
 type instance XListTy          DocNameI = NoExt
-type instance XPArrTy          DocNameI = NoExt
 type instance XTupleTy         DocNameI = NoExt
 type instance XSumTy           DocNameI = NoExt
 type instance XOpTy            DocNameI = NoExt
