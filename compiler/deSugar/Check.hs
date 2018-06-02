@@ -841,11 +841,6 @@ translatePat fam_insts pat = case pat of
                             (map (LitPat noExt  . HsChar src) (unpackFS s))
     | otherwise -> return [mkLitPattern lit]
 
-  PArrPat ty ps -> do
-    tidy_ps <- translatePatVec fam_insts (map unLoc ps)
-    let fake_con = RealDataCon (parrFakeCon (length ps))
-    return [vanillaConPattern fake_con [ty] (concat tidy_ps)]
-
   TuplePat tys ps boxity -> do
     tidy_ps <- translatePatVec fam_insts (map unLoc ps)
     let tuple_con = RealDataCon (tupleDataCon boxity (length ps))

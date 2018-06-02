@@ -36,7 +36,7 @@ module LoadIface (
 import GhcPrelude
 
 import {-# SOURCE #-}   TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
-                                 tcIfaceFamInst, tcIfaceVectInfo,
+                                 tcIfaceFamInst,
                                  tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import DynFlags
@@ -453,7 +453,7 @@ loadInterface doc_str mod from
         --
         -- The main thing is to add the ModIface to the PIT, but
         -- we also take the
-        --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules, IfaceVectInfo
+        --      IfaceDecls, IfaceClsInst, IfaceFamInst, IfaceRules,
         -- out of the ModIface and put them into the big EPS pools
 
         -- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
@@ -467,7 +467,6 @@ loadInterface doc_str mod from
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
-        ; new_eps_vect_info <- tcIfaceVectInfo mod (mkNameEnv new_eps_decls) (mi_vect_info iface)
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
 
         ; let { final_iface = iface {
@@ -495,8 +494,6 @@ loadInterface doc_str mod from
                                                        new_eps_insts,
                   eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
                                                           new_eps_fam_insts,
-                  eps_vect_info    = plusVectInfo (eps_vect_info eps)
-                                                  new_eps_vect_info,
                   eps_ann_env      = extendAnnEnvList (eps_ann_env eps)
                                                       new_eps_anns,
                   eps_mod_fam_inst_env
@@ -979,7 +976,6 @@ initExternalPackageState
         -- Initialise the EPS rule pool with the built-in rules
       eps_mod_fam_inst_env
                            = emptyModuleEnv,
-      eps_vect_info        = noVectInfo,
       eps_complete_matches = emptyUFM,
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
@@ -1087,7 +1083,6 @@ pprModIface iface
         , vcat (map ppr (mi_insts iface))
         , vcat (map ppr (mi_fam_insts iface))
         , vcat (map ppr (mi_rules iface))
-        , pprVectInfo (mi_vect_info iface)
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
@@ -1160,21 +1155,6 @@ pprFixities []    = Outputable.empty
 pprFixities fixes = text "fixities" <+> pprWithCommas pprFix fixes
                   where
                     pprFix (occ,fix) = ppr fix <+> ppr occ
-
-pprVectInfo :: IfaceVectInfo -> SDoc
-pprVectInfo (IfaceVectInfo { ifaceVectInfoVar            = vars
-                           , ifaceVectInfoTyCon          = tycons
-                           , ifaceVectInfoTyConReuse     = tyconsReuse
-                           , ifaceVectInfoParallelVars   = parallelVars
-                           , ifaceVectInfoParallelTyCons = parallelTyCons
-                           }) =
-  vcat
-  [ text "vectorised variables:" <+> hsep (map ppr vars)
-  , text "vectorised tycons:" <+> hsep (map ppr tycons)
-  , text "vectorised reused tycons:" <+> hsep (map ppr tyconsReuse)
-  , text "parallel variables:" <+> hsep (map ppr parallelVars)
-  , text "parallel tycons:" <+> hsep (map ppr parallelTyCons)
-  ]
 
 pprTrustInfo :: IfaceTrustInfo -> SDoc
 pprTrustInfo trust = text "trusted:" <+> ppr trust

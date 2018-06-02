@@ -543,9 +543,6 @@ dATA_TYPE_EQUALITY = mkBaseModule (fsLit "Data.Type.Equality")
 dATA_COERCE     = mkBaseModule (fsLit "Data.Coerce")
 dEBUG_TRACE     = mkBaseModule (fsLit "Debug.Trace")
 
-gHC_PARR' :: Module
-gHC_PARR' = mkBaseModule (fsLit "GHC.PArr")
-
 gHC_SRCLOC :: Module
 gHC_SRCLOC = mkBaseModule (fsLit "GHC.SrcLoc")
 
@@ -1744,10 +1741,6 @@ funPtrTyConKey                          = mkPreludeTyConUnique 76
 tVarPrimTyConKey                        = mkPreludeTyConUnique 77
 compactPrimTyConKey                     = mkPreludeTyConUnique 78
 
--- Parallel array type constructor
-parrTyConKey :: Unique
-parrTyConKey                            = mkPreludeTyConUnique 82
-
 -- dotnet interop
 objectTyConKey :: Unique
 objectTyConKey                          = mkPreludeTyConUnique 83
@@ -1937,10 +1930,6 @@ crossDataConKey                         = mkPreludeDataConUnique 20
 inlDataConKey                           = mkPreludeDataConUnique 21
 inrDataConKey                           = mkPreludeDataConUnique 22
 genUnitDataConKey                       = mkPreludeDataConUnique 23
-
--- Data constructor for parallel arrays
-parrDataConKey :: Unique
-parrDataConKey                          = mkPreludeDataConUnique 24
 
 leftDataConKey, rightDataConKey :: Unique
 leftDataConKey                          = mkPreludeDataConUnique 25

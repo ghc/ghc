@@ -123,7 +123,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
                                            -- matching this string
-  | CoreDoVectorisation
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
@@ -149,7 +148,6 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecialising       = text "Specialise"
   ppr CoreDoSpecConstr         = text "SpecConstr"
   ppr CoreCSE                  = text "Common sub-expression"
-  ppr CoreDoVectorisation      = text "Vectorisation"
   ppr CoreDesugar              = text "Desugar (before optimization)"
   ppr CoreDesugarOpt           = text "Desugar (after optimization)"
   ppr CoreTidy                 = text "Tidy Core"

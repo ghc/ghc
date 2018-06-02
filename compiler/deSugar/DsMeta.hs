@@ -121,7 +121,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_warnds  = warnds
                         , hs_annds   = annds
                         , hs_ruleds  = ruleds
-                        , hs_vects   = vects
                         , hs_docs    = docs })
  = do { let { bndrs  = hsSigTvBinders valds
                        ++ hsGroupBinders group
@@ -151,7 +150,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; ann_ds   <- mapM repAnnD annds
                      ; rule_ds  <- mapM repRuleD (concatMap (rds_rules . unLoc)
                                                             ruleds)
-                     ; _        <- mapM no_vect vects
                      ; _        <- mapM no_doc docs
 
                         -- more needed
@@ -178,8 +176,6 @@ repTopDs group@(HsGroup { hs_valds   = valds
       = notHandledL loc "WARNING and DEPRECATION pragmas" $
                     text "Pragma for declaration of" <+> ppr thing
     no_warn (L _ (XWarnDecl _)) = panic "repTopDs"
-    no_vect (L loc decl)
-      = notHandledL loc "Vectorisation pragmas" (ppr decl)
     no_doc (L loc _)
       = notHandledL loc "Haddock documentation" empty
 repTopDs (XHsGroup _) = panic "repTopDs"
@@ -1114,11 +1110,6 @@ repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
                                 repTapp tcon t1
-repTy (HsPArrTy _ t)   = do
-                           t1   <- repLTy t
-                           tcon <- repTy (HsTyVar noExt NotPromoted
-                                                  (noLoc (tyConName parrTyCon)))
-                           repTapp tcon t1
 repTy (HsTupleTy _ HsUnboxedTuple tys) = do
                                 tys1 <- repLTys tys
                                 tcon <- repUnboxedTupleTyCon (length tys)
@@ -1291,7 +1282,6 @@ repE e@(HsDo _ ctxt (L _ sts))
   = notHandled "mdo, monad comprehension and [: :]" (ppr e)
 
 repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
-repE e@(ExplicitPArr _ _) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple _ es boxed)
   | not (all tupArgPresent es) = notHandled "Tuple sections" (ppr e)
   | isBoxed boxed = do { xs <- repLEs [e | L _ (Present _ e) <- es]; repTup xs }
@@ -1340,7 +1330,6 @@ repE (HsUnboundVar _ uv)   = do
                                sname <- repNameS occ
                                repUnboundVar sname
 
-repE e@(PArrSeq {})        = notHandled "Parallel arrays" (ppr e)
 repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
 repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
 repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)

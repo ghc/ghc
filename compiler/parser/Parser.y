@@ -79,7 +79,7 @@ import TysPrim          ( eqPrimTyCon )
 import PrelNames        ( eqTyCon_RDR )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
-                          listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
+                          listTyCon_RDR, consDataCon_RDR )
 
 -- compiler/utils
 import Util             ( looksLikePackageName )
@@ -88,7 +88,7 @@ import GhcPrelude
 import qualified GHC.LanguageExtensions as LangExt
 }
 
-%expect 233 -- shift/reduce conflicts
+%expect 229 -- shift/reduce conflicts
 
 {- Last updated: 14 Apr 2018
 
@@ -502,9 +502,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# UNPACK'             { L _ (ITunpack_prag _) }
  '{-# NOUNPACK'           { L _ (ITnounpack_prag _) }
  '{-# ANN'                { L _ (ITann_prag _) }
- '{-# VECTORISE'          { L _ (ITvect_prag _) }
- '{-# VECTORISE_SCALAR'   { L _ (ITvect_scalar_prag _) }
- '{-# NOVECTORISE'        { L _ (ITnovect_prag _) }
  '{-# MINIMAL'            { L _ (ITminimal_prag _) }
  '{-# CTYPE'              { L _ (ITctype _) }
  '{-# OVERLAPPING'        { L _ (IToverlapping_prag _) }
@@ -1040,33 +1037,6 @@ topdecl :: { LHsDecl GhcPs }
                                                        [mo $1,mc $3] }
         | '{-# RULES' rules '#-}'               {% ams (sLL $1 $> $ RuleD noExt (HsRules noExt (getRULES_PRAGs $1) (fromOL $2)))
                                                        [mo $1,mc $3] }
-        | '{-# VECTORISE' qvar '=' exp '#-}' {% ams (sLL $1 $> $ VectD noExt (HsVect noExt (getVECT_PRAGs $1) $2 $4))
-                                                    [mo $1,mj AnnEqual $3
-                                                    ,mc $5] }
-        | '{-# NOVECTORISE' qvar '#-}'       {% ams (sLL $1 $> $ VectD noExt (HsNoVect noExt (getNOVECT_PRAGs $1) $2))
-                                                     [mo $1,mc $3] }
-        | '{-# VECTORISE' 'type' gtycon '#-}'
-                                {% ams (sLL $1 $> $
-                                    VectD noExt (HsVectType (VectTypePR (getVECT_PRAGs $1) $3 Nothing) False))
-                                    [mo $1,mj AnnType $2,mc $4] }
-
-        | '{-# VECTORISE_SCALAR' 'type' gtycon '#-}'
-                                {% ams (sLL $1 $> $
-                                    VectD noExt (HsVectType (VectTypePR (getVECT_SCALAR_PRAGs $1) $3 Nothing) True))
-                                    [mo $1,mj AnnType $2,mc $4] }
-
-        | '{-# VECTORISE' 'type' gtycon '=' gtycon '#-}'
-                                {% ams (sLL $1 $> $
-                                    VectD noExt (HsVectType (VectTypePR (getVECT_PRAGs $1) $3 (Just $5)) False))
-                                    [mo $1,mj AnnType $2,mj AnnEqual $4,mc $6] }
-        | '{-# VECTORISE_SCALAR' 'type' gtycon '=' gtycon '#-}'
-                                {% ams (sLL $1 $> $
-                                    VectD noExt (HsVectType (VectTypePR (getVECT_SCALAR_PRAGs $1) $3 (Just $5)) True))
-                                    [mo $1,mj AnnType $2,mj AnnEqual $4,mc $6] }
-
-        | '{-# VECTORISE' 'class' gtycon '#-}'
-                                         {% ams (sLL $1 $>  $ VectD noExt (HsVectClass (VectClassPR (getVECT_PRAGs $1) $3)))
-                                                 [mo $1,mj AnnClass $2,mc $4] }
         | annotation { $1 }
         | decl_no_th                            { $1 }
 
@@ -1968,9 +1938,8 @@ atype :: { LHsType GhcPs }
                                              [mo $1,mc $3] }
         | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
                                              [mo $1,mc $3] }
-        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy noExt $2) [mos $1,mcs $3] }
-        | '[:' ctype ':]'             {% ams (sLL $1 $> $ HsPArrTy noExt $2) [mo $1,mc $3] }
-        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy  noExt $2) [mop $1,mcp $3] }
+        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy  noExt $2) [mos $1,mcs $3] }
+        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy   noExt $2) [mop $1,mcp $3] }
         | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig noExt $2 $4)
                                              [mop $1,mu AnnDcolon $3,mcp $5] }
         | quasiquote                  { sL1 $1 (HsSpliceTy noExt (unLoc $1) ) }
@@ -2628,7 +2597,6 @@ aexp2   :: { LHsExpr GhcPs }
                                               ; ams (sLL $1 $> e) ((mo $1:fst $2) ++ [mc $3]) } }
 
         | '[' list ']'      {% ams (sLL $1 $> (snd $2)) (mos $1:mcs $3:(fst $2)) }
-        | '[:' parr ':]'    {% ams (sLL $1 $> (snd $2)) (mo $1:mc $3:(fst $2)) }
         | '_'               { sL1 $1 $ EWildPat noExt }
 
         -- Template Haskell Extension
@@ -2832,28 +2800,6 @@ transformqual :: { Located ([AddAnn],[LStmt GhcPs (LHsExpr GhcPs)] -> Stmt GhcPs
 -- TransformListComp while still using Data.List.group. However, this
 -- introduces a shift/reduce conflict. Happy chooses to resolve the conflict
 -- in by choosing the "group by" variant, which is what we want.
-
------------------------------------------------------------------------------
--- Parallel array expressions
-
--- The rules below are little bit contorted; see the list case for details.
--- Note that, in contrast to lists, we only have finite arithmetic sequences.
--- Moreover, we allow explicit arrays with no element (represented by the nil
--- constructor in the list case).
-
-parr :: { ([AddAnn],HsExpr GhcPs) }
-        :                      { ([],ExplicitPArr noExt []) }
-        | texp                 { ([],ExplicitPArr noExt [$1]) }
-        | lexps                { ([],ExplicitPArr noExt (reverse (unLoc $1))) }
-        | texp '..' exp        { ([mj AnnDotdot $2]
-                                 ,PArrSeq noExt (FromTo $1 $3)) }
-        | texp ',' exp '..' exp
-                        { ([mj AnnComma $2,mj AnnDotdot $4]
-                          ,PArrSeq noExt (FromThenTo $1 $3 $5)) }
-        | texp '|' flattenedpquals
-                        { ([mj AnnVbar $2],mkHsComp PArrComp (unLoc $3) $1) }
-
--- We are reusing `lexps' and `flattenedpquals' from the list case.
 
 -----------------------------------------------------------------------------
 -- Guards
@@ -3114,8 +3060,6 @@ gen_qcon :: { Located RdrName }
   | '(' qconsym ')'       {% ams (sLL $1 $> (unLoc $2))
                                    [mop $1,mj AnnVal $2,mcp $3] }
 
--- The case of '[:' ':]' is part of the production `parr'
-
 con     :: { Located RdrName }
         : conid                 { $1 }
         | '(' consym ')'        {% ams (sLL $1 $> (unLoc $2))
@@ -3175,7 +3119,6 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
-        | '[:' ':]'             {% ams (sLL $1 $> $ parrTyCon_RDR) [mo $1,mc $2] }
         | '(' '~#' ')'          {% ams (sLL $1 $> $ getRdrName eqPrimTyCon)
                                         [mop $1,mj AnnTildehsh $2,mcp $3] }
 
@@ -3555,9 +3498,6 @@ getCORE_PRAGs         (L _ (ITcore_prag         src)) = src
 getUNPACK_PRAGs       (L _ (ITunpack_prag       src)) = src
 getNOUNPACK_PRAGs     (L _ (ITnounpack_prag     src)) = src
 getANN_PRAGs          (L _ (ITann_prag          src)) = src
-getVECT_PRAGs         (L _ (ITvect_prag         src)) = src
-getVECT_SCALAR_PRAGs  (L _ (ITvect_scalar_prag  src)) = src
-getNOVECT_PRAGs       (L _ (ITnovect_prag       src)) = src
 getMINIMAL_PRAGs      (L _ (ITminimal_prag      src)) = src
 getOVERLAPPABLE_PRAGs (L _ (IToverlappable_prag src)) = src
 getOVERLAPPING_PRAGs  (L _ (IToverlapping_prag  src)) = src

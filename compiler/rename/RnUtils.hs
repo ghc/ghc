@@ -374,7 +374,6 @@ data HsDocContext
   | GHCiCtx
   | SpliceTypeCtx (LHsType GhcPs)
   | ClassInstanceCtx
-  | VectDeclCtx (Located RdrName)
   | GenericCtx SDoc   -- Maybe we want to use this more!
 
 withHsDocContext :: HsDocContext -> SDoc -> SDoc
@@ -409,5 +408,3 @@ pprHsDocContext (ConDeclCtx [name])
    = text "the definition of data constructor" <+> quotes (ppr name)
 pprHsDocContext (ConDeclCtx names)
    = text "the definition of data constructors" <+> interpp'SP names
-pprHsDocContext (VectDeclCtx tycon)
-   = text "the VECTORISE pragma for type constructor" <+> quotes (ppr tycon)

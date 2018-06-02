@@ -37,7 +37,6 @@ module CoreFVs (
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
         rulesFreeVarsDSet,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
-        vectsFreeVars,
 
         expr_fvs,
 
@@ -514,17 +513,6 @@ from "rule-only loop breakers" (see BasicTypes.OccInfo).  So it will
 put this 'f' in a Rec block, but will mark the binding as a non-rule loop
 breaker, which is perfectly inlinable.
 -}
-
--- |Free variables of a vectorisation declaration
-vectsFreeVars :: [CoreVect] -> VarSet
-vectsFreeVars = mapUnionVarSet vectFreeVars
-  where
-    vectFreeVars (Vect   _ rhs)   = fvVarSet $ filterFV isLocalId $ expr_fvs rhs
-    vectFreeVars (NoVect _)       = noFVs
-    vectFreeVars (VectType _ _ _) = noFVs
-    vectFreeVars (VectClass _)    = noFVs
-    vectFreeVars (VectInst _)     = noFVs
-      -- this function is only concerned with values, not types
 
 {-
 ************************************************************************

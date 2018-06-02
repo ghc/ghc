@@ -29,7 +29,6 @@ import Id
 import NameEnv
 import FieldLabel ( flSelector )
 import SrcLoc
-import DynFlags
 import Outputable
 import Control.Monad(liftM)
 import Data.List (groupBy)
@@ -93,9 +92,8 @@ matchConFamily :: [Id]
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
 matchConFamily (var:vars) ty groups
-  = do dflags <- getDynFlags
-       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
-       return (mkCoAlgCaseMatchResult dflags var ty alts)
+  = do alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
+       return (mkCoAlgCaseMatchResult var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }

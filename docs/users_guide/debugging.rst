@@ -299,13 +299,6 @@ subexpression elimination pass.
     that ``foo`` is not being inlined. You can pass ``-dinline-check foo`` and
     you will see a report about why ``foo`` is not inlined.
 
-
-.. ghc-flag:: -ddump-vect
-    :shortdesc: Dump vectoriser input and output
-    :type: dynamic
-
-    Dumps the output of the vectoriser.
-
 .. ghc-flag:: -ddump-simpl
     :shortdesc: Dump final simplifier output
     :type: dynamic
@@ -350,12 +343,6 @@ subexpression elimination pass.
     :type: dynamic
 
     Dump "occurrence analysis" output
-
-.. ghc-flag:: -ddump-vt-trace
-    :shortdesc: Trace vectoriser
-    :type: dynamic
-
-    Make the vectoriser be *real* chatty about what it is up to.
 
 .. ghc-flag:: -ddump-prep
     :shortdesc: Dump prepared core

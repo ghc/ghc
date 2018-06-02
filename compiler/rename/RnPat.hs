@@ -483,10 +483,6 @@ rnPatAndThen mk (ListPat _ pats)
                      ; return (ListPat (Just to_list_name) pats')}
           False -> return (ListPat Nothing pats') }
 
-rnPatAndThen mk (PArrPat x pats)
-  = do { pats' <- rnLPatsAndThen mk pats
-       ; return (PArrPat x pats') }
-
 rnPatAndThen mk (TuplePat x pats boxed)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats

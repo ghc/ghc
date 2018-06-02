@@ -127,25 +127,24 @@ simpleOptExprWith subst expr
 
 ----------------------
 simpleOptPgm :: DynFlags -> Module
-             -> CoreProgram -> [CoreRule] -> [CoreVect]
-             -> IO (CoreProgram, [CoreRule], [CoreVect])
+             -> CoreProgram -> [CoreRule]
+             -> IO (CoreProgram, [CoreRule])
 -- See Note [The simple optimiser]
-simpleOptPgm dflags this_mod binds rules vects
+simpleOptPgm dflags this_mod binds rules
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                        (pprCoreBindings occ_anald_binds $$ pprRules rules );
 
-       ; return (reverse binds', rules', vects') }
+       ; return (reverse binds', rules') }
   where
     occ_anald_binds  = occurAnalysePgm this_mod
                           (\_ -> True)  {- All unfoldings active -}
                           (\_ -> False) {- No rules active -}
-                          rules vects emptyVarSet binds
+                          rules binds
 
     (final_env, binds') = foldl do_one (emptyEnv, []) occ_anald_binds
     final_subst = soe_subst final_env
 
     rules' = substRulesForImportedIds final_subst rules
-    vects' = substVects final_subst vects
              -- We never unconditionally inline into rules,
              -- hence paying just a substitution
 
@@ -535,18 +534,6 @@ simpleUnfoldingFun id
 wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
 wrapLet Nothing      body = body
 wrapLet (Just (b,r)) body = Let (NonRec b r) body
-
-------------------
-substVects :: Subst -> [CoreVect] -> [CoreVect]
-substVects subst = map (substVect subst)
-
-------------------
-substVect :: Subst -> CoreVect -> CoreVect
-substVect subst  (Vect v rhs)        = Vect v (simpleOptExprWith subst rhs)
-substVect _subst vd@(NoVect _)       = vd
-substVect _subst vd@(VectType _ _ _) = vd
-substVect _subst vd@(VectClass _)    = vd
-substVect _subst vd@(VectInst _)     = vd
 
 {-
 Note [Inline prag in simplOpt]

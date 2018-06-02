@@ -1228,7 +1228,6 @@ Parallel List Comprehensions
 
 .. extension:: ParallelListComp
     :shortdesc: Enable parallel list comprehensions.
-        Implied by :extension:`ParallelArrays`.
 
     :since: 6.8.1
 

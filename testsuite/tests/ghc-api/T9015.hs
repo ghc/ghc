@@ -13,7 +13,6 @@ testStrings = [
   , "add a b = a+b"
   , "data Foo = Foo String"
   , "deriving instance Show Foo"
-  , "{-# NOVECTORISE foo #-}"
   , "{-# WARNING Foo \"Just a warning\" #-}"
   , "{-# ANN foo (Just \"Hello\") #-}"
   , "{-# RULES \"map/map\" forall f g xs. map f (map g xs) = map (f.g) xs #-}"

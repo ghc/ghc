@@ -48,14 +48,12 @@ import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
-import Vectorise        ( vectorise )
 import SrcLoc
 import Util
 import Module
 import Plugins          ( withPlugins, installCoreToDos )
 import DynamicLoading  -- ( initializePlugins )
 
-import Maybes
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import UniqFM
 import Outputable
@@ -137,7 +135,6 @@ getCoreToDo dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
-    vectorise_on  = gopt Opt_Vectorise                    dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
@@ -162,30 +159,6 @@ getCoreToDo dflags
 
           , maybe_rule_check (Phase phase) ]
 
-          -- Vectorisation can introduce a fair few common sub expressions involving
-          --  DPH primitives. For example, see the Reverse test from dph-examples.
-          --  We need to eliminate these common sub expressions before their definitions
-          --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings,
-          --  so we also run simpl_gently to inline them.
-      ++  (if vectorise_on && phase == 3
-            then [CoreCSE, simpl_gently]
-            else [])
-
-    vectorisation
-      = runWhen vectorise_on $
-          CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
-
-                -- By default, we have 2 phases before phase 0.
-
-                -- Want to run with inline phase 2 after the specialiser to give
-                -- maximum chance for fusion to work before we inline build/augment
-                -- in phase 1.  This made a difference in 'ansi' where an
-                -- overloaded function wasn't inlined till too late.
-
-                -- Need phase 1 so that build/augment get
-                -- inlined.  I found that spectral/hartel/genfft lost some useful
-                -- strictness in the function sumcode' if augment is not inlined
-                -- before strictness analysis runs
     simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
                                 | phase <- [phases, phases-1 .. 1] ]
 
@@ -195,7 +168,7 @@ getCoreToDo dflags
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
                                   , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
-                                  , sm_inline = not vectorise_on
+                                  , sm_inline = True
                                               -- See Note [Inline in InitialPhase]
                                   , sm_case_case = False })
                           -- Don't do case-of-case transformations.
@@ -228,8 +201,7 @@ getCoreToDo dflags
 
     core_todo =
      if opt_level == 0 then
-       [ vectorisation,
-         static_ptrs_float_outwards,
+       [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
              (base_mode { sm_phase = Phase 0
                         , sm_names = ["Non-opt simplification"] })
@@ -242,10 +214,6 @@ getCoreToDo dflags
     -- up the output of the transformation we need at do at least one simplify
     -- after this before anything else
         runWhen static_args (CoreDoPasses [ simpl_gently, CoreDoStaticArgs ]),
-
-        -- We run vectorisation here for now, but we might also try to run
-        -- it later
-        vectorisation,
 
         -- initial simplify: mk specialiser happy: minimum effort please
         simpl_gently,
@@ -483,9 +451,6 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
 
-doCorePass CoreDoVectorisation       = {-# SCC "Vectorise" #-}
-                                       vectorise
-
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
@@ -718,30 +683,9 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
       , () <- sz `seq` ()     -- Force it
       = do {
                 -- Occurrence analysis
-           let {   -- Note [Vectorisation declarations and occurrences]
-                   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                   -- During the 'InitialPhase' (i.e., before vectorisation), we need to make sure
-                   -- that the right-hand sides of vectorisation declarations are taken into
-                   -- account during occurrence analysis. After the 'InitialPhase', we need to ensure
-                   -- that the binders representing variable vectorisation declarations are kept alive.
-                   -- (In contrast to automatically vectorised variables, their unvectorised versions
-                   -- don't depend on them.)
-                 vectVars = mkVarSet $
-                              catMaybes [ fmap snd $ lookupDVarEnv (vectInfoVar (mg_vect_info guts)) bndr
-                                        | Vect bndr _ <- mg_vect_decls guts]
-                              ++
-                              catMaybes [ fmap snd $ lookupDVarEnv (vectInfoVar (mg_vect_info guts)) bndr
-                                        | bndr <- bindersOfBinds binds]
-                                        -- FIXME: This second comprehensions is only needed as long as we
-                                        --        have vectorised bindings where we get "Could NOT call
-                                        --        vectorised from original version".
-              ;  (maybeVects, maybeVectVars)
-                   = case sm_phase mode of
-                       InitialPhase -> (mg_vect_decls guts, vectVars)
-                       _            -> ([], vectVars)
-               ; tagged_binds = {-# SCC "OccAnal" #-}
+           let { tagged_binds = {-# SCC "OccAnal" #-}
                      occurAnalysePgm this_mod active_unf active_rule rules
-                                     maybeVects maybeVectVars binds
+                                     binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);

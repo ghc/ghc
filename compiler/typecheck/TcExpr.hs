@@ -45,7 +45,6 @@ import TcPatSyn( tcPatSynBuilderOcc, nonBidirectionalErr )
 import TcPat
 import TcMType
 import TcType
-import DsMonad
 import Id
 import IdInfo
 import ConLike
@@ -533,15 +532,6 @@ tcExpr (ExplicitList _ witness exprs) res_ty
                      ; return $ ExplicitList elt_ty (Just fln') exprs' }
      where tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
-tcExpr (ExplicitPArr _ exprs) res_ty    -- maybe empty
-  = do  { res_ty <- expTypeToType res_ty
-        ; (coi, elt_ty) <- matchExpectedPArrTy res_ty
-        ; exprs' <- mapM (tc_elt elt_ty) exprs
-        ; return $
-          mkHsWrapCo coi $ ExplicitPArr elt_ty exprs' }
-  where
-    tc_elt elt_ty expr = tcPolyExpr expr elt_ty
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1000,34 +990,6 @@ tcExpr e@(HsRecFld _ f) res_ty
 
 tcExpr (ArithSeq _ witness seq) res_ty
   = tcArithSeq witness seq res_ty
-
-tcExpr (PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
-  = do  { res_ty <- expTypeToType res_ty
-        ; (coi, elt_ty) <- matchExpectedPArrTy res_ty
-        ; expr1' <- tcPolyExpr expr1 elt_ty
-        ; expr2' <- tcPolyExpr expr2 elt_ty
-        ; enumFromToP <- initDsTc $ dsDPHBuiltin enumFromToPVar
-        ; enum_from_to <- newMethodFromName (PArrSeqOrigin seq)
-                                 (idName enumFromToP) elt_ty
-        ; return $
-          mkHsWrapCo coi $ PArrSeq enum_from_to (FromTo expr1' expr2') }
-
-tcExpr (PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = do  { res_ty <- expTypeToType res_ty
-        ; (coi, elt_ty) <- matchExpectedPArrTy res_ty
-        ; expr1' <- tcPolyExpr expr1 elt_ty
-        ; expr2' <- tcPolyExpr expr2 elt_ty
-        ; expr3' <- tcPolyExpr expr3 elt_ty
-        ; enumFromThenToP <- initDsTc $ dsDPHBuiltin enumFromThenToPVar
-        ; eft <- newMethodFromName (PArrSeqOrigin seq)
-                      (idName enumFromThenToP) elt_ty        -- !!!FIXME: chak
-        ; return $
-          mkHsWrapCo coi $ PArrSeq eft (FromThenTo expr1' expr2' expr3') }
-
-tcExpr (PArrSeq {}) _
-  = panic "TcExpr.tcExpr: Infinite parallel array!"
-    -- the parser shouldn't have generated it and the renamer shouldn't have
-    -- let it through
 
 {-
 ************************************************************************

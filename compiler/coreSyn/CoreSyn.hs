@@ -92,9 +92,6 @@ module CoreSyn (
         ruleArity, ruleName, ruleIdName, ruleActivation,
         setRuleIdName, ruleModule,
         isBuiltinRule, isLocalRule, isAutoRule,
-
-        -- * Core vectorisation declarations data type
-        CoreVect(..)
     ) where
 
 #include "HsVersions.h"
@@ -112,7 +109,6 @@ import NameEnv( NameEnv, emptyNameEnv )
 import Literal
 import DataCon
 import Module
-import TyCon
 import BasicTypes
 import DynFlags
 import Outputable
@@ -1301,23 +1297,6 @@ isLocalRule = ru_local
 -- | Set the 'Name' of the 'Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Vectorisation declarations}
-*                                                                      *
-************************************************************************
-
-Representation of desugared vectorisation declarations that are fed to the vectoriser (via
-'ModGuts').
--}
-
-data CoreVect = Vect      Id   CoreExpr
-              | NoVect    Id
-              | VectType  Bool TyCon (Maybe TyCon)
-              | VectClass TyCon                     -- class tycon
-              | VectInst  Id                        -- instance dfun (always SCALAR)  !!!FIXME: should be superfluous now
 
 {-
 ************************************************************************

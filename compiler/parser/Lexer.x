@@ -371,11 +371,6 @@ $tab          { warnTab }
 -- "special" symbols
 
 <0> {
-  "[:" / { ifExtension parrEnabled }    { token ITopabrack }
-  ":]" / { ifExtension parrEnabled }    { token ITcpabrack }
-}
-
-<0> {
   "[|"        / { ifExtension thQuotesEnabled } { token (ITopenExpQuote NoE
                                                                 NormalSyntax) }
   "[||"       / { ifExtension thQuotesEnabled } { token (ITopenTExpQuote NoE) }
@@ -665,9 +660,6 @@ data Token
   | IToptions_prag String
   | ITinclude_prag String
   | ITlanguage_prag
-  | ITvect_prag         SourceText
-  | ITvect_scalar_prag  SourceText
-  | ITnovect_prag       SourceText
   | ITminimal_prag      SourceText
   | IToverlappable_prag SourceText  -- instance overlap mode
   | IToverlapping_prag  SourceText  -- instance overlap mode
@@ -2230,7 +2222,6 @@ data ExtBits
   = FfiBit
   | InterruptibleFfiBit
   | CApiFfiBit
-  | ParrBit
   | ArrowsBit
   | ThBit
   | ThQuotesBit
@@ -2271,8 +2262,6 @@ data ExtBits
 
 always :: ExtsBitmap -> Bool
 always           _     = True
-parrEnabled :: ExtsBitmap -> Bool
-parrEnabled = xtest ParrBit
 arrowsEnabled :: ExtsBitmap -> Bool
 arrowsEnabled = xtest ArrowsBit
 thEnabled :: ExtsBitmap -> Bool
@@ -2357,7 +2346,6 @@ mkParserFlags flags =
       bitmap =     FfiBit                      `setBitIf` xopt LangExt.ForeignFunctionInterface flags
                .|. InterruptibleFfiBit         `setBitIf` xopt LangExt.InterruptibleFFI         flags
                .|. CApiFfiBit                  `setBitIf` xopt LangExt.CApiFFI                  flags
-               .|. ParrBit                     `setBitIf` xopt LangExt.ParallelArrays           flags
                .|. ArrowsBit                   `setBitIf` xopt LangExt.Arrows                   flags
                .|. ThBit                       `setBitIf` xopt LangExt.TemplateHaskell          flags
                .|. ThQuotesBit                 `setBitIf` xopt LangExt.TemplateHaskellQuotes    flags
@@ -2878,8 +2866,6 @@ oneWordPrags = Map.fromList [
      ("unpack", strtoken (\s -> ITunpack_prag (SourceText s))),
      ("nounpack", strtoken (\s -> ITnounpack_prag (SourceText s))),
      ("ann", strtoken (\s -> ITann_prag (SourceText s))),
-     ("vectorize", strtoken (\s -> ITvect_prag (SourceText s))),
-     ("novectorize", strtoken (\s -> ITnovect_prag (SourceText s))),
      ("minimal", strtoken (\s -> ITminimal_prag (SourceText s))),
      ("overlaps", strtoken (\s -> IToverlaps_prag (SourceText s))),
      ("overlappable", strtoken (\s -> IToverlappable_prag (SourceText s))),
@@ -2890,7 +2876,7 @@ oneWordPrags = Map.fromList [
      ("column", columnPrag)
      ]
 
-twoWordPrags = Map.fromList([
+twoWordPrags = Map.fromList [
      ("inline conlike",
          strtoken (\s -> (ITinline_prag (SourceText s) Inline ConLike))),
      ("notinline conlike",
@@ -2898,9 +2884,8 @@ twoWordPrags = Map.fromList([
      ("specialize inline",
          strtoken (\s -> (ITspec_inline_prag (SourceText s) True))),
      ("specialize notinline",
-         strtoken (\s -> (ITspec_inline_prag (SourceText s) False))),
-     ("vectorize scalar",
-         strtoken (\s -> ITvect_scalar_prag (SourceText s)))])
+         strtoken (\s -> (ITspec_inline_prag (SourceText s) False)))
+     ]
 
 dispatch_pragmas :: Map String Action -> Action
 dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToString buf len)) prags of
@@ -2922,8 +2907,6 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                           canonical prag' = case prag' of
                                               "noinline" -> "notinline"
                                               "specialise" -> "specialize"
-                                              "vectorise" -> "vectorize"
-                                              "novectorise" -> "novectorize"
                                               "constructorlike" -> "conlike"
                                               _ -> prag'
                           canon_ws s = unwords (map canonical (words s))

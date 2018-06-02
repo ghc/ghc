@@ -481,11 +481,6 @@ ifeq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 define addExtraPackage
 ifeq "$2" "-"
 # Do nothing; this package is already handled above
-else ifeq "$2" "dph"
-ifeq "$$(BUILD_DPH) $$(GhcProfiled)" "YES NO"
-# The DPH packages need TH, which is incompatible with a profiled GHC.
-PACKAGES_STAGE2 += $1
-endif
 else ifeq "$2" "extra"
 ifeq "$$(BUILD_EXTRA_PKGS)" "YES"
 PACKAGES_STAGE2 += $1
@@ -662,13 +657,6 @@ ifneq "$(CLEANING)" "YES"
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE2))
 BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
-ifeq "$(BUILD_DPH)" "YES"
-# Note: `$(eval $(call foreachLibrary,addExtraPackage))` above adds the
-# packages listed in `libraries/dph/ghc-packages` (e.g. dph-base) to
-# PACKAGES_STAGE2. But not 'libraries/dph' itself (it doesn't have a cabal
-# file). Since it does have a ghc.mk file, we add it to BUILD_DIRS here.
-BUILD_DIRS += $(wildcard libraries/dph)
-endif
 endif
 
 BUILD_DIRS += libraries/integer-gmp/gmp
@@ -792,8 +780,7 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 # Make sure we have all the GHCi libs by the time we've built
-# ghc-stage2.  DPH includes a bit of Template Haskell which needs the
-# GHCi libs, and we don't have a better way to express that dependency.
+# ghc-stage2.
 #
 GHCI_LIBS = $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_GHCI_LIB)) \
 	    $(compiler_stage2_GHCI_LIB)
@@ -1082,10 +1069,6 @@ $(eval $(call bindist-list,.,\
     bindist.mk \
     libraries/gen_contents_index \
     libraries/prologue.txt \
-    $(wildcard libraries/dph/LICENSE \
-               libraries/dph/ghc-packages \
-               libraries/dph/ghc-packages2 \
-               libraries/dph/ghc-stage2-package) \
  ))
 endif
 # mk/project.mk gets an absolute path, so we manually include it in
@@ -1231,7 +1214,7 @@ GIT_COMMIT_ID:
 sdist-ghc-prep-tree : VERSION GIT_COMMIT_ID
 
 # Extra packages which shouldn't be in the source distribution: see #8801
-EXTRA_PACKAGES=parallel random primitive vector dph
+EXTRA_PACKAGES=parallel random
 
 .PHONY: sdist-ghc-prep-tree
 sdist-ghc-prep-tree :

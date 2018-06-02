@@ -1012,11 +1012,10 @@ checkAPat msg loc e0 = do
 
    OpApp {}           -> patFail msg loc e0
 
-   HsPar _ e          -> checkLPat msg e >>= (return . (ParPat noExt))
    ExplicitList _ _ es -> do ps <- mapM (checkLPat msg) es
                              return (ListPat noExt ps)
-   ExplicitPArr _ es  -> do ps <- mapM (checkLPat msg) es
-                            return (PArrPat noExt ps)
+
+   HsPar _ e          -> checkLPat msg e >>= (return . (ParPat noExt))
 
    ExplicitTuple _ es b
      | all tupArgPresent es  -> do ps <- mapM (checkLPat msg)

@@ -15,7 +15,7 @@ module TcHsType (
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
         tcHsClsInstType,
-        tcHsDeriv, tcHsVectInst,
+        tcHsDeriv,
         tcHsTypeApp,
         UserTypeCtxt(..),
         tcImplicitTKBndrs, tcImplicitTKBndrsX,
@@ -302,22 +302,6 @@ tcHsClsInstType user_ctxt hs_inst_ty
   = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
     do { inst_ty <- tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
-
--- Used for 'VECTORISE [SCALAR] instance' declarations
-tcHsVectInst :: LHsSigType GhcRn -> TcM (Class, [Type])
-tcHsVectInst ty
-  | let hs_cls_ty = hsSigType ty
-  , Just (L _ cls_name, tys) <- hsTyGetAppHead_maybe hs_cls_ty
-    -- Ignoring the binders looks pretty dodgy to me
-  = do { (cls, cls_kind) <- tcClass cls_name
-       ; (applied_class, _res_kind)
-           <- tcTyApps typeLevelMode hs_cls_ty (mkClassPred cls []) cls_kind tys
-       ; case tcSplitTyConApp_maybe applied_class of
-           Just (_tc, args) -> ASSERT( _tc == classTyCon cls )
-                               return (cls, args)
-           _ -> failWithTc (text "Too many arguments passed to" <+> ppr cls_name) }
-  | otherwise
-  = failWithTc $ text "Malformed instance type"
 
 ----------------------------------------------
 -- | Type-check a visible type application
@@ -678,12 +662,6 @@ tc_hs_type mode rn_ty@(HsListTy _ elt_ty) exp_kind
   = do { tau_ty <- tc_lhs_type mode elt_ty liftedTypeKind
        ; checkWiredInTyCon listTyCon
        ; checkExpectedKind rn_ty (mkListTy tau_ty) liftedTypeKind exp_kind }
-
-tc_hs_type mode rn_ty@(HsPArrTy _ elt_ty) exp_kind
-  = do { MASSERT( isTypeLevel (mode_level mode) )
-       ; tau_ty <- tc_lhs_type mode elt_ty liftedTypeKind
-       ; checkWiredInTyCon parrTyCon
-       ; checkExpectedKind rn_ty (mkPArrTy tau_ty) liftedTypeKind exp_kind }
 
 -- See Note [Distinguishing tuple kinds] in HsTypes
 -- See Note [Inferring tuple kinds]
@@ -1186,23 +1164,6 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                 Just (ATyCon tc) -> return tc
                 _                -> do { traceTc "lk1 (loopy)" (ppr name)
                                        ; return tc_tc } }
-
-tcClass :: Name -> TcM (Class, TcKind)
-tcClass cls     -- Must be a class
-  = do { thing <- tcLookup cls
-       ; case thing of
-           ATcTyCon tc -> return (aThingErr "tcClass" cls, tyConKind tc)
-           AGlobal (ATyCon tc)
-             | Just cls <- tyConClass_maybe tc
-             -> return (cls, tyConKind tc)
-           _ -> wrongThingErr "class" thing cls }
-
-
-aThingErr :: String -> Name -> b
--- The type checker for types is sometimes called simply to
--- do *kind* checking; and in that case it ignores the type
--- returned. Which is a good thing since it may not be available yet!
-aThingErr str x = pprPanic "AThing evaluated unexpectedly" (text str <+> ppr x)
 
 {-
 Note [Type-checking inside the knot]

@@ -612,21 +612,3 @@ instance Outputable id => Outputable (Tickish id) where
   ppr (SourceNote span _) =
       hcat [ text "src<", pprUserRealSpan True span, char '>']
 
-{-
------------------------------------------------------
---      Vectorisation declarations
------------------------------------------------------
--}
-
-instance Outputable CoreVect where
-  ppr (Vect     var e)               = hang (text "VECTORISE" <+> ppr var <+> char '=')
-                                         4 (pprCoreExpr e)
-  ppr (NoVect   var)                 = text "NOVECTORISE" <+> ppr var
-  ppr (VectType False var Nothing)   = text "VECTORISE type" <+> ppr var
-  ppr (VectType True  var Nothing)   = text "VECTORISE SCALAR type" <+> ppr var
-  ppr (VectType False var (Just tc)) = text "VECTORISE type" <+> ppr var <+> char '=' <+>
-                                       ppr tc
-  ppr (VectType True var (Just tc))  = text "VECTORISE SCALAR type" <+> ppr var <+>
-                                       char '=' <+> ppr tc
-  ppr (VectClass tc)                 = text "VECTORISE class" <+> ppr tc
-  ppr (VectInst var)                 = text "VECTORISE SCALAR instance" <+> ppr var

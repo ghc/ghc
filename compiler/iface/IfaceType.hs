@@ -1100,7 +1100,6 @@ pprIfaceCoTcApp ctxt_prec tc tys = ppr_iface_tc_app ppr_co ctxt_prec tc tys
 ppr_iface_tc_app :: (PprPrec -> a -> SDoc) -> PprPrec -> IfaceTyCon -> [a] -> SDoc
 ppr_iface_tc_app pp _ tc [ty]
   | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
-  | tc `ifaceTyConHasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp topPrec ty)
 
 ppr_iface_tc_app pp ctxt_prec tc tys
   |  tc `ifaceTyConHasKey` starKindTyConKey

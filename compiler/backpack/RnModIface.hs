@@ -108,7 +108,6 @@ rnModIface hsc_env insts nsubst iface = do
         deps <- rnDependencies (mi_deps iface)
         -- TODO:
         -- mi_rules
-        -- mi_vect_info (LOW PRIORITY)
         return iface { mi_module = mod
                      , mi_sig_of = sig_of
                      , mi_insts = insts

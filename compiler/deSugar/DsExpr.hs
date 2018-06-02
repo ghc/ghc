@@ -423,7 +423,6 @@ ds_expr _ (HsLet _ binds body) = do
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
 ds_expr _ (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
-ds_expr _ (HsDo _ PArrComp      (L _ stmts)) = dsPArrComp (map unLoc stmts)
 ds_expr _ (HsDo _ DoExpr        (L _ stmts)) = dsDo stmts
 ds_expr _ (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
 ds_expr _ (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
@@ -460,37 +459,11 @@ ds_expr _ (HsMultiIf res_ty alts)
 ds_expr _ (ExplicitList elt_ty wit xs)
   = dsExplicitList elt_ty wit xs
 
--- We desugar [:x1, ..., xn:] as
---   singletonP x1 +:+ ... +:+ singletonP xn
---
-ds_expr _ (ExplicitPArr  ty []) = do
-    emptyP <- dsDPHBuiltin emptyPVar
-    return (Var emptyP `App` Type ty)
-ds_expr _ (ExplicitPArr ty xs) = do
-    singletonP <- dsDPHBuiltin singletonPVar
-    appP       <- dsDPHBuiltin appPVar
-    xs'        <- mapM dsLExprNoLP xs
-    let unary  fn x   = mkApps (Var fn) [Type ty, x]
-        binary fn x y = mkApps (Var fn) [Type ty, x, y]
-
-    return . foldr1 (binary appP) $ map (unary singletonP) xs'
-
 ds_expr _ (ArithSeq expr witness seq)
   = case witness of
      Nothing -> dsArithSeq expr seq
      Just fl -> do { newArithSeq <- dsArithSeq expr seq
                    ; dsSyntaxExpr fl [newArithSeq] }
-
-ds_expr _ (PArrSeq expr (FromTo from to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, to]
-
-ds_expr _ (PArrSeq expr (FromThenTo from thn to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, thn, to]
-
-ds_expr _ (PArrSeq _ _)
-  = panic "DsExpr.dsExpr: Infinite parallel array!"
-    -- the parser shouldn't have generated it and the renamer and typechecker
-    -- shouldn't have let it through
 
 {-
 Static Pointers

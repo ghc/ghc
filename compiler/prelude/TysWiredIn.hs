@@ -95,11 +95,6 @@ module TysWiredIn (
         unicodeStarKindTyCon, unicodeStarKindTyConName,
         liftedTypeKindTyCon, constraintKindTyCon,
 
-        -- * Parallel arrays
-        mkPArrTy,
-        parrTyCon, parrFakeCon, isPArrTyCon, isPArrFakeCon,
-        parrTyCon_RDR, parrTyConName,
-
         -- * Equality predicates
         heqTyCon, heqClass, heqDataCon,
         coercibleTyCon, coercibleTyConName, coercibleDataCon, coercibleClass,
@@ -220,7 +215,6 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , word8TyCon
                 , listTyCon
                 , maybeTyCon
-                , parrTyCon
                 , heqTyCon
                 , coercibleTyCon
                 , typeNatKindCon
@@ -445,14 +439,8 @@ vecElemDataConNames = zipWith3Lazy mk_special_dc_name
 mk_special_dc_name :: FastString -> Unique -> DataCon -> Name
 mk_special_dc_name fs u dc = mkWiredInDataConName UserSyntax gHC_TYPES fs u dc
 
-parrTyConName, parrDataConName :: Name
-parrTyConName   = mkWiredInTyConName   BuiltInSyntax
-                    gHC_PARR' (fsLit "[::]") parrTyConKey parrTyCon
-parrDataConName = mkWiredInDataConName UserSyntax
-                    gHC_PARR' (fsLit "PArr") parrDataConKey parrDataCon
-
 boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR,
-    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR, parrTyCon_RDR :: RdrName
+    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR :: RdrName
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR       = nameRdrName falseDataConName
 true_RDR        = nameRdrName trueDataConName
@@ -461,7 +449,6 @@ charTyCon_RDR   = nameRdrName charTyConName
 intDataCon_RDR  = nameRdrName intDataConName
 listTyCon_RDR   = nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
-parrTyCon_RDR   = nameRdrName parrTyConName
 
 {-
 ************************************************************************
@@ -691,8 +678,6 @@ isBuiltInOcc_maybe occ =
     case name of
       "[]" -> Just $ choose_ns listTyConName nilDataConName
       ":"    -> Just consDataConName
-
-      "[::]" -> Just parrTyConName
 
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
@@ -1517,78 +1502,6 @@ unitTy = mkTupleTy Boxed []
 mkSumTy :: [Type] -> Type
 mkSumTy tys = mkTyConApp (sumTyCon (length tys))
                          (map getRuntimeRep tys ++ tys)
-
-{- *********************************************************************
-*                                                                      *
-        The parallel-array type,  [::]
-*                                                                      *
-************************************************************************
-
-Special syntax for parallel arrays needs some wired in definitions.
--}
-
--- | Construct a type representing the application of the parallel array constructor
-mkPArrTy    :: Type -> Type
-mkPArrTy ty  = mkTyConApp parrTyCon [ty]
-
--- | Represents the type constructor of parallel arrays
---
---  * This must match the definition in @PrelPArr@
---
--- NB: Although the constructor is given here, it will not be accessible in
---     user code as it is not in the environment of any compiled module except
---     @PrelPArr@.
---
-parrTyCon :: TyCon
-parrTyCon  = pcTyCon parrTyConName Nothing alpha_tyvar [parrDataCon]
-
-parrDataCon :: DataCon
-parrDataCon  = pcDataCon
-                 parrDataConName
-                 alpha_tyvar            -- forall'ed type variables
-                 [intTy,                -- 1st argument: Int
-                  mkTyConApp            -- 2nd argument: Array# a
-                    arrayPrimTyCon
-                    alpha_ty]
-                 parrTyCon
-
--- | Check whether a type constructor is the constructor for parallel arrays
-isPArrTyCon    :: TyCon -> Bool
-isPArrTyCon tc  = tyConName tc == parrTyConName
-
--- | Fake array constructors
---
--- * These constructors are never really used to represent array values;
---   however, they are very convenient during desugaring (and, in particular,
---   in the pattern matching compiler) to treat array pattern just like
---   yet another constructor pattern
---
-parrFakeCon                        :: Arity -> DataCon
-parrFakeCon i | i > mAX_TUPLE_SIZE  = mkPArrFakeCon  i  -- build one specially
-parrFakeCon i                       = parrFakeConArr!i
-
--- pre-defined set of constructors
---
-parrFakeConArr :: Array Int DataCon
-parrFakeConArr  = array (0, mAX_TUPLE_SIZE) [(i, mkPArrFakeCon i)
-                                            | i <- [0..mAX_TUPLE_SIZE]]
-
--- build a fake parallel array constructor for the given arity
---
-mkPArrFakeCon       :: Int -> DataCon
-mkPArrFakeCon arity  = data_con
-  where
-        data_con  = pcDataCon name [tyvar] tyvarTys parrTyCon
-        tyvar     = head alphaTyVars
-        tyvarTys  = replicate arity $ mkTyVarTy tyvar
-        nameStr   = mkFastString ("MkPArr" ++ show arity)
-        name      = mkWiredInName gHC_PARR' (mkDataOccFS nameStr) unique
-                                  (AConLike (RealDataCon data_con)) UserSyntax
-        unique      = mkPArrDataConUnique arity
-
--- | Checks whether a data constructor is a fake constructor for parallel arrays
-isPArrFakeCon      :: DataCon -> Bool
-isPArrFakeCon dcon  = dcon == parrFakeCon (dataConSourceArity dcon)
 
 -- Promoted Booleans
 

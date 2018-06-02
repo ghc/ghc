@@ -86,7 +86,6 @@ import HscTypes
 import Finder
 import DynFlags
 import VarEnv
-import VarSet
 import Var
 import Name
 import Avail
@@ -222,7 +221,6 @@ mkIface_ hsc_env maybe_old_fingerprint
                       md_fam_insts = fam_insts,
                       md_rules     = rules,
                       md_anns      = anns,
-                      md_vect_info = vect_info,
                       md_types     = type_env,
                       md_exports   = exports,
                       md_complete_sigs = complete_sigs }
@@ -257,7 +255,6 @@ mkIface_ hsc_env maybe_old_fingerprint
         iface_rules = map coreRuleToIfaceRule rules
         iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
-        iface_vect_info = flattenVectInfo vect_info
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
         icomplete_sigs = map mkIfaceCompleteSig complete_sigs
@@ -279,8 +276,6 @@ mkIface_ hsc_env maybe_old_fingerprint
               mi_insts       = sortBy cmp_inst     iface_insts,
               mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
               mi_rules       = sortBy cmp_rule     iface_rules,
-
-              mi_vect_info   = iface_vect_info,
 
               mi_fixities    = fixities,
               mi_warns       = warns,
@@ -351,19 +346,6 @@ mkIface_ hsc_env maybe_old_fingerprint
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
      ifFamInstTcName = ifFamInstFam
-
-     flattenVectInfo (VectInfo { vectInfoVar            = vVar
-                               , vectInfoTyCon          = vTyCon
-                               , vectInfoParallelVars     = vParallelVars
-                               , vectInfoParallelTyCons = vParallelTyCons
-                               }) =
-       IfaceVectInfo
-       { ifaceVectInfoVar            = [Var.varName v | (v, _  ) <- dVarEnvElts vVar]
-       , ifaceVectInfoTyCon          = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t /= t_v]
-       , ifaceVectInfoTyConReuse     = [tyConName t   | (t, t_v) <- nameEnvElts vTyCon, t == t_v]
-       , ifaceVectInfoParallelVars   = [Var.varName v | v <- dVarSetElems vParallelVars]
-       , ifaceVectInfoParallelTyCons = nameSetElemsStable vParallelTyCons
-       }
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -686,13 +668,11 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    --   - export list
    --   - orphans
    --   - deprecations
-   --   - vect info
    --   - flag abi hash
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
-                       mi_warns iface0,
-                       mi_vect_info iface0)
+                       mi_warns iface0)
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
@@ -722,8 +702,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                 mi_orphan      = not (   all ifRuleAuto orph_rules
                                            -- See Note [Orphans and auto-generated rules]
                                       && null orph_insts
-                                      && null orph_fis
-                                      && isNoIfaceVectInfo (mi_vect_info iface0)),
+                                      && null orph_fis),
                 mi_finsts      = not . null $ mi_fam_insts iface0,
                 mi_decls       = sorted_decls,
                 mi_hash_fn     = lookupOccEnv local_env }

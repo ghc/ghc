@@ -25,7 +25,6 @@ module TcUnify (
   -- Holes
   tcInferInst, tcInferNoInst,
   matchExpectedListTy,
-  matchExpectedPArrTy,
   matchExpectedTyConApp,
   matchExpectedAppTy,
   matchExpectedFunTys,
@@ -361,13 +360,6 @@ matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
 matchExpectedListTy exp_ty
  = do { (co, [elt_ty]) <- matchExpectedTyConApp listTyCon exp_ty
       ; return (co, elt_ty) }
-
-----------------------
-matchExpectedPArrTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)
--- Special case for parrs
-matchExpectedPArrTy exp_ty
-  = do { (co, [elt_ty]) <- matchExpectedTyConApp parrTyCon exp_ty
-       ; return (co, elt_ty) }
 
 ---------------------
 matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> ... -> kn -> *

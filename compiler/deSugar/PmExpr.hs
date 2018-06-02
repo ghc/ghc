@@ -261,10 +261,6 @@ hsExprToPmExpr e@(ExplicitList _  mb_ol elems)
     cons x xs = mkPmExprData consDataCon [x,xs]
     nil       = mkPmExprData nilDataCon  []
 
-hsExprToPmExpr (ExplicitPArr _ elems)
-  = mkPmExprData (parrFakeCon (length elems)) (map lhsExprToPmExpr elems)
-
-
 -- we want this but we would have to make everything monadic :/
 -- ./compiler/deSugar/DsMonad.hs:397:dsLookupDataCon :: Name -> DsM DataCon
 --
@@ -395,7 +391,7 @@ needsParens (PmExprLit    l) = isNegatedPmLit l
 needsParens (PmExprEq    {}) = False -- will become a wildcard
 needsParens (PmExprOther {}) = False -- will become a wildcard
 needsParens (PmExprCon (RealDataCon c) es)
-  | isTupleDataCon c || isPArrFakeCon c
+  | isTupleDataCon c
   || isConsDataCon c || null es = False
   | otherwise                   = True
 needsParens (PmExprCon (PatSynCon _) es) = not (null es)
@@ -408,12 +404,10 @@ pprPmExprWithParens expr
 pprPmExprCon :: ConLike -> [PmExpr] -> PmPprM SDoc
 pprPmExprCon (RealDataCon con) args
   | isTupleDataCon con = mkTuple <$> mapM pprPmExpr args
-  |  isPArrFakeCon con = mkPArr  <$> mapM pprPmExpr args
-  |  isConsDataCon con = pretty_list
+  | isConsDataCon con  = pretty_list
   where
-    mkTuple, mkPArr :: [SDoc] -> SDoc
+    mkTuple :: [SDoc] -> SDoc
     mkTuple = parens     . fsep . punctuate comma
-    mkPArr  = paBrackets . fsep . punctuate comma
 
     -- lazily, to be used in the list case only
     pretty_list :: PmPprM SDoc

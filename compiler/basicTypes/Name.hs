@@ -51,7 +51,6 @@ module Name (
         setNameLoc,
         tidyNameOcc,
         localiseName,
-        mkLocalisedOccName,
 
         nameSrcLoc, nameSrcSpan, pprNameDefnLoc, pprDefinedAt,
 
@@ -413,18 +412,6 @@ tidyNameOcc name                            occ = name { n_occ = occ }
 -- | Make the 'Name' into an internal name, regardless of what it was to begin with
 localiseName :: Name -> Name
 localiseName n = n { n_sort = Internal }
-
--- |Create a localised variant of a name.
---
--- If the name is external, encode the original's module name to disambiguate.
--- SPJ says: this looks like a rather odd-looking function; but it seems to
---           be used only during vectorisation, so I'm not going to worry
-mkLocalisedOccName :: Module -> (Maybe String -> OccName -> OccName) -> Name -> OccName
-mkLocalisedOccName this_mod mk_occ name = mk_occ origin (nameOccName name)
-  where
-    origin
-      | nameIsLocalOrFrom this_mod name = Nothing
-      | otherwise                       = Just (moduleNameColons . moduleName . nameModule $ name)
 
 {-
 ************************************************************************

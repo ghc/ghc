@@ -1054,7 +1054,6 @@ collect_lpat (L _ pat) bndrs
     go (ParPat _ pat)             = collect_lpat pat bndrs
 
     go (ListPat _ pats)           = foldr collect_lpat bndrs pats
-    go (PArrPat _ pats)           = foldr collect_lpat bndrs pats
     go (TuplePat _ pats _)        = foldr collect_lpat bndrs pats
     go (SumPat _ pat _ _)         = collect_lpat pat bndrs
 
@@ -1345,7 +1344,6 @@ lPatImplicits = hs_lpat
     hs_pat (ViewPat _ _ pat)    = hs_lpat pat
     hs_pat (ParPat _ pat)       = hs_lpat pat
     hs_pat (ListPat _ pats)     = hs_lpats pats
-    hs_pat (PArrPat _ pats)     = hs_lpats pats
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
 
     hs_pat (SigPat _ pat)       = hs_lpat pat

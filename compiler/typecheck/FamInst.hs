@@ -152,7 +152,6 @@ See #9562.
 
 newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
 -- Freshen the type variables of the FamInst branches
--- Called from the vectoriser monad too, hence the rather general type
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
   = ASSERT2( tyCoVarsOfTypes lhs `subVarSet` tcv_set, text "lhs" <+> pp_ax )
     ASSERT2( tyCoVarsOfType  rhs `subVarSet` tcv_set, text "rhs" <+> pp_ax )

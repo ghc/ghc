@@ -352,7 +352,7 @@ Core plugins in more detail
 
 ``CoreToDo`` is effectively a data type that describes all the kinds of
 optimization passes GHC does on Core. There are passes for
-simplification, CSE, vectorisation, etc. There is a specific case for
+simplification, CSE, etc. There is a specific case for
 plugins, ``CoreDoPluginPass :: String -> PluginPass -> CoreToDo`` which
 should be what you always use when inserting your own pass into the
 pipeline. The first parameter is the name of the plugin, and the second

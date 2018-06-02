@@ -350,7 +350,7 @@ rnImplicitBndrs bind_free_tvs
 
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- Rename the type in an instance.
--- The 'doc_str' is "an instance declaration" or "a VECTORISE pragma"
+-- The 'doc_str' is "an instance declaration".
 -- Do not try to decompose the inst_ty in case it is malformed
 rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
 
@@ -607,11 +607,6 @@ rnHsTyKi env t@(HsKindSig _ ty k)
        ; (ty', fvs1) <- rnLHsTyKi env ty
        ; (k', fvs2)  <- rnLHsTyKi (env { rtke_level = KindLevel }) k
        ; return (HsKindSig noExt ty' k', fvs1 `plusFV` fvs2) }
-
-rnHsTyKi env t@(HsPArrTy _ ty)
-  = do { notInKinds env t
-       ; (ty', fvs) <- rnLHsTyKi env ty
-       ; return (HsPArrTy noExt ty', fvs) }
 
 -- Unboxed tuples are allowed to have poly-typed arguments.  These
 -- sometimes crop up as a result of CPR worker-wrappering dictionaries.
@@ -1149,7 +1144,6 @@ collectAnonWildCards lty = go lty
       HsAppTy _ ty1 ty2              -> go ty1 `mappend` go ty2
       HsFunTy _ ty1 ty2              -> go ty1 `mappend` go ty2
       HsListTy _ ty                  -> go ty
-      HsPArrTy _ ty                  -> go ty
       HsTupleTy _ _ tys              -> gos tys
       HsSumTy _ tys                  -> gos tys
       HsOpTy _ ty1 _ ty2             -> go ty1 `mappend` go ty2
@@ -1839,7 +1833,6 @@ extract_lty t_or_k (L _ ty) acc
       HsAppTy _ ty1 ty2           -> extract_lty t_or_k ty1 =<<
                                      extract_lty t_or_k ty2 acc
       HsListTy _ ty               -> extract_lty t_or_k ty acc
-      HsPArrTy _ ty               -> extract_lty t_or_k ty acc
       HsTupleTy _ _ tys           -> extract_ltys t_or_k tys acc
       HsSumTy _ tys               -> extract_ltys t_or_k tys acc
       HsFunTy _ ty1 ty2           -> extract_lty t_or_k ty1 =<<

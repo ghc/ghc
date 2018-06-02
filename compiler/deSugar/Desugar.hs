@@ -28,8 +28,6 @@ import TcRnDriver ( runTcInteractive )
 import Id
 import Name
 import Type
-import InstEnv
-import Class
 import Avail
 import CoreSyn
 import CoreFVs     ( exprsSomeFreeVarsList )
@@ -104,7 +102,6 @@ deSugar hsc_env
                             tcg_th_foreign_files = th_foreign_files_var,
                             tcg_fords        = fords,
                             tcg_rules        = rules,
-                            tcg_vects        = vects,
                             tcg_patsyns      = patsyns,
                             tcg_tcs          = tcs,
                             tcg_insts        = insts,
@@ -134,18 +131,17 @@ deSugar hsc_env
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
-                          ; ds_vects <- mapM dsVect vects
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
                           ; return ( ds_ev_binds
                                    , foreign_prs `appOL` core_prs `appOL` spec_prs
-                                   , spec_rules ++ ds_rules, ds_vects
+                                   , spec_rules ++ ds_rules
                                    , ds_fords `appendStubC` hpc_init) }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
-           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords) ->
+           Just (ds_ev_binds, all_prs, all_rules, ds_fords) ->
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
@@ -162,8 +158,8 @@ deSugar hsc_env
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
         ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
-        ; (ds_binds, ds_rules_for_imps, ds_vects)
-            <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
+        ; (ds_binds, ds_rules_for_imps)
+            <- simpleOptPgm dflags mod final_pgm rules_for_imps
                          -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
 
@@ -211,8 +207,6 @@ deSugar hsc_env
                 mg_foreign_files = foreign_files,
                 mg_hpc_info     = ds_hpc_info,
                 mg_modBreaks    = modBreaks,
-                mg_vect_decls   = ds_vects,
-                mg_vect_info    = noVectInfo,
                 mg_safe_haskell = safe_mode,
                 mg_trust_pkg    = imp_trust_own_pkg imports,
                 mg_complete_sigs = complete_matches
@@ -548,32 +542,4 @@ and similar, which will elicit exactly these warnings, and risk never
 firing.  But it's not clear what to do instead.  We could make the
 class method rules inactive in phase 2, but that would delay when
 subsequent transformations could fire.
-
-
-************************************************************************
-*                                                                      *
-*              Desugaring vectorisation declarations
-*                                                                      *
-************************************************************************
 -}
-
-dsVect :: LVectDecl GhcTc -> DsM CoreVect
-dsVect (L loc (HsVect _ _ (L _ v) rhs))
-  = putSrcSpanDs loc $
-    do { rhs' <- dsLExpr rhs
-       ; return $ Vect v rhs'
-       }
-dsVect (L _loc (HsNoVect _ _ (L _ v)))
-  = return $ NoVect v
-dsVect (L _loc (HsVectType (VectTypeTc tycon rhs_tycon) isScalar))
-  = return $ VectType isScalar tycon' rhs_tycon
-  where
-    tycon' | Just ty <- coreView $ mkTyConTy tycon
-           , (tycon', []) <- splitTyConApp ty      = tycon'
-           | otherwise                             = tycon
-dsVect (L _loc (HsVectClass cls))
-  = return $ VectClass (classTyCon cls)
-dsVect (L _loc (HsVectInst inst))
-  = return $ VectInst (instanceDFunId inst)
-dsVect vd@(L _ (XVectDecl {}))
-  = pprPanic "Desugar.dsVect: unexpected 'XVectDecl'" (ppr vd)

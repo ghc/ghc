@@ -55,7 +55,6 @@ upcase foo
 
 {-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}
 {-# ANN foo (Just "Hello") #-}
-{-# NOVECTORISE foo #-}
 
 :seti -XRoleAnnotations
 :{

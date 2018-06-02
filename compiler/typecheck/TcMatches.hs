@@ -302,14 +302,6 @@ tcDoStmts ListComp (L l stmts) res_ty
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
-tcDoStmts PArrComp (L l stmts) res_ty
-  = do  { res_ty <- expTypeToType res_ty
-        ; (co, elt_ty) <- matchExpectedPArrTy res_ty
-        ; let parr_ty = mkPArrTy elt_ty
-        ; stmts' <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts
-                            (mkCheckExpType elt_ty)
-        ; return $ mkHsWrapCo co (HsDo parr_ty PArrComp (L l stmts')) }
-
 tcDoStmts DoExpr (L l stmts) res_ty
   = do  { stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
@@ -427,20 +419,19 @@ tcGuardStmt _ stmt _ _
 
 
 ---------------------------------------------------
---           List comprehensions and PArrays
+--           List comprehensions
 --               (no rebindable syntax)
 ---------------------------------------------------
 
 -- Dealt with separately, rather than by tcMcStmt, because
---   a) PArr isn't (yet) an instance of Monad, so the generality seems overkill
---   b) We have special desugaring rules for list comprehensions,
+--   a) We have special desugaring rules for list comprehensions,
 --      which avoid creating intermediate lists.  They in turn
 --      assume that the bind/return operations are the regular
 --      polymorphic ones, and in particular don't have any
 --      coercion matching stuff in them.  It's hard to avoid the
 --      potential for non-trivial coercions in tcMcStmt
 
-tcLcStmt :: TyCon       -- The list/Parray type constructor ([] or PArray)
+tcLcStmt :: TyCon       -- The list type constructor ([])
          -> TcExprStmtChecker
 
 tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside

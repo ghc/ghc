@@ -272,10 +272,6 @@ rnExpr (ExplicitList x _  exps)
            else
             return  (ExplicitList x Nothing exps', fvs) }
 
-rnExpr (ExplicitPArr x exps)
-  = do { (exps', fvs) <- rnExprs exps
-       ; return  (ExplicitPArr x exps', fvs) }
-
 rnExpr (ExplicitTuple x tup_args boxity)
   = do { checkTupleSection tup_args
        ; checkTupSize (length tup_args)
@@ -341,10 +337,6 @@ rnExpr (ArithSeq x _ seq)
                      , fvs `plusFV` fvs') }
            else
             return (ArithSeq x Nothing new_seq, fvs) }
-
-rnExpr (PArrSeq x seq)
-  = do { (new_seq, fvs) <- rnArithSeq seq
-       ; return (PArrSeq x new_seq, fvs) }
 
 {-
 These three are pattern syntax appearing in expressions.
@@ -841,7 +833,7 @@ rnStmt ctxt rnBody (L loc (BodyStmt _ body _ _)) thing_inside
         ; (guard_op, fvs2) <- if isListCompExpr ctxt
                               then lookupStmtName ctxt guardMName
                               else return (noSyntaxExpr, emptyFVs)
-                              -- Only list/parr/monad comprehensions use 'guard'
+                              -- Only list/monad comprehensions use 'guard'
                               -- Also for sub-stmts of same eg [ e | x<-xs, gd | blah ]
                               -- Here "gd" is a guard
         ; (thing, fvs3)    <- thing_inside []
@@ -1020,12 +1012,11 @@ lookupStmtNamePoly ctxt name
     not_rebindable = return (HsVar noExt (noLoc name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
--- but ListComp/PArrComp are never rebindable
+-- but ListComp are never rebindable
 -- Neither is ArrowExpr, which has its own desugarer in DsArrows
 rebindableContext :: HsStmtContext Name -> Bool
 rebindableContext ctxt = case ctxt of
   ListComp        -> False
-  PArrComp        -> False
   ArrowExpr       -> False
   PatGuard {}     -> False
 
@@ -1818,7 +1809,6 @@ isStrictPattern (L _ pat) =
     ListPat{}       -> True
     TuplePat{}      -> True
     SumPat{}        -> True
-    PArrPat{}       -> True
     ConPatIn{}      -> True
     ConPatOut{}     -> True
     LitPat{}        -> True
@@ -1977,7 +1967,6 @@ checkLastStmt ctxt lstmt@(L loc stmt)
   = case ctxt of
       ListComp  -> check_comp
       MonadComp -> check_comp
-      PArrComp  -> check_comp
       ArrowExpr -> check_do
       DoExpr    -> check_do
       MDoExpr   -> check_do
@@ -2028,7 +2017,7 @@ pprStmtCat (XStmtLR {})         = panic "pprStmtCat: XStmtLR"
 emptyInvalid :: Validity  -- Payload is the empty document
 emptyInvalid = NotValid Outputable.empty
 
-okStmt, okDoStmt, okCompStmt, okParStmt, okPArrStmt
+okStmt, okDoStmt, okCompStmt, okParStmt
    :: DynFlags -> HsStmtContext Name
    -> Stmt GhcPs (Located (body GhcPs)) -> Validity
 -- Return Nothing if OK, (Just extra) if not ok
@@ -2044,7 +2033,6 @@ okStmt dflags ctxt stmt
       GhciStmtCtxt       -> okDoStmt   dflags ctxt stmt
       ListComp           -> okCompStmt dflags ctxt stmt
       MonadComp          -> okCompStmt dflags ctxt stmt
-      PArrComp           -> okPArrStmt dflags ctxt stmt
       TransStmtCtxt ctxt -> okStmt dflags ctxt stmt
 
 -------------
@@ -2090,21 +2078,6 @@ okCompStmt dflags _ stmt
        LastStmt {} -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
        ApplicativeStmt {} -> emptyInvalid
        XStmtLR{} -> panic "okCompStmt"
-
-----------------
-okPArrStmt dflags _ stmt
-  = case stmt of
-       BindStmt {} -> IsValid
-       LetStmt {}  -> IsValid
-       BodyStmt {} -> IsValid
-       ParStmt {}
-         | LangExt.ParallelListComp `xopt` dflags -> IsValid
-         | otherwise -> NotValid (text "Use ParallelListComp")
-       TransStmt {} -> emptyInvalid
-       RecStmt {}   -> emptyInvalid
-       LastStmt {}  -> emptyInvalid  -- Should not happen (dealt with by checkLastStmt)
-       ApplicativeStmt {} -> emptyInvalid
-       XStmtLR{} -> panic "okPArrStmt"
 
 ---------
 checkTupleSection :: [LHsTupArg GhcPs] -> RnM ()

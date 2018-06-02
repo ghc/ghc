@@ -207,12 +207,6 @@ if [ $be_quiet -eq 1 ]; then
     echo "V=0"                  >> mk/are-validating.mk # Less gunk
 fi
 
-if [ $use_dph -eq 1 ]; then
-    echo "BUILD_DPH=YES"    >> mk/are-validating.mk
-else
-    echo "BUILD_DPH=NO"     >> mk/are-validating.mk
-fi
-
 $make -j$threads
 # For a "debug make", add "--debug=b --debug=m"
 

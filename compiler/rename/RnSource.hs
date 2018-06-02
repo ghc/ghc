@@ -99,7 +99,6 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                             hs_fords   = foreign_decls,
                             hs_defds   = default_decls,
                             hs_ruleds  = rule_decls,
-                            hs_vects   = vect_decls,
                             hs_docs    = docs })
  = do {
    -- (A) Process the fixity declarations, creating a mapping from
@@ -187,12 +186,11 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    (rn_rule_decls,    src_fvs2) <- setXOptM LangExt.ScopedTypeVariables $
                                    rnList rnHsRuleDecls rule_decls ;
                            -- Inside RULES, scoped type variables are on
-   (rn_vect_decls,    src_fvs3) <- rnList rnHsVectDecl    vect_decls ;
-   (rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
-   (rn_ann_decls,     src_fvs5) <- rnList rnAnnDecl       ann_decls ;
-   (rn_default_decls, src_fvs6) <- rnList rnDefaultDecl   default_decls ;
-   (rn_deriv_decls,   src_fvs7) <- rnList rnSrcDerivDecl  deriv_decls ;
-   (rn_splice_decls,  src_fvs8) <- rnList rnSpliceDecl    splice_decls ;
+   (rn_foreign_decls, src_fvs3) <- rnList rnHsForeignDecl foreign_decls ;
+   (rn_ann_decls,     src_fvs4) <- rnList rnAnnDecl       ann_decls ;
+   (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
+   (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
+   (rn_splice_decls,  src_fvs7) <- rnList rnSpliceDecl    splice_decls ;
       -- Haddock docs; no free vars
    rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
 
@@ -210,13 +208,12 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                              hs_annds  = rn_ann_decls,
                              hs_defds  = rn_default_decls,
                              hs_ruleds = rn_rule_decls,
-                             hs_vects  = rn_vect_decls,
                              hs_docs   = rn_docs } ;
 
         tcf_bndrs = hsTyClForeignBinders rn_tycl_decls rn_foreign_decls ;
         other_def  = (Just (mkNameSet tcf_bndrs), emptyNameSet) ;
-        other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4, src_fvs5,
-                              src_fvs6, src_fvs7, src_fvs8] ;
+        other_fvs  = plusFVs [src_fvs1, src_fvs2, src_fvs3, src_fvs4,
+                              src_fvs5, src_fvs6, src_fvs7] ;
                 -- It is tiresome to gather the binders from type and class decls
 
         src_dus = [other_def] `plusDU` bind_dus `plusDU` usesOnly other_fvs ;
@@ -1105,53 +1102,6 @@ badRuleLhsErr name lhs bad_e
     err = case bad_e of
             HsUnboundVar _ uv -> text "Not in scope:" <+> ppr uv
             _ -> text "Illegal expression:" <+> ppr bad_e
-
-{-
-*********************************************************
-*                                                      *
-\subsection{Vectorisation declarations}
-*                                                      *
-*********************************************************
--}
-
-rnHsVectDecl :: VectDecl GhcPs -> RnM (VectDecl GhcRn, FreeVars)
--- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
---        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
-rnHsVectDecl (HsVect _ s var rhs@(L _ (HsVar _ _)))
-  = do { var' <- lookupLocatedOccRn var
-       ; (rhs', fv_rhs) <- rnLExpr rhs
-       ; return (HsVect noExt s var' rhs', fv_rhs `addOneFV` unLoc var')
-       }
-rnHsVectDecl (HsVect _ _ _var _rhs)
-  = failWith $ vcat
-               [ text "IMPLEMENTATION RESTRICTION: right-hand side of a VECTORISE pragma"
-               , text "must be an identifier"
-               ]
-rnHsVectDecl (HsNoVect _ s var)
-  = do { var' <- lookupLocatedTopBndrRn var           -- only applies to local (not imported) names
-       ; return (HsNoVect noExt s var', unitFV (unLoc var'))
-       }
-rnHsVectDecl (HsVectType (VectTypePR s tycon Nothing) isScalar)
-  = do { tycon' <- lookupLocatedOccRn tycon
-       ; return ( HsVectType (VectTypePR s tycon' Nothing) isScalar
-                , unitFV (unLoc tycon'))
-       }
-rnHsVectDecl (HsVectType (VectTypePR s tycon (Just rhs_tycon)) isScalar)
-  = do { tycon'     <- lookupLocatedOccRn tycon
-       ; rhs_tycon' <- lookupLocatedOccRn rhs_tycon
-       ; return ( HsVectType (VectTypePR s tycon' (Just rhs_tycon')) isScalar
-                , mkFVs [unLoc tycon', unLoc rhs_tycon'])
-       }
-rnHsVectDecl (HsVectClass (VectClassPR s cls))
-  = do { cls' <- lookupLocatedOccRn cls
-       ; return (HsVectClass (VectClassPR s cls'), unitFV (unLoc cls'))
-       }
-rnHsVectDecl (HsVectInst instTy)
-  = do { (instTy', fvs) <- rnLHsInstType (text "a VECTORISE pragma") instTy
-       ; return (HsVectInst instTy', fvs)
-       }
-rnHsVectDecl (XVectDecl {})
-  = panic "RnSource.rnHsVectDecl: Unexpected 'XVectDecl'"
 
 {- **************************************************************
          *                                                      *
@@ -2187,8 +2137,6 @@ add gp@(HsGroup {hs_annds  = ts}) l (AnnD _ d) ds
   = addl (gp { hs_annds = L l d : ts }) ds
 add gp@(HsGroup {hs_ruleds  = ts}) l (RuleD _ d) ds
   = addl (gp { hs_ruleds = L l d : ts }) ds
-add gp@(HsGroup {hs_vects  = ts}) l (VectD _ d) ds
-  = addl (gp { hs_vects = L l d : ts }) ds
 add gp l (DocD _ d) ds
   = addl (gp { hs_docs = (L l d) : (hs_docs gp) })  ds
 add (HsGroup {}) _ (SpliceD _ (XSpliceDecl _)) _ = panic "RnSource.add"
