@@ -81,6 +81,7 @@ module TcMType (
   zonkCt, zonkSkolemInfo,
 
   tcGetGlobalTyCoVars,
+  skolemiseUnboundMetaTyVar,
 
   ------------------------------
   -- Levity polymorphism

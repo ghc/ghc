@@ -134,6 +134,7 @@ module Type (
         -- ** Finding the kind of a type
         typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
+        tcIsRuntimeTypeKind,
 
         -- ** Common Kind
         liftedTypeKind,
@@ -1799,6 +1800,17 @@ tcIsLiftedTypeKind ty
   | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
   , tc `hasKey` tYPETyConKey
   = isLiftedRuntimeRep arg
+  | otherwise
+  = False
+
+-- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
+--
+-- This considers 'Constraint' to be distinct from @*@.
+tcIsRuntimeTypeKind :: Kind -> Bool
+tcIsRuntimeTypeKind ty
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey
+  = True
   | otherwise
   = False
 

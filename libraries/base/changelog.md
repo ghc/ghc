@@ -1,5 +1,14 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.14.0.0 *TBA*
+  * Bundled with GHC *TBA*
+
+  * The type of `coerce` has been generalized. It is now runtime-representation
+    polymorphic:
+    `forall {r :: RuntimeRep} (a :: TYPE r) (b :: TYPE r). Coercible a b => a -> b`.
+    The type argument `r` is marked as `Inferred` to prevent it from
+    interfering with visible type application.
+
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 

@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -21,9 +22,11 @@
 
 module Data.Coerce
         ( -- * Safe coercions
-          coerce, Coercible,
+          coerce, Coercible
         ) where
 import GHC.Prim (coerce)
 import GHC.Types (Coercible)
 
-import GHC.Base () -- for build ordering; see Notes in GHC.Base for more info
+-- The import of GHC.Base is for build ordering; see Notes in GHC.Base for
+-- more info.
+import GHC.Base ()

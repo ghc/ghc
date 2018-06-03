@@ -60,6 +60,7 @@ module HsTypes (
         mkHsOpTy, mkHsAppTy, mkHsAppTys,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
+        hsConDetailsArgs,
 
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllExtra, pprHsExplicitForAll,
@@ -899,6 +900,14 @@ instance (Outputable arg, Outputable rec)
   ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
+
+hsConDetailsArgs ::
+     HsConDetails (LHsType a) (Located [LConDeclField a])
+  -> [LHsType a]
+hsConDetailsArgs details = case details of
+  InfixCon a b -> [a,b]
+  PrefixCon xs -> xs
+  RecCon r -> map (cd_fld_type . unLoc) (unLoc r)
 
 {-
 Note [ConDeclField passs]
