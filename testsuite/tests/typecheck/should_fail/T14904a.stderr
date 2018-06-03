@@ -6,6 +6,7 @@ T14904a.hs:8:1: error:
     Inferred kinds of user-written variables:
       g :: k0 -> *
       f :: forall (a :: k0). g a
+    Inferred result kind: *
 
 T14904a.hs:9:6: error:
     • Expected kind ‘forall (a :: k1). g a’, but ‘f’ has kind ‘k0’
