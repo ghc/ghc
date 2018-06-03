@@ -27,7 +27,7 @@ module TcEnv(
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
-        tcExtendTyVarEnv, tcExtendTyVarEnv2,
+        tcExtendTyVarEnv, tcExtendNameTyVarEnv,
         tcExtendLetEnv, tcExtendSigIds, tcExtendRecIds,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
@@ -464,13 +464,13 @@ tcExtendKindEnv extra_env thing_inside
 -- bumps the TcLevel.
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
-  = tcExtendTyVarEnv2 (mkTyVarNamePairs tvs) thing_inside
+  = tcExtendNameTyVarEnv (mkTyVarNamePairs tvs) thing_inside
 
 -- Before using this function, consider using TcHsType.scopeTyVars2, which
 -- bumps the TcLevel and thus prevents any of these TyVars from appearing
 -- in kinds of tyvars in an outer scope.
-tcExtendTyVarEnv2 :: [(Name,TcTyVar)] -> TcM r -> TcM r
-tcExtendTyVarEnv2 binds thing_inside
+tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
+tcExtendNameTyVarEnv binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.
   -- thus, no coercion variables
   = do { tc_extend_local_env NotTopLevel

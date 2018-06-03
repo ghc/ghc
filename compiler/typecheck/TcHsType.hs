@@ -1516,7 +1516,7 @@ tcWildCardBindersX new_wc maybe_skol_info wc_names thing_inside
   where
     scope_tvs
       | Just info <- maybe_skol_info = scopeTyVars2 info
-      | otherwise                    = tcExtendTyVarEnv2
+      | otherwise                    = tcExtendNameTyVarEnv
 
 -- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
 -- user-supplied kind signature (CUSK), generalise the result.
@@ -1922,7 +1922,7 @@ scopeTyVars2 :: SkolemInfo -> [(Name, TcTyVar)] -> TcM a -> TcM a
 scopeTyVars2 skol_info prs thing_inside
   = fmap snd $ -- discard the TcEvBinds, which will always be empty
     checkConstraints skol_info (map snd prs) [{- no EvVars -}] $
-    tcExtendTyVarEnv2 prs $
+    tcExtendNameTyVarEnv prs $
     thing_inside
 
 ------------------
@@ -2079,7 +2079,7 @@ kcTyClTyVars :: Name -> TcM a -> TcM a
 kcTyClTyVars tycon_name thing_inside
   -- See Note [Use SigTvs in kind-checking pass] in TcTyClsDecls
   = do { tycon <- kcLookupTcTyCon tycon_name
-       ; tcExtendTyVarEnv2 (tcTyConScopedTyVars tycon) $ thing_inside }
+       ; tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
 
 tcTyClTyVars :: Name
              -> ([TyConBinder] -> Kind -> TcM a) -> TcM a

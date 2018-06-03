@@ -1303,7 +1303,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                 , ib_derived    = is_derived })
       -- tcExtendTyVarEnv (not scopeTyVars) is OK because the TcLevel is pushed
       -- in checkInstConstraints
-  = tcExtendTyVarEnv2 (lexical_tvs `zip` tyvars) $
+  = tcExtendNameTyVarEnv (lexical_tvs `zip` tyvars) $
        -- The lexical_tvs scope over the 'where' part
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; checkMinimalDefinition
