@@ -73,12 +73,17 @@ import Data.Bits
 -- .subsections_via_symbols and -dead_strip can be found at
 -- <https://developer.apple.com/library/mac/documentation/DeveloperTools/Reference/Assembler/040-Assembler_Directives/asm_directives.html#//apple_ref/doc/uid/TP30000823-TPXREF101>
 
+pprProcAlignment :: SDoc
+pprProcAlignment = sdocWithDynFlags $ \dflags ->
+  (maybe empty pprAlign . cmmProcAlignment $ dflags)
+
 pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   sdocWithDynFlags $ \dflags ->
+  pprProcAlignment $$
   case topInfoTable proc of
     Nothing ->
        case blocks of
@@ -86,6 +91,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
            pprLabel lbl
          blocks -> -- special case for code without info table:
            pprSectionAlign (Section Text lbl) $$
+           pprProcAlignment $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks) $$
            (if debugLevel dflags > 0
@@ -95,6 +101,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
+      pprProcAlignment $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
