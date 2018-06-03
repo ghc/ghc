@@ -6939,7 +6939,7 @@ Overloaded labels
 
 GHC supports *overloaded labels*, a form of identifier whose interpretation may
 depend both on its type and on its literal text.  When the
-:extension:`OverloadedLabels` extension is enabled, an overloaded label can written
+:extension:`OverloadedLabels` extension is enabled, an overloaded label can be written
 with a prefix hash, for example ``#foo``.  The type of this expression is
 ``IsLabel "foo" a => a``.
 
