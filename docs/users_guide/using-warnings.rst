@@ -33,6 +33,7 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wunsupported-llvm-version`
     * :ghc-flag:`-Wtabs`
     * :ghc-flag:`-Wunrecognised-warning-flags`
+    * :ghc-flag:`-Winaccessible-code`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -685,7 +686,7 @@ of ``-W(no-)*``.
     Similar warnings are given for a redundant constraint in an instance
     declaration.
 
-    When turning on, you can suppress it on a per-module basis with 
+    When turning on, you can suppress it on a per-module basis with
     :ghc-flag:`-Wno-redundant-constraints <-Wredundant-constraints>`.
     Occasionally you may specifically want a function to have a more
     constrained signature than necessary, perhaps to leave yourself
@@ -1087,6 +1088,43 @@ of ``-W(no-)*``.
     where the last pattern match in ``f`` won't ever be reached, as the
     second pattern overlaps it. More often than not, redundant patterns
     is a programmer mistake/error, so this option is enabled by default.
+
+.. ghc-flag:: -Winaccessible-code
+    :shortdesc: warn about inaccessible code
+    :type: dynamic
+    :reverse: -Wno-inaccessible-code
+    :category:
+
+    .. index::
+       single: inaccessible code, warning
+       single: inaccessible
+
+    By default, the compiler will warn you if types make a branch inaccessible.
+    This generally requires GADTs or similar extensions.
+
+    Take, for example, the following program ::
+
+        {-# LANGUAGE GADTs #-}
+
+        data Foo a where
+         Foo1 :: Foo Char
+         Foo2 :: Foo Int
+
+        data TyEquality a b where
+                Refl :: TyEquality a a
+
+        checkTEQ :: Foo t -> Foo u -> Maybe (TyEquality t u)
+        checkTEQ x y = error "unimportant"
+
+        step2 :: Bool
+        step2 = case checkTEQ Foo1 Foo2 of
+                 Just Refl -> True -- Inaccessible code
+                 Nothing -> False
+
+    The ``Just Refl`` case in ``step2`` is inaccessible, because in order for
+    ``checkTEQ`` to be able to produce a ``Just``, ``t ~ u`` must hold, but
+    since we're passing ``Foo1`` and ``Foo2`` here, it follows that ``t ~
+    Char``, and ``u ~ Int``, and thus ``t ~ u`` cannot hold.
 
 .. ghc-flag:: -Wsimplifiable-class-constraints
     :shortdesc: 2arn about class constraints in a type signature that can
