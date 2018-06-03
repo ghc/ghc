@@ -122,4 +122,5 @@ foldlOL k z (Many xs)   = foldl k z xs
 
 toOL :: [a] -> OrdList a
 toOL [] = None
+toOL [x] = One x
 toOL xs = Many xs
