@@ -679,6 +679,9 @@ isBuiltInOcc_maybe occ =
       "[]" -> Just $ choose_ns listTyConName nilDataConName
       ":"    -> Just consDataConName
 
+      -- equality tycon
+      "~"    -> Just eqTyConName
+
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
       _ | Just rest <- "(" `BS.stripPrefix` name
