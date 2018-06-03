@@ -280,7 +280,6 @@ data AnnKeywordId
     | AnnThIdTySplice -- ^ '$$'
     | AnnThTyQuote -- ^ double '''
     | AnnTilde -- ^ '~'
-    | AnnTildehsh -- ^ '~#'
     | AnnType
     | AnnUnit -- ^ '()' for types
     | AnnUsing
@@ -322,7 +321,7 @@ instance Outputable AnnotationComment where
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
 --             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma',
---             'ApiAnnotation.AnnRarrow','ApiAnnotation.AnnTildehsh',
+--             'ApiAnnotation.AnnRarrow'
 --             'ApiAnnotation.AnnTilde'
 --   - May have 'ApiAnnotation.AnnComma' when in a list
 type LRdrName = Located RdrName

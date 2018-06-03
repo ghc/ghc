@@ -678,7 +678,6 @@ data Token
   | ITrarrow            IsUnicodeSyntax
   | ITat
   | ITtilde
-  | ITtildehsh
   | ITdarrow            IsUnicodeSyntax
   | ITminus
   | ITbang
@@ -888,7 +887,6 @@ reservedSymsFM = listToUFM $
        ,("->",  ITrarrow NormalSyntax, always)
        ,("@",   ITat,                  always)
        ,("~",   ITtilde,               always)
-       ,("~#",  ITtildehsh,            magicHashEnabled)
        ,("=>",  ITdarrow NormalSyntax, always)
        ,("-",   ITminus,               always)
        ,("!",   ITbang,                always)
