@@ -48,6 +48,7 @@ import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
+             GetDocsFailure(..),
              getModuleGraph, handleSourceError )
 import HsImpExp
 import HsSyn
@@ -99,6 +100,7 @@ import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
 import qualified Data.Set as S
 import Data.Maybe
+import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
@@ -179,6 +181,7 @@ ghciCommands = map mkCmd [
   ("def",       keepGoing (defineMacro False),  completeExpression),
   ("def!",      keepGoing (defineMacro True),   completeExpression),
   ("delete",    keepGoing deleteCmd,            noCompletion),
+  ("doc",       keepGoing' docCmd,              completeIdentifier),
   ("edit",      keepGoing' editFile,            completeFilename),
   ("etags",     keepGoing createETagsFileCmd,   completeFilename),
   ("force",     keepGoing forceCmd,             completeExpression),
@@ -288,6 +291,7 @@ defFullHelpText =
   "                               (!: use regex instead of line number)\n" ++
   "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
   "                               precedence, ::<cmd> is always a builtin command)\n" ++
+  "   :doc <name>                 display docs for the given name (experimental)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
   "   :etags [<file>]             create tags file <file> for Emacs (default: \"TAGS\")\n" ++
@@ -1604,6 +1608,38 @@ checkModule m = do
           return True
   afterLoad (successIf ok) False
 
+-----------------------------------------------------------------------------
+-- :doc
+
+docCmd :: String -> InputT GHCi ()
+docCmd "" =
+  throwGhcException (CmdLineError "syntax: ':doc <thing-you-want-docs-for>'")
+docCmd s  = do
+  -- TODO: Maybe also get module headers for module names
+  names <- GHC.parseName s
+  e_docss <- mapM GHC.getDocs names
+  sdocs <- mapM (either handleGetDocsFailure (pure . pprDocs)) e_docss
+  let sdocs' = vcat (intersperse (text "") sdocs)
+  unqual <- GHC.getPrintUnqual
+  dflags <- getDynFlags
+  (liftIO . putStrLn . showSDocForUser dflags unqual) sdocs'
+
+-- TODO: also print arg docs.
+pprDocs :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
+pprDocs (mb_decl_docs, _arg_docs) =
+  maybe
+    (text "<has no documentation>")
+    (text . unpackHDS)
+    mb_decl_docs
+
+handleGetDocsFailure :: GHC.GhcMonad m => GetDocsFailure -> m SDoc
+handleGetDocsFailure no_docs = do
+  dflags <- getDynFlags
+  let msg = showPpr dflags no_docs
+  throwGhcException $ case no_docs of
+    NameHasNoModule {} -> Sorry msg
+    NoDocsInIface {} -> InstallationError msg
+    InteractiveName -> ProgramError msg
 
 -----------------------------------------------------------------------------
 -- :load, :add, :reload

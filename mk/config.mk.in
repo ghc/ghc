@@ -311,8 +311,11 @@ GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 #
 # 	-O(2) is pretty desirable, otherwise no inlining of prelude
 #		things (incl "+") happens when compiling with this compiler
+#
+#       -haddock is needed so the GHCi :doc command can find the boot
+#               library docs in the respective .hi-files
 
-GhcLibHcOpts=-O2
+GhcLibHcOpts=-O2 -haddock
 
 # Strip local symbols from libraries?  This can make the libraries smaller,
 # but makes debugging somewhat more difficult.  Doesn't work with all ld's.

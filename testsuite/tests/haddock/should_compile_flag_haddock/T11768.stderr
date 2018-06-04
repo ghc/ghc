@@ -3,10 +3,10 @@
 module T11768 where
 data Foo
   = Foo
-  deriving Eq  Documenting a single type
+  deriving Eq " Documenting a single type"
 data Bar
   = Bar
-  deriving (Eq  Documenting one of multiple types, Ord)
+  deriving (Eq " Documenting one of multiple types", Ord)
 <document comment>
 deriving instance Read Bar
 
