@@ -1168,6 +1168,10 @@ data HsArg tm ty
   = HsValArg tm   -- Argument is an ordinary expression     (f arg)
   | HsTypeArg  ty -- Argument is a visible type application (f @ty)
 
+instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
+  ppr (HsValArg tm) = text "HsValArg" <> ppr tm
+  ppr (HsTypeArg ty) = text "HsTypeArg" <> ppr ty
+
 isHsValArg :: HsArg tm ty -> Bool
 isHsValArg (HsValArg {}) = True
 isHsValArg (HsTypeArg {}) = False
@@ -1179,6 +1183,7 @@ tcApp1 :: HsExpr GhcRn  -- either HsApp or HsAppType
        -> ExpRhoType -> TcM (HsExpr GhcTcId)
 tcApp1 e res_ty
   = do { (wrap, fun, args) <- tcApp Nothing (noLoc e) [] res_ty
+       ; pprTrace "tcApp1" (ppr wrap $$ ppr fun $$ ppr args) (return ())
        ; return (mkHsWrap wrap $ unLoc $ foldl mk_hs_app fun args) }
   where
     mk_hs_app f (HsValArg a)  = mkHsApp f a
@@ -1259,7 +1264,7 @@ tcGeneralApp m_herald fun args res_ty
                      tcSubTypeDS_NC_O orig GenSigCtxt
                        (Just $ unLoc $ foldl mk_hs_app fun args)
                        actual_res_ty res_ty
-
+       ; pprTrace "tcGeneralApp" (ppr wrap_res) (return ())
        ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
   where
     mk_hs_app f (HsValArg a)  = mkHsApp f a

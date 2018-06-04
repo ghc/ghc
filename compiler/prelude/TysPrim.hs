@@ -23,6 +23,8 @@ module TysPrim(
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
+        multiplicityTyVar,
+
         -- Kind constructors...
         tYPETyCon, tYPETyConName,
 
@@ -320,7 +322,7 @@ openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
 multiplicityTyVar :: TyVar
-multiplicityTyVar = mkTemplateTyVars [multiplicityTy] !! 0
+multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13
 
 {-
 ************************************************************************

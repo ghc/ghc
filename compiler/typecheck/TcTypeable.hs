@@ -24,7 +24,7 @@ import PrelNames
 import TysPrim ( primTyCons )
 import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , vecCountTyCon, vecElemTyCon
-                  , nilDataCon, consDataCon )
+                  , nilDataCon, consDataCon, omegaDataConTy )
 import Name
 import Id
 import Type
@@ -392,8 +392,10 @@ collect_stuff = do
 mkTrNameLit :: TcM (FastString -> LHsExpr GhcTc)
 mkTrNameLit = do
     trNameSDataCon <- tcLookupDataCon trNameSDataConName
-    let trNameLit :: FastString -> LHsExpr GhcTc
-        trNameLit fs = nlHsPar $ nlHsDataCon trNameSDataCon
+    let data_con = mkLHsWrap (mkWpTyApps [omegaDataConTy])
+                             (nlHsDataCon trNameSDataCon)
+        trNameLit :: FastString -> LHsExpr GhcTc
+        trNameLit fs = nlHsPar $ data_con
                        `nlHsApp` nlHsLit (mkHsStringPrimLit fs)
     return trNameLit
 

@@ -121,6 +121,9 @@ instance Binary a => Binary (Weighted a) where
 weightedSet :: Weighted a -> b -> Weighted b
 weightedSet x b = fmap (\_->b) x
 
+setWeight :: Rig -> Weighted a -> Weighted a
+setWeight r x = x { weightedWeight = r }
+
 scaleWeighted :: Rig -> Weighted a -> Weighted a
 scaleWeighted w x =
   x { weightedWeight = w * weightedWeight x }

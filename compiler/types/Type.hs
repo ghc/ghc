@@ -115,6 +115,8 @@ module Type (
         dropRuntimeRepArgs,
         getRuntimeRep, getRuntimeRepFromKind,
 
+        isMultiplicityTy, isMultiplicityVar,
+
         -- Multiplicity
 
         isLinearType, isOneMultiplicity, isOmegaMultiplicity,

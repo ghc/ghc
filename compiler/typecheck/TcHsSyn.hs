@@ -1748,6 +1748,7 @@ zonkTypeZapping :: UnboundTyVarZonker
 -- Works on both types and kinds
 zonkTypeZapping tv
   = do { let ty | isRuntimeRepVar tv = liftedRepTy
+                | isMultiplicityVar tv = omegaDataConTy
                 | otherwise          = anyTypeOfKind (tyVarKind tv)
        ; writeMetaTyVar tv ty
        ; return ty }

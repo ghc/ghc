@@ -53,7 +53,7 @@ module IfaceType (
 import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
-import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
+import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy, pprType )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
@@ -615,7 +615,7 @@ ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
 
     ppr_fun_arrow Omega = arrow
     ppr_fun_arrow One = lollipop
-    ppr_fun_arrow _ = arrow -- arnaud: TODO: generic notation for non-1/ω multiplicities
+    ppr_fun_arrow (RigTy ty) = arrow <> brackets (pprType ty)
 
 ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
   = if_print_coercions

@@ -1083,12 +1083,10 @@ defaultTyVar default_kind tv
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
-  {-
   | isMultiplicityVar tv
   = do { traceTc "Defaulting a Multiplicty var to Omega" (ppr tv)
-       ; writeMetaTyVar tv liftedRepTy
+       ; writeMetaTyVar tv omegaDataConTy
        ; return True }
-       -}
 
   | default_kind                 -- -XNoPolyKinds and this is a kind var
   = do { default_kind_var tv     -- so default it to * if possible

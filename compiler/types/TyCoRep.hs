@@ -45,6 +45,8 @@ module TyCoRep (
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
         sameVis, isLinearType,
 
+        isMultiplicityTy, isMultiplicityVar,
+
         -- * Functions over binders
         TyBinder(..), TyVarBinder,
         binderVar, binderVars, binderKind, binderArgFlag,
@@ -844,6 +846,14 @@ isRuntimeRepTy _ = False
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
+
+isMultiplicityVar :: TyVar -> Bool
+isMultiplicityVar = isMultiplicityTy . tyVarKind
+
+isMultiplicityTy :: Type -> Bool
+isMultiplicityTy ty | Just ty' <- coreView ty = isMultiplicityTy ty'
+isMultiplicityTy (TyConApp tc []) = tc `hasKey` multiplicityTyConKey
+isMultiplicityTy _ = False
 
 
 isLinearType :: Type -> Bool

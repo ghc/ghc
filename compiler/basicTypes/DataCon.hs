@@ -84,6 +84,8 @@ import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
 
+import TysPrim
+
 import qualified Data.Data as Data
 import Data.Char
 import Data.Word
@@ -1242,10 +1244,14 @@ dataConUserType :: DataCon -> Type
 dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkForAllTys user_tvbs $
-    mkFunTys (map unrestricted theta) $ -- TODO: arnaud: what is theta in constructors? Does it need linearity information?
-    mkFunTys arg_tys $
-    res_ty
+  = let tvb = mkTyVarBinder Inferred multiplicityTyVar
+        ty  = mkTyVarTy multiplicityTyVar
+        arg_tys' = map (setWeight (RigTy ty)) arg_tys
+    in
+      mkForAllTys (tvb : user_tvbs) $
+      mkFunTys (map unrestricted theta) $
+      mkFunTys arg_tys' $
+      res_ty
 
 -- | Finds the instantiated types of the arguments required to construct a 'DataCon' representation
 -- NB: these INCLUDE any dictionary args

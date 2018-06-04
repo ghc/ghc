@@ -47,7 +47,7 @@ import TcSMonad  as TcS
 import TcType
 import TrieMap       () -- DV: for now
 import Type
-import TysWiredIn    ( liftedRepTy )
+import TysWiredIn    ( liftedRepTy, omegaDataConTy )
 import Unify         ( tcMatchTyKi )
 import TcUnify       ( tcSubType_NC )
 import Util
@@ -1982,6 +1982,13 @@ defaultTyVarTcS the_tv
                              -- See Note [Kind generalisation and SigTvs]
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
+       ; return True }
+  | isMultiplicityVar the_tv
+  , not (isSigTyVar the_tv)  -- SigTvs should only be unified with a tyvar
+                             -- never with a type; c.f. TcMType.defaultTyVar
+                             -- See Note [Kind generalisation and SigTvs]
+  = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
+       ; unifyTyVar the_tv omegaDataConTy
        ; return True }
   | otherwise
   = return False  -- the common case

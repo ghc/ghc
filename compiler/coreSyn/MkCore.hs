@@ -161,7 +161,7 @@ mkCoreApps fun args
 -- expressions to that of a data constructor expression. The leftmost expression
 -- in the list is applied first
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
-mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
+mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) (Type omegaDataConTy : args)
 
 mk_val_app :: CoreExpr -> CoreExpr -> Weighted Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
