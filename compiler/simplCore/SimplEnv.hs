@@ -319,7 +319,7 @@ extendIdSubst env@(SimplEnv {seIdSubst = subst}) var res
 
 extendTvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
 extendTvSubst env@(SimplEnv {seTvSubst = tsubst}) var res
-  = ASSERT( isTyVar var )
+  = ASSERT2( isTyVar var, ppr var $$ ppr res )
     env {seTvSubst = extendVarEnv tsubst var res}
 
 extendCvSubst :: SimplEnv -> CoVar -> Coercion -> SimplEnv
