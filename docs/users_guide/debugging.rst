@@ -382,6 +382,9 @@ These flags dump various phases of GHC's C-\\- pipeline.
     ``.cmm`` compilation this also dumps the result of
     file parsing.
 
+    Cmm dumps don't include unreachable blocks since we print
+    blocks in reverse post order.
+
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-\\- output
     :type: dynamic
