@@ -485,6 +485,7 @@ conArgDocs con = case getConArgs con of
                    RecCon _ -> go 1 ret
   where
     go n (HsDocTy _ _ (L _ ds) : tys) = M.insert n ds $ go (n+1) tys
+    go n (HsBangTy _ _ (L _ (HsDocTy _ _ (L _ ds))) : tys) = M.insert n ds $ go (n+1) tys
     go n (_ : tys) = go (n+1) tys
     go _ [] = M.empty
 
