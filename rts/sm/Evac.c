@@ -278,14 +278,7 @@ evacuate_large(StgPtr p)
   }
 
   // remove from large_object list
-  if (bd->u.back) {
-    bd->u.back->link = bd->link;
-  } else { // first object in the list
-    gen->large_objects = bd->link;
-  }
-  if (bd->link) {
-    bd->link->u.back = bd->u.back;
-  }
+  dbl_link_remove(bd, &gen->large_objects);
 
   /* link it on to the evacuated large object list of the destination gen
    */
@@ -414,14 +407,7 @@ evacuate_compact (StgPtr p)
     }
 
     // remove from compact_objects list
-    if (bd->u.back) {
-        bd->u.back->link = bd->link;
-    } else { // first object in the list
-        gen->compact_objects = bd->link;
-    }
-    if (bd->link) {
-        bd->link->u.back = bd->u.back;
-    }
+    dbl_link_remove(bd, &gen->compact_objects);
 
     /* link it on to the evacuated compact object list of the destination gen
      */
