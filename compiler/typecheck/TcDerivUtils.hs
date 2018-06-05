@@ -10,13 +10,14 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 
 module TcDerivUtils (
         DerivM, DerivEnv(..),
-        DerivSpec(..), pprDerivSpec, DerivSpecMechanism(..),
-        isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass,
-        DerivContext(..), DerivStatus(..),
+        DerivSpec(..), pprDerivSpec,
+        DerivSpecMechanism(..), derivSpecMechanismToStrategy, isDerivSpecStock,
+        isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia,
+        DerivContext(..), OriginativeDerivStatus(..),
         isStandaloneDeriv, isStandaloneWildcardDeriv, mkDerivOrigin,
         PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
         mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
-        checkSideConditions, hasStockDeriving,
+        checkOriginativeSideConditions, hasStockDeriving,
         canDeriveAnyClass,
         std_class_via_coercible, non_coercible_class,
         newDerivClsInst, extendLocalInstEnv
@@ -114,7 +115,7 @@ data DerivEnv = DerivEnv
     --   'InferContext' for @deriving@ clauses, or for standalone deriving that
     --   uses a wildcard constraint.
     --   See @Note [Inferring the instance context]@.
-  , denv_strat        :: Maybe DerivStrategy
+  , denv_strat        :: Maybe (DerivStrategy GhcTc)
     -- ^ 'Just' if user requests a particular deriving strategy.
     --   Otherwise, 'Nothing'.
   }
@@ -224,7 +225,17 @@ data DerivSpecMechanism
 
   | DerivSpecAnyClass -- -XDeriveAnyClass
 
-isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass
+  | DerivSpecVia -- -XDerivingVia
+      Type -- The @via@ type
+
+-- | Convert a 'DerivSpecMechanism' to its corresponding 'DerivStrategy'.
+derivSpecMechanismToStrategy :: DerivSpecMechanism -> DerivStrategy GhcTc
+derivSpecMechanismToStrategy DerivSpecStock{}   = StockStrategy
+derivSpecMechanismToStrategy DerivSpecNewtype{} = NewtypeStrategy
+derivSpecMechanismToStrategy DerivSpecAnyClass  = AnyclassStrategy
+derivSpecMechanismToStrategy (DerivSpecVia t)   = ViaStrategy t
+
+isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia
   :: DerivSpecMechanism -> Bool
 isDerivSpecStock (DerivSpecStock{}) = True
 isDerivSpecStock _                  = False
@@ -232,17 +243,17 @@ isDerivSpecStock _                  = False
 isDerivSpecNewtype (DerivSpecNewtype{}) = True
 isDerivSpecNewtype _                    = False
 
-isDerivSpecAnyClass (DerivSpecAnyClass{}) = True
-isDerivSpecAnyClass _                     = False
+isDerivSpecAnyClass DerivSpecAnyClass = True
+isDerivSpecAnyClass _                 = False
 
--- A DerivSpecMechanism can be losslessly converted to a DerivStrategy.
-mechanismToStrategy :: DerivSpecMechanism -> DerivStrategy
-mechanismToStrategy (DerivSpecStock{})    = StockStrategy
-mechanismToStrategy (DerivSpecNewtype{})  = NewtypeStrategy
-mechanismToStrategy (DerivSpecAnyClass{}) = AnyclassStrategy
+isDerivSpecVia (DerivSpecVia{}) = True
+isDerivSpecVia _                = False
 
 instance Outputable DerivSpecMechanism where
-  ppr = ppr . mechanismToStrategy
+  ppr (DerivSpecStock{})   = text "DerivSpecStock"
+  ppr (DerivSpecNewtype t) = text "DerivSpecNewtype" <> colon <+> ppr t
+  ppr DerivSpecAnyClass    = text "DerivSpecAnyClass"
+  ppr (DerivSpecVia t)     = text "DerivSpecVia" <> colon <+> ppr t
 
 -- | Whether GHC is processing a @deriving@ clause or a standalone deriving
 -- declaration.
@@ -268,16 +279,21 @@ instance Outputable DerivContext where
   ppr (InferContext standalone) = text "InferContext"  <+> ppr standalone
   ppr (SupplyContext theta)     = text "SupplyContext" <+> ppr theta
 
-data DerivStatus = CanDerive                 -- Stock class, can derive
-                     (SrcSpan -> TyCon -> [Type]
-                              -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
-                 | DerivableClassError SDoc  -- Stock class, but can't do it
-                 | DerivableViaInstance      -- See Note [Deriving any class]
-                 | NonDerivableClass SDoc    -- Non-stock class
+-- | Records whether a particular class can be derived by way of an
+-- /originative/ deriving strategy (i.e., @stock@ or @anyclass@).
+--
+-- See @Note [Deriving strategies]@ in "TcDeriv".
+data OriginativeDerivStatus
+  = CanDeriveStock            -- Stock class, can derive
+      (SrcSpan -> TyCon -> [Type]
+               -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
+  | StockClassError SDoc      -- Stock class, but can't do it
+  | CanDeriveAnyClass         -- See Note [Deriving any class]
+  | NonDerivableClass SDoc    -- Cannot derive with either stock or anyclass
 
 -- A stock class is one either defined in the Haskell report or for which GHC
 -- otherwise knows how to generate code for (possibly requiring the use of a
--- language extension), such as Eq, Ord, Ix, Data, Generic, etc.
+-- language extension), such as Eq, Ord, Ix, Data, Generic, etc.)
 
 -- | A 'PredType' annotated with the origin of the constraint 'CtOrigin',
 -- and whether or the constraint deals in types or kinds.
@@ -395,9 +411,9 @@ substPredOrigin subst (PredOrigin pred origin t_or_k)
 
 Only certain blessed classes can be used in a deriving clause (without the
 assistance of GeneralizedNewtypeDeriving or DeriveAnyClass). These classes
-are listed below in the definition of hasStockDeriving. The sideConditions
+are listed below in the definition of hasStockDeriving. The stockSideConditions
 function determines the criteria that needs to be met in order for a particular
-class to be able to be derived successfully.
+stock class to be able to be derived successfully.
 
 A class might be able to be used in a deriving clause if -XDeriveAnyClass
 is willing to support it. The canDeriveAnyClass function checks if this is the
@@ -503,20 +519,26 @@ getDataConFixityFun tc
     doc = text "Data con fixities for" <+> ppr name
 
 ------------------------------------------------------------------
--- Check side conditions that dis-allow derivability for particular classes
--- This is *apart* from the newtype-deriving mechanism
+-- Check side conditions that dis-allow derivability for the originative
+-- deriving strategies (stock and anyclass).
+-- See Note [Deriving strategies] in TcDeriv for an explanation of what
+-- "originative" means.
+--
+-- This is *apart* from the coerce-based strategies, newtype and via.
 --
 -- Here we get the representation tycon in case of family instances as it has
 -- the data constructors - but we need to be careful to fall back to the
 -- family tycon (with indexes) in error messages.
 
-checkSideConditions :: DynFlags -> DerivContext -> Class -> [TcType]
-                    -> TyCon -> TyCon
-                    -> DerivStatus
-checkSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
-  | Just cond <- sideConditions deriv_ctxt cls
+checkOriginativeSideConditions
+  :: DynFlags -> DerivContext -> Class -> [TcType]
+  -> TyCon -> TyCon
+  -> OriginativeDerivStatus
+checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
+    -- First, check if stock deriving is possible...
+  | Just cond <- stockSideConditions deriv_ctxt cls
   = case (cond dflags tc rep_tc) of
-        NotValid err -> DerivableClassError err  -- Class-specific error
+        NotValid err -> StockClassError err  -- Class-specific error
         IsValid  | null (filterOutInvisibleTypes (classTyCon cls) cls_tys)
                    -- All stock derivable classes are unary in the sense that
                    -- there should be not types in cls_tys (i.e., no type args
@@ -524,15 +546,16 @@ checkSideConditions dflags deriv_ctxt cls cls_tys tc rep_tc
                    -- invisible types as well (e.g., for Generic1, which is
                    -- poly-kinded), so make sure those are not counted.
                  , Just gen_fn <- hasStockDeriving cls
-                   -> CanDerive gen_fn
-                 | otherwise -> DerivableClassError (classArgsErr cls cls_tys)
+                   -> CanDeriveStock gen_fn
+                 | otherwise -> StockClassError (classArgsErr cls cls_tys)
                    -- e.g. deriving( Eq s )
 
+    -- ...if not, try falling back on DeriveAnyClass.
   | NotValid err <- canDeriveAnyClass dflags
-  = NonDerivableClass err  -- DeriveAnyClass does not work
+  = NonDerivableClass err  -- Neither anyclass nor stock work
 
   | otherwise
-  = DerivableViaInstance   -- DeriveAnyClass should work
+  = CanDeriveAnyClass   -- DeriveAnyClass should work
 
 classArgsErr :: Class -> [Type] -> SDoc
 classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is not a class"
@@ -542,8 +565,8 @@ classArgsErr cls cls_tys = quotes (ppr (mkClassPred cls cls_tys)) <+> text "is n
 -- mechanism on certain classes (as opposed to classes that require
 -- GeneralizedNewtypeDeriving or DeriveAnyClass). Returns Nothing for a
 -- class for which stock deriving isn't possible.
-sideConditions :: DerivContext -> Class -> Maybe Condition
-sideConditions deriv_ctxt cls
+stockSideConditions :: DerivContext -> Class -> Maybe Condition
+stockSideConditions deriv_ctxt cls
   | cls_key == eqClassKey          = Just (cond_std `andCond` cond_args cls)
   | cls_key == ordClassKey         = Just (cond_std `andCond` cond_args cls)
   | cls_key == showClassKey        = Just (cond_std `andCond` cond_args cls)

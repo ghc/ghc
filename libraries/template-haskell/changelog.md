@@ -16,6 +16,8 @@
     `qAddTempFile` method to `Quasi`, which requests a temporary file of
     a given suffix.
 
+  * Add a `ViaStrategy` constructor to `DerivStrategy`.
+
 ## 2.13.0.0 *March 2018*
 
   * Bundled with GHC 8.4.1

@@ -184,6 +184,11 @@ deriving instance Data (DerivDecl GhcPs)
 deriving instance Data (DerivDecl GhcRn)
 deriving instance Data (DerivDecl GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (DerivStrategy p)
+deriving instance Data (DerivStrategy GhcPs)
+deriving instance Data (DerivStrategy GhcRn)
+deriving instance Data (DerivStrategy GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (DefaultDecl p)
 deriving instance Data (DefaultDecl GhcPs)
 deriving instance Data (DefaultDecl GhcRn)

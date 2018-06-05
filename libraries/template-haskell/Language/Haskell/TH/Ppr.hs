@@ -388,11 +388,12 @@ ppr_dec _ (PatSynSigD name ty)
   = pprPatSynSig name ty
 
 ppr_deriv_strategy :: DerivStrategy -> Doc
-ppr_deriv_strategy ds = text $
+ppr_deriv_strategy ds =
   case ds of
-    StockStrategy    -> "stock"
-    AnyclassStrategy -> "anyclass"
-    NewtypeStrategy  -> "newtype"
+    StockStrategy    -> text "stock"
+    AnyclassStrategy -> text "anyclass"
+    NewtypeStrategy  -> text "newtype"
+    ViaStrategy ty   -> text "via" <+> pprParendType ty
 
 ppr_overlap :: Overlap -> Doc
 ppr_overlap o = text $
@@ -452,8 +453,16 @@ ppr_newtype maybeInst ctxt t argsDoc ksig c decs
 
 ppr_deriv_clause :: DerivClause -> Doc
 ppr_deriv_clause (DerivClause ds ctxt)
-  = text "deriving" <+> maybe empty ppr_deriv_strategy ds
+  = text "deriving" <+> pp_strat_before
                     <+> ppr_cxt_preds ctxt
+                    <+> pp_strat_after
+  where
+    -- @via@ is unique in that in comes /after/ the class being derived,
+    -- so we must special-case it.
+    (pp_strat_before, pp_strat_after) =
+      case ds of
+        Just (via@ViaStrategy{}) -> (empty, ppr_deriv_strategy via)
+        _                        -> (maybe empty ppr_deriv_strategy ds, empty)
 
 ppr_tySyn :: Doc -> Name -> Doc -> Type -> Doc
 ppr_tySyn maybeInst t argsDoc rhs

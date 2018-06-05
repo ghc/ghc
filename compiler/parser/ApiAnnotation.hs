@@ -286,6 +286,7 @@ data AnnKeywordId
     | AnnVal  -- ^ e.g. INTEGER
     | AnnValStr  -- ^ String value, will need quotes when output
     | AnnVbar -- ^ '|'
+    | AnnVia -- ^ 'via'
     | AnnWhere
     | Annlarrowtail -- ^ '-<'
     | AnnlarrowtailU -- ^ '-<', unicode variant

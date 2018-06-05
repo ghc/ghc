@@ -36,6 +36,8 @@ test('T5939', normal, compile, [''])
 test('drv-functor1', normal, compile, [''])
 test('drv-functor2', normal, compile, [''])
 test('drv-foldable-traversable1', normal, compile, [''])
+test('deriving-via-compile', normal, compile, [''])
+test('deriving-via-standalone', normal, compile, [''])
 test('T6031', [], multimod_compile, ['T6031', '-v0 -O'])
 # Adding -O on T6031 to expose Trac #11245 regardless of way
 test('T1133', [], run_command, ['$MAKE --no-print-directory -s T1133'])

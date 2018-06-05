@@ -385,6 +385,10 @@ type ForallXDerivDecl (c :: * -> Constraint) (x :: *) =
        )
 
 -- -------------------------------------
+-- DerivStrategy type family
+type family XViaStrategy x
+
+-- -------------------------------------
 -- DefaultDecl type families
 type family XCDefaultDecl      x
 type family XXDefaultDecl      x
@@ -1100,6 +1104,10 @@ type OutputableX p = -- See Note [OutputableX]
 
   , Outputable (XAppTypeE p)
   , Outputable (XAppTypeE GhcRn)
+
+  , Outputable (XViaStrategy p)
+  , Outputable (XViaStrategy GhcRn)
+
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
