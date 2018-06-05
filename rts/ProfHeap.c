@@ -1093,16 +1093,16 @@ heapCensusChain( Census *census, bdescr *bd )
 
             case MUT_ARR_PTRS_CLEAN:
             case MUT_ARR_PTRS_DIRTY:
-            case MUT_ARR_PTRS_FROZEN:
-            case MUT_ARR_PTRS_FROZEN0:
+            case MUT_ARR_PTRS_FROZEN_CLEAN:
+            case MUT_ARR_PTRS_FROZEN_DIRTY:
                 prim = true;
                 size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
                 break;
 
             case SMALL_MUT_ARR_PTRS_CLEAN:
             case SMALL_MUT_ARR_PTRS_DIRTY:
-            case SMALL_MUT_ARR_PTRS_FROZEN:
-            case SMALL_MUT_ARR_PTRS_FROZEN0:
+            case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+            case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
                 prim = true;
                 size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
                 break;

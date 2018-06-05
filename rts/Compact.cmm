@@ -154,8 +154,8 @@ eval:
     }
 
     case
-        MUT_ARR_PTRS_FROZEN0,
-        MUT_ARR_PTRS_FROZEN: {
+        MUT_ARR_PTRS_FROZEN_DIRTY,
+        MUT_ARR_PTRS_FROZEN_CLEAN: {
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
         if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
@@ -186,8 +186,8 @@ eval:
     }
 
     case
-        SMALL_MUT_ARR_PTRS_FROZEN0,
-        SMALL_MUT_ARR_PTRS_FROZEN: {
+        SMALL_MUT_ARR_PTRS_FROZEN_DIRTY,
+        SMALL_MUT_ARR_PTRS_FROZEN_CLEAN: {
 
         (should) = ccall shouldCompact(compact "ptr", p "ptr");
         if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }

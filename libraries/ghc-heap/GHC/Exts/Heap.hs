@@ -224,7 +224,7 @@ getClosure x = do
                         ++ show (length rawWds)
             pure $ ArrWordsClosure itbl (head rawWds) (tail rawWds)
 
-        t | t >= MUT_ARR_PTRS_CLEAN && t <= MUT_ARR_PTRS_FROZEN -> do
+        t | t >= MUT_ARR_PTRS_CLEAN && t <= MUT_ARR_PTRS_FROZEN_CLEAN -> do
             unless (length rawWds >= 2) $
                 fail $ "Expected at least 2 words to MUT_ARR_PTRS_* "
                         ++ "found " ++ show (length rawWds)

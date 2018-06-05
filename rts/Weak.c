@@ -138,7 +138,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     size = n + mutArrPtrsCardTableSize(n);
     arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, CCS_SYSTEM);
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCS_SYSTEM);
     arr->ptrs = n;
     arr->size = size;
 

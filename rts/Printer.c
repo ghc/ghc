@@ -308,8 +308,8 @@ printClosure( const StgClosure *obj )
         debugBelch("MUT_ARR_PTRS_DIRTY(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
         break;
 
-    case MUT_ARR_PTRS_FROZEN:
-        debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+        debugBelch("MUT_ARR_PTRS_FROZEN_CLEAN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
         break;
 
     case SMALL_MUT_ARR_PTRS_CLEAN:
@@ -322,8 +322,8 @@ printClosure( const StgClosure *obj )
                    (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
         break;
 
-    case SMALL_MUT_ARR_PTRS_FROZEN:
-        debugBelch("SMALL_MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n",
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        debugBelch("SMALL_MUT_ARR_PTRS_FROZEN_CLEAN(size=%" FMT_Word ")\n",
                    (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
         break;
 
@@ -919,8 +919,8 @@ const char *closure_type_names[] = {
  [ARR_WORDS]             = "ARR_WORDS",
  [MUT_ARR_PTRS_CLEAN]    = "MUT_ARR_PTRS_CLEAN",
  [MUT_ARR_PTRS_DIRTY]    = "MUT_ARR_PTRS_DIRTY",
- [MUT_ARR_PTRS_FROZEN0]  = "MUT_ARR_PTRS_FROZEN0",
- [MUT_ARR_PTRS_FROZEN]   = "MUT_ARR_PTRS_FROZEN",
+ [MUT_ARR_PTRS_FROZEN_DIRTY]  = "MUT_ARR_PTRS_FROZEN_DIRTY",
+ [MUT_ARR_PTRS_FROZEN_CLEAN]   = "MUT_ARR_PTRS_FROZEN_CLEAN",
  [MUT_VAR_CLEAN]         = "MUT_VAR_CLEAN",
  [MUT_VAR_DIRTY]         = "MUT_VAR_DIRTY",
  [WEAK]                  = "WEAK",
@@ -935,8 +935,8 @@ const char *closure_type_names[] = {
  [WHITEHOLE]             = "WHITEHOLE",
  [SMALL_MUT_ARR_PTRS_CLEAN] = "SMALL_MUT_ARR_PTRS_CLEAN",
  [SMALL_MUT_ARR_PTRS_DIRTY] = "SMALL_MUT_ARR_PTRS_DIRTY",
- [SMALL_MUT_ARR_PTRS_FROZEN0] = "SMALL_MUT_ARR_PTRS_FROZEN0",
- [SMALL_MUT_ARR_PTRS_FROZEN] = "SMALL_MUT_ARR_PTRS_FROZEN",
+ [SMALL_MUT_ARR_PTRS_FROZEN_DIRTY] = "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY",
+ [SMALL_MUT_ARR_PTRS_FROZEN_CLEAN] = "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN",
  [COMPACT_NFDATA]        = "COMPACT_NFDATA"
 };
 

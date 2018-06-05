@@ -275,28 +275,15 @@ stg_newArrayzh ( W_ n /* words */, gcptr init )
 
 stg_unsafeThawArrayzh ( gcptr arr )
 {
-    // SUBTLETY TO DO WITH THE OLD GEN MUTABLE LIST
-    //
-    // A MUT_ARR_PTRS lives on the mutable list, but a MUT_ARR_PTRS_FROZEN
-    // normally doesn't.  However, when we freeze a MUT_ARR_PTRS, we leave
-    // it on the mutable list for the GC to remove (removing something from
-    // the mutable list is not easy).
-    //
-    // So that we can tell whether a MUT_ARR_PTRS_FROZEN is on the mutable list,
-    // when we freeze it we set the info ptr to be MUT_ARR_PTRS_FROZEN0
-    // to indicate that it is still on the mutable list.
-    //
-    // So, when we thaw a MUT_ARR_PTRS_FROZEN, we must cope with two cases:
-    // either it is on a mut_list, or it isn't.  We adopt the convention that
-    // the closure type is MUT_ARR_PTRS_FROZEN0 if it is on the mutable list,
-    // and MUT_ARR_PTRS_FROZEN otherwise.  In fact it wouldn't matter if
-    // we put it on the mutable list more than once, but it would get scavenged
-    // multiple times during GC, which would be unnecessarily slow.
-    //
-    if (StgHeader_info(arr) != stg_MUT_ARR_PTRS_FROZEN0_info) {
+    // A MUT_ARR_PTRS always lives on a mut_list, but a MUT_ARR_PTRS_FROZEN
+    // doesn't. To decide whether to add the thawed array to a mut_list we check
+    // the info table. MUT_ARR_PTRS_FROZEN_DIRTY means it's already on a
+    // mut_list so no need to add it again. MUT_ARR_PTRS_FROZEN_CLEAN means it's
+    // not and we should add it to a mut_list.
+    if (StgHeader_info(arr) != stg_MUT_ARR_PTRS_FROZEN_DIRTY_info) {
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
+        // must be done after SET_INFO, because it ASSERTs closure_MUTABLE():
         recordMutable(arr);
-        // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
         return (arr);
     } else {
         SET_INFO(arr,stg_MUT_ARR_PTRS_DIRTY_info);
@@ -326,7 +313,7 @@ stg_copyMutableArrayArrayzh ( gcptr src, W_ src_off, gcptr dst, W_ dst_off, W_ n
 
 stg_cloneArrayzh ( gcptr src, W_ offset, W_ n )
 {
-    cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+    cloneArray(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, src, offset, n)
 }
 
 stg_cloneMutableArrayzh ( gcptr src, W_ offset, W_ n )
@@ -337,7 +324,7 @@ stg_cloneMutableArrayzh ( gcptr src, W_ offset, W_ n )
 // We have to escape the "z" in the name.
 stg_freezzeArrayzh ( gcptr src, W_ offset, W_ n )
 {
-    cloneArray(stg_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+    cloneArray(stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, src, offset, n)
 }
 
 stg_thawArrayzh ( gcptr src, W_ offset, W_ n )
@@ -439,7 +426,7 @@ stg_newSmallArrayzh ( W_ n /* words */, gcptr init )
 stg_unsafeThawSmallArrayzh ( gcptr arr )
 {
     // See stg_unsafeThawArrayzh
-    if (StgHeader_info(arr) != stg_SMALL_MUT_ARR_PTRS_FROZEN0_info) {
+    if (StgHeader_info(arr) != stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info) {
         SET_INFO(arr, stg_SMALL_MUT_ARR_PTRS_DIRTY_info);
         recordMutable(arr);
         // must be done after SET_INFO, because it ASSERTs closure_MUTABLE()
@@ -452,7 +439,7 @@ stg_unsafeThawSmallArrayzh ( gcptr arr )
 
 stg_cloneSmallArrayzh ( gcptr src, W_ offset, W_ n )
 {
-    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, src, offset, n)
 }
 
 stg_cloneSmallMutableArrayzh ( gcptr src, W_ offset, W_ n )
@@ -463,7 +450,7 @@ stg_cloneSmallMutableArrayzh ( gcptr src, W_ offset, W_ n )
 // We have to escape the "z" in the name.
 stg_freezzeSmallArrayzh ( gcptr src, W_ offset, W_ n )
 {
-    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_FROZEN_info, src, offset, n)
+    cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, src, offset, n)
 }
 
 stg_thawSmallArrayzh ( gcptr src, W_ offset, W_ n )

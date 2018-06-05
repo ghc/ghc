@@ -380,8 +380,8 @@ checkClosure( const StgClosure* p )
 
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
         {
             StgMutArrPtrs* a = (StgMutArrPtrs *)p;
             uint32_t i;
