@@ -687,7 +687,11 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                         mkWpTyApps    (mkTyVarTys ex_tvs)                       <.>
                         mkWpTyApps    [ ty
                                       | (tv, ty) <- univ_tvs `zip` out_inst_tys
-                                      , not (tv `elemVarEnv` wrap_subst) ]
+                                      , not (tv `elemVarEnv` wrap_subst) ]  <.>
+                        mkWpTyApps [omegaDataConTy]
+                  -- TODO: This looks very dodgy MattP, need to treat this
+                  -- uniformly like ex_tvs probably?
+
                  rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
 
                         -- Tediously wrap the application in a cast

@@ -1169,8 +1169,8 @@ data HsArg tm ty
   | HsTypeArg  ty -- Argument is a visible type application (f @ty)
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm) = text "HsValArg" <> ppr tm
-  ppr (HsTypeArg ty) = text "HsTypeArg" <> ppr ty
+  ppr (HsValArg tm) = text "HsValArg" <+> ppr tm
+  ppr (HsTypeArg ty) = text "HsTypeArg" <+> ppr ty
 
 isHsValArg :: HsArg tm ty -> Bool
 isHsValArg (HsValArg {}) = True
