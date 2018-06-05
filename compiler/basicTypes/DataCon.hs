@@ -931,10 +931,10 @@ mkDataCon name declared_infix prom_info
       case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConUserType.
-        NoDataConRep -> dataConUserType con
+--        NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
+        _ -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
                  mkFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 

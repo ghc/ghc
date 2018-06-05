@@ -410,7 +410,7 @@ tcRnSrcDecls explicit_mod_hdr decls
                         simplifyTop lie
 
         -- Emit Typeable bindings
-      ; tcg_env <- mkTypeableBinds
+      -- ; tcg_env <- mkTypeableBinds
 
         -- Finalizers must run after constraints are simplified, or some types
         -- might not be complete when using reify (see #12777).

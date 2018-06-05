@@ -136,7 +136,7 @@ module TysWiredIn (
 
 import GhcPrelude
 
-import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
+import {-# SOURCE #-} MkId( mkDataConWorkId, mkDataConRepSimple, mkDictSelId )
 
 -- friends:
 import PrelNames
@@ -534,6 +534,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
   = data_con
   where
     tag_map = mkTyConTagMap tycon
+
     -- This constructs the constructor Name to ConTag map once per
     -- constructor, which is quadratic. It's OK here, because it's
     -- only called for wired in data types that don't have a lot of
@@ -554,8 +555,9 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (lookupNameEnv_NF tag_map dc_name)
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
-                NoDataConRep    -- Wired-in types are too simple to need wrappers
+                (mkDataConRepSimple work_name data_con)
 
+    work_name = mkDataConWorkerName data_con (dataConWrapperUnique (getUnique dc_name))
      -- We assume that we don't need non-linear wired-in types. Constraints are,
      -- on the other hand, always unrestricted (constraint arguments occur, in
      -- particular, in @Eq#@)

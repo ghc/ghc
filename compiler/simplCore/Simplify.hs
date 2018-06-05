@@ -535,7 +535,8 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
   = return (emptyLetFloats, expr)
 
   | otherwise
-  = do  { (floats, expr1) <- prepareRhs mode top_lvl occ_fs info expr
+  = do  { pprTrace "makeTrivialWithInfo" (ppr expr) (return ())
+        ; (floats, expr1) <- prepareRhs mode top_lvl occ_fs info expr
         ; if   exprIsTrivial expr1  -- See Note [Trivial after prepareRhs]
           then return (floats, expr1)
           else do

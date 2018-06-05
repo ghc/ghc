@@ -108,11 +108,12 @@ import UniqSet
 ************************************************************************
 -}
 
-exprType :: CoreExpr -> Type
+exprType :: HasCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'CoreSyn.Type' expression as it cannot
 -- really be said to have a type
-exprType (Var var)           = idType var
+exprType e | pprTrace "exprType" (ppr e) False = undefined
+exprType (Var var)           = pprTrace "exprType" (ppr var <+> ppr (idType var)) (idType var)
 exprType (Lit lit)           = literalType lit
 exprType (Coercion co)       = coercionType co
 exprType (Let bind body)
@@ -221,7 +222,7 @@ Note that there might be existentially quantified coercion variables, too.
 -}
 
 -- Not defined with applyTypeToArg because you can't print from CoreSyn.
-applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: HasCallStack => CoreExpr -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
 applyTypeToArgs e op_ty args
@@ -232,7 +233,7 @@ applyTypeToArgs e op_ty args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
-    go _ _ = pprPanic "applyTypeToArgs" panic_msg
+    go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
     -- go_ty_args: accumulate type arguments so we can
     -- instantiate all at once with piResultTys
@@ -243,9 +244,11 @@ applyTypeToArgs e op_ty args
     go_ty_args op_ty rev_tys args
        = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg = vcat [ text "Expression:" <+> pprCoreExpr e
+    panic_msg as = vcat [ text "Expression:" <+> pprCoreExpr e
                      , text "Type:" <+> ppr op_ty
-                     , text "Args:" <+> ppr args ]
+                     , text "Args:" <+> ppr args
+                     , text "Args':" <+> ppr as
+                     , callStackDoc ]
 
 
 {-

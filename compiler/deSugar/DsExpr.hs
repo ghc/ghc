@@ -262,7 +262,7 @@ ds_expr _ (HsPar _ e)            = dsLExpr e
 ds_expr _ (ExprWithTySig _ e)    = dsLExpr e
 ds_expr w (HsVar _ (L _ var))    = dsHsVar w var
 ds_expr _ (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
-ds_expr w (HsConLikeOut _ con)   = dsConLike w con
+ds_expr w (HsConLikeOut _ con)   = pprTrace "conLikeOut" (ppr con) (dsConLike w con)
 ds_expr _ (HsIPVar {})           = panic "dsExpr: HsIPVar"
 ds_expr _ (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
 ds_expr _ (HsLit _ lit)          = dsLit (convertLit lit)
@@ -687,8 +687,8 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                         mkWpTyApps    (mkTyVarTys ex_tvs)                       <.>
                         mkWpTyApps    [ ty
                                       | (tv, ty) <- univ_tvs `zip` out_inst_tys
-                                      , not (tv `elemVarEnv` wrap_subst) ]  <.>
-                        mkWpTyApps [omegaDataConTy]
+                                      , not (tv `elemVarEnv` wrap_subst) ]
+                        <.> mkWpTyApps [omegaDataConTy]
                   -- TODO: This looks very dodgy MattP, need to treat this
                   -- uniformly like ex_tvs probably?
 
@@ -1046,7 +1046,8 @@ dsHsVar w var
        ; return unitExpr }  -- return something eminently safe
 
   | otherwise
-  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
+  = pprTrace "dsHsVar" (ppr var $$ ppr (idType var))
+      $ return (varToCoreExpr var)   -- See Note [Desugaring vars]
 
   where
     ty = idType var

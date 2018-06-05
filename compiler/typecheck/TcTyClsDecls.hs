@@ -73,6 +73,8 @@ import Unique
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
+import TysPrim
+
 import Control.Monad
 import Data.Functor.Compose ( Compose(..) )
 import Data.List

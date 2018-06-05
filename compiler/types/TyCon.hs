@@ -153,7 +153,7 @@ import FastStringEnv
 import FieldLabel
 import Constants
 import Util
-import Unique( tyConRepNameUnique, dataConRepNameUnique )
+import Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import UniqSet
 import Module
 import {-# SOURCE #-} DataCon
@@ -1210,7 +1210,7 @@ mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
     name_mod  = nameModule  tc_name
     name_uniq = nameUnique  tc_name
     rep_uniq | isTcOcc name_occ = tyConRepNameUnique   name_uniq
-             | otherwise        = dataConRepNameUnique name_uniq
+             | otherwise        = dataConTyRepNameUnique name_uniq
     (rep_mod, rep_occ) = tyConRepModOcc name_mod name_occ
 
 -- | The name (and defining module) for the Typeable representation (TyCon) of a

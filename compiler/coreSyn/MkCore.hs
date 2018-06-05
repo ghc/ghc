@@ -124,7 +124,7 @@ mkCoreLets binds body = foldr mkCoreLet body binds
 -- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
+mkCoreAppTyped :: HasCallStack => SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
 mkCoreAppTyped _ (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
 mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
@@ -132,7 +132,7 @@ mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   where
     (_, res_ty) = splitFunTy fun_ty
 mkCoreAppTyped d (fun, fun_ty) arg
-  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr fun_ty $$ ppr arg $$ d )
     (mk_val_app fun arg arg_ty res_ty, res_ty)
   where
     (arg_ty, res_ty) = splitFunTy fun_ty
@@ -141,7 +141,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
 -- to the other
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp :: HasCallStack => SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreApp s fun arg
   = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
@@ -149,7 +149,7 @@ mkCoreApp s fun arg
 -- expressions to another. The leftmost expression in the list is applied first
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreApps :: HasCallStack => CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreApps fun args
   = fst $
     foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args
@@ -161,7 +161,7 @@ mkCoreApps fun args
 -- expressions to that of a data constructor expression. The leftmost expression
 -- in the list is applied first
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
-mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) (Type omegaDataConTy : args)
+mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
 mk_val_app :: CoreExpr -> CoreExpr -> Weighted Type -> Type -> CoreExpr
 -- Build an application (e1 e2),

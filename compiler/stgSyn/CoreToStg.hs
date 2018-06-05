@@ -583,7 +583,7 @@ coreToStgApp _ f args ticks = do
          | f_arity > 0 && saturated = stgSatOcc -- Saturated or over-saturated function call
          | otherwise                = stgUnsatOcc       -- Unsaturated function or thunk
 
-        res_ty = exprType (mkApps (Var f) args)
+        res_ty = pprTrace "App" (ppr f) $ exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
                   | saturated    -> StgConApp dc args'
@@ -663,7 +663,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- or foreign call.
         -- Wanted: a better solution than this hacky warning
     let
-        arg_ty = exprType arg
+        arg_ty = pprTrace "arg" (ppr arg) $ exprType arg
         stg_arg_ty = stgArgType stg_arg
         bad_args = (isUnliftedType arg_ty && not (isUnliftedType stg_arg_ty))
                 || (typePrimRep arg_ty /= typePrimRep stg_arg_ty)

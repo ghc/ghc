@@ -551,7 +551,7 @@ which stupidly tries to bind the datacon 'True'.
 -}
 
 -- NB: Make sure the argument is not levity polymorphic
-mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreAppDs  :: HasCallStack => SDoc -> CoreExpr -> CoreExpr -> CoreExpr
 mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
@@ -562,10 +562,10 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
                    _      -> mkWildValBinder Omega ty1
                              -- Remark: seq is always unrestricted in its first argument
 
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
+mkCoreAppDs s fun arg = mkCoreApp (text "mkCoreAppDs" $$ s) fun arg  -- The rest is done in MkCore
 
 -- NB: No argument can be levity polymorphic
-mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
+mkCoreAppsDs :: HasCallStack => SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
 mkCoreAppsDs s fun args = foldl (mkCoreAppDs s) fun args
 
 mkCastDs :: CoreExpr -> Coercion -> CoreExpr

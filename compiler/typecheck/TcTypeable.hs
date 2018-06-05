@@ -388,7 +388,7 @@ collect_stuff = do
 
 -- | Defaults the multiplicity of an argument to Omega
 dataConOmega :: DataCon -> LHsExpr GhcTc
-dataConOmega dc =
+dataConOmega dc =  -- nlHsDataCon dc
   mkLHsWrap (mkWpTyApps [omegaDataConTy]) (nlHsDataCon dc)
 
 -- | Lookup the necessary pieces to construct the @trNameLit@. We do this so we

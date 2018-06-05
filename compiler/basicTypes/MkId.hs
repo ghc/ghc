@@ -23,7 +23,7 @@ module MkId (
         wrapFamInstBody, unwrapFamInstScrut,
         wrapTypeUnbranchedFamInstBody, unwrapTypeUnbranchedFamInstScrut,
 
-        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
+        DataConBoxer(..), mkDataConRep, mkDataConRepSimple, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -79,6 +79,7 @@ import ListSetOps
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
+import Data.Functor.Identity
 
 {-
 ************************************************************************
@@ -518,20 +519,55 @@ But if we inline the wrapper, we get
 and now case-of-known-constructor eliminates the redundant allocation.
 -}
 
-mkDataConRep :: DynFlags
+mkDataConRepSimple :: Name -> DataCon -> DataConRep
+mkDataConRepSimple n dc =
+  runIdentity $
+    mkDataConRepX
+      (\tys -> Identity $ mkTemplateLocals (map weightedThing tys))
+      (\_ ini -> return ini)
+      emptyFamInstEnvs
+      n
+      (Right (repeat HsLazy))
+      dc
+
+
+mkDataConRep :: DynFlags -> FamInstEnvs -> Name -> Maybe [HsImplBang] -> DataCon
+             -> UniqSM DataConRep
+mkDataConRep dflags fam_envs wrap_name mb_bangs data_con =
+  mkDataConRepX
+    (mapM newLocal)
+    mk_rep_app
+    fam_envs
+    wrap_name
+    (maybe (Left dflags) Right mb_bangs)
+    data_con
+  where
+    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
+    mk_rep_app [] con_app
+      = return con_app
+    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
+      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
+           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
+           ; return (unbox_fn expr) }
+
+
+
+mkDataConRepX :: Monad m =>
+                ([Weighted Type] -> m [Id])
+             -> ([(Id, Unboxer)] -> CoreExpr -> m CoreExpr)
              -> FamInstEnvs
              -> Name
-             -> Maybe [HsImplBang]
+             -> (Either DynFlags [HsImplBang])
                 -- See Note [Bangs on imported data constructors]
              -> DataCon
-             -> UniqSM DataConRep
-mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
-  | not wrapper_reqd
-  = return NoDataConRep
+             -> m DataConRep
+mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
+--  | not wrapper_reqd
+--  = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mapM newLocal wrap_arg_tys
-       ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
+  = do { wrap_args <- mkArgs wrap_arg_tys
+       ; wrap_body <- mkBody (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
 
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
@@ -574,7 +610,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
                         wrap_body
-
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
                      , dcr_arg_tys = rep_tys
@@ -584,7 +619,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
-    wrap_tvs     = dataConUserTyVars data_con
+    wrap_tvs     = multiplicityTyVar : dataConUserTyVars data_con
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
@@ -602,9 +637,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
     arg_ibangs =
       case mb_bangs of
-        Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
+        Left dflags -> zipWith (dataConSrcToImplBang dflags fam_envs)
                               orig_arg_tys orig_bangs
-        Just bangs -> bangs
+        Right bangs -> bangs
 
     (rep_tys_w_strs, wrappers)
       = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))
@@ -651,13 +686,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
            ; return (rep_ids1 ++ rep_ids2, NonRec src_var arg : binds) }
     go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
 
-    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
-    mk_rep_app [] con_app
-      = return con_app
-    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
-      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
-           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
-           ; return (unbox_fn expr) }
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
