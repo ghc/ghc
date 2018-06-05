@@ -3,6 +3,8 @@ module Haddock.Backends.Hyperlinker.Parser (parse) where
 import Data.Either         ( isRight, isLeft )
 import Data.List           ( foldl', isPrefixOf, isSuffixOf )
 import Data.Maybe          ( maybeToList )
+import Data.Char           ( isSpace )
+import qualified Text.Read as R
 
 import GHC                 ( DynFlags, addSourceToTokens )
 import SrcLoc
@@ -109,12 +111,9 @@ isCPPline :: String -> Bool
 isCPPline = isPrefixOf "#" . dropWhile (`elem` " \t") . take 5
 
 
--- | Split a "line" off the front of a string, supporting newline escapes.
---
--- By "line", we understand: the shortest substring ending in a '\n' that is not
---
---   1. immediately preceded by a '\\'
---   2. not inside some (possibly nested) block comment
+-- | Split a "line" off the front of a string, hopefully without cutting tokens
+-- in half. I say "hopefully" because knowing what a token is requires lexing,
+-- yet lexing depends on this function.
 --
 -- All characters in the input are present in the output:
 --
@@ -122,17 +121,36 @@ isCPPline = isPrefixOf "#" . dropWhile (`elem` " \t") . take 5
 spanToNewline :: Int                 -- ^ open '{-'
               -> String              -- ^ input
               -> (String, String)
-spanToNewline _ [] = ([], [])
+
+-- Base case and space characters
+spanToNewline _ "" = ("", "")
+spanToNewline n ('\n':str) | n <= 0 = ("\n", str)
 spanToNewline n ('\n':str) | n <= 0 = ("\n", str)
 spanToNewline n ('\\':'\n':str) =
     let (str', rest) = spanToNewline n str
     in ('\\':'\n':str', rest)
+
+-- Block comments
 spanToNewline n ('{':'-':str) =
     let (str', rest) = spanToNewline (n+1) str
     in ('{':'-':str', rest)
 spanToNewline n ('-':'}':str) =
     let (str', rest) = spanToNewline (n-1) str
     in ('-':'}':str', rest)
+
+-- When not in a block comment, try to lex a Haskell token
+spanToNewline 0 str@(c:_) | ((lexed, str') : _) <- R.lex str, not (isSpace c) =
+    if all (== '-') lexed && length lexed >= 2
+      -- A Haskell line comment
+      then case span (/= '\n') str' of
+             (str'', '\n':rest) -> (lexed ++ str'' ++ "\n", rest)
+             (_, _) -> (str, "") 
+
+      -- An actual Haskell token
+      else let (str'', rest) = spanToNewline 0 str'
+           in (lexed ++ str'', rest)
+
+-- In all other cases, advance one character at a time
 spanToNewline n (c:str) =
     let (str', rest) = spanToNewline n str
     in (c:str', rest)
