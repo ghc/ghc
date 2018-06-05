@@ -28,7 +28,9 @@ import Name             ( mkSystemVarName, isExternalName, getOccFS )
 import Coercion hiding  ( substCo, substCoVar )
 import OptCoercion      ( optCoercion )
 import FamInstEnv       ( topNormaliseType_maybe )
-import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness, dataConRepArgTys )
+import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
+                        , dataConRepArgTys, isUnboxedTupleCon
+                        , StrictnessMark (MarkedStrict) )
 import CoreMonad        ( Tick(..), SimplMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
@@ -50,6 +52,7 @@ import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
+import PrimOp          ( PrimOp (SeqOp) )
 
 
 {-
@@ -2603,7 +2606,14 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
                 -- Mark the ones that are in ! positions in the
                 -- data constructor as certainly-evaluated.
                 -- NB: simplLamBinders preserves this eval info
-        ; let vs_with_evals = add_evals (dataConRepStrictness con)
+        ; let vs_with_evals
+                | isUnboxedTupleCon con
+                , [s,x] <- vs
+                , Just (App (App (App (App (Var f) _) _) _) _) <- scrut'
+                , Just SeqOp <- isPrimOpId_maybe f
+                = [s, add_seq_eval x]
+                | otherwise = add_evals (dataConRepStrictness con)
+
         ; (env', vs') <- simplLamBndrs env vs_with_evals
 
                 -- Bind the case-binder to (con args)
@@ -2645,6 +2655,18 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
           zap str v = setCaseBndrEvald str $ -- Add eval'dness info
                       zapIdOccInfo v         -- And kill occ info;
                                              -- see Note [Case alternative occ info]
+    -- add_seq_eval records the fact that the result of seq# is in WHNF. In
+    --
+    -- case seq# v s of
+    --   (# s', v' #) -> E
+    --
+    -- we want the compiler to be aware that v' is in WHNF in E. See #15226.
+    -- We don't record that v itself is in WHNF (and we can't do it here).
+    -- Should we do it elsewhere? Arguably it would be better to do all this
+    -- in PrelRules/caseRules, but at least for now that only allows
+    -- certain pattern transformations and doesn't allow branches to be
+    -- changed.
+    add_seq_eval x = setCaseBndrEvald MarkedStrict (zapIdOccInfo x)
 
 addAltUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> OutExpr -> SimplM SimplEnv
 addAltUnfoldings env scrut case_bndr con_app
