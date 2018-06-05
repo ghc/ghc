@@ -166,12 +166,12 @@ test-suite spec
     Haddock.Backends.Hyperlinker.Parser
     Haddock.Backends.Hyperlinker.Types
 
-  build-depends: Cabal           ^>= 2.0.0
+  build-depends: Cabal           ^>= 2.2
                , ghc             ^>= 8.4
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.6.0
                , xhtml           ^>= 3000.2.2
-               , hspec           ^>= 2.4.4
+               , hspec           >= 2.4.4 && < 2.6
                , QuickCheck      ^>= 2.11
 
   -- Versions for the dependencies below are transitively pinned by
@@ -188,7 +188,7 @@ test-suite spec
                , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover ^>= 2.4.4
+    hspec-discover:hspec-discover >= 2.4.4 && < 2.6
 
 source-repository head
   type:     git
