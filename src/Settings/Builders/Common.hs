@@ -11,6 +11,7 @@ module Settings.Builders.Common (
 
 import Base
 import Expression
+import GHC.Packages
 import Hadrian.Haskell.Cabal.PackageData
 import Oracles.Flag
 import Oracles.Setting
@@ -27,7 +28,7 @@ cIncludeArgs = do
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir
-    mconcat [ arg "-Iincludes"
+    mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
