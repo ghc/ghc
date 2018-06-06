@@ -574,3 +574,13 @@ test('T14936',
                        (wordsize(64), 51792, 5) ])],
      compile_and_run,
      ['-O2'])
+
+test('T15226',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 41040, 5) ]),
+                    # 2018-06-06   41040  Let the simplifier know the result
+                    #                     of seq# is in WHNF
+                    # initial  400041040
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
