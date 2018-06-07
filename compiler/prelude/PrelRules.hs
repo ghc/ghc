@@ -1067,6 +1067,10 @@ Implementing seq#.  The compiler has magic for SeqOp in
 
 - CoreUtils.exprOkForSpeculation;
   see Note [seq# and expr_ok] in CoreUtils
+
+- Simplify.addEvals records evaluated-ness for the result; see
+  Note [Adding evaluatedness info to pattern-bound variables]
+  in Simplify
 -}
 
 seqRule :: RuleM CoreExpr

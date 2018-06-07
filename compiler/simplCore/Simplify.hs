@@ -2615,32 +2615,34 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
         ; rhs' <- simplExprC env'' rhs cont'
         ; return (DataAlt con, vs', rhs') }
 
--- Note [Adding evaluatedness info to pattern-bound variables]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- add_evals records the evaluated-ness of the bound variables of
--- a case pattern.  This is *important*.  Consider
---
---      data T = T !Int !Int
---
---      case x of { T a b -> T (a+1) b }
---
--- We really must record that b is already evaluated so that we don't
--- go and re-evaluate it when constructing the result.
--- See Note [Data-con worker strictness] in MkId.hs
---
--- NB: simplLamBinders preserves this eval info
---
--- In addition to handling data constructor fields with !s, add_evals
--- also records the fact that the result of seq# is always in WHNF.
--- in
---
---   case seq# v s of
---     (# s', v' #) -> E
---
--- we want the compiler to be aware that v' is in WHNF in E. See #15226.
--- We don't record that v itself is in WHNF (and we can't do it here).
--- I don't know if we should attempt to do so.
+{- Note [Adding evaluatedness info to pattern-bound variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+addEvals records the evaluated-ness of the bound variables of
+a case pattern.  This is *important*.  Consider
+
+     data T = T !Int !Int
+
+     case x of { T a b -> T (a+1) b }
+
+We really must record that b is already evaluated so that we don't
+go and re-evaluate it when constructing the result.
+See Note [Data-con worker strictness] in MkId.hs
+
+NB: simplLamBinders preserves this eval info
+
+In addition to handling data constructor fields with !s, addEvals
+also records the fact that the result of seq# is always in WHNF.
+See Note [seq# magic] in PrelRules.  Example (Trac #15226):
+
+  case seq# v s of
+    (# s', v' #) -> E
+
+we want the compiler to be aware that v' is in WHNF in E.
+
+Open problem: we don't record that v itself is in WHNF (and we can't
+do it here).  The right thing is to do some kind of binder-swap;
+see Trac #15226 for discussion.
+-}
 
 addEvals :: Maybe OutExpr -> DataCon -> [Id] -> [Id]
 -- See Note [Adding evaluatedness info to pattern-bound variables]
