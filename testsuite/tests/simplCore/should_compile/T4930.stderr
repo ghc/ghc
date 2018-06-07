@@ -71,7 +71,9 @@ foo [InlPrag=NOUSERINLINE[2]] :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (w [Occ=Once!] :: Int) ->
                  case w of { GHC.Types.I# ww1 [Occ=Once] ->
-                 case T4930.$wfoo ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+                 case T4930.$wfoo ww1 of ww2 [Occ=Once] { __DEFAULT ->
+                 GHC.Types.I# ww2
+                 }
                  }}]
 foo
   = \ (w :: Int) ->
