@@ -1281,11 +1281,15 @@ dataConInstOrigArgTys
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcUnivTyVars = univ_tvs,
                                   dcExTyVars = ex_tvs}) inst_tys
-  = ASSERT2( tyvars `equalLength` inst_tys
-          , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-    map (fmap $ substTyWith tyvars inst_tys) arg_tys
+  = ASSERT2( tyvars `equalLength` inst_tys2
+           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+    map (fmap $ substTyWith tyvars inst_tys2) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
+    inst_tys2 = if isUnboxedTupleCon dc
+                  then map getRuntimeRep inst_tys ++ inst_tys
+                  else inst_tys
+                  -- See Note [Unboxed tuple RuntimeRep vars]
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
