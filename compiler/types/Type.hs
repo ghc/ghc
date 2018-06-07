@@ -963,7 +963,7 @@ See #11714.
 isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
-splitFunTy :: Type -> (Weighted Type, Type)
+splitFunTy :: HasCallStack => Type -> (Weighted Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'

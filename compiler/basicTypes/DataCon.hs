@@ -1272,7 +1272,8 @@ dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
 dataConInstOrigArgTys
-        :: DataCon      -- Works for any DataCon
+        :: HasCallStack
+        => DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
         -> [Weighted Type]

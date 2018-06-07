@@ -229,7 +229,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 ************************************************************************
 -}
 
-dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
+dsLExpr :: HasCallStack => LHsExpr GhcTc -> DsM CoreExpr
 
 dsLExpr (L loc e)
   = putSrcSpanDs loc $
@@ -245,17 +245,17 @@ dsLExpr (L loc e)
 -- be an argument to some other function.
 -- See Note [Levity polymorphism checking] in DsMonad
 -- See Note [Levity polymorphism invariants] in CoreSyn
-dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
+dsLExprNoLP :: HasCallStack => LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
   = putSrcSpanDs loc $
     do { e' <- dsExpr e
        ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
        ; return e' }
 
-dsExpr :: HsExpr GhcTc -> DsM CoreExpr
-dsExpr = ds_expr False
+dsExpr :: HasCallStack => HsExpr GhcTc -> DsM CoreExpr
+dsExpr e = ds_expr False e
 
-ds_expr :: Bool   -- are we directly inside an HsWrap?
+ds_expr :: HasCallStack => Bool   -- are we directly inside an HsWrap?
                   -- See Wrinkle in Note [Detecting forced eta expansion]
         -> HsExpr GhcTc -> DsM CoreExpr
 ds_expr _ (HsPar _ e)            = dsLExpr e

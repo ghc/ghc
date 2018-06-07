@@ -10,6 +10,7 @@ import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
 import {-# SOURCE #-} TyCoRep ( Type, ThetaType )
 import Weight
+import Util (  HasCallStack )
 
 data DataCon
 data DataConRep
@@ -22,7 +23,7 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConInstOrigArgTys  :: DataCon -> [Type] -> [Weighted Type]
+dataConInstOrigArgTys  :: HasCallStack => DataCon -> [Type] -> [Weighted Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
                -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Weighted Type], Type)
