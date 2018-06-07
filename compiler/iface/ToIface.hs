@@ -535,14 +535,17 @@ mkIfaceApps f as = foldl (\f a -> IfaceApp f (toIfaceExpr a)) f as
 ---------------------
 toIfaceVar :: Id -> IfaceExpr
 toIfaceVar v
-    | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
-       -- Foreign calls have special syntax
     | isBootUnfolding (idUnfolding v)
-    = IfaceApp (IfaceApp (IfaceExt noinlineIdName) (IfaceType (toIfaceType (idType v))))
+    = -- See Note [Inlining and hs-boot files]
+      IfaceApp (IfaceApp (IfaceExt noinlineIdName)
+                         (IfaceType (toIfaceType (idType v))))
                (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
-       -- See Note [Inlining and hs-boot files]
-    | isExternalName name                        = IfaceExt name
-    | otherwise                                  = IfaceLcl (getOccFS name)
+
+    | Just fcall <- isFCallId_maybe v = IfaceFCall fcall (toIfaceType (idType v))
+                                      -- Foreign calls have special syntax
+
+    | isExternalName name             = IfaceExt name
+    | otherwise                       = IfaceLcl (getOccFS name)
   where name = idName v
 
 
