@@ -555,9 +555,9 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (lookupNameEnv_NF tag_map dc_name)
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
-                (mkDataConRepSimple work_name data_con)
+                (mkDataConRepSimple wrapper_name data_con)
 
-    work_name = mkDataConWorkerName data_con (dataConWrapperUnique (getUnique dc_name))
+    wrapper_name = mkDataConWrapperName data_con (dataConWrapperUnique (nameUnique dc_name))
      -- We assume that we don't need non-linear wired-in types. Constraints are,
      -- on the other hand, always unrestricted (constraint arguments occur, in
      -- particular, in @Eq#@)
@@ -569,6 +569,17 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
     wrk_name = mkDataConWorkerName data_con wrk_key
 
     prom_info = mkPrelTyConRepName dc_name
+
+mkDataConWrapperName :: DataCon -> Unique -> Name
+mkDataConWrapperName data_con wrap_key =
+    mkWiredInName modu wrk_occ wrap_key
+                  (AnId (dataConWrapId data_con)) UserSyntax
+  where
+    modu     = ASSERT( isExternalName dc_name )
+               nameModule dc_name
+    dc_name = dataConName data_con
+    dc_occ  = nameOccName dc_name
+    wrk_occ = mkDataConWrapperOcc dc_occ
 
 mkDataConWorkerName :: DataCon -> Unique -> Name
 mkDataConWorkerName data_con wrk_key =
