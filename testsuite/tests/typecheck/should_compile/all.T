@@ -621,5 +621,4 @@ test('SplitWD', normal, compile, [''])
 test('T14441', omit_ways(['profasm']), compile, [''])
 test('T15050', [expect_broken(15050)], compile, [''])
 test('T14735', normal, compile, [''])
-test('T15232', expect_broken(15232), compile, [''])
-
+test('T15232', normal, compile, [''])
