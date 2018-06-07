@@ -381,7 +381,6 @@ data Tick
   | CaseIdentity                Id      -- Case binder
   | FillInCaseDefault           Id      -- Case binder
 
-  | BottomFound
   | SimplifierDone              -- Ticked at each iteration of the simplifier
 
 instance Outputable Tick where
@@ -410,7 +409,6 @@ tickToTag (CaseMerge _)                 = 10
 tickToTag (CaseElim _)                  = 11
 tickToTag (CaseIdentity _)              = 12
 tickToTag (FillInCaseDefault _)         = 13
-tickToTag BottomFound                   = 14
 tickToTag SimplifierDone                = 16
 tickToTag (AltMerge _)                  = 17
 
@@ -430,7 +428,6 @@ tickString (AltMerge _)                 = "AltMerge"
 tickString (CaseElim _)                 = "CaseElim"
 tickString (CaseIdentity _)             = "CaseIdentity"
 tickString (FillInCaseDefault _)        = "FillInCaseDefault"
-tickString BottomFound                  = "BottomFound"
 tickString SimplifierDone               = "SimplifierDone"
 
 pprTickCts :: Tick -> SDoc
