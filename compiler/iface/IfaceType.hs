@@ -933,6 +933,15 @@ criteria are met:
 
 -------------------
 
+-- | Prefix a space if the given 'IfaceType' is a promoted 'TyCon'.
+pprSpaceIfPromotedTyCon :: IfaceType -> SDoc -> SDoc
+pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
+  = case ifaceTyConIsPromoted (ifaceTyConInfo tyCon) of
+      IsPromoted -> (space <>)
+      _ -> id
+pprSpaceIfPromotedTyCon _
+  = id
+
 -- See equivalent function in TyCoRep.hs
 pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print
@@ -941,8 +950,8 @@ pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 pprIfaceTyList ctxt_prec ty1 ty2
   = case gather ty2 of
       (arg_tys, Nothing)
-        -> char '\'' <> brackets (fsep (punctuate comma
-                        (map (ppr_ty topPrec) (ty1:arg_tys))))
+        -> char '\'' <> brackets (pprSpaceIfPromotedTyCon ty1 (fsep
+                        (punctuate comma (map (ppr_ty topPrec) (ty1:arg_tys)))))
       (arg_tys, Just tl)
         -> maybeParen ctxt_prec funPrec $ hang (ppr_ty funPrec ty1)
            2 (fsep [ colon <+> ppr_ty funPrec ty | ty <- arg_tys ++ [tl]])
@@ -1136,8 +1145,11 @@ pprTuple ctxt_prec ConstraintTuple IsNotPromoted ITC_Nil
 pprTuple _ sort IsPromoted args
   = let tys = tcArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
+        spaceIfPromoted = case args' of
+          arg0:_ -> pprSpaceIfPromotedTyCon arg0
+          _ -> id
     in pprPromotionQuoteI IsPromoted <>
-       tupleParens sort (pprWithCommas pprIfaceType args')
+       tupleParens sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
 
 pprTuple _ sort promoted args
   =   -- drop the RuntimeRep vars.
