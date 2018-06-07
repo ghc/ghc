@@ -23,4 +23,7 @@
 ,("aarch64-apple-ios", ("e-m:o-i64:64-i128:128-n32:64-S128", "generic", "+neon"))
 ,("i386-apple-ios", ("e-m:o-p:32:32-f64:32:64-f80:128-n8:16:32-S128", "yonah", ""))
 ,("x86_64-apple-ios", ("e-m:o-i64:64-f80:128-n8:16:32:64-S128", "core2", ""))
+,("aarch64-unknown-freebsd", ("e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", "generic", "+neon"))
+,("armv6-unknown-freebsd-gnueabihf", ("e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64", "arm1176jzf-s", "+strict-align"))
+,("armv7-unknown-freebsd-gnueabihf", ("e-m:e-p:32:32-i64:64-v128:64:128-a:0:32-n32-S64", "generic", "+strict-align"))
 ]
