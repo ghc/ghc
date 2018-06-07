@@ -4720,7 +4720,7 @@ which really behave differently for the newtype and its representation.
         {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
         import Lib
-        
+
         newtype Int' = Int' Int
                      deriving (AClass)
 
@@ -9130,6 +9130,24 @@ In this redefinition, we give an explicit kind for ``(:~~:)``, deferring the cho
 of ``k2`` until after the first argument (``a``) has been given. With this declaration
 for ``(:~~:)``, the instance for ``HTestEquality`` is accepted.
 
+Another difference between higher-rank kinds and types can be found in their
+treatment of inferred and user-specified type variables. Consider the following
+program: ::
+
+  newtype Foo (f :: forall k. k -> Type) = MkFoo (f Int)
+  data Proxy a = Proxy
+
+  foo :: Foo Proxy
+  foo = MkFoo Proxy
+
+The kind of ``Foo``'s parameter is ``forall k. k -> Type``, but the kind of
+``Proxy`` is ``forall {k}. k -> Type``, where ``{k}`` denotes that the kind
+variable ``k`` is to be inferred, not specified by the user. (See
+:ref:`visible-type-application` for more discussion on the inferred-specified
+distinction). GHC does not consider ``forall k. k -> Type`` and
+``forall {k}. k -> Type`` to be equal at the kind level, and thus rejects
+``Foo Proxy`` as ill-kinded.
+
 Constraints in kinds
 --------------------
 
@@ -11533,7 +11551,7 @@ for typed holes:
                 with maxBound @Bool
               minBound :: forall a. Bounded a => a
                 with minBound @Bool
- 
+
 .. _typed-hole-valid-hole-fits:
 
 Valid Hole Fits
@@ -11579,7 +11597,7 @@ configurable by a few flags.
     By default, the hole fits show the type of the hole fit.
     This can be turned off by the reverse of this flag.
 
-     
+
 
 .. ghc-flag:: -fshow-type-app-of-hole-fits
     :shortdesc: Toggles whether to show the type application of the valid
@@ -11625,7 +11643,7 @@ configurable by a few flags.
     hole fit, i.e. where it was bound or defined, and what module
     it was originally defined in if it was imported. This can be toggled
     off using the reverse of this flag.
-           
+
 
 .. ghc-flag:: -funclutter-valid-hole-fits
     :shortdesc: Unclutter the list of valid hole fits by not showing
@@ -11715,7 +11733,7 @@ it will additionally offer up a list of refinement hole fits, in this case: ::
 
 Which shows that the hole could be replaced with e.g. ``foldl1 _``. While not
 fixing the hole, this can help users understand what options they have.
- 
+
 .. ghc-flag:: -frefinement-level-hole-fits=⟨n⟩
     :shortdesc: *default: off.* Sets the level of refinement of the
          refinement hole fits, where level ``n`` means that hole fits
@@ -11776,9 +11794,9 @@ fixing the hole, this can help users understand what options they have.
     for the hole ``_ :: [a] -> a``. If this flag is toggled off, the output
     will display only ``foldl1 _``, which can be used as a direct replacement
     for the hole, without requiring ``-XScopedTypeVariables``.
-   
-          
-    
+
+
+
 
 Sorting Valid Hole Fits
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
