@@ -112,7 +112,7 @@ exprType :: HasCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'CoreSyn.Type' expression as it cannot
 -- really be said to have a type
-exprType e | pprTrace "exprType" (ppr e) False = undefined
+--exprType e | pprTrace "exprType" (ppr e) False = undefined
 exprType (Var var)           = pprTrace "exprType" (ppr var <+> ppr (idType var)) (idType var)
 exprType (Lit lit)           = literalType lit
 exprType (Coercion co)       = coercionType co
