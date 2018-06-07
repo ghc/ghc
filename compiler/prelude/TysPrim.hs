@@ -30,7 +30,7 @@ module TysPrim(
         tYPE, primRepToRuntimeRep,
 
         funTyCon, funTyConName,
-        primTyCons,
+        unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
         charPrimTyCon,          charPrimTy, charPrimTyConName,
         intPrimTyCon,           intPrimTy, intPrimTyConName,
@@ -118,7 +118,22 @@ import Data.Char
 -}
 
 primTyCons :: [TyCon]
-primTyCons
+primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
+
+-- | Primitive 'TyCon's that are defined in "GHC.Prim" but not exposed.
+-- It's important to keep these separate as we don't want users to be able to
+-- write them (see Trac #15209) or see them in GHCi's @:browse@ output
+-- (see Trac #12023).
+unexposedPrimTyCons :: [TyCon]
+unexposedPrimTyCons
+  = [ eqPrimTyCon
+    , eqReprPrimTyCon
+    , eqPhantPrimTyCon
+    ]
+
+-- | Primitive 'TyCon's that are defined in, and exported from, "GHC.Prim".
+exposedPrimTyCons :: [TyCon]
+exposedPrimTyCons
   = [ addrPrimTyCon
     , arrayPrimTyCon
     , byteArrayPrimTyCon
@@ -150,9 +165,6 @@ primTyCons
     , wordPrimTyCon
     , word32PrimTyCon
     , word64PrimTyCon
-    , eqPrimTyCon
-    , eqReprPrimTyCon
-    , eqPhantPrimTyCon
 
     , tYPETyCon
 

@@ -61,3 +61,8 @@ T11389:
 	# (without -v0)
 	'$(TEST_HC)' $(filter-out -v0,$(TEST_HC_OPTS_INTERACTIVE)) \
             -ghci-script T11389.script < /dev/null | grep 'configuration'
+
+.PHONY: T12023
+T12023:
+	-'$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) \
+	    -ghci-script T12023.script < /dev/null | grep -c -E '(~#|~R#|~P#)'

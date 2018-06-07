@@ -110,6 +110,7 @@ test('T13450', normal, compile_fail, [''])
 test('T13450TH', normal, compile_fail, [''])
 test('T14588', normal, compile_fail, [''])
 test('T14740', normal, compile_fail, [''])
+test('T15209', normal, compile_fail, [''])
 
 test('NoNumericUnderscores0', normal, compile_fail, [''])
 test('NoNumericUnderscores1', normal, compile_fail, [''])
