@@ -1,0 +1,12 @@
+T15243.hs:(10,3)-(15,6): Splicing declarations
+    [d| type family F_at5 (a_at7 :: k_at6) :: k_at6 where
+          F_at5  'Unit =  'Unit
+          F_at5  '(,) =  '(,)
+          F_at5 '[] = '[]
+          F_at5  '(:) =  '(:) |]
+  ======>
+    type family F_a3ZE (a_a3ZG :: k_a3ZF) :: k_a3ZF where
+      F_a3ZE  'Unit =  'Unit
+      F_a3ZE  '(,) =  '(,)
+      F_a3ZE '[] = '[]
+      F_a3ZE  '(:) =  '(:)

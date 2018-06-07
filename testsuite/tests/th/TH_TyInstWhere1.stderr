@@ -4,5 +4,5 @@ TH_TyInstWhere1.hs:(5,3)-(7,24): Splicing declarations
           F a b = False |]
   ======>
     type family F (a :: k) (b :: k) :: Bool where
-      F a a = True
-      F a b = False
+      F a a =  'True
+      F a b =  'False

@@ -1344,7 +1344,7 @@ cvtTypeKind ty_str ty
                    }
 
            PromotedT nm -> do { nm' <- cName nm
-                              ; mk_apps (HsTyVar noExt NotPromoted
+                              ; mk_apps (HsTyVar noExt Promoted
                                                              (noLoc nm')) tys' }
                  -- Promoted data constructor; hence cName
 
@@ -1354,7 +1354,7 @@ cvtTypeKind ty_str ty
              | m == n   -- Saturated
              -> returnL (HsExplicitTupleTy noExt tys')
              | otherwise
-             -> mk_apps (HsTyVar noExt NotPromoted
+             -> mk_apps (HsTyVar noExt Promoted
                                (noLoc (getRdrName (tupleDataCon Boxed n)))) tys'
              where
                m = length tys'
@@ -1367,7 +1367,7 @@ cvtTypeKind ty_str ty
              | [ty1, L _ (HsExplicitListTy _ ip tys2)] <- tys'
              -> returnL (HsExplicitListTy noExt ip (ty1:tys2))
              | otherwise
-             -> mk_apps (HsTyVar noExt NotPromoted
+             -> mk_apps (HsTyVar noExt Promoted
                          (noLoc (getRdrName consDataCon)))
                         tys'
 
