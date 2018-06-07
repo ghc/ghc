@@ -1583,6 +1583,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             //
             switch (get_itbl((StgClosure *)p)->type) {
             case MUT_ARR_PTRS_CLEAN:
+            case SMALL_MUT_ARR_PTRS_CLEAN:
                 recordMutableGen_GC((StgClosure *)p,gen_no);
                 continue;
             case MUT_ARR_PTRS_DIRTY:
