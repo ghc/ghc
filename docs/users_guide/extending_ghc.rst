@@ -131,8 +131,8 @@ when invoked:
     import GHC
     import GHC.Paths ( libdir )
     import DynFlags ( defaultLogAction )
-     
-    main = 
+
+    main =
         defaultErrorHandler defaultLogAction $ do
           runGhc (Just libdir) $ do
             dflags <- getSessionDynFlags
@@ -157,7 +157,7 @@ Compiling it results in:
     [1 of 1] Compiling Main             ( simple_ghc_api.hs, simple_ghc_api.o )
     Linking simple_ghc_api ...
     $ ./simple_ghc_api
-    $ ./test_main 
+    $ ./test_main
     hi
     $
 
@@ -425,7 +425,7 @@ in a module it compiles:
       where printBind :: DynFlags -> CoreBind -> CoreM CoreBind
             printBind dflags bndr@(NonRec b _) = do
               putMsgS $ "Non-recursive binding named " ++ showSDoc dflags (ppr b)
-              return bndr 
+              return bndr
             printBind _ bndr = return bndr
 
 .. _getting-annotations:
@@ -610,14 +610,14 @@ access different representations of the source code. The main purpose of these
 plugins is to make it easier to implement development tools.
 
 There are several different access points that you can use for defining plugins
-that access the representations. All these fields receive the list of 
-``CommandLineOption`` strings that are passed to the compiler using the 
+that access the representations. All these fields receive the list of
+``CommandLineOption`` strings that are passed to the compiler using the
 ``-fplugin-opt`` flags.
 
 ::
 
     plugin :: Plugin
-    plugin = defaultPlugin { 
+    plugin = defaultPlugin {
         parsedResultAction = parsed
       , typeCheckResultAction = typechecked
       , spliceRunAction = spliceRun
@@ -630,15 +630,15 @@ Parsed representation
 
 When you want to define a plugin that uses the syntax tree of the source code,
 you would like to override the ``parsedResultAction`` field. This access point
-enables you to get access to information about the lexical tokens and comments 
+enables you to get access to information about the lexical tokens and comments
 in the source code as well as the original syntax tree of the compiled module.
 
 ::
 
-    parsed :: [CommandLineOption] -> ModSummary -> HsParsedModule 
+    parsed :: [CommandLineOption] -> ModSummary -> HsParsedModule
                 -> Hsc HsParsedModule
 
-The ``ModSummary`` contains useful 
+The ``ModSummary`` contains useful
 meta-information about the compiled module. The ``HsParsedModule`` contains the
 lexical and syntactical information we mentioned before. The result that you
 return will change the result of the parsing. If you don't want to change the
@@ -647,33 +647,33 @@ result, just return the ``HsParsedModule`` that you received as the argument.
 Type checked representation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When you want to define a plugin that needs semantic information about the 
-source code, use the ``typeCheckResultAction`` field. For example, if your 
+When you want to define a plugin that needs semantic information about the
+source code, use the ``typeCheckResultAction`` field. For example, if your
 plugin have to decide if two names are referencing the same definition or it has
-to check the type of a function it is using semantic information. In this case 
-you need to access the renamed or type checked version of the syntax tree with 
+to check the type of a function it is using semantic information. In this case
+you need to access the renamed or type checked version of the syntax tree with
 ``typeCheckResultAction``
 
 ::
 
-    typechecked :: [CommandLineOption] -> ModSummary -> TcGblEnv -> Hsc TcGblEnv
+    typechecked :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
 
-By overriding the ``renamedResultAction`` field with a ``Just`` function, you 
+By overriding the ``renamedResultAction`` field with a ``Just`` function, you
 can request the compiler to keep the renamed syntax tree and give it to your
-processing function. This is important because some parts of the renamed 
-syntax tree (for example, imports) are not found in the typechecked one. 
+processing function. This is important because some parts of the renamed
+syntax tree (for example, imports) are not found in the typechecked one.
 The ``renamedResultAction`` is set to ``Nothing`` by default.
 
 ::
 
-    rename :: Maybe ([CommandLineOption] -> ModSummary -> Hsc ())
+    rename :: Maybe ([CommandLineOption] -> ModSummary -> TcM ())
 
 
 Evaluated code
 ^^^^^^^^^^^^^^
 
-When the compiler type checks the source code, :ref:`template-haskell` Splices 
-and :ref:`th-quasiquotation` will be replaced by the syntax tree fragments 
+When the compiler type checks the source code, :ref:`template-haskell` Splices
+and :ref:`th-quasiquotation` will be replaced by the syntax tree fragments
 generated from them. However for tools that operate on the source code the
 code generator is usually more interesting than the generated code. For this
 reason we included ``spliceRunAction``. This field is invoked on each expression
@@ -696,7 +696,7 @@ Interface files
 
 Sometimes when you are writing a tool, knowing the source code is not enough,
 you also have to know details about the modules that you import. In this case we
-suggest using the ``interfaceLoadAction``. This will be called each time when 
+suggest using the ``interfaceLoadAction``. This will be called each time when
 the code of an already compiled module is loaded. It will be invoked for modules
 from installed packages and even modules that are installed with GHC. It will
 NOT be invoked with your own modules.
@@ -713,10 +713,10 @@ the exported definitions and type class instances.
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^
 
-In this example, we inspect all available details of the compiled source code. 
-We don't change any of the representation, but write out the details to the 
-standard output. The pretty printed representation of the parsed, renamed and 
-type checked syntax tree will be in the output as well as the evaluated splices 
+In this example, we inspect all available details of the compiled source code.
+We don't change any of the representation, but write out the details to the
+standard output. The pretty printed representation of the parsed, renamed and
+type checked syntax tree will be in the output as well as the evaluated splices
 and quasi quotes. The name of the interfaces that are loaded will also be
 displayed.
 
@@ -736,36 +736,36 @@ displayed.
     plugin :: Plugin
     plugin = defaultPlugin { parsedResultAction = parsedPlugin
                            , renamedResultAction = Just renamedAction
-                           , typeCheckResultAction = typecheckPlugin 
+                           , typeCheckResultAction = typecheckPlugin
                            , spliceRunAction = metaPlugin
                            , interfaceLoadAction = interfaceLoadPlugin
                            }
 
     parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule -> Hsc HsParsedModule
-    parsedPlugin _ _ pm 
+    parsedPlugin _ _ pm
       = do liftIO $ putStrLn $ "parsePlugin: \n" ++ (showSDocUnsafe $ ppr $ hpm_module pm)
            return pm
 
-    renamedAction :: [CommandLineOption] -> ModSummary 
+    renamedAction :: [CommandLineOption] -> ModSummary
                         -> ( HsGroup GhcRn, [LImportDecl GhcRn]
-                           , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString ) 
-                        -> Hsc ()
+                           , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString )
+                        -> TcM ()
     renamedAction _ _ ( gr, _, _, _ )
       = liftIO $ putStrLn "typeCheckPlugin (rn): " ++ (showSDocUnsafe $ ppr gr)
 
-    typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> Hsc TcGblEnv
-    typecheckPlugin _ _ tc 
+    typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
+    typecheckPlugin _ _ tc
       = do liftIO $ putStrLn $ "typeCheckPlugin (rn): \n" ++ (showSDocUnsafe $ ppr $ tcg_rn_decls tc)
            liftIO $ putStrLn $ "typeCheckPlugin (tc): \n" ++ (showSDocUnsafe $ ppr $ tcg_binds tc)
            return tc
 
     metaPlugin :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
-    metaPlugin _ meta 
+    metaPlugin _ meta
       = do liftIO $ putStrLn $ "meta: " ++ (showSDocUnsafe $ ppr meta)
            return meta
 
     interfaceLoadPlugin :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
-    interfaceLoadPlugin _ iface 
+    interfaceLoadPlugin _ iface
       = do liftIO $ putStrLn $ "interface loaded: " ++ (showSDocUnsafe $ ppr $ mi_module iface)
            return iface
 
@@ -785,7 +785,7 @@ output:
 
 .. code-block:: none
 
-    parsePlugin: 
+    parsePlugin:
     module A where
     a = ()
     $(return [])
@@ -797,9 +797,9 @@ output:
     interface loaded: GHC.Types
     meta: return []
     interface loaded: GHC.Integer.Type
-    typeCheckPlugin (rn): 
+    typeCheckPlugin (rn):
     Just a = ()
-    typeCheckPlugin (tc): 
+    typeCheckPlugin (tc):
     {$trModule = Module (TrNameS "main"#) (TrNameS "A"#), a = ()}
 
 

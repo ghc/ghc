@@ -85,7 +85,7 @@ module HscMain
 import GhcPrelude
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( isJust, fromMaybe )
+import Data.Maybe       ( isJust )
 import DynFlags         (addPluginModuleName)
 import Id
 import GHCi             ( addSptEntry )
@@ -101,7 +101,6 @@ import Panic
 import ConLike
 import Control.Concurrent
 
-import Avail            ( Avails )
 import Module
 import Packages
 import RdrName
@@ -391,18 +390,12 @@ hscParse' mod_summary
                   = parsedResultAction p opts mod_summary
             withPlugins dflags applyPluginAction res
 
--- XXX: should this really be a Maybe X?  Check under which circumstances this
--- can become a Nothing and decide whether this should instead throw an
--- exception/signal an error.
-type RenamedStuff =
-        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
-                Maybe LHsDocString))
 
 -- -----------------------------------------------------------------------------
 -- | If the renamed source has been kept, extract it. Dump it if requested.
 extract_renamed_stuff :: TcGblEnv -> Hsc (TcGblEnv, RenamedStuff)
 extract_renamed_stuff tc_result = do
-    let rn_info = get_renamed_stuff tc_result
+    let rn_info = getRenamedStuff tc_result
 
     dflags <- getDynFlags
     liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer" $
@@ -410,12 +403,6 @@ extract_renamed_stuff tc_result = do
 
     return (tc_result, rn_info)
 
--- | Extract the renamed information from TcGblEnv.
-get_renamed_stuff :: TcGblEnv -> RenamedStuff
-get_renamed_stuff tc_result
-  = fmap (\decls -> ( decls, tcg_rn_imports tc_result
-                    , tcg_rn_exports tc_result, tcg_doc_hdr tc_result ) )
-         (tcg_rn_decls tc_result)
 
 -- -----------------------------------------------------------------------------
 -- | Rename and typecheck a module, additionally returning the renamed syntax
@@ -474,7 +461,7 @@ tcRnModule' sum save_rn_syntax mod = do
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
-                   tcRnModule hsc_env (ms_hsc_src sum)
+                   tcRnModule hsc_env sum
                      (save_rn_syntax || plugin_needs_rn) mod
 
     -- See Note [Safe Haskell Overlapping Instances Implementation]
@@ -508,23 +495,9 @@ tcRnModule' sum save_rn_syntax mod = do
                  return tcg_res'
 
     -- apply plugins to the type checking result
-    let unsafeText = "Use of plugins makes the module unsafe"
-        pluginUnsafe = unitBag ( mkPlainWarnMsg dflags noSrcSpan
-                                   (Outputable.text unsafeText) )
 
-    case get_renamed_stuff res of
-      Just rn ->
-        withPlugins_ dflags
-                     (\p opts -> (fromMaybe (\_ _ _ -> return ())
-                                            (renamedResultAction p)) opts sum)
-                     rn
-      Nothing -> return ()
 
-    res' <- withPlugins dflags
-                        (\p opts -> typeCheckResultAction p opts sum
-                                      >=> flip markUnsafeInfer pluginUnsafe)
-                        res
-    return res'
+    return res
   where
     pprMod t  = ppr $ moduleName $ tcg_mod t
     errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"

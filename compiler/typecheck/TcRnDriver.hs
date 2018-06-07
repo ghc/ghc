@@ -42,6 +42,7 @@ module TcRnDriver (
         badReexportedBootThing,
         checkBootDeclM,
         missingBootThing,
+        getRenamedStuff, RenamedStuff
     ) where
 
 import GhcPrelude
@@ -60,7 +61,7 @@ import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
-import Plugins ( tcPlugin, LoadedPlugin(..))
+import Plugins
 import DynFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
@@ -148,12 +149,12 @@ import Control.Monad
 
 -- | Top level entry point for typechecker and renamer
 tcRnModule :: HscEnv
-           -> HscSource
+           -> ModSummary
            -> Bool              -- True <=> save renamed syntax
            -> HsParsedModule
            -> IO (Messages, Maybe TcGblEnv)
 
-tcRnModule hsc_env hsc_src save_rn_syntax
+tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module=L loc this_module}
  | RealSrcSpan real_loc <- loc
  = withTiming (pure dflags)
@@ -162,12 +163,13 @@ tcRnModule hsc_env hsc_src save_rn_syntax
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
           withTcPlugins hsc_env $
 
-          tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
+          tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
   | otherwise
   = return ((emptyBag, unitBag err_msg), Nothing)
 
   where
+    hsc_src = ms_hsc_src mod_sum
     dflags = hsc_dflags hsc_env
     err_msg = mkPlainErrMsg (hsc_dflags hsc_env) loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
@@ -186,13 +188,13 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
 
 tcRnModuleTcRnM :: HscEnv
-                -> HscSource
+                -> ModSummary
                 -> HsParsedModule
                 -> (Module, SrcSpan)
                 -> TcRn TcGblEnv
 -- Factored out separately from tcRnModule so that a Core plugin can
 -- call the type checker directly
-tcRnModuleTcRnM hsc_env hsc_src
+tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
                       (L loc (HsModule maybe_mod export_ies
@@ -202,8 +204,8 @@ tcRnModuleTcRnM hsc_env hsc_src
                 })
                 (this_mod, prel_imp_loc)
  = setSrcSpan loc $
-   do { let { explicit_mod_hdr = isJust maybe_mod } ;
-
+   do { let { explicit_mod_hdr = isJust maybe_mod
+            ; hsc_src = ms_hsc_src mod_sum };
                 -- Load the hi-boot interface for this module, if any
                 -- We do this now so that the boot_names can be passed
                 -- to tcTyAndClassDecls, because the boot_names are
@@ -287,6 +289,9 @@ tcRnModuleTcRnM hsc_env hsc_src
 
                 -- add extra source files to tcg_dependent_files
         addDependentFiles src_files ;
+
+        runRenamerPlugin mod_sum hsc_env tcg_env ;
+        tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env ;
 
                 -- Dump output and return
         tcDump tcg_env ;
@@ -2698,3 +2703,39 @@ withTcPlugins hsc_env m =
 getTcPlugins :: DynFlags -> [TcPlugin]
 getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
   where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
+
+runRenamerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM ()
+runRenamerPlugin mod_sum hsc_env gbl_env = do
+    let dflags = hsc_dflags hsc_env
+    case getRenamedStuff gbl_env of
+      Just rn ->
+        withPlugins_ dflags
+                     (\p opts -> (fromMaybe (\_ _ _ -> return ())
+                                            (renamedResultAction p)) opts mod_sum)
+                     rn
+      Nothing -> return ()
+
+-- XXX: should this really be a Maybe X?  Check under which circumstances this
+-- can become a Nothing and decide whether this should instead throw an
+-- exception/signal an error.
+type RenamedStuff =
+        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
+                Maybe LHsDocString))
+
+-- | Extract the renamed information from TcGblEnv.
+getRenamedStuff :: TcGblEnv -> RenamedStuff
+getRenamedStuff tc_result
+  = fmap (\decls -> ( decls, tcg_rn_imports tc_result
+                    , tcg_rn_exports tc_result, tcg_doc_hdr tc_result ) )
+         (tcg_rn_decls tc_result)
+
+runTypecheckerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM TcGblEnv
+runTypecheckerPlugin sum hsc_env gbl_env = do
+    let dflags = hsc_dflags hsc_env
+        unsafeText = "Use of plugins makes the module unsafe"
+        pluginUnsafe = unitBag ( mkPlainWarnMsg dflags noSrcSpan
+                                   (Outputable.text unsafeText) )
+        mark_unsafe = recordUnsafeInfer pluginUnsafe
+    withPlugins dflags
+      (\p opts env -> mark_unsafe >> typeCheckResultAction p opts sum env)
+      gbl_env

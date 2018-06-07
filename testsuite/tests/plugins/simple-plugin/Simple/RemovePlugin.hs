@@ -39,7 +39,7 @@ removeParsedBinding name (L l m)
           = occNameString (rdrNameOcc fid) /= name
         notNamedAs _ _ = True
 
-typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> Hsc TcGblEnv
+typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
 typecheckPlugin [name, "typecheck"] _ tc
   = return $ tc { tcg_exports = filter (availNotNamedAs name) (tcg_exports tc)
                 , tcg_binds = filterBag (notNamedAs name) (tcg_binds tc)

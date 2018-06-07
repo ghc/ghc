@@ -31,11 +31,11 @@ parsedPlugin opts _ pm
 renamedAction :: [CommandLineOption] -> ModSummary
                     -> ( HsGroup GhcRn, [LImportDecl GhcRn]
                        , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString )
-                    -> Hsc ()
+                    -> TcM ()
 renamedAction _ _ ( gr, _, _, _ )
   = liftIO $ putStrLn "typeCheckPlugin (rn)"
 
-typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> Hsc TcGblEnv
+typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
 typecheckPlugin _ _ tc
   = do liftIO $ putStrLn "typeCheckPlugin (tc)"
        return tc
