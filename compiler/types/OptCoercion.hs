@@ -83,11 +83,15 @@ an ambient substitution, which is why a LiftingContext stores a TCvSubst.
 
 -}
 
-optCoercion :: TCvSubst -> Coercion -> NormalCo
+optCoercion :: DynFlags -> TCvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
-optCoercion env co
-  | hasNoOptCoercion unsafeGlobalDynFlags = substCo env co
+optCoercion dflags env co
+  | hasNoOptCoercion dflags = substCo env co
+  | otherwise               = optCoercion' env co
+
+optCoercion' :: TCvSubst -> Coercion -> NormalCo
+optCoercion' env co
   | debugIsOn
   = let out_co = opt_co1 lc False co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
@@ -350,7 +354,7 @@ opt_co4 env sym rep r (CoherenceCo co1 co2)
 
   | TransCo col1' cor1' <- co1'
   = if sym then opt_trans in_scope col1'
-                  (optCoercion (zapTCvSubst (lcTCvSubst env))
+                  (optCoercion' (zapTCvSubst (lcTCvSubst env))
                                (mkCoherenceRightCo cor1' co2'))
            else opt_trans in_scope (mkCoherenceCo col1' co2') cor1'
 

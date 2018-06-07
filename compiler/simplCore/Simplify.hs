@@ -1015,8 +1015,9 @@ simplCoercionF env co cont
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
-  = let opt_co = optCoercion (getTCvSubst env) co
-    in seqCo opt_co `seq` return opt_co
+  = do { dflags <- getDynFlags
+       ; let opt_co = optCoercion dflags (getTCvSubst env) co
+       ; seqCo opt_co `seq` return opt_co }
 
 -----------------------------------
 -- | Push a TickIt context outwards past applications and cases, as

@@ -85,7 +85,7 @@ mkTopUnfolding dflags is_bottoming rhs
 mkImplicitUnfolding :: DynFlags -> CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
 mkImplicitUnfolding dflags expr
-  = mkTopUnfolding dflags False (simpleOptExpr expr)
+  = mkTopUnfolding dflags False (simpleOptExpr dflags expr)
 
 -- Note [Top-level flag on inline rules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -107,14 +107,14 @@ mkDFunUnfolding bndrs con ops
 mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
 mkWwInlineRule expr arity
   = mkCoreUnfolding InlineStable True
-                   (simpleOptExpr expr)
+                   (simpleOptExpr unsafeGlobalDynFlags expr)
                    (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
                             , ug_boring_ok = boringCxtNotOk })
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr         -- Used for things that absolutely must be unfolded
   = mkCoreUnfolding InlineCompulsory True
-                    (simpleOptExpr expr)
+                    (simpleOptExpr unsafeGlobalDynFlags expr)
                     (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
                              , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
 
@@ -126,7 +126,7 @@ mkWorkerUnfolding dflags work_fn
   | isStableSource src
   = mkCoreUnfolding src top_lvl new_tmpl guidance
   where
-    new_tmpl = simpleOptExpr (work_fn tmpl)
+    new_tmpl = simpleOptExpr dflags (work_fn tmpl)
     guidance = calcUnfoldingGuidance dflags False new_tmpl
 
 mkWorkerUnfolding _ _ _ = noUnfolding
@@ -141,7 +141,7 @@ mkInlineUnfolding expr
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
-    expr' = simpleOptExpr expr
+    expr' = simpleOptExpr unsafeGlobalDynFlags expr
     guide = UnfWhen { ug_arity = manifestArity expr'
                     , ug_unsat_ok = unSaturatedOk
                     , ug_boring_ok = boring_ok }
@@ -155,7 +155,7 @@ mkInlineUnfoldingWithArity arity expr
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
-    expr' = simpleOptExpr expr
+    expr' = simpleOptExpr unsafeGlobalDynFlags expr
     guide = UnfWhen { ug_arity = arity
                     , ug_unsat_ok = needSaturated
                     , ug_boring_ok = boring_ok }
@@ -165,14 +165,15 @@ mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkInlinableUnfolding dflags expr
   = mkUnfolding dflags InlineStable False False expr'
   where
-    expr' = simpleOptExpr expr
+    expr' = simpleOptExpr dflags expr
 
-specUnfolding :: [Var] -> (CoreExpr -> CoreExpr) -> Arity -> Unfolding -> Unfolding
+specUnfolding :: DynFlags -> [Var] -> (CoreExpr -> CoreExpr) -> Arity
+              -> Unfolding -> Unfolding
 -- See Note [Specialising unfoldings]
 -- specUnfolding spec_bndrs spec_app arity_decrease unf
 --   = \spec_bndrs. spec_app( unf )
 --
-specUnfolding spec_bndrs spec_app arity_decrease
+specUnfolding dflags spec_bndrs spec_app arity_decrease
               df@(DFunUnfolding { df_bndrs = old_bndrs, df_con = con, df_args = args })
   = ASSERT2( arity_decrease == count isId old_bndrs - count isId spec_bndrs, ppr df )
     mkDFunUnfolding spec_bndrs con (map spec_arg args)
@@ -184,11 +185,11 @@ specUnfolding spec_bndrs spec_app arity_decrease
       --       \new_bndrs. MkD (spec_app(\old_bndrs. <op1>)) ... ditto <opn>
       -- The ASSERT checks the value part of that
   where
-    spec_arg arg = simpleOptExpr (spec_app (mkLams old_bndrs arg))
+    spec_arg arg = simpleOptExpr dflags (spec_app (mkLams old_bndrs arg))
                    -- The beta-redexes created by spec_app will be
                    -- simplified away by simplOptExpr
 
-specUnfolding spec_bndrs spec_app arity_decrease
+specUnfolding dflags spec_bndrs spec_app arity_decrease
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                              , uf_is_top = top_lvl
                              , uf_guidance = old_guidance })
@@ -199,13 +200,13 @@ specUnfolding spec_bndrs spec_app arity_decrease
  = let guidance = UnfWhen { ug_arity     = old_arity - arity_decrease
                           , ug_unsat_ok  = unsat_ok
                           , ug_boring_ok = boring_ok }
-       new_tmpl = simpleOptExpr (mkLams spec_bndrs (spec_app tmpl))
+       new_tmpl = simpleOptExpr dflags (mkLams spec_bndrs (spec_app tmpl))
                    -- The beta-redexes created by spec_app will be
                    -- simplified away by simplOptExpr
 
    in mkCoreUnfolding src top_lvl new_tmpl guidance
 
-specUnfolding _ _ _ _ = noUnfolding
+specUnfolding _ _ _ _ _ = noUnfolding
 
 {- Note [Specialising unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1346,7 +1346,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding poly_tyvars spec_app
+                  = (inl_prag, specUnfolding dflags poly_tyvars spec_app
                                              arity_decrease fn_unf)
 
                 arity_decrease = length spec_dict_args

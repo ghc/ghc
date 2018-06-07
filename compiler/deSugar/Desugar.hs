@@ -397,18 +397,18 @@ dsRule (L loc (HsRule _ name rule_act vars lhs rhs))
                 Left msg -> do { warnDs NoReason msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
-        { let is_local = isLocalId fn_id
+        { dflags <- getDynFlags
+        ; let is_local = isLocalId fn_id
                 -- NB: isLocalId is False of implicit Ids.  This is good because
                 -- we don't want to attach rules to the bindings of implicit Ids,
                 -- because they don't show up in the bindings until just before code gen
               fn_name   = idName fn_id
-              final_rhs = simpleOptExpr rhs''    -- De-crap it
+              final_rhs = simpleOptExpr dflags rhs''    -- De-crap it
               rule_name = snd (unLoc name)
               final_bndrs_set = mkVarSet final_bndrs
               arg_ids = filterOut (`elemVarSet` final_bndrs_set) $
                         exprsSomeFreeVarsList isId args
 
-        ; dflags <- getDynFlags
         ; rule <- dsMkUserRule this_mod is_local
                          rule_name rule_act fn_name final_bndrs args
                          final_rhs

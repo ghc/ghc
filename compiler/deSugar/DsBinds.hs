@@ -689,7 +689,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        { dflags <- getDynFlags
        ; this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
-             spec_unf  = specUnfolding spec_bndrs core_app arity_decrease fn_unf
+             spec_unf  = specUnfolding dflags spec_bndrs core_app arity_decrease fn_unf
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
@@ -849,7 +849,7 @@ decomposeRuleLhs orig_bndrs orig_lhs
   = Left bad_shape_msg
  where
    lhs1         = drop_dicts orig_lhs
-   lhs2         = simpleOptExpr lhs1  -- See Note [Simplify rule LHS]
+   lhs2         = simpleOptExpr unsafeGlobalDynFlags lhs1  -- See Note [Simplify rule LHS]
    (fun2,args2) = collectArgs lhs2
 
    lhs_fvs    = exprFreeVars lhs2
