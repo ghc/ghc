@@ -340,7 +340,7 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
+funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 
 -- | The @(->)@ type constructor.
 --

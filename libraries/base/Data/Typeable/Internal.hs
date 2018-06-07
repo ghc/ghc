@@ -85,7 +85,7 @@ import GHC.Base
 import qualified GHC.Arr as A
 import GHC.Types ( TYPE )
 import Data.Type.Equality
-import GHC.List ( splitAt, foldl' )
+import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
 import GHC.Show
 import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
@@ -777,11 +777,11 @@ showTypeable _ rep
   | isTupleTyCon tc =
     showChar '(' . showArgs (showChar ',') tys . showChar ')'
   where (tc, tys) = splitApps rep
-showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = []})
-  = showsPrec p tycon
+showTypeable _ (TrTyCon {trTyCon = tycon, trKindVars = []})
+  = showTyCon tycon
 showTypeable p (TrTyCon {trTyCon = tycon, trKindVars = args})
   = showParen (p > 9) $
-    showsPrec p tycon .
+    showTyCon tycon .
     showChar ' ' .
     showArgs (showChar ' ') args
 showTypeable p (TrFun {trFunArg = x, trFunRes = r})
@@ -840,6 +840,28 @@ isTupleTyCon :: TyCon -> Bool
 isTupleTyCon tc
   | ('(':',':_) <- tyConName tc = True
   | otherwise                   = False
+
+-- This is only an approximation. We don't have the general
+-- character-classification machinery here, so we just do our best.
+-- This should work for promoted Haskell 98 data constructors and
+-- for TypeOperators type constructors that begin with ASCII
+-- characters, but it will miss Unicode operators.
+--
+-- If we wanted to catch Unicode as well, we ought to consider moving
+-- GHC.Lexeme from ghc-boot-th to base. Then we could just say:
+--
+--   startsVarSym symb || startsConSym symb
+--
+-- But this is a fair deal of work just for one corner case, so I think I'll
+-- leave it like this unless someone shouts.
+isOperatorTyCon :: TyCon -> Bool
+isOperatorTyCon tc
+  | symb : _ <- tyConName tc
+  , symb `elem` "!#$%&*+./<=>?@\\^|-~:" = True
+  | otherwise                           = False
+
+showTyCon :: TyCon -> ShowS
+showTyCon tycon = showParen (isOperatorTyCon tycon) (shows tycon)
 
 showArgs :: Show a => ShowS -> [a] -> ShowS
 showArgs _   []     = id

@@ -21,4 +21,4 @@ Proxy * *
 Proxy * *
 Proxy RuntimeRep 'LiftedRep
 Proxy (Nat,Symbol) ('(,) Nat Symbol 1 "hello")
-Proxy (* -> * -> Constraint) (~~ * *)
+Proxy (* -> * -> Constraint) ((~~) * *)
