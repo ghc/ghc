@@ -104,10 +104,10 @@ mkDFunUnfolding bndrs con ops
                   , df_args = map occurAnalyseExpr ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
-mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
-mkWwInlineRule expr arity
+mkWwInlineRule :: DynFlags -> CoreExpr -> Arity -> Unfolding
+mkWwInlineRule dflags expr arity
   = mkCoreUnfolding InlineStable True
-                   (simpleOptExpr unsafeGlobalDynFlags expr)
+                   (simpleOptExpr dflags expr)
                    (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
                             , ug_boring_ok = boringCxtNotOk })
 
