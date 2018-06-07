@@ -130,7 +130,9 @@ test('TypeableEq', normal, compile_and_run, [''])
 test('T13435', normal, compile_and_run, [''])
 test('T11715', exit_code(1), compile_and_run, [''])
 test('T13594a', normal, ghci_script, ['T13594a.script'])
-test('T13838', [exit_code(1)], compile_and_run, ['-fdefer-type-errors'])
+
+# GHCi exits with code zero due to deferred type errors
+test('T13838', [exit_code(1), omit_ways(['ghci'])], compile_and_run, ['-fdefer-type-errors'])
 test('T14218', normal, compile_and_run, [''])
 test('T14236', normal, compile_and_run, [''])
 test('T14925', normal, compile_and_run, [''])
