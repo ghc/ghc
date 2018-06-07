@@ -1890,6 +1890,7 @@ type :: { LHsType GhcPs }
 typedoc :: { LHsType GhcPs }
         : btype                          { $1 }
         | btype docprev                  { sLL $1 $> $ HsDocTy noExt $1 $2 }
+        | docnext btype                  { sLL $1 $> $ HsDocTy noExt $2 $1 }
         | btype '->'     ctypedoc        {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $ HsFunTy noExt $1 $3)
                                                 [mu AnnRarrow $2] }
@@ -1899,6 +1900,14 @@ typedoc :: { LHsType GhcPs }
                                                             (HsDocTy noExt $1 $2))
                                                          $4)
                                                 [mu AnnRarrow $3] }
+        | docnext btype '->' ctypedoc    {% ams $2 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
+                                         >> ams (sLL $1 $> $
+                                                 HsFunTy noExt (L (comb2 $1 $2)
+                                                            (HsDocTy noExt $2 $1))
+                                                         $4)
+                                                [mu AnnRarrow $3] }
+
+
 
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }
