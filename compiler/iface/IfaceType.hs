@@ -14,7 +14,7 @@ module IfaceType (
         IfExtName, IfLclName,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
-        IfaceUnivCoProv(..),
+        IfaceUnivCoProv(..), IfaceRig,
         IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..), IsPromoted(..),
         IfaceTyLit(..), IfaceTcArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
@@ -90,7 +90,7 @@ data IfaceBndr          -- Local (non-top-level) binders
   = IfaceIdBndr {-# UNPACK #-} !IfaceIdBndr
   | IfaceTvBndr {-# UNPACK #-} !IfaceTvBndr
 
-type IfaceIdBndr  = (Rig, IfLclName, IfaceType)
+type IfaceIdBndr  = (IfaceType, IfLclName, IfaceType)
 type IfaceTvBndr  = (IfLclName, IfaceKind)
 
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
@@ -119,7 +119,7 @@ data IfaceType     -- A kind of universal type, used for types and kinds
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceType
-  | IfaceFunTy     Rig IfaceType IfaceType
+  | IfaceFunTy     IfaceRig IfaceType IfaceType
   | IfaceDFunTy    IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceTcArgs  -- Not necessarily saturated
@@ -132,6 +132,8 @@ data IfaceType     -- A kind of universal type, used for types and kinds
        IsPromoted                 -- A bit like IfaceTyCon
        IfaceTcArgs                -- arity = length args
           -- For promoted data cons, the kind args are omitted
+
+type IfaceRig = IfaceType
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
@@ -253,7 +255,7 @@ data IfaceTyConInfo   -- Used to guide pretty-printing
 
 data IfaceCoercion
   = IfaceReflCo       Role IfaceType
-  | IfaceFunCo        Role Rig IfaceCoercion IfaceCoercion
+  | IfaceFunCo        Role IfaceType IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
@@ -613,9 +615,7 @@ ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
     ppr_fun_tail wthis other_ty
       = [ppr_fun_arrow wthis <+> pprIfaceType other_ty]
 
-    ppr_fun_arrow Omega = arrow
-    ppr_fun_arrow One = lollipop
-    ppr_fun_arrow (RigTy ty) = arrow <> brackets (pprType ty)
+    ppr_fun_arrow ty = arrow <> text "@" <> brackets (pprIfaceType ty)
 
 ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
   = if_print_coercions

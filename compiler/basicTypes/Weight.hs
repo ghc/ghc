@@ -36,6 +36,7 @@ instance Num Rig where
   _ * Zero = Zero
   p * One = p
   One * p = p
+  Omega * Omega = Omega
   p1 * p2 = RigMul p1 p2
 
   Zero + x = x
@@ -53,22 +54,6 @@ instance Outputable Rig where
   ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
   ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
   ppr (RigTy ty) = pprType ty
-
-instance Binary Rig where
-  put_ bh Zero = putByte bh 0
-  put_ bh One = putByte bh 1
-  put_ bh Omega = putByte bh 2
-  put_ bh _ = panic "TODO: Not implemented polymorphism"
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return Zero
-      1 -> return One
-      2 -> return Omega
-      _ -> fail "Invalid binary data for multiplicity found"
-
-
 
 -- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
 -- and @w2@.
@@ -109,14 +94,6 @@ instance Outputable a => Outputable (Weighted a) where
                           ppr t
 
 -- MattP: For now we don't print the weight by default as it creeps into
--- error messages.
-
-instance Binary a => Binary (Weighted a) where
-  put_ bh (Weighted r x) = put_ bh r >> put_ bh x
-  get bh = do
-    r <- get bh
-    x <- get bh
-    return $ Weighted r x
 
 weightedSet :: Weighted a -> b -> Weighted b
 weightedSet x b = fmap (\_->b) x

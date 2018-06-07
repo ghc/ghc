@@ -208,7 +208,7 @@ module Type (
         tidyKind,
         tidyTyVarBinder, tidyTyVarBinders,
 
-        rigToType
+        rigToType, typeToRig
     ) where
 
 #include "HsVersions.h"
@@ -731,6 +731,12 @@ rigToType r =
     Omega -> omegaDataConTy
     RigTy ty -> ty
     r -> pprPanic "rigToType" (ppr r)
+
+typeToRig :: Type -> Rig
+typeToRig ty
+  | oneDataConTy `eqType` ty = One
+  | omegaDataConTy `eqType` ty = Omega
+  | otherwise = RigTy ty
 
 
 -------------

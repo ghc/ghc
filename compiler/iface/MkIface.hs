@@ -109,6 +109,7 @@ import Fingerprint
 import Exception
 import UniqSet
 import Packages
+import Weight
 
 import Control.Monad
 import Data.Function
@@ -1690,7 +1691,9 @@ tyConToIfaceDecl env tycon
                     ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
-                    ifConArgTys  = map (fmap (tidyToIfaceType con_env2)) arg_tys,
+                    ifConArgTys  =
+                      map (\(Weighted w t) -> (tidyToIfaceType con_env2 (rigToType w)
+                                        , (tidyToIfaceType con_env2 t))) arg_tys,
                     ifConFields  = dataConFieldLabels data_con,
                     ifConStricts = map (toIfaceBang con_env2)
                                        (dataConImplBangs data_con),
