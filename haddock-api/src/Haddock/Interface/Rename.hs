@@ -233,6 +233,8 @@ renameType t = case t of
   HsTyVar _ ip (L l n) -> return . HsTyVar NoExt ip . L l =<< rename n
   HsBangTy _ b ltype -> return . HsBangTy NoExt b =<< renameLType ltype
 
+  HsStarTy _ isUni -> return (HsStarTy NoExt isUni)
+
   HsAppTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
@@ -276,7 +278,6 @@ renameType t = case t of
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ s          -> renameHsSpliceTy s
   HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
-  HsAppsTy _ _            -> error "renameType: HsAppsTy"
 
 -- | Rename splices, but _only_ those that turn out to be for types.
 -- I think this is actually safe for our possible inputs:

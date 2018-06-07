@@ -1000,8 +1000,7 @@ ppr_mono_ty ctxt_prec (HsDocTy _ ty _) unicode
 ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ = char '_'
 
 ppr_mono_ty _ (HsTyLit _ t) u = ppr_tylit t u
-
-ppr_mono_ty _ (HsAppsTy {}) _ = panic "ppr_mono_ty:HsAppsTy"
+ppr_mono_ty _ (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
 
 
 ppr_tylit :: HsTyLit -> Bool -> LaTeX
@@ -1266,12 +1265,12 @@ quote :: LaTeX -> LaTeX
 quote doc = text "\\begin{quote}" $$ doc $$ text "\\end{quote}"
 
 
-dcolon, arrow, darrow, forallSymbol :: Bool -> LaTeX
+dcolon, arrow, darrow, forallSymbol, starSymbol :: Bool -> LaTeX
 dcolon unicode = text (if unicode then "∷" else "::")
 arrow  unicode = text (if unicode then "→" else "->")
 darrow unicode = text (if unicode then "⇒" else "=>")
 forallSymbol unicode = text (if unicode then "∀" else "forall")
-
+starSymbol unicode = text (if unicode then "★" else "*")
 
 dot :: LaTeX
 dot = char '.'

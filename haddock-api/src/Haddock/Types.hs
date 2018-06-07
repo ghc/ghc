@@ -669,7 +669,7 @@ instance Monad ErrMsgGhc where
 type instance XForAllTy        DocNameI = NoExt
 type instance XQualTy          DocNameI = NoExt
 type instance XTyVar           DocNameI = NoExt
-type instance XAppsTy          DocNameI = NoExt
+type instance XStarTy          DocNameI = NoExt
 type instance XAppTy           DocNameI = NoExt
 type instance XFunTy           DocNameI = NoExt
 type instance XListTy          DocNameI = NoExt

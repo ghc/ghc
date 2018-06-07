@@ -254,6 +254,7 @@ renameType (HsQualTy x lctxt lt) =
         <$> located renameContext lctxt
         <*> renameLType lt
 renameType (HsTyVar x ip name) = HsTyVar x ip <$> located renameName name
+renameType t@(HsStarTy _ _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
 renameType (HsFunTy x la lr) = HsFunTy x <$> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
@@ -276,7 +277,6 @@ renameType (HsExplicitTupleTy x ltys) =
     HsExplicitTupleTy x <$> renameLTypes ltys
 renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
-renameType (HsAppsTy _ _) = error "HsAppsTy: Only used before renaming"
 
 
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)

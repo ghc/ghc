@@ -307,6 +307,7 @@ classify tok =
     ITminus                -> TkGlyph
     ITbang                 -> TkGlyph
     ITdot                  -> TkOperator
+    ITstar              {} -> TkOperator
     ITtypeApp              -> TkGlyph
 
     ITbiglam               -> TkGlyph

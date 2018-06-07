@@ -36,7 +36,7 @@ import TyCon
 import Type
 import TyCoRep
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName, starKindTyConName, unitTy )
+import TysWiredIn ( listTyConName, liftedTypeKindTyConName, unitTy )
 import PrelNames ( hasKey, eqTyConKey, ipClassKey
                  , tYPETyConKey, liftedRepDataConKey )
 import Unique ( getUnique )
@@ -167,7 +167,7 @@ synifyTyCon _coax tc
                                                     -- algebraic data nor newtype:
                                       , dd_ctxt = noLoc []
                                       , dd_cType = Nothing
-                                      , dd_kindSig = synifyDataTyConReturnKind tc
+                                      , dd_kindSig = Just (synifyKindSig (tyConKind tc))
                                                -- we have their kind accurately:
                                       , dd_cons = []  -- No constructors
                                       , dd_derivs = noLoc [] }
@@ -222,7 +222,7 @@ synifyTyCon coax tc
                            -- CoAxioms, not their TyCons
     _ -> synifyName tc
   tyvars = synifyTyVars (tyConVisibleTyVars tc)
-  kindSig = synifyDataTyConReturnKind tc
+  kindSig = Just (tyConKind tc)
   -- The data constructors.
   --
   -- Any data-constructors not exported from the module that *defines* the
@@ -248,7 +248,7 @@ synifyTyCon coax tc
                     , dd_ND      = alg_nd
                     , dd_ctxt    = alg_ctx
                     , dd_cType   = Nothing
-                    , dd_kindSig = kindSig
+                    , dd_kindSig = fmap synifyKindSig kindSig
                     , dd_cons    = cons
                     , dd_derivs  = alg_deriv }
  in case lefts consRaw of
@@ -257,27 +257,6 @@ synifyTyCon coax tc
                  , tcdDataDefn = defn
                  , tcdDExt = DataDeclRn False placeHolderNamesTc }
   dataConErrs -> Left $ unlines dataConErrs
-
--- In this module, every TyCon being considered has come from an interface
--- file. This means that when considering a data type constructor such as:
---
---   data Foo (w :: *) (m :: * -> *) (a :: *)
---
--- Then its tyConKind will be (* -> (* -> *) -> * -> *). But beware! We are
--- also rendering the type variables of Foo, so if we synify the tyConKind of
--- Foo in full, we will end up displaying this in Haddock:
---
---   data Foo (w :: *) (m :: * -> *) (a :: *)
---     :: * -> (* -> *) -> * -> *
---
--- Which is entirely wrong (#548). We only want to display the *return* kind,
--- which this function obtains.
-synifyDataTyConReturnKind :: TyCon -> Maybe (LHsKind GhcRn)
-synifyDataTyConReturnKind tc
-  = case splitFunTys (tyConKind tc) of
-      (_, ret_kind)
-        | isLiftedTypeKind ret_kind -> Nothing -- Don't bother displaying :: *
-        | otherwise                 -> Just (synifyKindSig ret_kind)
 
 synifyInjectivityAnn :: Maybe Name -> [TyVar] -> Injectivity
                      -> Maybe (LInjectivityAnn GhcRn)
@@ -447,7 +426,7 @@ synifyType _ (TyConApp tc tys)
       | tc `hasKey` tYPETyConKey
       , [TyConApp lev []] <- tys
       , lev `hasKey` liftedRepDataConKey
-      = noLoc (HsTyVar noExt NotPromoted (noLoc starKindTyConName))
+      = noLoc (HsTyVar noExt NotPromoted (noLoc liftedTypeKindTyConName))
       -- Use non-prefix tuple syntax where possible, because it looks nicer.
       | Just sort <- tyConTuple_maybe tc
       , tyConArity tc == length tys

@@ -1192,16 +1192,22 @@ ppr_mono_ty ctxt_prec (HsQualTy _ ctxt ty) unicode qual emptyCtxts
 
 -- UnicodeSyntax alternatives
 ppr_mono_ty _ (HsTyVar _ _ (L _ name)) True _ _
-  | getOccString (getName name) == "*"    = toHtml "★"
   | getOccString (getName name) == "(->)" = toHtml "(→)"
 
-ppr_mono_ty _         (HsBangTy _ b ty)     u q _ = ppBang b +++ ppLParendType u q HideEmptyContexts ty
-ppr_mono_ty _         (HsTyVar _ _ (L _ name)) _ q _ = ppDocName q Prefix True name
-ppr_mono_ty ctxt_prec (HsFunTy _ ty1 ty2)   u q e = ppr_fun_ty ctxt_prec ty1 ty2 u q e
-ppr_mono_ty _         (HsTupleTy _ con tys) u q _ = tupleParens con (map (ppLType u q HideEmptyContexts) tys)
-ppr_mono_ty _         (HsSumTy _ tys) u q _ = sumParens (map (ppLType u q HideEmptyContexts) tys)
-ppr_mono_ty _         (HsKindSig _ ty kind) u q e =
-    parens (ppr_mono_lty pREC_TOP ty u q e <+> dcolon u <+> ppLKind u q kind)
+ppr_mono_ty _ (HsBangTy _ b ty) u q _ =
+  ppBang b +++ ppLParendType u q HideEmptyContexts ty
+ppr_mono_ty _ (HsTyVar _ _ (L _ name)) _ q _ =
+  ppDocName q Prefix True name
+ppr_mono_ty _ (HsStarTy _ isUni) u _ _ =
+  toHtml (if u || isUni then "★" else "*")
+ppr_mono_ty ctxt_prec (HsFunTy _ ty1 ty2) u q e =
+  ppr_fun_ty ctxt_prec ty1 ty2 u q e
+ppr_mono_ty _ (HsTupleTy _ con tys) u q _ =
+  tupleParens con (map (ppLType u q HideEmptyContexts) tys)
+ppr_mono_ty _ (HsSumTy _ tys) u q _ =
+  sumParens (map (ppLType u q HideEmptyContexts) tys)
+ppr_mono_ty _ (HsKindSig _ ty kind) u q e =
+  parens (ppr_mono_lty pREC_TOP ty u q e <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy _ ty)       u q _ = brackets (ppr_mono_lty pREC_TOP ty u q HideEmptyContexts)
 ppr_mono_ty ctxt_prec (HsIParamTy _ (L _ n) ty) u q _ =
     maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q HideEmptyContexts
@@ -1214,7 +1220,6 @@ ppr_mono_ty _         (XHsType (NHsCoreTy {})) _ _ _ = error "ppr_mono_ty HsCore
 ppr_mono_ty _         (HsExplicitListTy _ Promoted tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty _         (HsExplicitListTy _ NotPromoted tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys
-ppr_mono_ty _         (HsAppsTy {})       _ _ _ = error "ppr_mono_ty HsAppsTy"
 
 ppr_mono_ty ctxt_prec (HsEqTy _ ty1 ty2) unicode qual _
   = maybeParen ctxt_prec pREC_CTX $
