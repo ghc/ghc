@@ -353,7 +353,7 @@ resultWrapper result_ty
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let narrow_wrapper = maybeNarrow dflags tycon
              marshal_con e  = Var (dataConWrapId data_con)
-                              `mkTyApps` tycon_arg_tys
+                              `mkTyApps` (omegaDataConTy : tycon_arg_tys)
                               `App` wrapper (narrow_wrapper e)
        ; return (maybe_ty, marshal_con) }
 
