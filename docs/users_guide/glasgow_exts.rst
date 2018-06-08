@@ -9747,9 +9747,9 @@ Introducing quantified constraints offers two main benefits:
    instance (Eq a, forall b. Eq b => Eq (f b)) => Eq (Rose f a) where
      (Rose x1 rs1) == (Rose x2 rs2) = x1 == x2 && rs1 == rs2
 
-  This extension allows to write constraints of the form ``forall b. Eq b => Eq (f b)``,
-  which is needed to solve the ``Eq (f (Rose f x))`` constraint arising from the
-  second usage of the ``(==)`` method.
+  This extension allows us to write constraints of the form ``forall b. Eq b =>
+  Eq (f b)``, which is needed to solve the ``Eq (f (Rose f x))`` constraint
+  arising from the second usage of the ``(==)`` method.
 
 - Secondly, quantified constraints allow for more concise and precise specifications. As an example, consider the MTL type class for monad transformers::
 
@@ -9757,7 +9757,7 @@ Introducing quantified constraints offers two main benefits:
      lift :: Monad m => m a -> (t m) a
 
   The developer knows that a monad transformer takes a monad ``m`` into a new monad ``t m``.
-  But this is property is not formally specified in the above declaration.
+  But this property is not formally specified in the above declaration.
   This omission becomes an issue when defining monad transformer composition::
 
     newtype (t1 * t2) m a = C { runC :: t1 (t2 m) a }
@@ -9776,31 +9776,37 @@ Introducing quantified constraints offers two main benefits:
     class (forall m. Monad m => Monad (t m)) => Trans t where
       lift :: Monad m => m a -> (t m) a
 
-THe idea is very old; see Seciton 7 of `Derivable type classes <https://www.microsoft.com/en-us/research/publication/derivable-type-classes/>`_.
+This idea is very old; see Seciton 7 of `Derivable type classes <https://www.microsoft.com/en-us/research/publication/derivable-type-classes/>`_.
 
 Syntax changes
 ----------------
 
 `Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this ::
 
- context ::= class
-         |   ( class1, ..., classn )
+.. code-block:: none
 
- class ::= qtycls tyvar
-        |  qtycls (tyvar atype1 ... atypen)
+    context ::= class
+            |   ( class1, ..., classn )
+
+    class ::= qtycls tyvar
+            |  qtycls (tyvar atype1 ... atypen)
 
 We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration ::
 
- class ::= ...
-       | context => qtycls inst
-       | context => tyvar inst
+.. code-block:: none
+
+    class ::= ...
+          | context => qtycls inst
+          | context => tyvar inst
 
 The definition of ``inst`` is unchanged from the Haskell Report (roughly, just a type).
 That is the only syntactic change to the language.
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with ``ExplicitForAll`` and ``MultiParameterTypeClasses`` the syntax becomes ::
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes ::
+
+.. code-block:: none
 
     class ::= ...
            | [forall tyavrs .] context => qtycls inst1 ... instn
@@ -9822,7 +9828,7 @@ Notes:
    instance (forall xx. c (Free c xx)) => Monad (Free c) where
        Free f >>= g = f g
 
-  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the `=>` may be headed by a type *variable* (`c` in this case), rather than a class.  It should not be one of the forall'd variables, though.
+  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
 
   (NB: this goes beyond what is described in `the paper <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_, but does not seem to introduce any new technical difficulties.)
 
@@ -9907,7 +9913,7 @@ is in practice, and try something more ambitious if necessary.
 Instance lookup
 -------------------
 
-In the light of the overlap decision, instance lookup works like this, when
+In the light of the overlap decision, instance lookup works like this when
 trying to solve a class constraint ``C t``
 
 1. First see if there is a given un-quantified constraint ``C t``.  If so, use it to solve the constraint.
@@ -9919,22 +9925,9 @@ trying to solve a class constraint ``C t``
 Termination
 ---------------
 
-GHC uses the `Paterson Conditions <http://downloads.haskell.org/~ghc/master/users-guide/glasgow_exts.html#instance-termination-rules>`_ to ensure that instance resolution terminates:
-
-The Paterson Conditions are these: for each class constraint ``(C t1 ... tn)``
-in the context
-
-1. No type variable has more occurrences in the constraint than in
-   the head
-
-2. The constraint has fewer constructors and variables (taken
-   together and counting repetitions) than the head
-
-3. The constraint mentions no type functions. A type function
-   application can in principle expand to a type of arbitrary size,
-   and so are rejected out of hand
-
-How are those rules modified for quantified constraints? In two ways.
+GHC uses the :ref:`Paterson Conditions <instance-termination>` to ensure
+that instance resolution terminates. How are those rules modified for quantified
+constraints? In two ways.
 
 - Each quantified constraint, taken by itself, must satisfy the termination rules for an instance declaration.
 
