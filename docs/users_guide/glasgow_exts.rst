@@ -9901,7 +9901,7 @@ There are several possible approaches for handling these overlapping local axiom
   instances), so it is a much more pervasive change, with substantial consequences
   for the type inference engine.
 
-GHC adoptst **Reject if in doubt** for now.  We can see how painful it
+GHC adopts **Reject if in doubt** for now.  We can see how painful it
 is in practice, and try something more ambitious if necessary.
 
 Instance lookup
