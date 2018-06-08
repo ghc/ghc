@@ -22,9 +22,9 @@ free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
       Constraints include
         Functor f (from free_monad_hole_fits.hs:10:10-38)
       Valid hole fits include
-        fmap :: forall (f :: * -> *).
+        fmap :: forall (f :: * -> *) a b.
                 Functor f =>
-                forall a b. (a -> b) -> f a -> f b
+                (a -> b) -> f a -> f b
         (<$>) :: forall (f :: * -> *) a b.
                  Functor f =>
                  (a -> b) -> f a -> f b
@@ -32,9 +32,7 @@ free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
         ($) (_ :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b))
           where ($) :: forall a b. (a -> b) -> a -> b
         pure (_ :: f (Free f a) -> f (Free f b))
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
 
 free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Free f a -> Free f b
@@ -58,13 +56,13 @@ free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
         Applicative f (from free_monad_hole_fits.hs:22:10-40)
       Valid refinement hole fits include
         fmap (_ :: a -> b)
-          where fmap :: forall (f :: * -> *).
+          where fmap :: forall (f :: * -> *) a b.
                         Functor f =>
-                        forall a b. (a -> b) -> f a -> f b
+                        (a -> b) -> f a -> f b
         (<*>) (_ :: Free f (a -> b))
-          where (<*>) :: forall (f :: * -> *).
+          where (<*>) :: forall (f :: * -> *) a b.
                          Applicative f =>
-                         forall a b. f (a -> b) -> f a -> f b
+                         f (a -> b) -> f a -> f b
         (<$>) (_ :: a -> b)
           where (<$>) :: forall (f :: * -> *) a b.
                          Functor f =>
@@ -76,6 +74,4 @@ free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
         ($) (_ :: Free f a -> Free f b)
           where ($) :: forall a b. (a -> b) -> a -> b
         pure (_ :: Free f b)
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a

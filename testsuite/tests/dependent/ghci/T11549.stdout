@@ -1,12 +1,21 @@
 -fno-print-explicit-runtime-reps
 ($) :: (a -> b) -> a -> b
+($) :: (a -> b) -> a -> b 	-- Defined in ‘GHC.Base’
+infixr 0 $
 TYPE :: RuntimeRep -> *
+error :: [Char] -> a
 error :: GHC.Stack.Types.HasCallStack => [Char] -> a
+  	-- Defined in ‘GHC.Err’
 
 -fprint-explicit-runtime-reps
+($) :: (a -> b) -> a -> b
 ($) :: forall (r :: RuntimeRep) a (b :: TYPE r). (a -> b) -> a -> b
+  	-- Defined in ‘GHC.Base’
+infixr 0 $
 TYPE :: RuntimeRep -> *
-error
-  :: forall (r :: RuntimeRep) (a :: TYPE r).
-     GHC.Stack.Types.HasCallStack =>
-     [Char] -> a
+error :: [Char] -> a
+error ::
+  forall (r :: RuntimeRep) (a :: TYPE r).
+  GHC.Stack.Types.HasCallStack =>
+  [Char] -> a
+  	-- Defined in ‘GHC.Err’

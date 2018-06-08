@@ -6,4 +6,8 @@ type Pair (a :: TYPE rep) (b :: TYPE rep') rep'' = forall (r :: TYPE rep''). (a 
 :kind Pair Int Float
 :kind Pair Int Float LiftedRep
 
-
+:set -fprint-explicit-runtime-reps
+:kind Pair
+:kind Pair Int
+:kind Pair Int Float
+:kind Pair Int Float LiftedRep

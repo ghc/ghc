@@ -24,11 +24,11 @@ valid_hole_fits.hs:17:17: warning: [-Wtyped-holes (in -Wdefault)]
         c :: Int -> IO Int (bound at valid_hole_fits.hs:16:1)
         a :: Int -> IO Int (bound at valid_hole_fits.hs:12:1)
         b :: Int -> IO Int (bound at valid_hole_fits.hs:14:1)
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @IO @Int
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @IO @Int
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
@@ -79,11 +79,11 @@ valid_hole_fits.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
           with Just @Integer
           (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
            (and originally defined in ‘GHC.Base’))
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @Maybe @Integer
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @Maybe @Integer
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))
@@ -245,7 +245,7 @@ valid_hole_fits.hs:37:8: warning: [-Wtyped-holes (in -Wdefault)]
           with print @[Char]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘System.IO’))
-        fail :: forall (m :: * -> *). Monad m => forall a. String -> m a
+        fail :: forall (m :: * -> *) a. Monad m => String -> m a
           with fail @IO @()
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))

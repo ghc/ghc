@@ -9407,7 +9407,7 @@ stub out functions that return unboxed types.
 Printing levity-polymorphic types
 ---------------------------------
 
-.. ghc-flag:: -fprint-explicit-runtime-rep
+.. ghc-flag:: -fprint-explicit-runtime-reps
     :shortdesc: Print ``RuntimeRep`` variables in types which are
         runtime-representation polymorphic.
     :type: dynamic

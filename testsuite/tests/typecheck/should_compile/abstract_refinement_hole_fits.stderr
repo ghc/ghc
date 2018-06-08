@@ -11,49 +11,37 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
         g :: [Integer] -> Integer
         head :: forall a. [a] -> a
         last :: forall a. [a] -> a
-        maximum :: forall (t :: * -> *).
-                   Foldable t =>
-                   forall a. Ord a => t a -> a
-        minimum :: forall (t :: * -> *).
-                   Foldable t =>
-                   forall a. Ord a => t a -> a
-        product :: forall (t :: * -> *).
-                   Foldable t =>
-                   forall a. Num a => t a -> a
-        sum :: forall (t :: * -> *).
-               Foldable t =>
-               forall a. Num a => t a -> a
+        maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        product :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
+        sum :: forall (t :: * -> *) a. (Foldable t, Num a) => t a -> a
       Valid refinement hole fits include
         foldl1 (_ :: Integer -> Integer -> Integer)
-          where foldl1 :: forall (t :: * -> *).
+          where foldl1 :: forall (t :: * -> *) a.
                           Foldable t =>
-                          forall a. (a -> a -> a) -> t a -> a
+                          (a -> a -> a) -> t a -> a
         foldr1 (_ :: Integer -> Integer -> Integer)
-          where foldr1 :: forall (t :: * -> *).
+          where foldr1 :: forall (t :: * -> *) a.
                           Foldable t =>
-                          forall a. (a -> a -> a) -> t a -> a
+                          (a -> a -> a) -> t a -> a
         foldl (_ :: Integer -> Integer -> Integer) (_ :: Integer)
-          where foldl :: forall (t :: * -> *).
+          where foldl :: forall (t :: * -> *) b a.
                          Foldable t =>
-                         forall b a. (b -> a -> b) -> b -> t a -> b
+                         (b -> a -> b) -> b -> t a -> b
         foldr (_ :: Integer -> Integer -> Integer) (_ :: Integer)
-          where foldr :: forall (t :: * -> *).
+          where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
-                         forall a b. (a -> b -> b) -> b -> t a -> b
+                         (a -> b -> b) -> b -> t a -> b
         const (_ :: Integer)
           where const :: forall a b. a -> b -> a
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
         fail (_ :: String)
-          where fail :: forall (m :: * -> *).
-                        Monad m =>
-                        forall a. String -> m a
+          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: Integer)
-          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer)
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
         ($!) (_ :: [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
         curry (_ :: (a2, [Integer]) -> Integer) (_ :: a2)
@@ -63,25 +51,25 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
         flip (_ :: [Integer] -> b7 -> Integer) (_ :: b7)
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         (>>=) (_ :: [Integer] -> a11) (_ :: a11 -> [Integer] -> Integer)
-          where (>>=) :: forall (m :: * -> *).
+          where (>>=) :: forall (m :: * -> *) a b.
                          Monad m =>
-                         forall a b. m a -> (a -> m b) -> m b
+                         m a -> (a -> m b) -> m b
         (>>) (_ :: [Integer] -> a10) (_ :: [Integer] -> Integer)
-          where (>>) :: forall (m :: * -> *).
+          where (>>) :: forall (m :: * -> *) a b.
                         Monad m =>
-                        forall a b. m a -> m b -> m b
+                        m a -> m b -> m b
         fmap (_ :: a12 -> Integer) (_ :: [Integer] -> a12)
-          where fmap :: forall (f :: * -> *).
+          where fmap :: forall (f :: * -> *) a b.
                         Functor f =>
-                        forall a b. (a -> b) -> f a -> f b
+                        (a -> b) -> f a -> f b
         (<*>) (_ :: [Integer] -> a8 -> Integer) (_ :: [Integer] -> a8)
-          where (<*>) :: forall (f :: * -> *).
+          where (<*>) :: forall (f :: * -> *) a b.
                          Applicative f =>
-                         forall a b. f (a -> b) -> f a -> f b
+                         f (a -> b) -> f a -> f b
         (*>) (_ :: [Integer] -> a7) (_ :: [Integer] -> Integer)
-          where (*>) :: forall (f :: * -> *).
+          where (*>) :: forall (f :: * -> *) a b.
                         Applicative f =>
-                        forall a b. f a -> f b -> f b
+                        f a -> f b -> f b
         (<$>) (_ :: a1 -> Integer) (_ :: [Integer] -> a1)
           where (<$>) :: forall (f :: * -> *) a b.
                          Functor f =>
@@ -91,13 +79,13 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
                          Monad m =>
                          (a -> m b) -> m a -> m b
         (<*) (_ :: [Integer] -> Integer) (_ :: [Integer] -> b5)
-          where (<*) :: forall (f :: * -> *).
+          where (<*) :: forall (f :: * -> *) a b.
                         Applicative f =>
-                        forall a b. f a -> f b -> f a
+                        f a -> f b -> f a
         (<$) (_ :: Integer) (_ :: [Integer] -> b4)
-          where (<$) :: forall (f :: * -> *).
+          where (<$) :: forall (f :: * -> *) a b.
                         Functor f =>
-                        forall a b. a -> f b -> f a
+                        a -> f b -> f a
         id (_ :: t0 -> [Integer] -> Integer) (_ :: t0)
           where id :: forall a. a -> a
         head (_ :: [t0 -> [Integer] -> Integer]) (_ :: t0)
@@ -129,15 +117,11 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
         ($) (_ :: a5 -> [Integer] -> Integer) (_ :: a5)
           where ($) :: forall a b. (a -> b) -> a -> b
         fail (_ :: String) (_ :: t0)
-          where fail :: forall (m :: * -> *).
-                        Monad m =>
-                        forall a. String -> m a
+          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: [Integer] -> Integer) (_ :: t0)
-          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer) (_ :: t0)
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
         uncurry (_ :: a4 -> b3 -> [Integer] -> Integer) (_ :: (a4, b3))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c
         ($!) (_ :: a6 -> [Integer] -> Integer) (_ :: a6)
@@ -153,17 +137,17 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           (bound at abstract_refinement_hole_fits.hs:7:1)
       Valid hole fits include
         const :: forall a b. a -> b -> a
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
       Valid refinement hole fits include
         foldl (_ :: Integer -> Integer -> Integer)
-          where foldl :: forall (t :: * -> *).
+          where foldl :: forall (t :: * -> *) b a.
                          Foldable t =>
-                         forall b a. (b -> a -> b) -> b -> t a -> b
+                         (b -> a -> b) -> b -> t a -> b
         foldr (_ :: Integer -> Integer -> Integer)
-          where foldr :: forall (t :: * -> *).
+          where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
-                         forall a b. (a -> b -> b) -> b -> t a -> b
+                         (a -> b -> b) -> b -> t a -> b
         curry (_ :: (Integer, [Integer]) -> Integer)
           where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         flip (_ :: [Integer] -> Integer -> Integer)
@@ -173,15 +157,11 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
         fail (_ :: String)
-          where fail :: forall (m :: * -> *).
-                        Monad m =>
-                        forall a. String -> m a
+          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: [Integer] -> Integer)
-          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer)
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
         ($!) (_ :: Integer -> [Integer] -> Integer)
           where ($!) :: forall a b. (a -> b) -> a -> b
         curry (_ :: (a2, Integer) -> [Integer] -> Integer) (_ :: a2)
@@ -192,26 +172,26 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
         (>>=) (_ :: Integer -> a11)
               (_ :: a11 -> Integer -> [Integer] -> Integer)
-          where (>>=) :: forall (m :: * -> *).
+          where (>>=) :: forall (m :: * -> *) a b.
                          Monad m =>
-                         forall a b. m a -> (a -> m b) -> m b
+                         m a -> (a -> m b) -> m b
         (>>) (_ :: Integer -> a10) (_ :: Integer -> [Integer] -> Integer)
-          where (>>) :: forall (m :: * -> *).
+          where (>>) :: forall (m :: * -> *) a b.
                         Monad m =>
-                        forall a b. m a -> m b -> m b
+                        m a -> m b -> m b
         fmap (_ :: a12 -> [Integer] -> Integer) (_ :: Integer -> a12)
-          where fmap :: forall (f :: * -> *).
+          where fmap :: forall (f :: * -> *) a b.
                         Functor f =>
-                        forall a b. (a -> b) -> f a -> f b
+                        (a -> b) -> f a -> f b
         (<*>) (_ :: Integer -> a8 -> [Integer] -> Integer)
               (_ :: Integer -> a8)
-          where (<*>) :: forall (f :: * -> *).
+          where (<*>) :: forall (f :: * -> *) a b.
                          Applicative f =>
-                         forall a b. f (a -> b) -> f a -> f b
+                         f (a -> b) -> f a -> f b
         (*>) (_ :: Integer -> a7) (_ :: Integer -> [Integer] -> Integer)
-          where (*>) :: forall (f :: * -> *).
+          where (*>) :: forall (f :: * -> *) a b.
                         Applicative f =>
-                        forall a b. f a -> f b -> f b
+                        f a -> f b -> f b
         (<$>) (_ :: a1 -> [Integer] -> Integer) (_ :: Integer -> a1)
           where (<$>) :: forall (f :: * -> *) a b.
                          Functor f =>
@@ -222,13 +202,13 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
                          Monad m =>
                          (a -> m b) -> m a -> m b
         (<*) (_ :: Integer -> [Integer] -> Integer) (_ :: Integer -> b5)
-          where (<*) :: forall (f :: * -> *).
+          where (<*) :: forall (f :: * -> *) a b.
                         Applicative f =>
-                        forall a b. f a -> f b -> f a
+                        f a -> f b -> f a
         (<$) (_ :: [Integer] -> Integer) (_ :: Integer -> b4)
-          where (<$) :: forall (f :: * -> *).
+          where (<$) :: forall (f :: * -> *) a b.
                         Functor f =>
-                        forall a b. a -> f b -> f a
+                        a -> f b -> f a
         id (_ :: t0 -> Integer -> [Integer] -> Integer) (_ :: t0)
           where id :: forall a. a -> a
         head (_ :: [t0 -> Integer -> [Integer] -> Integer]) (_ :: t0)
@@ -261,15 +241,11 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
         ($) (_ :: a5 -> Integer -> [Integer] -> Integer) (_ :: a5)
           where ($) :: forall a b. (a -> b) -> a -> b
         fail (_ :: String) (_ :: t0)
-          where fail :: forall (m :: * -> *).
-                        Monad m =>
-                        forall a. String -> m a
+          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
-          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer -> [Integer] -> Integer) (_ :: t0)
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
         uncurry (_ :: a4 -> b3 -> Integer -> [Integer] -> Integer)
                 (_ :: (a4, b3))
           where uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c

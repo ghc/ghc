@@ -1,0 +1,11 @@
+:set -fno-print-explicit-runtime-reps
+:t ($)
+:t (($))
+:t +v ($)
+:i ($)
+
+:set -fprint-explicit-runtime-reps
+:t ($)
+:t (($))
+:t +v ($)
+:i ($)

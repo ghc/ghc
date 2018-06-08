@@ -3,34 +3,34 @@ T12918b.hs:8:11: error:
     • The default type signature for bar1: forall b. b -> a
       does not match its corresponding non-default type signature
     • When checking the class method:
-        bar1 :: forall a. Foo1 a => forall b. a -> b
+        bar1 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
 T12918b.hs:12:11: error:
     • The default type signature for bar2: forall x. x
       does not match its corresponding non-default type signature
     • When checking the class method:
-        bar2 :: forall a. Foo1 a => forall b. a -> b
+        bar2 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
 T12918b.hs:12:11: error:
     • Could not deduce (Foo1 a0)
       from the context: Foo1 a
         bound by the type signature for:
-                   bar2 :: forall a. Foo1 a => forall x. x
+                   bar2 :: forall a x. Foo1 a => x
         at T12918b.hs:12:11-14
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘bar2’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the class method:
-        bar2 :: forall a. Foo1 a => forall b. a -> b
+        bar2 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
 T12918b.hs:16:11: error:
     • The default type signature for bar3: a -> Int
       does not match its corresponding non-default type signature
     • When checking the class method:
-        bar3 :: forall a. Foo1 a => forall b. a -> b
+        bar3 :: forall a b. Foo1 a => a -> b
       In the class declaration for ‘Foo1’
 
 T12918b.hs:20:11: error:

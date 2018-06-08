@@ -342,8 +342,23 @@ isIfaceLiftedTypeKind _ = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
+--
+-- Here we split nested IfaceSigmaTy properly.
+--
+-- @
+-- forall t. T t => forall m a b. M m => (a -> m b) -> t a -> m (t b)
+-- @
+--
+-- If you called @splitIfaceSigmaTy@ on this type:
+--
+-- @
+-- ([t, m, a, b], [T t, M m], (a -> m b) -> t a -> m (t b))
+-- @
 splitIfaceSigmaTy ty
-  = (bndrs, theta, tau)
+  = case (bndrs, theta) of
+      ([], []) -> (bndrs, theta, tau)
+      _        -> let (bndrs', theta', tau') = splitIfaceSigmaTy tau
+                   in (bndrs ++ bndrs', theta ++ theta', tau')
   where
     (bndrs, rho)   = split_foralls ty
     (theta, tau)   = split_rho rho
@@ -623,6 +638,8 @@ pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
 
 pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
+-- We still need `eliminateRuntimeRep`, since the `pprPrecIfaceType` maybe
+-- called from other places, besides `:type` and `:info`.
 pprPrecIfaceType prec ty = eliminateRuntimeRep (ppr_ty prec) ty
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
@@ -883,9 +900,11 @@ data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
-  = ppr_iface_forall_part show_forall tvs theta (ppr tau)
+  = eliminateRuntimeRep ppr_fn ty
   where
-    (tvs, theta, tau) = splitIfaceSigmaTy ty
+    ppr_fn iface_ty =
+      let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
+       in ppr_iface_forall_part show_forall tvs theta (ppr tau)
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs

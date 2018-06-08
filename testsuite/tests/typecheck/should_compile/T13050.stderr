@@ -76,11 +76,11 @@ T13050.hs:4:9: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Base’))
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Base’))
@@ -162,11 +162,11 @@ T13050.hs:5:11: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Base’))
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Base’))
@@ -249,11 +249,11 @@ T13050.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Classes’))
-        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Base’))
-        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+        pure :: forall (f :: * -> *) a. Applicative f => a -> f a
           with pure @((->) Int) @Int
           (imported from ‘Prelude’ at T13050.hs:1:8-17
            (and originally defined in ‘GHC.Base’))

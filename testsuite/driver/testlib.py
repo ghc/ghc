@@ -1440,7 +1440,7 @@ def stdout_ok(name, way):
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
-    with open(in_testdir(name, 'run.stdout')) as f:
+    with open(in_testdir(name, 'run.stdout'), encoding='utf8') as f:
         str = f.read().strip()
         if str:
             print("Stdout (", name, "):")
@@ -1456,7 +1456,7 @@ def stderr_ok(name, way):
                           whitespace_normaliser=normalise_whitespace)
 
 def dump_stderr( name ):
-    with open(in_testdir(name, 'run.stderr')) as f:
+    with open(in_testdir(name, 'run.stderr'), encoding='utf8') as f:
         str = f.read().strip()
         if str:
             print("Stderr (", name, "):")
