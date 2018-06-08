@@ -184,10 +184,10 @@ processModule verbosity modsum flags modMap instIfaceMap = do
 
   if not $ isBootSummary modsum then do
     out verbosity verbose "Creating interface..."
-    (interface, msg) <- {-# SCC createIterface #-}
+    (interface, msgs) <- {-# SCC createIterface #-}
                         withTiming getDynFlags "createInterface" (const ()) $ do
                           runWriterGhc $ createInterface tm flags modMap instIfaceMap
-    liftIO $ mapM_ putStrLn msg
+    liftIO $ mapM_ putStrLn (nub msgs)
     dflags <- getDynFlags
     let (haddockable, haddocked) = ifaceHaddockCoverage interface
         percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int

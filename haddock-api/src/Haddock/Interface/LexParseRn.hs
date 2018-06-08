@@ -28,7 +28,7 @@ import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser
 import Haddock.Types
 import Name
-import Outputable ( showPpr )
+import Outputable ( showPpr, showSDoc )
 import RdrName
 import EnumSet
 import RnEnv (dataTcOccs)
@@ -120,11 +120,11 @@ rename dflags gre = rn
           -- There is only one name in the environment that matches so
           -- use it.
           [a] -> pure (DocIdentifier a)
+
           -- But when there are multiple names available, default to
           -- type constructors: somewhat awfully GHC returns the
           -- values in the list positionally.
-          a:b:_ | isTyConName a -> pure (DocIdentifier a)
-                | otherwise -> pure (DocIdentifier b)
+          a:b:_ -> ambiguous dflags x (if isTyConName a then a else b) names
 
       DocWarning doc -> DocWarning <$> rn doc
       DocEmphasis doc -> DocEmphasis <$> rn doc
@@ -168,3 +168,17 @@ outOfScope dflags x =
       tell ["Warning: '" ++ showPpr dflags a ++ "' is out of scope."]
       pure (monospaced a)
     monospaced a = DocMonospaced (DocString (showPpr dflags a))
+
+-- | Warn about an ambiguous identifier.
+ambiguous :: DynFlags -> RdrName -> Name -> [Name] -> ErrMsgM (Doc Name)
+ambiguous dflags x dflt names = do
+  tell [msg]
+  pure (DocIdentifier dflt)
+  where
+    msg = "Warning: " ++ x_str ++ " is ambiguous. It is defined\n" ++
+          concatMap (\n -> "    * " ++ defnLoc n ++ "\n") names ++
+          "    You may be able to disambiguate the identifier by qualifying it or\n" ++
+          "    by hiding some imports.\n" ++
+          "    Defaulting to " ++ x_str ++ " defined " ++ defnLoc dflt
+    x_str = '\'' : showPpr dflags x ++ "'"
+    defnLoc = showSDoc dflags . pprNameDefnLoc
