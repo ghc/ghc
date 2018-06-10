@@ -15,7 +15,7 @@ ghcPackages =
     , containers, deepseq, deriveConstants, directory, filepath, genapply
     , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact, ghcHeap, ghci, ghcPkg
     , ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
-    , integerSimple, iservBin, libffi, mtl, parsec, parallel, pretty, primitive
+    , integerSimple, iserv, libffi, libiserv, mtl, parsec, parallel, pretty
     , process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy
     , transformers, unlit, unix, win32, xhtml ]
 
@@ -58,8 +58,9 @@ hpc                 = hsLib  "hpc"
 hpcBin              = hsUtil "hpc-bin"         `setPath` "utils/hpc"
 integerGmp          = hsLib  "integer-gmp"
 integerSimple       = hsLib  "integer-simple"
-iservBin            = hsUtil "iserv-bin"       `setPath` "iserv"
+iserv               = hsUtil "iserv"
 libffi              = cTop   "libffi"
+libiserv            = hsLib  "libiserv"
 mtl                 = hsLib  "mtl"
 parsec              = hsLib  "parsec"
 parallel            = hsLib  "parallel"
