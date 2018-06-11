@@ -45,7 +45,7 @@ import TcRnMonad
 import TcEnv
 import TcEvidence
 import InstEnv
-import TysWiredIn  ( heqDataCon, coercibleDataCon )
+import TysWiredIn  ( heqDataCon, coercibleDataCon, omegaDataConTy )
 import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
@@ -363,7 +363,7 @@ instCallConstraints orig preds
      | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
      , tc `hasKey` heqTyConKey
      = do { co <- unifyType Nothing ty1 ty2
-          ; return (evDFunApp (dataConWrapId heqDataCon) args [evCoercion co]) }
+          ; return (evDFunApp (dataConWrapId heqDataCon) (omegaDataConTy : args) [evCoercion co]) }
 
      | otherwise
      = emitWanted orig pred

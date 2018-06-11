@@ -105,7 +105,7 @@ import RdrName
 import Var
 import TyCoRep
 import Type   ( filterOutInvisibleTypes )
-import TysWiredIn ( unitTy )
+import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType
 import DataCon
 import ConLike
@@ -395,7 +395,8 @@ nlHsVar n = noLoc (HsVar noExt (noLoc n))
 
 -- NB: Only for LHsExpr **Id**
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
-nlHsDataCon con = noLoc (HsConLikeOut noExt (RealDataCon con))
+nlHsDataCon con = mkLHsWrap (mkWpTyApps [omegaDataConTy])
+                    (noLoc (HsConLikeOut noExt (RealDataCon con)))
 
 nlHsLit :: HsLit (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsLit n = noLoc (HsLit noExt n)
