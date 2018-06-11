@@ -245,7 +245,8 @@ boxResult result_ty
 
               wrap the_call =
                               mkApps (Var toIOCon)
-                                     [ Type io_res_ty,
+                                     [ Type omegaDataConTy
+                                     , Type io_res_ty,
                                        Lam state_id $
                                        mkWildCase (App the_call (Var state_id))
                                              (unrestricted ccall_res_ty) -- TODO: arnaud this probably prevents foreign import from being linear: fix.
