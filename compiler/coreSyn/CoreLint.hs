@@ -675,7 +675,9 @@ lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
 lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
                                             , df_args = args })
   = do { ty <- lintBinders LambdaBind bndrs $ \ bndrs' ->
-               do { (res_ty, _) <- lintCoreArgs ((dataConRepType con), emptyUE) args -- MattP: TODO Check
+               do { (res_ty, _) <- lintCoreArgs ((dataConUserType con), emptyUE) args -- MattP: TODO Check
+                  -- Use dataConUserType here as we are going to desugar
+                  --
                   ; return (mkLamTypes bndrs' res_ty) }
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "dfun unfolding") ty) }
 
