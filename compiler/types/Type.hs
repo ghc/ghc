@@ -540,7 +540,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
-    go_rig (RigTy t) = RigTy <$> go t
+    go_rig (RigTy t) = typeToRig <$> go t
     go_rig t = pure t
 
     (mktyconapp, mkappty, mkcastty)
@@ -1113,7 +1113,7 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon
   , [w, _rep1,_rep2,ty1,ty2] <- tys
-  = FunTy (RigTy w) ty1 ty2
+  = FunTy (typeToRig w) ty1 ty2
 
   | otherwise
   = TyConApp tycon tys
