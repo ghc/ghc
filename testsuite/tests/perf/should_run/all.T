@@ -584,3 +584,12 @@ test('T15226',
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
+
+test('T15226a',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 41040, 5) ]),
+                    # 2018-06-06   41040  Look through casts for seq#
+                    # initial  400041040
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
