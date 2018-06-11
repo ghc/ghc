@@ -527,7 +527,7 @@ mkDataConRepSimple n dc =
       (\_ ini -> return ini)
       emptyFamInstEnvs
       n
-      (Right (repeat HsLazy))
+      (Right (map (const HsLazy) (dataConOrigArgTys dc)))
       dc
 
 
