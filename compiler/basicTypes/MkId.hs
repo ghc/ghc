@@ -297,7 +297,7 @@ mkDictSelId name clas
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUserTyVarBinders data_con
-    n_ty_args      = length tyvars
+    n_ty_args      = length tyvars + 1 -- +1 for the multiplicity argument
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
