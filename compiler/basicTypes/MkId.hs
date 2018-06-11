@@ -524,7 +524,7 @@ mkDataConRepSimple n dc =
   runIdentity $
     mkDataConRepX
       (\tys -> Identity $ mkTemplateLocals (map weightedThing tys))
-      (\_ ini -> return ini)
+      (\idus ini -> return (mkVarApps ini (map fst idus))) -- They are all going to be unitUnboxer
       emptyFamInstEnvs
       n
       (Right (map (const HsLazy) (dataConOrigArgTys dc)))
