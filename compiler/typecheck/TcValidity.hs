@@ -1418,8 +1418,7 @@ checkInstTermination theta head_pred
    check2 foralld_tvs pred pred_size
      | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what)
      | not (isTyFamFree pred) = addErrTc (nestedMsg what)
-     | pred_size >= head_size = traceTc "check2" (ppr pred $$ ppr pred_size $$ ppr head_pred $$ ppr head_size)
-     >> addErrTc (smallerMsg what)
+     | pred_size >= head_size = addErrTc (smallerMsg what)
      | otherwise              = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
      where
