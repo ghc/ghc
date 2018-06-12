@@ -12,6 +12,7 @@
 
 module GHCi.UI.Monad (
         GHCi(..), startGHCi,
+        bracketGHCi, bracketGHCi_,
         GHCiState(..), setGHCiState, getGHCiState, modifyGHCiState,
         GHCiOption(..), isOptionSet, setOption, unsetOption,
         Command(..),
@@ -224,6 +225,19 @@ reifyGHCi f = GHCi f'
     f' gs = reifyGhc (f'' gs)
     -- f'' :: IORef GHCiState -> Session -> IO a
     f'' gs s = f (s, gs)
+
+bracketGHCi :: GHCi a -> (a -> GHCi c) -> (a -> GHCi b) -> GHCi b
+bracketGHCi acquire release run =
+  GHCi (\gs ->
+    Ghc (\s ->
+      bracket
+        (reflectGHCi (s, gs) acquire)
+        (\a -> reflectGHCi (s, gs) (release a))
+        (\a -> reflectGHCi (s, gs) (run a))))
+
+bracketGHCi_ :: GHCi a -> GHCi c -> GHCi b -> GHCi b
+bracketGHCi_ acquire release run =
+  bracketGHCi acquire (const release) (const run)
 
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
