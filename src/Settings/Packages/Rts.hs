@@ -115,6 +115,7 @@ rtsPackageArgs = package rts ? do
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
+          , arg $ "-DCOMPILING_RTS"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
           -- only happens for optimised builds. Otherwise we can assume that
@@ -122,8 +123,13 @@ rtsPackageArgs = package rts ? do
           -- provide non-inlined alternatives and hence needs the function to
           -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
+          , arg "-fomit-frame-pointer"
+          , arg "-g"
 
-          , Debug     `wayUnit` way          ? arg "-DDEBUG"
+          , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
+                                                    , "-fno-omit-frame-pointer"
+                                                    , "-g"
+                                                    , "-O0" ]
           , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
@@ -153,8 +159,7 @@ rtsPackageArgs = package rts ? do
           , input "//xxhash.c" ? pure
             [ "-O3"
             , "-ffast-math"
-            , "-ftree-vectorize"
-            ]
+            , "-ftree-vectorize" ]
 
             , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
 
@@ -175,7 +180,6 @@ rtsPackageArgs = package rts ? do
             -- emits warnings about call-clobbered registers on x86_64
             , inputs [ "//RetainerProfile.c", "//StgCRun.c"
                      , "//win32/ConsoleHandler.c", "//win32/ThrIOManager.c"] ? arg "-w"
-            , inputs ["//RetainerSet.c"] ? arg "-Wno-format"
             -- The above warning suppression flags are a temporary kludge.
             -- While working on this module you are encouraged to remove it and fix
             -- any warnings in the module. See:
@@ -184,7 +188,6 @@ rtsPackageArgs = package rts ? do
             , (not <$> flag GccIsClang) ?
               inputs ["//Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
             , input "//RetainerProfile.c" ? flag GccIsClang ?
               arg "-Wno-incompatible-pointer-types"
             , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
