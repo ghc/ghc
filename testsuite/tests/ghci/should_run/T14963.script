@@ -1,0 +1,2 @@
+:load Foo.hs
+test

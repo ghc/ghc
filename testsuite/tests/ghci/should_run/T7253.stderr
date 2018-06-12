@@ -1,8 +1,55 @@
 
+<interactive>:8:7: error:
+    • Ambiguous type variable ‘t0’ arising from a use of ‘sum’
+      prevents the constraint ‘(Foldable t0)’ from being solved.
+      Relevant bindings include
+        add :: t0 Integer -> Integer (bound at <interactive>:8:1)
+      Probable fix: use a type annotation to specify what ‘t0’ should be.
+      These potential instances exist:
+        instance Foldable (Either a) -- Defined in ‘Data.Foldable’
+        instance Foldable Maybe -- Defined in ‘Data.Foldable’
+        instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
+        ...plus one other
+        ...plus 24 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: sum
+      In an equation for ‘add’: add = sum
+
+<interactive>:9:5: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘[Integer]’
+    • In the first argument of ‘add’, namely ‘[1, 2, 3]’
+      In the expression: add [1, 2, 3]
+      In an equation for ‘it’: it = add [1, 2, 3]
+
 <interactive>:19:1: warning: [-Wunrecognised-pragmas (in -Wdefault)]
     Unrecognised pragma
 
+<interactive>:27:1: error:
+    Illegal standalone deriving declaration
+      Use StandaloneDeriving to enable this extension
+
+<interactive>:31:1: error:
+    • No instance for (Show Foo) arising from a use of ‘show’
+    • In the expression: show foo
+      In an equation for ‘it’: it = show foo
+
+<interactive>:44:3: error:
+    Unexpected default signature:
+      default content :: Show a => a -> String
+    Use DefaultSignatures to enable default signatures
+
+<interactive>:49:10: error:
+    Not in scope: type constructor or class ‘HasString’
+
+<interactive>:54:1: error:
+    Variable not in scope: upcase :: Foo -> t
+
 <interactive>:62:1: error:
-    • Role mismatch on variable b:
-        Annotation says phantom but role representational is required
+    • Illegal role annotation for T1;
+      did you intend to use RoleAnnotations?
     • while checking a role annotation for ‘T1’
+
+<interactive>:67:1: error:
+    • Illegal role annotation for T2;
+      did you intend to use RoleAnnotations?
+    • while checking a role annotation for ‘T2’

@@ -1,0 +1,4 @@
+
+<no location info>: error: can't find file: Foo.hs
+
+<interactive>:2:1: error: Variable not in scope: test
