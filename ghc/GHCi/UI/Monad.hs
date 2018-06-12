@@ -226,6 +226,7 @@ reifyGHCi f = GHCi f'
     -- f'' :: IORef GHCiState -> Session -> IO a
     f'' gs s = f (s, gs)
 
+-- | 'bracket', lifted to the `GHCi` monad.
 bracketGHCi :: GHCi a -> (a -> GHCi c) -> (a -> GHCi b) -> GHCi b
 bracketGHCi acquire release run =
   GHCi (\gs ->
@@ -235,6 +236,7 @@ bracketGHCi acquire release run =
         (\a -> reflectGHCi (s, gs) (release a))
         (\a -> reflectGHCi (s, gs) (run a))))
 
+-- | 'bracket_', lifted to the `GHCi` monad.
 bracketGHCi_ :: GHCi a -> GHCi c -> GHCi b -> GHCi b
 bracketGHCi_ acquire release run =
   bracketGHCi acquire (const release) (const run)

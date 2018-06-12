@@ -1078,13 +1078,13 @@ enqueueCommands cmds = do
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
 runStmt stmt step = do
+  -- Override session DynFlags. See Note [Disabling defer-type-errors in GHCi]
   sdflags <- GHC.getSessionDynFlags
   let sdflags' =
         sdflags
           `gopt_unset` Opt_DeferTypeErrors
           `gopt_unset` Opt_DeferTypedHoles
           `gopt_unset` Opt_DeferOutOfScopeVariables
-          `wopt_unset` Opt_WarnDeferredTypeErrors
   bracketGHCi_
     (GHC.setSessionDynFlags sdflags')
     (GHC.setSessionDynFlags sdflags)
@@ -1308,6 +1308,25 @@ getCurrentBreakModule = do
            else do
                 let hist = GHC.resumeHistory r !! (ix-1)
                 return $ Just $ GHC.getHistoryModule  hist
+
+-- Note [Disabling defer-type-errors in GHCi]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- In Trac:#14963, we saw that a recent fix causes deferring type errors, typed
+-- holes, and out-of-scope variables (all three implied by the
+-- -fdefer-type-errors flag) to produce incorrect Core when compiling
+-- interactive statements for immediate execution in GHCi, which in turn causes
+-- a compiler panic, even for some perfectly simple and well-typed programs.
+--
+-- We don't have a fix for the underlying problem yet, however considering how
+-- deferring errors in interactive statements doesn't really buy the user
+-- anything (the deferred errors would just pop up immediately after compiling
+-- anyway), we decided on a workaround: we simply disable the three offending
+-- DynFlags options temporarily while running interactive statements.
+--
+-- This avoids the panic, but still allows users to enable deferring for all
+-- things that are not interactively issued statements, particularly modules
+-- loaded into GHCi.
 
 -----------------------------------------------------------------------------
 --
