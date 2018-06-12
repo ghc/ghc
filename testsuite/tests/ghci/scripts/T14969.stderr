@@ -1,7 +1,47 @@
 
 <interactive>:1:1: error:
-    • Non type-variable argument
-        in the constraint: Num (t2 -> t1 -> t3)
-      (Use FlexibleContexts to permit this)
-    • When checking the inferred type
-        it :: forall t1 t2 t3. (Num t1, Num (t2 -> t1 -> t3)) => t3
+    • No instance for (Num (t0 -> t1 -> t2))
+        arising from the literal ‘3’
+        (maybe you haven't applied a function to enough arguments?)
+    • In the expression: 3
+      In the expression: 3 _ 4
+      In an equation for ‘it’: it = 3 _ 4
+
+<interactive>:1:3: error:
+    • Found hole: _ :: t0
+      Where: ‘t0’ is an ambiguous type variable
+    • In the first argument of ‘3’, namely ‘_’
+      In the expression: 3 _ 4
+      In an equation for ‘it’: it = 3 _ 4
+    • Relevant bindings include it :: t2 (bound at <interactive>:1:1)
+      Valid substitutions include
+        Left :: forall a b. a -> Either a b
+          (imported from ‘Prelude’ (and originally defined in ‘Data.Either’))
+        Right :: forall a b. b -> Either a b
+          (imported from ‘Prelude’ (and originally defined in ‘Data.Either’))
+        properFraction :: forall a.
+                          RealFrac a =>
+                          forall b. Integral b => a -> (b, a)
+          (imported from ‘Prelude’ (and originally defined in ‘GHC.Real’))
+        divMod :: forall a. Integral a => a -> a -> (a, a)
+          (imported from ‘Prelude’ (and originally defined in ‘GHC.Real’))
+        quotRem :: forall a. Integral a => a -> a -> (a, a)
+          (imported from ‘Prelude’ (and originally defined in ‘GHC.Real’))
+        significand :: forall a. RealFloat a => a -> a
+          (imported from ‘Prelude’ (and originally defined in ‘GHC.Float’))
+        (Some substitutions suppressed; use -fmax-valid-substitutions=N or -fno-max-valid-substitutions)
+
+<interactive>:1:5: error:
+    • Ambiguous type variable ‘t1’ arising from the literal ‘4’
+      prevents the constraint ‘(Num t1)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘t1’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        ...plus 10 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘3’, namely ‘4’
+      In the expression: 3 _ 4
+      In an equation for ‘it’: it = 3 _ 4

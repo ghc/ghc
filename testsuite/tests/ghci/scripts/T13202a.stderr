@@ -1,6 +1,6 @@
 
-<interactive>:3:5: error:
-    • Non type-variable argument in the constraint: HasField "name" r a
-      (Use FlexibleContexts to permit this)
-    • When checking the inferred type
-        foo :: forall r a. HasField "name" r a => r -> a
+<interactive>:3:11: error:
+    • No instance for (HasField "name" r0 a0)
+        arising from a use of ‘getField’
+    • In the expression: getField @"name"
+      In an equation for ‘foo’: foo = getField @"name"

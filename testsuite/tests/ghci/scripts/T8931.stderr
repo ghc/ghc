@@ -1,0 +1,37 @@
+
+<interactive>:4:1: error:
+    • No instance for (Typeable a0) arising from a use of ‘f’
+    • In the expression: f (\ x -> (x == 3))
+      In an equation for ‘it’: it = f (\ x -> (x == 3))
+
+<interactive>:4:11: error:
+    • Ambiguous type variable ‘a0’ arising from a use of ‘==’
+      prevents the constraint ‘(Eq a0)’ from being solved.
+      Relevant bindings include x :: a0 (bound at <interactive>:4:5)
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Eq Ordering -- Defined in ‘GHC.Classes’
+        instance Eq TyCon -- Defined in ‘GHC.Classes’
+        instance Eq Integer
+          -- Defined in ‘integer-gmp-1.0.2.0:GHC.Integer.Type’
+        ...plus 23 others
+        ...plus 12 instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the expression: (x == 3)
+      In the first argument of ‘f’, namely ‘(\ x -> (x == 3))’
+      In the expression: f (\ x -> (x == 3))
+
+<interactive>:4:16: error:
+    • Ambiguous type variable ‘a0’ arising from the literal ‘3’
+      prevents the constraint ‘(Num a0)’ from being solved.
+      Relevant bindings include x :: a0 (bound at <interactive>:4:5)
+      Probable fix: use a type annotation to specify what ‘a0’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        (use -fprint-potential-instances to see them all)
+    • In the second argument of ‘(==)’, namely ‘3’
+      In the expression: (x == 3)
+      In the first argument of ‘f’, namely ‘(\ x -> (x == 3))’

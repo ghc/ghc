@@ -54,11 +54,9 @@ Should fail, GADTs is now disabled
 base language is: Haskell2010
 with the following modifiers:
   -XNoDatatypeContexts
-  -XExtendedDefaultRules
   -XGADTSyntax
   -XGADTs
   -XMonoLocalBinds
-  -XNoMonomorphismRestriction
   -XNondecreasingIndentation
 GHCi-specific dynamic flag settings:
 other dynamic, non-language, flag settings:
@@ -71,4 +69,3 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
 warning settings:
 Should fail, GADTs is only enabled at the prompt
-C :: T Int

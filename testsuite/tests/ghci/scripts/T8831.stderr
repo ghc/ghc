@@ -1,0 +1,4 @@
+
+<interactive>:3:1: error:
+    parse error on input ‘$’
+    Perhaps you intended to use TemplateHaskell

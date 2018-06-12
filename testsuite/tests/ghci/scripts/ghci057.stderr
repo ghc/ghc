@@ -17,3 +17,12 @@ ghci057.hs:3:3: error:
         (Enable ExistentialQuantification or GADTs to allow this)
     • In the definition of data constructor ‘C’
       In the data type declaration for ‘T’
+
+<interactive>:25:16: error:
+    • Data constructor ‘C’ has existential type variables, a context, or a specialised result type
+        C :: T Int
+        (Enable ExistentialQuantification or GADTs to allow this)
+    • In the definition of data constructor ‘C’
+      In the data type declaration for ‘T’
+
+<interactive>:1:1: error: Data constructor not in scope: C

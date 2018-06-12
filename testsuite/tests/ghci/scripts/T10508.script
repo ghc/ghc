@@ -1,5 +1,5 @@
 -- :cmd accepts an expr of type 'IO String'
-let cmd = return "0"
+let cmd = return "0" :: IO String
 :cmd cmd
 
 -- works with multiline mode, handles indention correctly

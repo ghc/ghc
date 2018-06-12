@@ -1,0 +1,1968 @@
+
+ghci014.hs:2:1: error:
+    Could not find module ‘Test.QuickCheck.Batch’
+    Use -v to see a list of the files searched for.
+
+<interactive>:2:1: error: Variable not in scope: do_test
+
+<interactive>:3:1: error: Variable not in scope: do_test
+
+<interactive>:4:1: error: Variable not in scope: do_test
+
+<interactive>:5:1: error: Variable not in scope: do_test
+
+<interactive>:6:1: error: Variable not in scope: do_test
+
+<interactive>:7:1: error: Variable not in scope: do_test
+
+<interactive>:8:1: error: Variable not in scope: do_test
+
+<interactive>:9:1: error: Variable not in scope: do_test
+
+<interactive>:10:1: error: Variable not in scope: do_test
+
+<interactive>:11:1: error: Variable not in scope: do_test
+
+<interactive>:12:1: error: Variable not in scope: do_test
+
+<interactive>:13:1: error: Variable not in scope: do_test
+
+<interactive>:14:1: error: Variable not in scope: do_test
+
+<interactive>:15:1: error: Variable not in scope: do_test
+
+<interactive>:16:1: error: Variable not in scope: do_test
+
+<interactive>:17:1: error: Variable not in scope: do_test
+
+<interactive>:18:1: error: Variable not in scope: do_test
+
+<interactive>:19:1: error: Variable not in scope: do_test
+
+<interactive>:20:1: error: Variable not in scope: do_test
+
+<interactive>:21:1: error: Variable not in scope: do_test
+
+<interactive>:22:1: error: Variable not in scope: do_test
+
+<interactive>:23:1: error: Variable not in scope: do_test
+
+<interactive>:24:1: error: Variable not in scope: do_test
+
+<interactive>:25:1: error: Variable not in scope: do_test
+
+<interactive>:26:1: error: Variable not in scope: do_test
+
+<interactive>:27:1: error: Variable not in scope: do_test
+
+<interactive>:28:1: error: Variable not in scope: do_test
+
+<interactive>:29:1: error: Variable not in scope: do_test
+
+<interactive>:30:1: error: Variable not in scope: do_test
+
+<interactive>:31:1: error: Variable not in scope: do_test
+
+<interactive>:32:1: error: Variable not in scope: do_test
+
+<interactive>:33:1: error: Variable not in scope: do_test
+
+<interactive>:34:1: error: Variable not in scope: do_test
+
+<interactive>:35:1: error: Variable not in scope: do_test
+
+<interactive>:36:1: error: Variable not in scope: do_test
+
+<interactive>:37:1: error: Variable not in scope: do_test
+
+<interactive>:38:1: error: Variable not in scope: do_test
+
+<interactive>:39:1: error: Variable not in scope: do_test
+
+<interactive>:40:1: error: Variable not in scope: do_test
+
+<interactive>:41:1: error: Variable not in scope: do_test
+
+<interactive>:42:1: error: Variable not in scope: do_test
+
+<interactive>:43:1: error: Variable not in scope: do_test
+
+<interactive>:44:1: error: Variable not in scope: do_test
+
+<interactive>:45:1: error: Variable not in scope: do_test
+
+<interactive>:46:1: error: Variable not in scope: do_test
+
+<interactive>:47:1: error: Variable not in scope: do_test
+
+<interactive>:48:1: error: Variable not in scope: do_test
+
+<interactive>:49:1: error: Variable not in scope: do_test
+
+<interactive>:50:1: error: Variable not in scope: do_test
+
+<interactive>:51:1: error: Variable not in scope: do_test
+
+<interactive>:52:1: error: Variable not in scope: do_test
+
+<interactive>:53:1: error: Variable not in scope: do_test
+
+<interactive>:54:1: error: Variable not in scope: do_test
+
+<interactive>:55:1: error: Variable not in scope: do_test
+
+<interactive>:56:1: error: Variable not in scope: do_test
+
+<interactive>:57:1: error: Variable not in scope: do_test
+
+<interactive>:58:1: error: Variable not in scope: do_test
+
+<interactive>:59:1: error: Variable not in scope: do_test
+
+<interactive>:60:1: error: Variable not in scope: do_test
+
+<interactive>:61:1: error: Variable not in scope: do_test
+
+<interactive>:62:1: error: Variable not in scope: do_test
+
+<interactive>:63:1: error: Variable not in scope: do_test
+
+<interactive>:64:1: error: Variable not in scope: do_test
+
+<interactive>:65:1: error: Variable not in scope: do_test
+
+<interactive>:66:1: error: Variable not in scope: do_test
+
+<interactive>:67:1: error: Variable not in scope: do_test
+
+<interactive>:68:1: error: Variable not in scope: do_test
+
+<interactive>:69:1: error: Variable not in scope: do_test
+
+<interactive>:70:1: error: Variable not in scope: do_test
+
+<interactive>:71:1: error: Variable not in scope: do_test
+
+<interactive>:72:1: error: Variable not in scope: do_test
+
+<interactive>:73:1: error: Variable not in scope: do_test
+
+<interactive>:74:1: error: Variable not in scope: do_test
+
+<interactive>:75:1: error: Variable not in scope: do_test
+
+<interactive>:76:1: error: Variable not in scope: do_test
+
+<interactive>:77:1: error: Variable not in scope: do_test
+
+<interactive>:78:1: error: Variable not in scope: do_test
+
+<interactive>:79:1: error: Variable not in scope: do_test
+
+<interactive>:80:1: error: Variable not in scope: do_test
+
+<interactive>:81:1: error: Variable not in scope: do_test
+
+<interactive>:82:1: error: Variable not in scope: do_test
+
+<interactive>:83:1: error: Variable not in scope: do_test
+
+<interactive>:84:1: error: Variable not in scope: do_test
+
+<interactive>:85:1: error: Variable not in scope: do_test
+
+<interactive>:86:1: error: Variable not in scope: do_test
+
+<interactive>:87:1: error: Variable not in scope: do_test
+
+<interactive>:88:1: error: Variable not in scope: do_test
+
+<interactive>:89:1: error: Variable not in scope: do_test
+
+<interactive>:90:1: error: Variable not in scope: do_test
+
+<interactive>:91:1: error: Variable not in scope: do_test
+
+<interactive>:92:1: error: Variable not in scope: do_test
+
+<interactive>:93:1: error: Variable not in scope: do_test
+
+<interactive>:94:1: error: Variable not in scope: do_test
+
+<interactive>:95:1: error: Variable not in scope: do_test
+
+<interactive>:96:1: error: Variable not in scope: do_test
+
+<interactive>:97:1: error: Variable not in scope: do_test
+
+<interactive>:98:1: error: Variable not in scope: do_test
+
+<interactive>:99:1: error: Variable not in scope: do_test
+
+<interactive>:100:1: error: Variable not in scope: do_test
+
+<interactive>:101:1: error: Variable not in scope: do_test
+
+<interactive>:102:1: error: Variable not in scope: do_test
+
+<interactive>:103:1: error: Variable not in scope: do_test
+
+<interactive>:104:1: error: Variable not in scope: do_test
+
+<interactive>:105:1: error: Variable not in scope: do_test
+
+<interactive>:106:1: error: Variable not in scope: do_test
+
+<interactive>:107:1: error: Variable not in scope: do_test
+
+<interactive>:108:1: error: Variable not in scope: do_test
+
+<interactive>:109:1: error: Variable not in scope: do_test
+
+<interactive>:110:1: error: Variable not in scope: do_test
+
+<interactive>:111:1: error: Variable not in scope: do_test
+
+<interactive>:112:1: error: Variable not in scope: do_test
+
+<interactive>:113:1: error: Variable not in scope: do_test
+
+<interactive>:114:1: error: Variable not in scope: do_test
+
+<interactive>:115:1: error: Variable not in scope: do_test
+
+<interactive>:116:1: error: Variable not in scope: do_test
+
+<interactive>:117:1: error: Variable not in scope: do_test
+
+<interactive>:118:1: error: Variable not in scope: do_test
+
+<interactive>:119:1: error: Variable not in scope: do_test
+
+<interactive>:120:1: error: Variable not in scope: do_test
+
+<interactive>:121:1: error: Variable not in scope: do_test
+
+<interactive>:122:1: error: Variable not in scope: do_test
+
+<interactive>:123:1: error: Variable not in scope: do_test
+
+<interactive>:124:1: error: Variable not in scope: do_test
+
+<interactive>:125:1: error: Variable not in scope: do_test
+
+<interactive>:126:1: error: Variable not in scope: do_test
+
+<interactive>:127:1: error: Variable not in scope: do_test
+
+<interactive>:128:1: error: Variable not in scope: do_test
+
+<interactive>:129:1: error: Variable not in scope: do_test
+
+<interactive>:130:1: error: Variable not in scope: do_test
+
+<interactive>:131:1: error: Variable not in scope: do_test
+
+<interactive>:132:1: error: Variable not in scope: do_test
+
+<interactive>:133:1: error: Variable not in scope: do_test
+
+<interactive>:134:1: error: Variable not in scope: do_test
+
+<interactive>:135:1: error: Variable not in scope: do_test
+
+<interactive>:136:1: error: Variable not in scope: do_test
+
+<interactive>:137:1: error: Variable not in scope: do_test
+
+<interactive>:138:1: error: Variable not in scope: do_test
+
+<interactive>:139:1: error: Variable not in scope: do_test
+
+<interactive>:140:1: error: Variable not in scope: do_test
+
+<interactive>:141:1: error: Variable not in scope: do_test
+
+<interactive>:142:1: error: Variable not in scope: do_test
+
+<interactive>:143:1: error: Variable not in scope: do_test
+
+<interactive>:144:1: error: Variable not in scope: do_test
+
+<interactive>:145:1: error: Variable not in scope: do_test
+
+<interactive>:146:1: error: Variable not in scope: do_test
+
+<interactive>:147:1: error: Variable not in scope: do_test
+
+<interactive>:148:1: error: Variable not in scope: do_test
+
+<interactive>:149:1: error: Variable not in scope: do_test
+
+<interactive>:150:1: error: Variable not in scope: do_test
+
+<interactive>:151:1: error: Variable not in scope: do_test
+
+<interactive>:152:1: error: Variable not in scope: do_test
+
+<interactive>:153:1: error: Variable not in scope: do_test
+
+<interactive>:154:1: error: Variable not in scope: do_test
+
+<interactive>:155:1: error: Variable not in scope: do_test
+
+<interactive>:156:1: error: Variable not in scope: do_test
+
+<interactive>:157:1: error: Variable not in scope: do_test
+
+<interactive>:158:1: error: Variable not in scope: do_test
+
+<interactive>:159:1: error: Variable not in scope: do_test
+
+<interactive>:160:1: error: Variable not in scope: do_test
+
+<interactive>:161:1: error: Variable not in scope: do_test
+
+<interactive>:162:1: error: Variable not in scope: do_test
+
+<interactive>:163:1: error: Variable not in scope: do_test
+
+<interactive>:164:1: error: Variable not in scope: do_test
+
+<interactive>:165:1: error: Variable not in scope: do_test
+
+<interactive>:166:1: error: Variable not in scope: do_test
+
+<interactive>:167:1: error: Variable not in scope: do_test
+
+<interactive>:168:1: error: Variable not in scope: do_test
+
+<interactive>:169:1: error: Variable not in scope: do_test
+
+<interactive>:170:1: error: Variable not in scope: do_test
+
+<interactive>:171:1: error: Variable not in scope: do_test
+
+<interactive>:172:1: error: Variable not in scope: do_test
+
+<interactive>:173:1: error: Variable not in scope: do_test
+
+<interactive>:174:1: error: Variable not in scope: do_test
+
+<interactive>:175:1: error: Variable not in scope: do_test
+
+<interactive>:176:1: error: Variable not in scope: do_test
+
+<interactive>:177:1: error: Variable not in scope: do_test
+
+<interactive>:178:1: error: Variable not in scope: do_test
+
+<interactive>:179:1: error: Variable not in scope: do_test
+
+<interactive>:180:1: error: Variable not in scope: do_test
+
+<interactive>:181:1: error: Variable not in scope: do_test
+
+<interactive>:182:1: error: Variable not in scope: do_test
+
+<interactive>:183:1: error: Variable not in scope: do_test
+
+<interactive>:184:1: error: Variable not in scope: do_test
+
+<interactive>:185:1: error: Variable not in scope: do_test
+
+<interactive>:186:1: error: Variable not in scope: do_test
+
+<interactive>:187:1: error: Variable not in scope: do_test
+
+<interactive>:188:1: error: Variable not in scope: do_test
+
+<interactive>:189:1: error: Variable not in scope: do_test
+
+<interactive>:190:1: error: Variable not in scope: do_test
+
+<interactive>:191:1: error: Variable not in scope: do_test
+
+<interactive>:192:1: error: Variable not in scope: do_test
+
+<interactive>:193:1: error: Variable not in scope: do_test
+
+<interactive>:194:1: error: Variable not in scope: do_test
+
+<interactive>:195:1: error: Variable not in scope: do_test
+
+<interactive>:196:1: error: Variable not in scope: do_test
+
+<interactive>:197:1: error: Variable not in scope: do_test
+
+<interactive>:198:1: error: Variable not in scope: do_test
+
+<interactive>:199:1: error: Variable not in scope: do_test
+
+<interactive>:200:1: error: Variable not in scope: do_test
+
+<interactive>:201:1: error: Variable not in scope: do_test
+
+<interactive>:202:1: error: Variable not in scope: do_test
+
+<interactive>:203:1: error: Variable not in scope: do_test
+
+<interactive>:204:1: error: Variable not in scope: do_test
+
+<interactive>:205:1: error: Variable not in scope: do_test
+
+<interactive>:206:1: error: Variable not in scope: do_test
+
+<interactive>:207:1: error: Variable not in scope: do_test
+
+<interactive>:208:1: error: Variable not in scope: do_test
+
+<interactive>:209:1: error: Variable not in scope: do_test
+
+<interactive>:210:1: error: Variable not in scope: do_test
+
+<interactive>:211:1: error: Variable not in scope: do_test
+
+<interactive>:212:1: error: Variable not in scope: do_test
+
+<interactive>:213:1: error: Variable not in scope: do_test
+
+<interactive>:214:1: error: Variable not in scope: do_test
+
+<interactive>:215:1: error: Variable not in scope: do_test
+
+<interactive>:216:1: error: Variable not in scope: do_test
+
+<interactive>:217:1: error: Variable not in scope: do_test
+
+<interactive>:218:1: error: Variable not in scope: do_test
+
+<interactive>:219:1: error: Variable not in scope: do_test
+
+<interactive>:220:1: error: Variable not in scope: do_test
+
+<interactive>:221:1: error: Variable not in scope: do_test
+
+<interactive>:222:1: error: Variable not in scope: do_test
+
+<interactive>:223:1: error: Variable not in scope: do_test
+
+<interactive>:224:1: error: Variable not in scope: do_test
+
+<interactive>:225:1: error: Variable not in scope: do_test
+
+<interactive>:226:1: error: Variable not in scope: do_test
+
+<interactive>:227:1: error: Variable not in scope: do_test
+
+<interactive>:228:1: error: Variable not in scope: do_test
+
+<interactive>:229:1: error: Variable not in scope: do_test
+
+<interactive>:230:1: error: Variable not in scope: do_test
+
+<interactive>:231:1: error: Variable not in scope: do_test
+
+<interactive>:232:1: error: Variable not in scope: do_test
+
+<interactive>:233:1: error: Variable not in scope: do_test
+
+<interactive>:234:1: error: Variable not in scope: do_test
+
+<interactive>:235:1: error: Variable not in scope: do_test
+
+<interactive>:236:1: error: Variable not in scope: do_test
+
+<interactive>:237:1: error: Variable not in scope: do_test
+
+<interactive>:238:1: error: Variable not in scope: do_test
+
+<interactive>:239:1: error: Variable not in scope: do_test
+
+<interactive>:240:1: error: Variable not in scope: do_test
+
+<interactive>:241:1: error: Variable not in scope: do_test
+
+<interactive>:242:1: error: Variable not in scope: do_test
+
+<interactive>:243:1: error: Variable not in scope: do_test
+
+<interactive>:244:1: error: Variable not in scope: do_test
+
+<interactive>:245:1: error: Variable not in scope: do_test
+
+<interactive>:246:1: error: Variable not in scope: do_test
+
+<interactive>:247:1: error: Variable not in scope: do_test
+
+<interactive>:248:1: error: Variable not in scope: do_test
+
+<interactive>:249:1: error: Variable not in scope: do_test
+
+<interactive>:250:1: error: Variable not in scope: do_test
+
+<interactive>:251:1: error: Variable not in scope: do_test
+
+<interactive>:252:1: error: Variable not in scope: do_test
+
+<interactive>:253:1: error: Variable not in scope: do_test
+
+<interactive>:254:1: error: Variable not in scope: do_test
+
+<interactive>:255:1: error: Variable not in scope: do_test
+
+<interactive>:256:1: error: Variable not in scope: do_test
+
+<interactive>:257:1: error: Variable not in scope: do_test
+
+<interactive>:258:1: error: Variable not in scope: do_test
+
+<interactive>:259:1: error: Variable not in scope: do_test
+
+<interactive>:260:1: error: Variable not in scope: do_test
+
+<interactive>:261:1: error: Variable not in scope: do_test
+
+<interactive>:262:1: error: Variable not in scope: do_test
+
+<interactive>:263:1: error: Variable not in scope: do_test
+
+<interactive>:264:1: error: Variable not in scope: do_test
+
+<interactive>:265:1: error: Variable not in scope: do_test
+
+<interactive>:266:1: error: Variable not in scope: do_test
+
+<interactive>:267:1: error: Variable not in scope: do_test
+
+<interactive>:268:1: error: Variable not in scope: do_test
+
+<interactive>:269:1: error: Variable not in scope: do_test
+
+<interactive>:270:1: error: Variable not in scope: do_test
+
+<interactive>:271:1: error: Variable not in scope: do_test
+
+<interactive>:272:1: error: Variable not in scope: do_test
+
+<interactive>:273:1: error: Variable not in scope: do_test
+
+<interactive>:274:1: error: Variable not in scope: do_test
+
+<interactive>:275:1: error: Variable not in scope: do_test
+
+<interactive>:276:1: error: Variable not in scope: do_test
+
+<interactive>:277:1: error: Variable not in scope: do_test
+
+<interactive>:278:1: error: Variable not in scope: do_test
+
+<interactive>:279:1: error: Variable not in scope: do_test
+
+<interactive>:280:1: error: Variable not in scope: do_test
+
+<interactive>:281:1: error: Variable not in scope: do_test
+
+<interactive>:282:1: error: Variable not in scope: do_test
+
+<interactive>:283:1: error: Variable not in scope: do_test
+
+<interactive>:284:1: error: Variable not in scope: do_test
+
+<interactive>:285:1: error: Variable not in scope: do_test
+
+<interactive>:286:1: error: Variable not in scope: do_test
+
+<interactive>:287:1: error: Variable not in scope: do_test
+
+<interactive>:288:1: error: Variable not in scope: do_test
+
+<interactive>:289:1: error: Variable not in scope: do_test
+
+<interactive>:290:1: error: Variable not in scope: do_test
+
+<interactive>:291:1: error: Variable not in scope: do_test
+
+<interactive>:292:1: error: Variable not in scope: do_test
+
+<interactive>:293:1: error: Variable not in scope: do_test
+
+<interactive>:294:1: error: Variable not in scope: do_test
+
+<interactive>:295:1: error: Variable not in scope: do_test
+
+<interactive>:296:1: error: Variable not in scope: do_test
+
+<interactive>:297:1: error: Variable not in scope: do_test
+
+<interactive>:298:1: error: Variable not in scope: do_test
+
+<interactive>:299:1: error: Variable not in scope: do_test
+
+<interactive>:300:1: error: Variable not in scope: do_test
+
+<interactive>:301:1: error: Variable not in scope: do_test
+
+<interactive>:302:1: error: Variable not in scope: do_test
+
+<interactive>:303:1: error: Variable not in scope: do_test
+
+<interactive>:304:1: error: Variable not in scope: do_test
+
+<interactive>:305:1: error: Variable not in scope: do_test
+
+<interactive>:306:1: error: Variable not in scope: do_test
+
+<interactive>:307:1: error: Variable not in scope: do_test
+
+<interactive>:308:1: error: Variable not in scope: do_test
+
+<interactive>:309:1: error: Variable not in scope: do_test
+
+<interactive>:310:1: error: Variable not in scope: do_test
+
+<interactive>:311:1: error: Variable not in scope: do_test
+
+<interactive>:312:1: error: Variable not in scope: do_test
+
+<interactive>:313:1: error: Variable not in scope: do_test
+
+<interactive>:314:1: error: Variable not in scope: do_test
+
+<interactive>:315:1: error: Variable not in scope: do_test
+
+<interactive>:316:1: error: Variable not in scope: do_test
+
+<interactive>:317:1: error: Variable not in scope: do_test
+
+<interactive>:318:1: error: Variable not in scope: do_test
+
+<interactive>:319:1: error: Variable not in scope: do_test
+
+<interactive>:320:1: error: Variable not in scope: do_test
+
+<interactive>:321:1: error: Variable not in scope: do_test
+
+<interactive>:322:1: error: Variable not in scope: do_test
+
+<interactive>:323:1: error: Variable not in scope: do_test
+
+<interactive>:324:1: error: Variable not in scope: do_test
+
+<interactive>:325:1: error: Variable not in scope: do_test
+
+<interactive>:326:1: error: Variable not in scope: do_test
+
+<interactive>:327:1: error: Variable not in scope: do_test
+
+<interactive>:328:1: error: Variable not in scope: do_test
+
+<interactive>:329:1: error: Variable not in scope: do_test
+
+<interactive>:330:1: error: Variable not in scope: do_test
+
+<interactive>:331:1: error: Variable not in scope: do_test
+
+<interactive>:332:1: error: Variable not in scope: do_test
+
+<interactive>:333:1: error: Variable not in scope: do_test
+
+<interactive>:334:1: error: Variable not in scope: do_test
+
+<interactive>:335:1: error: Variable not in scope: do_test
+
+<interactive>:336:1: error: Variable not in scope: do_test
+
+<interactive>:337:1: error: Variable not in scope: do_test
+
+<interactive>:338:1: error: Variable not in scope: do_test
+
+<interactive>:339:1: error: Variable not in scope: do_test
+
+<interactive>:340:1: error: Variable not in scope: do_test
+
+<interactive>:341:1: error: Variable not in scope: do_test
+
+<interactive>:342:1: error: Variable not in scope: do_test
+
+<interactive>:343:1: error: Variable not in scope: do_test
+
+<interactive>:344:1: error: Variable not in scope: do_test
+
+<interactive>:345:1: error: Variable not in scope: do_test
+
+<interactive>:346:1: error: Variable not in scope: do_test
+
+<interactive>:347:1: error: Variable not in scope: do_test
+
+<interactive>:348:1: error: Variable not in scope: do_test
+
+<interactive>:349:1: error: Variable not in scope: do_test
+
+<interactive>:350:1: error: Variable not in scope: do_test
+
+<interactive>:351:1: error: Variable not in scope: do_test
+
+<interactive>:352:1: error: Variable not in scope: do_test
+
+<interactive>:353:1: error: Variable not in scope: do_test
+
+<interactive>:354:1: error: Variable not in scope: do_test
+
+<interactive>:355:1: error: Variable not in scope: do_test
+
+<interactive>:356:1: error: Variable not in scope: do_test
+
+<interactive>:357:1: error: Variable not in scope: do_test
+
+<interactive>:358:1: error: Variable not in scope: do_test
+
+<interactive>:359:1: error: Variable not in scope: do_test
+
+<interactive>:360:1: error: Variable not in scope: do_test
+
+<interactive>:361:1: error: Variable not in scope: do_test
+
+<interactive>:362:1: error: Variable not in scope: do_test
+
+<interactive>:363:1: error: Variable not in scope: do_test
+
+<interactive>:364:1: error: Variable not in scope: do_test
+
+<interactive>:365:1: error: Variable not in scope: do_test
+
+<interactive>:366:1: error: Variable not in scope: do_test
+
+<interactive>:367:1: error: Variable not in scope: do_test
+
+<interactive>:368:1: error: Variable not in scope: do_test
+
+<interactive>:369:1: error: Variable not in scope: do_test
+
+<interactive>:370:1: error: Variable not in scope: do_test
+
+<interactive>:371:1: error: Variable not in scope: do_test
+
+<interactive>:372:1: error: Variable not in scope: do_test
+
+<interactive>:373:1: error: Variable not in scope: do_test
+
+<interactive>:374:1: error: Variable not in scope: do_test
+
+<interactive>:375:1: error: Variable not in scope: do_test
+
+<interactive>:376:1: error: Variable not in scope: do_test
+
+<interactive>:377:1: error: Variable not in scope: do_test
+
+<interactive>:378:1: error: Variable not in scope: do_test
+
+<interactive>:379:1: error: Variable not in scope: do_test
+
+<interactive>:380:1: error: Variable not in scope: do_test
+
+<interactive>:381:1: error: Variable not in scope: do_test
+
+<interactive>:382:1: error: Variable not in scope: do_test
+
+<interactive>:383:1: error: Variable not in scope: do_test
+
+<interactive>:384:1: error: Variable not in scope: do_test
+
+<interactive>:385:1: error: Variable not in scope: do_test
+
+<interactive>:386:1: error: Variable not in scope: do_test
+
+<interactive>:387:1: error: Variable not in scope: do_test
+
+<interactive>:388:1: error: Variable not in scope: do_test
+
+<interactive>:389:1: error: Variable not in scope: do_test
+
+<interactive>:390:1: error: Variable not in scope: do_test
+
+<interactive>:391:1: error: Variable not in scope: do_test
+
+<interactive>:392:1: error: Variable not in scope: do_test
+
+<interactive>:393:1: error: Variable not in scope: do_test
+
+<interactive>:394:1: error: Variable not in scope: do_test
+
+<interactive>:395:1: error: Variable not in scope: do_test
+
+<interactive>:396:1: error: Variable not in scope: do_test
+
+<interactive>:397:1: error: Variable not in scope: do_test
+
+<interactive>:398:1: error: Variable not in scope: do_test
+
+<interactive>:399:1: error: Variable not in scope: do_test
+
+<interactive>:400:1: error: Variable not in scope: do_test
+
+<interactive>:401:1: error: Variable not in scope: do_test
+
+<interactive>:402:1: error: Variable not in scope: do_test
+
+<interactive>:403:1: error: Variable not in scope: do_test
+
+<interactive>:404:1: error: Variable not in scope: do_test
+
+<interactive>:405:1: error: Variable not in scope: do_test
+
+<interactive>:406:1: error: Variable not in scope: do_test
+
+<interactive>:407:1: error: Variable not in scope: do_test
+
+<interactive>:408:1: error: Variable not in scope: do_test
+
+<interactive>:409:1: error: Variable not in scope: do_test
+
+<interactive>:410:1: error: Variable not in scope: do_test
+
+<interactive>:411:1: error: Variable not in scope: do_test
+
+<interactive>:412:1: error: Variable not in scope: do_test
+
+<interactive>:413:1: error: Variable not in scope: do_test
+
+<interactive>:414:1: error: Variable not in scope: do_test
+
+<interactive>:415:1: error: Variable not in scope: do_test
+
+<interactive>:416:1: error: Variable not in scope: do_test
+
+<interactive>:417:1: error: Variable not in scope: do_test
+
+<interactive>:418:1: error: Variable not in scope: do_test
+
+<interactive>:419:1: error: Variable not in scope: do_test
+
+<interactive>:420:1: error: Variable not in scope: do_test
+
+<interactive>:421:1: error: Variable not in scope: do_test
+
+<interactive>:422:1: error: Variable not in scope: do_test
+
+<interactive>:423:1: error: Variable not in scope: do_test
+
+<interactive>:424:1: error: Variable not in scope: do_test
+
+<interactive>:425:1: error: Variable not in scope: do_test
+
+<interactive>:426:1: error: Variable not in scope: do_test
+
+<interactive>:427:1: error: Variable not in scope: do_test
+
+<interactive>:428:1: error: Variable not in scope: do_test
+
+<interactive>:429:1: error: Variable not in scope: do_test
+
+<interactive>:430:1: error: Variable not in scope: do_test
+
+<interactive>:431:1: error: Variable not in scope: do_test
+
+<interactive>:432:1: error: Variable not in scope: do_test
+
+<interactive>:433:1: error: Variable not in scope: do_test
+
+<interactive>:434:1: error: Variable not in scope: do_test
+
+<interactive>:435:1: error: Variable not in scope: do_test
+
+<interactive>:436:1: error: Variable not in scope: do_test
+
+<interactive>:437:1: error: Variable not in scope: do_test
+
+<interactive>:438:1: error: Variable not in scope: do_test
+
+<interactive>:439:1: error: Variable not in scope: do_test
+
+<interactive>:440:1: error: Variable not in scope: do_test
+
+<interactive>:441:1: error: Variable not in scope: do_test
+
+<interactive>:442:1: error: Variable not in scope: do_test
+
+<interactive>:443:1: error: Variable not in scope: do_test
+
+<interactive>:444:1: error: Variable not in scope: do_test
+
+<interactive>:445:1: error: Variable not in scope: do_test
+
+<interactive>:446:1: error: Variable not in scope: do_test
+
+<interactive>:447:1: error: Variable not in scope: do_test
+
+<interactive>:448:1: error: Variable not in scope: do_test
+
+<interactive>:449:1: error: Variable not in scope: do_test
+
+<interactive>:450:1: error: Variable not in scope: do_test
+
+<interactive>:451:1: error: Variable not in scope: do_test
+
+<interactive>:452:1: error: Variable not in scope: do_test
+
+<interactive>:453:1: error: Variable not in scope: do_test
+
+<interactive>:454:1: error: Variable not in scope: do_test
+
+<interactive>:455:1: error: Variable not in scope: do_test
+
+<interactive>:456:1: error: Variable not in scope: do_test
+
+<interactive>:457:1: error: Variable not in scope: do_test
+
+<interactive>:458:1: error: Variable not in scope: do_test
+
+<interactive>:459:1: error: Variable not in scope: do_test
+
+<interactive>:460:1: error: Variable not in scope: do_test
+
+<interactive>:461:1: error: Variable not in scope: do_test
+
+<interactive>:462:1: error: Variable not in scope: do_test
+
+<interactive>:463:1: error: Variable not in scope: do_test
+
+<interactive>:464:1: error: Variable not in scope: do_test
+
+<interactive>:465:1: error: Variable not in scope: do_test
+
+<interactive>:466:1: error: Variable not in scope: do_test
+
+<interactive>:467:1: error: Variable not in scope: do_test
+
+<interactive>:468:1: error: Variable not in scope: do_test
+
+<interactive>:469:1: error: Variable not in scope: do_test
+
+<interactive>:470:1: error: Variable not in scope: do_test
+
+<interactive>:471:1: error: Variable not in scope: do_test
+
+<interactive>:472:1: error: Variable not in scope: do_test
+
+<interactive>:473:1: error: Variable not in scope: do_test
+
+<interactive>:474:1: error: Variable not in scope: do_test
+
+<interactive>:475:1: error: Variable not in scope: do_test
+
+<interactive>:476:1: error: Variable not in scope: do_test
+
+<interactive>:477:1: error: Variable not in scope: do_test
+
+<interactive>:478:1: error: Variable not in scope: do_test
+
+<interactive>:479:1: error: Variable not in scope: do_test
+
+<interactive>:480:1: error: Variable not in scope: do_test
+
+<interactive>:481:1: error: Variable not in scope: do_test
+
+<interactive>:482:1: error: Variable not in scope: do_test
+
+<interactive>:483:1: error: Variable not in scope: do_test
+
+<interactive>:484:1: error: Variable not in scope: do_test
+
+<interactive>:485:1: error: Variable not in scope: do_test
+
+<interactive>:486:1: error: Variable not in scope: do_test
+
+<interactive>:487:1: error: Variable not in scope: do_test
+
+<interactive>:488:1: error: Variable not in scope: do_test
+
+<interactive>:489:1: error: Variable not in scope: do_test
+
+<interactive>:490:1: error: Variable not in scope: do_test
+
+<interactive>:491:1: error: Variable not in scope: do_test
+
+<interactive>:492:1: error: Variable not in scope: do_test
+
+<interactive>:493:1: error: Variable not in scope: do_test
+
+<interactive>:494:1: error: Variable not in scope: do_test
+
+<interactive>:495:1: error: Variable not in scope: do_test
+
+<interactive>:496:1: error: Variable not in scope: do_test
+
+<interactive>:497:1: error: Variable not in scope: do_test
+
+<interactive>:498:1: error: Variable not in scope: do_test
+
+<interactive>:499:1: error: Variable not in scope: do_test
+
+<interactive>:500:1: error: Variable not in scope: do_test
+
+<interactive>:501:1: error: Variable not in scope: do_test
+
+<interactive>:502:1: error: Variable not in scope: do_test
+
+<interactive>:503:1: error: Variable not in scope: do_test
+
+<interactive>:504:1: error: Variable not in scope: do_test
+
+<interactive>:505:1: error: Variable not in scope: do_test
+
+<interactive>:506:1: error: Variable not in scope: do_test
+
+<interactive>:507:1: error: Variable not in scope: do_test
+
+<interactive>:508:1: error: Variable not in scope: do_test
+
+<interactive>:509:1: error: Variable not in scope: do_test
+
+<interactive>:510:1: error: Variable not in scope: do_test
+
+<interactive>:511:1: error: Variable not in scope: do_test
+
+<interactive>:512:1: error: Variable not in scope: do_test
+
+<interactive>:513:1: error: Variable not in scope: do_test
+
+<interactive>:514:1: error: Variable not in scope: do_test
+
+<interactive>:515:1: error: Variable not in scope: do_test
+
+<interactive>:516:1: error: Variable not in scope: do_test
+
+<interactive>:517:1: error: Variable not in scope: do_test
+
+<interactive>:518:1: error: Variable not in scope: do_test
+
+<interactive>:519:1: error: Variable not in scope: do_test
+
+<interactive>:520:1: error: Variable not in scope: do_test
+
+<interactive>:521:1: error: Variable not in scope: do_test
+
+<interactive>:522:1: error: Variable not in scope: do_test
+
+<interactive>:523:1: error: Variable not in scope: do_test
+
+<interactive>:524:1: error: Variable not in scope: do_test
+
+<interactive>:525:1: error: Variable not in scope: do_test
+
+<interactive>:526:1: error: Variable not in scope: do_test
+
+<interactive>:527:1: error: Variable not in scope: do_test
+
+<interactive>:528:1: error: Variable not in scope: do_test
+
+<interactive>:529:1: error: Variable not in scope: do_test
+
+<interactive>:530:1: error: Variable not in scope: do_test
+
+<interactive>:531:1: error: Variable not in scope: do_test
+
+<interactive>:532:1: error: Variable not in scope: do_test
+
+<interactive>:533:1: error: Variable not in scope: do_test
+
+<interactive>:534:1: error: Variable not in scope: do_test
+
+<interactive>:535:1: error: Variable not in scope: do_test
+
+<interactive>:536:1: error: Variable not in scope: do_test
+
+<interactive>:537:1: error: Variable not in scope: do_test
+
+<interactive>:538:1: error: Variable not in scope: do_test
+
+<interactive>:539:1: error: Variable not in scope: do_test
+
+<interactive>:540:1: error: Variable not in scope: do_test
+
+<interactive>:541:1: error: Variable not in scope: do_test
+
+<interactive>:542:1: error: Variable not in scope: do_test
+
+<interactive>:543:1: error: Variable not in scope: do_test
+
+<interactive>:544:1: error: Variable not in scope: do_test
+
+<interactive>:545:1: error: Variable not in scope: do_test
+
+<interactive>:546:1: error: Variable not in scope: do_test
+
+<interactive>:547:1: error: Variable not in scope: do_test
+
+<interactive>:548:1: error: Variable not in scope: do_test
+
+<interactive>:549:1: error: Variable not in scope: do_test
+
+<interactive>:550:1: error: Variable not in scope: do_test
+
+<interactive>:551:1: error: Variable not in scope: do_test
+
+<interactive>:552:1: error: Variable not in scope: do_test
+
+<interactive>:553:1: error: Variable not in scope: do_test
+
+<interactive>:554:1: error: Variable not in scope: do_test
+
+<interactive>:555:1: error: Variable not in scope: do_test
+
+<interactive>:556:1: error: Variable not in scope: do_test
+
+<interactive>:557:1: error: Variable not in scope: do_test
+
+<interactive>:558:1: error: Variable not in scope: do_test
+
+<interactive>:559:1: error: Variable not in scope: do_test
+
+<interactive>:560:1: error: Variable not in scope: do_test
+
+<interactive>:561:1: error: Variable not in scope: do_test
+
+<interactive>:562:1: error: Variable not in scope: do_test
+
+<interactive>:563:1: error: Variable not in scope: do_test
+
+<interactive>:564:1: error: Variable not in scope: do_test
+
+<interactive>:565:1: error: Variable not in scope: do_test
+
+<interactive>:566:1: error: Variable not in scope: do_test
+
+<interactive>:567:1: error: Variable not in scope: do_test
+
+<interactive>:568:1: error: Variable not in scope: do_test
+
+<interactive>:569:1: error: Variable not in scope: do_test
+
+<interactive>:570:1: error: Variable not in scope: do_test
+
+<interactive>:571:1: error: Variable not in scope: do_test
+
+<interactive>:572:1: error: Variable not in scope: do_test
+
+<interactive>:573:1: error: Variable not in scope: do_test
+
+<interactive>:574:1: error: Variable not in scope: do_test
+
+<interactive>:575:1: error: Variable not in scope: do_test
+
+<interactive>:576:1: error: Variable not in scope: do_test
+
+<interactive>:577:1: error: Variable not in scope: do_test
+
+<interactive>:578:1: error: Variable not in scope: do_test
+
+<interactive>:579:1: error: Variable not in scope: do_test
+
+<interactive>:580:1: error: Variable not in scope: do_test
+
+<interactive>:581:1: error: Variable not in scope: do_test
+
+<interactive>:582:1: error: Variable not in scope: do_test
+
+<interactive>:583:1: error: Variable not in scope: do_test
+
+<interactive>:584:1: error: Variable not in scope: do_test
+
+<interactive>:585:1: error: Variable not in scope: do_test
+
+<interactive>:586:1: error: Variable not in scope: do_test
+
+<interactive>:587:1: error: Variable not in scope: do_test
+
+<interactive>:588:1: error: Variable not in scope: do_test
+
+<interactive>:589:1: error: Variable not in scope: do_test
+
+<interactive>:590:1: error: Variable not in scope: do_test
+
+<interactive>:591:1: error: Variable not in scope: do_test
+
+<interactive>:592:1: error: Variable not in scope: do_test
+
+<interactive>:593:1: error: Variable not in scope: do_test
+
+<interactive>:594:1: error: Variable not in scope: do_test
+
+<interactive>:595:1: error: Variable not in scope: do_test
+
+<interactive>:596:1: error: Variable not in scope: do_test
+
+<interactive>:597:1: error: Variable not in scope: do_test
+
+<interactive>:598:1: error: Variable not in scope: do_test
+
+<interactive>:599:1: error: Variable not in scope: do_test
+
+<interactive>:600:1: error: Variable not in scope: do_test
+
+<interactive>:601:1: error: Variable not in scope: do_test
+
+<interactive>:602:1: error: Variable not in scope: do_test
+
+<interactive>:603:1: error: Variable not in scope: do_test
+
+<interactive>:604:1: error: Variable not in scope: do_test
+
+<interactive>:605:1: error: Variable not in scope: do_test
+
+<interactive>:606:1: error: Variable not in scope: do_test
+
+<interactive>:607:1: error: Variable not in scope: do_test
+
+<interactive>:608:1: error: Variable not in scope: do_test
+
+<interactive>:609:1: error: Variable not in scope: do_test
+
+<interactive>:610:1: error: Variable not in scope: do_test
+
+<interactive>:611:1: error: Variable not in scope: do_test
+
+<interactive>:612:1: error: Variable not in scope: do_test
+
+<interactive>:613:1: error: Variable not in scope: do_test
+
+<interactive>:614:1: error: Variable not in scope: do_test
+
+<interactive>:615:1: error: Variable not in scope: do_test
+
+<interactive>:616:1: error: Variable not in scope: do_test
+
+<interactive>:617:1: error: Variable not in scope: do_test
+
+<interactive>:618:1: error: Variable not in scope: do_test
+
+<interactive>:619:1: error: Variable not in scope: do_test
+
+<interactive>:620:1: error: Variable not in scope: do_test
+
+<interactive>:621:1: error: Variable not in scope: do_test
+
+<interactive>:622:1: error: Variable not in scope: do_test
+
+<interactive>:623:1: error: Variable not in scope: do_test
+
+<interactive>:624:1: error: Variable not in scope: do_test
+
+<interactive>:625:1: error: Variable not in scope: do_test
+
+<interactive>:626:1: error: Variable not in scope: do_test
+
+<interactive>:627:1: error: Variable not in scope: do_test
+
+<interactive>:628:1: error: Variable not in scope: do_test
+
+<interactive>:629:1: error: Variable not in scope: do_test
+
+<interactive>:630:1: error: Variable not in scope: do_test
+
+<interactive>:631:1: error: Variable not in scope: do_test
+
+<interactive>:632:1: error: Variable not in scope: do_test
+
+<interactive>:633:1: error: Variable not in scope: do_test
+
+<interactive>:634:1: error: Variable not in scope: do_test
+
+<interactive>:635:1: error: Variable not in scope: do_test
+
+<interactive>:636:1: error: Variable not in scope: do_test
+
+<interactive>:637:1: error: Variable not in scope: do_test
+
+<interactive>:638:1: error: Variable not in scope: do_test
+
+<interactive>:639:1: error: Variable not in scope: do_test
+
+<interactive>:640:1: error: Variable not in scope: do_test
+
+<interactive>:641:1: error: Variable not in scope: do_test
+
+<interactive>:642:1: error: Variable not in scope: do_test
+
+<interactive>:643:1: error: Variable not in scope: do_test
+
+<interactive>:644:1: error: Variable not in scope: do_test
+
+<interactive>:645:1: error: Variable not in scope: do_test
+
+<interactive>:646:1: error: Variable not in scope: do_test
+
+<interactive>:647:1: error: Variable not in scope: do_test
+
+<interactive>:648:1: error: Variable not in scope: do_test
+
+<interactive>:649:1: error: Variable not in scope: do_test
+
+<interactive>:650:1: error: Variable not in scope: do_test
+
+<interactive>:651:1: error: Variable not in scope: do_test
+
+<interactive>:652:1: error: Variable not in scope: do_test
+
+<interactive>:653:1: error: Variable not in scope: do_test
+
+<interactive>:654:1: error: Variable not in scope: do_test
+
+<interactive>:655:1: error: Variable not in scope: do_test
+
+<interactive>:656:1: error: Variable not in scope: do_test
+
+<interactive>:657:1: error: Variable not in scope: do_test
+
+<interactive>:658:1: error: Variable not in scope: do_test
+
+<interactive>:659:1: error: Variable not in scope: do_test
+
+<interactive>:660:1: error: Variable not in scope: do_test
+
+<interactive>:661:1: error: Variable not in scope: do_test
+
+<interactive>:662:1: error: Variable not in scope: do_test
+
+<interactive>:663:1: error: Variable not in scope: do_test
+
+<interactive>:664:1: error: Variable not in scope: do_test
+
+<interactive>:665:1: error: Variable not in scope: do_test
+
+<interactive>:666:1: error: Variable not in scope: do_test
+
+<interactive>:667:1: error: Variable not in scope: do_test
+
+<interactive>:668:1: error: Variable not in scope: do_test
+
+<interactive>:669:1: error: Variable not in scope: do_test
+
+<interactive>:670:1: error: Variable not in scope: do_test
+
+<interactive>:671:1: error: Variable not in scope: do_test
+
+<interactive>:672:1: error: Variable not in scope: do_test
+
+<interactive>:673:1: error: Variable not in scope: do_test
+
+<interactive>:674:1: error: Variable not in scope: do_test
+
+<interactive>:675:1: error: Variable not in scope: do_test
+
+<interactive>:676:1: error: Variable not in scope: do_test
+
+<interactive>:677:1: error: Variable not in scope: do_test
+
+<interactive>:678:1: error: Variable not in scope: do_test
+
+<interactive>:679:1: error: Variable not in scope: do_test
+
+<interactive>:680:1: error: Variable not in scope: do_test
+
+<interactive>:681:1: error: Variable not in scope: do_test
+
+<interactive>:682:1: error: Variable not in scope: do_test
+
+<interactive>:683:1: error: Variable not in scope: do_test
+
+<interactive>:684:1: error: Variable not in scope: do_test
+
+<interactive>:685:1: error: Variable not in scope: do_test
+
+<interactive>:686:1: error: Variable not in scope: do_test
+
+<interactive>:687:1: error: Variable not in scope: do_test
+
+<interactive>:688:1: error: Variable not in scope: do_test
+
+<interactive>:689:1: error: Variable not in scope: do_test
+
+<interactive>:690:1: error: Variable not in scope: do_test
+
+<interactive>:691:1: error: Variable not in scope: do_test
+
+<interactive>:692:1: error: Variable not in scope: do_test
+
+<interactive>:693:1: error: Variable not in scope: do_test
+
+<interactive>:694:1: error: Variable not in scope: do_test
+
+<interactive>:695:1: error: Variable not in scope: do_test
+
+<interactive>:696:1: error: Variable not in scope: do_test
+
+<interactive>:697:1: error: Variable not in scope: do_test
+
+<interactive>:698:1: error: Variable not in scope: do_test
+
+<interactive>:699:1: error: Variable not in scope: do_test
+
+<interactive>:700:1: error: Variable not in scope: do_test
+
+<interactive>:701:1: error: Variable not in scope: do_test
+
+<interactive>:702:1: error: Variable not in scope: do_test
+
+<interactive>:703:1: error: Variable not in scope: do_test
+
+<interactive>:704:1: error: Variable not in scope: do_test
+
+<interactive>:705:1: error: Variable not in scope: do_test
+
+<interactive>:706:1: error: Variable not in scope: do_test
+
+<interactive>:707:1: error: Variable not in scope: do_test
+
+<interactive>:708:1: error: Variable not in scope: do_test
+
+<interactive>:709:1: error: Variable not in scope: do_test
+
+<interactive>:710:1: error: Variable not in scope: do_test
+
+<interactive>:711:1: error: Variable not in scope: do_test
+
+<interactive>:712:1: error: Variable not in scope: do_test
+
+<interactive>:713:1: error: Variable not in scope: do_test
+
+<interactive>:714:1: error: Variable not in scope: do_test
+
+<interactive>:715:1: error: Variable not in scope: do_test
+
+<interactive>:716:1: error: Variable not in scope: do_test
+
+<interactive>:717:1: error: Variable not in scope: do_test
+
+<interactive>:718:1: error: Variable not in scope: do_test
+
+<interactive>:719:1: error: Variable not in scope: do_test
+
+<interactive>:720:1: error: Variable not in scope: do_test
+
+<interactive>:721:1: error: Variable not in scope: do_test
+
+<interactive>:722:1: error: Variable not in scope: do_test
+
+<interactive>:723:1: error: Variable not in scope: do_test
+
+<interactive>:724:1: error: Variable not in scope: do_test
+
+<interactive>:725:1: error: Variable not in scope: do_test
+
+<interactive>:726:1: error: Variable not in scope: do_test
+
+<interactive>:727:1: error: Variable not in scope: do_test
+
+<interactive>:728:1: error: Variable not in scope: do_test
+
+<interactive>:729:1: error: Variable not in scope: do_test
+
+<interactive>:730:1: error: Variable not in scope: do_test
+
+<interactive>:731:1: error: Variable not in scope: do_test
+
+<interactive>:732:1: error: Variable not in scope: do_test
+
+<interactive>:733:1: error: Variable not in scope: do_test
+
+<interactive>:734:1: error: Variable not in scope: do_test
+
+<interactive>:735:1: error: Variable not in scope: do_test
+
+<interactive>:736:1: error: Variable not in scope: do_test
+
+<interactive>:737:1: error: Variable not in scope: do_test
+
+<interactive>:738:1: error: Variable not in scope: do_test
+
+<interactive>:739:1: error: Variable not in scope: do_test
+
+<interactive>:740:1: error: Variable not in scope: do_test
+
+<interactive>:741:1: error: Variable not in scope: do_test
+
+<interactive>:742:1: error: Variable not in scope: do_test
+
+<interactive>:743:1: error: Variable not in scope: do_test
+
+<interactive>:744:1: error: Variable not in scope: do_test
+
+<interactive>:745:1: error: Variable not in scope: do_test
+
+<interactive>:746:1: error: Variable not in scope: do_test
+
+<interactive>:747:1: error: Variable not in scope: do_test
+
+<interactive>:748:1: error: Variable not in scope: do_test
+
+<interactive>:749:1: error: Variable not in scope: do_test
+
+<interactive>:750:1: error: Variable not in scope: do_test
+
+<interactive>:751:1: error: Variable not in scope: do_test
+
+<interactive>:752:1: error: Variable not in scope: do_test
+
+<interactive>:753:1: error: Variable not in scope: do_test
+
+<interactive>:754:1: error: Variable not in scope: do_test
+
+<interactive>:755:1: error: Variable not in scope: do_test
+
+<interactive>:756:1: error: Variable not in scope: do_test
+
+<interactive>:757:1: error: Variable not in scope: do_test
+
+<interactive>:758:1: error: Variable not in scope: do_test
+
+<interactive>:759:1: error: Variable not in scope: do_test
+
+<interactive>:760:1: error: Variable not in scope: do_test
+
+<interactive>:761:1: error: Variable not in scope: do_test
+
+<interactive>:762:1: error: Variable not in scope: do_test
+
+<interactive>:763:1: error: Variable not in scope: do_test
+
+<interactive>:764:1: error: Variable not in scope: do_test
+
+<interactive>:765:1: error: Variable not in scope: do_test
+
+<interactive>:766:1: error: Variable not in scope: do_test
+
+<interactive>:767:1: error: Variable not in scope: do_test
+
+<interactive>:768:1: error: Variable not in scope: do_test
+
+<interactive>:769:1: error: Variable not in scope: do_test
+
+<interactive>:770:1: error: Variable not in scope: do_test
+
+<interactive>:771:1: error: Variable not in scope: do_test
+
+<interactive>:772:1: error: Variable not in scope: do_test
+
+<interactive>:773:1: error: Variable not in scope: do_test
+
+<interactive>:774:1: error: Variable not in scope: do_test
+
+<interactive>:775:1: error: Variable not in scope: do_test
+
+<interactive>:776:1: error: Variable not in scope: do_test
+
+<interactive>:777:1: error: Variable not in scope: do_test
+
+<interactive>:778:1: error: Variable not in scope: do_test
+
+<interactive>:779:1: error: Variable not in scope: do_test
+
+<interactive>:780:1: error: Variable not in scope: do_test
+
+<interactive>:781:1: error: Variable not in scope: do_test
+
+<interactive>:782:1: error: Variable not in scope: do_test
+
+<interactive>:783:1: error: Variable not in scope: do_test
+
+<interactive>:784:1: error: Variable not in scope: do_test
+
+<interactive>:785:1: error: Variable not in scope: do_test
+
+<interactive>:786:1: error: Variable not in scope: do_test
+
+<interactive>:787:1: error: Variable not in scope: do_test
+
+<interactive>:788:1: error: Variable not in scope: do_test
+
+<interactive>:789:1: error: Variable not in scope: do_test
+
+<interactive>:790:1: error: Variable not in scope: do_test
+
+<interactive>:791:1: error: Variable not in scope: do_test
+
+<interactive>:792:1: error: Variable not in scope: do_test
+
+<interactive>:793:1: error: Variable not in scope: do_test
+
+<interactive>:794:1: error: Variable not in scope: do_test
+
+<interactive>:795:1: error: Variable not in scope: do_test
+
+<interactive>:796:1: error: Variable not in scope: do_test
+
+<interactive>:797:1: error: Variable not in scope: do_test
+
+<interactive>:798:1: error: Variable not in scope: do_test
+
+<interactive>:799:1: error: Variable not in scope: do_test
+
+<interactive>:800:1: error: Variable not in scope: do_test
+
+<interactive>:801:1: error: Variable not in scope: do_test
+
+<interactive>:802:1: error: Variable not in scope: do_test
+
+<interactive>:803:1: error: Variable not in scope: do_test
+
+<interactive>:804:1: error: Variable not in scope: do_test
+
+<interactive>:805:1: error: Variable not in scope: do_test
+
+<interactive>:806:1: error: Variable not in scope: do_test
+
+<interactive>:807:1: error: Variable not in scope: do_test
+
+<interactive>:808:1: error: Variable not in scope: do_test
+
+<interactive>:809:1: error: Variable not in scope: do_test
+
+<interactive>:810:1: error: Variable not in scope: do_test
+
+<interactive>:811:1: error: Variable not in scope: do_test
+
+<interactive>:812:1: error: Variable not in scope: do_test
+
+<interactive>:813:1: error: Variable not in scope: do_test
+
+<interactive>:814:1: error: Variable not in scope: do_test
+
+<interactive>:815:1: error: Variable not in scope: do_test
+
+<interactive>:816:1: error: Variable not in scope: do_test
+
+<interactive>:817:1: error: Variable not in scope: do_test
+
+<interactive>:818:1: error: Variable not in scope: do_test
+
+<interactive>:819:1: error: Variable not in scope: do_test
+
+<interactive>:820:1: error: Variable not in scope: do_test
+
+<interactive>:821:1: error: Variable not in scope: do_test
+
+<interactive>:822:1: error: Variable not in scope: do_test
+
+<interactive>:823:1: error: Variable not in scope: do_test
+
+<interactive>:824:1: error: Variable not in scope: do_test
+
+<interactive>:825:1: error: Variable not in scope: do_test
+
+<interactive>:826:1: error: Variable not in scope: do_test
+
+<interactive>:827:1: error: Variable not in scope: do_test
+
+<interactive>:828:1: error: Variable not in scope: do_test
+
+<interactive>:829:1: error: Variable not in scope: do_test
+
+<interactive>:830:1: error: Variable not in scope: do_test
+
+<interactive>:831:1: error: Variable not in scope: do_test
+
+<interactive>:832:1: error: Variable not in scope: do_test
+
+<interactive>:833:1: error: Variable not in scope: do_test
+
+<interactive>:834:1: error: Variable not in scope: do_test
+
+<interactive>:835:1: error: Variable not in scope: do_test
+
+<interactive>:836:1: error: Variable not in scope: do_test
+
+<interactive>:837:1: error: Variable not in scope: do_test
+
+<interactive>:838:1: error: Variable not in scope: do_test
+
+<interactive>:839:1: error: Variable not in scope: do_test
+
+<interactive>:840:1: error: Variable not in scope: do_test
+
+<interactive>:841:1: error: Variable not in scope: do_test
+
+<interactive>:842:1: error: Variable not in scope: do_test
+
+<interactive>:843:1: error: Variable not in scope: do_test
+
+<interactive>:844:1: error: Variable not in scope: do_test
+
+<interactive>:845:1: error: Variable not in scope: do_test
+
+<interactive>:846:1: error: Variable not in scope: do_test
+
+<interactive>:847:1: error: Variable not in scope: do_test
+
+<interactive>:848:1: error: Variable not in scope: do_test
+
+<interactive>:849:1: error: Variable not in scope: do_test
+
+<interactive>:850:1: error: Variable not in scope: do_test
+
+<interactive>:851:1: error: Variable not in scope: do_test
+
+<interactive>:852:1: error: Variable not in scope: do_test
+
+<interactive>:853:1: error: Variable not in scope: do_test
+
+<interactive>:854:1: error: Variable not in scope: do_test
+
+<interactive>:855:1: error: Variable not in scope: do_test
+
+<interactive>:856:1: error: Variable not in scope: do_test
+
+<interactive>:857:1: error: Variable not in scope: do_test
+
+<interactive>:858:1: error: Variable not in scope: do_test
+
+<interactive>:859:1: error: Variable not in scope: do_test
+
+<interactive>:860:1: error: Variable not in scope: do_test
+
+<interactive>:861:1: error: Variable not in scope: do_test
+
+<interactive>:862:1: error: Variable not in scope: do_test
+
+<interactive>:863:1: error: Variable not in scope: do_test
+
+<interactive>:864:1: error: Variable not in scope: do_test
+
+<interactive>:865:1: error: Variable not in scope: do_test
+
+<interactive>:866:1: error: Variable not in scope: do_test
+
+<interactive>:867:1: error: Variable not in scope: do_test
+
+<interactive>:868:1: error: Variable not in scope: do_test
+
+<interactive>:869:1: error: Variable not in scope: do_test
+
+<interactive>:870:1: error: Variable not in scope: do_test
+
+<interactive>:871:1: error: Variable not in scope: do_test
+
+<interactive>:872:1: error: Variable not in scope: do_test
+
+<interactive>:873:1: error: Variable not in scope: do_test
+
+<interactive>:874:1: error: Variable not in scope: do_test
+
+<interactive>:875:1: error: Variable not in scope: do_test
+
+<interactive>:876:1: error: Variable not in scope: do_test
+
+<interactive>:877:1: error: Variable not in scope: do_test
+
+<interactive>:878:1: error: Variable not in scope: do_test
+
+<interactive>:879:1: error: Variable not in scope: do_test
+
+<interactive>:880:1: error: Variable not in scope: do_test
+
+<interactive>:881:1: error: Variable not in scope: do_test
+
+<interactive>:882:1: error: Variable not in scope: do_test
+
+<interactive>:883:1: error: Variable not in scope: do_test
+
+<interactive>:884:1: error: Variable not in scope: do_test
+
+<interactive>:885:1: error: Variable not in scope: do_test
+
+<interactive>:886:1: error: Variable not in scope: do_test
+
+<interactive>:887:1: error: Variable not in scope: do_test
+
+<interactive>:888:1: error: Variable not in scope: do_test
+
+<interactive>:889:1: error: Variable not in scope: do_test
+
+<interactive>:890:1: error: Variable not in scope: do_test
+
+<interactive>:891:1: error: Variable not in scope: do_test
+
+<interactive>:892:1: error: Variable not in scope: do_test
+
+<interactive>:893:1: error: Variable not in scope: do_test
+
+<interactive>:894:1: error: Variable not in scope: do_test
+
+<interactive>:895:1: error: Variable not in scope: do_test
+
+<interactive>:896:1: error: Variable not in scope: do_test
+
+<interactive>:897:1: error: Variable not in scope: do_test
+
+<interactive>:898:1: error: Variable not in scope: do_test
+
+<interactive>:899:1: error: Variable not in scope: do_test
+
+<interactive>:900:1: error: Variable not in scope: do_test
+
+<interactive>:901:1: error: Variable not in scope: do_test
+
+<interactive>:902:1: error: Variable not in scope: do_test
+
+<interactive>:903:1: error: Variable not in scope: do_test
+
+<interactive>:904:1: error: Variable not in scope: do_test
+
+<interactive>:905:1: error: Variable not in scope: do_test
+
+<interactive>:906:1: error: Variable not in scope: do_test
+
+<interactive>:907:1: error: Variable not in scope: do_test
+
+<interactive>:908:1: error: Variable not in scope: do_test
+
+<interactive>:909:1: error: Variable not in scope: do_test
+
+<interactive>:910:1: error: Variable not in scope: do_test
+
+<interactive>:911:1: error: Variable not in scope: do_test
+
+<interactive>:912:1: error: Variable not in scope: do_test
+
+<interactive>:913:1: error: Variable not in scope: do_test
+
+<interactive>:914:1: error: Variable not in scope: do_test
+
+<interactive>:915:1: error: Variable not in scope: do_test
+
+<interactive>:916:1: error: Variable not in scope: do_test
+
+<interactive>:917:1: error: Variable not in scope: do_test
+
+<interactive>:918:1: error: Variable not in scope: do_test
+
+<interactive>:919:1: error: Variable not in scope: do_test
+
+<interactive>:920:1: error: Variable not in scope: do_test
+
+<interactive>:921:1: error: Variable not in scope: do_test
+
+<interactive>:922:1: error: Variable not in scope: do_test
+
+<interactive>:923:1: error: Variable not in scope: do_test
+
+<interactive>:924:1: error: Variable not in scope: do_test
+
+<interactive>:925:1: error: Variable not in scope: do_test
+
+<interactive>:926:1: error: Variable not in scope: do_test
+
+<interactive>:927:1: error: Variable not in scope: do_test
+
+<interactive>:928:1: error: Variable not in scope: do_test
+
+<interactive>:929:1: error: Variable not in scope: do_test
+
+<interactive>:930:1: error: Variable not in scope: do_test
+
+<interactive>:931:1: error: Variable not in scope: do_test
+
+<interactive>:932:1: error: Variable not in scope: do_test
+
+<interactive>:933:1: error: Variable not in scope: do_test
+
+<interactive>:934:1: error: Variable not in scope: do_test
+
+<interactive>:935:1: error: Variable not in scope: do_test
+
+<interactive>:936:1: error: Variable not in scope: do_test
+
+<interactive>:937:1: error: Variable not in scope: do_test
+
+<interactive>:938:1: error: Variable not in scope: do_test
+
+<interactive>:939:1: error: Variable not in scope: do_test
+
+<interactive>:940:1: error: Variable not in scope: do_test
+
+<interactive>:941:1: error: Variable not in scope: do_test
+
+<interactive>:942:1: error: Variable not in scope: do_test
+
+<interactive>:943:1: error: Variable not in scope: do_test
+
+<interactive>:944:1: error: Variable not in scope: do_test
+
+<interactive>:945:1: error: Variable not in scope: do_test
+
+<interactive>:946:1: error: Variable not in scope: do_test
+
+<interactive>:947:1: error: Variable not in scope: do_test
+
+<interactive>:948:1: error: Variable not in scope: do_test
+
+<interactive>:949:1: error: Variable not in scope: do_test
+
+<interactive>:950:1: error: Variable not in scope: do_test
+
+<interactive>:951:1: error: Variable not in scope: do_test
+
+<interactive>:952:1: error: Variable not in scope: do_test
+
+<interactive>:953:1: error: Variable not in scope: do_test
+
+<interactive>:954:1: error: Variable not in scope: do_test
+
+<interactive>:955:1: error: Variable not in scope: do_test
+
+<interactive>:956:1: error: Variable not in scope: do_test
+
+<interactive>:957:1: error: Variable not in scope: do_test
+
+<interactive>:958:1: error: Variable not in scope: do_test
+
+<interactive>:959:1: error: Variable not in scope: do_test
+
+<interactive>:960:1: error: Variable not in scope: do_test
+
+<interactive>:961:1: error: Variable not in scope: do_test
+
+<interactive>:962:1: error: Variable not in scope: do_test
+
+<interactive>:963:1: error: Variable not in scope: do_test
+
+<interactive>:964:1: error: Variable not in scope: do_test
+
+<interactive>:965:1: error: Variable not in scope: do_test
+
+<interactive>:966:1: error: Variable not in scope: do_test
+
+<interactive>:967:1: error: Variable not in scope: do_test
+
+<interactive>:968:1: error: Variable not in scope: do_test
+
+<interactive>:969:1: error: Variable not in scope: do_test
+
+<interactive>:970:1: error: Variable not in scope: do_test
+
+<interactive>:971:1: error: Variable not in scope: do_test
+
+<interactive>:972:1: error: Variable not in scope: do_test
+
+<interactive>:973:1: error: Variable not in scope: do_test
+
+<interactive>:974:1: error: Variable not in scope: do_test
+
+<interactive>:975:1: error: Variable not in scope: do_test
+
+<interactive>:976:1: error: Variable not in scope: do_test
+
+<interactive>:977:1: error: Variable not in scope: do_test
+
+<interactive>:978:1: error: Variable not in scope: do_test
+
+<interactive>:979:1: error: Variable not in scope: do_test
+
+<interactive>:980:1: error: Variable not in scope: do_test
+
+<interactive>:981:1: error: Variable not in scope: do_test
+
+<interactive>:982:1: error: Variable not in scope: do_test
+
+<interactive>:983:1: error: Variable not in scope: do_test
