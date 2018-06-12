@@ -612,7 +612,7 @@ plugins is to make it easier to implement development tools.
 There are several different access points that you can use for defining plugins
 that access the representations. All these fields receive the list of
 ``CommandLineOption`` strings that are passed to the compiler using the
-``-fplugin-opt`` flags.
+:ghc-flag:`-fplugin-opt` flags.
 
 ::
 
