@@ -963,14 +963,14 @@ def run_command( name, way, cmd ):
 # -----------------------------------------------------------------------------
 # GHCi tests
 
-def ghci_script( name, way, script):
+def ghci_script( name, way, script, extra_hc_opts='' ):
     flags = ' '.join(get_compiler_flags())
     way_flags = ' '.join(config.way_flags[way])
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
-    cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {flags} {way_flags}'
-          ).format(flags=flags, way_flags=way_flags)
+    cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {flags} {way_flags} {extra_hc_opts}'
+          ).format(flags=flags, way_flags=way_flags, extra_hc_opts=extra_hc_opts)
 
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
