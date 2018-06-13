@@ -22,7 +22,6 @@ import Data.List
 import Documentation.Haddock.Doc (metaDocConcat)
 import DynFlags (languageExtensions)
 import qualified GHC.LanguageExtensions as LangExt
-import FastString
 import GHC
 import Haddock.Interface.ParseModuleHeader
 import Haddock.Parser

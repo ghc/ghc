@@ -58,7 +58,7 @@ import Packages   ( lookupModuleInAllPackages, PackageName(..) )
 import Bag
 import RdrName
 import TcRnTypes
-import FastString ( concatFS, unpackFS, fastStringToByteString)
+import FastString ( unpackFS, fastStringToByteString)
 import BasicTypes ( StringLiteral(..), SourceText(..) )
 import qualified Outputable as O
 import HsDecls ( getConArgs )

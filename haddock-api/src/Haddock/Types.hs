@@ -38,8 +38,6 @@ import BasicTypes (Fixity(..))
 import GHC hiding (NoLink)
 import DynFlags (Language)
 import qualified GHC.LanguageExtensions as LangExt
-import Coercion
-import NameSet
 import OccName
 import Outputable
 import Control.Applicative (Applicative(..))

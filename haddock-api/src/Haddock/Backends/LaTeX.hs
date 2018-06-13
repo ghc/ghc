@@ -27,7 +27,7 @@ import GHC
 import OccName
 import Name                 ( nameOccName )
 import RdrName              ( rdrNameOcc )
-import FastString           ( unpackFS, unpackLitString, zString )
+import FastString           ( unpackFS )
 import Outputable           ( panic)
 
 import qualified Data.Map as Map
