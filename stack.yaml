@@ -10,7 +10,7 @@ packages:
 - '../libraries/text'
 
 extra-deps:
-- shake-0.16
+- shake-0.16.1
 
 nix:
    enable: false
