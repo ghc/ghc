@@ -76,6 +76,8 @@ in
         [ hadrianPackages.hadrian
           nixpkgs.arcanist
           nixpkgs.git
+          nixpkgs.gmp.dev nixpkgs.gmp.out
+          nixpkgs.ncurses.dev nixpkgs.ncurses.out
           nixpkgs.python3Packages.sphinx
           nixpkgs.texlive.combined.scheme-basic
           (nixpkgs.haskell.packages.ghc822.ghcWithPackages
