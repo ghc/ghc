@@ -139,6 +139,7 @@ defaultBuilderArgs = mconcat
     , ldBuilderArgs
     , makeBuilderArgs
     , runTestBuilderArgs
+    , validateBuilderArgs
     , xelatexBuilderArgs
     -- Generic builders from the Hadrian library:
     , builder (Ar Pack     ) ? Hadrian.Builder.Ar.args Pack

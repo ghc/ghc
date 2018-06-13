@@ -5,6 +5,7 @@ import Expression
 import GHC
 import Oracles.Flag
 import Oracles.Setting
+import Settings
 import Target
 import Utilities
 
@@ -63,13 +64,23 @@ testRules = do
         -- Execute the test target.
         buildWithCmdOptions env $ target (vanillaContext Stage2 compiler) RunTest [] []
 
+-- | Build extra programs required by testsuite
+needTestsuiteBuilders :: Action ()
+needTestsuiteBuilders = do
+    targets <- mapM (needfile Stage1) =<< testsuitePackages
+    need targets
+  where
+    needfile :: Stage -> Package -> Action FilePath
+    needfile stage pkg = programPath =<< programContext stage pkg
+
+
 needTestBuilders :: Action ()
 needTestBuilders = do
     needBuilder $ Ghc CompileHs Stage2
     needBuilder $ GhcPkg Update Stage1
-    needBuilder Hp2Ps
     needBuilder Hpc
     needBuilder (Hsc2Hs Stage1)
+    needTestsuiteBuilders
 
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Action String

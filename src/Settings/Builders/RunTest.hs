@@ -1,10 +1,11 @@
 module Settings.Builders.RunTest (runTestBuilderArgs) where
 
-import CommandLine (TestArgs(..), defaultTestArgs)
+import CommandLine (TestArgs(..), defaultTestArgs, TestSpeed(..))
 import Flavour
 import GHC.Packages
 import Hadrian.Builder (getBuilderPath)
 import Hadrian.Utilities
+import Oracles.Setting (setting)
 import Rules.Test
 import Settings.Builders.Common
 
@@ -28,7 +29,9 @@ runTestBuilderArgs = builder RunTest ? do
 
     threads  <- shakeThreads <$> expr getShakeOptions
     verbose  <- shakeVerbosity <$> expr getShakeOptions
-
+    os       <- expr $ setting TargetOs
+    arch     <- expr $ setting TargetArch
+    platform <- expr $ setting TargetPlatform
     top      <- expr topDirectory
     compiler <- getBuilderPath $ Ghc CompileHs Stage2
     ghcPkg   <- getBuilderPath $ GhcPkg Update Stage1
@@ -71,7 +74,12 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.ghc_dynamic=False"              -- TODO: support dynamic
 
             , arg "-e", arg $ "config.in_tree_compiler=True"          -- Use default value, see https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
-
+            , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
+            , arg "-e", arg $ "config.wordsize=\"64\""
+            , arg "-e", arg $ "config.os="       ++ show os
+            , arg "-e", arg $ "config.arch="     ++ show arch
+            , arg "-e", arg $ "config.platform=" ++ show platform 
+            
             , arg "--config-file=testsuite/config/ghc"
             , arg "--config", arg $ "compiler="     ++ show (top -/- compiler)
             , arg "--config", arg $ "ghc_pkg="      ++ show (top -/- ghcPkg)
@@ -92,15 +100,34 @@ getTestArgs = do
     let testOnlyArg = case testOnly args of
                         Just cases -> map ("--only=" ++) (words cases)
                         Nothing -> []
+        onlyPerfArg = if testOnlyPerf args
+                        then Just "--only-perf-tests"
+                        else Nothing
         skipPerfArg = if testSkipPerf args
                         then Just "--skip-perf-tests"
                         else Nothing
+        speedArg   = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
         summaryArg = case testSummary args of
                         Just filepath -> Just $ "--summary-file" ++ quote filepath
                         Nothing -> Just $ "--summary-file=testsuite_summary.txt"
         junitArg = case testJUnit args of
                         Just filepath -> Just $ "--junit " ++ quote filepath
                         Nothing -> Nothing
-        configArgs = map ("-e " ++) (testConfigs args)
+        configArgs = concat [["-e", configArg] | configArg <- testConfigs args]
+        verbosityArg = case testVerbosity args of
+                         Nothing -> Nothing
+                         Just verbosity -> Just $ "--verbose=" ++ verbosity
+        wayArgs    = map ("--way=" ++) (testWays args) 
+    pure $  testOnlyArg
+         ++ speedArg 
+         ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
+                      , junitArg, verbosityArg  ] 
+         ++ configArgs
+         ++ wayArgs
 
-    pure $ testOnlyArg ++ catMaybes [skipPerfArg, summaryArg, junitArg] ++ configArgs
+-- | Set speed for test
+setTestSpeed :: TestSpeed -> String
+setTestSpeed Fast    = "2"
+setTestSpeed Average = "1"
+setTestSpeed Slow    = "0"
+

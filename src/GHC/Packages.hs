@@ -11,13 +11,13 @@ import Hadrian.Utilities
 -- modify build default build conditions in "UserSettings".
 ghcPackages :: [Package]
 ghcPackages =
-    [ array, base, binary, bytestring, cabal, checkPpr, compareSizes, compiler
-    , containers, deepseq, deriveConstants, directory, filepath, genapply
-    , genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact, ghcHeap, ghci, ghcPkg
-    , ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp
-    , integerSimple, iserv, libffi, libiserv, mtl, parsec, parallel, pretty
-    , process, rts, runGhc, stm, templateHaskell, terminfo, text, time, touchy
-    , transformers, unlit, unix, win32, xhtml ]
+    [ array, base, binary, bytestring, cabal, checkPpr, checkApiAnnotations
+    , compareSizes, compiler, containers, deepseq, deriveConstants, directory
+    , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact
+    , ghcHeap, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps
+    , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
+    , parsec, parallel, pretty, process, rts, runGhc, stm, templateHaskell
+    , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -29,6 +29,7 @@ base                = hsLib  "base"
 binary              = hsLib  "binary"
 bytestring          = hsLib  "bytestring"
 cabal               = hsLib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
+checkApiAnnotations = hsUtil "check-api-annotations"
 checkPpr            = hsUtil "check-ppr"
 compareSizes        = hsUtil "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = hsTop  "ghc"             `setPath` "compiler"
