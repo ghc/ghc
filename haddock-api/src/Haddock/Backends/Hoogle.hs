@@ -201,6 +201,7 @@ ppFam dflags decl@(FamilyDecl { fdInfo = info })
               -- for Hoogle, so pretend it doesn't have any.
               ClosedTypeFamily{} -> decl { fdInfo = OpenTypeFamily }
               _                  -> decl
+ppFam _ XFamilyDecl {} = panic "ppFam"
 
 ppInstance :: DynFlags -> ClsInst -> [String]
 ppInstance dflags x =
