@@ -2,8 +2,7 @@ module Settings.Builders.RunTest (runTestBuilderArgs) where
 
 import CommandLine (TestArgs(..), defaultTestArgs, TestSpeed(..))
 import Flavour
-import GHC.Packages
-import Hadrian.Builder (getBuilderPath)
+import GHC
 import Hadrian.Utilities
 import Oracles.Setting (setting)
 import Rules.Test
@@ -26,19 +25,11 @@ runTestBuilderArgs = builder RunTest ? do
 
     windows  <- expr windowsHost
     darwin   <- expr osxHost
-
     threads  <- shakeThreads <$> expr getShakeOptions
-    verbose  <- shakeVerbosity <$> expr getShakeOptions
     os       <- expr $ setting TargetOs
     arch     <- expr $ setting TargetArch
     platform <- expr $ setting TargetPlatform
     top      <- expr topDirectory
-    compiler <- getBuilderPath $ Ghc CompileHs Stage2
-    ghcPkg   <- getBuilderPath $ GhcPkg Update Stage1
-    haddock  <- getBuilderPath $ Haddock BuildPackage
-    hp2ps    <- getBuilderPath $ Hp2Ps
-    hpc      <- getBuilderPath $ Hpc
-
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutProgPath)
 
@@ -81,53 +72,85 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.platform=" ++ show platform
 
             , arg "--config-file=testsuite/config/ghc"
-            , arg "--config", arg $ "compiler="     ++ show (top -/- compiler)
-            , arg "--config", arg $ "ghc_pkg="      ++ show (top -/- ghcPkg)
-            , arg "--config", arg $ "haddock="      ++ show (top -/- haddock)
-            , arg "--config", arg $ "hp2ps="        ++ show (top -/- hp2ps)
-            , arg "--config", arg $ "hpc="          ++ show (top -/- hpc)
             , arg "--config", arg $ "gs=gs"                           -- Use the default value as in test.mk
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
             , arg $ "--threads=" ++ show threads
-            , arg $ "--verbose=" ++ show (fromEnum verbose)
             , getTestArgs -- User-provided arguments from command line.
             ]
 
 -- | Prepare the command-line arguments to run GHC's test script.
 getTestArgs :: Args
 getTestArgs = do
-    args <- expr $ userSetting defaultTestArgs
-    let testOnlyArg = case testOnly args of
-                        Just cases -> map ("--only=" ++) (words cases)
-                        Nothing -> []
-        onlyPerfArg = if testOnlyPerf args
-                        then Just "--only-perf-tests"
-                        else Nothing
-        skipPerfArg = if testSkipPerf args
-                        then Just "--skip-perf-tests"
-                        else Nothing
-        speedArg   = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
-        summaryArg = case testSummary args of
-                        Just filepath -> Just $ "--summary-file" ++ quote filepath
-                        Nothing -> Just $ "--summary-file=testsuite_summary.txt"
-        junitArg = case testJUnit args of
-                        Just filepath -> Just $ "--junit " ++ quote filepath
-                        Nothing -> Nothing
-        configArgs = concat [["-e", configArg] | configArg <- testConfigs args]
+    args            <- expr $ userSetting defaultTestArgs
+    bindir          <- expr $ setBinaryDirectory (testCompiler args)
+    compiler        <- expr $ setCompiler (testCompiler args)
+    globalVerbosity <- shakeVerbosity <$> expr getShakeOptions 
+    let testOnlyArg  = case testOnly args of
+                           Just cases -> map ("--only=" ++) (words cases)
+                           Nothing -> []
+        onlyPerfArg  = if testOnlyPerf args
+                           then Just "--only-perf-tests"
+                           else Nothing
+        skipPerfArg  = if testSkipPerf args
+                           then Just "--skip-perf-tests"
+                           else Nothing
+        speedArg     = ["-e", "config.speed=" ++ setTestSpeed (testSpeed args)]
+        summaryArg   = case testSummary args of
+                           Just filepath -> Just $ "--summary-file" ++ quote filepath
+                           Nothing -> Just $ "--summary-file=testsuite_summary.txt"
+        junitArg     = case testJUnit args of
+                           Just filepath -> Just $ "--junit " ++ quote filepath
+                           Nothing -> Nothing
+        configArgs   = concat [["-e", configArg] | configArg <- testConfigs args]
         verbosityArg = case testVerbosity args of
-                         Nothing -> Nothing
-                         Just verbosity -> Just $ "--verbose=" ++ verbosity
-        wayArgs    = map ("--way=" ++) (testWays args)
-    pure $  testOnlyArg
-         ++ speedArg
+                           Nothing -> Just $ "--verbose=" ++ show (fromEnum globalVerbosity)
+                           Just verbosity -> Just $ "--verbose=" ++ verbosity
+        wayArgs      = map ("--way=" ++) (testWays args) 
+        compilerArg  = ["--config", "compiler=" ++ show (compiler)]
+        ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- "ghc-pkg")]
+        haddockArg   = ["--config", "haddock=" ++ show (bindir -/- "haddock")]
+        hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps")]
+        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]   
+    pure $  testOnlyArg ++ speedArg 
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
-                      , junitArg, verbosityArg  ]
-         ++ configArgs
-         ++ wayArgs
+                      , junitArg, verbosityArg  ] 
+         ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
+         ++ haddockArg ++ hp2psArg ++ hpcArg
+
+-- | Directory to look for Binaries
+-- | We assume that required programs are present in the same binary directory 
+-- | in which ghc is stored and that they have their conventional name.
+-- | QUESTION : packages can be named different from their conventional names.
+-- | For example, ghc-pkg can be named as ghc-pkg-version. In such cases, it will
+-- | be impossible to search the binary. Only possible way will be to take user 
+-- | inputs for these directory also. boilerplate soes not account for this 
+-- | problem, but simply returns an error. How should we handle such cases?
+setBinaryDirectory :: String -> Action FilePath
+setBinaryDirectory "stage0" = setting InstallBinDir
+setBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0) 
+setBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1) 
+setBinaryDirectory compiler = pure $ parentPath compiler
+
+-- | Set Test Compiler
+setCompiler :: String -> Action FilePath
+setCompiler "stage0" = setting SystemGhc
+setCompiler "stage1" = liftM2 (-/-) topDirectory (fullpath Stage0 ghc)
+setCompiler "stage2" = liftM2 (-/-) topDirectory (fullpath Stage1 ghc)
+setCompiler compiler = pure compiler 
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String
 setTestSpeed Fast    = "2"
 setTestSpeed Average = "1"
 setTestSpeed Slow    = "0"
+
+-- | Returns parent path of test compiler 
+-- | TODO : Is there a simpler way to find parent directory?
+parentPath :: String -> String
+parentPath path = let upPath = init $ splitOn "/" path
+                  in  intercalate "/" upPath
+
+-- | TODO: move to hadrian utilities.
+fullpath :: Stage -> Package -> Action FilePath
+fullpath stage pkg = programPath =<< programContext stage pkg
 

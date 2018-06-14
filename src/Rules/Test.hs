@@ -73,7 +73,6 @@ needTestsuiteBuilders = do
     needfile :: Stage -> Package -> Action FilePath
     needfile stage pkg = programPath =<< programContext stage pkg
 
-
 needTestBuilders :: Action ()
 needTestBuilders = do
     needBuilder $ Ghc CompileHs Stage2
