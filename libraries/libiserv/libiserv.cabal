@@ -2,7 +2,7 @@ Name: libiserv
 Version: 8.5
 Copyright: XXX
 License: BSD3
--- XXX License-File: LICENSE
+License-File: LICENSE
 Author: XXX
 Maintainer: XXX
 Synopsis: Provides shared functionality between iserv and iserv-proxy
