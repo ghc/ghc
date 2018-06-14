@@ -5,6 +5,7 @@
            , RecordWildCards
            , PatternSynonyms
   #-}
+{-# LANGUAGE TypeInType #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -41,6 +42,7 @@ import GHC.Base
 import GHC.Show
 import GHC.Stack.Types
 import GHC.OldList
+import GHC.Prim
 import GHC.IO.Unsafe
 import {-# SOURCE #-} GHC.Stack.CCS
 
@@ -164,7 +166,8 @@ instance Exception SomeException where
 
 -- | Throw an exception.  Exceptions may be thrown from purely
 -- functional code, but may only be caught within the 'IO' monad.
-throw :: Exception e => e -> a
+throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
+         Exception e => e -> a
 throw e = raise# (toException e)
 
 -- | This is thrown when the user calls 'error'. The first @String@ is the

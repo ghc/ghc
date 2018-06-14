@@ -35,6 +35,8 @@
 
   * `Data.Monoid.Ap` has been introduced
 
+  * `Control.Exception.throw` is now levity polymorphic. (#15180)
+
 ## 4.11.1.0 *TBA*
   * Bundled with GHC 8.4.2
 
