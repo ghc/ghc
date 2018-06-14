@@ -1,6 +1,6 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = https://github.com/kolmodin/binary.git
+	url = ../packages/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
@@ -108,7 +108,7 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://github.com/int-index/haddock.git
+	url = ../haddock.git
 	ignore = untracked
 	branch = ghc-head
 [submodule "nofib"]
