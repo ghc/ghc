@@ -682,12 +682,12 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; -- pprTrace "dsRule" (vcat [ text "Id:" <+> ppr poly_id
          --                         , text "spec_co:" <+> ppr spec_co
          --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
-         case decomposeRuleLhs spec_bndrs ds_lhs of {
+         dflags <- getDynFlags
+       ; case decomposeRuleLhs dflags spec_bndrs ds_lhs of {
            Left msg -> do { warnDs NoReason msg; return Nothing } ;
            Right (rule_bndrs, _fn, args) -> do
 
-       { dflags <- getDynFlags
-       ; this_mod <- getModule
+       { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
              spec_unf  = specUnfolding dflags spec_bndrs core_app arity_decrease fn_unf
              spec_id   = mkLocalId spec_name spec_ty
@@ -821,14 +821,15 @@ SPEC f :: ty                [n]   INLINE [k]
 ************************************************************************
 -}
 
-decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
+decomposeRuleLhs :: DynFlags -> [Var] -> CoreExpr
+                 -> Either SDoc ([Var], Id, [CoreExpr])
 -- (decomposeRuleLhs bndrs lhs) takes apart the LHS of a RULE,
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
 -- may add some extra dictionary binders (see Note [Free dictionaries])
 --
 -- Returns an error message if the LHS isn't of the expected shape
 -- Note [Decomposing the left-hand side of a RULE]
-decomposeRuleLhs orig_bndrs orig_lhs
+decomposeRuleLhs dflags orig_bndrs orig_lhs
   | not (null unbound)    -- Check for things unbound on LHS
                           -- See Note [Unused spec binders]
   = Left (vcat (map dead_msg unbound))
@@ -849,7 +850,7 @@ decomposeRuleLhs orig_bndrs orig_lhs
   = Left bad_shape_msg
  where
    lhs1         = drop_dicts orig_lhs
-   lhs2         = simpleOptExpr unsafeGlobalDynFlags lhs1  -- See Note [Simplify rule LHS]
+   lhs2         = simpleOptExpr dflags lhs1  -- See Note [Simplify rule LHS]
    (fun2,args2) = collectArgs lhs2
 
    lhs_fvs    = exprFreeVars lhs2

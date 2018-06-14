@@ -393,12 +393,12 @@ dsRule (L loc (HsRule _ name rule_act vars lhs rhs))
 
         -- Substitute the dict bindings eagerly,
         -- and take the body apart into a (f args) form
-        ; case decomposeRuleLhs bndrs'' lhs'' of {
+        ; dflags <- getDynFlags
+        ; case decomposeRuleLhs dflags bndrs'' lhs'' of {
                 Left msg -> do { warnDs NoReason msg; return Nothing } ;
                 Right (final_bndrs, fn_id, args) -> do
 
-        { dflags <- getDynFlags
-        ; let is_local = isLocalId fn_id
+        { let is_local = isLocalId fn_id
                 -- NB: isLocalId is False of implicit Ids.  This is good because
                 -- we don't want to attach rules to the bindings of implicit Ids,
                 -- because they don't show up in the bindings until just before code gen
