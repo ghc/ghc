@@ -15,8 +15,9 @@ import Control.Monad
 import qualified Data.List as List
 import Data.Maybe
 
+import Distribution.Text
+import Distribution.Types.PackageName
 import Distribution.InstalledPackageInfo
-import Distribution.Package
 import Distribution.Simple.Compiler hiding (Flag)
 import Distribution.Simple.GHC
 import Distribution.Simple.PackageIndex
@@ -256,15 +257,44 @@ baseDependencies ghcPath = do
     concat `fmap` mapM (getDependency pkgIndex) pkgs
   where
     getDependency pkgIndex name = case ifaces pkgIndex name of
-        [] -> do
-            hPutStrLn stderr $ "Couldn't find base test dependency: " ++ name
+      [] -> do
+        hPutStrLn stderr $ "Couldn't find base test dependency: " ++ name
+        exitFailure
+
+      (unit, ifaceOpt, htmlOpt) : alts -> do
+        when (not . null $ alts) $
+          hPutStr stderr $ unlines
+            [ "Multiple options found for base test dependency: " ++ name
+            , "Choosing the first of these, which has unit id: " ++ unit
+            ]
+
+        case (ifaceOpt, htmlOpt) of
+          (Nothing, _) -> do
+            hPutStr stderr $
+              "No '.haddock' file found for base test dependency: " ++ name
             exitFailure
-        (ifArg:_) -> pure ["--optghc=-package" ++ name, ifArg]
+
+          (Just iface, Nothing) -> do
+            hPutStrLn stderr $
+              "No HTML directory found for base test dependency: " ++ name
+            pure [ "--optghc=-package" ++ name
+                 , "--read-interface=" ++ iface
+                 ]
+
+          (Just iface, Just html) ->
+            pure [ "--optghc=-package" ++ name
+                 , "--read-interface=" ++ html ++ "," ++ iface
+                 ]
+
     ifaces pkgIndex name = do
         pkg <- join $ snd <$> lookupPackageName pkgIndex (mkPackageName name)
-        iface <$> haddockInterfaces pkg <*> haddockHTMLs pkg
-    iface file html = "--read-interface=" ++ html ++ "," ++ file
 
+        let unitId = display (installedUnitId pkg)
+            ifaceOpt = listToMaybe (haddockInterfaces pkg)
+            htmlDirOpt = listToMaybe (haddockHTMLs pkg)
+
+        pure (unitId, ifaceOpt, htmlDirOpt)
+    
 
 defaultDiffTool :: IO (Maybe FilePath)
 defaultDiffTool =
