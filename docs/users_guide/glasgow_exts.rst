@@ -12681,9 +12681,9 @@ non-trivial program, you may be interested in combining this with the
 :ghc-flag:`-ddump-to-file` flag (see :ref:`dumping-output`. For each file using
 Template Haskell, this will show the output in a ``.dump-splices`` file.
 
-The flag :ghc-flag:`-dth-dec-file=⟨file⟩` shows the expansions of all top-level
+The flag :ghc-flag:`-dth-dec-file` dumps the expansions of all top-level
 TH declaration splices, both typed and untyped, in the file :file:`M.th.hs`
-where M is the name of the module being compiled. Note that other types of
+for each module `M` being compiled. Note that other types of
 splices (expressions, types, and patterns) are not shown. Application
 developers can check this into their repository so that they can grep for
 identifiers that were defined in Template Haskell. This is similar to using
@@ -12702,7 +12702,7 @@ Below is a sample output of :ghc-flag:`-ddump-splices` ::
       foo :: Int -> Int
       foo x = (x + 1)
 
-Below is the output of the same sample using :ghc-flag:`-dth-dec-file=⟨file⟩` ::
+Below is the output of the same sample using :ghc-flag:`-dth-dec-file` ::
 
     -- TH_pragma.hs:(6,4)-(8,26): Splicing declarations
     foo :: Int -> Int
