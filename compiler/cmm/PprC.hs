@@ -546,6 +546,14 @@ pprStatics dflags (CmmStaticLit (CmmInt a W32) :
                             rest)
     else pprStatics dflags (CmmStaticLit (CmmInt ((shiftL b 32) .|. a) W64) :
                             rest)
+pprStatics dflags (CmmStaticLit (CmmInt a W16) :
+                   CmmStaticLit (CmmInt b W16) : rest)
+  | wordWidth dflags == W32
+  = if wORDS_BIGENDIAN dflags
+    then pprStatics dflags (CmmStaticLit (CmmInt ((shiftL a 16) .|. b) W32) :
+                            rest)
+    else pprStatics dflags (CmmStaticLit (CmmInt ((shiftL b 16) .|. a) W32) :
+                            rest)
 pprStatics dflags (CmmStaticLit (CmmInt _ w) : _)
   | w /= wordWidth dflags
   = pprPanic "pprStatics: cannot emit a non-word-sized static literal" (ppr w)
