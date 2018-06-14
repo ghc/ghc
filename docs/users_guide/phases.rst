@@ -874,11 +874,12 @@ for example).
     ``Main`` module present (normally the compiler will not attempt
     linking when there is no ``Main``).
 
-    The flags :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` and
+    The flags :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]` and
     :ghc-flag:`-with-rtsopts=⟨opts⟩` have no effect when used with
     :ghc-flag:`-no-hs-main`, because they are implemented by changing the
     definition of ``main`` that GHC generates. See :ref:`using-own-main` for
-    how to get the effect of :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` and
+    how to get the effect of
+    :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]` and
     :ghc-flag:`-with-rtsopts=⟨opts⟩` when using your own ``main``.
 
 .. ghc-flag:: -debug
@@ -908,7 +909,7 @@ for example).
     The threaded runtime system provides the following benefits:
 
     -  It enables the :rts-flag:`-N ⟨x⟩` RTS option to be used,
-       which allows threads to run in parallel on a multiprocessor 
+       which allows threads to run in parallel on a multiprocessor
        or multicore machine. See :ref:`using-smp`.
 
     -  If a thread makes a foreign call (and the call is not marked
@@ -932,12 +933,17 @@ for example).
     :ghc-flag:`-eventlog` can be used with :ghc-flag:`-threaded`. It is implied by
     :ghc-flag:`-debug`.
 
-.. ghc-flag:: -rtsopts[=⟨none|some|all⟩]
+.. ghc-flag:: -rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]
     :shortdesc: Control whether the RTS behaviour can be tweaked via command-line
         flags and the ``GHCRTS`` environment variable. Using ``none``
         means no RTS flags can be given; ``some`` means only a minimum
-        of safe options can be given (the default), and ``all`` (or no
-        argument at all) means that all RTS flags are permitted.
+        of safe options can be given (the default); ``all`` (or no
+        argument at all) means that all RTS flags are permitted; ``ignore``
+        means RTS flags can be given, but are treated as regular arguments and
+        passed to the Haskell program as arguments; ``ignoreAll`` is the same as
+        ``ignore``, but ``GHCRTS`` is also ignored. ``-rtsopts`` does not
+        affect ``-with-rtsopts`` behavior; flags passed via ``-with-rtsopts``
+        are used regardless of ``-rtsopts``.
     :type: dynamic
     :category: linking
 
@@ -953,7 +959,7 @@ for example).
         an error message. If the ``GHCRTS`` environment variable is set,
         then the program will emit a warning message, ``GHCRTS`` will be
         ignored, and the program will run as normal.
-    
+
     ``-rtsopts=ignore``
         Disables all processing of RTS options. Unlike ``none`` this treats
         all RTS flags appearing on the command line the same way as regular
@@ -982,6 +988,9 @@ for example).
     Note that ``-rtsopts`` has no effect when used with :ghc-flag:`-no-hs-main`;
     see :ref:`using-own-main` for details.
 
+    ``-rtsopts`` does not affect RTS options passed via ``-with-rtsopts``;
+    those are used regardless of ``-rtsopts``.
+
 .. ghc-flag:: -with-rtsopts=⟨opts⟩
     :shortdesc: Set the default RTS options to ⟨opts⟩.
     :type: dynamic
@@ -1000,16 +1009,17 @@ for example).
 
 .. ghc-flag:: -no-rtsopts-suggestions
     :shortdesc: Don't print RTS suggestions about linking with
-        :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`.
+        :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]`.
     :type: dynamic
     :category: linking
 
     This option disables RTS suggestions about linking with
-    :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` when they are not available. These
-    suggestions would be unhelpful if the users have installed Haskell programs
-    through their package managers. With this option enabled, these suggestions
-    will not appear. It is recommended for people distributing binaries to
-    build with either ``-rtsopts`` or ``-no-rtsopts-suggestions``.
+    :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]` when they are not
+    available. These suggestions would be unhelpful if the users have installed
+    Haskell programs through their package managers. With this option enabled,
+    these suggestions will not appear. It is recommended for people
+    distributing binaries to build with either ``-rtsopts`` or
+    ``-no-rtsopts-suggestions``.
 
 .. ghc-flag:: -fno-gen-manifest
     :shortdesc: Do not generate a manifest file (Windows only)
