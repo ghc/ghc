@@ -2061,21 +2061,73 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                     tcGhciStmts [no_it_b] ,
                     tcGhciStmts [no_it_c] ]
 
-
-        -- Ensure that type errors don't get deferred when type checking the
-        -- naked expression. Deferring type errors here is unhelpful because the
-        -- expression gets evaluated right away anyway. It also would potentially
-        -- emit two redundant type-error warnings, one from each plan.
         ; generate_it <- goptM Opt_NoIt
+
+        -- We disable `-fdefer-type-errors` in GHCi for naked expressions.
+        -- See Note [Deferred type errors in GHCi]
+
+        -- NB: The flag `-fdefer-type-errors` implies `-fdefer-type-holes`
+        -- and `-fdefer-out-of-scope-variables`. However the flag
+        -- `-fno-defer-type-errors` doesn't imply `-fdefer-type-holes` and
+        -- `-fno-defer-out-of-scope-variables`. Thus the later two flags
+        -- also need to be unset here.
         ; plan <- unsetGOptM Opt_DeferTypeErrors $
                   unsetGOptM Opt_DeferTypedHoles $
+                  unsetGOptM Opt_DeferOutOfScopeVariables $
                     runPlans $ if generate_it
                                  then no_it_plans
                                  else it_plans
 
-
         ; fix_env <- getFixityEnv
         ; return (plan, fix_env) }
+
+{- Note [Deferred type errors in GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHCi, we ensure that type errors don't get deferred when type checking the
+naked expressions. Deferring type errors here is unhelpful because the
+expression gets evaluated right away anyway. It also would potentially emit
+two redundant type-error warnings, one from each plan.
+
+Trac #14963 reveals another bug that when deferred type errors is enabled
+in GHCi, any reference of imported/loaded variables (directly or indirectly)
+in interactively issued naked expressions will cause ghc panic. See more
+detailed dicussion in Trac #14963.
+
+The interactively issued declarations, statements, as well as the modules
+loaded into GHCi, are not affected. That means, for declaration, you could
+have
+
+    Prelude> :set -fdefer-type-errors
+    Prelude> x :: IO (); x = putStrLn True
+    <interactive>:14:26: warning: [-Wdeferred-type-errors]
+        ? Couldn't match type ‘Bool’ with ‘[Char]’
+          Expected type: String
+            Actual type: Bool
+        ? In the first argument of ‘putStrLn’, namely ‘True’
+          In the expression: putStrLn True
+          In an equation for ‘x’: x = putStrLn True
+
+But for naked expressions, you will have
+
+    Prelude> :set -fdefer-type-errors
+    Prelude> putStrLn True
+    <interactive>:2:10: error:
+        ? Couldn't match type ‘Bool’ with ‘[Char]’
+          Expected type: String
+            Actual type: Bool
+        ? In the first argument of ‘putStrLn’, namely ‘True’
+          In the expression: putStrLn True
+          In an equation for ‘it’: it = putStrLn True
+
+    Prelude> let x = putStrLn True
+    <interactive>:2:18: warning: [-Wdeferred-type-errors]
+        ? Couldn't match type ‘Bool’ with ‘[Char]’
+          Expected type: String
+            Actual type: Bool
+        ? In the first argument of ‘putStrLn’, namely ‘True’
+          In the expression: putStrLn True
+          In an equation for ‘x’: x = putStrLn True
+-}
 
 tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
@@ -2117,7 +2169,7 @@ tcUserStmt rdr_stmt@(L loc _)
 
 {-
 Note [GHCi Plans]
-
+~~~~~~~~~~~~~~~~~
 When a user types an expression in the repl we try to print it in three different
 ways. Also, depending on whether -fno-it is set, we bind a variable called `it`
 which can be used to refer to the result of the expression subsequently in the repl.

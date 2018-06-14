@@ -1085,6 +1085,10 @@ enqueueCommands cmds = do
 runStmt :: String -> SingleStep -> GHCi (Maybe GHC.ExecResult)
 runStmt stmt step = do
   dflags <- GHC.getInteractiveDynFlags
+  -- In GHCi, we disable `-fdefer-type-errors`, as well as `-fdefer-type-holes`
+  -- and `-fdefer-out-of-scope-variables` for **naked expressions**. The
+  -- declarations and statements are not affected.
+  -- See Note [Deferred type errors in GHCi] in typecheck/TcRnDriver.hs
   if | GHC.isStmt dflags stmt    -> run_stmt
      | GHC.isImport dflags stmt  -> run_import
      -- Every import declaration should be handled by `run_import`. As GHCi
