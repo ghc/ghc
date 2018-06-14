@@ -508,7 +508,9 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
 
 #if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)
     struct rlimit limit;
-    if (!getrlimit(RLIMIT_AS, &limit) && *len > limit.rlim_cur) {
+    if (!getrlimit(RLIMIT_AS, &limit)
+        && limit.rlim_cur > 0
+        && *len > limit.rlim_cur) {
         *len = limit.rlim_cur;
     }
 #endif
