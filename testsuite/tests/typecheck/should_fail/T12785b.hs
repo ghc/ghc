@@ -1,6 +1,6 @@
-{-# LANGUAGE RankNTypes, TypeInType, TypeOperators, KindSignatures, ViewPatterns #-}
+{-# LANGUAGE RankNTypes, TypeOperators, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds, GADTs #-}
+{-# LANGUAGE DataKinds, PolyKinds, GADTs #-}
 
 module T12785b where
 
@@ -13,14 +13,14 @@ data HTree n a where
   Leaf :: HTree (S n) a
   Branch :: a -> HTree n (HTree (S n) a) -> HTree (S n) a
 
-data STree n :: forall a . (a -> *) -> HTree n a -> * where
+data STree n :: forall a . (a -> Type) -> HTree n a -> Type where
   SPoint :: f a -> STree Z f (Point a)
   SLeaf :: STree (S n) f Leaf
   SBranch :: f a -> STree n (STree (S n) f) stru -> STree (S n) f (a `Branch` stru)
   SBranchX :: (Payload (S n) (Payload n stru) ~ a)
           => f a -> STree n (STree (S n) f) stru -> STree (S n) f (a `Branch` stru)
 
-data Hidden :: Peano -> (a -> *) -> * where
+data Hidden :: Peano -> (a -> Type) -> Type where
   Hide :: STree n f s -> Hidden n f
 
 nest :: HTree m (Hidden (S m) f) -> Hidden m (STree ('S m) f)

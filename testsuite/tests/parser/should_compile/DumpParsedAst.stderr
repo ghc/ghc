@@ -80,77 +80,56 @@
                (HsParTy
                 (NoExt)
                 ({ DumpParsedAst.hs:8:11-16 }
-                 (HsAppsTy
+                 (HsOpTy
                   (NoExt)
-                  [({ DumpParsedAst.hs:8:11 }
-                    (HsAppPrefix
-                     (NoExt)
-                     ({ DumpParsedAst.hs:8:11 }
-                      (HsTyVar
-                       (NoExt)
-                       (NotPromoted)
-                       ({ DumpParsedAst.hs:8:11 }
-                        (Unqual
-                         {OccName: a}))))))
-                  ,({ DumpParsedAst.hs:8:13 }
-                    (HsAppInfix
-                     (NoExt)
-                     ({ DumpParsedAst.hs:8:13 }
-                      (Exact
-                       {Name: :}))))
-                  ,({ DumpParsedAst.hs:8:15-16 }
-                    (HsAppPrefix
-                     (NoExt)
-                     ({ DumpParsedAst.hs:8:15-16 }
-                      (HsTyVar
-                       (NoExt)
-                       (NotPromoted)
-                       ({ DumpParsedAst.hs:8:15-16 }
-                        (Unqual
-                         {OccName: as}))))))]))))]
-             (Prefix)
-             ({ DumpParsedAst.hs:8:21-36 }
-              (HsAppsTy
-               (NoExt)
-               [({ DumpParsedAst.hs:8:21-24 }
-                 (HsAppPrefix
-                  (NoExt)
-                  ({ DumpParsedAst.hs:8:21-24 }
+                  ({ DumpParsedAst.hs:8:11 }
                    (HsTyVar
                     (NoExt)
                     (NotPromoted)
-                    ({ DumpParsedAst.hs:8:21-24 }
+                    ({ DumpParsedAst.hs:8:11 }
                      (Unqual
-                      {OccName: Succ}))))))
-               ,({ DumpParsedAst.hs:8:26-36 }
-                 (HsAppPrefix
-                  (NoExt)
-                  ({ DumpParsedAst.hs:8:26-36 }
-                   (HsParTy
+                      {OccName: a}))))
+                  ({ DumpParsedAst.hs:8:13 }
+                   (Exact
+                    {Name: :}))
+                  ({ DumpParsedAst.hs:8:15-16 }
+                   (HsTyVar
                     (NoExt)
-                    ({ DumpParsedAst.hs:8:27-35 }
-                     (HsAppsTy
-                      (NoExt)
-                      [({ DumpParsedAst.hs:8:27-32 }
-                        (HsAppPrefix
-                         (NoExt)
-                         ({ DumpParsedAst.hs:8:27-32 }
-                          (HsTyVar
-                           (NoExt)
-                           (NotPromoted)
-                           ({ DumpParsedAst.hs:8:27-32 }
-                            (Unqual
-                             {OccName: Length}))))))
-                      ,({ DumpParsedAst.hs:8:34-35 }
-                        (HsAppPrefix
-                         (NoExt)
-                         ({ DumpParsedAst.hs:8:34-35 }
-                          (HsTyVar
-                           (NoExt)
-                           (NotPromoted)
-                           ({ DumpParsedAst.hs:8:34-35 }
-                            (Unqual
-                             {OccName: as}))))))]))))))])))))
+                    (NotPromoted)
+                    ({ DumpParsedAst.hs:8:15-16 }
+                     (Unqual
+                      {OccName: as}))))))))]
+             (Prefix)
+             ({ DumpParsedAst.hs:8:21-36 }
+              (HsAppTy
+               (NoExt)
+               ({ DumpParsedAst.hs:8:21-24 }
+                (HsTyVar
+                 (NoExt)
+                 (NotPromoted)
+                 ({ DumpParsedAst.hs:8:21-24 }
+                  (Unqual
+                   {OccName: Succ}))))
+               ({ DumpParsedAst.hs:8:26-36 }
+                (HsParTy
+                 (NoExt)
+                 ({ DumpParsedAst.hs:8:27-35 }
+                  (HsAppTy
+                   (NoExt)
+                   ({ DumpParsedAst.hs:8:27-32 }
+                    (HsTyVar
+                     (NoExt)
+                     (NotPromoted)
+                     ({ DumpParsedAst.hs:8:27-32 }
+                      (Unqual
+                       {OccName: Length}))))
+                   ({ DumpParsedAst.hs:8:34-35 }
+                    (HsTyVar
+                     (NoExt)
+                     (NotPromoted)
+                     ({ DumpParsedAst.hs:8:34-35 }
+                      (Unqual
+                       {OccName: as})))))))))))))
          ,({ DumpParsedAst.hs:9:3-24 }
            (HsIB
             (NoExt)

@@ -11,10 +11,10 @@
 module T12133 where
 
 import           GHC.Classes (IP(..))
-import           GHC.Exts (Constraint)
+import           Data.Kind (Constraint, Type)
 
 -- | From "Data.Constraint":
-data Dict :: Constraint -> * where Dict :: a => Dict a
+data Dict :: Constraint -> Type where Dict :: a => Dict a
 
 newtype a :- b = Sub (a => Dict b)
 

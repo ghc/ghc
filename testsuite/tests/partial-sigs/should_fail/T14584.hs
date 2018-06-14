@@ -17,9 +17,9 @@
 {-# Language FunctionalDependencies #-}
 {-# Language UndecidableSuperClasses #-}
 {-# Language UndecidableInstances #-}
-{-# Language TypeInType #-}
 {-# Language AllowAmbiguousTypes #-}
 {-# Language InstanceSigs, TypeApplications #-}
+
 
 module T14584 where
 

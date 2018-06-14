@@ -2,9 +2,11 @@
 
 module T3330c where
 
+import Data.Kind
+
 data (f :+: g) x = Inl (f x) | Inr (g x)
 
-data R :: (* -> *) -> * where
+data R :: (Type -> Type) -> Type where
   RSum  :: R f -> R g -> R (f :+: g)
 
 class Rep f where
@@ -13,7 +15,7 @@ class Rep f where
 instance (Rep f, Rep g) => Rep (f :+: g) where
   rep = RSum rep rep
 
-type family Der (f :: * -> *) :: * -> *
+type family Der (f :: Type -> Type) :: Type -> Type
 type instance Der (f :+: g) = Der f :+: Der g
 
 plug :: Rep f => Der f x -> x -> f x

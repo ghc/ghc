@@ -1,10 +1,10 @@
-{-# Language TypeInType #-}
 {-# Language TypeOperators, DataKinds, PolyKinds, GADTs #-}
+
 
 module T14555 where
 
 import Data.Kind
-import GHC.Types (TYPE)
+import GHC.Types (TYPE, Type)
 
 data Exp :: [TYPE rep] -> TYPE rep -> Type where
 --data Exp (x :: [TYPE rep]) (y :: TYPE rep) where

@@ -13,7 +13,7 @@ module RnEnv (
         lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
-        lookupTypeOccRn, lookupKindOccRn,
+        lookupTypeOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         lookupOccRn_overloaded, lookupGlobalOccRn_overloaded, lookupExactOcc,
 
@@ -824,20 +824,6 @@ lookupLocalOccRn rdr_name
            Just name -> return name
            Nothing   -> unboundName WL_LocalOnly rdr_name }
 
-lookupKindOccRn :: RdrName -> RnM Name
--- Looking up a name occurring in a kind
-lookupKindOccRn rdr_name
-  | isVarOcc (rdrNameOcc rdr_name)  -- See Note [Promoted variables in types]
-  = badVarInType rdr_name
-  | otherwise
-  = do { typeintype <- xoptM LangExt.TypeInType
-       ; if | typeintype           -> lookupTypeOccRn rdr_name
-      -- With -XNoTypeInType, treat any usage of * in kinds as in scope
-      -- this is a dirty hack, but then again so was the old * kind.
-            | isStar rdr_name     -> return starKindTyConName
-            | isUniStar rdr_name -> return unicodeStarKindTyConName
-            | otherwise            -> lookupOccRn rdr_name }
-
 -- lookupPromotedOccRn looks up an optionally promoted RdrName.
 lookupTypeOccRn :: RdrName -> RnM Name
 -- see Note [Demotion]
@@ -846,16 +832,18 @@ lookupTypeOccRn rdr_name
   = badVarInType rdr_name
   | otherwise
   = do { mb_name <- lookupOccRn_maybe rdr_name
-       ; case mb_name of {
-             Just name -> return name ;
-             Nothing   -> do { dflags <- getDynFlags
-                             ; lookup_demoted rdr_name dflags } } }
+       ; case mb_name of
+             Just name -> return name
+             Nothing   -> lookup_demoted rdr_name }
 
-lookup_demoted :: RdrName -> DynFlags -> RnM Name
-lookup_demoted rdr_name dflags
+lookup_demoted :: RdrName -> RnM Name
+lookup_demoted rdr_name
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
+       ; type_operators <- xoptM LangExt.TypeOperators
+       ; star_is_type <- xoptM LangExt.StarIsType
+       ; let star_info = starInfo (type_operators, star_is_type) rdr_name
        ; if data_kinds
             then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
                     ; case mb_demoted_name of
@@ -873,7 +861,7 @@ lookup_demoted rdr_name dflags
                       mb_demoted_name <- discardErrs $
                                          lookupOccRn_maybe demoted_rdr
                     ; let suggestion | isJust mb_demoted_name = suggest_dk
-                                     | otherwise              = star_info
+                                     | otherwise = star_info
                     ; unboundNameX WL_Any rdr_name suggestion } }
 
   | otherwise
@@ -888,17 +876,6 @@ lookup_demoted rdr_name dflags
            , quotes (char '\'' <> ppr name)
            , text "instead of"
            , quotes (ppr name) <> dot ]
-
-    star_info
-      | isStar rdr_name || isUniStar rdr_name
-      = if xopt LangExt.TypeInType dflags
-        then text "NB: With TypeInType, you must import" <+>
-             ppr rdr_name <+> text "from Data.Kind"
-        else empty
-
-      | otherwise
-      = empty
-
 
 badVarInType :: RdrName -> RnM Name
 badVarInType rdr_name

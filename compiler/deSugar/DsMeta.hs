@@ -288,10 +288,8 @@ and have Template Haskell turn it into this:
   idProxy :: forall k proxy (b :: k). proxy b -> proxy b
   idProxy x = x
 
-Notice that we explicitly quantified the variable `k`! This is quite bad, as the
-latter declaration requires -XTypeInType, while the former does not. Not to
-mention that the latter declaration isn't even what the user wrote in the
-first place.
+Notice that we explicitly quantified the variable `k`! The latter declaration
+isn't what the user wrote in the first place.
 
 Usually, the culprit behind these bugs is taking implicitly quantified type
 variables (often from the hsib_vars field of HsImplicitBinders) and putting
@@ -1128,6 +1126,7 @@ repTy (HsEqTy _ t1 t2) = do
                          t2' <- repLTy t2
                          eq  <- repTequality
                          repTapps eq [t1', t2']
+repTy (HsStarTy _ _) =  repTStar
 repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t
                                 k1 <- repLTy k

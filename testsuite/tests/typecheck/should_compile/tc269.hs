@@ -1,6 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 module Tc269 where
 
 import GHC.Types

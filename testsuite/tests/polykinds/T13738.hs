@@ -1,8 +1,8 @@
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+
 
 module T13738 where
 

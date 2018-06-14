@@ -13,7 +13,7 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 module T12648 where
 
-import GHC.Exts (Constraint)
+import Data.Kind (Type, Constraint)
 import Unsafe.Coerce (unsafeCoerce)
 
 type family Skolem (p :: k -> Constraint) :: k
@@ -25,7 +25,7 @@ instance p (Skolem p) => Forall_ (p :: k -> Constraint)
 inst :: forall p a. Forall p :- p a
 inst = unsafeCoerce (Sub Dict :: Forall p :- p (Skolem p))
 
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 newtype a :- b = Sub (a => Dict b)
@@ -40,7 +40,7 @@ class (Applicative b, Applicative m, Monad b, Monad m) => MonadBase b m | m -> b
 instance MonadBase IO IO -- where liftBase = id
 
 class MonadBase b m => MonadBaseControl b m | m -> b where
-  type StM m a :: *
+  type StM m a :: Type
   liftBaseWith :: (RunInBase m b -> b a) -> m a
 
 type RunInBase m b = forall a. m a -> b (StM m a)

@@ -6,9 +6,11 @@
 {-# LANGUAGE ViewPatterns #-}
 module T13768 where
 
-data NS (f :: k -> *) (xs :: [k]) = NS Int
+import Data.Kind (Type)
 
-data IsNS (f :: k -> *) (xs :: [k]) where
+data NS (f :: k -> Type) (xs :: [k]) = NS Int
+
+data IsNS (f :: k -> Type) (xs :: [k]) where
   IsZ :: f x -> IsNS f (x ': xs)
   IsS :: NS f xs -> IsNS f (x ': xs)
 
@@ -23,7 +25,7 @@ pattern S p <- (isNS -> IsS p)
 
 {-# COMPLETE Z, S #-}
 
-data SList :: [k] -> * where
+data SList :: [k] -> Type where
   SNil  :: SList '[]
   SCons :: SList (x ': xs)
 

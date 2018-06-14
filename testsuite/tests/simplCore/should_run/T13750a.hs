@@ -6,14 +6,15 @@
 {-# LANGUAGE ViewPatterns #-}
 module T13750a where
 
+import Data.Kind (Type)
 import Unsafe.Coerce
 
-type family AnyT :: * where {}
-type family AnyList :: [*] where {}
+type family AnyT :: Type where {}
+type family AnyList :: [Type] where {}
 
-newtype NP (xs :: [*]) = NP [AnyT]
+newtype NP (xs :: [Type]) = NP [AnyT]
 
-data IsNP (xs :: [*]) where
+data IsNP (xs :: [Type]) where
   IsNil  :: IsNP '[]
   IsCons :: x -> NP xs -> IsNP (x ': xs)
 
@@ -34,9 +35,9 @@ pattern x :* xs <- (isNP -> IsCons x xs)
     x :* NP xs = NP (unsafeCoerce x : xs)
 infixr 5 :*
 
-data NS (xs :: [[*]]) = NS !Int (NP AnyList)
+data NS (xs :: [[Type]]) = NS !Int (NP AnyList)
 
-data IsNS (xs :: [[*]]) where
+data IsNS (xs :: [[Type]]) where
   IsZ :: NP x -> IsNS (x ': xs)
   IsS :: NS xs -> IsNS (x ': xs)
 

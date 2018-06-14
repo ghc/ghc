@@ -1,5 +1,5 @@
 
-T2544.hs:17:12: error:
+T2544.hs:19:12: error:
     • Couldn't match type ‘IxMap r’ with ‘IxMap i1’
       Expected type: IxMap (l :|: r) [Int]
         Actual type: BiApp (IxMap l) (IxMap i1) [Int]
@@ -9,9 +9,9 @@ T2544.hs:17:12: error:
       In an equation for ‘empty’: empty = BiApp empty empty
       In the instance declaration for ‘Ix (l :|: r)’
     • Relevant bindings include
-        empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
+        empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:19:4)
 
-T2544.hs:17:18: error:
+T2544.hs:19:18: error:
     • Couldn't match type ‘IxMap i0’ with ‘IxMap l’
       Expected type: IxMap l [Int]
         Actual type: IxMap i0 [Int]
@@ -21,4 +21,4 @@ T2544.hs:17:18: error:
       In the expression: BiApp empty empty
       In an equation for ‘empty’: empty = BiApp empty empty
     • Relevant bindings include
-        empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:17:4)
+        empty :: IxMap (l :|: r) [Int] (bound at T2544.hs:19:4)

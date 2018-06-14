@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, TypeInType, GADTs #-}
+{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds, GADTs #-}
 
 module Dep3 where
 

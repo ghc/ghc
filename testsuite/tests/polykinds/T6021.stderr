@@ -1,4 +1,0 @@
-
-T6021.hs:5:22: error:
-    Variable ‘b’ used as both a kind and a type
-    Did you intend to use TypeInType?

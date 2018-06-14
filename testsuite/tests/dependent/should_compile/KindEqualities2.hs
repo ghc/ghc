@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, PolyKinds, TypeFamilies, ExplicitForAll,
-             TemplateHaskell, UndecidableInstances, ScopedTypeVariables,
-             TypeInType #-}
+             TemplateHaskell, UndecidableInstances, ScopedTypeVariables #-}
 
 module KindEqualities2 where
 

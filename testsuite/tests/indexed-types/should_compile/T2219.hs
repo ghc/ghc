@@ -2,6 +2,8 @@
 
 module Test where
 
+import Data.Kind (Type)
+
 data Zero
 data Succ a
 
@@ -15,7 +17,7 @@ data Fin n fn where
 data Nil
 data a ::: b
 
-type family Lookup ts fn :: *
+type family Lookup ts fn :: Type
 type instance Lookup (t ::: ts) FZ = t
 type instance Lookup (t ::: ts) (FS fn) = Lookup ts fn
 

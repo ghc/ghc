@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, ScopedTypeVariables, TypeOperators, GADTs #-}
+{-# LANGUAGE PolyKinds, ScopedTypeVariables, TypeOperators, GADTs #-}
 {-# OPTIONS_GHC -Wno-overlapping-patterns #-}  -- don't want erroneous warning in test output
                                                -- if removing this doesn't change output, then
                                                -- remove it!

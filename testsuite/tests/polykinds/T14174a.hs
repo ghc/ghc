@@ -1,14 +1,15 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 module T14174a where
 
 import Data.Kind
 
-data TyFun :: * -> * -> *
-type a ~> b = TyFun a b -> *
+data TyFun :: Type -> Type -> Type
+type a ~> b = TyFun a b -> Type
 infixr 0 ~>
 
 type family Apply (f :: k1 ~> k2) (x :: k1) :: k2

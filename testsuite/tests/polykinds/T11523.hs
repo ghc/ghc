@@ -15,7 +15,6 @@
 {-# language FunctionalDependencies #-}
 {-# language UndecidableSuperClasses #-}
 {-# language UndecidableInstances #-}
-{-# language TypeInType #-}
 
 module T11523 where
 

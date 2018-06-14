@@ -91,9 +91,8 @@ module TysWiredIn (
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        starKindTyCon, starKindTyConName,
-        unicodeStarKindTyCon, unicodeStarKindTyConName,
         liftedTypeKindTyCon, constraintKindTyCon,
+        liftedTypeKindTyConName,
 
         -- * Equality predicates
         heqTyCon, heqClass, heqDataCon,
@@ -224,8 +223,6 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
-                , starKindTyCon
-                , unicodeStarKindTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -389,11 +386,8 @@ typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol")
 constraintKindTyConName :: Name
 constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
 
-liftedTypeKindTyConName, starKindTyConName, unicodeStarKindTyConName
-  :: Name
+liftedTypeKindTyConName :: Name
 liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") liftedTypeKindTyConKey liftedTypeKindTyCon
-starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKindTyConKey starKindTyCon
-unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
 
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
@@ -1063,22 +1057,10 @@ mk_class tycon sc_pred sc_sel_id
 runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
-liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
-
 -- Type synonyms; see Note [TYPE and RuntimeRep] in TysPrim
 -- type Type = tYPE 'LiftedRep
--- type *    = tYPE 'LiftedRep
--- type *    = tYPE 'LiftedRep  -- Unicode variant
-
+liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
-
-starKindTyCon         = buildSynTyCon starKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
-
-unicodeStarKindTyCon  = buildSynTyCon unicodeStarKindTyConName
                                        [] liftedTypeKind []
                                        (tYPE liftedRepTy)
 

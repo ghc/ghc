@@ -21,6 +21,7 @@
 module T12734a where
 
 import Prelude
+import Data.Kind
 import Control.Applicative
 import Control.Monad.Fix
 import Control.Monad.Trans.Identity
@@ -31,12 +32,12 @@ import Control.Monad.IO.Class
 data A
 data B
 data Net
-data Type
+data Ty
 
 data Layer4 t l
 data TermStore
 
-data Stack lrs (t :: * -> *) where
+data Stack lrs (t :: Type -> Type) where
     SLayer :: t l -> Stack ls t -> Stack (l ': ls) t
     SNull  :: Stack '[] t
 
@@ -44,7 +45,7 @@ instance ( Con m (t l)
          , Con m (Stack ls t)) => Con m (Stack (l ': ls) t)
 instance Monad m               => Con m (Stack '[]       t)
 instance ( expr ~ Expr t lrs
-         , Con m (TStk t lrs)) => Con m (Layer4 expr Type)
+         , Con m (TStk t lrs)) => Con m (Layer4 expr Ty)
 
 
 newtype Expr  t lrs    = Expr (TStk t lrs)
@@ -63,18 +64,18 @@ test_gr :: forall m t lrs bind.
 test_gr = undefined
 
 
-newtype KT (cls :: *) (t :: k) (m :: * -> *) (a :: *)
+newtype KT (cls :: Type) (t :: k) (m :: Type -> Type) (a :: Type)
    = KT (IdentityT m a)
 
-test_ghc_err :: KT A '[Type] IO (Expr Net '[Type])
+test_ghc_err :: KT A '[Ty] IO (Expr Net '[Ty])
 
-test_ghc_err = test_gr @(KT A '[Type] IO) @_ @'[Type] @(Expr Net '[Type])
+test_ghc_err = test_gr @(KT A '[Ty] IO) @_ @'[Ty] @(Expr Net '[Ty])
 
 {-  Works!
-test_ghc_err = test_gr @(KT A '[Type] IO)
+test_ghc_err = test_gr @(KT A '[Ty] IO)
                        @Net
-                       @'[Type]
-                       @(Expr Net '[Type])
+                       @'[Ty]
+                       @(Expr Net '[Ty])
 -}
 
 {-  Some notes.  See comment:10 on Trac #12734
@@ -82,22 +83,22 @@ test_ghc_err = test_gr @(KT A '[Type] IO)
 [W] Con m (TStk t lrs)
 [W] Inferable A lrs m
 [W] bind ~ Expr t lrs
-[W] m bind ~ KT A '[Type] IO (Expr Net '[Type])
+[W] m bind ~ KT A '[Ty] IO (Expr Net '[Ty])
 
-==> m := KT A '[Type] IO
-    bind := Expr Net '[Type]
+==> m := KT A '[Ty] IO
+    bind := Expr Net '[Ty]
     t := Net
-    lrs := '[Type]
+    lrs := '[Ty]
 
 [W] Con m (TStk t lrs)
   = Con m (Stack lrs (Layer4 bind))
 --> inline lrs
-[W] Con m (Stack '[Type] (Layer4 bind))
+[W] Con m (Stack '[Ty] (Layer4 bind))
 --> instance
 [W] Con m (Stack '[] bind)
     --> Monad m
 +
-[W] Con m (Layer4 bind Type)
+[W] Con m (Layer4 bind Ty)
 -->
 [W] bind ~ Expr t0 lrs0
 [W] Con m (TStk t0 lrs0)

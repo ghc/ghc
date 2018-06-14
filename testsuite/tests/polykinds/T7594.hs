@@ -10,9 +10,11 @@
 
 module T7594 where
 
-import GHC.Exts (Constraint)
+import Data.Kind (Constraint, Type)
 
-class    (c1 t, c2 t) => (:&:) (c1 :: * -> Constraint) (c2 :: * -> Constraint) (t :: *)
+class    (c1 t, c2 t) => (:&:) (c1 :: Type -> Constraint)
+                               (c2 :: Type -> Constraint)
+                               (t :: Type)
 instance (c1 t, c2 t) => (:&:) c1 c2 t
 
 data ColD c where

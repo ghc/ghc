@@ -1,5 +1,5 @@
 
-readFail036.hs:4:16:
-    Illegal kind signature: ‘*’
+readFail036.hs:5:16: error:
+    Illegal kind signature: ‘Type’
       Perhaps you intended to use KindSignatures
     In the data type declaration for ‘Foo’

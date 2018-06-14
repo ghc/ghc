@@ -17,14 +17,15 @@
 import GHC.Generics
 import Data.Data
 import Data.Proxy
+import Data.Kind
 
-type family FirstSelector (f :: * -> *) :: Meta
+type family FirstSelector (f :: Type -> Type) :: Meta
 type instance FirstSelector (M1 D x f) = FirstSelector f
 type instance FirstSelector (M1 C x f) = FirstSelector f
 type instance FirstSelector (a :*: b)  = FirstSelector a
 type instance FirstSelector (M1 S s f) = s
 
-data SelectorProxy (s :: Meta) (f :: * -> *) a = SelectorProxy
+data SelectorProxy (s :: Meta) (f :: Type -> Type) a = SelectorProxy
 type SelectorProxy' (s :: Meta) = SelectorProxy s Proxy ()
 
 -- Extract the first selector name using GHC.Generics

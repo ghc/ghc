@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeApplications, ScopedTypeVariables, GADTs, RankNTypes, TypeInType, KindSignatures #-}
+{-# LANGUAGE TypeApplications, ScopedTypeVariables, GADTs, RankNTypes,
+             PolyKinds, KindSignatures #-}
 {-# OPTIONS_GHC -O2 #-} -- We are provoking a bug in SpecConstr
 
 module T14270a where

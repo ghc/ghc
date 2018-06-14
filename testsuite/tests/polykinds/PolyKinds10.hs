@@ -9,6 +9,7 @@
 
 module Main where
 
+import Data.Kind
 
 -- Type-level peano naturals (value-level too, but we don't use those)
 data Nat = Ze | Su Nat
@@ -18,15 +19,15 @@ type T1 = Su T0
 type T2 = Su T1
 
 -- (!) at the type level
-type family El (n :: Nat) (l :: [*]) :: *
+type family El (n :: Nat) (l :: [Type]) :: Type
 type instance El Ze     (h ': t) = h
 type instance El (Su n) (h ': t) = El n t
 
 {-
 -- The following might be useful, but are not used at the moment
 -- ($) at the type level (well, not quite ($), in fact...)
-class Apply (fs :: [*]) (es :: [*]) where
-  type ApplyT (fs :: [*]) (es :: [*]) :: [*]
+class Apply (fs :: [Type]) (es :: [Type]) where
+  type ApplyT (fs :: [Type]) (es :: [Type]) :: [Type]
   apply :: ListV fs -> ListV es -> ListV (ApplyT fs es)
 
 instance Apply '[] '[] where
@@ -39,11 +40,11 @@ instance (Apply fs es) => Apply ((e1 -> e2) ': fs) (e1 ': es) where
 -}
 
 -- Value mirror for the list kind
-data ListV :: [*] -> * where
+data ListV :: [Type] -> Type where
   NilV  :: ListV '[]
   ConsV :: a -> ListV t -> ListV (a ': t)
   
-data ListV2 :: [[*]] -> * where
+data ListV2 :: [[Type]] -> Type where
   NilV2  :: ListV2 '[]
   ConsV2 :: ListV a -> ListV2 t -> ListV2 (a ': t)
   
@@ -53,26 +54,26 @@ listv1 = ConsV 3 NilV
 listv2 :: ListV2 ((Int ': '[]) ': '[])
 listv2 = ConsV2 listv1 NilV2
 
---data ListVX :: Maybe -> * where
+--data ListVX :: Maybe -> Type where
 
-data TripleV :: (*, * -> *, *) -> * where
+data TripleV :: (Type, Type -> Type, Type) -> Type where
   TripleV :: a -> c -> TripleV '(a, [], c)
 
 -- Value mirror for the Nat kind
-data NatV :: Nat -> * where
+data NatV :: Nat -> Type where
   ZeW :: NatV Ze
   SuW :: NatV n -> NatV (Su n)
 
 -- Generic universe
 data MultiP x = UNIT
-              | KK x -- wish I could just write * instead of x
+              | KK x -- wish I could just write Type instead of x
               | SUM  (MultiP x) (MultiP x)
               | PROD (MultiP x) (MultiP x)
               | PAR Nat
               | REC
 
 -- Universe interpretation
-data Interprt :: MultiP * -> [*] -> * -> * where
+data Interprt :: MultiP Type -> [Type] -> Type -> Type where
   Unit  :: Interprt UNIT lp r
   K     :: x -> Interprt (KK x) lp r
   L     :: Interprt a lp r -> Interprt (SUM a b) lp r
@@ -83,13 +84,13 @@ data Interprt :: MultiP * -> [*] -> * -> * where
 
 -- Embedding values into the universe
 class Generic a where
-  type Rep a :: MultiP *
-  type Es a  :: [*]
+  type Rep a :: MultiP Type
+  type Es a  :: [Type]
   from :: a -> Interprt (Rep a) (Es a) a
   to   :: Interprt (Rep a) (Es a) a -> a
 
 -- Parameter map over the universe
-class PMap (rep :: MultiP *) where
+class PMap (rep :: MultiP Type) where
   pmap :: (forall n. NatV n -> El n lp1 -> El n lp2)
        -> (r -> s) -> Interprt rep lp1 r -> Interprt rep lp2 s
 

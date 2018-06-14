@@ -3,6 +3,7 @@
 
 module Main where
 
+import Data.Kind
 import GHC.Exts
 import GHC.Generics hiding (C, D)
 import GEq1A
@@ -18,14 +19,14 @@ data D a = D0 | D1 { d11 :: a, d12 :: (D a) }
 data (:**:) a b = a :**: b
   deriving Generic
 
-data family F a b :: * -> *
+data family F a b :: Type -> Type
 data instance F Int b c = F b Int c
   deriving Generic
 
 data U a = U a Addr# Char# Double# Float# Int# Word#
   deriving Generic
 
-data family UF a b :: * -> *
+data family UF a b :: Type -> Type
 data instance UF Int b c = UF b c Addr# Char# Double# Float# Int# Word#
   deriving Generic
 

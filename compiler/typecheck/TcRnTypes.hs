@@ -1106,8 +1106,6 @@ data PromotionErr
                      -- See Note [Recursion and promoting data constructors] in TcTyClsDecls
   | NoDataKindsTC    -- -XDataKinds not enabled (for a tycon)
   | NoDataKindsDC    -- -XDataKinds not enabled (for a datacon)
-  | NoTypeInTypeTC   -- -XTypeInType not enabled (for a tycon)
-  | NoTypeInTypeDC   -- -XTypeInType not enabled (for a datacon)
 
 instance Outputable TcTyThing where     -- Debugging only
    ppr (AGlobal g)      = ppr g
@@ -1260,8 +1258,6 @@ instance Outputable PromotionErr where
   ppr RecDataConPE   = text "RecDataConPE"
   ppr NoDataKindsTC  = text "NoDataKindsTC"
   ppr NoDataKindsDC  = text "NoDataKindsDC"
-  ppr NoTypeInTypeTC = text "NoTypeInTypeTC"
-  ppr NoTypeInTypeDC = text "NoTypeInTypeDC"
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
@@ -1279,8 +1275,6 @@ pprPECategory FamDataConPE   = text "Data constructor"
 pprPECategory RecDataConPE   = text "Data constructor"
 pprPECategory NoDataKindsTC  = text "Type constructor"
 pprPECategory NoDataKindsDC  = text "Data constructor"
-pprPECategory NoTypeInTypeTC = text "Type constructor"
-pprPECategory NoTypeInTypeDC = text "Data constructor"
 
 {-
 ************************************************************************

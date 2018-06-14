@@ -2,7 +2,6 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeInType #-}
 
 module T11524 where
 

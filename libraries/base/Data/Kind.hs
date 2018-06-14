@@ -14,6 +14,6 @@
 -- @since 4.9.0.0
 -----------------------------------------------------------------------------
 
-module Data.Kind ( Type, Constraint, type (*), type (★) ) where
+module Data.Kind ( Type, Constraint ) where
 
 import GHC.Types

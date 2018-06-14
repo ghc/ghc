@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, TypeFamilies, UndecidableInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- The "tricky case" in #11391

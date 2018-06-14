@@ -21,25 +21,25 @@
 
 module T11480b where
 
-import GHC.Types (Constraint)
+import Data.Kind (Constraint, Type)
 import Data.Type.Equality as Equality
 import Data.Type.Coercion as Coercion
 import qualified Prelude
 import Prelude (Either(..))
 
-newtype Y (p :: i -> j -> *) (a :: j) (b :: i) = Y { getY :: p b a }
+newtype Y (p :: i -> j -> Type) (a :: j) (b :: i) = Y { getY :: p b a }
 
-type family Op (p :: i -> j -> *) :: j -> i -> * where
+type family Op (p :: i -> j -> Type) :: j -> i -> Type where
   Op (Y p) = p
   Op p = Y p
 
-class Vacuous (p :: i -> i -> *) (a :: i)
+class Vacuous (p :: i -> i -> Type) (a :: i)
 instance Vacuous p a
 
 data Dict (p :: Constraint) where
   Dict :: p => Dict p
 
-class Functor (Op p) (Nat p (->)) p => Category (p :: i -> i -> *) where
+class Functor (Op p) (Nat p (->)) p => Category (p :: i -> i -> Type) where
   type Ob p :: i -> Constraint
   type Ob p = Vacuous p
 
@@ -62,11 +62,16 @@ class Functor (Op p) (Nat p (->)) p => Category (p :: i -> i -> *) where
   default unop :: Op p ~ Y p => Op p b a -> p a b
   unop = getY
 
-class (Category p, Category q) => Functor (p :: i -> i -> *) (q :: j -> j -> *) (f :: i -> j) | f -> p q where
+class (Category p, Category q) =>
+      Functor (p :: i -> i -> Type)
+              (q :: j -> j -> Type)
+              (f :: i -> j) | f -> p q where
   fmap :: p a b -> q (f a) (f b)
 
-data Nat (p :: i -> i -> *) (q :: j -> j -> *) (f :: i -> j) (g :: i -> j) where
-  Nat :: (Functor p q f, Functor p q g) => { runNat :: forall a. Ob p a => q (f a) (g a) } -> Nat p q f g
+data Nat (p :: i -> i -> Type)
+         (q :: j -> j -> Type) (f :: i -> j) (g :: i -> j) where
+  Nat :: (Functor p q f, Functor p q g) =>
+         { runNat :: forall a. Ob p a => q (f a) (g a) } -> Nat p q f g
 
 instance (Category p, Category q) => Category (Nat p q) where
   type Ob (Nat p q) = Functor p q
@@ -80,7 +85,8 @@ instance (Category p, Category q) => Category (Nat p q) where
 ob :: forall p q f a. Functor p q f => Ob p a :- Ob q (f a)
 ob = Sub (case source (fmap (id :: p a a) :: q (f a) (f a)) of Dict -> Dict)
 
-instance (Category p, Category q) => Functor (Y (Nat p q)) (Nat (Nat p q) (->)) (Nat p q) where
+instance (Category p, Category q) =>
+         Functor (Y (Nat p q)) (Nat (Nat p q) (->)) (Nat p q) where
   fmap (Y f) = Nat (. f)
 
 instance (Category p, Category q) => Functor (Nat p q) (->) (Nat p q f) where

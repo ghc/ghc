@@ -7,7 +7,7 @@ Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
 {-#  LANGUAGE RankNTypes, PolyKinds, TypeOperators,
              ScopedTypeVariables, GADTs, FlexibleInstances,
              UndecidableInstances, RebindableSyntax,
-             DataKinds, MagicHash, AutoDeriveTypeable, TypeInType  #-}
+             DataKinds, MagicHash, AutoDeriveTypeable #-}
 {-# OPTIONS_GHC -Wno-missing-methods -Wno-redundant-constraints #-}
 {-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
   -- Because we define a local Typeable class and have
@@ -127,7 +127,7 @@ gcast x = do  Refl <- eqT  (typeRep :: TypeRep a)
                            (typeRep :: TypeRep b)
               return x
 
-data SameKind :: k -> k -> *
+data SameKind :: k -> k -> Type
 type CheckAppResult = SameKind AppResult AppResultNoKind
   --  not the most thorough check
 foo :: AppResult x -> AppResultNoKind x
@@ -170,17 +170,20 @@ dynFst :: Dynamic -> Maybe Dynamic
 dynFst (Dyn (rpab :: TypeRep pab) (x :: pab))
 
   = do  App (rpa  :: TypeRep pa ) (rb :: TypeRep b)  <- splitApp rpab
-            --  introduces kind |k2|, and types |pa :: k2 -> *|, |b :: k2|
+            --  introduces kind |k2|, and types |pa :: k2 -> Type|, |b :: k2|
 
         App (rp   :: TypeRep p  ) (ra :: TypeRep a)  <- splitApp rpa
-            --  introduces kind |k1|, and types |p :: k1 -> k2 -> *|, |a :: k1|
+            --  introduces kind |k1|, and types |p :: k1 -> k2 -> Type|,
+            --                                  |a :: k1|
 
         Refl       <- eqT rp (typeRep :: TypeRep (,))
-            --  introduces |p ~ (,)| and |(k1 -> k2 -> *) ~ (* -> * -> *)|
+            --  introduces |p ~ (,)| and
+            --             |(k1 -> k2 -> Type) ~ (Type -> Type -> Type)|
 
         return (Dyn ra (fst x))
 
-eqT :: forall k1 k2 (a :: k1) (b :: k2). TypeRep a -> TypeRep b -> Maybe (a :~: b)
+eqT :: forall k1 k2 (a :: k1) (b :: k2).
+       TypeRep a -> TypeRep b -> Maybe (a :~: b)
 
 data (a :: k1) :~: (b :: k2) where
   Refl :: forall k (a :: k). a :~: a
@@ -201,11 +204,13 @@ data SomeTypeRep where
 
 type TyMapLessTyped = Map SomeTypeRep Dynamic
 
-insertLessTyped    ::  forall a. Typeable a => a -> TyMapLessTyped -> TyMapLessTyped
-insertLessTyped x  =   Map.insert (SomeTypeRep (typeRep :: TypeRep a)) (toDynamic x)
+insertLessTyped :: forall a. Typeable a => a -> TyMapLessTyped -> TyMapLessTyped
+insertLessTyped x
+  = Map.insert (SomeTypeRep (typeRep :: TypeRep a)) (toDynamic x)
 
-lookupLessTyped  ::  forall a. Typeable a => TyMapLessTyped -> Maybe a
-lookupLessTyped  =   fromDynamic <=< Map.lookup (SomeTypeRep (typeRep :: TypeRep a))
+lookupLessTyped :: forall a. Typeable a => TyMapLessTyped -> Maybe a
+lookupLessTyped
+  = fromDynamic <=< Map.lookup (SomeTypeRep (typeRep :: TypeRep a))
 
 instance Ord SomeTypeRep where
   compare (SomeTypeRep tr1) (SomeTypeRep tr2) = compareTypeRep tr1 tr2
@@ -329,7 +334,7 @@ dynApplyOld (DynOld trf f) (DynOld trx x) =
 data DynamicClosed where
   DynClosed :: TypeRepClosed a -> a -> DynamicClosed
 
-data TypeRepClosed (a :: *) where
+data TypeRepClosed (a :: Type) where
   TBool  :: TypeRepClosed Bool
   TFun   :: TypeRepClosed a -> TypeRepClosed b -> TypeRepClosed (a -> b)
   TProd  :: TypeRepClosed a -> TypeRepClosed b -> TypeRepClosed (a, b)

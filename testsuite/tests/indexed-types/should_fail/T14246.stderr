@@ -18,7 +18,7 @@ T14246.hs:22:67: error:
       In the type ‘Reveal (f t) l’
       In the type family declaration for ‘Reveal’
 
-T14246.hs:23:21: error:
+T14246.hs:23:24: error:
     • Expected kind ‘Vect (KLN a) L’, but ‘Nil’ has kind ‘Vect 'Z L’
     • In the second argument of ‘Reveal’, namely ‘Nil’
       In the type family declaration for ‘Reveal’

@@ -3,9 +3,11 @@
 
 module T6035 where
 
+import Data.Kind (Type)
+
 data Nat = Zero | Succ Nat
 
-type family Sing (a :: k) :: k -> *
+type family Sing (a :: k) :: k -> Type
 
 data SNat n where
   SZero :: SNat Zero

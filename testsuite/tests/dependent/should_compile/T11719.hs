@@ -1,12 +1,12 @@
-{-# LANGUAGE RankNTypes, TypeFamilies, TypeInType, TypeOperators,
+{-# LANGUAGE RankNTypes, TypeFamilies, TypeOperators, DataKinds, PolyKinds,
              UndecidableInstances #-}
 
 module T11719 where
 
 import Data.Kind
 
-data TyFun :: * -> * -> *
-type a ~> b = TyFun a b -> *
+data TyFun :: Type -> Type -> Type
+type a ~> b = TyFun a b -> Type
 
 type family (f :: a ~> b) @@ (x :: a) :: b
 

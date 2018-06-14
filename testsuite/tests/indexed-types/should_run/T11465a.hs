@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeInType #-}
 
 import GHC.Exts
 import GHC.Types

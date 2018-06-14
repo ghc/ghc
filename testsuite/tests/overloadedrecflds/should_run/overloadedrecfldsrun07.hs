@@ -1,10 +1,10 @@
 {-# LANGUAGE DataKinds
+           , PolyKinds
            , FlexibleContexts
            , FlexibleInstances
            , GADTs
            , MultiParamTypeClasses
            , OverloadedLabels
-           , TypeInType
            , ScopedTypeVariables
            , TypeApplications
            , TypeOperators
@@ -13,13 +13,13 @@
 
 import GHC.OverloadedLabels
 import GHC.Records
-import GHC.TypeLits hiding (type (*))
+import GHC.TypeLits
 import Data.Kind
 
 data Label (x :: Symbol) = Label
 data Labelled x a = Label x := a
 
-data Rec :: forall k. [(k, *)] -> * where
+data Rec :: forall k. [(k, Type)] -> Type where
   Nil  :: Rec '[]
   (:>) :: Labelled x a -> Rec xs -> Rec ('(x, a) ': xs)
 infixr 5 :>

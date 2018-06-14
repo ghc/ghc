@@ -2,6 +2,8 @@
 
 module T4174 where
 
+import Data.Kind (Type)
+
 data True
 data False
 
@@ -10,17 +12,17 @@ data Minor1
 data GHC6'8 m
 data GHC6'10 m
 
-type family a :<=: b :: {-Bool-}*
+type family a :<=: b :: {-Bool-} Type
 type instance GHC6'10 m1 :<=: GHC6'8 m2 = False
 
 type a :>=: b = b :<=: a
 
 data Way ghcVersion tablesNextToCode profiling threaded
 
-type family GHCVersion way :: {-GHCVersion-} *
+type family GHCVersion way :: {-GHCVersion-} Type
 type instance GHCVersion (Way v n p t) = v
 
-type family Threaded way :: {-Bool-} *
+type family Threaded way :: {-Bool-} Type
 type instance Threaded (Way v n p t) = t
 
 data Field w s t
@@ -30,7 +32,7 @@ data RtsSpinLock
 field :: String -> m (Field w a b)
 field = undefined
 
-type family WayOf (m :: * -> *) :: *
+type family WayOf (m :: Type -> Type) :: Type
 
 sync_large_objects :: (Monad m, 
                        (GHCVersion (WayOf m) :>=: GHC6'10 Minor1) ~ True, 

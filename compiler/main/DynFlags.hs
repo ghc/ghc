@@ -36,6 +36,7 @@ module DynFlags (
         xopt, xopt_set, xopt_unset,
         lang_set,
         useUnicodeSyntax,
+        useStarIsType,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
         dynamicTooMkDynamicDynFlags,
@@ -804,6 +805,7 @@ data WarningFlag =
    | Opt_WarnPartialFields                -- Since 8.4
    | Opt_WarnMissingExportList
    | Opt_WarnInaccessibleCode
+   | Opt_WarnStarIsType                   -- Since 8.6
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -2102,6 +2104,8 @@ languageExtensions Nothing
 
 languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
+       -- See Note [When is StarIsType enabled]
+       LangExt.StarIsType,
        LangExt.MonomorphismRestriction,
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
@@ -2116,6 +2120,8 @@ languageExtensions (Just Haskell98)
 
 languageExtensions (Just Haskell2010)
     = [LangExt.ImplicitPrelude,
+       -- See Note [When is StarIsType enabled]
+       LangExt.StarIsType,
        LangExt.MonomorphismRestriction,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
@@ -2249,6 +2255,9 @@ lang_set dflags lang =
 -- of this function.
 useUnicodeSyntax :: DynFlags -> Bool
 useUnicodeSyntax = gopt Opt_PrintUnicodeSyntax
+
+useStarIsType :: DynFlags -> Bool
+useStarIsType = xopt LangExt.StarIsType
 
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
@@ -3835,6 +3844,7 @@ wWarningFlagsDeps = [
   flagSpec "simplifiable-class-constraints" Opt_WarnSimplifiableClassConstraints,
   flagSpec "missing-home-modules"        Opt_WarnMissingHomeModules,
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
+  flagSpec "star-is-type"                Opt_WarnStarIsType,
   flagSpec "partial-fields"              Opt_WarnPartialFields ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -4204,6 +4214,7 @@ xFlagsDeps = [
   flagSpec "RoleAnnotations"                  LangExt.RoleAnnotations,
   flagSpec "ScopedTypeVariables"              LangExt.ScopedTypeVariables,
   flagSpec "StandaloneDeriving"               LangExt.StandaloneDeriving,
+  flagSpec "StarIsType"                       LangExt.StarIsType,
   flagSpec "StaticPointers"                   LangExt.StaticPointers,
   flagSpec "Strict"                           LangExt.Strict,
   flagSpec "StrictData"                       LangExt.StrictData,
@@ -4330,9 +4341,12 @@ impliedXFlags
 
     , (LangExt.TypeFamilies,     turnOn, LangExt.KindSignatures)  -- Type families use kind signatures
     , (LangExt.PolyKinds,        turnOn, LangExt.KindSignatures)  -- Ditto polymorphic kinds
+
+    -- TypeInType is now just a synonym for a couple of other extensions.
     , (LangExt.TypeInType,       turnOn, LangExt.DataKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
+    , (LangExt.TypeInType,       turnOff, LangExt.StarIsType)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
     , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
@@ -4343,6 +4357,9 @@ impliedXFlags
     , (LangExt.TypeOperators, turnOn, LangExt.ExplicitNamespaces)
 
     , (LangExt.ImpredicativeTypes,  turnOn, LangExt.RankNTypes)
+
+    -- See Note [When is StarIsType enabled]
+    , (LangExt.TypeOperators, turnOff, LangExt.StarIsType)
 
         -- Record wild-cards implies field disambiguation
         -- Otherwise if you write (C {..}) you may well get
@@ -4363,6 +4380,20 @@ impliedXFlags
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
   ]
+
+-- Note [When is StarIsType enabled]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The StarIsType extension determines whether to treat '*' as a regular type
+-- operator or as a synonym for 'Data.Kind.Type'. Many existing pre-TypeInType
+-- programs expect '*' to be synonymous with 'Type', so by default StarIsType is
+-- enabled.
+--
+-- However, programs that use TypeOperators might expect to repurpose '*' for
+-- multiplication or another binary operation, so we make TypeOperators imply
+-- NoStarIsType.
+--
+-- It is still possible to have TypeOperators and StarIsType enabled at the same
+-- time, although it's not recommended.
 
 -- Note [Documenting optimisation flags]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

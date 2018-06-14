@@ -6,7 +6,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds, PolyKinds #-}
 {-# LANGUAGE TypeOperators #-}
 module T13877 where
 
@@ -17,8 +17,8 @@ data instance Sing (z :: [a]) where
   SNil  :: Sing '[]
   SCons :: Sing x -> Sing xs -> Sing (x:xs)
 
-data TyFun :: * -> * -> *
-type a ~> b = TyFun a b -> *
+data TyFun :: Type -> Type -> Type
+type a ~> b = TyFun a b -> Type
 infixr 0 ~>
 
 type family Apply (f :: k1 ~> k2) (x :: k1) :: k2

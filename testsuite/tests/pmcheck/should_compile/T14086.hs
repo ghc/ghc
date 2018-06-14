@@ -1,4 +1,4 @@
-{-# language TypeInType, EmptyCase #-}
+{-# language EmptyCase #-}
 module T14086 where
 import Data.Kind
 

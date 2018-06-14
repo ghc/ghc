@@ -2,7 +2,7 @@
 {-# Language RankNTypes             #-}
 {-# Language KindSignatures         #-}
 {-# Language DataKinds              #-}
-{-# Language TypeInType             #-}
+{-# Language PolyKinds              #-}
 {-# Language GADTs                  #-}
 
 import Data.Kind (Type)

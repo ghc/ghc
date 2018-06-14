@@ -32,7 +32,7 @@ module GHC.Types (
         Nat, Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, RuntimeRep(..), Type, type (*), type (★), Constraint,
+        TYPE, RuntimeRep(..), Type, Constraint,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -58,12 +58,6 @@ data Constraint
 
 -- | The kind of types with values. For example @Int :: Type@.
 type Type = TYPE 'LiftedRep
-
--- | A backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type * = TYPE 'LiftedRep
-
--- | A unicode backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type ★ = TYPE 'LiftedRep
 
 {- *********************************************************************
 *                                                                      *

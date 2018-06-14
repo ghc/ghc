@@ -1,10 +1,10 @@
 
-ClassOperator.hs:12:3: error:
+ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
       from the context: a ><> b
         bound by the type signature for:
                    (**>) :: forall a b. (a ><> b) => a -> a -> ()
-        at ClassOperator.hs:12:3-44
+        at ClassOperator.hs:14:3-44
       The type variable ‘b0’ is ambiguous
     • In the ambiguity check for ‘**>’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
@@ -12,12 +12,12 @@ ClassOperator.hs:12:3: error:
         (**>) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
 
-ClassOperator.hs:12:3: error:
+ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
       from the context: a ><> b
         bound by the type signature for:
                    (**<) :: forall a b. (a ><> b) => a -> a -> ()
-        at ClassOperator.hs:12:3-44
+        at ClassOperator.hs:14:3-44
       The type variable ‘b0’ is ambiguous
     • In the ambiguity check for ‘**<’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
@@ -25,12 +25,12 @@ ClassOperator.hs:12:3: error:
         (**<) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
 
-ClassOperator.hs:12:3: error:
+ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
       from the context: a ><> b
         bound by the type signature for:
                    (>**) :: forall a b. (a ><> b) => a -> a -> ()
-        at ClassOperator.hs:12:3-44
+        at ClassOperator.hs:14:3-44
       The type variable ‘b0’ is ambiguous
     • In the ambiguity check for ‘>**’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
@@ -38,12 +38,12 @@ ClassOperator.hs:12:3: error:
         (>**) :: forall a b. (a ><> b) => a -> a -> ()
       In the class declaration for ‘><>’
 
-ClassOperator.hs:12:3: error:
+ClassOperator.hs:14:3: error:
     • Could not deduce (a ><> b0)
       from the context: a ><> b
         bound by the type signature for:
                    (<**) :: forall a b. (a ><> b) => a -> a -> ()
-        at ClassOperator.hs:12:3-44
+        at ClassOperator.hs:14:3-44
       The type variable ‘b0’ is ambiguous
     • In the ambiguity check for ‘<**’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes

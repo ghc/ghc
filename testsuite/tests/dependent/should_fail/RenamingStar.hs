@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE KindSignatures, NoStarIsType #-}
 
 module RenamingStar where
 

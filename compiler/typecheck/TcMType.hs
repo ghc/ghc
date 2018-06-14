@@ -1106,7 +1106,7 @@ defaultTyVar default_kind tv
        -- It takes an (unconstrained) meta tyvar and defaults it.
        -- Works only on vars of type *; for other kinds, it issues an error.
     default_kind_var kv
-      | isStarKind (tyVarKind kv)
+      | isLiftedTypeKind (tyVarKind kv)
       = do { traceTc "Defaulting a kind var to *" (ppr kv)
            ; writeMetaTyVar kv liftedTypeKind }
       | otherwise

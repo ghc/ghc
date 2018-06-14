@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables, TypeInType #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, PolyKinds #-}
 
 module T14066d where
 

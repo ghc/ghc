@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ConstraintKinds, PolyKinds, TypeInType,  KindSignatures, RankNTypes #-}
+{-# LANGUAGE GADTs, ConstraintKinds, PolyKinds, KindSignatures, RankNTypes #-}
 
 module T12593 where
 

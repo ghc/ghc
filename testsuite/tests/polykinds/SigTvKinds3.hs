@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, ExplicitForAll, TypeInType #-}
+{-# LANGUAGE GADTs, ExplicitForAll, PolyKinds #-}
 
 module SigTvKinds3 where
 

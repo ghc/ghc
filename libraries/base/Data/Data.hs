@@ -4,12 +4,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -1310,7 +1310,7 @@ deriving instance (Typeable f, Typeable g, Data p, Data (f p), Data (g p))
     => Data ((f :+: g) p)
 
 -- | @since 4.9.0.0
-deriving instance (Typeable (f :: * -> *), Typeable (g :: * -> *),
+deriving instance (Typeable (f :: Type -> Type), Typeable (g :: Type -> Type),
           Data p, Data (f (g p)))
     => Data ((f :.: g) p)
 

@@ -8,18 +8,20 @@
 
 module T4903a where
 
+import Data.Kind
+
 class El phi ix where
   proof :: phi ix
 
 class Fam phi where
   from :: phi ix -> ix -> PF phi I0 ix
 
-type family PF (phi :: * -> *) :: (* -> *) -> * -> *
+type family PF (phi :: Type -> Type) :: (Type -> Type) -> Type -> Type
 
 data I0 a = I0 a
 
-data I xi      (r :: * -> *) ix = I (r xi)
-data (f :*: g) (r :: * -> *) ix = f r ix :*: g r ix
+data I xi      (r :: Type -> Type) ix = I (r xi)
+data (f :*: g) (r :: Type -> Type) ix = f r ix :*: g r ix
 
 class HEq phi f where
   heq :: (forall ix. phi ix -> r ix -> Bool)
@@ -45,7 +47,7 @@ tree :: Tree
 -- The problem only occurs on an inifite (or very large) structure  
 tree = Bin tree tree
 
-data TreeF :: * -> * where Tree :: TreeF Tree
+data TreeF :: Type -> Type where Tree :: TreeF Tree
 
 type instance PF TreeF = I Tree :*: I Tree
 -- If the representation is only |I Tree| then there is no problem

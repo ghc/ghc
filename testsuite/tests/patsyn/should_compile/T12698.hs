@@ -1,5 +1,5 @@
 {-# Language ViewPatterns, TypeOperators, KindSignatures, PolyKinds,
-             TypeInType, StandaloneDeriving, GADTs, RebindableSyntax,
+             StandaloneDeriving, GADTs, RebindableSyntax,
              RankNTypes, LambdaCase, PatternSynonyms, TypeApplications #-}
 
 module T12698 where

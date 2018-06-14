@@ -1,6 +1,6 @@
 
-T11313.hs:7:12: error:
+T11313.hs:5:13: error:
     • Expected kind ‘* -> *’, but ‘*’ has kind ‘*’
-    • In the type ‘*’
-      In the expression: fmap @*
-      In an equation for ‘x’: x = fmap @*
+    • In the type ‘(*)’
+      In the expression: fmap @(*)
+      In an equation for ‘x’: x = fmap @(*)

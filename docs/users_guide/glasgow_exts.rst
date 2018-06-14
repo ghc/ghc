@@ -148,24 +148,25 @@ stores a pointer. GHC currently does not support this variety of ``Just``
 nodes (nor for any other datatype). Accordingly, the *kind* of an unboxed
 type is different from the kind of a boxed type.
 
-The Haskell Report describes that ``*`` is the kind of ordinary datatypes,
-such as ``Int``. Furthermore, type constructors can have kinds with arrows;
-for example, ``Maybe`` has kind ``* -> *``. Unboxed types have a kind that
-specifies their runtime representation. For example, the type ``Int#`` has
-kind ``TYPE 'IntRep`` and ``Double#`` has kind ``TYPE 'DoubleRep``. These
-kinds say that the runtime representation of an ``Int#`` is a machine integer,
-and the runtime representation of a ``Double#`` is a machine double-precision
-floating point. In contrast, the kind ``*`` is actually just a synonym
-for ``TYPE 'LiftedRep``. More details of the ``TYPE`` mechanisms appear in
-the `section on runtime representation polymorphism <#runtime-rep>`__.
+The Haskell Report describes that ``*`` (spelled ``Type`` and imported from
+``Data.Kind`` in the GHC dialect of Haskell) is the kind of ordinary datatypes,
+such as ``Int``. Furthermore, type constructors can have kinds with arrows; for
+example, ``Maybe`` has kind ``Type -> Type``. Unboxed types have a kind that
+specifies their runtime representation. For example, the type ``Int#`` has kind
+``TYPE 'IntRep`` and ``Double#`` has kind ``TYPE 'DoubleRep``. These kinds say
+that the runtime representation of an ``Int#`` is a machine integer, and the
+runtime representation of a ``Double#`` is a machine double-precision floating
+point. In contrast, the kind ``Type`` is actually just a synonym for ``TYPE
+'LiftedRep``. More details of the ``TYPE`` mechanisms appear in the `section
+on runtime representation polymorphism <#runtime-rep>`__.
 
-Given that ``Int#``'s kind is not ``*``, it then it follows that
-``Maybe Int#`` is disallowed. Similarly, because type variables tend
-to be of kind ``*`` (for example, in ``(.) :: (b -> c) -> (a -> b) -> a -> c``,
-all the type variables have kind ``*``), polymorphism tends not to work
-over primitive types. Stepping back, this makes some sense, because
-a polymorphic function needs to manipulate the pointers to its data,
-and most primitive types are unboxed.
+Given that ``Int#``'s kind is not ``Type``, it then it follows that ``Maybe
+Int#`` is disallowed. Similarly, because type variables tend to be of kind
+``Type`` (for example, in ``(.) :: (b -> c) -> (a -> b) -> a -> c``, all the
+type variables have kind ``Type``), polymorphism tends not to work over
+primitive types. Stepping back, this makes some sense, because a polymorphic
+function needs to manipulate the pointers to its data, and most primitive types
+are unboxed.
 
 There are some restrictions on the use of primitive types:
 
@@ -2310,12 +2311,12 @@ Data types with no constructors
 With the :extension:`EmptyDataDecls` extension, GHC
 lets you declare a data type with no constructors. For example: ::
 
-      data S      -- S :: *
-      data T a    -- T :: * -> *
+      data S      -- S :: Type
+      data T a    -- T :: Type -> Type
 
-Syntactically, the declaration lacks the "= constrs" part. The type can
-be parameterised over types of any kind, but if the kind is not ``*``
-then an explicit kind annotation must be used (see :ref:`kinding`).
+Syntactically, the declaration lacks the "= constrs" part. The type can be
+parameterised over types of any kind, but if the kind is not ``Type`` then an
+explicit kind annotation must be used (see :ref:`kinding`).
 
 Such data types have only one value, namely bottom. Nevertheless, they
 can be useful when defining "phantom types".
@@ -2944,16 +2945,16 @@ type declarations.
    in the "``data Set a where``" header have no scope. Indeed, one can
    write a kind signature instead: ::
 
-         data Set :: * -> * where ...
+         data Set :: Type -> Type where ...
 
    or even a mixture of the two: ::
 
-         data Bar a :: (* -> *) -> * where ...
+         data Bar a :: (Type -> Type) -> Type where ...
 
    The type variables (if given) may be explicitly kinded, so we could
    also write the header for ``Foo`` like this: ::
 
-         data Bar a (b :: * -> *) where ...
+         data Bar a (b :: Type -> Type) where ...
 
 -  You can use strictness annotations, in the obvious places in the
    constructor type: ::
@@ -4046,7 +4047,7 @@ Deriving ``Functor`` instances
 
 
 With :extension:`DeriveFunctor`, one can derive ``Functor`` instances for data types
-of kind ``* -> *``. For example, this declaration::
+of kind ``Type -> Type``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
       deriving Functor
@@ -4239,7 +4240,7 @@ Deriving ``Foldable`` instances
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
 With :extension:`DeriveFoldable`, one can derive ``Foldable`` instances for data types
-of kind ``* -> *``. For example, this declaration::
+of kind ``Type -> Type``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
       deriving Foldable
@@ -4381,7 +4382,7 @@ Deriving ``Traversable`` instances
     Allow automatic deriving of instances for the ``Traversable`` typeclass.
 
 With :extension:`DeriveTraversable`, one can derive ``Traversable`` instances for data
-types of kind ``* -> *``. For example, this declaration::
+types of kind ``Type -> Type``. For example, this declaration::
 
     data Example a = Ex a Char (Example a) (Example Char)
       deriving (Functor, Foldable, Traversable)
@@ -4729,7 +4730,7 @@ which really behave differently for the newtype and its representation.
     including:
 
       * :extension:`UnboxedTuples`
-      * :extension:`TypeInType`
+      * :extension:`PolyKinds`
       * :extension:`MultiParamTypeClasses`
       * :extension:`FlexibleContexts`
 
@@ -6315,9 +6316,9 @@ original definition of ``Collects`` with a simple dependency: ::
 
 The dependency ``ce -> e`` here specifies that the type ``e`` of elements is
 uniquely determined by the type of the collection ``ce``. Note that both
-parameters of Collects are of kind ``*``; there are no constructor classes
-here. Note too that all of the instances of ``Collects`` that we gave
-earlier can be used together with this new definition.
+parameters of Collects are of kind ``Type``; there are no constructor classes
+here. Note too that all of the instances of ``Collects`` that we gave earlier
+can be used together with this new definition.
 
 What about the ambiguity problems that we encountered with the original
 definition? The empty function still has type ``Collects e ce => ce``, but
@@ -7358,7 +7359,7 @@ example (Trac #10318) ::
             Fractional (Frac a),
             IntegralDomain (Frac a))
          => IntegralDomain a where
-      type Frac a :: *
+      type Frac a :: Type
 
 Here the superclass cycle does terminate but it's not entirely straightforward
 to see that it does.
@@ -7464,11 +7465,11 @@ Data family declarations
 
 Indexed data families are introduced by a signature, such as ::
 
-    data family GMap k :: * -> *
+    data family GMap k :: Type -> Type
 
 The special ``family`` distinguishes family from standard data
 declarations. The result kind annotation is optional and, as usual,
-defaults to ``*`` if omitted. An example is ::
+defaults to ``Type`` if omitted. An example is ::
 
     data family Array e
 
@@ -7476,12 +7477,12 @@ Named arguments can also be given explicit kind signatures if needed.
 Just as with :ref:`GADT declarations <gadt>` named arguments are
 entirely optional, so that we can declare ``Array`` alternatively with ::
 
-    data family Array :: * -> *
+    data family Array :: Type -> Type
 
 Unlike with ordinary data definitions, the result kind of a data family
-does not need to be ``*``: it can alternatively be a kind variable
+does not need to be ``Type``: it can alternatively be a kind variable
 (with :extension:`PolyKinds`). Data instances' kinds must end in
-``*``, however.
+``Type``, however.
 
 .. _data-instance-declarations:
 
@@ -7608,11 +7609,11 @@ Type family declarations
 
 Open indexed type families are introduced by a signature, such as ::
 
-    type family Elem c :: *
+    type family Elem c :: Type
 
 The special ``family`` distinguishes family from standard type
 declarations. The result kind annotation is optional and, as usual,
-defaults to ``*`` if omitted. An example is ::
+defaults to ``Type`` if omitted. An example is ::
 
     type family Elem c
 
@@ -7625,18 +7626,19 @@ determine a family's arity, and hence in general, also insufficient to
 determine whether a type family application is well formed. As an
 example, consider the following declaration: ::
 
-    type family F a b :: * -> *   -- F's arity is 2,
-                                  -- although its overall kind is * -> * -> * -> *
+    type family F a b :: Type -> Type
+      -- F's arity is 2,
+      -- although its overall kind is Type -> Type -> Type -> Type
 
 Given this declaration the following are examples of well-formed and
 malformed types: ::
 
-    F Char [Int]       -- OK!  Kind: * -> *
-    F Char [Int] Bool  -- OK!  Kind: *
+    F Char [Int]       -- OK!  Kind: Type -> Type
+    F Char [Int] Bool  -- OK!  Kind: Type
     F IO Bool          -- WRONG: kind mismatch in the first argument
     F Bool             -- WRONG: unsaturated application
 
-The result kind annotation is optional and defaults to ``*`` (like
+The result kind annotation is optional and defaults to ``Type`` (like
 argument kinds) if omitted. Polykinded type families can be declared
 using a parameter in the kind annotation: ::
 
@@ -7720,7 +7722,7 @@ Type family examples
 
 Here are some examples of admissible and illegal type instances: ::
 
-    type family F a :: *
+    type family F a :: Type
     type instance F [Int]   = Int   -- OK!
     type instance F String  = Char  -- OK!
     type instance F (F a)   = a     -- WRONG: type parameter mentions a type family
@@ -7735,7 +7737,7 @@ Here are some examples of admissible and illegal type instances: ::
     type instance H Char = Char    -- WRONG: cannot have instances of closed family
     type family K a where          -- OK!
 
-    type family G a b :: * -> *
+    type family G a b :: Type -> Type
     type instance G Int            = (,)     -- WRONG: must be two type parameters
     type instance G Int Char Float = Double  -- WRONG: must be two type parameters
 
@@ -7786,8 +7788,8 @@ like types. For example, the following is accepted: ::
     type instance J Int = Bool
     type instance J Int = Maybe
 
-These instances are compatible because they differ in their implicit
-kind parameter; the first uses ``*`` while the second uses ``* -> *``.
+These instances are compatible because they differ in their implicit kind
+parameter; the first uses ``Type`` while the second uses ``Type -> Type``.
 
 The definition for "compatible" uses a notion of "apart", whose
 definition in turn relies on type family reduction. This condition of
@@ -7879,11 +7881,11 @@ When the name of a type argument of a data or type instance
 declaration doesn't matter, it can be replaced with an underscore
 (``_``). This is the same as writing a type variable with a unique name. ::
 
-    data family F a b :: *
+    data family F a b :: Type
     data instance F Int _ = Int
     -- Equivalent to  data instance F Int b = Int
 
-    type family T a :: *
+    type family T a :: Type
     type instance T (a,_) = a
     -- Equivalent to  type instance T (a,b) = a
 
@@ -7910,11 +7912,11 @@ A data or type synonym family can be declared as part of a type class,
 thus: ::
 
     class GMapKey k where
-      data GMap k :: * -> *
+      data GMap k :: Type -> Type
       ...
 
     class Collects ce where
-      type Elem ce :: *
+      type Elem ce :: Type
       ...
 
 When doing so, we (optionally) may drop the "``family``" keyword.
@@ -7926,7 +7928,7 @@ may be omitted and they may be in an order other than in the class head.
 Hence, the following contrived example is admissible: ::
 
       class C a b c where
-        type T c a x :: *
+        type T c a x :: Type
 
 Here ``c`` and ``a`` are class parameters, but the type is also indexed
 on a third parameter ``x``.
@@ -7953,7 +7955,7 @@ the rule that the type indexes corresponding to class parameters must have
 precisely the same as type given in the instance head. For example: ::
 
     class Collects ce where
-      type Elem ce :: *
+      type Elem ce :: Type
 
     instance Eq (Elem [e]) => Collects [e] where
       -- Choose one of the following alternatives:
@@ -7974,17 +7976,17 @@ Note the following points:
    to mention kind variables that are implicitly bound. For example, these are
    legitimate: ::
 
-    data family Nat :: k -> k -> *
+    data family Nat :: k -> k -> Type
     -- k is implicitly bound by an invisible kind pattern
-    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
+    newtype instance Nat :: (k -> Type) -> (k -> Type) -> Type where
       Nat :: (forall xx. f xx -> g xx) -> Nat f g
 
     class Funct f where
-      type Codomain f :: *
+      type Codomain f :: Type
     instance Funct ('KProxy :: KProxy o) where
       -- o is implicitly bound by the kind signature
       -- of the LHS type pattern ('KProxy)
-      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+      type Codomain 'KProxy = NatTr (Proxy :: o -> Type)
 
 -  The instance for an associated type can be omitted in class
    instances. In that case, unless there is a default instance (see
@@ -8005,7 +8007,7 @@ Note the following points:
    parameter is ``[v]``, and one for which it is ``Int``. Since you
    cannot give any *subsequent* instances for ``(GMap Flob ...)``, this
    facility is most useful when the free indexed parameter is of a kind
-   with a finite number of alternatives (unlike ``*``).
+   with a finite number of alternatives (unlike ``Type``).
 
 .. _assoc-decl-defs:
 
@@ -8050,8 +8052,8 @@ Here are some examples:
 
 ::
 
-      class C (a :: *) where
-        type F1 a :: *
+      class C (a :: Type) where
+        type F1 a :: Type
         type instance F1 a = [a]     -- OK
         type instance F1 a = a->a    -- BAD; only one default instance is allowed
 
@@ -8186,7 +8188,7 @@ Recall our running ``GMapKey`` class example:
 ::
 
     class GMapKey k where
-      data GMap k :: * -> *
+      data GMap k :: Type -> Type
       insert :: GMap k v -> k -> v -> GMap k v
       lookup :: GMap k v -> k -> Maybe v
       empty  :: GMap k v
@@ -8482,7 +8484,7 @@ Motivation
 Standard Haskell has a rich type language. Types classify terms and
 serve to avoid many common programming mistakes. The kind language,
 however, is relatively simple, distinguishing only regular types (kind
-``*``) and type constructors (e.g. kind ``* -> * -> *``).
+``Type``) and type constructors (e.g. kind ``Type -> Type -> Type``).
 In particular when using advanced type
 system features, such as type families (:ref:`type-families`) or GADTs
 (:ref:`gadt`), this simple kind system is insufficient, and fails to
@@ -8492,11 +8494,11 @@ numbers, and length-indexed vectors: ::
     data Ze
     data Su n
 
-    data Vec :: * -> * -> * where
+    data Vec :: Type -> Type -> Type where
       Nil  :: Vec a Ze
       Cons :: a -> Vec a n -> Vec a (Su n)
 
-The kind of ``Vec`` is ``* -> * -> *``. This means that, e.g.,
+The kind of ``Vec`` is ``Type -> Type -> Type``. This means that, e.g.,
 ``Vec Int Char`` is a well-kinded type, even though this is not what we
 intend when defining length-indexed vectors.
 
@@ -8504,7 +8506,7 @@ With :extension:`DataKinds`, the example above can then be rewritten to: ::
 
     data Nat = Ze | Su Nat
 
-    data Vec :: * -> Nat -> * where
+    data Vec :: Type -> Nat -> Type where
       Nil  :: Vec a 'Ze
       Cons :: a -> Vec a n -> Vec a ('Su n)
 
@@ -8529,48 +8531,27 @@ following types ::
 give rise to the following kinds and type constructors (where promoted
 constructors are prefixed by a tick ``'``): ::
 
-    Nat :: *
+    Nat :: Type
     'Zero :: Nat
     'Succ :: Nat -> Nat
 
-    List :: * -> *
+    List :: Type -> Type
     'Nil  :: forall k. List k
     'Cons :: forall k. k -> List k -> List k
 
-    Pair  :: * -> * -> *
+    Pair  :: Type -> Type -> Type
     'Pair :: forall k1 k2. k1 -> k2 -> Pair k1 k2
 
-    Sum :: * -> * -> *
+    Sum :: Type -> Type -> Type
     'L :: k1 -> Sum k1 k2
     'R :: k2 -> Sum k1 k2
 
-The following restrictions apply to promotion:
+.. note::
+    Data family instances cannot be promoted at the moment: GHC’s type theory
+    just isn’t up to the task of promoting data families, which requires full
+    dependent types.
 
--  We promote ``data`` types and ``newtypes``; type synonyms and
-   type/data families are not promoted (:ref:`type-families`).
-
--  We only promote types whose kinds are of the form
-   ``* -> ... -> * -> *``. In particular, we do not promote
-   higher-kinded datatypes such as ``data Fix f = In (f (Fix f))``, or
-   datatypes whose kinds involve promoted types such as
-   ``Vec :: * -> Nat -> *``.
-
--  We do not promote data constructors that are kind polymorphic,
-   involve constraints, mention type or data families, or involve types
-   that are not promotable.
-
-The flag :extension:`TypeInType` (which implies :extension:`DataKinds`)
-relaxes some of these restrictions, allowing:
-
--  Promotion of type synonyms and type families, but not data families.
-   GHC's type theory just isn't up to the task of promoting data families,
-   which requires full dependent types.
-
--  All datatypes, even those with rich kinds, get promoted. For example: ::
-
-     data Proxy a = Proxy
-     data App f a = MkApp (f a)   -- App :: forall k. (k -> *) -> k -> *
-     x = Proxy :: Proxy ('MkApp ('Just 'True))
+    See also :ghc-ticket:`15245`.
 
 .. _promotion-syntax:
 
@@ -8612,11 +8593,11 @@ With :extension:`DataKinds`, Haskell's list and tuple types are natively
 promoted to kinds, and enjoy the same convenient syntax at the type
 level, albeit prefixed with a quote: ::
 
-    data HList :: [*] -> * where
+    data HList :: [Type] -> Type where
       HNil  :: HList '[]
       HCons :: a -> HList t -> HList (a ': t)
 
-    data Tuple :: (*,*) -> * where
+    data Tuple :: (Type,Type) -> Type where
       Tuple :: a -> b -> Tuple '(a,b)
 
     foo0 :: HList '[]
@@ -8647,7 +8628,7 @@ Promoting existential data constructors
 Note that we do promote existential data constructors that are otherwise
 suitable. For example, consider the following: ::
 
-    data Ex :: * where
+    data Ex :: Type where
       MkEx :: forall a. a -> Ex
 
 Both the type ``Ex`` and the data constructor ``MkEx`` get promoted,
@@ -8666,7 +8647,7 @@ The return kind ``k`` is an implicit parameter to ``UnEx``. The
 elaborated definitions are as follows (where implicit parameters are
 denoted by braces): ::
 
-    type family UnEx {k :: *} (ex :: Ex) :: k
+    type family UnEx {k :: Type} (ex :: Ex) :: k
     type instance UnEx {k} (MkEx @k x) = x
 
 Thus, the instance triggers only when the implicit parameter to ``UnEx``
@@ -8679,22 +8660,18 @@ See also :ghc-ticket:`7347`.
 .. _type-in-type:
 .. _kind-polymorphism:
 
-Kind polymorphism and Type-in-Type
+Kind polymorphism
 ==================================
 
 .. extension:: TypeInType
-    :shortdesc: Allow kinds to be used as types,
-        including explicit kind variable quantification, higher-rank
-        kinds, kind synonyms, and kind families.
-        Implies :extension:`DataKinds`, :extension:`KindSignatures`,
-        and :extension:`PolyKinds`.
+    :shortdesc: Deprecated. Enable kind polymorphism and datatype promotion.
 
-    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
+    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`,
+              :extension:`NoStarIsType`
     :since: 8.0.1
 
-    Allow kinds to be as intricate as types, allowing explicit quantification
-    over kind variables, higher-rank kinds, and the use of type synonyms and
-    families in kinds, among other features.
+    In the past this extension used to enable advanced type-level programming
+    techniques. Now it's a shorthand for a couple of other extensions.
 
 .. extension:: PolyKinds
     :shortdesc: Enable kind polymorphism.
@@ -8711,31 +8688,6 @@ although it is a conservative extension beyond standard Haskell. The extensions
 above simply enable syntax and tweak the inference algorithm to allow users to
 take advantage of the extra expressiveness of GHC's kind system.
 
-The difference between :extension:`TypeInType` and :extension:`PolyKinds`
----------------------------------------------------------------------------
-
-It is natural to consider :extension:`TypeInType` as an extension of
-:extension:`PolyKinds`. The latter simply enables fewer features of GHC's
-rich kind system than does the former. The need for two separate extensions
-stems from their history: :extension:`PolyKinds` was introduced for GHC 7.4,
-when it was experimental and temperamental. The wrinkles were smoothed out for
-GHC 7.6. :extension:`TypeInType` was introduced for GHC 8.0, and is currently
-experimental and temperamental, with the wrinkles to be smoothed out in due
-course. The intent of having the two extensions is that users can rely on
-:extension:`PolyKinds` to work properly while being duly sceptical of
-:extension:`TypeInType`. In particular, we recommend enabling
-:ghc-flag:`-dcore-lint` whenever using :extension:`TypeInType`; that extension
-turns on a set of internal checks within GHC that will discover bugs in the
-implementation of :extension:`TypeInType`. Please report bugs at `our bug
-tracker <https://ghc.haskell.org/trac/ghc/wiki/ReportABug>`__.
-
-Although we have tried to allow the new behavior only when
-:extension:`TypeInType` is enabled, some particularly thorny cases may have
-slipped through. It is thus possible that some construct is available in GHC
-8.0 with :extension:`PolyKinds` that was not possible in GHC 7.x. If you spot
-such a case, you are welcome to submit that as a bug as well. We flag
-newly-available capabilities below.
-
 Overview of kind polymorphism
 -----------------------------
 
@@ -8743,22 +8695,22 @@ Consider inferring the kind for ::
 
   data App f a = MkApp (f a)
 
-In Haskell 98, the inferred kind for ``App`` is ``(* -> *) -> * -> *``.
-But this is overly specific, because another suitable Haskell 98 kind for
-``App`` is ``((* -> *) -> *) -> (* -> *) -> *``, where the kind assigned
-to ``a`` is ``* -> *``. Indeed, without kind signatures
-(:extension:`KindSignatures`), it is necessary to use a dummy constructor
-to get a Haskell compiler to infer the second kind. With kind polymorphism
-(:extension:`PolyKinds`), GHC infers the kind ``forall k. (k -> *) -> k -> *``
-for ``App``, which is its most general kind.
+In Haskell 98, the inferred kind for ``App`` is ``(Type -> Type) -> Type ->
+Type``. But this is overly specific, because another suitable Haskell 98 kind
+for ``App`` is ``((Type -> Type) -> Type) -> (Type -> Type) -> Type``, where the
+kind assigned to ``a`` is ``Type -> Type``. Indeed, without kind signatures
+(:extension:`KindSignatures`), it is necessary to use a dummy constructor to get
+a Haskell compiler to infer the second kind. With kind polymorphism
+(:extension:`PolyKinds`), GHC infers the kind ``forall k. (k -> Type) -> k ->
+Type`` for ``App``, which is its most general kind.
 
 Thus, the chief benefit of kind polymorphism is that we can now infer these
 most general kinds and use ``App`` at a variety of kinds: ::
 
-  App Maybe Int   -- `k` is instantiated to *
+  App Maybe Int   -- `k` is instantiated to Type
 
-  data T a = MkT (a Int)    -- `a` is inferred to have kind (* -> *)
-  App T Maybe     -- `k` is instantiated to (* -> *)
+  data T a = MkT (a Int)    -- `a` is inferred to have kind (Type -> Type)
+  App T Maybe     -- `k` is instantiated to (Type -> Type)
 
 Overview of Type-in-Type
 ------------------------
@@ -8773,16 +8725,15 @@ between types and kinds is a hallmark of dependently typed languages.
 Full dependently typed languages also remove the difference between expressions
 and types, but doing that in GHC is a story for another day.
 
-One simplification allowed by combining types and kinds is that the type
-of ``*`` is just ``*``. It is true that the ``* :: *`` axiom can lead to
-non-termination, but this is not a problem in GHC, as we already have other
-means of non-terminating programs in both types and expressions. This
-decision (among many, many others) *does* mean that despite the expressiveness
-of GHC's type system, a "proof" you write in Haskell is not an irrefutable
-mathematical proof. GHC promises only partial correctness, that if your
-programs compile and run to completion, their results indeed have the types
-assigned. It makes no claim about programs that do not finish in a finite
-amount of time.
+One simplification allowed by combining types and kinds is that the type of
+``Type`` is just ``Type``. It is true that the ``Type :: Type`` axiom can lead
+to non-termination, but this is not a problem in GHC, as we already have other
+means of non-terminating programs in both types and expressions. This decision
+(among many, many others) *does* mean that despite the expressiveness of GHC's
+type system, a "proof" you write in Haskell is not an irrefutable mathematical
+proof. GHC promises only partial correctness, that if your programs compile and
+run to completion, their results indeed have the types assigned. It makes no
+claim about programs that do not finish in a finite amount of time.
 
 To learn more about this decision and the design of GHC under the hood
 please see the `paper <http://www.seas.upenn.edu/~sweirich/papers/fckinds.pdf>`__
@@ -8802,13 +8753,13 @@ inference. But that is not always the case. Consider ::
 Type family declarations have no right-hand side, but GHC must still
 infer a kind for ``F``. Since there are no constraints, it could infer
 ``F :: forall k1 k2. k1 -> k2``, but that seems *too* polymorphic. So
-GHC defaults those entirely-unconstrained kind variables to ``*`` and we
-get ``F :: * -> *``. You can still declare ``F`` to be kind-polymorphic
+GHC defaults those entirely-unconstrained kind variables to ``Type`` and we
+get ``F :: Type -> Type``. You can still declare ``F`` to be kind-polymorphic
 using kind signatures: ::
 
-    type family F1 a                -- F1 :: * -> *
-    type family F2 (a :: k)         -- F2 :: forall k. k -> *
-    type family F3 a :: k           -- F3 :: forall k. * -> k
+    type family F1 a                -- F1 :: Type -> Type
+    type family F2 (a :: k)         -- F2 :: forall k. k -> Type
+    type family F3 a :: k           -- F3 :: forall k. Type -> k
     type family F4 (a :: k1) :: k2  -- F4 :: forall k1 k2. k1 -> k2
 
 The general principle is this:
@@ -8820,7 +8771,7 @@ The general principle is this:
    class method signatures.
 
 -  *When there is no right hand side, GHC defaults argument and result
-   kinds to ``*``, except when directed otherwise by a kind signature*.
+   kinds to ``Type``, except when directed otherwise by a kind signature*.
    Examples: data and open type family declarations.
 
 This rule has occasionally-surprising consequences (see
@@ -8830,10 +8781,10 @@ This rule has occasionally-surprising consequences (see
                        -- so C :: forall k. k -> Constraint
       data D1 a        -- No right hand side for these two family
       type F1 a        -- declarations, but the class forces (a :: k)
-                       -- so   D1, F1 :: forall k. k -> *
+                       -- so   D1, F1 :: forall k. k -> Type
 
-    data D2 a   -- No right-hand side so D2 :: * -> *
-    type F2 a   -- No right-hand side so F2 :: * -> *
+    data D2 a   -- No right-hand side so D2 :: Type -> Type
+    type F2 a   -- No right-hand side so F2 :: Type -> Type
 
 The kind-polymorphism from the class declaration makes ``D1``
 kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
@@ -8851,21 +8802,21 @@ Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
 
     data T m a = MkT (m a) (T Maybe (m a))
-    -- GHC infers kind  T :: (* -> *) -> * -> *
+    -- GHC infers kind  T :: (Type -> Type) -> Type -> Type
 
 The recursive use of ``T`` forced the second argument to have kind
-``*``. However, just as in type inference, you can achieve polymorphic
+``Type``. However, just as in type inference, you can achieve polymorphic
 recursion by giving a *complete user-supplied kind signature* (or CUSK)
 for ``T``. A CUSK is present when all argument kinds and the result kind
 are known, without any need for inference. For example: ::
 
-    data T (m :: k -> *) :: k -> * where
+    data T (m :: k -> Type) :: k -> Type where
       MkT :: m a -> T Maybe (m a) -> T m a
 
 The complete user-supplied kind signature specifies the polymorphic kind
 for ``T``, and this signature is used for all the calls to ``T``
 including the recursive ones. In particular, the recursive use of ``T``
-is at kind ``*``.
+is at kind ``Type``.
 
 What exactly is considered to be a "complete user-supplied kind
 signature" for a type constructor? These are the forms:
@@ -8876,35 +8827,30 @@ signature" for a type constructor? These are the forms:
    annotation does not affect whether or not the declaration has a
    complete signature. ::
 
-       data T1 :: (k -> *) -> k -> *       where ...
-       -- Yes;  T1 :: forall k. (k->*) -> k -> *
+       data T1 :: (k -> Type) -> k -> Type       where ...
+       -- Yes;  T1 :: forall k. (k->Type) -> k -> Type
 
-       data T2 (a :: k -> *) :: k -> *     where ...
-       -- Yes;  T2 :: forall k. (k->*) -> k -> *
+       data T2 (a :: k -> Type) :: k -> Type     where ...
+       -- Yes;  T2 :: forall k. (k->Type) -> k -> Type
 
-       data T3 (a :: k -> *) (b :: k) :: * where ...
-       -- Yes;  T3 :: forall k. (k->*) -> k -> *
+       data T3 (a :: k -> Type) (b :: k) :: Type where ...
+       -- Yes;  T3 :: forall k. (k->Type) -> k -> Type
 
-       data T4 (a :: k -> *) (b :: k)      where ...
-       -- Yes;  T4 :: forall k. (k->*) -> k -> *
+       data T4 (a :: k -> Type) (b :: k)      where ...
+       -- Yes;  T4 :: forall k. (k->Type) -> k -> Type
 
-       data T5 a (b :: k) :: *             where ...
+       data T5 a (b :: k) :: Type             where ...
        -- No;  kind is inferred
 
        data T6 a b                         where ...
        -- No;  kind is inferred
 
--  For a datatype with a top-level ``::`` when :extension:`TypeInType`
-   is in effect: all kind variables introduced after the ``::`` must
-   be explicitly quantified. ::
+-  For a datatype with a top-level ``::``: all kind variables introduced after
+   the ``::`` must be explicitly quantified. ::
 
-     -- -XTypeInType is on
-     data T1 :: k -> *            -- No CUSK: `k` is not explicitly quantified
-     data T2 :: forall k. k -> *  -- CUSK: `k` is bound explicitly
-     data T3 :: forall (k :: *). k -> *   -- still a CUSK
-
-   Note that the first example would indeed have a CUSK without
-   :extension:`TypeInType`.
+     data T1 :: k -> Type            -- No CUSK: `k` is not explicitly quantified
+     data T2 :: forall k. k -> Type  -- CUSK: `k` is bound explicitly
+     data T3 :: forall (k :: Type). k -> Type   -- still a CUSK
 
 -  For a class, every type variable must be annotated with a kind.
 
@@ -8920,13 +8866,12 @@ signature" for a type constructor? These are the forms:
    signature -- no inference can be done before detecting the signature.
 
 -  An un-associated open type or data family declaration *always* has a CUSK;
-   un-annotated type variables default to
-   kind ``*``: ::
+   un-annotated type variables default to kind ``Type``: ::
 
-       data family D1 a               -- D1 :: * -> *
-       data family D2 (a :: k)        -- D2 :: forall k. k -> *
-       data family D3 (a :: k) :: *   -- D3 :: forall k. k -> *
-       type family S1 a :: k -> *     -- S1 :: forall k. * -> k -> *
+       data family D1 a                  -- D1 :: Type -> Type
+       data family D2 (a :: k)           -- D2 :: forall k. k -> Type
+       data family D3 (a :: k) :: Type   -- D3 :: forall k. k -> Type
+       type family S1 a :: k -> Type     -- S1 :: forall k. Type -> k -> Type
 
 -  An associated type or data family declaration has a CUSK precisely if
    its enclosing class has a CUSK. ::
@@ -8941,11 +8886,11 @@ signature" for a type constructor? These are the forms:
    variables are annotated and a return kind (with a top-level ``::``)
    is supplied.
 
-With :extension:`TypeInType` enabled, it is possible to write a datatype
-that syntactically has a CUSK (according to the rules above)
-but actually requires some inference. As a very contrived example, consider ::
+It is possible to write a datatype that syntactically has a CUSK (according to
+the rules above) but actually requires some inference. As a very contrived
+example, consider ::
 
-  data Proxy a           -- Proxy :: forall k. k -> *
+  data Proxy a           -- Proxy :: forall k. k -> Type
   data X (a :: Proxy k)
 
 According to the rules above ``X`` has a CUSK. Yet, what is the kind of ``k``?
@@ -9008,9 +8953,9 @@ for it: ::
 In the class declaration, nothing constrains the kind of the type ``a``,
 so it becomes a poly-kinded type variable ``(a :: k)``. Yet, in the
 instance declaration, the right-hand side of the associated type
-instance ``b -> b`` says that ``b`` must be of kind ``*``. GHC could
+instance ``b -> b`` says that ``b`` must be of kind ``Type``. GHC could
 theoretically propagate this information back into the instance head,
-and make that instance declaration apply only to type of kind ``*``, as
+and make that instance declaration apply only to type of kind ``Type``, as
 opposed to types of any kind. However, GHC does *not* do this.
 
 In short: GHC does *not* propagate kind information from the members of
@@ -9031,23 +8976,23 @@ type when figuring out how to generalise the type's kind.
 For example,
 consider these definitions (with :extension:`ScopedTypeVariables`): ::
 
-  data Proxy a    -- Proxy :: forall k. k -> *
+  data Proxy a    -- Proxy :: forall k. k -> Type
   p :: forall a. Proxy a
-  p = Proxy :: Proxy (a :: *)
+  p = Proxy :: Proxy (a :: Type)
 
 GHC reports an error, saying that the kind of ``a`` should be a kind variable
-``k``, not ``*``. This is because, by looking at the type signature
+``k``, not ``Type``. This is because, by looking at the type signature
 ``forall a. Proxy a``, GHC assumes ``a``'s kind should be generalised, not
-restricted to be ``*``. The function definition is then rejected for being
+restricted to be ``Type``. The function definition is then rejected for being
 more specific than its type signature.
 
 Explicit kind quantification
 ----------------------------
 
-Enabled by :extension:`TypeInType`, GHC now supports explicit kind quantification,
+Enabled by :extension:`PolyKinds`, GHC supports explicit kind quantification,
 as in these examples: ::
 
-  data Proxy :: forall k. k -> *
+  data Proxy :: forall k. k -> Type
   f :: (forall k (a :: k). Proxy a -> ()) -> Int
 
 Note that the second example has a ``forall`` that binds both a kind ``k`` and
@@ -9078,8 +9023,8 @@ Consider the type ::
 
 This datatype ``G`` is GADT-like in both its kind and its type. Suppose you
 have ``g :: G a``, where ``a :: k``. Then pattern matching to discover that
-``g`` is in fact ``GMaybe`` tells you both that ``k ~ (* -> *)`` and
-``a ~ Maybe``. The definition for ``G`` requires that :extension:`TypeInType`
+``g`` is in fact ``GMaybe`` tells you both that ``k ~ (Type -> Type)`` and
+``a ~ Maybe``. The definition for ``G`` requires that :extension:`PolyKinds`
 be in effect, but pattern-matching on ``G`` requires no extension beyond
 :extension:`GADTs`. That this works is actually a straightforward extension
 of regular GADTs and a consequence of the fact that kinds and types are the
@@ -9151,7 +9096,7 @@ distinction). GHC does not consider ``forall k. k -> Type`` and
 Constraints in kinds
 --------------------
 
-As kinds and types are the same, kinds can now (with :extension:`TypeInType`)
+As kinds and types are the same, kinds can (with :extension:`PolyKinds`)
 contain type constraints. Only equality constraints are currently supported,
 however. We expect this to extend to other constraints in the future.
 
@@ -9162,7 +9107,7 @@ Here is an example of a constrained kind: ::
     IsTypeLit Symbol = 'True
     IsTypeLit a      = 'False
 
-  data T :: forall a. (IsTypeLit a ~ 'True) => a -> * where
+  data T :: forall a. (IsTypeLit a ~ 'True) => a -> Type where
     MkNat    :: T 42
     MkSymbol :: T "Don't panic!"
 
@@ -9171,50 +9116,23 @@ we get an error that the equality constraint is not satisfied; ``Int`` is
 not a type literal. Note that explicitly quantifying with ``forall a`` is
 not necessary here.
 
-The kind ``*``
---------------
+The kind ``Type``
+-----------------
 
-The kind ``*`` classifies ordinary types. Without :extension:`TypeInType`,
-this identifier is always in scope when writing a kind. However, with
-:extension:`TypeInType`, a user may wish to use ``*`` in a type or a
-type operator ``*`` in a kind. To make this all more manageable, ``*``
-becomes an (almost) ordinary name with :extension:`TypeInType` enabled.
-So as not to cause naming collisions, it is not imported by default;
-you must ``import Data.Kind`` to get ``*`` (but only with :extension:`TypeInType`
-enabled).
+.. extension:: StarIsType
+    :shortdesc: Desugar ``*`` to ``Data.Kind.Type``.
 
-The only way ``*`` is unordinary is in its parsing. In order to be backward
-compatible, ``*`` is parsed as if it were an alphanumeric identifier; note
-that we do not write ``Int :: (*)`` but just plain ``Int :: *``. Due to the
-bizarreness with which ``*`` is parsed--and the fact that it is the only such
-operator in GHC--there are some corner cases that are
-not handled. We are aware of three:
+    :since: 8.6.1
 
-- In a Haskell-98-style data constructor, you must put parentheses around
-  ``*``, like this: ::
+    Treat the unqualified uses of the ``*`` type operator as nullary and desugar
+    to ``Data.Kind.Type``. Disabled by :extension:`TypeOperators` and
+    :extension:`TypeInType`.
 
-    data Universe = Ty (*) | Num Int | ...
-
-- In an import/export list, you must put parentheses around ``*``, like this: ::
-
-    import Data.Kind ( type (*) )
-
-  Note that the keyword ``type`` there is just to disambiguate the import
-  from a term-level ``(*)``. (:ref:`explicit-namespaces`)
-
-- In an instance declaration head (the part after the word ``instance``), you
-  must parenthesize ``*``. This applies to all manners of instances, including
-  the left-hand sides of individual equations of a closed type family.
-
-The ``Data.Kind`` module also exports ``Type`` as a synonym for ``*``.
-Now that type synonyms work in kinds, it is conceivable that we will deprecate
-``*`` when there is a good migration story for everyone to use ``Type``.
-If you like neither of these names, feel free to write your own synonym: ::
-
-  type Set = *   -- silly Agda programmers...
-
-All the affordances for ``*`` also apply to ``★``, the Unicode variant
-of ``*``.
+The kind ``Type`` (imported from ``Data.Kind``) classifies ordinary types. With
+:extension:`StarIsType` (currently enabled by default), ``*`` is desugared to
+``Type``, but using this legacy syntax is not recommended due to conflicts with
+:extension:`TypeOperators`. This also applies to ``★``, the Unicode variant of
+``*``.
 
 Inferring dependency in datatype declarations
 ---------------------------------------------
@@ -9274,16 +9192,17 @@ the program.
 Kind defaulting without :extension:`PolyKinds`
 -----------------------------------------------
 
-Without :extension:`PolyKinds` or :extension:`TypeInType` enabled, GHC
-refuses to generalise over kind variables. It thus defaults kind variables
-to ``*`` when possible; when this is not possible, an error is issued.
+Without :extension:`PolyKinds`, GHC refuses to generalise over kind variables.
+It thus defaults kind variables to ``Type`` when possible; when this is not
+possible, an error is issued.
 
 Here is an example of this in action: ::
 
-  {-# LANGUAGE TypeInType #-}
-  data Proxy a = P   -- inferred kind: Proxy :: k -> *
+  {-# LANGUAGE PolyKinds #-}
+  import Data.Kind (Type)
+  data Proxy a = P   -- inferred kind: Proxy :: k -> Type
   data Compose f g x = MkCompose (f (g x))
-    -- inferred kind: Compose :: (b -> *) -> (a -> b) -> a -> *
+    -- inferred kind: Compose :: (b -> Type) -> (a -> b) -> a -> Type
 
   -- separate module having imported the first
   {-# LANGUAGE NoPolyKinds, DataKinds #-}
@@ -9292,13 +9211,13 @@ Here is an example of this in action: ::
 In the last line, we use the promoted constructor ``'MkCompose``, which has
 kind ::
 
-  forall (a :: *) (b :: *) (f :: b -> *) (g :: a -> b) (x :: a).
+  forall (a :: Type) (b :: Type) (f :: b -> Type) (g :: a -> b) (x :: a).
     f (g x) -> Compose f g x
 
 Now we must infer a type for ``z``. To do so without generalising over kind
-variables, we must default the kind variables of ``'MkCompose``. We can
-easily default ``a`` and ``b`` to ``*``, but ``f`` and ``g`` would be ill-kinded
-if defaulted. The definition for ``z`` is thus an error.
+variables, we must default the kind variables of ``'MkCompose``. We can easily
+default ``a`` and ``b`` to ``Type``, but ``f`` and ``g`` would be ill-kinded if
+defaulted. The definition for ``z`` is thus an error.
 
 Pretty-printing in the presence of kind polymorphism
 ----------------------------------------------------
@@ -9328,7 +9247,7 @@ polymorphism.
 
 Here are the key definitions, all available from ``GHC.Exts``: ::
 
-  TYPE :: RuntimeRep -> *   -- highly magical, built into GHC
+  TYPE :: RuntimeRep -> Type   -- highly magical, built into GHC
 
   data RuntimeRep = LiftedRep     -- for things like `Int`
                   | UnliftedRep   -- for things like `Array#`
@@ -9337,7 +9256,7 @@ Here are the key definitions, all available from ``GHC.Exts``: ::
 		  | SumRep [RuntimeRep]    -- unboxed sums, indexed by the representations of the disjuncts
                   | ...
 
-  type * = TYPE LiftedRep    -- * is just an ordinary type synonym
+  type Type = TYPE LiftedRep    -- Type is just an ordinary type synonym
 
 The idea is that we have a new fundamental type constant ``TYPE``, which
 is parameterised by a ``RuntimeRep``. We thus get ``Int# :: TYPE 'IntRep``
@@ -9375,7 +9294,7 @@ representation-polymorphic type.
 
 However, not all is lost. We can still do this: ::
 
-  ($) :: forall r (a :: *) (b :: TYPE r).
+  ($) :: forall r (a :: Type) (b :: TYPE r).
          (a -> b) -> a -> b
   f $ x = f x
 
@@ -9421,7 +9340,8 @@ Most GHC users will not need to worry about levity polymorphism
 or unboxed types. For these users, seeing the levity polymorphism
 in the type of ``$`` is unhelpful. And thus, by default, it is suppressed,
 by supposing all type variables of type ``RuntimeRep`` to be ``'LiftedRep``
-when printing, and printing ``TYPE 'LiftedRep`` as ``*``.
+when printing, and printing ``TYPE 'LiftedRep`` as ``Type`` (or ``*`` when
+:extension:`StarIsType` is on).
 
 Should you wish to see levity polymorphism in your types, enable
 the flag :ghc-flag:`-fprint-explicit-runtime-reps`.
@@ -9665,7 +9585,7 @@ The following things have kind ``Constraint``:
 -  Anything whose form is not yet known, but the user has declared to
    have kind ``Constraint`` (for which they need to import it from
    ``GHC.Exts``). So for example
-   ``type Foo (f :: * -> Constraint) = forall b. f b => b -> b``
+   ``type Foo (f :: Type -> Constraint) = forall b. f b => b -> b``
    is allowed, as well as examples involving type families: ::
 
        type family Typ a b :: Constraint
@@ -10195,29 +10115,27 @@ This extension enables kind signatures in the following places:
 
 -  ``data`` declarations: ::
 
-         data Set (cxt :: * -> *) a = Set [a]
+         data Set (cxt :: Type -> Type) a = Set [a]
 
 -  ``type`` declarations: ::
 
-         type T (f :: * -> *) = f Int
+         type T (f :: Type -> Type) = f Int
 
 -  ``class`` declarations: ::
 
-         class (Eq a) => C (f :: * -> *) a where ...
+         class (Eq a) => C (f :: Type -> Type) a where ...
 
 -  ``forall``\'s in type signatures: ::
 
-         f :: forall (cxt :: * -> *). Set cxt Int
+         f :: forall (cxt :: Type -> Type). Set cxt Int
 
-The parentheses are required. Some of the spaces are required too, to
-separate the lexemes. If you write ``(f::*->*)`` you will get a parse
-error, because ``::*->*`` is a single lexeme in Haskell.
+The parentheses are required.
 
 As part of the same extension, you can put kind annotations in types as
 well. Thus: ::
 
-       f :: (Int :: *) -> Int
-       g :: forall a. a -> (a :: *)
+       f :: (Int :: Type) -> Int
+       g :: forall a. a -> (a :: Type)
 
 The syntax is
 
@@ -15611,7 +15529,7 @@ Haskell datatypes: ::
     -- | Unit: used for constructors without arguments
     data U1 p = U1
 
-    -- | Constants, additional parameters and recursion of kind *
+    -- | Constants, additional parameters and recursion of kind Type
     newtype K1 i c p = K1 { unK1 :: c }
 
     -- | Meta-information (constructor names, etc.)
@@ -15630,22 +15548,22 @@ datatypes and their internal representation as a sum-of-products: ::
 
     class Generic a where
       -- Encode the representation of a user datatype
-      type Rep a :: * -> *
+      type Rep a :: Type -> Type
       -- Convert from the datatype to its representation
       from  :: a -> (Rep a) x
       -- Convert from the representation to the datatype
       to    :: (Rep a) x -> a
 
-    class Generic1 (f :: k -> *) where
-      type Rep1 f :: k -> *
+    class Generic1 (f :: k -> Type) where
+      type Rep1 f :: k -> Type
 
       from1  :: f a -> Rep1 f a
       to1    :: Rep1 f a -> f a
 
 ``Generic1`` is used for functions that can only be defined over type
 containers, such as ``map``. Note that ``Generic1`` ranges over types of kind
-``* -> *`` by default, but if the :extension:`PolyKinds` extension is enabled,
-then it can range of types of kind ``k -> *``, for any kind ``k``.
+``Type -> Type`` by default, but if the :extension:`PolyKinds` extension is
+enabled, then it can range of types of kind ``k -> Type``, for any kind ``k``.
 
 .. extension:: DeriveGeneric
     :shortdesc: Enable deriving for the Generic class.

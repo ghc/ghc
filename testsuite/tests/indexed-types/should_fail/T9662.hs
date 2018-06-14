@@ -4,10 +4,12 @@
 
 module T9662 where
 
+import Data.Kind (Type)
+
 data Exp a = Exp
 data (a:.b) = a:.b
 
-type family Plain e :: *
+type family Plain e :: Type
 type instance Plain (Exp a) = a
 type instance Plain (a:.b) = Plain a :. Plain b
 

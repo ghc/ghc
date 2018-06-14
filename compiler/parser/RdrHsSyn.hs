@@ -57,7 +57,8 @@ module   RdrHsSyn (
         checkRecordSyntax,
         checkEmptyGADTs,
         parseErrorSDoc, hintBangPat,
-        splitTilde, splitTildeApps,
+        splitTilde,
+        TyEl(..), mergeOps,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -66,6 +67,10 @@ module   RdrHsSyn (
         mkTypeImpExp,
         mkImpExpSubSpec,
         checkImportSpec,
+
+        -- Warnings and errors
+        warnStarIsType,
+        failOpFewArgs,
 
         SumOrTuple (..), mkSumOrTuple
 
@@ -87,8 +92,7 @@ import Lexeme           ( isLexCon )
 import Type             ( TyThing(..) )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey,
-                          starKindTyConName, unicodeStarKindTyConName )
+                          listTyConName, listTyConKey )
 import ForeignCall
 import PrelNames        ( forall_tv_RDR, eqTyCon_RDR, allNameStrings )
 import SrcLoc
@@ -103,7 +107,7 @@ import ApiAnnotation
 import HsExtension      ( noExt )
 import Data.List
 import qualified GHC.LanguageExtensions as LangExt
-import MonadUtils
+import DynFlags ( WarningFlag(..) )
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -479,9 +483,15 @@ So the plan is:
      data T = (+++)
   will parse ok (since tycons can be operators), but we should reject
   it (Trac #12051).
+
+'splitCon' takes a reversed list @apps@ of types as input, such that
+@foldl1 mkHsAppTy (reverse apps)@ yields the original type. This is because
+this is easy for the parser to produce and we avoid the overhead of unrolling
+'HsAppTy'.
+
 -}
 
-splitCon :: LHsType GhcPs
+splitCon :: [LHsType GhcPs]
       -> P ( Located RdrName         -- constructor name
            , HsConDeclDetails GhcPs  -- constructor field information
            , Maybe LHsDocString      -- docstring to go on the constructor
@@ -491,15 +501,11 @@ splitCon :: LHsType GhcPs
 --      C Int Bool
 -- or   C { x::Int, y::Bool }
 -- and returns the pieces
-splitCon ty
+splitCon apps
  = split apps' []
  where
-   -- This is used somewhere where HsAppsTy is not used
-   unrollApps (L _ (HsAppTy _ t u)) = u : unrollApps t
-   unrollApps t = [t]
-
-   apps = unrollApps ty
    oneDoc = [ () | L _ (HsDocTy{}) <- apps ] `lengthIs` 1
+   ty = foldl1 mkHsAppTy (reverse apps)
 
    -- the trailing doc, if any, can be extracted first
    (apps', trailing_doc)
@@ -865,15 +871,6 @@ checkTyClHdr is_cls ty
       | isRdrTc tc               = return (ltc, t1:t2:acc, Infix, ann)
     go l (HsParTy _ ty)    acc ann fix = goL ty acc (ann ++mkParensApiAnn l) fix
     go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (t2:acc) ann fix
-    go _ (HsAppsTy _ ts)   acc ann _fix
-      | Just (head, args, fixity) <- getAppsTyHead_maybe ts
-      = goL head (args ++ acc) ann fixity
-
-    go _ (HsAppsTy _ [L _ (HsAppInfix _ (L loc star))]) [] ann fix
-      | isStar star
-      = return (L loc (nameRdrName starKindTyConName), [], fix, ann)
-      | isUniStar star
-      = return (L loc (nameRdrName unicodeStarKindTyConName), [], fix, ann)
 
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
       = return (L l (nameRdrName tup_name), ts, fix, ann)
@@ -926,10 +923,6 @@ checkContext (L l orig_t)
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
     -- be used as context constraints.
     = return (anns ++ mkParensApiAnn lp,L l ts)                -- Ditto ()
-
-    -- don't let HsAppsTy get in the way
-  check anns (L _ (HsAppsTy _ [L _ (HsAppPrefix _ ty)]))
-    = check anns ty
 
   check anns (L lp1 (HsParTy _ ty))
                                   -- to be sure HsParTy doesn't get into the way
@@ -1276,56 +1269,78 @@ isFunLhs e = go e [] []
                  _ -> return Nothing }
    go _ _ _ = return Nothing
 
+-- | Transform a list of 'atype' with 'strict_mark' into
+-- HsOpTy's of 'eqTyCon_RDR':
+--
+--   [~a, ~b, c, ~d] ==> (~a) ~ ((b c) ~ d)
+--
+-- See Note [Parsing ~]
+splitTilde :: [LHsType GhcPs] -> P (LHsType GhcPs)
+splitTilde [] = panic "splitTilde"
+splitTilde (x:xs) = go x xs
+  where
+    -- We accumulate applications in the LHS until we encounter a laziness
+    -- annotation. For example, if we have [Foo, x, y, ~Bar, z], the 'lhs'
+    -- accumulator will become '(Foo x) y'. Then we strip the laziness
+    -- annotation off 'Bar' and process the tail [Bar, z] recursively.
+    --
+    -- This leaves us with 'lhs = (Foo x) y' and 'rhs = Bar z'.
+    -- In case the tail contained more laziness annotations, they would be
+    -- processed similarly. This makes '~' right-associative.
+    go lhs [] = return lhs
+    go lhs (x:xs)
+      | L loc (HsBangTy _ (HsSrcBang NoSourceText NoSrcUnpack SrcLazy) t) <- x
+      = do { rhs <- splitTilde (t:xs)
+           ; let r = mkLHsOpTy lhs (tildeOp loc) rhs
+           ; moveAnnotations loc (getLoc r)
+           ; return r }
+      | otherwise
+      = go (mkHsAppTy lhs x) xs
 
--- | Transform btype_no_ops with strict_mark's into HsEqTy's
--- (((~a) ~b) c) ~d ==> ((~a) ~ (b c)) ~ d
-splitTilde :: LHsType GhcPs -> P (LHsType GhcPs)
-splitTilde t = go t
-  where go (L loc (HsAppTy _ t1 t2))
-          | L lo (HsBangTy _ (HsSrcBang NoSourceText NoSrcUnpack SrcLazy) t2')
-                                                                          <- t2
-          = do
-              moveAnnotations lo loc
-              t1' <- go t1
-              return (L loc (HsEqTy noExt t1' t2'))
-          | otherwise
-          = do
-              t1' <- go t1
-              case t1' of
-                (L lo (HsEqTy _ tl tr)) -> do
-                  let lr = combineLocs tr t2
-                  moveAnnotations lo loc
-                  return (L loc (HsEqTy noExt tl
-                                           (L lr (HsAppTy noExt tr t2))))
-                t -> do
-                  return (L loc (HsAppTy noExt t t2))
+    tildeOp loc = L (srcSpanFirstCharacter loc) eqTyCon_RDR
 
-        go t = return t
+-- | Either an operator or an operand.
+data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
 
+-- | Merge a /reversed/ and /non-empty/ soup of operators and operands
+--   into a type.
+--
+-- User input: @F x y + G a b * X@
+-- Input to 'mergeOps': [X, *, b, a, G, +, y, x, F]
+-- Output corresponds to what the user wrote assuming all operators are of the
+-- same fixity and right-associative.
+--
+-- It's a bit silly that we're doing it at all, as the renamer will have to
+-- rearrange this, and it'd be easier to keep things separate.
+mergeOps :: [Located TyEl] -> P (LHsType GhcPs)
+mergeOps = go [] id
+  where
+    -- clause (a):
+    -- when we encounter an operator, we must have accumulated
+    -- something for its rhs, and there must be something left
+    -- to build its lhs.
+    go acc ops_acc (L l (TyElOpr op):xs) =
+      if null acc || null xs
+        then failOpFewArgs (L l op)
+        else do { a <- splitTilde acc
+                ; go [] (\c -> mkLHsOpTy c (L l op) (ops_acc a)) xs }
 
--- | Transform tyapps with strict_marks into uses of twiddle
--- [~a, ~b, c, ~d] ==> (~a) ~ b c ~ d
-splitTildeApps :: [LHsAppType GhcPs] -> P [LHsAppType GhcPs]
-splitTildeApps []         = return []
-splitTildeApps (t : rest) = do
-  rest' <- concatMapM go rest
-  return (t : rest')
-  where go (L l (HsAppPrefix _
-            (L loc (HsBangTy noExt
-                    (HsSrcBang NoSourceText NoSrcUnpack SrcLazy)
-                    ty))))
-          = addAnnotation l AnnTilde tilde_loc >>
-            return
-              [L tilde_loc (HsAppInfix noExt (L tilde_loc eqTyCon_RDR)),
-               L l (HsAppPrefix noExt ty)]
-               -- NOTE: no annotation is attached to an HsAppPrefix, so the
-               --       surrounding SrcSpan is not critical
-          where
-            tilde_loc = srcSpanFirstCharacter loc
+    -- clause (b):
+    -- whenever an operand is encountered, it is added to the accumulator
+    go acc ops_acc (L l (TyElOpd a):xs) = go (L l a:acc) ops_acc xs
 
-        go t = return [t]
-
-
+    -- clause (c):
+    -- at this point we know that 'acc' is non-empty because
+    -- there are three options when 'acc' can be empty:
+    -- 1. 'mergeOps' was called with an empty list, and this
+    --    should never happen
+    -- 2. 'mergeOps' was called with a list where the head is an
+    --    operator, this is handled by clause (a)
+    -- 3. 'mergeOps' was called with a list where the head is an
+    --    operand, this is handled by clause (b)
+    go acc ops_acc [] =
+      do { a <- splitTilde acc
+         ; return (ops_acc a) }
 
 ---------------------------------------------------------------------------
 -- Check for monad comprehensions
@@ -1715,6 +1730,28 @@ isImpExpQcWildcard ImpExpQcWildcard = True
 isImpExpQcWildcard _                = False
 
 -----------------------------------------------------------------------------
+-- Warnings and failures
+
+warnStarIsType :: SrcSpan -> P ()
+warnStarIsType span = addWarning Opt_WarnStarIsType span msg
+  where
+    msg =  text "Using" <+> quotes (text "*")
+           <+> text "(or its Unicode variant) to mean"
+           <+> quotes (text "Data.Kind.Type")
+        $$ text "relies on the StarIsType extension."
+        $$ text "Suggested fix: use" <+> quotes (text "Type")
+           <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
+
+failOpFewArgs :: Located RdrName -> P a
+failOpFewArgs (L loc op) =
+  do { type_operators <- extension typeOperatorsEnabled
+     ; star_is_type <- extension starIsTypeEnabled
+     ; let msg = too_few $$ starInfo (type_operators, star_is_type) op
+     ; parseErrorSDoc loc msg }
+  where
+    too_few = text "Operator applied to too few arguments:" <+> ppr op
+
+-----------------------------------------------------------------------------
 -- Misc utils
 
 parseErrorSDoc :: SrcSpan -> SDoc -> P a
@@ -1748,3 +1785,8 @@ mkSumOrTuple Boxed l (Sum alt arity (L _ e)) =
       text "(" <+> ppr_bars (alt - 1) <+> ppr e <+> ppr_bars (arity - alt) <+> text ")"
 
     ppr_bars n = hsep (replicate n (Outputable.char '|'))
+
+mkLHsOpTy :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> LHsType GhcPs
+mkLHsOpTy x op y =
+  let loc = getLoc x `combineSrcSpans` getLoc op `combineSrcSpans` getLoc y
+  in L loc (mkHsOpTy x op y)

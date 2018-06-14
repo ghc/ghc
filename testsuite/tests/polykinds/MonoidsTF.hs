@@ -12,13 +12,15 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Main where
+
+import Data.Kind
 import Control.Monad (Monad(..), join, ap, liftM)
 import Data.Monoid (Monoid(..))
 import Data.Semigroup (Semigroup(..))
 
 -- First we define the type class Monoidy:
 
-class Monoidy (to :: k0 -> k1 -> *) (m :: k1)  where
+class Monoidy (to :: k0 -> k1 -> Type) (m :: k1)  where
   type MComp to m :: k1 -> k1 -> k0
   type MId   to m :: k0
   munit :: MId to m `to` m

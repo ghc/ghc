@@ -4,17 +4,19 @@
              TypeOperators #-}
 module T13025a where
 
+import Data.Kind (Type)
+
 data Nat = Z | S Nat
 data Proxy a = Proxy
 
-data Field :: (k,*) -> * where
+data Field :: (k,Type) -> Type where
   Field :: a -> Field '(s,a)
 
 type family Index r rs :: Nat where
   Index r (r ': rs) = 'Z
   Index r (s ': rs) = 'S (Index r rs)
 
-data Rec (rs :: [ (k,*) ]) where
+data Rec (rs :: [ (k,Type) ]) where
   Nil :: Rec '[]
   (:&) :: Field r -> Rec rs -> Rec (r ': rs)
 infixr 5 :&

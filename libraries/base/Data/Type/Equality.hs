@@ -5,13 +5,13 @@
 {-# LANGUAGE StandaloneDeriving     #-}
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeInType             #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE ExplicitNamespaces     #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE TypeInType             #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE Trustworthy            #-}
 
 -----------------------------------------------------------------------------

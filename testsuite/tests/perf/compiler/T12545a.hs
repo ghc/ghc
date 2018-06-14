@@ -19,6 +19,7 @@ module T12545a
   , ElemsOf
   ) where
 
+import Data.Kind (Type)
 import Data.Proxy (Proxy(..))
 
 data ElemPath = HeadElem
@@ -55,4 +56,4 @@ type IsElem a l = ElemAt (JustElemPath (FindElem 'HeadElem a l)) a l
 
 class IsElem t (ElemsOf a) => ElemOf a t where
 
-type family ElemsOf a :: [*]
+type family ElemsOf a :: [Type]

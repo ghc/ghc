@@ -88,7 +88,7 @@ import GhcPrelude
 import qualified GHC.LanguageExtensions as LangExt
 }
 
-%expect 233 -- shift/reduce conflicts
+%expect 235 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -158,7 +158,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 143 contains 14 shift/reduce conflicts.
+state 144 contains 15 shift/reduce conflicts.
 
         exp -> infixexp . '::' sigtype
         exp -> infixexp . '-<' exp
@@ -169,7 +169,7 @@ state 143 contains 14 shift/reduce conflicts.
         infixexp -> infixexp . qop exp10
 
     Conflicts: ':' '::' '-' '!' '-<' '>-' '-<<' '>>-'
-               '.' '`' VARSYM CONSYM QVARSYM QCONSYM
+               '.' '`' '*' VARSYM CONSYM QVARSYM QCONSYM
 
 Examples of ambiguity:
     'if x then y else z -< e'
@@ -183,7 +183,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 148 contains 68 shift/reduce conflicts.
+state 149 contains 67 shift/reduce conflicts.
 
     *** exp10 -> fexp .
         fexp -> fexp . aexp
@@ -201,7 +201,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 204 contains 28 shift/reduce conflicts.
+state 204 contains 27 shift/reduce conflicts.
 
         aexp2 -> TH_TY_QUOTE . tyvar
         aexp2 -> TH_TY_QUOTE . gtycon
@@ -220,7 +220,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 308 contains 1 shift/reduce conflicts.
+state 300 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp
 
@@ -238,7 +238,7 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 318 contains 1 shift/reduce conflict.
+state 310 contains 1 shift/reduce conflict.
 
     *** type -> btype .
         type -> btype . '->' ctype
@@ -249,7 +249,7 @@ Same as state 61 but without contexts.
 
 -------------------------------------------------------------------------------
 
-state 362 contains 1 shift/reduce conflicts.
+state 354 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(' commas . ')'
@@ -264,7 +264,7 @@ if -XTupleSections is not specified.
 
 -------------------------------------------------------------------------------
 
-state 418 contains 1 shift/reduce conflicts.
+state 409 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(#' commas . '#)'
@@ -272,21 +272,21 @@ state 418 contains 1 shift/reduce conflicts.
 
     Conflict: '#)' (empty tup_tail reduces)
 
-Same as State 362 for unboxed tuples.
+Same as State 354 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 429 contains 68 shift/reduce conflicts.
+state 417 contains 67 shift/reduce conflicts.
 
     *** exp10 -> '-' fexp .
         fexp -> fexp . aexp
         fexp -> fexp . TYPEAPP atype
 
-Same as 148 but with a unary minus.
+Same as 149 but with a unary minus.
 
 -------------------------------------------------------------------------------
 
-state 493 contains 1 shift/reduce conflict.
+state 481 contains 1 shift/reduce conflict.
 
         oqtycon -> '(' qtyconsym . ')'
     *** qtyconop -> qtyconsym .
@@ -300,7 +300,7 @@ parenthesized infix type expression of length 1.
 
 -------------------------------------------------------------------------------
 
-state 694 contains 1 shift/reduce conflicts.
+state 675 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .
         dbind -> ipvar . '=' exp
@@ -315,7 +315,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 771 contains 1 shift/reduce conflicts.
+state 752 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp
 
@@ -332,7 +332,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 1019 contains 1 shift/reduce conflicts.
+state 986 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp
         transformqual -> 'then' 'group' . 'by' exp 'using' exp
@@ -342,7 +342,7 @@ state 1019 contains 1 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 1404 contains 1 shift/reduce conflict.
+state 1367 contains 1 shift/reduce conflict.
 
     *** atype -> tyvar .
         tv_bndr -> '(' tyvar . '::' kind ')'
@@ -526,6 +526,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '=>'           { L _ (ITdarrow _) }
  '-'            { L _ ITminus }
  '!'            { L _ ITbang }
+ '*'            { L _ (ITstar _) }
  '-<'           { L _ (ITlarrowtail _) }            -- for arrow notation
  '>-'           { L _ (ITrarrowtail _) }            -- for arrow notation
  '-<<'          { L _ (ITLarrowtail _) }            -- for arrow notation
@@ -1160,11 +1161,7 @@ deriv_strategy_no_via :: { LDerivStrategy GhcPs }
                                        [mj AnnNewtype $1] }
 
 deriv_strategy_via :: { LDerivStrategy GhcPs }
-  : 'via' tyapp                 {% splitTildeApps [$2] >>= \tys -> let
-                                     ty :: LHsType GhcPs
-                                     ty = sL1 $1 $ mkHsAppsTy tys
-
-                                     in ams (sLL $1 $> (ViaStrategy (mkLHsSigType ty)))
+  : 'via' type              {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
                                             [mj AnnVia $1] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
@@ -1856,7 +1853,7 @@ context :: { LHsContext GhcPs }
                                                 } }
 
 context_no_ops :: { LHsContext GhcPs }
-        : btype_no_ops                 {% do { ty <- splitTilde $1
+        : btype_no_ops                 {% do { ty <- splitTilde (reverse (unLoc $1))
                                              ; (anns,ctx) <- checkContext ty
                                              ; if null (unLoc ctx)
                                                    then addAnnotation (gl ty) AnnUnit (gl ty)
@@ -1911,29 +1908,27 @@ typedoc :: { LHsType GhcPs }
 
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }
-        : tyapps                      {%  splitTildeApps (reverse (unLoc $1)) >>=
-                                          \ts -> return $ sL1 $1 $ mkHsAppsTy ts }
+      : tyapps                      {%  mergeOps (unLoc $1) }
 
 -- Used for parsing Haskell98-style data constructors,
 -- in order to forbid the blasphemous
 -- > data Foo = Int :+ Char :* Bool
 -- See also Note [Parsing data constructors is hard] in RdrHsSyn
-btype_no_ops :: { LHsType GhcPs }
-        : btype_no_ops atype_docs       { sLL $1 $> $ HsAppTy noExt $1 $2 }
-        | atype_docs                    { $1 }
+btype_no_ops :: { Located [LHsType GhcPs] } -- NB: This list is reversed
+        : atype_docs                    { sL1 $1 [$1] }
+        | btype_no_ops atype_docs       { sLL $1 $> $ $2 : (unLoc $1) }
 
-tyapps :: { Located [LHsAppType GhcPs] }   -- NB: This list is reversed
+tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
         : tyapp                         { sL1 $1 [$1] }
         | tyapps tyapp                  { sLL $1 $> $ $2 : (unLoc $1) }
 
--- See Note [HsAppsTy] in HsTypes
-tyapp :: { LHsAppType GhcPs }
-        : atype                         { sL1 $1 $ HsAppPrefix noExt $1 }
-        | qtyconop                      { sL1 $1 $ HsAppInfix noExt $1 }
-        | tyvarop                       { sL1 $1 $ HsAppInfix noExt $1 }
-        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ HsAppInfix noExt $2)
+tyapp :: { Located TyEl }
+        : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
+        | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
+        | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
+        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1] }
-        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ HsAppInfix noExt $2)
+        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1] }
 
 atype_docs :: { LHsType GhcPs }
@@ -1943,6 +1938,8 @@ atype_docs :: { LHsType GhcPs }
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
         | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
+        | '*'                            {% do { warnStarIsType (getLoc $1)
+                                               ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy noExt (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -2061,13 +2058,13 @@ Note [Parsing ~]
 
 Due to parsing conflicts between laziness annotations in data type
 declarations (see strict_mark) and equality types ~'s are always
-parsed as laziness annotations, and turned into HsEqTy's in the
+parsed as laziness annotations, and turned into HsOpTy's in the
 correct places using RdrHsSyn.splitTilde.
 
 Since strict_mark is parsed as part of atype which is part of type,
 typedoc and context (where HsEqTy previously appeared) it made most
 sense and was simplest to parse ~ as part of strict_mark and later
-turn them into HsEqTy's.
+turn them into HsOpTy's.
 
 -}
 
@@ -2191,14 +2188,15 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr GhcPs]) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs, Maybe LHsDocString) }
     -- See Note [Parsing data constructors is hard] in RdrHsSyn
-        : btype_no_ops                         {% do { c <- splitCon $1
-                                                     ; return $ sLL $1 $> c } }
+        : btype_no_ops                     {% do { c <- splitCon (unLoc $1)
+                                                 ; return $ sL1 $1 c } }
         | btype_no_ops conop maybe_docprev btype_no_ops
-            {% do { lhs <- splitTilde $1
-                              ; (_, ds_l) <- checkInfixConstr lhs
-                  ; (rhs, ds_r) <- checkInfixConstr $4
+            {% do { lhs <- splitTilde (reverse (unLoc $1))
+                  ; (_, ds_l) <- checkInfixConstr lhs
+                  ; let rhs1 = foldl1 mkHsAppTy (reverse (unLoc $4))
+                  ; (rhs, ds_r) <- checkInfixConstr rhs1
                   ; return $ if isJust (ds_l `mplus` $3)
-                               then sLL $1 $> ($2, InfixCon lhs $4, $3)
+                               then sLL $1 $> ($2, InfixCon lhs rhs1, $3)
                                else sLL $1 $> ($2, InfixCon lhs rhs, ds_r) } }
 
 fielddecls :: { [LConDeclField GhcPs] }
@@ -3370,6 +3368,7 @@ special_id
 special_sym :: { Located FastString }
 special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
             | '.'       { sL1 $1 (fsLit ".") }
+            | '*'       { sL1 $1 (fsLit (if isUnicode $1 then "★" else "*")) }
 
 -----------------------------------------------------------------------------
 -- Data constructors
@@ -3552,6 +3551,7 @@ isUnicode (L _ (IToparenbar      iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITcparenbar      iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITopenExpQuote _ iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITcloseQuote     iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITstar           iu)) = iu == UnicodeSyntax
 isUnicode _                           = False
 
 hasE :: Located Token -> Bool

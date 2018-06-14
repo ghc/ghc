@@ -902,7 +902,6 @@ type ForallXHsWildCardBndrs(c :: * -> Constraint) (x :: *) (b :: *) =
 type family XForAllTy        x
 type family XQualTy          x
 type family XTyVar           x
-type family XAppsTy          x
 type family XAppTy           x
 type family XFunTy           x
 type family XListTy          x
@@ -912,6 +911,7 @@ type family XOpTy            x
 type family XParTy           x
 type family XIParamTy        x
 type family XEqTy            x
+type family XStarTy          x
 type family XKindSig         x
 type family XSpliceTy        x
 type family XDocTy           x
@@ -929,7 +929,6 @@ type ForallXType (c :: * -> Constraint) (x :: *) =
        ( c (XForAllTy        x)
        , c (XQualTy          x)
        , c (XTyVar           x)
-       , c (XAppsTy          x)
        , c (XAppTy           x)
        , c (XFunTy           x)
        , c (XListTy          x)
@@ -939,6 +938,7 @@ type ForallXType (c :: * -> Constraint) (x :: *) =
        , c (XParTy           x)
        , c (XIParamTy        x)
        , c (XEqTy            x)
+       , c (XStarTy          x)
        , c (XKindSig         x)
        , c (XSpliceTy        x)
        , c (XDocTy           x)
@@ -961,18 +961,6 @@ type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
        ( c (XUserTyVar      x)
        , c (XKindedTyVar    x)
        , c (XXTyVarBndr     x)
-       )
-
--- ---------------------------------------------------------------------
-
-type family XAppInfix  x
-type family XAppPrefix x
-type family XXAppType  x
-
-type ForallXAppType (c :: * -> Constraint) (x :: *) =
-       ( c (XAppInfix   x)
-       , c (XAppPrefix  x)
-       , c (XXAppType   x)
        )
 
 -- ---------------------------------------------------------------------

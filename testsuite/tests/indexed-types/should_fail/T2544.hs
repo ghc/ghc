@@ -4,10 +4,12 @@
 
 module T2544 where
 
+import Data.Kind
+
 data (:|:) a b = Inl a | Inr b
 
 class Ix i where
-   type IxMap i :: * -> *
+   type IxMap i :: Type -> Type
    empty  :: IxMap i [Int]
 
 data BiApp a b c = BiApp (a c) (b c)

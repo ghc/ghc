@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeOperators
+{-# LANGUAGE TypeOperators, StarIsType
            , DataKinds
            , PolyKinds
            , TypeFamilies

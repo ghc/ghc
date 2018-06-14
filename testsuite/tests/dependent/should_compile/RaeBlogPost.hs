@@ -1,5 +1,4 @@
-{-# LANGUAGE DataKinds, PolyKinds, GADTs, TypeOperators, TypeFamilies,
-             TypeInType #-}
+{-# LANGUAGE DataKinds, PolyKinds, GADTs, TypeOperators, TypeFamilies #-}
 {-# OPTIONS_GHC -fwarn-unticked-promoted-constructors #-}
 
 module RaeBlogPost where
@@ -8,7 +7,7 @@ import Data.Kind
 
 -- a Proxy type with an explicit kind
 data Proxy k (a :: k) = P
-prox :: Proxy * Bool
+prox :: Proxy Type Bool
 prox = P
 
 prox2 :: Proxy Bool 'True
@@ -16,11 +15,11 @@ prox2 = P
 
 -- implicit kinds still work
 data A
-data B :: A -> *
-data C :: B a -> *
-data D :: C b -> *
-data E :: D c -> *
--- note that E :: forall (a :: A) (b :: B a) (c :: C b). D c -> *
+data B :: A -> Type
+data C :: B a -> Type
+data D :: C b -> Type
+data E :: D c -> Type
+-- note that E :: forall (a :: A) (b :: B a) (c :: C b). D c -> Type
 
 -- a kind-indexed GADT
 data TypeRep (a :: k) where
@@ -37,7 +36,7 @@ type family a + b where
   'Zero     + b = b
   ('Succ a) + b = 'Succ (a + b)
 
-data Vec :: * -> Nat -> * where
+data Vec :: Type -> Nat -> Type where
   Nil  :: Vec a 'Zero
   (:>) :: a -> Vec a n -> Vec a ('Succ n)
 infixr 5 :>
@@ -47,17 +46,17 @@ type family (x :: Vec a n) ++ (y :: Vec a m) :: Vec a (n + m) where
   'Nil      ++ y = y
   (h ':> t) ++ y = h ':> (t ++ y)
 
--- datatype that mentions *
-data U = Star (*)
+-- datatype that mentions Type
+data U = Star (Type)
        | Bool Bool
 
 -- kind synonym
-type Monadish = * -> *
+type Monadish = Type -> Type
 class MonadTrans (t :: Monadish -> Monadish) where
   lift :: Monad m => m a -> t m a
 data Free :: Monadish where
   Return :: a -> Free a
   Bind   :: Free a -> (a -> Free b) -> Free b
 
--- yes, * really does have type *.
-type Star = (* :: (* :: (* :: *)))
+-- yes, Type really does have type Type.
+type Star = (Type :: (Type :: (Type :: Type)))

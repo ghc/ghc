@@ -1,4 +1,5 @@
-{-# Language MagicHash, PolyKinds, ViewPatterns, TypeInType, RebindableSyntax, NoImplicitPrelude #-}
+{-# Language PolyKinds, ViewPatterns, RebindableSyntax,
+             MagicHash, NoImplicitPrelude #-}
 
 module T12709 where
 

@@ -3,11 +3,13 @@
 
 module Bug where
 
-data SBool :: Bool -> * where
+import Data.Kind
+
+data SBool :: Bool -> Type where
   SFalse :: SBool False
   STrue :: SBool True
 
-data SList :: [Bool] -> * where
+data SList :: [Bool] -> Type where
   SNil :: SList '[]
   SCons :: SBool h -> SList t -> SList (h ': t)
 

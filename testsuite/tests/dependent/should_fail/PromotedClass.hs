@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, GADTs #-}
+{-# LANGUAGE DataKinds, GADTs #-}
 
 module PromotedClass where
 

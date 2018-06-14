@@ -685,7 +685,7 @@ tcDataFamInstDecl mb_clsinfo
          -- Deal with any kind signature.
          -- See also Note [Arity of data families] in FamInstEnv
        ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind'
-       ; checkTc (tcIsStarKind final_res_kind) (badKindSig True res_kind')
+       ; checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind')
 
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats' `chkAppend` extra_pats
@@ -727,7 +727,7 @@ tcDataFamInstDecl mb_clsinfo
        ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats' extra_pats pp_hs_pats
 
          -- Result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (tcIsStarKind final_res_kind) $
+       ; checkTc (tcIsLiftedTypeKind final_res_kind) $
          tooFewParmsErr (tyConArity fam_tc)
 
        ; checkValidTyCon rep_tc
