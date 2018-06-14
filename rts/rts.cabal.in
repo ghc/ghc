@@ -251,9 +251,11 @@ library
          "-Wl,-u,_hs_atomicwrite8"
          "-Wl,-u,_hs_atomicwrite16"
          "-Wl,-u,_hs_atomicwrite32"
+#if defined(DEBUG)
          -- This symbol is useful in gdb, but not referred to anywhere,
          -- so we need to force it to be included in the binary.
          "-Wl,-u,_findPtr"
+#endif         
     else
       ld-options:
          "-Wl,-u,base_GHCziTopHandler_runIO_closure"
@@ -324,9 +326,11 @@ library
          "-Wl,-u,hs_atomicwrite8"
          "-Wl,-u,hs_atomicwrite16"
          "-Wl,-u,hs_atomicwrite32"
+#if defined(DEBUG)         
          -- This symbol is useful in gdb, but not referred to anywhere,
          -- so we need to force it to be included in the binary.
          "-Wl,-u,findPtr"
+#endif         
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
