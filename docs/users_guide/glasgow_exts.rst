@@ -9707,8 +9707,17 @@ contexts and superclasses, but to do so you must use
 :extension:`UndecidableInstances` to signal that you don't mind if the type
 checker fails to terminate.
 
+.. _quantified-constraints:
+
 Quantified constraints
 ======================
+
+.. extension:: QuantifiedConstraints
+    :shortdesc: Allow ``forall`` quantifiers in constraints.
+
+    :since: 8.6.1
+
+    Allow constraints to quantify over types.
 
 The extension :extension:`QuantifiedConstraints` introduces **quantified constraints**,
 which give a new level of expressiveness in constraints. For example, consider ::

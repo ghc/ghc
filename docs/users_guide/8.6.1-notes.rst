@@ -28,6 +28,19 @@ Full details
 
 Language
 ~~~~~~~~
+
+- Use of quantified type variables in constraints is now allowed via the
+  :extension:`QuantifiedConstraints` language extension. This long-awaited feature
+  enables users to encode significantly more precision in their types. For instance,
+  the common ``MonadTrans`` typeclass could now make the expectation that an
+  applied transformer is must be a ``Monad`` ::
+
+      class (forall a. Monad m => Monad (t m)) => MonadTrans t where {- ... -}
+
+  Additionally, quantification can enable terminating instance resolution
+  where this previously was not possible. See :ref:`quantified-constraints` for
+  details.
+
 - A new :extension:`DerivingVia` language extension has been added which allows
   the use of the ``via`` deriving strategy. For instance: ::
 
