@@ -454,10 +454,18 @@ stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
 ************************************************************************
 -}
 
+-- | The same comments as for `Name`'s `Ord` instance apply.
 instance Eq Name where
     a == b = case (a `compare` b) of { EQ -> True;  _ -> False }
     a /= b = case (a `compare` b) of { EQ -> False; _ -> True }
 
+-- | __Caution__: This instance is implemented via `nonDetCmpUnique`, which
+-- means that the ordering is not stable across deserialization or rebuilds.
+--
+-- See `nonDetCmpUnique` for further information, and trac #15240 for a bug
+-- caused by improper use of this instance.
+
+-- For a deterministic lexicographic ordering, use `stableNameCmp`.
 instance Ord Name where
     a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
     a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }

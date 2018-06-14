@@ -118,8 +118,10 @@ concatDocs xs =
 newtype DeclDocMap = DeclDocMap (Map Name HsDocString)
 
 instance Binary DeclDocMap where
-  put_ bh (DeclDocMap m) = put_ bh (Map.toAscList m)
-  get bh = DeclDocMap . Map.fromDistinctAscList <$> get bh
+  put_ bh (DeclDocMap m) = put_ bh (Map.toList m)
+  -- We can't rely on a deterministic ordering of the `Name`s here.
+  -- See the comments on `Name`'s `Ord` instance for context.
+  get bh = DeclDocMap . Map.fromList <$> get bh
 
 instance Outputable DeclDocMap where
   ppr (DeclDocMap m) = vcat (map pprPair (Map.toAscList m))
@@ -133,9 +135,10 @@ emptyDeclDocMap = DeclDocMap Map.empty
 newtype ArgDocMap = ArgDocMap (Map Name (Map Int HsDocString))
 
 instance Binary ArgDocMap where
-  put_ bh (ArgDocMap m) = put_ bh (Map.toAscList (Map.toAscList <$> m))
-  get bh = ArgDocMap . fmap Map.fromDistinctAscList . Map.fromDistinctAscList
-             <$> get bh
+  put_ bh (ArgDocMap m) = put_ bh (Map.toList (Map.toAscList <$> m))
+  -- We can't rely on a deterministic ordering of the `Name`s here.
+  -- See the comments on `Name`'s `Ord` instance for context.
+  get bh = ArgDocMap . fmap Map.fromDistinctAscList . Map.fromList <$> get bh
 
 instance Outputable ArgDocMap where
   ppr (ArgDocMap m) = vcat (map pprPair (Map.toAscList m))

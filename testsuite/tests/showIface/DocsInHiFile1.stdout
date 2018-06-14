@@ -4,28 +4,25 @@ module header:
 '<>', ':=:', 'Bool'
 "
 declaration docs:
-  D':
-    " Another datatype...
-
- ...with two docstrings."
-  P:
-    " A class"
-  p:
-    " A class method"
+  elem:
+    " '()', 'elem'."
   D:
     " A datatype."
   D0:
     " A constructor for 'D'. '"
   D1:
     " Another constructor"
-  elem:
-    " '()', 'elem'."
+  P:
+    " A class"
+  p:
+    " A class method"
   $fShowD:
     " 'Show' instance"
+  D':
+    " Another datatype...
+
+ ...with two docstrings."
 arg docs:
-  p:
-    0:
-      " An argument"
   add:
     0:
       " First summand for 'add'"
@@ -33,4 +30,7 @@ arg docs:
       " Second summand"
     2:
       " Sum"
+  p:
+    0:
+      " An argument"
 
