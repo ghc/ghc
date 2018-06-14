@@ -12298,7 +12298,7 @@ page on the GHC Wiki has a wealth of information. You may also consult the
 :th-ref:`Haddock reference documentation <Language.Haskell.TH.>`.
 Many changes to the original
 design are described in `Notes on Template Haskell version
-2 <http://research.microsoft.com/~simonpj/papers/meta-haskell/notes2.ps>`__.
+2 <https://www.haskell.org/ghc/docs/papers/th2.ps>`__.
 Not all of these changes are in GHC, however.
 
 The first example from that paper is set out below (:ref:`th-example`)
