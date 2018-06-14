@@ -806,7 +806,7 @@ messages and in GHCi:
 
     When :ghc-flag:`-fprint-explicit-runtime-reps` is enabled, GHC prints
     ``RuntimeRep`` type variables for levity-polymorphic types.
-    Otherwise GHC will default these to ``PtrRepLifted``. For example,
+    Otherwise GHC will default these to ``LiftedRep``. For example,
 
     .. code-block:: none
 

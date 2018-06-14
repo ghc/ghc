@@ -156,7 +156,7 @@ kind ``TYPE 'IntRep`` and ``Double#`` has kind ``TYPE 'DoubleRep``. These
 kinds say that the runtime representation of an ``Int#`` is a machine integer,
 and the runtime representation of a ``Double#`` is a machine double-precision
 floating point. In contrast, the kind ``*`` is actually just a synonym
-for ``TYPE 'PtrRepLifted``. More details of the ``TYPE`` mechanisms appear in
+for ``TYPE 'LiftedRep``. More details of the ``TYPE`` mechanisms appear in
 the `section on runtime representation polymorphism <#runtime-rep>`__.
 
 Given that ``Int#``'s kind is not ``*``, it then it follows that
