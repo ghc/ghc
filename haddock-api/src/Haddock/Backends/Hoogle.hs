@@ -128,6 +128,7 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
         f (TyClD _ d@ClassDecl{}) = ppClass dflags d subdocs
+        f (TyClD _ (FamDecl _ d)) = ppFam dflags d
         f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
         f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
         f (SigD _ sig) = ppSig dflags sig ++ ppFixities
@@ -140,11 +141,7 @@ ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
 ppSigWithDoc dflags (TypeSig _ names sig) subdocs
     = concatMap mkDocSig names
     where
-        mkDocSig n = concatMap (ppDocumentation dflags) (getDoc n)
-                     ++ [pp_sig dflags names (hsSigWcType sig)]
-
-        getDoc :: Located Name -> [Documentation Name]
-        getDoc n = maybe [] (return . fst) (lookup (unL n) subdocs)
+        mkDocSig n = mkSubdoc dflags n subdocs [pp_sig dflags [n] (hsSigWcType sig)]
 
 ppSigWithDoc _ _ _ = []
 
@@ -172,9 +169,13 @@ ppClass dflags decl subdocs =
         ppTyFams
             | null $ tcdATs decl = ""
             | otherwise = (" " ++) . showSDocUnqual dflags . whereWrapper $ concat
-                [ map ppr (tcdATs decl)
+                [ map pprTyFam (tcdATs decl)
                 , map (ppr . tyFamEqnToSyn . unLoc) (tcdATDefs decl)
                 ]
+
+        pprTyFam :: LFamilyDecl GhcRn -> SDoc
+        pprTyFam (L _ at) = vcat' $ map text $
+            mkSubdoc dflags (fdLName at) subdocs (ppFam dflags at)
 
         whereWrapper elems = vcat'
             [ text "where" <+> lbrace
@@ -191,6 +192,16 @@ ppClass dflags decl subdocs =
             , tcdSExt   = emptyNameSet
             }
 
+ppFam :: DynFlags -> FamilyDecl GhcRn -> [String]
+ppFam dflags decl@(FamilyDecl { fdInfo = info })
+  = [out dflags decl']
+  where
+    decl' = case info of
+              -- We don't need to print out a closed type family's equations
+              -- for Hoogle, so pretend it doesn't have any.
+              ClosedTypeFamily{} -> decl { fdInfo = OpenTypeFamily }
+              _                  -> decl
+ppFam _ XFamilyDecl {} = panic "ppFam"
 
 ppInstance :: DynFlags -> ClsInst -> [String]
 ppInstance dflags x =
@@ -213,13 +224,12 @@ ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
       concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
     where
 
-        -- GHC gives out "data Bar =", we want to delete the equals
-        -- also writes data : a b, when we want data (:) a b
-        showData d = unwords $ map f $ if last xs == "=" then init xs else xs
+        -- GHC gives out "data Bar =", we want to delete the equals.
+        -- There's no need to worry about parenthesizing infix data type names,
+        -- since this Outputable instance for TyClDecl gets this right already.
+        showData d = unwords $ if last xs == "=" then init xs else xs
             where
                 xs = words $ out dflags d
-                nam = out dflags $ tyClDeclLName d
-                f w = if w == nam then operator nam else w
 ppData _ _ _ = panic "ppData"
 
 -- | for constructors, and named-fields...
@@ -285,6 +295,10 @@ docWith dflags header d
     lines header ++ ["" | header /= "" && isJust d] ++
     maybe [] (showTags . markup (markupTag dflags)) d
 
+mkSubdoc :: DynFlags -> Located Name -> [(Name, DocForDecl Name)] -> [String] -> [String]
+mkSubdoc dflags n subdocs s = concatMap (ppDocumentation dflags) getDoc ++ s
+ where
+   getDoc = maybe [] (return . fst) (lookup (unL n) subdocs)
 
 data Tag = TagL Char [Tags] | TagP Tags | TagPre Tags | TagInline String Tags | Str String
            deriving Show
@@ -328,7 +342,8 @@ markupTag dflags = Markup {
   markupAName                = const $ str "",
   markupProperty             = box TagPre . str,
   markupExample              = box TagPre . str . unlines . map exampleToString,
-  markupHeader               = \(Header l h) -> box (TagInline $ "h" ++ show l) h
+  markupHeader               = \(Header l h) -> box (TagInline $ "h" ++ show l) h,
+  markupTable                = \(Table _ _) -> str "TODO: table"
   }
 
 

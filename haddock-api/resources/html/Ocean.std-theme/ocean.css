@@ -443,6 +443,21 @@ div#style-menu-holder {
   margin-top: 0.8em;
 }
 
+.doc table {
+  border-collapse: collapse;
+  border-spacing: 0px;
+}
+
+.doc th,
+.doc td {
+  padding: 5px;
+  border: 1px solid #ddd;
+}
+
+.doc th {
+  background-color: #f0f0f0;
+}
+
 .clearfix:after {
   clear: both;
   content: " ";

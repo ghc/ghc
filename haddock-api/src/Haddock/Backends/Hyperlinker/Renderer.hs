@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 
-
 module Haddock.Backends.Hyperlinker.Renderer (render) where
 
 
@@ -15,7 +14,6 @@ import System.FilePath.Posix ((</>))
 
 import Data.List
 import Data.Maybe
-import Data.Monoid
 import qualified Data.Map as Map
 
 import Text.XHtml (Html, HtmlAttr, (!))
@@ -29,36 +27,10 @@ render :: Maybe FilePath -> Maybe FilePath -> SrcMap -> [RichToken]
        -> Html
 render mcss mjs srcs tokens = header mcss mjs <> body srcs tokens
 
-
-data TokenGroup
-    = GrpNormal Token
-    | GrpRich TokenDetails [Token]
-
-
--- | Group consecutive tokens pointing to the same element.
---
--- We want to render qualified identifiers as one entity. For example,
--- @Bar.Baz.foo@ consists of 5 tokens (@Bar@, @.@, @Baz@, @.@, @foo@) but for
--- better user experience when highlighting and clicking links, these tokens
--- should be regarded as one identifier. Therefore, before rendering we must
--- group consecutive elements pointing to the same 'GHC.Name' (note that even
--- dot token has it if it is part of qualified name).
-groupTokens :: [RichToken] -> [TokenGroup]
-groupTokens [] = []
-groupTokens ((RichToken tok Nothing):rest) = (GrpNormal tok):(groupTokens rest)
-groupTokens ((RichToken tok (Just det)):rest) =
-    let (grp, rest') = span same rest
-    in (GrpRich det (tok:(map rtkToken grp))):(groupTokens rest')
-  where
-    same (RichToken _ (Just det')) = det == det'
-    same _ = False
-
-
 body :: SrcMap -> [RichToken] -> Html
-body srcs tokens =
-    Html.body . Html.pre $ hypsrc
+body srcs tokens = Html.body . Html.pre $ hypsrc
   where
-    hypsrc = mconcat . map (tokenGroup srcs) . groupTokens $ tokens
+    hypsrc = mconcat . map (richToken srcs) $ tokens
 
 
 header :: Maybe FilePath -> Maybe FilePath -> Html
@@ -79,29 +51,20 @@ header mcss mjs =
         , Html.src scriptFile
         ]
 
-
-tokenGroup :: SrcMap -> TokenGroup -> Html
-tokenGroup _ (GrpNormal tok@(Token { .. }))
-    | tkType == TkSpace = renderSpace (posRow . spStart $ tkSpan) tkValue
-    | otherwise = tokenSpan tok ! attrs
+-- | Given information about the source position of definitions, render a token
+richToken :: SrcMap -> RichToken -> Html
+richToken srcs (RichToken Token{..} details)
+    | tkType == TkSpace = renderSpace (GHC.srcSpanStartLine tkSpan) tkValue
+    | otherwise = linked content
   where
-    attrs = [ multiclass . tokenStyle $ tkType ]
-tokenGroup srcs (GrpRich det tokens) =
-    externalAnchor det . internalAnchor det . hyperlink srcs det $ content
-  where
-    content = mconcat . map (richToken det) $ tokens
+    content = tokenSpan ! [ multiclass style ]
+    tokenSpan = Html.thespan (Html.toHtml tkValue)
+    style = tokenStyle tkType ++ maybe [] richTokenStyle details
 
-
-richToken :: TokenDetails -> Token -> Html
-richToken det tok =
-    tokenSpan tok ! [ multiclass style ]
-  where
-    style = (tokenStyle . tkType) tok ++ richTokenStyle det
-
-
-tokenSpan :: Token -> Html
-tokenSpan = Html.thespan . Html.toHtml . tkValue
-
+    -- If we have name information, we can make links
+    linked = case details of
+      Just d -> externalAnchor d . internalAnchor d . hyperlink srcs d
+      Nothing -> id
 
 richTokenStyle :: TokenDetails -> [StyleClass]
 richTokenStyle (RtkVar _) = ["hs-var"]
@@ -155,7 +118,7 @@ internalHyperlink name content =
     Html.anchor content ! [ Html.href $ "#" ++ internalAnchorIdent name ]
 
 externalNameHyperlink :: SrcMap -> GHC.Name -> Html -> Html
-externalNameHyperlink (srcs, _) name content = case Map.lookup mdl srcs of
+externalNameHyperlink srcs name content = case Map.lookup mdl srcs of
     Just SrcLocal -> Html.anchor content !
         [ Html.href $ hypSrcModuleNameUrl mdl name ]
     Just (SrcExternal path) -> Html.anchor content !
@@ -165,12 +128,14 @@ externalNameHyperlink (srcs, _) name content = case Map.lookup mdl srcs of
     mdl = GHC.nameModule name
 
 externalModHyperlink :: SrcMap -> GHC.ModuleName -> Html -> Html
-externalModHyperlink (_, srcs) name content = case Map.lookup name srcs of
-    Just SrcLocal -> Html.anchor content !
+externalModHyperlink srcs name content =
+    let srcs' = Map.mapKeys GHC.moduleName srcs in
+    case Map.lookup name srcs' of
+      Just SrcLocal -> Html.anchor content !
         [ Html.href $ hypSrcModuleUrl' name ]
-    Just (SrcExternal path) -> Html.anchor content !
+      Just (SrcExternal path) -> Html.anchor content !
         [ Html.href $ path </> hypSrcModuleUrl' name ]
-    Nothing -> content
+      Nothing -> content
 
 
 renderSpace :: Int -> String -> Html

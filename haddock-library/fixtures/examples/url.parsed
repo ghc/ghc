@@ -1,0 +1,4 @@
+DocParagraph
+  (DocHyperlink
+     Hyperlink
+       {hyperlinkLabel = Nothing, hyperlinkUrl = "http://example.com/"})

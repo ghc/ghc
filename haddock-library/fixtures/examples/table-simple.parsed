@@ -1,0 +1,52 @@
+DocTable
+  Table
+    {tableBodyRows = [TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString " 200  ",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocAppend
+                                                  (DocString "   ")
+                                                  (DocAppend
+                                                     (DocMonospaced (DocString "OK"))
+                                                     (DocString "       ")),
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString
+                                                  " operation successful                     ",
+                            tableCellRowspan = 1}],
+                      TableRow
+                        [TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString " 204  ",
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocAppend
+                                                  (DocString " ")
+                                                  (DocAppend
+                                                     (DocMonospaced (DocString "No Content"))
+                                                     (DocString " ")),
+                            tableCellRowspan = 1},
+                         TableCell
+                           {tableCellColspan = 1,
+                            tableCellContents = DocString
+                                                  " operation successful, no body returned   ",
+                            tableCellRowspan = 1}]],
+     tableHeaderRows = [TableRow
+                          [TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString " code ",
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString " message      ",
+                              tableCellRowspan = 1},
+                           TableCell
+                             {tableCellColspan = 1,
+                              tableCellContents = DocString
+                                                    " description                              ",
+                              tableCellRowspan = 1}]]}

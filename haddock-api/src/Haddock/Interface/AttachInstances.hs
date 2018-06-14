@@ -19,7 +19,6 @@ import Haddock.Types
 import Haddock.Convert
 import Haddock.GhcUtils
 
-import Control.Applicative
 import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)
@@ -70,7 +69,7 @@ attachInstances expInfo ifaces instIfaceMap = do
 
 attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance GhcRn]
 attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
-  [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, (L (getSrcSpan n) n))
+  [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, (L (getSrcSpan n) n), Nothing)
   | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
   , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
   , not $ isInstanceHidden expInfo cls tys
@@ -92,7 +91,11 @@ attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
         let mb_instances  = lookupNameEnv index (tcdName d)
             cls_instances = maybeToList mb_instances >>= fst
             fam_instances = maybeToList mb_instances >>= snd
-            fam_insts = [ (synifyFamInst i opaque, doc,spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d)) )
+            fam_insts = [ ( synifyFamInst i opaque
+                          , doc
+                          , spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d))
+                          , nameModule_maybe n
+                          )
                         | i <- sortBy (comparing instFam) fam_instances
                         , let n = getName i
                         , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
@@ -100,14 +103,18 @@ attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
                         , not $ any (isTypeHidden expInfo) (fi_tys i)
                         , let opaque = isTypeHidden expInfo (fi_rhs i)
                         ]
-            cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L eSpan (tcdName d)))
+            cls_insts = [ ( synifyInstHead i
+                          , instLookup instDocMap n iface ifaceMap instIfaceMap
+                          , spanName n (synifyInstHead i) (L eSpan (tcdName d))
+                          , nameModule_maybe n
+                          )
                         | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                         , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                         , not $ isInstanceHidden expInfo cls tys
                         ]
               -- fam_insts but with failing type fams filtered out
-            cleanFamInsts = [ (fi, n, L l r) | (Right fi, n, L l (Right r)) <- fam_insts ]
-            famInstErrs = [ errm | (Left errm, _, _) <- fam_insts ]
+            cleanFamInsts = [ (fi, n, L l r, m) | (Right fi, n, L l (Right r), m) <- fam_insts ]
+            famInstErrs = [ errm | (Left errm, _, _, _) <- fam_insts ]
         in do
           dfs <- getDynFlags
           let mkBug = (text "haddock-bug:" <+>) . text

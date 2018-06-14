@@ -62,7 +62,6 @@ import Haddock.GhcUtils
 
 import GHC
 import Name
-import NameSet ( emptyNameSet )
 import HsTypes (extFieldOcc)
 import Outputable ( panic )
 

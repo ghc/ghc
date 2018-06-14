@@ -1,5 +1,6 @@
+cabal-version:        2.0
 name:                 haddock
-version:              2.18.2
+version:              2.20.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -32,8 +33,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-cabal-version:        >= 2.0
-tested-with:          GHC==8.2.*
+tested-with:          GHC==8.4.*
 
 extra-source-files:
   CHANGES.md
@@ -62,11 +62,12 @@ executable haddock
   hs-source-dirs:       driver
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
 
-  -- haddock typically only supports a single GHC major version
+  -- haddock typically only supports a single GHC major version 
   build-depends:
-    base >= 4.3 && < 4.13
+    base ^>= 4.12.0
+
   if flag(in-ghc-tree)
-    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.13.1.0, haddock-library/src
+    hs-source-dirs: haddock-api/src,  haddock-library/src
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,
@@ -79,6 +80,8 @@ executable haddock
       ghc-boot,
       ghc == 8.5.*,
       bytestring,
+      parsec,
+      text,
       transformers
 
     other-modules:
@@ -86,17 +89,6 @@ executable haddock
       Documentation.Haddock.Parser.Monad
       Documentation.Haddock.Types
       Documentation.Haddock.Doc
-      Data.Attoparsec
-      Data.Attoparsec.ByteString
-      Data.Attoparsec.ByteString.Buffer
-      Data.Attoparsec.ByteString.Char8
-      Data.Attoparsec.ByteString.FastSet
-      Data.Attoparsec.ByteString.Internal
-      Data.Attoparsec.Combinator
-      Data.Attoparsec.Internal
-      Data.Attoparsec.Internal.Fhthagn
-      Data.Attoparsec.Internal.Types
-      Data.Attoparsec.Number
       Documentation.Haddock.Utf8
       Documentation.Haddock.Parser.Util
       Documentation.Haddock.Markup
@@ -150,7 +142,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.18.2
+    build-depends:  haddock-api == 2.20.0
 
 test-suite html-test
   type:             exitcode-stdio-1.0

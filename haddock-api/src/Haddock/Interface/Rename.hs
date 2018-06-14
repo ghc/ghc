@@ -22,6 +22,8 @@ import Bag (emptyBag)
 import GHC hiding (NoLink)
 import Name
 import Outputable ( panic )
+import RdrName (RdrName(Exact))
+import PrelNames (eqTyCon_RDR)
 
 import Control.Applicative
 import Control.Monad hiding (mapM)
@@ -60,11 +62,18 @@ renameInterface dflags renamingEnv warnings iface =
                     (missingNames1 ++ missingNames2 ++ missingNames3
                      ++ missingNames4 ++ missingNames5)
 
-      -- filter out certain built in type constructors using their string
-      -- representation. TODO: use the Name constants from the GHC API.
---      strings = filter (`notElem` ["()", "[]", "(->)"])
---                (map pretty missingNames)
-      strings = map (pretty dflags) . filter (\n -> not (isSystemName n || isBuiltInSyntax n)) $ missingNames
+      -- Filter out certain built in type constructors using their string
+      -- representation.
+      --
+      -- Note that since the renamed AST represents equality constraints as
+      -- @HasOpTy t1 eqTyCon_RDR t2@ (and _not_ as @HsEqTy t1 t2@), we need to
+      -- manually filter out 'eqTyCon_RDR' (aka @~@).
+      strings = [ pretty dflags n
+                | n <- missingNames
+                , not (isSystemName n)
+                , not (isBuiltInSyntax n)
+                , Exact n /= eqTyCon_RDR
+                ]
 
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
@@ -263,11 +272,22 @@ renameType t = case t of
 
   HsRecTy _ a               -> HsRecTy NoExt <$> mapM renameConDeclFieldField a
   (XHsType (NHsCoreTy a))   -> pure (XHsType (NHsCoreTy a))
-  HsExplicitListTy x i b    -> HsExplicitListTy x i <$> mapM renameLType b
-  HsExplicitTupleTy x b     -> HsExplicitTupleTy x <$> mapM renameLType b
-  HsSpliceTy _ _            -> error "renameType: HsSpliceTy"
-  HsWildCardTy a            -> HsWildCardTy <$> renameWildCardInfo a
-  HsAppsTy _ _              -> error "renameType: HsAppsTy"
+  HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
+  HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
+  HsSpliceTy _ s          -> renameHsSpliceTy s
+  HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
+  HsAppsTy _ _            -> error "renameType: HsAppsTy"
+
+-- | Rename splices, but _only_ those that turn out to be for types.
+-- I think this is actually safe for our possible inputs:
+--
+--  * the input is from after GHC's renamer, so should have an 'HsSpliced'
+--  * the input is typechecked, and only 'HsSplicedTy' should get through that
+--
+renameHsSpliceTy :: HsSplice GhcRn -> RnM (HsType DocNameI)
+renameHsSpliceTy (HsSpliced _ _ (HsSplicedTy t)) = renameType t
+renameHsSpliceTy (HsSpliced _ _ _) = error "renameHsSpliceTy: not an HsSplicedTy"
+renameHsSpliceTy _ = error "renameHsSpliceTy: not an HsSpliced"
 
 renameLHsQTyVars :: LHsQTyVars GhcRn -> RnM (LHsQTyVars DocNameI)
 renameLHsQTyVars (HsQTvs { hsq_explicit = tvs })
@@ -644,11 +664,11 @@ renameWc rn_thing (HsWC { hswc_body = thing })
 renameWc _ (XHsWildCardBndrs _) = panic "haddock:renameWc"
 
 renameDocInstance :: DocInstance GhcRn -> RnM (DocInstance DocNameI)
-renameDocInstance (inst, idoc, L l n) = do
+renameDocInstance (inst, idoc, L l n, m) = do
   inst' <- renameInstHead inst
   n' <- rename n
   idoc' <- mapM renameDoc idoc
-  return (inst', idoc',L l n')
+  return (inst', idoc', L l n', m)
 
 renameExportItem :: ExportItem GhcRn -> RnM (ExportItem DocNameI)
 renameExportItem item = case item of

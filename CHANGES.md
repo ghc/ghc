@@ -1,6 +1,30 @@
-## Changes in version 2.18.2
+## TBD / GHC-8.5+
 
- * to be released
+ * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
+   documenting individual arguments of constructors/patterns (#709)
+
+## Changes in version 2.20.0
+
+TODO
+
+## Changes in version 2.19.1
+
+ * Show where instances are defined (#748)
+
+ * `@since` includes package name (#452, #550, #749)
+
+## Changes in version 2.19.0.1
+
+ * Support for linking unicode operators (#458)
+
+ * Hyperlinker: Fix file handle leak in (#763)
+
+## Changes in version 2.19.0
+
+ * Haddock now supports tables in documentation inspired by reSTs grid tables
+
+ * `--quickjump` allows for quick navigation in documentation on hackage and
+   other documentation hosting sites.
 
  * A --reexport flag, which can be used to add extra modules to the
    top-level module tree
@@ -19,11 +43,17 @@
  * Fix: Generate constraint signatures for constructors exported as pattern
    synonyms (#663)
 
+ * The hyperlinker backend now uses the GHC lexer instead of a custom one.
+   This notably fixes rendering of quasiquotes.
+
  * Overhaul Haddock's rendering of kind signatures so that invisible kind
    parameters are not printed (#681) (Fixes #544)
 
- * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
-   documenting individual arguments of constructors/patterns (#709)
+ * Recognise `SPDX-License-Identifier` as alias for `License` in module header
+   parser (#743)
+
+ * Remove the response file related utilities, and use the ones that
+   come with `base` (Trac #13896)
 
  * Remove the response file related utilities, and use the ones that
    come with `base` (Trac #13896)

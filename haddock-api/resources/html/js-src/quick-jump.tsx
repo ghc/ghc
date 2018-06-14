@@ -107,7 +107,15 @@ class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
           caseSensitive: true,
           includeScore: true,
           tokenize: true,
-          keys: ["name", "module"]
+          keys: [ {
+                    name: "name",
+                    weight: 0.7
+                  },
+                  {
+                    name: "module",
+                    weight: 0.3
+                  }
+                ]
         }),
         moduleResults: []
       });
@@ -143,7 +151,7 @@ class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
   }
 
   hide() {
-    this.setState({ isVisible: false });
+    this.setState({ isVisible: false, searchString: '' });
   }
 
   show() {

@@ -25,5 +25,7 @@ TAGS
 .cabal-sandbox
 .ghc.environment.*
 cabal.sandbox.config
+cabal.project.local
+cabal.project.local~
 
 .stack-work/

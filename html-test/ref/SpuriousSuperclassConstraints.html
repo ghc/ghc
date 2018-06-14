@@ -73,11 +73,7 @@ Fix spurious superclass constraints bug.</pre
 	    >data</span
 	    > <a id="t:SomeType" class="def"
 	    >SomeType</a
-	    > (f :: <a href="#"
-	    >*</a
-	    > -&gt; <a href="#"
-	    >*</a
-	    >) a <a href="#" class="selflink"
+	    > (f :: * -&gt; *) a <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="subs instances"
@@ -90,9 +86,7 @@ Fix spurious superclass constraints bug.</pre
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:SomeType:Functor:1"
 		      ></span
-		      > <a href="#"
-		      >Functor</a
-		      > (<a href="#"
+		      > Functor (<a href="#" title="SpuriousSuperclassConstraints"
 		      >SomeType</a
 		      > f)</span
 		    > <a href="#" class="selflink"
@@ -106,29 +100,29 @@ Fix spurious superclass constraints bug.</pre
 		  ><details id="i:id:SomeType:Functor:1"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
-		      ><div class="subs methods"
+		      ><p
+		      >Defined in <a href="#"
+			>SpuriousSuperclassConstraints</a
+			></p
+		      > <div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
 			><a href="#"
 			  >fmap</a
-			  > :: (a -&gt; b) -&gt; <a href="#"
+			  > :: (a -&gt; b) -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a -&gt; <a href="#"
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f b</p
 			><p class="src"
 			><a href="#"
 			  >(&lt;$)</a
-			  > :: a -&gt; <a href="#"
+			  > :: a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b -&gt; <a href="#"
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f a</p
 			></div
 		      ></details
 		    ></td
@@ -138,11 +132,7 @@ Fix spurious superclass constraints bug.</pre
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:SomeType:Applicative:2"
 		      ></span
-		      > <a href="#"
-		      >Applicative</a
-		      > f =&gt; <a href="#"
-		      >Applicative</a
-		      > (<a href="#"
+		      > Applicative f =&gt; Applicative (<a href="#" title="SpuriousSuperclassConstraints"
 		      >SomeType</a
 		      > f)</span
 		    > <a href="#" class="selflink"
@@ -156,65 +146,59 @@ Fix spurious superclass constraints bug.</pre
 		  ><details id="i:id:SomeType:Applicative:2"
 		    ><summary class="hide-when-js-enabled"
 		      >Instance details</summary
-		      ><div class="subs methods"
+		      ><p
+		      >Defined in <a href="#"
+			>SpuriousSuperclassConstraints</a
+			></p
+		      > <div class="subs methods"
 		      ><p class="caption"
 			>Methods</p
 			><p class="src"
 			><a href="#"
 			  >pure</a
-			  > :: a -&gt; <a href="#"
+			  > :: a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f a</p
 			><p class="src"
 			><a href="#"
 			  >(&lt;*&gt;)</a
-			  > :: <a href="#"
+			  > :: <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f (a -&gt; b) -&gt; <a href="#"
+			  > f (a -&gt; b) -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a -&gt; <a href="#"
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f b</p
 			><p class="src"
 			><a href="#"
 			  >liftA2</a
-			  > :: (a -&gt; b -&gt; c) -&gt; <a href="#"
+			  > :: (a -&gt; b -&gt; c) -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a -&gt; <a href="#"
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b -&gt; <a href="#"
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f c <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f c</p
 			><p class="src"
 			><a href="#"
 			  >(*&gt;)</a
-			  > :: <a href="#"
+			  > :: <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a -&gt; <a href="#"
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b -&gt; <a href="#"
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f b</p
 			><p class="src"
 			><a href="#"
 			  >(&lt;*)</a
-			  > :: <a href="#"
+			  > :: <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a -&gt; <a href="#"
+			  > f a -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f b -&gt; <a href="#"
+			  > f b -&gt; <a href="#" title="SpuriousSuperclassConstraints"
 			  >SomeType</a
-			  > f a <a href="#" class="selflink"
-			  >#</a
-			  ></p
+			  > f a</p
 			></div
 		      ></details
 		    ></td

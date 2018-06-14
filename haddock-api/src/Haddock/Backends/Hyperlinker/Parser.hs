@@ -1,11 +1,19 @@
 module Haddock.Backends.Hyperlinker.Parser (parse) where
 
+import Data.Either         ( isRight, isLeft )
+import Data.List           ( foldl', isPrefixOf, isSuffixOf )
+import Data.Maybe          ( maybeToList )
+import Data.Char           ( isSpace )
+import qualified Text.Read as R
 
-import Data.Char
-import Data.List
-import Data.Maybe
+import GHC                 ( DynFlags, addSourceToTokens )
+import SrcLoc
+import FastString          ( mkFastString )
+import StringBuffer        ( stringToStringBuffer )
+import Lexer               ( Token(..) )
+import qualified Lexer as L
 
-import Haddock.Backends.Hyperlinker.Types
+import Haddock.Backends.Hyperlinker.Types as T
 
 
 -- | Turn source code string into a stream of more descriptive tokens.
@@ -13,202 +21,419 @@ import Haddock.Backends.Hyperlinker.Types
 -- Result should retain original file layout (including comments, whitespace,
 -- etc.), i.e. the following "law" should hold:
 --
--- @concat . map 'tkValue' . 'parse' = id@
-parse :: String -> [Token]
-parse = tokenize . tag . chunk
-
--- | Split raw source string to more meaningful chunks.
+-- prop> concat . map tkValue . parse = id
 --
--- This is the initial stage of tokenization process. Each chunk is either
--- a comment (including comment delimiters), a whitespace string, preprocessor
--- macro (and all its content until the end of a line) or valid Haskell lexeme.
-chunk :: String -> [String]
-chunk [] = []
-chunk str@(c:_)
-    | isSpace c =
-        let (space, mcpp, rest) = spanSpaceOrCpp str
-        in [space] ++ maybeToList mcpp ++ chunk rest
-chunk str
-    | "--" `isPrefixOf` str = chunk' $ spanToNewline str
-    | "{-" `isPrefixOf` str = chunk' $ chunkComment 0 str
-    | otherwise = case lex' str of
-        (tok:_) -> chunk' tok
-        [] -> [str]
+-- (In reality, this only holds for input not containing '\r', '\t', '\f', '\v',
+-- characters, since GHC transforms those into ' ' and '\n')
+parse :: DynFlags -> FilePath -> String -> [T.Token]
+parse dflags fp = ghcToks . processCPP dflags fp . filterCRLF
   where
-    chunk' (c, rest) = c:(chunk rest)
+    -- Remove CRLFs from source
+    filterCRLF :: String -> String
+    filterCRLF ('\r':'\n':cs) = '\n' : filterCRLF cs
+    filterCRLF (c:cs) = c : filterCRLF cs
+    filterCRLF [] = []
 
--- | A bit better lexer then the default, i.e. handles DataKinds quotes
-lex' :: ReadS String
-lex' ('\'' : '\'' : rest)              = [("''", rest)]
-lex' str@('\'' : '\\' : _ : '\'' : _)  = lex str
-lex' str@('\'' : _ : '\'' : _)         = lex str
-lex' ('\'' : rest)                     = [("'", rest)]
-lex' str                               = lex str
-
--- | Split input to "first line" string and the rest of it.
+-- | Parse the source into tokens using the GHC lexer.
 --
--- Ideally, this should be done simply with @'break' (== '\n')@. However,
--- Haskell also allows line-unbreaking (or whatever it is called) so things
--- are not as simple and this function deals with that.
-spanToNewline :: String -> (String, String)
-spanToNewline [] = ([], [])
-spanToNewline ('\\':'\n':str) =
-    let (str', rest) = spanToNewline str
+--   * CPP lines are removed and reinserted as line-comments
+--   * top-level file pragmas are parsed as block comments (see the
+--     'ITblockComment' case of 'classify' for more details)
+--
+processCPP :: DynFlags    -- ^ GHC's flags
+           -> FilePath    -- ^ source file name (for position information)
+           -> String      -- ^ source file contents
+           -> [(Located L.Token, String)]
+processCPP dflags fpath s = addSrc . go start . splitCPP $ s
+  where
+    start = mkRealSrcLoc (mkFastString fpath) 1 1
+    addSrc = addSourceToTokens start (stringToStringBuffer s)
+
+    -- Transform a list of Haskell/CPP lines into a list of tokens
+    go :: RealSrcLoc -> [Either String String] -> [Located L.Token]
+    go _   [] = []
+    go pos ls =
+      let (hLinesRight,  ls')  = span isRight ls
+          (cppLinesLeft, rest) = span isLeft ls'
+
+          hSrc   = concat [ hLine   | Right hLine  <- hLinesRight  ]
+          cppSrc = concat [ cppLine | Left cppLine <- cppLinesLeft ]
+
+      in case L.lexTokenStream (stringToStringBuffer hSrc) pos dflags of
+
+           -- Stuff that fails to lex gets turned into comments
+           L.PFailed _ _ss _msg ->
+             let (src_pos, failed) = mkToken ITunknown pos hSrc
+                 (new_pos, cpp)    = mkToken ITlineComment src_pos cppSrc
+             in failed : cpp : go new_pos rest
+
+           -- Successfully lexed
+           L.POk ss toks ->
+             let (new_pos, cpp) = mkToken ITlineComment (L.loc ss) cppSrc
+             in toks ++ [cpp] ++ go new_pos rest
+
+    -- Manually make a token from a 'String', advancing the cursor position
+    mkToken tok start' str =
+      let end = foldl' advanceSrcLoc start' str
+      in (end, L (RealSrcSpan $ mkRealSrcSpan start' end) (tok str))
+
+
+-- | Split apart the initial file into Haskell source lines ('Left' entries) and
+-- CPP lines ('Right' entries).
+--
+-- All characters in the input are present in the output:
+--
+-- prop> concat . map (either id id) . splitCPP = id
+splitCPP :: String -> [Either String String]
+splitCPP "" = []
+splitCPP s | isCPPline s = Left l : splitCPP rest
+           | otherwise =  Right l : splitCPP rest
+  where
+    ~(l, rest) = spanToNewline 0 s
+
+
+-- | Heuristic to decide if a line is going to be a CPP line. This should be a
+-- cheap operation since it is going to be run on every line being processed.
+--
+-- Right now it just checks if the first non-whitespace character in the first
+-- five characters of the line is a '#':
+--
+-- >>> isCPPline "#define FOO 1"
+-- True
+--
+-- >>> isCPPline "\t\t  #ifdef GHC"
+-- True
+--
+-- >>> isCPPline "       #endif"
+-- False
+--
+isCPPline :: String -> Bool
+isCPPline = isPrefixOf "#" . dropWhile (`elem` " \t") . take 5
+
+
+-- | Split a "line" off the front of a string, hopefully without cutting tokens
+-- in half. I say "hopefully" because knowing what a token is requires lexing,
+-- yet lexing depends on this function.
+--
+-- All characters in the input are present in the output:
+--
+-- prop> curry (++) . spanToNewLine 0 = id
+spanToNewline :: Int                 -- ^ open '{-'
+              -> String              -- ^ input
+              -> (String, String)
+
+-- Base case and space characters
+spanToNewline _ "" = ("", "")
+spanToNewline n ('\n':str) | n <= 0 = ("\n", str)
+spanToNewline n ('\n':str) | n <= 0 = ("\n", str)
+spanToNewline n ('\\':'\n':str) =
+    let (str', rest) = spanToNewline n str
     in ('\\':'\n':str', rest)
-spanToNewline str@('\n':_) = ("", str)
-spanToNewline (c:str) =
-    let (str', rest) = spanToNewline str
+
+-- Block comments
+spanToNewline n ('{':'-':str) =
+    let (str', rest) = spanToNewline (n+1) str
+    in ('{':'-':str', rest)
+spanToNewline n ('-':'}':str) =
+    let (str', rest) = spanToNewline (n-1) str
+    in ('-':'}':str', rest)
+
+-- When not in a block comment, try to lex a Haskell token
+spanToNewline 0 str@(c:_) | ((lexed, str') : _) <- R.lex str, not (isSpace c) =
+    if all (== '-') lexed && length lexed >= 2
+      -- A Haskell line comment
+      then case span (/= '\n') str' of
+             (str'', '\n':rest) -> (lexed ++ str'' ++ "\n", rest)
+             (_, _) -> (str, "") 
+
+      -- An actual Haskell token
+      else let (str'', rest) = spanToNewline 0 str'
+           in (lexed ++ str'', rest)
+
+-- In all other cases, advance one character at a time
+spanToNewline n (c:str) =
+    let (str', rest) = spanToNewline n str
     in (c:str', rest)
 
--- | Split input to whitespace string, (optional) preprocessor directive and
--- the rest of it.
---
--- Again, using something like @'span' 'isSpace'@ would be nice to chunk input
--- to whitespace. The problem is with /#/ symbol - if it is placed at the very
--- beginning of a line, it should be recognized as preprocessor macro. In any
--- other case, it is ordinary Haskell symbol and can be used to declare
--- operators. Hence, while dealing with whitespace we also check whether there
--- happens to be /#/ symbol just after a newline character - if that is the
--- case, we begin treating the whole line as preprocessor macro.
-spanSpaceOrCpp :: String -> (String, Maybe String, String)
-spanSpaceOrCpp ('\n':'#':str) =
-    let (str', rest) = spanToNewline str
-    in ("\n", Just $ '#':str', rest)
-spanSpaceOrCpp (c:str')
-    | isSpace c =
-        let (space, mcpp, rest) = spanSpaceOrCpp str'
-        in (c:space, mcpp, rest)
-spanSpaceOrCpp str = ("", Nothing, str)
 
--- | Split input to comment content (including delimiters) and the rest.
---
--- Again, some more logic than simple 'span' is required because of Haskell
--- comment nesting policy.
-chunkComment :: Int -> String -> (String, String)
-chunkComment _ [] = ("", "")
-chunkComment depth ('{':'-':str) =
-    let (c, rest) = chunkComment (depth + 1) str
-    in ("{-" ++ c, rest)
-chunkComment depth ('-':'}':str)
-    | depth == 1 = ("-}", str)
-    | otherwise =
-        let (c, rest) = chunkComment (depth - 1) str
-        in ("-}" ++ c, rest)
-chunkComment depth (e:str) =
-    let (c, rest) = chunkComment depth str
-    in (e:c, rest)
-
--- | Assign source location for each chunk in given stream.
-tag :: [String] -> [(Span, String)]
-tag =
-    reverse . snd . foldl aux (Position 1 1, [])
+-- | Turn a list of GHC's 'L.Token' (and their source 'String') into a list of
+-- Haddock's 'T.Token'.
+ghcToks :: [(Located L.Token, String)] -> [T.Token]
+ghcToks = reverse . (\(_,ts,_) -> ts) . foldl' go (start, [], False)
   where
-    aux (pos, cs) str =
-        let pos' = foldl move pos str
-        in (pos', (Span pos pos', str):cs)
-    move pos '\n' = pos { posRow = posRow pos + 1, posCol = 1 }
-    move pos _ = pos { posCol = posCol pos + 1 }
+    start = mkRealSrcLoc (mkFastString "lexing") 1 1
 
--- | Turn unrecognised chunk stream to more descriptive token stream.
-tokenize :: [(Span, String)] -> [Token]
-tokenize =
-    map aux
-  where
-    aux (sp, str) = Token
-        { tkType = classify str
-        , tkValue = str
-        , tkSpan = sp
-        }
+    go :: (RealSrcLoc, [T.Token], Bool)
+       -- ^ current position, tokens accumulated, currently in pragma (or not)
+       
+       -> (Located L.Token, String)
+       -- ^ next token, its content
+       
+       -> (RealSrcLoc, [T.Token], Bool)
+       -- ^ new position, new tokens accumulated, currently in pragma (or not)
 
--- | Classify given string as appropriate Haskell token.
---
--- This method is based on Haskell 98 Report lexical structure description:
--- https://www.haskell.org/onlinereport/lexemes.html
---
--- However, this is probably far from being perfect and most probably does not
--- handle correctly all corner cases.
-classify :: String -> TokenType
-classify str
-    | "--" `isPrefixOf` str = TkComment
-    | "{-#" `isPrefixOf` str = TkPragma
-    | "{-" `isPrefixOf` str = TkComment
-classify "''" = TkSpecial
-classify "'"  = TkSpecial
-classify str@(c:_)
-    | isSpace c = TkSpace
-    | isDigit c = TkNumber
-    | c `elem` special = TkSpecial
-    | str `elem` glyphs = TkGlyph
-    | all (`elem` symbols) str = TkOperator
-    | c == '#' = TkCpp
-    | c == '"' = TkString
-    | c == '\'' = TkChar
-classify str
-    | str `elem` keywords = TkKeyword
-    | isIdentifier str = TkIdentifier
-    | otherwise = TkUnknown
+    go (pos, toks, in_prag) (L l tok, raw) =
+        ( next_pos
+        , classifiedTok ++ maybeToList white ++ toks
+        , inPragma in_prag tok
+        )
+       where
+         (next_pos, white) = mkWhitespace pos l
+         
+         classifiedTok = [ Token (classify' tok) raw rss
+                         | RealSrcSpan rss <- [l]
+                         , not (null raw)
+                         ]
+         
+         classify' | in_prag = const TkPragma
+                   | otherwise = classify
 
-keywords :: [String]
-keywords =
-    [ "as"
-    , "case"
-    , "class"
-    , "data"
-    , "default"
-    , "deriving"
-    , "do"
-    , "else"
-    , "hiding"
-    , "if"
-    , "import"
-    , "in"
-    , "infix"
-    , "infixl"
-    , "infixr"
-    , "instance"
-    , "let"
-    , "module"
-    , "newtype"
-    , "of"
-    , "qualified"
-    , "then"
-    , "type"
-    , "where"
-    , "forall"
-    , "family"
-    , "mdo"
-    ]
 
-glyphs :: [String]
-glyphs =
-    [ ".."
-    , ":"
-    , "::"
-    , "="
-    , "\\"
-    , "|"
-    , "<-"
-    , "->"
-    , "@"
-    , "~"
-    , "~#"
-    , "=>"
-    , "-"
-    , "!"
-    ]
+-- | Find the correct amount of whitespace between tokens.
+mkWhitespace :: RealSrcLoc -> SrcSpan -> (RealSrcLoc, Maybe T.Token)
+mkWhitespace prev spn =
+  case spn of
+    UnhelpfulSpan _ -> (prev,Nothing)
+    RealSrcSpan s | null wsstring -> (end, Nothing)
+                  | otherwise -> (end, Just (Token TkSpace wsstring wsspan))
+      where
+        start = realSrcSpanStart s
+        end = realSrcSpanEnd s
+        wsspan = mkRealSrcSpan prev start
+        nls = srcLocLine start - srcLocLine prev
+        spaces = if nls == 0 then srcLocCol start - srcLocCol prev
+                             else srcLocCol start - 1
+        wsstring = replicate nls '\n' ++ replicate spaces ' '
 
-special :: [Char]
-special = "()[]{},;`"
 
--- TODO: Add support for any Unicode symbol or punctuation.
--- source: http://stackoverflow.com/questions/10548170/what-characters-are-permitted-for-haskell-operators
-symbols :: [Char]
-symbols = "!#$%&*+./<=>?@\\^|-~:"
+-- | Classify given tokens as appropriate Haskell token type.
+classify :: L.Token -> TokenType
+classify tok =
+  case tok of
+    ITas                   -> TkKeyword
+    ITcase                 -> TkKeyword
+    ITclass                -> TkKeyword
+    ITdata                 -> TkKeyword
+    ITdefault              -> TkKeyword
+    ITderiving             -> TkKeyword
+    ITdo                   -> TkKeyword
+    ITelse                 -> TkKeyword
+    IThiding               -> TkKeyword
+    ITforeign              -> TkKeyword
+    ITif                   -> TkKeyword
+    ITimport               -> TkKeyword
+    ITin                   -> TkKeyword
+    ITinfix                -> TkKeyword
+    ITinfixl               -> TkKeyword
+    ITinfixr               -> TkKeyword
+    ITinstance             -> TkKeyword
+    ITlet                  -> TkKeyword
+    ITmodule               -> TkKeyword
+    ITnewtype              -> TkKeyword
+    ITof                   -> TkKeyword
+    ITqualified            -> TkKeyword
+    ITthen                 -> TkKeyword
+    ITtype                 -> TkKeyword
+    ITvia                  -> TkKeyword
+    ITwhere                -> TkKeyword
 
-isIdentifier :: String -> Bool
-isIdentifier (s:str)
-    | (isLower' s || isUpper s) && all isAlphaNum' str = True
-  where
-    isLower' c = isLower c || c == '_'
-    isAlphaNum' c = isAlphaNum c || c == '_' || c == '\''
-isIdentifier _ = False
+    ITforall            {} -> TkKeyword
+    ITexport               -> TkKeyword
+    ITlabel                -> TkKeyword
+    ITdynamic              -> TkKeyword
+    ITsafe                 -> TkKeyword
+    ITinterruptible        -> TkKeyword
+    ITunsafe               -> TkKeyword
+    ITstdcallconv          -> TkKeyword
+    ITccallconv            -> TkKeyword
+    ITcapiconv             -> TkKeyword
+    ITprimcallconv         -> TkKeyword
+    ITjavascriptcallconv   -> TkKeyword
+    ITmdo                  -> TkKeyword
+    ITfamily               -> TkKeyword
+    ITrole                 -> TkKeyword
+    ITgroup                -> TkKeyword
+    ITby                   -> TkKeyword
+    ITusing                -> TkKeyword
+    ITpattern              -> TkKeyword
+    ITstatic               -> TkKeyword
+    ITstock                -> TkKeyword
+    ITanyclass             -> TkKeyword
+
+    ITunit                 -> TkKeyword
+    ITsignature            -> TkKeyword
+    ITdependency           -> TkKeyword
+    ITrequires             -> TkKeyword
+
+    ITinline_prag       {} -> TkPragma
+    ITspec_prag         {} -> TkPragma
+    ITspec_inline_prag  {} -> TkPragma
+    ITsource_prag       {} -> TkPragma
+    ITrules_prag        {} -> TkPragma
+    ITwarning_prag      {} -> TkPragma
+    ITdeprecated_prag   {} -> TkPragma
+    ITline_prag         {} -> TkPragma
+    ITcolumn_prag       {} -> TkPragma
+    ITscc_prag          {} -> TkPragma
+    ITgenerated_prag    {} -> TkPragma
+    ITcore_prag         {} -> TkPragma
+    ITunpack_prag       {} -> TkPragma
+    ITnounpack_prag     {} -> TkPragma
+    ITann_prag          {} -> TkPragma
+    ITcomplete_prag     {} -> TkPragma
+    ITclose_prag           -> TkPragma
+    IToptions_prag      {} -> TkPragma
+    ITinclude_prag      {} -> TkPragma
+    ITlanguage_prag        -> TkPragma
+    ITminimal_prag      {} -> TkPragma
+    IToverlappable_prag {} -> TkPragma
+    IToverlapping_prag  {} -> TkPragma
+    IToverlaps_prag     {} -> TkPragma
+    ITincoherent_prag   {} -> TkPragma
+    ITctype             {} -> TkPragma
+
+    ITdotdot               -> TkGlyph
+    ITcolon                -> TkGlyph
+    ITdcolon            {} -> TkGlyph
+    ITequal                -> TkGlyph
+    ITlam                  -> TkGlyph
+    ITlcase                -> TkGlyph
+    ITvbar                 -> TkGlyph
+    ITlarrow            {} -> TkGlyph
+    ITrarrow            {} -> TkGlyph
+    ITat                   -> TkGlyph
+    ITtilde                -> TkGlyph
+    ITdarrow            {} -> TkGlyph
+    ITminus                -> TkGlyph
+    ITbang                 -> TkGlyph
+    ITdot                  -> TkOperator
+    ITtypeApp              -> TkGlyph
+
+    ITbiglam               -> TkGlyph
+
+    ITocurly               -> TkSpecial
+    ITccurly               -> TkSpecial
+    ITvocurly              -> TkSpecial
+    ITvccurly              -> TkSpecial
+    ITobrack               -> TkSpecial
+    ITopabrack             -> TkSpecial
+    ITcpabrack             -> TkSpecial
+    ITcbrack               -> TkSpecial
+    IToparen               -> TkSpecial
+    ITcparen               -> TkSpecial
+    IToubxparen            -> TkSpecial
+    ITcubxparen            -> TkSpecial
+    ITsemi                 -> TkSpecial
+    ITcomma                -> TkSpecial
+    ITunderscore           -> TkIdentifier
+    ITbackquote            -> TkSpecial
+    ITsimpleQuote          -> TkSpecial
+
+    ITvarid             {} -> TkIdentifier
+    ITconid             {} -> TkIdentifier
+    ITvarsym            {} -> TkOperator
+    ITconsym            {} -> TkOperator
+    ITqvarid            {} -> TkIdentifier
+    ITqconid            {} -> TkIdentifier
+    ITqvarsym           {} -> TkOperator
+    ITqconsym           {} -> TkOperator
+
+    ITdupipvarid        {} -> TkUnknown
+    ITlabelvarid        {} -> TkUnknown
+
+    ITchar              {} -> TkChar
+    ITstring            {} -> TkString
+    ITinteger           {} -> TkNumber
+    ITrational          {} -> TkNumber
+
+    ITprimchar          {} -> TkChar
+    ITprimstring        {} -> TkString
+    ITprimint           {} -> TkNumber
+    ITprimword          {} -> TkNumber
+    ITprimfloat         {} -> TkNumber
+    ITprimdouble        {} -> TkNumber
+
+    ITopenExpQuote      {} -> TkSpecial
+    ITopenPatQuote         -> TkSpecial
+    ITopenDecQuote         -> TkSpecial
+    ITopenTypQuote         -> TkSpecial
+    ITcloseQuote        {} -> TkSpecial
+    ITopenTExpQuote     {} -> TkSpecial
+    ITcloseTExpQuote       -> TkSpecial
+    ITidEscape          {} -> TkUnknown
+    ITparenEscape          -> TkSpecial
+    ITidTyEscape        {} -> TkUnknown
+    ITparenTyEscape        -> TkSpecial
+    ITtyQuote              -> TkSpecial
+    ITquasiQuote        {} -> TkUnknown
+    ITqQuasiQuote       {} -> TkUnknown
+
+    ITproc                 -> TkKeyword
+    ITrec                  -> TkKeyword
+    IToparenbar         {} -> TkGlyph
+    ITcparenbar         {} -> TkGlyph
+    ITlarrowtail        {} -> TkGlyph
+    ITrarrowtail        {} -> TkGlyph
+    ITLarrowtail        {} -> TkGlyph
+    ITRarrowtail        {} -> TkGlyph
+
+    ITunknown           {} -> TkUnknown
+    ITeof                  -> TkUnknown
+
+    -- Line comments are only supposed to start with '--'. Starting with '#'
+    -- means that this was probably a CPP.
+    ITlineComment s
+      | isCPPline s        -> TkCpp
+      | otherwise          -> TkComment
+
+    ITdocCommentNext    {} -> TkComment
+    ITdocCommentPrev    {} -> TkComment
+    ITdocCommentNamed   {} -> TkComment
+    ITdocSection        {} -> TkComment
+    ITdocOptions        {} -> TkComment
+
+    -- The lexer considers top-level pragmas as comments (see `pragState` in
+    -- the GHC lexer for more), so we have to manually reverse this. The
+    -- following is a hammer: it smashes _all_ pragma-like block comments into
+    -- pragmas.
+    ITblockComment c
+      | isPrefixOf "{-#" c
+      , isSuffixOf "#-}" c -> TkPragma
+      | otherwise          -> TkComment
+
+-- | Classify given tokens as beginning pragmas (or not).
+inPragma :: Bool     -- ^ currently in pragma
+         -> L.Token  -- ^ current token
+         -> Bool     -- ^ new information about whether we are in a pragma
+inPragma _ ITclose_prag = False
+inPragma True _ = True
+inPragma False tok =
+  case tok of
+    ITinline_prag       {} -> True
+    ITspec_prag         {} -> True
+    ITspec_inline_prag  {} -> True
+    ITsource_prag       {} -> True
+    ITrules_prag        {} -> True
+    ITwarning_prag      {} -> True
+    ITdeprecated_prag   {} -> True
+    ITline_prag         {} -> True
+    ITcolumn_prag       {} -> True
+    ITscc_prag          {} -> True
+    ITgenerated_prag    {} -> True
+    ITcore_prag         {} -> True
+    ITunpack_prag       {} -> True
+    ITnounpack_prag     {} -> True
+    ITann_prag          {} -> True
+    ITcomplete_prag     {} -> True
+    IToptions_prag      {} -> True
+    ITinclude_prag      {} -> True
+    ITlanguage_prag        -> True
+    ITminimal_prag      {} -> True
+    IToverlappable_prag {} -> True
+    IToverlapping_prag  {} -> True
+    IToverlaps_prag     {} -> True
+    ITincoherent_prag   {} -> True
+    ITctype             {} -> True
+
+    _                      -> False
+

@@ -28,8 +28,8 @@ import RdrName (RdrName)
 import SrcLoc (mkRealSrcLoc, unLoc)
 import StringBuffer (stringToStringBuffer)
 
-parseParas :: DynFlags -> String -> MetaDoc mod RdrName
-parseParas d = overDoc (P.overIdentifier (parseIdent d)) . P.parseParas
+parseParas :: DynFlags -> Maybe Package -> String -> MetaDoc mod RdrName
+parseParas d p = overDoc (P.overIdentifier (parseIdent d)) . P.parseParas p
 
 parseString :: DynFlags -> String -> DocH mod RdrName
 parseString d = P.overIdentifier (parseIdent d) . P.parseString

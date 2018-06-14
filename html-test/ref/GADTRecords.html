@@ -54,35 +54,27 @@
 	      ><li
 		><a href="#"
 		  >C1</a
-		  > :: <a href="#"
+		  > :: <a href="#" title="GADTRecords"
 		  >H1</a
 		  > a b</li
 		><li
 		><a href="#"
 		  >C2</a
-		  > :: <a href="#"
-		  >Ord</a
-		  > a =&gt; [a] -&gt; <a href="#"
+		  > :: Ord a =&gt; [a] -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
 		  > a a</li
 		><li
 		><a href="#"
 		  >C3</a
-		  > :: {..} -&gt; <a href="#"
+		  > :: {..} -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
-		  > <a href="#"
-		  >Int</a
-		  > <a href="#"
-		  >Int</a
-		  ></li
+		  > Int Int</li
 		><li
 		><a href="#"
 		  >C4</a
-		  > :: {..} -&gt; <a href="#"
+		  > :: {..} -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
-		  > <a href="#"
-		  >Int</a
-		  > a</li
+		  > Int a</li
 		></ul
 	      ></li
 	    ></ul
@@ -114,7 +106,7 @@
 	      ><td class="src"
 		><a id="v:C1" class="def"
 		  >C1</a
-		  > :: <a href="#"
+		  > :: <a href="#" title="GADTRecords"
 		  >H1</a
 		  > a b</td
 		><td class="doc empty"
@@ -124,9 +116,7 @@
 	      ><td class="src"
 		><a id="v:C2" class="def"
 		  >C2</a
-		  > :: <a href="#"
-		  >Ord</a
-		  > a =&gt; [a] -&gt; <a href="#"
+		  > :: Ord a =&gt; [a] -&gt; <a href="#" title="GADTRecords"
 		  >H1</a
 		  > a a</td
 		><td class="doc empty"
@@ -136,12 +126,6 @@
 	      ><td class="src"
 		><a id="v:C3" class="def"
 		  >C3</a
-		  > :: {..} -&gt; <a href="#"
-		  >H1</a
-		  > <a href="#"
-		  >Int</a
-		  > <a href="#"
-		  >Int</a
 		  ></td
 		><td class="doc empty"
 		></td
@@ -154,15 +138,21 @@
 		    ><ul
 		    ><li
 		      ><dfn class="src"
-			><a id="v:field" class="def"
+			>:: { <a id="v:field" class="def"
 			  >field</a
-			  > :: <a href="#"
-			  >Int</a
-			  ></dfn
+			  > :: Int</dfn
 			><div class="doc"
 			><p
 			  >hello docs</p
 			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>} -&gt; <a href="#" title="GADTRecords"
+			  >H1</a
+			  > Int Int</dfn
+			><div class="doc empty"
+			></div
 			></li
 		      ></ul
 		    ></div
@@ -172,11 +162,7 @@
 	      ><td class="src"
 		><a id="v:C4" class="def"
 		  >C4</a
-		  > :: {..} -&gt; <a href="#"
-		  >H1</a
-		  > <a href="#"
-		  >Int</a
-		  > a</td
+		  ></td
 		><td class="doc empty"
 		></td
 		></tr
@@ -188,13 +174,21 @@
 		    ><ul
 		    ><li
 		      ><dfn class="src"
-			><a id="v:field2" class="def"
+			>:: { <a id="v:field2" class="def"
 			  >field2</a
 			  > :: a</dfn
 			><div class="doc"
 			><p
 			  >hello2 docs</p
 			  ></div
+			></li
+		      ><li
+		      ><dfn class="src"
+			>} -&gt; <a href="#" title="GADTRecords"
+			  >H1</a
+			  > Int a</dfn
+			><div class="doc empty"
+			></div
 			></li
 		      ></ul
 		    ></div

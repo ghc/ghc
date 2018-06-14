@@ -24,8 +24,8 @@ import RdrName
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: DynFlags -> String -> (HaddockModInfo RdrName, MDoc RdrName)
-parseModuleHeader dflags str0 =
+parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo RdrName, MDoc RdrName)
+parseModuleHeader dflags pkgName str0 =
    let
       getKey :: String -> String -> (Maybe String,String)
       getKey key str = case parseKey key str of
@@ -37,21 +37,22 @@ parseModuleHeader dflags str0 =
       (copyrightOpt,str3) = getKey "Copyright" str2
       (licenseOpt,str4) = getKey "License" str3
       (licenceOpt,str5) = getKey "Licence" str4
-      (maintainerOpt,str6) = getKey "Maintainer" str5
-      (stabilityOpt,str7) = getKey "Stability" str6
-      (portabilityOpt,str8) = getKey "Portability" str7
+      (spdxLicenceOpt,str6) = getKey "SPDX-License-Identifier" str5
+      (maintainerOpt,str7) = getKey "Maintainer" str6
+      (stabilityOpt,str8) = getKey "Stability" str7
+      (portabilityOpt,str9) = getKey "Portability" str8
 
    in (HaddockModInfo {
           hmi_description = parseString dflags <$> descriptionOpt,
           hmi_copyright = copyrightOpt,
-          hmi_license = licenseOpt `mplus` licenceOpt,
+          hmi_license = spdxLicenceOpt `mplus` licenseOpt `mplus` licenceOpt,
           hmi_maintainer = maintainerOpt,
           hmi_stability = stabilityOpt,
           hmi_portability = portabilityOpt,
           hmi_safety = Nothing,
           hmi_language = Nothing, -- set in LexParseRn
           hmi_extensions = [] -- also set in LexParseRn
-          }, parseParas dflags str8)
+          }, parseParas dflags pkgName str9)
 
 -- | This function is how we read keys.
 --

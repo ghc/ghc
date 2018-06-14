@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 -- |
 -- Module      :  Documentation.Haddock.Parser.Util
 -- Copyright   :  (c) Mateusz Kowalczyk 2013-2014,
@@ -11,62 +11,59 @@
 --
 -- Various utility functions used by the parser.
 module Documentation.Haddock.Parser.Util (
-  unsnoc
-, strip
-, takeUntil
-, removeEscapes
-, makeLabeled
-, takeHorizontalSpace
-, skipHorizontalSpace
+  takeUntil,
+  removeEscapes,
+  makeLabeled,
+  takeHorizontalSpace,
+  skipHorizontalSpace,
 ) where
+
+import qualified Text.Parsec as Parsec
+
+import qualified Data.Text as T
+import           Data.Text (Text)
 
 import           Control.Applicative
 import           Control.Monad (mfilter)
-import           Documentation.Haddock.Parser.Monad hiding (isHorizontalSpace)
-import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as BS
+import           Documentation.Haddock.Parser.Monad
 import           Prelude hiding (takeWhile)
 
-#if MIN_VERSION_bytestring(0,10,2)
-import           Data.ByteString.Char8 (unsnoc)
-#else
-unsnoc :: ByteString -> Maybe (ByteString, Char)
-unsnoc bs
-  | BS.null bs = Nothing
-  | otherwise = Just (BS.init bs, BS.last bs)
-#endif
+import           Data.Char (isSpace)
 
--- | Remove all leading and trailing whitespace
-strip :: String -> String
-strip = (\f -> f . f) $ dropWhile isSpace . reverse
+-- | Characters that count as horizontal space
+horizontalSpace :: [Char]
+horizontalSpace = " \t\f\v\r"
 
-isHorizontalSpace :: Char -> Bool
-isHorizontalSpace = inClass " \t\f\v\r"
-
+-- | Skip and ignore leading horizontal space
 skipHorizontalSpace :: Parser ()
-skipHorizontalSpace = skipWhile isHorizontalSpace
+skipHorizontalSpace = Parsec.skipMany (Parsec.oneOf horizontalSpace)
 
-takeHorizontalSpace :: Parser BS.ByteString
-takeHorizontalSpace = takeWhile isHorizontalSpace
+-- | Take leading horizontal space
+takeHorizontalSpace :: Parser Text 
+takeHorizontalSpace = takeWhile (Parsec.oneOf horizontalSpace)
 
-makeLabeled :: (String -> Maybe String -> a) -> String -> a
-makeLabeled f input = case break isSpace $ removeEscapes $ strip input of
-  (uri, "")    -> f uri Nothing
-  (uri, label) -> f uri (Just $ dropWhile isSpace label)
+makeLabeled :: (String -> Maybe String -> a) -> Text -> a
+makeLabeled f input = case T.break isSpace $ removeEscapes $ T.strip input of
+  (uri, "")    -> f (T.unpack uri) Nothing
+  (uri, label) -> f (T.unpack uri) (Just . T.unpack $ T.stripStart label)
 
 -- | Remove escapes from given string.
 --
 -- Only do this if you do not process (read: parse) the input any further.
-removeEscapes :: String -> String
-removeEscapes "" = ""
-removeEscapes ('\\':'\\':xs) = '\\' : removeEscapes xs
-removeEscapes ('\\':xs) = removeEscapes xs
-removeEscapes (x:xs) = x : removeEscapes xs
-
-takeUntil :: ByteString -> Parser ByteString
-takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p) >>= gotSome
+removeEscapes :: Text -> Text
+removeEscapes = T.unfoldr go
   where
-    end = BS.unpack end_
+  go :: Text -> Maybe (Char, Text)
+  go xs = case T.uncons xs of
+            Just ('\\',ys) -> T.uncons ys
+            unconsed -> unconsed
+
+-- | Consume characters from the input up to and including the given pattern.
+-- Return everything consumed except for the end pattern itself.
+takeUntil :: Text -> Parser Text 
+takeUntil end_ = T.dropEnd (T.length end_) <$> requireEnd (scan p (False, end)) >>= gotSome
+  where
+    end = T.unpack end_ 
 
     p :: (Bool, String) -> Char -> Maybe (Bool, String)
     p acc c = case acc of
@@ -75,9 +72,8 @@ takeUntil end_ = dropEnd <$> requireEnd (scan (False, end) p) >>= gotSome
       (_, x:xs) | x == c -> Just (False, xs)
       _ -> Just (c == '\\', end)
 
-    dropEnd = BS.reverse . BS.drop (length end) . BS.reverse
-    requireEnd = mfilter (BS.isSuffixOf end_)
+    requireEnd = mfilter (T.isSuffixOf end_)
 
     gotSome xs
-      | BS.null xs = fail "didn't get any content"
+      | T.null xs = fail "didn't get any content"
       | otherwise = return xs

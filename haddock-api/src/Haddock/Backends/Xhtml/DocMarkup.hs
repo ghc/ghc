@@ -73,7 +73,8 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
   markupMathDisplay          = \mathjax -> toHtml ("\\[" ++ mathjax ++ "\\]"),
   markupProperty             = pre . toHtml,
   markupExample              = examplesToHtml,
-  markupHeader               = \(Header l t) -> makeHeader l t
+  markupHeader               = \(Header l t) -> makeHeader l t,
+  markupTable                = \(Table h r) -> makeTable h r
   }
   where
     makeHeader :: Int -> Html -> Html
@@ -85,6 +86,22 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
     makeHeader 6 mkup = h6 mkup
     makeHeader l _ = error $ "Somehow got a header level `" ++ show l ++ "' in DocMarkup!"
 
+    makeTable :: [TableRow Html] -> [TableRow Html] -> Html
+    makeTable hs bs = table (concatHtml (hs' ++ bs'))
+      where
+        hs' | null hs   = []
+            | otherwise = [thead (concatHtml (map (makeTableRow th) hs))]
+
+        bs' = [tbody (concatHtml (map (makeTableRow td) bs))]
+
+    makeTableRow :: (Html -> Html) -> TableRow Html -> Html
+    makeTableRow thr (TableRow cs) = tr (concatHtml (map (makeTableCell thr) cs))
+
+    makeTableCell :: (Html -> Html) -> TableCell Html -> Html
+    makeTableCell thr (TableCell i j c) = thr c ! (i' ++ j')
+      where
+        i' = if i == 1 then [] else [ colspan i ]
+        j' = if j == 1 then [] else [ rowspan j ]
 
     examplesToHtml l = pre (concatHtml $ map exampleToHtml l) ! [theclass "screen"]
 
@@ -154,10 +171,10 @@ flatten x = [x]
 -- extract/append the underlying 'Doc' and convert it to 'Html'. For
 -- 'CollapsingHeader', we attach extra info to the generated 'Html'
 -- that allows us to expand/collapse the content.
-hackMarkup :: DocMarkup id Html -> Hack (ModuleName, OccName) id -> Html
-hackMarkup fmt' h' =
+hackMarkup :: DocMarkup id Html -> Maybe Package -> Hack (ModuleName, OccName) id -> Html
+hackMarkup fmt' currPkg h' =
   let (html, ms) = hackMarkup' fmt' h'
-  in html +++ renderMeta fmt' (metaConcat ms)
+  in html +++ renderMeta fmt' currPkg (metaConcat ms)
   where
     hackMarkup' :: DocMarkup id Html -> Hack (ModuleName, OccName) id
                 -> (Html, [Meta])
@@ -176,45 +193,50 @@ hackMarkup fmt' h' =
                              (y, m') = hackMarkup' fmt d'
                          in (markupAppend fmt x y, m ++ m')
 
-renderMeta :: DocMarkup id Html -> Meta -> Html
-renderMeta fmt (Meta { _version = Just x }) =
+renderMeta :: DocMarkup id Html -> Maybe Package -> Meta -> Html
+renderMeta fmt currPkg (Meta { _version = Just x, _package = pkg }) =
   markupParagraph fmt . markupEmphasis fmt . toHtml $
-    "Since: " ++ formatVersion x
+    "Since: " ++ formatPkgMaybe pkg ++ formatVersion x
   where
     formatVersion v = concat . intersperse "." $ map show v
-renderMeta _ _ = noHtml
+    formatPkgMaybe (Just p) | Just p /= currPkg = p ++ "-"
+    formatPkgMaybe _ = ""
+renderMeta _ _ _ = noHtml
 
 -- | Goes through 'hackMarkup' to generate the 'Html' rather than
 -- skipping straight to 'markup': this allows us to employ XHtml
 -- specific hacks to the tree first.
 markupHacked :: DocMarkup id Html
+             -> Maybe Package      -- this package
              -> Maybe String
              -> MDoc id
              -> Html
-markupHacked fmt n = hackMarkup fmt . toHack 0 n . flatten
+markupHacked fmt currPkg n = hackMarkup fmt currPkg . toHack 0 n . flatten
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).  FIXME: Does this still apply?
-docToHtml :: Maybe String -- ^ Name of the thing this doc is for. See
-                          -- comments on 'toHack' for details.
+docToHtml :: Maybe String  -- ^ Name of the thing this doc is for. See
+                           -- comments on 'toHack' for details.
+          -> Maybe Package -- ^ Current package
           -> Qualification -> MDoc DocName -> Html
-docToHtml n qual = markupHacked fmt n . cleanup
+docToHtml n pkg qual = markupHacked fmt pkg n . cleanup
   where fmt = parHtmlMarkup qual True (ppDocName qual Raw)
 
 -- | Same as 'docToHtml' but it doesn't insert the 'anchor' element
 -- in links. This is used to generate the Contents box elements.
-docToHtmlNoAnchors :: Maybe String -- ^ See 'toHack'
+docToHtmlNoAnchors :: Maybe String  -- ^ See 'toHack'
+                   -> Maybe Package -- ^ Current package
                    -> Qualification -> MDoc DocName -> Html
-docToHtmlNoAnchors n qual = markupHacked fmt n . cleanup
+docToHtmlNoAnchors n pkg qual = markupHacked fmt pkg n . cleanup
   where fmt = parHtmlMarkup qual False (ppDocName qual Raw)
 
-origDocToHtml :: Qualification -> MDoc Name -> Html
-origDocToHtml qual = markupHacked fmt Nothing . cleanup
+origDocToHtml :: Maybe Package -> Qualification -> MDoc Name -> Html
+origDocToHtml pkg qual = markupHacked fmt pkg Nothing . cleanup
   where fmt = parHtmlMarkup qual True (const $ ppName Raw)
 
 
-rdrDocToHtml :: Qualification -> MDoc RdrName -> Html
-rdrDocToHtml qual = markupHacked fmt Nothing . cleanup
+rdrDocToHtml :: Maybe Package -> Qualification -> MDoc RdrName -> Html
+rdrDocToHtml pkg qual = markupHacked fmt pkg Nothing . cleanup
   where fmt = parHtmlMarkup qual True (const ppRdrName)
 
 
@@ -226,14 +248,17 @@ docElement el content_ =
 
 
 docSection :: Maybe Name -- ^ Name of the thing this doc is for
+           -> Maybe Package -- ^ Current package
            -> Qualification -> Documentation DocName -> Html
-docSection n qual = maybe noHtml (docSection_ n qual) . combineDocumentation
+docSection n pkg qual =
+  maybe noHtml (docSection_ n pkg qual) . combineDocumentation
 
 
-docSection_ :: Maybe Name -- ^ Name of the thing this doc is for
+docSection_ :: Maybe Name    -- ^ Name of the thing this doc is for
+            -> Maybe Package -- ^ Current package
             -> Qualification -> MDoc DocName -> Html
-docSection_ n qual =
-  (docElement thediv <<) . docToHtml (getOccString <$> n) qual
+docSection_ n pkg qual =
+  (docElement thediv <<) . docToHtml (getOccString <$> n) pkg qual
 
 
 cleanup :: MDoc a -> MDoc a

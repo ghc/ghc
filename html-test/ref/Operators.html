@@ -70,19 +70,19 @@
 	      >Foo</a
 	      ><ul class="subs"
 	      ><li
-		>= <a href="#"
+		>= <a href="#" title="Operators"
 		  >Foo</a
 		  > <a href="#"
 		  >`Bar`</a
-		  > <a href="#"
+		  > <a href="#" title="Operators"
 		  >Foo</a
 		  ></li
 		><li
-		>| <a href="#"
+		>| <a href="#" title="Operators"
 		  >Foo</a
 		  > <a href="#"
 		  >:-</a
-		  > <a href="#"
+		  > <a href="#" title="Operators"
 		  >Foo</a
 		  ></li
 		></ul
@@ -106,7 +106,7 @@
 	      ><li
 		><a href="#"
 		  >(:&lt;-&gt;)</a
-		  > :: a -&gt; b -&gt; a <a href="#"
+		  > :: a -&gt; b -&gt; a <a href="#" title="Operators"
 		  >&lt;-&gt;</a
 		  > b</li
 		></ul
@@ -136,15 +136,29 @@
 		  >type</span
 		  > a <a href="#"
 		  >&lt;&gt;&lt;</a
-		  > b :: <a href="#"
-		  >*</a
-		  ></li
+		  > b :: *</li
 		><li
 		><span class="keyword"
 		  >data</span
 		  > a <a href="#"
 		  >&gt;&lt;&lt;</a
 		  > b</li
+		><li
+		><a href="#"
+		  >(&gt;&gt;&lt;)</a
+		  >, <a href="#"
+		  >(&lt;&lt;&gt;)</a
+		  > :: a -&gt; b -&gt; ()</li
+		><li
+		><a href="#"
+		  >(**&gt;)</a
+		  >, <a href="#"
+		  >(**&lt;)</a
+		  >, <a href="#"
+		  >(&gt;**)</a
+		  >, <a href="#"
+		  >(&lt;**)</a
+		  > :: a -&gt; a -&gt; ()</li
 		></ul
 	      ></li
 	    ><li class="src short"
@@ -152,7 +166,7 @@
 	      >type</span
 	      > <a href="#"
 	      >(&gt;-&lt;)</a
-	      > a b = a <a href="#"
+	      > a b = a <a href="#" title="Operators"
 	      >&lt;-&gt;</a
 	      > b</li
 	    ></ul
@@ -224,11 +238,11 @@
 	    ><table
 	    ><tr
 	      ><td class="src"
-		><a href="#"
+		><a href="#" title="Operators"
 		  >Foo</a
 		  > <a id="v:Bar" class="def"
 		  >`Bar`</a
-		  > <a href="#"
+		  > <a href="#" title="Operators"
 		  >Foo</a
 		  > <span class="fixity"
 		  >infixl 3</span
@@ -242,11 +256,11 @@
 		></tr
 	      ><tr
 	      ><td class="src"
-		><a href="#"
+		><a href="#" title="Operators"
 		  >Foo</a
 		  > <a id="v::-45-" class="def"
 		  >:-</a
-		  > <a href="#"
+		  > <a href="#" title="Operators"
 		  >Foo</a
 		  > <span class="fixity"
 		  >infixr 5</span
@@ -308,7 +322,7 @@
 	      ><td class="src"
 		><a id="v::-60--45--62-" class="def"
 		  >(:&lt;-&gt;)</a
-		  > :: a -&gt; b -&gt; a <a href="#"
+		  > :: a -&gt; b -&gt; a <a href="#" title="Operators"
 		  >&lt;-&gt;</a
 		  > b <span class="fixity"
 		  >infixr 6</span
@@ -376,24 +390,6 @@
 	  ><p
 	    >Class with fixity, including associated types</p
 	    ></div
-	  ><div class="subs minimal"
-	  ><p class="caption"
-	    >Minimal complete definition</p
-	    ><p class="src"
-	    ><a href="#"
-	      >(&gt;&gt;&lt;)</a
-	      >, <a href="#"
-	      >(&lt;&lt;&gt;)</a
-	      >, <a href="#"
-	      >(**&gt;)</a
-	      >, <a href="#"
-	      >(**&lt;)</a
-	      >, <a href="#"
-	      >(&gt;**)</a
-	      >, <a href="#"
-	      >(&lt;**)</a
-	      ></p
-	    ></div
 	  ><div class="subs associated-types"
 	  ><p class="caption"
 	    >Associated Types</p
@@ -402,9 +398,7 @@
 	      >type</span
 	      > a <a id="t:-60--62--60-" class="def"
 	      >&lt;&gt;&lt;</a
-	      > b :: <a href="#"
-	      >*</a
-	      > <span class="fixity"
+	      > b :: * <span class="fixity"
 	      >infixl 2</span
 	      ><span class="rightedge"
 	      ></span
@@ -511,7 +505,7 @@
 	    >type</span
 	    > <a id="t:-62--45--60-" class="def"
 	    >(&gt;-&lt;)</a
-	    > a b = a <a href="#"
+	    > a b = a <a href="#" title="Operators"
 	    >&lt;-&gt;</a
 	    > b <span class="fixity"
 	    >infixl 6</span

@@ -1,5 +1,6 @@
+cabal-version:        2.0
 name:                 haddock-api
-version:              2.18.2
+version:              2.20.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -12,7 +13,6 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-cabal-version:        >= 2.0
 
 extra-source-files:
   CHANGES.md
@@ -41,10 +41,10 @@ library
 
   -- this package typically supports only single major versions
   build-depends: base            ^>= 4.12.0
-               , Cabal           ^>= 2.0.0
-               , ghc             ^>= 8.3
+               , Cabal           ^>= 2.3.0
+               , ghc             ^>= 8.5
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.4.6
+               , haddock-library ^>= 1.6.0
                , xhtml           ^>= 3000.2.2
 
   -- Versions for the dependencies below are transitively pinned by
@@ -124,27 +124,71 @@ test-suite spec
       test
     , src
 
-  -- NB: We only use a small subset of lib:haddock-api here, which
-  --     explains why this component has a smaller build-depends set
   other-modules:
+    Haddock
+    Haddock.Backends.Hoogle
+    Haddock.Backends.Hyperlinker
+    Haddock.Backends.Hyperlinker.Ast
+    Haddock.Backends.Hyperlinker.Renderer
+    Haddock.Backends.Hyperlinker.Utils
+    Haddock.Backends.LaTeX
+    Haddock.Backends.Xhtml
+    Haddock.Backends.Xhtml.Decl
+    Haddock.Backends.Xhtml.DocMarkup
+    Haddock.Backends.Xhtml.Layout
+    Haddock.Backends.Xhtml.Meta
+    Haddock.Backends.Xhtml.Names
+    Haddock.Backends.Xhtml.Themes
+    Haddock.Backends.Xhtml.Types
+    Haddock.Backends.Xhtml.Utils
+    Haddock.Convert
+    Haddock.Doc
+    Haddock.GhcUtils
+    Haddock.Interface
+    Haddock.Interface.AttachInstances
+    Haddock.Interface.Create
+    Haddock.Interface.Json
+    Haddock.Interface.LexParseRn
+    Haddock.Interface.ParseModuleHeader
+    Haddock.Interface.Rename
+    Haddock.Interface.Specialize
+    Haddock.InterfaceFile
+    Haddock.ModuleTree
+    Haddock.Options
+    Haddock.Parser
+    Haddock.Syb
+    Haddock.Types
+    Haddock.Utils
+    Haddock.Utils.Json
+    Haddock.Version
+    Paths_haddock_api
     Haddock.Backends.Hyperlinker.ParserSpec
     Haddock.Backends.Hyperlinker.Parser
     Haddock.Backends.Hyperlinker.Types
 
-  build-depends:
-      ghc         ^>= 8.3
-    , hspec       ^>= 2.4.4
-    , QuickCheck  ^>= 2.10
+  build-depends: Cabal           ^>= 2.3
+               , ghc             ^>= 8.5
+               , ghc-paths       ^>= 0.1.0.9
+               , haddock-library ^>= 1.6.0
+               , xhtml           ^>= 3000.2.2
+               , hspec           >= 2.4.4 && < 2.6
+               , QuickCheck      ^>= 2.11
 
   -- Versions for the dependencies below are transitively pinned by
   -- the non-reinstallable `ghc` package and hence need no version
   -- bounds
-  build-depends:
-      base
-    , containers
+  build-depends: base
+               , array
+               , bytestring
+               , containers
+               , deepseq
+               , directory
+               , filepath
+               , ghc-boot
+               , transformers
 
   build-tool-depends:
-    hspec-discover:hspec-discover ^>= 2.4.4
+    hspec-discover:hspec-discover >= 2.4.4 && < 2.6
 
 source-repository head
   type:     git

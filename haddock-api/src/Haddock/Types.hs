@@ -38,8 +38,6 @@ import BasicTypes (Fixity(..))
 import GHC hiding (NoLink)
 import DynFlags (Language)
 import qualified GHC.LanguageExtensions as LangExt
-import Coercion
-import NameSet
 import OccName
 import Outputable
 import Control.Applicative (Applicative(..))
@@ -390,7 +388,7 @@ mkPseudoFamilyDecl (XFamilyDecl {}) = panic "haddock:mkPseudoFamilyDecl"
 
 
 -- | An instance head that may have documentation and a source location.
-type DocInstance name = (InstHead name, Maybe (MDoc (IdP name)), Located (IdP name))
+type DocInstance name = (InstHead name, Maybe (MDoc (IdP name)), Located (IdP name), Maybe Module)
 
 -- | The head of an instance. Consists of a class name, a list of type
 -- parameters (which may be annotated with kinds), and an instance type
@@ -456,6 +454,7 @@ instance (NFData a, NFData mod)
     DocProperty a             -> a `deepseq` ()
     DocExamples a             -> a `deepseq` ()
     DocHeader a               -> a `deepseq` ()
+    DocTable a                -> a `deepseq` ()
 
 #if !MIN_VERSION_ghc(8,0,2)
 -- These were added to GHC itself in 8.0.2
@@ -476,6 +475,14 @@ instance NFData Picture where
 instance NFData Example where
   rnf (Example a b) = a `deepseq` b `deepseq` ()
 
+instance NFData id => NFData (Table id) where
+    rnf (Table h b) = h `deepseq` b `deepseq` ()
+
+instance NFData id => NFData (TableRow id) where
+    rnf (TableRow cs) = cs `deepseq` ()
+
+instance NFData id => NFData (TableCell id) where
+    rnf (TableCell i j c) = i `deepseq` j `deepseq` c `deepseq` ()
 
 exampleToString :: Example -> String
 exampleToString (Example expression result) =
@@ -570,6 +577,12 @@ makeModuleQual qual aliases mdl =
 data HideEmptyContexts
   = HideEmptyContexts
   | ShowEmptyToplevelContexts
+
+-- | When to qualify @since@ annotations with their package
+data SinceQual
+  = Always
+  | External -- ^ only qualify when the thing being annotated is from
+             -- an external package
 
 -----------------------------------------------------------------------------
 -- * Error handling
