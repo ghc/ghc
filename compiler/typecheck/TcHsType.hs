@@ -100,7 +100,7 @@ import PrelNames hiding ( wildCardName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
-import Data.List ( partition, mapAccumR )
+import Data.List ( mapAccumR )
 import Control.Monad
 
 {-
@@ -1580,33 +1580,23 @@ kcLHsQTyVars name flav cusk
 
            -- Now, because we're in a CUSK, quantify over the mentioned
            -- kind vars, in dependency order.
-       ; tc_tvs  <- mapM zonkTcTyVarToTyVar tc_tvs
-       ; res_kind <- zonkTcType res_kind
-       ; let tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
-             qkvs = tyCoVarsOfTypeWellScoped (mkTyConKind tc_binders res_kind)
-                   -- the visibility of tvs doesn't matter here; we just
-                   -- want the free variables not to include the tvs
+       ; let tc_binders_unzonked = zipWith mk_tc_binder hs_tvs tc_tvs
+       ; dvs     <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys scoped_kvs $
+                                               mkTyConKind tc_binders_unzonked res_kind)
+       ; qkvs    <- quantifyTyVars emptyVarSet dvs
+         -- don't call tcGetGlobalTyCoVars. For associated types, it gets the
+         -- tyvars from the enclosing class -- but that's wrong. We *do* want
+         -- to quantify over those tyvars.
 
-          -- If there are any meta-tvs left, the user has
-          -- lied about having a CUSK. Error.
-       ; let (meta_tvs, good_tvs) = partition isMetaTyVar qkvs
-          -- skip this check for associated types. Why?
-          -- Any variables mentioned in the definition will get defaulted,
-          -- except those that appear in the class head. Defaulted vars do
-          -- not concern us here (they are fully determined). Variables from
-          -- the class head will be fully determined whenever the class has
-          -- a CUSK, and an associated family has a CUSK only when the enclosing
-          -- class has one. So skipping is safe. But why is it necessary?
-          -- It's possible that a class variable has too low a TcLevel to have
-          -- fully settled down by this point, and so this check will get
-          -- a false positive.
-       ; when (not_associated && not (null meta_tvs)) $
-         report_non_cusk_tvs (qkvs ++ tc_tvs) res_kind
+       ; scoped_kvs <- mapM zonkTcTyVarToTyVar scoped_kvs
+       ; tc_tvs     <- mapM zonkTcTyVarToTyVar tc_tvs
+       ; res_kind   <- zonkTcType res_kind
+       ; let tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
 
           -- If any of the scoped_kvs aren't actually mentioned in a binder's
           -- kind (or the return kind), then we're in the CUSK case from
           -- Note [Free-floating kind vars]
-       ; let all_tc_tvs        = good_tvs ++ tc_tvs
+       ; let all_tc_tvs        = scoped_kvs ++ tc_tvs
              all_mentioned_tvs = mapUnionVarSet (tyCoVarsOfType . tyVarKind)
                                                 all_tc_tvs
                                  `unionVarSet` tyCoVarsOfType res_kind
@@ -1614,8 +1604,9 @@ kcLHsQTyVars name flav cusk
                                            scoped_kvs
        ; reportFloatingKvs name flav all_tc_tvs unmentioned_kvs
 
-       ; let final_binders = map (mkNamedTyConBinder Specified) good_tvs
-                            ++ tc_binders
+       ; let final_binders =  map (mkNamedTyConBinder Inferred) qkvs
+                           ++ map (mkNamedTyConBinder Specified) scoped_kvs
+                           ++ tc_binders
              tycon = mkTcTyCon name (ppr user_tyvars) final_binders res_kind
                                (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
                                flav
@@ -1627,7 +1618,7 @@ kcLHsQTyVars name flav cusk
        ; traceTc "kcLHsQTyVars: cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
               , ppr tc_tvs, ppr (mkTyConKind final_binders res_kind)
-              , ppr qkvs, ppr meta_tvs, ppr good_tvs, ppr final_binders ]
+              , ppr qkvs, ppr final_binders ]
 
        ; return (tycon, stuff) }
 
@@ -1651,11 +1642,6 @@ kcLHsQTyVars name flav cusk
        ; return (tycon, stuff) }
   where
     open_fam = tcFlavourIsOpen flav
-    not_associated = case flav of
-      DataFamilyFlavour assoc     -> not assoc
-      OpenTypeFamilyFlavour assoc -> not assoc
-      _                           -> True
-
     skol_info = TyConSkol flav name
 
     mk_tc_binder :: LHsTyVarBndr GhcRn -> TyVar -> TyConBinder
@@ -1666,27 +1652,6 @@ kcLHsQTyVars name flav cusk
        | otherwise
        = mkAnonTyConBinder tv
 
-    report_non_cusk_tvs all_tvs res_kind
-      = do { all_tvs <- mapM zonkTyCoVarKind all_tvs
-           ; let (_, tidy_tvs)         = tidyOpenTyCoVars emptyTidyEnv all_tvs
-                 (meta_tvs, other_tvs) = partition isMetaTyVar tidy_tvs
-
-           ; addErr $
-             vcat [ text "You have written a *complete user-suppled kind signature*,"
-                  , hang (text "but the following variable" <> plural meta_tvs <+>
-                          isOrAre meta_tvs <+> text "undetermined:")
-                       2 (vcat (map pp_tv meta_tvs))
-                  , text "Perhaps add a kind signature."
-                  , ppUnless (null other_tvs) $
-                    hang (text "Inferred kinds of user-written variables:")
-                       2 (vcat (map pp_tv other_tvs))
-                    -- It's possible that the result kind contains
-                    -- underdetermined, forall-bound variables which weren't
-                    -- reported earier (see #13777).
-                  , hang (text "Inferred result kind:")
-                       2 (ppr res_kind) ] }
-      where
-        pp_tv tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 kcLHsQTyVars _ _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
 kcLHsTyVarBndrs :: Bool   -- True <=> bump the TcLevel when bringing vars into scope
