@@ -7,8 +7,8 @@ import Base
 import Context
 import Expression hiding (stage, way)
 import GHC
+import Oracles.Flag
 import Oracles.ModuleFiles
-import Oracles.Flag (crossCompiling)
 import Settings
 import Settings.Packages.Rts
 import Target
@@ -49,7 +49,7 @@ buildProgram rs = do
                         -- @llvm-passes@.
                         need =<< ghcDeps stage
 
-                    cross <- crossCompiling
+                    cross <- flag CrossCompiling
                     -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.
                     case (cross, stage) of
                         (True, s) | s > Stage0 -> do

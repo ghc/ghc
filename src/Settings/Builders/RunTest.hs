@@ -21,7 +21,7 @@ runTestBuilderArgs = builder RunTest ? do
 
     withNativeCodeGen <- expr ghcWithNativeCodeGen
     withInterpreter   <- expr ghcWithInterpreter
-    unregisterised    <- expr $ flag GhcUnregisterised
+    unregisterised    <- getFlag GhcUnregisterised
     withSMP           <- expr ghcWithSMP
 
     windows  <- expr windowsHost
@@ -78,8 +78,8 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.wordsize=\"64\""
             , arg "-e", arg $ "config.os="       ++ show os
             , arg "-e", arg $ "config.arch="     ++ show arch
-            , arg "-e", arg $ "config.platform=" ++ show platform 
-            
+            , arg "-e", arg $ "config.platform=" ++ show platform
+
             , arg "--config-file=testsuite/config/ghc"
             , arg "--config", arg $ "compiler="     ++ show (top -/- compiler)
             , arg "--config", arg $ "ghc_pkg="      ++ show (top -/- ghcPkg)
@@ -117,11 +117,11 @@ getTestArgs = do
         verbosityArg = case testVerbosity args of
                          Nothing -> Nothing
                          Just verbosity -> Just $ "--verbose=" ++ verbosity
-        wayArgs    = map ("--way=" ++) (testWays args) 
+        wayArgs    = map ("--way=" ++) (testWays args)
     pure $  testOnlyArg
-         ++ speedArg 
+         ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
-                      , junitArg, verbosityArg  ] 
+                      , junitArg, verbosityArg  ]
          ++ configArgs
          ++ wayArgs
 

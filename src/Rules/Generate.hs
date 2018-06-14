@@ -239,7 +239,7 @@ generateGhcPlatformH = do
     targetArch     <- getSetting TargetArch
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
-    ghcUnreg       <- expr $ flag GhcUnregisterised
+    ghcUnreg       <- getFlag    GhcUnregisterised
     return . unlines $
         [ "#ifndef __GHCPLATFORM_H__"
         , "#define __GHCPLATFORM_H__"
@@ -305,7 +305,7 @@ generateConfigHs = do
     cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
     cLibFFI                    <- expr useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
-    cGhcRtsWithLibdw           <- expr $ flag WithLibdw
+    cGhcRtsWithLibdw           <- getFlag WithLibdw
     let cGhcRTSWays = unwords $ map show rtsWays
     return $ unlines
         [ "{-# LANGUAGE CPP #-}"
@@ -381,7 +381,7 @@ generateGhcAutoconfH = do
     trackGenerateHs
     configHContents  <- expr $ map undefinePackage <$> readFileLines configH
     tablesNextToCode <- expr ghcEnableTablesNextToCode
-    ghcUnreg         <- expr $ flag GhcUnregisterised
+    ghcUnreg         <- getFlag    GhcUnregisterised
     ccLlvmBackend    <- getSetting CcLlvmBackend
     ccClangBackend   <- getSetting CcClangBackend
     return . unlines $

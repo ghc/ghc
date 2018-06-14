@@ -1,14 +1,14 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
     -- * GHC packages
-    array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr, 
+    array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal,
-    ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, 
-    haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, 
-    libffi, libiserv, mtl, parsec, parallel, pretty, primitive, process, rts, 
-    runGhc, stm, templateHaskell, terminfo, text, time, touchy, transformers, 
-    unlit, unix, win32, xhtml, ghcPackages, isGhcPackage, defaultPackages, 
+    ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock,
+    haskeline, hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv,
+    libffi, libiserv, mtl, parsec, parallel, pretty, primitive, process, rts,
+    runGhc, stm, templateHaskell, terminfo, text, time, touchy, transformers,
+    unlit, unix, win32, xhtml, ghcPackages, isGhcPackage, defaultPackages,
     testsuitePackages,
 
     -- * Package information
@@ -36,7 +36,7 @@ defaultPackages Stage3 = return []
 stage0Packages :: Action [Package]
 stage0Packages = do
     win <- windowsHost
-    cross <- crossCompiling
+    cross <- flag CrossCompiling
     return $ [ binary
              , cabal
              , compareSizes
@@ -68,7 +68,7 @@ stage1Packages = do
     win        <- windowsHost
     intLib     <- integerLibrary =<< flavour
     libraries0 <- filter isLibrary <$> stage0Packages
-    cross      <- crossCompiling
+    cross      <- flag CrossCompiling
     return $ libraries0 -- Build all Stage0 libraries in Stage1
           ++ [ array
              , base
@@ -106,7 +106,7 @@ stage2Packages = return [haddock]
 testsuitePackages :: Action [Package]
 testsuitePackages = return [ checkApiAnnotations
                            , checkPpr
-                           , hp2ps              ] 
+                           , hp2ps              ]
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC
@@ -114,7 +114,7 @@ testsuitePackages = return [ checkApiAnnotations
 -- 'Library', the function simply returns its name.
 programName :: Context -> Action String
 programName Context {..} = do
-    cross <- crossCompiling
+    cross <- flag CrossCompiling
     targetPlatform <- setting TargetPlatformFull
     let prefix = if cross then targetPlatform ++ "-" else ""
       in return $ prefix ++ case package of

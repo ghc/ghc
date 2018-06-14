@@ -25,7 +25,8 @@ ghcCabalBuilderArgs = mconcat
             --     stripping as well. As it is now, I believe we might have issues with stripping on
             --     windows, as I can't see a consumer of `stripCmdPath`.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
-            , crossCompiling ? pure [ "--disable-executable-stripping", "--disable-library-stripping" ]
+            , flag CrossCompiling ? pure [ "--disable-executable-stripping"
+                                         , "--disable-library-stripping" ]
             , arg "--cabal-file"
             , arg =<< fromJust . pkgCabalFile <$> getPackage
             , arg "--distdir"
@@ -103,7 +104,7 @@ configureArgs = do
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
-        , crossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
+        , flag CrossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH))]
 

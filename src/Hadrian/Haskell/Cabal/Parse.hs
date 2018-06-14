@@ -147,12 +147,12 @@ configurePackage context@Context {..} = do
             pure $ C.simpleUserHooks { C.postConf = \_ _ _ _ -> return () }
           | otherwise -> pure C.simpleUserHooks
 
+    -- Compute the list of flags
+    -- Compute the Cabal configurartion arguments
     flavourArgs <- args <$> flavour
-    -- Compute the list of flags.
-    flagList <- interpret (target context (CabalFlags stage) [] []) flavourArgs
-    -- Compute the Cabal configurartion arguments.
-    argList <- interpret (target context (GhcCabal Conf stage) [] []) flavourArgs
-    verbosity <- getVerbosity
+    flagList    <- interpret (target context (CabalFlags    stage) [] []) flavourArgs
+    argList     <- interpret (target context (GhcCabal Conf stage) [] []) flavourArgs
+    verbosity   <- getVerbosity
     let v = if verbosity >= Loud then "-v3" else "-v0"
     liftIO $ C.defaultMainWithHooksNoReadArgs hooks gpd
         (argList ++ ["--flags=" ++ unwords flagList, v])
@@ -184,10 +184,10 @@ registerPackage context@Context {..} = do
 -- | Parse the 'PackageData' of the 'Package' of a given 'Context'.
 parsePackageData :: Context -> Action PackageData
 parsePackageData context@Context {..} = do
-    -- XXX: This is conceptually wrong!
-    -- We should use the gpd, the flagAssignment and compiler, hostPlatform, ...
-    -- information from the lbi. And then compute the finalised PD (flags,
-    -- satisfiable dependencies, platform, compiler info, deps, gpd.)
+    -- TODO: This is conceptually wrong!
+    -- We should use the gpd, the flagAssignment and compiler, hostPlatform, and
+    -- other information from the lbi. And then compute the finalised PD (flags,
+    -- satisfiable dependencies, platform, compiler info, deps, gpd).
     --
     -- let (Right (pd,_)) = C.finalizePackageDescription flags (const True) platform (compilerInfo compiler) [] gpd
     --
@@ -199,7 +199,7 @@ parsePackageData context@Context {..} = do
 
     lbi <- liftIO $ C.getPersistBuildConfig cPath
 
-    -- XXX: move this into its own rule for "build/autogen/cabal_macros.h", and
+    -- TODO: Move this into its own rule for "build/autogen/cabal_macros.h", and
     -- "build/autogen/Path_*.hs" and 'need' them here.
     -- create the cabal_macros.h, ...
     -- Note: the `cPath` is ignored. The path that's used is the 'buildDir' path
@@ -211,26 +211,25 @@ parsePackageData context@Context {..} = do
 
     -- TODO: Get rid of deprecated 'externalPackageDeps' and drop -Wno-deprecations
     -- See: https://github.com/snowleopard/hadrian/issues/548
-    let extDeps = C.externalPackageDeps lbi'
-        deps    = map (C.display . snd) extDeps
-        dep_direct = map (fromMaybe (error "dep_keys failed")
-                          . C.lookupUnitId (C.installedPkgs lbi')
-                          . fst) extDeps
-        dep_ipids = map (C.display . Installed.installedUnitId) dep_direct
-
+    let extDeps      = C.externalPackageDeps lbi'
+        deps         = map (C.display . snd) extDeps
+        dep_direct   = map (fromMaybe (error "parsePackageData: dep_keys failed")
+                          . C.lookupUnitId (C.installedPkgs lbi') . fst) extDeps
+        dep_ipids    = map (C.display . Installed.installedUnitId) dep_direct
         Just ghcProg = C.lookupProgram C.ghcProgram (C.withPrograms lbi')
-
-        dep_pkgs = C.topologicalOrder (packageHacks (C.installedPkgs lbi'))
-        forDeps f = concatMap f dep_pkgs
+        dep_pkgs     = C.topologicalOrder (packageHacks (C.installedPkgs lbi'))
+        forDeps f    = concatMap f dep_pkgs
 
         -- Copied from Distribution.Simple.PreProcess.ppHsc2Hs
         packageHacks = case C.compilerFlavor (C.compiler lbi') of
             C.GHC | C.pkgName (C.package pd') /= (C.mkPackageName "rts") -> hackRtsPackage
             _   -> id
+
+        -- TODO: Get rid of this hack.
         -- We don't link in the actual Haskell libraries of our dependencies, so
-        -- the -u flags in the ldOptions of the rts package mean linking fails
-        -- on OS X (it's ld is a tad stricter than gnu ld). Thus we remove the
-        -- ldOptions for GHC's rts package:
+        -- the "-u" flags in @ldOptions@ of the @rts@ package mean linking fails
+        -- on OS X (its @ld@ is a tad stricter than GNU @ld@). Thus we remove
+        -- @ldOptions@ for the @rts@ package. With one exception (see below).
         hackRtsPackage index | null (C.allPackages index) = index
         -- ^ do not hack the empty index
         hackRtsPackage index = case C.lookupPackageName index (C.mkPackageName "rts") of
@@ -244,50 +243,52 @@ parsePackageData context@Context {..} = do
             -- there. So we filter out gcc-lib from the RTS's library-dirs here.
             _ -> error "No (or multiple) GHC rts package is registered!"
 
+        buildInfo = fst (biModules pd')
+
       in return $ PackageData
-          { dependencies = deps
-          , name         = C.unPackageName . C.pkgName . C.package $ pd'
-          , version      = C.display . C.pkgVersion . C.package $ pd'
-          , componentId  = C.localCompatPackageKey lbi'
-          , modules      = map C.display . snd . biModules $ pd'
-          , otherModules = map C.display . C.otherModules . fst . biModules $ pd'
-          , synopsis     = C.synopsis pd'
-          , description  = C.description pd'
-          , srcDirs      = C.hsSourceDirs . fst . biModules $ pd'
-          , deps         = deps
-          , depIpIds     = dep_ipids
-          , depNames     = map (C.display . C.mungedName . snd) extDeps
-          , depCompIds   = if C.packageKeySupported (C.compiler lbi')
-                           then dep_ipids
-                           else deps
-          , includeDirs  = C.includeDirs . fst . biModules $ pd'
-          , includes     = C.includes . fst . biModules $ pd'
-          , installIncludes = C.installIncludes . fst . biModules $ pd'
-          , extraLibs    = C.extraLibs . fst . biModules $ pd'
-          , extraLibDirs = C.extraLibDirs . fst . biModules $ pd'
-          , asmSrcs      = C.asmSources . fst . biModules $ pd'
-          , cSrcs        = C.cSources . fst . biModules $ pd'
-          , cmmSrcs      = C.cmmSources . fst . biModules $ pd'
-          , dataFiles    = C.dataFiles pd'
-          , hcOpts       = C.programDefaultArgs ghcProg
-              ++ (C.hcOptions C.GHC . fst . biModules $ pd')
-              ++ C.languageToFlags   (C.compiler lbi') (C.defaultLanguage . fst $ biModules pd')
-              ++ C.extensionsToFlags (C.compiler lbi') (C.usedExtensions  . fst $ biModules pd')
+          { dependencies    = deps
+          , name            = C.unPackageName . C.pkgName    . C.package $ pd'
+          , version         = C.display       . C.pkgVersion . C.package $ pd'
+          , componentId     = C.localCompatPackageKey lbi'
+          , modules         = map C.display . snd . biModules $ pd'
+          , otherModules    = map C.display . C.otherModules  $ buildInfo
+          , synopsis        = C.synopsis    pd'
+          , description     = C.description pd'
+          , srcDirs         = C.hsSourceDirs buildInfo
+          , deps            = deps
+          , depIpIds        = dep_ipids
+          , depNames        = map (C.display . C.mungedName . snd) extDeps
+          , depCompIds      = if C.packageKeySupported (C.compiler lbi')
+                              then dep_ipids
+                              else deps
+          , includeDirs     = C.includeDirs     buildInfo
+          , includes        = C.includes        buildInfo
+          , installIncludes = C.installIncludes buildInfo
+          , extraLibs       = C.extraLibs       buildInfo
+          , extraLibDirs    = C.extraLibDirs    buildInfo
+          , asmSrcs         = C.asmSources      buildInfo
+          , cSrcs           = C.cSources        buildInfo
+          , cmmSrcs         = C.cmmSources      buildInfo
+          , dataFiles       = C.dataFiles pd'
+          , hcOpts          = C.programDefaultArgs ghcProg
+              ++ C.hcOptions C.GHC buildInfo
+              ++ C.languageToFlags   (C.compiler lbi') (C.defaultLanguage buildInfo)
+              ++ C.extensionsToFlags (C.compiler lbi') (C.usedExtensions  buildInfo)
               ++ C.programOverrideArgs ghcProg
-          , asmOpts   = C.asmOptions . fst $ biModules pd'
-          , ccOpts    = C.ccOptions  . fst $ biModules pd'
-          , cmmOpts   = C.cmmOptions . fst $ biModules pd'
-          , cppOpts   = C.cppOptions . fst $ biModules pd'
-          , ldOpts    = C.ldOptions  . fst $ biModules pd'
-          , depIncludeDirs = forDeps Installed.includeDirs
-          , depCcOpts      = forDeps Installed.ccOptions
-          , depLdOpts      = forDeps Installed.ldOptions
-          , buildGhciLib   = C.withGHCiLib lbi' }
+          , asmOpts         = C.asmOptions buildInfo
+          , ccOpts          = C.ccOptions  buildInfo
+          , cmmOpts         = C.cmmOptions buildInfo
+          , cppOpts         = C.cppOptions buildInfo
+          , ldOpts          = C.ldOptions  buildInfo
+          , depIncludeDirs  = forDeps Installed.includeDirs
+          , depCcOpts       = forDeps Installed.ccOptions
+          , depLdOpts       = forDeps Installed.ldOptions
+          , buildGhciLib    = C.withGHCiLib lbi' }
 
 getHookedBuildInfo :: FilePath -> IO C.HookedBuildInfo
 getHookedBuildInfo baseDir = do
-    -- TODO: We should probably better generate this in the build dir, rather then
-    -- in the base dir? However `configure` is run in the baseDir.
+    -- TODO: We should probably better generate this in the build dir, rather
+    -- than in the base dir? However, @configure@ is run in the baseDir.
     maybeInfoFile <- C.findHookedPackageDesc baseDir
     case maybeInfoFile of
         Nothing       -> return C.emptyHookedBuildInfo

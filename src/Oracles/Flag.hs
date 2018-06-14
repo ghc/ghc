@@ -1,9 +1,10 @@
 module Oracles.Flag (
-    Flag (..), flag, crossCompiling, platformSupportsSharedLibs,
-    ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
+    Flag (..), flag, getFlag, platformSupportsSharedLibs, ghcWithSMP,
+    ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
 import Hadrian.Oracles.TextFile
+import Hadrian.Expression
 
 import Base
 import Oracles.Setting
@@ -39,8 +40,9 @@ flag f = do
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
     return $ value == "YES"
 
-crossCompiling :: Action Bool
-crossCompiling = flag CrossCompiling
+-- | Get a configuration setting.
+getFlag :: Flag -> Expr c b Bool
+getFlag = expr . flag
 
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do

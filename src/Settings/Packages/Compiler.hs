@@ -31,7 +31,7 @@ compilerPackageArgs = package compiler ? do
               , ghcWithNativeCodeGen ? arg "--flags=ncg"
               , ghcWithInterpreter ?
                 notStage0 ? arg "--flags=ghci"
-              , crossCompiling ? arg "-f-terminfo"
+              , flag CrossCompiling ? arg "-f-terminfo"
               , ghcWithInterpreter ?
                 ghcEnableTablesNextToCode ?
                 notM (flag GhcUnregisterised) ?

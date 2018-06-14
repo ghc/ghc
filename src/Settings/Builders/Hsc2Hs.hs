@@ -22,11 +22,11 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     tmpl <- (top -/-) <$> expr (templateHscPath Stage0)
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
-            , notM windowsHost ? notM crossCompiling ? arg "--cross-safe"
+            , notM windowsHost ? notM (flag CrossCompiling) ? arg "--cross-safe"
             , pure $ map ("-I" ++) (words gmpDir)
             , map ("--cflag=" ++) <$> getCFlags
             , map ("--lflag=" ++) <$> getLFlags
-            , notStage0 ? crossCompiling ? arg "--cross-compile"
+            , notStage0 ? flag CrossCompiling ? arg "--cross-compile"
             , stage0    ? arg ("--cflag=-D" ++ hArch ++ "_HOST_ARCH=1")
             , stage0    ? arg ("--cflag=-D" ++ hOs   ++ "_HOST_OS=1"  )
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
