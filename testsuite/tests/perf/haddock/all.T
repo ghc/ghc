@@ -10,7 +10,7 @@ test('haddock.base',
             # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
             # 2017-12-24                        18733710728 (x64/Windows) - Unknown
 
-          ,(wordsize(64), 21123660336, 5)
+          ,(wordsize(64), 24662232152, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
             # 2012-09-20:  5829972376 (amd64/Linux)
             # 2012-10-08:  5902601224 (amd64/Linux)
@@ -50,7 +50,8 @@ test('haddock.base',
             # 2018-04-10: 18511324808 (x86_64/Linux) - TTG HsBinds and Data instances
             # 2018-04-11: 20727464616 (x86_64/Linux) - Collateral of simplCast improvement (#14737)
             # 2018-04-20: 18971030224 (x86_64/Linux) - Cache coercion roles
-            # 2018-05-14: 21123660336 (amd64/Linux) D4659: strictness to fix space leaks
+            # 2018-05-14: 21123660336 (amd64/Linux) - D4659: strictness to fix space leaks
+            # 2018-06-14: 24662232152 (amd64/Linux) - Bump haddock
 
           ,(platform('i386-unknown-mingw32'), 2885173512, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
@@ -77,7 +78,7 @@ test('haddock.Cabal',
      [extra_files(['../../../../libraries/Cabal/Cabal/dist-install/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 24519860272, 5)
+          [(wordsize(64), 27520214496, 5)
             # 2012-08-14:  3255435248 (amd64/Linux)
             # 2012-08-29:  3324606664 (amd64/Linux, new codegen)
             # 2012-10-08:  3373401360 (amd64/Linux)
@@ -131,7 +132,8 @@ test('haddock.Cabal',
             # 2017-11-09: 20104611952 (amd64/Linux) - Bump Cabal
             # 2018-01-22: 25261834904 (amd64/Linux) - Bump Cabal
             # 2018-04-10: 23525241536 (amd64/Linux) - TTG HsBinds and Data instances
-            # 2018-05-14: 24519860272 (amd64/Linux) D4659: strictness to fix space leaks
+            # 2018-05-14: 24519860272 (amd64/Linux) - D4659: strictness to fix space leaks
+            # 2018-06-14: 27520214496 (amd64/Linux) - Bump haddock
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)
