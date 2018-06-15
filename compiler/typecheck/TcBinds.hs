@@ -9,7 +9,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
+module TcBinds ( tcLocalBinds, tcTopBinds, tcValBinds,
                  tcHsBootSigs, tcPolyCheck,
                  addTypecheckedBinds,
                  chooseInferredQuantifiers,
@@ -303,15 +303,6 @@ tcCompleteSigs sigs =
                                <+> text "resp."
                                <+> quotes (ppr tc'))
   in  mapMaybeM (addLocM doOne) sigs
-
-tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
-tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
-  = tcExtendGlobalValEnv [sel_id | L _ (IdSig _ sel_id) <- sigs] $
-    do { (rec_sel_binds, tcg_env) <- discardWarnings $
-                                     tcValBinds TopLevel binds sigs getGblEnv
-       ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
-       ; return tcg_env' }
-tcRecSelBinds (ValBinds {}) = panic "tcRecSelBinds"
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type

@@ -330,7 +330,7 @@ setGlobalTypeEnv tcg_env new_type_env
 
 tcExtendGlobalEnvImplicit :: [TyThing] -> TcM r -> TcM r
   -- Just extend the global environment with some TyThings
-  -- Do not extend tcg_tcs etc
+  -- Do not extend tcg_tcs, tcg_patsyns etc
 tcExtendGlobalEnvImplicit things thing_inside
    = do { tcg_env <- getGblEnv
         ; let ge'  = extendTypeEnvList (tcg_type_env tcg_env) things

@@ -19,10 +19,10 @@ module TcTyDecls(
         checkClassCycles,
 
         -- * Implicits
-        tcAddImplicits, mkDefaultMethodType,
+        addTyConsToGblEnv, mkDefaultMethodType,
 
         -- * Record selectors
-        mkRecSelBinds, mkOneRecordSelector
+        tcRecSelBinds, mkRecSelBinds, mkOneRecordSelector
     ) where
 
 #include "HsVersions.h"
@@ -31,7 +31,7 @@ import GhcPrelude
 
 import TcRnMonad
 import TcEnv
-import TcBinds( tcRecSelBinds )
+import TcBinds( tcValBinds, addTypecheckedBinds )
 import TyCoRep( Type(..), Coercion(..), UnivCoProvenance(..) )
 import TcType
 import TysWiredIn( unitTy )
@@ -743,23 +743,24 @@ updateRoleEnv name n role
 *                                                                      *
 ********************************************************************* -}
 
-tcAddImplicits :: [TyCon] -> TcM TcGblEnv
+addTyConsToGblEnv :: [TyCon] -> TcM TcGblEnv
 -- Given a [TyCon], add to the TcGblEnv
+--   * extend the TypeEnv with the tycons
 --   * extend the TypeEnv with their implicitTyThings
 --   * extend the TypeEnv with any default method Ids
 --   * add bindings for record selectors
---   * add bindings for type representations for the TyThings
-tcAddImplicits tycons
-  = discardWarnings $
+addTyConsToGblEnv tyclss
+  = tcExtendTyConEnv tyclss                    $
     tcExtendGlobalEnvImplicit implicit_things  $
     tcExtendGlobalValEnv def_meth_ids          $
-    do { traceTc "tcAddImplicits" $ vcat
-            [ text "tycons" <+> ppr tycons
+    do { traceTc "tcAddTyCons" $ vcat
+            [ text "tycons" <+> ppr tyclss
             , text "implicits" <+> ppr implicit_things ]
-       ; tcRecSelBinds (mkRecSelBinds tycons) }
+       ; gbl_env <- tcRecSelBinds (mkRecSelBinds tyclss)
+       ; return gbl_env }
  where
-   implicit_things = concatMap implicitTyConThings tycons
-   def_meth_ids    = mkDefaultMethodIds tycons
+   implicit_things = concatMap implicitTyConThings tyclss
+   def_meth_ids    = mkDefaultMethodIds tyclss
 
 mkDefaultMethodIds :: [TyCon] -> [Id]
 -- We want to put the default-method Ids (both vanilla and generic)
@@ -822,30 +823,37 @@ when typechecking the [d| .. |] quote, and typecheck them later.
 ************************************************************************
 -}
 
-mkRecSelBinds :: [TyCon] -> HsValBinds GhcRn
+tcRecSelBinds :: [(Id, LHsBind GhcRn)] -> TcM TcGblEnv
+tcRecSelBinds sel_bind_prs
+  = tcExtendGlobalValEnv [sel_id | L _ (IdSig _ sel_id) <- sigs] $
+    do { (rec_sel_binds, tcg_env) <- discardWarnings $
+                                     tcValBinds TopLevel binds sigs getGblEnv
+       ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
+  where
+    sigs = [ L loc (IdSig noExt sel_id)   | (sel_id, _) <- sel_bind_prs
+                                          , let loc = getSrcSpan sel_id ]
+    binds = [(NonRecursive, unitBag bind) | (_, bind) <- sel_bind_prs]
+
+mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
 mkRecSelBinds tycons
-  = XValBindsLR (NValBinds binds sigs)
-  where
-    (sigs, binds) = unzip rec_sels
-    rec_sels = map mkRecSelBind [ (tc,fld)
-                                | tc <- tycons
+  = map mkRecSelBind [ (tc,fld) | tc <- tycons
                                 , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
+mkRecSelBind :: (TyCon, FieldLabel) -> (Id, LHsBind GhcRn)
 mkRecSelBind (tycon, fl)
   = mkOneRecordSelector all_cons (RecSelData tycon) fl
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
 
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
-                    -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
+                    -> (Id, LHsBind GhcRn)
 mkOneRecordSelector all_cons idDetails fl
-  = (L loc (IdSig noExt sel_id), (NonRecursive, unitBag (L loc sel_bind)))
+  = (sel_id, L loc sel_bind)
   where
-    loc    = getSrcSpan sel_name
+    loc      = getSrcSpan sel_name
     lbl      = flLabel fl
     sel_name = flSelector fl
 
