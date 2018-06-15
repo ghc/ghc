@@ -4,6 +4,7 @@ import GHC
 import Oracles.Setting
 import Rules.Gmp
 import Settings.Builders.Common
+import CommandLine
 
 makeBuilderArgs :: Args
 makeBuilderArgs = do
@@ -23,7 +24,8 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
     compiler            <- expr $ fullpath ghc
     checkPpr            <- expr $ fullpath checkPpr
     checkApiAnnotations <- expr $ fullpath checkApiAnnotations
-    return [ "fast"
+    args                <- expr $ userSetting defaultTestArgs
+    return [ setTestSpeed $ testSpeed args
            , "THREADS=" ++ show threads
            , "TEST_HC=" ++ (top -/- compiler)
            , "CHECK_PPR=" ++ (top -/- checkPpr)
@@ -33,3 +35,8 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
     fullpath :: Package -> Action FilePath
     fullpath pkg = programPath =<< programContext Stage1 pkg
 
+-- | Support for speed of validation 
+setTestSpeed :: TestSpeed -> String
+setTestSpeed Fast    = "fasttest"
+setTestSpeed Average = "test"
+setTestSpeed Slow    = "slowtest" 

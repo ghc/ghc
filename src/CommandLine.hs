@@ -45,31 +45,33 @@ defaultCommandLineArgs = CommandLineArgs
 
 -- | These arguments are used by the `test` target.
 data TestArgs = TestArgs
-    { testCompiler :: String
-    , testConfigs  :: [String]
-    , testJUnit    :: Maybe FilePath
-    , testOnly     :: Maybe String
-    , testOnlyPerf :: Bool
-    , testSkipPerf :: Bool
-    , testSpeed    :: TestSpeed
-    , testSummary  :: Maybe FilePath
-    , testVerbosity:: Maybe String
-    , testWays     :: [String] }
+    { testCompiler   :: String
+    , testConfigFile :: String
+    , testConfigs    :: [String]
+    , testJUnit      :: Maybe FilePath
+    , testOnly       :: Maybe String
+    , testOnlyPerf   :: Bool
+    , testSkipPerf   :: Bool
+    , testSpeed      :: TestSpeed
+    , testSummary    :: Maybe FilePath
+    , testVerbosity  :: Maybe String
+    , testWays       :: [String] }
     deriving (Eq, Show)
 
 -- | Default value for `TestArgs`.
 defaultTestArgs :: TestArgs
 defaultTestArgs = TestArgs
-    { testCompiler = "stage2"
-    , testConfigs  = []
-    , testJUnit    = Nothing
-    , testOnly     = Nothing
-    , testOnlyPerf = False
-    , testSkipPerf = False
-    , testSpeed    = Average
-    , testSummary  = Nothing
-    , testVerbosity= Nothing
-    , testWays     = [] }
+    { testCompiler   = "stage2"
+    , testConfigFile = "testsuite/config/ghc"
+    , testConfigs    = []
+    , testJUnit      = Nothing
+    , testOnly       = Nothing
+    , testOnlyPerf   = False
+    , testSkipPerf   = False
+    , testSpeed      = Fast
+    , testSummary    = Nothing
+    , testVerbosity  = Nothing
+    , testWays       = [] }
 
 readConfigure :: Either String (CommandLineArgs -> CommandLineArgs)
 readConfigure = Right $ \flags -> flags { configure = True }
@@ -136,6 +138,12 @@ readTestConfig config =
                         let configs = conf : testConfigs (testArgs flags)
                         in flags { testArgs = (testArgs flags) { testConfigs = configs } }
 
+readTestConfigFile :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readTestConfigFile filepath = 
+    maybe (Left "Cannot parse test-speed") (Right . set) filepath
+  where
+    set filepath flags =  flags { testArgs = (testArgs flags) { testConfigFile = filepath } } 
+
 readTestJUnit :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
 
@@ -197,6 +205,8 @@ optDescrs =
       "Generate split objects (requires a full clean rebuild)."
     , Option [] ["test-compiler"] (OptArg readTestCompiler "TEST_COMPILER")
       "Use given compiler [Default=stage2]."
+    , Option [] ["test-config-file"] (OptArg readTestConfigFile "CONFIG_FILE")
+      "congiguration file for testsuite. Default=testsuite/config/ghc"
     , Option [] ["config"] (OptArg readTestConfig "EXTRA_TEST_CONFIG")
       "Configurations to run test, in key=value format."
     , Option [] ["summary-junit"] (OptArg readTestJUnit "TEST_SUMMARY_JUNIT")
