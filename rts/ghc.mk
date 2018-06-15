@@ -46,6 +46,7 @@ ALL_DIRS += posix
 endif
 
 rts_C_SRCS := $(wildcard rts/*.c $(foreach dir,$(ALL_DIRS),rts/$(dir)/*.c))
+rts_C_HOOK_SRCS := $(wildcard rts/hooks/*.c)
 rts_CMM_SRCS := $(wildcard rts/*.cmm)
 
 # Don't compile .S files when bootstrapping a new arch
@@ -171,9 +172,10 @@ $(call cmm-suffix-rules,rts,dist,$1)
 rts_$1_LIB_FILE = libHSrts$$($1_libsuf)
 rts_$1_LIB = rts/dist/build/$$(rts_$1_LIB_FILE)
 
-rts_$1_C_OBJS   = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
-rts_$1_S_OBJS   = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
-rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_SRCS)) $$(patsubst %.cmm,%.$$($1_osuf),$$(rts_AUTO_APPLY_CMM))
+rts_$1_C_OBJS      = $$(patsubst rts/%.c,rts/dist/build/%.$$($1_osuf),$$(rts_C_SRCS)) $$(patsubst %.c,%.$$($1_osuf),$$(rts_$1_EXTRA_C_SRCS))
+rts_$1_C_HOOK_OBJS = $$(patsubst rts/hooks/%.c,rts/dist/build/hooks/%.$$($1_osuf),$$(rts_C_HOOK_SRCS))
+rts_$1_S_OBJS      = $$(patsubst rts/%.S,rts/dist/build/%.$$($1_osuf),$$(rts_S_SRCS))
+rts_$1_CMM_OBJS    = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_SRCS)) $$(patsubst %.cmm,%.$$($1_osuf),$$(rts_AUTO_APPLY_CMM))
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
@@ -254,9 +256,21 @@ else
 
 ifeq "$(USE_DTRACE)" "YES"
 ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
+# A list of objects that do not get included in the RTS object that is created
+# during the linking step. To prevent future linking errors, especially when
+# using the compiler as a bootstrap compiler, we need to exclude the hook
+# objects from being re-linked into the single LINKED_OBJS object file. When the
+# hooks are being linked into the RTS object this will result in duplicated
+# symbols causing the linker to fail (e.g. `StackOverflowHook` in RTS.o and
+# hschooks.o). The excluded objects do not get relinked into the RTS object but
+# get included separately so prevent linker errors.
+# (see issue #15040)
+rts_$1_EXCLUDED_OBJS = $$(rts_$1_C_HOOK_OBJS)
+# The RTS object that gets generated to package up all of the runtime system
+# with the dtrace probe code.
 rts_$1_LINKED_OBJS = rts/dist/build/RTS.$$($1_osuf)
 
-$$(rts_$1_LINKED_OBJS) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
+$$(rts_$1_LINKED_OBJS) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_$1_C_HOOK_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
 
 	# When linking an archive the linker will only include the object files that
@@ -264,11 +278,17 @@ $$(rts_$1_LINKED_OBJS) : $$(rts_$1_OBJS) $$(rts_$1_DTRACE_OBJS)
 	# specific code for initializing the probes. By creating a single object that
 	# also includes the probe object code we force the linker to include the
 	# probes when linking the static runtime.
-	$(LD) -r -o $$(rts_$1_LINKED_OBJS) $$(rts_$1_DTRACE_OBJS) $$(rts_$1_OBJS)
+	#
+	# The reason why we are re-linking all the objects into a single object file
+	# is stated in this thread:
+	# https://thr3ads.net/dtrace-discuss/2005/08/384778-Problem-with-probes-defined-in-static-libraries
+	$(LD) -r -o $$(rts_$1_LINKED_OBJS) $$(rts_$1_DTRACE_OBJS) $$(filter-out $$(rts_$1_EXCLUDED_OBJS), $$(rts_$1_OBJS))
 else
+rts_$1_EXCLUDED_OBJS =
 rts_$1_LINKED_OBJS = $$(rts_$1_OBJS)
 endif
 else
+rts_$1_EXCLUDED_OBJS =
 rts_$1_LINKED_OBJS = $$(rts_$1_OBJS)
 endif
 
@@ -276,7 +296,7 @@ endif
 $$(rts_$1_LIB) : $$(rts_$1_LINKED_OBJS)
 	"$$(RM)" $$(RM_OPTS) $$@
 
-	echo $$(rts_$1_LINKED_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
+	echo $$(rts_$1_LINKED_OBJS) $$(rts_$1_EXCLUDED_OBJS) | "$$(XARGS)" $$(XARGS_OPTS) "$$(AR_STAGE1)" \
 		$$(AR_OPTS_STAGE1) $$(EXTRA_AR_ARGS_STAGE1) $$@
 
 ifneq "$$(UseSystemLibFFI)" "YES"
