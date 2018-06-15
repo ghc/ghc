@@ -1,6 +1,6 @@
 type family T8953.Poly (a_0 :: k_1) :: *
 type instance T8953.Poly (x_2 :: GHC.Types.Bool) = GHC.Types.Int
-type instance T8953.Poly (x_3 :: GHC.Base.Maybe k_4) = GHC.Types.Double
+type instance T8953.Poly (x_3 :: GHC.Maybe.Maybe k_4) = GHC.Types.Double
 type family T8953.Silly :: k_0 -> *
 type instance T8953.Silly = (Data.Proxy.Proxy :: * -> *)
 type instance T8953.Silly = (Data.Proxy.Proxy :: (* -> *) -> *)

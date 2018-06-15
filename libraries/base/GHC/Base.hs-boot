@@ -1,10 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module GHC.Base where
+module GHC.Base (Maybe, Semigroup, Monoid) where
 
+import GHC.Maybe (Maybe)
 import GHC.Types ()
 
 class Semigroup a
 class Monoid a
-
-data Maybe a = Nothing | Just a

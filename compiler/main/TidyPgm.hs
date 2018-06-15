@@ -1093,9 +1093,14 @@ tidyTopBinds :: HscEnv
 
 tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
   = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
+       mkNaturalId <- lookupMkNaturalName dflags hsc_env
        integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-       let cvt_integer = cvtLitInteger dflags mkIntegerId integerSDataCon
-           result      = tidy cvt_integer init_env binds
+       naturalSDataCon <- lookupNaturalSDataConName dflags hsc_env
+       let cvt_literal nt i = case nt of
+             LitNumInteger -> Just (cvtLitInteger dflags mkIntegerId integerSDataCon i)
+             LitNumNatural -> Just (cvtLitNatural dflags mkNaturalId naturalSDataCon i)
+             _             -> Nothing
+           result      = tidy cvt_literal init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
@@ -1104,34 +1109,35 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
     init_env = (init_occ_env, emptyVarEnv)
 
     tidy _           env []     = (env, [])
-    tidy cvt_integer env (b:bs)
-        = let (env1, b')  = tidyTopBind dflags this_mod
-                                        cvt_integer unfold_env env b
-              (env2, bs') = tidy cvt_integer env1 bs
+    tidy cvt_literal env (b:bs)
+        = let (env1, b')  = tidyTopBind dflags this_mod cvt_literal unfold_env
+                                        env b
+              (env2, bs') = tidy cvt_literal env1 bs
           in  (env2, b':bs')
 
 ------------------------
 tidyTopBind  :: DynFlags
              -> Module
-             -> (Integer -> CoreExpr)
+             -> (LitNumType -> Integer -> Maybe CoreExpr)
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_mod cvt_integer unfold_env
+tidyTopBind dflags this_mod cvt_literal unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_mod (subst1, cvt_integer)
+    caf_info      = hasCafRefs dflags this_mod
+                               (subst1, cvt_literal)
                                (idArity bndr) rhs
     (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name'
                                 (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_mod cvt_integer unfold_env
+tidyTopBind dflags this_mod cvt_literal unfold_env
             (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
@@ -1150,7 +1156,7 @@ tidyTopBind dflags this_mod cvt_integer unfold_env
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
         | or [ mayHaveCafRefs (hasCafRefs dflags this_mod
-                                          (subst1, cvt_integer)
+                                          (subst1, cvt_literal)
                                           (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
         | otherwise                = NoCafRefs
@@ -1296,25 +1302,28 @@ We compute hasCafRefs here, because IdInfo is supposed to be finalised
 after TidyPgm.  But CorePrep does some transformations that affect CAF-hood.
 So we have to *predict* the result here, which is revolting.
 
-In particular CorePrep expands Integer literals.  So in the prediction code
-here we resort to applying the same expansion (cvt_integer). Ugh!
+In particular CorePrep expands Integer and Natural literals. So in the
+prediction code here we resort to applying the same expansion (cvt_literal).
+Ugh!
 -}
 
-type CafRefEnv = (VarEnv Id, Integer -> CoreExpr)
+type CafRefEnv = (VarEnv Id, LitNumType -> Integer -> Maybe CoreExpr)
   -- The env finds the Caf-ness of the Id
-  -- The Integer -> CoreExpr is the desugaring function for Integer literals
+  -- The LitNumType -> Integer -> CoreExpr is the desugaring functions for
+  -- Integer and Natural literals
   -- See Note [Disgusting computation of CafRefs]
 
 hasCafRefs :: DynFlags -> Module
            -> CafRefEnv -> Arity -> CoreExpr
            -> CafInfo
-hasCafRefs dflags this_mod p@(_,cvt_integer) arity expr
+hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
-  mentions_cafs   = cafRefsE p expr
+  mentions_cafs   = cafRefsE expr
   is_dynamic_name = isDllName dflags this_mod
-  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name cvt_integer expr)
+  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name
+                                         cvt_literal expr)
 
   -- NB. we pass in the arity of the expression, which is expected
   -- to be calculated by exprArity.  This is because exprArity
@@ -1322,34 +1331,36 @@ hasCafRefs dflags this_mod p@(_,cvt_integer) arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
-cafRefsE :: CafRefEnv -> Expr a -> Bool
-cafRefsE p (Var id)            = cafRefsV p id
-cafRefsE p (Lit lit)           = cafRefsL p lit
-cafRefsE p (App f a)           = cafRefsE p f || cafRefsE p a
-cafRefsE p (Lam _ e)           = cafRefsE p e
-cafRefsE p (Let b e)           = cafRefsEs p (rhssOfBind b) || cafRefsE p e
-cafRefsE p (Case e _ _ alts)   = cafRefsE p e || cafRefsEs p (rhssOfAlts alts)
-cafRefsE p (Tick _n e)         = cafRefsE p e
-cafRefsE p (Cast e _co)        = cafRefsE p e
-cafRefsE _ (Type _)            = False
-cafRefsE _ (Coercion _)        = False
+  cafRefsE :: Expr a -> Bool
+  cafRefsE (Var id)            = cafRefsV id
+  cafRefsE (Lit lit)           = cafRefsL lit
+  cafRefsE (App f a)           = cafRefsE f || cafRefsE a
+  cafRefsE (Lam _ e)           = cafRefsE e
+  cafRefsE (Let b e)           = cafRefsEs (rhssOfBind b) || cafRefsE e
+  cafRefsE (Case e _ _ alts)   = cafRefsE e || cafRefsEs (rhssOfAlts alts)
+  cafRefsE (Tick _n e)         = cafRefsE e
+  cafRefsE (Cast e _co)        = cafRefsE e
+  cafRefsE (Type _)            = False
+  cafRefsE (Coercion _)        = False
 
-cafRefsEs :: CafRefEnv -> [Expr a] -> Bool
-cafRefsEs _ []     = False
-cafRefsEs p (e:es) = cafRefsE p e || cafRefsEs p es
+  cafRefsEs :: [Expr a] -> Bool
+  cafRefsEs []     = False
+  cafRefsEs (e:es) = cafRefsE e || cafRefsEs es
 
-cafRefsL :: CafRefEnv -> Literal -> Bool
--- Don't forget that mk_integer id might have Caf refs!
--- We first need to convert the Integer into its final form, to
--- see whether mkInteger is used.
-cafRefsL p@(_, cvt_integer) (LitInteger i _) = cafRefsE p (cvt_integer i)
-cafRefsL _                  _                = False
+  cafRefsL :: Literal -> Bool
+  -- Don't forget that mk_integer id might have Caf refs!
+  -- We first need to convert the Integer into its final form, to
+  -- see whether mkInteger is used. Same for LitNatural.
+  cafRefsL (LitNumber nt i _) = case cvt_literal nt i of
+    Just e  -> cafRefsE e
+    Nothing -> False
+  cafRefsL _                = False
 
-cafRefsV :: CafRefEnv -> Id -> Bool
-cafRefsV (subst, _) id
-  | not (isLocalId id)                = mayHaveCafRefs (idCafInfo id)
-  | Just id' <- lookupVarEnv subst id = mayHaveCafRefs (idCafInfo id')
-  | otherwise                         = False
+  cafRefsV :: Id -> Bool
+  cafRefsV id
+    | not (isLocalId id)                = mayHaveCafRefs (idCafInfo id)
+    | Just id' <- lookupVarEnv subst id = mayHaveCafRefs (idCafInfo id')
+    | otherwise                         = False
 
 
 {-

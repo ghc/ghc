@@ -167,7 +167,7 @@ Roman.foo1 :: Maybe Int
  Str=m2,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-Roman.foo1 = GHC.Base.Just @ Int Roman.foo2
+Roman.foo1 = GHC.Maybe.Just @ Int Roman.foo2
 
 -- RHS size: {terms: 11, types: 4, coercions: 0, joins: 0/0}
 foo :: Int -> Int
@@ -180,7 +180,7 @@ foo :: Int -> Int
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (n [Occ=Once!] :: Int) ->
                  case n of n1 [Occ=Once] { GHC.Types.I# _ [Occ=Dead] ->
-                 Roman.foo_go (GHC.Base.Just @ Int n1) Roman.foo1
+                 Roman.foo_go (GHC.Maybe.Just @ Int n1) Roman.foo1
                  }}]
 foo
   = \ (n :: Int) ->
@@ -192,8 +192,8 @@ foo
 ------ Local rules for imported ids --------
 "SC:$wgo0" [2]
     forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
-      Roman.$wgo (GHC.Base.Just @ Int (GHC.Types.I# sc1))
-                 (GHC.Base.Just @ Int (GHC.Types.I# sc))
+      Roman.$wgo (GHC.Maybe.Just @ Int (GHC.Types.I# sc1))
+                 (GHC.Maybe.Just @ Int (GHC.Types.I# sc))
       = Roman.foo_$s$wgo sc sc1
 
 

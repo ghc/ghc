@@ -94,10 +94,10 @@ cgLit other_lit   = do dflags <- getDynFlags
 mkSimpleLit :: DynFlags -> Literal -> CmmLit
 mkSimpleLit dflags (MachChar   c)    = CmmInt (fromIntegral (ord c)) (wordWidth dflags)
 mkSimpleLit dflags MachNullAddr      = zeroCLit dflags
-mkSimpleLit dflags (MachInt i)       = CmmInt i (wordWidth dflags)
-mkSimpleLit _      (MachInt64 i)     = CmmInt i W64
-mkSimpleLit dflags (MachWord i)      = CmmInt i (wordWidth dflags)
-mkSimpleLit _      (MachWord64 i)    = CmmInt i W64
+mkSimpleLit dflags (LitNumber LitNumInt i _)    = CmmInt i (wordWidth dflags)
+mkSimpleLit _      (LitNumber LitNumInt64 i _)  = CmmInt i W64
+mkSimpleLit dflags (LitNumber LitNumWord i _)   = CmmInt i (wordWidth dflags)
+mkSimpleLit _      (LitNumber LitNumWord64 i _) = CmmInt i W64
 mkSimpleLit _      (MachFloat r)     = CmmFloat r W32
 mkSimpleLit _      (MachDouble r)    = CmmFloat r W64
 mkSimpleLit _      (MachLabel fs ms fod)
@@ -529,8 +529,7 @@ emitCmmLitSwitch scrut  branches deflt = do
 
     -- We find the necessary type information in the literals in the branches
     let signed = case head branches of
-                    (MachInt _, _) ->   True
-                    (MachInt64 _, _) -> True
+                    (LitNumber nt _ _, _) -> litNumIsSigned nt
                     _ -> False
 
     let range | signed    = (tARGET_MIN_INT dflags, tARGET_MAX_INT dflags)

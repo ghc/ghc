@@ -219,6 +219,7 @@ Library
         GHC.Environment
         GHC.Err
         GHC.Exception
+        GHC.Exception.Type
         GHC.ExecutionStack
         GHC.ExecutionStack.Internal
         GHC.Exts
@@ -258,6 +259,7 @@ Library
         GHC.IORef
         GHC.Int
         GHC.List
+        GHC.Maybe
         GHC.MVar
         GHC.Natural
         GHC.Num

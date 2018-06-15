@@ -6,3 +6,4 @@ interfacePlugin: GHC.Types
 typeCheckPlugin (rn)
 typeCheckPlugin (tc)
 interfacePlugin: GHC.Integer.Type
+interfacePlugin: GHC.Natural

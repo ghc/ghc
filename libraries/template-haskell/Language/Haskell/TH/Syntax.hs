@@ -731,8 +731,8 @@ trueName  = mkNameG DataName "ghc-prim" "GHC.Types" "True"
 falseName = mkNameG DataName "ghc-prim" "GHC.Types" "False"
 
 nothingName, justName :: Name
-nothingName = mkNameG DataName "base" "GHC.Base" "Nothing"
-justName    = mkNameG DataName "base" "GHC.Base" "Just"
+nothingName = mkNameG DataName "base" "GHC.Maybe" "Nothing"
+justName    = mkNameG DataName "base" "GHC.Maybe" "Just"
 
 leftName, rightName :: Name
 leftName  = mkNameG DataName "base" "Data.Either" "Left"

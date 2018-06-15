@@ -116,7 +116,7 @@ Derived type family instances:
                                                                            'GHC.Types.True)
                                                                         (GHC.Generics.S1
                                                                            ('GHC.Generics.MetaSel
-                                                                              ('GHC.Base.Just
+                                                                              ('GHC.Maybe.Just
                                                                                  "element")
                                                                               'GHC.Generics.NoSourceUnpackedness
                                                                               'GHC.Generics.NoSourceStrictness
@@ -124,7 +124,7 @@ Derived type family instances:
                                                                            (GHC.Generics.Rec0 a)
                                                                          GHC.Generics.:*: GHC.Generics.S1
                                                                                             ('GHC.Generics.MetaSel
-                                                                                               ('GHC.Base.Just
+                                                                                               ('GHC.Maybe.Just
                                                                                                   "rest")
                                                                                                'GHC.Generics.NoSourceUnpackedness
                                                                                                'GHC.Generics.NoSourceStrictness
@@ -146,7 +146,7 @@ Derived type family instances:
                                                                         'GHC.Types.True)
                                                                      (GHC.Generics.S1
                                                                         ('GHC.Generics.MetaSel
-                                                                           ('GHC.Base.Just
+                                                                           ('GHC.Maybe.Just
                                                                               "element")
                                                                            'GHC.Generics.NoSourceUnpackedness
                                                                            'GHC.Generics.NoSourceStrictness
@@ -154,7 +154,7 @@ Derived type family instances:
                                                                         GHC.Generics.Par1
                                                                       GHC.Generics.:*: GHC.Generics.S1
                                                                                          ('GHC.Generics.MetaSel
-                                                                                            ('GHC.Base.Just
+                                                                                            ('GHC.Maybe.Just
                                                                                                "rest")
                                                                                             'GHC.Generics.NoSourceUnpackedness
                                                                                             'GHC.Generics.NoSourceStrictness
@@ -180,14 +180,14 @@ Derived type family instances:
                                                                            'GHC.Types.False)
                                                                         (GHC.Generics.S1
                                                                            ('GHC.Generics.MetaSel
-                                                                              'GHC.Base.Nothing
+                                                                              'GHC.Maybe.Nothing
                                                                               'GHC.Generics.NoSourceUnpackedness
                                                                               'GHC.Generics.NoSourceStrictness
                                                                               'GHC.Generics.DecidedLazy)
                                                                            (GHC.Generics.Rec0 a)
                                                                          GHC.Generics.:*: GHC.Generics.S1
                                                                                             ('GHC.Generics.MetaSel
-                                                                                               'GHC.Base.Nothing
+                                                                                               'GHC.Maybe.Nothing
                                                                                                'GHC.Generics.NoSourceUnpackedness
                                                                                                'GHC.Generics.NoSourceStrictness
                                                                                                'GHC.Generics.DecidedLazy)
@@ -211,14 +211,14 @@ Derived type family instances:
                                                                         'GHC.Types.False)
                                                                      (GHC.Generics.S1
                                                                         ('GHC.Generics.MetaSel
-                                                                           'GHC.Base.Nothing
+                                                                           'GHC.Maybe.Nothing
                                                                            'GHC.Generics.NoSourceUnpackedness
                                                                            'GHC.Generics.NoSourceStrictness
                                                                            'GHC.Generics.DecidedLazy)
                                                                         GHC.Generics.Par1
                                                                       GHC.Generics.:*: GHC.Generics.S1
                                                                                          ('GHC.Generics.MetaSel
-                                                                                            'GHC.Base.Nothing
+                                                                                            'GHC.Maybe.Nothing
                                                                                             'GHC.Generics.NoSourceUnpackedness
                                                                                             'GHC.Generics.NoSourceStrictness
                                                                                             'GHC.Generics.DecidedLazy)
