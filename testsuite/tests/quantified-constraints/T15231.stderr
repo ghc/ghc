@@ -1,0 +1,7 @@
+
+T15231.hs:15:10: error:
+    • Variable ‘c’ occurs more often
+        in the constraint ‘c’ than in the instance head ‘Z a’
+      (Use UndecidableInstances to permit this)
+    • In the quantified constraint ‘c => Z a’
+      In the instance declaration for ‘Z (ECC c a)’
