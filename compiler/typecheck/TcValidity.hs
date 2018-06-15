@@ -1121,12 +1121,13 @@ tcInstHeadTyNotSynonym ty
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
--- These must be a constructor applied to type variable arguments.
+-- These must be a constructor applied to type variable arguments
+-- or a type-level literal.
 -- But we allow kind instantiations.
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
   = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
-
+  | LitTy _ <- ty = True  -- accept type literals (Trac #13833)
   | otherwise
   = False
   where
