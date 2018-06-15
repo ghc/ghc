@@ -1,19 +1,10 @@
-module Rules.Libffi (libffiRules, libffiBuildPath, libffiDependencies) where
+module Rules.Libffi (libffiRules, libffiDependencies) where
 
-import GHC.Packages
+import GHC
 import Hadrian.Utilities
 import Settings.Builders.Common
-import Settings.Packages.Rts
 import Target
 import Utilities
-
--- | Libffi is considered a Stage1 package. This determines its build directory.
-libffiContext :: Context
-libffiContext = vanillaContext Stage1 libffi
-
--- | Build directory for in-tree Libffi library.
-libffiBuildPath :: Action FilePath
-libffiBuildPath = buildPath libffiContext
 
 libffiDependencies :: [FilePath]
 libffiDependencies = ["ffi.h", "ffitarget.h"]
@@ -21,13 +12,19 @@ libffiDependencies = ["ffi.h", "ffitarget.h"]
 libffiLibrary :: FilePath
 libffiLibrary = "inst/lib/libffi.a"
 
+rtsLibffiLibrary :: Way -> Action FilePath
+rtsLibffiLibrary way = do
+    name    <- libffiLibraryName
+    suf     <- libsuf way
+    rtsPath <- rtsBuildPath
+    return $ rtsPath -/- "lib" ++ name ++ suf
+
 fixLibffiMakefile :: FilePath -> String -> String
 fixLibffiMakefile top =
       replace "-MD" "-MMD"
     . replace "@toolexeclibdir@" "$(libdir)"
     . replace "@INSTALL@" ("$(subst ../install-sh," ++ top ++ "/install-sh,@INSTALL@)")
 
--- TODO: remove code duplication (see Settings/Builders/GhcCabal.hs)
 -- TODO: check code duplication w.r.t. ConfCcArgs
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do

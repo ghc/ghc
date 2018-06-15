@@ -15,7 +15,8 @@ module GHC (
     programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
 
     -- * Miscellaneous
-    programPath, buildDll0
+    programPath, buildDll0, rtsContext, rtsBuildPath, libffiContext,
+    libffiBuildPath, libffiLibraryName
     ) where
 
 import Base
@@ -174,3 +175,28 @@ buildDll0 :: Context -> Action Bool
 buildDll0 Context {..} = do
     windows <- windowsHost
     return $ windows && stage == Stage1 && package == compiler
+
+-- | RTS is considered a Stage1 package. This determines RTS build directory.
+rtsContext :: Context
+rtsContext = vanillaContext Stage1 rts
+
+-- | Path to the RTS build directory.
+rtsBuildPath :: Action FilePath
+rtsBuildPath = buildPath rtsContext
+
+-- | Libffi is considered a Stage1 package. This determines its build directory.
+libffiContext :: Context
+libffiContext = vanillaContext Stage1 libffi
+
+-- | Build directory for in-tree Libffi library.
+libffiBuildPath :: Action FilePath
+libffiBuildPath = buildPath libffiContext
+
+libffiLibraryName :: Action FilePath
+libffiLibraryName = do
+    useSystemFfi <- flag UseSystemFfi
+    windows      <- windowsHost
+    return $ case (useSystemFfi, windows) of
+        (True , False) -> "ffi"
+        (False, False) -> "Cffi"
+        (_    , True ) -> "Cffi-6"

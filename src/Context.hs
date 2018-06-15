@@ -13,7 +13,7 @@ module Context (
     ) where
 
 import Base
-import Context.Paths
+import Context.Path
 import Context.Type
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
@@ -78,6 +78,7 @@ pkgInplaceConfig context = do
     path <- contextPath context
     return $ path -/- "inplace-pkg-config"
 
+-- TODO: Add a @Rules FilePath@ alternative.
 -- | Path to the @setup-config@ of a given 'Context'.
 pkgSetupConfigFile :: Context -> Action FilePath
 pkgSetupConfigFile context = do

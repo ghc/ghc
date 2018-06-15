@@ -26,7 +26,6 @@ import Settings.Builders.Make
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
 import Settings.Packages
-import Settings.Packages.Rts
 import Settings.Warnings
 
 import {-# SOURCE #-} Builder
@@ -152,7 +151,4 @@ defaultBuilderArgs = mconcat
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
-defaultPackageArgs = mconcat
-    [ packageArgs
-    , rtsPackageArgs
-    , warningArgs ]
+defaultPackageArgs = mconcat [ packageArgs, warningArgs ]

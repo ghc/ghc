@@ -10,7 +10,6 @@ import GHC
 import Oracles.Flag
 import Oracles.ModuleFiles
 import Settings
-import Settings.Packages.Rts
 import Target
 import Utilities
 

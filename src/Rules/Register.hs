@@ -1,4 +1,7 @@
-module Rules.Register (registerPackages) where
+module Rules.Register (configurePackage, registerPackage) where
+
+import Distribution.ParseUtils
+import Distribution.Version (Version)
 
 import Base
 import Context
@@ -7,29 +10,36 @@ import Settings
 import Target
 import Utilities
 
-import Distribution.ParseUtils
-import qualified Distribution.Compat.ReadP as Parse
-import Distribution.Version (Version)
-import qualified System.Directory as IO
-
 import Hadrian.Expression
-import Hadrian.Haskell.Cabal.Parse as Cabal
+
+import qualified Distribution.Compat.ReadP   as Parse
+import qualified System.Directory            as IO
+import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 
 parseCabalName :: String -> Maybe (String, Version)
 parseCabalName = readPToMaybe parse
-  where parse = (,) <$> (parsePackageName <* Parse.char '-') <*> parseOptVersion
+  where
+    parse = (,) <$> (parsePackageName <* Parse.char '-') <*> parseOptVersion
 
--- | Build rules for registering packages and initialising package databases
--- by running the @ghc-pkg@ utility.
-registerPackages :: [(Resource, Int)] -> Context -> Rules ()
-registerPackages rs context@Context {..} = do
+-- | Configure a package and build its @setup-config@ file.
+configurePackage :: Context -> Rules ()
+configurePackage context@Context {..} = do
     root <- buildRootRules
-    root -/- relativePackageDbPath stage %> buildStamp rs context
+    root -/- contextDir context -/- "setup-config" %> \_ ->
+        Cabal.configurePackage context
 
+-- | Registering a package and initialise the corresponding package database if
+-- need be.
+registerPackage :: [(Resource, Int)] -> Context -> Rules ()
+registerPackage rs context@Context {..} = do
+    root <- buildRootRules
+
+    -- Initialise the package database.
     root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp ->
         writeFileLines stamp []
 
     -- TODO: Add proper error handling for partial functions.
+    -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
         settings <- libPath context <&> (-/- "settings")
         platformConstants <- libPath context <&> (-/- "platformConstants")
@@ -46,9 +56,8 @@ buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildConf _ context@Context {..} _conf = do
     depPkgIds <- cabalDependencies context
 
-    -- Calling 'need' on @setup-config@, triggers @ghc-cabal configure@
-    -- Building anything in a package transitively depends on its configuration.
-    setupConfig <- contextPath context <&> (-/- "setup-config")
+    -- Calling 'need' on @setupConfig@, triggers the package configuration.
+    setupConfig <- pkgSetupConfigFile context
     need [setupConfig]
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
@@ -71,8 +80,8 @@ buildConf _ context@Context {..} _conf = do
     when (package == integerGmp) $ need [path -/- "ghc-gmp.h"]
 
     -- Copy and register the package.
-    copyPackage context
-    registerPackage context
+    Cabal.copyPackage context
+    Cabal.registerPackage context
 
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 copyConf rs context@Context {..} conf = do
@@ -94,9 +103,3 @@ copyConf rs context@Context {..} conf = do
   where
     stdOutToPkgIds :: String -> [String]
     stdOutToPkgIds = drop 1 . concatMap words . lines
-
-buildStamp :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildStamp rs Context {..} path = do
-    buildWithResources rs $
-        target (vanillaContext stage ghc) (GhcPkg Init stage) [] [path]
-    putSuccess $ "| Successfully initialised " ++ path

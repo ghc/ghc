@@ -17,7 +17,6 @@ import qualified Rules.Generate
 import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Library
-import qualified Rules.PackageData
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
@@ -108,15 +107,15 @@ packageRules = do
 
     Rules.Program.buildProgram readPackageDb
 
-    forM_ [Stage0 .. ] $ \stage -> do
-      -- we create a dummy context, that has the correct state, but contains
-      -- @dummyPackage@ as a... dummy package. The package isn't accessed but the record
-      -- need to be set properly. @undefined@ is not an option as it ends up
-      -- being forced.
-      Rules.Register.registerPackages writePackageDb (Context stage dummyPackage vanilla)
+    forM_ [Stage0 .. ] $ \stage ->
+        -- we create a dummy context, that has the correct state, but contains
+        -- @dummyPackage@ as a... dummy package. The package isn't accessed but the record
+        -- need to be set properly. @undefined@ is not an option as it ends up
+        -- being forced.
+        Rules.Register.registerPackage writePackageDb (Context stage dummyPackage vanilla)
 
     forM_ vanillaContexts $ mconcat
-        [ Rules.PackageData.buildPackageData
+        [ Rules.Register.configurePackage
         , Rules.Dependencies.buildPackageDependencies readPackageDb
         , Rules.Documentation.buildPackageDocumentation
         , Rules.Generate.generatePackageCode ]

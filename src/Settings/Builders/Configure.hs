@@ -1,7 +1,7 @@
 module Settings.Builders.Configure (configureBuilderArgs) where
 
+import GHC
 import Rules.Gmp
-import Rules.Libffi
 import Settings.Builders.Common
 
 configureBuilderArgs :: Args

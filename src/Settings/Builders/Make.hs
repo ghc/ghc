@@ -3,7 +3,6 @@ module Settings.Builders.Make (makeBuilderArgs, validateBuilderArgs) where
 import GHC
 import Oracles.Setting
 import Rules.Gmp
-import Rules.Libffi
 import Settings.Builders.Common
 
 makeBuilderArgs :: Args

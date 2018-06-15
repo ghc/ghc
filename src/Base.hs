@@ -20,12 +20,11 @@ module Base (
 
     -- * Files
     configH, ghcVersionH,
+
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
-    generatedDir, generatedPath,
-    stageBinPath, stageLibPath,
-    templateHscPath, ghcDeps,
-    relativePackageDbPath, packageDbPath, packageDbStamp, ghcSplitPath
+    generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
+    ghcDeps, relativePackageDbPath, packageDbPath, packageDbStamp, ghcSplitPath
     ) where
 
 import Control.Applicative

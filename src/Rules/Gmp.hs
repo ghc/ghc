@@ -82,7 +82,7 @@ gmpRules = do
     root <//> "gmp/config.mk" %> \_ -> do
         -- Calling 'need' on @setup-config@, triggers @ghc-cabal configure@
         -- Building anything in a package transitively depends on its configuration.
-        setupConfig <- contextPath gmpContext <&> (-/- "setup-config")
+        setupConfig <- pkgSetupConfigFile gmpContext
         need [setupConfig]
 
     -- TODO: Get rid of hard-coded @gmp@.
