@@ -53,15 +53,10 @@ import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
-import RnUnbound           ( mkUnboundName )
 import RnTypes
 import PrelNames
-import TyCon               ( tyConName )
-import ConLike
-import Type                ( TyThing(..) )
 import Name
 import NameSet
-import OccName             ( setOccNameSpace, tcName )
 import RdrName
 import BasicTypes
 import Util
@@ -73,7 +68,7 @@ import TysWiredIn          ( nilDataCon )
 import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, liftM, ap )
+import Control.Monad       ( when, liftM, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
@@ -582,7 +577,7 @@ rnHsRecFields
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM LangExt.RecordPuns
        ; disambig_ok <- xoptM LangExt.DisambiguateRecordFields
-       ; parent <- check_disambiguation disambig_ok mb_con
+       ; let parent = guard disambig_ok >> mb_con
        ; flds1  <- mapM (rn_fld pun_ok parent) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
@@ -595,17 +590,13 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                 HsRecFieldPat con  -> Just con
                 _ {- update -}     -> Nothing
 
-    doc = case mb_con of
-            Nothing  -> text "constructor field name"
-            Just con -> text "field of constructor" <+> quotes (ppr con)
-
     rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (Located arg)
            -> RnM (LHsRecField GhcRn (Located arg))
     rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl
                                               = L loc (FieldOcc _ (L ll lbl))
                                           , hsRecFieldArg = arg
                                           , hsRecPun      = pun }))
-      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent doc lbl
+      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
@@ -671,41 +662,6 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
       -- _mb_con = Nothing => Record update
       -- _mb_con = Just unbound => Out of scope data constructor
 
-    check_disambiguation :: Bool -> Maybe Name -> RnM (Maybe Name)
-    -- When disambiguation is on, return name of parent tycon.
-    check_disambiguation disambig_ok mb_con
-      | disambig_ok, Just con <- mb_con
-      = do { env <- getGlobalRdrEnv; return (find_tycon env con) }
-      | otherwise = return Nothing
-
-    find_tycon :: GlobalRdrEnv -> Name {- DataCon -}
-               -> Maybe Name {- TyCon -}
-    -- Return the parent *type constructor* of the data constructor
-    -- (that is, the parent of the data constructor),
-    -- or 'Nothing' if it is a pattern synonym or not in scope.
-    -- That's the parent to use for looking up record fields.
-    find_tycon env con_name
-      | isUnboundName con_name
-      = Just (mkUnboundName (setOccNameSpace tcName (getOccName con_name)))
-        -- If the data con is not in scope, return an unboundName tycon
-        -- That way the calls to lookupRecFieldOcc in rn_fld won't generate
-        -- an error cascade; see Trac #14307
-
-      | Just (AConLike (RealDataCon dc)) <- wiredInNameTyThing_maybe con_name
-      = Just (tyConName (dataConTyCon dc))
-        -- Special case for [], which is built-in syntax
-        -- and not in the GlobalRdrEnv (Trac #8448)
-
-      | Just gre <- lookupGRE_Name env con_name
-      = case gre_par gre of
-          ParentIs p -> Just p
-          _          -> Nothing   -- Can happen if the con_name
-                                  -- is for a pattern synonym
-
-      | otherwise = Nothing
-        -- Data constructor not lexically in scope at all
-        -- See Note [Disambiguation and Template Haskell]
-
     dup_flds :: [NE.NonEmpty RdrName]
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
@@ -713,21 +669,12 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     (_, dup_flds) = removeDups compare (getFieldLbls flds)
 
 
-{- Note [Disambiguation and Template Haskell]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (Trac #12130)
-   module Foo where
-     import M
-     b = $(funny)
-
-   module M(funny) where
-     data T = MkT { x :: Int }
-     funny :: Q Exp
-     funny = [| MkT { x = 3 } |]
-
-When we splice, neither T nor MkT are lexically in scope, so find_tycon will
-fail.  But there is no need for disambiguation anyway, so we just return Nothing
--}
+-- NB: Consider this:
+--      module Foo where { data R = R { fld :: Int } }
+--      module Odd where { import Foo; fld x = x { fld = 3 } }
+-- Arguably this should work, because the reference to 'fld' is
+-- unambiguous because there is only one field id 'fld' in scope.
+-- But currently it's rejected.
 
 rnHsRecUpdFields
     :: [LHsRecUpdField GhcPs]
