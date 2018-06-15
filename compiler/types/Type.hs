@@ -133,7 +133,7 @@ module Type (
         noFreeVarsOfType,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
-        typeSize,
+        typeSize, occCheckExpand,
 
         -- * Well-scoped lists of variables
         dVarSetElemsWellScoped, toposortTyVars, tyCoVarsOfTypeWellScoped,
@@ -2320,16 +2320,20 @@ nonDetCmpTc tc1 tc2
 -}
 
 typeKind :: HasDebugCallStack => Type -> Kind
-typeKind (TyConApp tc tys)     = piResultTys (tyConKind tc) tys
-typeKind (AppTy fun arg)       = typeKind_apps fun [arg]
-typeKind (LitTy l)             = typeLiteralKind l
-typeKind (FunTy {})            = liftedTypeKind
-typeKind (TyVarTy tyvar)       = tyVarKind tyvar
-typeKind (CastTy _ty co)       = pSnd $ coercionKind co
-typeKind (CoercionTy co)       = coercionType co
-typeKind (ForAllTy _ ty)       = typeKind ty -- Urk. See Note [Stupid type synonyms]
-                                             -- in CoreLint.  Maybe we should do
-                                             -- something similar here...
+typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
+typeKind (AppTy fun arg)   = typeKind_apps fun [arg]
+typeKind (LitTy l)         = typeLiteralKind l
+typeKind (FunTy {})        = liftedTypeKind
+typeKind (TyVarTy tyvar)   = tyVarKind tyvar
+typeKind (CastTy _ty co)   = pSnd $ coercionKind co
+typeKind (CoercionTy co)   = coercionType co
+typeKind ty@(ForAllTy {})  = case occCheckExpand tvs k of
+                               Just k' -> k'
+                               Nothing -> pprPanic "typeKind"
+                                            (ppr ty $$ ppr k $$ ppr tvs $$ ppr body)
+                           where
+                             (tvs, body) = splitForAllTys ty
+                             k           = typeKind body
 
 typeKind_apps :: HasDebugCallStack => Type -> [Type] -> Kind
 -- The sole purpose of the function is to accumulate
@@ -2369,6 +2373,153 @@ isTypeLevPoly = go
 -- Example: False for (forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)
 resultIsLevPoly :: Type -> Bool
 resultIsLevPoly = isTypeLevPoly . snd . splitPiTys
+
+
+{- **********************************************************************
+*                                                                       *
+           Occurs check expansion
+%*                                                                      *
+%********************************************************************* -}
+
+{- Note [Occurs check expansion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(occurCheckExpand tv xi) expands synonyms in xi just enough to get rid
+of occurrences of tv outside type function arguments, if that is
+possible; otherwise, it returns Nothing.
+
+For example, suppose we have
+  type F a b = [a]
+Then
+  occCheckExpand b (F Int b) = Just [Int]
+but
+  occCheckExpand a (F a Int) = Nothing
+
+We don't promise to do the absolute minimum amount of expanding
+necessary, but we try not to do expansions we don't need to.  We
+prefer doing inner expansions first.  For example,
+  type F a b = (a, Int, a, [a])
+  type G b   = Char
+We have
+  occCheckExpand b (F (G b)) = Just (F Char)
+even though we could also expand F to get rid of b.
+-}
+
+occCheckExpand :: [Var] -> Type -> Maybe Type
+-- See Note [Occurs check expansion]
+-- We may have needed to do some type synonym unfolding in order to
+-- get rid of the variable (or forall), so we also return the unfolded
+-- version of the type, which is guaranteed to be syntactically free
+-- of the given type variable.  If the type is already syntactically
+-- free of the variable, then the same type is returned.
+occCheckExpand vs_to_avoid ty
+  = go (mkVarSet vs_to_avoid, emptyVarEnv) ty
+  where
+    go :: (VarSet, VarEnv TyVar) -> Type -> Maybe Type
+          -- The VarSet is the set of variables we are trying to avoid
+          -- The VarEnv carries mappings necessary
+          -- because of kind expansion
+    go cxt@(as, env) (TyVarTy tv')
+      | tv' `elemVarSet` as               = Nothing
+      | Just tv'' <- lookupVarEnv env tv' = return (mkTyVarTy tv'')
+      | otherwise                         = do { tv'' <- go_var cxt tv'
+                                               ; return (mkTyVarTy tv'') }
+
+    go _   ty@(LitTy {}) = return ty
+    go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
+                                ; ty2' <- go cxt ty2
+                                ; return (mkAppTy ty1' ty2') }
+    go cxt (FunTy ty1 ty2) = do { ty1' <- go cxt ty1
+                                ; ty2' <- go cxt ty2
+                                ; return (mkFunTy ty1' ty2') }
+    go cxt@(as, env) (ForAllTy (TvBndr tv vis) body_ty)
+       = do { ki' <- go cxt (tyVarKind tv)
+            ; let tv' = setTyVarKind tv ki'
+                  env' = extendVarEnv env tv tv'
+                  as'  = as `delVarSet` tv
+            ; body' <- go (as', env') body_ty
+            ; return (ForAllTy (TvBndr tv' vis) body') }
+
+    -- For a type constructor application, first try expanding away the
+    -- offending variable from the arguments.  If that doesn't work, next
+    -- see if the type constructor is a type synonym, and if so, expand
+    -- it and try again.
+    go cxt ty@(TyConApp tc tys)
+      = case mapM (go cxt) tys of
+          Just tys' -> return (mkTyConApp tc tys')
+          Nothing | Just ty' <- tcView ty -> go cxt ty'
+                  | otherwise             -> Nothing
+                      -- Failing that, try to expand a synonym
+
+    go cxt (CastTy ty co) =  do { ty' <- go cxt ty
+                                ; co' <- go_co cxt co
+                                ; return (mkCastTy ty' co') }
+    go cxt (CoercionTy co) = do { co' <- go_co cxt co
+                                   ; return (mkCoercionTy co') }
+
+    ------------------
+    go_var cxt v = do { k' <- go cxt (varType v)
+                      ; return (setVarType v k') }
+           -- Works for TyVar and CoVar
+           -- See Note [Occurrence checking: look inside kinds]
+
+    ------------------
+    go_co cxt (Refl r ty)               = do { ty' <- go cxt ty
+                                             ; return (mkReflCo r ty') }
+      -- Note: Coercions do not contain type synonyms
+    go_co cxt (TyConAppCo r tc args)    = do { args' <- mapM (go_co cxt) args
+                                             ; return (mkTyConAppCo r tc args') }
+    go_co cxt (AppCo co arg)            = do { co' <- go_co cxt co
+                                             ; arg' <- go_co cxt arg
+                                             ; return (mkAppCo co' arg') }
+    go_co cxt@(as, env) (ForAllCo tv kind_co body_co)
+      = do { kind_co' <- go_co cxt kind_co
+           ; let tv' = setTyVarKind tv $
+                       pFst (coercionKind kind_co')
+                 env' = extendVarEnv env tv tv'
+                 as'  = as `delVarSet` tv
+           ; body' <- go_co (as', env') body_co
+           ; return (ForAllCo tv' kind_co' body') }
+    go_co cxt (FunCo r co1 co2)         = do { co1' <- go_co cxt co1
+                                             ; co2' <- go_co cxt co2
+                                             ; return (mkFunCo r co1' co2') }
+    go_co cxt (CoVarCo c)               = do { c' <- go_var cxt c
+                                             ; return (mkCoVarCo c') }
+    go_co cxt (HoleCo h)                = do { c' <- go_var cxt (ch_co_var h)
+                                             ; return (HoleCo (h { ch_co_var = c' })) }
+    go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
+                                             ; return (mkAxiomInstCo ax ind args') }
+    go_co cxt (UnivCo p r ty1 ty2)      = do { p' <- go_prov cxt p
+                                             ; ty1' <- go cxt ty1
+                                             ; ty2' <- go cxt ty2
+                                             ; return (mkUnivCo p' r ty1' ty2') }
+    go_co cxt (SymCo co)                = do { co' <- go_co cxt co
+                                             ; return (mkSymCo co') }
+    go_co cxt (TransCo co1 co2)         = do { co1' <- go_co cxt co1
+                                             ; co2' <- go_co cxt co2
+                                             ; return (mkTransCo co1' co2') }
+    go_co cxt (NthCo r n co)            = do { co' <- go_co cxt co
+                                             ; return (mkNthCo r n co') }
+    go_co cxt (LRCo lr co)              = do { co' <- go_co cxt co
+                                             ; return (mkLRCo lr co') }
+    go_co cxt (InstCo co arg)           = do { co' <- go_co cxt co
+                                             ; arg' <- go_co cxt arg
+                                             ; return (mkInstCo co' arg') }
+    go_co cxt (CoherenceCo co1 co2)     = do { co1' <- go_co cxt co1
+                                             ; co2' <- go_co cxt co2
+                                             ; return (mkCoherenceCo co1' co2') }
+    go_co cxt (KindCo co)               = do { co' <- go_co cxt co
+                                             ; return (mkKindCo co') }
+    go_co cxt (SubCo co)                = do { co' <- go_co cxt co
+                                             ; return (mkSubCo co') }
+    go_co cxt (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co cxt) cs
+                                             ; return (mkAxiomRuleCo ax cs') }
+
+    ------------------
+    go_prov _   UnsafeCoerceProv    = return UnsafeCoerceProv
+    go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
+    go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
+    go_prov _   p@(PluginProv _)    = return p
+
 
 {-
 %************************************************************************

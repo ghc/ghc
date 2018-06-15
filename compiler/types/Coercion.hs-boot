@@ -32,6 +32,7 @@ mkCoherenceCo :: Coercion -> Coercion -> Coercion
 mkKindCo :: Coercion -> Coercion
 mkSubCo :: Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
+mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
 
 isReflCo :: Coercion -> Bool
 isReflexiveCo :: Coercion -> Bool

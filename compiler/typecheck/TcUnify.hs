@@ -31,8 +31,7 @@ module TcUnify (
   matchActualFunTys, matchActualFunTysPart,
   matchExpectedFunKind,
 
-  occCheckExpand, metaTyVarUpdateOK,
-  occCheckForErrors, OccCheckResult(..)
+  metaTyVarUpdateOK, occCheckForErrors, OccCheckResult(..)
 
   ) where
 
@@ -61,7 +60,6 @@ import DynFlags
 import BasicTypes
 import Bag
 import Util
-import Pair( pFst )
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
 
@@ -1985,34 +1983,8 @@ matchExpectedFunKind hs_ty = go
 ********************************************************************* -}
 
 
-{- Note [Occurs check expansion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(occurCheckExpand tv xi) expands synonyms in xi just enough to get rid
-of occurrences of tv outside type function arguments, if that is
-possible; otherwise, it returns Nothing.
-
-For example, suppose we have
-  type F a b = [a]
-Then
-  occCheckExpand b (F Int b) = Just [Int]
-but
-  occCheckExpand a (F a Int) = Nothing
-
-We don't promise to do the absolute minimum amount of expanding
-necessary, but we try not to do expansions we don't need to.  We
-prefer doing inner expansions first.  For example,
-  type F a b = (a, Int, a, [a])
-  type G b   = Char
-We have
-  occCheckExpand b (F (G b)) = Just (F Char)
-even though we could also expand F to get rid of b.
-
-The two variants of the function are to support TcUnify.checkTauTvUpdate,
-which wants to prevent unification with type families. For more on this
-point, see Note [Prevent unification with type families] in TcUnify.
-
-Note [Occurrence checking: look inside kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-  Note [Occurrence checking: look inside kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are considering unifying
    (alpha :: *)  ~  Int -> (beta :: alpha -> alpha)
 This may be an error (what is that alpha doing inside beta's kind?),
@@ -2083,7 +2055,7 @@ occCheckForErrors dflags tv ty
   = case preCheck dflags True tv ty of
       OC_OK _   -> OC_OK ()
       OC_Bad    -> OC_Bad
-      OC_Occurs -> case occCheckExpand tv ty of
+      OC_Occurs -> case occCheckExpand [tv] ty of
                      Nothing -> OC_Occurs
                      Just _  -> OC_OK ()
 
@@ -2121,7 +2093,7 @@ metaTyVarUpdateOK dflags tv ty
          -- See Note [Prevent unification with type families]
       OC_OK _   -> Just ty
       OC_Bad    -> Nothing  -- forall or type function
-      OC_Occurs -> occCheckExpand tv ty
+      OC_Occurs -> occCheckExpand [tv] ty
 
 preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> OccCheckResult ()
 -- A quick check for
@@ -2181,121 +2153,6 @@ preCheck dflags ty_fam_ok tv ty
       | not (impredicative_ok || isTauTyCon tc)     = True
       | not (ty_fam_ok        || isFamFreeTyCon tc) = True
       | otherwise                                   = False
-
-occCheckExpand :: TcTyVar -> TcType -> Maybe TcType
--- See Note [Occurs check expansion]
--- We may have needed to do some type synonym unfolding in order to
--- get rid of the variable (or forall), so we also return the unfolded
--- version of the type, which is guaranteed to be syntactically free
--- of the given type variable.  If the type is already syntactically
--- free of the variable, then the same type is returned.
-occCheckExpand tv ty
-  = go emptyVarEnv ty
-  where
-    go :: VarEnv TyVar -> Type -> Maybe Type
-          -- The VarEnv carries mappings necessary
-          -- because of kind expansion
-    go env (TyVarTy tv')
-      | tv == tv'                         = Nothing
-      | Just tv'' <- lookupVarEnv env tv' = return (mkTyVarTy tv'')
-      | otherwise                         = do { tv'' <- go_var env tv'
-                                               ; return (mkTyVarTy tv'') }
-
-    go _   ty@(LitTy {}) = return ty
-    go env (AppTy ty1 ty2) = do { ty1' <- go env ty1
-                                ; ty2' <- go env ty2
-                                ; return (mkAppTy ty1' ty2') }
-    go env (FunTy ty1 ty2) = do { ty1' <- go env ty1
-                                ; ty2' <- go env ty2
-                                ; return (mkFunTy ty1' ty2') }
-    go env ty@(ForAllTy (TvBndr tv' vis) body_ty)
-       | tv == tv'         = return ty
-       | otherwise         = do { ki' <- go env (tyVarKind tv')
-                                ; let tv'' = setTyVarKind tv' ki'
-                                      env' = extendVarEnv env tv' tv''
-                                ; body' <- go env' body_ty
-                                ; return (ForAllTy (TvBndr tv'' vis) body') }
-
-    -- For a type constructor application, first try expanding away the
-    -- offending variable from the arguments.  If that doesn't work, next
-    -- see if the type constructor is a type synonym, and if so, expand
-    -- it and try again.
-    go env ty@(TyConApp tc tys)
-      = case mapM (go env) tys of
-          Just tys' -> return (mkTyConApp tc tys')
-          Nothing | Just ty' <- tcView ty -> go env ty'
-                  | otherwise             -> Nothing
-                      -- Failing that, try to expand a synonym
-
-    go env (CastTy ty co) =  do { ty' <- go env ty
-                                ; co' <- go_co env co
-                                ; return (mkCastTy ty' co') }
-    go env (CoercionTy co) = do { co' <- go_co env co
-                                ; return (mkCoercionTy co') }
-
-    ------------------
-    go_var env v = do { k' <- go env (varType v)
-                      ; return (setVarType v k') }
-           -- Works for TyVar and CoVar
-           -- See Note [Occurrence checking: look inside kinds]
-
-    ------------------
-    go_co env (Refl r ty)               = do { ty' <- go env ty
-                                             ; return (mkReflCo r ty') }
-      -- Note: Coercions do not contain type synonyms
-    go_co env (TyConAppCo r tc args)    = do { args' <- mapM (go_co env) args
-                                             ; return (mkTyConAppCo r tc args') }
-    go_co env (AppCo co arg)            = do { co' <- go_co env co
-                                             ; arg' <- go_co env arg
-                                             ; return (mkAppCo co' arg') }
-    go_co env co@(ForAllCo tv' kind_co body_co)
-      | tv == tv'         = return co
-      | otherwise         = do { kind_co' <- go_co env kind_co
-                               ; let tv'' = setTyVarKind tv' $
-                                            pFst (coercionKind kind_co')
-                                     env' = extendVarEnv env tv' tv''
-                               ; body' <- go_co env' body_co
-                               ; return (ForAllCo tv'' kind_co' body') }
-    go_co env (FunCo r co1 co2)         = do { co1' <- go_co env co1
-                                             ; co2' <- go_co env co2
-                                             ; return (mkFunCo r co1' co2') }
-    go_co env (CoVarCo c)               = do { c' <- go_var env c
-                                             ; return (mkCoVarCo c') }
-    go_co env (HoleCo h)                = do { c' <- go_var env (ch_co_var h)
-                                             ; return (HoleCo (h { ch_co_var = c' })) }
-    go_co env (AxiomInstCo ax ind args) = do { args' <- mapM (go_co env) args
-                                             ; return (mkAxiomInstCo ax ind args') }
-    go_co env (UnivCo p r ty1 ty2)      = do { p' <- go_prov env p
-                                             ; ty1' <- go env ty1
-                                             ; ty2' <- go env ty2
-                                             ; return (mkUnivCo p' r ty1' ty2') }
-    go_co env (SymCo co)                = do { co' <- go_co env co
-                                             ; return (mkSymCo co') }
-    go_co env (TransCo co1 co2)         = do { co1' <- go_co env co1
-                                             ; co2' <- go_co env co2
-                                             ; return (mkTransCo co1' co2') }
-    go_co env (NthCo r n co)            = do { co' <- go_co env co
-                                             ; return (mkNthCo r n co') }
-    go_co env (LRCo lr co)              = do { co' <- go_co env co
-                                             ; return (mkLRCo lr co') }
-    go_co env (InstCo co arg)           = do { co' <- go_co env co
-                                             ; arg' <- go_co env arg
-                                             ; return (mkInstCo co' arg') }
-    go_co env (CoherenceCo co1 co2)     = do { co1' <- go_co env co1
-                                             ; co2' <- go_co env co2
-                                             ; return (mkCoherenceCo co1' co2') }
-    go_co env (KindCo co)               = do { co' <- go_co env co
-                                             ; return (mkKindCo co') }
-    go_co env (SubCo co)                = do { co' <- go_co env co
-                                             ; return (mkSubCo co') }
-    go_co env (AxiomRuleCo ax cs)       = do { cs' <- mapM (go_co env) cs
-                                             ; return (mkAxiomRuleCo ax cs') }
-
-    ------------------
-    go_prov _   UnsafeCoerceProv    = return UnsafeCoerceProv
-    go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
-    go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
-    go_prov _   p@(PluginProv _)    = return p
 
 canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
 canUnifyWithPolyType dflags details

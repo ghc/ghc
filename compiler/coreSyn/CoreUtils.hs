@@ -130,13 +130,13 @@ exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side
-coreAltType (_,bs,rhs)
-  | any bad_binder bs = expandTypeSynonyms ty
-  | otherwise         = ty    -- Note [Existential variables and silly type synonyms]
+coreAltType alt@(_,bs,rhs)
+  = case occCheckExpand bs rhs_ty of
+      -- Note [Existential variables and silly type synonyms]
+      Just ty -> ty
+      Nothing -> pprPanic "coreAltType" (pprCoreAlt alt $$ ppr rhs_ty)
   where
-    ty           = exprType rhs
-    free_tvs     = tyCoVarsOfType ty
-    bad_binder b = b `elemVarSet` free_tvs
+    rhs_ty = exprType rhs
 
 coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
