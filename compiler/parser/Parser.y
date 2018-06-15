@@ -3368,7 +3368,7 @@ special_id
 special_sym :: { Located FastString }
 special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
             | '.'       { sL1 $1 (fsLit ".") }
-            | '*'       { sL1 $1 (fsLit (if isUnicode $1 then "★" else "*")) }
+            | '*'       { sL1 $1 (fsLit (if isUnicode $1 then "\x2605" else "*")) }
 
 -----------------------------------------------------------------------------
 -- Data constructors
