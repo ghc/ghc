@@ -71,7 +71,12 @@ needTestsuiteBuilders = do
     need targets
   where
     needfile :: Stage -> Package -> Action FilePath
-    needfile stage pkg = programPath =<< programContext stage pkg
+    needfile stage pkg
+      -- TODO (Alp): we might sometimes need more than vanilla!
+      -- This should therefore depend on what test ways
+      -- we are going to use, I suppose?
+      | isLibrary pkg = pkgConfFile (vanillaContext stage pkg)
+      | otherwise = programPath =<< programContext stage pkg
 
 needTestBuilders :: Action ()
 needTestBuilders = do

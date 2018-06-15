@@ -8,7 +8,13 @@ import Oracles.Setting (setting)
 import Rules.Test
 import Settings.Builders.Common
 
+oneZero :: String -> Bool -> String
+oneZero lbl False = lbl ++ "=0"
+oneZero lbl True = lbl ++ "=1"
+
 -- Arguments to send to the runtest.py script.
+--
+-- A lot of this mirrors what's achieved at testsuite/mk/test.mk.
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder RunTest ? do
     pkgs     <- expr $ stagePackages Stage1
@@ -16,7 +22,12 @@ runTestBuilderArgs = builder RunTest ? do
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
 
-    debugged          <- ghcDebugged <$> expr flavour
+    flav <- expr flavour
+    rtsways <- rtsWays flav
+    libways <- libraryWays flav
+    let hasRtsWay w = elem w rtsways
+        hasLibWay w = elem w libways
+        debugged = ghcDebugged flav
 
     withNativeCodeGen <- expr ghcWithNativeCodeGen
     withInterpreter   <- expr ghcWithInterpreter
@@ -33,6 +44,8 @@ runTestBuilderArgs = builder RunTest ? do
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutProgPath)
 
+    -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
+
     mconcat [ arg $ "testsuite/driver/runtests.py"
             , arg $ "--rootdir=" ++ ("testsuite" -/- "tests")
             , pure ["--rootdir=" ++ test | test <- libTests]
@@ -43,24 +56,20 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.cleanup=False"                  -- Don't clean up.
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)
-            , arg "-e", arg $ "ghc_with_native_codegen=" ++ zeroOne withNativeCodeGen
+            , arg "-e", arg $ oneZero "ghc_with_native_codegen" withNativeCodeGen
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ "ghc_with_vanilla=1"                    -- TODO: do we always build vanilla?
-            , arg "-e", arg $ "ghc_with_dynamic=0"                    -- TODO: support dynamic
-            , arg "-e", arg $ "ghc_with_profiling=0"                  -- TODO: support profiling
-
-            , arg "-e", arg $ "config.have_vanilla=1"                 -- TODO: support other build context
-            , arg "-e", arg $ "config.have_dynamic=0"                 -- TODO: support dynamic
-            , arg "-e", arg $ "config.have_profiling=0"               -- TODO: support profiling
-            , arg "-e", arg $ "ghc_with_smp=" ++ zeroOne withSMP
+            , arg "-e", arg $ oneZero "ghc_with_dynamic_rts" (hasRtsWay dynamic)
+            , arg "-e", arg $ oneZero "ghc_with_threaded_rts" (hasRtsWay threaded)
+            , arg "-e", arg $ oneZero "config.have_vanilla" (hasLibWay vanilla)
+            , arg "-e", arg $ oneZero "config.have_dynamic" (hasLibWay dynamic)
+            , arg "-e", arg $ oneZero "config.have_profiling" (hasLibWay profiling)
+            , arg "-e", arg $ oneZero "ghc_with_smp" withSMP
             , arg "-e", arg $ "ghc_with_llvm=0"                       -- TODO: support LLVM
 
-            , arg "-e", arg $ "ghc_with_threaded_rts=0"               -- TODO: support threaded
-            , arg "-e", arg $ "ghc_with_dynamic_rts=0"                -- TODO: support dynamic
             , arg "-e", arg $ "config.ghc_dynamic_by_default=False"   -- TODO: support dynamic
             , arg "-e", arg $ "config.ghc_dynamic=False"              -- TODO: support dynamic
 
