@@ -587,7 +587,11 @@ tc_infer_hs_type mode (HsOpTy _ lhs lhs_op@(L _ hs_op) rhs)
                        [lhs, rhs] }
 
 tc_infer_hs_type mode (HsKindSig _ ty sig)
-  = do { sig' <- tc_lhs_kind (kindLevel mode) sig
+  = do { sig' <- tcLHsKindSig KindSigCtxt sig
+                 -- We must typeckeck the kind signature, and solve all
+                 -- its equalities etc; from this point on we may do
+                 -- things like instantiate its foralls, so it needs
+                 -- to be fully determined (Trac #149904)
        ; traceTc "tc_infer_hs_type:sig" (ppr ty $$ ppr sig')
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
