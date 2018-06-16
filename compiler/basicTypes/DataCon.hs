@@ -86,7 +86,7 @@ import Unique( mkAlphaTyVarUnique )
 import qualified Data.Data as Data
 import Data.Char
 import Data.Word
-import Data.List( mapAccumL, find )
+import Data.List( find )
 import qualified Data.Set as Set
 
 {-
@@ -1189,7 +1189,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
     , substTys   subst arg_tys)
   where
     univ_subst = zipTvSubst univ_tvs univ_tys
-    (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst ex_tvs
+    (subst, ex_tvs') = Type.substTyVarBndrs univ_subst ex_tvs
 
 
 -- | The \"full signature\" of the 'DataCon' returns, in order:

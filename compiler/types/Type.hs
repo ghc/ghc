@@ -177,7 +177,7 @@ module Type (
         substTyUnchecked, substTysUnchecked, substThetaUnchecked,
         substTyWithUnchecked,
         substCoUnchecked, substCoWithUnchecked,
-        substTyVarBndr, substTyVar, substTyVars,
+        substTyVarBndr, substTyVarBndrs, substTyVar, substTyVars,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
         -- * Pretty-printing
@@ -398,7 +398,7 @@ expandTypeSynonyms ty
     go subst (FunTy arg res)
       = mkFunTy (go subst arg) (go subst res)
     go subst (ForAllTy (TvBndr tv vis) t)
-      = let (subst', tv') = substTyVarBndrCallback go subst tv in
+      = let (subst', tv') = substTyVarBndrUsing go subst tv in
         ForAllTy (TvBndr tv' vis) (go subst' t)
     go subst (CastTy ty co)  = mkCastTy (go subst ty) (go_co subst co)
     go subst (CoercionTy co) = mkCoercionTy (go_co subst co)
@@ -448,10 +448,10 @@ expandTypeSynonyms ty
     go_prov _     p@(PluginProv _)    = p
 
       -- the "False" and "const" are to accommodate the type of
-      -- substForAllCoBndrCallback, which is general enough to
+      -- substForAllCoBndrUsing, which is general enough to
       -- handle coercion optimization (which sometimes swaps the
       -- order of a coercion)
-    go_cobndr subst = substForAllCoBndrCallback False (go_co subst) subst
+    go_cobndr subst = substForAllCoBndrUsing False (go_co subst) subst
 
 {-
 ************************************************************************

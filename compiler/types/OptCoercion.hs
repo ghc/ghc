@@ -1043,4 +1043,4 @@ and these two imply
 optForAllCoBndr :: LiftingContext -> Bool
                 -> TyVar -> Coercion -> (LiftingContext, TyVar, Coercion)
 optForAllCoBndr env sym
-  = substForAllCoBndrCallbackLC sym (opt_co4_wrap env sym False Nominal) env
+  = substForAllCoBndrUsingLC sym (opt_co4_wrap env sym False Nominal) env

@@ -148,7 +148,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                                          emptyTCvSubst (catMaybes mbSubsts)
                    unmapped_tvs = filter (\v -> v `notElemTCvSubst` subst
                                              && not (v `isInScope` subst)) tvs
-                   (subst', _)  = mapAccumL substTyVarBndr subst unmapped_tvs
+                   (subst', _)  = substTyVarBndrs subst unmapped_tvs
                    preds'       = map (substPredOrigin subst') preds
                    inst_tys'    = substTys subst' inst_tys
                    tvs'         = tyCoVarsOfTypesWellScoped inst_tys'

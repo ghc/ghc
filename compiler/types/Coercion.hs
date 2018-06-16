@@ -81,10 +81,10 @@ module Coercion (
         -- ** Lifting
         liftCoSubst, liftCoSubstTyVar, liftCoSubstWith, liftCoSubstWithEx,
         emptyLiftingContext, extendLiftingContext, extendLiftingContextAndInScope,
-        liftCoSubstVarBndrCallback, isMappedByLC,
+        liftCoSubstVarBndrUsing, isMappedByLC,
 
         mkSubstLiftingContext, zapLiftingContext,
-        substForAllCoBndrCallbackLC, lcTCvSubst, lcInScopeSet,
+        substForAllCoBndrUsingLC, lcTCvSubst, lcInScopeSet,
 
         LiftCoEnv, LiftingContext(..), liftEnvSubstLeft, liftEnvSubstRight,
         substRightCo, substLeftCo, swapLiftCoEnv, lcSubstLeft, lcSubstRight,
@@ -1621,14 +1621,14 @@ zapLiftingContext :: LiftingContext -> LiftingContext
 zapLiftingContext (LC subst _) = LC (zapTCvSubst subst) emptyVarEnv
 
 -- | Like 'substForAllCoBndr', but works on a lifting context
-substForAllCoBndrCallbackLC :: Bool
+substForAllCoBndrUsingLC :: Bool
                             -> (Coercion -> Coercion)
                             -> LiftingContext -> TyVar -> Coercion
                             -> (LiftingContext, TyVar, Coercion)
-substForAllCoBndrCallbackLC sym sco (LC subst lc_env) tv co
+substForAllCoBndrUsingLC sym sco (LC subst lc_env) tv co
   = (LC subst' lc_env, tv', co')
   where
-    (subst', tv', co') = substForAllCoBndrCallback sym sco subst tv co
+    (subst', tv', co') = substForAllCoBndrUsing sym sco subst tv co
 
 -- | The \"lifting\" operation which substitutes coercions for type
 --   variables in a type to produce a coercion.
@@ -1687,16 +1687,16 @@ liftCoSubstTyVar (LC subst env) r v
 liftCoSubstVarBndr :: LiftingContext -> TyVar
                    -> (LiftingContext, TyVar, Coercion)
 liftCoSubstVarBndr lc tv
-  = let (lc', tv', h, _) = liftCoSubstVarBndrCallback callback lc tv in
+  = let (lc', tv', h, _) = liftCoSubstVarBndrUsing callback lc tv in
     (lc', tv', h)
   where
     callback lc' ty' = (ty_co_subst lc' Nominal ty', ())
 
 -- the callback must produce a nominal coercion
-liftCoSubstVarBndrCallback :: (LiftingContext -> Type -> (Coercion, a))
+liftCoSubstVarBndrUsing :: (LiftingContext -> Type -> (Coercion, a))
                            -> LiftingContext -> TyVar
                            -> (LiftingContext, TyVar, Coercion, a)
-liftCoSubstVarBndrCallback fun lc@(LC subst cenv) old_var
+liftCoSubstVarBndrUsing fun lc@(LC subst cenv) old_var
   = ( LC (subst `extendTCvInScope` new_var) new_cenv
     , new_var, eta, stuff )
   where
