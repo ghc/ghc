@@ -1098,6 +1098,21 @@ arithSeqEltType (Just fl) res_ty
 data HsArg tm ty
   = HsValArg tm   -- Argument is an ordinary expression     (f arg)
   | HsTypeArg  ty -- Argument is a visible type application (f @ty)
+  | HsArgPar SrcSpan -- See Note [HsArgPar]
+
+{-
+Note [HsArgPar]
+A HsArgPar indicates that everything to the left of this in the argument list is
+enclosed in parenthesis together with the function itself. It is necessary so
+that we can recreate the parenthesis structure in the original source after
+typechecking the arguments.
+
+The SrcSpan is the span of the original HsPar
+
+((f arg1) arg2 arg3) results in an input argument list of
+[HsValArg arg1, HsArgPar span1, HsValArg arg2, HsValArg arg3, HsArgPar span2]
+
+-}
 
 wrapHsArgs :: (XAppTypeE (GhcPass id) ~ LHsWcType GhcRn)
            => LHsExpr (GhcPass id)
@@ -1106,14 +1121,26 @@ wrapHsArgs :: (XAppTypeE (GhcPass id) ~ LHsWcType GhcRn)
 wrapHsArgs f []                   = f
 wrapHsArgs f (HsValArg  a : args) = wrapHsArgs (mkHsApp f a)     args
 wrapHsArgs f (HsTypeArg t : args) = wrapHsArgs (mkHsAppType f t) args
+wrapHsArgs f (HsArgPar sp : args) = wrapHsArgs (L sp $ HsPar noExt f) args
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
   ppr (HsValArg tm) = text "HsValArg" <> ppr tm
   ppr (HsTypeArg ty) = text "HsTypeArg" <> ppr ty
+  ppr (HsArgPar sp) = text "HsArgPar" <> ppr sp
 
 isHsValArg :: HsArg tm ty -> Bool
-isHsValArg (HsValArg {}) = True
+isHsValArg (HsValArg {})  = True
 isHsValArg (HsTypeArg {}) = False
+isHsValArg (HsArgPar {})  = False
+
+isArgPar :: HsArg tm ty -> Bool
+isArgPar (HsArgPar {})  = True
+isArgPar (HsValArg {})  = False
+isArgPar (HsTypeArg {}) = False
+
+isArgPar_maybe :: HsArg a b -> Maybe (HsArg c d)
+isArgPar_maybe (HsArgPar sp) = Just $ HsArgPar sp
+isArgPar_maybe _ = Nothing
 
 type LHsExprArgIn  = HsArg (LHsExpr GhcRn)   (LHsWcType GhcRn)
 type LHsExprArgOut = HsArg (LHsExpr GhcTcId) (LHsWcType GhcRn)
@@ -1133,8 +1160,8 @@ tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
            -- But OpApp is slightly different, so that's why the caller
            -- must assemble
 
-tcApp m_herald (L _ (HsPar _ fun)) args res_ty
-  = tcApp m_herald fun args res_ty
+tcApp m_herald (L sp (HsPar _ fun)) args res_ty
+  = tcApp m_herald fun (HsArgPar sp : args) res_ty
 
 tcApp m_herald (L _ (HsApp _ fun arg1)) args res_ty
   = tcApp m_herald fun (HsValArg arg1 : args) res_ty
@@ -1144,7 +1171,7 @@ tcApp m_herald (L _ (HsAppType ty1 fun)) args res_ty
 
 tcApp m_herald fun@(L loc (HsRecFld _ fld_lbl)) args res_ty
   | Ambiguous _ lbl        <- fld_lbl  -- Still ambiguous
-  , HsValArg (L _ arg) : _ <- args     -- A value arg is first
+  , HsValArg (L _ arg) : _ <- filterOut isArgPar args -- A value arg is first
   , Just sig_ty     <- obviousSig arg  -- A type sig on the arg disambiguates
   = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
        ; sel_name  <- disambiguateSelector lbl sig_tc_ty
@@ -1293,6 +1320,11 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     orig_expr_args_arity = count isHsValArg orig_args
 
     go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
+
+    go acc_args n fun_ty (HsArgPar sp : args)
+      = do { (inner_wrap, args', res_ty) <- go acc_args n fun_ty args
+           ; return (inner_wrap, HsArgPar sp : args', res_ty)
+           }
 
     go acc_args n fun_ty (HsTypeArg hs_ty_arg : args)
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
@@ -1881,7 +1913,12 @@ tcTagToEnum :: SrcSpan -> Name -> [LHsExprArgIn] -> ExpRhoType
 tcTagToEnum loc fun_name args res_ty
   = do { fun <- tcLookupId fun_name
 
-       ; arg <- case args of
+       ; let pars1 = mapMaybe isArgPar_maybe before
+             pars2 = mapMaybe isArgPar_maybe after
+             -- args contains exactly one HsValArg
+             (before, _:after) = break isHsValArg args
+
+       ; arg <- case filterOut isArgPar args of
            [HsTypeArg hs_ty_arg, HsValArg term_arg]
              -> do { ty_arg <- tcHsTypeApp hs_ty_arg liftedTypeKind
                    ; _ <- tcSubTypeDS (OccurrenceOf fun_name) GenSigCtxt ty_arg res_ty
@@ -1914,8 +1951,13 @@ tcTagToEnum loc fun_name args res_ty
        ; arg' <- tcMonoExpr arg (mkCheckExpType intPrimTy)
        ; let fun' = L loc (mkHsWrap (WpTyApp rep_ty) (HsVar noExt (L loc fun)))
              rep_ty = mkTyConApp rep_tc rep_args
+             out_args = concat
+              [ pars1
+              , [HsValArg arg']
+              , pars2
+              ]
 
-       ; return (mkWpCastR (mkTcSymCo coi), fun', [HsValArg arg']) }
+       ; return (mkWpCastR (mkTcSymCo coi), fun', out_args) }
                  -- coi is a Representational coercion
   where
     doc1 = vcat [ text "Specify the type by giving a type signature"
@@ -1937,6 +1979,7 @@ too_many_args fun args
     pp (HsValArg e)                             = ppr e
     pp (HsTypeArg (HsWC { hswc_body = L _ t })) = pprHsType t
     pp (HsTypeArg (XHsWildCardBndrs _)) = panic "too_many_args"
+    pp (HsArgPar _) = empty
 
 
 {-

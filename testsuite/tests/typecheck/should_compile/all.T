@@ -624,3 +624,19 @@ test('T14735', normal, compile, [''])
 test('T15180', normal, compile, [''])
 test('T15232', normal, compile, [''])
 test('T13833', normal, compile, [''])
+
+def onlyHsParLocs(x): 
+    """ 
+    We only want to check that all the parenthesis are present with the correct location, 
+    not compare the entire typechecked AST.
+    Located (HsPar GhcTc) are pretty printed with the form
+    ({ <location info>
+     (HsPar
+    This function tries to extract all such location infos from the typechecked AST.
+    """
+    ls = x.split("\n")
+    filteredLines = (loc.strip() for (loc,hspar) in zip(ls,ls[1:]) 
+                      if hspar.strip().startswith("(HsPar")
+                        and not "<no location info>" in loc)
+    return '\n'.join(filteredLines)
+test('T15242', normalise_errmsg_fun(onlyHsParLocs), compile, [''])
