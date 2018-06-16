@@ -13,6 +13,7 @@ if config.arch == 'i386':
 else:
     opts = ''
 test('num009', [ when(fast(), skip)
+               , when(wordsize(32), expect_broken(15062))
                , when(platform('i386-apple-darwin'), expect_broken(2370))
                , when(platform('powerpc64le-unknown-linux'), expect_broken(13634))
                , when(opsys('mingw32'), omit_ways(['ghci'])) ],
