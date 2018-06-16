@@ -1,3 +1,6 @@
+# Questions about this file?
+# See https://ghc.haskell.org/trac/ghc/wiki/ContinuousIntegration/Usage.
+
 version: 2
 
 aliases:
