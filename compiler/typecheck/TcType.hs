@@ -1158,7 +1158,9 @@ candidateQTyVarsOfType ty = closeOverKindsCQTvs $
 -- NB: *not* closed over kinds
 -- See Note [Closing over free variable kinds] in TyCoRep
 split_dvs :: Bool  -- True <=> consider every fv in Type to be dependent
-          -> VarSet -> CandidatesQTvs -> Type -> CandidatesQTvs
+          -> VarSet  -- These variables have been locally bound
+                     -- See Note [Removing variables with bound kinds]
+          -> CandidatesQTvs -> Type -> CandidatesQTvs
 split_dvs is_dep bound dvs ty
   = go dvs ty
   where
