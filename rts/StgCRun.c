@@ -363,6 +363,15 @@ saved on the stack by the call instruction. Then we perform regular Haskell
 stack unwinding.
 */
 
+/*
+ * gcc automatically inserts .cfi_startproc/.cfi_endproc directives around
+ * inline assembler but clang does not. This caused the build to fail with
+ * Clang (see #15207).
+ */
+
+#if defined(__clang__)
+#define NEED_EXPLICIT_CFI_START_END
+#endif
 
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
@@ -376,6 +385,10 @@ StgRunIsImplementedInAssembler(void)
         STG_HIDDEN STG_RUN "\n"
 #endif
         STG_RUN ":\n\t"
+
+#if defined(NEED_EXPLICIT_CFI_START_END)
+        ".cfi_startproc simple\n\t"
+#endif
         "subq %1, %%rsp\n\t"
         "movq %%rsp, %%rax\n\t"
         "subq %0, %%rsp\n\t"
@@ -462,6 +475,10 @@ StgRunIsImplementedInAssembler(void)
 #if !defined(mingw32_HOST_OS)
         STG_HIDDEN xstr(STG_RUN_JMP) "\n"
 #endif
+#if defined(NEED_EXPLICIT_CFI_START_END)
+        ".cfi_endproc\n\t"
+#endif
+
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
         // If we have deadstripping enabled and a label is detected as unused
         // the code gets nop'd out.
@@ -500,7 +517,7 @@ StgRunIsImplementedInAssembler(void)
         "movq 136(%%rax),%%xmm15\n\t"
 #endif
         "addq %1, %%rsp\n\t"
-        "retq"
+        "retq\n\t"
 
         :
         : "i"(RESERVED_C_STACK_BYTES),
