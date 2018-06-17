@@ -807,6 +807,7 @@ data WarningFlag =
    | Opt_WarnMissingExportList
    | Opt_WarnInaccessibleCode
    | Opt_WarnStarIsType                   -- Since 8.6
+   | Opt_WarnImplicitKindVars             -- Since 8.6
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -3784,6 +3785,7 @@ wWarningFlagsDeps = [
   flagSpec "hi-shadowing"                Opt_WarnHiShadows,
   flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
+  flagSpec "implicit-kind-vars"          Opt_WarnImplicitKindVars,
   flagSpec "incomplete-patterns"         Opt_WarnIncompletePatterns,
   flagSpec "incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
   flagSpec "incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
@@ -4593,6 +4595,7 @@ minusWcompatOpts
     = [ Opt_WarnMissingMonadFailInstances
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
+      , Opt_WarnImplicitKindVars
       ]
 
 enableUnusedBinds :: DynP ()

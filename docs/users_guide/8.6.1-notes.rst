@@ -152,6 +152,12 @@ Compiler
   :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
   need this, you don't need it.
 
+- :ghc-flag:`-Wcompat` now includes :ghc-flag:`-Wimplicit-kind-vars` to
+  provide early detection of breakage that will be caused by implementation of
+  `GHC proposal #24
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0024-no-kind-vars.rst>`__
+  in a future release.
+
 Plugins
 ~~~~~~~
 
