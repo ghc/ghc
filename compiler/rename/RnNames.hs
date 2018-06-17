@@ -863,7 +863,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                 -- NB the AvailInfo may have duplicates, and several items
                 --    for the same parent; e.g N(x) and N(y)
 
-            names  = availsToNameSet (map snd items2)
+            names  = availsToNameSetWithSelectors (map snd items2)
             keep n = not (n `elemNameSet` names)
             pruned_avails = filterAvails keep all_avails
             hiding_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
@@ -879,8 +879,9 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     imp_occ_env :: OccEnv (Name,    -- the name
                            AvailInfo,   -- the export item providing the name
                            Maybe Name)  -- the parent of associated types
-    imp_occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing))
-                                     | a <- all_avails, n <- availNames a]
+    imp_occ_env = mkOccEnv_C combine [ (occ, (n, a, Nothing))
+                                     | a <- all_avails
+                                     , (n, occ) <- availNamesWithOccs a]
       where
         -- See Note [Dealing with imports]
         -- 'combine' is only called for associated data types which appear
