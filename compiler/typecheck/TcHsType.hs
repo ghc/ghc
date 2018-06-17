@@ -100,7 +100,7 @@ import PrelNames hiding ( wildCardName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
-import Data.List ( mapAccumR )
+import Data.List ( find, mapAccumR )
 import Control.Monad
 
 {-
@@ -1150,6 +1150,11 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                    ; when (isFamInstTyCon (dataConTyCon dc)) $
                        -- see Trac #15245
                        promotionErr name FamDataConPE
+                   ; let (_, _, _, theta, _, _) = dataConFullSig dc
+                   ; case dc_theta_illegal_constraint theta of
+                       Just pred -> promotionErr name $
+                                    ConstrainedDataConPE pred
+                       Nothing   -> pure ()
                    ; let tc = promoteDataCon dc
                    ; return (mkNakedTyConApp tc [], tyConKind tc) }
 
@@ -1200,6 +1205,18 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                 Just (ATyCon tc) -> return tc
                 _                -> do { traceTc "lk1 (loopy)" (ppr name)
                                        ; return tc_tc } }
+
+    -- We cannot promote a data constructor with a context that contains
+    -- constraints other than equalities, so error if we find one.
+    -- See Note [Don't promote data constructors with non-equality contexts]
+    dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
+    dc_theta_illegal_constraint = find go
+      where
+        go :: PredType -> Bool
+        go pred | Just tc <- tyConAppTyCon_maybe pred
+                = not $  tc `hasKey` eqTyConKey
+                      || tc `hasKey` heqTyConKey
+                | otherwise = True
 
 {-
 Note [Type-checking inside the knot]
@@ -1365,6 +1382,24 @@ in the e2 example, we'll desugar the type, zonking the kind unification
 variables as we go.  When we encounter the unconstrained kappa, we
 want to default it to '*', not to (Any *).
 
+Note [Don't promote data constructors with non-equality contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With -XTypeInType, one can promote almost any data constructor. There is a
+notable exception to this rule, however: data constructors that contain
+non-equality constraints, such as:
+
+  data Foo a where
+    MkFoo :: Show a => Foo a
+
+MkFoo cannot be promoted since GHC cannot produce evidence for (Show a) at the
+kind level. Therefore, we check the context of each data constructor before
+promotion, and give a sensible error message if the context contains an illegal
+constraint.
+
+Note that equality constraints (i.e, (~) and (~~)) /are/
+permitted inside data constructor contexts. All other constraints are
+off-limits, however (and likely will remain off-limits until dependent types
+become a reality in GHC).
 
 Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2685,6 +2720,9 @@ promotionErr name err
                    2 (parens reason))
   where
     reason = case err of
+               ConstrainedDataConPE pred
+                              -> text "it has an unpromotable context"
+                                 <+> quotes (ppr pred)
                FamDataConPE   -> text "it comes from a data family instance"
                NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"

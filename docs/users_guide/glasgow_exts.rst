@@ -8546,12 +8546,24 @@ constructors are prefixed by a tick ``'``): ::
     'L :: k1 -> Sum k1 k2
     'R :: k2 -> Sum k1 k2
 
-.. note::
-    Data family instances cannot be promoted at the moment: GHC’s type theory
-    just isn’t up to the task of promoting data families, which requires full
-    dependent types.
+Virtually all data constructors, even those with rich kinds, can be promoted.
+There are only a couple of exceptions to this rule:
 
-    See also :ghc-ticket:`15245`.
+-  Data family instance constructors cannot be promoted at the moment. GHC's
+   type theory just isn’t up to the task of promoting data families, which
+   requires full dependent types.
+
+-  Data constructors with contexts that contain non-equality constraints cannot
+   be promoted. For example: ::
+
+     data Foo :: Type -> Type where
+       MkFoo1 :: a ~ Int         => Foo a    -- promotable
+       MkFoo2 :: a ~~ Int        => Foo a    -- promotable
+       MkFoo3 :: Show a          => Foo a    -- not promotable
+
+   ``MkFoo1`` and ``MkFoo2`` can be promoted, since their contexts
+   only involve equality-oriented constraints. However, ``MkFoo3``'s context
+   contains a non-equality constraint ``Show a``, and thus cannot be promoted.
 
 .. _promotion-syntax:
 
