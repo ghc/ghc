@@ -3522,10 +3522,7 @@ dynamic_flags_deps = [
  ++ map (mkFlag turnOff "fno-"      unSetGeneralFlag  ) fFlagsDeps
  ++ map (mkFlag turnOn  "W"         setWarningFlag    ) wWarningFlagsDeps
  ++ map (mkFlag turnOff "Wno-"      unSetWarningFlag  ) wWarningFlagsDeps
- ++ map (mkFlag turnOn  "Werror="   (\flag -> do {
-                                       ; setWarningFlag flag
-                                       ; setFatalWarningFlag flag }))
-                                                        wWarningFlagsDeps
+ ++ map (mkFlag turnOn  "Werror="   setWErrorFlag )     wWarningFlagsDeps
  ++ map (mkFlag turnOn  "Wwarn="     unSetFatalWarningFlag )
                                                         wWarningFlagsDeps
  ++ map (mkFlag turnOn  "Wno-error=" unSetFatalWarningFlag )
@@ -3537,6 +3534,12 @@ dynamic_flags_deps = [
  ++ [ (NotDeprecated, unrecognisedWarning "W"),
       (Deprecated,    unrecognisedWarning "fwarn-"),
       (Deprecated,    unrecognisedWarning "fno-warn-") ]
+ ++ [ make_ord_flag defFlag "Werror=compat"
+        (NoArg (mapM_ setWErrorFlag minusWcompatOpts))
+    , make_ord_flag defFlag "Wno-error=compat"
+        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts))
+    , make_ord_flag defFlag "Wwarn=compat"
+        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts)) ]
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
@@ -4801,6 +4804,11 @@ unSetWarningFlag f = upd (\dfs -> wopt_unset dfs f)
 setFatalWarningFlag, unSetFatalWarningFlag :: WarningFlag -> DynP ()
 setFatalWarningFlag   f = upd (\dfs -> wopt_set_fatal dfs f)
 unSetFatalWarningFlag f = upd (\dfs -> wopt_unset_fatal dfs f)
+
+setWErrorFlag :: WarningFlag -> DynP ()
+setWErrorFlag flag =
+  do { setWarningFlag flag
+     ; setFatalWarningFlag flag }
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: LangExt.Extension -> DynP ()

@@ -151,6 +151,9 @@ to abort.
     Makes a specific warning into a fatal error. The warning will be enabled if
     it hasn't been enabled yet.
 
+    ``-Werror=compat`` has the same effect as ``-Werror=...`` for each warning
+    flag in the :ghc-flag:`-Wcompat` option group.
+
 .. ghc-flag:: -Wwarn
     :shortdesc: make warnings non-fatal
     :type: dynamic
@@ -171,6 +174,9 @@ to abort.
 
     Note that it doesn't fully negate the effects of ``-Werror=<wflag>`` - the
     warning will still be enabled.
+
+    ``-Wwarn=compat`` has the same effect as ``-Wwarn=...`` for each warning
+    flag in the :ghc-flag:`-Wcompat` option group.
 
 When a warning is emitted, the specific warning flag which controls
 it is shown.
