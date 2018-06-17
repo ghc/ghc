@@ -17,3 +17,6 @@ test('package07e', normalise_version('ghc'), compile_fail, [incr_ghc + inc_ghc +
 test('package08e', normalise_version('ghc'), compile_fail, [incr_ghc + hide_ghc])
 test('package09e', normal, compile_fail, ['-package "containers (Data.Map as M, Data.Set as M)"'])
 test('package10',  normal, compile,      ['-hide-all-packages -package "ghc (UniqFM as Prelude)" '])
+
+test('T4806', normal, compile_fail, ['-ignore-package containers'])
+test('T4806a', normal, compile_fail, ['-ignore-package deepseq'])
