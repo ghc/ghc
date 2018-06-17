@@ -379,14 +379,10 @@ pprExpr e = case e of
     CmmReg reg      -> pprCastReg reg
     CmmRegOff reg 0 -> pprCastReg reg
 
-    CmmRegOff reg i
-        | i < 0 && negate_ok -> pprRegOff (char '-') (-i)
-        | otherwise          -> pprRegOff (char '+') i
-      where
-        pprRegOff op i' = pprCastReg reg <> op <> int i'
-        negate_ok = negate (fromIntegral i :: Integer) <
-                    fromIntegral (maxBound::Int)
-                     -- overflow is undefined; see #7620
+    -- CmmRegOff is an alias of MO_Add
+    CmmRegOff reg i -> sdocWithDynFlags $ \dflags ->
+                       pprCastReg reg <> char '+' <>
+                       pprHexVal (fromIntegral i) (wordWidth dflags)
 
     CmmMachOp mop args -> pprMachOpApp mop args
 
