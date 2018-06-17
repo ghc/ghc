@@ -646,8 +646,6 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
    Weak Pointer Primitives
    -------------------------------------------------------------------------- */
 
-STRING(stg_weak_msg,"New weak pointer at %p\n")
-
 stg_mkWeakzh ( gcptr key,
                gcptr value,
                gcptr finalizer /* or stg_NO_FINALIZER_closure */ )
@@ -670,7 +668,7 @@ stg_mkWeakzh ( gcptr key,
         Capability_weak_ptr_list_tl(MyCapability()) = w;
     }
 
-    IF_DEBUG(weak, ccall debugBelch(stg_weak_msg,w));
+    IF_DEBUG(weak, ccall debugBelch("New weak pointer at %p\n",w));
 
     return (w);
 }
@@ -679,8 +677,6 @@ stg_mkWeakNoFinalizzerzh ( gcptr key, gcptr value )
 {
     jump stg_mkWeakzh (key, value, stg_NO_FINALIZER_closure);
 }
-
-STRING(stg_cfinalizer_msg,"Adding a finalizer to %p\n")
 
 stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
                              W_ ptr,
@@ -715,7 +711,7 @@ stg_addCFinalizzerToWeakzh ( W_ fptr,   // finalizer
 
     recordMutable(w);
 
-    IF_DEBUG(weak, ccall debugBelch(stg_cfinalizer_msg,w));
+    IF_DEBUG(weak, ccall debugBelch("Adding a finalizer to %p\n",w));
 
     return (1);
 }
@@ -2037,8 +2033,6 @@ stg_waitWritezh ( W_ fd )
 #endif
 }
 
-
-STRING(stg_delayzh_malloc_str, "stg_delayzh")
 stg_delayzh ( W_ us_delay )
 {
 #if defined(mingw32_HOST_OS)
@@ -2059,7 +2053,7 @@ stg_delayzh ( W_ us_delay )
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        stg_delayzh_malloc_str);
+                                        "stg_delayzh");
     (reqID) = ccall addDelayRequest(us_delay);
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
@@ -2104,7 +2098,6 @@ while:
 
 
 #if defined(mingw32_HOST_OS)
-STRING(stg_asyncReadzh_malloc_str, "stg_asyncReadzh")
 stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 {
     W_ ares;
@@ -2119,7 +2112,7 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        stg_asyncReadzh_malloc_str);
+                                        "stg_asyncReadzh");
     (reqID) = ccall addIORequest(fd, 0/*FALSE*/,is_sock,len,buf "ptr");
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
@@ -2130,7 +2123,6 @@ stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 #endif
 }
 
-STRING(stg_asyncWritezh_malloc_str, "stg_asyncWritezh")
 stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 {
     W_ ares;
@@ -2144,7 +2136,7 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
 
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        stg_asyncWritezh_malloc_str);
+                                        "stg_asyncWritezh");
     (reqID) = ccall addIORequest(fd, 1/*TRUE*/,is_sock,len,buf "ptr");
 
     StgAsyncIOResult_reqID(ares)   = reqID;
@@ -2156,7 +2148,6 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 #endif
 }
 
-STRING(stg_asyncDoProczh_malloc_str, "stg_asyncDoProczh")
 stg_asyncDoProczh ( W_ proc, W_ param )
 {
     W_ ares;
@@ -2171,7 +2162,7 @@ stg_asyncDoProczh ( W_ proc, W_ param )
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
-                                        stg_asyncDoProczh_malloc_str);
+                                        "stg_asyncDoProczh");
     (reqID) = ccall addDoProcRequest(proc "ptr",param "ptr");
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;

@@ -402,8 +402,6 @@ statics :: { [CmmParse [CmmStatic]] }
         : {- empty -}                   { [] }
         | static statics                { $1 : $2 }
     
--- Strings aren't used much in the RTS HC code, so it doesn't seem
--- worth allowing inline strings.  C-- doesn't allow them anyway.
 static  :: { CmmParse [CmmStatic] }
         : type expr ';' { do e <- $2;
                              return [CmmStaticLit (getLit e)] }
