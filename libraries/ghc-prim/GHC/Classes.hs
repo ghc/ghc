@@ -119,6 +119,21 @@ for the types in "GHC.Word" and "GHC.Int".
 -- and 'Eq' may be derived for any datatype whose constituents are also
 -- instances of 'Eq'.
 --
+-- The Haskell Report defines no laws for 'Eq'. However, '==' is customarily
+-- expected to implement an equivalence relationship where two values comparing
+-- equal are indistinguishable by "public" functions, with a "public" function
+-- being one not allowing to see implementation details. For example, for a
+-- type representing non-normalised natural numbers modulo 100, a "public"
+-- function doesn't make the difference between 1 and 201. It is expected to
+-- have the following properties:
+--
+-- [__Reflexivity__]: @x == x@ = 'True'
+-- [__Symmetry__]: @x == y@ = @y == x@
+-- [__Transitivity__]: if @x == y && y == z@ = 'True', then @x == z@ = 'True'
+-- [__Substitutivity__]: if @x == y@ = 'True' and @f@ is a "public" function
+-- whose return type is an instance of 'Eq', then @f x == f y@ = 'True'
+-- [__Negation__]: @x /= y@ = @not (x == y)@
+--
 -- Minimal complete definition: either '==' or '/='.
 --
 class  Eq a  where
@@ -207,6 +222,18 @@ eqChar, neChar :: Char -> Char -> Bool
 (C# x) `eqChar` (C# y) = isTrue# (x `eqChar#` y)
 (C# x) `neChar` (C# y) = isTrue# (x `neChar#` y)
 
+-- | Note that due to the presence of @NaN@, `Float`'s 'Eq' instance does not
+-- satisfy reflexivity.
+--
+-- >>> 0/0 == (0/0 :: Float)
+-- False
+--
+-- Also note that `Float`'s 'Eq' instance does not satisfy substitutivity:
+--
+-- >>> 0 == (-0 :: Float)
+-- True
+-- >>> recip 0 == recip (-0 :: Float)
+-- False
 instance Eq Float where
     (==) = eqFloat
 
@@ -215,6 +242,18 @@ instance Eq Float where
 eqFloat :: Float -> Float -> Bool
 (F# x) `eqFloat` (F# y) = isTrue# (x `eqFloat#` y)
 
+-- | Note that due to the presence of @NaN@, `Double`'s 'Eq' instance does not
+-- satisfy reflexivity.
+--
+-- >>> 0/0 == (0/0 :: Double)
+-- False
+--
+-- Also note that `Double`'s 'Eq' instance does not satisfy substitutivity:
+--
+-- >>> 0 == (-0 :: Double)
+-- True
+-- >>> recip 0 == recip (-0 :: Double)
+-- False
 instance Eq Double where
     (==) = eqDouble
 
@@ -261,11 +300,30 @@ instance Ord TyCon where
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
--- Instances of 'Ord' can be derived for any user-defined
--- datatype whose constituent types are in 'Ord'.  The declared order
--- of the constructors in the data declaration determines the ordering
--- in derived 'Ord' instances.  The 'Ordering' datatype allows a single
--- comparison to determine the precise ordering of two objects.
+-- Instances of 'Ord' can be derived for any user-defined datatype whose
+-- constituent types are in 'Ord'. The declared order of the constructors in
+-- the data declaration determines the ordering in derived 'Ord' instances. The
+-- 'Ordering' datatype allows a single comparison to determine the precise
+-- ordering of two objects.
+--
+-- The Haskell Report defines no laws for 'Ord'. However, '<=' is customarily
+-- expected to implement a non-strict partial order and have the following
+-- properties:
+--
+-- [__Transitivity__]: if @x <= y && y <= z@ = 'True', then @x <= z@ = 'True'
+-- [__Reflexivity__]: @x <= x@ = 'True'
+-- [__Antisymmetry__]: if @x <= y && y <= x@ = 'True', then @x == y@ = 'True'
+--
+-- Note that the following operator interactions are expected to hold:
+--
+-- 1. @x >= y@ = @y <= x@
+-- 2. @x < y@ = @x <= y && x /= y@
+-- 3. @x > y@ = @y < x@
+-- 4. @x < y@ = @compare x y == LT@
+-- 5. @x > y@ = @compare x y == GT@
+-- 6. @x == y@ = @compare x y == EQ@
+-- 7. @min x y == if x <= y then x else y@ = 'True'
+-- 8. @max x y == if x >= y then x else y@ = 'True'
 --
 -- Minimal complete definition: either 'compare' or '<='.
 -- Using 'compare' can be more efficient for complex types.
@@ -350,6 +408,19 @@ instance Ord Char where
     (C# c1) <= (C# c2) = isTrue# (c1 `leChar#` c2)
     (C# c1) <  (C# c2) = isTrue# (c1 `ltChar#` c2)
 
+-- | Note that due to the presence of @NaN@, `Float`'s 'Ord' instance does not
+-- satisfy reflexivity.
+--
+-- >>> 0/0 <= (0/0 :: Float)
+-- False
+--
+-- Also note that, due to the same, `Ord`'s operator interactions are not
+-- respected by `Float`'s instance:
+--
+-- >>> (0/0 :: Float) > 1
+-- False
+-- >>> compare (0/0 :: Float) 1
+-- GT
 instance Ord Float where
     (F# x) `compare` (F# y)
         = if      isTrue# (x `ltFloat#` y) then LT
@@ -361,6 +432,19 @@ instance Ord Float where
     (F# x) >= (F# y) = isTrue# (x `geFloat#` y)
     (F# x) >  (F# y) = isTrue# (x `gtFloat#` y)
 
+-- | Note that due to the presence of @NaN@, `Double`'s 'Ord' instance does not
+-- satisfy reflexivity.
+--
+-- >>> 0/0 <= (0/0 :: Double)
+-- False
+--
+-- Also note that, due to the same, `Ord`'s operator interactions are not
+-- respected by `Double`'s instance:
+--
+-- >>> (0/0 :: Double) > 1
+-- False
+-- >>> compare (0/0 :: Double) 1
+-- GT
 instance Ord Double where
     (D# x) `compare` (D# y)
         = if      isTrue# (x <##  y) then LT

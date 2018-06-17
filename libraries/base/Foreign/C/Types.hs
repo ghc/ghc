@@ -68,7 +68,11 @@ module Foreign.C.Types
           -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
           -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
           -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
-          -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
+          -- 'Prelude.RealFrac' and 'Prelude.RealFloat'. That does mean
+          -- that `CFloat`'s (respectively `CDouble`'s) instances of
+          -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num' and
+          -- 'Prelude.Fractional' are as badly behaved as `Prelude.Float`'s
+          -- (respectively `Prelude.Double`'s).
         , CFloat(..),   CDouble(..)
         -- XXX GHC doesn't support CLDouble yet
         -- , CLDouble(..)

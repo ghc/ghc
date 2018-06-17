@@ -35,6 +35,23 @@ default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
 
 -- | Basic numeric class.
+--
+-- The Haskell Report defines no laws for 'Num'. However, '(+)' and '(*)' are
+-- customarily expected to define a ring and have the following properties:
+--
+-- [__Associativity of (+)__]: @(x + y) + z@ = @x + (y + z)@
+-- [__Commutativity of (+)__]: @x + y@ = @y + x@
+-- [__@fromInteger 0@ is the additive identity__]: @x + fromInteger 0@ = @x@
+-- [__'negate' gives the additive inverse__]: @x + negate x@ = @fromInteger 0@
+-- [__Associativity of (*)__]: @(x * y) * z@ = @x * (y * z)@
+-- [__@fromInteger 1@ is the multiplicative identity__]:
+-- @x * fromInteger 1@ = @x@ and @fromInteger 1 * x@ = @x@
+-- [__Distributivity of (*) with respect to (+)__]:
+-- @a * (b + c)@ = @(a * b) + (a * c)@ and @(b + c) * a@ = @(b * a) + (c * a)@
+--
+-- Note that it /isn't/ customarily expected that a type instance of both 'Num'
+-- and 'Ord' implement an ordered ring. Indeed, in 'base' only 'Integer' and
+-- 'Rational' do.
 class  Num a  where
     {-# MINIMAL (+), (*), abs, signum, fromInteger, (negate | (-)) #-}
 
@@ -109,7 +126,10 @@ instance  Num Integer  where
     signum = signumInteger
 
 #if defined(MIN_VERSION_integer_gmp)
--- | @since 4.8.0.0
+-- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an
+-- additive inverse. It is a semiring though.
+--
+-- @since 4.8.0.0
 instance  Num Natural  where
     (+) = plusNatural
     (-) = minusNatural
@@ -121,7 +141,10 @@ instance  Num Natural  where
     signum = signumNatural
 
 #else
--- | @since 4.8.0.0
+-- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an
+-- additive inverse. It is a semiring though.
+--
+-- @since 4.8.0.0
 instance Num Natural where
   Natural n + Natural m = Natural (n + m)
   {-# INLINE (+) #-}

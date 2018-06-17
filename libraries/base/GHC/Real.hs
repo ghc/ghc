@@ -75,6 +75,10 @@ underflowError = raise# underflowException
 --------------------------------------------------------------
 
 -- | Rational numbers, with numerator and denominator of some 'Integral' type.
+--
+-- Note that `Ratio`'s instances inherit the deficiencies from the type
+-- parameter's. For example, @Ratio Natural@'s 'Num' instance has similar
+-- problems to `Numeric.Natural.Natural`'s.
 data  Ratio a = !a :% !a  deriving Eq -- ^ @since 2.01
 
 -- | Arbitrary-precision rational numbers, represented as a ratio of
@@ -131,6 +135,19 @@ class  (Num a, Ord a) => Real a  where
     toRational          ::  a -> Rational
 
 -- | Integral numbers, supporting integer division.
+--
+-- The Haskell Report defines no laws for 'Integral'. However, 'Integral'
+-- instances are customarily expected to define a Euclidean domain and have the
+-- following properties for the 'div'/'mod' and 'quot'/'rem' pairs, given
+-- suitable Euclidean functions @f@ and @g@:
+--
+-- * @x@ = @y * quot x y + rem x y@ with @rem x y@ = @fromInteger 0@ or
+-- @g (rem x y)@ < @g y@
+-- * @x@ = @y * div x y + mod x y@ with @mod x y@ = @fromInteger 0@ or
+-- @f (mod x y)@ < @f y@
+--
+-- An example of a suitable Euclidean function, for `Integer`'s instance, is
+-- 'abs'.
 class  (Real a, Enum a) => Integral a  where
     -- | integer division truncated toward zero
     quot                :: a -> a -> a
@@ -164,6 +181,16 @@ class  (Real a, Enum a) => Integral a  where
                            where qr@(q,r) = quotRem n d
 
 -- | Fractional numbers, supporting real division.
+--
+-- The Haskell Report defines no laws for 'Fractional'. However, '(+)' and
+-- '(*)' are customarily expected to define a division ring and have the
+-- following properties:
+--
+-- [__'recip' gives the multiplicative inverse__]:
+-- @x * recip x@ = @recip x * x@ = @fromInteger 1@
+--
+-- Note that it /isn't/ customarily expected that a type instance of
+-- 'Fractional' implement a field. However, all instances in 'base' do.
 class  (Num a) => Fractional a  where
     {-# MINIMAL fromRational, (recip | (/)) #-}
 

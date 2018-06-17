@@ -64,6 +64,13 @@ infixr 8  **
 ------------------------------------------------------------------------
 
 -- | Trigonometric and hyperbolic functions and related functions.
+--
+-- The Haskell Report defines no laws for 'Floating'. However, '(+)', '(*)'
+-- and 'exp' are customarily expected to define an exponential field and have
+-- the following properties:
+--
+-- * @exp (a + b)@ = @exp a * exp b
+-- * @exp (fromInteger 0)@ = @fromInteger 1@
 class  (Fractional a) => Floating a  where
     pi                  :: a
     exp, log, sqrt      :: a -> a
@@ -245,7 +252,18 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 ------------------------------------------------------------------------
 
 -- | @since 2.01
-instance  Num Float  where
+-- Note that due to the presence of @NaN@, not all elements of 'Float' have an
+-- additive inverse.
+--
+-- >>> 0/0 + (negate 0/0 :: Float)
+-- NaN
+--
+-- Also note that due to the presence of -0, `Float`'s 'Num' instance doesn't
+-- have an additive identity
+--
+-- >>> 0 + (-0 :: Float)
+-- 0.0
+instance Num Float where
     (+)         x y     =  plusFloat x y
     (-)         x y     =  minusFloat x y
     negate      x       =  negateFloat x
@@ -272,6 +290,11 @@ instance  Real Float  where
                     smallInteger m# :% shiftLInteger 1 (negateInt# e#)
 
 -- | @since 2.01
+-- Note that due to the presence of @NaN@, not all elements of 'Float' have an
+-- multiplicative inverse.
+--
+-- >>> 0/0 * (recip 0/0 :: Float)
+-- NaN
 instance  Fractional Float  where
     (/) x y             =  divideFloat x y
     {-# INLINE fromRational #-}
@@ -429,6 +452,17 @@ instance  Show Float  where
 ------------------------------------------------------------------------
 
 -- | @since 2.01
+-- Note that due to the presence of @NaN@, not all elements of 'Double' have an
+-- additive inverse.
+--
+-- >>> 0/0 + (negate 0/0 :: Double)
+-- NaN
+--
+-- Also note that due to the presence of -0, `Double`'s 'Num' instance doesn't
+-- have an additive identity
+--
+-- >>> 0 + (-0 :: Double)
+-- 0.0
 instance  Num Double  where
     (+)         x y     =  plusDouble x y
     (-)         x y     =  minusDouble x y
@@ -458,6 +492,11 @@ instance  Real Double  where
                 m :% shiftLInteger 1 (negateInt# e#)
 
 -- | @since 2.01
+-- Note that due to the presence of @NaN@, not all elements of 'Double' have an
+-- multiplicative inverse.
+--
+-- >>> 0/0 * (recip 0/0 :: Double)
+-- NaN
 instance  Fractional Double  where
     (/) x y             =  divideDouble x y
     {-# INLINE fromRational #-}
