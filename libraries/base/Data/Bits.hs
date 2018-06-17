@@ -190,8 +190,12 @@ class Eq a => Bits a where
     {-| Return the number of bits in the type of the argument.  The actual
         value of the argument is ignored.  The function 'bitSize' is
         undefined for types that do not have a fixed bitsize, like 'Integer'.
+
+        Default implementation based upon 'bitSizeMaybe' provided since
+        4.12.0.0.
         -}
     bitSize           :: a -> Int
+    bitSize b = fromMaybe (error "bitSize is undefined") (bitSizeMaybe b)
 
     {-| Return 'True' if the argument is a signed type.  The actual
         value of the argument is ignored -}

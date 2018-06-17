@@ -325,6 +325,9 @@
   * New `Control.Exception.TypeError` datatype, which is thrown when an
     expression fails to typecheck when run using `-fdefer-type-errors` (#10284)
 
+  * The `bitSize` method of `Data.Bits.Bits` now has a (partial!)
+    default implementation based on `bitSizeMaybe`. (#12970)
+
 ### New instances
 
   * `Alt`, `Dual`, `First`, `Last`, `Product`, and `Sum` now have `Data`,
