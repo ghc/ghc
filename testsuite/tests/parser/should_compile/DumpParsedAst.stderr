@@ -33,7 +33,8 @@
           ({ DumpParsedAst.hs:5:14-17 }
            (Unqual
             {OccName: Zero}))
-          (False)
+          ({ <no location info> }
+           (False))
           []
           (Nothing)
           (PrefixCon
@@ -45,7 +46,8 @@
           ({ DumpParsedAst.hs:5:21-24 }
            (Unqual
             {OccName: Succ}))
-          (False)
+          ({ <no location info> }
+           (False))
           []
           (Nothing)
           (PrefixCon

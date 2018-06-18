@@ -693,13 +693,13 @@ repAnnProv ModuleAnnProvenance
 
 repC :: LConDecl GhcRn -> DsM (Core TH.ConQ)
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_forall = False
+                      , con_forall = L _ False
                       , con_mb_cxt = Nothing
                       , con_args = args }))
   = repDataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_forall = is_existential
+                      , con_forall = L _ is_existential
                       , con_ex_tvs = con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))

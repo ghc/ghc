@@ -535,14 +535,14 @@ cvtConstr (ForallC tvs ctxt con)
     add_cxt (L loc cxt1) (Just (L _ cxt2)) = Just (L loc (cxt1 ++ cxt2))
 
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
-      = con { con_forall = not (null all_tvs)
+      = con { con_forall = noLoc $ not (null all_tvs)
             , con_qvars  = mkHsQTvs all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
         all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit qvars
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
-      = con { con_forall = not (null all_tvs)
+      = con { con_forall = noLoc $ not (null all_tvs)
             , con_ex_tvs = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
@@ -555,7 +555,7 @@ cvtConstr (GadtC c strtys ty)
         ; args    <- mapM cvt_arg strtys
         ; L _ ty' <- cvtType ty
         ; c_ty    <- mk_arr_apps args ty'
-        ; returnL $ mkGadtDecl c' c_ty}
+        ; returnL $ fst $ mkGadtDecl c' c_ty}
 
 cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
@@ -563,7 +563,7 @@ cvtConstr (RecGadtC c varstrtys ty)
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy noExt
                                            (noLoc $ HsRecTy noExt rec_flds) ty')
-        ; returnL $ mkGadtDecl c' rec_ty }
+        ; returnL $ fst $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
 cvtSrcUnpackedness NoSourceUnpackedness = NoSrcUnpack

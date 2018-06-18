@@ -629,7 +629,7 @@ mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr GhcPs]
 mkConDeclH98 name mb_forall mb_cxt args
   = ConDeclH98 { con_ext    = noExt
                , con_name   = name
-               , con_forall = isJust mb_forall
+               , con_forall = noLoc $ isJust mb_forall
                , con_ex_tvs = mb_forall `orElse` []
                , con_mb_cxt = mb_cxt
                , con_args   = args'
@@ -639,33 +639,39 @@ mkConDeclH98 name mb_forall mb_cxt args
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs     -- Always a HsForAllTy
-           -> ConDecl GhcPs
+           -> (ConDecl GhcPs, [AddAnn])
 mkGadtDecl names ty
-  = ConDeclGADT { con_g_ext  = noExt
-                , con_names  = names
-                , con_forall = isLHsForAllTy ty
-                , con_qvars  = mkHsQTvs tvs
-                , con_mb_cxt = mcxt
-                , con_args   = args'
-                , con_res_ty = res_ty
-                , con_doc    = Nothing }
+  = (ConDeclGADT { con_g_ext  = noExt
+                 , con_names  = names
+                 , con_forall = L l $ isLHsForAllTy ty
+                 , con_qvars  = mkHsQTvs tvs
+                 , con_mb_cxt = mcxt
+                 , con_args   = args'
+                 , con_res_ty = res_ty
+                 , con_doc    = Nothing }
+    , anns1 ++ anns2 ++ anns3)
   where
-    (tvs, rho) = splitLHsForAllTy ty
-    (mcxt, tau) = split_rho rho
+    (ty'@(L l _),anns1) = peel_parens ty []
+    (tvs, rho) = splitLHsForAllTy ty'
+    (mcxt, tau, anns2) = split_rho rho []
 
-    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
-                                   = (Just cxt, tau)
-    split_rho (L _ (HsParTy _ ty)) = split_rho ty
-    split_rho tau                  = (Nothing, tau)
+    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau })) ann
+                                       = (Just cxt, tau, ann)
+    split_rho (L l (HsParTy _ ty)) ann = split_rho ty (ann++mkParensApiAnn l)
+    split_rho tau                  ann = (Nothing, tau, ann)
 
-    (args, res_ty) = split_tau tau
+    (args, res_ty, anns3) = split_tau tau []
     args' = nudgeHsSrcBangs args
 
     -- See Note [GADT abstract syntax] in HsDecls
-    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) res_ty))
-                                   = (RecCon (L loc rf), res_ty)
-    split_tau (L _ (HsParTy _ ty)) = split_tau ty
-    split_tau tau                  = (PrefixCon [], tau)
+    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) res_ty)) ann
+                                       = (RecCon (L loc rf), res_ty, ann)
+    split_tau (L l (HsParTy _ ty)) ann = split_tau ty (ann++mkParensApiAnn l)
+    split_tau tau                  ann = (PrefixCon [], tau, ann)
+
+    peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
+                                                       (ann++mkParensApiAnn l)
+    peel_parens ty                   ann = (ty, ann)
 
 nudgeHsSrcBangs :: HsConDeclDetails GhcPs -> HsConDeclDetails GhcPs
 -- ^ This function ensures that fields with strictness or packedness

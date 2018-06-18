@@ -1236,7 +1236,9 @@ data ConDecl pass
 
       -- The next four fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
-      , con_forall  :: Bool              -- ^ True <=> explicit forall
+      -- The following field is Located to anchor API Annotations,
+      -- AnnForall and AnnDot.
+      , con_forall  :: Located Bool      -- ^ True <=> explicit forall
                                          --   False => hsq_explicit is empty
       , con_qvars   :: LHsQTyVars pass
                        -- Whether or not there is an /explicit/ forall, we still
@@ -1254,7 +1256,8 @@ data ConDecl pass
       { con_ext     :: XConDeclH98 pass
       , con_name    :: Located (IdP pass)
 
-      , con_forall  :: Bool   -- ^ True <=> explicit user-written forall
+      , con_forall  :: Located Bool
+                              -- ^ True <=> explicit user-written forall
                               --     e.g. data T a = forall b. MkT b (b->a)
                               --     con_ex_tvs = {b}
                               -- False => con_ex_tvs is empty
