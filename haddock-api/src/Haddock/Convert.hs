@@ -338,7 +338,7 @@ synifyDataCon use_gadt_syntax dc =
            then return $ noLoc $
               ConDeclGADT { con_g_ext  = noExt
                           , con_names  = [name]
-                          , con_forall = True
+                          , con_forall = noLoc True
                           , con_qvars  = synifyTyVars (univ_tvs ++ ex_tvs)
                           , con_mb_cxt = Just ctx
                           , con_args   =  hat
@@ -347,7 +347,7 @@ synifyDataCon use_gadt_syntax dc =
            else return $ noLoc $
               ConDeclH98 { con_ext    = noExt
                          , con_name   = name
-                         , con_forall = True
+                         , con_forall = noLoc True
                          , con_ex_tvs = map synifyTyVar ex_tvs
                          , con_mb_cxt = Just ctx
                          , con_args   = hat
