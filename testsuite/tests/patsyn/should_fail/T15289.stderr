@@ -1,0 +1,8 @@
+  T15289.hs:5:16: error:
+      • Couldn't match expected type ‘Maybe’ with actual type ‘Bool’
+      • In the pattern: True
+        In the pattern: True :: Maybe
+        In the declaration for pattern synonym ‘What’
+    |
+  5 | pattern What = True :: Maybe
+    |                ^^^^
