@@ -23,7 +23,7 @@ Library
     Build-Depends: base       >= 4   && < 5,
                    binary     >= 0.7 && < 0.9,
                    bytestring >= 0.10 && < 0.11,
-                   containers >= 0.5 && < 0.6,
+                   containers >= 0.5 && < 0.7,
                    deepseq    >= 1.4 && < 1.5,
                    ghci       == 8.6.*
     if flag(network)
