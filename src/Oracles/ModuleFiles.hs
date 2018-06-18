@@ -124,10 +124,15 @@ moduleFilesOracle = void $ do
     void . addOracle $ \(ModuleFiles (stage, package)) -> do
         let context = vanillaContext stage package
         srcDirs <- interpretInContext context (getPackageData PD.srcDirs)
+        mainIs  <- interpretInContext context (getPackageData PD.mainIs)
+        let removeMain = case mainIs of
+                              Just (mod, _) -> delete mod
+                              Nothing       -> id
         modules <- fmap sort $ interpretInContext context (getPackageData PD.modules)
         autogen <- autogenPath context
         let dirs = autogen : map (pkgPath package -/-) srcDirs
-            modDirFiles = groupSort $ map decodeModule modules
+            -- Don't resolve the file path for module `Main` twice.
+            modDirFiles = groupSort $ map decodeModule $ removeMain modules
         result <- concatForM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
             forM todo $ \(mDir, mFiles) -> do
@@ -136,7 +141,24 @@ moduleFilesOracle = void $ do
                 let cmp f = compare (dropExtension f)
                     found = intersectOrd cmp files mFiles
                 return (map (fullDir -/-) found, mDir)
-        let pairs = sort [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
+
+        -- For a BuildInfo, it may be a library, which deosn't have the `Main`
+        -- module, or an executable, which must have the `Main` module and the
+        -- file path of `Main` module is indicated by the `main-is` field in it's
+        -- .cabal file.
+        --
+        -- For `Main` module, the file name may not be `Main.hs`, unlike other
+        -- exposed modules. We could get the file path by the module name for
+        -- other exposed modules, but for `Main`, we must resolve the file path
+        -- via the `main-is` field in the .cabal file.
+        mainpairs <- case mainIs of
+            Just (mod, filepath) ->
+                concatForM dirs $ \dir -> do
+                    found <- doesFileExist (dir -/- filepath)
+                    return [(mod, unifyPath $ dir -/- filepath) | found]
+            Nothing              -> return []
+
+        let pairs = sort $ mainpairs ++ [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
         unless (null multi) $ do
             let (m, f1, f2) = head multi

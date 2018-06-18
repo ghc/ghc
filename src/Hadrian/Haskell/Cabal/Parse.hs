@@ -54,13 +54,13 @@ import Settings
 parseCabalPkgId :: FilePath -> IO String
 parseCabalPkgId file = C.display . C.package . C.packageDescription <$> C.readGenericPackageDescription C.silent file
 
-biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName])
-biModules pd = go [ comp | comp@(bi,_) <-
+biModules :: C.PackageDescription -> (C.BuildInfo, [C.ModuleName], Maybe (C.ModuleName, String))
+biModules pd = go [ comp | comp@(bi,_,_) <-
                              (map libBiModules . maybeToList $ C.library pd) ++
                              (map exeBiModules               $ C.executables pd)
                          , C.buildable bi ]
   where
-    libBiModules lib = (C.libBuildInfo lib, C.explicitLibModules lib)
+    libBiModules lib = (C.libBuildInfo lib, C.explicitLibModules lib, Nothing)
     exeBiModules exe = (C.buildInfo exe,
                        -- If "main-is: ..." is not a .hs or .lhs file, do not
                        -- inject "Main" into the modules.  This does not respect
@@ -68,7 +68,9 @@ biModules pd = go [ comp | comp@(bi,_) <-
                        -- Distribution.Simple.GHC for the glory details.
                        if takeExtension (C.modulePath exe) `elem` [".hs", ".lhs"]
                            then C.main : C.exeModules exe
-                           else C.exeModules exe)
+                                -- The module `Main` still need to be kept in `modules` of PD.
+                           else C.exeModules exe,
+                       Just (C.main, C.modulePath exe))
     go []  = error "No buildable component found."
     go [x] = x
     go _   = error "Cannot handle more than one buildinfo yet."
@@ -243,15 +245,18 @@ parsePackageData context@Context {..} = do
             -- there. So we filter out gcc-lib from the RTS's library-dirs here.
             _ -> error "No (or multiple) GHC rts package is registered!"
 
-        buildInfo = fst (biModules pd')
+        (buildInfo, modules, mainIs) = biModules pd'
 
       in return $ PackageData
           { dependencies    = deps
           , name            = C.unPackageName . C.pkgName    . C.package $ pd'
           , version         = C.display       . C.pkgVersion . C.package $ pd'
           , componentId     = C.localCompatPackageKey lbi'
-          , modules         = map C.display . snd . biModules $ pd'
-          , otherModules    = map C.display . C.otherModules  $ buildInfo
+          , mainIs          = case mainIs of
+                                   Just (mod, filepath) -> Just (C.display mod, filepath)
+                                   Nothing              -> Nothing
+          , modules         = map C.display $ modules
+          , otherModules    = map C.display . C.otherModules $ buildInfo
           , synopsis        = C.synopsis    pd'
           , description     = C.description pd'
           , srcDirs         = C.hsSourceDirs buildInfo

@@ -10,6 +10,7 @@ data PackageData = PackageData
     , name            :: PackageName
     , version         :: String
     , componentId     :: String
+    , mainIs          :: Maybe (String, FilePath)  -- ("Main", filepath)
     , modules         :: [String]
     , otherModules    :: [String]
     , synopsis        :: String
