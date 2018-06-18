@@ -114,10 +114,16 @@ test('T5363', [], compile_and_run, [''])
 
 test('profinline001', [], compile_and_run, [''])
 
-test('T11627a', [extra_ways(extra_prof_ways)], compile_and_run, [''])
+# Skip T11627a and T11627b on Darwin as it tends to give us a very small stack
+# which the retainer profiler tends to overflow. See #15287 and #11627.
+test('T11627a', [ extra_ways(extra_prof_ways)
+                , when(opsys('darwin'), skip)
+                ],
+     compile_and_run, [''])
 
 test('T11627b', [ extra_run_opts('+RTS -i0 -RTS')  # census after each GC
                 , extra_ways(extra_prof_ways)
+                , when(opsys('darwin'), skip)
                 , when(opsys('mingw32'),
                        expect_broken_for(12236, ['prof_hc_hb']))
                 ]
