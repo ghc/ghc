@@ -1688,7 +1688,8 @@ loadModule' files = do
 
   -- Grab references to the currently loaded modules so that we can
   -- see if they leak.
-  leak_indicators <- if gopt Opt_GhciLeakCheck (hsc_dflags hsc_env)
+  let !dflags = hsc_dflags hsc_env
+  leak_indicators <- if gopt Opt_GhciLeakCheck dflags
     then liftIO $ getLeakIndicators hsc_env
     else return (panic "no leak indicators")
 
@@ -1700,8 +1701,8 @@ loadModule' files = do
 
   GHC.setTargets targets
   success <- doLoadAndCollectInfo False LoadAllTargets
-  when (gopt Opt_GhciLeakCheck (hsc_dflags hsc_env)) $
-    liftIO $ checkLeakIndicators (hsc_dflags hsc_env) leak_indicators
+  when (gopt Opt_GhciLeakCheck dflags) $
+    liftIO $ checkLeakIndicators dflags leak_indicators
   return success
 
 -- | @:add@ command
