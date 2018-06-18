@@ -1763,7 +1763,7 @@ Example 1:  (c Int), where c :: * -> Constraint.  We can't do anything
 
 Example 2:  a ~ b, where a :: *, b :: k, where k is a kind variable
             We don't want to use this to substitute 'b' for 'a', in case
-            'k' is subequently unifed with (say) *->*, because then
+            'k' is subsequently unifed with (say) *->*, because then
             we'd have ill-kinded types floating about.  Rather we want
             to defer using the equality altogether until 'k' get resolved.
 

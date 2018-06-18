@@ -421,7 +421,7 @@ We do the following steps:
         error if B is used in any of the kinds needed to initialse
         B's kind (e.g. (a :: Type)) here
 
-      - Extend the type env with these intial kinds (monomorphic for
+      - Extend the type env with these initial kinds (monomorphic for
         decls that lack a CUSK)
             B :-> TcTyCon <initial kind>
         (thereby overriding the B :-> TyConPE binding)

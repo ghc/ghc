@@ -392,7 +392,7 @@ rnHsForeignDecl (XForeignDecl _) = panic "rnHsForeignDecl"
 
 -- | For Windows DLLs we need to know what packages imported symbols are from
 --      to generate correct calls. Imported symbols are tagged with the current
---      package, so if they get inlined across a package boundry we'll still
+--      package, so if they get inlined across a package boundary we'll still
 --      know where they're from.
 --
 patchForeignImport :: UnitId -> ForeignImport -> ForeignImport

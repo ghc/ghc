@@ -1103,7 +1103,7 @@ data HsArg tm ty
 {-
 Note [HsArgPar]
 A HsArgPar indicates that everything to the left of this in the argument list is
-enclosed in parenthesis together with the function itself. It is necessary so
+enclosed in parentheses together with the function itself. It is necessary so
 that we can recreate the parenthesis structure in the original source after
 typechecking the arguments.
 

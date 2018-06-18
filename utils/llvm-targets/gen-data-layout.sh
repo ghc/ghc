@@ -78,7 +78,7 @@ FILE=_____dummy.c
 touch $FILE
 
 for target in "${TARGETS[@]}"; do
-    # find the cpu and attributes emitte by clang for the given $target
+    # find the cpu and attributes emitted by clang for the given $target
     CPU=""
     ATTR=()
     args=$(clang --target=$target -S $FILE -o /dev/null -v 2>&1 |grep $FILE)

@@ -678,7 +678,7 @@ obscure way in Trac #14777.  Problem was that during matching we look
 up target-term variables in the in-scope set (see Note [Lookup
 in-scope]).  If a target-term variable happens to name-clash with a
 template variable, that lookup will find the template variable, which
-is /uttterly/ bogus.  In Trac #14777, this transformed a term variable
+is /utterly/ bogus.  In Trac #14777, this transformed a term variable
 into a type variable, and then crashed when we wanted its idInfo.
 ------ End of historical note -------
 

@@ -3,7 +3,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
-module T13429a where -- Orignally FingerTree.hs from the ticket
+module T13429a where -- Originally FingerTree.hs from the ticket
 
 import Data.Semigroup (Semigroup(..))
 

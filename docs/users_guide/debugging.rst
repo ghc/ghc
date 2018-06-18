@@ -384,7 +384,7 @@ These flags dump various phases of GHC's C-\\- pipeline.
     file parsing.
 
     Cmm dumps don't include unreachable blocks since we print
-    blocks in reverse post order.
+    blocks in reverse post-order.
 
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-\\- output
@@ -763,7 +763,7 @@ Checking for consistency
     useful when finding pointer tagging issues.
 
 .. ghc-flag:: -fproc-alignment
-    :shortdesc: Align functions at given boundry.
+    :shortdesc: Align functions at given boundary.
     :type: dynamic
 
     Align functions to multiples of the given value. Only valid values are powers

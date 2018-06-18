@@ -398,7 +398,7 @@ We have some special hacks to support things like
    data T = MkT Int# deriving ( Show )
 
 Specifically, we use TcGenDeriv.box to box the Int# into an Int
-(which we know how to show), and append a '#'. Parenthesis are not required
+(which we know how to show), and append a '#'. Parentheses are not required
 for unboxed values (`MkT -3#` is a valid expression).
 
 Note [Superclasses of derived instance]

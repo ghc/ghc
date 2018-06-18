@@ -627,7 +627,7 @@ test('T13833', normal, compile, [''])
 
 def onlyHsParLocs(x): 
     """ 
-    We only want to check that all the parenthesis are present with the correct location, 
+    We only want to check that all the parentheses are present with the correct location, 
     not compare the entire typechecked AST.
     Located (HsPar GhcTc) are pretty printed with the form
     ({ <location info>

@@ -612,7 +612,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
  where
   nc_var = hsc_NC hsc_env
 
-  -- init_ext_ids is the intial list of Ids that should be
+  -- init_ext_ids is the initial list of Ids that should be
   -- externalised.  It serves as the starting point for finding a
   -- deterministic, tidy, renaming for all external Ids in this
   -- module.

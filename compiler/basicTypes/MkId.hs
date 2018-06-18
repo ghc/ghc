@@ -124,7 +124,7 @@ Note [magicIds]
 ~~~~~~~~~~~~~~~
 The magicIds
 
-  * Are expotted from GHC.Maic
+  * Are exported from GHC.Maic
 
   * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic.hs).
     This definition at least generates Haddock documentation for them.

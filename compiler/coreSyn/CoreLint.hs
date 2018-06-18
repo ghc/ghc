@@ -1384,7 +1384,7 @@ Consider (Trac #14939)
    f :: forall (cls :: * -> Constraint) (b :: Alg cls *). b
 
 Here 'cls' appears free in b's kind, which would usually be illegal
-(becuase in (forall a. ty), ty's kind should not mention 'a'). But
+(because in (forall a. ty), ty's kind should not mention 'a'). But
 #in this case (Alg cls *) = *, so all is well.  Currently we allow
 this, and make Lint expand synonyms where necessary to make it so.
 

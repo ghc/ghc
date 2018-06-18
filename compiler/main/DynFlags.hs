@@ -880,7 +880,7 @@ data DynFlags = DynFlags {
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
 
-  cmmProcAlignment      :: Maybe Int,   -- ^ Align Cmm functions at this boundry or use default.
+  cmmProcAlignment      :: Maybe Int,   -- ^ Align Cmm functions at this boundary or use default.
 
   historySize           :: Int,         -- ^ Simplification history size
 

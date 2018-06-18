@@ -1088,7 +1088,7 @@ spectral/mandel/Mandel.hs, where the mandelset function gets a useful
 let-float if you inline windowToViewport
 
 However, as usual for Gentle mode, do not inline things that are
-inactive in the intial stages.  See Note [Gentle mode].
+inactive in the initial stages.  See Note [Gentle mode].
 
 Note [Stable unfoldings and preInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2231,7 +2231,7 @@ mkCase3 _dflags scrut bndr alts_ty alts
   = return (Case scrut bndr alts_ty alts)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in Exitify.hs
--- This lives here (and not in Id) becuase occurrence info is only valid on
+-- This lives here (and not in Id) because occurrence info is only valid on
 -- InIds, so it's crucial that isExitJoinId is only called on freshly
 -- occ-analysed code. It's not a generic function you can call anywhere.
 isExitJoinId :: Var -> Bool

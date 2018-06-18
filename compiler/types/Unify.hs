@@ -595,7 +595,7 @@ So, we work as follows:
        [ b :: *, z :: a, rest :: G a z ]
 
  6. Apply the substitution left-to-right to the kinds of these
-    tyvars, extendinng it each time with a new binding, so we
+    tyvars, extending it each time with a new binding, so we
     finish up with
        [ xs   :-> ..as before..
        , a    :-> ..as before..
@@ -604,10 +604,10 @@ So, we work as follows:
        , rest :-> rest :: G a (z :: b) ]
     Note that rest now has the right kind
 
- 7. Apply this extended substution (once) to the range of
-    the /original/ substituion.  (Note that we do the
+ 7. Apply this extended substitution (once) to the range of
+    the /original/ substitution.  (Note that we do the
     extended substitution would go on forever if you tried
-    to find its fixpoint, becuase it maps z to z.)
+    to find its fixpoint, because it maps z to z.)
 
  8. And go back to step 1
 

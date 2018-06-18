@@ -2552,7 +2552,7 @@ data RecTcChecker = RC !Int (NameEnv Int)
   -- we have encountered each TyCon
 
 initRecTc :: RecTcChecker
--- Intialise with a fixed max bound of 100
+-- Initialise with a fixed max bound of 100
 -- We should probably have a flag for this
 initRecTc = RC 100 emptyNameEnv
 
