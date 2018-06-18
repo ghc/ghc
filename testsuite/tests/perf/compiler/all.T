@@ -449,7 +449,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1106015512, 5)]),
+           (wordsize(64), 1161885448, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -464,8 +464,9 @@ test('T5631',
         # 2017-02-17:     1517484488 (amd64/Linux) Type-indexed Typeable
         # 2017-03-03:     1065147968 (amd64/Linux) Share Typeable KindReps
         # 2017-03-31:     1037482512 (amd64/Linux) Fix memory leak in simplifier
-	# 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in TypeEqOrigin
-	#                                  should be fixed by #14037
+        # 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in TypeEqOrigin
+        #                                  should be fixed by #14037
+        # 2018-06-18:     1161885448 (Mac) Not entirely clear
        only_ways(['normal'])
       ],
      compile,
@@ -723,7 +724,7 @@ test('T6048',
             # 2014-12-01: 49987836 (x86 Windows)
             # 2016-04-06: 55701280 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 90996312, 10)])
+           (wordsize(64), 100574504, 10)])
              # 2012-09-18  97247032 amd64/Linux
              # 2014-01-16 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 2014-01-18  95960720 amd64/Linux Call Arity improvements
@@ -736,7 +737,8 @@ test('T6048',
              # 2016-03-11 108225624 amd64/Linux unknown reason sadly; likely gradual creep.
              # 2016-11-25  94327392 amd64/Linux Back down again hooray; still not sure why
              # 2017-02-17 115715592 amd64/Linux Type-indexed Typeable
-             # 2017-04-28 90996312 Join point refactoring
+             # 2017-04-28  90996312 Join point refactoring
+             # 2018-06-18 100574504 Darwin      Unclear
       ],
       compile,[''])
 
