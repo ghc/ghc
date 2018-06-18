@@ -591,7 +591,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
                  -- We must typecheck the kind signature, and solve all
                  -- its equalities etc; from this point on we may do
                  -- things like instantiate its foralls, so it needs
-                 -- to be fully determined (Trac #149904)
+                 -- to be fully determined (Trac #14904)
        ; traceTc "tc_infer_hs_type:sig" (ppr ty $$ ppr sig')
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
