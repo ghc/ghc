@@ -17,7 +17,8 @@ ghcPackages =
     , ghcHeap, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps
     , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
     , parsec, parallel, pretty, process, rts, runGhc, stm, templateHaskell
-    , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml ]
+    , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
+    , timeout ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -81,6 +82,7 @@ unlit               = hsUtil "unlit"
 unix                = hsLib  "unix"
 win32               = hsLib  "Win32"
 xhtml               = hsLib  "xhtml"
+timeout             = hsUtil "timeout"         `setPath` "testsuite/timeout"
 
 -- | Construct a Haskell library package, e.g. @array@.
 hsLib :: PackageName -> Package

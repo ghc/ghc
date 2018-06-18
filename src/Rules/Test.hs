@@ -3,6 +3,7 @@ module Rules.Test (testRules, runTestGhcFlags, timeoutProgPath) where
 import Base
 import Expression
 import GHC
+import GHC.Packages (timeout)
 import Oracles.Flag
 import Oracles.Setting
 import Settings
@@ -14,34 +15,12 @@ import System.Environment
 -- TODO: clean up after testing
 testRules :: Rules ()
 testRules = do
-    root <- buildRootRules
-
-    root -/- timeoutPyPath ~> do
-        copyFile "testsuite/timeout/timeout.py" (root -/- timeoutPyPath)
-
-    -- TODO windows is still not supported.
-    --
-    -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
-    root -/- timeoutProgPath ~> do
-        python <- builderPath Python
-        need [root -/- timeoutPyPath]
-        let script = unlines
-                [ "#!/usr/bin/env sh"
-                , "exec " ++ python ++ " $0.py \"$@\""
-                ]
-        liftIO $ do
-            writeFile (root -/- timeoutProgPath) script
-        makeExecutable (root -/- timeoutProgPath)
-
     "validate" ~> do
         needTestBuilders
         build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
         needTestBuilders
-
-        -- Prepare the timeout program.
-        need [ root -/- timeoutProgPath ]
 
         -- TODO This approach doesn't work.
         -- Set environment variables for test's Makefile.
@@ -78,6 +57,28 @@ needTestsuiteBuilders = do
       | isLibrary pkg = pkgConfFile (vanillaContext stage pkg)
       | otherwise = programPath =<< programContext stage pkg
 
+-- | Build the timeout program.
+-- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
+timeoutProgBuilder :: Action ()
+timeoutProgBuilder = do
+    root    <- buildRoot
+    windows <- windowsHost
+    if windows
+        then do
+            prog <- programPath =<< programContext Stage1 timeout
+            need [ prog ]
+            copyFile prog (root -/- timeoutProgPath)
+        else do
+            python <- builderPath Python
+            copyFile "testsuite/timeout/timeout.py" (root -/- "test/bin/timeout.py")
+            let script = unlines
+                    [ "#!/usr/bin/env sh"
+                    , "exec " ++ python ++ " $0.py \"$@\""
+                    ]
+            liftIO $ do
+                writeFile (root -/- timeoutProgPath) script
+            makeExecutable (root -/- timeoutProgPath)
+
 needTestBuilders :: Action ()
 needTestBuilders = do
     needBuilder $ Ghc CompileHs Stage2
@@ -85,6 +86,7 @@ needTestBuilders = do
     needBuilder Hpc
     needBuilder (Hsc2Hs Stage1)
     needTestsuiteBuilders
+    timeoutProgBuilder
 
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Action String
@@ -116,8 +118,5 @@ runTestGhcFlags = do
         , pure "-dno-debug-output"
         ]
 
-timeoutPyPath :: FilePath
-timeoutPyPath = "test/bin/timeout.py"
-
 timeoutProgPath :: FilePath
-timeoutProgPath = "test/bin/timeout" <.> exe
+timeoutProgPath = "testsuite/timeout/install-inplace/bin/timeout" <.> exe
