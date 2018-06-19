@@ -52,7 +52,7 @@ Library
 
     build-depends:
         base        >= 4.9 && < 4.13,
-        ghc-boot-th == 8.5,
+        ghc-boot-th == 8.6.*,
         pretty      == 1.1.*
 
     ghc-options: -Wall
