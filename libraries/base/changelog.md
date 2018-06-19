@@ -37,6 +37,11 @@
 
   * `Control.Exception.throw` is now levity polymorphic. (#15180)
 
+  * `Data.Ord.Down` now has a number of new instances. These include:
+    `MonadFix`, `MonadZip`, `Data`, `Foldable`, `Traversable`, `Eq1`, `Ord1`,
+    `Read1`, `Show1`, `Generic`, `Generic1`. (#15098)
+
+
 ## 4.11.1.0 *TBA*
   * Bundled with GHC 8.4.2
 

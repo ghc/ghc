@@ -1334,3 +1334,9 @@ deriving instance Data SourceStrictness
 
 -- | @since 4.9.0.0
 deriving instance Data DecidedStrictness
+
+----------------------------------------------------------------------------
+-- Data instances for Data.Ord
+
+-- | @since 4.12.0.0
+deriving instance Data a => Data (Down a)
