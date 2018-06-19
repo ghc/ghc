@@ -598,10 +598,10 @@ So, we work as follows:
     tyvars, extending it each time with a new binding, so we
     finish up with
        [ xs   :-> ..as before..
-       , a    :-> ..as before..
+       , a    :-> b
        , b    :-> b    :: *
        , z    :-> z    :: b
-       , rest :-> rest :: G a (z :: b) ]
+       , rest :-> rest :: G b (z :: b) ]
     Note that rest now has the right kind
 
  7. Apply this extended substitution (once) to the range of
