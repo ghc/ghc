@@ -546,6 +546,7 @@ mkNomReflCo = mkReflCo Nominal
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
   | [w, _rep1, _rep2, co1, co2] <- cos   -- See Note [Function coercions]
+  , isFunTyCon tc
   = -- (a :: TYPE ra) -> (b :: TYPE rb)  ~  (c :: TYPE rc) -> (d :: TYPE rd)
     -- rep1 :: ra  ~  rc        rep2 :: rb  ~  rd
     -- co1  :: a   ~  c         co2  :: b   ~  d
