@@ -139,11 +139,12 @@ filterM p        = foldr (\ x -> liftA2 (\ flg -> if flg then (x:) else id) (p x
 
 infixr 1 <=<, >=>
 
--- | Left-to-right Kleisli composition of monads.
+-- | Left-to-right composition of Kleisli arrows.
 (>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
 f >=> g     = \x -> f x >>= g
 
--- | Right-to-left Kleisli composition of monads. @('>=>')@, with the arguments flipped.
+-- | Right-to-left composition of Kleisli arrows. @('>=>')@, with the arguments
+-- flipped.
 --
 -- Note how this operator resembles function composition @('.')@:
 --
