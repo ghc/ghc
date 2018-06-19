@@ -37,7 +37,7 @@ import Type
 import TyCoRep
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, liftedTypeKindTyConName, unitTy )
-import PrelNames ( hasKey, eqTyConKey, ipClassKey
+import PrelNames ( hasKey, eqTyConKey, eqTyConName, ipClassKey
                  , tYPETyConKey, liftedRepDataConKey )
 import Unique ( getUnique )
 import Util ( chkAppend, compareLength, dropList, filterByList, filterOut
@@ -468,7 +468,10 @@ synifyType _ (TyConApp tc tys)
       -- and equalities
       | tc `hasKey` eqTyConKey
       , [ty1, ty2] <- tys
-      = noLoc $ HsEqTy noExt (synifyType WithinType ty1) (synifyType WithinType ty2)
+      = noLoc $ HsOpTy noExt
+                       (synifyType WithinType ty1)
+                       (noLoc eqTyConName)
+                       (synifyType WithinType ty2)
       -- and infix type operators
       | isSymOcc (nameOccName (getName tc))
       , ty1:ty2:tys_rest <- vis_tys

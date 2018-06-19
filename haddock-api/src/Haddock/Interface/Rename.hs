@@ -247,7 +247,6 @@ renameType t = case t of
 
   HsListTy _ ty -> return . (HsListTy NoExt) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy NoExt n) (renameLType ty)
-  HsEqTy _ ty1 ty2 -> liftM2 (HsEqTy NoExt) (renameLType ty1) (renameLType ty2)
 
   HsTupleTy _ b ts -> return . HsTupleTy NoExt b =<< mapM renameLType ts
   HsSumTy _ ts -> HsSumTy NoExt <$> mapM renameLType ts

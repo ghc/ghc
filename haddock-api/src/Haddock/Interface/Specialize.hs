@@ -264,7 +264,6 @@ renameType (HsOpTy x la lop lb) =
     HsOpTy x <$> renameLType la <*> located renameName lop <*> renameLType lb
 renameType (HsParTy x lt) = HsParTy x <$> renameLType lt
 renameType (HsIParamTy x ip lt) = HsIParamTy x ip <$> renameLType lt
-renameType (HsEqTy x la lb) = HsEqTy x <$> renameLType la <*> renameLType lb
 renameType (HsKindSig x lt lk) = HsKindSig x <$> renameLType lt <*> pure lk
 renameType t@(HsSpliceTy _ _) = pure t
 renameType (HsDocTy x lt doc) = HsDocTy x <$> renameLType lt <*> pure doc

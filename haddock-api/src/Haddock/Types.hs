@@ -678,7 +678,6 @@ type instance XSumTy           DocNameI = NoExt
 type instance XOpTy            DocNameI = NoExt
 type instance XParTy           DocNameI = NoExt
 type instance XIParamTy        DocNameI = NoExt
-type instance XEqTy            DocNameI = NoExt
 type instance XKindSig         DocNameI = NoExt
 type instance XSpliceTy        DocNameI = NoExt
 type instance XDocTy           DocNameI = NoExt

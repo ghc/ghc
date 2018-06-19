@@ -1221,10 +1221,6 @@ ppr_mono_ty _         (HsExplicitListTy _ Promoted tys) u q _ = promoQuote $ bra
 ppr_mono_ty _         (HsExplicitListTy _ NotPromoted tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys
 
-ppr_mono_ty ctxt_prec (HsEqTy _ ty1 ty2) unicode qual _
-  = maybeParen ctxt_prec pREC_CTX $
-    ppr_mono_lty pREC_OP ty1 unicode qual HideEmptyContexts <+> char '~' <+> ppr_mono_lty pREC_OP ty2 unicode qual HideEmptyContexts
-
 ppr_mono_ty ctxt_prec (HsAppTy _ fun_ty arg_ty) unicode qual _
   = maybeParen ctxt_prec pREC_CON $
     hsep [ppr_mono_lty pREC_FUN fun_ty unicode qual HideEmptyContexts, ppr_mono_lty pREC_CON arg_ty unicode qual HideEmptyContexts]
