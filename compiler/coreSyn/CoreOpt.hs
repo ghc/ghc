@@ -401,7 +401,7 @@ simple_out_bind :: SimpleOptEnv -> (InVar, OutExpr)
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
-  = ASSERT( isTyVar in_bndr )
+  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr out_ty $$ ppr out_rhs )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion out_co <- out_rhs
