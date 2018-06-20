@@ -1549,7 +1549,7 @@ maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
 maybeUnfoldingTemplate (CoreUnfolding { uf_tmpl = expr })
   = Just expr
 maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
-  = Just (mkLams bndrs (mkApps (Var (dataConWorkId con)) args))
+  = Just (mkLams bndrs (mkApps (Var (dataConWrapId con)) args))
 maybeUnfoldingTemplate _
   = Nothing
 
