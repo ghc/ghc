@@ -18,7 +18,7 @@ data Pair a = Pair { pFst :: a, pSnd :: a }
 -- Note that Pair is a *unary* type constructor
 -- whereas (,) is binary
 
--- The important thing about Pair is that it has a *homogenous*
+-- The important thing about Pair is that it has a *homogeneous*
 -- Functor instance, so you can easily apply the same function
 -- to both components
 instance Functor Pair where

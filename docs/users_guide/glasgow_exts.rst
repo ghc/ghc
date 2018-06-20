@@ -540,7 +540,7 @@ corresponds closely to the underlying bit-encoding of the number.
 In this notation floating point numbers are written using hexadecimal digits,
 and so the digits are interpreted using base 16, rather then the usual 10.
 This means that digits left of the decimal point correspond to positive
-powers of 16, while the ones to the right correspond to negaitve ones.
+powers of 16, while the ones to the right correspond to negative ones.
 
 You may also write an explicit exponent, which is similar to the exponent
 in decimal notation with the following differences:
