@@ -548,18 +548,6 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsEqTy              (XEqTy pass)
-                        (LHsType pass)   -- ty1 ~ ty2
-                        (LHsType pass)   -- Always allowed even without
-                                         -- TypeOperators, and has special
-                                         -- kinding rule
-      -- ^
-      -- > ty1 ~ ty2
-      --
-      -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
-
-      -- For details on above see note [Api annotations] in ApiAnnotation
-
   | HsStarTy            (XStarTy pass)
                         Bool             -- Is this the Unicode variant?
                                          -- Note [HsStarTy]
@@ -665,7 +653,6 @@ type instance XSumTy           (GhcPass _) = NoExt
 type instance XOpTy            (GhcPass _) = NoExt
 type instance XParTy           (GhcPass _) = NoExt
 type instance XIParamTy        (GhcPass _) = NoExt
-type instance XEqTy            (GhcPass _) = NoExt
 type instance XStarTy          (GhcPass _) = NoExt
 type instance XKindSig         (GhcPass _) = NoExt
 
@@ -1395,9 +1382,6 @@ ppr_mono_ty (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr_tylit t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 
-ppr_mono_ty (HsEqTy _ ty1 ty2)
-  = ppr_mono_lty ty1 <+> char '~' <+> ppr_mono_lty ty2
-
 ppr_mono_ty (HsStarTy _ isUni)  = char (if isUni then '★' else '*')
 
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
@@ -1457,7 +1441,6 @@ hsTypeNeedsParens p = go
     go (HsExplicitTupleTy{}) = False
     go (HsTyLit{})           = False
     go (HsWildCardTy{})      = False
-    go (HsEqTy{})            = p >= opPrec
     go (HsStarTy{})          = False
     go (HsAppTy{})           = p >= appPrec
     go (HsOpTy{})            = p >= opPrec
