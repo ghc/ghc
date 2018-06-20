@@ -557,6 +557,13 @@ data GeneralFlag
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
+   -- copy all libs into a single folder prior to linking binaries
+   -- this should elivate the excessive command line limit restrictions
+   -- on windows, by only requiring a single -L argument instead of
+   -- one for each dependency.  At the time of this writing, gcc
+   -- forwards all -L flags to the collect2 command without using a
+   -- response file and as such breaking apart.
+   | Opt_SingleLibFolder
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -2820,6 +2827,8 @@ dynamic_flags_deps = [
 #endif
   , make_ord_flag defGhcFlag "relative-dynlib-paths"
       (NoArg (setGeneralFlag Opt_RelativeDynlibPaths))
+  , make_ord_flag defGhcFlag "copy-libs-when-linking"
+      (NoArg (setGeneralFlag Opt_SingleLibFolder))
   , make_ord_flag defGhcFlag "pie"            (NoArg (setGeneralFlag Opt_PICExecutable))
   , make_ord_flag defGhcFlag "no-pie"         (NoArg (unSetGeneralFlag Opt_PICExecutable))
 
