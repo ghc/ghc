@@ -4,36 +4,89 @@
 StgWord64
 hs_pext64(StgWord64 src, StgWord64 mask)
 {
-  uint64_t result = 0;
-  int offset = 0;
+  uint64_t mk, mp, mv, t;
 
-  for (int bit = 0; bit != sizeof(uint64_t) * 8; ++bit) {
-    const uint64_t src_bit = (src >> bit) & 1;
-    const uint64_t mask_bit = (mask >> bit) & 1;
+  src = src & mask;
+  mk = ~mask << 1;
 
-    if (mask_bit) {
-      result |= (uint64_t)(src_bit) << offset;
-      ++offset;
-    }
+  for (int i = 0; i < 6 ; i++) {
+    mp = mk ^ (mk << 1);
+    mp = mp ^ (mp << 2);
+    mp = mp ^ (mp << 4);
+    mp = mp ^ (mp << 8);
+    mp = mp ^ (mp << 16);
+    mp = mp ^ (mp << 32);
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> (1 << i));
+    t = src & mv;
+    src = (src ^ t) | (t >> (1 << i));
+    mk = mk & ~mp;
   }
-
-  return result;
+  return src;
 }
 
 StgWord
 hs_pext32(StgWord src, StgWord mask)
 {
-  return hs_pext64(src, mask);
+  uint32_t mk, mp, mv, t;
+
+  src = src & mask;
+  mk = ~mask << 1;
+
+  for (int i = 0; i < 5 ; i++) {
+    mp = mk ^ (mk << 1);
+    mp = mp ^ (mp << 2);
+    mp = mp ^ (mp << 4);
+    mp = mp ^ (mp << 8);
+    mp = mp ^ (mp << 16);
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> (1 << i));
+    t = src & mv;
+    src = (src ^ t) | (t >> (1 << i));
+    mk = mk & ~mp;
+  }
+  return src;
 }
 
 StgWord
 hs_pext16(StgWord src, StgWord mask)
 {
-  return hs_pext64(src, mask);
+  uint16_t mk, mp, mv, t;
+
+  src = src & mask;
+  mk = ~mask << 1;
+
+  for (int i = 0; i < 4 ; i++) {
+    mp = mk ^ (mk << 1);
+    mp = mp ^ (mp << 2);
+    mp = mp ^ (mp << 4);
+    mp = mp ^ (mp << 8);
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> (1 << i));
+    t = src & mv;
+    src = (src ^ t) | (t >> (1 << i));
+    mk = mk & ~mp;
+  }
+  return src;
 }
 
 StgWord
 hs_pext8(StgWord src, StgWord mask)
 {
-  return hs_pext64(src, mask);
+  uint8_t mk, mp, mv, t;
+
+  src = src & mask;
+  mk = ~mask << 1;
+
+  for (int i = 0; i < 3 ; i++) {
+    mp = mk ^ (mk << 1);
+    mp = mp ^ (mp << 2);
+    mp = mp ^ (mp << 4);
+    mv = mp & mask;
+    mask = (mask ^ mv) | (mv >> (1 << i));
+    t = src & mv;
+    src = (src ^ t) | (t >> (1 << i));
+    mk = mk & ~mp;
+  }
+  return src;
 }
