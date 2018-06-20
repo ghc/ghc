@@ -42,7 +42,7 @@ library
   -- this package typically supports only single major versions
   build-depends: base            ^>= 4.12.0
                , Cabal           ^>= 2.3.0
-               , ghc             ^>= 8.6
+               , ghc             ^>= 8.5
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.6.0
                , xhtml           ^>= 3000.2.2
@@ -167,7 +167,7 @@ test-suite spec
     Haddock.Backends.Hyperlinker.Types
 
   build-depends: Cabal           ^>= 2.3
-               , ghc             ^>= 8.6
+               , ghc             ^>= 8.5
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.6.0
                , xhtml           ^>= 3000.2.2
