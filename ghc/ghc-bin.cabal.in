@@ -52,7 +52,7 @@ Executable ghc
     if flag(ghci)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:
-            containers     >= 0.5 && < 0.7,
+            containers     == 0.5.*,
             deepseq        == 1.4.*,
             ghci           == @ProjectVersionMunged@,
             haskeline      == 0.7.*,

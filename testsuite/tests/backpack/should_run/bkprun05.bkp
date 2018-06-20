@@ -53,8 +53,8 @@ unit app where
         union :: Ord k => Map k a -> Map k a -> Map k a
         unionWith :: Ord k => (a -> a -> a) -> Map k a -> Map k a -> Map k a
         unionWithKey :: Ord k => (k -> a -> a -> a) -> Map k a -> Map k a -> Map k a
-        unions :: (Foldable f, Ord k) => f (Map k a) -> Map k a
-        unionsWith :: (Foldable f, Ord k) => (a -> a -> a) -> f (Map k a) -> Map k a
+        unions :: Ord k => [Map k a] -> Map k a
+        unionsWith :: Ord k => (a -> a -> a) -> [Map k a] -> Map k a
         difference :: Ord k => Map k a -> Map k b -> Map k a
         differenceWith :: Ord k => (a -> b -> Maybe a) -> Map k a -> Map k b -> Map k a
         differenceWithKey :: Ord k => (k -> a -> b -> Maybe a) -> Map k a -> Map k b -> Map k a
@@ -127,6 +127,8 @@ unit app where
         maxView :: Map k a -> Maybe (a, Map k a)
         minViewWithKey :: Map k a -> Maybe ((k, a), Map k a)
         maxViewWithKey :: Map k a -> Maybe ((k, a), Map k a)
+        showTree :: (Show k, Show a) => Map k a -> String
+        showTreeWith :: (k -> a -> String) -> Bool -> Bool -> Map k a -> String
         valid :: Ord k => Map k a -> Bool
     module App where
         import Map
