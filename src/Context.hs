@@ -7,7 +7,7 @@ module Context (
     withHsPackage,
 
     -- * Paths
-    contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
+    contextDir, buildPath, buildDir, pkgId, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
     contextPath, getContextPath, libDir, libPath
     ) where

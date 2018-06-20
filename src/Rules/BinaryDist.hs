@@ -1,5 +1,6 @@
 module Rules.BinaryDist where
 
+import Context
 import Expression
 import GHC
 import Oracles.Setting
@@ -14,19 +15,25 @@ bindistRules = do
       -- We 'need' all binaries and libraries
       targets <- mapM pkgTarget =<< stagePackages Stage1
       need targets
-
-      version <- setting ProjectVersion
+      version        <- setting ProjectVersion
       targetPlatform <- setting TargetPlatformFull
+      hostOs         <- setting BuildOs
+      hostArch       <- setting BuildArch
+      rtsDir         <- pkgId $ vanillaContext Stage1 rts
 
       let ghcBuildDir      = root -/- stageString Stage1
           bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
           ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+          distDir          = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
+          rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir 
+                             -/- "include"
 
       -- we create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
       -- and populate it with a stage2 build
       createDirectory bindistFilesDir
       copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
       copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
+      copyDirectory (rtsIncludeDir)         bindistFilesDir        
       {- SHOULD WE SHIP DOCS?
       need ["docs"]
       copyDirectory (root -/- "docs") bindistFilesDir
@@ -39,7 +46,8 @@ bindistRules = do
                  (["configure", "Makefile"] ++ bindistInstallFiles)
       need $ map ((bindistFilesDir -/- "wrappers") -/-) ["check-api-annotations"
                  , "check-ppr", "ghc", "ghc-iserv", "ghc-pkg", "ghc-split"
-                 , "ghci", "haddock", "hpc", "hp2ps", "hsc2hs", "runhaskell"]
+                 , "ghci-script", "ghci", "haddock", "hpc", "hp2ps", "hsc2hs"
+                 , "runhaskell"]
 
       -- finally, we create the archive, at
       -- <root>/bindist/ghc-X.Y.Z-platform.tar.xz
@@ -89,7 +97,7 @@ bindistInstallFiles :: [FilePath]
 bindistInstallFiles =
   [ "config.sub", "config.guess", "install-sh"
   , "mk" -/- "config.mk.in", "mk" -/- "install.mk.in"
-  , "mk" -/- "project.mk.in", "settings.in", "README", "INSTALL"
+  , "mk" -/- "project.mk", "settings.in", "README", "INSTALL"
   ]
 
 -- | Auxiliary function that gives us a 'Filepath' we can 'need' for
@@ -165,7 +173,7 @@ bindistMakefile = unlines
   , "GHCBINDIR = \"$(LIBPARENT)/bin\""
   , ""
   , ".PHONY: install"
-  , "install: install_bin install_lib"
+  , "install: install_bin install_lib install_includes"
   , ""
   , "# Check if we need to install docs"
   , "ifeq \"DOCS\" \"YES\""
@@ -186,6 +194,12 @@ bindistMakefile = unlines
   , "\tfor i in $(BINARIES); do \\"
   , "\t\tcp -R $$i \"$(GHCBINDIR)\"; \\"
   , "\tdone"
+  , "\t@echo \"Copying and installing ghci\""
+  , "\trm -f $(GHCBINDIR)/dir"
+  , "\t$(CREATE_SCRIPT) $(GHCBINDIR)/ghci"
+  , "\t@echo \"#!$(SHELL)\" >>  $(GHCBINDIR)/ghci"
+  , "\tcat wrappers/ghci-script >> $(GHCBINDIR)/ghci"
+  , "\t$(EXECUTABLE_FILE) $(GHCBINDIR)/ghci"
   , ""
   , "LIBRARIES = $(wildcard ./lib/*)"
   , "install_lib:"
@@ -194,6 +208,14 @@ bindistMakefile = unlines
   , "\tfor i in $(LIBRARIES); do \\"
   , "\t\tcp -R $$i \"$(libdir)/\"; \\"
   , "\tdone"
+  , ""
+  , "INCLUDES = $(wildcard ./include/*)"
+  , "install_includes:"
+  , "\t@echo \"Copying libraries to $(includedir)\""
+  , "\t$(INSTALL_DIR) \"$(includedir)\""
+  , "\tfor i in $(INCLUDES); do \\"
+  , "\t\tcp -R $$i \"$(includedir)/\"; \\"
+  , "\tdone" 
   , ""
   , "DOCS = $(wildcard ./docs/*)"
   , "install_docs:"
@@ -215,13 +237,14 @@ bindistMakefile = unlines
   ]
 
 wrapper :: FilePath -> String
-wrapper "ghc"        = ghcWrapper
-wrapper "ghc-pkg"    = ghcPkgWrapper
-wrapper "ghci"       = ghciWrapper
-wrapper "haddock"    = haddockWrapper
-wrapper "hsc2hs"     = hsc2hsWrapper                          
-wrapper "runhaskell" = runhaskellWrapper
-wrapper _            = commonWrapper
+wrapper "ghc"         = ghcWrapper
+wrapper "ghc-pkg"     = ghcPkgWrapper
+wrapper "ghci"        = ghciWrapper
+wrapper "ghci-script" = ghciScriptWrapper
+wrapper "haddock"     = haddockWrapper
+wrapper "hsc2hs"      = hsc2hsWrapper                          
+wrapper "runhaskell"  = runhaskellWrapper
+wrapper _             = commonWrapper
 
 -- | Wrapper scripts for different programs. Common is default wrapper. 
 
@@ -279,4 +302,12 @@ runhaskellWrapper = unlines
   ["exec \"$executablename\" -f \"$exedir/ghc\" ${1+\"$@\"}"
   ]
 
+-- | We need to ship ghci executable, which basically just calls ghc with
+-- | --interactive flag. 
+ghciScriptWrapper :: String
+ghciScriptWrapper = unlines
+  [ "DIR=`dirname \"$0\"`"
+  , "executable=\"$DIR/ghc\""
+  , "exec $executable --interactive \"$@\""
+  ]
 
