@@ -920,7 +920,7 @@ sort :: (Ord a) => [a] -> [a]
 --
 -- >>> sortBy (\(a,_) (b,_) -> compare a b) [(2, "world"), (4, "!"), (1, "Hello")]
 -- [(1,"Hello"),(2,"world"),(4,"!")]
-sortBy :: (a -> a -> Ordering) -> [a] -> [a]
+sortBy :: forall a . (a -> a -> Ordering) -> [a] -> [a]
 
 #if defined(USE_REPORT_PRELUDE)
 sort = sortBy compare
@@ -942,6 +942,10 @@ Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/2143
 sort = sortBy compare
 sortBy cmp = mergeAll . sequences
   where
+    -- TODO: MattP, there is a problem with type inference here and
+    -- polymorphic constructors. This type signature resolves the ambiguity
+    -- sufficiently.
+    sequences :: [a] -> [[a]]
     sequences (a:b:xs)
       | a `cmp` b == GT = descending b [a]  xs
       | otherwise       = ascending  b (a:) xs
