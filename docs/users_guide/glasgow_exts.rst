@@ -5281,7 +5281,7 @@ Constructing an explicitly bidirectional pattern synonym also:
 - can create different data constructors from the underlying data type,
   not just the one appearing in the pattern match;
   
-- can call any functionss or conditional logic, especially validation
+- can call any functions or conditional logic, especially validation,
   of course providing it constructs a result of the right type;
   
 - can use guards on the lhs of the ``=``;
@@ -5305,7 +5305,7 @@ There is an extensive Haskell folk art of `smart constructors
 essentially functions that wrap validation around a constructor,
 and avoid exposing its representation.
 The downside is that the underlying constructor can't be used as a matcher.
-Pattern synonyms can be used as genuinely Smart constructors, for both validation and matching.
+Pattern synonyms can be used as genuinely smart constructors, for both validation and matching.
 
 The table below summarises where each kind of pattern synonym can be used.
 
@@ -5395,7 +5395,7 @@ Record  ``Name{arg1,arg2,...,argn}``
 ======= ============================
 
 The `pat_lhs` for explicitly bidirectional construction cannot use Record syntax.
-(Because the rhs `expr` might be constructing different data constructors.)
+(Because the rhs *expr* might be constructing different data constructors.)
 It can use guards with multiple equations.
 
 Pattern synonym declarations can only occur in the top level of a
