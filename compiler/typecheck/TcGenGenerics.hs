@@ -309,6 +309,10 @@ data GenericKind = Gen0 | Gen1
 -- as above, but with a payload of the TyCon's name for "the" parameter
 data GenericKind_ = Gen0_ | Gen1_ TyVar
 
+instance Outputable GenericKind_ where
+  ppr Gen0_ = text "Gen0_"
+  ppr (Gen1_ tv) = text "Gen1_" <+> ppr tv
+
 -- as above, but using a single datacon's name for "the" parameter
 data GenericKind_DC = Gen0_DC | Gen1_DC TyVar
 
