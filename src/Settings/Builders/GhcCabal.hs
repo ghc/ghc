@@ -57,21 +57,25 @@ ghcCabalBuilderArgs = mconcat
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 -- TODO: should `elem` be `wayUnit`?
+-- This approach still doesn't work. Previously libraries were build only in the 
+-- Default flavours and not using context. 
 libraryArgs :: Args
 libraryArgs = do
-    ways        <- getLibraryWays
+    flavourWays <- getLibraryWays
+    contextWay  <- getWay
     withGhci    <- expr ghcWithInterpreter
     dynPrograms <- dynamicGhcPrograms <$> expr flavour
+    let ways = flavourWays ++ [contextWay]
     pure [ if vanilla `elem` ways
            then  "--enable-library-vanilla"
            else "--disable-library-vanilla"
          , if vanilla `elem` ways && withGhci && not dynPrograms
            then  "--enable-library-for-ghci"
            else "--disable-library-for-ghci"
-         , if profiling `elem` ways
+         , if or [Profiling `wayUnit` way | way <- ways]
            then  "--enable-library-profiling"
            else "--disable-library-profiling"
-         , if dynamic `elem` ways
+         , if or [Dynamic `wayUnit` way | way <- ways]
            then  "--enable-shared"
            else "--disable-shared" ]
 

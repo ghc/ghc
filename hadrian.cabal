@@ -50,6 +50,7 @@ executable hadrian
                        , Oracles.Flag
                        , Oracles.Setting
                        , Oracles.ModuleFiles
+                       , Oracles.TestSettings
                        , Rules
                        , Rules.BinaryDist
                        , Rules.Clean

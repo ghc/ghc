@@ -1,16 +1,26 @@
 module Settings.Builders.RunTest (runTestBuilderArgs) where
 
 import CommandLine (TestArgs(..), defaultTestArgs, TestSpeed(..))
+import Context
 import Flavour
 import GHC
 import Hadrian.Utilities
 import Oracles.Setting (setting)
+import Oracles.TestSettings
 import Rules.Test
 import Settings.Builders.Common
 
 oneZero :: String -> Bool -> String
 oneZero lbl False = lbl ++ "=0"
 oneZero lbl True = lbl ++ "=1"
+
+stringToBool :: String -> Bool
+stringToBool "YES"  = True
+stringToBool "NO"   = False
+
+-- | An abstraction to get boolean value of some settings
+getBooleanSetting :: TestSetting -> Action Bool
+getBooleanSetting key = fmap stringToBool $ testSetting key
 
 -- Arguments to send to the runtest.py script.
 --
@@ -23,23 +33,25 @@ runTestBuilderArgs = builder RunTest ? do
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
 
     flav <- expr flavour
-    rtsways <- rtsWays flav
+    rtsways <- expr $ testRTSSettings
     libways <- libraryWays flav
     let hasRtsWay w = elem w rtsways
         hasLibWay w = elem w libways
         debugged = ghcDebugged flav
-
-    withNativeCodeGen <- expr ghcWithNativeCodeGen
-    withInterpreter   <- expr ghcWithInterpreter
-    unregisterised    <- getFlag GhcUnregisterised
-    withSMP           <- expr ghcWithSMP
+    hasDynamic    <- expr $ getBooleanSetting TestGhcDynamic
+    hasDynamicByDefault <- expr $ getBooleanSetting TestGhcDynamicByDefault
+    withNativeCodeGen <- expr $ getBooleanSetting TestGhcWithNativeCodeGen
+    withInterpreter   <- expr $ getBooleanSetting TestGhcWithInterpreter
+    unregisterised    <- expr $ getBooleanSetting TestGhcUnregisterised
+    withSMP           <- expr $ getBooleanSetting TestGhcWithSMP
 
     windows  <- expr windowsHost
     darwin   <- expr osxHost
     threads  <- shakeThreads <$> expr getShakeOptions
-    os       <- expr $ setting TargetOs
-    arch     <- expr $ setting TargetArch
-    platform <- expr $ setting TargetPlatform
+    os       <- expr $ testSetting TestHostOS
+    arch     <- expr $ testSetting TestTargetARCH_CPP
+    platform <- expr $ testSetting TestTARGETPLATFORM
+    wordsize <- expr $ testSetting TestWORDSIZE
     top      <- expr topDirectory
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutProgPath)
@@ -51,7 +63,6 @@ runTestBuilderArgs = builder RunTest ? do
             , pure ["--rootdir=" ++ test | test <- libTests]
             , arg "-e", arg $ "windows=" ++ show windows
             , arg "-e", arg $ "darwin=" ++ show darwin
-            , arg "-e", arg $ "config.speed=2"                        -- Use default value in GHC's test.mk
             , arg "-e", arg $ "config.local=True"
             , arg "-e", arg $ "config.cleanup=False"                  -- Don't clean up.
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
@@ -62,20 +73,20 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ oneZero "ghc_with_dynamic_rts" (hasRtsWay dynamic)
-            , arg "-e", arg $ oneZero "ghc_with_threaded_rts" (hasRtsWay threaded)
+            , arg "-e", arg $ oneZero "ghc_with_dynamic_rts" (hasRtsWay "dyn")
+            , arg "-e", arg $ oneZero "ghc_with_threaded_rts" (hasRtsWay "thr")
             , arg "-e", arg $ oneZero "config.have_vanilla" (hasLibWay vanilla)
             , arg "-e", arg $ oneZero "config.have_dynamic" (hasLibWay dynamic)
             , arg "-e", arg $ oneZero "config.have_profiling" (hasLibWay profiling)
             , arg "-e", arg $ oneZero "ghc_with_smp" withSMP
             , arg "-e", arg $ "ghc_with_llvm=0"                       -- TODO: support LLVM
 
-            , arg "-e", arg $ "config.ghc_dynamic_by_default=False"   -- TODO: support dynamic
-            , arg "-e", arg $ "config.ghc_dynamic=False"              -- TODO: support dynamic
+            , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
+            , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
 
             , arg "-e", arg $ "config.in_tree_compiler=True"          -- Use default value, see https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
             , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
-            , arg "-e", arg $ "config.wordsize=\"64\""
+            , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
             , arg "-e", arg $ "config.arch="     ++ show arch
             , arg "-e", arg $ "config.platform=" ++ show platform
