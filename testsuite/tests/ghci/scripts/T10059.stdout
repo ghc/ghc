@@ -1,0 +1,9 @@
+class (a ~ b) => (~) (a :: k) (b :: k)
+  	-- Defined in ‘Data.Type.Equality’
+instance [incoherent] forall k (a :: k) (b :: k). (a ~ b) => a ~ b
+  -- Defined in ‘Data.Type.Equality’
+(~) :: k -> k -> Constraint
+class (a ~~ b) => (~) (a :: k) (b :: k)
+  	-- Defined in ‘Data.Type.Equality’
+instance [incoherent] forall k (a :: k) (b :: k). (a ~~ b) => a ~ b
+  -- Defined in ‘Data.Type.Equality’

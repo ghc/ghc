@@ -626,7 +626,9 @@ identifier :: { Located RdrName }
         | qvarop                        { $1 }
         | qconop                        { $1 }
     | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName funTyCon)
-                               [mj AnnOpenP $1,mu AnnRarrow $2,mj AnnCloseP $3] }
+                               [mop $1,mu AnnRarrow $2,mcp $3] }
+    | '(' '~' ')'       {% ams (sLL $1 $> $ eqTyCon_RDR)
+                               [mop $1,mj AnnTilde $2,mcp $3] }
 
 -----------------------------------------------------------------------------
 -- Backpack stuff
