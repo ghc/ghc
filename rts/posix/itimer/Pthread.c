@@ -123,7 +123,7 @@ static void *itimer_thread_func(void *_handle_tick)
         if (USE_TIMERFD_FOR_ITIMER) {
             if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
                 if (errno != EINTR) {
-                    sysErrorBelch("Itimer: read(timerfd) failed");
+                    barf("Itimer: read(timerfd) failed");
                 }
             }
         } else {
