@@ -51,8 +51,9 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
       n = roundUpToPage(oc->fileSize);
 
       /* Keep image and symbol_extras contiguous */
-      void *new = mmapForLinker(n + (sizeof(SymbolExtra) * count),
-                                MAP_ANONYMOUS, -1, 0);
+
+      size_t allocated_size = n + (sizeof(SymbolExtra) * count);
+      void *new = mmapForLinker(allocated_size, MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
           if (oc->imageMapped) {
@@ -62,6 +63,9 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
           oc->imageMapped = true;
           oc->fileSize = n + (sizeof(SymbolExtra) * count);
           oc->symbol_extras = (SymbolExtra *) (oc->image + n);
+          if(mprotect(new, allocated_size, PROT_READ | PROT_EXEC) != 0) {
+              sysErrorBelch("unable to protect memory");
+          }
       }
       else {
           oc->symbol_extras = NULL;
