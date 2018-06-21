@@ -15867,8 +15867,8 @@ Here are some examples: ::
 The type ``Simple`` has its parameter at role representational, which is
 generally the most common case. ``Simple Age`` would have the same
 representation as ``Simple Int``. The type ``Complex``, on the other
-hand, has its parameter at role nominal, because ``Simple Age`` and
-``Simple Int`` are *not* the same. Lastly, ``Phant Age`` and
+hand, has its parameter at role nominal, because ``Complex Age`` and
+``Complex Int`` are *not* the same. Lastly, ``Phant Age`` and
 ``Phant Bool`` have the same representation, even though ``Age`` and
 ``Bool`` are unrelated.
 
