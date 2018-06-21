@@ -410,22 +410,6 @@ of ``-W(no-)*``.
 
     This option is on by default.
 
-.. ghc-flag:: -Wamp
-    :shortdesc: *(deprecated)* warn on definitions conflicting with the
-        Applicative-Monad Proposal (AMP)
-    :type: dynamic
-    :reverse: -Wno-amp
-    :category:
-
-    .. index::
-       single: AMP
-       single: Applicative-Monad Proposal
-
-    This option is deprecated.
-
-    Caused a warning to be emitted when a definition was in conflict with
-    the AMP (Applicative-Monad proosal).
-
 .. ghc-flag:: -Wnoncanonical-monad-instances
     :shortdesc: warn when ``Applicative`` or ``Monad`` instances have
         noncanonical definitions of ``return``, ``pure``, ``(>>)``,

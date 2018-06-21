@@ -772,7 +772,6 @@ data WarningFlag =
    | Opt_WarnUnusedForalls
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
-   | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
    | Opt_WarnMissingMonadFailInstances -- since 8.0
    | Opt_WarnSemigroup -- since 8.0
    | Opt_WarnDodgyExports
@@ -3774,8 +3773,6 @@ wWarningFlagsDeps = [
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "alternative-layout-rule-transitional"
                                       Opt_WarnAlternativeLayoutRuleTransitional,
-  depFlagSpec "amp"                      Opt_WarnAMP
-    "it has no effect",
   depFlagSpec "auto-orphans"             Opt_WarnAutoOrphans
     "it has no effect",
   flagSpec "cpp-undef"                   Opt_WarnCPPUndef,
