@@ -1204,7 +1204,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
-    -- See Note [Don't promote data constructors with non-equality contexts]
+    -- See Note [Constraints handled in types] in Inst.
     dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
     dc_theta_illegal_constraint = find go
       where
@@ -1377,25 +1377,6 @@ In the e1 example, the context of the splice fixes kappa to *.  But
 in the e2 example, we'll desugar the type, zonking the kind unification
 variables as we go.  When we encounter the unconstrained kappa, we
 want to default it to '*', not to (Any *).
-
-Note [Don't promote data constructors with non-equality contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-With -XTypeInType, one can promote almost any data constructor. There is a
-notable exception to this rule, however: data constructors that contain
-non-equality constraints, such as:
-
-  data Foo a where
-    MkFoo :: Show a => Foo a
-
-MkFoo cannot be promoted since GHC cannot produce evidence for (Show a) at the
-kind level. Therefore, we check the context of each data constructor before
-promotion, and give a sensible error message if the context contains an illegal
-constraint.
-
-Note that equality constraints (i.e, (~) and (~~)) /are/
-permitted inside data constructor contexts. All other constraints are
-off-limits, however (and likely will remain off-limits until dependent types
-become a reality in GHC).
 
 Help functions for type applications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
