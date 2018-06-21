@@ -45,12 +45,14 @@ libraries/binary             -           -                               https:/
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
 libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
 libraries/ghc-compact        -           -                               -
+libraries/ghc-heap           -           -                               -
 libraries/containers         -           -                               https://github.com/haskell/containers.git
 libraries/deepseq            -           -                               ssh://git@github.com/haskell/deepseq.git
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git
 libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
 libraries/hpc                -           -                               -
+libraries/libiserv           -           -                               -
 libraries/mtl                -           -                               https://github.com/haskell/mtl.git
 libraries/parsec             -           -                               https://github.com/haskell/parsec.git
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
