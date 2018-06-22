@@ -1207,19 +1207,6 @@ sure to quantify over them.  This leads to several wrinkles:
   refrain from bogusly quantifying, in TcSimplify.decideMonoTyVars.  We
   report the error later, in TcBinds.chooseInferredQuantifiers.
 
-Note [Quantifying over equality constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Should we quantify over an equality constraint (s ~ t)?  In general, we don't.
-Doing so may simply postpone a type error from the function definition site to
-its call site.  (At worst, imagine (Int ~ Bool)).
-
-However, consider this
-         forall a. (F [a] ~ Int) => blah
-Should we quantify over the (F [a] ~ Int)?  Perhaps yes, because at the call
-site we will know 'a', and perhaps we have instance  F [Bool] = Int.
-So we *do* quantify over a type-family equality where the arguments mention
-the quantified variables.
-
 Note [Growing the tau-tvs using constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (growThetaTyVars insts tvs) is the result of extending the set
