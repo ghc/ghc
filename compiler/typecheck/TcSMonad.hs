@@ -367,7 +367,8 @@ selectNextWorkItem
        ; case selectWorkItem wl of {
            Nothing -> return Nothing ;
            Just (ct, new_wl) ->
-    do { checkReductionDepth (ctLoc ct) (ctPred ct)
+    do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
+         -- This is done by TcInteract.chooseInstance
        ; wrapTcS (TcM.writeTcRef wl_var new_wl)
        ; return (Just ct) } } }
 
