@@ -156,11 +156,11 @@ type ForallXHsIPBinds (c :: * -> Constraint) (x :: *) =
        )
 
 -- IPBind type families
-type family XIPBind  x
+type family XCIPBind x
 type family XXIPBind x
 
 type ForallXIPBind (c :: * -> Constraint) (x :: *) =
-       ( c (XIPBind  x)
+       ( c (XCIPBind x)
        , c (XXIPBind x)
        )
 
