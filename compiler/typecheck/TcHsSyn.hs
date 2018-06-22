@@ -436,7 +436,7 @@ zonkLocalBinds env (HsIPBinds x (IPBinds dict_binds binds )) = do
         = do n' <- mapIPNameTc (zonkIdBndr env) n
              e' <- zonkLExpr env e
              return (IPBind x n' e')
-    zonk_ip_bind (XCIPBind _) = panic "zonkLocalBinds : XCIPBind"
+    zonk_ip_bind (XIPBind _) = panic "zonkLocalBinds : XCIPBind"
 
 zonkLocalBinds _ (HsIPBinds _ (XHsIPBinds _))
   = panic "zonkLocalBinds" -- Not in typechecker output

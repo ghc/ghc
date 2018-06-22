@@ -361,7 +361,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind noExt (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
-    tc_ip_bind _ (XCIPBind _) = panic "tc_ip_bind"
+    tc_ip_bind _ (XIPBind _) = panic "tc_ip_bind"
 
     -- Coerces a `t` into a dictionry for `IP "x" t`.
     -- co : t -> IP "x" t
