@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -Wwarn #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ViewPatterns #-}
   -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface.LexParseRn
@@ -18,7 +19,11 @@ module Haddock.Interface.LexParseRn
   , processModuleHeader
   ) where
 
+import Avail
+import Control.Arrow
+import Control.Monad
 import Data.List
+import Data.Ord
 import Documentation.Haddock.Doc (metaDocConcat)
 import DynFlags (languageExtensions)
 import qualified GHC.LanguageExtensions as LangExt
@@ -94,11 +99,9 @@ rename dflags gre = rn
         -- Generate the choices for the possible kind of thing this
         -- is.
         let choices = dataTcOccs x
-        -- Try to look up all the names in the GlobalRdrEnv that match
-        -- the names.
-        let names = concatMap (\c -> map gre_name (lookupGRE_RdrName c gre)) choices
 
-        case names of
+        -- Lookup any GlobalRdrElts that match the choices.
+        case concatMap (\c -> lookupGRE_RdrName c gre) choices of
           -- We found no names in the env so we start guessing.
           [] ->
             case choices of
@@ -117,12 +120,10 @@ rename dflags gre = rn
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> pure (DocIdentifier a)
+          [a] -> pure (DocIdentifier (gre_name a))
 
-          -- But when there are multiple names available, default to
-          -- type constructors: somewhat awfully GHC returns the
-          -- values in the list positionally.
-          a:b:_ -> ambiguous dflags x (if isTyConName a then a else b) names
+          -- There are multiple names available.
+          gres -> ambiguous dflags x gres
 
       DocWarning doc -> DocWarning <$> rn doc
       DocEmphasis doc -> DocEmphasis <$> rn doc
@@ -167,16 +168,32 @@ outOfScope dflags x =
       pure (monospaced a)
     monospaced a = DocMonospaced (DocString (showPpr dflags a))
 
--- | Warn about an ambiguous identifier.
-ambiguous :: DynFlags -> RdrName -> Name -> [Name] -> ErrMsgM (Doc Name)
-ambiguous dflags x dflt names = do
-  tell [msg]
+-- | Handle ambiguous identifiers.
+--
+-- Prefers local names primarily and type constructors or class names secondarily.
+--
+-- Emits a warning if the 'GlobalRdrElts's don't belong to the same type or class.
+ambiguous :: DynFlags
+          -> RdrName
+          -> [GlobalRdrElt] -- ^ More than one @gre@s sharing the same `RdrName` above.
+          -> ErrMsgM (Doc Name)
+ambiguous dflags x gres = do
+  let noChildren = map availName (gresToAvailInfo gres)
+      dflt = maximumBy (comparing (isLocalName &&& isTyConName)) noChildren
+      msg = "Warning: " ++ x_str ++ " is ambiguous. It is defined\n" ++
+            concatMap (\n -> "    * " ++ defnLoc n ++ "\n") (map gre_name gres) ++
+            "    You may be able to disambiguate the identifier by qualifying it or\n" ++
+            "    by hiding some imports.\n" ++
+            "    Defaulting to " ++ x_str ++ " defined " ++ defnLoc dflt
+  -- TODO: Once we have a syntax for namespace qualification (#667) we may also
+  -- want to emit a warning when an identifier is a data constructor for a type
+  -- of the same name, but not the only constructor.
+  -- For example, for @data D = C | D@, someone may want to reference the @D@
+  -- constructor.
+  when (length noChildren > 1) $ tell [msg]
   pure (DocIdentifier dflt)
   where
-    msg = "Warning: " ++ x_str ++ " is ambiguous. It is defined\n" ++
-          concatMap (\n -> "    * " ++ defnLoc n ++ "\n") names ++
-          "    You may be able to disambiguate the identifier by qualifying it or\n" ++
-          "    by hiding some imports.\n" ++
-          "    Defaulting to " ++ x_str ++ " defined " ++ defnLoc dflt
+    isLocalName (nameSrcLoc -> RealSrcLoc {}) = True
+    isLocalName _ = False
     x_str = '\'' : showPpr dflags x ++ "'"
     defnLoc = showSDoc dflags . pprNameDefnLoc
