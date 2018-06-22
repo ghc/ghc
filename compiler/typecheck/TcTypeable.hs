@@ -24,7 +24,7 @@ import PrelNames
 import TysPrim ( primTyCons )
 import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , vecCountTyCon, vecElemTyCon
-                  , nilDataCon, consDataCon, omegaDataConTy )
+                  , nilDataCon, consDataCon )
 import Name
 import Id
 import Type

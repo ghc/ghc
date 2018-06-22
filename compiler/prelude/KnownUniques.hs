@@ -155,8 +155,8 @@ getCTupleDataConUnique n =
 -- Normal tuples
 
 mkTupleDataConUnique :: Boxity -> Arity -> Unique
-mkTupleDataConUnique Boxed          a = mkUnique '7' (3*a)    -- may be used in C labels
-mkTupleDataConUnique Unboxed        a = mkUnique '8' (3*a)
+mkTupleDataConUnique Boxed          a = mkUnique '7' (4*a)    -- may be used in C labels
+mkTupleDataConUnique Unboxed        a = mkUnique '8' (4*a)
 
 mkTupleTyConUnique :: Boxity -> Arity -> Unique
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)

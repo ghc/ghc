@@ -1381,7 +1381,8 @@ ty_co_match menv subst (FunTy w ty1 ty2) co _lkco _rkco
     -- runtime rep and two types), we shouldn't need to explicitly unify the
     -- runtime reps here; unifying the types themselves should be sufficient.
     -- See Note [Representation of function types].
-  | Just (tc, [_,_,co1,co2]) <- splitTyConAppCo_maybe co
+    -- TODO: MattP deal with Weight here as well
+  | Just (tc, [_, _,_,co1,co2]) <- splitTyConAppCo_maybe co
   , tc == funTyCon
   = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co1,co2]
     in ty_co_match_args menv subst [ty1, ty2] [co1, co2] lkcos rkcos

@@ -249,8 +249,10 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
-      , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
-      | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+      , [_,_,_,_, _] <- cos         = pprPanic "toIfaceCoercion" empty
+      | otherwise                =
+        --ASSERT2( not (tc `hasKey` funTyConKey), ppr cos)
+        IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
     go (FunCo r w co1 co2)   = IfaceFunCo r (toIfaceRig w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)

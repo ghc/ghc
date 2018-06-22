@@ -1863,7 +1863,7 @@ coercionKind co =
     go (TransCo co1 co2)      = Pair (pFst $ go co1) (pSnd $ go co2)
     go g@(NthCo _ d co)
       | Just argss <- traverse tyConAppArgs_maybe tys
-      = ASSERT( and $ (`lengthExceeds` d) <$> argss )
+      = ASSERT2( and $ (`lengthExceeds` d) <$> argss, ppr co $$ ppr tys $$ ppr argss )
         (`getNth` d) <$> argss
 
       | d == 0

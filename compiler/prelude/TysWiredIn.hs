@@ -923,7 +923,7 @@ unitDataCon :: DataCon
 unitDataCon   = head (tyConDataCons unitTyCon)
 
 unitDataConId :: Id
-unitDataConId = dataConWorkId unitDataCon
+unitDataConId = dataConWrapId unitDataCon
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
