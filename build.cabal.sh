@@ -61,11 +61,12 @@ else
     if ! ( "$CABAL" sandbox hc-pkg list > /dev/null 2>&1); then
         "$CABAL" sandbox init
         "$CABAL" sandbox add-source ../libraries/Cabal/Cabal
-        "$CABAL" install                \
-            --dependencies-only         \
-            --disable-library-profiling \
-            --disable-shared
     fi
+
+    "$CABAL" install                \
+	--dependencies-only         \
+	--disable-library-profiling \
+	--disable-shared
 
     "$CABAL" run hadrian --            \
         --lint                         \
