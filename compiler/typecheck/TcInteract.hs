@@ -1840,7 +1840,7 @@ doTopReactOther work_item
   = do { -- Try local quantified constraints
          res <- matchLocalInst pred (ctEvLoc ev)
        ; case res of
-           OneInst {} -> chooseInstance ev pred res
+           OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }
   where
     ev = ctEvidence work_item
@@ -2235,7 +2235,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                OneInst { lir_safe_over = s }
                   -> do { unless s $ insertSafeOverlapFailureTcS work_item
                         ; when (isWanted ev) $ addSolvedDict ev cls xis
-                        ; chooseInstance ev dict_pred lkup_res }
+                        ; chooseInstance work_item lkup_res }
                _  ->  -- NoInstance or NotSure
                      do { when (isImprovable ev) $
                           try_fundep_improvement
@@ -2264,9 +2264,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
 
-chooseInstance :: CtEvidence -> TcPredType -> LookupInstResult
-               -> TcS (StopOrContinue Ct)
-chooseInstance ev pred
+chooseInstance :: Ct -> LookupInstResult -> TcS (StopOrContinue Ct)
+chooseInstance work_item
                (OneInst { lir_new_theta = theta
                         , lir_mk_ev     = mk_ev })
   = do { traceTcS "doTopReact/found instance for" $ ppr ev
@@ -2274,9 +2273,11 @@ chooseInstance ev pred
        ; if isDerived ev then finish_derived theta
                          else finish_wanted  theta mk_ev }
   where
+     ev         = ctEvidence work_item
+     pred       = ctEvPred ev
      loc        = ctEvLoc ev
-     deeper_loc = zap_origin (bumpCtLocDepth loc)
      origin     = ctLocOrigin loc
+     deeper_loc = zap_origin (bumpCtLocDepth loc)
 
      zap_origin loc  -- After applying an instance we can set ScOrigin to
                      -- infinity, so that prohibitedSuperClassSolve never fires
@@ -2289,10 +2290,15 @@ chooseInstance ev pred
                    -> ([EvExpr] -> EvTerm) -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
      finish_wanted theta mk_ev
-        = do { evc_vars <- mapM (newWanted deeper_loc) theta
+        = do { evb <- getTcEvBindsVar
+             ; if isNoEvBindsVar evb
+               then -- See Note [Instances in no-evidence implications]
+                    continueWith work_item
+               else
+          do { evc_vars <- mapM (newWanted deeper_loc) theta
              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
              ; emitWorkNC (freshGoals evc_vars)
-             ; stopWith ev "Dict/Top (solved wanted)" }
+             ; stopWith ev "Dict/Top (solved wanted)" } }
 
      finish_derived theta  -- Use type-class instances for Deriveds, in the hope
        =                   -- of generating some improvements
@@ -2302,8 +2308,28 @@ chooseInstance ev pred
             ; traceTcS "finish_derived" (ppr (ctl_depth deeper_loc))
             ; stopWith ev "Dict/Top (solved derived)" }
 
-chooseInstance ev _ lookup_res
-  = pprPanic "chooseInstance" (ppr ev $$ ppr lookup_res)
+chooseInstance work_item lookup_res
+  = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
+
+{- Note [Instances in no-evidence implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Trac #15290 we had
+  [G] forall p q. Coercible p q => Coercible (m p) (m q))
+  [W] forall <no-ev> a. m (Int, IntStateT m a)
+                          ~R#
+                        m (Int, StateT Int m a)
+
+The Given is an ordinary quantified constraint; the Wanted is an implication
+equality that arises from
+  [W] (forall a. t1) ~R# (forall a. t2)
+
+But because the (t1 ~R# t2) is solved "inside a type" (under that forall a)
+we can't generate any term evidence.  So we can't actually use that
+lovely quantified constraint.  Alas!
+
+This test arranges to ignore the instance-based solution under these
+(rare) circumstances.   It's sad, but I  really don't see what else we can do.
+-}
 
 {- *******************************************************************
 *                                                                    *
