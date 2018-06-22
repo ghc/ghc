@@ -172,9 +172,10 @@ getTupleTyConName boxity n =
 
 getTupleDataConName :: Boxity -> Int -> Name
 getTupleDataConName boxity n =
-    case n `divMod` 3 of
+    case n `divMod` 4 of
       (arity, 0) -> dataConName $ tupleDataCon boxity arity
       (arity, 1) -> idName $ dataConWorkId $ tupleDataCon boxity arity
       (arity, 2) -> fromMaybe (panic "getTupleDataCon")
                     $ tyConRepName_maybe $ promotedTupleDataCon boxity arity
+      (arity, 3) -> idName $ dataConWrapId $ tupleDataCon boxity arity
       _          -> panic "getTupleDataConName: impossible"
