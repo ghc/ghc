@@ -1418,7 +1418,7 @@ lintType ty@(TyConApp tc tys)
        ; lintTySynApp report_unsat ty tc tys }
 
   | isFunTyCon tc
-  , tys `lengthIs` 4
+  , tys `lengthIs` 5
     -- We should never see a saturated application of funTyCon; such
     -- applications should be represented with the FunTy constructor.
     -- See Note [Linting function types] and
@@ -1706,7 +1706,7 @@ lintCoercion (Refl r ty)
 
 lintCoercion co@(TyConAppCo r tc cos)
   | tc `hasKey` funTyConKey
-  , [_rep1,_rep2,_co1,_co2] <- cos
+  , [_w, _rep1,_rep2,_co1,_co2] <- cos
   = do { failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
        } -- All saturated TyConAppCos should be FunCos
 
