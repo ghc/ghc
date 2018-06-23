@@ -163,7 +163,9 @@ outOfScope dflags x =
     Exact name -> warnAndMonospace name  -- Shouldn't happen since x is out of scope
   where
     warnAndMonospace a = do
-      tell ["Warning: '" ++ showPpr dflags a ++ "' is out of scope."]
+      tell ["Warning: '" ++ showPpr dflags a ++ "' is out of scope.\n" ++
+            "    If you qualify the identifier, haddock can try to link it\n" ++
+            "    it anyway."]
       pure (monospaced a)
     monospaced a = DocMonospaced (DocString (showPpr dflags a))
 
