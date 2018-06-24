@@ -442,7 +442,7 @@ basicKnownKeyNames
 
 genericTyConNames :: [Name]
 genericTyConNames = [
-    v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
+    v1TyConName, u1TyConName, par1TyConName, parAp1TyConName, rec1TyConName,
     k1TyConName, m1TyConName, sumTyConName, prodTyConName,
     compTyConName, rTyConName, dTyConName,
     cTyConName, sTyConName, rec0TyConName,
@@ -778,10 +778,10 @@ error_RDR :: RdrName
 error_RDR = varQual_RDR gHC_ERR (fsLit "error")
 
 -- Generics (constructors and functions)
-u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
+u1DataCon_RDR, par1DataCon_RDR, parAp1DataCon_RDR, rec1DataCon_RDR,
   k1DataCon_RDR, m1DataCon_RDR, l1DataCon_RDR, r1DataCon_RDR,
   prodDataCon_RDR, comp1DataCon_RDR,
-  unPar1_RDR, unRec1_RDR, unK1_RDR, unComp1_RDR,
+  unPar1_RDR, unParAp1_RDR, unRec1_RDR, unK1_RDR, unComp1_RDR,
   from_RDR, from1_RDR, to_RDR, to1_RDR,
   datatypeName_RDR, moduleName_RDR, packageName_RDR, isNewtypeName_RDR,
   conName_RDR, conFixity_RDR, conIsRecord_RDR, selName_RDR,
@@ -792,11 +792,12 @@ u1DataCon_RDR, par1DataCon_RDR, rec1DataCon_RDR,
   uAddrHash_RDR, uCharHash_RDR, uDoubleHash_RDR,
   uFloatHash_RDR, uIntHash_RDR, uWordHash_RDR :: RdrName
 
-u1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "U1")
-par1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Par1")
-rec1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Rec1")
-k1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "K1")
-m1DataCon_RDR    = dataQual_RDR gHC_GENERICS (fsLit "M1")
+u1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "U1")
+par1DataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "Par1")
+parAp1DataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "ParAp1")
+rec1DataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "Rec1")
+k1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "K1")
+m1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "M1")
 
 l1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "L1")
 r1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "R1")
@@ -804,10 +805,11 @@ r1DataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "R1")
 prodDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit ":*:")
 comp1DataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "Comp1")
 
-unPar1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unPar1")
-unRec1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unRec1")
-unK1_RDR    = varQual_RDR gHC_GENERICS (fsLit "unK1")
-unComp1_RDR = varQual_RDR gHC_GENERICS (fsLit "unComp1")
+unPar1_RDR   = varQual_RDR gHC_GENERICS (fsLit "unPar1")
+unParAp1_RDR = varQual_RDR gHC_GENERICS (fsLit "unParAp1")
+unRec1_RDR   = varQual_RDR gHC_GENERICS (fsLit "unRec1")
+unK1_RDR     = varQual_RDR gHC_GENERICS (fsLit "unK1")
+unComp1_RDR  = varQual_RDR gHC_GENERICS (fsLit "unComp1")
 
 from_RDR  = varQual_RDR gHC_GENERICS (fsLit "from")
 from1_RDR = varQual_RDR gHC_GENERICS (fsLit "from1")
@@ -904,7 +906,7 @@ leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
 
 -- Generics (types)
-v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
+v1TyConName, u1TyConName, par1TyConName, parAp1TyConName, rec1TyConName,
   k1TyConName, m1TyConName, sumTyConName, prodTyConName,
   compTyConName, rTyConName, dTyConName,
   cTyConName, sTyConName, rec0TyConName,
@@ -920,12 +922,13 @@ v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
   decidedLazyDataConName, decidedStrictDataConName, decidedUnpackDataConName,
   metaDataDataConName, metaConsDataConName, metaSelDataConName :: Name
 
-v1TyConName  = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
-u1TyConName  = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
-par1TyConName  = tcQual gHC_GENERICS (fsLit "Par1") par1TyConKey
-rec1TyConName  = tcQual gHC_GENERICS (fsLit "Rec1") rec1TyConKey
-k1TyConName  = tcQual gHC_GENERICS (fsLit "K1") k1TyConKey
-m1TyConName  = tcQual gHC_GENERICS (fsLit "M1") m1TyConKey
+v1TyConName     = tcQual gHC_GENERICS (fsLit "V1") v1TyConKey
+u1TyConName     = tcQual gHC_GENERICS (fsLit "U1") u1TyConKey
+par1TyConName   = tcQual gHC_GENERICS (fsLit "Par1") par1TyConKey
+parAp1TyConName = tcQual gHC_GENERICS (fsLit "ParAp1") parAp1TyConKey
+rec1TyConName   = tcQual gHC_GENERICS (fsLit "Rec1") rec1TyConKey
+k1TyConName     = tcQual gHC_GENERICS (fsLit "K1") k1TyConKey
+m1TyConName     = tcQual gHC_GENERICS (fsLit "M1") m1TyConKey
 
 sumTyConName    = tcQual gHC_GENERICS (fsLit ":+:") sumTyConKey
 prodTyConName   = tcQual gHC_GENERICS (fsLit ":*:") prodTyConKey
@@ -1788,8 +1791,9 @@ unknown3TyConKey                        = mkPreludeTyConUnique 132
 opaqueTyConKey                          = mkPreludeTyConUnique 133
 
 -- Generics (Unique keys)
-v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
-  k1TyConKey, m1TyConKey, sumTyConKey, prodTyConKey,
+v1TyConKey, u1TyConKey, par1TyConKey, parAp1TyConKey,
+  rec1TyConKey, k1TyConKey, m1TyConKey,
+  sumTyConKey, prodTyConKey,
   compTyConKey, rTyConKey, dTyConKey,
   cTyConKey, sTyConKey, rec0TyConKey,
   d1TyConKey, c1TyConKey, s1TyConKey, noSelTyConKey,
@@ -1797,12 +1801,13 @@ v1TyConKey, u1TyConKey, par1TyConKey, rec1TyConKey,
   uAddrTyConKey, uCharTyConKey, uDoubleTyConKey,
   uFloatTyConKey, uIntTyConKey, uWordTyConKey :: Unique
 
-v1TyConKey    = mkPreludeTyConUnique 135
-u1TyConKey    = mkPreludeTyConUnique 136
-par1TyConKey  = mkPreludeTyConUnique 137
-rec1TyConKey  = mkPreludeTyConUnique 138
-k1TyConKey    = mkPreludeTyConUnique 139
-m1TyConKey    = mkPreludeTyConUnique 140
+v1TyConKey     = mkPreludeTyConUnique 134
+u1TyConKey     = mkPreludeTyConUnique 135
+par1TyConKey   = mkPreludeTyConUnique 136
+parAp1TyConKey = mkPreludeTyConUnique 137
+rec1TyConKey   = mkPreludeTyConUnique 138
+k1TyConKey     = mkPreludeTyConUnique 139
+m1TyConKey     = mkPreludeTyConUnique 140
 
 sumTyConKey   = mkPreludeTyConUnique 141
 prodTyConKey  = mkPreludeTyConUnique 142

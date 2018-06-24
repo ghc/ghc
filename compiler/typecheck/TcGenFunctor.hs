@@ -178,6 +178,7 @@ gen_Functor_binds loc tycon
                    -- fmap f = fmap g
                  , ft_forall = \_ g -> g
                  , ft_bad_app = panic "in other argument in ft_fmap"
+                 , ft_var_app = panic "applied in ft_fmap"
                  , ft_co_var = panic "contravariant in ft_fmap" }
 
     -- See Note [Deriving <$]
@@ -220,6 +221,7 @@ gen_Functor_binds loc tycon
                    -- (p <$) = fmap (p <$)
                  , ft_forall = \_ g -> g
                  , ft_bad_app = panic "in other argument in ft_replace"
+                 , ft_var_app = panic "applied in ft_replace"
                  , ft_co_var = panic "contravariant in ft_replace" }
 
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
@@ -346,6 +348,8 @@ data FFoldType a      -- Describes how to fold over a Type in a functor like way
           -- ^ Type app, variable only in last argument
         , ft_bad_app :: a
           -- ^ Type app, variable other than in last argument
+        , ft_var_app :: a -> a
+          -- ^ Application of the type variable
         , ft_forall  :: TcTyVar -> a -> a
           -- ^ Forall type
      }
@@ -358,7 +362,8 @@ functorLikeTraverse :: forall a.
 functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
                             , ft_co_var = caseCoVar,     ft_fun = caseFun
                             , ft_tup = caseTuple,        ft_ty_app = caseTyApp
-                            , ft_bad_app = caseWrongArg, ft_forall = caseForAll })
+                            , ft_bad_app = caseWrongArg, ft_var_app = caseVarApp
+                            , ft_forall = caseForAll })
                     ty
   = fst (go False ty)
   where
@@ -372,6 +377,8 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
                        | xc || yc   = (caseFun xr yr,True)
         where (xr,xc) = go (not co) x
               (yr,yc) = go co       y
+    go co (AppTy (TyVarTy v) y) | v == var = (caseVarApp yr, True)
+        where (yr, _) = go co y
     go co (AppTy    x y) | xc = (caseWrongArg,   True)
                          | yc = (caseTyApp x yr, True)
         where (_, xc) = go co x
@@ -409,6 +416,7 @@ deepSubtypesContaining tv
             , ft_tup = \_ xs -> concat xs
             , ft_ty_app = (:)
             , ft_bad_app = panic "in other argument in deepSubtypesContaining"
+            , ft_var_app = panic "applied in deepSubtypesContaining"
             , ft_co_var = panic "contravariant in deepSubtypesContaining"
             , ft_forall = \v xs -> filterOut ((v `elemVarSet`) . tyCoVarsOfType) xs })
 
@@ -732,7 +740,8 @@ gen_Foldable_binds loc tycon
            , ft_forall  = \_ g -> g
            , ft_co_var  = panic "contravariant in ft_foldr"
            , ft_fun     = panic "function in ft_foldr"
-           , ft_bad_app = panic "in other argument in ft_foldr" }
+           , ft_bad_app = panic "in other argument in ft_foldr"
+           , ft_var_app = panic "applied in ft_foldr" }
 
     match_foldr :: LHsExpr GhcPs
                 -> [LPat GhcPs]
@@ -762,7 +771,8 @@ gen_Foldable_binds loc tycon
            , ft_forall = \_ g -> g
            , ft_co_var = panic "contravariant in ft_foldMap"
            , ft_fun = panic "function in ft_foldMap"
-           , ft_bad_app = panic "in other argument in ft_foldMap" }
+           , ft_bad_app = panic "in other argument in ft_foldMap"
+           , ft_var_app = panic "applied in ft_foldMap" }
 
     match_foldMap :: [LPat GhcPs]
                   -> DataCon
@@ -810,7 +820,8 @@ gen_Foldable_binds loc tycon
            , ft_forall = \_ g -> g
            , ft_co_var = panic "contravariant in ft_null"
            , ft_fun = panic "function in ft_null"
-           , ft_bad_app = panic "in other argument in ft_null" }
+           , ft_bad_app = panic "in other argument in ft_null"
+           , ft_var_app = panic "applied in ft_null" }
 
     match_null :: [LPat GhcPs]
                   -> DataCon
@@ -919,7 +930,8 @@ gen_Traversable_binds loc tycon
            , ft_forall  = \_ g -> g
            , ft_co_var  = panic "contravariant in ft_trav"
            , ft_fun     = panic "function in ft_trav"
-           , ft_bad_app = panic "in other argument in ft_trav" }
+           , ft_bad_app = panic "in other argument in ft_trav"
+           , ft_var_app = panic "applied in ft_trav" }
 
     -- Con a1 a2 ... -> liftA2 (\b1 b2 ... -> Con b1 b2 ...) (g1 a1)
     --                    (g2 a2) <*> ...
@@ -1100,6 +1112,9 @@ a is the last type variable in a given datatype):
               Functor, Foldable, and Traversable instances cannot be derived
               for datatypes containing arguments with such types.
               Examples: Either a Int, Const a b
+
+* ft_var_app: A kigher-kinded type is being applied.
+              Example: data WrapIntWith a = Wrapped (a Int)
 
 * ft_forall:  A forall'd type mentions the last type parameter on its right-
               hand side (and is not quantified on the left-hand side). This

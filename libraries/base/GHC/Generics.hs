@@ -618,6 +618,13 @@ module GHC.Generics  (
 --
 -- |
 --
+-- Types of kind @k -> *@ can include applications of the parameter, which are
+-- represented by @ParAp1@
+--
+-- @
+-- newtype 'ParAp1' f p = 'ParAp1' { 'unParAp1' :: p (f p) } -- applications of the parameter
+-- @
+--
 -- The 'Generic1' class can be generalized to range over types of kind
 -- @k -> *@, for any kind @k@. To do so, derive a 'Generic1' instance with the
 -- @PolyKinds@ extension enabled. For example, the declaration
@@ -1015,6 +1022,13 @@ deriving instance Semigroup (f (g p)) => Semigroup ((f :.: g) p)
 
 -- | @since 4.12.0.0
 deriving instance Monoid (f (g p)) => Monoid ((f :.: g) p)
+
+-- | Applications of the parameter
+newtype ParAp1 (f :: (k1 -> Type) -> k1) (p :: k1 -> Type) =
+    ParAp1 { unParAp1 :: p (f p) }
+  deriving (Generic  
+           -- , Generic1 
+           )
 
 -- | Constants of unlifted kinds
 --
