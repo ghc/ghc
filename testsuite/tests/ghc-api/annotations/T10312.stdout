@@ -171,6 +171,7 @@
 ((Test10312.hs:68:28-35,AnnOpenP), [Test10312.hs:68:28]),
 ((Test10312.hs:68:28-35,AnnRarrow), [Test10312.hs:68:37-38]),
 ((Test10312.hs:68:28-51,AnnRarrow), [Test10312.hs:68:37-38]),
+((Test10312.hs:68:29,AnnRarrow), [Test10312.hs:68:31-32]),
 ((Test10312.hs:68:29-34,AnnRarrow), [Test10312.hs:68:31-32]),
 ((Test10312.hs:68:40-42,AnnCloseS), [Test10312.hs:68:42]),
 ((Test10312.hs:68:40-42,AnnOpenS), [Test10312.hs:68:40]),
