@@ -87,6 +87,7 @@ get_gen1_constrained_tys :: TyVar -> Type -> [Type]
 get_gen1_constrained_tys argVar
   = argTyFold argVar $ ArgTyAlg { ata_rec0 = const []
                                 , ata_par1 = [], ata_rec1 = const []
+                                , ata_parAp1 = id
                                 , ata_comp = (:) }
 
 {-
@@ -278,6 +279,9 @@ canDoGenerics1 rep_tc =
       -- (ty arg), where head of ty is neither (->) nor a tuple constructor and
       -- the parameter of interest does not occur in ty
       , ft_ty_app = \_ arg -> arg
+      
+      -- (var arg), where the higher-kinded parameter of interest is being applied
+      , ft_var_app = \arg -> bmplus caseVar arg
 
       , ft_bad_app = bmbad con wrong_arg
       , ft_forall  = \_ body -> body -- polytypes are handled elsewhere
@@ -451,6 +455,7 @@ tc_mkRepFamInsts gk tycon inst_tys =
 data ArgTyAlg a = ArgTyAlg
   { ata_rec0 :: (Type -> a)
   , ata_par1 :: a, ata_rec1 :: (Type -> a)
+  , ata_parAp1 :: (a -> a)
   , ata_comp :: (Type -> a -> a)
   }
 
@@ -485,18 +490,25 @@ data ArgTyAlg a = ArgTyAlg
 argTyFold :: forall a. TyVar -> ArgTyAlg a -> Type -> a
 argTyFold argVar (ArgTyAlg {ata_rec0 = mkRec0,
                             ata_par1 = mkPar1, ata_rec1 = mkRec1,
+                            ata_parAp1 = mkParAp1,
                             ata_comp = mkComp}) =
   -- mkRec0 is the default; use it if there is no interesting structure
   -- (e.g. occurrences of parameters or recursive occurrences)
   \t -> maybe (mkRec0 t) id $ go t where
   go :: Type -> -- type to fold through
         Maybe a -- the result (e.g. representation type), unless it's trivial
-  go t = isParam `mplus` isApp where
+  go t = isParam `mplus` isParamApp `mplus` isApp where
 
     isParam = do -- handles parameters
       t' <- getTyVar_maybe t
       Just $ if t' == argVar then mkPar1 -- moreover, it is "the" parameter
              else mkRec0 t -- NB mkRec0 instead of the conventional mkPar0
+
+    isParamApp = do -- handles applications of the parameter
+      (phi, beta) <- tcSplitAppTy_maybe t
+      t' <- getTyVar_maybe phi
+      if t' == argVar then mkParAp1 `fmap` go beta
+      else Nothing
 
     isApp = do -- handles applications
       (phi, beta) <- tcSplitAppTy_maybe t
@@ -527,6 +539,7 @@ tc_mkRepTy gk_ tycon k =
     rec0    <- tcLookupTyCon rec0TyConName
     rec1    <- tcLookupTyCon rec1TyConName
     par1    <- tcLookupTyCon par1TyConName
+    parAp1  <- tcLookupTyCon parAp1TyConName
     u1      <- tcLookupTyCon u1TyConName
     v1      <- tcLookupTyCon v1TyConName
     plus    <- tcLookupTyCon sumTyConName
@@ -602,7 +615,9 @@ tc_mkRepTy gk_ tycon k =
             -- the presence of composition).
             argPar argVar = argTyFold argVar $ ArgTyAlg
               {ata_rec0 = mkRec0, ata_par1 = mkPar1,
-               ata_rec1 = mkRec1, ata_comp = mkComp comp k}
+               ata_rec1 = mkRec1,
+               ata_parAp1 = mkParAp1 parAp1 k,
+               ata_comp = mkComp comp k}
 
         tyConName_user = case tyConFamInst_maybe tycon of
                            Just (ptycon, _) -> tyConName ptycon
@@ -674,6 +689,12 @@ mkComp comp k f g
     k1_first = k_first == p_kind_var
     [k_first,_,_,_,p] = tyConTyVars comp
     Just p_kind_var = getTyVar_maybe (tyVarKind p)
+
+mkParAp1 :: TyCon -> Kind -> Type -> Type
+mkParAp1 parAp1 k f = mkTyConApp parAp1 [k1,f]
+  where
+    -- The parameter must have kind (k1 -> *) ~ k
+    (k1,_) = splitFunTy k
 
 -- Given the TyCons for each URec-related type synonym, check to see if the
 -- given type is an unlifted type that generics understands. If so, return
