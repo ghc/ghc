@@ -68,7 +68,6 @@ module Lexer (
    explicitNamespacesEnabled,
    patternSynonymsEnabled,
    sccProfilingOn, hpcEnabled,
-   typeOperatorsEnabled,
    starIsTypeEnabled,
    addWarning,
    lexTokenStream,
@@ -2264,7 +2263,6 @@ data ExtBits
   | TypeApplicationsBit
   | StaticPointersBit
   | NumericUnderscoresBit
-  | TypeOperatorsBit
   | StarIsTypeBit
   deriving Enum
 
@@ -2334,8 +2332,6 @@ staticPointersEnabled :: ExtsBitmap -> Bool
 staticPointersEnabled = xtest StaticPointersBit
 numericUnderscoresEnabled :: ExtsBitmap -> Bool
 numericUnderscoresEnabled = xtest NumericUnderscoresBit
-typeOperatorsEnabled :: ExtsBitmap -> Bool
-typeOperatorsEnabled = xtest TypeOperatorsBit
 starIsTypeEnabled :: ExtsBitmap -> Bool
 starIsTypeEnabled = xtest StarIsTypeBit
 
@@ -2392,7 +2388,6 @@ mkParserFlags flags =
       .|. TypeApplicationsBit         `xoptBit` LangExt.TypeApplications
       .|. StaticPointersBit           `xoptBit` LangExt.StaticPointers
       .|. NumericUnderscoresBit       `xoptBit` LangExt.NumericUnderscores
-      .|. TypeOperatorsBit            `xoptBit` LangExt.TypeOperators
       .|. StarIsTypeBit               `xoptBit` LangExt.StarIsType
     optBits =
           HaddockBit        `goptBit` Opt_Haddock

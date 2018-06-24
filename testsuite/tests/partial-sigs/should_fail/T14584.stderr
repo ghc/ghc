@@ -11,7 +11,7 @@ T14584.hs:56:41: warning: [-Wdeferred-type-errors (in -Wdefault)]
         act @_ @_ @act (fromSing @m (sing @m @a :: Sing _))
 
 T14584.hs:56:50: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Expected kind ‘m1’, but ‘a’ has kind ‘Type’
+    • Expected kind ‘m1’, but ‘a’ has kind ‘*’
     • In the type ‘a’
       In the second argument of ‘fromSing’, namely
         ‘(sing @m @a :: Sing _)’

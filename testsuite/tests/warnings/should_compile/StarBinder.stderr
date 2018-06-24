@@ -1,0 +1,10 @@
+
+StarBinder.hs:5:14: warning: [-Wstar-binder (in -Wdefault)]
+    Desugaring ‘*’ in a binder position as a type operator despite StarIsType.
+    NB. To use (or export) this operator in modules with StarIsType,
+        including the definition module, you must qualify it.
+
+StarBinder.hs:5:30: warning: [-Wstar-binder (in -Wdefault)]
+    Desugaring ‘*’ in a binder position as a type operator despite StarIsType.
+    NB. To use (or export) this operator in modules with StarIsType,
+        including the definition module, you must qualify it.
