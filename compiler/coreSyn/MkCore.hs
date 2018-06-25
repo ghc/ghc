@@ -360,7 +360,7 @@ mkCoreVarTupTy ids = mkBoxedTupleTy (map idType ids)
 -- | Build a small tuple holding the specified expressions
 -- One-tuples are flattened; see Note [Flattening one-tuples]
 mkCoreTup :: [CoreExpr] -> CoreExpr
-mkCoreTup []  = Var unitDataConId `App` (Type omegaDataConTy)
+mkCoreTup []  = unitExpr
 mkCoreTup [c] = c
 mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
                               (map (Type . exprType) cs ++ cs)
@@ -410,7 +410,7 @@ mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 
 -- | The unit expression
 unitExpr :: CoreExpr
-unitExpr = Var unitDataConId
+unitExpr = Var unitDataConId `App` (Type omegaDataConTy)
 
 {-
 ************************************************************************

@@ -322,7 +322,7 @@ resultWrapper result_ty
   -- Base case 2: the unit type ()
   | Just (tc,_) <- maybe_tc_app
   , tc `hasKey` unitTyConKey
-  = return (Nothing, \_ -> Var unitDataConId)
+  = return (Nothing, \_ -> unitExpr)
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app
