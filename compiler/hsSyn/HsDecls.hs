@@ -516,17 +516,11 @@ data TyClDecl pass
     --              'ApiAnnotation.AnnWhere',
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-    DataDecl { tcdDExt     :: XDataDecl pass -- ^ Post renamer, CUSK flag, FVs
-             , tcdLName    :: Located (IdP pass) -- ^ Type constructor
-             , tcdTyVars   :: LHsQTyVars pass  -- ^ Type variables; for an
-                                               -- associated type
-                                               --   these include outer binders
-                                               -- Eg  class T a where
-                                               --       type F a :: *
-                                               --       type F a = a -> a
-                                               -- Here the type decl for 'f'
-                                               -- includes 'a' in its tcdTyVars
-             , tcdFixity   :: LexicalFixity -- ^ Fixity used in the declaration
+    DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
+             , tcdLName    :: Located (IdP pass)   -- ^ Type constructor
+             , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
+                              -- See Note [TyVar binders for associated declarations]
+             , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass }
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
@@ -539,8 +533,7 @@ data TyClDecl pass
                 tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
                 tcdMeths   :: LHsBinds pass,            -- ^ Default methods
                 tcdATs     :: [LFamilyDecl pass],       -- ^ Associated types;
-                tcdATDefs  :: [LTyFamDefltEqn pass],
-                                                   -- ^ Associated type defaults
+                tcdATDefs  :: [LTyFamDefltEqn pass],    -- ^ Associated type defaults
                 tcdDocs    :: [LDocDecl]                -- ^ Haddock docs
     }
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnClass',
@@ -557,6 +550,27 @@ data DataDeclRn = DataDeclRn
              { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
              , tcdFVs      :: NameSet }
   deriving Data
+
+{- Note [TyVar binders for associated decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For an /associated/ data, newtype, or type-family decl, the LHsQTyVars
+/includes/ outer binders.  For example
+    class T a where
+       data D a c
+       type F a b :: *
+       type F a b = a -> a
+Here the data decl for 'D', and type-family decl for 'F', both include 'a'
+in their LHsQTyVars (tcdTyVars and fdTyVars resp).
+
+Ditto any implicit binders in the hsq_implicit field of the LHSQTyVars.
+
+The idea is that the associated type is really a top-level decl in its
+own right.  However we are careful to use the same name 'a', so that
+we can match things up.
+
+c.f. Note [Associated type tyvar names] in Class.hs
+     Note [Family instance declaration binders]
+-}
 
 type instance XFamDecl      (GhcPass _) = NoExt
 
@@ -966,6 +980,7 @@ data FamilyDecl pass = FamilyDecl
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
   , fdLName          :: Located (IdP pass)           -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
+                       -- See Note [TyVar binders for associated declarations]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
   , fdResultSig      :: LFamilyResultSig pass        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn pass) -- optional injectivity ann
@@ -1490,6 +1505,8 @@ HsImplicitBndrs in FamInstEqn. Note in particular
 For associated type family default instances (TyFamDefltEqn), instead of using
 type patterns with binders in a surrounding HsImplicitBndrs, we use raw type
 variables (LHsQTyVars) in the feqn_pats field of FamEqn.
+
+c.f. Note [TyVar binders for associated declarations]
 -}
 
 -- | Type Family Instance Equation
