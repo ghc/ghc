@@ -667,6 +667,13 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
     go _ = markAllJoinsBad (lintCoreExpr rhs)
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
+lintIdUnfolding bndr bndr_ty uf
+  | Just rhs <- maybeUnfoldingTemplate uf
+  , isStableUnfolding uf
+  = do { ty <- fst <$> lintRhs bndr rhs
+       ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
+lintIdUnfolding _ _ _= return ()
+{-
 lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
   | isStableSource src
   = do { ty <- fst <$> lintRhs bndr rhs
@@ -675,7 +682,7 @@ lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
 lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
                                             , df_args = args })
   = do { ty <- lintBinders LambdaBind bndrs $ \ bndrs' ->
-               do { (res_ty, _) <- lintCoreArgs ((dataConUserType con), emptyUE) args -- MattP: TODO Check
+               do { (res_ty, _) <- lintCoreArgs ((dataConUserType con), emptyUE) (Type omegaDataConTy : args) -- MattP: TODO Check
                   -- Use dataConUserType here as we are going to desugar
                   --
                   ; return (mkLamTypes bndrs' res_ty) }
@@ -684,6 +691,7 @@ lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
 lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
                     -- to exponential behaviour; c.f. CoreFVs.idUnfoldingVars
+-}
 
 {-
 Note [Checking for INLINE loop breakers]
