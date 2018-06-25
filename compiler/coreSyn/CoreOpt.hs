@@ -348,7 +348,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
   , let out_ty = substTy (soe_subst rhs_env) ty
-  = ASSERT( isTyVar in_bndr )
+  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr in_rhs )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
