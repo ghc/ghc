@@ -19,6 +19,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -O0 #-}
 
 -----------------------------------------------------------------------------
 -- |
