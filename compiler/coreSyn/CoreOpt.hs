@@ -742,7 +742,9 @@ data ConCont = CC [CoreExpr] Coercion
 -- where t1..tk are the *universally-quantified* type args of 'dc'
 exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
+  = let res = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
+    in pprTrace "exprIsConApp_maybe" (ppr expr $$ ppr res) res
+
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1073,10 +1075,14 @@ pushCoDataCon :: HasCallStack => DataCon -> [CoreExpr] -> Coercion
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
 pushCoDataCon dc dc_args co
+{-
   | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
-  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
-  = Just (dc, map exprToType univ_ty_args, rest_args)
-
+  , let (univ_ty_args, rest_args) =  -- tail here for multiplicity
+            -- TODO: Fix this properly with an assertion
+          (splitAtList (dataConUnivTyVars dc) dc_args)
+  = pprTrace "pushCo" (ppr dc_args $$ ppr univ_ty_args $$ ppr rest_args)
+      $ Just (dc, map exprToType (pprTrace "univ" (ppr dc $$ ppr univ_ty_args $$ callStackDoc) univ_ty_args), rest_args)
+-}
   | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
   , to_tc == dataConTyCon dc
         -- These two tests can fail; we might see
