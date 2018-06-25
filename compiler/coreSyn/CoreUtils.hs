@@ -113,7 +113,7 @@ exprType :: HasCallStack => CoreExpr -> Type
 -- applied to the actual 'CoreSyn.Type' expression as it cannot
 -- really be said to have a type
 --exprType e | pprTrace "exprType" (ppr e) False = undefined
-exprType (Var var)           = pprTrace "exprType" (ppr var <+> ppr (idType var)) (idType var)
+exprType (Var var)           = idType var
 exprType (Lit lit)           = literalType lit
 exprType (Coercion co)       = coercionType co
 exprType (Let bind body)
