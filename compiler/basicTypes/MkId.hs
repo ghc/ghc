@@ -328,7 +328,7 @@ mkDictSelId name clas
     rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
                                      occNameFS (getOccName name)
                        , ru_fn    = name
-                       , ru_nargs = n_ty_args + 1
+                       , ru_nargs = n_ty_args
                        , ru_try   = dictSelRule val_index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
