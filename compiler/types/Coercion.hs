@@ -247,9 +247,9 @@ decomposeFunCo :: HasDebugCallStack
                -> (Coercion, Coercion)
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
--- See Note [Function coercions] for the "2" and "3"
+-- See Note [Function coercions] for the "3" and "4"
 decomposeFunCo r co = ASSERT2( all_ok, ppr co )
-                      (mkNthCo r 2 co, mkNthCo r 3 co)
+                      (mkNthCo r 3 co, mkNthCo r 4 co)
   where
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
@@ -878,7 +878,7 @@ mkNthCo r n co
       -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
       -- then (nth 0 co :: k1 ~N k2)
 
-    go r n co@(FunCo r0 _w arg res)
+    go r n co@(FunCo r0 w arg res)
       -- See Note [Function coercions]
       -- If FunCo _ arg_co res_co ::   (s1:TYPE sk1 -> s2:TYPE sk2)
       --                             ~ (t1:TYPE tk1 -> t2:TYPE tk2)
@@ -889,10 +889,13 @@ mkNthCo r n co
       --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
       --                             i.e. mkRuntimeRepCo
       = case n of
-          0 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
-          1 -> ASSERT( r == Nominal ) mkRuntimeRepCo res
-          2 -> ASSERT( r == r0 )      arg
-          3 -> ASSERT( r == r0 )      res
+          -- TODO: MattP, this is probably wrong, the correct coercion
+          -- needs to be placed here. And need to update the comment
+          0 -> pprPanic "multiplicityCo" (ppr co)
+          1 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
+          2 -> ASSERT( r == Nominal ) mkRuntimeRepCo res
+          3 -> ASSERT( r == r0 )      arg
+          4 -> ASSERT( r == r0 )      res
           _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr co)
 
     go r n (TyConAppCo r0 tc arg_cos) = ASSERT2( r == nthRole r0 tc n
