@@ -297,7 +297,10 @@ mkDictSelId name clas
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUserTyVarBinders data_con
-    n_ty_args      = length tyvars + 1 -- +1 for the multiplicity argument
+    n_ty_args      = length tyvars    --  for the multiplicity argument
+                                      -- MattP: Don't know why this works..
+                                      -- But a lot compiles properly so it
+                                      -- seems to be correct.
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
@@ -328,7 +331,7 @@ mkDictSelId name clas
     rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
                                      occNameFS (getOccName name)
                        , ru_fn    = name
-                       , ru_nargs = n_ty_args
+                       , ru_nargs = n_ty_args + 1 -- +1 for the type
                        , ru_try   = dictSelRule val_index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
