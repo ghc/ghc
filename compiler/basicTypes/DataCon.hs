@@ -1086,7 +1086,7 @@ dataConWrapId_maybe dc = case dcRep dc of
 -- the worker (see 'dataConWorkId')
 dataConWrapId :: DataCon -> Id
 dataConWrapId dc = case dcRep dc of
-                     NoDataConRep-> dcWorkId dc    -- worker=wrapper
+                     NoDataConRep-> panic "dataConWrapId"
                      DCR { dcr_wrap_id = wrap_id } -> wrap_id
 
 -- | Find all the 'Id's implicitly brought into scope by the data constructor. Currently,
