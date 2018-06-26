@@ -70,7 +70,7 @@ instance Outputable CmmCat where
 -- Why is CmmType stratified?  For native code generation,
 -- most of the time you just want to know what sort of register
 -- to put the thing in, and for this you need to know how
--- many bits thing has and whether it goes in a floating-point
+-- many bits thing has, and whether it goes in a floating-point
 -- register.  By contrast, the distinction between GcPtr and
 -- GcNonPtr is of interest to only a few parts of the code generator.
 
