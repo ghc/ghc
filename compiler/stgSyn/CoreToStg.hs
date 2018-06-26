@@ -663,7 +663,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         -- or foreign call.
         -- Wanted: a better solution than this hacky warning
     let
-        arg_ty = pprTrace "arg" (ppr arg) $ exprType arg
+        arg_ty = exprType arg
         stg_arg_ty = stgArgType stg_arg
         bad_args = (isUnliftedType arg_ty && not (isUnliftedType stg_arg_ty))
                 || (typePrimRep arg_ty /= typePrimRep stg_arg_ty)

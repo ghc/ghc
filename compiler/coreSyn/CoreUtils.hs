@@ -1000,7 +1000,7 @@ also CoreArity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 -}
 
-exprIsBottom :: CoreExpr -> Bool
+exprIsBottom :: HasCallStack => CoreExpr -> Bool
 -- See Note [Bottoming expressions]
 exprIsBottom e
   | isEmptyTy (exprType e)

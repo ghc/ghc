@@ -38,7 +38,7 @@ import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
 import Pair
-import Util     ( debugIsOn )
+import Util     ( debugIsOn, HasCallStack )
 
 {-
 ************************************************************************
@@ -902,7 +902,8 @@ to re-add floats on the top.
 -- We should have that:
 --
 -- > ty = exprType e = exprType e'
-etaExpand :: Arity              -- ^ Result should have this number of value args
+etaExpand :: HasCallStack
+          => Arity              -- ^ Result should have this number of value args
           -> CoreExpr           -- ^ Expression to expand
           -> CoreExpr
 -- etaExpand arity e = res
