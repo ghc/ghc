@@ -63,6 +63,7 @@ import PatSyn
 
 import Control.Monad
 import Data.Functor.Compose
+import TysPrim
 
 {-
 ************************************************************************
