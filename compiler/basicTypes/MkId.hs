@@ -392,7 +392,7 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon
-  = mkGlobalId (DataConWrapId data_con) wkr_name nt_wrap_ty nt_work_info
+  = mkGlobalId (DataConWrapId data_con) wkr_name alg_wkr_ty nt_work_info
   | otherwise
   = mkGlobalId (DataConWorkId data_con) wkr_name alg_wkr_ty wkr_info
 
