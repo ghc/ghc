@@ -1264,7 +1264,7 @@ W_ gcThreadLiveBlocks (uint32_t i, uint32_t g)
  * to store bitmaps and the mark stack.  Note: blocks_needed does not
  * include the blocks in the nursery.
  *
- * Assume: all data currently live will remain live.  Generationss
+ * Assume: all data currently live will remain live.  Generations
  * that will be collected next time will therefore need twice as many
  * blocks since all the data will be copied.
  */
