@@ -371,22 +371,25 @@ ds_expr _ e@(SectionR _ op expr) = do
                                                           core_op [Var x_id, Var y_id]))
 
 ds_expr _ (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (L _ (Missing ty))
+  = do { let go (lam_vars, args, _) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring. This lambda is linear
                     -- since tuples are linear
-               = do { lam_var <- newSysLocalDsNoLP One ty
-                    ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (L _ (Present _ expr))
+               = do { lam_var <- newSysLocalDsNoLP (RigTy (mkTyVarTy multiplicityTyVar)) ty
+                    ; return (lam_var : lam_vars, Var lam_var : args, True) }
+             go (lam_vars, args, missing) (L _ (Present _ expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
-                    ; return (lam_vars, core_expr : args) }
+                    ; return (lam_vars, core_expr : args, missing) }
              go _ (L _ (XTupArg {})) = panic "ds_expr"
 
-       ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
+       ; dsWhenNoErrs (foldM go ([], [], False) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
-                      (\(lam_vars, args) -> mkCoreLams lam_vars $
+                      (\(lam_vars, args, missing) ->
+                      (if missing then mkCoreLams [multiplicityTyVar]
+                                 else id) $
+                        mkCoreLams lam_vars $
                                             mkCoreTupBoxity boxity args) }
 
 ds_expr _ (ExplicitSum types alt arity expr)

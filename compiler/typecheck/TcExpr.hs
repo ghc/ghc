@@ -64,7 +64,7 @@ import Type
 import TcEvidence
 import VarSet
 import TysWiredIn
-import TysPrim( intPrimTy )
+import TysPrim( intPrimTy, multiplicityTyVar )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -513,13 +513,17 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; arg_tys <- case boxity of
            { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
+      ; let w_tvb = mkTyVarBinder Inferred multiplicityTyVar
+            w_ty  = mkTyVarTy multiplicityTyVar
        ; let actual_res_ty
                  -- MattP: I changed this to linear 17/04/18. It is
                  -- computing the type of the tuple section which is like
                  -- a partially applied tuple constructor and hence should
                  -- be linear. I don't see how the comment about case is
                  -- relevant.
-                 = mkFunTys [linear ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                 -- MattP: I made this polymorphic on 26-06-2018
+                 =  mkForAllTys [w_tvb] $
+                    mkFunTys [ mkWeighted (RigTy w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
@@ -528,6 +532,10 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
 
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
+
+       --TODO: MattP: Check whether we should use a wrapper here or do it
+       --in dsExpr
+--       ; let wrap' = wrap <.> mkWpTyLams [w_ty]
 
        ; return $ mkHsWrap wrap (ExplicitTuple x tup_args1 boxity) }
 
