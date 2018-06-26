@@ -1930,9 +1930,9 @@ tyapp :: { Located TyEl }
         | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
         | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
         | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
-                                               [mj AnnSimpleQuote $1] }
+                                               [mj AnnSimpleQuote $1,mj AnnVal $2] }
         | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
-                                               [mj AnnSimpleQuote $1] }
+                                               [mj AnnSimpleQuote $1,mj AnnVal $2] }
 
 atype_docs :: { LHsType GhcPs }
         : atype docprev                 { sLL $1 $> $ HsDocTy noExt $1 $2 }
