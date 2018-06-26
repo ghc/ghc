@@ -141,3 +141,7 @@ T12417:
 .PHONY: T13163
 T13163:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test13163.hs
+
+.PHONY: T15303
+T15303:
+	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test15303.hs
