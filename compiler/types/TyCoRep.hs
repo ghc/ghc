@@ -559,9 +559,7 @@ This table summarises the visibility rules:
     optional kind applications, thus (T @*), but we have not
     yet implemented that
 
----- Examples of where the different visibilities come from -----
-
-In term declarations:
+---- In term declarations ----
 
 * Inferred.  Function defn, with no signature:  f1 x = x
   We infer f1 :: forall {a}. a -> a, with 'a' Inferred
@@ -592,7 +590,7 @@ In term declarations:
   Inferred - from inferred types (e.g. no pattern type signature)
            - or from inferred kind polymorphism
 
-In type declarations:
+---- In type declarations ----
 
 * Inferred (k)
      data T1 a b = MkT1 (a b)
@@ -620,6 +618,19 @@ In type declarations:
   Here T's kind is  T :: forall {k1:*} (k:*). (k1->*) -> k1 -> k -> *
   So 'k' is Specified, because it appears explicitly,
   but 'k1' is Inferred, because it does not
+
+Generally, in the list of TyConBinders for a TyCon,
+
+* Inferred arguments always come first
+* Specified, Anon and Required can be mixed
+
+e.g.
+  data Foo (a :: Type) :: forall b. (a -> b -> Type) -> Type where ...
+
+Here Foo's TyConBinders are
+   [Required 'a', Specified 'b', Anon]
+and its kind prints as
+   Foo :: forall a -> forall b. (a -> b -> Type) -> Type
 
 ---- Printing -----
 
