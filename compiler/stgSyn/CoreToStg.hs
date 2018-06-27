@@ -583,7 +583,7 @@ coreToStgApp _ f args ticks = do
          | f_arity > 0 && saturated = stgSatOcc -- Saturated or over-saturated function call
          | otherwise                = stgUnsatOcc       -- Unsaturated function or thunk
 
-        res_ty = pprTrace "App" (ppr f) $ exprType (mkApps (Var f) args)
+        res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
                   | saturated    -> StgConApp dc args'
