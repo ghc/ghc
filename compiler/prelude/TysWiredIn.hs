@@ -125,7 +125,8 @@ module TysWiredIn (
 
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, omegaDataConName, multiplicityTy,
-        multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy
+        multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy,
+        omegaDataConTyCon
 
 
 
@@ -1121,7 +1122,10 @@ omegaDataCon = pcDataCon omegaDataConName [] [] multiplicityTyCon
 
 oneDataConTy, omegaDataConTy :: Type
 oneDataConTy = mkTyConTy (promoteDataCon oneDataCon)
-omegaDataConTy = mkTyConTy (promoteDataCon omegaDataCon)
+omegaDataConTy = mkTyConTy omegaDataConTyCon
+
+omegaDataConTyCon :: TyCon
+omegaDataConTyCon = promoteDataCon omegaDataCon
 
 {- *********************************************************************
 *                                                                      *

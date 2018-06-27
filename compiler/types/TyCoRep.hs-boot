@@ -21,6 +21,7 @@ pprKind :: Kind -> SDoc
 pprType :: Type -> SDoc
 
 isRuntimeRepTy :: Type -> Bool
+isMultiplicityTy :: Type -> Bool
 
 instance Data Type
   -- To support Data instances in CoAxiom
