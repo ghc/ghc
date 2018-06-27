@@ -616,7 +616,10 @@ ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
     ppr_fun_tail wthis other_ty
       = [ppr_fun_arrow wthis <+> pprIfaceType other_ty]
 
-    ppr_fun_arrow ty = arrow <> text "@" <> brackets (pprIfaceType ty)
+    ppr_fun_arrow w
+      | (IfaceTyConApp tc _) <- w
+      , tc `ifaceTyConHasKey` (getUnique omegaDataConTyCon) = arrow
+      | otherwise = arrow <> text "@" <> brackets (pprIfaceType w)
 
 ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
   = if_print_coercions
