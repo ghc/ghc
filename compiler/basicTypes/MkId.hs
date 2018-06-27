@@ -609,10 +609,15 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
              wrap_unf = mkInlineUnfolding wrap_rhs
+
+             casted_body | isNewTyCon tycon = wrap_body
+                         | otherwise = wrapFamInstBody tycon res_ty_args $
+                                        wrap_body
+
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
-                        wrapFamInstBody tycon res_ty_args $
-                        wrap_body
+                        casted_body
+
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
                      , dcr_arg_tys = rep_tys
