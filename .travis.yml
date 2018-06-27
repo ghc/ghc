@@ -104,6 +104,13 @@ install:
     - mv .git ghc/hadrian
     - cd ghc/hadrian && git reset --hard HEAD && cd ..
 
+    # We checkout a patched Cabal.
+    # See: https://github.com/snowleopard/hadrian/issues/634
+    - cd libraries/Cabal/
+    - git remote add quasicomputational https://github.com/quasicomputational/cabal.git
+    - git fetch quasicomputational && git checkout cwd-independent-check
+    - cd ../../
+
 cache:
     directories:
         - $HOME/.cabal
