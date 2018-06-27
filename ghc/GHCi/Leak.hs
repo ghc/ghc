@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, LambdaCase #-}
+{-# LANGUAGE RecordWildCards, LambdaCase, MagicHash, UnboxedTuples #-}
 module GHCi.Leak
   ( LeakIndicators
   , getLeakIndicators
@@ -6,12 +6,19 @@ module GHCi.Leak
   ) where
 
 import Control.Monad
+import Data.Bits
+import DynFlags (settings, sTargetPlatform)
+import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
-import Outputable
+import GHC.Exts (anyToAddr#, State#, RealWorld)
+import GHC.Ptr (Ptr (..))
 import HscTypes
-import UniqDFM
+import Outputable
+import Platform (target32Bit)
 import System.Mem
 import System.Mem.Weak
+import UniqDFM
+import Unsafe.Coerce (unsafeCoerce)
 
 -- Checking for space leaks in GHCi. See #15111, and the
 -- -fghci-leak-check flag.
@@ -55,5 +62,19 @@ checkLeakIndicators dflags (LeakIndicators leakmods)  = do
  where
   report :: String -> Maybe a -> IO ()
   report _ Nothing = return ()
-  report msg (Just _) =
-    putStrLn ("-fghci-leak-check: " ++ msg ++ " is still alive!")
+  report msg (Just a) = do
+    addr <- mkIO (\s -> case anyToAddr# a s of
+                          (# s', addr #) -> (# s', Ptr addr #)) :: IO (Ptr ())
+    putStrLn ("-fghci-leak-check: " ++ msg ++ " is still alive at " ++
+              show (maskTagBits addr))
+
+  -- We don't have access to ghc-prim here so using `unsafeCoerce` for `IO`
+  mkIO :: (State# RealWorld -> (# State# RealWorld, a #)) -> IO a
+  mkIO = unsafeCoerce
+
+  tagBits
+    | target32Bit (sTargetPlatform (settings dflags)) = 2
+    | otherwise = 3
+
+  maskTagBits :: Ptr a -> Ptr a
+  maskTagBits p = intPtrToPtr (ptrToIntPtr p .&. complement (shiftL 1 tagBits - 1))
