@@ -1859,7 +1859,7 @@ tc_infer_id lbl id_name
                  theta' = substTheta subst theta
                  rho'   = substTy subst rho
            ; wrap <- instCall (OccurrenceOf id_name) tys' theta'
-           ; addDataConStupidTheta con tys'
+           ; addDataConStupidTheta con (tail tys') -- tail for extra multiplicity argument
            ; return ( mkHsWrap wrap (HsConLikeOut noExt (RealDataCon con))
                     , rho') }
 
