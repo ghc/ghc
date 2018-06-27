@@ -109,7 +109,7 @@ struct Capability_ {
     int interrupt;
 
     // Total words allocated by this cap since rts start
-    // See [Note allocation accounting] in Storage.c
+    // See Note [allocation accounting] in Storage.c
     W_ total_allocated;
 
 #if defined(THREADED_RTS)

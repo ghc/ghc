@@ -1158,7 +1158,7 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p)
  * -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------
- * [Note allocation accounting]
+ * Note [allocation accounting]
  *
  *   - When cap->r.rCurrentNusery moves to a new block in the nursery,
  *     we add the size of the used portion of the previous block to
@@ -1271,9 +1271,8 @@ W_ gcThreadLiveBlocks (uint32_t i, uint32_t g)
 extern W_
 calcNeeded (bool force_major, memcount *blocks_needed)
 {
-    W_ needed = 0, blocks;
-    uint32_t g, N;
-    generation *gen;
+    W_ needed = 0;
+    uint32_t N;
 
     if (force_major) {
         N = RtsFlags.GcFlags.generations - 1;
@@ -1281,12 +1280,12 @@ calcNeeded (bool force_major, memcount *blocks_needed)
         N = 0;
     }
 
-    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        gen = &generations[g];
+    for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        generation *gen = &generations[g];
 
-        blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
-               + gen->n_large_blocks
-               + gen->n_compact_blocks;
+        W_ blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
+                  + gen->n_large_blocks
+                  + gen->n_compact_blocks;
 
         // we need at least this much space
         needed += blocks;
