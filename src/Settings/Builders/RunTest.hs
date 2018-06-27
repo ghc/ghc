@@ -103,7 +103,7 @@ getTestArgs = do
     args            <- expr $ userSetting defaultTestArgs
     bindir          <- expr $ setBinaryDirectory (testCompiler args)
     compiler        <- expr $ setCompiler (testCompiler args)
-    globalVerbosity <- shakeVerbosity <$> expr getShakeOptions 
+    globalVerbosity <- shakeVerbosity <$> expr getShakeOptions
     let configFileArg= ["--config-file=" ++ (testConfigFile args)]
         testOnlyArg  = case testOnly args of
                            Just cases -> map ("--only=" ++) (words cases)
@@ -125,30 +125,30 @@ getTestArgs = do
         verbosityArg = case testVerbosity args of
                            Nothing -> Just $ "--verbose=" ++ show (fromEnum globalVerbosity)
                            Just verbosity -> Just $ "--verbose=" ++ verbosity
-        wayArgs      = map ("--way=" ++) (testWays args) 
+        wayArgs      = map ("--way=" ++) (testWays args)
         compilerArg  = ["--config", "compiler=" ++ show (compiler)]
         ghcPkgArg    = ["--config", "ghc_pkg=" ++ show (bindir -/- "ghc-pkg")]
         haddockArg   = ["--config", "haddock=" ++ show (bindir -/- "haddock")]
         hp2psArg     = ["--config", "hp2ps=" ++ show (bindir -/- "hp2ps")]
-        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]   
-    pure $  configFileArg ++ testOnlyArg ++ speedArg 
+        hpcArg       = ["--config", "hpc=" ++ show (bindir -/- "hpc")]
+    pure $  configFileArg ++ testOnlyArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
-                      , junitArg, verbosityArg  ] 
+                      , junitArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg
 
 -- | Directory to look for Binaries
--- | We assume that required programs are present in the same binary directory 
+-- | We assume that required programs are present in the same binary directory
 -- | in which ghc is stored and that they have their conventional name.
 -- | QUESTION : packages can be named different from their conventional names.
 -- | For example, ghc-pkg can be named as ghc-pkg-version. In such cases, it will
--- | be impossible to search the binary. Only possible way will be to take user 
--- | inputs for these directory also. boilerplate soes not account for this 
+-- | be impossible to search the binary. Only possible way will be to take user
+-- | inputs for these directory also. boilerplate soes not account for this
 -- | problem, but simply returns an error. How should we handle such cases?
 setBinaryDirectory :: String -> Action FilePath
 setBinaryDirectory "stage0" = setting InstallBinDir
-setBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0) 
-setBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1) 
+setBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
+setBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
 setBinaryDirectory compiler = pure $ parentPath compiler
 
 -- | Set Test Compiler
@@ -156,7 +156,7 @@ setCompiler :: String -> Action FilePath
 setCompiler "stage0" = setting SystemGhc
 setCompiler "stage1" = liftM2 (-/-) topDirectory (fullpath Stage0 ghc)
 setCompiler "stage2" = liftM2 (-/-) topDirectory (fullpath Stage1 ghc)
-setCompiler compiler = pure compiler 
+setCompiler compiler = pure compiler
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String
@@ -164,7 +164,7 @@ setTestSpeed Fast    = "2"
 setTestSpeed Average = "1"
 setTestSpeed Slow    = "0"
 
--- | Returns parent path of test compiler 
+-- | Returns parent path of test compiler
 -- | TODO : Is there a simpler way to find parent directory?
 parentPath :: String -> String
 parentPath path = let upPath = init $ splitOn "/" path
@@ -173,4 +173,3 @@ parentPath path = let upPath = init $ splitOn "/" path
 -- | TODO: move to hadrian utilities.
 fullpath :: Stage -> Package -> Action FilePath
 fullpath stage pkg = programPath =<< programContext stage pkg
-

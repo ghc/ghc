@@ -21,13 +21,15 @@ testRules = do
     root -/- ghcConfigProgPath ~> do
         ghc             <- builderPath $ Ghc CompileHs Stage0
         cmd ghc [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
- 
-    -- | TODO : Use input test compiler and not just stage2 compiler.  
+
+    -- | TODO : Use input test compiler and not just stage2 compiler.
     root -/- ghcConfigPath ~> do
         ghcPath         <- needfile Stage1 ghc
         need [ root -/- ghcConfigProgPath]
         cmd [FileStdout $ root -/- ghcConfigPath] (root -/- ghcConfigProgPath)
-            [ ghcPath  ] 
+            [ ghcPath  ]
+
+    root -/- timeoutProgPath ~> timeoutProgBuilder
 
     "validate" ~> do
         needTestBuilders
@@ -38,7 +40,7 @@ testRules = do
 
         -- TODO : Should we remove the previosly generated config file?
         -- Prepare Ghc configuration file for input compiler.
-        need [ root -/- ghcConfigPath ]
+        need [ root -/- ghcConfigPath, root -/- timeoutProgPath ]
 
         -- TODO This approach doesn't work.
         -- Set environment variables for test's Makefile.
@@ -93,13 +95,12 @@ timeoutProgBuilder = do
             copyFile prog (root -/- timeoutProgPath)
         else do
             python <- builderPath Python
-            copyFile "testsuite/timeout/timeout.py" (root -/- "test/bin/timeout.py")
+            copyFile "testsuite/timeout/timeout.py" (root -/- timeoutProgPath <.> "py")
             let script = unlines
                     [ "#!/usr/bin/env sh"
                     , "exec " ++ python ++ " $0.py \"$@\""
                     ]
-            liftIO $ do
-                writeFile (root -/- timeoutProgPath) script
+            writeFile' (root -/- timeoutProgPath) script
             makeExecutable (root -/- timeoutProgPath)
 
 needTestBuilders :: Action ()
@@ -108,7 +109,6 @@ needTestBuilders = do
     needBuilder $ GhcPkg Update Stage1
     needBuilder Hpc
     needBuilder (Hsc2Hs Stage1)
-    timeoutProgBuilder
     needTestsuitePackages
 
 -- | Extra flags to send to the Haskell compiler to run tests.
@@ -160,4 +160,3 @@ needfile stage pkg
 -- we are going to use, I suppose?
     | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
     | otherwise = programPath =<< programContext stage pkg
-

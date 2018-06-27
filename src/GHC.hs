@@ -105,15 +105,18 @@ stage2Packages = return [haddock]
 
 -- | Packages that are built only for the testsuite.
 testsuitePackages :: Action [Package]
-testsuitePackages = return [ checkApiAnnotations
-                           , checkPpr
-                           , ghci
-                           , ghcPkg
-                           , hp2ps
-                           , iserv
-                           , parallel
-                           , runGhc
-                           , timeout           ]
+testsuitePackages = do
+  win <- windowsHost
+  return $
+    [ checkApiAnnotations
+    , checkPpr
+    , ghci
+    , ghcPkg
+    , hp2ps
+    , iserv
+    , parallel
+    , runGhc              ] ++
+    [ timeout | win       ]
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC
