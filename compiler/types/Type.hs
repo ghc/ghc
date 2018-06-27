@@ -208,7 +208,7 @@ module Type (
         tidyKind,
         tidyTyVarBinder, tidyTyVarBinders,
 
-        rigToType, typeToRig
+        rigToType, typeToRig, flattenRig
     ) where
 
 #include "HsVersions.h"
@@ -733,10 +733,16 @@ rigToType r =
     r -> pprPanic "rigToType" (ppr r)
 
 typeToRig :: Type -> Rig
-typeToRig ty
-  | oneDataConTy `eqType` ty = One
-  | omegaDataConTy `eqType` ty = Omega
-  | otherwise = RigTy ty
+typeToRig ty = flattenRig (RigTy ty)
+
+-- | Change occurence of types to their constructors
+flattenRig :: Rig -> Rig
+flattenRig (RigTy r)
+  | oneDataConTy `eqType` r = One
+  | omegaDataConTy `eqType` r = Omega
+  | otherwise = RigTy r
+flattenRig r = r
+
 
 
 -------------

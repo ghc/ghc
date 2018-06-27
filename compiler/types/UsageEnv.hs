@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module UsageEnv where
 
 import GhcPrelude
@@ -85,13 +86,15 @@ instance Outputable UsageEnv where
 -- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
 subweight :: Rig -> Rig -> Bool
-subweight _     Omega = True
-subweight Zero  Zero  = True
--- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
--- used zero times cannot be used one time.
--- Zero = {0}
--- One  = {1}
--- Omega = {0...}
-subweight One   One   = True
-subweight (RigTy t) (RigTy t') = t `eqType` t'
-subweight _     _     = False
+subweight (flattenRig -> r1) (flattenRig -> r2) = go r1 r2
+  where
+    go _     Omega = True
+    go Zero  Zero  = True
+    -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
+    -- used zero times cannot be used one time.
+    -- Zero = {0}
+    -- One  = {1}
+    -- Omega = {0...}
+    go One   One   = True
+    go (RigTy t) (RigTy t') = t `eqType` t'
+    go _     _     = False
