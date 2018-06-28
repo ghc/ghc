@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable,
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
              RankNTypes, RoleAnnotations, ScopedTypeVariables,
-             Trustworthy #-}
+             Trustworthy, NoImplicitPrelude #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
@@ -41,6 +41,7 @@ import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
+import Prelude
 
 import qualified Control.Monad.Fail as Fail
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, NoImplicitPrelude #-}
 {- |
 Module : Language.Haskell.TH.Quote
 Description : Quasi-quoting support for Template Haskell
@@ -21,6 +21,7 @@ module Language.Haskell.TH.Quote(
     ) where
 
 import Language.Haskell.TH.Syntax
+import Prelude
 
 -- | The 'QuasiQuoter' type, a value @q@ of this type can be used
 -- in the syntax @[q| ... string to parse ...|]@.  In fact, for

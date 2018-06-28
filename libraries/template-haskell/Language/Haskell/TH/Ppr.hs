@@ -1,5 +1,6 @@
--- | contains a prettyprinter for the
--- Template Haskell datatypes
+{-# LANGUAGE NoImplicitPrelude #-}
+
+-- | A prettyprinter for the Template Haskell datatypes.
 
 module Language.Haskell.TH.Ppr where
     -- All of the exports from this module should
