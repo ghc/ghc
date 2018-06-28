@@ -11,6 +11,37 @@
  *
  * ---------------------------------------------------------------------------*/
 
+/* ----------------------------------------------------------------------------
+   We have two main scavenge functions:
+
+   - scavenge_block(bdescr *bd)
+   - scavenge_one(StgPtr p)
+
+   As the names and parameters suggest, first one scavenges a whole block while
+   the second one only scavenges one object. This however is not the only
+   difference. scavenge_block scavenges all SRTs while scavenge_one only
+   scavenges SRTs of stacks. The reason is because scavenge_one is called in two
+   cases:
+
+   - When scavenging a mut_list
+   - When scavenging a large object
+
+   We don't have to scavenge SRTs when scavenging a mut_list, because we only
+   scavenge mut_lists in minor GCs, and static objects are only collected in
+   major GCs.
+
+   However, because scavenge_one is also used to scavenge large objects (which
+   are scavenged even in major GCs), we need to deal with SRTs of large
+   objects. We never allocate large FUNs and THUNKs, but we allocate large
+   STACKs (e.g. in threadStackOverflow), and stack frames can have SRTs. So
+   scavenge_one skips FUN and THUNK SRTs but scavenges stack frame SRTs.
+
+   In summary, in a major GC:
+
+   - scavenge_block() scavenges all SRTs
+   - scavenge_one() scavenges only stack frame SRTs
+   ------------------------------------------------------------------------- */
+
 #include "PosixSource.h"
 #include "Rts.h"
 
