@@ -7,6 +7,7 @@ A ``lint'' pass to check for Core correctness
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module CoreLint (
     lintCoreBindings, lintUnfolding,
@@ -1094,7 +1095,7 @@ lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
 
 -- | Implements the case rules for linearity
 checkCaseLinearity :: (Rig, Var -> Rig, Rig) ->  Rig -> Var -> LintM ()
-checkCaseLinearity (scrut_usage, var_usage, scrut_w) var_w bndr = do
+checkCaseLinearity (flattenRig -> scrut_usage, var_usage, flattenRig -> scrut_w) (flattenRig -> var_w) bndr = do
   lintL (lhs `subweight` rhs) err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
   where
@@ -1249,7 +1250,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
     rhs_ue <- lintAltExpr rhs alt_ty ;
     let scrut_usage = lookup_scrut rhs_ue
 --    ; pprTrace "lintCoreAlt" (ppr weights $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
-    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
+    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, flattenRig . lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
     return rhs_ue
     } }
 

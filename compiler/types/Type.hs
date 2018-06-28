@@ -741,6 +741,7 @@ flattenRig (RigTy r)
   | oneDataConTy `eqType` r = One
   | omegaDataConTy `eqType` r = Omega
   | otherwise = RigTy r
+flattenRig (RigMul m1 m2) = flattenRig m1 * flattenRig m2
 flattenRig r = r
 
 
