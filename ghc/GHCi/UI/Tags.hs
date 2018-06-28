@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 module GHCi.UI.Tags (
   createCTagsWithLineNumbersCmd,
@@ -25,13 +26,14 @@ import OccName (pprOccName)
 import ConLike
 import MonadUtils
 
+import Control.Monad
 import Data.Function
+import Data.List
 import Data.Maybe
 import Data.Ord
 import DriverPhases
 import Panic
-import Data.List
-import Control.Monad
+import Prelude
 import System.Directory
 import System.IO
 import System.IO.Error

@@ -103,6 +103,8 @@ REALGOALS=$(filter-out \
     fulltest \
     slowtest \
     fasttest \
+    load-ghci \
+    run-ghci \
   ,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
@@ -225,3 +227,11 @@ test:
 .PHONY: slowtest fulltest
 slowtest fulltest:
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt slow
+
+.PHONY: load-ghci
+load-ghci:
+	inplace/bin/ghc-stage2 --interactive -ghci-script utils/ghc-in-ghci/load-main.ghci -odir tmp -hidir tmp +RTS -A128m -RTS -j$(N)
+
+.PHONY: run-ghci
+run-ghci:
+	inplace/bin/ghc-stage2 --interactive -ghci-script utils/ghc-in-ghci/settings.ghci -odir tmp -hidir tmp +RTS -A128m -RTS -j$(N)
