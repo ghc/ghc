@@ -2844,10 +2844,10 @@ getSkolemInfo :: [Implication] -> [TcTyVar]
 getSkolemInfo _ []
   = []
 
-getSkolemInfo [implic] tvs = [(implic, tvs)]
-
 getSkolemInfo [] tvs
   = pprPanic "No skolem info:" (ppr tvs)
+
+getSkolemInfo [implic] tvs = [(implic, tvs)]
 
 getSkolemInfo (implic:implics) tvs
   | null tvs_here =                      getSkolemInfo implics tvs
