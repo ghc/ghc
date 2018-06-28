@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, NoImplicitPrelude #-}
 
 -- This is a non-exposed internal module
 --
@@ -15,6 +15,8 @@ module Language.Haskell.TH.Lib.Map
     , insert
     , Language.Haskell.TH.Lib.Map.lookup
     ) where
+
+import Prelude
 
 data Map k a  = Bin {-# UNPACK #-} !Size !k a !(Map k a) !(Map k a)
               | Tip

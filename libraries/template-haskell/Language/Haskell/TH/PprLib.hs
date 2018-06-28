@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, NoImplicitPrelude #-}
 
 -- | Monadic front-end to Text.PrettyPrint
 

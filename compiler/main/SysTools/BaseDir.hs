@@ -25,6 +25,10 @@ import Panic
 import System.FilePath
 import Data.List
 
+#if defined(mingw32_HOST_OS) || defined(GHC_LOADED_INTO_GHCI)
+import System.Directory
+#endif
+
 -- POSIX
 #if defined(darwin_HOST_OS) || defined(linux_HOST_OS)
 import System.Environment (getExecutablePath)
@@ -36,7 +40,6 @@ import qualified System.Win32.Types as Win32
 import Exception
 import Foreign
 import Foreign.C.String
-import System.Directory
 import System.Win32.Types (DWORD, LPTSTR, HANDLE)
 import System.Win32.Types (failIfNull, failIf, iNVALID_HANDLE_VALUE)
 import System.Win32.File (createFile,closeHandle, gENERIC_READ, fILE_SHARE_READ, oPEN_EXISTING, fILE_ATTRIBUTE_NORMAL, fILE_FLAG_BACKUP_SEMANTICS )
@@ -113,14 +116,48 @@ expandPathVar _ _ [] = []
 -- | Returns a Unix-format path pointing to TopDir.
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
            -> IO String    -- TopDir (in Unix format '/' separated)
-findTopDir (Just minusb) = return (normalise minusb)
+findTopDir (Just minusb) = resolveTopDir (normalise minusb)
 findTopDir Nothing
     = do -- Get directory of executable
          maybe_exec_dir <- getBaseDir
          case maybe_exec_dir of
              -- "Just" on Windows, "Nothing" on unix
              Nothing  -> throwGhcExceptionIO (InstallationError "missing -B<dir> option")
-             Just dir -> return dir
+             Just dir -> resolveTopDir dir
+
+resolveTopDir :: String -> IO String
+#if !defined(GHC_LOADED_INTO_GHCI)
+resolveTopDir dir = return dir
+#else
+resolveTopDir dir = do
+    exists <- doesDirectoryExist dir
+    if exists
+        then do
+            putStrLn $ unwords
+                [ "Note: Due to -DGHC_LOADED_INTO_GHCI, did not expect that"
+                , show dir
+                , "would exist, but it does, so using it instead of its parent."
+                ]
+            return dir
+        else do
+            let parent = takeDirectory dir
+            parentExists <- doesDirectoryExist parent
+            if parentExists
+                then do
+                    putStrLn $ unwords
+                        [ "Note: Due to -DGHC_LOADED_INTO_GHCI, guessing that"
+                        , show parent
+                        , "should be used as the topdir."
+                        ]
+                    return parent
+                else do
+                    putStrLn $ concat
+                        [ "Note: Due to -DGHC_LOADED_INTO_GHCI, expected"
+                        , show parent
+                        , "to be an existent topdir, but it doesn't exist."
+                        ]
+                    return dir
+#endif
 
 getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)

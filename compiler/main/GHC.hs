@@ -326,6 +326,7 @@ import HscTypes
 import CmdLineParser
 import DynFlags hiding (WarnReason(..))
 import SysTools
+import SysTools.BaseDir
 import Annotations
 import Module
 import Panic
@@ -494,8 +495,9 @@ withCleanupSession ghc = ghc `gfinally` cleanup
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
   = do { env <- liftIO $
-                do { mySettings <- initSysTools mb_top_dir
-                   ; myLlvmConfig <- initLlvmConfig mb_top_dir
+                do { top_dir <- findTopDir mb_top_dir
+                   ; mySettings <- initSysTools top_dir
+                   ; myLlvmConfig <- initLlvmConfig top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags
