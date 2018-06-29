@@ -554,6 +554,12 @@ These flags dump various bits of information from other backends.
 
     Dump byte-code objects (BCOs) produced for the GHC's byte-code interpreter.
 
+.. ghc-flag:: -ddump-rtti
+    :shortdesc: Trace runtime type inference
+    :type: dynamic
+
+    Trace runtime type inference done by various interpreter commands.
+
 .. ghc-flag:: -ddump-foreign
     :shortdesc: Dump ``foreign export`` stubs
     :type: dynamic
