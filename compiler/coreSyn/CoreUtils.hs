@@ -532,7 +532,7 @@ isDefaultAlt _               = False
 -- | Find the case alternative corresponding to a particular
 -- constructor: panics if no such constructor exists
 findAlt :: AltCon -> [(AltCon, a, b)] -> Maybe (AltCon, a, b)
-    -- A "Nothing" result *is* legitmiate
+    -- A "Nothing" result *is* legitimate
     -- See Note [Unreachable code]
 findAlt con alts
   = case alts of

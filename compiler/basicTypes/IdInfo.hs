@@ -263,7 +263,7 @@ setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
-        -- Try to avoid spack leaks by seq'ing
+        -- Try to avoid space leaks by seq'ing
 
 setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf

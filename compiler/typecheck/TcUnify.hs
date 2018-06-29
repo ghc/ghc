@@ -1778,7 +1778,7 @@ Note [Eliminate younger unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a choice of unifying
      alpha := beta   or   beta := alpha
-we try, if possible, to elimiate the "younger" one, as determined
+we try, if possible, to eliminate the "younger" one, as determined
 by `ltUnique`.  Reason: the younger one is less likely to appear free in
 an existing inert constraint, and hence we are less likely to be forced
 into kicking out and rewriting inert constraints.
