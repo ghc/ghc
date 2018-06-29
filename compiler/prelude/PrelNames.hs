@@ -1675,7 +1675,8 @@ doublePrimTyConKey                      = mkPreludeTyConUnique  9
 doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
-funTyConKey                             = funTyConOmegaKey
+-- TODO: Put this back in order MattP, RIP interface files
+funTyConKey                             = mkPreludeTyConUnique 42
 intPrimTyConKey                         = mkPreludeTyConUnique 14
 intTyConKey                             = mkPreludeTyConUnique 15
 int8TyConKey                            = mkPreludeTyConUnique 16
@@ -1704,10 +1705,6 @@ eqTyConKey                              = mkPreludeTyConUnique 38
 heqTyConKey                             = mkPreludeTyConUnique 39
 arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 40
 mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 41
-
-funTyConOmegaKey                        = mkPreludeTyConUnique 42
-funTyConOneKey                          = mkPreludeTyConUnique 43
-funTyConZeroKey                         = mkPreludeTyConUnique 44
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
