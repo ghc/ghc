@@ -643,7 +643,7 @@ mkGadtDecl :: [Located RdrName]
 mkGadtDecl names ty
   = (ConDeclGADT { con_g_ext  = noExt
                  , con_names  = names
-                 , con_forall = L l $ isLHsForAllTy ty
+                 , con_forall = L l $ isLHsForAllTy ty'
                  , con_qvars  = mkHsQTvs tvs
                  , con_mb_cxt = mcxt
                  , con_args   = args'
