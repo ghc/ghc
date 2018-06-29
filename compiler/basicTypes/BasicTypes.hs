@@ -409,7 +409,7 @@ defaultFixity = Fixity NoSourceText maxPrecedence InfixL
 negateFixity, funTyFixity :: Fixity
 -- Wired-in fixities
 negateFixity = Fixity NoSourceText 6 InfixL  -- Fixity of unary negate
-funTyFixity  = Fixity NoSourceText 0 InfixR  -- Fixity of '->'
+funTyFixity  = Fixity NoSourceText (-1) InfixR  -- Fixity of '->'
 
 {-
 Consider
