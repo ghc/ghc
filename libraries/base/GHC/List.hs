@@ -444,7 +444,7 @@ minimum xs              =  foldl1 min xs
 -- > iterate f x == [x, f x, f (f x), ...]
 --
 -- Note that 'iterate' is lazy, potentially leading to thunk build-up if
--- the consumer doesn't force each iterate. See 'iterate\'' for a strict
+-- the consumer doesn't force each iterate. See 'iterate'' for a strict
 -- variant of this function.
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
@@ -461,7 +461,7 @@ iterateFB c f x0 = go x0
  #-}
 
 
--- | 'iterate\'' is the strict version of 'iterate'.
+-- | 'iterate'' is the strict version of 'iterate'.
 --
 -- It ensures that the result of each application of force to weak head normal
 -- form before proceeding.
