@@ -2847,6 +2847,8 @@ getSkolemInfo _ []
 getSkolemInfo [] tvs
   = pprPanic "No skolem info:" (ppr tvs)
 
+getSkolemInfo [implic] tvs = [(implic, tvs)]
+
 getSkolemInfo (implic:implics) tvs
   | null tvs_here =                      getSkolemInfo implics tvs
   | otherwise     = (implic, tvs_here) : getSkolemInfo implics tvs_other
