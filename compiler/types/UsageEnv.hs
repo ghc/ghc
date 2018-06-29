@@ -9,6 +9,7 @@ import Outputable
 import Name
 
 import Control.Monad
+import Data.Maybe
 
 --
 -- * Usage environments
@@ -83,18 +84,39 @@ lookupUE (UsageEnv e) x =
 instance Outputable UsageEnv where
   ppr (UsageEnv ne) = text "UsageEnv:" <+> ppr ne
 
+subweight :: Rig -> Rig -> Bool
+subweight r1 r2 = case subweightMaybe r1 r2 of
+                    Smaller -> True
+                    _ -> False
+
+
+data IsSubweight = Smaller -- Definitely a subweight
+                 | Larger  -- Definitely not a subweight
+                 | Unknown -- Could be a subweight, need to ask the typechecker
+                 deriving (Show, Eq, Ord)
+
+isUnknown :: IsSubweight -> Bool
+isUnknown Unknown = True
+isUnknown _ = False
+
+instance Outputable IsSubweight where
+  ppr = text . show
+
+
 -- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
-subweight :: Rig -> Rig -> Bool
-subweight (flattenRig -> r1) (flattenRig -> r2) = go r1 r2
+subweightMaybe :: Rig -> Rig -> IsSubweight
+subweightMaybe (flattenRig -> r1) (flattenRig -> r2) = go r1 r2
   where
-    go _     Omega = True
-    go Zero  Zero  = True
+    go _     Omega = Smaller
+    go Zero  Zero  = Smaller
+    go _     Zero  = Larger
+    go Zero  One   = Larger
     -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
     -- used zero times cannot be used one time.
     -- Zero = {0}
     -- One  = {1}
     -- Omega = {0...}
-    go One   One   = True
-    go (RigTy t) (RigTy t') = t `eqType` t'
-    go _     _     = False
+    go One   One   = Smaller
+--    go (RigTy t) (RigTy t') = Unknown
+    go _     _     = Unknown

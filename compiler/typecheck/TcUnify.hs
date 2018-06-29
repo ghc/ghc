@@ -11,7 +11,7 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
+  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubWeight,
   tcSubTypeDS_NC_O, tcSubTypeET,
   checkConstraints, buildImplicationFor,
 
@@ -65,6 +65,7 @@ import Util
 import Pair( pFst )
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
+import UsageEnv
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -768,7 +769,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { weight_wrap <- tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight
+        -- This additional check to implement the 1 <= Omega rule
+        -- TODO: MattP this should be on the same code path as tcSubWeight
+        do { unless (subweight act_weight exp_weight) (void (tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight))
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
            ; return (mkWpFun act_weight exp_weight arg_wrap res_wrap exp_arg exp_res doc) }
@@ -822,6 +825,32 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 tc_sub_weight_ds :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM HsWrapper
 tc_sub_weight_ds eq_orig inst_orig ctxt w_actual w_expected =
   tc_sub_type_ds eq_orig inst_orig ctxt (rigToType w_actual) (rigToType w_expected)
+
+-- TODO: MattP fix the origins
+-- As an approximation to checking w1 * w2 <= w we check that w1 <= w and
+-- w2 <= w. As together they imply that w1 * w2 <= w.
+-- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
+-- <= w
+-- The error messages from this function are currently awful.
+tcSubWeight :: Rig -> Rig -> TcM ()
+tcSubWeight actual_w w
+  = do_one actual_w
+  where
+    do_one weight =
+      case weight of
+        RigAdd m1 m2 -> do
+          --tcSubWeight Omega m1 -- We probably need to instantiate these
+          --type variables to be Omega right here.
+          --tcSubWeight Omega m2
+          tcSubWeight w Omega
+        RigMul m1 m2 -> do
+          tcSubWeight m1 w
+          tcSubWeight m2 w
+        _ -> do_one_action weight w
+
+    do_one_action a_w c_w
+       = void (tc_sub_weight_ds AppOrigin AppOrigin TypeAppCtxt a_w c_w)
+
 
 
 -----------------
