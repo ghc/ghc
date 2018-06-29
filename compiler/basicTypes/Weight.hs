@@ -26,8 +26,12 @@ import {-# SOURCE #-} TyCoRep
 --
 
 
-data Rig = Zero | One | Omega | RigVar Id | RigAdd Rig Rig | RigMul Rig Rig
-                              | RigTy Type
+data Rig = Zero
+         | One
+         | Omega
+         | RigAdd Rig Rig
+         | RigMul Rig Rig
+         | RigTy Type
   deriving (Data)
 
 
@@ -50,7 +54,6 @@ instance Outputable Rig where
   ppr Zero = text "0"
   ppr One = text "1"
   ppr Omega = text "ω"
-  ppr (RigVar id) = ppr id
   ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
   ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
   ppr (RigTy ty) = pprType ty

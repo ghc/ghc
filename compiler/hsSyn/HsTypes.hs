@@ -718,8 +718,7 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-data HsRig pass = HsZero | HsOne | HsOmega | HsRigVar (IdP pass)
-                                           | HsRigTy (LHsType pass)
+data HsRig pass = HsZero | HsOne | HsOmega | HsRigTy (LHsType pass)
 
 instance
       (OutputableBndrId (GhcPass pass)) =>
@@ -727,7 +726,6 @@ instance
   ppr HsZero = text "0"
   ppr HsOne = text "1"
   ppr HsOmega = text "ω"
-  ppr (HsRigVar _id) = text "var"
   ppr (HsRigTy p) = ppr p
 
 
@@ -737,7 +735,6 @@ hsRigToRig c =
     HsZero -> Zero
     HsOne  -> One
     HsOmega -> Omega
-    HsRigVar v -> RigVar v
     _ -> panic "hsRigToRig"
 
 hsUnrestricted, hsLinear :: a -> HsWeighted pass a

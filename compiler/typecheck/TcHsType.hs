@@ -609,7 +609,6 @@ tc_weight mode r = case r of
                          HsRigTy ty -> do
                           ty' <- tc_lhs_type mode ty multiplicityTy
                           case ty' of
---                            TyVarTy tv -> return $ RigVar tv
                             t | isOneMultiplicity t -> return One
                             t | isOmegaMultiplicity t -> return Omega
                             t -> return $ RigTy t

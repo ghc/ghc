@@ -2353,7 +2353,6 @@ eqRig Zero Zero = True
 eqRig One One = True
 eqRig Omega Omega = True
 eqRig (RigTy ty) (RigTy ty') = eqType ty ty'
-eqRig (RigVar i1) (RigVar i2) = i1 == i2
 eqRig (RigAdd r1 r2) (RigAdd r1' r2') = eqRig r1 r1' && eqRig r2 r2'
 eqRig (RigMul r1 r2) (RigMul r1' r2') = eqRig r1 r1' && eqRig r2 r2'
 eqRig _ _ = False
