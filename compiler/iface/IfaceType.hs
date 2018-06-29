@@ -838,7 +838,7 @@ defaultMultiplicityVars sty = go emptyFsEnv
       where dc_name = getName omegaDataConTyCon
 
     isMultiplicity :: IfaceType -> Bool
-    isMultiplicity (IfaceTyConApp tc _) = pprTrace "isApp" (ppr tc) $
+    isMultiplicity (IfaceTyConApp tc _) =
         tc `ifaceTyConHasKey` multiplicityTyConKey
     isMultiplicity _ = False
 
