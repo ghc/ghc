@@ -1825,18 +1825,14 @@ stg_readMVarzh ( P_ mvar, /* :: MVar a */ )
 
 stg_tryReadMVarzh ( P_ mvar, /* :: MVar a */ )
 {
-    W_ val, info, tso, q;
-
-    LOCK_CLOSURE(mvar, info);
-
-    if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
-        unlockClosure(mvar, info);
-        return (0, stg_NO_FINALIZER_closure);
-    }
+    W_ val;
 
     val = StgMVar_value(mvar);
 
-    unlockClosure(mvar, info);
+    if (val == stg_END_TSO_QUEUE_closure) {
+        return (0, stg_NO_FINALIZER_closure);
+    }
+
     return (1, val);
 }
 
