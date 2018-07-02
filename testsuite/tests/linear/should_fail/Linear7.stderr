@@ -1,0 +1,9 @@
+
+Linear7.hs:6:16: error:
+    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+        arising from an application
+    • In an equation for ‘incorrectLCase’:
+          incorrectLCase n
+            = \case
+                True -> n
+                False -> 0

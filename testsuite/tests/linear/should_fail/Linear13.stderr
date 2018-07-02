@@ -1,0 +1,12 @@
+
+Linear13.hs:8:20: error:
+    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+        arising from an application
+    • In an equation for ‘incorrectLazyMatch’:
+          incorrectLazyMatch x = let (a, b) = x in b
+
+Linear13.hs:11:24: error:
+    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+        arising from an application
+    • In an equation for ‘incorrectCasePromotion’:
+          incorrectCasePromotion x = case x of { (a, b) -> b }
