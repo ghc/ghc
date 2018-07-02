@@ -21,7 +21,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
-        Rig(..), HsRig(..), hsFunTyConName, HsWeighted(..),
+        Rig(..), HsRig(..), HsWeighted(..),
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
@@ -735,13 +735,6 @@ hsLinear = HsWeighted HsOne
 isHsOmega :: HsRig pass -> Bool
 isHsOmega HsOmega = True
 isHsOmega _ = False
-
-
--- TODO: This is going to change because (->) will have to take
--- a multiplicity as an argument
-hsFunTyConName :: HsRig pass -> Name
-hsFunTyConName _ = funTyConName
-
 
 data HsWeighted pass a = HsWeighted { hsWeight :: HsRig pass, hsThing :: a }
   deriving (Traversable, Functor, Foldable)

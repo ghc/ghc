@@ -603,7 +603,7 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
        ; (weight', w_fvs) <- rnRig env weight
        -- TODO: Can linear arrows appear in kinds?
        -- Arnaud says no, perhaps this needs to be restricted
-       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') (hsFunTyConName weight) funTyFixity ty1' ty2'
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
     hs_fun_ty w a b = HsFunTy noExt a w b
