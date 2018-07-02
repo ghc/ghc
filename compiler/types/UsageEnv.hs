@@ -118,5 +118,7 @@ subweightMaybe (flattenRig -> r1) (flattenRig -> r2) = go r1 r2
     -- One  = {1}
     -- Omega = {0...}
     go One   One   = Smaller
+    -- The 1 <= p rule
+    go One   _     = Smaller
 --    go (RigTy t) (RigTy t') = Unknown
     go _     _     = Unknown
