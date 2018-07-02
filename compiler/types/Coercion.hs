@@ -248,6 +248,9 @@ decomposeFunCo :: HasDebugCallStack
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
 -- See Note [Function coercions] for the "3" and "4"
+-- Include this list here to that grepping for a list of exactly
+-- length 5 points to here.
+-- [w, r1, r2, a1, a2]
 decomposeFunCo r co = ASSERT2( all_ok, ppr co )
                       (mkNthCo r 3 co, mkNthCo r 4 co)
   where
@@ -891,6 +894,9 @@ mkNthCo r n co
       = case n of
           -- TODO: MattP, this is probably wrong, the correct coercion
           -- needs to be placed here. And need to update the comment
+          -- Include this list here to that grepping for a list of exactly
+          -- length 5 points to here.
+          -- [w, r1, r2, a1, a2]
           0 -> pprPanic "multiplicityCo" (ppr co)
           1 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
           2 -> ASSERT( r == Nominal ) mkRuntimeRepCo res

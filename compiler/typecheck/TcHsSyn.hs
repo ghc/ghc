@@ -1743,8 +1743,9 @@ zonkTvSkolemising tv
 
 zonkTypeZapping :: UnboundTyVarZonker
 -- This variant is used for everything except the LHS of rules
--- It zaps unbound type variables to Any, except for RuntimeRep
--- vars which it zonks to LiftedRep
+-- It zaps unbound type variables to Any, except for
+-- 1. RuntimeRep vars which it zonks to LiftedRep
+-- 2. Multiplicity vars which it zonks to Omega
 -- Works on both types and kinds
 zonkTypeZapping tv
   = do { let ty | isRuntimeRepVar tv = liftedRepTy
