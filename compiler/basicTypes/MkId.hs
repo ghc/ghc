@@ -570,7 +570,8 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
 --  = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mkArgs wrap_arg_tys
+  = do { let w_ty = RigTy (mkTyVarTy multiplicityTyVar)
+       ; wrap_args <- mkArgs (map (setWeight w_ty) wrap_arg_tys)
        ; wrap_body <- mkBody (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
 
