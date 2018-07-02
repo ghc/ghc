@@ -223,6 +223,7 @@ import BasicTypes
 import Kind
 import TyCoRep
 import Weight
+import {-# SOURCE #-} UsageEnv
 
 -- friends:
 import Var
@@ -2344,7 +2345,12 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
 
     go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
-    go_rig env r1 r2 = go env (rigToType r1) (rigToType r2)
+    go_rig env r1 r2 | r1 `eqRig` r2 = TEQ
+    go_rig env r1 r2 =
+      case subweightMaybe r1 r2 of
+        Smaller -> TLT
+        Larger  -> TGT
+        Unknown -> go env (rigToType r1) (rigToType r2)
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ

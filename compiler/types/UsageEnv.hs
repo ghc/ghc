@@ -4,9 +4,9 @@ module UsageEnv where
 import GhcPrelude
 import Weight
 import NameEnv
-import Type
 import Outputable
 import Name
+import Type (flattenRig)
 
 import Control.Monad
 import Data.Maybe
