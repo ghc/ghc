@@ -943,7 +943,7 @@ checkLinearity :: UsageEnv -> Var -> LintM ()
 checkLinearity body_ue lam_var =
   case varWeightMaybe lam_var of
     Just mult ->
-      checkL (lookupUE body_ue lam_var `subweight` mult) (err_msg mult)
+      ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
     Nothing   -> return () -- A type variable
   where
     lhs = lookupUE body_ue lam_var
@@ -1079,7 +1079,7 @@ lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
 -- | Implements the case rules for linearity
 checkCaseLinearity :: (Rig, Var -> Rig, Rig) ->  Rig -> Var -> LintM ()
 checkCaseLinearity (flattenRig -> scrut_usage, var_usage, flattenRig -> scrut_w) (flattenRig -> var_w) bndr = do
-  lintL (lhs `subweight` rhs) err_msg
+  ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
   where
     lhs = var_usage bndr + (scrut_usage * var_w)
@@ -1242,8 +1242,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
 
 lintLinearBinder :: SDoc -> Rig -> Rig -> LintM ()
 lintLinearBinder doc actual_usage described_usage
-  = lintL (actual_usage `subweight` described_usage)
-          err_msg
+  = ensureEqWeights actual_usage described_usage err_msg
     where
       err_msg = (text "Multiplicity of variable does agree with its context"
                 $$ doc
@@ -2318,6 +2317,14 @@ ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have already had the substitution applied
 ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
+
+ensureEqWeights :: Rig -> Rig -> SDoc -> LintM ()
+ensureEqWeights actual_usage described_usage err_msg =
+    case (actual_usage `subweightMaybe` described_usage) of
+      Smaller -> return ()
+      Larger -> addErrL err_msg
+      Unknown -> ensureEqTys (rigToType actual_usage)
+                             (rigToType described_usage) err_msg
 
 lintRole :: Outputable thing
           => thing     -- where the role appeared
