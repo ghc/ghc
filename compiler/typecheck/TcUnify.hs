@@ -839,10 +839,9 @@ tcSubWeight actual_w w
     do_one weight =
       case weight of
         RigAdd m1 m2 -> do
-          --tcSubWeight Omega m1 -- We probably need to instantiate these
-          --type variables to be Omega right here.
-          --tcSubWeight Omega m2
-          tcSubWeight w Omega
+          -- MattP: We probably need to instantiate these
+          -- variables m1 and m2 to be Omega right here.
+          tcSubWeight Omega w
         RigMul m1 m2 -> do
           tcSubWeight m1 w
           tcSubWeight m2 w

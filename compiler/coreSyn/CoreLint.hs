@@ -673,26 +673,9 @@ lintIdUnfolding bndr bndr_ty uf
   , isStableUnfolding uf
   = do { ty <- fst <$> lintRhs bndr rhs
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
-lintIdUnfolding _ _ _= return ()
-{-
-lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-  | isStableSource src
-  = do { ty <- fst <$> lintRhs bndr rhs
-       ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
-
-lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
-                                            , df_args = args })
-  = do { ty <- lintBinders LambdaBind bndrs $ \ bndrs' ->
-               do { (res_ty, _) <- lintCoreArgs ((dataConUserType con), emptyUE) (Type omegaDataConTy : args) -- MattP: TODO Check
-                  -- Use dataConUserType here as we are going to desugar
-                  --
-                  ; return (mkLamTypes bndrs' res_ty) }
-       ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "dfun unfolding") ty) }
-
 lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
                     -- to exponential behaviour; c.f. CoreFVs.idUnfoldingVars
--}
 
 {-
 Note [Checking for INLINE loop breakers]
@@ -1259,7 +1242,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
 
 lintLinearBinder :: SDoc -> Rig -> Rig -> LintM ()
 lintLinearBinder doc actual_usage described_usage
-  = lintL (actual_usage `eqRig` described_usage)
+  = lintL (actual_usage `subweight` described_usage)
           err_msg
     where
       err_msg = (text "Multiplicity of variable does agree with its context"

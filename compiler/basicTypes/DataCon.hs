@@ -931,6 +931,7 @@ mkDataCon name declared_infix prom_info
       case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConUserType.
+        -- See Note [All data constructors have wrappers]
 --        NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
@@ -950,6 +951,18 @@ mkDataCon name declared_infix prom_info
 
     roles = map (const Nominal) (univ_tvs ++ ex_tvs) ++
             map (const Representational) orig_arg_tys
+
+{- Note [All data constructors have wrappers]
+
+All data constructors should have a wrapper. The reason for this is that
+all data constructors have an unused multiplicity argument which is taken and
+thrown away by the wrapper.
+
+If we reverse this
+decision then this line will need to be restored. It is
+commented out to make it easy to add back with the correct
+information.
+-}
 
 mkCleanAnonTyConBinders :: [TyConBinder] -> [Type] -> [TyConBinder]
 -- Make sure that the "anonymous" tyvars don't clash in

@@ -115,9 +115,9 @@ module Type (
         dropRuntimeRepArgs,
         getRuntimeRep, getRuntimeRepFromKind,
 
-        isMultiplicityTy, isMultiplicityVar,
-
         -- Multiplicity
+
+        isMultiplicityTy, isMultiplicityVar,
 
         isLinearType, isOneMultiplicity, isOmegaMultiplicity,
 
@@ -2318,7 +2318,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy w1 s1 t1) (FunTy w2 s2 t2)
-      = --liftOrdering (compare w1 w2) `thenCmpTy` TODO: MattP need to add this back in
+      = go_rig env w1 w2 `thenCmpTy`
         go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
@@ -2341,6 +2341,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (TyConApp {})   = 5
             get_rank (FunTy {})      = 6
             get_rank (ForAllTy {})   = 7
+
+
+    go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
+    go_rig env r1 r2 = go env (rigToType r1) (rigToType r2)
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ

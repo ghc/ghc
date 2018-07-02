@@ -1549,8 +1549,9 @@ unfoldingTemplate = uf_tmpl
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
 maybeUnfoldingTemplate (CoreUnfolding { uf_tmpl = expr })
   = Just expr
--- Use `dataConWorkId` here as we don't store `Multiplicity` vars in the
--- `DFunUnfolding` arguments.
+-- Use `dataConWorkId` here as we don't store `Multiplicity` vars in theS--
+-- `DFunUnfolding` argument. When we make the `DFunUnfolding`, we don't
+-- put a multiplicity argument in `df_args`.
 maybeUnfoldingTemplate (DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = args })
   = Just (mkLams bndrs (mkApps (Var (dataConWorkId con)) args))
 maybeUnfoldingTemplate _

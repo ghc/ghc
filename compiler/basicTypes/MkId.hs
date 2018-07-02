@@ -565,6 +565,7 @@ mkDataConRepX :: Monad m =>
              -> DataCon
              -> m DataConRep
 mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
+-- See Note [All data constructors have wrappers]
 --  | not wrapper_reqd
 --  = return NoDataConRep
 

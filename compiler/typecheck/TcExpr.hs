@@ -1272,7 +1272,6 @@ tcGeneralApp m_herald fun args res_ty
                      tcSubTypeDS_NC_O orig GenSigCtxt
                        (Just $ unLoc $ foldl mk_hs_app fun args)
                        actual_res_ty res_ty
---       ; pprTrace "tcGeneralApp" (ppr wrap_res) (return ())
        ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
   where
     mk_hs_app f (HsValArg a)  = mkHsApp f a
@@ -1859,7 +1858,12 @@ tc_infer_id lbl id_name
                  theta' = substTheta subst theta
                  rho'   = substTy subst rho
            ; wrap <- instCall (OccurrenceOf id_name) tys' theta'
-           ; addDataConStupidTheta con (tail tys') -- tail for extra multiplicity argument
+           ; addDataConStupidTheta con (tail tys')
+           -- The first argument of `tys'` is the multiplicity argument.
+           -- It is then followed by the dictionaries which are the stupid
+           -- theta. Thus, we ignore the first argument as we just want to
+           -- instantiate dictionary arguments in `addDataConStupidTheta`.
+           -- It might be better to use `dataConRepType` in `con_ty` below.
            ; return ( mkHsWrap wrap (HsConLikeOut noExt (RealDataCon con))
                     , rho') }
 

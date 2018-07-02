@@ -1107,8 +1107,13 @@ mk_class tycon sc_pred sc_sel_id
 *                                                                      *
 ********************************************************************* -}
 
--- For information about the usage of the following type,
--- see Note [TYPE and RuntimeRep] in module TysPrim
+{- Multiplicity polymorphism is implemented very similarly to levity
+ polymorphism. We write in the multiplicity kind and the One and Omega
+ types which can appear in user programs. These are defined properly in GHC.Types.
+
+data Multiplicity = One | Omega
+-}
+
 multiplicityTy :: Type
 multiplicityTy = mkTyConTy multiplicityTyCon
 

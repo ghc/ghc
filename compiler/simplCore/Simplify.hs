@@ -239,7 +239,6 @@ simplLazyBind :: SimplEnv
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = ASSERT( isId bndr )
     ASSERT2( not (isJoinId bndr), ppr bndr )
-    -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
     do  { let   rhs_env     = rhs_se `setInScopeFromE` env
                 (tvs, body) = case collectTyAndValBinders rhs of
                                 (tvs, [], body)
@@ -535,8 +534,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
   = return (emptyLetFloats, expr)
 
   | otherwise
-  = do  { --pprTrace "makeTrivialWithInfo" (ppr expr) (return ()) ;
-          (floats, expr1) <- prepareRhs mode top_lvl occ_fs info expr
+  = do  { (floats, expr1) <- prepareRhs mode top_lvl occ_fs info expr
         ; if   exprIsTrivial expr1  -- See Note [Trivial after prepareRhs]
           then return (floats, expr1)
           else do
