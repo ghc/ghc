@@ -728,15 +728,6 @@ instance
   ppr HsOmega = text "ω"
   ppr (HsRigTy p) = ppr p
 
-
-hsRigToRig :: HsRig GhcTc -> Rig
-hsRigToRig c =
-  case c of
-    HsZero -> Zero
-    HsOne  -> One
-    HsOmega -> Omega
-    _ -> panic "hsRigToRig"
-
 hsUnrestricted, hsLinear :: a -> HsWeighted pass a
 hsUnrestricted = HsWeighted HsOmega
 hsLinear = HsWeighted HsOne
