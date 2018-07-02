@@ -40,7 +40,8 @@ instance Num Rig where
   _ * Zero = Zero
   p * One = p
   One * p = p
-  Omega * Omega = Omega
+  p * Omega = Omega
+  Omega * p = Omega
   p1 * p2 = RigMul p1 p2
 
   Zero + x = x
