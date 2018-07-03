@@ -39,7 +39,19 @@
         copy_tag(p, info, src, size, stp, tag)
 #endif
 
-/* Used to avoid long recursion due to selector thunks
+/* Note [Selector optimisation depth limit]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * MAX_THUNK_SELECTOR_DEPTH is used to avoid long recursion of
+ * eval_thunk_selector due to nested selector thunks. Note that this *only*
+ * counts nested selector thunks, e.g. `fst (fst (... (fst x)))`. The collector
+ * will traverse interleaved selector-constructor pairs without limit, e.g.
+ *
+ *     a = (fst b, _)
+ *     b = (fst c, _)
+ *     c = (fst d, _)
+ *     d = (x, _)
+ *
  */
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
@@ -1252,6 +1264,7 @@ selector_loop:
 
           // recursively evaluate this selector.  We don't want to
           // recurse indefinitely, so we impose a depth bound.
+          // See Note [Selector optimisation depth limit].
           if (gct->thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
               goto bale_out;
           }
