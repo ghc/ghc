@@ -1483,11 +1483,17 @@ topNormaliseNewType_maybe ty
 
 -- | Syntactic equality of coercions
 eqCoercion :: Coercion -> Coercion -> Bool
-eqCoercion = eqType `on` coercionType
+eqCoercion co1 co2 =
+  let Pair t1 s1 = coercionKind co1
+      Pair t2 s2 = coercionKind co2
+  in eqType t1 t2 && eqType s1 s2
 
 -- | Compare two 'Coercion's, with respect to an RnEnv2
 eqCoercionX :: RnEnv2 -> Coercion -> Coercion -> Bool
-eqCoercionX env = eqTypeX env `on` coercionType
+eqCoercionX env co1 co2 =
+  let Pair t1 s1 = coercionKind co1
+      Pair t2 s2 = coercionKind co2
+  in eqTypeX env t1 t2 && eqTypeX env s1 s2
 
 {-
 %************************************************************************
