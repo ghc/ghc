@@ -571,7 +571,8 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
 
   | otherwise
   = do { let w_ty = RigTy (mkTyVarTy multiplicityTyVar)
-       ; wrap_args <- mkArgs (map (setWeight w_ty) wrap_arg_tys)
+       -- See Note [Wrapper weights]
+       ; wrap_args <- mkArgs (map (scaleWeighted w_ty) wrap_arg_tys)
        ; wrap_body <- mkBody (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
 
@@ -775,6 +776,22 @@ wrappers! After all, a newtype can also be written with GADT syntax:
 Again, this needs a wrapper data con to reorder the type variables. It does
 mean that this newtype constructor requires another level of indirection when
 being called, but the inliner should make swift work of that.
+
+
+Note [Wrapper weights]
+~~~~~~~~~~~~~~~~~~~~~~
+
+When we made the wrapper for a data type of different multiplicity fields,
+we only want to make the ones which are linear multiplicity polymorphic. If we
+do not do this then the wrapper will not be well-typed.
+
+The way we ensure this is by scaling the weight of the field by the multiplicity
+variable. This works because..
+
+1 * p = p
+w * p = w
+
+So the arguments end up with the right multiplicity all very elegantly.
 -}
 
 -------------------------

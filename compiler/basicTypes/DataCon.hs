@@ -936,7 +936,7 @@ mkDataCon name declared_infix prom_info
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         _ -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
-                 mkFunTys (map (setWeight One) rep_arg_tys) $
+                 mkFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
         -- MattP: We really should not use `setWeight` here but this makes
         -- all the wrappers well typed. It is stop gap solution.
@@ -1261,7 +1261,8 @@ dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOrigResTy = res_ty })
   = let tvb = mkTyVarBinder Inferred multiplicityTyVar
         ty  = mkTyVarTy multiplicityTyVar
-        arg_tys' = map (setWeight (RigTy ty)) arg_tys
+        -- See Note [Wrapper weights]
+        arg_tys' = map (scaleWeighted (RigTy ty)) arg_tys
     in
       mkForAllTys (tvb : user_tvbs) $
       mkFunTys (map unrestricted theta) $
