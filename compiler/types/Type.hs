@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -2345,12 +2345,14 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
 
     go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
-    go_rig env r1 r2 | r1 `eqRig` r2 = TEQ
-    go_rig env r1 r2 =
-      case subweightMaybe r1 r2 of
-        Smaller -> TLT
-        Larger  -> TGT
-        Unknown -> go env (rigToType r1) (rigToType r2)
+    go_rig env (flattenRig -> r1) (flattenRig -> r2) =
+      if r1 `eqRig` r2
+        then TEQ
+        else
+          case subweightMaybe r1 r2 of
+            Smaller -> TLT
+            Larger  -> TGT
+            Unknown -> go env (rigToType r1) (rigToType r2)
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ
