@@ -769,9 +769,10 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        -- This additional check to implement the 1 <= Omega rule
         -- TODO: MattP this should be on the same code path as tcSubWeight
-        do { unless (subweight act_weight exp_weight) (void (tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight))
+        do { -- Note that here we do not call to `subweightMaybe`, so we check
+             -- for strict equality.
+           ; void (tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight)
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
            ; return (mkWpFun act_weight exp_weight arg_wrap res_wrap exp_arg exp_res doc) }
