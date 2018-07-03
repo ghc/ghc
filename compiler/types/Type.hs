@@ -725,13 +725,13 @@ splitAppTy_maybe ty | Just ty' <- coreView ty
                     = splitAppTy_maybe ty'
 splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
-rigToType :: Rig -> Type
+rigToType :: HasCallStack => Rig -> Type
 rigToType r =
   case r of
     One ->  oneDataConTy
     Omega -> omegaDataConTy
     RigTy ty -> ty
-    r -> pprPanic "rigToType" (ppr r)
+    r -> pprPanic "rigToType" (ppr r $$ callStackDoc )
 
 typeToRig :: Type -> Rig
 typeToRig ty = flattenRig (RigTy ty)
