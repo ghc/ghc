@@ -570,12 +570,9 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
 --  = return NoDataConRep
 
   | otherwise
-  = do { let w_ty = RigTy (mkTyVarTy multiplicityTyVar)
-       -- See Note [Wrapper weights]
-       ; wrap_args <- mkArgs (map (scaleWeighted w_ty) wrap_arg_tys)
+  = do { wrap_args <- mkArgs wrap_arg_tys
        ; wrap_body <- mkBody (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
-
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
              wrap_info = noCafIdInfo
                          `setArityInfo`         wrap_arity
@@ -640,7 +637,10 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = (map unrestricted theta) ++ orig_arg_tys
+    w_ty = RigTy (mkTyVarTy multiplicityTyVar)
+    -- See Note [Wrapper weights]
+    wrap_arg_tys = (map unrestricted theta)
+                    ++ (map (scaleWeighted w_ty) orig_arg_tys)
     wrap_arity   = length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -910,14 +910,15 @@ dataConArgUnpack (Weighted arg_weight arg_ty)
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = map (scaleWeighted arg_weight) $ dataConInstArgTys con tc_args
+  , let rep_tys = dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyVars con) )  -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
+          ; let r_weight = idWeight arg_id
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, rep_ids, body)]
+                         [(DataAlt con, map (flip scaleIdBy r_weight) rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . fmap (TcType.substTyUnchecked subst)) rep_tys
