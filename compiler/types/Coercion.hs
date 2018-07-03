@@ -553,7 +553,7 @@ mkTyConAppCo r tc cos
   = -- (a :: TYPE ra) -> (b :: TYPE rb)  ~  (c :: TYPE rc) -> (d :: TYPE rd)
     -- rep1 :: ra  ~  rc        rep2 :: rb  ~  rd
     -- co1  :: a   ~  c         co2  :: b   ~  d
-    mkFunCo r Omega co1 co2 -- TODO: Change when changing Rig To Coercion in FunCo
+    mkFunCo r (coercionToRig w) co1 co2
 
                -- Expand type synonyms
   | Just (tv_co_prs, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos
@@ -563,6 +563,15 @@ mkTyConAppCo r tc cos
   = Refl r (mkTyConApp tc (map fst tys_roles))    -- See Note [Refl invariant]
 
   | otherwise = TyConAppCo r tc cos
+
+-- TODO: MattP this is very suspect. There can probably be more complicated
+-- coercions here. However, there is another function rigToCo which is
+-- probably the inverse which is also extremely simple minded like this.
+coercionToRig :: Coercion -> Rig
+coercionToRig co
+  | Just (ty, _) <- isReflCo_maybe co
+  = typeToRig ty
+  | otherwise = pprPanic "coercionToRig" (ppr co)
 
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
 -- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@.
