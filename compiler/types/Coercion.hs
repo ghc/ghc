@@ -423,7 +423,8 @@ mkCoercionType Phantom          = \ty1 ty2 ->
   let ki1 = typeKind ty1
       ki2 = typeKind ty2
   in
-  TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
+  ASSERT2(eqType ki1 ki2, ppr ty1 $$ ppr ty2 $$ ppr ki1 $$ ppr ki2)
+  TyConApp eqPhantPrimTyCon [ki1, ty1, ty2]
 
 mkHeteroCoercionType :: Role -> Kind -> Kind -> Type -> Type -> Type
 mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred
@@ -1482,11 +1483,17 @@ topNormaliseNewType_maybe ty
 
 -- | Syntactic equality of coercions
 eqCoercion :: Coercion -> Coercion -> Bool
-eqCoercion = eqType `on` coercionType
+eqCoercion co1 co2 =
+  let Pair t1 s1 = coercionKind co1
+      Pair t2 s2 = coercionKind co2
+  in eqType t1 t2 && eqType s1 s2
 
 -- | Compare two 'Coercion's, with respect to an RnEnv2
 eqCoercionX :: RnEnv2 -> Coercion -> Coercion -> Bool
-eqCoercionX env = eqTypeX env `on` coercionType
+eqCoercionX env co1 co2 =
+  let Pair t1 s1 = coercionKind co1
+      Pair t2 s2 = coercionKind co2
+  in eqTypeX env t1 t2 && eqTypeX env s1 s2
 
 {-
 %************************************************************************

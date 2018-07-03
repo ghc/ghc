@@ -814,10 +814,10 @@ eqPrimTyCon :: TyCon  -- The representation type for equality predicates
                       -- See Note [The equality types story]
 eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> Void#
-    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
+    -- Kind :: forall k. k -> k -> Void#
+    binders  = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
     res_kind = unboxedTupleKind []
-    roles    = [Nominal, Nominal, Nominal, Nominal]
+    roles    = [Nominal, Nominal, Nominal]
 
 -- like eqPrimTyCon, but the type for *Representational* coercions
 -- this should only ever appear as the type of a covar. Its role is
@@ -825,10 +825,10 @@ eqPrimTyCon  = mkPrimTyCon eqPrimTyConName binders res_kind roles
 eqReprPrimTyCon :: TyCon   -- See Note [The equality types story]
 eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> Void#
-    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
+    -- Kind :: forall k. k -> k -> Void#
+    binders  = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
     res_kind = unboxedTupleKind []
-    roles    = [Nominal, Nominal, Representational, Representational]
+    roles    = [Nominal, Nominal, Representational]
 
 -- like eqPrimTyCon, but the type for *Phantom* coercions.
 -- This is only used to make higher-order equalities. Nothing
@@ -836,10 +836,10 @@ eqReprPrimTyCon = mkPrimTyCon eqReprPrimTyConName binders res_kind roles
 eqPhantPrimTyCon :: TyCon
 eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
   where
-    -- Kind :: forall k1 k2. k1 -> k2 -> Void#
-    binders  = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
+    -- Kind :: forall k. k -> k -> Void#
+    binders  = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
     res_kind = unboxedTupleKind []
-    roles    = [Nominal, Nominal, Phantom, Phantom]
+    roles    = [Nominal, Nominal, Phantom]
 
 {- *********************************************************************
 *                                                                      *
