@@ -423,7 +423,8 @@ mkCoercionType Phantom          = \ty1 ty2 ->
   let ki1 = typeKind ty1
       ki2 = typeKind ty2
   in
-  TyConApp eqPhantPrimTyCon [ki1, ki2, ty1, ty2]
+  ASSERT2(eqType ki1 ki2, ppr ty1 $$ ppr ty2 $$ ppr ki1 $$ ppr ki2)
+  TyConApp eqPhantPrimTyCon [ki1, ty1, ty2]
 
 mkHeteroCoercionType :: Role -> Kind -> Kind -> Type -> Type -> Type
 mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred

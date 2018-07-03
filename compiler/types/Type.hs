@@ -1629,7 +1629,8 @@ mkPrimEqPredRole Phantom          = panic "mkPrimEqPredRole phantom"
 -- Invariant: the types are not Coercions
 mkPrimEqPred :: Type -> Type -> Type
 mkPrimEqPred ty1 ty2
-  = TyConApp eqPrimTyCon [k1, k2, ty1, ty2]
+  = ASSERT2(eqType k1 k2, ppr ty1 $$ ppr ty2 $$ ppr k1 $$ ppr k2)
+    TyConApp eqPrimTyCon [k1, ty1, ty2]
   where
     k1 = typeKind ty1
     k2 = typeKind ty2
@@ -1653,7 +1654,8 @@ splitCoercionType_maybe ty
 
 mkReprPrimEqPred :: Type -> Type -> Type
 mkReprPrimEqPred ty1  ty2
-  = TyConApp eqReprPrimTyCon [k1, k2, ty1, ty2]
+  = ASSERT2(eqType k1 k2, ppr ty1 $$ ppr ty2 $$ ppr k1 $$ ppr k2)
+    TyConApp eqReprPrimTyCon [k1, ty1, ty2]
   where
     k1 = typeKind ty1
     k2 = typeKind ty2

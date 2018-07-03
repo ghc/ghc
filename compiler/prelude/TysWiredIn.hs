@@ -1015,8 +1015,8 @@ heqSCSelId, coercibleSCSelId :: Id
     datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
 
     -- Kind: forall k1 k2. k1 -> k2 -> Constraint
-    binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (\ks -> ks)
-    roles     = [Nominal, Nominal, Nominal, Nominal]
+    binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
+    roles     = [Nominal, Nominal, Nominal]
     rhs       = mkDataTyConRhs [datacon]
 
     tvs       = binderVars binders
