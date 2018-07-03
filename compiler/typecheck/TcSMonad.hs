@@ -3188,7 +3188,7 @@ demoteUnfilledFmv fmv
 
 -----------------------------
 dischargeFunEq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFunEqCan ev tv co ty)
+-- (dischargeFunEq tv co ty)
 --     Preconditions
 --       - ev :: F tys ~ tv   is a CFunEqCan
 --       - tv is a FlatMetaTv of FlatSkolTv
