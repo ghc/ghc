@@ -1219,8 +1219,8 @@ isTouchableMetaTyVar ctxt_tclvl tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl }
-        -> --ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
-           --         ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
+        -> ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
+                    ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
            tv_tclvl `sameDepthAs` ctxt_tclvl
       _ -> False
   | otherwise = False
