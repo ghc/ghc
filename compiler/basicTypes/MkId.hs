@@ -1294,15 +1294,15 @@ unsafeCoerceId
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
-    -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+    -- unsafeCoerce# :: forall (m : Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
     --                         (a :: TYPE r1) (b :: TYPE r2).
-    --                         a -> b
-    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
+    --                         a ->@{m} b
+    bndrs = multiplicityTyVar : mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
                                (\ks -> map tYPE ks)
 
-    [_, _, a, b] = mkTyVarTys bndrs
+    [m, _, _, a, b] = mkTyVarTys bndrs
 
-    ty  = mkSpecForAllTys bndrs (mkFunTy Omega a b)
+    ty  = mkSpecForAllTys bndrs (mkFunTy (RigTy m) a b)
 
     [x] = mkTemplateLocals [a]
     rhs = mkLams (bndrs ++ [x]) $
