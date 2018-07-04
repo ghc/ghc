@@ -1,0 +1,6 @@
+
+T15316.hs:20:13: error:
+    • The constraint ‘c’ is no smaller than the instance head ‘c’
+      (Use UndecidableInstances to permit this)
+    • In the quantified constraint ‘c => c’
+      In the type signature: subsume' :: Proxy c -> ((c => c) => r) -> r

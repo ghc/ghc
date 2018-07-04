@@ -410,7 +410,7 @@ How is this implemented? It's complicated! So we'll step through it all:
     the list is null.
 
  2) `TcInteract.matchClassInst` -- This module drives the instance resolution
-    / dictionary generation. The return type is `LookupInstResult`, which either
+    / dictionary generation. The return type is `ClsInstResult`, which either
     says no instance matched, or one found, and if it was a safe or unsafe
     overlap.
 
