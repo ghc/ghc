@@ -781,11 +781,14 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
           dflags <- getDynFlags
           let word_size = wORD_SIZE dflags
               size_b = primRepSizeB dflags rep
-              -- Fields are always aligned.
-              !aligned_idx = roundUpTo arr_i size_b
+              -- Align the start offset (eg, 2-byte value should be 2-byte
+              -- aligned). But not more than to a word. The offset calculation
+              -- should be the same with the offset calculation in
+              -- StgCmmLayout.mkVirtHeapOffsetsWithPadding.
+              !aligned_idx = roundUpTo arr_i (min word_size size_b)
               !new_arr_i = aligned_idx + size_b
               ws | size_b < word_size =
-                     [index size_b array aligned_idx word_size]
+                     [index size_b aligned_idx word_size]
                  | otherwise =
                      let (q, r) = size_b `quotRem` word_size
                      in ASSERT( r == 0 )
@@ -800,7 +803,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                 (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
 
     -- Extract a sub-word sized field from a word
-    index item_size_b array index_b word_size =
+    index item_size_b index_b word_size =
         (word .&. (mask `shiftL` moveBytes)) `shiftR` moveBytes
       where
         mask :: Word
