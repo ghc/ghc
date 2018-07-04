@@ -1559,10 +1559,16 @@ tyCoFVsOfType (TyVarTy v)        a b c = (unitFV v `unionFV` tyCoFVsOfType (tyVa
 tyCoFVsOfType (TyConApp _ tys)   a b c = tyCoFVsOfTypes tys a b c
 tyCoFVsOfType (LitTy {})         a b c = emptyFV a b c
 tyCoFVsOfType (AppTy fun arg)    a b c = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) a b c
-tyCoFVsOfType (FunTy _ arg res)  a b c = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
+tyCoFVsOfType (FunTy w arg res)  a b c = (tyCoFVsOfRig w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
 tyCoFVsOfType (ForAllTy bndr ty) a b c = tyCoFVsBndr bndr (tyCoFVsOfType ty)  a b c
 tyCoFVsOfType (CastTy ty co)     a b c = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) a b c
 tyCoFVsOfType (CoercionTy co)    a b c = tyCoFVsOfCo co a b c
+
+tyCoFVsOfRig :: Rig -> FV
+tyCoFVsOfRig (RigTy t) a b c = (tyCoFVsOfType t) a b c
+tyCoFVsOfRig (RigAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
+tyCoFVsOfRig (RigMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
+tyCoFVsOfRig _ a b c = emptyFV a b c
 
 tyCoFVsBndr :: TyVarBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
@@ -1796,10 +1802,18 @@ noFreeVarsOfType (TyVarTy _)      = False
 noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
 noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
-noFreeVarsOfType (FunTy _ t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
+noFreeVarsOfType (FunTy w t1 t2)  = noFreeVarsOfRig w
+                                      && noFreeVarsOfType t1
+                                      && noFreeVarsOfType t2
 noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
+
+noFreeVarsOfRig :: Rig -> Bool
+noFreeVarsOfRig (RigTy ty) = noFreeVarsOfType ty
+noFreeVarsOfRig (RigAdd m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
+noFreeVarsOfRig (RigMul m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
+noFreeVarsOfRig _ = True
 
 -- | Returns True if this coercion has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
