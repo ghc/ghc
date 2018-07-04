@@ -335,7 +335,7 @@ splitTyConAppCo_maybe _                     = Nothing
 -- TODO: This is wrong and should be ripped out when I change
 -- Rig to Coercion in FunCo.
 rigToCo :: Rig -> Coercion
-rigToCo r = mkRepReflCo (rigToType r)
+rigToCo r = mkNomReflCo (rigToType r)
 
 -- first result has role equal to input; third result is Nominal
 splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
