@@ -1628,8 +1628,8 @@ tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
   = (delFV tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo _ w co1 co2)    fv_cand in_scope acc
-  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
+tyCoFVsOfCo (FunCo _ _ co1 co2)    fv_cand in_scope acc
+  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
@@ -1679,9 +1679,7 @@ coVarsOfType (TyVarTy v)         = coVarsOfType (tyVarKind v)
 coVarsOfType (TyConApp _ tys)    = coVarsOfTypes tys
 coVarsOfType (LitTy {})          = emptyVarSet
 coVarsOfType (AppTy fun arg)     = coVarsOfType fun `unionVarSet` coVarsOfType arg
-coVarsOfType (FunTy w arg res)   = coVarsOfType (rigToType w)
-                                    `unionVarSet` coVarsOfType arg
-                                    `unionVarSet` coVarsOfType res
+coVarsOfType (FunTy _ arg res)   = coVarsOfType arg `unionVarSet` coVarsOfType res
 coVarsOfType (ForAllTy (TvBndr tv _) ty)
   = (coVarsOfType ty `delVarSet` tv)
     `unionVarSet` coVarsOfType (tyVarKind tv)
@@ -1698,7 +1696,7 @@ coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
 coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (ForAllCo tv kind_co co)
   = coVarsOfCo co `delVarSet` tv `unionVarSet` coVarsOfCo kind_co
-coVarsOfCo (FunCo _ w co1 co2)    = coVarsOfCo w `unionVarSet` coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
+coVarsOfCo (FunCo _ _w co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (CoVarCo v)          = coVarsOfCoVar v
 coVarsOfCo (HoleCo h)           = coVarsOfCoVar (coHoleCoVar h)
                                   -- See Note [CoercionHoles and coercion free variables]
@@ -1804,9 +1802,7 @@ noFreeVarsOfCo (Refl _ ty)            = noFreeVarsOfType ty
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
 noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
-noFreeVarsOfCo (FunCo _ w c1 c2)      = noFreeVarsOfCo c1
-                                          && noFreeVarsOfCo c2
-                                          && noFreeVarsOfCo w
+noFreeVarsOfCo (FunCo _ _ c1 c2)      = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo (CoVarCo _)            = False
 noFreeVarsOfCo (HoleCo {})            = True    -- I'm unsure; probably never happens
 noFreeVarsOfCo (AxiomInstCo _ _ args) = all noFreeVarsOfCo args
@@ -2486,7 +2482,7 @@ subst_co subst co
     go (ForAllCo tv kind_co co)
       = case substForAllCoBndrUnchecked subst tv kind_co of { (subst', tv', kind_co') ->
           ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co }
-    go (FunCo r w co1 co2)   = (mkFunCo r $! go w $! go co1) $! go co2
+    go (FunCo r w co1 co2)   = (mkFunCo r w $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
     go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
@@ -3089,7 +3085,7 @@ tidyCo env@(_, subst) co
                                where (envp, tvp) = tidyTyCoVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r w co1 co2)   = FunCo r $! go w $! go co1 $! go co2
+    go (FunCo r w co1 co2)   = (FunCo r w $! go co1) $! go co2
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
@@ -3152,8 +3148,7 @@ coercionSize (Refl _ ty)         = typeSize ty
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
-                                                        + coercionSize w
+coercionSize (FunCo _ _ co1 co2) = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
