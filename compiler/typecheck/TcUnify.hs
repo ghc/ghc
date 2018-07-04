@@ -11,7 +11,7 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
+  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubWeight,
   tcSubTypeDS_NC_O, tcSubTypeET,
   checkConstraints, buildImplicationFor,
 
@@ -65,6 +65,7 @@ import Util
 import Pair( pFst )
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
+import UsageEnv
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -767,9 +768,12 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go (FunTy act_weight act_arg act_res) (FunTy exp_weight exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
-      , subweight act_weight exp_weight
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
+        -- TODO: MattP this should be on the same code path as tcSubWeight
+        do { -- Note that here we do not call to `subweightMaybe`, so we check
+             -- for strict equality.
+           ; void (tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight)
+           ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
            ; return (mkWpFun act_weight exp_weight arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
@@ -818,6 +822,36 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
+
+tc_sub_weight_ds :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM HsWrapper
+tc_sub_weight_ds eq_orig inst_orig ctxt w_actual w_expected =
+  tc_sub_type_ds eq_orig inst_orig ctxt (rigToType w_actual) (rigToType w_expected)
+
+-- TODO: MattP fix the origins
+-- As an approximation to checking w1 * w2 <= w we check that w1 <= w and
+-- w2 <= w. As together they imply that w1 * w2 <= w.
+-- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
+-- <= w
+-- The error messages from this function are currently awful.
+tcSubWeight :: Rig -> Rig -> TcM ()
+tcSubWeight actual_w w
+  = do_one actual_w
+  where
+    do_one weight =
+      case weight of
+        RigAdd m1 m2 -> do
+          -- MattP: We probably need to instantiate these
+          -- variables m1 and m2 to be Omega right here.
+          tcSubWeight Omega w
+        RigMul m1 m2 -> do
+          tcSubWeight m1 w
+          tcSubWeight m2 w
+        _ -> do_one_action weight w
+
+    do_one_action a_w c_w
+       = void (tc_sub_weight_ds AppOrigin AppOrigin TypeAppCtxt a_w c_w)
+
+
 
 -----------------
 -- needs both un-type-checked (for origins) and type-checked (for wrapping)
@@ -1342,10 +1376,11 @@ uType t_or_k origin orig_ty1 orig_ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
 
         -- Functions (or predicate functions) just check the two parts
-    go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2) | w1 == w2
+    go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2)
       = do { co_l <- uType t_or_k origin fun1 fun2
            ; co_r <- uType t_or_k origin arg1 arg2
-           ; return $ mkFunCo Nominal w1 co_l co_r }
+           ; co_w <- uType t_or_k origin (rigToType w1) (rigToType w2)
+           ; return $ mkFunCo Nominal co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)

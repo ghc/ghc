@@ -40,7 +40,10 @@ module GHC.Types (
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
-        KindRep(..), KindBndr
+        KindRep(..), KindBndr,
+
+        -- * Multiplicity Types
+        Multiplicity(..)
     ) where
 
 import GHC.Prim
@@ -406,6 +409,8 @@ data VecElem = Int8ElemRep
              | FloatElemRep
              | DoubleElemRep
 -- Enum, Bounded instances in GHC.Enum
+
+data Multiplicity = Omega | One
 
 {- *********************************************************************
 *                                                                      *

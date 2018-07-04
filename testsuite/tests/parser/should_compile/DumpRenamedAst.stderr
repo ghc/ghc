@@ -101,8 +101,8 @@
             []
             (Nothing)
             (PrefixCon
-             [(Weighted
-               (One)
+             [(HsWeighted
+               (HsOne)
                ({ DumpRenamedAst.hs:6:26-30 }
                 (HsTyVar
                  (NoExt)
@@ -265,7 +265,7 @@
                (NotPromoted)
                ({ DumpRenamedAst.hs:12:20 }
                 {Name: k})))
-             (Omega)
+             (HsOmega)
              ({ DumpRenamedAst.hs:12:25-30 }
               (HsFunTy
                (NoExt)
@@ -275,7 +275,7 @@
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:12:25 }
                   {Name: k})))
-               (Omega)
+               (HsOmega)
                ({ DumpRenamedAst.hs:12:30 }
                 (HsTyVar
                  (NoExt)
@@ -315,7 +315,7 @@
                   (NotPromoted)
                   ({ DumpRenamedAst.hs:15:28 }
                    {Name: k})))
-                (Omega)
+                (HsOmega)
                 ({ DumpRenamedAst.hs:15:33 }
                  (HsTyVar
                   (NoExt)
@@ -345,14 +345,14 @@
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:15:40 }
                       {Name: k})))
-                   (Omega)
+                   (HsOmega)
                    ({ DumpRenamedAst.hs:15:45 }
                     (HsTyVar
                      (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:15:45 }
                       {Name: GHC.Types.*})))))))
-               (Omega)
+               (HsOmega)
                ({ DumpRenamedAst.hs:15:51 }
                 (HsTyVar
                  (NoExt)
@@ -374,8 +374,8 @@
                 [])
                (Nothing)
                (PrefixCon
-                [(Weighted
-                  (Omega)
+                [(HsWeighted
+                  (HsOmega)
                   ({ DumpRenamedAst.hs:16:10-34 }
                    (HsParTy
                     (NoExt)
@@ -405,7 +405,7 @@
                             (NotPromoted)
                             ({ DumpRenamedAst.hs:16:24-25 }
                              {Name: xx})))))
-                        (Omega)
+                        (HsOmega)
                         ({ DumpRenamedAst.hs:16:30-33 }
                          (HsAppTy
                           (NoExt)

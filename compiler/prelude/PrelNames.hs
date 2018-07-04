@@ -1675,7 +1675,8 @@ doublePrimTyConKey                      = mkPreludeTyConUnique  9
 doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
-funTyConKey                             = funTyConOmegaKey
+-- TODO: Put this back in order MattP, RIP interface files
+funTyConKey                             = mkPreludeTyConUnique 42
 intPrimTyConKey                         = mkPreludeTyConUnique 14
 intTyConKey                             = mkPreludeTyConUnique 15
 int8TyConKey                            = mkPreludeTyConUnique 16
@@ -1704,10 +1705,6 @@ eqTyConKey                              = mkPreludeTyConUnique 38
 heqTyConKey                             = mkPreludeTyConUnique 39
 arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 40
 mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 41
-
-funTyConOmegaKey                        = mkPreludeTyConUnique 42
-funTyConOneKey                          = mkPreludeTyConUnique 43
-funTyConZeroKey                         = mkPreludeTyConUnique 44
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
@@ -1892,6 +1889,9 @@ someTypeRepDataConKey = mkPreludeTyConUnique 189
 typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 
+multiplicityTyConKey :: Unique
+multiplicityTyConKey = mkPreludeTyConUnique 191
+
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------
@@ -2062,6 +2062,13 @@ kindRepTypeLitDDataConKey = mkPreludeDataConUnique 106
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 107
 typeLitNatDataConKey      = mkPreludeDataConUnique 108
+
+-- Multiplicity
+
+oneDataConKey, omegaDataConKey :: Unique
+oneDataConKey = mkPreludeDataConUnique 115
+omegaDataConKey = mkPreludeDataConUnique 116
+
 
 
 ---------------- Template Haskell -------------------

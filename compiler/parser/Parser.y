@@ -61,7 +61,6 @@ import BasicTypes
 
 -- compiler/types
 import Type             ( funTyCon, Rig(..) )
-import Weight           ( linear )
 import Kind             ( Kind )
 import Class            ( FunDep )
 
@@ -525,6 +524,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
  '⊸'           { L _ (ITlolly _) }
+ '->@{'           { L _ (ITlolly2) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
  '~#'           { L _ ITtildehsh }
@@ -629,7 +629,7 @@ identifier :: { Located RdrName }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
-    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName (funTyCon Omega))
+    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName funTyCon)
                                [mj AnnOpenP $1,mu AnnRarrow $2,mj AnnCloseP $3] }
 
 -----------------------------------------------------------------------------
@@ -1898,30 +1898,38 @@ is connected to the first type too.
 
 type :: { LHsType GhcPs }
         : btype                        { $1 }
-        | btype '->' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 Omega $3)
+        | btype '->' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOmega $3)
                                               [mu AnnRarrow $2] }
-        | btype '⊸' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 One $3)
+
+        | btype '⊸' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
                                               [mu AnnRarrow $2] }
+        | btype '->@{' '(' mult ')' ctype  {% ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
+                                              [mu AnnRarrow $2] }
+
+mult :: { LHsType GhcPs }
+        : btype                  { $1 }
 
 
 typedoc :: { LHsType GhcPs }
         : btype                          { $1 }
         | btype docprev                  { sLL $1 $> $ HsDocTy noExt $1 $2 }
         | btype '->'     ctypedoc        {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $ HsFunTy noExt $1 Omega $3)
+                                         >> ams (sLL $1 $> $ HsFunTy noExt $1 HsOmega $3)
                                                 [mu AnnRarrow $2] }
         | btype docprev '->' ctypedoc    {% ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
                                          >> ams (sLL $1 $> $
                                                  HsFunTy noExt (L (comb2 $1 $2) (HsDocTy noExt $1 $2))
-                                                         Omega $4)
+                                                         HsOmega $4)
                                                 [mu AnnRarrow $3] }
-        | btype '⊸'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy noExt $1 One $3)
+        | btype '⊸'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
                                                 [mu AnnRarrow $2] }
         | btype docprev '⊸' ctypedoc    {% ams (sLL $1 $> $
                                                  HsFunTy noExt (L (comb2 $1 $2) (HsDocTy noExt $1 $2))
-                                                         One
+                                                         HsOne
                                                          $4)
                                                 [mu AnnRarrow $3] }
+        | btype '->@{' '(' mult ')' ctypedoc  {% ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
+                                              [mu AnnRarrow $2] }
 
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }
@@ -2213,8 +2221,8 @@ constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs, Maybe LHsDoc
                               ; (_, ds_l) <- checkInfixConstr lhs
                   ; (rhs, ds_r) <- checkInfixConstr $4
                   ; return $ if isJust (ds_l `mplus` $3)
-                               then sLL $1 $> ($2, InfixCon (linear lhs) (linear $4), $3)
-                               else sLL $1 $> ($2, InfixCon (linear lhs) (linear rhs), ds_r) } }
+                               then sLL $1 $> ($2, InfixCon (hsLinear lhs) (hsLinear $4), $3)
+                               else sLL $1 $> ($2, InfixCon (hsLinear lhs) (hsLinear rhs), ds_r) } }
 
 fielddecls :: { [LConDeclField GhcPs] }
         : {- empty -}     { [] }
@@ -3182,7 +3190,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
-        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName (funTyCon Omega))
+        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
         | '[:' ':]'             {% ams (sLL $1 $> $ parrTyCon_RDR) [mo $1,mc $2] }

@@ -33,7 +33,7 @@ import PrelNames ( knownNatClassName, knownSymbolClassName,
                    hasFieldClassName,
                    heqTyConKey, eqTyConKey, ipClassKey )
 import TysWiredIn ( typeNatKind, typeSymbolKind, heqDataCon,
-                    coercibleDataCon, constraintKindTyCon )
+                    coercibleDataCon, constraintKindTyCon, omegaDataConTy )
 import TysPrim    ( eqPrimTyCon, eqReprPrimTyCon )
 import Id( idType, isNaughtyRecordSelector )
 import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
@@ -2558,7 +2558,7 @@ matchCTuple clas tys   -- (isCTupleClass clas) holds
             -- The dfun *is* the data constructor!
   where
      data_con = tyConSingleDataCon (classTyCon clas)
-     tuple_ev = EvExpr . evDFunApp (dataConWrapId data_con) tys
+     tuple_ev = EvExpr . evDFunApp (dataConWrapId data_con) (omegaDataConTy : tys)
 
 {- ********************************************************************
 *                                                                     *
@@ -2796,7 +2796,7 @@ a TypeRep for them.  For qualified but not polymorphic types, like
 matchLiftedEquality :: [Type] -> TcS LookupInstResult
 matchLiftedEquality args
   = return (GenInst { lir_new_theta = [ mkTyConApp eqPrimTyCon args ]
-                    , lir_mk_ev     = EvExpr . evDFunApp (dataConWrapId heqDataCon) args
+                    , lir_mk_ev     = EvExpr . evDFunApp (dataConWrapId heqDataCon) (omegaDataConTy : args)
                     , lir_safe_over = True })
 
 -- See also Note [The equality types story] in TysPrim
@@ -2804,7 +2804,7 @@ matchLiftedCoercible :: [Type] -> TcS LookupInstResult
 matchLiftedCoercible args@[k, t1, t2]
   = return (GenInst { lir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
                     , lir_mk_ev     = EvExpr . evDFunApp (dataConWrapId coercibleDataCon)
-                                                args
+                                                (omegaDataConTy : args)
                     , lir_safe_over = True })
   where
     args' = [k, k, t1, t2]

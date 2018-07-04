@@ -7,6 +7,7 @@ A ``lint'' pass to check for Core correctness
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module CoreLint (
     lintCoreBindings, lintUnfolding,
@@ -47,6 +48,7 @@ import SrcLoc
 import Kind
 import Type
 import Weight
+import UsageEnv
 import RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCon
@@ -666,18 +668,11 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
     go _ = markAllJoinsBad (lintCoreExpr rhs)
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
-lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
-  | isStableSource src
+lintIdUnfolding bndr bndr_ty uf
+  | Just rhs <- maybeUnfoldingTemplate uf
+  , isStableUnfolding uf
   = do { ty <- fst <$> lintRhs bndr rhs
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
-
-lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
-                                            , df_args = args })
-  = do { ty <- lintBinders LambdaBind bndrs $ \ bndrs' ->
-               do { (res_ty, _) <- lintCoreArgs ((dataConRepType con), emptyUE) args -- MattP: TODO Check
-                  ; return (mkLamTypes bndrs' res_ty) }
-       ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "dfun unfolding") ty) }
-
 lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
                     -- to exponential behaviour; c.f. CoreFVs.idUnfoldingVars
@@ -948,7 +943,7 @@ checkLinearity :: UsageEnv -> Var -> LintM ()
 checkLinearity body_ue lam_var =
   case varWeightMaybe lam_var of
     Just mult ->
-      checkL (lookupUE body_ue lam_var `subweight` mult) (err_msg mult)
+      ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
     Nothing   -> return () -- A type variable
   where
     lhs = lookupUE body_ue lam_var
@@ -1083,8 +1078,8 @@ lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
 
 -- | Implements the case rules for linearity
 checkCaseLinearity :: (Rig, Var -> Rig, Rig) ->  Rig -> Var -> LintM ()
-checkCaseLinearity (scrut_usage, var_usage, scrut_w) var_w bndr = do
-  lintL (lhs `subweight` rhs) err_msg
+checkCaseLinearity (flattenRig -> scrut_usage, var_usage, flattenRig -> scrut_w) (flattenRig -> var_w) bndr = do
+  ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
   where
     lhs = var_usage bndr + (scrut_usage * var_w)
@@ -1238,7 +1233,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
     rhs_ue <- lintAltExpr rhs alt_ty ;
     let scrut_usage = lookup_scrut rhs_ue
 --    ; pprTrace "lintCoreAlt" (ppr weights $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
-    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
+    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, flattenRig . lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
     return rhs_ue
     } }
 
@@ -1247,8 +1242,7 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
 
 lintLinearBinder :: SDoc -> Rig -> Rig -> LintM ()
 lintLinearBinder doc actual_usage described_usage
-  = lintL (actual_usage == described_usage)
-          err_msg
+  = ensureEqWeights actual_usage described_usage err_msg
     where
       err_msg = (text "Multiplicity of variable does agree with its context"
                 $$ doc
@@ -1415,7 +1409,7 @@ lintType ty@(TyConApp tc tys)
        ; lintTySynApp report_unsat ty tc tys }
 
   | isFunTyCon tc
-  , tys `lengthIs` 4
+  , tys `lengthIs` 5
     -- We should never see a saturated application of funTyCon; such
     -- applications should be represented with the FunTy constructor.
     -- See Note [Linting function types] and
@@ -1703,7 +1697,7 @@ lintCoercion (Refl r ty)
 
 lintCoercion co@(TyConAppCo r tc cos)
   | tc `hasKey` funTyConKey
-  , [_rep1,_rep2,_co1,_co2] <- cos
+  , [_w, _rep1,_rep2,_co1,_co2] <- cos
   = do { failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
        } -- All saturated TyConAppCos should be FunCos
 
@@ -1759,11 +1753,15 @@ lintCoercion (ForAllCo tv1 kind_co co)
 lintCoercion co@(FunCo r w co1 co2)
   = do { (k1,k'1,s1,t1,r1) <- lintCoercion co1
        ; (k2,k'2,s2,t2,r2) <- lintCoercion co2
+       ; (k3, k'3, s3, t3, r3) <- lintCoercion w
        ; k <- lintArrow (text "coercion" <+> quotes (ppr co)) k1 k2
        ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
        ; lintRole co1 r r1
        ; lintRole co2 r r2
-       ; return (k, k', mkFunTy w s1 s2, mkFunTy w t1 t2, r) }
+       -- TODO: MattP, this check needs to be reenabled. The problem lies
+       -- somewhere in 30e7ecb805c2eb2d53b6cf02308a382e492cc64c
+       --; lintRole w Nominal r3
+       ; return (k, k', mkFunTy (typeToRig s3) s1 s2, mkFunTy (typeToRig t3) t1 t2, r) }
 
 lintCoercion (CoVarCo cv)
   | not (isCoVar cv)
@@ -2323,6 +2321,14 @@ ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- annotations need only be consistent, not equal)
 -- Assumes ty1,ty2 are have already had the substitution applied
 ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
+
+ensureEqWeights :: Rig -> Rig -> SDoc -> LintM ()
+ensureEqWeights actual_usage described_usage err_msg =
+    case (actual_usage `subweightMaybe` described_usage) of
+      Smaller -> return ()
+      Larger -> addErrL err_msg
+      Unknown -> ensureEqTys (rigToType actual_usage)
+                             (rigToType described_usage) err_msg
 
 lintRole :: Outputable thing
           => thing     -- where the role appeared

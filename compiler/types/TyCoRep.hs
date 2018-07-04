@@ -45,6 +45,8 @@ module TyCoRep (
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
         sameVis, isLinearType,
 
+        isMultiplicityTy, isMultiplicityVar,
+
         -- * Functions over binders
         TyBinder(..), TyVarBinder,
         binderVar, binderVars, binderKind, binderArgFlag,
@@ -845,6 +847,14 @@ isRuntimeRepTy _ = False
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 
+isMultiplicityVar :: TyVar -> Bool
+isMultiplicityVar = isMultiplicityTy . tyVarKind
+
+isMultiplicityTy :: Type -> Bool
+isMultiplicityTy ty | Just ty' <- coreView ty = isMultiplicityTy ty'
+isMultiplicityTy (TyConApp tc []) = tc `hasKey` multiplicityTyConKey
+isMultiplicityTy _ = False
+
 
 isLinearType :: Type -> Bool
 -- ^ Returns @True@ of an 'Type' if the 'Type' has any linear function arrows
@@ -911,7 +921,8 @@ data Coercion
   | ForAllCo TyVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role Rig Coercion Coercion         -- lift FunTy
+  -- TODO: Change this Rig to coercion
+  | FunCo Role Coercion Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
 
   -- These are special
@@ -2400,7 +2411,7 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy w arg res) = ((FunTy $! w) $! go arg) $! go res
+    go (FunTy w arg res) = ((FunTy $! go_rig w) $! go arg) $! go res
     go (ForAllTy (TvBndr tv vis) ty)
                          = case substTyVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -2409,6 +2420,10 @@ subst_ty subst ty
     go (LitTy n)         = LitTy $! n
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
+
+    go_rig :: Rig -> Rig
+    go_rig (RigTy t) = RigTy (go t)
+    go_rig r = r
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
@@ -2795,6 +2810,7 @@ debug_ppr_ty prec (FunTy weight arg res)
                 Zero -> text "->0"
                 One -> text "⊸"
                 Omega -> arrow
+                w -> ppr w
     in
       maybeParen prec funPrec $
       sep [debug_ppr_ty funPrec arg, arr <+> debug_ppr_ty prec res]

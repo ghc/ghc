@@ -13,8 +13,8 @@ import GhcPrelude
 
 import DynFlags
 import CoreSyn
+import MkCore
 import CoreUnfold       ( couldBeSmallEnoughToInline )
-import TysWiredIn       ( unitDataConId )
 import Id
 import VarEnv
 import Util             ( notNull )
@@ -155,7 +155,7 @@ libCaseBind env (Rec pairs)
     small_enough = case bombOutSize env of
                       Nothing   -> True   -- Infinity
                       Just size -> couldBeSmallEnoughToInline (lc_dflags env) size $
-                                   Let (Rec dup_pairs) (Var unitDataConId)
+                                   Let (Rec dup_pairs) unitExpr
 
     ok_pair (id,_)
         =  idArity id > 0          -- Note [Only functions!]

@@ -63,6 +63,7 @@ import PatSyn
 
 import Control.Monad
 import Data.Functor.Compose
+import TysPrim
 
 {-
 ************************************************************************
@@ -229,7 +230,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 ************************************************************************
 -}
 
-dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
+dsLExpr :: HasCallStack => LHsExpr GhcTc -> DsM CoreExpr
 
 dsLExpr (L loc e)
   = putSrcSpanDs loc $
@@ -245,17 +246,17 @@ dsLExpr (L loc e)
 -- be an argument to some other function.
 -- See Note [Levity polymorphism checking] in DsMonad
 -- See Note [Levity polymorphism invariants] in CoreSyn
-dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
+dsLExprNoLP :: HasCallStack => LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
   = putSrcSpanDs loc $
     do { e' <- dsExpr e
        ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
        ; return e' }
 
-dsExpr :: HsExpr GhcTc -> DsM CoreExpr
-dsExpr = ds_expr False
+dsExpr :: HasCallStack => HsExpr GhcTc -> DsM CoreExpr
+dsExpr e = ds_expr False e
 
-ds_expr :: Bool   -- are we directly inside an HsWrap?
+ds_expr :: HasCallStack => Bool   -- are we directly inside an HsWrap?
                   -- See Wrinkle in Note [Detecting forced eta expansion]
         -> HsExpr GhcTc -> DsM CoreExpr
 ds_expr _ (HsPar _ e)            = dsLExpr e
@@ -371,22 +372,25 @@ ds_expr _ e@(SectionR _ op expr) = do
                                                           core_op [Var x_id, Var y_id]))
 
 ds_expr _ (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (L _ (Missing ty))
+  = do { let go (lam_vars, args, _) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring. This lambda is linear
                     -- since tuples are linear
-               = do { lam_var <- newSysLocalDsNoLP One ty
-                    ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (L _ (Present _ expr))
+               = do { lam_var <- newSysLocalDsNoLP (RigTy (mkTyVarTy multiplicityTyVar)) ty
+                    ; return (lam_var : lam_vars, Var lam_var : args, True) }
+             go (lam_vars, args, missing) (L _ (Present _ expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
-                    ; return (lam_vars, core_expr : args) }
+                    ; return (lam_vars, core_expr : args, missing) }
              go _ (L _ (XTupArg {})) = panic "ds_expr"
 
-       ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
+       ; dsWhenNoErrs (foldM go ([], [], False) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
-                      (\(lam_vars, args) -> mkCoreLams lam_vars $
+                      (\(lam_vars, args, missing) ->
+                      (if missing then mkCoreLams [multiplicityTyVar]
+                                 else id) $
+                        mkCoreLams lam_vars $
                                             mkCoreTupBoxity boxity args) }
 
 ds_expr _ (ExplicitSum types alt arity expr)
@@ -688,6 +692,10 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                         mkWpTyApps    [ ty
                                       | (tv, ty) <- univ_tvs `zip` out_inst_tys
                                       , not (tv `elemVarEnv` wrap_subst) ]
+                        <.> mkWpTyApps [omegaDataConTy]
+                  -- TODO: This looks very dodgy MattP, need to treat this
+                  -- uniformly like ex_tvs probably?
+
                  rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
 
                         -- Tediously wrap the application in a cast

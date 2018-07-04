@@ -80,7 +80,9 @@ import IfaceEnv
 import TcRnMonad
 import TcMType
 import Weight
+import UsageEnv
 import TcType
+import {-# SOURCE #-} TcUnify ( tcSubWeight )
 import LoadIface
 import PrelNames
 import TysWiredIn
@@ -113,9 +115,10 @@ import Util
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad ( foldM )
+import Control.Monad ( foldM, when )
 import Data.IORef
 import Data.List
+import Data.Maybe
 
 
 {- *********************************************************************
@@ -542,22 +545,26 @@ tc_extend_local_env top_lvl extra_env thing_inside
     -- Checks that the usage of the newly introduced binders is compatible with
     -- their weight. If so, combines the usage of non-new binders to |uenv|
     check_then_add_usage u0
-      = do { uok <- foldM (\u (x,w_) -> deleteBinder (weightedWeight w_) x u) u0 extra_env
+      = do { uok <- foldM (\u (x,w_) -> check_binder (weightedWeight w_) x u) u0 extra_env
            ; env <- getLclEnv
            ; let usage = tcl_usage env
            ; updTcRef usage (addUE uok) }
 
-    deleteBinder :: Rig -> Name -> UsageEnv -> TcM UsageEnv
-    deleteBinder w x uenv =
-      case deleteUEAsserting w x uenv of
-        Just uenv' -> return uenv'
-        Nothing    -> do
-          let actual_weight = lookupUE uenv x
+    check_binder :: Rig -> Name -> UsageEnv -> TcM UsageEnv
+    check_binder w x uenv = do
+      let actual_w = lookupUE uenv x
+      traceTc "check_binder" (ppr w $$ ppr actual_w)
+      case subweightMaybe actual_w w of
+        Smaller -> return ()
+        Unknown -> tcSubWeight actual_w w
+        Larger  ->
           addErrTc $ text "Couldn't match expected weight" <+> quotes (ppr w) <+>
                      text "of variable" <+> quotes (ppr x) <+>
-                     text "with actual weight" <+> quotes (ppr actual_weight)
+                     text "with actual weight" <+> quotes (ppr actual_w)
           -- In case of error, recover by pretending that the weight usage was correct
-          return $ deleteUE x uenv
+      return $ deleteUE x uenv
+
+
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, Weighted TcTyThing)] -> TcM TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things

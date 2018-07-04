@@ -23,7 +23,7 @@ module MkId (
         wrapFamInstBody, unwrapFamInstScrut,
         wrapTypeUnbranchedFamInstBody, unwrapTypeUnbranchedFamInstScrut,
 
-        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
+        DataConBoxer(..), mkDataConRep, mkDataConRepSimple, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -79,6 +79,7 @@ import ListSetOps
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
+import Data.Functor.Identity
 
 {-
 ************************************************************************
@@ -296,7 +297,10 @@ mkDictSelId name clas
     new_tycon      = isNewTyCon tycon
     [data_con]     = tyConDataCons tycon
     tyvars         = dataConUserTyVarBinders data_con
-    n_ty_args      = length tyvars
+    n_ty_args      = length tyvars    --  for the multiplicity argument
+                                      -- MattP: Don't know why this works..
+                                      -- But a lot compiles properly so it
+                                      -- seems to be correct.
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
@@ -327,7 +331,7 @@ mkDictSelId name clas
     rule = BuiltinRule { ru_name = fsLit "Class op " `appendFS`
                                      occNameFS (getOccName name)
                        , ru_fn    = name
-                       , ru_nargs = n_ty_args + 1
+                       , ru_nargs = n_ty_args + 1 -- +1 for the type
                        , ru_try   = dictSelRule val_index n_ty_args }
 
         -- The strictness signature is of the form U(AAAVAAAA) -> T
@@ -388,7 +392,7 @@ dictSelRule val_index n_ty_args _ id_unf _ args
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDataConWorkId wkr_name data_con
   | isNewTyCon tycon
-  = mkGlobalId (DataConWrapId data_con) wkr_name nt_wrap_ty nt_work_info
+  = mkGlobalId (DataConWrapId data_con) wkr_name alg_wkr_ty nt_work_info
   | otherwise
   = mkGlobalId (DataConWorkId data_con) wkr_name alg_wkr_ty wkr_info
 
@@ -518,22 +522,57 @@ But if we inline the wrapper, we get
 and now case-of-known-constructor eliminates the redundant allocation.
 -}
 
-mkDataConRep :: DynFlags
+mkDataConRepSimple :: Name -> DataCon -> DataConRep
+mkDataConRepSimple n dc =
+  runIdentity $
+    mkDataConRepX
+      (\tys -> Identity $ mkTemplateLocals (map weightedThing tys))
+      (\idus ini -> return (mkVarApps ini (map fst idus))) -- They are all going to be unitUnboxer
+      emptyFamInstEnvs
+      n
+      (Right (map (const HsLazy) (dataConOrigArgTys dc)))
+      dc
+
+
+mkDataConRep :: DynFlags -> FamInstEnvs -> Name -> Maybe [HsImplBang] -> DataCon
+             -> UniqSM DataConRep
+mkDataConRep dflags fam_envs wrap_name mb_bangs data_con =
+  mkDataConRepX
+    (mapM newLocal)
+    mk_rep_app
+    fam_envs
+    wrap_name
+    (maybe (Left dflags) Right mb_bangs)
+    data_con
+  where
+    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
+    mk_rep_app [] con_app
+      = return con_app
+    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
+      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
+           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
+           ; return (unbox_fn expr) }
+
+
+
+mkDataConRepX :: Monad m =>
+                ([Weighted Type] -> m [Id])
+             -> ([(Id, Unboxer)] -> CoreExpr -> m CoreExpr)
              -> FamInstEnvs
              -> Name
-             -> Maybe [HsImplBang]
+             -> (Either DynFlags [HsImplBang])
                 -- See Note [Bangs on imported data constructors]
              -> DataCon
-             -> UniqSM DataConRep
-mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
-  | not wrapper_reqd
-  = return NoDataConRep
+             -> m DataConRep
+mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
+-- See Note [All data constructors have wrappers]
+--  | not wrapper_reqd
+--  = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mapM newLocal wrap_arg_tys
-       ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
+  = do { wrap_args <- mkArgs wrap_arg_tys
+       ; wrap_body <- mkBody (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
-
        ; let wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
              wrap_info = noCafIdInfo
                          `setArityInfo`         wrap_arity
@@ -570,10 +609,14 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
              wrap_unf = mkInlineUnfolding wrap_rhs
+
+             casted_body | isNewTyCon tycon = wrap_body
+                         | otherwise = wrapFamInstBody tycon res_ty_args $
+                                        wrap_body
+
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
-                        wrapFamInstBody tycon res_ty_args $
-                        wrap_body
+                        casted_body
 
        ; return (DCR { dcr_wrap_id = wrap_id
                      , dcr_boxer   = mk_boxer boxers
@@ -584,7 +627,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   where
     (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
-    wrap_tvs     = dataConUserTyVars data_con
+    wrap_tvs     = multiplicityTyVar : dataConUserTyVars data_con
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
@@ -594,7 +637,10 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     ev_ibangs    = map (const HsLazy) ev_tys
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = (map unrestricted theta) ++ orig_arg_tys
+    w_ty = RigTy (mkTyVarTy multiplicityTyVar)
+    -- See Note [Wrapper weights]
+    wrap_arg_tys = (map unrestricted theta)
+                    ++ (map (scaleWeighted w_ty) orig_arg_tys)
     wrap_arity   = length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -602,9 +648,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
     arg_ibangs =
       case mb_bangs of
-        Nothing    -> zipWith (dataConSrcToImplBang dflags fam_envs)
+        Left dflags -> zipWith (dataConSrcToImplBang dflags fam_envs)
                               orig_arg_tys orig_bangs
-        Just bangs -> bangs
+        Right bangs -> bangs
 
     (rep_tys_w_strs, wrappers)
       = unzip (zipWith dataConArgRep all_arg_tys (ev_ibangs ++ arg_ibangs))
@@ -651,13 +697,6 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
            ; return (rep_ids1 ++ rep_ids2, NonRec src_var arg : binds) }
     go _ (_:_) [] = pprPanic "mk_boxer" (ppr data_con)
 
-    mk_rep_app :: [(Id,Unboxer)] -> CoreExpr -> UniqSM CoreExpr
-    mk_rep_app [] con_app
-      = return con_app
-    mk_rep_app ((wrap_arg, unboxer) : prs) con_app
-      = do { (rep_ids, unbox_fn) <- unboxer wrap_arg
-           ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
-           ; return (unbox_fn expr) }
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -737,6 +776,22 @@ wrappers! After all, a newtype can also be written with GADT syntax:
 Again, this needs a wrapper data con to reorder the type variables. It does
 mean that this newtype constructor requires another level of indirection when
 being called, but the inliner should make swift work of that.
+
+
+Note [Wrapper weights]
+~~~~~~~~~~~~~~~~~~~~~~
+
+When we made the wrapper for a data type of different multiplicity fields,
+we only want to make the ones which are linear multiplicity polymorphic. If we
+do not do this then the wrapper will not be well-typed.
+
+The way we ensure this is by scaling the weight of the field by the multiplicity
+variable. This works because..
+
+1 * p = p
+w * p = w
+
+So the arguments end up with the right multiplicity all very elegantly.
 -}
 
 -------------------------
@@ -855,14 +910,15 @@ dataConArgUnpack (Weighted arg_weight arg_ty)
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = map (scaleWeighted arg_weight) $ dataConInstArgTys con tc_args
+  , let rep_tys = dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyVars con) )  -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
+          ; let r_weight = idWeight arg_id
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, rep_ids, body)]
+                         [(DataAlt con, map (flip scaleIdBy r_weight) rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . fmap (TcType.substTyUnchecked subst)) rep_tys

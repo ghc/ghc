@@ -52,7 +52,6 @@ import Avail
 import Outputable
 import Bag
 import BasicTypes       ( DerivStrategy, RuleName, pprRuleName )
-import Weight
 import FastString
 import SrcLoc
 import DynFlags
@@ -66,7 +65,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Control.Arrow ( first )
-import Data.Functor.Compose ( Compose(..) )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -1966,7 +1964,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
           -- See Trac #14808.
-        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ (map irrelevantWeight arg_tys) ++ [res_ty])
+        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ (map hsThing arg_tys) ++ [res_ty])
         ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
 
         ; let ctxt    = ConDeclCtx new_names
@@ -2013,16 +2011,16 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (Weighted (LHsType GhcPs)) (Located [LConDeclField GhcPs])
-   -> RnM ((HsConDetails (Weighted (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
+   -> HsConDetails (HsWeighted GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails (HsWeighted GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
-  = do { (Compose new_tys, fvs) <- rnLHsTypes doc (Compose tys)
+  = do { (new_tys, fvs) <- mapFvRn (rnWeightedLHsType doc) tys
        ; return (PrefixCon new_tys, fvs) }
 
 rnConDeclDetails _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnLHsTypes doc ty1
-       ; (new_ty2, fvs2) <- rnLHsTypes doc ty2
+  = do { (new_ty1, fvs1) <- rnWeightedLHsType doc ty1
+       ; (new_ty2, fvs2) <- rnWeightedLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
 rnConDeclDetails con doc (RecCon (L l fields))

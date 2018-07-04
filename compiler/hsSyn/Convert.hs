@@ -30,7 +30,6 @@ import qualified Coercion ( Role(..) )
 import TysWiredIn
 import TysPrim (eqPrimTyCon)
 import BasicTypes as Hs
-import Weight
 import ForeignCall
 import Unique
 import ErrUtils
@@ -511,7 +510,7 @@ cvtConstr :: TH.Con -> CvtM (LConDecl GhcPs)
 cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon (map unrestricted tys')) }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon (map hsUnrestricted tys')) }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
@@ -523,7 +522,8 @@ cvtConstr (InfixC st1 c st2)
   = do  { c'   <- cNameL c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon (unrestricted st1') (unrestricted st2')) }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon (hsUnrestricted st1')
+                                                              (hsUnrestricted st2')) }
 
 cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
@@ -561,7 +561,7 @@ cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; let rec_ty = noLoc (HsFunTy noExt (noLoc $ HsRecTy noExt rec_flds) Omega ty')
+        ; let rec_ty = noLoc (HsFunTy noExt (noLoc $ HsRecTy noExt rec_flds) HsOmega ty')
         ; returnL $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
@@ -1281,9 +1281,9 @@ cvtTypeKind ty_str ty
                           L _ HsForAllTy{} -> returnL (HsParTy noExt x')
                                                                        -- #14646
                           _                -> return x'
-                 returnL (HsFunTy noExt x'' Omega y')
+                 returnL (HsFunTy noExt x'' HsOmega y')
              | otherwise ->
-                  mk_apps (HsTyVar noExt NotPromoted (noLoc (getRdrName (funTyCon Omega)))) -- TODO: arnaud: fix when the above is done
+                  mk_apps (HsTyVar noExt NotPromoted (noLoc (getRdrName funTyCon))) -- TODO: arnaud: fix when the above is done
                           tys'
            ListT
              | [x']    <- tys' -> returnL (HsListTy noExt x')
@@ -1428,7 +1428,7 @@ mk_arr_apps :: [LHsType GhcPs] -> HsType GhcPs -> CvtM (LHsType GhcPs)
 mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
     where go :: LHsType GhcPs -> HsType GhcPs -> CvtM (HsType GhcPs)
           go arg ret_ty = do { ret_ty_l <- returnL ret_ty
-                             ; return (HsFunTy noExt arg Omega ret_ty_l) }
+                             ; return (HsFunTy noExt arg HsOmega ret_ty_l) }
             -- TODO: arnaud: linear syntax for template haskell
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsType GhcPs])

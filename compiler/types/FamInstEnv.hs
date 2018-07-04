@@ -1364,8 +1364,9 @@ normalise_type ty
     go (FunTy w ty1 ty2)
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
+           ; (wco, wty) <- go (rigToType w)
            ; r <- getRole
-           ; return (mkFunCo r w co1 co2, mkFunTy w nty1 nty2) }
+           ; return (mkFunCo r wco co1 co2, mkFunTy (typeToRig wty) nty1 nty2) }
     go (ForAllTy (TvBndr tyvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_tyvar_bndr tyvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty

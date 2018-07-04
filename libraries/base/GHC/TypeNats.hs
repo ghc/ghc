@@ -175,7 +175,12 @@ newtype SNat    (n :: Nat)    = SNat    Natural
 
 data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
 
+wrapN :: forall a b . (KnownNat a => Proxy a -> b) -> WrapN a b
+wrapN f = WrapN f
+
+{-# NOINLINE wrapN #-}
+
 -- See Note [magicDictId magic] in "basicType/MkId.hs"
 withSNat :: (KnownNat a => Proxy a -> b)
          -> SNat a      -> Proxy a -> b
-withSNat f x y = magicDict (WrapN f) x y
+withSNat f x y = magicDict (wrapN f) x y

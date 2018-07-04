@@ -17,6 +17,7 @@ module ToIface
     , toIfaceTyCon
     , toIfaceTyCon_name
     , toIfaceTyLit
+    , toIfaceRig
       -- * Tidying types
     , tidyToIfaceType
     , tidyToIfaceContext
@@ -84,7 +85,7 @@ toIfaceTvBndrX fr tyvar = ( occNameFS (getOccName tyvar)
 
 
 toIfaceIdBndr :: Id -> IfaceIdBndr
-toIfaceIdBndr id      = (idWeight id, occNameFS (getOccName id),    toIfaceType (idType id))
+toIfaceIdBndr id = (toIfaceRig (idWeight id), occNameFS (getOccName id),    toIfaceType (idType id))
 
 toIfaceTvBndrs :: [TyVar] -> [IfaceTvBndr]
 toIfaceTvBndrs = map toIfaceTvBndr
@@ -128,8 +129,8 @@ toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy w t1 t2)
-  | isPredTy t1 && w == Omega   = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2) -- TODO: arnaud: we may not want to check about omega here, maybe rather store the multiplicity in the 'pred' interface, but this is enough for debugging
-  | otherwise                   = IfaceFunTy  w (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+  | isPredTy t1 && w `eqRig` Omega   = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2) -- TODO: arnaud: we may not want to check about omega here, maybe rather store the multiplicity in the 'pred' interface, but this is enough for debugging
+  | otherwise                   = IfaceFunTy (toIfaceRig w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -169,6 +170,9 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 
 toIfaceForAllBndrX :: VarSet -> TyVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (TvBndr v vis) = TvBndr (toIfaceTvBndrX fr v) vis
+
+toIfaceRig :: Rig -> IfaceRig
+toIfaceRig = toIfaceType . rigToType
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
@@ -245,9 +249,10 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
-      , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
-      | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r w co1 co2)   = IfaceFunCo r w (go co1) (go co2)
+      , [_,_,_,_, _] <- cos         = pprPanic "toIfaceCoercion" empty
+      | otherwise                =
+        IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+    go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
                                           (toIfaceCoercionX fr' k)

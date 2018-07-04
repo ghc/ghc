@@ -75,6 +75,7 @@ import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
+import Weight
 
 import Data.List
 import Control.Monad
@@ -938,7 +939,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                 -- the argument types was recursively defined.
                 -- See also Note [Tying the knot]
                 ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                           $ mapM (traverse tcIfaceType) args
+                           $ mapM (\(w, ty) -> mkWeighted <$> tcIfaceRig w <*> tcIfaceType ty) args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1271,7 +1272,7 @@ tcIfaceType = go
     go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceAppTy t1 t2)     = (\a b -> AppTy a b) <$> go t1 <*> go t2
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy w t1 t2)     = (\a b -> FunTy w a b) <$> go t1 <*> go t2
+    go (IfaceFunTy w t1 t2)     = (\w' a b -> FunTy w' a b) <$> tcIfaceRig w <*> go t1 <*> go t2
     go (IfaceDFunTy t1 t2)    = (\a b -> FunTy Omega a b) <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
     go (IfaceTyConApp tc tks)
@@ -1283,6 +1284,9 @@ tcIfaceType = go
         ForAllTy (TvBndr tv' vis) <$> go t
     go (IfaceCastTy ty co)   = (\a b -> CastTy a b) <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
+
+tcIfaceRig :: IfaceType -> IfL Rig
+tcIfaceRig if_ty = typeToRig <$> tcIfaceType if_ty
 
 tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceTcArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args
@@ -1336,8 +1340,9 @@ tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo = go
   where
+    go :: IfaceCoercion -> IfL Coercion
     go (IfaceReflCo r t)         = Refl r <$> tcIfaceType t
-    go (IfaceFunCo r w c1 c2)    = mkFunCo r w <$> go c1 <*> go c2
+    go (IfaceFunCo r w c1 c2)    = mkFunCo r <$> go w <*> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs)
       = (\a b -> TyConAppCo r a b) <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = (\a b -> AppCo a b) <$> go c1 <*> go c2
@@ -1849,7 +1854,8 @@ bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
 bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
-        ; let id = mkLocalIdOrCoVar name w ty'
+        ; w' <- tcIfaceRig w
+        ; let id = mkLocalIdOrCoVar name w' ty'
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a

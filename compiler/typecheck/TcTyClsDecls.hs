@@ -73,6 +73,8 @@ import Unique
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
+import TysPrim
+
 import Control.Monad
 import Data.Functor.Compose ( Compose(..) )
 import Data.List
@@ -758,7 +760,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
       -- See Note [Use SigTvs in kind-checking pass]
     kcExplicitTKBndrs ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; mapM_ (tcHsOpenType . getBangType) (map weightedThing (hsConDeclArgTys args)) }
+       ; mapM_ (tcHsOpenType . getBangType) (map hsThing (hsConDeclArgTys args)) }
               -- We don't need to check the telescope here, because that's
               -- done in tcConDecl
 
@@ -779,7 +781,7 @@ kcConDecl (ConDeclGADT { con_names = names
     kcImplicitTKBndrs implicit_tkv_nms Nothing $
     kcExplicitTKBndrs explicit_tkv_nms $
     do { _ <- tcHsMbContext cxt
-       ; mapM_ (tcHsOpenType . getBangType . irrelevantWeight) (hsConDeclArgTys args)
+       ; mapM_ (tcHsOpenType . getBangType . hsThing) (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
 kcConDecl (XConDecl _) = panic "kcConDecl"
@@ -2016,7 +2018,7 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (Weighted (LHsType GhcRn)) r
+             -> HsConDetails (HsWeighted GhcRn (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
@@ -2024,7 +2026,7 @@ tcConIsInfixGADT con details
            RecCon {}    -> return False
            PrefixCon arg_tys           -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
-               , [_ty1,_ty2] <- map irrelevantWeight arg_tys
+               , [_ty1,_ty2] <- map hsThing arg_tys
                   -> do { fix_env <- getFixityEnv
                         ; return (con `elemNameEnv` fix_env) }
                | otherwise -> return False
@@ -2041,21 +2043,22 @@ tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,linear (cd_fld_type f))) (unLoc fields) -- TODO: arnaud: the @linear@ here duplicates logic, maybe it's better to make a function such that record field types are returned with their linear multiplicity (grep @linear@ in the code to find the other occurrences of this logic)
+    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f))) (unLoc fields) -- TODO: arnaud: the @linear@ here duplicates logic, maybe it's better to make a function such that record field types are returned with their linear multiplicity (grep @linear@ in the code to find the other occurrences of this logic)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
 
 
-tcConArg :: Weighted (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
-tcConArg (Weighted w bty)
+tcConArg :: HsWeighted GhcRn (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
+tcConArg (HsWeighted w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
+        ; w' <- tcWeight w
              -- Newtypes can't have unboxed types, but we check
              -- that in checkValidDataCon; this tcConArg stuff
              -- doesn't happen for GADT-style declarations
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (Weighted w arg_ty, getBangStrictness bty) }
+        ; return (Weighted w' arg_ty, getBangStrictness bty) }
 
 {-
 Note [Infix GADT constructors]

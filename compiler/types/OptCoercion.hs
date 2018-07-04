@@ -549,9 +549,9 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
 opt_trans_rule is in_co1@(FunCo r1 w1 co1a co1b) in_co2@(FunCo r2 w2 co2a co2b)
-  = ASSERT( r1 == r2 && w1 == w2)   -- Just like the TyConAppCo/TyConAppCo case
+  = ASSERT( r1 == r2)   -- Just like the TyConAppCo/TyConAppCo case
     fireTransRule "PushFun" in_co1 in_co2 $
-    mkFunCo r1 w1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+    mkFunCo r1 (opt_trans is w1 w2) (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   -- Must call opt_trans_rule_app; see Note [EtaAppCo]

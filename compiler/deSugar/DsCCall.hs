@@ -245,7 +245,8 @@ boxResult result_ty
 
               wrap the_call =
                               mkApps (Var toIOCon)
-                                     [ Type io_res_ty,
+                                     [ Type omegaDataConTy
+                                     , Type io_res_ty,
                                        Lam state_id $
                                        mkWildCase (App the_call (Var state_id))
                                              (unrestricted ccall_res_ty) -- TODO: arnaud this probably prevents foreign import from being linear: fix.
@@ -321,7 +322,7 @@ resultWrapper result_ty
   -- Base case 2: the unit type ()
   | Just (tc,_) <- maybe_tc_app
   , tc `hasKey` unitTyConKey
-  = return (Nothing, \_ -> Var unitDataConId)
+  = return (Nothing, \_ -> unitExpr)
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app
@@ -353,7 +354,7 @@ resultWrapper result_ty
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let narrow_wrapper = maybeNarrow dflags tycon
              marshal_con e  = Var (dataConWrapId data_con)
-                              `mkTyApps` tycon_arg_tys
+                              `mkTyApps` (omegaDataConTy : tycon_arg_tys)
                               `App` wrapper (narrow_wrapper e)
        ; return (maybe_ty, marshal_con) }
 

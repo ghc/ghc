@@ -75,7 +75,6 @@ import GhcPrelude
 import HsSyn            -- Lots of it
 import Class            ( FunDep )
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
-import Weight
 import DataCon          ( DataCon, dataConTyCon )
 import ConLike          ( ConLike(..) )
 import CoAxiom          ( Role, fsFromRole )
@@ -519,7 +518,7 @@ splitCon ty
      return (data_con, mk_rest ts, trailing_doc)
    split [ L l (HsTupleTy _ HsBoxedOrConstraintTuple ts) ] []
      = return ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-              , PrefixCon (map linear ts) --arnaud: check
+              , PrefixCon (map hsLinear ts) --arnaud: check
               , trailing_doc
               )
    split [ L l _ ] _ = parseErrorSDoc l (text msg <+> ppr ty)
@@ -529,7 +528,7 @@ splitCon ty
 
    mk_rest [L _ (HsDocTy _ t@(L _ HsRecTy{}) _)] = mk_rest [t]
    mk_rest [L l (HsRecTy _ flds)] = RecCon (L l flds)
-   mk_rest ts                     = PrefixCon (map linear ts)
+   mk_rest ts                     = PrefixCon (map hsLinear ts)
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 -- See Note [Parsing data constructors is hard]

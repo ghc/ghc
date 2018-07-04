@@ -121,7 +121,14 @@ module TysWiredIn (
         int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-        doubleElemRepDataConTy
+        doubleElemRepDataConTy,
+
+        -- * Multiplicity and friends
+        multiplicityTyConName, oneDataConName, omegaDataConName, multiplicityTy,
+        multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy,
+        omegaDataConTyCon
+
+
 
     ) where
 
@@ -130,7 +137,7 @@ module TysWiredIn (
 
 import GhcPrelude
 
-import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
+import {-# SOURCE #-} MkId( mkDataConWorkId, mkDataConRepSimple, mkDictSelId )
 
 -- friends:
 import PrelNames
@@ -233,6 +240,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , liftedTypeKindTyCon
                 , starKindTyCon
                 , unicodeStarKindTyCon
+                , multiplicityTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -402,6 +410,14 @@ liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type")
 starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKindTyConKey starKindTyCon
 unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
 
+multiplicityTyConName :: Name
+multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multiplicity")
+                          multiplicityTyConKey multiplicityTyCon
+
+oneDataConName, omegaDataConName :: Name
+oneDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
+omegaDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Omega") omegaDataConKey omegaDataCon
+
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
 vecRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "VecRep") vecRepDataConKey vecRepDataCon
@@ -519,6 +535,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
   = data_con
   where
     tag_map = mkTyConTagMap tycon
+
     -- This constructs the constructor Name to ConTag map once per
     -- constructor, which is quadratic. It's OK here, because it's
     -- only called for wired in data types that don't have a lot of
@@ -539,8 +556,9 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (lookupNameEnv_NF tag_map dc_name)
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
-                NoDataConRep    -- Wired-in types are too simple to need wrappers
+                (mkDataConRepSimple wrapper_name data_con)
 
+    wrapper_name = mkDataConWrapperName data_con (dataConWrapperUnique (nameUnique dc_name))
      -- We assume that we don't need non-linear wired-in types. Constraints are,
      -- on the other hand, always unrestricted (constraint arguments occur, in
      -- particular, in @Eq#@)
@@ -552,6 +570,17 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
     wrk_name = mkDataConWorkerName data_con wrk_key
 
     prom_info = mkPrelTyConRepName dc_name
+
+mkDataConWrapperName :: DataCon -> Unique -> Name
+mkDataConWrapperName data_con wrap_key =
+    mkWiredInName modu wrk_occ wrap_key
+                  (AnId (dataConWrapId data_con)) UserSyntax
+  where
+    modu     = ASSERT( isExternalName dc_name )
+               nameModule dc_name
+    dc_name = dataConName data_con
+    dc_occ  = nameOccName dc_name
+    wrk_occ = mkDataConWrapperOcc dc_occ
 
 mkDataConWorkerName :: DataCon -> Unique -> Name
 mkDataConWorkerName data_con wrk_key =
@@ -895,7 +924,7 @@ unitDataCon :: DataCon
 unitDataCon   = head (tyConDataCons unitTyCon)
 
 unitDataConId :: Id
-unitDataConId = dataConWorkId unitDataCon
+unitDataConId = dataConWrapId unitDataCon
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
@@ -1071,6 +1100,37 @@ mk_class :: TyCon -> PredType -> Id -> Class
 mk_class tycon sc_pred sc_sel_id
   = mkClass (tyConName tycon) (tyConTyVars tycon) [] [sc_pred] [sc_sel_id]
             [] [] (mkAnd []) tycon
+
+{- *********************************************************************
+*                                                                      *
+                Multiplicity Polymorphism
+*                                                                      *
+********************************************************************* -}
+
+{- Multiplicity polymorphism is implemented very similarly to levity
+ polymorphism. We write in the multiplicity kind and the One and Omega
+ types which can appear in user programs. These are defined properly in GHC.Types.
+
+data Multiplicity = One | Omega
+-}
+
+multiplicityTy :: Type
+multiplicityTy = mkTyConTy multiplicityTyCon
+
+multiplicityTyCon :: TyCon
+multiplicityTyCon = pcTyCon multiplicityTyConName Nothing []
+                          [oneDataCon, omegaDataCon]
+
+oneDataCon, omegaDataCon :: DataCon
+oneDataCon = pcDataCon oneDataConName [] [] multiplicityTyCon
+omegaDataCon = pcDataCon omegaDataConName [] [] multiplicityTyCon
+
+oneDataConTy, omegaDataConTy :: Type
+oneDataConTy = mkTyConTy (promoteDataCon oneDataCon)
+omegaDataConTy = mkTyConTy omegaDataConTyCon
+
+omegaDataConTyCon :: TyCon
+omegaDataConTyCon = promoteDataCon omegaDataCon
 
 {- *********************************************************************
 *                                                                      *

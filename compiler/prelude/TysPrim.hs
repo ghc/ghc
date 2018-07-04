@@ -23,6 +23,8 @@ module TysPrim(
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
+        multiplicityTyVar,
+
         -- Kind constructors...
         tYPETyCon, tYPETyConName,
 
@@ -94,7 +96,7 @@ import {-# SOURCE #-} TysWiredIn
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy )
+  , mkPromotedListTy, multiplicityTy )
 
 import Var              ( TyVar, TyVarBndr(TvBndr), mkTyVar )
 import Name
@@ -319,6 +321,9 @@ openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
+multiplicityTyVar :: TyVar
+multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13
+
 {-
 ************************************************************************
 *                                                                      *
@@ -327,30 +332,26 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 ************************************************************************
 -}
 
-funTyConName :: Rig -> Name
-funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConZeroKey (funTyCon Zero)
-funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConOneKey (funTyCon One)
-funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConOmegaKey (funTyCon Omega)
+funTyConName :: Name
+funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
--- TODO: arnaud: without Rig, funTyCon (and funTyConName) was allocated a single
--- time, now it's allocated at every call. It may be worth a bit of boilerplate
--- to make the allocation unique as it used to.
 -- | The @(->)@ type constructor.
 --
 -- @
--- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
+-- (->) :: forall (m :: Multiplicity) (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
-funTyCon :: Rig -> TyCon
-funTyCon w = mkFunTyCon w (funTyConName w) tc_bndrs tc_rep_nm
+funTyCon :: TyCon
+funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ TvBndr runtimeRep1TyVar (NamedTCB Inferred)
+    tc_bndrs = [ TvBndr multiplicityTyVar (NamedTCB Inferred)
+               , TvBndr runtimeRep1TyVar (NamedTCB Inferred)
                , TvBndr runtimeRep2TyVar (NamedTCB Inferred)
                ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
                                              ]
-    tc_rep_nm = mkPrelTyConRepName (funTyConName w)
+    tc_rep_nm = mkPrelTyConRepName funTyConName
 
 {-
 ************************************************************************

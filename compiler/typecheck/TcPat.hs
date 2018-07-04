@@ -30,6 +30,7 @@ import Var
 import Name
 import RdrName
 import Weight
+import UsageEnv (subweight)
 import TcEnv
 import TcMType
 import TcValidity( arityErr )

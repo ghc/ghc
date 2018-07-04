@@ -1514,7 +1514,7 @@ pmcheckGuards (gv:gvs) vva = do
 -- | Worker function: Implements all cases described in the paper for all three
 -- functions (`covered`, `uncovered` and `divergent`) apart from the `Guard`
 -- cases which are handled by `pmcheck`
-pmcheckHd :: Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
+pmcheckHd :: HasCallStack => Pattern -> PatVec -> [PatVec] -> ValAbs -> ValVec
           -> PmM PartialResult
 
 -- Var
@@ -1542,7 +1542,7 @@ pmcheckHd ( p@(PmCon { pm_con_con = c1, pm_con_tvs = ex_tvs1
           | tv1 == tv2 = pure Nothing
           | otherwise  = Just <$> to_evvar tv1 tv2
     evvars <- (listToBag . catMaybes) <$>
-              ASSERT(ex_tvs1 `equalLength` ex_tvs2)
+              ASSERT2(ex_tvs1 `equalLength` ex_tvs2, ppr c1 <+> ppr ex_tvs1 <+> ppr ex_tvs2)
               liftD (zipWithM mb_to_evvar ex_tvs1 ex_tvs2)
     let delta' = delta { delta_ty_cs = evvars `unionBags` delta_ty_cs delta }
     kcon c1 (pm_con_arg_tys p) (pm_con_tvs p) (pm_con_dicts p)

@@ -70,6 +70,8 @@ import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
 
+import TysWiredIn
+
 import Control.Monad
 import Maybes
 
@@ -882,7 +884,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_tys  = MkD ty1 ty2
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
-             con_app_tys  = mkHsWrap (mkWpTyApps inst_tys)
+             con_app_tys  = mkHsWrap (mkWpTyApps (omegaDataConTy : inst_tys))
                                   (HsConLikeOut noExt (RealDataCon dict_constr))
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
@@ -943,10 +945,10 @@ addDFunPrags dfun_id sc_meth_ids
            `setInlinePragma` dfunInlinePragma
  where
    con_app    = mkLams dfun_bndrs $
-                mkApps (Var (dataConWrapId dict_con)) dict_args
+                mkApps (Var (dataConWorkId dict_con)) dict_args
                  -- mkApps is OK because of the checkForLevPoly call in checkValidClass
                  -- See Note [Levity polymorphism checking] in DsMonad
-   dict_args  = map Type inst_tys ++
+   dict_args  = map Type (inst_tys) ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 
    (dfun_tvs, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)

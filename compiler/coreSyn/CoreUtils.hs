@@ -108,7 +108,7 @@ import UniqSet
 ************************************************************************
 -}
 
-exprType :: CoreExpr -> Type
+exprType :: HasCallStack => CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'CoreSyn.Type' expression as it cannot
 -- really be said to have a type
@@ -221,7 +221,7 @@ Note that there might be existentially quantified coercion variables, too.
 -}
 
 -- Not defined with applyTypeToArg because you can't print from CoreSyn.
-applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: HasCallStack => CoreExpr -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
 applyTypeToArgs e op_ty args
@@ -232,7 +232,7 @@ applyTypeToArgs e op_ty args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
-    go _ _ = pprPanic "applyTypeToArgs" panic_msg
+    go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
     -- go_ty_args: accumulate type arguments so we can
     -- instantiate all at once with piResultTys
@@ -243,9 +243,11 @@ applyTypeToArgs e op_ty args
     go_ty_args op_ty rev_tys args
        = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg = vcat [ text "Expression:" <+> pprCoreExpr e
+    panic_msg as = vcat [ text "Expression:" <+> pprCoreExpr e
                      , text "Type:" <+> ppr op_ty
-                     , text "Args:" <+> ppr args ]
+                     , text "Args:" <+> ppr args
+                     , text "Args':" <+> ppr as
+                     , callStackDoc ]
 
 
 {-
@@ -997,7 +999,7 @@ also CoreArity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 -}
 
-exprIsBottom :: CoreExpr -> Bool
+exprIsBottom :: HasCallStack => CoreExpr -> Bool
 -- See Note [Bottoming expressions]
 exprIsBottom e
   | isEmptyTy (exprType e)
@@ -2380,15 +2382,15 @@ tryEtaReduce bndrs body
        | bndr == v
        , let weight = idWeight v
        , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: arnaud: it is probably a bit slow to compute the type every time but it simplifies the implementation tremendously for now
-       , weight == fun_weight -- There is no change in multiplicity, otherwise we must abort
+       , weight `eqRig` fun_weight -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
-         in Just (mkFunCo Representational weight reflCo co, [])
+         in Just (mkFunCo Representational (rigToCo weight) reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
        , bndr == v
-       , fun_weight == idWeight v
-       = Just (mkFunCo Representational (idWeight v) (mkSymCo co_arg) co, ticks)
+       , fun_weight `eqRig` idWeight v
+       = Just (mkFunCo Representational (rigToCo fun_weight) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty

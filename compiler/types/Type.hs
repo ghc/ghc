@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -115,7 +115,11 @@ module Type (
         dropRuntimeRepArgs,
         getRuntimeRep, getRuntimeRepFromKind,
 
-        isLinearType,
+        -- Multiplicity
+
+        isMultiplicityTy, isMultiplicityVar,
+
+        isLinearType, isOneMultiplicity, isOmegaMultiplicity,
 
         -- * Main data types representing Kinds
         Kind,
@@ -144,7 +148,7 @@ module Type (
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
         nonDetCmpTypesX, nonDetCmpTc,
-        eqVarBndrs,
+        eqVarBndrs, eqRig,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -202,7 +206,9 @@ module Type (
         tidyTyVarOcc,
         tidyTopType,
         tidyKind,
-        tidyTyVarBinder, tidyTyVarBinders
+        tidyTyVarBinder, tidyTyVarBinders,
+
+        rigToType, typeToRig, flattenRig
     ) where
 
 #include "HsVersions.h"
@@ -217,6 +223,7 @@ import BasicTypes
 import Kind
 import TyCoRep
 import Weight
+import {-# SOURCE #-} UsageEnv
 
 -- friends:
 import Var
@@ -228,7 +235,8 @@ import Class
 import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
-                                 , typeSymbolKind, liftedTypeKind )
+                                 , typeSymbolKind, liftedTypeKind
+                                 , oneDataConTy, omegaDataConTy )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion
@@ -524,7 +532,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go t@(TyConApp _ []) = return t  -- avoid allocation in this exceedingly
                                      -- common case (mostly, for *)
     go (TyConApp tc tys) = mktyconapp tc <$> mapM go tys
-    go (FunTy w arg res) = (\a b -> FunTy w a b) <$> go arg <*> go res
+    go (FunTy w arg res) = (\w' a b -> FunTy w' a b) <$> go_rig w <*> go arg <*> go res
     go (ForAllTy (TvBndr tv vis) inner)
       = do { (env', tv') <- tybinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -532,6 +540,9 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go ty@(LitTy {})   = return ty
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
+
+    go_rig (RigTy t) = typeToRig <$> go t
+    go_rig t = pure t
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
@@ -714,12 +725,34 @@ splitAppTy_maybe ty | Just ty' <- coreView ty
                     = splitAppTy_maybe ty'
 splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
+rigToType :: HasCallStack => Rig -> Type
+rigToType r =
+  case r of
+    One ->  oneDataConTy
+    Omega -> omegaDataConTy
+    RigTy ty -> ty
+    r -> pprPanic "rigToType" (ppr r $$ callStackDoc )
+
+typeToRig :: Type -> Rig
+typeToRig ty = flattenRig (RigTy ty)
+
+-- | Change occurence of types to their constructors
+flattenRig :: Rig -> Rig
+flattenRig (RigTy r)
+  | oneDataConTy `eqType` r = One
+  | omegaDataConTy `eqType` r = Omega
+  | otherwise = RigTy r
+flattenRig (RigMul m1 m2) = flattenRig m1 * flattenRig m2
+flattenRig r = r
+
+
+
 -------------
 repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy w ty1 ty2)
-  = Just (TyConApp (funTyCon w) [rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [rigToType w, rep1, rep2, ty1], ty2)
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -744,7 +777,7 @@ tcRepSplitAppTy_maybe (FunTy w ty1 ty2)
   | isConstraintKind (typeKind ty1)
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
   | otherwise
-  = Just (TyConApp (funTyCon w) [rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [rigToType w, rep1, rep2, ty1], ty2)
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -775,7 +808,7 @@ tcRepSplitTyConApp_maybe (TyConApp tc tys)
   = Just (tc, tys)
 
 tcRepSplitTyConApp_maybe (FunTy w arg res)
-  = Just (funTyCon w, [arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
   where
     arg_rep = getRuntimeRep arg
     res_rep = getRuntimeRep res
@@ -809,7 +842,7 @@ splitAppTys ty = split ty ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _   (FunTy w ty1 ty2) args
       = ASSERT( null args )
-        (TyConApp (funTyCon w) [], [rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], [rigToType w, rep1, rep2, ty1, ty2])
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -829,7 +862,7 @@ repSplitAppTys ty = split ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split (FunTy w ty1 ty2) args
       = ASSERT( null args )
-        (TyConApp (funTyCon w) [], [rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], [rigToType w, rep1, rep2, ty1, ty2])
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -938,7 +971,7 @@ See #11714.
 isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
-splitFunTy :: Type -> (Weighted Type, Type)
+splitFunTy :: HasCallStack => Type -> (Weighted Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
@@ -1086,9 +1119,9 @@ applyTysX tvs body_ty arg_tys
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
-  | Just w <- isFunTyConWeight tycon
-  , [_rep1,_rep2,ty1,ty2] <- tys
-  = FunTy w ty1 ty2
+  | isFunTyCon tycon
+  , [w, _rep1,_rep2,ty1,ty2] <- tys
+  = FunTy (typeToRig w) ty1 ty2
 
   | otherwise
   = TyConApp tycon tys
@@ -1101,7 +1134,7 @@ mkTyConApp tycon tys
 -- look through synonyms.
 tyConAppTyConPicky_maybe :: Type -> Maybe TyCon
 tyConAppTyConPicky_maybe (TyConApp tc _) = Just tc
-tyConAppTyConPicky_maybe (FunTy w _ _)   = Just (funTyCon w)
+tyConAppTyConPicky_maybe (FunTy w _ _)   = Just funTyCon
 tyConAppTyConPicky_maybe _               = Nothing
 
 
@@ -1109,7 +1142,7 @@ tyConAppTyConPicky_maybe _               = Nothing
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty | Just ty' <- coreView ty = tyConAppTyCon_maybe ty'
 tyConAppTyCon_maybe (TyConApp tc _) = Just tc
-tyConAppTyCon_maybe (FunTy w _ _)   = Just (funTyCon w)
+tyConAppTyCon_maybe (FunTy w _ _)   = Just funTyCon
 tyConAppTyCon_maybe _               = Nothing
 
 tyConAppTyCon :: Type -> TyCon
@@ -1119,10 +1152,10 @@ tyConAppTyCon ty = tyConAppTyCon_maybe ty `orElse` pprPanic "tyConAppTyCon" (ppr
 tyConAppArgs_maybe :: Type -> Maybe [Type]
 tyConAppArgs_maybe ty | Just ty' <- coreView ty = tyConAppArgs_maybe ty'
 tyConAppArgs_maybe (TyConApp _ tys) = Just tys
-tyConAppArgs_maybe (FunTy _ arg res)
+tyConAppArgs_maybe (FunTy w arg res)
   | Just rep1 <- getRuntimeRep_maybe arg
   , Just rep2 <- getRuntimeRep_maybe res
-  = Just [rep1, rep2, arg, res]
+  = Just [rigToType w, rep1, rep2, arg, res]
 tyConAppArgs_maybe _  = Nothing
 
 tyConAppArgs :: Type -> [Type]
@@ -1156,7 +1189,7 @@ repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy w arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon w, [arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 
 -- | Attempts to tease a list type apart and gives the type of the elements if
@@ -1916,6 +1949,19 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 {-
 ************************************************************************
 *                                                                      *
+\subsection{Multiplicity}
+*                                                                      *
+************************************************************************
+-}
+
+isOneMultiplicity, isOmegaMultiplicity :: Type -> Bool
+isOneMultiplicity ty = ty `eqType` oneDataConTy
+
+isOmegaMultiplicity ty = ty `eqType` omegaDataConTy
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{Liftedness}
 *                                                                      *
 ************************************************************************
@@ -2273,7 +2319,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy w1 s1 t1) (FunTy w2 s2 t2)
-      = liftOrdering (compare w1 w2) `thenCmpTy`
+      = go_rig env w1 w2 `thenCmpTy`
         go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
@@ -2297,11 +2343,31 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (FunTy {})      = 6
             get_rank (ForAllTy {})   = 7
 
+
+    go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
+    go_rig env (flattenRig -> r1) (flattenRig -> r2) =
+      if r1 `eqRig` r2
+        then TEQ
+        else
+          case subweightMaybe r1 r2 of
+            Smaller -> TLT
+            Larger  -> TGT
+            Unknown -> go env (rigToType r1) (rigToType r2)
+
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ
     gos _   []         _          = TLT
     gos _   _          []         = TGT
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
+
+eqRig :: Rig -> Rig -> Bool
+eqRig Zero Zero = True
+eqRig One One = True
+eqRig Omega Omega = True
+eqRig (RigTy ty) (RigTy ty') = eqType ty ty'
+eqRig (RigAdd r1 r2) (RigAdd r1' r2') = eqRig r1 r1' && eqRig r2 r2'
+eqRig (RigMul r1 r2) (RigMul r1' r2') = eqRig r1 r1' && eqRig r2 r2'
+eqRig _ _ = False
 
 -------------
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
@@ -2402,7 +2468,8 @@ tyConsOfType ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
-     go (FunTy w a b)               = go a `unionUniqSets` go b `unionUniqSets` go_tc (funTyCon w)
+     -- MattP: TODO get tycons from weight once it is just a type
+     go (FunTy w a b)               = go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
      go (ForAllTy (TvBndr tv _) ty) = go ty `unionUniqSets` go (tyVarKind tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co

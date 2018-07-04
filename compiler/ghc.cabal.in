@@ -489,6 +489,7 @@ Library
         FunDeps
         InstEnv
         Weight
+        UsageEnv
         TyCon
         CoAxiom
         Kind

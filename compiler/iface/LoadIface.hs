@@ -956,7 +956,7 @@ ghcPrimIface
   where
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
                                       -- seq is infixr 0
-             : (occName (funTyConName Omega), funTyFixity)  -- trac #10145
+             : (occName funTyConName, funTyFixity)  -- trac #10145
              : mapMaybe mkFixity allThePrimOps
     mkFixity op = (,) (primOpOcc op) <$> primOpFixity op
 

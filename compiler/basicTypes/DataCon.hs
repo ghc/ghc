@@ -84,6 +84,8 @@ import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
 
+import TysPrim
+
 import qualified Data.Data as Data
 import Data.Char
 import Data.Word
@@ -929,12 +931,15 @@ mkDataCon name declared_infix prom_info
       case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
         -- user-facing type, so we can simply use dataConUserType.
-        NoDataConRep -> dataConUserType con
+        -- See Note [All data constructors have wrappers]
+--        NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
-        DCR{} -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
+        _ -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
                  mkFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
+        -- MattP: We really should not use `setWeight` here but this makes
+        -- all the wrappers well typed. It is stop gap solution.
 
       -- See Note [Promoted data constructors] in TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
@@ -948,6 +953,18 @@ mkDataCon name declared_infix prom_info
 
     roles = map (const Nominal) (univ_tvs ++ ex_tvs) ++
             map (const Representational) orig_arg_tys
+
+{- Note [All data constructors have wrappers]
+
+All data constructors should have a wrapper. The reason for this is that
+all data constructors have an unused multiplicity argument which is taken and
+thrown away by the wrapper.
+
+If we reverse this
+decision then this line will need to be restored. It is
+commented out to make it easy to add back with the correct
+information.
+-}
 
 mkCleanAnonTyConBinders :: [TyConBinder] -> [Type] -> [TyConBinder]
 -- Make sure that the "anonymous" tyvars don't clash in
@@ -1084,7 +1101,7 @@ dataConWrapId_maybe dc = case dcRep dc of
 -- the worker (see 'dataConWorkId')
 dataConWrapId :: DataCon -> Id
 dataConWrapId dc = case dcRep dc of
-                     NoDataConRep-> dcWorkId dc    -- worker=wrapper
+                     NoDataConRep-> panic "dataConWrapId"
                      DCR { dcr_wrap_id = wrap_id } -> wrap_id
 
 -- | Find all the 'Id's implicitly brought into scope by the data constructor. Currently,
@@ -1242,10 +1259,15 @@ dataConUserType :: DataCon -> Type
 dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkForAllTys user_tvbs $
-    mkFunTys (map unrestricted theta) $ -- TODO: arnaud: what is theta in constructors? Does it need linearity information?
-    mkFunTys arg_tys $
-    res_ty
+  = let tvb = mkTyVarBinder Inferred multiplicityTyVar
+        ty  = mkTyVarTy multiplicityTyVar
+        -- See Note [Wrapper weights]
+        arg_tys' = map (scaleWeighted (RigTy ty)) arg_tys
+    in
+      mkForAllTys (tvb : user_tvbs) $
+      mkFunTys (map unrestricted theta) $
+      mkFunTys arg_tys' $
+      res_ty
 
 -- | Finds the instantiated types of the arguments required to construct a 'DataCon' representation
 -- NB: these INCLUDE any dictionary args
@@ -1266,7 +1288,8 @@ dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
 dataConInstOrigArgTys
-        :: DataCon      -- Works for any DataCon
+        :: HasCallStack
+        => DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
         -> [Weighted Type]
@@ -1275,11 +1298,15 @@ dataConInstOrigArgTys
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcUnivTyVars = univ_tvs,
                                   dcExTyVars = ex_tvs}) inst_tys
-  = ASSERT2( tyvars `equalLength` inst_tys
-          , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-    map (fmap $ substTyWith tyvars inst_tys) arg_tys
+  = ASSERT2( tyvars `equalLength` inst_tys2
+           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+    map (fmap $ substTyWith tyvars inst_tys2) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
+    inst_tys2 = if isUnboxedTupleCon dc
+                  then map getRuntimeRep inst_tys ++ inst_tys
+                  else inst_tys
+                  -- See Note [Unboxed tuple RuntimeRep vars]
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables

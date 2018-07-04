@@ -105,7 +105,7 @@ import RdrName
 import Var
 import TyCoRep
 import Type   ( filterOutInvisibleTypes )
-import TysWiredIn ( unitTy )
+import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType
 import DataCon
 import ConLike
@@ -395,7 +395,8 @@ nlHsVar n = noLoc (HsVar noExt (noLoc n))
 
 -- NB: Only for LHsExpr **Id**
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
-nlHsDataCon con = noLoc (HsConLikeOut noExt (RealDataCon con))
+nlHsDataCon con = mkLHsWrap (mkWpTyApps [omegaDataConTy])
+                    (noLoc (HsConLikeOut noExt (RealDataCon con)))
 
 nlHsLit :: HsLit (GhcPass p) -> LHsExpr (GhcPass p)
 nlHsLit n = noLoc (HsLit noExt n)
@@ -496,7 +497,7 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: (XFunTy p ~ NoExt) => LHsType p -> Rig -> LHsType p -> LHsType p
+nlHsFunTy :: (XFunTy p ~ NoExt) => LHsType p -> HsRig p -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
@@ -653,7 +654,7 @@ typeToLHsType ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                         , hst_xqual = noExt
                         , hst_body = go tau })
-    go (FunTy weight arg res) = nlHsFunTy (go arg) weight (go res)
+    go (FunTy weight arg res) = nlHsFunTy (go arg) (rigToHsRig weight) (go res)
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
@@ -684,6 +685,11 @@ typeToLHsType ty
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
+rigToHsRig :: Rig -> HsRig p
+rigToHsRig Zero = HsZero
+rigToHsRig One  = HsOne
+rigToHsRig Omega = HsOmega
+rigToHsRig _ = panic "rigToHsRig: polymorphism not yet implemented"
 {-
 Note [Kind signatures in typeToLHsType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

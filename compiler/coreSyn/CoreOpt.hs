@@ -105,8 +105,7 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- may change radically
 
 simpleOptExpr expr
-  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    simpleOptExprWith init_subst expr
+  = simpleOptExprWith init_subst expr
   where
     init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
         -- It's potentially important to make a proper in-scope set
@@ -348,7 +347,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
   , let out_ty = substTy (soe_subst rhs_env) ty
-  = ASSERT( isTyVar in_bndr )
+  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr in_rhs )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
@@ -401,7 +400,7 @@ simple_out_bind :: SimpleOptEnv -> (InVar, OutExpr)
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
-  = ASSERT( isTyVar in_bndr )
+  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr out_ty $$ ppr out_rhs )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion out_co <- out_rhs
@@ -742,7 +741,10 @@ data ConCont = CC [CoreExpr] Coercion
 -- where t1..tk are the *universally-quantified* type args of 'dc'
 exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
-  = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
+  = let res = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
+--    in pprTrace "exprIsConApp_maybe" (ppr expr $$ ppr res) res
+    in res
+
   where
     go :: Either InScopeSet Subst
              -- Left in-scope  means "empty substitution"
@@ -1073,10 +1075,14 @@ pushCoDataCon :: HasCallStack => DataCon -> [CoreExpr] -> Coercion
 -- The left-hand one must be a T, because exprIsConApp returned True
 -- but the right-hand one might not be.  (Though it usually will.)
 pushCoDataCon dc dc_args co
+{- TODO: MattP  See #100
   | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
-  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
-  = Just (dc, map exprToType univ_ty_args, rest_args)
-
+  , let (univ_ty_args, rest_args) =  -- tail here for multiplicity
+            -- TODO: Fix this properly with an assertion
+          (splitAtList (dataConUnivTyVars dc) dc_args)
+  = pprTrace "pushCo" (ppr dc_args $$ ppr univ_ty_args $$ ppr rest_args)
+      $ Just (dc, map exprToType (pprTrace "univ" (ppr dc $$ ppr univ_ty_args $$ callStackDoc) univ_ty_args), rest_args)
+-}
   | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
   , to_tc == dataConTyCon dc
         -- These two tests can fail; we might see
@@ -1111,7 +1117,8 @@ pushCoDataCon dc dc_args co
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
                          ppr arg_tys, ppr dc_args,
-                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc ]
+                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc
+                         , ppr $ mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args) ]
     in
     ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )

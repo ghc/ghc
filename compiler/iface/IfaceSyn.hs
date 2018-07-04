@@ -71,6 +71,7 @@ import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import DynFlags
+import FastString
 
 import Control.Monad
 import System.IO.Unsafe
@@ -251,7 +252,7 @@ data IfaceConDecl
           -- See Note [DataCon user type variable binders] in DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
-        ifConArgTys  :: [Weighted IfaceType],-- Arg types
+        ifConArgTys  :: [(IfaceRig, IfaceType)],-- Arg types
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
@@ -422,7 +423,7 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
     --    data constructor (DataCon namespace)
     --    data worker (Id namespace)
     --    no wrapper (class dictionaries never have a wrapper)
-    [dc_occ, dcww_occ] ++
+    [dc_occ, dcww_occ, dcwrap_occ] ++
     -- associated types
     [occName (ifName at) | IfaceAT at _ <- ats ] ++
     -- superclass selectors
@@ -436,6 +437,7 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
     co_occs | is_newtype = [mkNewTyCoOcc cls_tc_occ]
             | otherwise  = []
     dcww_occ = mkDataConWorkerOcc dc_occ
+    dcwrap_occ = mkDataConWrapperOcc dc_occ
     dc_occ = mkClassDataConOcc cls_tc_occ
     is_newtype = n_sigs + n_ctxt == 1 -- Sigh (keep this synced with buildClass)
 
@@ -869,7 +871,9 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                              , ex_msg
                              , pprIfaceContextArr prov_ctxt
-                             , pprIfaceType $ foldr (IfaceFunTy Omega) pat_ty arg_tys ])
+                             , pprIfaceType $ foldr
+                                                (IfaceFunTy (IfaceTyVar (mkFastString "Omega")))
+                                                pat_ty arg_tys ])
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
         ex_msg   = pprUserIfaceForAll ex_bndrs
@@ -991,7 +995,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
-    tys_w_strs = zip stricts (map weightedThing arg_tys) -- TODO: arnaud: don't drop linearity when printing
+    tys_w_strs = zip stricts (map snd arg_tys) -- TODO: arnaud: don't drop linearity when printing
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     -- If we're pretty-printing a H98-style declaration with existential
@@ -1396,7 +1400,7 @@ freeNamesIfConDecl (IfCon { ifConExTvs   = ex_tvs, ifConCtxt = ctxt
                           , ifConStricts = bangs })
   = fnList freeNamesIfTvBndr ex_tvs &&&
     freeNamesIfContext ctxt &&&
-    fnList freeNamesIfType (map weightedThing arg_tys) &&&
+    fnList freeNamesIfType (map snd arg_tys) &&& -- TODO: rig types have free vars
     mkNameSet (map flSelector flds) &&&
     fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
     fnList freeNamesIfBang bangs

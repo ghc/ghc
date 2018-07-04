@@ -19,6 +19,8 @@ module RnTypes (
         rnConDeclFields,
         rnLTyVar,
 
+        rnWeightedLHsType,
+
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
         checkPrecMatch, checkSectionPrec,
@@ -64,7 +66,6 @@ import Util
 import ListSetOps       ( deleteBys )
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
                           Fixity(..), FixityDirection(..), LexicalFixity(..) )
-import Weight
 import Outputable
 import FastString
 import Maybes
@@ -494,6 +495,14 @@ rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 rnLHsTypes :: Traversable t => HsDocContext -> t (LHsType GhcPs) -> RnM (t (LHsType GhcRn), FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
+rnWeightedLHsType :: HsDocContext -> HsWeighted GhcPs (LHsType GhcPs)
+                                  -> RnM (HsWeighted GhcRn (LHsType GhcRn), FreeVars)
+rnWeightedLHsType doc (HsWeighted w ty) = do
+  (w' , fvs_w) <- rnRig (mkTyKiEnv doc TypeLevel RnTypeBody) w
+  (ty', fvs) <- rnLHsType doc ty
+  return (HsWeighted w' ty', fvs `plusFV` fvs_w)
+
+
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 rnHsType ctxt ty = rnHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
@@ -591,10 +600,13 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; res_ty <- mkHsOpTyRn hs_fun_ty (funTyConName weight) funTyFixity ty1' ty2'
-       ; return (res_ty, fvs1 `plusFV` fvs2) }
+       ; (weight', w_fvs) <- rnRig env weight
+       -- TODO: Can linear arrows appear in kinds?
+       -- Arnaud says no, perhaps this needs to be restricted
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') funTyConName funTyFixity ty1' ty2'
+       ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
-    hs_fun_ty a b = HsFunTy noExt a weight b
+    hs_fun_ty w a b = HsFunTy noExt a w b
 
 rnHsTyKi env listTy@(HsListTy _ ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -751,6 +763,15 @@ rnHsTyKi env (HsWildCardTy _)
          -- emptyFVs: this occurrence does not refer to a
          --           user-written binding site, so don't treat
          --           it as a free variable
+
+rnRig :: RnTyKiEnv -> HsRig GhcPs -> RnM ((HsRig GhcRn), FreeVars)
+rnRig env r =
+  case r of
+    HsZero -> return (HsZero, emptyFVs)
+    HsOne  -> return (HsOne, emptyFVs)
+    HsOmega -> return (HsOmega, emptyFVs)
+    HsRigTy ty -> (\(ty, fvs) -> (HsRigTy ty, fvs)) <$> rnLHsTyKi env ty
+    _r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
@@ -1270,7 +1291,7 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExt ty21 op2 ty22))
 
 mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 weight ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
-                hs_fun_ty (funTyConName Omega) funTyFixity ty21 ty22 loc2
+                hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
   where
     hs_fun_ty a b = HsFunTy noExt a weight b
 
@@ -1803,7 +1824,7 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
                             , con_mb_cxt = ctxt, con_args = args }) acc
       = extract_hs_tv_bndrs ex_tvs acc =<<
         extract_mlctxt ctxt =<<
-        extract_ltys TypeLevel (map weightedThing $ hsConDeclArgTys args) emptyFKTV
+        extract_ltys TypeLevel (map hsThing $ hsConDeclArgTys args) emptyFKTV
     extract_con (XConDecl { }) _ = panic "extractDataDefnKindVars"
 extractDataDefnKindVars (XHsDataDefn _) = panic "extractDataDefnKindVars"
 
@@ -1847,8 +1868,9 @@ extract_lty t_or_k (L _ ty) acc
       HsPArrTy _ ty               -> extract_lty t_or_k ty acc
       HsTupleTy _ _ tys           -> extract_ltys t_or_k tys acc
       HsSumTy _ tys               -> extract_ltys t_or_k tys acc
-      HsFunTy _ ty1 _ ty2           -> extract_lty t_or_k ty1 =<<
-                                     extract_lty t_or_k ty2 acc
+      HsFunTy _ ty1 w ty2           -> extract_lty t_or_k ty1 =<<
+                                       extract_lty t_or_k ty2 =<<
+                                       extract_rig t_or_k w acc
       HsIParamTy _ _ ty           -> extract_lty t_or_k ty acc
       HsEqTy _ ty1 ty2            -> extract_lty t_or_k ty1 =<<
                                      extract_lty t_or_k ty2 acc
@@ -1872,6 +1894,11 @@ extract_lty t_or_k (L _ ty) acc
       XHsType {}                  -> return acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> return acc
+
+extract_rig :: TypeOrKind -> HsRig GhcPs -> FreeKiTyVarsWithDups ->
+               RnM FreeKiTyVarsWithDups
+extract_rig t_or_k (HsRigTy t) acc = extract_lty t_or_k t acc
+extract_rig t_or_k _ acc = return acc
 
 extract_apps :: TypeOrKind
              -> [LHsAppType GhcPs] -> FreeKiTyVars -> RnM FreeKiTyVars

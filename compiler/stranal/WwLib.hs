@@ -986,7 +986,7 @@ mk_ww_local :: Unique -> (Weighted Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says
 -- whether this field is strict
 -- See Note [Record evaluated-ness in worker/wrapper]
-mk_ww_local uniq (Weighted w ty,str)
+mk_ww_local uniq (Weighted _w ty,str)
   = setCaseBndrEvald str $
     mkSysLocalOrCoVar (fsLit "ww") uniq Omega ty
     -- MattP: TODO - Imprecise and should be passed from call sites

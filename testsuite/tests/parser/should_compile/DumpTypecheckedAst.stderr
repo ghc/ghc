@@ -25,9 +25,15 @@
                (HsApp
                 (NoExt)
                 ({ <no location info> }
-                 (HsConLikeOut
+                 (HsWrap
                   (NoExt)
-                  ({abstract:ConLike})))
+                  (WpTyApp
+                   (TyConApp
+                    ({abstract:TyCon})
+                    []))
+                  (HsConLikeOut
+                   (NoExt)
+                   ({abstract:ConLike}))))
                 ({ <no location info> }
                  (HsLit
                   (NoExt)
@@ -48,9 +54,15 @@
              (HsApp
               (NoExt)
               ({ <no location info> }
-               (HsConLikeOut
+               (HsWrap
                 (NoExt)
-                ({abstract:ConLike})))
+                (WpTyApp
+                 (TyConApp
+                  ({abstract:TyCon})
+                  []))
+                (HsConLikeOut
+                 (NoExt)
+                 ({abstract:ConLike}))))
               ({ <no location info> }
                (HsLit
                 (NoExt)
@@ -91,9 +103,15 @@
                (HsApp
                 (NoExt)
                 ({ <no location info> }
-                 (HsConLikeOut
+                 (HsWrap
                   (NoExt)
-                  ({abstract:ConLike})))
+                  (WpTyApp
+                   (TyConApp
+                    ({abstract:TyCon})
+                    []))
+                  (HsConLikeOut
+                   (NoExt)
+                   ({abstract:ConLike}))))
                 ({ <no location info> }
                  (HsLit
                   (NoExt)
@@ -114,9 +132,15 @@
              (HsApp
               (NoExt)
               ({ <no location info> }
-               (HsConLikeOut
+               (HsWrap
                 (NoExt)
-                ({abstract:ConLike})))
+                (WpTyApp
+                 (TyConApp
+                  ({abstract:TyCon})
+                  []))
+                (HsConLikeOut
+                 (NoExt)
+                 ({abstract:ConLike}))))
               ({ <no location info> }
                (HsLit
                 (NoExt)
@@ -157,9 +181,15 @@
                (HsApp
                 (NoExt)
                 ({ <no location info> }
-                 (HsConLikeOut
+                 (HsWrap
                   (NoExt)
-                  ({abstract:ConLike})))
+                  (WpTyApp
+                   (TyConApp
+                    ({abstract:TyCon})
+                    []))
+                  (HsConLikeOut
+                   (NoExt)
+                   ({abstract:ConLike}))))
                 ({ <no location info> }
                  (HsLit
                   (NoExt)
@@ -180,9 +210,15 @@
              (HsApp
               (NoExt)
               ({ <no location info> }
-               (HsConLikeOut
+               (HsWrap
                 (NoExt)
-                ({abstract:ConLike})))
+                (WpTyApp
+                 (TyConApp
+                  ({abstract:TyCon})
+                  []))
+                (HsConLikeOut
+                 (NoExt)
+                 ({abstract:ConLike}))))
               ({ <no location info> }
                (HsLit
                 (NoExt)
@@ -211,9 +247,15 @@
        (HsApp
         (NoExt)
         ({ <no location info> }
-         (HsConLikeOut
+         (HsWrap
           (NoExt)
-          ({abstract:ConLike})))
+          (WpTyApp
+           (TyConApp
+            ({abstract:TyCon})
+            []))
+          (HsConLikeOut
+           (NoExt)
+           ({abstract:ConLike}))))
         ({ <no location info> }
          (HsVar
           (NoExt)
@@ -236,9 +278,15 @@
        (HsApp
         (NoExt)
         ({ <no location info> }
-         (HsConLikeOut
+         (HsWrap
           (NoExt)
-          ({abstract:ConLike})))
+          (WpTyApp
+           (TyConApp
+            ({abstract:TyCon})
+            []))
+          (HsConLikeOut
+           (NoExt)
+           ({abstract:ConLike}))))
         ({ <no location info> }
          (HsVar
           (NoExt)
@@ -247,10 +295,15 @@
       ({ <no location info> }
        (HsWrap
         (NoExt)
-        (WpTyApp
-         (TyConApp
-          ({abstract:TyCon})
-          []))
+        (WpCompose
+         (WpTyApp
+          (TyConApp
+           ({abstract:TyCon})
+           []))
+         (WpTyApp
+          (TyConApp
+           ({abstract:TyCon})
+           [])))
         (HsConLikeOut
          (NoExt)
          ({abstract:ConLike}))))))
@@ -266,9 +319,15 @@
        (HsApp
         (NoExt)
         ({ <no location info> }
-         (HsConLikeOut
+         (HsWrap
           (NoExt)
-          ({abstract:ConLike})))
+          (WpTyApp
+           (TyConApp
+            ({abstract:TyCon})
+            []))
+          (HsConLikeOut
+           (NoExt)
+           ({abstract:ConLike}))))
         ({ <no location info> }
          (HsPar
           (NoExt)
@@ -276,9 +335,15 @@
            (HsApp
             (NoExt)
             ({ <no location info> }
-             (HsConLikeOut
+             (HsWrap
               (NoExt)
-              ({abstract:ConLike})))
+              (WpTyApp
+               (TyConApp
+                ({abstract:TyCon})
+                []))
+              (HsConLikeOut
+               (NoExt)
+               ({abstract:ConLike}))))
             ({ <no location info> }
              (HsLit
               (NoExt)
@@ -292,9 +357,15 @@
          (HsApp
           (NoExt)
           ({ <no location info> }
-           (HsConLikeOut
+           (HsWrap
             (NoExt)
-            ({abstract:ConLike})))
+            (WpTyApp
+             (TyConApp
+              ({abstract:TyCon})
+              []))
+            (HsConLikeOut
+             (NoExt)
+             ({abstract:ConLike}))))
           ({ <no location info> }
            (HsLit
             (NoExt)

@@ -33,7 +33,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Set as S
 
-getNth :: Outputable a => [a] -> Int -> a
+getNth :: (HasCallStack, Outputable a) => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
              xs !! n
 

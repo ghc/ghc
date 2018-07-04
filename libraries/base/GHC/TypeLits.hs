@@ -201,7 +201,12 @@ newtype SSymbol (s :: Symbol) = SSymbol String
 
 data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
 
+
+wrapS :: forall a b . (KnownSymbol a => Proxy a -> b) -> WrapS a b
+wrapS f = WrapS f
+{-# NOINLINE wrapS #-}
+
 -- See Note [magicDictId magic] in "basicType/MkId.hs"
 withSSymbol :: (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
-withSSymbol f x y = magicDict (WrapS f) x y
+withSSymbol f x y = magicDict (wrapS f) x y

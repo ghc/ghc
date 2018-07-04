@@ -687,7 +687,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                       -- subterms with tyvars
                       zterm' <- mapTermTypeM
                                  (\ty -> case tcSplitTyConApp_maybe ty of
-                                           Just (tc, _:_) | tc /= (funTyCon Omega) -- TODO: arnaud: probably use a predicate instead of equality
+                                           Just (tc, _:_) | tc /= funTyCon
                                                -> newOpenVar
                                            _   -> return ty)
                                  term
@@ -1200,7 +1200,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
 -- FunTy inductive case
     | Just (Weighted w1 l1,l2) <- splitFunTy_maybe l
     , Just (Weighted w2 r1,r2) <- splitFunTy_maybe r
-    , w1 == w2
+    , w1 `eqRig` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
          return (mkFunTy w1 r1' r2')

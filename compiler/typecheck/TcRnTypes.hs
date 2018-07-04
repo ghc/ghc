@@ -160,6 +160,7 @@ import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
 import Weight
+import UsageEnv
 import TcType
 import Annotations
 import InstEnv

@@ -15,9 +15,14 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
-        Rig(..),
+        Rig(..), HsRig(..), HsWeighted(..),
+        hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..), HsQTvsRn(..),
@@ -85,7 +90,6 @@ import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
-import Weight
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -503,7 +507,7 @@ data HsType pass
 
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
-                        Rig
+                        (HsRig pass)
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
@@ -713,6 +717,33 @@ data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
     deriving Data
+
+data HsRig pass = HsZero | HsOne | HsOmega | HsRigTy (LHsType pass)
+
+instance
+      (OutputableBndrId (GhcPass pass)) =>
+      Outputable (HsRig (GhcPass pass)) where
+  ppr HsZero = text "0"
+  ppr HsOne = text "1"
+  ppr HsOmega = text "ω"
+  ppr (HsRigTy p) = ppr p
+
+hsUnrestricted, hsLinear :: a -> HsWeighted pass a
+hsUnrestricted = HsWeighted HsOmega
+hsLinear = HsWeighted HsOne
+
+isHsOmega :: HsRig pass -> Bool
+isHsOmega HsOmega = True
+isHsOmega _ = False
+
+data HsWeighted pass a = HsWeighted { hsWeight :: HsRig pass, hsThing :: a }
+  deriving (Traversable, Functor, Foldable)
+
+instance Outputable a => Outputable (HsWeighted pass a) where
+   ppr (HsWeighted _cnt t) = -- ppr cnt <> ppr t
+                          ppr t
+
+
 
 newtype HsWildCardInfo        -- See Note [The wildcard story for types]
     = AnonWildCard (Located Name)
@@ -1073,21 +1104,21 @@ mkHsAppsTy app_tys                        = HsAppsTy NoExt app_tys
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
-splitHsFunType :: LHsType GhcRn -> ([Weighted (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsWeighted GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
 splitHsFunType (L _ (HsFunTy _ x weight y))
   | (args, res) <- splitHsFunType y
-  = ((Weighted weight x):args, res)
+  = ((HsWeighted weight x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == (funTyConName Omega) -- TODO: arnaud harder but should be done for all arity
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName -- TODO: arnaud harder but should be done for all arity
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = ((unrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
+                                 = ((hsUnrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
     go _                     _   = ([], orig_ty)  -- Failure to match
@@ -1497,16 +1528,18 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> Rig -> LHsType (GhcPass p) -> SDoc
+           => LHsType (GhcPass p) -> HsRig (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty ty1 weight ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
         arr = case weight of
-          Zero -> "->_0"
-          One -> "⊸"
-          Omega -> "->"
+          HsZero -> text "->_0"
+          HsOne -> text "⊸"
+          HsOmega -> text "->"
+          HsRigTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
+          _ -> panic "ppr_fun_ty: polymorphism is not yet implemented"
     in
-    sep [p1, text arr <+> p2]
+    sep [p1, arr <+> p2]
 
 --------------------------
 ppr_app_ty :: (OutputableBndrId (GhcPass p)) => HsAppType (GhcPass p) -> SDoc
