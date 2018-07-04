@@ -8,20 +8,19 @@
 --
 -----------------------------------------------------------------------------
 module RtClosureInspect(
-     cvObtainTerm,      -- :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
+     -- * Entry points and types
+     cvObtainTerm,
      cvReconstructType,
      improveRTTIType,
-
      Term(..),
-     isTerm, isSuspension, isPrim, isFun, isFunLike, isNewtypeWrap,
-     isFullyEvaluated, isFullyEvaluatedTerm,
+
+     -- * Utils
+     isFullyEvaluatedTerm,
      termType, mapTermType, termTyCoVars,
-     foldTerm, TermFold(..), foldTermM, TermFoldM(..), idTermFold,
-     pprTerm, cPprTerm, cPprTermBase, CustomTermPrinter,
+     foldTerm, TermFold(..),
+     cPprTerm, cPprTermBase,
 
---     unsafeDeepSeq,
-
-     constrClosToName, isConstr, isIndirection
+     constrClosToName -- exported to use in test T4891
  ) where
 
 #include "HsVersions.h"
@@ -102,28 +101,6 @@ data Term = Term { ty        :: RttiType
                          ty           :: RttiType
                        , wrapped_term :: Term }
 
-isTerm, isSuspension, isPrim, isFun, isFunLike, isNewtypeWrap :: Term -> Bool
-isTerm Term{} = True
-isTerm   _    = False
-isSuspension Suspension{} = True
-isSuspension      _       = False
-isPrim Prim{} = True
-isPrim   _    = False
-isNewtypeWrap NewtypeWrap{} = True
-isNewtypeWrap _             = False
-
-isFun Suspension{ctype=FUN} = True
-isFun Suspension{ctype=FUN_1_0} = True
-isFun Suspension{ctype=FUN_0_1} = True
-isFun Suspension{ctype=FUN_2_0} = True
-isFun Suspension{ctype=FUN_1_1} = True
-isFun Suspension{ctype=FUN_0_2} = True
-isFun Suspension{ctype=FUN_STATIC} = True
-isFun _ = False
-
-isFunLike s@Suspension{ty=ty} = isFun s || isFunTy ty
-isFunLike _ = False
-
 termType :: Term -> RttiType
 termType t = ty t
 
@@ -142,39 +119,11 @@ instance Outputable (Term) where
 -- Runtime Closure information functions
 ----------------------------------------
 
-isConstr, isIndirection, isThunk :: GenClosure a -> Bool
-isConstr ConstrClosure{} = True
-isConstr    _   = False
-
-isIndirection IndClosure{} = True
-isIndirection _ = False
-
+isThunk :: GenClosure a -> Bool
 isThunk ThunkClosure{} = True
 isThunk APClosure{} = True
 isThunk APStackClosure{} = True
 isThunk _             = False
-
-isFullyEvaluated :: a -> IO Bool
-isFullyEvaluated a = do
-  closure <- getClosureData a
-  if isConstr closure
-    then do are_subs_evaluated <- amapM isFullyEvaluated (ptrArgs closure)
-            return$ and are_subs_evaluated
-    else return False
-  where amapM f = sequence . map (\(Box x) -> f x)
-
--- TODO: Fix it. Probably the otherwise case is failing, trace/debug it
-{-
-unsafeDeepSeq :: a -> b -> b
-unsafeDeepSeq = unsafeDeepSeq1 2
- where unsafeDeepSeq1 0 a b = seq a $! b
-       unsafeDeepSeq1 i a b   -- 1st case avoids infinite loops for non reducible thunks
-        | not (isConstr tipe) = seq a $! unsafeDeepSeq1 (i-1) a b
-     -- | unsafePerformIO (isFullyEvaluated a) = b
-        | otherwise = case unsafePerformIO (getClosureData a) of
-                        closure -> foldl' (flip unsafeDeepSeq) b (ptrs closure)
-        where tipe = unsafePerformIO (getClosureType a)
--}
 
 -- Lookup the name in a constructor closure
 constrClosToName :: HscEnv -> Closure -> IO (Either String Name)
@@ -266,17 +215,12 @@ termTyCoVars = foldTerm TermFold {
 ----------------------------------
 
 type Precedence        = Int
-type TermPrinter       = Precedence -> Term ->   SDoc
 type TermPrinterM m    = Precedence -> Term -> m SDoc
 
 app_prec,cons_prec, max_prec ::Int
 max_prec  = 10
 app_prec  = max_prec
 cons_prec = 5 -- TODO Extract this info from GHC itself
-
-pprTerm :: TermPrinter -> TermPrinter
-pprTerm y p t | Just doc <- pprTermM (\p -> Just . y p) p t = doc
-pprTerm _ _ _ = panic "pprTerm"
 
 pprTermM, ppr_termM, pprNewtypeWrap :: Monad m => TermPrinterM m -> TermPrinterM m
 pprTermM y p t = pprDeeper `liftM` ppr_termM y p t
@@ -591,9 +535,26 @@ addConstraint actual expected = do
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
--- Type & Term reconstruction
-------------------------------
-cvObtainTerm :: HscEnv -> Int -> Bool -> RttiType -> HValue -> IO Term
+
+-- | Term reconstruction
+--
+-- Given a pointer to a heap object (`HValue`) and its type, build a `Term`
+-- representation of the object. Subterms (objects in the payload) are also
+-- built up to the given `max_depth`. After `max_depth` any subterms will appear
+-- as `Suspension`s. Any thunks found while traversing the object will be forced
+-- based on `force` parameter.
+--
+-- Types of terms will be refined based on constructors we find during term
+-- reconstruction. See `cvReconstructType` for an overview of how type
+-- reconstruction works.
+--
+cvObtainTerm
+    :: HscEnv
+    -> Int      -- ^ How many times to recurse for subterms
+    -> Bool     -- ^ Force thunks
+    -> RttiType -- ^ Type of the object to reconstruct
+    -> HValue   -- ^ Object to reconstruct
+    -> IO Term
 cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- we quantify existential tyvars as universal,
   -- as this is needed to be able to manipulate
@@ -814,9 +775,35 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
         moveBytes = r * 8
 
 
--- Fast, breadth-first Type reconstruction
-------------------------------------------
-cvReconstructType :: HscEnv -> Int -> GhciType -> HValue -> IO (Maybe Type)
+-- | Fast, breadth-first Type reconstruction
+--
+-- Given a heap object (`HValue`) and its (possibly polymorphic) type (usually
+-- obtained in GHCi), try to reconstruct a more monomorphic type of the object.
+-- This is used for improving type information in debugger. For example, if we
+-- have a polymorphic function:
+--
+--     sumNumList :: Num a => [a] -> a
+--     sumNumList [] = 0
+--     sumNumList (x : xs) = x + sumList xs
+--
+-- and add a breakpoint to it:
+--
+--     ghci> break sumNumList
+--     ghci> sumNumList ([0 .. 9] :: [Int])
+--
+-- ghci shows us more precise types than just `a`s:
+--
+--     Stopped in Main.sumNumList, debugger.hs:3:23-39
+--     _result :: Int = _
+--     x :: Int = 0
+--     xs :: [Int] = _
+--
+cvReconstructType
+    :: HscEnv
+    -> Int       -- ^ How many times to recurse for subterms
+    -> GhciType  -- ^ Type to refine
+    -> HValue    -- ^ Refine the type using this value
+    -> IO (Maybe Type)
 cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
    traceTR (text "RTTI started with initial type " <> ppr old_ty)
    let sigma_old_ty@(old_tvs, _) = quantifyType old_ty
