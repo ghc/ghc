@@ -58,7 +58,7 @@ import RnUtils ( HsDocContext(..) )
 import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
-import TysWiredIn ( unitTy, mkListTy, omegaDataConTy )
+import TysWiredIn ( unitTy, mkListTy )
 import Plugins ( tcPlugin, LoadedPlugin(..))
 import DynFlags
 import HsSyn
@@ -2178,7 +2178,7 @@ tcGhciStmts stmts
                                                             (map mk_item ids)) ;
             mk_item id = let ty_args = [idType id, unitTy] in
                          nlHsApp (nlHsTyApp unsafeCoerceId
-                                   (omegaDataConTy : map getRuntimeRep ty_args ++ ty_args))
+                                   (map getRuntimeRep ty_args ++ ty_args))
                                  (nlHsVar id) ;
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
         } ;
