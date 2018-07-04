@@ -8,7 +8,7 @@ module TcEvidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, pprHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -75,6 +75,7 @@ import Outputable
 import SrcLoc
 import Data.IORef( IORef )
 import UniqSet
+import Weight
 
 {-
 Note [TcCoercions]
@@ -178,7 +179,7 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun Rig HsWrapper HsWrapper TcType SDoc
+  | WpFun HsWrapper HsWrapper HsWrapper (Weighted TcType) SDoc
        -- (WpFun w wrap1 wrap2 t1)[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -264,47 +265,32 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: Rig -> HsWrapper -> HsWrapper -> TcType -> HsWrapper
-wpFunEmpty w c1 c2 t1 = WpFun w c1 c2 t1 empty
+wpFunEmpty :: HsWrapper -> HsWrapper -> HsWrapper -> Weighted TcType -> HsWrapper
+wpFunEmpty w_c c1 c2 t1 = WpFun w_c c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
 WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-mkWpFun :: Rig -> Rig -- the multiplicities on the arrows of the wrappee and wrapper respectively
+mkWpFun :: HsWrapper -- the multiplicities on the arrows of the wrappee and wrapper respectively
         -> HsWrapper -> HsWrapper
-        -> TcType    -- the "from" type of the first wrapper
+        -> (Weighted TcType)    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
-mkWpFun w1 w2 co1          co2          t1 _  d | not (w1 `eqRig` w2) = WpFun w2 co1 co2 t1 d
+mkWpFun w_co co1          co2         t1 _  d  = WpFun w_co co1 co2 t1 d
 -- When the multiplicities are not the same, always make a proper wrapper.  We
 -- don't currently need to actually record the source multiplicity: it is just
 -- here to prevent making a coercion between two incoercible function arrow
 -- arnaud: TODO: add an assertion that w1 is a subweight of w2
-mkWpFun _  _  WpHole       WpHole       _  _  _ = WpHole
+mkWpFun WpHole WpHole       WpHole       _  _  _ = WpHole
 --mkWpFun w  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational w (mkTcRepReflCo t1) co2)
 --mkWpFun w  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) (mkTcRepReflCo t2))
 --mkWpFun w  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) co2)
-mkWpFun w  _  co1          co2          t1 _  d = WpFun w co1 co2 t1 d
+--mkWpFun w_co  co1          co2          t1 _  d = WpFun w_co co1 co2 t1 d
 
--- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
--- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
--- @wrap3 :: ty3 "->" ty3'@ and @ty_res@ is /either/ @ty3@ or @ty3'@,
--- gives a wrapper @(ty1' -> ty2' -> ty3) "->" (ty1 -> ty2 -> ty3')@.
--- Notice that the result wrapper goes the other way round to all
--- the others. This is a result of sub-typing contravariance.
--- The SDoc is a description of what you were doing when you called mkWpFuns.
-mkWpFuns :: [(TcType, HsWrapper)] -> TcType -> HsWrapper -> SDoc -> HsWrapper
-mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
-  where
-    go [] res_ty res_wrap = (res_ty, res_wrap)
-    go ((arg_ty, arg_wrap) : args) res_ty res_wrap
-      = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkFunTyOm` tail_ty, mkWpFun Omega Omega arg_wrap tail_wrap arg_ty tail_ty doc)
-        -- MattP: Looks suspicious but never called
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
