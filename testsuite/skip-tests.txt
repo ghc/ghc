@@ -137,3 +137,8 @@ rule2
 spec001
 str-rules
 tcrun041
+
+# FunCo fallout
+
+readRun004
+EtaExpandLevPoly
