@@ -1340,8 +1340,9 @@ tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo = go
   where
+    go :: IfaceCoercion -> IfL Coercion
     go (IfaceReflCo r t)         = Refl r <$> tcIfaceType t
-    go (IfaceFunCo r w c1 c2)    = mkFunCo r <$> tcIfaceRig w <*> go c1 <*> go c2
+    go (IfaceFunCo r w c1 c2)    = mkFunCo r <$> go w <*> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs)
       = (\a b -> TyConAppCo r a b) <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = (\a b -> AppCo a b) <$> go c1 <*> go c2

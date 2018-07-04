@@ -252,7 +252,7 @@ toIfaceCoercionX fr co
       , [_,_,_,_, _] <- cos         = pprPanic "toIfaceCoercion" empty
       | otherwise                =
         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r w co1 co2)   = IfaceFunCo r (toIfaceRig w) (go co1) (go co2)
+    go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
                                           (toIfaceCoercionX fr' k)

@@ -922,7 +922,7 @@ data Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
   -- TODO: Change this Rig to coercion
-  | FunCo Role Rig Coercion Coercion         -- lift FunTy
+  | FunCo Role Coercion Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
 
   -- These are special
