@@ -19,8 +19,7 @@ module MkId (
 
         mkPrimOpId, mkFCallId,
 
-        wrapNewTypeBody, unwrapNewTypeBody,
-        wrapFamInstBody,
+        unwrapNewTypeBody, wrapFamInstBody,
         DataConBoxer(..), mkDataConRep, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
@@ -246,6 +245,47 @@ Hence we translate to
 
         -- Coercion from family type to representation type
   Co7T a :: T [a] ~ :R7T a
+
+Newtype instances through an additional wrinkle into the mix. Consider the
+following example (adapted from #15318, comment:2):
+
+  data family T a
+  newtype instance T [a] = MkT [a]
+
+Within the newtype instance, there are three distinct types at play:
+
+1. The newtype's underlying type, [a].
+2. The instance's representation type, TList a (where TList is the
+   representation tycon).
+3. The family type, T [a].
+
+We need two coercions in order to cast from (1) to (3):
+
+(a) A newtype coercion axiom:
+
+      axiom coTList a :: TList a ~ [a]
+
+    (Where TList is the representation tycon of the newtype instance.)
+
+(b) A data family instance coercion axiom:
+
+      axiom coT a :: T [a] ~ TList a
+
+When we translate the newtype instance to Core, we obtain:
+
+    -- Wrapper
+  $WMkT :: forall a. [a] -> T [a]
+  $WMkT a x = MkT a x |> Sym (coT a)
+
+    -- Worker
+  MkT :: forall a. [a] -> TList [a]
+  MkT a x = x |> Sym (coTList a)
+
+Unlike for data instances, the worker for a newtype instance is actually an
+executable function which expands to a cast, but otherwise, the general
+strategy is essentially the same as for data instances. Also note that we have
+a wrapper, which is unusual for a newtype, but we make GHC produce one anyway
+for symmetry with the way data instances are handled.
 
 Note [Newtype datacons]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -614,8 +654,8 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                      -- of some newtypes written with GADT syntax. See below.
          && (any isBanged (ev_ibangs ++ arg_ibangs)
                      -- Some forcing/unboxing (includes eq_spec)
-             || isFamInstTyCon tycon  -- Cast result
              || (not $ null eq_spec))) -- GADT
+      || isFamInstTyCon tycon -- Cast result
       || dataConUserTyVarsArePermuted data_con
                      -- If the data type was written with GADT syntax and
                      -- orders the type variables differently from what the
@@ -1009,15 +1049,9 @@ wrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 --
 -- If a coercion constructor is provided in the newtype, then we use
 -- it, otherwise the wrap/unwrap are both no-ops
---
--- If the we are dealing with a newtype *instance*, we have a second coercion
--- identifying the family instance with the constructor of the newtype
--- instance.  This coercion is applied in any case (ie, composed with the
--- coercion constructor of the newtype or applied by itself).
 
 wrapNewTypeBody tycon args result_expr
   = ASSERT( isNewTyCon tycon )
-    wrapFamInstBody tycon args $
     mkCast result_expr (mkSymCo co)
   where
     co = mkUnbranchedAxInstCo Representational (newTyConCo tycon) args []
