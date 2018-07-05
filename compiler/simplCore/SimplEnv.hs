@@ -899,8 +899,8 @@ substCo env co = Coercion.substCo (getTCvSubst env) co
 ------------------
 substIdType :: HasCallStack => SimplEnv -> Id -> Id
 substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
-  |  (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
-  || noFreeVarsOfType old_ty
+  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
+    || no_free_vars
   = id
   | otherwise =
       Id.setIdWeight
@@ -912,6 +912,7 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
                 -- because we cache the free tyvars of the type
                 -- in a Note in the id's type itself
   where
+    no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfRig old_w
     subst = TCvSubst in_scope tv_env cv_env
     old_ty = idType id
     old_w  = idWeight id

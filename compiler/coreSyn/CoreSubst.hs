@@ -479,6 +479,7 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
     (Subst (in_scope `extendInScopeSet` new_id) new_env tvs cvs, new_id)
   where
     id1 = uniqAway in_scope old_id      -- id1 is cloned if necessary
+    -- Why is this not substIdType???
     id2 | no_type_change = id1
         | otherwise      = setIdType id1 (substTy subst old_ty)
 
@@ -605,6 +606,7 @@ substCo subst co = Coercion.substCo (getTCvSubst subst) co
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst _ _ tv_env cv_env) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env) || noFreeVarsOfType old_ty = id
+  -- TODO: MattP, we need to substitute weight here as well
   | otherwise   = setIdType id (substTy subst old_ty)
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type

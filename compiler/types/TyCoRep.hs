@@ -87,7 +87,7 @@ module TyCoRep (
         closeOverKinds,
         injectiveVarsOfBinder, injectiveVarsOfType,
 
-        noFreeVarsOfType, noFreeVarsOfCo,
+        noFreeVarsOfType, noFreeVarsOfCo, noFreeVarsOfRig,
 
         -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
