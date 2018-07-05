@@ -1,9 +1,7 @@
 
 tcrun045.hs:11:10: error:
     • Illegal implicit parameter ‘?imp::Int’
-    • In the context: ?imp::Int
-      While checking an instance declaration
-      In the instance declaration for ‘C Int’
+    • In the instance declaration for ‘C Int’
 
 tcrun045.hs:24:1: error:
     • Illegal implicit parameter ‘?imp::Int’
@@ -13,6 +11,4 @@ tcrun045.hs:24:1: error:
 
 tcrun045.hs:27:10: error:
     • Illegal implicit parameter ‘?imp::Int’
-    • In the context: ?imp::Int
-      While checking an instance declaration
-      In the instance declaration for ‘D Int’
+    • In the instance declaration for ‘D Int’
