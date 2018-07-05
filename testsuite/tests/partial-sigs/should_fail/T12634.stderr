@@ -15,3 +15,17 @@ T12634.hs:14:58: error:
       In the type signature:
         bench_twacePow :: forall t m m' r.
                           _ => t m' r -> Bench '(t, m, m', r)
+
+T12634.hs:15:18: error:
+    • Couldn't match kind ‘(* -> * -> *, *, *, *)’ with ‘*’
+      When matching types
+        params0 :: *
+        '(t, m, m', r) :: (* -> * -> *, *, *, *)
+      Expected type: t m' r -> Bench '(t, m, m', r)
+        Actual type: t m' r -> Bench params0
+    • In the expression: bench (twacePowDec :: t m' r -> t m r)
+      In an equation for ‘bench_twacePow’:
+          bench_twacePow = bench (twacePowDec :: t m' r -> t m r)
+    • Relevant bindings include
+        bench_twacePow :: t m' r -> Bench '(t, m, m', r)
+          (bound at T12634.hs:15:1)
