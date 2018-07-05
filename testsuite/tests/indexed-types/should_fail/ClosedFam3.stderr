@@ -27,5 +27,5 @@ ClosedFam3.hs-boot:12:1: error:
     Main module: type family Baz a :: *
                    where Baz Int = Bool
     Boot file:   type family Baz (a :: k) :: *
-                   where Baz * Int = Bool
+                   where Baz Int = Bool
     The types have different kinds
