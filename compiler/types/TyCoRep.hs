@@ -122,6 +122,8 @@ module TyCoRep (
         substTyVarBndrCallback, substForAllCoBndrCallback,
         checkValidSubst, isValidTCvSubst,
 
+        substRigUnchecked,
+
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
         tidyOpenType,  tidyOpenTypes,
@@ -2375,6 +2377,12 @@ substTy subst ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
+substRigUnchecked :: TCvSubst -> Rig -> Rig
+substRigUnchecked subst r
+  | isEmptyTCvSubst subst = r
+  | otherwise             = subst_rig subst r
+
+
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
 -- Note [The substitution invariant].
@@ -2433,7 +2441,7 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy w arg res) = ((FunTy $! go_rig w) $! go arg) $! go res
+    go (FunTy w arg res) = ((FunTy $! subst_rig subst w) $! go arg) $! go res
     go (ForAllTy (TvBndr tv vis) ty)
                          = case substTyVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -2443,9 +2451,11 @@ subst_ty subst ty
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
-    go_rig :: Rig -> Rig
-    go_rig (RigTy t) = RigTy (go t)
-    go_rig r = r
+subst_rig :: TCvSubst -> Rig -> Rig
+subst_rig subst (RigTy t) = RigTy (subst_ty subst t)
+subst_rig subst (RigAdd m1 m2) = RigAdd (subst_rig subst m1) (subst_rig subst m2)
+subst_rig subst (RigMul m1 m2) = RigMul (subst_rig subst m1) (subst_rig subst m2)
+subst_rig _ r = r
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv

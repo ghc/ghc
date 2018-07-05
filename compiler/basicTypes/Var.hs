@@ -46,7 +46,7 @@ module Var (
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType, updateVarType,
-        updateVarTypeM, scaleVarBy,
+        updateVarTypeM, scaleVarBy, setVarWeight,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -393,6 +393,10 @@ varWeightDef = fromMaybe Omega . varWeightMaybe
 scaleVarBy :: Id -> Rig -> Id
 scaleVarBy id r | isId id  = id { varWeight = r * (varWeight id) }
 scaleVarBy id _ = id
+
+setVarWeight :: Id -> Rig -> Id
+setVarWeight id r | isId id = id { varWeight = r }
+setVarWeight id r = id
 
 {- *********************************************************************
 *                                                                      *
