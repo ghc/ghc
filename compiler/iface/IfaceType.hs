@@ -513,8 +513,13 @@ stripInvisArgs dflags tys
     where
       suppress_invis c
         = case c of
+            ITC_Nil        -> ITC_Nil
             ITC_Invis _ ts -> suppress_invis ts
-            _ -> c
+            ITC_Vis   t ts -> ITC_Vis t $ suppress_invis ts
+              -- Keep recursing through the remainder of the arguments, as it's
+              -- possible that there are remaining invisible ones.
+              -- See the "In type declarations" section of Note [TyVarBndrs,
+              -- TyVarBinders, TyConBinders, and visibility] in TyCoRep.
 
 tcArgsIfaceTypes :: IfaceTcArgs -> [IfaceType]
 tcArgsIfaceTypes ITC_Nil = []
