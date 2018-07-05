@@ -608,7 +608,9 @@ data UserTypeCtxt
                         --      f x :: t = ....
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Types in a default declaration
-  | InstDeclCtxt        -- An instance declaration
+  | InstDeclCtxt Bool   -- An instance declaration
+                        --    True:  stand-alone deriving
+                        --    False: vanilla instance declaration
   | SpecInstCtxt        -- SPECIALISE instance pragma
   | ThBrackCtxt         -- Template Haskell type brackets [t| ... |]
   | GenSigCtxt          -- Higher-rank or impredicative situations
@@ -654,7 +656,8 @@ pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
 pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
 pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
-pprUserTypeCtxt InstDeclCtxt      = text "an instance declaration"
+pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"
+pprUserTypeCtxt (InstDeclCtxt True)  = text "a stand-alone deriving instance declaration"
 pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
 pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
 pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"

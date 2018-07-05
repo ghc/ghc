@@ -95,7 +95,7 @@ module TysWiredIn (
         liftedTypeKindTyConName,
 
         -- * Equality predicates
-        heqTyCon, heqClass, heqDataCon,
+        heqTyCon, heqTyConName, heqClass, heqDataCon,
         coercibleTyCon, coercibleTyConName, coercibleDataCon, coercibleClass,
 
         -- * RuntimeRep and friends

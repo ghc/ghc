@@ -1795,10 +1795,10 @@ instDeclDataFamInsts inst_decls
 ************************************************************************
 -}
 
--- | Located Deriving Declaration
+-- | Located stand-alone 'deriving instance' declaration
 type LDerivDecl pass = Located (DerivDecl pass)
 
--- | Deriving Declaration
+-- | Stand-alone 'deriving instance' declaration
 data DerivDecl pass = DerivDecl
         { deriv_ext          :: XCDerivDecl pass
         , deriv_type         :: LHsSigWcType pass

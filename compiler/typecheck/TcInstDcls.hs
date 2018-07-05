@@ -53,8 +53,6 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import PrelNames  ( typeableClassName, genericClassNames
-                  , knownNatClassName, knownSymbolClassName )
 import Bag
 import BasicTypes
 import DynFlags
@@ -475,7 +473,10 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 poly_ty)  $
-    do  { (tyvars, theta, clas, inst_tys) <- tcHsClsInstType InstDeclCtxt poly_ty
+    do  { (tyvars, theta, clas, inst_tys)
+             <- tcHsClsInstType (InstDeclCtxt False) poly_ty
+             -- NB: tcHsClsInstType does checkValidInstance
+
         ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
               mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
               mb_info    = Just (clas, tyvars, mini_env)
@@ -516,59 +517,14 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
                                      , ib_extensions = []
                                      , ib_derived = False } }
 
-        ; doClsInstErrorChecks inst_info
+         -- In hs-boot files there should be no bindings
+        ; is_boot <- tcIsHsBootOrSig
+        ; let no_binds = isEmptyLHsBinds binds && null uprags
+        ; failIfTc (is_boot && not no_binds) badBootDeclErr
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts
                  , deriv_infos ) }
 tcClsInstDecl (L _ (XClsInstDecl _)) = panic "tcClsInstDecl"
-
-doClsInstErrorChecks :: InstInfo GhcRn -> TcM ()
-doClsInstErrorChecks inst_info
- = do { traceTc "doClsInstErrorChecks" (ppr ispec)
-      ; dflags <- getDynFlags
-      ; is_boot <- tcIsHsBootOrSig
-
-         -- In hs-boot files there should be no bindings
-      ; failIfTc (is_boot && not no_binds) badBootDeclErr
-
-         -- If not in an hs-boot file, abstract classes cannot have
-         -- instances declared
-      ; failIfTc (not is_boot && isAbstractClass clas) abstractClassInstErr
-
-         -- Handwritten instances of any rejected
-         -- class is always forbidden
-         -- #12837
-      ; failIfTc (clas_nm `elem` rejectedClassNames) clas_err
-
-         -- Check for hand-written Generic instances (disallowed in Safe Haskell)
-      ; when (clas_nm `elem` genericClassNames) $
-        do { failIfTc (safeLanguageOn dflags) gen_inst_err
-           ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
-  }
-  where
-    ispec    = iSpec inst_info
-    binds    = iBinds inst_info
-    no_binds = isEmptyLHsBinds (ib_binds binds) && null (ib_pragmas binds)
-    clas_nm  = is_cls_nm ispec
-    clas     = is_cls ispec
-
-    gen_inst_err = hang (text ("Generic instances can only be "
-                            ++ "derived in Safe Haskell.") $+$
-                         text "Replace the following instance:")
-                      2 (pprInstanceHdr ispec)
-
-    abstractClassInstErr =
-        text "Cannot define instance for abstract class" <+> quotes (ppr clas_nm)
-
-    -- Report an error or a warning for certain class instances.
-    -- If we are working on an .hs-boot file, we just report a warning,
-    -- and ignore the instance.  We do this, to give users a chance to fix
-    -- their code.
-    rejectedClassNames = [ typeableClassName
-                         , knownNatClassName
-                         , knownSymbolClassName ]
-    clas_err = text "Class" <+> quotes (ppr clas_nm)
-                    <+> text "does not support user-specified instances"
 
 {-
 ************************************************************************
