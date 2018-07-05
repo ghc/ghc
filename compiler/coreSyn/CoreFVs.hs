@@ -722,9 +722,10 @@ freeVars = go
   where
     go :: CoreExpr -> CoreExprWithFVs
     go (Var v)
-      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs, AnnVar v)
+      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs `unionFVs` rig_vars, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
+        rig_vars = tyCoVarsOfRigDSet (idWeight v)
         ty_fvs = dVarTypeTyCoVars v
                  -- See Note [The FVAnn invariant]
 
@@ -735,7 +736,9 @@ freeVars = go
       where
         body'@(body_fvs, _) = go body
         b_ty  = idType b
+        b_w   = idWeight b
         b_fvs = tyCoVarsOfTypeDSet b_ty
+        w_fvs = tyCoVarsOfRigDSet b_w
                 -- See Note [The FVAnn invariant]
 
     go (App fun arg)

@@ -73,7 +73,8 @@ module TyCoRep (
         debugPprType,
 
         -- * Free variables
-        tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
+        tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfRigDSet,
+        tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
         closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
@@ -1538,6 +1539,9 @@ tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
+
+tyCoVarsOfRigDSet :: Rig -> DTyCoVarSet
+tyCoVarsOfRigDSet r = fvDVarSet $ tyCoFVsOfRig r
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
