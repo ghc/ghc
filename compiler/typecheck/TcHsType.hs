@@ -1623,14 +1623,14 @@ kcLHsQTyVars :: Name              -- ^ of the thing being checked
              -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
              -> Bool              -- ^ True <=> the decl being checked has a CUSK
              -> LHsQTyVars GhcRn
-             -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
-             -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
+             -> TcM Kind          -- ^ The result kind
+             -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcLHsQTyVars name flav cusk
   user_tyvars@(HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
                                            , hsq_dependent = dep_names }
                       , hsq_explicit = hs_tvs }) thing_inside
   | cusk
-  = do { (scoped_kvs, (tc_tvs, (res_kind, stuff)))
+  = do { (scoped_kvs, (tc_tvs, res_kind))
            <- solveEqualities                    $
               tcImplicitQTKBndrs skol_info kv_ns $
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
@@ -1677,10 +1677,10 @@ kcLHsQTyVars name flav cusk
               , ppr tc_tvs, ppr (mkTyConKind final_binders res_kind)
               , ppr qkvs, ppr final_binders ]
 
-       ; return (tycon, stuff) }
+       ; return tycon }
 
   | otherwise
-  = do { (scoped_kvs, (tc_tvs, (res_kind, stuff)))
+  = do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why kcImplicitTKBndrs which uses newSigTyVar?
            -- See Note [Kind generalisation and sigTvs]
            <- kcImplicitTKBndrs kv_ns $
@@ -1696,7 +1696,7 @@ kcLHsQTyVars name flav cusk
        ; traceTc "kcLHsQTyVars: not-cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
               , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
-       ; return (tycon, stuff) }
+       ; return tycon }
   where
     open_fam = tcFlavourIsOpen flav
     skol_info = TyConSkol flav name
