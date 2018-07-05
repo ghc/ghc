@@ -7,10 +7,10 @@ Derived class instances:
       = GHC.Prim.coerce
           @(forall (a :: TYPE GHC.Types.LiftedRep)
                    (b :: TYPE GHC.Types.LiftedRep).
-            a -> b -> f a -> f b)
+            (a -> b) -> f a -> f b)
           @(forall (a :: TYPE GHC.Types.LiftedRep)
                    (b :: TYPE GHC.Types.LiftedRep).
-            a -> b -> T14578.App f a -> T14578.App f b)
+            (a -> b) -> T14578.App f a -> T14578.App f b)
           GHC.Base.fmap
     (GHC.Base.<$)
       = GHC.Prim.coerce
@@ -43,11 +43,12 @@ Derived class instances:
           @(forall (a :: TYPE GHC.Types.LiftedRep)
                    (b :: TYPE GHC.Types.LiftedRep)
                    (c :: TYPE GHC.Types.LiftedRep).
-            a -> b -> c -> f a -> f b -> f c)
+            (a -> b -> c) -> f a -> f b -> f c)
           @(forall (a :: TYPE GHC.Types.LiftedRep)
                    (b :: TYPE GHC.Types.LiftedRep)
                    (c :: TYPE GHC.Types.LiftedRep).
-            a -> b -> c -> T14578.App f a -> T14578.App f b -> T14578.App f c)
+            (a -> b -> c)
+            -> T14578.App f a -> T14578.App f b -> T14578.App f c)
           GHC.Base.liftA2
     (GHC.Base.*>)
       = GHC.Prim.coerce

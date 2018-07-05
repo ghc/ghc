@@ -497,7 +497,13 @@ nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExt NotPromoted (noLoc x))
-nlHsFunTy a b = noLoc (HsFunTy noExt a b)
+nlHsFunTy a b = noLoc (HsFunTy noExt (parenthesizeHsType funPrec a)
+                                     (parenthesize_fun_tail b))
+  where
+    parenthesize_fun_tail (L loc (HsFunTy ext ty1 ty2))
+      = L loc (HsFunTy ext (parenthesizeHsType funPrec ty1)
+                           (parenthesize_fun_tail ty2))
+    parenthesize_fun_tail lty = lty
 nlHsParTy t   = noLoc (HsParTy noExt t)
 
 nlHsTyConApp :: IdP (GhcPass p) -> [LHsType (GhcPass p)] -> LHsType (GhcPass p)
