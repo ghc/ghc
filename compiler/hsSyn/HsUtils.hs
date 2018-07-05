@@ -700,7 +700,7 @@ The derived Eq instance for Glurp (without any kind signatures) would be:
   instance Eq a => Eq (Glurp a) where
     (==) = coerce @(Wat 'Proxy -> Wat 'Proxy -> Bool)
                   @(Glurp a    -> Glurp a    -> Bool)
-                  (==)
+                  (==) :: Glurp a -> Glurp a -> Bool
 
 (Where the visible type applications use types produced by typeToLHsType.)
 
