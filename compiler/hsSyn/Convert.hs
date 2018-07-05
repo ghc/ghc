@@ -1283,7 +1283,9 @@ cvtTypeKind ty_str ty
                  x'' <- case x' of
                           L _ HsFunTy{}    -> returnL (HsParTy noExt x')
                           L _ HsForAllTy{} -> returnL (HsParTy noExt x')
-                                                                       -- #14646
+                                                               -- #14646
+                          L _ HsQualTy{}   -> returnL (HsParTy noExt x')
+                                                               -- #15324
                           _                -> return x'
                  returnL (HsFunTy noExt x'' y')
              | otherwise ->
