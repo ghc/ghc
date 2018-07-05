@@ -123,7 +123,7 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
                            , expItemMbDoc   = (dc, _)
                            , expItemSubDocs = subdocs
                            , expItemFixities = fixities
-                           } = ppDocumentation dflags dc ++ f decl
+                           } = ppDocumentation dflags dc ++ f decl ++ ppFixities
     where
         f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
@@ -131,7 +131,7 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
         f (TyClD _ (FamDecl _ d)) = ppFam dflags d
         f (ForD _ (ForeignImport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
         f (ForD _ (ForeignExport _ name typ _)) = [pp_sig dflags [name] (hsSigType typ)]
-        f (SigD _ sig) = ppSig dflags sig ++ ppFixities
+        f (SigD _ sig) = ppSig dflags sig
         f _ = []
 
         ppFixities = concatMap (ppFixity dflags) fixities
