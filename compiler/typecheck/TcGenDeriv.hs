@@ -1583,39 +1583,55 @@ mk_appE_app a b = nlHsApps appE_RDR [a, b]
 Note [Newtype-deriving instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We take every method in the original instance and `coerce` it to fit
-into the derived instance. We need a type annotation on the argument
+into the derived instance. We need type applications on the argument
 to `coerce` to make it obvious what instantiation of the method we're
 coercing from.  So from, say,
+
   class C a b where
-    op :: a -> [b] -> Int
+    op :: forall c. a -> [b] -> c -> Int
 
   newtype T x = MkT <rep-ty>
 
   instance C a <rep-ty> => C a (T x) where
-    op = coerce @ (a -> [<rep-ty>] -> Int)
-                @ (a -> [T x]      -> Int)
-                op
+    op = coerce @ (a -> [<rep-ty>] -> c -> Int)
+                @ (a -> [T x]      -> c -> Int)
+                op :: forall c. a -> [T x] -> c -> Int
 
-Notice that we give the 'coerce' two explicitly-visible type arguments
-to say how it should be instantiated.  Recall
+In addition to the type applications, we also have an explicit
+type signature on the entire RHS. This brings the method-bound variable
+`c` into scope over the two type applications.
+See Note [GND and QuantifiedConstraints] for more information on why this
+is important.
 
-  coerce :: Coeercible a b => a -> b
+Giving 'coerce' two explicitly-visible type arguments grants us finer control
+over how it should be instantiated. Recall
+
+  coerce :: Coercible a b => a -> b
 
 By giving it explicit type arguments we deal with the case where
 'op' has a higher rank type, and so we must instantiate 'coerce' with
 a polytype.  E.g.
-   class C a where op :: forall b. a -> b -> b
+
+   class C a where op :: a -> forall b. b -> b
    newtype T x = MkT <rep-ty>
    instance C <rep-ty> => C (T x) where
-     op = coerce @ (forall b. <rep-ty> -> b -> b)
-                 @ (forall b. T x -> b -> b)
-                op
+     op = coerce @ (<rep-ty> -> forall b. b -> b)
+                 @ (T x      -> forall b. b -> b)
+                op :: T x -> forall b. b -> b
 
-The type checker checks this code, and it currently requires
--XImpredicativeTypes to permit that polymorphic type instantiation,
-so we have to switch that flag on locally in TcDeriv.genInst.
+The use of type applications is crucial here. If we had tried using only
+explicit type signatures, like so:
 
-See #8503 for more discussion.
+   instance C <rep-ty> => C (T x) where
+     op = coerce (op :: <rep-ty> -> forall b. b -> b)
+                     :: T x      -> forall b. b -> b
+
+Then GHC will attempt to deeply skolemize the two type signatures, which will
+wreak havoc with the Coercible solver. Therefore, we instead use type
+applications, which do not deeply skolemize and thus avoid this issue.
+The downside is that we currently require -XImpredicativeTypes to permit this
+polymorphic type instantiation, so we have to switch that flag on locally in
+TcDeriv.genInst. See #8503 for more discussion.
 
 Note [Newtype-deriving trickiness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1636,13 +1652,98 @@ coercing opList, thus:
   instance C a => C (N a) where { op = opN }
 
   opN :: (C a, D (N a)) => N a -> N a
-  opN = coerce @(D [a]   => [a] -> [a])
-               @(D (N a) => [N a] -> [N a]
-               opList
+  opN = coerce @([a]   -> [a])
+               @([N a] -> [N a]
+               opList :: D (N a) => [N a] -> [N a]
 
 But there is no reason to suppose that (D [a]) and (D (N a))
 are inter-coercible; these instances might completely different.
 So GHC rightly rejects this code.
+
+Note [GND and QuantifiedConstraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following example from #15290:
+
+  class C m where
+    join :: m (m a) -> m a
+
+  newtype T m a = MkT (m a)
+
+  deriving instance
+    (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
+    C (T m)
+
+The code that GHC used to generate for this was:
+
+  instance (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
+      C (T m) where
+    join = coerce @(forall a.   m   (m a) ->   m a)
+                  @(forall a. T m (T m a) -> T m a)
+                  join
+
+This instantiates `coerce` at a polymorphic type, a form of impredicative
+polymorphism, so we're already on thin ice. And in fact the ice breaks,
+as we'll explain:
+
+The call to `coerce` gives rise to:
+
+  Coercible (forall a.   m   (m a) ->   m a)
+            (forall a. T m (T m a) -> T m a)
+
+And that simplified to the following implication constraint:
+
+  forall a <no-ev>. m (T m a) ~R# m (m a)
+
+But because this constraint is under a `forall`, inside a type, we have to
+prove it *without computing any term evidence* (hence the <no-ev>). Alas, we
+*must* generate a term-level evidence binding in order to instantiate the
+quantified constraint! In response, GHC currently chooses not to use such
+a quantified constraint.
+See Note [Instances in no-evidence implications] in TcInteract.
+
+But this isn't the death knell for combining QuantifiedConstraints with GND.
+On the contrary, if we generate GND bindings in a slightly different way, then
+we can avoid this situation altogether. Instead of applying `coerce` to two
+polymorphic types, we instead let an explicit type signature do the polymorphic
+instantiation, and omit the `forall`s in the type applications.
+More concretely, we generate the following code instead:
+
+  instance (C m, forall p q. Coercible p q => Coercible (m p) (m q)) =>
+      C (T m) where
+    join = coerce @(  m   (m a) ->   m a)
+                  @(T m (T m a) -> T m a)
+                  join :: forall a. T m (T m a) -> T m a
+
+Now the visible type arguments are both monotypes, so we need do any of this
+funny quantified constraint instantiation business.
+
+You might think that that second @(T m (T m a) -> T m a) argument is redundant
+in the presence of the explicit `:: forall a. T m (T m a) -> T m a` type
+signature, but in fact leaving it off will break this example (from the
+T15290d test case):
+
+  class C a where
+    c :: Int -> forall b. b -> a
+
+  instance C Int
+
+  instance C Age where
+    c = coerce @(Int -> forall b. b -> Int)
+               c :: Int -> forall b. b -> Age
+
+That is because the explicit type signature deeply skolemizes the forall-bound
+`b`, which wreaks havoc with the `Coercible` solver. An additional visible type
+argument of @(Int -> forall b. b -> Age) is enough to prevent this.
+
+Be aware that the use of an explicit type signature doesn't /solve/ this
+problem; it just makes it less likely to occur. For example, if a class has
+a truly higher-rank type like so:
+
+  class CProblem m where
+    op :: (forall b. ... (m b) ...) -> Int
+
+Then the same situation will arise again. But at least it won't arise for the
+common case of methods with ordinary, prenex-quantified types.
 -}
 
 gen_Newtype_binds :: SrcSpan
@@ -1668,13 +1769,16 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
                                           [] rhs_expr]
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
+        (_, _, from_tau) = tcSplitSigmaTy from_ty
+        (_, _, to_tau)   = tcSplitSigmaTy to_ty
 
         meth_RDR = getRdrName meth_id
 
         rhs_expr = nlHsVar (getRdrName coerceId)
-                                      `nlHsAppType` from_ty
-                                      `nlHsAppType` to_ty
-                                      `nlHsApp`     nlHsVar meth_RDR
+                                      `nlHsAppType`     from_tau
+                                      `nlHsAppType`     to_tau
+                                      `nlHsApp`         nlHsVar meth_RDR
+                                      `nlExprWithTySig` to_ty
 
     mk_atf_inst :: TyCon -> TcM FamInst
     mk_atf_inst fam_tc = do
