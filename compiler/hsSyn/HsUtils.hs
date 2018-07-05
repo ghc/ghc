@@ -178,7 +178,10 @@ mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExt e1 e2)
 
 mkHsAppType :: (XAppTypeE (GhcPass id) ~ LHsWcType GhcRn)
             => LHsExpr (GhcPass id) -> LHsWcType GhcRn -> LHsExpr (GhcPass id)
-mkHsAppType e t = addCLoc e (hswc_body t) (HsAppType t e)
+mkHsAppType e t = addCLoc e t_body (HsAppType paren_wct e)
+  where
+    t_body    = hswc_body t
+    paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
 
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl mkHsAppType

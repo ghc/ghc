@@ -818,7 +818,8 @@ cvtl e = wrapL (cvt e)
     cvt (AppTypeE e t) = do { e' <- cvtl e
                             ; t' <- cvtType t
                             ; tp <- wrap_apps t'
-                            ; return $ HsAppType (mkHsWildCardBndrs tp) e' }
+                            ; let tp' = parenthesizeHsType appPrec tp
+                            ; return $ HsAppType (mkHsWildCardBndrs tp') e' }
     cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
