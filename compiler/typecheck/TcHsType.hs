@@ -540,9 +540,8 @@ missing any patterns.
 
 Note [The tcType invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If    tc_ty = tc_hs_type hs_ty exp_kind
-then
-      typeKind tc_ty = exp_kind
+(IT1) If    tc_ty = tc_hs_type hs_ty exp_kind
+      then  typeKind tc_ty = exp_kind
 without any zonking needed.  The reason for this is that in
 tcInferApps we see (F ty), and we kind-check 'ty' with an
 expected-kind coming from F.  Then, to make the resulting application
@@ -550,10 +549,26 @@ well kinded --- see Note [The well-kinded type invariant] in TcType ---
 we need the kind-checked 'ty' to have exactly the kind that F expects,
 with no funny zonking nonsense in between.
 
-The tcType invariant also applies to checkExpectedKind: if
-    (tc_ty, _, _) = checkExpectedKind ty act_ki exp_ki
-then
-    typeKind tc_ty = exp_ki
+The tcType invariant also applies to checkExpectedKind:
+
+(IT2) if
+        (tc_ty, _, _) = checkExpectedKind ty act_ki exp_ki
+      then
+        typeKind tc_ty = exp_ki
+
+These other invariants are all necessary, too, as these functions
+are used within tc_hs_type:
+
+(IT3) If (ty, ki) <- tc_infer_hs_type ..., then typeKind ty == ki.
+
+(IT4) If (ty, ki) <- tc_infer_hs_type ..., then zonk ki == ki.
+      (In other words, the result kind of tc_infer_hs_type is zonked.)
+
+(IT5) If (ty, ki) <- tcTyVar ..., then typeKind ty == ki.
+
+(IT6) If (ty, ki) <- tcTyVar ..., then zonk ki == ki.
+      (In other words, the result kind of tcTyVar is zonked.)
+
 -}
 
 ------------------------------------------
@@ -575,17 +590,12 @@ tc_infer_hs_type mode (HsTyVar _ _ (L _ tv)) = tcTyVar mode tv
 tc_infer_hs_type mode (HsAppTy _ ty1 ty2)
   = do { let (hs_fun_ty, hs_arg_tys) = splitHsAppTys ty1 [ty2]
        ; (fun_ty, fun_kind) <- tc_infer_lhs_type mode hs_fun_ty
-         -- A worry: what if fun_kind needs zoonking?
-         -- We used to zonk it here, but that got fun_ty and fun_kind
-         -- out of sync (see the precondition to tcTyApps), which caused
-         -- Trac #14873.  So I'm now zonking in tcTyVar, and not here.
-         -- Is that enough?  Seems so, but I can't see how to be certain.
+           -- NB: (IT4) of Note [The tcType invariant] ensures that fun_kind is zonked
        ; tcTyApps mode hs_fun_ty fun_ty fun_kind hs_arg_tys }
 
 tc_infer_hs_type mode (HsOpTy _ lhs lhs_op@(L _ hs_op) rhs)
   | not (hs_op `hasKey` funTyConKey)
   = do { (op, op_kind) <- tcTyVar mode hs_op
-         -- See "A worry" in the HsApp case
        ; tcTyApps mode (noLoc $ HsTyVar noExt NotPromoted lhs_op) op op_kind
                        [lhs, rhs] }
 
@@ -609,7 +619,9 @@ tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
   = tc_infer_hs_type mode ty
 
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
-tc_infer_hs_type _    (XHsType (NHsCoreTy ty))  = return (ty, typeKind ty)
+tc_infer_hs_type _    (XHsType (NHsCoreTy ty))
+  = do { ty <- zonkTcType ty  -- (IT3) and (IT4) of Note [The tcType invariant]
+       ; return (ty, typeKind ty) }
 tc_infer_hs_type mode other_ty
   = do { kv <- newMetaKindVar
        ; ty' <- tc_hs_type mode other_ty kv
@@ -705,7 +717,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
                 then tc_lhs_type mode ty constraintKind
                 else do { ek <- newOpenTypeKind
                                 -- The body kind (result of the function)
-                                -- can be * or #, hence newOpenTypeKind
+                                -- can be TYPE r, for any r, hence newOpenTypeKind
                         ; ty' <- tc_lhs_type mode ty ek
                         ; checkExpectedKind (unLoc ty) ty' liftedTypeKind exp_kind }
 
@@ -917,11 +929,13 @@ tcInferApps :: TcTyMode
 --    Reason: we will return a type application like (fun_ty arg1 ... argn),
 --            and that type must be well-kinded
 --            See Note [The tcType invariant]
+-- Postcondition: Result kind is zonked.
 tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
   = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr fun_ki)
-       ; stuff <- go 1 [] empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
+       ; (f_args, args, res_k) <- go 1 [] empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
        ; traceTc "tcInferApps }" empty
-       ; return stuff }
+       ; res_k <- zonkTcType res_k  -- nec'y to uphold (IT4) of Note [The tcType invariant]
+       ; return (f_args, args, res_k) }
   where
     empty_subst                      = mkEmptyTCvSubst $ mkInScopeSet $
                                        tyCoVarsOfType fun_ki
@@ -1003,11 +1017,12 @@ tcTyApps :: TcTyMode
          -> TcType               -- ^ Function (could be knot-tied)
          -> TcKind               -- ^ Function kind (zonked)
          -> [LHsType GhcRn]      -- ^ Args
-         -> TcM (TcType, TcKind) -- ^ (f args, result kind)
+         -> TcM (TcType, TcKind) -- ^ (f args, result kind)   result kind is zonked
 -- Precondition: see precondition for tcInferApps
 tcTyApps mode orig_hs_ty fun_ty fun_ki args
   = do { (ty', _args, ki') <- tcInferApps mode Nothing orig_hs_ty fun_ty fun_ki args
-       ; return (ty', ki') }
+       ; return (ty' `mkNakedCastTy` mkRepReflCo ki', ki') }
+          -- The mkNakedCastTy is for (IT3) of Note [The tcType invariant]
 
 --------------------------
 -- Like checkExpectedKindX, but returns only the final type; convenient wrapper
@@ -1067,11 +1082,12 @@ checkExpectedKindX mb_kind_env pp_hs_ty ty act_kind exp_kind
 -- | Instantiate @n@ invisible arguments to a type. If @n <= 0@, no instantiation
 -- occurs. If @n@ is too big, then all available invisible arguments are instantiated.
 -- (In other words, this function is very forgiving about bad values of @n@.)
+-- Why zonk the result? So that tcTyVar can obey (IT6) of Note [The tcType invariant]
 instantiateTyN :: Maybe (VarEnv Kind)              -- ^ Predetermined instantiations
                                                    -- (for assoc. type patterns)
                -> Int                              -- ^ @n@
-               -> [TyBinder] -> TcKind             -- ^ its kind
-               -> TcM ([TcType], TcKind)   -- ^ The inst'ed type, new args, kind
+               -> [TyBinder] -> TcKind             -- ^ its kind (zonked)
+               -> TcM ([TcType], TcKind)   -- ^ The inst'ed type, new args, kind (zonked)
 instantiateTyN mb_kind_env n bndrs inner_ki
   | n <= 0
   = return ([], ki)
@@ -1079,7 +1095,7 @@ instantiateTyN mb_kind_env n bndrs inner_ki
   | otherwise
   = do { (subst, inst_args) <- tcInstTyBinders empty_subst mb_kind_env inst_bndrs
        ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
-             ki'        = substTy subst rebuilt_ki
+       ; ki' <- zonkTcType (substTy subst rebuilt_ki)
        ; traceTc "instantiateTyN" (vcat [ ppr ki
                                         , ppr n
                                         , ppr subst
@@ -1186,22 +1202,24 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
     handle_tyfams tc tc_tc
       | mightBeUnsaturatedTyCon tc_tc || mode_unsat mode
                                          -- This is where mode_unsat is used
-      = do { traceTc "tcTyVar2a" (ppr tc_tc $$ ppr tc_kind)
-           ; return (mkNakedTyConApp tc [], tc_kind) }
+      = do { tc_kind <- zonkTcType (tyConKind tc_tc)   -- (IT6) of Note [The tcType invariant]
+           ; traceTc "tcTyVar2a" (ppr tc_tc $$ ppr tc_kind)
+           ; return (mkNakedTyConApp tc [] `mkNakedCastTy` mkRepReflCo tc_kind, tc_kind) }
+              -- the mkNakedCastTy ensures (IT5) of Note [The tcType invariant]
 
       | otherwise
-      = do { (tc_args, kind) <- instantiateTyN Nothing (length (tyConBinders tc_tc))
+      = do { tc_kind <- zonkTcType (tyConKind tc_tc)
+           ; let (tc_kind_bndrs, tc_inner_ki) = splitPiTysInvisible tc_kind
+           ; (tc_args, kind) <- instantiateTyN Nothing (length (tyConBinders tc_tc))
                                                tc_kind_bndrs tc_inner_ki
-           ; let tc_ty = mkNakedTyConApp tc tc_args
+           ; let tc_ty = mkNakedTyConApp tc tc_args `mkNakedCastTy` mkRepReflCo kind
+               -- mkNakedCastTy is for (IT5) of Note [The tcType invariant]
            -- tc and tc_ty must not be traced here, because that would
            -- force the evaluation of a potentially knot-tied variable (tc),
            -- and the typechecker would hang, as per #11708
            ; traceTc "tcTyVar2b" (vcat [ ppr tc_tc <+> dcolon <+> ppr tc_kind
                                        , ppr kind ])
            ; return (tc_ty, kind) }
-      where
-        tc_kind                      = tyConKind tc_tc
-        (tc_kind_bndrs, tc_inner_ki) = splitPiTysInvisible tc_kind
 
     get_loopy_tc :: Name -> TyCon -> TcM TyCon
     -- Return the knot-tied global TyCon if there is one
@@ -2720,6 +2738,7 @@ It does sort checking and desugaring at the same time, in one single pass.
 tcLHsKindSig :: UserTypeCtxt -> LHsKind GhcRn -> TcM Kind
 tcLHsKindSig ctxt hs_kind
 -- See  Note [Recipe for checking a signature] in TcHsType
+-- Result is zonked
   = do { kind <- solveLocalEqualities $
                  tc_lhs_kind kindLevelMode hs_kind
        ; traceTc "tcLHsKindSig" (ppr kind)
