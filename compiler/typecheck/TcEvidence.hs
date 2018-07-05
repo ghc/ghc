@@ -280,12 +280,12 @@ mkWpFun :: HsWrapper -- the multiplicities on the arrows of the wrappee and wrap
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
-mkWpFun w_co co1          co2         t1 _  d  = WpFun w_co co1 co2 t1 d
 -- When the multiplicities are not the same, always make a proper wrapper.  We
 -- don't currently need to actually record the source multiplicity: it is just
 -- here to prevent making a coercion between two incoercible function arrow
 -- arnaud: TODO: add an assertion that w1 is a subweight of w2
 mkWpFun WpHole WpHole       WpHole       _  _  _ = WpHole
+mkWpFun w_co co1          co2         t1 _  d  = WpFun w_co co1 co2 t1 d
 --mkWpFun w  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational w (mkTcRepReflCo t1) co2)
 --mkWpFun w  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) (mkTcRepReflCo t2))
 --mkWpFun w  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) co2)
