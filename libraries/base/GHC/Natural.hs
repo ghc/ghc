@@ -594,7 +594,7 @@ mkNatural :: [Word]  -- ^ value expressed in 32 bit chunks, least
           -> Natural
 mkNatural [] = wordToNaturalBase 0##
 mkNatural (W# i : is') = wordToNaturalBase (i `and#` 0xffffffff##) `orNatural`
-                         shiftLNatural (mkNatural is') 31
+                         shiftLNatural (mkNatural is') 32
 {-# CONSTANT_FOLDED mkNatural #-}
 
 -- | Convert 'Int' to 'Natural'.
