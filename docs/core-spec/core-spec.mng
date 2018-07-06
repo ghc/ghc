@@ -169,9 +169,10 @@ A program is just a list of bindings:
 
 \gram{\ottt}
 
-\ctor{ForAllTy}s are represented in two different ways, depending on whether
-the \ctor{ForAllTy} is anonymous (written $[[t1 -> t2]]$) or
-named (written $[[forall n . t]]$).
+\ctor{FunTy} is the special case for non-dependent function type. The
+\ctor{TyBinder} in \ghcfile{types/TyCoRep.lhs} distinguishes whether a binder is
+anonymours (\ctor{FunTy}) or named (\ctor{ForAllTy}). See
+\verb|Note [TyBinders]| in \ghcfile{types/TyCoRep.lhs}.
 
 There are some invariants on types:
 \begin{itemize}
@@ -182,7 +183,7 @@ $[[T]]$. It should be another application or a type variable.
 does \emph{not} need to be saturated.
 \item A saturated application of $[[(->) t1 t2]]$ should be represented as
 $[[t1 -> t2]]$. This is a different point in the grammar, not just pretty-printing.
-The constructor for a saturated $[[(->)]]$ is \texttt{ForAllTy}.
+The constructor for a saturated $[[(->)]]$ is \texttt{FunTy}.
 \item A type-level literal is represented in GHC with a different datatype than
 a term-level literal, but we are ignoring this distinction here.
 \item A coercion used as a type should appear only in the right-hand side of
@@ -194,7 +195,7 @@ are purely representational. The metatheory would remain the same if these forms
 were removed in favor of $[[t1 t2]]$. Nevertheless, we keep all three forms in
 this documentation to accurately reflect the implementation.
 
-The \texttt{Named} variant of a \texttt{Binder} (the first argument to a
+The \texttt{ArgFlag} field of a \texttt{TyVarBinder} (the first argument to a
 \texttt{ForAllTy}) also tracks visibility of arguments. Visibility affects
 only source Haskell, and is omitted from this presentation.
 
