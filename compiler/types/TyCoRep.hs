@@ -73,7 +73,8 @@ module TyCoRep (
         debugPprType,
 
         -- * Free variables
-        tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
+        tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfRigDSet,
+        tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
         closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
@@ -86,7 +87,7 @@ module TyCoRep (
         closeOverKinds,
         injectiveVarsOfBinder, injectiveVarsOfType,
 
-        noFreeVarsOfType, noFreeVarsOfCo,
+        noFreeVarsOfType, noFreeVarsOfCo, noFreeVarsOfRig,
 
         -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
@@ -121,6 +122,8 @@ module TyCoRep (
         substForAllCoBndr,
         substTyVarBndrCallback, substForAllCoBndrCallback,
         checkValidSubst, isValidTCvSubst,
+
+        substRigUnchecked,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -1537,6 +1540,9 @@ tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
+tyCoVarsOfRigDSet :: Rig -> DTyCoVarSet
+tyCoVarsOfRigDSet r = fvDVarSet $ tyCoFVsOfRig r
+
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
 -- Note [Deterministic FV] in FV.
@@ -1559,10 +1565,16 @@ tyCoFVsOfType (TyVarTy v)        a b c = (unitFV v `unionFV` tyCoFVsOfType (tyVa
 tyCoFVsOfType (TyConApp _ tys)   a b c = tyCoFVsOfTypes tys a b c
 tyCoFVsOfType (LitTy {})         a b c = emptyFV a b c
 tyCoFVsOfType (AppTy fun arg)    a b c = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) a b c
-tyCoFVsOfType (FunTy _ arg res)  a b c = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
+tyCoFVsOfType (FunTy w arg res)  a b c = (tyCoFVsOfRig w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
 tyCoFVsOfType (ForAllTy bndr ty) a b c = tyCoFVsBndr bndr (tyCoFVsOfType ty)  a b c
 tyCoFVsOfType (CastTy ty co)     a b c = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) a b c
 tyCoFVsOfType (CoercionTy co)    a b c = tyCoFVsOfCo co a b c
+
+tyCoFVsOfRig :: Rig -> FV
+tyCoFVsOfRig (RigTy t) a b c = (tyCoFVsOfType t) a b c
+tyCoFVsOfRig (RigAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
+tyCoFVsOfRig (RigMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
+tyCoFVsOfRig _ a b c = emptyFV a b c
 
 tyCoFVsBndr :: TyVarBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
@@ -1628,8 +1640,8 @@ tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
   = (delFV tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo _ _ co1 co2)    fv_cand in_scope acc
-  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
+tyCoFVsOfCo (FunCo _ w co1 co2)    fv_cand in_scope acc
+  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
@@ -1679,12 +1691,18 @@ coVarsOfType (TyVarTy v)         = coVarsOfType (tyVarKind v)
 coVarsOfType (TyConApp _ tys)    = coVarsOfTypes tys
 coVarsOfType (LitTy {})          = emptyVarSet
 coVarsOfType (AppTy fun arg)     = coVarsOfType fun `unionVarSet` coVarsOfType arg
-coVarsOfType (FunTy _ arg res)   = coVarsOfType arg `unionVarSet` coVarsOfType res
+coVarsOfType (FunTy w arg res)   = (coVarsOfRig w)
+                                    `unionVarSet` coVarsOfType arg
+                                    `unionVarSet` coVarsOfType res
 coVarsOfType (ForAllTy (TvBndr tv _) ty)
   = (coVarsOfType ty `delVarSet` tv)
     `unionVarSet` coVarsOfType (tyVarKind tv)
 coVarsOfType (CastTy ty co)      = coVarsOfType ty `unionVarSet` coVarsOfCo co
 coVarsOfType (CoercionTy co)     = coVarsOfCo co
+
+coVarsOfRig :: Rig -> CoVarSet
+coVarsOfRig (RigTy t) = coVarsOfType t
+coVarsOfRig _ = emptyVarSet
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
 coVarsOfTypes tys = mapUnionVarSet coVarsOfType tys
@@ -1696,7 +1714,7 @@ coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
 coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (ForAllCo tv kind_co co)
   = coVarsOfCo co `delVarSet` tv `unionVarSet` coVarsOfCo kind_co
-coVarsOfCo (FunCo _ _w co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
+coVarsOfCo (FunCo _ w co1 co2)    = coVarsOfCo w `unionVarSet` coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (CoVarCo v)          = coVarsOfCoVar v
 coVarsOfCo (HoleCo h)           = coVarsOfCoVar (coHoleCoVar h)
                                   -- See Note [CoercionHoles and coercion free variables]
@@ -1790,10 +1808,18 @@ noFreeVarsOfType (TyVarTy _)      = False
 noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
 noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
-noFreeVarsOfType (FunTy _ t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
+noFreeVarsOfType (FunTy w t1 t2)  = noFreeVarsOfRig w
+                                      && noFreeVarsOfType t1
+                                      && noFreeVarsOfType t2
 noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
+
+noFreeVarsOfRig :: Rig -> Bool
+noFreeVarsOfRig (RigTy ty) = noFreeVarsOfType ty
+noFreeVarsOfRig (RigAdd m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
+noFreeVarsOfRig (RigMul m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
+noFreeVarsOfRig _ = True
 
 -- | Returns True if this coercion has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
@@ -1802,7 +1828,9 @@ noFreeVarsOfCo (Refl _ ty)            = noFreeVarsOfType ty
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
 noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
-noFreeVarsOfCo (FunCo _ _ c1 c2)      = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
+noFreeVarsOfCo (FunCo _ w c1 c2)      = noFreeVarsOfCo c1
+                                          && noFreeVarsOfCo c2
+                                          && noFreeVarsOfCo w
 noFreeVarsOfCo (CoVarCo _)            = False
 noFreeVarsOfCo (HoleCo {})            = True    -- I'm unsure; probably never happens
 noFreeVarsOfCo (AxiomInstCo _ _ args) = all noFreeVarsOfCo args
@@ -2353,6 +2381,12 @@ substTy subst ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
+substRigUnchecked :: TCvSubst -> Rig -> Rig
+substRigUnchecked subst r
+  | isEmptyTCvSubst subst = r
+  | otherwise             = subst_rig subst r
+
+
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
 -- Note [The substitution invariant].
@@ -2411,7 +2445,7 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy w arg res) = ((FunTy $! go_rig w) $! go arg) $! go res
+    go (FunTy w arg res) = ((FunTy $! subst_rig subst w) $! go arg) $! go res
     go (ForAllTy (TvBndr tv vis) ty)
                          = case substTyVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -2421,9 +2455,11 @@ subst_ty subst ty
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
-    go_rig :: Rig -> Rig
-    go_rig (RigTy t) = RigTy (go t)
-    go_rig r = r
+subst_rig :: TCvSubst -> Rig -> Rig
+subst_rig subst (RigTy t) = RigTy (subst_ty subst t)
+subst_rig subst (RigAdd m1 m2) = RigAdd (subst_rig subst m1) (subst_rig subst m2)
+subst_rig subst (RigMul m1 m2) = RigMul (subst_rig subst m1) (subst_rig subst m2)
+subst_rig _ r = r
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
@@ -2482,7 +2518,7 @@ subst_co subst co
     go (ForAllCo tv kind_co co)
       = case substForAllCoBndrUnchecked subst tv kind_co of { (subst', tv', kind_co') ->
           ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co }
-    go (FunCo r w co1 co2)   = (mkFunCo r w $! go co1) $! go co2
+    go (FunCo r w co1 co2)   = ((mkFunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
     go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
@@ -3085,7 +3121,7 @@ tidyCo env@(_, subst) co
                                where (envp, tvp) = tidyTyCoVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r w co1 co2)   = (FunCo r w $! go co1) $! go co2
+    go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
@@ -3148,7 +3184,8 @@ coercionSize (Refl _ ty)         = typeSize ty
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ _ co1 co2) = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
+                                                        + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)

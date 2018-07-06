@@ -136,7 +136,7 @@ module Type (
         tyCoVarsOfTypeDSet,
         coVarsOfType,
         coVarsOfTypes, closeOverKinds, closeOverKindsList,
-        noFreeVarsOfType,
+        noFreeVarsOfType, noFreeVarsOfRig,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize,
@@ -185,6 +185,8 @@ module Type (
         substCoUnchecked, substCoWithUnchecked,
         substTyVarBndr, substTyVar, substTyVars,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
+
+        substRigUnchecked,
 
         -- * Pretty-printing
         pprType, pprParendType, pprPrecType,
@@ -408,6 +410,7 @@ expandTypeSynonyms ty
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
     go subst (FunTy weight arg res)
+      -- TODO: MattP recurse into weight here
       = mkFunTy weight (go subst arg) (go subst res)
     go subst (ForAllTy (TvBndr tv vis) t)
       = let (subst', tv') = substTyVarBndrCallback go subst tv in

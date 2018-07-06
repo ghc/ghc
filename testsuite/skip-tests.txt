@@ -142,3 +142,9 @@ tcrun041
 
 readRun004
 EtaExpandLevPoly
+
+# Eta-reduction performance
+
+T5363
+T3245
+list003

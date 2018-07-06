@@ -937,10 +937,15 @@ exactTyCoVarsOfType ty
     go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
-    go (FunTy _ arg res)      = go arg `unionVarSet` go res
+    go (FunTy w arg res)    = go_rig w `unionVarSet` go arg `unionVarSet` go res
     go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderKind bndr)
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
+
+    go_rig (RigTy ty)       = go ty
+    go_rig (RigAdd m1 m2)   = go_rig m1 `unionVarSet` go_rig m2
+    go_rig (RigMul m1 m2)   = go_rig m1 `unionVarSet` go_rig m2
+    go_rig _                = emptyVarSet
 
     goCo (Refl _ ty)        = go ty
     goCo (TyConAppCo _ _ args)= goCos args
@@ -992,10 +997,15 @@ anyRewritableTyVar ignore_cos role pred ty
     go _ _     (LitTy {})       = False
     go rl bvs (TyConApp tc tys) = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)   = go rl bvs fun || go NomEq bvs arg
-    go rl bvs (FunTy _ arg res)   = go rl bvs arg || go rl bvs res
+    go rl bvs (FunTy w arg res) = go_rig rl bvs w || go rl bvs arg || go rl bvs res
     go rl bvs (ForAllTy tv ty)  = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty co)    = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
+
+    go_rig rl bvs (RigTy ty) = go rl bvs ty
+    go_rig rl bvs (RigAdd m1 m2) = go_rig rl bvs m1 || go_rig rl bvs m2
+    go_rig rl bvs (RigMul m1 m2) = go_rig rl bvs m1 || go_rig rl bvs m2
+    go_rig _ _ _ = False
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
     go_tc ReprEq bvs tc tys = foldr ((&&) . go_arg bvs) False $
@@ -1142,7 +1152,7 @@ split_dvs bound dvs ty
   where
     go dv (AppTy t1 t2)    = go (go dv t1) t2
     go dv (TyConApp _ tys) = foldl go dv tys
-    go dv (FunTy _ arg res)  = go (go dv arg) res
+    go dv (FunTy w arg res)  = go (go (go_rig dv w) arg) res
     go dv (LitTy {})       = dv
     go dv (CastTy ty co)   = go dv ty `mappend` go_co co
     go dv (CoercionTy co)  = dv `mappend` go_co co
@@ -1161,6 +1171,12 @@ split_dvs bound dvs ty
            , dv_tvs = tvs }
       where
         DV { dv_kvs = kvs, dv_tvs = tvs } = split_dvs (bound `extendVarSet` tv) dv ty
+
+    go_rig dv (RigTy ty) =  go dv ty
+    go_rig dv (RigAdd m1 m2) = go_rig dv m1 `mappend` go_rig dv m2
+    go_rig dv (RigMul m1 m2) = go_rig dv m1 `mappend` go_rig dv m2
+    go_rig dv _              = dv
+
 
     go_co co = DV { dv_kvs = kill_bound (tyCoVarsOfCoDSet co)
                   , dv_tvs = emptyDVarSet }
@@ -1203,8 +1219,8 @@ isTouchableMetaTyVar ctxt_tclvl tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl }
-        -> --ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
-           --         ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
+        -> ASSERT2( checkTcLevelInvariant ctxt_tclvl tv_tclvl,
+                    ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
            tv_tclvl `sameDepthAs` ctxt_tclvl
       _ -> False
   | otherwise = False

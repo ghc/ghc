@@ -73,6 +73,7 @@ import Outputable
 import Util
 import UniqFM
 import CoreSyn
+import Weight
 
 import Control.Monad
 import Data.Functor.Compose ( Compose(..) )
@@ -985,8 +986,9 @@ zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; return (env2, WpCompose c1' c2') }
 zonkCoFn env (WpFun w c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                        ; (env2, c2') <- zonkCoFn env1 c2
-                                       ; t1'         <- zonkTcTypeToType env2 t1
-                                       ; return (env2, WpFun w c1' c2' t1' d) }
+                                       ; (env3, w') <- zonkCoFn env2 w
+                                       ; t1'         <- zonkWeightedTcTypeToType env2 t1
+                                       ; return (env2, WpFun w' c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
                               ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
@@ -1709,6 +1711,18 @@ zonk_tycomapper = TyCoMapper
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
 zonkTcTypeToType = mapType zonk_tycomapper
+
+zonkWeightedTcTypeToType :: ZonkEnv -> Weighted TcType -> TcM (Weighted TcType)
+zonkWeightedTcTypeToType env (Weighted r ty) = Weighted <$> zonkRig env r
+                                                        <*> zonkTcTypeToType env ty
+
+zonkRig :: ZonkEnv -> Rig -> TcM Rig
+zonkRig env (RigTy t) = RigTy <$> zonkTcTypeToType env t
+zonkRig env (RigAdd m1 m2) = RigAdd <$> zonkRig env m1 <*> zonkRig env m2
+zonkRig env (RigMul m1 m2) = RigMul <$> zonkRig env m1 <*> zonkRig env m2
+zonkRig env r = return r
+
+
 
 zonkTcTypeToTypes :: (Traversable t) => ZonkEnv -> t TcType -> TcM (t Type)
 zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys

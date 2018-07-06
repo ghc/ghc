@@ -942,10 +942,6 @@ Fixes ticket http://ghc.haskell.org/trac/ghc/ticket/2143
 sort = sortBy compare
 sortBy cmp = mergeAll . sequences
   where
-    -- TODO: MattP, there is a problem with type inference here and
-    -- polymorphic constructors. This type signature resolves the ambiguity
-    -- sufficiently. See #97
-    sequences :: [a] -> [[a]]
     sequences (a:b:xs)
       | a `cmp` b == GT = descending b [a]  xs
       | otherwise       = ascending  b (a:) xs
