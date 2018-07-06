@@ -1182,23 +1182,22 @@ if test "$ac_cv_sizeof_void_p" -eq 8 ; then
     if test "x$EnableLargeAddressSpace" = "xyes" ; then
         if test "$ghc_host_os" = "darwin" ; then
             use_large_address_space=yes
-        elif test "$ghc_host_os" = "openbsd" ; then
-            # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
-            # The flag MAP_NORESERVE is supported for source compatibility reasons,
-            # but is completely ignored by OS mmap
+	elif test "$ghc_host_os" = "openbsd" ; then
+	    # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
+	    # The flag MAP_NORESERVE is supported for source compatibility reasons,
+	    # but is completely ignored by OS mmap
             use_large_address_space=no
         else
-            AC_CHECK_DECLS([MAP_NORESERVE, MAP_GUARD, MADV_FREE, MADV_DONTNEED],[],[],
+            AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
                 [
                 #include <unistd.h>
                 #include <sys/types.h>
                 #include <sys/mman.h>
                 #include <fcntl.h>
             ])
-            if ( test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" ||
-                 test "$ac_cv_have_decl_MAP_GUARD" = "yes" ) &&
-                ( test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
-                test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ) ; then
+            if test "$ac_cv_have_decl_MAP_NORESERVE" = "yes" &&
+                test "$ac_cv_have_decl_MADV_FREE" = "yes" ||
+                test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
                     use_large_address_space=yes
             fi
         fi
