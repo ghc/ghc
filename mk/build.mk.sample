@@ -99,9 +99,6 @@ endif
 # https://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests/Running#AdditionalPackages
 #BUILD_EXTRA_PKGS=YES
 
-# Uncomment the following line to enable building DPH
-#BUILD_DPH=YES
-
 # Uncomment the following to force `integer-gmp` to use the in-tree GMP 6.1.2
 # (other sometimes useful configure-options: `--with-gmp-{includes,libraries}`)
 #libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
