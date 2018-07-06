@@ -102,8 +102,10 @@ void osMemInit(void)
  The naming is chosen from the Win32 API (VirtualAlloc) which does the
  same thing and has done so forever, while support for this in Unix systems
  has only been added recently and is hidden in the posix portability mess.
- It is confusing because to get the reserve behavior we need MAP_NORESERVE
- (which tells the kernel not to allocate backing space), but heh...
+ The Linux manpage suggests that mmap must be passed MAP_NORESERVE in order
+ to get reservation-only behavior. It is confusing because to get the reserve
+ behavior we need MAP_NORESERVE (which tells the kernel not to allocate backing
+ space), but heh...
 */
 enum
 {
@@ -161,7 +163,10 @@ my_mmap (void *addr, W_ size, int operation)
     else
         prot = PROT_NONE;
     if (operation == MEM_RESERVE)
-# if defined(MAP_NORESERVE)
+# if defined(MAP_GUARD)
+        // Provided by FreeBSD
+        flags = MAP_GUARD;
+# elif defined(MAP_NORESERVE)
         flags = MAP_NORESERVE;
 # else
 #  if defined(USE_LARGE_ADDRESS_SPACE)
