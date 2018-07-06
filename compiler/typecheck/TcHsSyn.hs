@@ -784,7 +784,7 @@ zonkExpr env (ExplicitList ty wit exprs)
        new_exprs <- zonkLExprs env1 exprs
        return (ExplicitList new_ty new_wit new_exprs)
    where zonkWit env Nothing    = return (env, Nothing)
-         zonkWit env (Just fln) = second (\x -> Just x) <$> zonkSyntaxExpr env fln
+         zonkWit env (Just fln) = second Just <$> zonkSyntaxExpr env fln
 
 zonkExpr env (ExplicitPArr ty exprs)
   = do new_ty <- zonkTcTypeToType env ty
@@ -823,7 +823,7 @@ zonkExpr env (ArithSeq expr wit info)
        new_info <- zonkArithSeq env1 info
        return (ArithSeq new_expr new_wit new_info)
    where zonkWit env Nothing    = return (env, Nothing)
-         zonkWit env (Just fln) = second (\a -> Just a) <$> zonkSyntaxExpr env fln
+         zonkWit env (Just fln) = second Just <$> zonkSyntaxExpr env fln
 
 zonkExpr env (PArrSeq expr info)
   = do new_expr <- zonkExpr env expr
@@ -944,7 +944,7 @@ zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
        ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
   where
     zonkWit env Nothing  = return (env, Nothing)
-    zonkWit env (Just w) = second (\a -> Just a) <$> zonkSyntaxExpr env w
+    zonkWit env (Just w) = second Just <$> zonkSyntaxExpr env w
 
 zonkCmd env (HsCmdLet x (L l binds) cmd)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
@@ -1160,7 +1160,7 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
         ; return (env2, ApplicativeStmt new_body_ty new_args new_mb_join) }
   where
     zonk_join env Nothing  = return (env, Nothing)
-    zonk_join env (Just j) = second (\a -> Just a) <$> zonkSyntaxExpr env j
+    zonk_join env (Just j) = second Just <$> zonkSyntaxExpr env j
 
     get_pat (_, ApplicativeArgOne _ pat _ _) = pat
     get_pat (_, ApplicativeArgMany _ _ _ pat) = pat
@@ -1345,7 +1345,7 @@ zonk_pat env (NPat ty (L l lit) mb_neg eq_expr)
   = do  { (env1, eq_expr') <- zonkSyntaxExpr env eq_expr
         ; (env2, mb_neg') <- case mb_neg of
             Nothing -> return (env1, Nothing)
-            Just n  -> second (\a -> Just a) <$> zonkSyntaxExpr env1 n
+            Just n  -> second Just <$> zonkSyntaxExpr env1 n
 
         ; lit' <- zonkOverLit env2 lit
         ; ty' <- zonkTcTypeToType env2 ty
@@ -1482,7 +1482,7 @@ zonkEvTerm :: ZonkEnv -> EvTerm -> TcM EvTerm
 zonkEvTerm env (EvExpr e) =
   EvExpr <$> zonkCoreExpr env e
 zonkEvTerm env (EvTypeable ty ev) =
-  (\a b -> EvTypeable a b) <$> zonkTcTypeToType env ty <*> zonkEvTypeable env ev
+  EvTypeable <$> zonkTcTypeToType env ty <*> zonkEvTypeable env ev
 
 zonkCoreExpr :: ZonkEnv -> CoreExpr -> TcM CoreExpr
 zonkCoreExpr env (Var v)
@@ -1498,12 +1498,12 @@ zonkCoreExpr env (Type ty)
     = Type <$> zonkTcTypeToType env ty
 
 zonkCoreExpr env (Cast e co)
-    = (\a b -> Cast a b) <$> zonkCoreExpr env e <*> zonkCoToCo env co
+    = Cast <$> zonkCoreExpr env e <*> zonkCoToCo env co
 zonkCoreExpr env (Tick t e)
     = Tick t <$> zonkCoreExpr env e -- Do we need to zonk in ticks?
 
 zonkCoreExpr env (App e1 e2)
-    = (\a b -> App a b) <$> zonkCoreExpr env e1 <*> zonkCoreExpr env e2
+    = App <$> zonkCoreExpr env e1 <*> zonkCoreExpr env e2
 zonkCoreExpr env (Lam v e)
     = do v' <- zonkIdBndr env v
          let env1 = extendIdZonkEnv1 env v'
@@ -1542,7 +1542,7 @@ zonkCoreBind env (Rec pairs)
          return (env1, pairs')
 
 zonkCorePair :: ZonkEnv -> (CoreBndr, CoreExpr) -> TcM (CoreBndr, CoreExpr)
-zonkCorePair env (v,e) = (\a b -> (a,b)) <$> zonkIdBndr env v <*> zonkCoreExpr env e
+zonkCorePair env (v,e) = (,) <$> zonkIdBndr env v <*> zonkCoreExpr env e
 
 zonkEvTypeable :: ZonkEnv -> EvTypeable -> TcM EvTypeable
 zonkEvTypeable env (EvTypeableTyCon tycon e)

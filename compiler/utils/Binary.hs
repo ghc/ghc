@@ -641,7 +641,7 @@ instance Binary RuntimeRep where
     get bh = do
         tag <- getByte bh
         case tag of
-          0  -> (\a b -> VecRep a b) <$> get bh <*> get bh
+          0  -> VecRep <$> get bh <*> get bh
           1  -> TupleRep <$> get bh
           2  -> SumRep <$> get bh
           3  -> pure LiftedRep
@@ -666,12 +666,12 @@ instance Binary KindRep where
     get bh = do
         tag <- getByte bh
         case tag of
-          0 -> (\a b -> KindRepTyConApp a b) <$> get bh <*> get bh
+          0 -> KindRepTyConApp <$> get bh <*> get bh
           1 -> KindRepVar <$> get bh
-          2 -> (\a b -> KindRepApp a b) <$> get bh <*> get bh
-          3 -> (\a b -> KindRepFun a b) <$> get bh <*> get bh
+          2 -> KindRepApp <$> get bh <*> get bh
+          3 -> KindRepFun <$> get bh <*> get bh
           4 -> KindRepTYPE <$> get bh
-          5 -> (\a b -> KindRepTypeLit a b) <$> get bh <*> get bh
+          5 -> KindRepTypeLit <$> get bh <*> get bh
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where

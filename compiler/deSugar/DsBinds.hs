@@ -1111,8 +1111,8 @@ So for now, we ban them altogether as requested by #13290. See also #7398.
 dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
 dsHsWrapper WpHole            = return $ \e -> e
 dsHsWrapper (WpTyApp ty)      = return $ \e -> App e (Type ty)
-dsHsWrapper (WpEvLam ev)      = return $ \e -> Lam ev e
-dsHsWrapper (WpTyLam tv)      = return $ \e -> Lam tv e
+dsHsWrapper (WpEvLam ev)      = return $ Lam ev
+dsHsWrapper (WpTyLam tv)      = return $ Lam tv
 dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
                                    ; return (mkCoreLets bs) }
 dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1

@@ -524,8 +524,8 @@ pmTopNormaliseType_maybe env typ
     newTypeStepper rec_nts tc tys
       | Just (ty', _co) <- instNewTyCon_maybe tc tys
       = case checkRecTc rec_nts tc of
-          Just rec_nts' -> let tyf x = ((TyConApp tc tys): x)
-                               tmf x = ((tyConSingleDataCon tc): x)
+          Just rec_nts' -> let tyf = ((TyConApp tc tys):)
+                               tmf = ((tyConSingleDataCon tc):)
                            in  NS_Step rec_nts' ty' (tyf, tmf)
           Nothing       -> NS_Abort
       | otherwise
@@ -541,7 +541,7 @@ pmTopNormaliseType_maybe env typ
           -- after reducing the kind of a bound tyvar.
 
         case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (_co, rhs) -> NS_Step rec_nts rhs (\x -> (rhs:x), id)
+          Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
           _               -> NS_Done
 
 {- Note [Type normalisation for EmptyCase]

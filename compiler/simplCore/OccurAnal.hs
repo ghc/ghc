@@ -1231,7 +1231,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     rules_w_uds = occAnalRules env (Just (length bndrs)) Recursive bndr
 
     rules_w_rhs_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
-    rules_w_rhs_fvs = maybe id (\ids xs -> ((AlwaysActive, ids):xs))
+    rules_w_rhs_fvs = maybe id (\ids -> ((AlwaysActive, ids):))
                                (lookupVarEnv imp_rule_edges bndr)
       -- See Note [Preventing loops due to imported functions rules]
                       [ (ru_act rule, udFreeVars bndr_set rhs_uds)
@@ -1812,7 +1812,7 @@ occAnal env (Case scrut bndr ty alts)
           -- No reason to not look through all ticks here, but only
           -- for soft-scoped ticks we can do so without having to
           -- update returned occurance info (see occAnal)
-        = second (\a -> Tick t a) $ occ_anal_scrut e alts
+        = second (Tick t) $ occ_anal_scrut e alts
 
     occ_anal_scrut scrut _alts
         = occAnal (vanillaCtxt env) scrut    -- No need for rhsCtxt

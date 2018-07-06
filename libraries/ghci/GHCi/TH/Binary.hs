@@ -70,4 +70,4 @@ instance Binary TH.PatSynArgs
 
 instance Binary Serialized where
     put (Serialized tyrep wds) = put tyrep >> put (B.pack wds)
-    get = (\a b -> Serialized a b) <$> get <*> (B.unpack <$> get)
+    get = Serialized <$> get <*> (B.unpack <$> get)

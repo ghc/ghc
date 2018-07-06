@@ -211,25 +211,25 @@ data HsWrapper
 -- So we do it manually:
 instance Data.Data HsWrapper where
   gfoldl _ z WpHole             = z WpHole
-  gfoldl k z (WpCompose a1 a2)  = z (\a b -> WpCompose a b) `k` a1 `k` a2
+  gfoldl k z (WpCompose a1 a2)  = z WpCompose `k` a1 `k` a2
   gfoldl k z (WpFun w a1 a2 a3 _) = z wpFunEmpty `k` w `k` a1 `k` a2 `k` a3
-  gfoldl k z (WpCast a1)        = z (\a -> WpCast a) `k` a1
-  gfoldl k z (WpEvLam a1)       = z (\a -> WpEvLam a) `k` a1
-  gfoldl k z (WpEvApp a1)       = z (\a -> WpEvApp a) `k` a1
-  gfoldl k z (WpTyLam a1)       = z (\a -> WpTyLam a) `k` a1
-  gfoldl k z (WpTyApp a1)       = z (\a -> WpTyApp a) `k` a1
-  gfoldl k z (WpLet a1)         = z (\a -> WpLet a) `k` a1
+  gfoldl k z (WpCast a1)        = z WpCast `k` a1
+  gfoldl k z (WpEvLam a1)       = z WpEvLam `k` a1
+  gfoldl k z (WpEvApp a1)       = z WpEvApp `k` a1
+  gfoldl k z (WpTyLam a1)       = z WpTyLam `k` a1
+  gfoldl k z (WpTyApp a1)       = z WpTyApp `k` a1
+  gfoldl k z (WpLet a1)         = z WpLet `k` a1
 
   gunfold k z c = case Data.constrIndex c of
                     1 -> z WpHole
-                    2 -> k (k (z (\a b -> WpCompose a b)))
+                    2 -> k (k (z WpCompose))
                     3 -> k (k (k (k (z wpFunEmpty))))
-                    4 -> k (z (\a -> WpCast a))
-                    5 -> k (z (\a -> WpEvLam a))
-                    6 -> k (z (\a -> WpEvApp a))
-                    7 -> k (z (\a -> WpTyLam a))
-                    8 -> k (z (\a -> WpTyApp a))
-                    _ -> k (z (\a -> WpLet a))
+                    4 -> k (z WpCast)
+                    5 -> k (z WpEvLam)
+                    6 -> k (z WpEvApp)
+                    7 -> k (z WpTyLam)
+                    8 -> k (z WpTyApp)
+                    _ -> k (z WpLet)
 
   toConstr WpHole          = wpHole_constr
   toConstr (WpCompose _ _) = wpCompose_constr

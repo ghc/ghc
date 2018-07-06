@@ -531,7 +531,7 @@ vectPolyApp e0
                   Local (vv, lv)
                     -> do { MASSERT( null dictsInner )    -- local vars cannot be class selectors
                           ; traceVt "  LOCAL" (text "")
-                          ; (\a b -> (a,b)) <$> reconstructOuter (Var vv) <*> reconstructOuter (Var lv)
+                          ; (,) <$> reconstructOuter (Var vv) <*> reconstructOuter (Var lv)
                           }
                   Global vv
                     | isDictComp var                      -- dictionary computation
@@ -588,11 +588,11 @@ vectDictExpr (Lit lit)
 vectDictExpr (Lam bndr e)
   = Lam bndr <$> vectDictExpr e
 vectDictExpr (App fn arg)
-  = (\a b -> App a b) <$> vectDictExpr fn <*> vectDictExpr arg
+  = App <$> vectDictExpr fn <*> vectDictExpr arg
 vectDictExpr (Case e bndr ty alts)
-  = (\a b c d -> Case a b c d) <$> vectDictExpr e <*> pure bndr <*> vectType ty <*> mapM vectDictAlt alts
+  = Case <$> vectDictExpr e <*> pure bndr <*> vectType ty <*> mapM vectDictAlt alts
   where
-    vectDictAlt (con, bs, e) = (\a b c -> (a,b,c)) <$> vectDictAltCon con <*> pure bs <*> vectDictExpr e
+    vectDictAlt (con, bs, e) = (,,) <$> vectDictAltCon con <*> pure bs <*> vectDictExpr e
     --
     vectDictAltCon (DataAlt datacon) = DataAlt <$> maybeV dataConErr (lookupDataCon datacon)
       where
@@ -600,7 +600,7 @@ vectDictExpr (Case e bndr ty alts)
     vectDictAltCon (LitAlt lit)      = return $ LitAlt lit
     vectDictAltCon DEFAULT           = return DEFAULT
 vectDictExpr (Let bnd body)
-  = (\a b -> Let a b) <$> vectDictBind bnd <*> vectDictExpr body
+  = Let <$> vectDictBind bnd <*> vectDictExpr body
   where
     vectDictBind (NonRec bndr e) = NonRec bndr <$> vectDictExpr e
     vectDictBind (Rec bnds)      = Rec <$> mapM (\(bndr, e) -> (bndr,) <$> vectDictExpr e) bnds

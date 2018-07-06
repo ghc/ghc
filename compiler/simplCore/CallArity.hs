@@ -473,7 +473,7 @@ callArityAnal _     _   e@(Coercion _)
     = (emptyArityRes, e)
 -- The transparent cases
 callArityAnal arity int (Tick t e)
-    = second (\x -> Tick t x) $ callArityAnal arity int e
+    = second (Tick t) $ callArityAnal arity int e
 callArityAnal arity int (Cast e co)
     = second (\e -> Cast e co) $ callArityAnal arity int e
 
@@ -486,7 +486,7 @@ callArityAnal arity int e@(Var v)
 
 -- Non-value lambdas are ignored
 callArityAnal arity int (Lam v e) | not (isId v)
-    = second (\x -> Lam v x) $ callArityAnal arity (int `delVarSet` v) e
+    = second (Lam v) $ callArityAnal arity (int `delVarSet` v) e
 
 -- We have a lambda that may be called multiple times, so its free variables
 -- can all be co-called.

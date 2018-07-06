@@ -472,7 +472,7 @@ rnIfaceDecl d@IfaceAxiom{} = do
                      }
 rnIfaceDecl d@IfacePatSyn{} =  do
             name <- rnIfaceGlobal (ifName d)
-            let rnPat (n, b) = (\a b -> (a, b)) <$> rnIfaceGlobal n <*> pure b
+            let rnPat (n, b) = (,) <$> rnIfaceGlobal n <*> pure b
             pat_matcher <- rnPat (ifPatMatcher d)
             pat_builder <- T.traverse rnPat (ifPatBuilder d)
             pat_univ_bndrs <- mapM rnIfaceForAllBndr (ifPatUnivBndrs d)
@@ -502,17 +502,17 @@ rnIfaceClassBody d@IfConcreteClass{} = do
 
 rnIfaceFamTyConFlav :: Rename IfaceFamTyConFlav
 rnIfaceFamTyConFlav (IfaceClosedSynFamilyTyCon (Just (n, axs)))
-    = IfaceClosedSynFamilyTyCon . Just <$> ((\a b -> (a,b)) <$> rnIfaceNeverExported n
+    = IfaceClosedSynFamilyTyCon . Just <$> ((,) <$> rnIfaceNeverExported n
                                                 <*> mapM rnIfaceAxBranch axs)
 rnIfaceFamTyConFlav flav = pure flav
 
 rnIfaceAT :: Rename IfaceAT
 rnIfaceAT (IfaceAT decl mb_ty)
-    = (\a b -> IfaceAT a b) <$> rnIfaceDecl decl <*> T.traverse rnIfaceType mb_ty
+    = IfaceAT <$> rnIfaceDecl decl <*> T.traverse rnIfaceType mb_ty
 
 rnIfaceTyConParent :: Rename IfaceTyConParent
 rnIfaceTyConParent (IfDataInstance n tc args)
-    = (\a b c -> IfDataInstance a b c) <$> rnIfaceGlobal n
+    = IfDataInstance <$> rnIfaceGlobal n
                      <*> rnIfaceTyCon tc
                      <*> rnIfaceTcArgs args
 rnIfaceTyConParent IfNoParent = pure IfNoParent
@@ -548,7 +548,7 @@ rnIfaceConDecl d = do
 
 rnIfaceClassOp :: Rename IfaceClassOp
 rnIfaceClassOp (IfaceClassOp n ty dm) =
-    (\a b c -> IfaceClassOp a b c) <$> rnIfaceGlobal n
+    IfaceClassOp <$> rnIfaceGlobal n
                  <*> rnIfaceType ty
                  <*> rnMaybeDefMethSpec dm
 
@@ -583,7 +583,7 @@ rnIfaceUnfolding (IfCompulsory if_expr)
 rnIfaceUnfolding (IfInlineRule arity unsat_ok boring_ok if_expr)
     = IfInlineRule arity unsat_ok boring_ok <$> rnIfaceExpr if_expr
 rnIfaceUnfolding (IfDFunUnfold bs ops)
-    = (\a b -> IfDFunUnfold a b) <$> rnIfaceBndrs bs <*> mapM rnIfaceExpr ops
+    = IfDFunUnfold <$> rnIfaceBndrs bs <*> mapM rnIfaceExpr ops
 
 rnIfaceExpr :: Rename IfaceExpr
 rnIfaceExpr (IfaceLcl name) = pure (IfaceLcl name)
@@ -592,26 +592,25 @@ rnIfaceExpr (IfaceType ty) = IfaceType <$> rnIfaceType ty
 rnIfaceExpr (IfaceCo co) = IfaceCo <$> rnIfaceCo co
 rnIfaceExpr (IfaceTuple sort args) = IfaceTuple sort <$> rnIfaceExprs args
 rnIfaceExpr (IfaceLam lam_bndr expr)
-    = (\a b -> IfaceLam a b) <$> rnIfaceLamBndr lam_bndr <*> rnIfaceExpr expr
+    = IfaceLam <$> rnIfaceLamBndr lam_bndr <*> rnIfaceExpr expr
 rnIfaceExpr (IfaceApp fun arg)
-    = (\a b -> IfaceApp a b) <$> rnIfaceExpr fun <*> rnIfaceExpr arg
+    = IfaceApp <$> rnIfaceExpr fun <*> rnIfaceExpr arg
 rnIfaceExpr (IfaceCase scrut case_bndr alts)
-    = (\a b c -> IfaceCase a b c)
-                <$> rnIfaceExpr scrut
+    = IfaceCase <$> rnIfaceExpr scrut
                 <*> pure case_bndr
                 <*> mapM rnIfaceAlt alts
 rnIfaceExpr (IfaceECase scrut ty)
-    = (\a b -> IfaceECase a b) <$> rnIfaceExpr scrut <*> rnIfaceType ty
+    = IfaceECase <$> rnIfaceExpr scrut <*> rnIfaceType ty
 rnIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body)
-    = (\a b -> IfaceLet a b) <$> ((\a b -> IfaceNonRec a b) <$> rnIfaceLetBndr bndr <*> rnIfaceExpr rhs)
+    = IfaceLet <$> (IfaceNonRec <$> rnIfaceLetBndr bndr <*> rnIfaceExpr rhs)
                <*> rnIfaceExpr body
 rnIfaceExpr (IfaceLet (IfaceRec pairs) body)
-    = (\a b -> IfaceLet a b) <$> (IfaceRec <$> mapM (\(bndr, rhs) ->
-                                        (\a b -> (a,b)) <$> rnIfaceLetBndr bndr
+    = IfaceLet <$> (IfaceRec <$> mapM (\(bndr, rhs) ->
+                                        (,) <$> rnIfaceLetBndr bndr
                                             <*> rnIfaceExpr rhs) pairs)
                <*> rnIfaceExpr body
 rnIfaceExpr (IfaceCast expr co)
-    = (\a b -> IfaceCast a b) <$> rnIfaceExpr expr <*> rnIfaceCo co
+    = IfaceCast <$> rnIfaceExpr expr <*> rnIfaceCo co
 rnIfaceExpr (IfaceLit lit) = pure (IfaceLit lit)
 rnIfaceExpr (IfaceFCall cc ty) = IfaceFCall cc <$> rnIfaceType ty
 rnIfaceExpr (IfaceTick tickish expr) = IfaceTick tickish <$> rnIfaceExpr expr
@@ -627,11 +626,11 @@ rnIfaceTvBndr :: Rename IfaceTvBndr
 rnIfaceTvBndr (fs, kind) = (,) fs <$> rnIfaceType kind
 
 rnIfaceTyConBinder :: Rename IfaceTyConBinder
-rnIfaceTyConBinder (TvBndr tv vis) = (\a b -> TvBndr a b) <$> rnIfaceTvBndr tv <*> pure vis
+rnIfaceTyConBinder (TvBndr tv vis) = TvBndr <$> rnIfaceTvBndr tv <*> pure vis
 
 rnIfaceAlt :: Rename IfaceAlt
 rnIfaceAlt (conalt, names, rhs)
-     = (\a b c -> (a,b,c)) <$> rnIfaceConAlt conalt <*> pure names <*> rnIfaceExpr rhs
+     = (,,) <$> rnIfaceConAlt conalt <*> pure names <*> rnIfaceExpr rhs
 
 rnIfaceConAlt :: Rename IfaceConAlt
 rnIfaceConAlt (IfaceDataAlt data_occ) = IfaceDataAlt <$> rnIfaceGlobal data_occ
@@ -639,79 +638,79 @@ rnIfaceConAlt alt = pure alt
 
 rnIfaceLetBndr :: Rename IfaceLetBndr
 rnIfaceLetBndr (IfLetBndr fs ty info jpi)
-    = (\a b c  -> IfLetBndr fs a b c ) <$> rnIfaceType ty <*> rnIfaceIdInfo info <*> pure jpi
+    = IfLetBndr fs <$> rnIfaceType ty <*> rnIfaceIdInfo info <*> pure jpi
 
 rnIfaceLamBndr :: Rename IfaceLamBndr
-rnIfaceLamBndr (bndr, oneshot) = (\a b ->  (a,b)) <$> rnIfaceBndr bndr <*> pure oneshot
+rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot
 
 rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo role ty) = IfaceReflCo role <$> rnIfaceType ty
 rnIfaceCo (IfaceFunCo role w co1 co2)
-    = (\a b -> IfaceFunCo role w a b) <$> rnIfaceCo co1 <*> rnIfaceCo co2
+    = IfaceFunCo role w <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos)
-    = (\a b -> IfaceTyConAppCo role a b) <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
+    = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)
-    = (\ a b -> IfaceAppCo a b) <$> rnIfaceCo co1 <*> rnIfaceCo co2
+    = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceForAllCo bndr co1 co2)
-    = (\ a b c -> IfaceForAllCo a b c) <$> rnIfaceTvBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
+    = IfaceForAllCo <$> rnIfaceTvBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c) = pure (IfaceFreeCoVar c)
 rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceHoleCo lcl)  = IfaceHoleCo  <$> pure lcl
 rnIfaceCo (IfaceAxiomInstCo n i cs)
-    = (\a b c -> IfaceAxiomInstCo a b c) <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs
+    = IfaceAxiomInstCo <$> rnIfaceGlobal n <*> pure i <*> mapM rnIfaceCo cs
 rnIfaceCo (IfaceUnivCo s r t1 t2)
-    = (\a b -> IfaceUnivCo s r a b) <$> rnIfaceType t1 <*> rnIfaceType t2
+    = IfaceUnivCo s r <$> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceCo (IfaceSymCo c)
     = IfaceSymCo <$> rnIfaceCo c
 rnIfaceCo (IfaceTransCo c1 c2)
-    = (\a b -> IfaceTransCo a b) <$> rnIfaceCo c1 <*> rnIfaceCo c2
+    = IfaceTransCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 rnIfaceCo (IfaceInstCo c1 c2)
-    = (\a b -> IfaceInstCo a b) <$> rnIfaceCo c1 <*> rnIfaceCo c2
+    = IfaceInstCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 rnIfaceCo (IfaceNthCo d c) = IfaceNthCo d <$> rnIfaceCo c
 rnIfaceCo (IfaceLRCo lr c) = IfaceLRCo lr <$> rnIfaceCo c
 rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomRuleCo ax cos)
     = IfaceAxiomRuleCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c) = IfaceKindCo <$> rnIfaceCo c
-rnIfaceCo (IfaceCoherenceCo c1 c2) = (\a b -> IfaceCoherenceCo a b) <$> rnIfaceCo c1 <*> rnIfaceCo c2
+rnIfaceCo (IfaceCoherenceCo c1 c2) = IfaceCoherenceCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)
-    = (\a b -> IfaceTyCon a b) <$> rnIfaceGlobal n <*> pure info
+    = IfaceTyCon <$> rnIfaceGlobal n <*> pure info
 
 rnIfaceExprs :: Rename [IfaceExpr]
 rnIfaceExprs = mapM rnIfaceExpr
 
 rnIfaceIdDetails :: Rename IfaceIdDetails
-rnIfaceIdDetails (IfRecSelId (Left tc) b) = (\a b -> IfRecSelId a b) <$> fmap Left (rnIfaceTyCon tc) <*> pure b
-rnIfaceIdDetails (IfRecSelId (Right decl) b) = (\a b -> IfRecSelId a b) <$> fmap Right (rnIfaceDecl decl) <*> pure b
+rnIfaceIdDetails (IfRecSelId (Left tc) b) = IfRecSelId <$> fmap Left (rnIfaceTyCon tc) <*> pure b
+rnIfaceIdDetails (IfRecSelId (Right decl) b) = IfRecSelId <$> fmap Right (rnIfaceDecl decl) <*> pure b
 rnIfaceIdDetails details = pure details
 
 rnIfaceType :: Rename IfaceType
 rnIfaceType (IfaceFreeTyVar n) = pure (IfaceFreeTyVar n)
 rnIfaceType (IfaceTyVar   n)   = pure (IfaceTyVar n)
 rnIfaceType (IfaceAppTy t1 t2)
-    = (\a b -> IfaceAppTy a b) <$> rnIfaceType t1 <*> rnIfaceType t2
+    = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)
 rnIfaceType (IfaceFunTy w t1 t2)
-    = (\a b -> IfaceFunTy w a b) <$> rnIfaceType t1 <*> rnIfaceType t2
+    = IfaceFunTy w <$> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceDFunTy t1 t2)
-    = (\a b -> IfaceDFunTy a b)<$> rnIfaceType t1 <*> rnIfaceType t2
+    = IfaceDFunTy <$> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceTupleTy s i tks)
     = IfaceTupleTy s i <$> rnIfaceTcArgs tks
 rnIfaceType (IfaceTyConApp tc tks)
-    = (\a b -> IfaceTyConApp a b) <$> rnIfaceTyCon tc <*> rnIfaceTcArgs tks
+    = IfaceTyConApp <$> rnIfaceTyCon tc <*> rnIfaceTcArgs tks
 rnIfaceType (IfaceForAllTy tv t)
-    = (\a b -> IfaceForAllTy a b) <$> rnIfaceForAllBndr tv <*> rnIfaceType t
+    = IfaceForAllTy <$> rnIfaceForAllBndr tv <*> rnIfaceType t
 rnIfaceType (IfaceCoercionTy co)
     = IfaceCoercionTy <$> rnIfaceCo co
 rnIfaceType (IfaceCastTy ty co)
-    = (\a b -> IfaceCastTy a b) <$> rnIfaceType ty <*> rnIfaceCo co
+    = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
 
 rnIfaceForAllBndr :: Rename IfaceForAllBndr
-rnIfaceForAllBndr (TvBndr tv vis) = (\a b -> TvBndr a b) <$> rnIfaceTvBndr tv <*> pure vis
+rnIfaceForAllBndr (TvBndr tv vis) = TvBndr <$> rnIfaceTvBndr tv <*> pure vis
 
 rnIfaceTcArgs :: Rename IfaceTcArgs
-rnIfaceTcArgs (ITC_Invis t ts) = (\a b -> ITC_Invis a b) <$> rnIfaceType t <*> rnIfaceTcArgs ts
-rnIfaceTcArgs (ITC_Vis t ts) = (\a b -> ITC_Vis a b) <$> rnIfaceType t <*> rnIfaceTcArgs ts
+rnIfaceTcArgs (ITC_Invis t ts) = ITC_Invis <$> rnIfaceType t <*> rnIfaceTcArgs ts
+rnIfaceTcArgs (ITC_Vis t ts) = ITC_Vis <$> rnIfaceType t <*> rnIfaceTcArgs ts
 rnIfaceTcArgs ITC_Nil = pure ITC_Nil

@@ -71,7 +71,7 @@ vType ty = (Type ty, Type ty)
 -- |Make a vectorised note.
 --
 vTick :: Tickish Id -> VExpr -> VExpr
-vTick = mapVect . (\t e -> Tick t e)
+vTick = mapVect . Tick
 
 -- |Make a vectorised non-recursive binding.
 --

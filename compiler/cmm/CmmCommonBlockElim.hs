@@ -102,7 +102,7 @@ mergeBlocks subst existing new = go new
         -- This block is a duplicate. Drop it, and add it to the substitution
         Just b' -> first (mapInsert (entryLabel b) (entryLabel b')) $ go bs
         -- This block is not a duplicate, keep it.
-        Nothing -> second (\xs -> (b:xs)) $ go bs
+        Nothing -> second (b:) $ go bs
 
 mergeBlockList :: Subst -> [DistinctBlocks] -> (Subst, DistinctBlocks)
 mergeBlockList _ [] = pprPanic "mergeBlockList" empty

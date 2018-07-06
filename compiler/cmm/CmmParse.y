@@ -372,8 +372,8 @@ cmm     :: { CmmParse () }
 cmmtop  :: { CmmParse () }
         : cmmproc                       { $1 }
         | cmmdata                       { $1 }
-        | decl                          { $1 }
-        | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'
+        | decl                          { $1 } 
+        | 'CLOSURE' '(' NAME ',' NAME lits ')' ';'  
                 {% liftP . withThisPackage $ \pkg ->
                    do lits <- sequence $6;
                       staticClosure pkg $3 $5 (map getLit lits) }
@@ -388,20 +388,20 @@ cmmtop  :: { CmmParse () }
 --      * we can derive closure and info table labels from a single NAME
 
 cmmdata :: { CmmParse () }
-        : 'section' STRING '{' data_label statics '}'
+        : 'section' STRING '{' data_label statics '}' 
                 { do lbl <- $4;
                      ss <- sequence $5;
                      code (emitDecl (CmmData (Section (section $2) lbl) (Statics lbl $ concat ss))) }
 
 data_label :: { CmmParse CLabel }
-    : NAME ':'
+    : NAME ':'  
                 {% liftP . withThisPackage $ \pkg ->
                    return (mkCmmDataLabel pkg $1) }
 
 statics :: { [CmmParse [CmmStatic]] }
         : {- empty -}                   { [] }
         | static statics                { $1 : $2 }
-
+    
 -- Strings aren't used much in the RTS HC code, so it doesn't seem
 -- worth allowing inline strings.  C-- doesn't allow them anyway.
 static  :: { CmmParse [CmmStatic] }
@@ -410,10 +410,10 @@ static  :: { CmmParse [CmmStatic] }
         | type ';'                      { return [CmmUninitialised
                                                         (widthInBytes (typeWidth $1))] }
         | 'bits8' '[' ']' STRING ';'    { return [mkString $4] }
-        | 'bits8' '[' INT ']' ';'       { return [CmmUninitialised
+        | 'bits8' '[' INT ']' ';'       { return [CmmUninitialised 
                                                         (fromIntegral $3)] }
-        | typenot8 '[' INT ']' ';'      { return [CmmUninitialised
-                                                (widthInBytes (typeWidth $1) *
+        | typenot8 '[' INT ']' ';'      { return [CmmUninitialised 
+                                                (widthInBytes (typeWidth $1) * 
                                                         fromIntegral $3)] }
         | 'CLOSURE' '(' NAME lits ')'
                 { do { lits <- sequence $4
@@ -474,7 +474,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                                            , cit_rep = rep
                                            , cit_prof = prof, cit_srt = NoC_SRT },
                               []) }
-
+        
         | 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
                 -- ptrs, nptrs, closure type, description, type, fun type
                 {% liftP . withThisPackage $ \pkg ->
@@ -511,7 +511,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
 
                      -- If profiling is on, this string gets duplicated,
                      -- but that's the way the old code did it we can fix it some other time.
-
+        
         | 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
                 -- selector, closure type, description, type
                 {% liftP . withThisPackage $ \pkg ->
@@ -574,7 +574,7 @@ importName
 
         -- A label imported without an explicit packageId.
         --      These are taken to come frome some foreign, unnamed package.
-        : NAME
+        : NAME  
         { ($1, mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction) }
 
         -- as previous 'NAME', but 'IsData'
@@ -584,8 +584,8 @@ importName
         -- A label imported with an explicit packageId.
         | STRING NAME
         { ($2, mkCmmCodeLabel (fsToUnitId (mkFastString $1)) $2) }
-
-
+        
+        
 names   :: { [FastString] }
         : NAME                          { [$1] }
         | NAME ',' names                { $1 : $3 }
@@ -671,9 +671,9 @@ bool_expr :: { CmmParse BoolExpr }
         | expr                          { do e <- $1; return (BoolTest e) }
 
 bool_op :: { CmmParse BoolExpr }
-        : bool_expr '&&' bool_expr      { do e1 <- $1; e2 <- $3;
+        : bool_expr '&&' bool_expr      { do e1 <- $1; e2 <- $3; 
                                           return (BoolAnd e1 e2) }
-        | bool_expr '||' bool_expr      { do e1 <- $1; e2 <- $3;
+        | bool_expr '||' bool_expr      { do e1 <- $1; e2 <- $3; 
                                           return (BoolOr e1 e2)  }
         | '!' bool_expr                 { do e <- $2; return (BoolNot e) }
         | '(' bool_op ')'               { $2 }
@@ -759,7 +759,7 @@ expr    :: { CmmParse CmmExpr }
 expr0   :: { CmmParse CmmExpr }
         : INT   maybe_ty         { return (CmmLit (CmmInt $1 (typeWidth $2))) }
         | FLOAT maybe_ty         { return (CmmLit (CmmFloat $1 (typeWidth $2))) }
-        | STRING                 { do s <- code (newStringCLit $1);
+        | STRING                 { do s <- code (newStringCLit $1); 
                                       return (CmmLit s) }
         | reg                    { $1 }
         | type '[' expr ']'      { do e <- $3; return (CmmLoad e $1) }
@@ -817,14 +817,14 @@ foreign_formal :: { CmmParse (LocalReg, ForeignHint) }
 local_lreg :: { CmmParse LocalReg }
         : NAME                  { do e <- lookupName $1;
                                      return $
-                                       case e of
+                                       case e of 
                                         CmmReg (CmmLocal r) -> r
                                         other -> pprPanic "CmmParse:" (ftext $1 <> text " not a local register") }
 
 lreg    :: { CmmParse CmmReg }
         : NAME                  { do e <- lookupName $1;
                                      return $
-                                       case e of
+                                       case e of 
                                         CmmReg r -> r
                                         other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
         | GLOBALREG             { return (CmmGlobal $1) }
@@ -930,50 +930,49 @@ exprMacros dflags = listToUFM [
   ]
 
 -- we understand a subset of C-- primitives:
-machOps :: UniqFM (Width -> MachOp)
 machOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
-        ( "add",        (\x -> MO_Add  x)),
-        ( "sub",        (\x -> MO_Sub x) ),
-        ( "eq",         (\x -> MO_Eq x)),
-        ( "ne",         (\x -> MO_Ne x) ),
-        ( "mul",        (\x -> MO_Mul x) ),
-        ( "neg",        (\x -> MO_S_Neg x )),
-        ( "quot",       (\x -> MO_S_Quot x) ),
-        ( "rem",        (\x -> MO_S_Rem x)),
-        ( "divu",       (\x -> MO_U_Quot x)),
-        ( "modu",       (\x -> MO_U_Rem x)),
+        ( "add",        MO_Add ),
+        ( "sub",        MO_Sub ),
+        ( "eq",         MO_Eq ),
+        ( "ne",         MO_Ne ),
+        ( "mul",        MO_Mul ),
+        ( "neg",        MO_S_Neg ),
+        ( "quot",       MO_S_Quot ),
+        ( "rem",        MO_S_Rem ),
+        ( "divu",       MO_U_Quot ),
+        ( "modu",       MO_U_Rem ),
 
-        ( "ge",         (\x -> MO_S_Ge x)),
-        ( "le",         (\x -> MO_S_Le x)),
-        ( "gt",         (\x -> MO_S_Gt x) ),
-        ( "lt",         (\x -> MO_S_Lt x)),
+        ( "ge",         MO_S_Ge ),
+        ( "le",         MO_S_Le ),
+        ( "gt",         MO_S_Gt ),
+        ( "lt",         MO_S_Lt ),
 
-        ( "geu",        (\x -> MO_U_Ge x) ),
-        ( "leu",        (\x -> MO_U_Le x) ),
-        ( "gtu",        (\x -> MO_U_Gt x) ),
-        ( "ltu",        (\x -> MO_U_Lt x )),
+        ( "geu",        MO_U_Ge ),
+        ( "leu",        MO_U_Le ),
+        ( "gtu",        MO_U_Gt ),
+        ( "ltu",        MO_U_Lt ),
 
-        ( "and",        (\x -> MO_And x) ),
-        ( "or",         (\x -> MO_Or x) ),
-        ( "xor",        (\x -> MO_Xor x) ),
-        ( "com",        (\x -> MO_Not x) ),
-        ( "shl",        (\x -> MO_Shl x) ),
-        ( "shrl",       (\x -> MO_U_Shr x) ),
-        ( "shra",       (\x -> MO_S_Shr x) ),
+        ( "and",        MO_And ),
+        ( "or",         MO_Or ),
+        ( "xor",        MO_Xor ),
+        ( "com",        MO_Not ),
+        ( "shl",        MO_Shl ),
+        ( "shrl",       MO_U_Shr ),
+        ( "shra",       MO_S_Shr ),
 
-        ( "fadd",       (\x -> MO_F_Add x) ),
-        ( "fsub",       (\x -> MO_F_Sub x)),
-        ( "fneg",       (\x -> MO_F_Neg x)),
-        ( "fmul",       (\x -> MO_F_Mul x)),
-        ( "fquot",      (\x -> MO_F_Quot x) ),
+        ( "fadd",       MO_F_Add ),
+        ( "fsub",       MO_F_Sub ),
+        ( "fneg",       MO_F_Neg ),
+        ( "fmul",       MO_F_Mul ),
+        ( "fquot",      MO_F_Quot ),
 
-        ( "feq",        (\x -> MO_F_Eq x )),
-        ( "fne",        (\x -> MO_F_Ne x )),
-        ( "fge",        (\x -> MO_F_Ge x )),
-        ( "fle",        (\x -> MO_F_Le x )),
-        ( "fgt",        (\x -> MO_F_Gt x )),
-        ( "flt",        (\x -> MO_F_Lt x )),
+        ( "feq",        MO_F_Eq ),
+        ( "fne",        MO_F_Ne ),
+        ( "fge",        MO_F_Ge ),
+        ( "fle",        MO_F_Le ),
+        ( "fgt",        MO_F_Gt ),
+        ( "flt",        MO_F_Lt ),
 
         ( "lobits8",  flip MO_UU_Conv W8  ),
         ( "lobits16", flip MO_UU_Conv W16 ),
@@ -998,42 +997,39 @@ machOps = listToUFM $
         ( "i2f64",    flip MO_SF_Conv W64 )
         ]
 
-mkTup :: a -> b -> (a, b)
-mkTup a b = (a, b)
-
 callishMachOps :: UniqFM ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
 callishMachOps = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
-        ( "write_barrier", (\a -> (,) MO_WriteBarrier a) ),
+        ( "write_barrier", (,) MO_WriteBarrier ),
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
         ( "memset", memcpyLikeTweakArgs MO_Memset ),
         ( "memmove", memcpyLikeTweakArgs MO_Memmove ),
         ( "memcmp", memcpyLikeTweakArgs MO_Memcmp ),
 
-        ("prefetch0", mkTup $ MO_Prefetch_Data 0),
-        ("prefetch1", mkTup $ MO_Prefetch_Data 1),
-        ("prefetch2", mkTup $ MO_Prefetch_Data 2),
-        ("prefetch3", mkTup $ MO_Prefetch_Data 3),
+        ("prefetch0", (,) $ MO_Prefetch_Data 0),
+        ("prefetch1", (,) $ MO_Prefetch_Data 1),
+        ("prefetch2", (,) $ MO_Prefetch_Data 2),
+        ("prefetch3", (,) $ MO_Prefetch_Data 3),
 
-        ( "popcnt8",  mkTup $ MO_PopCnt W8  ),
-        ( "popcnt16", mkTup $ MO_PopCnt W16 ),
-        ( "popcnt32", mkTup $ MO_PopCnt W32 ),
-        ( "popcnt64", mkTup $ MO_PopCnt W64 ),
+        ( "popcnt8",  (,) $ MO_PopCnt W8  ),
+        ( "popcnt16", (,) $ MO_PopCnt W16 ),
+        ( "popcnt32", (,) $ MO_PopCnt W32 ),
+        ( "popcnt64", (,) $ MO_PopCnt W64 ),
 
-        ( "pdep8",  mkTup $ MO_Pdep W8  ),
-        ( "pdep16", mkTup $ MO_Pdep W16 ),
-        ( "pdep32", mkTup $ MO_Pdep W32 ),
-        ( "pdep64", mkTup $ MO_Pdep W64 ),
+        ( "pdep8",  (,) $ MO_Pdep W8  ),
+        ( "pdep16", (,) $ MO_Pdep W16 ),
+        ( "pdep32", (,) $ MO_Pdep W32 ),
+        ( "pdep64", (,) $ MO_Pdep W64 ),
 
-        ( "pext8",  mkTup $ MO_Pext W8  ),
-        ( "pext16", mkTup $ MO_Pext W16 ),
-        ( "pext32", mkTup $ MO_Pext W32 ),
-        ( "pext64", mkTup $ MO_Pext W64 ),
+        ( "pext8",  (,) $ MO_Pext W8  ),
+        ( "pext16", (,) $ MO_Pext W16 ),
+        ( "pext32", (,) $ MO_Pext W32 ),
+        ( "pext64", (,) $ MO_Pext W64 ),
 
-        ( "cmpxchg8",  mkTup $ MO_Cmpxchg W8  ),
-        ( "cmpxchg16", mkTup $ MO_Cmpxchg W16 ),
-        ( "cmpxchg32", mkTup $ MO_Cmpxchg W32 ),
-        ( "cmpxchg64", mkTup $ MO_Cmpxchg W64 )
+        ( "cmpxchg8",  (,) $ MO_Cmpxchg W8  ),
+        ( "cmpxchg16", (,) $ MO_Cmpxchg W16 ),
+        ( "cmpxchg32", (,) $ MO_Cmpxchg W32 ),
+        ( "cmpxchg64", (,) $ MO_Cmpxchg W64 )
 
         -- ToDo: the rest, maybe
         -- edit: which rest?
@@ -1379,7 +1375,7 @@ doSwitch :: Maybe (Integer,Integer)
 doSwitch mb_range scrut arms deflt
    = do
         -- Compile code for the default branch
-        dflt_entry <-
+        dflt_entry <- 
                 case deflt of
                   Nothing -> return Nothing
                   Just e  -> do b <- forkLabelledCode e; return (Just b)
