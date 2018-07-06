@@ -785,10 +785,10 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
       MO_S_MulMayOflo rep -> imulMayOflo rep x y
 
-      MO_Mul rep -> triv_op rep (\a b c -> IMUL a b c)
-      MO_And rep -> triv_op rep (\a b c -> AND a b c)
-      MO_Or  rep -> triv_op rep (\a b c -> OR a b c)
-      MO_Xor rep -> triv_op rep (\a b c -> XOR a b c)
+      MO_Mul rep -> triv_op rep IMUL
+      MO_And rep -> triv_op rep AND
+      MO_Or  rep -> triv_op rep OR
+      MO_Xor rep -> triv_op rep XOR
 
         {- Shift ops on x86s have constraints on their source, it
            either has to be Imm, CL or 1
@@ -888,7 +888,7 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     add_code :: Width -> CmmExpr -> CmmExpr -> NatM Register
     add_code rep x (CmmLit (CmmInt y _))
         | is32BitInteger y = add_int rep x y
-    add_code rep x y = trivialCode rep (ADD format) (Just (\a b -> (ADD format a b))) x y
+    add_code rep x y = trivialCode rep (ADD format) (Just (ADD format)) x y
       where format = intFormat rep
     -- TODO: There are other interesting patterns we want to replace
     --     with a LEA, e.g. `(x + offset) + (y << shift)`.
@@ -1817,10 +1817,10 @@ genCCall _ _ (PrimTarget MO_Touch) _ _ = return nilOL
 
 genCCall _ is32bit (PrimTarget (MO_Prefetch_Data n )) _  [src] =
         case n of
-            0 -> genPrefetch src $ (\a -> PREFETCH NTA  format a)
-            1 -> genPrefetch src $ (\a -> PREFETCH Lvl2 format a)
-            2 -> genPrefetch src $ (\a -> PREFETCH Lvl1 format a)
-            3 -> genPrefetch src $ (\a -> PREFETCH Lvl0 format a)
+            0 -> genPrefetch src $ PREFETCH NTA  format
+            1 -> genPrefetch src $ PREFETCH Lvl2 format
+            2 -> genPrefetch src $ PREFETCH Lvl1 format
+            3 -> genPrefetch src $ PREFETCH Lvl0 format
             l -> panic $ "unexpected prefetch level in genCCall MO_Prefetch_Data: " ++ (show l)
             -- the c / llvm prefetch convention is 0, 1, 2, and 3
             -- the x86 corresponding names are : NTA, 2 , 1, and 0
@@ -2168,17 +2168,17 @@ genCCall _ is32Bit target dest_regs args = do
         if sse2
           then outOfLineCmmOp op (Just r) args
           else case op of
-              MO_F32_Sqrt -> actuallyInlineFloatOp (\a b c -> GSQRT a b c) FF32 args
-              MO_F64_Sqrt -> actuallyInlineFloatOp (\a b c -> GSQRT a b c) FF64 args
+              MO_F32_Sqrt -> actuallyInlineFloatOp GSQRT FF32 args
+              MO_F64_Sqrt -> actuallyInlineFloatOp GSQRT FF64 args
 
-              MO_F32_Sin  -> actuallyInlineFloatOp (\s a b -> GSIN s l1 l2 a b) FF32 args
-              MO_F64_Sin  -> actuallyInlineFloatOp (\s a b -> GSIN s l1 l2 a b) FF64 args
+              MO_F32_Sin  -> actuallyInlineFloatOp (\s -> GSIN s l1 l2) FF32 args
+              MO_F64_Sin  -> actuallyInlineFloatOp (\s -> GSIN s l1 l2) FF64 args
 
-              MO_F32_Cos  -> actuallyInlineFloatOp (\s a b -> GCOS s l1 l2 a b) FF32 args
-              MO_F64_Cos  -> actuallyInlineFloatOp (\s a b -> GCOS s l1 l2 a b) FF64 args
+              MO_F32_Cos  -> actuallyInlineFloatOp (\s -> GCOS s l1 l2) FF32 args
+              MO_F64_Cos  -> actuallyInlineFloatOp (\s -> GCOS s l1 l2) FF64 args
 
-              MO_F32_Tan  -> actuallyInlineFloatOp (\s a b -> GTAN s l1 l2 a b) FF32 args
-              MO_F64_Tan  -> actuallyInlineFloatOp (\s a b -> GTAN s l1 l2 a b) FF64 args
+              MO_F32_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF32 args
+              MO_F64_Tan  -> actuallyInlineFloatOp (\s -> GTAN s l1 l2) FF64 args
 
               _other_op   -> outOfLineCmmOp op (Just r) args
 
@@ -2221,7 +2221,7 @@ genCCall _ is32Bit target dest_regs args = do
             do hCode <- getAnyReg (CmmLit (CmmInt 0 width))
                let format = intFormat width
                lCode <- anyReg =<< trivialCode width (ADD_CC format)
-                                     (Just (\a b -> ADD_CC format a b)) arg_x arg_y
+                                     (Just (ADD_CC format)) arg_x arg_y
                let reg_l = getRegisterReg platform True (CmmLocal res_l)
                    reg_h = getRegisterReg platform True (CmmLocal res_h)
                    code = hCode reg_h `appOL`
@@ -2234,7 +2234,7 @@ genCCall _ is32Bit target dest_regs args = do
     (PrimTarget (MO_SubWordC width), [res_r, res_c]) ->
         addSubIntC platform SUB_CC (const Nothing) CARRY width res_r res_c args
     (PrimTarget (MO_AddIntC width), [res_r, res_c]) ->
-        addSubIntC platform ADD_CC (Just . (\a b c -> ADD_CC a b c)) OFLO width res_r res_c args
+        addSubIntC platform ADD_CC (Just . ADD_CC) OFLO width res_r res_c args
     (PrimTarget (MO_SubIntC width), [res_r, res_c]) ->
         addSubIntC platform SUB_CC (const Nothing) OFLO width res_r res_c args
     (PrimTarget (MO_U_Mul2 width), [res_h, res_l]) ->

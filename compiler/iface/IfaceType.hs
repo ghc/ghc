@@ -1335,14 +1335,14 @@ instance Binary IfaceTyConSort where
        n <- getByte bh
        case n of
          0 -> return IfaceNormalTyCon
-         1 -> (\a b -> IfaceTupleTyCon a b) <$> get bh <*> get bh
+         1 -> IfaceTupleTyCon <$> get bh <*> get bh
          2 -> IfaceSumTyCon <$> get bh
          _ -> return IfaceEqualityTyCon
 
 instance Binary IfaceTyConInfo where
    put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
 
-   get bh = (\a b -> IfaceTyConInfo a b) <$> get bh <*> get bh
+   get bh = IfaceTyConInfo <$> get bh <*> get bh
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit

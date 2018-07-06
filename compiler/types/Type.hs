@@ -535,7 +535,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go t@(TyConApp _ []) = return t  -- avoid allocation in this exceedingly
                                      -- common case (mostly, for *)
     go (TyConApp tc tys) = mktyconapp tc <$> mapM go tys
-    go (FunTy w arg res) = (\w' a b -> FunTy w' a b) <$> go_rig w <*> go arg <*> go res
+    go (FunTy w arg res) = FunTy <$> go_rig w <*> go arg <*> go res
     go (ForAllTy (TvBndr tv vis) inner)
       = do { (env', tv') <- tybinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -549,7 +549,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
-      | otherwise = ((\a b -> TyConApp a b), (\a b -> AppTy a b),   (\a b -> CastTy a b))
+      | otherwise = (TyConApp,   AppTy,   CastTy)
 
 {-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
 mapCoercion :: Monad m
@@ -600,19 +600,9 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
         , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo, mkCoherenceCo
         , mkKindCo, mkSubCo, mkForAllCo )
       | otherwise
-      = ( (\a b c -> TyConAppCo a b c)
-        , (\co1 co2 -> AppCo co1 co2)
-        , (\a b c -> AxiomInstCo a b c)
-        , (\a b c d -> UnivCo a b c d)
-        , (\a -> SymCo a)
-        , (\c1 c2 -> TransCo c1 c2)
-        , (\i co -> NthCo i co)
-        , (\lr co -> LRCo lr co)
-        , (\co a -> InstCo co a)
-        , (\c1 c2 -> CoherenceCo c1 c2)
-        , (\co -> KindCo co)
-        , (\co -> SubCo co)
-        , (\tv co1 co2 -> ForAllCo tv co1 co2))
+      = ( TyConAppCo, AppCo, AxiomInstCo, UnivCo
+        , SymCo, TransCo, NthCo, LRCo, InstCo, CoherenceCo
+        , KindCo, SubCo, ForAllCo )
 
 {-
 ************************************************************************
@@ -1488,8 +1478,8 @@ partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
   where
     go _ _ [] = ([], [])
     go subst (ForAllTy (TvBndr tv vis) res_ki) (x:xs)
-      | isVisibleArgFlag vis = second (\y -> x : y) (go subst' res_ki xs)
-      | otherwise            = first  (\y -> x : y) (go subst' res_ki xs)
+      | isVisibleArgFlag vis = second (x :) (go subst' res_ki xs)
+      | otherwise            = first  (x :) (go subst' res_ki xs)
       where
         subst' = extendTvSubst subst tv (get_ty x)
     go subst (TyVarTy tv) xs

@@ -57,7 +57,7 @@ instance Binary ResolvedBCO where
     putArray resolvedBCOBitmap
     putArray resolvedBCOLits
     put resolvedBCOPtrs
-  get = (\a1 a2 a3 a4 a5 a6 -> ResolvedBCO a1 a2 a3 a4 a5 a6)
+  get = ResolvedBCO
         <$> get <*> get <*> getArray <*> getArray <*> getArray <*> get
 
 data ResolvedBCOPtr

@@ -1484,7 +1484,7 @@ genMachOp_slow opt op [x, y] = case op of
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
         -- if expected. See Note [Literals and branch conditions].
         genBinComp opt cmp = do
-            ed@(v1, stmts, top) <- binLlvmOp (\_ -> i1) ((\a b -> Compare cmp a b))
+            ed@(v1, stmts, top) <- binLlvmOp (\_ -> i1) (Compare cmp)
             dflags <- getDynFlags
             if getVarType v1 == i1
                 then case i1Expected opt of
@@ -1497,9 +1497,9 @@ genMachOp_slow opt op [x, y] = case op of
                     panic $ "genBinComp: Compare returned type other then i1! "
                         ++ (showSDoc dflags $ ppr $ getVarType v1)
 
-        genBinMach op = binLlvmOp getVarType (\a b -> LlvmOp op a b)
+        genBinMach op = binLlvmOp getVarType (LlvmOp op)
 
-        genCastBinMach ty op = binCastLlvmOp ty (\a b -> LlvmOp op a b)
+        genCastBinMach ty op = binCastLlvmOp ty (LlvmOp op)
 
         -- | Detect if overflow will occur in signed multiply of the two
         -- CmmExpr's. This is the LLVM assembly equivalent of the NCG

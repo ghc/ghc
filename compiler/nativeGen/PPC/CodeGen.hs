@@ -496,10 +496,10 @@ getRegister' _ (CmmMachOp (MO_SS_Conv W32 W64) [CmmLoad mem _]) = do
 
 getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
   = case mop of
-      MO_Not rep   -> triv_ucode_int rep (\a b -> NOT a b)
+      MO_Not rep   -> triv_ucode_int rep NOT
 
-      MO_F_Neg w   -> triv_ucode_float w (\a b -> FNEG a b)
-      MO_S_Neg w   -> triv_ucode_int   w (\a b -> NEG a b)
+      MO_F_Neg w   -> triv_ucode_float w FNEG
+      MO_S_Neg w   -> triv_ucode_int   w NEG
 
       MO_FF_Conv W64 W32 -> trivialUCode  FF32 FRSP x
       MO_FF_Conv W32 W64 -> conversionNop FF64 x
@@ -517,13 +517,13 @@ getRegister' dflags (CmmMachOp mop [x]) -- unary MachOps
       MO_SS_Conv W32 to
         | arch32    -> conversionNop (intFormat to) x
         | otherwise -> case to of
-            W64 -> triv_ucode_int to (\a b -> EXTS II32 a b)
+            W64 -> triv_ucode_int to (EXTS II32)
             W16 -> conversionNop II16 x
             W8  -> conversionNop II8 x
             _   -> panic "PPC.CodeGen.getRegister: no match"
       MO_SS_Conv W16 W8 -> conversionNop II8 x
-      MO_SS_Conv W8  to -> triv_ucode_int to (\a b -> EXTS II8 a b)
-      MO_SS_Conv W16 to -> triv_ucode_int to (\a b -> EXTS II16 a b)
+      MO_SS_Conv W8  to -> triv_ucode_int to (EXTS II8)
+      MO_SS_Conv W16 to -> triv_ucode_int to (EXTS II16)
 
       MO_UU_Conv from to
         | from == to -> conversionNop (intFormat to) x
@@ -1124,7 +1124,7 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
           fmt      = intFormat width
           reg_dst  = getRegisterReg platform (CmmLocal dst)
       (instr, n_code) <- case amop of
-            AMO_Add  -> getSomeRegOrImm (\a b c -> ADD a b c) True reg_dst
+            AMO_Add  -> getSomeRegOrImm ADD True reg_dst
             AMO_Sub  -> case n of
                 CmmLit (CmmInt i _)
                   | Just imm <- makeImmediate width True (-i)
@@ -1133,11 +1133,11 @@ genCCall (PrimTarget (MO_AtomicRMW width amop)) [dst] [addr, n]
                    -> do
                          (n_reg, n_code) <- getSomeReg n
                          return  (SUBF reg_dst n_reg reg_dst, n_code)
-            AMO_And  -> getSomeRegOrImm (\a b c -> AND a b c) False reg_dst
+            AMO_And  -> getSomeRegOrImm AND False reg_dst
             AMO_Nand -> do (n_reg, n_code) <- getSomeReg n
                            return (NAND reg_dst reg_dst n_reg, n_code)
-            AMO_Or   -> getSomeRegOrImm (\a b c -> OR a b c) False reg_dst
-            AMO_Xor  -> getSomeRegOrImm (\a b c -> XOR a b c) False reg_dst
+            AMO_Or   -> getSomeRegOrImm OR False reg_dst
+            AMO_Xor  -> getSomeRegOrImm XOR False reg_dst
       Amode addr_reg addr_code <- getAmodeIndex addr
       lbl_retry <- getBlockIdNat
       return $ n_code `appOL` addr_code

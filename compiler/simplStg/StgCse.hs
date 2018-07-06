@@ -361,7 +361,7 @@ stgCsePairs env0 ((b,e):pairs)
         (pairs', env2) = stgCsePairs env1 pairs
     in (pairMB `mbCons` pairs', env2)
   where
-    mbCons = maybe id (\x xs -> x : xs)
+    mbCons = maybe id (:)
 
 -- The RHS of a binding.
 -- If it is a constructor application, either short-cut it or extend the environment

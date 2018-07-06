@@ -382,7 +382,7 @@ cvtDec (TH.PatSynD nm args dir pat)
            PSB noExt nm' args' pat' dir' }
   where
     cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameL args
-    cvtArgs (TH.InfixPatSyn a1 a2) = (\x y -> Hs.InfixCon x y) <$> vNameL a1 <*> vNameL a2
+    cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { sels' <- mapM vNameL sels
            ; vars' <- mapM (vNameL . mkNameS . nameBase) sels

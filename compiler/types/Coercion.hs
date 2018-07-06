@@ -1126,9 +1126,9 @@ setNominalRole_maybe r co
     setNominalRole_maybe_helper (SymCo co)
       = SymCo <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper (TransCo co1 co2)
-      = (\a b -> TransCo a b) <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
+      = TransCo <$> setNominalRole_maybe_helper co1 <*> setNominalRole_maybe_helper co2
     setNominalRole_maybe_helper (AppCo co1 co2)
-      = (\a b -> AppCo a b) <$> setNominalRole_maybe_helper co1 <*> pure co2
+      = AppCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper (ForAllCo tv kind_co co)
       = ForAllCo tv kind_co <$> setNominalRole_maybe_helper co
     setNominalRole_maybe_helper (NthCo _r n co)
@@ -1136,9 +1136,9 @@ setNominalRole_maybe r co
       -- setNominalRole_maybe_helper!
       = NthCo Nominal n <$> setNominalRole_maybe (coercionRole co) co
     setNominalRole_maybe_helper (InstCo co arg)
-      = (\a b -> InstCo a b) <$> setNominalRole_maybe_helper co <*> pure arg
+      = InstCo <$> setNominalRole_maybe_helper co <*> pure arg
     setNominalRole_maybe_helper (CoherenceCo co1 co2)
-      = (\a b -> CoherenceCo a b) <$> setNominalRole_maybe_helper co1 <*> pure co2
+      = CoherenceCo <$> setNominalRole_maybe_helper co1 <*> pure co2
     setNominalRole_maybe_helper (UnivCo prov _ co1 co2)
       | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
                      PhantomProv _    -> False  -- should always be phantom
