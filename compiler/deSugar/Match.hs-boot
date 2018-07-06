@@ -12,7 +12,6 @@ import Weight   ( Rig )
 
 match   :: [Id]
         -> Type
-        -> Rig
         -> [EquationInfo]
         -> DsM MatchResult
 

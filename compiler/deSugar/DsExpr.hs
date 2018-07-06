@@ -217,7 +217,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar Omega upat -- TODO: MattP
-       ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body) Omega -- MattP: TODO check this multiplicity.
+       ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 
 dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
