@@ -808,7 +808,7 @@ matchSinglePat (Var var) ctx pat ty match_result
   = match_single_pat_var var ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var           <- selectSimpleMatchVarL pat
+  = do { var           <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: I don't know where it's used. But I'd be surprised it if were not a bug.
        ; match_result' <- match_single_pat_var var hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 

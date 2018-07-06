@@ -97,8 +97,8 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 -}
 
-selectSimpleMatchVarL :: LPat GhcTc -> DsM Id
-selectSimpleMatchVarL pat = selectMatchVar Omega (unLoc pat)
+selectSimpleMatchVarL :: Rig -> LPat GhcTc -> DsM Id
+selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 -- TODO: MattP: This function is used in a few places where is might be
 -- necessary to take into account multiplicity but it wasn't on the
 -- critical path to fix for now.
@@ -129,6 +129,12 @@ selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
 selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
+                                  --
+                                  -- Remark: when the pattern is a variable (or
+                                  -- an @-pattern), then w is the same as the
+                                  -- multiplicity stored within the variable
+                                  -- itself. It's easier to pull it from the
+                                  -- variable, so we ignore the weight.
 selectMatchVar _w (AsPat _ var _) = return (unLoc var)
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 

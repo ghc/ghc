@@ -939,10 +939,10 @@ dsDo stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt res1_ty pat rhs bind_op fail_op) stmts
+    go _ (BindStmt (pat_weight, res1_ty) pat rhs bind_op fail_op) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
-            ; var   <- selectSimpleMatchVarL pat
+            ; var   <- selectSimpleMatchVarL pat_weight pat
             ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
             ; match_code <- handle_failure pat match fail_op
@@ -988,7 +988,7 @@ dsDo stmts
                         , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
+        new_bind_stmt = L loc $ BindStmt (Omega, bind_ty) (mkBigLHsPatTupId later_pats) -- TODO: arnaud: I'm not sure what is being desugared here.
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
 
