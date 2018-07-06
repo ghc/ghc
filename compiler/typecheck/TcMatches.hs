@@ -212,7 +212,6 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                                                 -- an alternative
                  -> ExpRhoType
                  -> TcM (Located (body GhcTcId)) }
-
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
   = do { (Weighted _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Weighted One rhs_ty):pat_tys) -- return type has implicitly weight 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.

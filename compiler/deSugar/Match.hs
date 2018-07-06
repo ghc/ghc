@@ -715,9 +715,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                              , mg_origin = origin })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
-        ; let scale_new_vars = map (\var -> scaleIdBy var weight)
 
-        ; new_vars    <- scale_new_vars <$> case matches of
+        ; new_vars    <- case matches of
                            []    -> mapM (\(Weighted w ty) -> newSysLocalDsNoLP w ty) arg_tys
                            (m:_) ->
                             selectMatchVars (zipWithEqual "matchWrapper"
