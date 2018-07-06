@@ -842,7 +842,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; lintIdBndr NotTopLevel CaseBind var $ \_ ->
        do { -- Check the alternatives
           ; alt_ues <- mapM (lintCoreAlt (\e -> lookupUE e var) scrut_ty scrut_weight alt_ty) alts
-          ; let case_ue = (scaleUE scrut_weight scrut_ue) `addUE` addUEs alt_ues
+          ; let case_ue = (scaleUE scrut_weight scrut_ue) `addUE` supUEs alt_ues
           ; checkCaseAlts e scrut_ty alts
           ; return (alt_ty, case_ue) } }
 
