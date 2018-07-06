@@ -343,11 +343,10 @@ tidyNPat _ over_lit mb_neg eq outer_ty
 
 matchLiterals :: [Id]
               -> Type                   -- Type of the whole case expression
-              -> Rig
               -> [[EquationInfo]]       -- All PgLits
               -> DsM MatchResult
 
-matchLiterals (var:vars) ty weight sub_groups
+matchLiterals (var:vars) ty sub_groups
   = ASSERT( notNull sub_groups && all notNull sub_groups )
     do  {       -- Deal with each group
         ; alts <- mapM match_group sub_groups
@@ -367,7 +366,7 @@ matchLiterals (var:vars) ty weight sub_groups
     match_group eqns
         = do dflags <- getDynFlags
              let LitPat _ hs_lit = firstPat (head eqns)
-             match_result <- match vars ty weight (shiftEqns eqns)
+             match_result <- match vars ty (shiftEqns eqns)
              return (hsLitKey dflags hs_lit, match_result)
 
     wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
@@ -381,7 +380,7 @@ matchLiterals (var:vars) ty weight sub_groups
              ; return (mkGuardedMatchResult pred mr) }
     wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)
 
-matchLiterals [] _ _ _ = panic "matchLiterals []"
+matchLiterals [] _ _ = panic "matchLiterals []"
 
 ---------------------------
 hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
@@ -412,17 +411,17 @@ hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 ************************************************************************
 -}
 
-matchNPats :: [Id] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
-matchNPats (var:vars) ty weight (eqn1:eqns)    -- All for the same literal
+matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+matchNPats (var:vars) ty (eqn1:eqns)    -- All for the same literal
   = do  { let NPat _ (L _ lit) mb_neg eq_chk = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing  -> return lit_expr
                             Just neg -> dsSyntaxExpr neg [lit_expr]
         ; pred_expr <- dsSyntaxExpr eq_chk [Var var, neg_lit]
-        ; match_result <- match vars ty weight (shiftEqns (eqn1:eqns))
+        ; match_result <- match vars ty (shiftEqns (eqn1:eqns))
         ; return (mkGuardedMatchResult pred_expr match_result) }
-matchNPats vars _ _ eqns = pprPanic "matchOneNPat" (ppr (vars, eqns))
+matchNPats vars _ eqns = pprPanic "matchOneNPat" (ppr (vars, eqns))
 
 {-
 ************************************************************************
@@ -442,16 +441,16 @@ We generate:
 \end{verbatim}
 -}
 
-matchNPlusKPats :: [Id] -> Type -> Rig -> [EquationInfo] -> DsM MatchResult
+matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- All NPlusKPats, for the *same* literal k
-matchNPlusKPats (var:vars) ty weight (eqn1:eqns)
+matchNPlusKPats (var:vars) ty (eqn1:eqns)
   = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus = firstPat eqn1
         ; lit1_expr   <- dsOverLit lit1
         ; lit2_expr   <- dsOverLit lit2
         ; pred_expr   <- dsSyntaxExpr ge    [Var var, lit1_expr]
         ; minusk_expr <- dsSyntaxExpr minus [Var var, lit2_expr]
         ; let (wraps, eqns') = mapAndUnzip (shift n1) (eqn1:eqns)
-        ; match_result <- match vars ty weight eqns'
+        ; match_result <- match vars ty eqns'
         ; return  (mkGuardedMatchResult pred_expr               $
                    mkCoLetMatchResult (NonRec n1 minusk_expr)   $
                    adjustMatchResult (foldr1 (.) wraps)         $
@@ -462,4 +461,4 @@ matchNPlusKPats (var:vars) ty weight (eqn1:eqns)
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)
 
-matchNPlusKPats vars _ _ eqns = pprPanic "matchNPlusKPats" (ppr (vars, eqns))
+matchNPlusKPats vars _ eqns = pprPanic "matchNPlusKPats" (ppr (vars, eqns))

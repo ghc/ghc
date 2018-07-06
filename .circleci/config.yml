@@ -100,8 +100,6 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *bindist
-      - *storeartifacts
       - *test
       - *store_test_results
 

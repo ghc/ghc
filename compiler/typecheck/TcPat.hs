@@ -203,7 +203,8 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
                                 -- the level, we'd be in checking mode
                                 do { bndr_ty <- inferResultToType infer_res
                                    ; return (mkTcNomReflCo bndr_ty, bndr_ty) }
-       ; bndr_id <- newLetBndr no_gen bndr_name bndr_ty
+       ; let bndr_mult = weightedWeight exp_pat_ty
+       ; bndr_id <- newLetBndr no_gen bndr_name bndr_mult bndr_ty
        ; traceTc "tcPatBndr(nosig)" (vcat [ ppr bind_lvl
                                           , ppr exp_pat_ty, ppr bndr_ty, ppr co
                                           , ppr bndr_id ])
@@ -217,7 +218,7 @@ tcPatBndr _ bndr_name pat_ty
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
-newLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
+newLetBndr :: LetBndrSpec -> Name -> Rig -> TcType -> TcM TcId
 -- Make up a suitable Id for the pattern-binder.
 -- See Note [Typechecking pattern bindings], item (4) in TcBinds
 --
@@ -228,13 +229,11 @@ newLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
 -- In the monomorphic case when we are not going to generalise
 --    (plan NoGen, no_gen = LetGblBndr) there is no AbsBinds,
 --    and we use the original name directly
-newLetBndr LetLclBndr name ty
+newLetBndr LetLclBndr name w ty
   = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name Omega ty) } -- TODO: arnaud: here and below, replace Omega by proper multiplicity
-newLetBndr (LetGblBndr prags) name ty
-  = addInlinePrags (mkLocalId name Omega ty) (lookupPragEnv prags name)
--- TODO: arnaud: let-binder must eventually take a multiplicity, and the two
--- occurrences of Omega, above, must be replaced.
+       ; return (mkLocalId mono_name w ty) }
+newLetBndr (LetGblBndr prags) name w ty
+  = addInlinePrags (mkLocalId name w ty) (lookupPragEnv prags name)
 
 tcSubTypePat :: PatEnv -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- tcSubTypeET with the UserTypeCtxt specialised to GenSigCtxt

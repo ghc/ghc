@@ -90,33 +90,42 @@ have-we-used-all-the-constructors? question; the local function
 
 matchConFamily :: [Id]
                -> Type
-               -> Rig
                -> [[EquationInfo]]
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
-matchConFamily (var:vars) ty weight groups
+matchConFamily (var:vars) ty groups
   = do dflags <- getDynFlags
+       let weight = idWeight var
+           -- Each variable in the argument list correspond to one column in the
+           -- pattern matching equations. It has the same type as all the
+           -- pattern, and, more importantly for this function, its multiplicity
+           -- is the context multiplicity of the pattern. We extract that
+           -- multiplicity, so that 'matchOneconLike' knows the context
+           -- multiplicity, in case it needs to come up with new variables.
+           --
+           -- TODO: arnaud: check correctness of the comment
        alts <- mapM (fmap toRealAlt . matchOneConLike vars ty weight) groups
        return (mkCoAlgCaseMatchResult dflags var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
         _ -> panic "matchConFamily: not RealDataCon"
-matchConFamily [] _ _ _ = panic "matchConFamily []"
+matchConFamily [] _ _ = panic "matchConFamily []"
 
 matchPatSyn :: [Id]
             -> Type
-            -> Rig
             -> [EquationInfo]
             -> DsM MatchResult
-matchPatSyn (var:vars) ty weight eqns
-  = do alt <- fmap toSynAlt $ matchOneConLike vars ty weight eqns
+matchPatSyn (var:vars) ty eqns
+  = do
+       let weight = idWeight var -- TODO: arnaud: this should be right. But it pertains to type synonym, so check for correctness later.
+       alt <- fmap toSynAlt $ matchOneConLike vars ty weight eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
         PatSynCon psyn -> alt{ alt_pat = psyn }
         _ -> panic "matchPatSyn: not PatSynCon"
-matchPatSyn _ _ _ _ = panic "matchPatSyn []"
+matchPatSyn _ _ _ = panic "matchPatSyn []"
 
 type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
 
@@ -140,7 +149,7 @@ matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single construc
                 = ASSERT( notNull arg_eqn_prs )
                   do { (wraps, eqns') <- liftM unzip (mapM shift arg_eqn_prs)
                      ; let group_arg_vars = select_arg_vars arg_vars arg_eqn_prs
-                     ; match_result <- match (group_arg_vars ++ vars) ty weight eqns'
+                     ; match_result <- match (group_arg_vars ++ vars) ty eqns'
                      ; return (adjustMatchResult (foldr1 (.) wraps) match_result) }
 
               shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
@@ -151,10 +160,15 @@ matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single construc
                             . wrapBinds (ds  `zip` dicts1)
                             . mkCoreLets ds_bind
                             , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
+                            -- TODO: arnaud: ^ should val_arg_tys be scaled here?
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
-        ; let scale_new_vars = map (\var -> scaleIdBy var weight)
-        ; arg_vars <- scale_new_vars <$> selectConMatchVars val_arg_tys args1
+        ; let scaled_arg_tys = map (scaleWeighted weight) val_arg_tys
+            -- The 'val_arg_tys' are taken from the data type definition, they
+            -- do not take into account the context multiplicity, therefore we
+            -- need to scale them back to get the correct context multiplicity
+            -- to desugar the sub-pattern in each field.
+        ; arg_vars <- selectConMatchVars scaled_arg_tys args1
                 -- Use the first equation as a source of
                 -- suggestions for the new variables
 

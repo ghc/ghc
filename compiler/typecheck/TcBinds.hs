@@ -1360,7 +1360,7 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- type of the thing whose rhs we are type checking
                tcMatchesFun (L nm_loc name) matches exp_ty
 
-        ; mono_id <- newLetBndr no_gen name rhs_ty
+        ; mono_id <- newLetBndr no_gen name Omega rhs_ty -- TODO: arnaud: I don't know what binders we are creating here, so I don't know yet where the multiplicity is supposed to come from
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches', fun_ext = fvs,
@@ -1435,7 +1435,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_matches = matches })
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name mono_ty
+       ; mono_id <- newLetBndr no_gen name Omega mono_ty -- TODO: arnaud: I don't know what binder we are creating here, so I don't know where the multiplicity should come from
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
                              , mbi_mono_id   = mono_id }
@@ -1503,7 +1503,7 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name tau
+  = newLetBndr no_gen name Omega tau -- TODO: arnaud: I don't know what binder we are creating here, so I don't know where the multiplicity should come from
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind GhcTcId)

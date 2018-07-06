@@ -217,7 +217,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_rhs = cantFailMatchResult body }
        ; var    <- selectMatchVar Omega upat -- TODO: MattP
-       ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body) Omega -- MattP: TODO check this multiplicity.
+       ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 
 dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
@@ -672,11 +672,14 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
                  subst = zipTvSubst univ_tvs in_inst_tys
+                 arg_tys' = scaleWeighted Omega <$> arg_tys
+                   -- Record updates consume the source record with multiplicity
+                   -- Omega. Therefore all the fields need to be scaled thus.
 
                 -- I'm not bothering to clone the ex_tvs
            ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
            ; theta_vars <- mapM newPredVarDs (substTheta subst prov_theta)
-           ; arg_ids    <- newSysLocalsDs (getCompose $ substTysUnchecked subst (Compose arg_tys))
+           ; arg_ids    <- newSysLocalsDs (getCompose $ substTysUnchecked subst (Compose arg_tys'))
            ; let field_labels = conLikeFieldLabels con
                  val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
                                          field_labels arg_ids
