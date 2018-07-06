@@ -15,7 +15,9 @@ aliases:
       name: submodules
       command: .circleci/fetch-submodules.sh
   - &buildenv
-    THREADS: 9
+    # ideally we would simply set THREADS here instead of re-detecting it every
+    # time we need it below. Unfortunately, there is no way to set an environment
+    # variable with the result of a shell script.
     SKIP_PERF_TESTS: YES
     VERBOSE: 2
   - &boot
@@ -50,19 +52,19 @@ aliases:
   - &make
     run:
       name: Build
-      command: "make -j$THREADS"
+      command: "make -j`mk/detect-cpu-count.sh`"
   - &build_hadrian
     run:
       name: Build GHC using Hadrian
       command: |
         cabal update
-        hadrian/build.sh -j$THREADS
+        hadrian/build.sh -j`mk/detect-cpu-count.sh`
   - &test
     run:
       name: Test
       command: |
         mkdir -p test-results
-        make test SKIP_PERF_TESTS=YES JUNIT_FILE=../../test-results/junit.xml
+        make test THREADS=`mk/detect-cpu-count.sh` SKIP_PERF_TESTS=YES JUNIT_FILE=../../test-results/junit.xml
   - &store_test_results
     store_test_results:
       path: test-results
