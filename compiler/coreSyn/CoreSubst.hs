@@ -14,7 +14,7 @@ module CoreSubst (
 
         -- ** Substituting into expressions and related types
         deShadowBinds, substSpec, substRulesForImportedIds,
-        substTy, substCo, substExpr, substExprSC, substBind, substBindSC,
+        substTy, substRig, substCo, substExpr, substExprSC, substBind, substBindSC,
         substUnfolding, substUnfoldingSC,
         lookupIdSubst, lookupTCvSubst, substIdOcc,
         substTickish, substDVarSet, substIdInfo,

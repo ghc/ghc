@@ -500,7 +500,11 @@ subst_opt_id_bndr (SOE { soe_subst = subst, soe_inl = inl }) old_id
     Subst in_scope id_subst tv_subst cv_subst = subst
 
     id1    = uniqAway in_scope old_id
-    id2    = setIdType id1 (substTy subst (idType old_id))
+    id2    =
+      setIdWeight
+        (setIdType id1
+          (substTy subst (idType old_id)))
+          (substRig subst (idWeight old_id))
     new_id = zapFragileIdInfo id2
              -- Zaps rules, unfolding, and fragile OccInfo
              -- The unfolding and rules will get added back later, by add_info
