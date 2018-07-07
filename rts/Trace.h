@@ -50,6 +50,7 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define DEBUG_weak        RtsFlags.DebugFlags.weak
 #define DEBUG_gccafs      RtsFlags.DebugFlags.gccafs
 #define DEBUG_gc          RtsFlags.DebugFlags.gc
+#define DEBUG_nonmoving_gc RtsFlags.DebugFlags.nonmoving_gc
 #define DEBUG_block_alloc RtsFlags.DebugFlags.alloc
 #define DEBUG_sanity      RtsFlags.DebugFlags.sanity
 #define DEBUG_stable      RtsFlags.DebugFlags.stable
