@@ -33,6 +33,7 @@ import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
 import qualified Data.Set as Set
 import           Documentation.Haddock.Doc
+import           Documentation.Haddock.Markup ( markup, plainMarkup )
 import           Documentation.Haddock.Parser.Monad
 import           Documentation.Haddock.Parser.Util
 import           Documentation.Haddock.Types
@@ -301,15 +302,19 @@ mathInline = DocMathInline . T.unpack
 -- >>> parseString "\\[\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\]"
 -- DocMathDisplay "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathDisplay :: Parser (DocH mod a)
-mathDisplay = DocMathDisplay . T.unpack 
+mathDisplay = DocMathDisplay . T.unpack
               <$> ("\\[" *> takeUntil "\\]")
 
-markdownImage :: Parser (DocH mod a)
+-- | Markdown image parser. As per the commonmark reference recommendation, the
+-- description text for an image converted to its a plain string representation.
+--
+-- >>> parseString "![some /emphasis/ in a description](www.site.com)"
+-- DocPic (Picture "www.site.com" (Just "some emphasis in a description"))
+markdownImage :: Parser (DocH mod Identifier)
 markdownImage = DocPic . fromHyperlink <$> ("!" *> linkParser)
   where
-    fromHyperlink (Hyperlink url Nothing) = Picture url Nothing
-    fromHyperlink (Hyperlink url (Just (DocString s))) = Picture url (Just s)
-    -- TODO partial ^
+    fromHyperlink (Hyperlink u l) = Picture u (fmap (markup stringMarkup) l)
+    stringMarkup = plainMarkup (const "") (\(l,c,r) -> [l] <> c <> [r])
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)

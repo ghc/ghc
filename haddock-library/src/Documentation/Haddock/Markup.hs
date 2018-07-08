@@ -2,9 +2,12 @@
 module Documentation.Haddock.Markup (
     markup
   , idMarkup
+  , plainMarkup
   ) where
 
 import Documentation.Haddock.Types
+
+import Data.Maybe ( fromMaybe )
 
 markup :: DocMarkupH mod id a -> DocH mod id -> a
 markup m DocEmpty                       = markupEmpty m
@@ -62,4 +65,35 @@ idMarkup = Markup {
   markupExample              = DocExamples,
   markupHeader               = DocHeader,
   markupTable                = DocTable
+  }
+
+-- | Map a 'DocH' into a best estimate of an alternate string. The idea is to
+-- strip away any formatting while preserving as much of the actual text as
+-- possible.
+plainMarkup :: (mod -> String) -> (id -> String) -> DocMarkupH mod id String
+plainMarkup plainMod plainIdent = Markup {
+  markupEmpty                = "",
+  markupString               = id,
+  markupParagraph            = id,
+  markupAppend               = (<>),
+  markupIdentifier           = plainIdent,
+  markupIdentifierUnchecked  = plainMod,
+  markupModule               = id,
+  markupWarning              = id,
+  markupEmphasis             = id,
+  markupBold                 = id,
+  markupMonospaced           = id,
+  markupUnorderedList        = const "",
+  markupOrderedList          = const "",
+  markupDefList              = const "",
+  markupCodeBlock            = id,
+  markupHyperlink            = \(Hyperlink url lbl) -> fromMaybe url lbl,
+  markupAName                = id,
+  markupPic                  = \(Picture uri title) -> fromMaybe uri title,
+  markupMathInline           = id,
+  markupMathDisplay          = id,
+  markupProperty             = id,
+  markupExample              = const "",
+  markupHeader               = \(Header _ title) -> title,
+  markupTable                = const ""
   }
