@@ -171,7 +171,7 @@ A program is just a list of bindings:
 
 \ctor{FunTy} is the special case for non-dependent function type. The
 \ctor{TyBinder} in \ghcfile{types/TyCoRep.lhs} distinguishes whether a binder is
-anonymours (\ctor{FunTy}) or named (\ctor{ForAllTy}). See
+anonymous (\ctor{FunTy}) or named (\ctor{ForAllTy}). See
 \verb|Note [TyBinders]| in \ghcfile{types/TyCoRep.lhs}.
 
 There are some invariants on types:
