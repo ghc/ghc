@@ -964,6 +964,10 @@ data MCoercion
     -- Other coercions
 type MCoercionR = MCoercion
 
+instance Outputable MCoercion where
+  ppr MRefl    = text "MRefl"
+  ppr (MCo co) = text "MCo" <+> ppr co
+
 {-
 Note [Refl invariant]
 ~~~~~~~~~~~~~~~~~~~~~
