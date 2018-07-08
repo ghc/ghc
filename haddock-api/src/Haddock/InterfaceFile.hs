@@ -434,7 +434,7 @@ instance Binary Example where
         result <- get bh
         return (Example expression result)
 
-instance Binary Hyperlink where
+instance Binary a => Binary (Hyperlink a) where
     put_ bh (Hyperlink url label) = do
         put_ bh url
         put_ bh label

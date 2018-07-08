@@ -107,7 +107,7 @@ overIdentifier f d = g d
     g (DocOrderedList x) = DocOrderedList $ fmap g x
     g (DocDefList x) = DocDefList $ fmap (\(y, z) -> (g y, g z)) x
     g (DocCodeBlock x) = DocCodeBlock $ g x
-    g (DocHyperlink x) = DocHyperlink x
+    g (DocHyperlink (Hyperlink u x)) = DocHyperlink (Hyperlink u (fmap g x))
     g (DocPic x) = DocPic x
     g (DocMathInline x) = DocMathInline x
     g (DocMathDisplay x) = DocMathDisplay x
@@ -305,9 +305,11 @@ mathDisplay = DocMathDisplay . T.unpack
               <$> ("\\[" *> takeUntil "\\]")
 
 markdownImage :: Parser (DocH mod a)
-markdownImage = fromHyperlink <$> ("!" *> linkParser)
+markdownImage = DocPic . fromHyperlink <$> ("!" *> linkParser)
   where
-    fromHyperlink (Hyperlink url label) = DocPic (Picture url label)
+    fromHyperlink (Hyperlink url Nothing) = Picture url Nothing
+    fromHyperlink (Hyperlink url (Just (DocString s))) = Picture url (Just s)
+    -- TODO partial ^
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
@@ -784,22 +786,22 @@ codeblock =
           | isNewline && isSpace c = Just isNewline
           | otherwise = Just $ c == '\n'
 
-hyperlink :: Parser (DocH mod a)
+hyperlink :: Parser (DocH mod Identifier)
 hyperlink = choice' [ angleBracketLink, markdownLink, autoUrl ]
 
 angleBracketLink :: Parser (DocH mod a)
 angleBracketLink =
-    DocHyperlink . makeLabeled Hyperlink 
+    DocHyperlink . flip Hyperlink Nothing . T.unpack . removeEscapes
     <$> disallowNewline ("<" *> takeUntil ">")
 
-markdownLink :: Parser (DocH mod a)
+markdownLink :: Parser (DocH mod Identifier)
 markdownLink = DocHyperlink <$> linkParser
 
-linkParser :: Parser Hyperlink
+linkParser :: Parser (Hyperlink (DocH mod Identifier))
 linkParser = flip Hyperlink <$> label <*> (whitespace *> url)
   where
-    label :: Parser (Maybe String)
-    label = Just . decode . T.strip <$> ("[" *> takeUntil "]")
+    label :: Parser (Maybe (DocH mod Identifier))
+    label = Just . parseParagraph . T.strip <$> ("[" *> takeUntil "]")
 
     whitespace :: Parser ()
     whitespace = skipHorizontalSpace <* optional ("\n" *> skipHorizontalSpace)
@@ -825,7 +827,7 @@ autoUrl = mkLink <$> url
       Just (xs,x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString [x]
       _ -> DocHyperlink (mkHyperlink s)
 
-    mkHyperlink :: Text -> Hyperlink
+    mkHyperlink :: Text -> Hyperlink (DocH mod a)
     mkHyperlink lnk = Hyperlink (T.unpack lnk) Nothing
 
 
