@@ -52,7 +52,7 @@ module TcType (
   -- Builders
   mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
   mkNakedTyConApp, mkNakedAppTys, mkNakedAppTy,
-  mkNakedCastTy,
+  mkNakedCastTy, nakedSubstTy,
 
   --------------------------------
   -- Splitters
@@ -226,6 +226,7 @@ import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
+import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import qualified Data.Semigroup as Semi
@@ -1391,6 +1392,69 @@ getDFunTyLitKey :: TyLit -> OccName
 getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
 getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 
+{- *********************************************************************
+*                                                                      *
+           Maintaining the well-kinded type invariant
+*                                                                      *
+********************************************************************* -}
+
+{- Note [The well-kinded type invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [The tcType invariant] in TcHsType.
+
+During type inference, we maintain the invariant that
+
+   INVARIANT: every type is well-kinded /without/ zonking
+
+   EXCEPT: you are allowed (ty |> co) even if the kind of ty
+           does not match the from-kind of co.
+
+Main goal: if this invariant is respected, then typeKind cannot fail
+(as it can for ill-kinded types).
+
+In particular, we can get types like
+     (k |> co) Int
+where
+    k :: kappa
+    co :: Refl (Type -> Type)
+    kappa is a unification variable and kappa := Type already
+
+So in the un-zonked form (k Int) would be ill-kinded,
+but (k |> co) Int is well-kinded.  So we want to keep that 'co'
+/even though it is Refl/.
+
+Immediate consequence: during type inference we cannot use the "smart
+contructors" for types, particularly
+   mkAppTy, mkCastTy
+because they all eliminate Refl casts.  Solution: during type
+inference use the mkNakedX type formers, which do no Refl-elimination.
+E.g. mkNakedCastTy uses an actual CastTy, without optimising for
+Refl.  (NB: mkNakedCastTy is only called in two places: in tcInferApps
+and in checkExpectedResultKind.)
+
+Where does this show up in practice: apparently mainly in
+TcHsType.tcInferApps.  Suppose we are kind-checking the type (a Int),
+where (a :: kappa).  Then in tcInferApps we'll run out of binders on
+a's kind, so we'll call matchExpectedFunKind, and unify
+   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
+That evidence is actually Refl, but we must not discard the cast to
+form the result type
+   ((a::kappa) (Int::*))
+bacause that does not satisfy the invariant, and crashes TypeKind.  This
+caused Trac #14174 and #14520.
+
+Notes:
+
+* The Refls will be removed later, when we zonk the type.
+
+* This /also/ applies to substitution.  We must use nakedSubstTy,
+  not substTy, bucause the latter uses smart constructors that do
+  Refl-elimination.
+
+* None of this is to do with knot-tying, which is the (quite distinct)
+  motivation for mkNakedTyConApp
+-}
+
 ---------------
 mkNakedTyConApp :: TyCon -> [Type] -> Type
 -- Builds a TyConApp
@@ -1421,33 +1485,21 @@ mkNakedCastTy :: Type -> Coercion -> Type
 -- In fact the calls to mkNakedCastTy ar pretty few and far between.
 mkNakedCastTy ty co = CastTy ty co
 
-{- Note [The well-kinded type invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During type inference, we maintain the invariant that
+nakedSubstTy :: HasCallStack => TCvSubst -> TcType  -> TcType
+nakedSubstTy subst ty
+  | isEmptyTCvSubst subst = ty
+  | otherwise             = runIdentity                   $
+                            checkValidSubst subst [ty] [] $
+                            mapType nakedSubstMapper subst ty
+  -- Interesting idea: use StrictIdentity to avoid space leaks
 
-   INVARIANT: every type is well-kinded /without/ zonking
-
-and in particular that typeKind does not fail (as it can for
-ill-kinded types).
-
-Now suppose we are kind-checking the type (a Int), where (a :: kappa).
-Then in tcInferApps we'll run out of binders on a's kind, so
-we'll call matchExpectedFunKind, and unify
-   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
-That evidence is actually Refl, but we must not discard the cast to
-form the result type
-   ((a::kappa) (Int::*))
-bacause that does not satisfy the invariant, and crashes TypeKind.  This
-caused Trac #14174 and #14520.
-
-Solution: make mkNakedCastTy use an actual CastTy, without optimising
-for Refl. Now everything is well-kinded.  The CastTy will be removed
-later, when we zonk.  Still, it's distressingly delicate.
-
-NB: mkNakedCastTy is only called in two places:
-    in tcInferApps and in checkExpectedResultKind.
-    See Note [The tcType invariant] in TcHsType.
--}
+nakedSubstMapper :: TyCoMapper TCvSubst Identity
+nakedSubstMapper
+  = TyCoMapper { tcm_smart    = False
+               , tcm_tyvar    = \subst tv -> return (substTyVar subst tv)
+               , tcm_covar    = \subst cv -> return (substCoVar subst cv)
+               , tcm_hole     = \_ hole   -> return (HoleCo hole)
+               , tcm_tybinder = \subst tv _ -> return (substTyVarBndr subst tv) }
 
 {-
 ************************************************************************
