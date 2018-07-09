@@ -3515,7 +3515,7 @@ matchFamTcM tycon args
               , ppr_res match_fam_result ]
        ; return match_fam_result }
   where
-    ppr_res (TyFamAppErr _)      = text "Match failed"
+    ppr_res (TyFamAppStuck _)      = text "Match failed"
     ppr_res (TyFamAppOk (co,ty)) = hang (text "Match succeeded:")
                                 2 (vcat [ text "Rewrites to:" <+> ppr ty
                                         , text "Coercion:" <+> ppr co ])

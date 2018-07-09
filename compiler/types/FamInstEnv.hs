@@ -129,9 +129,10 @@ data FamFlavor
 
 -- Result of a reduction of a type-family application
 data TyFamAppRes
-  = TyFamAppErr Int
-  -- if result is an error we return and Int that corresponds
+  = TyFamAppStuck Int
+  -- if result is stuck we return and Int that corresponds
   -- to the index of the first argument that mismatches
+  -- result is 1-indexed
   | TyFamAppOk (Coercion, Type) -- result is correct
 
 {-
@@ -1099,7 +1100,7 @@ reduceTyFamApp :: FamInstEnvs
 -- homogeneous
 reduceTyFamApp envs role tc tys
   | Phantom <- role
-  = TyFamAppErr 0
+  = TyFamAppStuck 0
 
   | case role of
       Representational -> isOpenFamilyTyCon     tc
@@ -1129,9 +1130,9 @@ reduceTyFamApp envs role tc tys
     in TyFamAppOk (co, ty)
 
   | Nominal <- role, isOpenTypeFamilyTyCon tc, length invisibleParamL > 0
-  = TyFamAppErr $ invParIndex tys invisibleParamL
+  = TyFamAppStuck $ invParIndex tys invisibleParamL
   | otherwise
-  = TyFamAppErr 0
+  = TyFamAppStuck 0
   where
     invisibleParamL = getInvisibleArgs tc tys
 

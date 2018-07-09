@@ -1741,7 +1741,7 @@ flatten_exact_fam_app_fully tc tys
                              co' = update_co $ mkSymCo co
                                                 `mkTcCoherenceLeftCo` kind_co
                        ; return $ Right (xi', co') }
-               TyFamAppErr a -> pure (Left a) }
+               TyFamAppStuck a -> pure (Left a) }
 
     try_to_reduce_nocache :: TyCon   -- F, family tycon
                           -> [Type]  -- args, not necessarily flattened
@@ -1770,7 +1770,7 @@ flatten_exact_fam_app_fully tc tys
                              co' = update_co $ mkSymCo co
                                                 `mkTcCoherenceLeftCo` kind_co
                        ; return $ Right (xi', co') }
-               TyFamAppErr a -> pure (Left a) }
+               TyFamAppStuck a -> pure (Left a) }
 
 {- Note [Reduce type family applications eagerly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
