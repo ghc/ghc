@@ -542,8 +542,8 @@ Note [The tcType invariant]
 without any zonking needed.  The reason for this is that in
 tcInferApps we see (F ty), and we kind-check 'ty' with an
 expected-kind coming from F.  Then, to make the resulting application
-well kinded --- see Note [Ensure well-kinded types] in TcType --- we
-need the kind-checked 'ty' to have exactly the kind that F expects,
+well kinded --- see Note [The well-kinded type invariant] in TcType ---
+we need the kind-checked 'ty' to have exactly the kind that F expects,
 with no funny zonking nonsense in between.
 
 The tcType invariant also applies to checkExpectedKind:
@@ -949,7 +949,10 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
 
       -- no user-written args left. We're done!
     go _ acc_args subst fun ki_binders inner_ki []
-      = return (fun, reverse acc_args, substTy subst $ mkPiTys ki_binders inner_ki)
+      = return ( fun
+               , reverse acc_args
+               , nakedSubstTy subst $ mkPiTys ki_binders inner_ki)
+                 -- nakedSubstTy: see Note [The well-kinded type invariant]
 
       -- The function's kind has a binder. Is it visible or invisible?
     go n acc_args subst fun (ki_binder:ki_binders) inner_ki
@@ -966,11 +969,16 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
       = do { traceTc "tcInferApps (vis)" (vcat [ ppr ki_binder, ppr arg
                                                , ppr (tyBinderType ki_binder)
                                                , ppr subst ])
+           ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
+                            -- nakedSubstTy: see Note [The well-kinded type invariant]
            ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
-                     tc_lhs_type mode arg (substTy subst $ tyBinderType ki_binder)
+                     tc_lhs_type mode arg exp_kind
+           ; traceTc "tcInferApps (vis 1)" (vcat [ ppr exp_kind
+                                                 , ppr arg'
+                                                 , ppr (typeKind arg') ])
            ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
            ; go (n+1) (arg' : acc_args) subst'
-                (mkNakedAppTy fun arg')
+                (mkNakedAppTy fun arg') -- See Note [The well-kinded type invariant]
                 ki_binders inner_ki args }
 
        -- We've run out of known binders in the functions's kind.
@@ -986,7 +994,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
            ; let new_in_scope = tyCoVarsOfTypes [arg_k, res_k]
                  subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
            ; go n acc_args subst'
-                (fun `mkNakedCastTy` co)
+                (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
                 [mkAnonBinder arg_k]
                 res_k all_args }
       where
