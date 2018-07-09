@@ -1874,7 +1874,7 @@ doTopReactFunEq work_item@(CFunEqCan { cc_ev = old_ev, cc_fun = fam_tc
                            -- Look up in top-level instances, or built-in axiom
                            -- See Note [MATCHING-SYNONYMS]
        ; case match_res of
-           TyFamAppErr _           -> no_reduction
+           TyFamAppStuck _           -> no_reduction
            TyFamAppOk match_info -> reduce_top_fun_eq old_ev fsk match_info }
   where
     no_reduction

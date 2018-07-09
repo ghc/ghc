@@ -2071,20 +2071,24 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
     msg6 = case level of
       KindLevel
         | Just th <- maybe_thing
-        -> hang (ppr exp <+> text "is stuck because there is no defining clause for" <+> kind_desc <> comma)
-              2 (quotes th <+> text "has kind" <+> quotes (ppr act) <+> text " maybe try -fprint-explicit-kinds")
+        -> hang (ppr exp <+>
+                 text "is stuck because there is no defining clause for" <+>
+                 kind_desc <> comma)
+              2 (quotes th <+> text "has kind" <+> quotes (ppr act) <+>
+                 text " maybe try -fprint-explicit-kinds")
            where
              kind_desc | isConstraintKind exp = text "a constraint"
 
                          -- TYPE t0
                        | Just (tc, [arg]) <- tcSplitTyConApp_maybe exp
                        , tc `hasKey` tYPETyConKey
-                       , tcIsTyVarTy arg      = sdocWithDynFlags $ \dflags ->
-                                               if gopt Opt_PrintExplicitRuntimeReps dflags
-                                               then text "kind" <+> quotes (ppr exp)
-                                               else text "a type"
+                       , tcIsTyVarTy arg =
+                           sdocWithDynFlags $ \dflags ->
+                             if gopt Opt_PrintExplicitRuntimeReps dflags
+                             then text "kind" <+> quotes (ppr exp)
+                             else text "a type"
 
-                       | otherwise            = text "kind" <+> quotes (ppr exp)
+                       | otherwise       = text "kind" <+> quotes (ppr exp)
       _ -> empty
 
     num_args_msg = case level of
