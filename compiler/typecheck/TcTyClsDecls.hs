@@ -1563,17 +1563,17 @@ kcFamTyPats :: TcTyCon
 kcFamTyPats tc_fam_tc tv_names arg_pats kind_checker
   = discardResult $
     kcImplicitTKBndrs tv_names $
-    do { let loc     = nameSrcSpan name
-             lhs_fun = L loc (HsTyVar noExt NotPromoted (L loc name))
-               -- lhs_fun is for error messages only
-             no_fun  = pprPanic "kcFamTyPats" (ppr name)
+    do { let name     = tyConName tc_fam_tc
+             loc      = nameSrcSpan name
+             lhs_fun  = L loc (HsTyVar noExt NotPromoted (L loc name))
+                        -- lhs_fun is for error messages only
+             no_fun   = pprPanic "kcFamTyPats" (ppr name)
              fun_kind = tyConKind tc_fam_tc
 
        ; (_, _, res_kind_out) <- tcInferApps typeLevelMode Nothing lhs_fun no_fun
                                              fun_kind arg_pats
+       ; traceTc "kcFamTyPats" (vcat [ ppr tc_fam_tc, ppr arg_pats, ppr res_kind_out ])
        ; kind_checker res_kind_out }
-  where
-    name = tyConName tc_fam_tc
 
 tcFamTyPats :: TyCon
             -> Maybe ClsInstInfo
@@ -1627,6 +1627,8 @@ tcFamTyPats fam_tc mb_clsinfo
                   ; (_, args, res_kind_out)
                       <- tcInferApps typeLevelMode mb_kind_env
                                      lhs_fun fun_ty fun_kind arg_pats
+
+                  ; traceTc "tcFamTyPats 1" (vcat [ ppr fam_tc, ppr arg_pats, ppr res_kind_out ])
 
                   ; stuff <- kind_checker res_kind_out
                   ; return (args, stuff) }

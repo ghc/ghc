@@ -837,7 +837,7 @@ tcWildCardOcc wc_info exp_kind
 
 ---------------------------
 -- | Call 'tc_infer_hs_type' and check its result against an expected kind.
-tc_infer_hs_type_ek :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
+tc_infer_hs_type_ek :: HasDebugCallStack => TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
 tc_infer_hs_type_ek mode hs_ty ek
   = do { (ty, k) <- tc_infer_hs_type mode hs_ty
        ; checkExpectedKind hs_ty ty k ek }
@@ -1004,7 +1004,8 @@ tcTyApps mode orig_hs_ty fun_ty fun_ki args
 --------------------------
 -- Like checkExpectedKindX, but returns only the final type; convenient wrapper
 -- Obeys Note [The tcType invariant]
-checkExpectedKind :: HsType GhcRn   -- type we're checking (for printing)
+checkExpectedKind :: HasDebugCallStack
+                  => HsType GhcRn   -- type we're checking (for printing)
                   -> TcType         -- type we're checking (might be knot-tied)
                   -> TcKind         -- the known kind of that type
                   -> TcKind         -- the expected kind
@@ -1012,7 +1013,8 @@ checkExpectedKind :: HsType GhcRn   -- type we're checking (for printing)
 checkExpectedKind hs_ty ty act exp
   = fstOf3 <$> checkExpectedKindX Nothing (ppr hs_ty) ty act exp
 
-checkExpectedKindX :: Maybe (VarEnv Kind)  -- Possibly, instantiations for kind vars
+checkExpectedKindX :: HasDebugCallStack
+                   => Maybe (VarEnv Kind)  -- Possibly, instantiations for kind vars
                    -> SDoc                 -- HsType whose kind we're checking
                    -> TcType               -- the type whose kind we're checking
                    -> TcKind               -- the known kind of that type, k
@@ -2712,6 +2714,7 @@ tcLHsKindSig ctxt hs_kind
 -- See  Note [Recipe for checking a signature] in TcHsType
   = do { kind <- solveLocalEqualities $
                  tc_lhs_kind kindLevelMode hs_kind
+       ; traceTc "tcLHsKindSig" (ppr kind)
        ; kind <- zonkPromoteType kind
          -- This zonk is very important in the case of higher rank kinds
          -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
@@ -2721,6 +2724,7 @@ tcLHsKindSig ctxt hs_kind
          --      else we may fail to substitute properly
 
        ; checkValidType ctxt kind
+       ; traceTc "tcLHsKindSig2" (ppr kind)
        ; return kind }
 
 tc_lhs_kind :: TcTyMode -> LHsKind GhcRn -> TcM Kind

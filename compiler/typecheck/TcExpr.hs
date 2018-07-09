@@ -1350,7 +1350,9 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                     ; traceTc "VTA" (vcat [ppr tv, debugPprType kind
                                           , debugPprType ty_arg
                                           , debugPprType (typeKind ty_arg)
+                                          , debugPprType inner_ty
                                           , debugPprType insted_ty ])
+
                     ; (inner_wrap, args', res_ty)
                         <- go acc_args (n+1) insted_ty args
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
