@@ -1,0 +1,4 @@
+
+Linear5.hs:6:20: error:
+    • Couldn't match expected weight ‘1’ of variable ‘n’ with actual weight ‘0’
+    • In an equation for ‘incorrectEqn’: incorrectEqn False n = 0

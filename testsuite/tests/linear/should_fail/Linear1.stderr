@@ -1,0 +1,9 @@
+
+Linear1.hs:9:14: error:
+    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+        arising from an application
+    • In an equation for ‘incorrectDup’: incorrectDup x = (x, x)
+
+Linear1.hs:13:15: error:
+    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘0’
+    • In an equation for ‘incorrectDrop’: incorrectDrop x = ()
