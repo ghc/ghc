@@ -356,7 +356,10 @@ tcHsTypeApp :: LHsWcType GhcRn -> Kind -> TcM Type
 -- See Note [Recipe for checking a signature] in TcHsType
 tcHsTypeApp wc_ty kind
   | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
-  = do { ty <- tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ _ ->
+  = do { ty <- solveLocalEqualities $
+               -- We are looking at a user-written type, very like a
+               -- signature so we want to solve its equalities right now
+               tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        ; ty <- zonkPromoteType ty
        ; checkValidType TypeAppCtxt ty

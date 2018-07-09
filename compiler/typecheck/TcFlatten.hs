@@ -1315,10 +1315,16 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
     go acc_xis acc_cos lc [] inner_ki roles tys
       | Just k   <- tcGetTyVar_maybe inner_ki
       , Just co1 <- liftCoSubstTyVar lc Nominal k
-      = do { let Pair flattened_kind _ = coercionKind co1
-                 (arg_cos, res_co)     = decomposePiCos flattened_kind tys co1
-                 casted_tys            = zipWith mkCastTy tys arg_cos
+      = do { let co1_kind              = coercionKind co1
+                 (arg_cos, res_co)     = decomposePiCos co1 co1_kind tys
+                 casted_tys            = ASSERT2( equalLength tys arg_cos
+                                                , ppr tys $$ ppr arg_cos )
+                                         zipWith mkCastTy tys arg_cos
+                    -- In general decomposePiCos can return fewer cos than tys,
+                    -- but not here; see "If we're at all well-typed..."
+                    -- in Note [Last case in flatten_args].  Hence the ASSERT.
                  zapped_lc             = zapLiftingContext lc
+                 Pair flattened_kind _ = co1_kind
                  (bndrs, new_inner)    = splitPiTys flattened_kind
 
            ; (xis_out, cos_out, res_co_out)

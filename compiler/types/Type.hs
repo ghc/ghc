@@ -669,7 +669,7 @@ the type checker (e.g. when matching type-function equations).
 mkAppTy :: Type -> Type -> Type
   -- See Note [Respecting definitional equality], invariant (EQ1).
 mkAppTy (CastTy fun_ty co) arg_ty
-  | ([arg_co], res_co) <- decomposePiCos (typeKind fun_ty) [arg_ty] co
+  | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
@@ -691,7 +691,7 @@ mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- in TyCoRep
   = foldl AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
-    (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) arg_tys co
+    (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
