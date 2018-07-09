@@ -45,9 +45,6 @@ addUE :: UsageEnv -> UsageEnv -> UsageEnv
 addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
   plusNameEnv_C (+) e1 e2
 
-addUEs :: [UsageEnv] -> UsageEnv
-addUEs = foldr addUE emptyUE
-
 scaleUE :: Rig -> UsageEnv -> UsageEnv
 scaleUE w (UsageEnv e) = UsageEnv $
   mapNameEnv (w*) e
@@ -55,6 +52,14 @@ scaleUE w (UsageEnv e) = UsageEnv $
 supUE :: UsageEnv -> UsageEnv -> UsageEnv
 supUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
   plusNameEnv_CD sup e1 Zero e2 Zero
+
+supUEs :: [UsageEnv] -> UsageEnv
+supUEs [] = zeroUE -- TODO: arnaud: this is incorrect, it should be the bottom
+                   -- usage env, but I haven't defined it yet. Then we could use
+                   -- a foldr and wouldn't need to special-case the empty list
+                   -- as currently. This hack/error is duplicated somewhere else
+                   -- too.
+supUEs l = foldr1 supUE l
 
 -- TODO: arnaud: both delete function: unify argument order with existing similar functions.
 -- | @deleteUEAsserting w x env@ deletes the binding to @x@ in @env@ under one
