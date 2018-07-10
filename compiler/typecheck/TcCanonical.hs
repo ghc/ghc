@@ -1291,7 +1291,7 @@ canEqCast flat ev eq_rel swapped ty1 co1 ty2 ps_ty2
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
        ; new_ev <- rewriteEqEvidence ev swapped ty1 ps_ty2
-                                     (mkTcReflCo role ty1 `mkTcCoherenceRightCo` co1)
+                                     (mkTcGReflRightCo role ty1 co1)
                                      (mkTcReflCo role ps_ty2)
        ; can_eq_nc flat new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
   where
@@ -1737,7 +1737,10 @@ canCFunEqCan ev fn tys fsk
                                -- new_co     :: F tys' ~ new_fsk
                                -- co         :: F tys ~ (new_fsk |> kind_co)
                             co = mkTcSymCo lhs_co `mkTcTransCo`
-                                 (new_co `mkTcCoherenceRightCo` kind_co)
+                                 mkTcCoherenceRightCo Nominal
+                                                      (mkTyVarTy new_fsk)
+                                                      kind_co
+                                                      new_co
 
                       ; traceTcS "Discharging fmv/fsk due to hetero flattening" (ppr ev)
                       ; dischargeFunEq ev fsk co xi
@@ -1788,7 +1791,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
 
                        new_rhs     = xi2 `mkCastTy` rhs_kind_co
                        ps_rhs      = ps_xi2 `mkCastTy` rhs_kind_co
-                       rhs_co      = mkTcReflCo role xi2 `mkTcCoherenceLeftCo` rhs_kind_co
+                       rhs_co      = mkTcGReflLeftCo role xi2 rhs_kind_co
 
                  ; new_ev <- rewriteEqEvidence ev swapped xi1 new_rhs
                                                (mkTcReflCo role xi1) rhs_co
@@ -1803,8 +1806,8 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
              new_rhs = xi2 `mkCastTy` sym_k2_co  -- :: flat_k2
              ps_rhs  = ps_xi2 `mkCastTy` sym_k2_co
 
-             lhs_co = mkReflCo role xi1 `mkTcCoherenceLeftCo` sym_k1_co
-             rhs_co = mkReflCo role xi2 `mkTcCoherenceLeftCo` sym_k2_co
+             lhs_co = mkTcGReflLeftCo role xi1 sym_k1_co
+             rhs_co = mkTcGReflLeftCo role xi2 sym_k2_co
                -- lhs_co :: (xi1 |> sym k1_co) ~ xi1
                -- rhs_co :: (xi2 |> sym k2_co) ~ xi2
 
@@ -1841,11 +1844,11 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
              homo_co = mkTcSymCo (ctEvCoercion kind_ev) `mkTcTransCo` mkTcSymCo co1
              rhs'    = mkCastTy xi2 homo_co     -- :: kind(tv1)
              ps_rhs' = mkCastTy ps_xi2 homo_co  -- :: kind(tv1)
-             rhs_co  = mkReflCo role xi2 `mkTcCoherenceLeftCo` homo_co
+             rhs_co  = mkTcGReflLeftCo role xi2 homo_co
                -- rhs_co :: (xi2 |> homo_co :: kind(tv1)) ~ xi2
 
              lhs'   = mkTyVarTy tv1       -- :: kind(tv1)
-             lhs_co = mkReflCo role lhs' `mkTcCoherenceRightCo` co1
+             lhs_co = mkTcGReflRightCo role lhs' co1
                -- lhs_co :: (tv1 :: kind(tv1)) ~ (tv1 |> co1 :: ki1)
 
        ; traceTcS "Hetero equality gives rise to given kind equality"
@@ -1895,10 +1898,10 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 ty2 _
              sym_co2 = mkTcSymCo co2
              ty1     = mkTyVarTy tv1
              new_lhs = ty1 `mkCastTy` sym_co2
-             lhs_co  = mkReflCo role ty1 `mkTcCoherenceLeftCo` sym_co2
+             lhs_co  = mkTcGReflLeftCo role ty1 sym_co2
 
              new_rhs = mkTyVarTy tv2
-             rhs_co  = mkReflCo role new_rhs `mkTcCoherenceRightCo` co2
+             rhs_co  = mkTcGReflRightCo role new_rhs co2
 
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
 

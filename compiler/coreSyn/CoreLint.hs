@@ -1617,14 +1617,27 @@ lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, Linted
 --
 -- If   lintCoercion co = (k1, k2, s1, s2, r)
 -- then co :: s1 ~r s2
---      s1 :: k2
+--      s1 :: k1
 --      s2 :: k2
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoercion (Refl r ty)
+lintCoercion (Refl ty)
+  = do { k <- lintType ty
+       ; return (k, k, ty, ty, Nominal) }
+
+lintCoercion (GRefl r ty MRefl)
   = do { k <- lintType ty
        ; return (k, k, ty, ty, r) }
+
+lintCoercion (GRefl r ty (MCo co))
+  = do { k <- lintType ty
+       ; (_, _, k1, k2, r') <- lintCoercion co
+       ; ensureEqTys k k1
+               (hang (text "GRefl coercion kind mis-match:" <+> ppr co)
+                   2 (vcat [ppr ty, ppr k, ppr k1]))
+       ; lintRole co Nominal r'
+       ; return (k1, k2, ty, mkCastTy ty co, r) }
 
 lintCoercion co@(TyConAppCo r tc cos)
   | tc `hasKey` funTyConKey
@@ -1646,7 +1659,7 @@ lintCoercion co@(TyConAppCo r tc cos)
 lintCoercion co@(AppCo co1 co2)
   | TyConAppCo {} <- co1
   = failWithL (text "TyConAppCo to the left of AppCo:" <+> ppr co)
-  | Refl _ (TyConApp {}) <- co1
+  | Just (TyConApp {}, _) <- isReflCo_maybe co1
   = failWithL (text "Refl (TyConApp ...) to the left of AppCo:" <+> ppr co)
   | otherwise
   = do { (k1,  k2,  s1, s2, r1) <- lintCoercion co1
@@ -1883,12 +1896,6 @@ lintCoercion co@(AxiomInstCo con ind cos)
                     (bad_ax (text "check_ki2" <+> vcat [ ppr co, ppr k'', ppr ktv, ppr ktv_kind_r ] ))
            ; return (extendTCvSubst subst_l ktv s',
                      extendTCvSubst subst_r ktv t') }
-
-lintCoercion (CoherenceCo co1 co2)
-  = do { (_, k2, t1, t2, r) <- lintCoercion co1
-       ; let lhsty = mkCastTy t1 co2
-       ; k1' <- lintType lhsty
-       ; return (k1', k2, lhsty, t2, r) }
 
 lintCoercion (KindCo co)
   = do { (k1, k2, _, _, _) <- lintCoercion co

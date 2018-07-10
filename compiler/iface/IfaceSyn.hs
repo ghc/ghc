@@ -1425,8 +1425,14 @@ freeNamesIfType (IfaceDFunTy s t)     = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceCastTy t c)     = freeNamesIfType t &&& freeNamesIfCoercion c
 freeNamesIfType (IfaceCoercionTy c)   = freeNamesIfCoercion c
 
+freeNamesIfMCoercion :: IfaceMCoercion -> NameSet
+freeNamesIfMCoercion IfaceMRefl    = emptyNameSet
+freeNamesIfMCoercion (IfaceMCo co) = freeNamesIfCoercion co
+
 freeNamesIfCoercion :: IfaceCoercion -> NameSet
-freeNamesIfCoercion (IfaceReflCo _ t) = freeNamesIfType t
+freeNamesIfCoercion (IfaceReflCo t) = freeNamesIfType t
+freeNamesIfCoercion (IfaceGReflCo _ t mco)
+  = freeNamesIfType t &&& freeNamesIfMCoercion mco
 freeNamesIfCoercion (IfaceFunCo _ c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
@@ -1452,8 +1458,6 @@ freeNamesIfCoercion (IfaceLRCo _ co)
   = freeNamesIfCoercion co
 freeNamesIfCoercion (IfaceInstCo co co2)
   = freeNamesIfCoercion co &&& freeNamesIfCoercion co2
-freeNamesIfCoercion (IfaceCoherenceCo c1 c2)
-  = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceKindCo c)
   = freeNamesIfCoercion c
 freeNamesIfCoercion (IfaceSubCo co)

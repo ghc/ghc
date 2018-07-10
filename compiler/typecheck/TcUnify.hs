@@ -971,7 +971,7 @@ promoteTcType dest_lvl ty
                                           , uo_thing    = Nothing
                                           , uo_visible  = False }
            ; ki_co <- uType KindLevel kind_orig (typeKind ty) res_kind
-           ; let co = mkTcNomReflCo ty `mkTcCoherenceRightCo` ki_co
+           ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
 
 {- Note [Promoting a type]
@@ -1265,7 +1265,7 @@ uType, uType_defer
   -> CtOrigin
   -> TcType    -- ty1 is the *actual* type
   -> TcType    -- ty2 is the *expected* type
-  -> TcM Coercion
+  -> TcM CoercionN
 
 --------------
 -- It is always safe to defer unification to the main constraint solver
@@ -1300,7 +1300,7 @@ uType t_or_k origin orig_ty1 orig_ty2
             else traceTc "u_tys yields coercion:" (ppr co)
        ; return co }
   where
-    go :: TcType -> TcType -> TcM Coercion
+    go :: TcType -> TcType -> TcM CoercionN
         -- The arguments to 'go' are always semantically identical
         -- to orig_ty{1,2} except for looking through type synonyms
 
@@ -1324,15 +1324,15 @@ uType t_or_k origin orig_ty1 orig_ty2
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
-      = return $ mkReflCo Nominal ty1
+      = return $ mkNomReflCo ty1
 
     go (CastTy t1 co1) t2
       = do { co_tys <- go t1 t2
-           ; return (mkCoherenceLeftCo co_tys co1) }
+           ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
 
     go t1 (CastTy t2 co2)
       = do { co_tys <- go t1 t2
-           ; return (mkCoherenceRightCo co_tys co2) }
+           ; return ( mkCoherenceRightCo Nominal t2 co2 co_tys) }
 
         -- See Note [Expanding synonyms during unification]
         --
