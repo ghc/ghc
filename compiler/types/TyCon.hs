@@ -391,7 +391,7 @@ See also:
 -}
 
 type TyConBinder = TyVarBndr TyVar TyConBndrVis
-                   -- See also Note [TyBinder] in TyCoRep
+                   -- See also Note [TyBinders] in TyCoRep
 
 data TyConBndrVis
   = NamedTCB ArgFlag

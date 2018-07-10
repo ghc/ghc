@@ -1839,6 +1839,8 @@ tcImplicitTKBndrsX new_tv skol_info tv_names thing_inside
        ; skol_tvs <- mapM zonkTcTyCoVarBndr skol_tvs
           -- use zonkTcTyCoVarBndr because a skol_tv might be a SigTv
 
+          -- do a stable topological sort, following
+          -- Note [Ordering of implicit variables] in HsTypes
        ; let final_tvs = toposortTyVars skol_tvs
        ; traceTc "tcImplicitTKBndrs" (ppr tv_names $$ ppr final_tvs)
        ; return (final_tvs, result) }
