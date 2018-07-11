@@ -2693,6 +2693,9 @@ defined to use this.  @pprParendType@ is the same, except it puts
 parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
+Note that any function which pretty-prints a @Type@ first converts the @Type@
+to an @IfaceType@. See Note [IfaceType and pretty-printing] in IfaceType.
+
 See Note [Precedence in types] in BasicTypes.
 -}
 

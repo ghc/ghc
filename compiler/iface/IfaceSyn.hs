@@ -184,7 +184,7 @@ data IfaceTyConParent
   = IfNoParent
   | IfDataInstance IfExtName
                    IfaceTyCon
-                   IfaceTcArgs
+                   IfaceAppArgs
 
 data IfaceFamTyConFlav
   = IfaceDataFamilyTyCon                      -- Data family
@@ -211,7 +211,7 @@ data IfaceAT = IfaceAT  -- See Class.ClassATItem
 -- This is just like CoAxBranch
 data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars   :: [IfaceTvBndr]
                                    , ifaxbCoVars   :: [IfaceIdBndr]
-                                   , ifaxbLHS      :: IfaceTcArgs
+                                   , ifaxbLHS      :: IfaceAppArgs
                                    , ifaxbRoles    :: [Role]
                                    , ifaxbRHS      :: IfaceType
                                    , ifaxbIncomps  :: [BranchIndex] }
@@ -573,7 +573,7 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
       | otherwise
       = brackets (pprWithCommas (pprIfaceTvBndr True) tvs <> semi <+>
                   pprWithCommas pprIfaceIdBndr cvs)
-    pp_lhs = hang pp_tc 2 (pprParendIfaceTcArgs pat_tys)
+    pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
     maybe_incomps = ppUnless (null incomps) $ parens $
                     text "incompatible indices:" <+> ppr incomps
 
@@ -1050,7 +1050,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     -- See Note [Result type of a data family GADT]
     mk_user_con_res_ty eq_spec
       | IfDataInstance _ tc tys <- parent
-      = pprIfaceType (IfaceTyConApp tc (substIfaceTcArgs gadt_subst tys))
+      = pprIfaceType (IfaceTyConApp tc (substIfaceAppArgs gadt_subst tys))
       | otherwise
       = sdocWithDynFlags (ppr_tc_app gadt_subst)
       where
@@ -1347,7 +1347,7 @@ freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars   = tyvars
                                    , ifaxbRHS      = rhs })
   = fnList freeNamesIfTvBndr tyvars &&&
     fnList freeNamesIfIdBndr covars &&&
-    freeNamesIfTcArgs lhs &&&
+    freeNamesIfAppArgs lhs &&&
     freeNamesIfType rhs
 
 freeNamesIfIdDetails :: IfaceIdDetails -> NameSet
@@ -1407,17 +1407,17 @@ freeNamesIfBang _               = emptyNameSet
 freeNamesIfKind :: IfaceType -> NameSet
 freeNamesIfKind = freeNamesIfType
 
-freeNamesIfTcArgs :: IfaceTcArgs -> NameSet
-freeNamesIfTcArgs (ITC_Vis   t ts) = freeNamesIfType t &&& freeNamesIfTcArgs ts
-freeNamesIfTcArgs (ITC_Invis k ks) = freeNamesIfKind k &&& freeNamesIfTcArgs ks
-freeNamesIfTcArgs ITC_Nil          = emptyNameSet
+freeNamesIfAppArgs :: IfaceAppArgs -> NameSet
+freeNamesIfAppArgs (IA_Vis   t ts) = freeNamesIfType t &&& freeNamesIfAppArgs ts
+freeNamesIfAppArgs (IA_Invis k ks) = freeNamesIfKind k &&& freeNamesIfAppArgs ks
+freeNamesIfAppArgs IA_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
 freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
-freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
-freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfTcArgs ts
-freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfTcArgs ts
+freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfAppArgs t
+freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfAppArgs ts
+freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfAppArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
 freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfTyVarBndr tv &&& freeNamesIfType t
 freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
@@ -1567,7 +1567,7 @@ freeNamesIfFamInst (IfaceFamInst { ifFamInstFam = famName
 freeNamesIfaceTyConParent :: IfaceTyConParent -> NameSet
 freeNamesIfaceTyConParent IfNoParent = emptyNameSet
 freeNamesIfaceTyConParent (IfDataInstance ax tc tys)
-  = unitNameSet ax &&& freeNamesIfTc tc &&& freeNamesIfTcArgs tys
+  = unitNameSet ax &&& freeNamesIfTc tc &&& freeNamesIfAppArgs tys
 
 -- helpers
 (&&&) :: NameSet -> NameSet -> NameSet
