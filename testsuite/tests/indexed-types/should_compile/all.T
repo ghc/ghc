@@ -288,3 +288,5 @@ test('T15318', normal, compile, [''])
 test('T15322', normal, compile, [''])
 test('T15322a', normal, compile_fail, [''])
 test('T15142', normal, compile, [''])
+test('T15352', normal, compile, [''])
+
