@@ -1402,26 +1402,26 @@ getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [The tcType invariant] in TcHsType.
 
-During type inference, we maintain the invariant that
+During type inference, we maintain this invariant
 
-   INVARIANT: every type is well-kinded /without/ zonking
+   (INV-TK): it is legal to call 'typeKind' on any Type ty,
+             /without/ zonking ty
 
-   EXCEPT: you are allowed (ty |> co) even if the kind of ty
-           does not match the from-kind of co.
+For example, suppose
+    kappa is a unification variable
+    We have already unified kappa := Type
+      yielding    co :: Refl (Type -> Type)
+    a :: kappa
+then consider the type
+    (a Int)
+If we call typeKind on that, we'll crash, because the (un-zonked)
+kind of 'a' is just kappa, not an arrow kind.  If we zonk first
+we'd be fine, but that is too tiresome, so instead we maintain
+(TK-INV).  So we do not form (a Int); instead we form
+    (a |> co) Int
+and typeKind has no problem with that.
 
-Main goal: if this invariant is respected, then typeKind cannot fail
-(as it can for ill-kinded types).
-
-In particular, we can get types like
-     (k |> co) Int
-where
-    k :: kappa
-    co :: Refl (Type -> Type)
-    kappa is a unification variable and kappa := Type already
-
-So in the un-zonked form (k Int) would be ill-kinded,
-but (k |> co) Int is well-kinded.  So we want to keep that 'co'
-/even though it is Refl/.
+Bottom line: we want to keep that 'co' /even though it is Refl/.
 
 Immediate consequence: during type inference we cannot use the "smart
 contructors" for types, particularly
