@@ -977,7 +977,6 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
            ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                      tc_lhs_type mode arg exp_kind
            ; traceTc "tcInferApps (vis 1)" (vcat [ ppr exp_kind
-                                                 , ppr arg'
                                                  , ppr (typeKind arg') ])
            ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
            ; go (n+1) (arg' : acc_args) subst'
