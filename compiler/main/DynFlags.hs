@@ -583,6 +583,7 @@ data GeneralFlag
    | Opt_UnclutterValidHoleFits
    | Opt_ShowTypeAppOfHoleFits
    | Opt_ShowTypeAppVarsOfHoleFits
+   | Opt_ShowDocsOfHoleFits
    | Opt_ShowTypeOfHoleFits
    | Opt_ShowProvOfHoleFits
    | Opt_ShowMatchesOfHoleFits
@@ -4025,6 +4026,7 @@ fHoleFlags = [
   flagSpec "show-type-of-hole-fits"           Opt_ShowTypeOfHoleFits,
   flagSpec "show-type-app-of-hole-fits"       Opt_ShowTypeAppOfHoleFits,
   flagSpec "show-type-app-vars-of-hole-fits"  Opt_ShowTypeAppVarsOfHoleFits,
+  flagSpec "show-docs-of-hole-fits"           Opt_ShowDocsOfHoleFits,
   flagSpec "unclutter-valid-hole-fits"        Opt_UnclutterValidHoleFits
   ]
 
@@ -4306,6 +4308,7 @@ validHoleFitsImpliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
 validHoleFitsImpliedGFlags
   = [ (Opt_UnclutterValidHoleFits, turnOff, Opt_ShowTypeAppOfHoleFits)
     , (Opt_UnclutterValidHoleFits, turnOff, Opt_ShowTypeAppVarsOfHoleFits)
+    , (Opt_UnclutterValidHoleFits, turnOff, Opt_ShowDocsOfHoleFits)
     , (Opt_ShowTypeAppVarsOfHoleFits, turnOff, Opt_ShowTypeAppOfHoleFits)
     , (Opt_UnclutterValidHoleFits, turnOff, Opt_ShowProvOfHoleFits) ]
 

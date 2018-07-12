@@ -16,7 +16,7 @@ module LoadIface (
         -- RnM/TcM functions
         loadModuleInterface, loadModuleInterfaces,
         loadSrcInterface, loadSrcInterface_maybe,
-        loadInterfaceForName, loadInterfaceForModule,
+        loadInterfaceForName, loadInterfaceForNameMaybe, loadInterfaceForModule,
 
         -- IfM functions
         loadInterface,
@@ -312,6 +312,15 @@ loadInterfaceForName doc name
             ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc ) }
       ; ASSERT2( isExternalName name, ppr name )
         initIfaceTcRn $ loadSysInterface doc (nameModule name) }
+
+-- | Only loads the interface for external non-local names.
+loadInterfaceForNameMaybe :: SDoc -> Name -> TcRn (Maybe ModIface)
+loadInterfaceForNameMaybe doc name
+  = do { this_mod <- getModule
+       ; if nameIsLocalOrFrom this_mod name || not (isExternalName name)
+         then return Nothing
+         else Just <$> (initIfaceTcRn $ loadSysInterface doc (nameModule name))
+       }
 
 -- | Loads the interface for a given Module.
 loadInterfaceForModule :: SDoc -> Module -> TcRn ModIface

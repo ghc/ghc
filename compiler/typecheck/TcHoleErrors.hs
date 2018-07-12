@@ -37,6 +37,12 @@ import Data.Function    ( on )
 import TcSimplify    ( simpl_top, runTcSDeriveds )
 import TcUnify       ( tcSubType_NC )
 
+import ExtractDocs ( extractDocs )
+import qualified Data.Map as Map
+import HsDoc           ( HsDocString, unpackHDS, DeclDocMap(..) )
+import HscTypes        ( ModIface(..) )
+import LoadIface       ( loadInterfaceForNameMaybe )
+
 {-
 Note [Valid hole fits include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -424,9 +430,19 @@ data HoleFit = HoleFit { hfElem :: Maybe GlobalRdrElt -- The element that was
                        , hfType :: TcType -- The type of the id, possibly zonked
                        , hfRefLvl :: Int  -- The number of holes in this fit
                        , hfWrap :: [TcType] -- The wrapper for the match
-                       , hfMatches :: [TcType] } -- What the refinement
-                                                 -- variables got matched with,
-                                                 -- if anything
+                       , hfMatches :: [TcType]  -- What the refinement
+                                                -- variables got matched with,
+                                                -- if anything
+                       , hfDoc :: Maybe HsDocString } -- Documentation of this
+                                                      -- HoleFit, if available.
+
+hfName :: HoleFit -> Name
+hfName = idName . hfId
+
+hfIsLcl :: HoleFit -> Bool
+hfIsLcl hf = case hfElem hf of
+               Just gre -> gre_lcl gre
+               Nothing -> True
 
 -- We define an Eq and Ord instance to be able to build a graph.
 instance Eq HoleFit where
@@ -439,7 +455,7 @@ instance Eq HoleFit where
 instance Ord HoleFit where
   compare a b = cmp a b
     where cmp  = if hfRefLvl a == hfRefLvl b
-                 then compare `on` (idName . hfId)
+                 then compare `on` hfName
                  else compare `on` hfRefLvl
 
 instance Outputable HoleFit where
@@ -451,6 +467,26 @@ instance (HasOccName a, HasOccName b) => HasOccName (Either a b) where
 instance HasOccName GlobalRdrElt where
     occName = occName . gre_name
 
+-- If enabled, we go through the fits and add any associated documentation,
+--  by looking it up in the module or the environment (for local fits)
+addDocs :: [HoleFit] -> TcM [HoleFit]
+addDocs fits =
+  do { showDocs <- goptM Opt_ShowDocsOfHoleFits
+     ; if showDocs
+       then do { (_, DeclDocMap lclDocs, _) <- extractDocs <$> getGblEnv
+               ; mapM (upd lclDocs) fits }
+       else return fits }
+  where
+   msg = text "TcHoleErrors addDocs"
+   lookupInIface name (ModIface { mi_decl_docs = DeclDocMap dmap })
+     = Map.lookup name dmap
+   upd lclDocs fit =
+     let name = hfName fit in
+     do { doc <- if hfIsLcl fit
+                 then pure (Map.lookup name lclDocs)
+                 else do { mbIface <- loadInterfaceForNameMaybe msg name
+                         ; return $ mbIface >>= lookupInIface name }
+        ; return $ fit {hfDoc = doc} }
 
 -- For pretty printing hole fits, we display the name and type of the fit,
 -- with added '_' to represent any extra arguments in case of a non-zero
@@ -459,7 +495,7 @@ pprHoleFit :: HoleFitDispConfig -> HoleFit -> SDoc
 pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) hf = hang display 2 provenance
     where name = case hfElem hf of
                       Just gre -> gre_name gre
-                      Nothing -> idName (hfId hf)
+                      Nothing -> hfName hf
           ty = hfType hf
           matches =  hfMatches hf
           wrap = hfWrap hf
@@ -488,12 +524,17 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) hf = hang display 2 provenance
                       $ text "with" <+> if sWrp || not sTy
                                         then occDisp <+> tyApp
                                         else tyAppVars
+          docs = case hfDoc hf of
+                   Just d ->
+                     text "{-^" <>
+                     (vcat . map text . lines . unpackHDS) d
+                     <> text "-}"
+                   _ -> empty
           funcInfo = ppWhen (has matches && sTy) $
                        text "where" <+> occDisp <+> tyDisp
           subDisp = occDisp <+> if has matches then holeDisp else tyDisp
-          display =  subDisp $$ nest 2 (funcInfo $+$ wrapDisp)
-          provenance = ppWhen sProv $
-            parens $
+          display =  subDisp $$ nest 2 (funcInfo $+$ docs $+$ wrapDisp)
+          provenance = ppWhen sProv $ parens $
                 case hfElem hf of
                     Just gre -> pprNameProvenance gre
                     Nothing -> text "bound at" <+> ppr (getSrcLoc name)
@@ -549,9 +590,10 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
      ; tidy_sorted_subs <- sortFits sortingAlg tidy_subs
      ; let (pVDisc, limited_subs) = possiblyDiscard maxVSubs tidy_sorted_subs
            vDiscards = pVDisc || searchDiscards
-     ; let vMsg = ppUnless (null limited_subs) $
+     ; subs_with_docs <- addDocs limited_subs
+     ; let vMsg = ppUnless (null subs_with_docs) $
                     hang (text "Valid hole fits include") 2 $
-                      vcat (map (pprHoleFit hfdc) limited_subs)
+                      vcat (map (pprHoleFit hfdc) subs_with_docs)
                         $$ ppWhen vDiscards subsDiscardMsg
      -- Refinement hole fits. See Note [Valid refinement hole fits include ...]
      ; (tidy_env, refMsg) <- if refLevel >= Just 0 then
@@ -576,10 +618,11 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
                   (pRDisc, exact_last_rfits) =
                     possiblyDiscard maxRSubs $ not_exact ++ exact
                   rDiscards = pRDisc || any fst refDs
+            ; rsubs_with_docs <- addDocs exact_last_rfits
             ; return (tidy_env,
-                ppUnless (null tidy_sorted_rsubs) $
+                ppUnless (null rsubs_with_docs) $
                   hang (text "Valid refinement hole fits include") 2 $
-                  vcat (map (pprHoleFit hfdc) exact_last_rfits)
+                  vcat (map (pprHoleFit hfdc) rsubs_with_docs)
                     $$ ppWhen rDiscards refSubsDiscardMsg) }
        else return (tidy_env, empty)
      ; traceTc "findingValidHoleFitsFor }" empty
@@ -612,7 +655,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
     sortFits BySize subs
         = (++) <$> sortBySize (sort lclFits)
                <*> sortBySize (sort gblFits)
-        where (lclFits, gblFits) = span isLocalHoleFit subs
+        where (lclFits, gblFits) = span hfIsLcl subs
 
     -- To sort by subsumption, we invoke the sortByGraph function, which
     -- builds the subsumption graph for the fits and then sorts them using a
@@ -623,12 +666,8 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
     sortFits BySubsumption subs
         = (++) <$> sortByGraph (sort lclFits)
                <*> sortByGraph (sort gblFits)
-        where (lclFits, gblFits) = span isLocalHoleFit subs
+        where (lclFits, gblFits) = span hfIsLcl subs
 
-    isLocalHoleFit :: HoleFit -> Bool
-    isLocalHoleFit hf = case hfElem hf of
-                          Just gre -> gre_lcl gre
-                          Nothing -> True
 
     -- See Note [Relevant Constraints]
     relevantCts :: [Ct]
@@ -787,7 +826,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
             go :: [(HoleFit, [HoleFit])] -> [HoleFit] -> TcM [HoleFit]
             go sofar [] = do { traceTc "subsumptionGraph was" $ ppr sofar
                              ; return $ uncurry (++)
-                                         $ partition isLocalHoleFit topSorted }
+                                         $ partition hfIsLcl topSorted }
               where toV (hf, adjs) = (hf, hfId hf, map hfId adjs)
                     (graph, fromV, _) = graphFromEdges $ map toV sofar
                     topSorted = map ((\(h,_,_) -> h) . fromV) $ topSort graph
@@ -841,10 +880,11 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
           where discard_it = go subs seen maxleft ty elts
                 keep_it id wrp ms = go (fit:subs) (extendVarSet seen id)
                                   ((\n -> n - 1) <$> maxleft) ty elts
-                  where fit = HoleFit { hfElem = mbel , hfId = id
+                  where fit = HoleFit { hfElem = mbel, hfId = id
                                       , hfType = idType id
                                       , hfRefLvl = length (snd ty)
-                                      , hfWrap = wrp , hfMatches = ms }
+                                      , hfWrap = wrp, hfMatches = ms
+                                      , hfDoc = Nothing }
                         mbel = either (const Nothing) Just el
                 -- We want to filter out undefined and the likes from GHC.Err
                 not_trivial id = nameModule_maybe (idName id) /= Just gHC_ERR

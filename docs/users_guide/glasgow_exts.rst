@@ -11595,6 +11595,21 @@ configurable by a few flags.
     ``mempty @(Int -> [Int])``. This can be toggled off with
     the reverse of this flag.
 
+.. ghc-flag:: -fshow-docs-of-hole-fits
+    :shortdesc: Toggles whether to show the documentation of the valid
+       hole fits in the output.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-docs-of-hole-fits
+
+    :default: off
+
+    It can sometime be the case that the name and type of a valid hole
+    fit is not enough to realize what the fit stands for. This flag
+    adds the documentation of the fit to the message, if the 
+    documentation is available (and the module from which the function
+    comes was compiled with the ``-haddock`` flag).
+
 .. ghc-flag:: -fshow-type-app-vars-of-hole-fits
     :shortdesc: Toggles whether to show what type each quantified
        variable takes in a valid hole fit.
