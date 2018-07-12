@@ -19,7 +19,7 @@ plugin = defaultPlugin { parsedResultAction = parsedPlugin
                        , typeCheckResultAction = typecheckPlugin
                        , spliceRunAction = metaPlugin'
                        , interfaceLoadAction = interfaceLoadPlugin'
-                       , renamedResultAction = Just renamedAction
+                       , renamedResultAction = renamedAction
                        }
 
 parsedPlugin :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -28,12 +28,12 @@ parsedPlugin opts _ pm
   = do liftIO $ putStrLn $ "parsePlugin(" ++ intercalate "," opts ++ ")"
        return pm
 
-renamedAction :: [CommandLineOption] -> ModSummary
-                    -> ( HsGroup GhcRn, [LImportDecl GhcRn]
-                       , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString )
-                    -> TcM ()
-renamedAction _ _ ( gr, _, _, _ )
-  = liftIO $ putStrLn "typeCheckPlugin (rn)"
+renamedAction :: [CommandLineOption]
+                    -> TcGblEnv -> HsGroup GhcRn
+                    -> TcM (TcGblEnv, HsGroup GhcRn)
+renamedAction _ env grp
+  = do liftIO $ putStrLn "typeCheckPlugin (rn)"
+       return (env, grp)
 
 typecheckPlugin :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
 typecheckPlugin _ _ tc
