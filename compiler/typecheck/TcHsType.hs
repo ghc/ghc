@@ -1211,8 +1211,16 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
            ; let (tc_kind_bndrs, tc_inner_ki) = splitPiTysInvisible tc_kind
            ; (tc_args, kind) <- instantiateTyN Nothing (length (tyConBinders tc_tc))
                                                tc_kind_bndrs tc_inner_ki
-           ; let tc_ty = mkNakedTyConApp tc tc_args `mkNakedCastTy` mkRepReflCo kind
-               -- mkNakedCastTy is for (IT5) of Note [The tcType invariant]
+           ; let is_saturated = tc_args `lengthAtLeast` tyConArity tc_tc
+                 tc_ty
+                   | is_saturated = mkNakedTyConApp tc tc_args `mkNakedCastTy` mkRepReflCo kind
+                      -- mkNakedCastTy is for (IT5) of Note [The tcType invariant]
+                   | otherwise    = mkNakedTyConApp tc tc_args
+                      -- if the tycon isn't yet saturated, then we don't want mkNakedCastTy,
+                      -- because that means we'll have an unsaturated type family
+                      -- We don't need it anyway, because we can be sure that the
+                      -- type family kind will accept further arguments (because it is
+                      -- not yet saturated)
            -- tc and tc_ty must not be traced here, because that would
            -- force the evaluation of a potentially knot-tied variable (tc),
            -- and the typechecker would hang, as per #11708
@@ -2742,7 +2750,7 @@ tcLHsKindSig ctxt hs_kind
 -- Result is zonked
   = do { kind <- solveLocalEqualities $
                  tc_lhs_kind kindLevelMode hs_kind
-       ; traceTc "tcLHsKindSig" (ppr kind)
+       ; traceTc "tcLHsKindSig" (ppr hs_kind $$ ppr kind)
        ; kind <- zonkPromoteType kind
          -- This zonk is very important in the case of higher rank kinds
          -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
