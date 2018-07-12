@@ -124,15 +124,6 @@ EXTERN_INLINE void unlockClosure(StgClosure *p, const StgInfoTable *info)
     p->header.info = info;
 }
 
-// Handy specialised versions of lockClosure()/unlockClosure()
-INLINE_HEADER void lockTSO(StgTSO *tso);
-INLINE_HEADER void lockTSO(StgTSO *tso)
-{ lockClosure((StgClosure *)tso); }
-
-INLINE_HEADER void unlockTSO(StgTSO *tso);
-INLINE_HEADER void unlockTSO(StgTSO *tso)
-{ unlockClosure((StgClosure*)tso, (const StgInfoTable *)&stg_TSO_info); }
-
 #endif /* CMINUSMINUS */
 
 #include "EndPrivate.h"

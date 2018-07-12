@@ -416,21 +416,12 @@ check_target:
     }
 
     case BlockedOnSTM:
-        lockTSO(target);
-        // Unblocking BlockedOnSTM threads requires the TSO to be
-        // locked; see STM.c:unpark_tso().
-        if (target->why_blocked != BlockedOnSTM) {
-            unlockTSO(target);
-            goto retry;
-        }
         if ((target->flags & TSO_BLOCKEX) &&
             ((target->flags & TSO_INTERRUPTIBLE) == 0)) {
             blockedThrowTo(cap,target,msg);
-            unlockTSO(target);
             return THROWTO_BLOCKED;
         } else {
             raiseAsync(cap, target, msg->exception, false, NULL);
-            unlockTSO(target);
             return THROWTO_SUCCESS;
         }
 
