@@ -1926,6 +1926,26 @@ static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
 
    IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
 
+   // Loading the same object multiple times will lead to chaos
+   // because we will have two NativeCodes but one underlying handle,
+   // so let's fail if this happens.
+   for (nc = native_objects; nc; nc = nc->next) {
+       if (!pathcmp(nc->fileName,path)) {
+           copyErrmsg(errmsg, "native object already loaded");
+           return NULL;
+       }
+   }
+
+   // We also cannot load the same object if we are in the process of
+   // unloading it. We cannot resurrect it because we've already
+   // released the StablePtrs.
+   for (nc = unloaded_native_objects; nc; nc = nc->next) {
+       if (!pathcmp(nc->fileName,path)) {
+           copyErrmsg(errmsg, "unload in progress");
+           return NULL;
+       }
+   }
+
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
 
