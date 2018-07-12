@@ -125,6 +125,11 @@ Language
 
   This is now an error unless :extension:`PolyKinds` is enabled.
 
+- The plugin mechanism has been extended to allow plugins to run between frontend
+  phases. Of particular note are the parser and typechecker plugins which run
+  after parsing and typechecking have completed. Collectively, these new extension
+  points are called :ref:`source plugins <source-plugins>`.
+	
 - Type literals now could be used in type class instances without the extension
   :extension:`FlexibleInstances`.
 
