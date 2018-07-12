@@ -9,7 +9,7 @@ cabal08: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp1.d
 	'$(GHC_PKG)' init tmp2.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cd p1 && $(SETUP) clean
 	cd p1 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp1.d --prefix='$(PWD)/inst-p1' --ipid="p-0.1-aaa"
 	cd p1 && $(SETUP) build

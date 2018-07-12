@@ -8,7 +8,7 @@ CONFIGURE=$(SETUP) configure --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OP
 T13168: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 
 	cd package1 && $(CONFIGURE) && $(SETUP) build && $(SETUP) copy && $(SETUP) register
 	cd package2 && $(CONFIGURE) && $(SETUP) build && $(SETUP) copy && $(SETUP) register

@@ -8,7 +8,7 @@ CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --gh
 bkpcabal02: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	# Here is a working signature which this
 	# package can typecheck with
 	cp p/H.hsig.in1 p/H.hsig

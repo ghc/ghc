@@ -24,7 +24,7 @@ SETUP=../Setup -v0
 cabal06: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cd p-1.0 && $(SETUP) clean
 	cd p-1.0 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-a' --ghc-pkg-options='--enable-multi-instance'
 	cd p-1.0 && $(SETUP) build
