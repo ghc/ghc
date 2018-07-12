@@ -144,7 +144,7 @@ spanToNewline 0 str@(c:_) | ((lexed, str') : _) <- R.lex str, not (isSpace c) =
       -- A Haskell line comment
       then case span (/= '\n') str' of
              (str'', '\n':rest) -> (lexed ++ str'' ++ "\n", rest)
-             (_, _) -> (str, "") 
+             (_, _) -> (str, "")
 
       -- An actual Haskell token
       else let (str'', rest) = spanToNewline 0 str'
@@ -165,10 +165,10 @@ ghcToks = reverse . (\(_,ts,_) -> ts) . foldl' go (start, [], False)
 
     go :: (RealSrcLoc, [T.Token], Bool)
        -- ^ current position, tokens accumulated, currently in pragma (or not)
-       
+
        -> (Located L.Token, String)
        -- ^ next token, its content
-       
+
        -> (RealSrcLoc, [T.Token], Bool)
        -- ^ new position, new tokens accumulated, currently in pragma (or not)
 
@@ -179,12 +179,12 @@ ghcToks = reverse . (\(_,ts,_) -> ts) . foldl' go (start, [], False)
         )
        where
          (next_pos, white) = mkWhitespace pos l
-         
+
          classifiedTok = [ Token (classify' tok) raw rss
                          | RealSrcSpan rss <- [l]
                          , not (null raw)
                          ]
-         
+
          classify' | in_prag = const TkPragma
                    | otherwise = classify
 
@@ -378,6 +378,7 @@ classify tok =
     ITLarrowtail        {} -> TkGlyph
     ITRarrowtail        {} -> TkGlyph
 
+    ITcomment_line_prag    -> TkUnknown
     ITunknown           {} -> TkUnknown
     ITeof                  -> TkUnknown
 
