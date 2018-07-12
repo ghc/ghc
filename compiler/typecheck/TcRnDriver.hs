@@ -290,7 +290,6 @@ tcRnModuleTcRnM hsc_env mod_sum
                 -- add extra source files to tcg_dependent_files
         addDependentFiles src_files ;
 
-        runRenamerPlugin mod_sum hsc_env tcg_env ;
         tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env ;
 
                 -- Dump output and return
@@ -1305,6 +1304,8 @@ rnTopSrcDecls group
         traceRn "rn12" empty ;
         (tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls group ;
         traceRn "rn13" empty ;
+        (tcg_env, rn_decls) <- runRenamerPlugin tcg_env rn_decls ;
+        traceRn "rn13-plugin" empty ;
 
         -- save the renamed syntax, if we want it
         let { tcg_env'
@@ -2756,16 +2757,15 @@ getTcPlugins :: DynFlags -> [TcPlugin]
 getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
   where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
 
-runRenamerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM ()
-runRenamerPlugin mod_sum hsc_env gbl_env = do
-    let dflags = hsc_dflags hsc_env
-    case getRenamedStuff gbl_env of
-      Just rn ->
-        withPlugins_ dflags
-                     (\p opts -> (fromMaybe (\_ _ _ -> return ())
-                                            (renamedResultAction p)) opts mod_sum)
-                     rn
-      Nothing -> return ()
+runRenamerPlugin :: TcGblEnv
+                 -> HsGroup GhcRn
+                 -> TcM (TcGblEnv, HsGroup GhcRn)
+runRenamerPlugin gbl_env hs_group = do
+    dflags <- getDynFlags
+    withPlugins dflags
+      (\p opts (e, g) -> ( mark_plugin_unsafe dflags >> renamedResultAction p opts e g))
+      (gbl_env, hs_group)
+
 
 -- XXX: should this really be a Maybe X?  Check under which circumstances this
 -- can become a Nothing and decide whether this should instead throw an
@@ -2784,10 +2784,14 @@ getRenamedStuff tc_result
 runTypecheckerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM TcGblEnv
 runTypecheckerPlugin sum hsc_env gbl_env = do
     let dflags = hsc_dflags hsc_env
-        unsafeText = "Use of plugins makes the module unsafe"
-        pluginUnsafe = unitBag ( mkPlainWarnMsg dflags noSrcSpan
-                                   (Outputable.text unsafeText) )
-        mark_unsafe = recordUnsafeInfer pluginUnsafe
     withPlugins dflags
-      (\p opts env -> mark_unsafe >> typeCheckResultAction p opts sum env)
+      (\p opts env -> mark_plugin_unsafe dflags
+                        >> typeCheckResultAction p opts sum env)
       gbl_env
+
+mark_plugin_unsafe :: DynFlags -> TcM ()
+mark_plugin_unsafe dflags = recordUnsafeInfer pluginUnsafe
+  where
+    unsafeText = "Use of plugins makes the module unsafe"
+    pluginUnsafe = unitBag ( mkPlainWarnMsg dflags noSrcSpan
+                                   (Outputable.text unsafeText) )
