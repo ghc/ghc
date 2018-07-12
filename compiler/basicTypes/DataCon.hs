@@ -87,7 +87,6 @@ import qualified Data.Data as Data
 import Data.Char
 import Data.Word
 import Data.List( find )
-import qualified Data.Set as Set
 
 {-
 Data constructor representation
@@ -887,24 +886,12 @@ mkDataCon name declared_infix prom_info
   = con
   where
     is_vanilla = null ex_tvs && null eq_spec && null theta
-    -- Check the dcUserTyVarBinders invariant
-    -- (see Note [DataCon user type variable binders])
-    user_tvbs_invariant =
-         Set.fromList (filterEqSpec eq_spec univ_tvs ++ ex_tvs)
-      == Set.fromList (binderVars user_tvbs)
-    user_tvbs' =
-      ASSERT2( user_tvbs_invariant
-             , (vcat [ ppr name
-                     , ppr univ_tvs
-                     , ppr ex_tvs
-                     , ppr eq_spec
-                     , ppr user_tvbs ]) )
-      user_tvbs
+
     con = MkData {dcName = name, dcUnique = nameUnique name,
                   dcVanilla = is_vanilla, dcInfix = declared_infix,
                   dcUnivTyVars = univ_tvs,
                   dcExTyVars = ex_tvs,
-                  dcUserTyVarBinders = user_tvbs',
+                  dcUserTyVarBinders = user_tvbs,
                   dcEqSpec = eq_spec,
                   dcOtherTheta = theta,
                   dcStupidTheta = stupid_theta,
@@ -937,7 +924,7 @@ mkDataCon name declared_infix prom_info
 
       -- See Note [Promoted data constructors] in TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
-                    | TvBndr tv vis <- user_tvbs' ]
+                    | TvBndr tv vis <- user_tvbs ]
 
     prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ orig_arg_tys)
     prom_res_kind  = orig_res_ty
