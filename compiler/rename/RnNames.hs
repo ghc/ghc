@@ -20,7 +20,9 @@ module RnNames (
         mkChildEnv,
         findChildren,
         dodgyMsg,
-        dodgyMsgInsert
+        dodgyMsgInsert,
+        findImportUsage,
+        ImportDeclUsage
     ) where
 
 #include "HsVersions.h"
