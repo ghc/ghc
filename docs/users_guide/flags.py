@@ -5,7 +5,7 @@
 #
 # .. ghc-flag::
 #     :shortdesc: A short description (REQUIRED)
-#     :type: dynamic, mode, dynamix/ ``:set`` (REQUIRED)
+#     :type: dynamic or mode  (REQUIRED)
 #     :reverse: The reverse of the flag
 #     :category: The category to list the flag under (default: 'misc')
 #     :noindex: Do not list the flag anywhere (good for duplicates)
@@ -109,6 +109,8 @@ class GenericFlag(GenericObject):
         type_node = nodes.paragraph()
         reverse_node = nodes.paragraph()
 
+        assert flag_type in ('dynamic', 'mode'), ('Unknown flag type for %s: %s' %
+                                                     (name_string, flag_type))
 
         # Nodes expect an internal ViewList type for the content,
         # we are just spoofing it here

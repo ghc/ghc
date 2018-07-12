@@ -4,8 +4,8 @@ Flag reference
 ==============
 
 This section is a quick-reference for GHC's command-line flags. For each
-flag, we also list its static/dynamic status (see
-:ref:`static-dynamic-flags`), and the flag's opposite (if available).
+flag, we also list its mode/dynamic status (see
+:ref:`mode-dynamic-flags`), and the flag's opposite (if available).
 
 Verbosity options
 -----------------
