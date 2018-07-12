@@ -420,3 +420,5 @@ test('T15324', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15331', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 # Note: T9693 should be only_ways(['ghci']) once it's fixed.
 test('T9693', expect_broken(9693), ghci_script, ['T9693.script'])
+test('T14471', normal, compile, [''])
+test('TH_rebindableAdo', normal, compile, [''])

@@ -26,6 +26,7 @@ import GhcPrelude
 import RnBinds   ( rnLocalBindsAndThen, rnLocalValBindsLHS, rnLocalValBindsRHS,
                    rnMatchGroup, rnGRHS, makeMiniFixityEnv)
 import HsSyn
+import TcEnv            ( isBrackStage )
 import TcRnMonad
 import Module           ( getModule )
 import RnEnv
@@ -731,7 +732,10 @@ postProcessStmtsForApplicativeDo ctxt stmts
          ado_is_on <- xoptM LangExt.ApplicativeDo
        ; let is_do_expr | DoExpr <- ctxt = True
                         | otherwise = False
-       ; if ado_is_on && is_do_expr
+       -- don't apply the transformation inside TH brackets, because
+       -- DsMeta does not handle ApplicativeDo.
+       ; in_th_bracket <- isBrackStage <$> getStage
+       ; if ado_is_on && is_do_expr && not in_th_bracket
             then do { traceRn "ppsfa" (ppr stmts)
                     ; rearrangeForApplicativeDo ctxt stmts }
             else noPostProcessStmts ctxt stmts }
