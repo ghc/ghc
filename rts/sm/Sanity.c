@@ -547,7 +547,8 @@ checkTSO(StgTSO *tso)
     ASSERT(next == END_TSO_QUEUE ||
            info == &stg_MVAR_TSO_QUEUE_info ||
            info == &stg_TSO_info ||
-           info == &stg_WHITEHOLE_info); // happens due to STM doing lockTSO()
+           info == &stg_WHITEHOLE_info); // used to happen due to STM doing
+                                         // lockTSO(), might not happen now
 
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead
