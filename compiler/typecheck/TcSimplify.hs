@@ -2204,17 +2204,23 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
 
        -- Now we can pick the ones to float
        -- The constraints are un-flattened and de-canonicalised
-       ; let seed_skols = mkVarSet skols     `unionVarSet`
-                          mkVarSet given_ids `unionVarSet`
-                          foldEvBindMap add_one emptyVarSet binds
-             add_one bind acc = extendVarSet acc (evBindVar bind)
-             -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
+       ; let (candidate_eqs, no_float_cts) = partitionBag is_float_eq_candidate simples
 
-             (eqs, non_eqs)        = partitionBag is_eq_ct simples
-             extended_skols        = transCloVarSet (extra_skols eqs) seed_skols
-             (flt_eqs, no_flt_eqs) = partitionBag (is_floatable extended_skols) eqs
-             remaining_simples = non_eqs `andCts` no_flt_eqs
-             -- extended_skols: See Note [What prevents a constraint from floating] (3)
+             seed_skols = mkVarSet skols     `unionVarSet`
+                          mkVarSet given_ids `unionVarSet`
+                          foldrBag add_non_flt_ct emptyVarSet no_float_cts `unionVarSet`
+                          foldEvBindMap add_one_bind emptyVarSet binds
+             -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
+             -- Include the EvIds of any non-floating constraints
+
+             extended_skols = transCloVarSet (add_captured_ev_ids candidate_eqs) seed_skols
+                 -- extended_skols contains the EvIds of all the trapped constraints
+                 -- See Note [What prevents a constraint from floating] (3)
+
+             (flt_eqs, no_flt_eqs) = partitionBag (is_floatable extended_skols)
+                                                  candidate_eqs
+
+             remaining_simples = no_float_cts `andCts` no_flt_eqs
 
        -- Promote any unification variables mentioned in the floated equalities
        -- See Note [Promoting unification variables]
@@ -2223,42 +2229,45 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
                                           , text "Extended skols =" <+> ppr extended_skols
                                           , text "Simples =" <+> ppr simples
-                                          , text "Eqs =" <+> ppr eqs
+                                          , text "Candidate eqs =" <+> ppr candidate_eqs
                                           , text "Floated eqs =" <+> ppr flt_eqs])
        ; return ( flt_eqs, wanteds { wc_simple = remaining_simples } ) }
 
   where
+    add_one_bind :: EvBind -> VarSet -> VarSet
+    add_one_bind bind acc = extendVarSet acc (evBindVar bind)
+
+    add_non_flt_ct :: Ct -> VarSet -> VarSet
+    add_non_flt_ct ct acc | isDerivedCt ct = acc
+                          | otherwise      = extendVarSet acc (ctEvId ct)
+
     is_floatable :: VarSet -> Ct -> Bool
     is_floatable skols ct
       | isDerivedCt ct = not (tyCoVarsOfCt ct `intersectsVarSet` skols)
       | otherwise      = not (ctEvId ct `elemVarSet` skols)
 
-    is_eq_ct ct | CTyEqCan {} <- ct      = True
-                | is_homo_eq (ctPred ct) = True
-                | otherwise              = False
-
-    extra_skols :: Cts -> VarSet -> VarSet
-    extra_skols eqs skols = foldrBag extra_skol emptyVarSet eqs
+    add_captured_ev_ids :: Cts -> VarSet -> VarSet
+    add_captured_ev_ids cts skols = foldrBag extra_skol emptyVarSet cts
        where
          extra_skol ct acc
            | isDerivedCt ct                           = acc
            | tyCoVarsOfCt ct `intersectsVarSet` skols = extendVarSet acc (ctEvId ct)
            | otherwise                                = acc
 
-      -- Float out alpha ~ ty, or ty ~ alpha
-      -- which might be unified outside
-      -- See Note [Which equalities to float]
-    is_homo_eq pred
-      | EqPred NomEq ty1 ty2 <- classifyPredType pred
+    -- Identify which equalities are candidates for floating
+    -- Float out alpha ~ ty, or ty ~ alpha which might be unified outside
+    -- See Note [Which equalities to float]
+    is_float_eq_candidate ct
+      | pred <- ctPred ct
+      , EqPred NomEq ty1 ty2 <- classifyPredType pred
       , typeKind ty1 `tcEqType` typeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
-          (Just tv1, _) -> float_tv_eq tv1 ty2
-          (_, Just tv2) -> float_tv_eq tv2 ty1
+          (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
+          (_, Just tv2) -> float_tv_eq_candidate tv2 ty1
           _             -> False
-      | otherwise
-      = False
+      | otherwise = False
 
-    float_tv_eq tv1 ty2  -- See Note [Which equalities to float]
+    float_tv_eq_candidate tv1 ty2  -- See Note [Which equalities to float]
       =  isMetaTyVar tv1
       && (not (isSigTyVar tv1) || isTyVarTy ty2)
 
@@ -2335,7 +2344,8 @@ The "bound variables of the implication" are
   1. The skolem type variables `ic_skols`
 
   2. The "given" evidence variables `ic_given`.  Example:
-         forall a. (co :: t1 ~# t2) =>  [W] co : (a ~# b |> co)
+         forall a. (co :: t1 ~# t2) =>  [W] co2 : (a ~# b |> co)
+     Here 'co' is bound
 
   3. The binders of all evidence bindings in `ic_binds`. Example
          forall a. (d :: t1 ~ t2)
