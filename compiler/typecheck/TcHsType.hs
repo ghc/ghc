@@ -1600,8 +1600,8 @@ tcWildCardBindersX new_wc maybe_skol_info wc_names thing_inside
 -- user-supplied kind signature (CUSK), generalise the result.
 -- Used in 'getInitialKind' (for tycon kinds and other kinds)
 -- and in kind-checking (but not for tycon kinds, which are checked with
--- tcTyClDecls). See also Note [Complete user-supplied kind signatures] in
--- HsDecls.
+-- tcTyClDecls). See Note [CUSKs: complete user-supplied kind signatures]
+-- in HsDecls.
 --
 -- This function does not do telescope checking.
 kcLHsQTyVars :: Name              -- ^ of the thing being checked
