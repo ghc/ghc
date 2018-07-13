@@ -848,6 +848,9 @@ NOTE THAT
     dependent/should_compile/KindLevels, which requires this
     case. (Naturally, any kind variable mentioned before the :: should
     not be bound after it.)
+
+    This last point is much more debatable than the others; see
+    Trac #15142 comment:22
 -}
 
 
