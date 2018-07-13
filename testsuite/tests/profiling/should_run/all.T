@@ -34,8 +34,7 @@ test('T3001', [only_ways(['prof_hb']), extra_ways(['prof_hb'])],
      compile_and_run, [''])
 
 test('T3001-2',
-     [only_ways(['prof_hb']), extra_ways(['prof_hb']),
-      when(wordsize(32), expect_broken(15063))],
+     [only_ways(['prof_hb']), extra_ways(['prof_hb'])],
      compile_and_run, ['-package bytestring'])
 
 # For profasm/profthreaded, the answer is correct but the ordering of some
