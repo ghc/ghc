@@ -65,5 +65,4 @@ libraries/xhtml              -           -                               https:/
 nofib                        nofib       -                               -
 libraries/parallel           extra       -                               ssh://git@github.com/haskell/parallel.git
 libraries/stm                -           -                               ssh://git@github.com/haskell/stm.git
-libraries/random             extra       -                               https://github.com/haskell/random.git
 .                            -           ghc.git                         -
