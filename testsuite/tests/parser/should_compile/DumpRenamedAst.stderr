@@ -125,10 +125,8 @@
           (Just
            [({ DumpRenamedAst.hs:9:3-36 }
              (HsIB
-              (HsIBRn
-               [{Name: a}
-               ,{Name: as}]
-               (True))
+              [{Name: a}
+              ,{Name: as}]
               (FamEqn
                (NoExt)
                ({ DumpRenamedAst.hs:9:3-8 }
@@ -183,9 +181,7 @@
                         {Name: as}))))))))))))
            ,({ DumpRenamedAst.hs:10:3-24 }
              (HsIB
-              (HsIBRn
-               []
-               (True))
+              []
               (FamEqn
                (NoExt)
                ({ DumpRenamedAst.hs:10:3-8 }
@@ -285,10 +281,8 @@
         (NoExt)
         (DataFamInstDecl
          (HsIB
-          (HsIBRn
-           [{Name: k}
-           ,{Name: a}]
-           (True))
+          [{Name: k}
+          ,{Name: a}]
           (FamEqn
            (NoExt)
            ({ DumpRenamedAst.hs:15:18-20 }

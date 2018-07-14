@@ -38,6 +38,7 @@ module TcHsType (
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcLHsType, tcLHsTypeUnsaturated, tcCheckLHsType,
         tcHsMbContext, tcHsContext, tcLHsPredType, tcInferApps,
+        failIfEmitsConstraints,
         solveEqualities, -- useful re-export
 
         typeLevelMode, kindLevelMode,
@@ -69,6 +70,7 @@ import TcUnify
 import TcIface
 import TcSimplify
 import TcHsSyn
+import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyBinder(..) )  -- Used in tcDataKindSig
@@ -178,7 +180,7 @@ tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
 kcHsSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
 kcHsSigType skol_info names (HsIB { hsib_body = hs_ty
-                                  , hsib_ext = HsIBRn { hsib_vars = sig_vars }})
+                                  , hsib_ext = sig_vars })
   = addSigCtxt (funsSigCtxt names) hs_ty $
     discardResult $
     tcImplicitTKBndrs skol_info sig_vars $
@@ -205,10 +207,7 @@ tcHsSigType ctxt sig_ty
               -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
           -- Generalise here: see Note [Kind generalisation]
-       ; do_kind_gen <- decideKindGeneralisationPlan sig_ty
-       ; ty <- if do_kind_gen
-               then tc_hs_sig_type_and_gen skol_info sig_ty kind >>= zonkTcType
-               else tc_hs_sig_type         skol_info sig_ty kind
+       ; ty <- tc_hs_sig_type_and_gen skol_info sig_ty kind >>= zonkTcType
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -222,37 +221,22 @@ tc_hs_sig_type_and_gen :: SkolemInfo -> LHsSigType GhcRn -> Kind -> TcM Type
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking or zonking
-tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext
-                                              = HsIBRn { hsib_vars = sig_vars }
+tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext = sig_vars
                                        , hsib_body = hs_ty }) kind
-  = do { (tkvs, ty) <- solveEqualities $
-                       tcImplicitTKBndrs skol_info sig_vars $
-                       tc_lhs_type typeLevelMode hs_ty kind
-         -- NB the call to solveEqualities, which unifies all those
-         --    kind variables floating about, immediately prior to
-         --    kind generalisation
+  = do { ((tkvs, ty), wanted) <- captureConstraints $
+                                 tcImplicitTKBndrs skol_info sig_vars $
+                                 tc_lhs_type typeLevelMode hs_ty kind
+         -- Any remaining variables (unsolved in the solveLocalEqualities in the
+         -- tcImplicitTKBndrs)
+         -- should be in the global tyvars, and therefore won't be quantified
+         -- over.
 
-       ; ty1 <- zonkPromoteType $ mkSpecForAllTys tkvs ty
-       ; kvs <- kindGeneralize ty1
+       ; let ty1 = mkSpecForAllTys tkvs ty
+       ; kvs <- kindGeneralizeLocal wanted ty1
+       ; emitConstraints wanted -- we still need to solve these
        ; return (mkInvForAllTys kvs ty1) }
 
 tc_hs_sig_type_and_gen _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
-
-tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn -> Kind -> TcM Type
--- Kind-check/desugar a 'LHsSigType', but does not solve
--- the equalities that arise from doing so; instead it may
--- emit kind-equality constraints into the monad
--- Zonking, but no validity checking
-tc_hs_sig_type skol_info (HsIB { hsib_ext = HsIBRn { hsib_vars = sig_vars }
-                               , hsib_body = hs_ty }) kind
-  = do { (tkvs, ty) <- tcImplicitTKBndrs skol_info sig_vars $
-                       tc_lhs_type typeLevelMode hs_ty kind
-
-          -- need to promote any remaining metavariables; test case:
-          -- dependent/should_fail/T14066e.
-       ; zonkPromoteType (mkSpecForAllTys tkvs ty) }
-
-tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
 
 -----------------
 tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
@@ -330,7 +314,14 @@ tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
 -- Like tcHsSigType, but for a class instance declaration
 tcHsClsInstType user_ctxt hs_inst_ty
   = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
-    do { inst_ty <- tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
+    {- We want to fail here if the tc_hs_sig_type_and_gen emits constraints.
+       First off, we know we'll never solve the constraints, as classes are
+       always at top level, and their constraints do not inform the kind checking
+       of method types. So failing isn't wrong. Yet, the reason we do it is
+       to avoid the validity checker from seeing unsolved coercion holes in
+       types. Much better just to report the kind error directly. -}
+    do { inst_ty <- failIfEmitsConstraints $
+                    tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
        ; inst_ty <- zonkTcTypeToType emptyZonkEnv inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
@@ -345,6 +336,12 @@ tcHsTypeApp wc_ty kind
                -- signature so we want to solve its equalities right now
                tcWildCardBinders sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
+       -- We must promote here. Ex:
+       --   f :: forall a. a
+       --   g = f @(forall b. Proxy b -> ()) @Int ...
+       -- After when processing the @Int, we'll have to check its kind
+       -- against the as-yet-unknown kind of b. This check causes an assertion
+       -- failure if we don't promote.
        ; ty <- zonkPromoteType ty
        ; checkValidType TypeAppCtxt ty
        ; return ty }
@@ -392,50 +389,7 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
   where
     mode = allowUnsaturated typeLevelMode
 
----------------------------
--- | Should we generalise the kind of this type signature?
--- We *should* generalise if the type is closed
--- or if NoMonoLocalBinds is set. Otherwise, nope.
--- See Note [Kind generalisation plan]
-decideKindGeneralisationPlan :: LHsSigType GhcRn -> TcM Bool
-decideKindGeneralisationPlan sig_ty@(HsIB { hsib_ext
-                                            = HsIBRn { hsib_closed = closed } })
-  = do { mono_locals <- xoptM LangExt.MonoLocalBinds
-       ; let should_gen = not mono_locals || closed
-       ; traceTc "decideKindGeneralisationPlan"
-           (ppr sig_ty $$ text "should gen?" <+> ppr should_gen)
-       ; return should_gen }
-decideKindGeneralisationPlan(XHsImplicitBndrs _)
-  = panic "decideKindGeneralisationPlan"
-
-{- Note [Kind generalisation plan]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When should we do kind-generalisation for user-written type signature?
-Answer: we use the same rule as for value bindings:
-
- * We always kind-generalise if the type signature is closed
- * Additionally, we attempt to generalise if we have NoMonoLocalBinds
-
-Trac #13337 shows the problem if we kind-generalise an open type (i.e.
-one that mentions in-scope type variable
-  foo :: forall k (a :: k) proxy. (Typeable k, Typeable a)
-      => proxy a -> String
-  foo _ = case eqT :: Maybe (k :~: Type) of
-            Nothing   -> ...
-            Just Refl -> case eqT :: Maybe (a :~: Int) of ...
-
-In the expression type sig on the last line, we have (a :: k)
-but (Int :: Type).  Since (:~:) is kind-homogeneous, this requires
-k ~ *, which is true in the Refl branch of the outer case.
-
-That equality will be solved if we allow it to float out to the
-implication constraint for the Refl match, but not not if we aggressively
-attempt to solve all equalities the moment they occur; that is, when
-checking (Maybe (a :~: Int)).   (NB: solveEqualities fails unless it
-solves all the kind equalities, which is the right thing at top level.)
-
-So here the right thing is simply not to do kind generalisation!
-
+{-
 ************************************************************************
 *                                                                      *
       Type-checking modes
@@ -1495,9 +1449,10 @@ Checking a user-written signature requires several steps:
 
  1. Generate constraints.
  2. Solve constraints.
- 3. Zonk and promote tyvars.
- 4. (Optional) Kind-generalize.
- 5. Check validity.
+ 3. Zonk.
+ 4. Promote tyvars and/or kind-generalize.
+ 5. Zonk.
+ 6. Check validity.
 
 There may be some surprises in here:
 
@@ -1507,11 +1462,33 @@ to get these in the right order (see Note [Keeping scoped variables in
 order: Implicit]). Additionally, solving is necessary in order to
 kind-generalize correctly.
 
-Step 3 requires *promoting* type variables. If there are any foralls
-in a type, the TcLevel will be bumped within the forall. This might
-lead to the generation of matavars with a high level. If we don't promote,
-we violate MetaTvInv of Note [TcLevel and untouchable type variables]
+In Step 4, we have to deal with the fact that metatyvars generated
+in the type may have a bumped TcLevel, because explicit foralls
+raise the TcLevel. To avoid these variables from every being visible
+in the surrounding context, we must obey the following dictum:
+
+  Every metavariable in a type must either be
+    (A) promoted, or
+    (B) generalized.
+
+If a variable is generalized, then it becomes a skolem and no longer
+has a proper TcLevel. (I'm ignoring the TcLevel on a skolem here, as
+it's not really in play here.) On the other hand, if it is not
+generalized (because we're not generalizing the construct -- e.g., pattern
+sig -- or because the metavars are constrained -- see kindGeneralizeLocal)
+we need to promote to (MetaTvInv) of Note [TcLevel and untouchable type variables]
 in TcType.
+
+After promoting/generalizing, we need to zonk *again* because both
+promoting and generalizing fill in metavariables.
+
+To avoid the double-zonk, we do two things:
+ 1. zonkPromoteType and friends zonk and promote at the same time.
+    Accordingly, the function does setps 3-5 all at once, preventing
+    the need for multiple traversals.
+
+ 2. kindGeneralize does not require a zonked type -- it zonks as it
+    gathers free variables. So this way effectively sidesteps step 3.
 
 -}
 
@@ -1921,14 +1898,36 @@ kindGeneralize :: TcType -> TcM [KindVar]
 -- Quantify the free kind variables of a kind or type
 -- In the latter case the type is closed, so it has no free
 -- type variables.  So in both cases, all the free vars are kind vars
--- Input must be zonked.
+-- Input needn't be zonked.
 -- NB: You must call solveEqualities or solveLocalEqualities before
 -- kind generalization
-kindGeneralize kind_or_type
-  = do { let kvs = tyCoVarsOfTypeDSet kind_or_type
-             dvs = DV { dv_kvs = kvs, dv_tvs = emptyDVarSet }
+kindGeneralize = kindGeneralizeLocal emptyWC
+
+-- | This variant of 'kindGeneralize' refuses to generalize over any
+-- variables free in the given WantedConstraints. Instead, it promotes
+-- these variables into an outer TcLevel. See also
+-- Note [Promoting unification variables] in TcSimplify
+kindGeneralizeLocal :: WantedConstraints -> TcType -> TcM [KindVar]
+kindGeneralizeLocal wanted kind_or_type
+  = do {
+       -- This bit is very much like decideMonoTyVars in TcSimplify,
+       -- but constraints are so much simpler in kinds, it is much
+       -- easier here. (In particular, we never quantify over a
+       -- constraint in a type.)
+       ; constrained <- zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
+       ; (_, constrained) <- promoteTyVarSet constrained
+
+         -- NB: zonk here, after promotion
+       ; kvs <- zonkTcTypeAndFV kind_or_type
+       ; let dvs = DV { dv_kvs = kvs, dv_tvs = emptyDVarSet }
+
        ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
-       ; quantifyTyVars gbl_tvs dvs }
+       ; traceTc "kindGeneralizeLocal" (vcat [ ppr wanted
+                                             , ppr kind_or_type
+                                             , ppr constrained
+                                             , ppr dvs ])
+
+       ; quantifyTyVars (gbl_tvs `unionVarSet` constrained) dvs }
 
 {-
 Note [Kind generalisation]
@@ -2268,7 +2267,7 @@ tcHsPartialSigType
 -- See Note [Recipe for checking a signature]
 tcHsPartialSigType ctxt sig_ty
   | HsWC { hswc_ext  = sig_wcs,         hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_ext = HsIBRn { hsib_vars = implicit_hs_tvs }
+  , HsIB { hsib_ext = implicit_hs_tvs
          , hsib_body = hs_ty } <- ib_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
@@ -2392,7 +2391,7 @@ tcHsPatSigType :: UserTypeCtxt
 -- See Note [Recipe for checking a signature]
 tcHsPatSigType ctxt sig_ty
   | HsWC { hswc_ext = sig_wcs,   hswc_body = ib_ty } <- sig_ty
-  , HsIB { hsib_ext = HsIBRn { hsib_vars = sig_vars}
+  , HsIB { hsib_ext = sig_vars
          , hsib_body = hs_ty } <- ib_ty
   = addSigCtxt ctxt hs_ty $
     do { sig_tkvs <- mapM new_implicit_tv sig_vars
@@ -2406,6 +2405,9 @@ tcHsPatSigType ctxt sig_ty
 
           -- sig_ty might have tyvars that are at a higher TcLevel (if hs_ty
           -- contains a forall). Promote these.
+          -- Ex: f (x :: forall a. Proxy a -> ()) = ... x ...
+          -- When we instantiate x, we have to compare the kind of the argument
+          -- to a's kind, which will be a metavariable.
         ; sig_ty <- zonkPromoteType sig_ty
         ; checkValidType ctxt sig_ty
 
@@ -2582,7 +2584,7 @@ unifyKinds rn_tys act_kinds
 -- to make sure that any free meta-tyvars in the type are promoted to the
 -- current TcLevel. (They might be at a higher level due to the level-bumping
 -- in tcExplicitTKBndrs, for example.) This function both zonks *and*
--- promotes.
+-- promotes. Why at the same time? See Note [Recipe for checking a signature]
 zonkPromoteType :: TcType -> TcM TcType
 zonkPromoteType = mapType zonkPromoteMapper ()
 
@@ -2618,10 +2620,8 @@ zonkPromoteTcTyVar tv
   = do { let ref = metaTyVarRef tv
        ; contents <- readTcRef ref
        ; case contents of
-           Flexi -> do { promoted <- promoteTyVar tv
-                       ; if promoted
-                         then zonkPromoteTcTyVar tv   -- read it again
-                         else mkTyVarTy <$> zonkPromoteTyCoVarKind tv }
+           Flexi -> do { (_, promoted_tv) <- promoteTyVar tv
+                       ; mkTyVarTy <$> zonkPromoteTyCoVarKind promoted_tv }
            Indirect ty -> zonkPromoteType ty }
 
   | isTcTyVar tv && isSkolemTyVar tv  -- NB: isSkolemTyVar says "True" to pure TyVars
@@ -2667,6 +2667,7 @@ tcLHsKindSig ctxt hs_kind
   = do { kind <- solveLocalEqualities $
                  tc_lhs_kind kindLevelMode hs_kind
        ; traceTc "tcLHsKindSig" (ppr hs_kind $$ ppr kind)
+       -- No generalization, so we must promote
        ; kind <- zonkPromoteType kind
          -- This zonk is very important in the case of higher rank kinds
          -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
@@ -2762,3 +2763,14 @@ reportFloatingKvs tycon_name flav all_tvs bad_tvs
 
     ppr_tv_bndrs tvs = sep (map pp_tv tvs)
     pp_tv tv         = parens (ppr tv <+> dcolon <+> ppr (tyVarKind tv))
+
+-- | If the inner action emits constraints, reports them as errors and fails;
+-- otherwise, propagates the return value. Useful as a wrapper around
+-- 'tcImplicitTKBndrs', which uses solveLocalEqualities, when there won't be
+-- another chance to solve constraints
+failIfEmitsConstraints :: TcM a -> TcM a
+failIfEmitsConstraints thing_inside
+  = do { (res, lie) <- captureConstraints thing_inside
+       ; reportAllUnsolved lie
+       ; return res
+       }

@@ -127,7 +127,8 @@ rn_hs_sig_wc_type always_bind_free_tvs ctxt
        ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
-             ib_ty'  = mk_implicit_bndrs vars hs_ty' fvs1
+             ib_ty'  = HsIB { hsib_ext = vars
+                            , hsib_body = hs_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
 rn_hs_sig_wc_type _ _ (HsWC _ (XHsImplicitBndrs _)) _
@@ -300,7 +301,9 @@ rnHsSigType ctx (HsIB { hsib_body = hs_ty })
        ; vars <- extractFilteredRdrTyVarsDups hs_ty
        ; rnImplicitBndrs (not (isLHsForAllTy hs_ty)) vars $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
-       ; return ( mk_implicit_bndrs vars body' fvs, fvs ) } }
+       ; return ( HsIB { hsib_ext = vars
+                       , hsib_body = body' }
+                , fvs ) } }
 rnHsSigType _ (XHsImplicitBndrs _) = panic "rnHsSigType"
 
 rnImplicitBndrs :: Bool    -- True <=> bring into scope any free type variables
@@ -366,18 +369,6 @@ rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- The 'doc_str' is "an instance declaration".
 -- Do not try to decompose the inst_ty in case it is malformed
 rnLHsInstType doc inst_ty = rnHsSigType (GenericCtx doc) inst_ty
-
-mk_implicit_bndrs :: [Name]  -- implicitly bound
-                  -> a           -- payload
-                  -> FreeVars    -- FreeVars of payload
-                  -> HsImplicitBndrs GhcRn a
-mk_implicit_bndrs vars body fvs
-  = HsIB { hsib_ext = HsIBRn
-           { hsib_vars = vars
-           , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
-         , hsib_body = body }
-
-
 
 {- ******************************************************
 *                                                       *

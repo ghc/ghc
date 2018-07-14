@@ -303,12 +303,12 @@ tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 -- See Note [Pattern synonym signatures]
 -- See Note [Recipe for checking a signature] in TcHsType
 tcPatSynSig name sig_ty
-  | HsIB { hsib_ext = HsIBRn { hsib_vars = implicit_hs_tvs }
+  | HsIB { hsib_ext = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
   , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTy hs_ty
   , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
   = do { (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
-           <-  -- NB: tcImplicitTKBndrs calls solveEqualities
+           <-  -- NB: tcImplicitTKBndrs calls solveLocalEqualities
               tcImplicitTKBndrs skol_info implicit_hs_tvs $
               tcExplicitTKBndrs skol_info univ_hs_tvs     $
               tcExplicitTKBndrs skol_info ex_hs_tvs       $
@@ -319,9 +319,8 @@ tcPatSynSig name sig_ty
                      -- e.g. pattern Zero <- 0#   (Trac #12094)
                  ; return (req, prov, body_ty) }
 
-       ; ungen_patsyn_ty <- zonkPromoteType $
-                            build_patsyn_type [] implicit_tvs univ_tvs req
-                                              ex_tvs prov body_ty
+       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvs req
+                                                 ex_tvs prov body_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralize ungen_patsyn_ty

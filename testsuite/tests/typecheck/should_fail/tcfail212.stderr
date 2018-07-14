@@ -2,21 +2,31 @@
 tcfail212.hs:10:7: error:
     • Expecting one more argument to ‘Maybe’
       Expected a type, but ‘Maybe’ has kind ‘* -> *’
-    • In the type signature:
-        f :: (Maybe, Either Int)
+    • In the type signature: f :: (Maybe, Either Int)
 
 tcfail212.hs:10:14: error:
     • Expecting one more argument to ‘Either Int’
       Expected a type, but ‘Either Int’ has kind ‘* -> *’
-    • In the type signature:
-        f :: (Maybe, Either Int)
+    • In the type signature: f :: (Maybe, Either Int)
+
+tcfail212.hs:11:6: error:
+    • Couldn't match expected type ‘Maybe’
+                  with actual type ‘Maybe Integer’
+    • In the expression: Just 1
+      In the expression: (Just 1, Left 1)
+      In an equation for ‘f’: f = (Just 1, Left 1)
+
+tcfail212.hs:11:14: error:
+    • Couldn't match expected type ‘Either Int’
+                  with actual type ‘Either Integer b0’
+    • In the expression: Left 1
+      In the expression: (Just 1, Left 1)
+      In an equation for ‘f’: f = (Just 1, Left 1)
 
 tcfail212.hs:13:7: error:
     • Expecting a lifted type, but ‘Int#’ is unlifted
-    • In the type signature:
-        g :: (Int#, Int#)
+    • In the type signature: g :: (Int#, Int#)
 
 tcfail212.hs:13:13: error:
     • Expecting a lifted type, but ‘Int#’ is unlifted
-    • In the type signature:
-        g :: (Int#, Int#)
+    • In the type signature: g :: (Int#, Int#)

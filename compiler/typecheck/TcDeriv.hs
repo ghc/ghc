@@ -713,17 +713,14 @@ tcStandaloneDerivInstType
   :: UserTypeCtxt -> LHsSigWcType GhcRn
   -> TcM ([TyVar], DerivContext, Class, [Type])
 tcStandaloneDerivInstType ctxt
-    (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = HsIBRn
-                                                        { hsib_vars   = vars
-                                                        , hsib_closed = closed }
+    (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = vars
                                        , hsib_body   = deriv_ty_body })})
   | (tvs, theta, rho) <- splitLHsSigmaTy deriv_ty_body
   , L _ [wc_pred] <- theta
   , L _ (HsWildCardTy (AnonWildCard (L wc_span _))) <- ignoreParens wc_pred
   = do (deriv_tvs, _deriv_theta, deriv_cls, deriv_inst_tys)
          <- tcHsClsInstType ctxt $
-            HsIB { hsib_ext = HsIBRn { hsib_vars = vars
-                                     , hsib_closed = closed }
+            HsIB { hsib_ext = vars
                  , hsib_body
                      = L (getLoc deriv_ty_body) $
                        HsForAllTy { hst_bndrs = tvs

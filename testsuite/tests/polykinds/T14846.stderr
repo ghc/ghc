@@ -13,10 +13,11 @@ T14846.hs:38:8: error:
                ríki a a
         at T14846.hs:38:8-48
       Expected type: ríki a a
-        Actual type: Hom riki a0 a0
+        Actual type: Hom riki a a
     • When checking that instance signature for ‘i’
         is more general than its signature in the class
-        Instance sig: forall (xx :: k0) (a :: Struct cls0).
+        Instance sig: forall k1 (cls :: k1
+                                        -> Constraint) k2 (xx :: k2) (a :: Struct cls).
                       StructI xx a =>
                       Hom riki a a
            Class sig: forall k1 (cls :: k1
@@ -31,15 +32,15 @@ T14846.hs:38:8: error:
       In the instance declaration for ‘Category (Hom riki)’
 
 T14846.hs:39:31: error:
-    • Couldn't match kind ‘k4’ with ‘Struct cls0’
+    • Couldn't match kind ‘k4’ with ‘Struct cls2’
       ‘k4’ is a rigid type variable bound by
         the instance declaration
         at T14846.hs:37:10-65
       When matching kinds
-        cls :: k4 -> Constraint
-        cls1 :: Struct cls0 -> Constraint
-      Expected kind ‘Struct cls1’,
-        but ‘Structured a cls’ has kind ‘Struct cls’
+        cls1 :: k4 -> Constraint
+        cls0 :: Struct cls -> Constraint
+      Expected kind ‘Struct cls0’,
+        but ‘Structured a cls’ has kind ‘Struct cls1’
     • In the first argument of ‘AStruct’, namely ‘(Structured a cls)’
       In an expression type signature: AStruct (Structured a cls)
       In the expression: struct :: AStruct (Structured a cls)

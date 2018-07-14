@@ -614,8 +614,10 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
                        tvs
           _other    -> tvs `unionVarSet` id_tvs
         where
-           id_tvs = tyCoVarsOfType (idType id)
-           is_closed_type = not (anyVarSet isTyVar id_tvs)
+           id_ty          = idType id
+           id_tvs         = tyCoVarsOfType id_ty
+           id_co_tvs      = closeOverKinds (coVarsOfType id_ty)
+           is_closed_type = not (anyVarSet isTyVar (id_tvs `minusVarSet` id_co_tvs))
            -- We only care about being closed wrt /type/ variables
            -- E.g. a top-level binding might have a type like
            --          foo :: t |> co

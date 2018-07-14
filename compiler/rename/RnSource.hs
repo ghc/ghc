@@ -765,8 +765,7 @@ rnFamInstEqn doc mb_cls rhs_kvars
              all_fvs  = fvs `addOneFV` unLoc tycon'
                         -- type instance => use, hence addOneFV
 
-       ; return (HsIB { hsib_ext = HsIBRn { hsib_vars = all_ibs
-                                          , hsib_closed = True }
+       ; return (HsIB { hsib_ext = all_ibs
                       , hsib_body
                           = FamEqn { feqn_ext    = noExt
                                    , feqn_tycon  = tycon'
@@ -1691,7 +1690,7 @@ rnLDerivStrategy doc mds thing_inside
         NewtypeStrategy  -> boring_case (L loc NewtypeStrategy)
         ViaStrategy via_ty ->
           do (via_ty', fvs1) <- rnHsSigType doc via_ty
-             let HsIB { hsib_ext  = HsIBRn { hsib_vars = via_imp_tvs }
+             let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
                  (via_exp_tv_bndrs, _, _) = splitLHsSigmaTy via_body
                  via_exp_tvs = map hsLTyVarName via_exp_tv_bndrs
