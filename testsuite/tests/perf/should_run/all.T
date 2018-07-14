@@ -562,7 +562,7 @@ test('T13623',
     ['-O2'])
 
 test('T14052',
-     [stats_num_field('bytes allocated',
+     [compiler_stats_num_field('bytes allocated',
                       [ (wordsize(64), 2346183840, 15) ])],
      ghci_script,
      ['T14052.script'])
