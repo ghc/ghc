@@ -104,7 +104,7 @@ if args.threads:
     config.threads = args.threads
     config.use_threads = True
 
-if args.verbose:
+if args.verbose is not None:
     config.verbose = args.verbose
 config.skip_perf_tests = args.skip_perf_tests
 
