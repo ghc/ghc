@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -36,8 +37,7 @@ module Data.IORef
 
 import GHC.Base
 import GHC.STRef
-import GHC.IORef hiding (atomicModifyIORef)
-import qualified GHC.IORef
+import GHC.IORef
 import GHC.Weak
 
 -- |Make a 'Weak' pointer to an 'IORef', using the second argument as a finalizer
@@ -91,18 +91,9 @@ modifyIORef' ref f = do
 -- Use 'atomicModifyIORef'' or 'atomicWriteIORef' to avoid this problem.
 --
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef = GHC.IORef.atomicModifyIORef
-
--- | Strict version of 'atomicModifyIORef'.  This forces both the value stored
--- in the 'IORef' as well as the value returned.
---
--- @since 4.6.0.0
-atomicModifyIORef' :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef' ref f = do
-    b <- atomicModifyIORef ref $ \a ->
-            case f a of
-                v@(a',_) -> a' `seq` v
-    b `seq` return b
+atomicModifyIORef ref f = do
+  (_old, ~(_new, res)) <- atomicModifyIORef2 ref f
+  pure res
 
 -- | Variant of 'writeIORef' with the \"barrier to reordering\" property that
 -- 'atomicModifyIORef' has.
@@ -110,8 +101,8 @@ atomicModifyIORef' ref f = do
 -- @since 4.6.0.0
 atomicWriteIORef :: IORef a -> a -> IO ()
 atomicWriteIORef ref a = do
-    x <- atomicModifyIORef ref (\_ -> (a, ()))
-    x `seq` return ()
+  _ <- atomicSwapIORef ref a
+  pure ()
 
 {- $memmodel
 

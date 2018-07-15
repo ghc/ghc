@@ -34,6 +34,9 @@ module GHC.Exts
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         isTrue#,
 
+        -- * Compat wrapper
+        atomicModifyMutVar#,
+
         -- * Fusion
         build, augment,
 
@@ -219,3 +222,27 @@ instance IsList CallStack where
   type (Item CallStack) = (String, SrcLoc)
   fromList = fromCallSiteList
   toList   = getCallStack
+
+-- | An implementation of the old @atomicModifyMutVar#@ primop in
+-- terms of the new 'atomicModifyMutVar2#' primop, for backwards
+-- compatibility. The type of this function is a bit bogus. It's
+-- best to think of it as having type
+--
+-- @
+-- atomicModifyMutVar#
+--   :: MutVar# s a
+--   -> (a -> (a, b))
+--   -> State# s
+--   -> (# State# s, b #)
+-- @
+--
+-- but there may be code that uses this with other two-field record
+-- types.
+atomicModifyMutVar#
+  :: MutVar# s a
+  -> (a -> b)
+  -> State# s
+  -> (# State# s, c #)
+atomicModifyMutVar# mv f s =
+  case unsafeCoerce# (atomicModifyMutVar2# mv f s) of
+    (# s', _, ~(_, res) #) -> (# s', res #)
