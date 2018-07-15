@@ -973,11 +973,11 @@ type ForallXConDeclField (c :: * -> Constraint) (x :: *) =
 
 -- ---------------------------------------------------------------------
 
-type family XFieldOcc  x
+type family XCFieldOcc x
 type family XXFieldOcc x
 
 type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
-       ( c (XFieldOcc  x)
+       ( c (XCFieldOcc x)
        , c (XXFieldOcc x)
        )
 
