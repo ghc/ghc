@@ -693,7 +693,7 @@ type instance XUserTyVar    DocNameI = NoExt
 type instance XKindedTyVar  DocNameI = NoExt
 type instance XXTyVarBndr   DocNameI = NoExt
 
-type instance XFieldOcc    DocNameI = DocName
+type instance XCFieldOcc   DocNameI = DocName
 type instance XXFieldOcc   DocNameI = NoExt
 
 type instance XFixitySig   DocNameI = NoExt
