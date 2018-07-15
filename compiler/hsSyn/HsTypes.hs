@@ -1136,19 +1136,19 @@ type LFieldOcc pass = Located (FieldOcc pass)
 -- Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc pass = FieldOcc { extFieldOcc     :: XFieldOcc pass
+data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
                               , rdrNameFieldOcc :: Located RdrName
                                  -- ^ See Note [Located RdrNames] in HsExpr
                               }
 
   | XFieldOcc
       (XXFieldOcc pass)
-deriving instance (p ~ GhcPass pass, Eq (XFieldOcc p)) => Eq  (FieldOcc p)
-deriving instance (p ~ GhcPass pass, Ord (XFieldOcc p)) => Ord (FieldOcc p)
+deriving instance (p ~ GhcPass pass, Eq (XCFieldOcc p)) => Eq  (FieldOcc p)
+deriving instance (p ~ GhcPass pass, Ord (XCFieldOcc p)) => Ord (FieldOcc p)
 
-type instance XFieldOcc GhcPs = NoExt
-type instance XFieldOcc GhcRn = Name
-type instance XFieldOcc GhcTc = Id
+type instance XCFieldOcc GhcPs = NoExt
+type instance XCFieldOcc GhcRn = Name
+type instance XCFieldOcc GhcTc = Id
 
 type instance XXFieldOcc (GhcPass _) = NoExt
 
