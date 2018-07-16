@@ -1311,14 +1311,10 @@ pprLoc (UnhelpfulSpan {}) = empty
 --      coming from GHC.TypeNats). In this case the user will get a kind
 --      mismatch error. This is a violation of assumption (c).
 --
--- Since NoStarIsType is implied by a fairly common extension TypeOperators,
--- the user might be working on a module with NoStarIsType unbeknownst to him.
--- Even if the user switched off StarIsType manually, he might have forgotten
--- about it and use '*' as 'Data.Kind.Type' out of habit.
---
--- Thus it is very important to give a hint whenever an assumption about '*' is
--- violated. Unfortunately, it is somewhat difficult to deal with (c), so we
--- limit ourselves to (a) and (b).
+-- The user might unknowingly be working on a module with NoStarIsType
+-- or use '*' as 'Data.Kind.Type' out of habit. So it is important to give a
+-- hint whenever an assumption about '*' is violated. Unfortunately, it is
+-- somewhat difficult to deal with (c), so we limit ourselves to (a) and (b).
 --
 -- 'starInfo' generates an appropriate hint to the user depending on the
 -- extensions enabled in the module and the name that triggered the error.
@@ -1326,10 +1322,10 @@ pprLoc (UnhelpfulSpan {}) = empty
 -- Unicode variant, the resulting SDoc will contain a helpful suggestion.
 -- Otherwise it is empty.
 --
-starInfo :: (Bool, Bool) -> RdrName -> SDoc
-starInfo (type_operators, star_is_type) rdr_name =
+starInfo :: Bool -> RdrName -> SDoc
+starInfo star_is_type rdr_name =
   -- One might ask: if can use sdocWithDynFlags here, why bother to take
-  -- (type_operators, star_is_type) as input? Why not refactor?
+  -- star_is_type as input? Why not refactor?
   --
   -- The reason is that sdocWithDynFlags would provide DynFlags that are active
   -- in the module that tries to load the problematic definition, not
@@ -1340,10 +1336,7 @@ starInfo (type_operators, star_is_type) rdr_name =
   -- with StarIsType enabled!
   --
   if isUnqualStar && not star_is_type
-     then text "With NoStarIsType" <>
-          (if type_operators
-              then text " (implied by TypeOperators), "
-              else text ", ") <>
+     then text "With NoStarIsType, " <>
           quotes (ppr rdr_name) <>
           text " is treated as a regular type operator. "
         $$

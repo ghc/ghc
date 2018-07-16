@@ -1,13 +1,13 @@
 
 T14584.hs:56:41: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Could not deduce: m1 ~ Type
+    • Could not deduce: m1 ~ *
       from the context: (Action act, Monoid a, Good m1)
         bound by the instance declaration at T14584.hs:54:10-89
       ‘m1’ is a rigid type variable bound by
         the instance declaration
         at T14584.hs:54:10-89
       When matching types
-        a :: Type
+        a :: *
         a0 :: m
       Expected type: Sing a0
         Actual type: Sing a
