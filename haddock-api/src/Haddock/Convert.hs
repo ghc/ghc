@@ -119,8 +119,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
         annot_typats    = zipWith3 annotHsType (mkIsPolyTvs fam_tvs)
                                    args_types_only typats
         hs_rhs          = synifyType WithinType rhs
-    in HsIB { hsib_ext = HsIBRn { hsib_vars   = map tyVarName tkvs
-                                , hsib_closed = True }
+    in HsIB { hsib_ext = map tyVarName tkvs
             , hsib_body   = FamEqn { feqn_ext    = noExt
                                    , feqn_tycon  = name
                                    , feqn_pats   = annot_typats
