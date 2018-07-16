@@ -111,19 +111,23 @@ atomicWriteIORef ref a = do
   processor architecture.  For example, on x86, loads can move ahead
   of stores, so in the following example:
 
->  maybePrint :: IORef Bool -> IORef Bool -> IO ()
->  maybePrint myRef yourRef = do
->    writeIORef myRef True
->    yourVal <- readIORef yourRef
->    unless yourVal $ putStrLn "critical section"
->
->  main :: IO ()
->  main = do
->    r1 <- newIORef False
->    r2 <- newIORef False
->    forkIO $ maybePrint r1 r2
->    forkIO $ maybePrint r2 r1
->    threadDelay 1000000
+  > import Data.IORef
+  > import Control.Monad (unless)
+  > import Control.Concurrent (forkIO, threadDelay)
+  >
+  > maybePrint :: IORef Bool -> IORef Bool -> IO ()
+  > maybePrint myRef yourRef = do
+  >   writeIORef myRef True
+  >   yourVal <- readIORef yourRef
+  >   unless yourVal $ putStrLn "critical section"
+  >
+  > main :: IO ()
+  > main = do
+  >   r1 <- newIORef False
+  >   r2 <- newIORef False
+  >   forkIO $ maybePrint r1 r2
+  >   forkIO $ maybePrint r2 r1
+  >   threadDelay 1000000
 
   it is possible that the string @"critical section"@ is printed
   twice, even though there is no interleaving of the operations of the
