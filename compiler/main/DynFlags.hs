@@ -814,7 +814,6 @@ data WarningFlag =
    | Opt_WarnMissingExportList
    | Opt_WarnInaccessibleCode
    | Opt_WarnStarIsType                   -- Since 8.6
-   | Opt_WarnStarBinder                   -- Since 8.6
    | Opt_WarnImplicitKindVars             -- Since 8.6
    deriving (Eq, Show, Enum)
 
@@ -3860,7 +3859,6 @@ wWarningFlagsDeps = [
   flagSpec "simplifiable-class-constraints" Opt_WarnSimplifiableClassConstraints,
   flagSpec "missing-home-modules"        Opt_WarnMissingHomeModules,
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
-  flagSpec "star-binder"                 Opt_WarnStarBinder,
   flagSpec "star-is-type"                Opt_WarnStarIsType,
   flagSpec "partial-fields"              Opt_WarnPartialFields ]
 
@@ -4364,6 +4362,7 @@ impliedXFlags
     , (LangExt.TypeInType,       turnOn, LangExt.DataKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
+    , (LangExt.TypeInType,       turnOff, LangExt.StarIsType)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
     , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
@@ -4374,6 +4373,9 @@ impliedXFlags
     , (LangExt.TypeOperators, turnOn, LangExt.ExplicitNamespaces)
 
     , (LangExt.ImpredicativeTypes,  turnOn, LangExt.RankNTypes)
+
+    -- See Note [When is StarIsType enabled]
+    , (LangExt.TypeOperators, turnOff, LangExt.StarIsType)
 
         -- Record wild-cards implies field disambiguation
         -- Otherwise if you write (C {..}) you may well get
@@ -4402,10 +4404,12 @@ impliedXFlags
 -- programs expect '*' to be synonymous with 'Type', so by default StarIsType is
 -- enabled.
 --
--- Programs that use TypeOperators might expect to repurpose '*' for
--- multiplication or another binary operation, but making TypeOperators imply
--- NoStarIsType caused too much breakage on Hackage.
+-- However, programs that use TypeOperators might expect to repurpose '*' for
+-- multiplication or another binary operation, so we make TypeOperators imply
+-- NoStarIsType.
 --
+-- It is still possible to have TypeOperators and StarIsType enabled at the same
+-- time, although it's not recommended.
 
 -- Note [Documenting optimisation flags]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4555,7 +4559,6 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnTabs,
         Opt_WarnUnrecognisedWarningFlags,
         Opt_WarnSimplifiableClassConstraints,
-        Opt_WarnStarBinder,
         Opt_WarnInaccessibleCode
       ]
 

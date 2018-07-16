@@ -51,7 +51,8 @@ Language
 
 - A new :extension:`StarIsType` language extension has been added which controls
   whether ``*`` is parsed as ``Data.Kind.Type`` or a regular type operator.
-  :extension:`StarIsType` is enabled by default.
+  :extension:`StarIsType` is enabled by default and disabled by
+  :extension:`TypeOperators`.
 
 - GHC now permits the use of a wildcard type as the context of a standalone
   ``deriving`` declaration with the use of the

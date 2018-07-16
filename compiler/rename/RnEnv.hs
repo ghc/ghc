@@ -930,8 +930,9 @@ lookup_demoted rdr_name
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
+       ; type_operators <- xoptM LangExt.TypeOperators
        ; star_is_type <- xoptM LangExt.StarIsType
-       ; let star_info = starInfo star_is_type rdr_name
+       ; let star_info = starInfo (type_operators, star_is_type) rdr_name
        ; if data_kinds
             then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
                     ; case mb_demoted_name of

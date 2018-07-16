@@ -870,12 +870,6 @@ checkTyClHdr is_cls ty
   where
     goL (L l ty) acc ann fix = go l ty acc ann fix
 
-    -- workaround to define '*' despite StarIsType
-    go _ (HsParTy _ (L l (HsStarTy _ isUni))) acc ann fix
-      = do { warnStarBndr l
-           ; let name = mkOccName tcClsName (if isUni then "★" else "*")
-           ; return (L l (Unqual name), acc, fix, ann) }
-
     go l (HsTyVar _ _ (L _ tc)) acc ann fix
       | isRdrTc tc               = return (L l tc, acc, fix, ann)
     go _ (HsOpTy _ t1 ltc@(L _ tc) t2) acc ann _fix
@@ -1753,19 +1747,11 @@ warnStarIsType span = addWarning Opt_WarnStarIsType span msg
         $$ text "Suggested fix: use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 
-warnStarBndr :: SrcSpan -> P ()
-warnStarBndr span = addWarning Opt_WarnStarBinder span msg
-  where
-    msg =  text "Desugaring" <+> quotes (text "*") <+> text "in a binder"
-           <+> text "position as a type operator despite StarIsType."
-        $$ text "NB. To use (or export) this operator in"
-           <+> text "modules with StarIsType,"
-        $$ text "    including the definition module, you must qualify it."
-
 failOpFewArgs :: Located RdrName -> P a
 failOpFewArgs (L loc op) =
-  do { star_is_type <- extension starIsTypeEnabled
-     ; let msg = too_few $$ starInfo star_is_type op
+  do { type_operators <- extension typeOperatorsEnabled
+     ; star_is_type <- extension starIsTypeEnabled
+     ; let msg = too_few $$ starInfo (type_operators, star_is_type) op
      ; parseErrorSDoc loc msg }
   where
     too_few = text "Operator applied to too few arguments:" <+> ppr op

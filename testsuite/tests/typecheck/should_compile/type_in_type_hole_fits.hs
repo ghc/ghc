@@ -2,7 +2,7 @@
              UndecidableInstances, ConstraintKinds #-}
 module TypeInTypeSubstitutions where
 
-import GHC.TypeLits as L
+import GHC.TypeLits
 import Data.Type.Bool
 import Data.Type.Equality
 import Data.List (sort)
@@ -21,7 +21,7 @@ type One   = NLogN 0 0
 type O (a :: AsympPoly) = a
 
 type family (^.) (n :: AsympPoly) (m :: Nat) :: AsympPoly where
-  (NLogN a b) ^. n = (NLogN (a L.* n) (b L.* n))
+  (NLogN a b) ^. n = (NLogN (a * n) (b * n))
 
 type family (*.) (n :: AsympPoly) (m :: AsympPoly) :: AsympPoly where
   (NLogN a b) *. (NLogN c d) = NLogN (a+c) (b+d)

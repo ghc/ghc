@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE NoStarIsType #-}
 
 module TH_unresolvedInfix_Lib where
 
