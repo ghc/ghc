@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, TypeOperators, TypeFamilies #-}
 module TcTypeNatSimple where
-import GHC.TypeLits
+import GHC.TypeLits as L
 import Data.Proxy
 
 --------------------------------------------------------------------------------
@@ -8,7 +8,7 @@ import Data.Proxy
 e1 :: Proxy (2 + 3) -> Proxy 5
 e1 = id
 
-e2 :: Proxy (2 * 3) -> Proxy 6
+e2 :: Proxy (2 L.* 3) -> Proxy 6
 e2 = id
 
 e3 :: Proxy (2 ^ 3) -> Proxy 8
@@ -20,16 +20,16 @@ e4 = id
 e5 :: Proxy (x + 0) -> Proxy x
 e5 = id
 
-e6 :: Proxy (x * 0) -> Proxy 0
+e6 :: Proxy (x L.* 0) -> Proxy 0
 e6 = id
 
-e7 :: Proxy (0 * x) -> Proxy 0
+e7 :: Proxy (0 L.* x) -> Proxy 0
 e7 = id
 
-e8 :: Proxy (x * 1) -> Proxy x
+e8 :: Proxy (x L.* 1) -> Proxy x
 e8 = id
 
-e9 :: Proxy (1 * x) -> Proxy x
+e9 :: Proxy (1 L.* x) -> Proxy x
 e9 = id
 
 e10 :: Proxy (x ^ 1) -> Proxy x
@@ -83,10 +83,10 @@ e23 = id
 ti2 :: Proxy (y + x) -> Proxy x -> ()
 ti2 _ _ = ()
 
-ti3 :: Proxy (2 * y) -> ()
+ti3 :: Proxy (2 L.* y) -> ()
 ti3 _ = ()
 
-ti4 :: Proxy (y * 2) -> ()
+ti4 :: Proxy (y L.* 2) -> ()
 ti4 _ = ()
 
 ti5 :: Proxy (2 ^ y) -> ()

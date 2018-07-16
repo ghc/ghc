@@ -8678,8 +8678,7 @@ Kind polymorphism
 .. extension:: TypeInType
     :shortdesc: Deprecated. Enable kind polymorphism and datatype promotion.
 
-    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`,
-              :extension:`NoStarIsType`
+    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
     :since: 8.0.1
 
     In the past this extension used to enable advanced type-level programming
@@ -9126,13 +9125,12 @@ The kind ``Type``
 -----------------
 
 .. extension:: StarIsType
-    :shortdesc: Desugar ``*`` to ``Data.Kind.Type``.
+    :shortdesc: Treat ``*`` as ``Data.Kind.Type``.
 
     :since: 8.6.1
 
     Treat the unqualified uses of the ``*`` type operator as nullary and desugar
-    to ``Data.Kind.Type``. Disabled by :extension:`TypeOperators` and
-    :extension:`TypeInType`.
+    to ``Data.Kind.Type``.
 
 The kind ``Type`` (imported from ``Data.Kind``) classifies ordinary types. With
 :extension:`StarIsType` (currently enabled by default), ``*`` is desugared to

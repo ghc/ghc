@@ -34,6 +34,7 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wtabs`
     * :ghc-flag:`-Wunrecognised-warning-flags`
     * :ghc-flag:`-Winaccessible-code`
+    * :ghc-flag:`-Wstar-binder`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -1184,6 +1185,36 @@ of ``-W(no-)*``.
     ``checkTEQ`` to be able to produce a ``Just``, ``t ~ u`` must hold, but
     since we're passing ``Foo1`` and ``Foo2`` here, it follows that ``t ~
     Char``, and ``u ~ Int``, and thus ``t ~ u`` cannot hold.
+
+.. ghc-flag:: -Wstar-binder
+     :shortdesc: warn about binding the ``(*)`` type operator despite
+         :ghc-flag:`-XStarIsType`
+     :type: dynamic
+     :reverse: -Wno-star-binder
+
+     Under :ghc-flag:`-XStarIsType`, a ``*`` in types is not an operator nor
+     even a name, it is special syntax that stands for ``Data.Kind.Type``. This
+     means that an expression like ``Either * Char`` is parsed as ``Either (*)
+     Char`` and not ``(*) Either Char``.
+
+     In binding positions, we have similar parsing rules. Consider the following
+     example ::
+
+         {-# LANGUAGE TypeOperators, TypeFamilies, StarIsType #-}
+
+         type family a + b
+         type family a * b
+
+     While ``a + b`` is parsed as ``(+) a b`` and becomes a binding position for
+     the ``(+)`` type operator, ``a * b`` is parsed as ``a (*) b`` and is rejected.
+
+     As a workaround, we allow to bind ``(*)`` in prefix form::
+
+         type family (*) a b
+
+     This is a rather fragile arrangement, as generally a programmer expects
+     ``(*) a b`` to be equivalent to ``a * b``. With :ghc-flag:`-Wstar-binder`
+     we warn when this special treatment of ``(*)`` takes place.
 
 .. ghc-flag:: -Wsimplifiable-class-constraints
     :shortdesc: 2arn about class constraints in a type signature that can

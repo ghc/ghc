@@ -20,3 +20,5 @@ test('Werror01', normal, compile, [''])
 test('Werror02', normal, compile, [''])
 
 test('MissingMod', normal, multimod_compile, ['MissingMod', '-Wmissing-home-modules'])
+
+test('StarBinder', normal, compile, [''])

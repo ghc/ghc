@@ -1,1 +1,1 @@
-Foo :: forall k -> k -> Type
+Foo :: forall k -> k -> *
