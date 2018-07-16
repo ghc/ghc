@@ -548,9 +548,12 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+                unregisterised = platformUnregisterised (targetPlatform dflags)
             let bsymbolicFlag = -- we need symbolic linking to resolve
-                                -- non-PIC intra-package-relocations
-                                ["-Wl,-Bsymbolic"]
+                                -- non-PIC intra-package-relocations for
+                                -- performance (where symbolic linking works)
+                                -- See Note [-Bsymbolic assumptions by GHC]
+                                ["-Wl,-Bsymbolic" | not unregisterised]
 
             runLink dflags (
                     map Option verbFlags
@@ -607,3 +610,27 @@ getFrameworkOpts dflags platform
     -- reverse because they're added in reverse order from the cmd line:
     framework_opts = concat [ ["-framework", fw]
                             | fw <- reverse frameworks ]
+
+{-
+Note [-Bsymbolic assumptions by GHC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GHC has a few assumptions about interaction of relocations in NCG and linker:
+
+1. -Bsymbolic resolves internal references when the shared library is linked,
+   which is important for performance.
+2. When there is a reference to data in a shared library from the main program,
+   the runtime linker relocates the data object into the main program using an
+   R_*_COPY relocation.
+3. If we used -Bsymbolic, then this results in multiple copies of the data
+   object, because some references have already been resolved to point to the
+   original instance. This is bad!
+
+We work around [3.] for native compiled code by avoiding the generation of
+R_*_COPY relocations.
+
+Unregisterised compiler can't evade R_*_COPY relocations easily thus we disable
+-Bsymbolic linking there.
+
+See related Trac tickets: #4210, #15338
+-}
