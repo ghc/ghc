@@ -470,6 +470,7 @@ library
                sm/NonMovingCensus.c
                sm/NonMovingMark.c
                sm/NonMovingScav.c
+               sm/NonMovingShortcut.c
                sm/NonMovingSweep.c
                sm/Sanity.c
                sm/Scav.c
