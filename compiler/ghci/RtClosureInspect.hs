@@ -27,6 +27,7 @@ module RtClosureInspect(
 
 import GhcPrelude
 
+import GHCi
 import GHCi.RemoteTypes
 import HscTypes
 
@@ -62,8 +63,12 @@ import GHC.IO ( IO(..) )
 import SMRep ( roundUpTo )
 
 import Control.Monad
+import Data.Array.Base
 import Data.Maybe
 import Data.List
+#if defined(INTEGER_GMP)
+import GHC.Integer.GMP.Internals
+#endif
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
 import Foreign
@@ -79,7 +84,7 @@ data Term = Term { ty        :: RttiType
                                -- Carries a text representation if the datacon is
                                -- not exported by the .hi file, which is the case
                                -- for private constructors in -O0 compiled libraries
-                 , val       :: HValue
+                 , val       :: ForeignHValue
                  , subTerms  :: [Term] }
 
           | Prim { ty        :: RttiType
@@ -87,7 +92,7 @@ data Term = Term { ty        :: RttiType
 
           | Suspension { ctype    :: ClosureType
                        , ty       :: RttiType
-                       , val      :: HValue
+                       , val      :: ForeignHValue
                        , bound_to :: Maybe Name   -- Useful for printing
                        }
           | NewtypeWrap{       -- At runtime there are no newtypes, and hence no
@@ -126,22 +131,22 @@ isThunk APStackClosure{} = True
 isThunk _             = False
 
 -- Lookup the name in a constructor closure
-constrClosToName :: HscEnv -> Closure -> IO (Either String Name)
+constrClosToName :: HscEnv -> GenClosure a -> IO (Either String Name)
 constrClosToName hsc_env ConstrClosure{pkg=pkg,modl=mod,name=occ} = do
    let occName = mkOccName OccName.dataName occ
        modName = mkModule (stringToUnitId pkg) (mkModuleName mod)
    Right `fmap` lookupOrigIO hsc_env modName occName
 constrClosToName _hsc_env clos =
-   return (Left ("conClosToName: Expected ConstrClosure, got " ++ show clos))
+   return (Left ("conClosToName: Expected ConstrClosure, got " ++ show (fmap (const ()) clos)))
 
 -----------------------------------
 -- * Traversals for Terms
 -----------------------------------
-type TermProcessor a b = RttiType -> Either String DataCon -> HValue -> [a] -> b
+type TermProcessor a b = RttiType -> Either String DataCon -> ForeignHValue -> [a] -> b
 
 data TermFold a = TermFold { fTerm        :: TermProcessor a a
                            , fPrim        :: RttiType -> [Word] -> a
-                           , fSuspension  :: ClosureType -> RttiType -> HValue
+                           , fSuspension  :: ClosureType -> RttiType -> ForeignHValue
                                             -> Maybe Name -> a
                            , fNewtypeWrap :: RttiType -> Either String DataCon
                                             -> a -> a
@@ -152,7 +157,7 @@ data TermFold a = TermFold { fTerm        :: TermProcessor a a
 data TermFoldM m a =
                    TermFoldM {fTermM        :: TermProcessor a (m a)
                             , fPrimM        :: RttiType -> [Word] -> m a
-                            , fSuspensionM  :: ClosureType -> RttiType -> HValue
+                            , fSuspensionM  :: ClosureType -> RttiType -> ForeignHValue
                                              -> Maybe Name -> m a
                             , fNewtypeWrapM :: RttiType -> Either String DataCon
                                             -> a -> m a
@@ -317,19 +322,26 @@ cPprTermBase y =
                                       . subTerms)
   , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
            ppr_list
-  , ifTerm (isTyCon intTyCon    . ty) ppr_int
-  , ifTerm (isTyCon charTyCon   . ty) ppr_char
-  , ifTerm (isTyCon floatTyCon  . ty) ppr_float
-  , ifTerm (isTyCon doubleTyCon . ty) ppr_double
-  , ifTerm (isIntegerTy         . ty) ppr_integer
+  , ifTerm' (isTyCon intTyCon    . ty) ppr_int
+  , ifTerm' (isTyCon charTyCon   . ty) ppr_char
+  , ifTerm' (isTyCon floatTyCon  . ty) ppr_float
+  , ifTerm' (isTyCon doubleTyCon . ty) ppr_double
+#if defined(INTEGER_GMP)
+  , ifTerm' (isIntegerTy         . ty) ppr_integer
+#endif
   ]
  where
    ifTerm :: (Term -> Bool)
           -> (Precedence -> Term -> m SDoc)
           -> Precedence -> Term -> m (Maybe SDoc)
-   ifTerm pred f prec t@Term{}
-       | pred t    = Just `liftM` f prec t
-   ifTerm _ _ _ _  = return Nothing
+   ifTerm pred f = ifTerm' pred (\prec t -> Just <$> f prec t)
+
+   ifTerm' :: (Term -> Bool)
+          -> (Precedence -> Term -> m (Maybe SDoc))
+          -> Precedence -> Term -> m (Maybe SDoc)
+   ifTerm' pred f prec t@Term{}
+       | pred t    = f prec t
+   ifTerm' _ _ _ _  = return Nothing
 
    isTupleTy ty    = fromMaybe False $ do
      (tc,_) <- tcSplitTyConApp_maybe ty
@@ -343,13 +355,67 @@ cPprTermBase y =
      (tc,_) <- tcSplitTyConApp_maybe ty
      return (tyConName tc == integerTyConName)
 
-   ppr_int, ppr_char, ppr_float, ppr_double, ppr_integer
-      :: Precedence -> Term -> m SDoc
-   ppr_int     _ v = return (Ppr.int     (unsafeCoerce# (val v)))
-   ppr_char    _ v = return (Ppr.char '\'' <> Ppr.char (unsafeCoerce# (val v)) <> Ppr.char '\'')
-   ppr_float   _ v = return (Ppr.float   (unsafeCoerce# (val v)))
-   ppr_double  _ v = return (Ppr.double  (unsafeCoerce# (val v)))
-   ppr_integer _ v = return (Ppr.integer (unsafeCoerce# (val v)))
+   ppr_int, ppr_char, ppr_float, ppr_double
+      :: Precedence -> Term -> m (Maybe SDoc)
+   ppr_int _ Term{subTerms=[Prim{valRaw=[w]}]} =
+      return (Just (Ppr.int (fromIntegral w)))
+   ppr_int _ _ = return Nothing
+
+   ppr_char _ Term{subTerms=[Prim{valRaw=[w]}]} =
+      return (Just (Ppr.pprHsChar (chr (fromIntegral w))))
+   ppr_char _ _ = return Nothing
+
+   ppr_float   _ Term{subTerms=[Prim{valRaw=[w]}]} = do
+      let f = unsafeDupablePerformIO $
+                alloca $ \p -> poke p w >> peek (castPtr p)
+      return (Just (Ppr.float f))
+   ppr_float _ _ = return Nothing
+
+   ppr_double  _ Term{subTerms=[Prim{valRaw=[w]}]} = do
+      let f = unsafeDupablePerformIO $
+                alloca $ \p -> poke p w >> peek (castPtr p)
+      return (Just (Ppr.double f))
+   -- let's assume that if we get two words, we're on a 32-bit
+   -- machine. There's no good way to get a DynFlags to check the word
+   -- size here.
+   ppr_double  _ Term{subTerms=[Prim{valRaw=[w1,w2]}]} = do
+      let f = unsafeDupablePerformIO $
+                alloca $ \p -> do
+                  poke p (fromIntegral w1 :: Word32)
+                  poke (p `plusPtr` 4) (fromIntegral w2 :: Word32)
+                  peek (castPtr p)
+      return (Just (Ppr.double f))
+   ppr_double _ _ = return Nothing
+
+   ppr_integer :: Precedence -> Term -> m (Maybe SDoc)
+#if defined(INTEGER_GMP)
+   -- Reconstructing Integers is a bit of a pain. This depends deeply
+   -- on the integer-gmp representation, so it'll break if that
+   -- changes (but there are several tests in
+   -- tests/ghci.debugger/scripts that will tell us if this is wrong).
+   --
+   --   data Integer
+   --     = S# Int#
+   --     | Jp# {-# UNPACK #-} !BigNat
+   --     | Jn# {-# UNPACK #-} !BigNat
+   --
+   --   data BigNat = BN# ByteArray#
+   --
+   ppr_integer _ Term{subTerms=[Prim{valRaw=[W# w]}]} =
+      return (Just (Ppr.integer (S# (word2Int# w))))
+   ppr_integer _ Term{dc=Right con,
+                      subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]} = do
+      -- We don't need to worry about sizes that are not an integral
+      -- number of words, because luckily GMP uses arrays of words
+      -- (see GMP_LIMB_SHIFT).
+      let
+        !(UArray _ _ _ arr#) = listArray (0,length ws-1) ws
+        constr
+          | "Jp#" <- occNameString (nameOccName (dataConName con)) = Jp#
+          | otherwise = Jn#
+      return (Just (Ppr.integer (constr (BN# arr#))))
+#endif
+   ppr_integer _ _ = return Nothing
 
    --Note pprinting of list terms is not lazy
    ppr_list :: Precedence -> Term -> m SDoc
@@ -357,10 +423,12 @@ cPprTermBase y =
        let elems      = h : getListTerms t
            isConsLast = not (termType (last elems) `eqType` termType h)
            is_string  = all (isCharTy . ty) elems
+           chars = [ chr (fromIntegral w)
+                   | Term{subTerms=[Prim{valRaw=[w]}]} <- elems ]
 
        print_elems <- mapM (y cons_prec) elems
        if is_string
-        then return (Ppr.doubleQuotes (Ppr.text (unsafeCoerce# (map val elems))))
+        then return (Ppr.doubleQuotes (Ppr.text chars))
         else if isConsLast
         then return $ cparen (p >= cons_prec)
                     $ pprDeeperList fsep
@@ -553,7 +621,7 @@ cvObtainTerm
     -> Int      -- ^ How many times to recurse for subterms
     -> Bool     -- ^ Force thunks
     -> RttiType -- ^ Type of the object to reconstruct
-    -> HValue   -- ^ Object to reconstruct
+    -> ForeignHValue   -- ^ Object to reconstruct
     -> IO Term
 cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   -- we quantify existential tyvars as universal,
@@ -599,7 +667,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             text "Type obtained: " <> ppr (termType term))
    return term
     where
-  go :: Int -> Type -> Type -> HValue -> TcM Term
+  go :: Int -> Type -> Type -> ForeignHValue -> TcM Term
    -- I believe that my_ty should not have any enclosing
    -- foralls, nor any free RuntimeUnk skolems;
    -- that is partly what the quantifyType stuff achieved
@@ -609,29 +677,31 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
   go 0 my_ty _old_ty a = do
     traceTR (text "Gave up reconstructing a term after" <>
                   int max_depth <> text " steps")
-    clos <- trIO $ getClosureData a
+    clos <- trIO $ GHCi.getClosure hsc_env a
     return (Suspension (tipe (info clos)) my_ty a Nothing)
   go !max_depth my_ty old_ty a = do
     let monomorphic = not(isTyVarTy my_ty)
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
-    clos <- trIO $ getClosureData a
+    clos <- trIO $ GHCi.getClosure hsc_env a
     case clos of
 -- Thunks we may want to force
-      t | isThunk t && force -> traceTR (text "Forcing a " <> text (show t)) >>
-                                seq a (go (pred max_depth) my_ty old_ty a)
+      t | isThunk t && force -> do
+         traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
+         liftIO $ GHCi.seqHValue hsc_env a
+         go (pred max_depth) my_ty old_ty a
 -- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE.  So we
 -- treat them like indirections; if the payload is TSO or BLOCKING_QUEUE, we'll end up
 -- showing '_' which is what we want.
       BlackholeClosure{indirectee=ind} -> do
          traceTR (text "Following a BLACKHOLE")
-         (\(Box x) -> go max_depth my_ty old_ty (HValue x)) ind
+         go max_depth my_ty old_ty ind
 -- We always follow indirections
       IndClosure{indirectee=ind} -> do
          traceTR (text "Following an indirection" )
-         (\(Box x) -> go max_depth my_ty old_ty (HValue x)) ind
+         go max_depth my_ty old_ty ind
 -- We also follow references
-      MutVarClosure{}
+      MutVarClosure{var=contents}
          | Just (tycon,[world,contents_ty]) <- tcSplitTyConApp_maybe old_ty
              -> do
                   -- Deal with the MutVar# primitive
@@ -640,7 +710,6 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                   -- MutVar# :: contents_ty -> MutVar# s contents_ty
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
-         contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
          ASSERT(isUnliftedType my_ty) return ()
          (mutvar_ty,_) <- instScheme $ quantifyType $ mkFunTy
                             contents_ty (mkTyConApp tycon [world,contents_ty])
@@ -649,8 +718,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          return (RefWrap my_ty x)
 
  -- The interesting case
-      ConstrClosure{ptrArgs=pArgs} -> do
-        traceTR (text "entering a constructor " <>
+      ConstrClosure{ptrArgs=pArgs,dataArgs=dArgs} -> do
+        traceTR (text "entering a constructor " <> ppr dArgs <+>
                       if monomorphic
                         then parens (text "already monomorphic: " <> ppr my_ty)
                         else Ppr.empty)
@@ -667,8 +736,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                            tag = showPpr dflags dcname
                        vars     <- replicateM (length pArgs)
                                               (newVar liftedTypeKind)
-                       subTerms <- sequence $ zipWith (\(Box x) tv ->
-                           go (pred max_depth) tv tv (HValue x)) pArgs vars
+                       subTerms <- sequence $ zipWith (\x tv ->
+                           go (pred max_depth) tv tv x) pArgs vars
                        return (Term my_ty (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do
             traceTR (text "Is constructor" <+> (ppr dc $$ ppr my_ty))
@@ -676,9 +745,17 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
             subTerms <- extractSubTerms (\ty -> go (pred max_depth) ty ty) clos subTtypes
             return (Term my_ty (Right dc) a subTerms)
 
+      -- This is to support printing of Integers. It's not a general
+      -- mechanism by any means; in particular we lose the size in
+      -- bytes of the array.
+      ArrWordsClosure{bytes=b, arrWords=ws} -> do
+         traceTR (text "ByteArray# closure, size " <> ppr b)
+         return (Term my_ty (Left "ByteArray#") a [Prim my_ty ws])
+
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       _ -> do
-         traceTR (text "Unknown closure:" <+> text (show clos))
+         traceTR (text "Unknown closure:" <+>
+                  text (show (fmap (const ()) clos)))
          return (Suspension (tipe (info clos)) my_ty a Nothing)
 
   -- insert NewtypeWraps around newtypes
@@ -698,8 +775,8 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       worker ct ty hval n | isFunTy ty = Suspension ct (dictsView ty) hval n
                           | otherwise  = Suspension ct ty hval n
 
-extractSubTerms :: (Type -> HValue -> TcM Term)
-                -> Closure -> [Type] -> TcM [Term]
+extractSubTerms :: (Type -> ForeignHValue -> TcM Term)
+                -> GenClosure ForeignHValue -> [Type] -> TcM [Term]
 extractSubTerms recurse clos = liftM thdOf3 . go 0 0
   where
     array = dataArgs clos
@@ -733,7 +810,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
 
     go_rep ptr_i arr_i ty rep
       | isGcPtrRep rep = do
-          t <- (\(Box x) -> recurse ty (HValue x)) $ (ptrArgs clos)!!ptr_i
+          t <- recurse ty $ (ptrArgs clos)!!ptr_i
           return (ptr_i + 1, arr_i, t)
       | otherwise = do
           -- This is a bit involved since we allow packing multiple fields
@@ -805,7 +882,7 @@ cvReconstructType
     :: HscEnv
     -> Int       -- ^ How many times to recurse for subterms
     -> GhciType  -- ^ Type to refine
-    -> HValue    -- ^ Refine the type using this value
+    -> ForeignHValue  -- ^ Refine the type using this value
     -> IO (Maybe Type)
 cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
    traceTR (text "RTTI started with initial type " <> ppr old_ty)
@@ -845,15 +922,14 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
                   search stop expand (xx `mappend` Seq.fromList new) $! (pred d)
 
    -- returns unification tasks,since we are going to want a breadth-first search
-  go :: Type -> HValue -> TR [(Type, HValue)]
+  go :: Type -> ForeignHValue -> TR [(Type, ForeignHValue)]
   go my_ty a = do
     traceTR (text "go" <+> ppr my_ty)
-    clos <- trIO $ getClosureData a
+    clos <- trIO $ GHCi.getClosure hsc_env a
     case clos of
-      BlackholeClosure{indirectee=ind} -> (\(Box x) -> go my_ty (HValue x)) ind
-      IndClosure{indirectee=ind} -> (\(Box x) -> go my_ty (HValue x)) ind
-      MutVarClosure{} -> do
-         contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
+      BlackholeClosure{indirectee=ind} -> go my_ty ind
+      IndClosure{indirectee=ind} -> go my_ty ind
+      MutVarClosure{var=contents} -> do
          tv'   <- newVar liftedTypeKind
          world <- newVar liftedTypeKind
          addConstraint my_ty (mkTyConApp mutVarPrimTyCon [world,tv'])
@@ -864,15 +940,15 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
         (_,mb_dc) <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing-> do
-            forM pArgs $ \(Box x) -> do
+            forM pArgs $ \x -> do
               tv <- newVar liftedTypeKind
-              return (tv, HValue x)
+              return (tv, x)
 
           Just dc -> do
             arg_tys <- getDataConArgTys dc my_ty
             (_, itys) <- findPtrTyss 0 arg_tys
             traceTR (text "Constr2" <+> ppr dcname <+> ppr arg_tys)
-            return $ zipWith (\(_,ty) (Box x) -> (ty, HValue x)) itys pArgs
+            return $ zipWith (\(_,ty) x -> (ty, x)) itys pArgs
       _ -> return []
 
 findPtrTys :: Int  -- Current pointer index

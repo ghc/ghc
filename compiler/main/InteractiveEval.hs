@@ -990,20 +990,22 @@ moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
 -- RTTI primitives
 
 obtainTermFromVal :: HscEnv -> Int -> Bool -> Type -> a -> IO Term
-obtainTermFromVal hsc_env bound force ty x =
-              cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
+obtainTermFromVal hsc_env bound force ty x
+  | gopt Opt_ExternalInterpreter (hsc_dflags hsc_env)
+  = throwIO (InstallationError
+      "this operation requires -fno-external-interpreter")
+  | otherwise
+  = cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
 
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
-  let dflags = hsc_dflags hsc_env
-  hv <- Linker.getHValue hsc_env (varName id) >>= wormhole dflags
+  hv <- Linker.getHValue hsc_env (varName id)
   cvObtainTerm hsc_env bound force (idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
 reconstructType hsc_env bound id = do
-  let dflags = hsc_dflags hsc_env
-  hv <- Linker.getHValue hsc_env (varName id) >>= wormhole dflags
+  hv <- Linker.getHValue hsc_env (varName id)
   cvReconstructType hsc_env bound (idType id) hv
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar

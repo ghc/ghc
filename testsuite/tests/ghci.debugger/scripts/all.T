@@ -1,4 +1,5 @@
 setTestOpts([extra_run_opts('-ignore-dot-ghci'),
+             extra_ways(['ghci-ext']), # test with -fexternal-interpreter
              normalise_slashes])
 
 test('print001', normal, ghci_script, ['print001.script'])
@@ -19,7 +20,12 @@ test('print016', extra_files(['../Test.hs']), ghci_script, ['print016.script'])
 test('print017', extra_files(['../Test.hs']), ghci_script, ['print017.script'])
 test('print018', extra_files(['../Test.hs']), ghci_script, ['print018.script'])
 test('print019', extra_files(['../Test.hs']), ghci_script, ['print019.script'])
-test('print020', extra_files(['../HappyTest.hs']), ghci_script, ['print020.script'])
+
+# The ghci-ext way emits messages in a slightly different order due to
+# printing from two processes, so let's just skip it.
+test('print020', [extra_files(['../HappyTest.hs']),
+                  omit_ways(['ghci-ext'])], ghci_script, ['print020.script'])
+
 test('print021', normal, ghci_script, ['print021.script'])
 test('print022',
      [when(arch('powerpc64'), expect_broken(14455))],

@@ -4,6 +4,8 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Exts.Heap.Closures (
     -- * Closures
@@ -35,6 +37,7 @@ import Data.Bits
 import Data.Int
 import Data.Word
 import GHC.Exts
+import GHC.Generics
 import Numeric
 
 ------------------------------------------------------------------------
@@ -222,7 +225,7 @@ data GenClosure b
     -- | A @MutVar#@
   | MutVarClosure
         { info       :: !StgInfoTable
-        , var        :: !b              -- ^ Pointer to closure
+        , var        :: !b              -- ^ Pointer to contents
         }
 
     -- | An STM blocking queue.
@@ -285,7 +288,7 @@ data GenClosure b
   | UnsupportedClosure
         { info       :: !StgInfoTable
         }
-  deriving (Show)
+  deriving (Show, Generic, Functor, Foldable, Traversable)
 
 
 data PrimType
@@ -296,7 +299,7 @@ data PrimType
   | PAddr
   | PFloat
   | PDouble
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 -- | For generic code, this function returns all referenced closures.
 allClosures :: GenClosure b -> [b]
