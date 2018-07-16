@@ -11,6 +11,7 @@
 // This is sometimes declared as a register variable therefore it is necessary
 // to include the declaration so that the compiler doesn't clobber the register.
 #include "NonMovingMark.h"
+#include "NonMovingShortcut.h"
 #include "NonMoving.h"
 #include "BlockAlloc.h"  /* for countBlocks */
 #include "HeapAlloc.h"
@@ -25,7 +26,7 @@
 #include "MarkWeak.h"
 #include "sm/Storage.h"
 
-static void mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin);
+static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
 static void mark_tso (MarkQueue *queue, StgTSO *tso);
 static void mark_stack (MarkQueue *queue, StgStack *stack);
 static void mark_PAP_payload (MarkQueue *queue,
@@ -1405,8 +1406,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case THUNK_SELECTOR:
-        PUSH_FIELD((StgSelector *) p, selectee);
-        // TODO: selector optimization
+        nonmoving_eval_thunk_selector(queue, (StgSelector*)p, origin);
         break;
 
     case AP_STACK: {
@@ -1551,6 +1551,7 @@ done:
     if (origin != NULL && (!HEAP_ALLOCED(p) || bd->flags & BF_NONMOVING)) {
         if (UNTAG_CLOSURE((StgClosure*)p0) != p && *origin == p0) {
             if (cas((StgVolatilePtr)origin, (StgWord)p0, (StgWord)TAG_CLOSURE(tag, p)) == (StgWord)p0) {
+                // debugBelch("Thunk optimization successful\n");
             }
         }
     }
