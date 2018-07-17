@@ -3778,7 +3778,7 @@ GHC extends this mechanism along several axes:
 
 * In Haskell 98, the only derivable classes are ``Eq``,
   ``Ord``, ``Enum``, ``Ix``, ``Bounded``, ``Read``, and ``Show``. `Various
-  langauge extensions <#deriving-extra>`__ extend this list.
+  language extensions <#deriving-extra>`__ extend this list.
 
 * Besides the stock approach to deriving instances by generating all method
   definitions, GHC supports two additional deriving strategies, which can
@@ -4123,7 +4123,7 @@ There are two exceptions to this rule:
 
    That is, :extension:`DeriveFunctor` pattern-matches its way into tuples and maps
    over each type that constitutes the tuple. The generated code is
-   reminiscient of what would be generated from
+   reminiscent of what would be generated from
    ``data Triple a = Triple a Int [a]``, except with extra machinery to handle
    the tuple.
 
@@ -4359,7 +4359,7 @@ There are some other differences regarding what data types can have derived
    polymorphic types that are syntactically equivalent to the last type
    parameter. In particular:
 
-  -  We don't fold over the arguments of ``E1`` or ``E4`` beacause even though
+  -  We don't fold over the arguments of ``E1`` or ``E4`` because even though
      ``(a ~ Int)``, ``Int`` is not syntactically equivalent to ``a``.
 
   -  We don't fold over the argument of ``E3`` because ``a`` is not universally
@@ -5439,10 +5439,10 @@ Constructing an explicitly bidirectional pattern synonym also:
 
 - can create different data constructors from the underlying data type,
   not just the one appearing in the pattern match;
-  
+
 - can call any functions or conditional logic, especially validation,
   of course providing it constructs a result of the right type;
-  
+
 - can use guards on the lhs of the ``=``;
 
 - can have multiple equations.
@@ -5459,7 +5459,7 @@ Or using guards: ::
         Smarter x | x >= 0    = (Pos x)
                   | otherwise = (Neg x)
 
-There is an extensive Haskell folk art of `smart constructors 
+There is an extensive Haskell folk art of `smart constructors
 <https://wiki.haskell.org/Smart_constructor>`_,
 essentially functions that wrap validation around a constructor,
 and avoid exposing its representation.
@@ -5722,7 +5722,7 @@ Note also the following points
          pattern P x y v <- MkT True x y (v::a)
 
    Here the universal type variable `a` scopes over the definition of `P`,
-   but the existential `b` does not.  (c.f. disussion on Trac #14998.)
+   but the existential `b` does not.  (c.f. discussion on Trac #14998.)
 
 -  For a bidirectional pattern synonym, a use of the pattern synonym as
    an expression has the type
@@ -7984,7 +7984,7 @@ keyword in the family instance: ::
       type Elem [e] = e
       ...
 
-The data or type family instance for an assocated type must follow
+The data or type family instance for an associated type must follow
 the rule that the type indexes corresponding to class parameters must have
 precisely the same as type given in the instance head. For example: ::
 
@@ -10557,7 +10557,7 @@ assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/Let
 The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies`
 and :extension:`GADTs`. You can switch it off again with
 :extension:`NoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
-less predicatable if you do so. (Read the papers!)
+less predictable if you do so. (Read the papers!)
 
 .. _kind-generalisation:
 
@@ -10650,7 +10650,7 @@ Here are the details:
     g :: Proxy (b :: j) -> Proxy (a :: (Proxy :: (k -> Type) -> Type) Proxy) -> ()
       -- as if g :: forall j k b a. ...
       -- NB: k is in a kind annotation within a kind annotation
-  
+
 - If any of the variables depend on other variables (that is, if some
   of the variables are *kind* variables), the variables are reordered
   so that kind variables come before type variables, preserving the
@@ -10665,7 +10665,7 @@ Here are the details:
   (Note that ``a`` is used in ``b``\'s kind.) Yet, even though ``a`` appears
   lexically before ``j`` and ``k``, ``j`` and ``k`` are quantified first,
   because ``a`` depends on ``j`` and ``k``. Note further that ``j`` and ``k``
-  are not reordered with respect to eacho other, even though doing so would
+  are not reordered with respect to each other, even though doing so would
   not violate dependency conditions.
 
 - Visible type application is available to instantiate only user-specified
@@ -11177,7 +11177,7 @@ the following pairs are equivalent: ::
                     h x y = y
                  in ...
 
-Notice that GHC always adds implicit quantfiers *at the outermost level*
+Notice that GHC always adds implicit quantifiers *at the outermost level*
 of a user-written type; it
 does *not* find the inner-most possible quantification
 point. For example: ::
@@ -11604,7 +11604,7 @@ configurable by a few flags.
 
     It can sometime be the case that the name and type of a valid hole
     fit is not enough to realize what the fit stands for. This flag
-    adds the documentation of the fit to the message, if the 
+    adds the documentation of the fit to the message, if the
     documentation is available (and the module from which the function
     comes was compiled with the ``-haddock`` flag).
 
@@ -15014,7 +15014,7 @@ modules. ``COMPLETE`` pragmas should be thought of as asserting a
 universal truth about a set of patterns and as a result, should not be
 used to silence context specific incomplete match warnings.
 
-When specifing a ``COMPLETE`` pragma, the result types of all patterns must
+When specifying a ``COMPLETE`` pragma, the result types of all patterns must
 be consistent with each other. This is a sanity check as it would be impossible
 to match on all the patterns if the types were inconsistent.
 
