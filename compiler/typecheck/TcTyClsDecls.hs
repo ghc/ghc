@@ -213,7 +213,7 @@ tcTyClDecls tyclds role_annots
            ; tcExtendRecEnv (zipRecTyClss tc_tycons rec_tyclss) $
 
                  -- Also extend the local type envt with bindings giving
-                 -- the (polymorphic) kind of each knot-tied TyCon or Class
+                 -- a TcTyCon for each each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
                  -- and Note [Type environment evolution]
              tcExtendKindEnvWithTyCons tc_tycons $
@@ -225,7 +225,8 @@ tcTyClDecls tyclds role_annots
     promotion_err_env = mkPromotionErrorEnv tyclds
     ppr_tc_tycon tc = parens (sep [ ppr (tyConName tc) <> comma
                                   , ppr (tyConBinders tc) <> comma
-                                  , ppr (tyConResKind tc) ])
+                                  , ppr (tyConResKind tc)
+                                  , ppr (isTcTyCon tc) ])
 
 zipRecTyClss :: [TcTyCon]
              -> [TyCon]           -- Knot-tied
@@ -373,6 +374,8 @@ TcTyCons are used for two distinct purposes
     into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
 
     In a TcTyCon, everything is zonked after the kind-checking pass (S2).
+
+    See also Note [Type checking recursive type and class declarations].
 
 Note [Check telescope again during generalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -907,12 +910,11 @@ without looking at T?  Delicate answer: during tcTyClDecl, we extend
 
 Then:
 
-  * During TcHsType.kcTyVar we look in the *local* env, to get the
-    known kind for T.
+  * During TcHsType.tcTyVar we look in the *local* env, to get the
+    fully-known, not knot-tied TcTyCon for T.
 
-  * But in TcHsType.ds_type (and ds_var_app in particular) we look in
-    the *global* env to get the TyCon. But we must be careful not to
-    force the TyCon or we'll get a loop.
+  * Then, in TcHsSyn.zonkTcTypeToType (and zonkTcTyCon in particular) we look in
+    the *global* env to get the TyCon.
 
 This fancy footwork (with two bindings for T) is only necessary for the
 TyCons or Classes of this recursive group.  Earlier, finished groups,
@@ -1008,11 +1010,17 @@ tcTyClDecl1 _parent roles_info
                -- TODO: Allow us to distinguish between abstract class,
                -- and concrete class with no methods (maybe by
                -- specifying a trailing where or not
+               ; sig_stuff' <- mapM zonkTcMethInfoToMethInfo sig_stuff
+                  -- this zonk is really just to squeeze out the TcTyCons
+                  -- and convert, e.g., Skolems to tyvars. We won't
+                  -- see any unfilled metavariables here.
+
                ; is_boot <- tcIsHsBootOrSig
                ; let body | is_boot, null ctxt', null at_stuff, null sig_stuff
                           = Nothing
                           | otherwise
-                          = Just (ctxt', at_stuff, sig_stuff, mindef)
+                          = Just (ctxt', at_stuff, sig_stuff', mindef)
+
                ; clas <- buildClass class_name binders roles fds' body
                ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
                                         ppr fds')
@@ -1096,13 +1104,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
          -- for this afterwards, in TcValidity.checkValidCoAxiom
          -- Example: tc265
 
-         -- Create a CoAxiom, with the correct src location. It is Vitally
-         -- Important that we do not pass the branches into
-         -- newFamInstAxiomName. They have types that have been zonked inside
-         -- the knot and we will die if we look at them. This is OK here
-         -- because there will only be one axiom, so we don't need to
-         -- differentiate names.
-         -- See [Zonking inside the knot] in TcHsType
+         -- Create a CoAxiom, with the correct src location.
        ; co_ax_name <- newFamInstAxiomName tc_lname []
 
        ; let mb_co_ax
@@ -1301,7 +1303,7 @@ tcClassATs class_name cls ats at_defs
 -------------------------
 tcDefaultAssocDecl :: TyCon                    -- ^ Family TyCon (not knot-tied)
                    -> [LTyFamDefltEqn GhcRn]        -- ^ Defaults
-                   -> TcM (Maybe (Type, SrcSpan))   -- ^ Type checked RHS
+                   -> TcM (Maybe (KnotTied Type, SrcSpan))   -- ^ Type checked RHS
 tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
@@ -1384,7 +1386,15 @@ F's own type variables, so we need to convert it to (Proxy a -> b).
 We do this by calling tcMatchTys to match them up.  This also ensures
 that x's kind matches a's and similarly for y and b.  The error
 message isn't great, mind you.  (Trac #11361 was caused by not doing a
-proper tcMatchTys here.)  -}
+proper tcMatchTys here.)
+
+Recall also that the left-hand side of an associated type family
+default is always just variables -- no tycons here. Accordingly,
+the patterns used in the tcMatchTys won't actually be knot-tied,
+even though we're in the knot. This is too delicate for my taste,
+but it works.
+
+-}
 
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
@@ -1438,7 +1448,7 @@ kcTyFamEqnRhs mb_clsinfo rhs_hs_ty lhs_ki
     mb_kind_env = thdOf3 <$> mb_clsinfo
 
 tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
-               -> TcM CoAxBranch
+               -> TcM (KnotTied CoAxBranch)
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 tcTyFamInstEqn fam_tc mb_clsinfo
@@ -1457,7 +1467,6 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; pats'      <- zonkTcTypeToTypes ze pats
        ; rhs_ty'    <- zonkTcTypeToType ze rhs_ty
        ; traceTc "tcTyFamInstEqn" (ppr fam_tc <+> pprTyVars tvs')
-          -- don't print out the pats here, as they might be zonked inside the knot
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }
@@ -1680,7 +1689,7 @@ tcFamTyPats fam_tc mb_clsinfo
        ; qtkvs <- quantifyTyVars emptyVarSet vars
 
        ; when debugIsOn $
-         do { all_pats <- mapM zonkTcTypeInKnot all_pats
+         do { all_pats <- mapM zonkTcType all_pats
             ; MASSERT2( isEmptyVarSet $ coVarsOfTypes all_pats, ppr all_pats ) }
            -- This should be the case, because otherwise the solveEqualities
            -- above would fail. TODO (RAE): Update once the solveEqualities
@@ -1688,7 +1697,6 @@ tcFamTyPats fam_tc mb_clsinfo
 
        ; traceTc "tcFamTyPats" (ppr (getName fam_tc)
                                 $$ ppr all_pats $$ ppr qtkvs)
-           -- Don't print out too much, as we might be in the knot
 
            -- See Note [Free-floating kind vars] in TcHsType
        ; let all_mentioned_tvs = mkVarSet qtkvs
@@ -1842,7 +1850,7 @@ consUseGadtSyntax _                           = False
                  -- All constructors have same shape
 
 -----------------------------------
-tcConDecls :: TyCon -> ([TyConBinder], Type)
+tcConDecls :: KnotTied TyCon -> ([KnotTied TyConBinder], KnotTied Type)
            -> [LConDecl GhcRn] -> TcM [DataCon]
   -- Why both the tycon tyvars and binders? Because the tyvars
   -- have all the names and the binders have the visibilities.
@@ -1852,9 +1860,9 @@ tcConDecls rep_tycon (tmpl_bndrs, res_tmpl)
     -- It's important that we pay for tag allocation here, once per TyCon,
     -- See Note [Constructor tag allocation], fixes #14657
 
-tcConDecl :: TyCon             -- Representation tycon. Knot-tied!
+tcConDecl :: KnotTied TyCon          -- Representation tycon. Knot-tied!
           -> NameEnv ConTag
-          -> [TyConBinder] -> Type
+          -> [KnotTied TyConBinder] -> KnotTied Type
                  -- Return type template (with its template tyvars)
                  --    (tvs, T tys), where T is the family TyCon
           -> ConDecl GhcRn
@@ -2024,7 +2032,7 @@ tcConDecl _ _ _ _ (XConDecl _) = panic "tcConDecl"
 quantifyConDecl :: TcTyCoVarSet  -- outer tvs, not to be quantified over; zonked
                 -> TcType -> TcM [TcTyVar]
 quantifyConDecl gbl_tvs ty
-  = do { ty <- zonkTcTypeInKnot ty
+  = do { ty <- zonkTcType ty
        ; let fvs = candidateQTyVarsOfType ty
        ; quantifyTyVars gbl_tvs fvs }
 
@@ -2129,7 +2137,7 @@ errors reported in one pass.  See Trac #7175, and #10836.
 --      TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
 -- In this case orig_res_ty = T (e,e)
 
-rejigConRes :: [TyConBinder] -> Type    -- Template for result type; e.g.
+rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result type; e.g.
                                   -- data instance T [a] b c ...
                                   --      gives template ([a,b,c], T [a] b c)
                                   -- Type must be of kind *!
@@ -2137,7 +2145,7 @@ rejigConRes :: [TyConBinder] -> Type    -- Template for result type; e.g.
                                   -- type variables
             -> [TyVar]            -- The constructor's user-written, specified
                                   -- type variables
-            -> Type               -- res_ty type must be of kind *
+            -> KnotTied Type      -- res_ty type must be of kind *
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
                 [TyVar],          -- The constructor's rejigged, user-written,
@@ -2148,7 +2156,7 @@ rejigConRes :: [TyConBinder] -> Type    -- Template for result type; e.g.
                 TCvSubst)      -- Substitution to apply to argument types
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
-
+-- NB: All arguments may potentially be knot-tied
 rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- E.g.  data T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z

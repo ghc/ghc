@@ -16,6 +16,7 @@ module Type (
         -- $representation_types
         TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyBinder, TyVarBinder,
+        KnotTied,
 
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
@@ -505,7 +506,7 @@ this one change made a 20% allocation difference in perf/compiler/T5030.
 data TyCoMapper env m
   = TyCoMapper
       { tcm_smart :: Bool -- ^ Should the new type be created with smart
-                         -- constructors?
+                          -- constructors?
       , tcm_tyvar :: env -> TyVar -> m Type
       , tcm_covar :: env -> CoVar -> m Coercion
       , tcm_hole  :: env -> CoercionHole -> m Coercion
@@ -514,20 +515,28 @@ data TyCoMapper env m
 
       , tcm_tybinder :: env -> TyVar -> ArgFlag -> m (env, TyVar)
           -- ^ The returned env is used in the extended scope
+
+      , tcm_tycon :: TyCon -> m TyCon
+          -- ^ This is used only to turn 'TcTyCon's into 'TyCon's.
+          -- See Note [Type checking recursive type and class declarations]
+          -- in TcTyClsDecls
       }
 
 {-# INLINABLE mapType #-}  -- See Note [Specialising mappers]
 mapType :: Monad m => TyCoMapper env m -> env -> Type -> m Type
 mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
-                           , tcm_tybinder = tybinder })
+                           , tcm_tybinder = tybinder, tcm_tycon = tycon })
         env ty
   = go ty
   where
     go (TyVarTy tv) = tyvar env tv
     go (AppTy t1 t2) = mkappty <$> go t1 <*> go t2
-    go t@(TyConApp _ []) = return t  -- avoid allocation in this exceedingly
-                                     -- common case (mostly, for *)
-    go (TyConApp tc tys) = mktyconapp tc <$> mapM go tys
+    go t@(TyConApp tc []) | not (isTcTyCon tc)
+                          = return t  -- avoid allocation in this exceedingly
+                                      -- common case (mostly, for *)
+    go (TyConApp tc tys)
+      = do { tc' <- tycon tc
+           ; mktyconapp tc' <$> mapM go tys }
     go (FunTy arg res)   = FunTy <$> go arg <*> go res
     go (ForAllTy (TvBndr tv vis) inner)
       = do { (env', tv') <- tybinder env tv vis
@@ -545,7 +554,8 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
 mapCoercion :: Monad m
             => TyCoMapper env m -> env -> Coercion -> m Coercion
 mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
-                               , tcm_hole = cohole, tcm_tybinder = tybinder })
+                               , tcm_hole = cohole, tcm_tybinder = tybinder
+                               , tcm_tycon = tycon })
             env co
   = go co
   where
@@ -555,7 +565,8 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (Refl ty) = Refl <$> mapType mapper env ty
     go (GRefl r ty mco) = mkgreflco r <$> mapType mapper env ty <*> (go_mco mco)
     go (TyConAppCo r tc args)
-      = mktyconappco r tc <$> mapM go args
+      = do { tc' <- tycon tc
+           ; mktyconappco r tc' <$> mapM go args }
     go (AppCo c1 c2) = mkappco <$> go c1 <*> go c2
     go (ForAllCo tv kind_co co)
       = do { kind_co' <- go kind_co

@@ -18,7 +18,7 @@ module TcEnv(
         tcExtendGlobalEnv, tcExtendTyConEnv,
         tcExtendGlobalEnvImplicit, setGlobalTypeEnv,
         tcExtendGlobalValEnv,
-        tcLookupLocatedGlobal, tcLookupGlobal,
+        tcLookupLocatedGlobal, tcLookupGlobal, tcLookupGlobalOnly,
         tcLookupTyCon, tcLookupClass,
         tcLookupDataCon, tcLookupPatSyn, tcLookupConLike,
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
@@ -228,6 +228,15 @@ tcLookupGlobal name
             Succeeded thing -> return thing
             Failed msg      -> failWithTc msg
         }}}
+
+-- Look up only in this module's global env't. Don't look in imports, etc.
+-- Panic if it's not there.
+tcLookupGlobalOnly :: Name -> TcM TyThing
+tcLookupGlobalOnly name
+  = do { env <- getGblEnv
+       ; return $ case lookupNameEnv (tcg_type_env env) name of
+                    Just thing -> thing
+                    Nothing    -> pprPanic "tcLookupGlobalOnly" (ppr name) }
 
 tcLookupDataCon :: Name -> TcM DataCon
 tcLookupDataCon name = do
