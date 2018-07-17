@@ -1448,7 +1448,7 @@ Notes:
 * The Refls will be removed later, when we zonk the type.
 
 * This /also/ applies to substitution.  We must use nakedSubstTy,
-  not substTy, bucause the latter uses smart constructors that do
+  not substTy, because the latter uses smart constructors that do
   Refl-elimination.
 
 * None of this is to do with knot-tying, which is the (quite distinct)
