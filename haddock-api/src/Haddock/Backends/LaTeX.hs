@@ -345,7 +345,7 @@ ppFamDecl doc instances decl unicode =
     ppFamDeclEqn (HsIB { hsib_body = FamEqn { feqn_tycon = L _ n
                                             , feqn_rhs = rhs
                                             , feqn_pats = ts } })
-      = hsep [ ppAppNameTypes n (map unLoc ts) unicode
+      = hsep [ ppAppNameTypeArgs n ts unicode
              , equals
              , ppType unicode (unLoc rhs)
              ]
@@ -908,6 +908,11 @@ ppAppDocNameTyVarBndrs unicode n vs =
 ppAppNameTypes :: DocName -> [HsType DocNameI] -> Bool -> LaTeX
 ppAppNameTypes n ts unicode = ppTypeApp n ts ppDocName (ppParendType unicode)
 
+ppAppNameTypeArgs :: DocName -> [LHsTypeArg DocNameI] -> Bool -> LaTeX
+ppAppNameTypeArgs n args@(HsValArg _:HsValArg _:_) unicode
+  = ppTypeApp n args ppDocName (ppLHsTypeArg unicode)
+ppAppNameTypeArgs n args unicode
+  = ppDocName n <+> hsep (map (ppLHsTypeArg unicode) args)
 
 -- | Print an application of a DocName and a list of Names
 ppAppDocNameNames :: Bool -> DocName -> [Name] -> LaTeX
@@ -925,7 +930,6 @@ ppTypeApp n (t1:t2:rest) ppDN ppT
     opApp = ppT t1 <+> ppDN n <+> ppT t2
 
 ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
-
 
 -------------------------------------------------------------------------------
 -- * Contexts
@@ -997,6 +1001,12 @@ ppType       unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
 ppParendType unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
 ppFunLhType  unicode ty = ppr_mono_ty (reparenTypePrec PREC_FUN ty) unicode
 
+ppLHsTypeArg :: Bool -> LHsTypeArg DocNameI -> LaTeX
+ppLHsTypeArg unicode (HsValArg ty) = ppLParendType unicode ty
+ppLHsTypeArg unicode (HsTypeArg ki) = atSign unicode <>
+                                     ppLParendType unicode ki
+ppLHsTypeArg _ (HsArgPar _) = text ""                                     
+
 ppHsTyVarBndr :: Bool -> HsTyVarBndr DocNameI -> LaTeX
 ppHsTyVarBndr _ (UserTyVar _ (L _ name)) = ppDocName name
 ppHsTyVarBndr unicode (KindedTyVar _ (L _ name) kind) =
@@ -1046,6 +1056,9 @@ ppr_mono_ty (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLTyp
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
   = hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 
+ppr_mono_ty (HsAppKindTy _ fun_ty arg_ki) unicode
+  = hsep [ppr_mono_lty fun_ty unicode, atSign unicode <> ppr_mono_lty arg_ki unicode]
+
 ppr_mono_ty (HsOpTy _ ty1 op ty2) unicode
   = ppr_mono_lty ty1 unicode <+> ppr_op <+> ppr_mono_lty ty2 unicode
   where
@@ -1059,7 +1072,7 @@ ppr_mono_ty (HsParTy _ ty) unicode
 ppr_mono_ty (HsDocTy _ ty _) unicode
   = ppr_mono_lty ty unicode
 
-ppr_mono_ty (HsWildCardTy (AnonWildCard _)) _ = text "\\_"
+ppr_mono_ty (HsWildCardTy _) _ = text "\\_"
 
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
@@ -1315,12 +1328,13 @@ quote :: LaTeX -> LaTeX
 quote doc = text "\\begin{quote}" $$ doc $$ text "\\end{quote}"
 
 
-dcolon, arrow, darrow, forallSymbol, starSymbol :: Bool -> LaTeX
+dcolon, arrow, darrow, forallSymbol, starSymbol, atSign :: Bool -> LaTeX
 dcolon unicode = text (if unicode then "∷" else "::")
 arrow  unicode = text (if unicode then "→" else "->")
 darrow unicode = text (if unicode then "⇒" else "=>")
 forallSymbol unicode = text (if unicode then "∀" else "forall")
 starSymbol unicode = text (if unicode then "★" else "*")
+atSign unicode = text (if unicode then "@" else "@")
 
 dot :: LaTeX
 dot = char '.'

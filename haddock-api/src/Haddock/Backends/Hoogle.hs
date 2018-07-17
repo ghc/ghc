@@ -76,6 +76,7 @@ dropHsDocTy = f
         f (HsQualTy x a e) = HsQualTy x a (g e)
         f (HsBangTy x a b) = HsBangTy x a (g b)
         f (HsAppTy x a b) = HsAppTy x (g a) (g b)
+        f (HsAppKindTy x a b) = HsAppKindTy x (g a) (g b)
         f (HsFunTy x a b) = HsFunTy x (g a) (g b)
         f (HsListTy x a) = HsListTy x (g a)
         f (HsTupleTy x a b) = HsTupleTy x a (map g b)

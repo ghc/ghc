@@ -183,6 +183,13 @@ renameFnArgsDoc = mapM renameDoc
 renameLType :: LHsType GhcRn -> RnM (LHsType DocNameI)
 renameLType = mapM renameType
 
+renameLTypeArg :: LHsTypeArg GhcRn -> RnM (LHsTypeArg DocNameI)
+renameLTypeArg (HsValArg ty) = do { ty' <- renameLType ty
+                                     ; return $ HsValArg ty' }
+renameLTypeArg (HsTypeArg ki) = do { ki' <- renameLKind ki
+                                 ; return $ HsTypeArg ki' }
+renameLTypeArg (HsArgPar sp) = return $ HsArgPar sp
+
 renameLSigType :: LHsSigType GhcRn -> RnM (LHsSigType DocNameI)
 renameLSigType = renameImplicit renameLType
 
@@ -238,6 +245,11 @@ renameType t = case t of
     b' <- renameLType b
     return (HsAppTy NoExt a' b')
 
+  HsAppKindTy _ a b -> do
+    a' <- renameLType a
+    b' <- renameLKind b
+    return (HsAppKindTy NoExt a' b')
+
   HsFunTy _ a b -> do
     a' <- renameLType a
     b' <- renameLType b
@@ -274,7 +286,7 @@ renameType t = case t of
   HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ s          -> renameHsSpliceTy s
-  HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
+  HsWildCardTy a          -> pure (HsWildCardTy a)
 
 -- | Rename splices, but _only_ those that turn out to be for types.
 -- I think this is actually safe for our possible inputs:
@@ -308,9 +320,6 @@ renameLContext :: Located [LHsType GhcRn] -> RnM (Located [LHsType DocNameI])
 renameLContext (L loc context) = do
   context' <- mapM renameLType context
   return (L loc context')
-
-renameWildCardInfo :: HsWildCardInfo -> RnM HsWildCardInfo
-renameWildCardInfo (AnonWildCard  (L l name)) = return (AnonWildCard (L l name))
 
 renameInstHead :: InstHead GhcRn -> RnM (InstHead DocNameI)
 renameInstHead InstHead {..} = do
@@ -603,7 +612,7 @@ renameTyFamInstEqn eqn
                               , feqn_rhs = rhs })
       = do { tc' <- renameL tc
            ; bndrs' <- traverse (mapM renameLTyVarBndr) bndrs
-           ; pats' <- mapM renameLType pats
+           ; pats' <- mapM renameLTypeArg pats
            ; rhs' <- renameLType rhs
            ; return (FamEqn { feqn_ext    = noExt
                             , feqn_tycon  = tc'
@@ -640,7 +649,7 @@ renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
                                 , feqn_rhs = defn })
       = do { tc' <- renameL tc
            ; bndrs' <- traverse (mapM renameLTyVarBndr) bndrs
-           ; pats' <- mapM renameLType pats
+           ; pats' <- mapM renameLTypeArg pats
            ; defn' <- renameDataDefn defn
            ; return (FamEqn { feqn_ext    = noExt
                             , feqn_tycon  = tc'

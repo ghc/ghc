@@ -125,7 +125,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
                                    , feqn_tycon  = name
                                    , feqn_bndrs  = Nothing
                                        -- this must change eventually
-                                   , feqn_pats   = annot_typats
+                                   , feqn_pats   = map HsValArg annot_typats
                                    , feqn_fixity = Prefix
                                    , feqn_rhs    = hs_rhs } }
   where

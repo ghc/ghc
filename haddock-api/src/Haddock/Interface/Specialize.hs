@@ -255,6 +255,7 @@ renameType (HsQualTy x lctxt lt) =
 renameType (HsTyVar x ip name) = HsTyVar x ip <$> located renameName name
 renameType t@(HsStarTy _ _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
+renameType (HsAppKindTy x lt lk) = HsAppKindTy x <$> renameLType lt <*> renameLKind lk
 renameType (HsFunTy x la lr) = HsFunTy x <$> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
@@ -280,6 +281,8 @@ renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)
 renameLType = located renameType
 
+renameLKind :: LHsKind GhcRn -> Rename (IdP GhcRn) (LHsKind GhcRn)
+renameLKind = renameLType
 
 renameLTypes :: [LHsType GhcRn] -> Rename (IdP GhcRn) [LHsType GhcRn]
 renameLTypes = mapM renameLType

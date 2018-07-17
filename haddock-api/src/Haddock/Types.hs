@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable, DeriveTraversable, StandaloneDeriving, TypeFamilies, RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -674,6 +675,7 @@ type instance XQualTy          DocNameI = NoExt
 type instance XTyVar           DocNameI = NoExt
 type instance XStarTy          DocNameI = NoExt
 type instance XAppTy           DocNameI = NoExt
+type instance XAppKindTy       DocNameI = NoExt
 type instance XFunTy           DocNameI = NoExt
 type instance XListTy          DocNameI = NoExt
 type instance XTupleTy         DocNameI = NoExt
@@ -689,7 +691,7 @@ type instance XRecTy           DocNameI = NoExt
 type instance XExplicitListTy  DocNameI = NoExt
 type instance XExplicitTupleTy DocNameI = NoExt
 type instance XTyLit           DocNameI = NoExt
-type instance XWildCardTy      DocNameI = HsWildCardInfo
+type instance XWildCardTy      DocNameI = NoExt
 type instance XXType           DocNameI = NewHsTypeX
 
 type instance XUserTyVar    DocNameI = NoExt
