@@ -1150,7 +1150,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                           -- here because we are also maintaining
                           -- Note [The tcType invariant], so we don't just
                           -- want to zonk the kind, leaving the TyVar
-                          -- un-zonked  (Trac #114873)
+                          -- un-zonked  (Trac #14873)
                           do { ty <- zonkTcTyVar tv
                              ; return (ty, typeKind ty) }
 
