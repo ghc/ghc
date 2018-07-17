@@ -23,6 +23,7 @@ module TcType (
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
   TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcTyCon,
+  KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -51,8 +52,7 @@ module TcType (
   --------------------------------
   -- Builders
   mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
-  mkNakedTyConApp, mkNakedAppTys, mkNakedAppTy,
-  mkNakedCastTy, nakedSubstTy,
+  mkNakedAppTy, mkNakedAppTys, mkNakedCastTy, nakedSubstTy,
 
   --------------------------------
   -- Splitters
@@ -352,7 +352,6 @@ type TcTyVarSet     = TyVarSet
 type TcTyCoVarSet   = TyCoVarSet
 type TcDTyVarSet    = DTyVarSet
 type TcDTyCoVarSet  = DTyCoVarSet
-
 
 {- *********************************************************************
 *                                                                      *
@@ -1445,27 +1444,17 @@ Notes:
   not substTy, bucause the latter uses smart constructors that do
   Refl-elimination.
 
-* None of this is to do with knot-tying, which is the (quite distinct)
-  motivation for mkNakedTyConApp
 -}
 
 ---------------
-mkNakedTyConApp :: TyCon -> [Type] -> Type
--- Builds a TyConApp
---   * without being strict in TyCon,
---   * without satisfying the invariants of TyConApp
--- A subsequent zonking will establish the invariants
--- See Note [Type-checking inside the knot] in TcHsType
-mkNakedTyConApp tc tys = TyConApp tc tys
-
 mkNakedAppTys :: Type -> [Type] -> Type
--- See Note [Type-checking inside the knot] in TcHsType
+-- See Note [The well-kinded type invariant]
 mkNakedAppTys ty1                []   = ty1
-mkNakedAppTys (TyConApp tc tys1) tys2 = mkNakedTyConApp tc (tys1 ++ tys2)
+mkNakedAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
 mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
 mkNakedAppTy :: Type -> Type -> Type
--- See Note [Type-checking inside the knot] in TcHsType
+-- See Note [The well-kinded type invariant]
 mkNakedAppTy ty1 ty2 = mkNakedAppTys ty1 [ty2]
 
 mkNakedCastTy :: Type -> Coercion -> Type
@@ -1493,7 +1482,8 @@ nakedSubstMapper
                , tcm_tyvar    = \subst tv -> return (substTyVar subst tv)
                , tcm_covar    = \subst cv -> return (substCoVar subst cv)
                , tcm_hole     = \_ hole   -> return (HoleCo hole)
-               , tcm_tybinder = \subst tv _ -> return (substTyVarBndr subst tv) }
+               , tcm_tybinder = \subst tv _ -> return (substTyVarBndr subst tv)
+               , tcm_tycon    = return }
 
 {-
 ************************************************************************

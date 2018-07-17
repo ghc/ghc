@@ -845,27 +845,27 @@ isMarkedStrict _               = True   -- All others are strict
 
 -- | Build a new data constructor
 mkDataCon :: Name
-          -> Bool           -- ^ Is the constructor declared infix?
-          -> TyConRepName   -- ^  TyConRepName for the promoted TyCon
-          -> [HsSrcBang]    -- ^ Strictness/unpack annotations, from user
-          -> [FieldLabel]   -- ^ Field labels for the constructor,
-                            -- if it is a record, otherwise empty
-          -> [TyVar]        -- ^ Universals.
-          -> [TyVar]        -- ^ Existentials.
-          -> [TyVarBinder]  -- ^ User-written 'TyVarBinder's.
-                            --   These must be Inferred/Specified.
-                            --   See @Note [TyVarBinders in DataCons]@
-          -> [EqSpec]       -- ^ GADT equalities
-          -> ThetaType      -- ^ Theta-type occuring before the arguments proper
-          -> [Type]         -- ^ Original argument types
-          -> Type           -- ^ Original result type
-          -> RuntimeRepInfo -- ^ See comments on 'TyCon.RuntimeRepInfo'
-          -> TyCon          -- ^ Representation type constructor
-          -> ConTag         -- ^ Constructor tag
-          -> ThetaType      -- ^ The "stupid theta", context of the data
-                            -- declaration e.g. @data Eq a => T a ...@
-          -> Id             -- ^ Worker Id
-          -> DataConRep     -- ^ Representation
+          -> Bool               -- ^ Is the constructor declared infix?
+          -> TyConRepName       -- ^  TyConRepName for the promoted TyCon
+          -> [HsSrcBang]        -- ^ Strictness/unpack annotations, from user
+          -> [FieldLabel]       -- ^ Field labels for the constructor,
+                                -- if it is a record, otherwise empty
+          -> [TyVar]            -- ^ Universals.
+          -> [TyVar]            -- ^ Existentials.
+          -> [TyVarBinder]      -- ^ User-written 'TyVarBinder's.
+                                --   These must be Inferred/Specified.
+                                --   See @Note [TyVarBinders in DataCons]@
+          -> [EqSpec]           -- ^ GADT equalities
+          -> KnotTied ThetaType -- ^ Theta-type occuring before the arguments proper
+          -> [KnotTied Type]    -- ^ Original argument types
+          -> KnotTied Type      -- ^ Original result type
+          -> RuntimeRepInfo     -- ^ See comments on 'TyCon.RuntimeRepInfo'
+          -> KnotTied TyCon     -- ^ Representation type constructor
+          -> ConTag             -- ^ Constructor tag
+          -> ThetaType          -- ^ The "stupid theta", context of the data
+                                -- declaration e.g. @data Eq a => T a ...@
+          -> Id                 -- ^ Worker Id
+          -> DataConRep         -- ^ Representation
           -> DataCon
   -- Can get the tag from the TyCon
 
@@ -1442,8 +1442,8 @@ buildAlgTyCon tc_name ktvs roles cType stupid_theta rhs
   where
     binders = mkTyConBindersPreferAnon ktvs liftedTypeKind
 
-buildSynTyCon :: Name -> [TyConBinder] -> Kind   -- ^ /result/ kind
-                  -> [Role] -> Type -> TyCon
+buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
+              -> [Role] -> KnotTied Type -> TyCon
 buildSynTyCon name binders res_kind roles rhs
   = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
   where

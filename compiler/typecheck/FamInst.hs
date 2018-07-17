@@ -443,7 +443,7 @@ checkFamInstConsistency directlyImpMods
            -- as quickly as possible, so that we aren't typechecking
            -- values with inconsistent axioms in scope.
            --
-           -- See also Note [Tying the knot] and Note [Type-checking inside the knot]
+           -- See also Note [Tying the knot]
            -- for why we are doing this at all.
            ; let check_now = famInstEnvElts env1
            ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
