@@ -856,7 +856,7 @@ promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 ************************************************************************
 -}
 
--- | Finds outermost type-family applications occuring in a type,
+-- | Finds outermost type-family applications occurring in a type,
 -- after expanding synonyms.  In the list (F, tys) that is returned
 -- we guarantee that tys matches F's arity.  For example, given
 --    type family F a :: * -> *    (arity 1)
@@ -1440,7 +1440,7 @@ a's kind, so we'll call matchExpectedFunKind, and unify
 That evidence is actually Refl, but we must not discard the cast to
 form the result type
    ((a::kappa) (Int::*))
-bacause that does not satisfy the invariant, and crashes TypeKind.  This
+because that does not satisfy the invariant, and crashes TypeKind.  This
 caused Trac #14174 and #14520.
 
 Notes:
