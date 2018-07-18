@@ -77,19 +77,19 @@ instance Instruction Instr where
         mkStackDeallocInstr     = ppc_mkStackDeallocInstr
 
 
-ppc_mkStackAllocInstr :: Platform -> Int -> Instr
+ppc_mkStackAllocInstr :: Platform -> Int -> [Instr]
 ppc_mkStackAllocInstr platform amount
   = ppc_mkStackAllocInstr' platform (-amount)
 
-ppc_mkStackDeallocInstr :: Platform -> Int -> Instr
+ppc_mkStackDeallocInstr :: Platform -> Int -> [Instr]
 ppc_mkStackDeallocInstr platform amount
   = ppc_mkStackAllocInstr' platform amount
 
-ppc_mkStackAllocInstr' :: Platform -> Int -> Instr
+ppc_mkStackAllocInstr' :: Platform -> Int -> [Instr]
 ppc_mkStackAllocInstr' platform amount
   = case platformArch platform of
-    ArchPPC      -> UPDATE_SP II32 (ImmInt amount)
-    ArchPPC_64 _ -> UPDATE_SP II64 (ImmInt amount)
+    ArchPPC      -> [UPDATE_SP II32 (ImmInt amount)]
+    ArchPPC_64 _ -> [UPDATE_SP II64 (ImmInt amount)]
     _            -> panic $ "ppc_mkStackAllocInstr' "
                             ++ show (platformArch platform)
 
@@ -126,7 +126,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
 
         insert_stack_insns (BasicBlock id insns)
             | Just new_blockid <- mapLookup id new_blockmap
-                = [ BasicBlock id [alloc, BCC ALWAYS new_blockid Nothing]
+                = [ BasicBlock id $ alloc ++ [BCC ALWAYS new_blockid Nothing]
                   , BasicBlock new_blockid block'
                   ]
             | otherwise
@@ -139,8 +139,8 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
             -- "labeled-goto" we use JMP, and for "computed-goto" we
             -- use MTCTR followed by BCTR. See 'PPC.CodeGen.genJump'.
             = case insn of
-                JMP _           -> dealloc : insn : r
-                BCTR [] Nothing -> dealloc : insn : r
+                JMP _           -> dealloc ++ (insn : r)
+                BCTR [] Nothing -> dealloc ++ (insn : r)
                 BCTR ids label  -> BCTR (map (fmap retarget) ids) label : r
                 BCCFAR cond b p -> BCCFAR cond (retarget b) p : r
                 BCC    cond b p -> BCC    cond (retarget b) p : r

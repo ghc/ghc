@@ -858,25 +858,104 @@ x86_mkJumpInstr
 x86_mkJumpInstr id
         = [JXX ALWAYS id]
 
+-- Note [Windows stack layout]
+-- | On most OSes the kernel will place a guard page after the current stack
+--   page.  If you allocate larger than a page worth you may jump over this
+--   guard page.  Not only is this a security issue, but on certain OSes such
+--   as Windows a new page won't be allocated if you don't hit the guard.  This
+--   will cause a segfault or access fault.
+--
+--   This function defines if the current allocation amount requires a probe.
+--   On Windows (for now) we emit a call to _chkstk for this.  For other OSes
+--   this is not yet implemented.
+--   See https://docs.microsoft.com/en-us/windows/desktop/DevNotes/-win32-chkstk
+--   The Windows stack looks like this:
+--
+--                         +-------------------+
+--                         |        SP         |
+--                         +-------------------+
+--                         |                   |
+--                         |    GUARD PAGE     |
+--                         |                   |
+--                         +-------------------+
+--                         |                   |
+--                         |                   |
+--                         |     UNMAPPED      |
+--                         |                   |
+--                         |                   |
+--                         +-------------------+
+--
+--   In essense each allocation larger than a page size needs to be chunked and
+--   a probe emitted after each page allocation.  You have to hit the guard
+--   page so the kernel can map in the next page, otherwise you'll segfault.
+--
+needs_probe_call :: Platform -> Int -> Bool
+needs_probe_call platform amount
+  = case platformOS platform of
+     OSMinGW32 -> case platformArch platform of
+                    ArchX86    -> amount > (4 * 1024)
+                    ArchX86_64 -> amount > (8 * 1024)
+                    _          -> False
+     _         -> False
 
 x86_mkStackAllocInstr
         :: Platform
         -> Int
-        -> Instr
+        -> [Instr]
 x86_mkStackAllocInstr platform amount
-  = case platformArch platform of
-      ArchX86    -> SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
-      ArchX86_64 -> SUB II64 (OpImm (ImmInt amount)) (OpReg rsp)
-      _ -> panic "x86_mkStackAllocInstr"
+  = case platformOS platform of
+      OSMinGW32 ->
+        -- These will clobber AX but this should be ok because
+        --
+        -- 1. It is the first thing we do when entering the closure and AX is
+        --    a caller saved registers on Windows both on x86_64 and x86.
+        --
+        -- 2. The closures are only entered via a call or longjmp in which case
+        --    there are no expectations for volatile registers.
+        --
+        -- 3. When the target is a local branch point it is re-targeted
+        --    after the dealloc, preserving #2.  See note [extra spill slots].
+        --
+        -- We emit a call because the stack probes are quite involved and
+        -- would bloat code size a lot.  GHC doesn't really have an -Os.
+        -- __chkstk is guaranteed to leave all nonvolatile registers and AX
+        -- untouched.  It's part of the standard prologue code for any Windows
+        -- function dropping the stack more than a page.
+        -- See Note [Windows stack layout]
+        case platformArch platform of
+            ArchX86    | needs_probe_call platform amount ->
+                           [ MOV II32 (OpImm (ImmInt amount)) (OpReg eax)
+                           , CALL (Left $ strImmLit "___chkstk_ms") [eax]
+                           , SUB II32 (OpReg eax) (OpReg esp)
+                           ]
+                       | otherwise ->
+                           [ SUB II32 (OpImm (ImmInt amount)) (OpReg esp)
+                           , TEST II32 (OpReg esp) (OpReg esp)
+                           ]
+            ArchX86_64 | needs_probe_call platform amount ->
+                           [ MOV II64 (OpImm (ImmInt amount)) (OpReg rax)
+                           , CALL (Left $ strImmLit "__chkstk_ms") [rax]
+                           , SUB II64 (OpReg rax) (OpReg rsp)
+                           ]
+                       | otherwise ->
+                           [ SUB II64 (OpImm (ImmInt amount)) (OpReg rsp)
+                           , TEST II64 (OpReg rsp) (OpReg rsp)
+                           ]
+            _ -> panic "x86_mkStackAllocInstr"
+      _       ->
+        case platformArch platform of
+          ArchX86    -> [ SUB II32 (OpImm (ImmInt amount)) (OpReg esp) ]
+          ArchX86_64 -> [ SUB II64 (OpImm (ImmInt amount)) (OpReg rsp) ]
+          _ -> panic "x86_mkStackAllocInstr"
 
 x86_mkStackDeallocInstr
         :: Platform
         -> Int
-        -> Instr
+        -> [Instr]
 x86_mkStackDeallocInstr platform amount
   = case platformArch platform of
-      ArchX86    -> ADD II32 (OpImm (ImmInt amount)) (OpReg esp)
-      ArchX86_64 -> ADD II64 (OpImm (ImmInt amount)) (OpReg rsp)
+      ArchX86    -> [ADD II32 (OpImm (ImmInt amount)) (OpReg esp)]
+      ArchX86_64 -> [ADD II64 (OpImm (ImmInt amount)) (OpReg rsp)]
       _ -> panic "x86_mkStackDeallocInstr"
 
 i386_insert_ffrees
@@ -996,7 +1075,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
 
       insert_stack_insns (BasicBlock id insns)
          | Just new_blockid <- mapLookup id new_blockmap
-         = [ BasicBlock id [alloc, JXX ALWAYS new_blockid]
+         = [ BasicBlock id $ alloc ++ [JXX ALWAYS new_blockid]
            , BasicBlock new_blockid block' ]
          | otherwise
          = [ BasicBlock id block' ]
@@ -1004,7 +1083,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
            block' = foldr insert_dealloc [] insns
 
       insert_dealloc insn r = case insn of
-         JMP _ _     -> dealloc : insn : r
+         JMP _ _     -> dealloc ++ (insn : r)
          JXX_GBL _ _ -> panic "insert_dealloc: cannot handle JXX_GBL"
          _other      -> x86_patchJumpInstr insn retarget : r
            where retarget b = fromMaybe b (mapLookup b new_blockmap)
@@ -1012,7 +1091,6 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       new_code = concatMap insert_stack_insns code
     -- in
     return (CmmProc info lbl live (ListGraph new_code))
-
 
 data JumpDest = DestBlockId BlockId | DestImm Imm
 
