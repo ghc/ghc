@@ -979,7 +979,7 @@ pushCoTyArg co ty
 
   | isForAllTy tyL
   = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
-    Just (ty `mkCastTy` mkSymCo co1, MCo co2)
+    Just (ty `mkCastTy` co1, MCo co2)
 
   | otherwise
   = Nothing
@@ -989,8 +989,8 @@ pushCoTyArg co ty
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2
 
-    co1 = mkNthCo Nominal 0 co
-       -- co1 :: k1 ~N k2
+    co1 = mkSymCo (mkNthCo Nominal 0 co)
+       -- co1 :: k2 ~N k1
        -- Note that NthCo can extract a Nominal equality between the
        -- kinds of the types related by a coercion between forall-types.
        -- See the NthCo case in CoreLint.
