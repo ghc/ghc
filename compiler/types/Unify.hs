@@ -85,7 +85,7 @@ How do you choose between them?
 1. If you know that the kinds of the two types are eqType, use
    the Ty variant. It is more efficient, as it does less work.
 
-2. If the kinds of variables in the  template type might mention type families,
+2. If the kinds of variables in the template type might mention type families,
    use the Ty variant (and do other work to make sure the kinds
    work out). These pure unification functions do a straightforward
    syntactic unification and do no complex reasoning about type
@@ -96,9 +96,9 @@ How do you choose between them?
    families in kinds in the TyKi variant. You just might get match
    failure even though a reducing a type family would lead to success.)
 
-3. Otherwise, if you're sure that the variable kinds to not mention
+3. Otherwise, if you're sure that the variable kinds do not mention
    type families and you're not already sure that the kind of the template
-   equals the kind of the target, then use the TyKi versio.n
+   equals the kind of the target, then use the TyKi version.
 -}
 
 -- | @tcMatchTy t1 t2@ produces a substitution (over fvs(t1))
@@ -502,7 +502,7 @@ tc_unify_tys :: (TyVar -> BindFlag)
 -- NB: It's tempting to ASSERT here that, if we're not matching kinds, then
 -- the kinds of the types should be the same. However, this doesn't work,
 -- as the types may be a dependent telescope, where later types have kinds
--- that mention variables occuring earlier in the list of types. Here's an
+-- that mention variables occurring earlier in the list of types. Here's an
 -- example (from typecheck/should_fail/T12709):
 --   template: [rep :: RuntimeRep,       a :: TYPE rep]
 --   target:   [LiftedRep :: RuntimeRep, Int :: TYPE LiftedRep]
