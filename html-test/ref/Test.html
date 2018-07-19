@@ -165,7 +165,13 @@
 	      ><li
 		>= <a href="#"
 		  >A</a
-		  > Int (Maybe Float)</li
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > (<a href="#" title="GHC.Maybe"
+		  >Maybe</a
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  >)</li
 		><li
 		>| <a href="#"
 		  >B</a
@@ -173,7 +179,11 @@
 		  >T</a
 		  > a b, <a href="#" title="Test"
 		  >T</a
-		  > Int Float)</li
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  >)</li
 		></ul
 	      ></li
 	    ><li class="src short"
@@ -347,7 +357,9 @@
 		  ><li
 		    ><a href="#"
 		      >p</a
-		      > :: Int</li
+		      > :: <a href="#" title="Data.Int"
+		      >Int</a
+		      ></li
 		    ><li
 		    ><a href="#"
 		      >q</a
@@ -359,7 +371,9 @@
 		      >r</a
 		      >, <a href="#"
 		      >s</a
-		      > :: Int</li
+		      > :: <a href="#" title="Data.Int"
+		      >Int</a
+		      ></li
 		    ></ul
 		  > }</li
 		><li
@@ -371,11 +385,23 @@
 		      >t</a
 		      > :: T1 -&gt; <a href="#" title="Test"
 		      >T2</a
-		      > Int Int -&gt; <a href="#" title="Test"
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      > -&gt; <a href="#" title="Test"
 		      >T3</a
-		      > Bool Bool -&gt; <a href="#" title="Test"
+		      > <a href="#" title="Data.Bool"
+		      >Bool</a
+		      > <a href="#" title="Data.Bool"
+		      >Bool</a
+		      > -&gt; <a href="#" title="Test"
 		      >T4</a
-		      > Float Float -&gt; <a href="#" title="Test"
+		      > <a href="#" title="Prelude"
+		      >Float</a
+		      > <a href="#" title="Prelude"
+		      >Float</a
+		      > -&gt; <a href="#" title="Test"
 		      >T5</a
 		      > () ()</li
 		    ><li
@@ -383,7 +409,9 @@
 		      >u</a
 		      >, <a href="#"
 		      >v</a
-		      > :: Int</li
+		      > :: <a href="#" title="Data.Int"
+		      >Int</a
+		      ></li
 		    ></ul
 		  > }</li
 		></ul
@@ -399,15 +427,21 @@
 	      ><li
 		><a href="#"
 		  >s1</a
-		  > :: Int</li
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  ></li
 		><li
 		><a href="#"
 		  >s2</a
-		  > :: Int</li
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  ></li
 		><li
 		><a href="#"
 		  >s3</a
-		  > :: Int</li
+		  > :: <a href="#" title="Data.Int"
+		  >Int</a
+		  ></li
 		></ul
 	      >}</li
 	    ><li class="src short"
@@ -415,7 +449,9 @@
 	      >p</a
 	      > :: <a href="#" title="Test"
 	      >R</a
-	      > -&gt; Int</li
+	      > -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >q</a
@@ -429,7 +465,9 @@
 	      >u</a
 	      > :: <a href="#" title="Test"
 	      >R</a
-	      > -&gt; Int</li
+	      > -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><span class="keyword"
 	      >class</span
@@ -443,7 +481,9 @@
 	      ><li
 		><a href="#"
 		  >a</a
-		  > :: IO a</li
+		  > :: <a href="#" title="System.IO"
+		  >IO</a
+		  > a</li
 		><li
 		><a href="#"
 		  >b</a
@@ -495,21 +535,33 @@
 	      >a</a
 	      > :: <a href="#" title="Test"
 	      >C</a
-	      > a =&gt; IO a</li
+	      > a =&gt; <a href="#" title="System.IO"
+	      >IO</a
+	      > a</li
 	    ><li class="src short"
 	    ><a href="#"
 	      >f</a
 	      > :: <a href="#" title="Test"
 	      >C</a
-	      > a =&gt; a -&gt; Int</li
+	      > a =&gt; a -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >g</a
-	      > :: Int -&gt; IO CInt</li
+	      > :: <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; <a href="#" title="System.IO"
+	      >IO</a
+	      > CInt</li
 	    ><li class="src short"
 	    ><a href="#"
 	      >hidden</a
-	      > :: Int -&gt; Int</li
+	      > :: <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    >module <a href="#"
 	      >Visible</a
@@ -551,17 +603,39 @@
 	      >T</a
 	      > () () -&gt; <a href="#" title="Test"
 	      >T2</a
-	      > Int Int -&gt; (<a href="#" title="Test"
+	      > <a href="#" title="Data.Int"
+	      >Int</a
+	      > <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; (<a href="#" title="Test"
 	      >T3</a
-	      > Bool Bool -&gt; <a href="#" title="Test"
+	      > <a href="#" title="Data.Bool"
+	      >Bool</a
+	      > <a href="#" title="Data.Bool"
+	      >Bool</a
+	      > -&gt; <a href="#" title="Test"
 	      >T4</a
-	      > Float Float) -&gt; <a href="#" title="Test"
+	      > <a href="#" title="Prelude"
+	      >Float</a
+	      > <a href="#" title="Prelude"
+	      >Float</a
+	      >) -&gt; <a href="#" title="Test"
 	      >T5</a
-	      > () () -&gt; IO ()</li
+	      > () () -&gt; <a href="#" title="System.IO"
+	      >IO</a
+	      > ()</li
 	    ><li class="src short"
 	    ><a href="#"
 	      >l</a
-	      > :: (Int, Int, Float) -&gt; Int</li
+	      > :: (<a href="#" title="Data.Int"
+	      >Int</a
+	      >, <a href="#" title="Data.Int"
+	      >Int</a
+	      >, <a href="#" title="Prelude"
+	      >Float</a
+	      >) -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >m</a
@@ -569,19 +643,33 @@
 	      >R</a
 	      > -&gt; <a href="#" title="Test"
 	      >N1</a
-	      > () -&gt; IO Int</li
+	      > () -&gt; <a href="#" title="System.IO"
+	      >IO</a
+	      > <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >o</a
-	      > :: Float -&gt; IO Float</li
+	      > :: <a href="#" title="Prelude"
+	      >Float</a
+	      > -&gt; <a href="#" title="System.IO"
+	      >IO</a
+	      > <a href="#" title="Prelude"
+	      >Float</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >f'</a
-	      > :: Int</li
+	      > :: <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >withType</a
-	      > :: Int</li
+	      > :: <a href="#" title="Data.Int"
+	      >Int</a
+	      ></li
 	    ><li class="src short"
 	    ><a href="#"
 	      >withoutType</a
@@ -622,7 +710,13 @@
 	      ><td class="src"
 		><a id="v:A" class="def"
 		  >A</a
-		  > Int (Maybe Float)</td
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > (<a href="#" title="GHC.Maybe"
+		  >Maybe</a
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  >)</td
 		><td class="doc"
 		><p
 		  >This comment describes the <code
@@ -640,7 +734,11 @@
 		  >T</a
 		  > a b, <a href="#" title="Test"
 		  >T</a
-		  > Int Float)</td
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  >)</td
 		><td class="doc"
 		><p
 		  >This comment describes the <code
@@ -1188,7 +1286,9 @@
 		      ><dfn class="src"
 			><a id="v:p" class="def"
 			  >p</a
-			  > :: Int</dfn
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
 			><div class="doc"
 			><p
 			  >This comment applies to the <code
@@ -1220,7 +1320,9 @@
 			  >r</a
 			  >, <a id="v:s" class="def"
 			  >s</a
-			  > :: Int</dfn
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
 			><div class="doc"
 			><p
 			  >This comment applies to both <code
@@ -1264,11 +1366,23 @@
 			  >t</a
 			  > :: T1 -&gt; <a href="#" title="Test"
 			  >T2</a
-			  > Int Int -&gt; <a href="#" title="Test"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="Test"
 			  >T3</a
-			  > Bool Bool -&gt; <a href="#" title="Test"
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; <a href="#" title="Test"
 			  >T4</a
-			  > Float Float -&gt; <a href="#" title="Test"
+			  > <a href="#" title="Prelude"
+			  >Float</a
+			  > <a href="#" title="Prelude"
+			  >Float</a
+			  > -&gt; <a href="#" title="Test"
 			  >T5</a
 			  > () ()</dfn
 			><div class="doc empty"
@@ -1280,7 +1394,9 @@
 			  >u</a
 			  >, <a id="v:v" class="def"
 			  >v</a
-			  > :: Int</dfn
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
 			><div class="doc empty"
 			></div
 			></li
@@ -1332,7 +1448,9 @@
 		      ><dfn class="src"
 			><a id="v:s1" class="def"
 			  >s1</a
-			  > :: Int</dfn
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
 			><div class="doc"
 			><p
 			  >The <code
@@ -1346,7 +1464,9 @@
 		      ><dfn class="src"
 			><a id="v:s2" class="def"
 			  >s2</a
-			  > :: Int</dfn
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
 			><div class="doc"
 			><p
 			  >The <code
@@ -1360,7 +1480,9 @@
 		      ><dfn class="src"
 			><a id="v:s3" class="def"
 			  >s3</a
-			  > :: Int</dfn
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  ></dfn
 			><div class="doc"
 			><p
 			  >The <code
@@ -1387,7 +1509,9 @@
 	    >p</a
 	    > :: <a href="#" title="Test"
 	    >R</a
-	    > -&gt; Int <a href="#" class="selflink"
+	    > -&gt; <a href="#" title="Data.Int"
+	    >Int</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -1425,7 +1549,9 @@
 	    >u</a
 	    > :: <a href="#" title="Test"
 	    >R</a
-	    > -&gt; Int <a href="#" class="selflink"
+	    > -&gt; <a href="#" title="Data.Int"
+	    >Int</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ></div
@@ -1462,7 +1588,9 @@
 	    ><p class="src"
 	    ><a id="v:a" class="def"
 	      >a</a
-	      > :: IO a <a href="#" class="selflink"
+	      > :: <a href="#" title="System.IO"
+	      >IO</a
+	      > a <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><div class="doc"
@@ -1534,7 +1662,9 @@
 		      ></span
 		      > <a href="#" title="Test"
 		      >D</a
-		      > Float</span
+		      > <a href="#" title="Prelude"
+		      >Float</a
+		      ></span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -1558,13 +1688,19 @@
 			  >d</a
 			  > :: <a href="#" title="Test"
 			  >T</a
-			  > Float b <a href="#" class="selflink"
+			  > <a href="#" title="Prelude"
+			  >Float</a
+			  > b <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >e</a
-			  > :: (Float, Float) <a href="#" class="selflink"
+			  > :: (<a href="#" title="Prelude"
+			  >Float</a
+			  >, <a href="#" title="Prelude"
+			  >Float</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -1578,7 +1714,9 @@
 		      ></span
 		      > <a href="#" title="Test"
 		      >D</a
-		      > Int</span
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      ></span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -1602,13 +1740,19 @@
 			  >d</a
 			  > :: <a href="#" title="Test"
 			  >T</a
-			  > Int b <a href="#" class="selflink"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > b <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >e</a
-			  > :: (Int, Int) <a href="#" class="selflink"
+			  > :: (<a href="#" title="Data.Int"
+			  >Int</a
+			  >, <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -1671,7 +1815,9 @@
 	    >a</a
 	    > :: <a href="#" title="Test"
 	    >C</a
-	    > a =&gt; IO a <a href="#" class="selflink"
+	    > a =&gt; <a href="#" title="System.IO"
+	    >IO</a
+	    > a <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -1693,7 +1839,9 @@
 	    >f</a
 	    > :: <a href="#" title="Test"
 	    >C</a
-	    > a =&gt; a -&gt; Int <a href="#" class="selflink"
+	    > a =&gt; a -&gt; <a href="#" title="Data.Int"
+	    >Int</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -1753,7 +1901,11 @@ using double quotes: <a href="#"
 	><p class="src"
 	  ><a id="v:g" class="def"
 	    >g</a
-	    > :: Int -&gt; IO CInt <a href="#" class="selflink"
+	    > :: <a href="#" title="Data.Int"
+	    >Int</a
+	    > -&gt; <a href="#" title="System.IO"
+	    >IO</a
+	    > CInt <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -1864,7 +2016,11 @@ is at the beginning of the line).</pre
 	><p class="src"
 	  ><a id="v:hidden" class="def"
 	    >hidden</a
-	    > :: Int -&gt; Int <a href="#" class="selflink"
+	    > :: <a href="#" title="Data.Int"
+	    >Int</a
+	    > -&gt; <a href="#" title="Data.Int"
+	    >Int</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ></div
@@ -1977,7 +2133,11 @@ is at the beginning of the line).</pre
 	      ><td class="src"
 		>-&gt; <a href="#" title="Test"
 		  >T2</a
-		  > Int Int</td
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  ></td
 		><td class="doc"
 		><p
 		  >This argument has type 'T2 Int Int'</p
@@ -1987,9 +2147,17 @@ is at the beginning of the line).</pre
 	      ><td class="src"
 		>-&gt; (<a href="#" title="Test"
 		  >T3</a
-		  > Bool Bool -&gt; <a href="#" title="Test"
+		  > <a href="#" title="Data.Bool"
+		  >Bool</a
+		  > <a href="#" title="Data.Bool"
+		  >Bool</a
+		  > -&gt; <a href="#" title="Test"
 		  >T4</a
-		  > Float Float)</td
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  >)</td
 		><td class="doc"
 		><p
 		  >This argument has type <code
@@ -2011,7 +2179,9 @@ is at the beginning of the line).</pre
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; IO ()</td
+		>-&gt; <a href="#" title="System.IO"
+		  >IO</a
+		  > ()</td
 		><td class="doc"
 		><p
 		  >This is the result type</p
@@ -2037,7 +2207,13 @@ is at the beginning of the line).</pre
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: (Int, Int, Float)</td
+		>:: (<a href="#" title="Data.Int"
+		  >Int</a
+		  >, <a href="#" title="Data.Int"
+		  >Int</a
+		  >, <a href="#" title="Prelude"
+		  >Float</a
+		  >)</td
 		><td class="doc"
 		><p
 		  >takes a triple</p
@@ -2045,11 +2221,15 @@ is at the beginning of the line).</pre
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; Int</td
+		>-&gt; <a href="#" title="Data.Int"
+		  >Int</a
+		  ></td
 		><td class="doc"
 		><p
 		  >returns an <code
-		    >Int</code
+		    ><a href="#" title="Data.Int"
+		      >Int</a
+		      ></code
 		    ></p
 		  ></td
 		></tr
@@ -2087,7 +2267,11 @@ is at the beginning of the line).</pre
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; IO Int</td
+		>-&gt; <a href="#" title="System.IO"
+		  >IO</a
+		  > <a href="#" title="Data.Int"
+		  >Int</a
+		  ></td
 		><td class="doc"
 		><p
 		  >and the return value</p
@@ -2113,7 +2297,9 @@ is at the beginning of the line).</pre
 	    ><table
 	    ><tr
 	      ><td class="src"
-		>:: Float</td
+		>:: <a href="#" title="Prelude"
+		  >Float</a
+		  ></td
 		><td class="doc"
 		><p
 		  >The input float</p
@@ -2121,7 +2307,11 @@ is at the beginning of the line).</pre
 		></tr
 	      ><tr
 	      ><td class="src"
-		>-&gt; IO Float</td
+		>-&gt; <a href="#" title="System.IO"
+		  >IO</a
+		  > <a href="#" title="Prelude"
+		  >Float</a
+		  ></td
 		><td class="doc"
 		><p
 		  >The output float</p
@@ -2154,7 +2344,9 @@ is at the beginning of the line).</pre
 	><p class="src"
 	  ><a id="v:f-39-" class="def"
 	    >f'</a
-	    > :: Int <a href="#" class="selflink"
+	    > :: <a href="#" title="Data.Int"
+	    >Int</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -2171,7 +2363,9 @@ is at the beginning of the line).</pre
 	><p class="src"
 	  ><a id="v:withType" class="def"
 	    >withType</a
-	    > :: Int <a href="#" class="selflink"
+	    > :: <a href="#" title="Data.Int"
+	    >Int</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"

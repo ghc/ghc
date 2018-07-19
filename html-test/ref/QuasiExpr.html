@@ -58,7 +58,9 @@
 	      ><td class="src"
 		><a id="v:IntExpr" class="def"
 		  >IntExpr</a
-		  > Integer</td
+		  > <a href="#" title="Prelude"
+		  >Integer</a
+		  ></td
 		><td class="doc empty"
 		></td
 		></tr
@@ -66,7 +68,9 @@
 	      ><td class="src"
 		><a id="v:AntiIntExpr" class="def"
 		  >AntiIntExpr</a
-		  > String</td
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></td
 		><td class="doc empty"
 		></td
 		></tr
@@ -88,7 +92,9 @@
 	      ><td class="src"
 		><a id="v:AntiExpr" class="def"
 		  >AntiExpr</a
-		  > String</td
+		  > <a href="#" title="Data.String"
+		  >String</a
+		  ></td
 		><td class="doc empty"
 		></td
 		></tr
@@ -104,7 +110,9 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:Expr:Show:1"
 		      ></span
-		      > Show <a href="#" title="QuasiExpr"
+		      > <a href="#" title="Text.Show"
+		      >Show</a
+		      > <a href="#" title="QuasiExpr"
 		      >Expr</a
 		      ></span
 		    > <a href="#" class="selflink"
@@ -128,21 +136,35 @@
 			><p class="src"
 			><a href="#"
 			  >showsPrec</a
-			  > :: Int -&gt; <a href="#" title="QuasiExpr"
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="QuasiExpr"
 			  >Expr</a
-			  > -&gt; ShowS</p
+			  > -&gt; <a href="#" title="Text.Show"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >show</a
 			  > :: <a href="#" title="QuasiExpr"
 			  >Expr</a
-			  > -&gt; String</p
+			  > -&gt; <a href="#" title="Data.String"
+			  >String</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >showList</a
 			  > :: [<a href="#" title="QuasiExpr"
 			  >Expr</a
-			  >] -&gt; ShowS</p
+			  >] -&gt; <a href="#" title="Text.Show"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -208,7 +230,9 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:BinOp:Show:1"
 		      ></span
-		      > Show <a href="#" title="QuasiExpr"
+		      > <a href="#" title="Text.Show"
+		      >Show</a
+		      > <a href="#" title="QuasiExpr"
 		      >BinOp</a
 		      ></span
 		    > <a href="#" class="selflink"
@@ -232,21 +256,35 @@
 			><p class="src"
 			><a href="#"
 			  >showsPrec</a
-			  > :: Int -&gt; <a href="#" title="QuasiExpr"
+			  > :: <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="QuasiExpr"
 			  >BinOp</a
-			  > -&gt; ShowS</p
+			  > -&gt; <a href="#" title="Text.Show"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >show</a
 			  > :: <a href="#" title="QuasiExpr"
 			  >BinOp</a
-			  > -&gt; String</p
+			  > -&gt; <a href="#" title="Data.String"
+			  >String</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >showList</a
 			  > :: [<a href="#" title="QuasiExpr"
 			  >BinOp</a
-			  >] -&gt; ShowS</p
+			  >] -&gt; <a href="#" title="Text.Show"
+			  >ShowS</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -261,7 +299,9 @@
 	    >eval</a
 	    > :: <a href="#" title="QuasiExpr"
 	    >Expr</a
-	    > -&gt; Integer <a href="#" class="selflink"
+	    > -&gt; <a href="#" title="Prelude"
+	    >Integer</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ></div
@@ -269,7 +309,9 @@
 	><p class="src"
 	  ><a id="v:expr" class="def"
 	    >expr</a
-	    > :: QuasiQuoter <a href="#" class="selflink"
+	    > :: <a href="#" title="Language.Haskell.TH.Quote"
+	    >QuasiQuoter</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ></div
@@ -277,7 +319,13 @@
 	><p class="src"
 	  ><a id="v:parseExprExp" class="def"
 	    >parseExprExp</a
-	    > :: String -&gt; Q Exp <a href="#" class="selflink"
+	    > :: <a href="#" title="Data.String"
+	    >String</a
+	    > -&gt; <a href="#" title="Language.Haskell.TH.Syntax"
+	    >Q</a
+	    > <a href="#" title="Language.Haskell.TH.Syntax"
+	    >Exp</a
+	    > <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ></div

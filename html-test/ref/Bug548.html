@@ -47,7 +47,13 @@
 	    >newtype</span
 	    > <a id="t:WrappedArrow" class="def"
 	    >WrappedArrow</a
-	    > (a :: * -&gt; * -&gt; *) b c <a href="#" class="selflink"
+	    > (a :: <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    > -&gt; <a href="#" title="Data.Kind"
+	    >Type</a
+	    >) b c <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="subs constructors"
@@ -92,9 +98,15 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Generic1:1"
 		      ></span
-		      > Generic1 (<a href="#" title="Bug548"
+		      > <a href="#" title="GHC.Generics"
+		      >Generic1</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
-		      > a b :: * -&gt; *)</span
+		      > a b :: <a href="#" title="Data.Kind"
+		      >Type</a
+		      > -&gt; <a href="#" title="Data.Kind"
+		      >Type</a
+		      >)</span
 		    ></td
 		  ><td class="doc empty"
 		  ></td
@@ -114,9 +126,15 @@
 			><p class="src"
 			><span class="keyword"
 			  >type</span
-			  > Rep1 (<a href="#" title="Bug548"
+			  > <a href="#" title="GHC.Generics"
+			  >Rep1</a
+			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b) :: k -&gt; *</p
+			  > a b) :: k -&gt; <a href="#" title="Data.Kind"
+			  >Type</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -126,17 +144,25 @@
 			  >from1</a
 			  > :: <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0 -&gt; Rep1 (<a href="#" title="Bug548"
+			  > a b a0 -&gt; <a href="#" title="GHC.Generics"
+			  >Rep1</a
+			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b) a0</p
+			  > a b) a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >to1</a
-			  > :: Rep1 (<a href="#" title="Bug548"
+			  > :: <a href="#" title="GHC.Generics"
+			  >Rep1</a
+			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
 			  > a b) a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0</p
+			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -146,12 +172,20 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Functor:2"
 		      ></span
-		      > Arrow a =&gt; Functor (<a href="#" title="Bug548"
+		      > <a href="#" title="Control.Arrow"
+		      >Arrow</a
+		      > a =&gt; <a href="#" title="Data.Functor"
+		      >Functor</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b)</span
 		    ></td
-		  ><td class="doc empty"
-		  ></td
+		  ><td class="doc"
+		  ><p
+		    ><em
+		      >Since: base-2.1</em
+		      ></p
+		    ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -172,7 +206,9 @@
 			  >WrappedArrow</a
 			  > a b a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b b0</p
+			  > a b b0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >(&lt;$)</a
@@ -180,7 +216,9 @@
 			  >WrappedArrow</a
 			  > a b b0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0</p
+			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -190,12 +228,20 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Applicative:3"
 		      ></span
-		      > Arrow a =&gt; Applicative (<a href="#" title="Bug548"
+		      > <a href="#" title="Control.Arrow"
+		      >Arrow</a
+		      > a =&gt; <a href="#" title="Control.Applicative"
+		      >Applicative</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b)</span
 		    ></td
-		  ><td class="doc empty"
-		  ></td
+		  ><td class="doc"
+		  ><p
+		    ><em
+		      >Since: base-2.1</em
+		      ></p
+		    ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -214,7 +260,9 @@
 			  >pure</a
 			  > :: a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0</p
+			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >(&lt;*&gt;)</a
@@ -224,7 +272,9 @@
 			  >WrappedArrow</a
 			  > a b a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b b0</p
+			  > a b b0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >liftA2</a
@@ -234,7 +284,9 @@
 			  >WrappedArrow</a
 			  > a b b0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b c</p
+			  > a b c <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >(*&gt;)</a
@@ -244,7 +296,9 @@
 			  >WrappedArrow</a
 			  > a b b0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b b0</p
+			  > a b b0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >(&lt;*)</a
@@ -254,7 +308,9 @@
 			  >WrappedArrow</a
 			  > a b b0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0</p
+			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -264,12 +320,22 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Alternative:4"
 		      ></span
-		      > (ArrowZero a, ArrowPlus a) =&gt; Alternative (<a href="#" title="Bug548"
+		      > (<a href="#" title="Control.Arrow"
+		      >ArrowZero</a
+		      > a, <a href="#" title="Control.Arrow"
+		      >ArrowPlus</a
+		      > a) =&gt; <a href="#" title="Control.Applicative"
+		      >Alternative</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b)</span
 		    ></td
-		  ><td class="doc empty"
-		  ></td
+		  ><td class="doc"
+		  ><p
+		    ><em
+		      >Since: base-2.1</em
+		      ></p
+		    ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -288,7 +354,9 @@
 			  >empty</a
 			  > :: <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0</p
+			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >(&lt;|&gt;)</a
@@ -298,7 +366,9 @@
 			  >WrappedArrow</a
 			  > a b a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b a0</p
+			  > a b a0 <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >some</a
@@ -306,7 +376,9 @@
 			  >WrappedArrow</a
 			  > a b a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b [a0]</p
+			  > a b [a0] <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >many</a
@@ -314,7 +386,9 @@
 			  >WrappedArrow</a
 			  > a b a0 -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b [a0]</p
+			  > a b [a0] <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -324,7 +398,9 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:id:WrappedArrow:Generic:5"
 		      ></span
-		      > Generic (<a href="#" title="Bug548"
+		      > <a href="#" title="GHC.Generics"
+		      >Generic</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b c)</span
 		    ></td
@@ -346,9 +422,17 @@
 			><p class="src"
 			><span class="keyword"
 			  >type</span
-			  > Rep (<a href="#" title="Bug548"
+			  > <a href="#" title="GHC.Generics"
+			  >Rep</a
+			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b c) :: * -&gt; *</p
+			  > a b c) :: <a href="#" title="Data.Kind"
+			  >Type</a
+			  > -&gt; <a href="#" title="Data.Kind"
+			  >Type</a
+			  > <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      > <div class="subs methods"
 		      ><p class="caption"
@@ -358,17 +442,25 @@
 			  >from</a
 			  > :: <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b c -&gt; Rep (<a href="#" title="Bug548"
+			  > a b c -&gt; <a href="#" title="GHC.Generics"
+			  >Rep</a
+			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b c) x</p
+			  > a b c) x <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			><p class="src"
 			><a href="#"
 			  >to</a
-			  > :: Rep (<a href="#" title="Bug548"
+			  > :: <a href="#" title="GHC.Generics"
+			  >Rep</a
+			  > (<a href="#" title="Bug548"
 			  >WrappedArrow</a
 			  > a b c) x -&gt; <a href="#" title="Bug548"
 			  >WrappedArrow</a
-			  > a b c</p
+			  > a b c <a href="#" class="selflink"
+			  >#</a
+			  ></p
 			></div
 		      ></details
 		    ></td
@@ -380,12 +472,22 @@
 		      ></span
 		      > <span class="keyword"
 		      >type</span
-		      > Rep1 (<a href="#" title="Bug548"
+		      > <a href="#" title="GHC.Generics"
+		      >Rep1</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
-		      > a b :: * -&gt; *)</span
+		      > a b :: <a href="#" title="Data.Kind"
+		      >Type</a
+		      > -&gt; <a href="#" title="Data.Kind"
+		      >Type</a
+		      >)</span
 		    ></td
-		  ><td class="doc empty"
-		  ></td
+		  ><td class="doc"
+		  ><p
+		    ><em
+		      >Since: base-4.7.0.0</em
+		      ></p
+		    ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -399,9 +501,43 @@
 		      > <div class="src"
 		      ><span class="keyword"
 			>type</span
-			> Rep1 (<a href="#" title="Bug548"
+			> <a href="#" title="GHC.Generics"
+			>Rep1</a
+			> (<a href="#" title="Bug548"
 			>WrappedArrow</a
-			> a b :: * -&gt; *) = D1 (MetaData &quot;WrappedArrow&quot; &quot;Control.Applicative&quot; &quot;base&quot; True) (C1 (MetaCons &quot;WrapArrow&quot; PrefixI True) (S1 (MetaSel (Just &quot;unwrapArrow&quot;) NoSourceUnpackedness NoSourceStrictness DecidedLazy) (Rec1 (a b))))</div
+			> a b :: <a href="#" title="Data.Kind"
+			>Type</a
+			> -&gt; <a href="#" title="Data.Kind"
+			>Type</a
+			>) = <a href="#" title="GHC.Generics"
+			>D1</a
+			> (<a href="#" title="GHC.Generics"
+			>MetaData</a
+			> &quot;WrappedArrow&quot; &quot;Control.Applicative&quot; &quot;base&quot; <a href="#" title="Data.Bool"
+			>True</a
+			>) (<a href="#" title="GHC.Generics"
+			>C1</a
+			> (<a href="#" title="GHC.Generics"
+			>MetaCons</a
+			> &quot;WrapArrow&quot; <a href="#" title="GHC.Generics"
+			>PrefixI</a
+			> <a href="#" title="Data.Bool"
+			>True</a
+			>) (<a href="#" title="GHC.Generics"
+			>S1</a
+			> (<a href="#" title="GHC.Generics"
+			>MetaSel</a
+			> (<a href="#" title="GHC.Maybe"
+			>Just</a
+			> &quot;unwrapArrow&quot;) <a href="#" title="GHC.Generics"
+			>NoSourceUnpackedness</a
+			> <a href="#" title="GHC.Generics"
+			>NoSourceStrictness</a
+			> <a href="#" title="GHC.Generics"
+			>DecidedLazy</a
+			>) (<a href="#" title="GHC.Generics"
+			>Rec1</a
+			> (a b))))</div
 		      ></details
 		    ></td
 		  ></tr
@@ -412,12 +548,18 @@
 		      ></span
 		      > <span class="keyword"
 		      >type</span
-		      > Rep (<a href="#" title="Bug548"
+		      > <a href="#" title="GHC.Generics"
+		      >Rep</a
+		      > (<a href="#" title="Bug548"
 		      >WrappedArrow</a
 		      > a b c)</span
 		    ></td
-		  ><td class="doc empty"
-		  ></td
+		  ><td class="doc"
+		  ><p
+		    ><em
+		      >Since: base-4.7.0.0</em
+		      ></p
+		    ></td
 		  ></tr
 		><tr
 		><td colspan="2"
@@ -431,9 +573,39 @@
 		      > <div class="src"
 		      ><span class="keyword"
 			>type</span
-			> Rep (<a href="#" title="Bug548"
+			> <a href="#" title="GHC.Generics"
+			>Rep</a
+			> (<a href="#" title="Bug548"
 			>WrappedArrow</a
-			> a b c) = D1 (MetaData &quot;WrappedArrow&quot; &quot;Control.Applicative&quot; &quot;base&quot; True) (C1 (MetaCons &quot;WrapArrow&quot; PrefixI True) (S1 (MetaSel (Just &quot;unwrapArrow&quot;) NoSourceUnpackedness NoSourceStrictness DecidedLazy) (Rec0 (a b c))))</div
+			> a b c) = <a href="#" title="GHC.Generics"
+			>D1</a
+			> (<a href="#" title="GHC.Generics"
+			>MetaData</a
+			> &quot;WrappedArrow&quot; &quot;Control.Applicative&quot; &quot;base&quot; <a href="#" title="Data.Bool"
+			>True</a
+			>) (<a href="#" title="GHC.Generics"
+			>C1</a
+			> (<a href="#" title="GHC.Generics"
+			>MetaCons</a
+			> &quot;WrapArrow&quot; <a href="#" title="GHC.Generics"
+			>PrefixI</a
+			> <a href="#" title="Data.Bool"
+			>True</a
+			>) (<a href="#" title="GHC.Generics"
+			>S1</a
+			> (<a href="#" title="GHC.Generics"
+			>MetaSel</a
+			> (<a href="#" title="GHC.Maybe"
+			>Just</a
+			> &quot;unwrapArrow&quot;) <a href="#" title="GHC.Generics"
+			>NoSourceUnpackedness</a
+			> <a href="#" title="GHC.Generics"
+			>NoSourceStrictness</a
+			> <a href="#" title="GHC.Generics"
+			>DecidedLazy</a
+			>) (<a href="#" title="GHC.Generics"
+			>Rec0</a
+			> (a b c))))</div
 		      ></details
 		    ></td
 		  ></tr
