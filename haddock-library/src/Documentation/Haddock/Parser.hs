@@ -28,6 +28,7 @@ import           Control.Applicative
 import           Control.Arrow (first)
 import           Control.Monad
 import           Data.Char (chr, isUpper, isAlpha, isAlphaNum, isSpace)
+import           Data.Foldable (asum)
 import           Data.List (intercalate, unfoldr, elemIndex)
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
@@ -75,24 +76,24 @@ isSymbolChar c = not (isPuncChar c) && case generalCategory c of
 #endif
 
 -- | Identifier string surrounded with opening and closing quotes/backticks.
-type Identifier = (Char, String, Char)
+data Identifier = Identifier !Namespace !Char String !Char
 
 -- | Drops the quotes/backticks around all identifiers, as if they
 -- were valid but still 'String's.
 toRegular :: DocH mod Identifier -> DocH mod String
-toRegular = fmap (\(_, x, _) -> x)
+toRegular = fmap (\(Identifier _ _ x _) -> x)
 
 -- | Maps over 'DocIdentifier's over 'String' with potentially failing
 -- conversion using user-supplied function. If the conversion fails,
 -- the identifier is deemed to not be valid and is treated as a
 -- regular string.
-overIdentifier :: (String -> Maybe a)
+overIdentifier :: (Namespace -> String -> Maybe a)
                -> DocH mod Identifier
                -> DocH mod a
 overIdentifier f d = g d
   where
-    g (DocIdentifier (o, x, e)) = case f x of
-      Nothing -> DocString $ o : x ++ [e]
+    g (DocIdentifier (Identifier ns o x e)) = case f ns x of
+      Nothing -> DocString $ renderNs ns ++ [o] ++ x ++ [e]
       Just x' -> DocIdentifier x'
     g DocEmpty = DocEmpty
     g (DocAppend x x') = DocAppend (g x) (g x')
@@ -314,7 +315,8 @@ markdownImage :: Parser (DocH mod Identifier)
 markdownImage = DocPic . fromHyperlink <$> ("!" *> linkParser)
   where
     fromHyperlink (Hyperlink u l) = Picture u (fmap (markup stringMarkup) l)
-    stringMarkup = plainMarkup (const "") (\(l,c,r) -> [l] <> c <> [r])
+    stringMarkup = plainMarkup (const "") renderIdent
+    renderIdent (Identifier ns l c r) = renderNs ns <> [l] <> c <> [r]
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
@@ -857,9 +859,13 @@ parseValid = p some
 -- 'String' from the string it deems valid.
 identifier :: Parser (DocH mod Identifier)
 identifier = do
+  ns <- asum [ Value <$ Parsec.char 'v'
+             , Type <$ Parsec.char 't'
+             , pure None
+             ]
   o <- idDelim
   vid <- parseValid
   e <- idDelim
-  return $ DocIdentifier (o, vid, e)
+  return $ DocIdentifier (Identifier ns o vid e)
   where
-    idDelim = Parsec.satisfy (\c -> c == '\'' || c == '`')
+    idDelim = Parsec.oneOf "'`"

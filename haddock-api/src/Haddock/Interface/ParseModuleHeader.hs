@@ -16,7 +16,6 @@ import Data.Char
 import DynFlags
 import Haddock.Parser
 import Haddock.Types
-import RdrName
 
 -- -----------------------------------------------------------------------------
 -- Parsing module headers
@@ -24,7 +23,7 @@ import RdrName
 -- NB.  The headers must be given in the order Module, Description,
 -- Copyright, License, Maintainer, Stability, Portability, except that
 -- any or all may be omitted.
-parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo RdrName, MDoc RdrName)
+parseModuleHeader :: DynFlags -> Maybe Package -> String -> (HaddockModInfo NsRdrName, MDoc NsRdrName)
 parseModuleHeader dflags pkgName str0 =
    let
       getKey :: String -> String -> (Maybe String,String)

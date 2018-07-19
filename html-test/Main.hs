@@ -45,7 +45,7 @@ stripIfRequired mdl =
 
 -- | List of modules in which we don't 'stripLinks'
 preserveLinksModules :: [String]
-preserveLinksModules = ["Bug253"]
+preserveLinksModules = ["Bug253.html", "NamespacedIdentifiers.html"]
 
 ingoredTests :: [FilePath]
 ingoredTests =

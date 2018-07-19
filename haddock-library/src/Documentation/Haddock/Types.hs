@@ -203,6 +203,16 @@ instance Bitraversable DocH where
   bitraverse f g (DocTable (Table header body)) = (\h b -> DocTable (Table h b)) <$> traverse (traverse (bitraverse f g)) header <*> traverse (traverse (bitraverse f g)) body
 #endif
 
+-- | The namespace qualification for an identifier.
+data Namespace = Value | Type | None deriving (Eq, Ord, Enum, Show)
+
+-- | Render the a namespace into the same format it was initially parsed.
+renderNs :: Namespace -> String
+renderNs Value = "v"
+renderNs Type = "t"
+renderNs None = ""
+
+
 -- | 'DocMarkupH' is a set of instructions for marking up documentation.
 -- In fact, it's really just a mapping from 'Doc' to some other
 -- type [a], where [a] is usually the type of the output (HTML, say).

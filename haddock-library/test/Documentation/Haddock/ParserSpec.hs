@@ -132,6 +132,12 @@ spec = do
       it "can parse an identifier that starts with an underscore" $ do
         "'_x'" `shouldParseTo` DocIdentifier "_x"
 
+      it "can parse value-namespaced identifiers" $ do
+        "v'foo'" `shouldParseTo` DocIdentifier "foo"
+
+      it "can parse type-namespaced identifiers" $ do
+        "t'foo'" `shouldParseTo` DocIdentifier "foo"
+
     context "when parsing operators" $ do
       it "can parse an operator enclosed within single quotes" $ do
         "'.='" `shouldParseTo` DocIdentifier ".="

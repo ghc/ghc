@@ -913,6 +913,16 @@ If ``M.T`` is not otherwise in scope, then Haddock will simply emit a
 link pointing to the entity ``T`` exported from module ``M`` (without
 checking to see whether either ``M`` or ``M.T`` exist).
 
+Since values and types live in different namespaces in Haskell, it is
+possible for a reference such as ``'X'`` to be ambiguous. In such a case,
+Haddock defaults to pointing to the type. The ambiguity can be overcome by explicitly specifying a namespace, by way of a ``v`` (for value) or ``t``
+(for type) immediately before the link: ::
+
+    -- | An implicit reference to  'X', the type constructor
+    --   An explicit reference to v'X', the data constructor
+    --   An explicit reference to t'X', the type constructor
+    data X = X
+
 To make life easier for documentation writers, a quoted identifier is
 only interpreted as such if the quotes surround a lexically valid
 Haskell identifier. This means, for example, that it normally isn't
