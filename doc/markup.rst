@@ -762,7 +762,7 @@ Special Characters
 ~~~~~~~~~~~~~~~~~~
 
 The following characters have special meanings in documentation
-comments: ``\\``, ``/``, ``'``, ``\```, ``"``, ``@``, ``<``, ``$``. To insert a
+comments: ``\\``, ``/``, ``'``, ``\```, ``"``, ``@``, ``<``, ``$``, ``#``. To insert a
 literal occurrence of one of these special characters, precede it with a
 backslash (``\\``).
 
