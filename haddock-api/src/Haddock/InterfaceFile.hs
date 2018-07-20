@@ -190,8 +190,9 @@ readInterfaceFile :: forall m.
                      MonadIO m
                   => NameCacheAccessor m
                   -> FilePath
+                  -> Bool  -- ^ Disable version check. Can cause runtime crash.
                   -> m (Either String InterfaceFile)
-readInterfaceFile (get_name_cache, set_name_cache) filename = do
+readInterfaceFile (get_name_cache, set_name_cache) filename bypass_checks = do
   bh0 <- liftIO $ readBinMem filename
 
   magic   <- liftIO $ get bh0
@@ -200,7 +201,8 @@ readInterfaceFile (get_name_cache, set_name_cache) filename = do
   case () of
     _ | magic /= binaryInterfaceMagic -> return . Left $
       "Magic number mismatch: couldn't load interface file: " ++ filename
-      | version `notElem` binaryInterfaceVersionCompatibility -> return . Left $
+      | not bypass_checks
+      , (version `notElem` binaryInterfaceVersionCompatibility) -> return . Left $
       "Interface file is of wrong version: " ++ filename
       | otherwise -> with_name_cache $ \update_nc -> do
 

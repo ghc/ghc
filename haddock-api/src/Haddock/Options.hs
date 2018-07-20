@@ -84,6 +84,7 @@ data Flag
   | Flag_Version
   | Flag_CompatibleInterfaceVersions
   | Flag_InterfaceVersion
+  | Flag_BypassInterfaceVersonCheck
   | Flag_UseContents String
   | Flag_GenContents
   | Flag_UseIndex String
@@ -175,6 +176,8 @@ options backwardsCompat =
       "output compatible interface file versions and exit",
     Option []  ["interface-version"]  (NoArg Flag_InterfaceVersion)
       "output interface file version and exit",
+    Option []  ["bypass-interface-version-check"] (NoArg Flag_BypassInterfaceVersonCheck)
+      "bypass the interface file version check (dangerous)",
     Option ['v']  ["verbosity"]  (ReqArg Flag_Verbosity "VERBOSITY")
       "set verbosity level",
     Option [] ["use-contents"] (ReqArg Flag_UseContents "URL")

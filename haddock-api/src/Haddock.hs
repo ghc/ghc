@@ -159,16 +159,21 @@ haddockWithGhc ghc args = handleTopExceptions $ do
           Just "YES" -> return $ Flag_OptGhc "-dynamic-too" : flags
           _ -> return flags
 
+  -- bypass the interface version check
+  let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
+
   unless (Flag_NoWarnings `elem` flags) $ do
     hypSrcWarnings flags
     forM_ (warnings args) $ \warning -> do
       hPutStrLn stderr warning
+    when noChecks $
+      hPutStrLn stderr noCheckWarning
 
   ghc flags' $ do
     dflags <- getDynFlags
 
     forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
-      mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)]
+      mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)] noChecks
       forM_ mIfaceFile $ \(_, ifaceFile) -> do
         putMsg dflags (renderJson (jsonInterfaceFile ifaceFile))
 
@@ -190,7 +195,7 @@ haddockWithGhc ghc args = handleTopExceptions $ do
         throwE "No input file(s)."
 
       -- Get packages supplied with --read-interface.
-      packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags)
+      packages <- liftIO $ readInterfaceFiles freshNameCache (readIfaceArgs flags) noChecks
 
       -- Render even though there are no input files (usually contents/index).
       liftIO $ renderStep dflags flags sinceQual qual packages []
@@ -201,6 +206,10 @@ warnings = map format . filter (isPrefixOf "-optghc")
   where
     format arg = concat ["Warning: `", arg, "' means `-o ", drop 2 arg, "', did you mean `-", arg, "'?"]
 
+-- | Create a warning about bypassing the interface version check
+noCheckWarning :: String
+noCheckWarning = "Warning: `--bypass-interface-version-check' can cause " ++
+                 "Haddock to crash when reading Haddock interface files."
 
 withGhc :: [Flag] -> Ghc a -> IO a
 withGhc flags action = do
@@ -218,7 +227,8 @@ readPackagesAndProcessModules :: [Flag] -> [String]
                               -> Ghc ([(DocPaths, InterfaceFile)], [Interface], LinkEnv)
 readPackagesAndProcessModules flags files = do
     -- Get packages supplied with --read-interface.
-    packages <- readInterfaceFiles nameCacheFromGhc (readIfaceArgs flags)
+    let noChecks = Flag_BypassInterfaceVersonCheck `elem` flags
+    packages <- readInterfaceFiles nameCacheFromGhc (readIfaceArgs flags) noChecks
 
     -- Create the interfaces -- this is the core part of Haddock.
     let ifaceFiles = map snd packages
@@ -398,13 +408,14 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
 readInterfaceFiles :: MonadIO m
                    => NameCacheAccessor m
                    -> [(DocPaths, FilePath)]
+                   -> Bool
                    -> m [(DocPaths, InterfaceFile)]
-readInterfaceFiles name_cache_accessor pairs = do
+readInterfaceFiles name_cache_accessor pairs bypass_version_check = do
   catMaybes `liftM` mapM ({-# SCC readInterfaceFile #-} tryReadIface) pairs
   where
     -- try to read an interface, warn if we can't
     tryReadIface (paths, file) =
-      readInterfaceFile name_cache_accessor file >>= \case
+      readInterfaceFile name_cache_accessor file bypass_version_check >>= \case
         Left err -> liftIO $ do
           putStrLn ("Warning: Cannot read " ++ file ++ ":")
           putStrLn ("   " ++ err)

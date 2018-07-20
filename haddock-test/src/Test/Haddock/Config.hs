@@ -196,6 +196,7 @@ loadConfig ccfg dcfg flags files = do
 
     cfgHaddockArgs <- liftM concat . sequence $
         [ pure ["--no-warnings"]
+        , pure ["--bypass-interface-version-check"]
         , pure ["--odir=" ++ dcfgOutDir dcfg]
         , pure ["--optghc=-w"]
         , pure ["--optghc=-hide-all-packages"]
