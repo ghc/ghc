@@ -2,6 +2,8 @@
 
  * Make `--package-version` optional for `--hoogle` (#899)
 
+ * Support type and data families in the LaTeX backend (#734)
+
 ## Changes in version 2.21.0
 
  * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
