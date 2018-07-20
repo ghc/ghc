@@ -620,9 +620,9 @@ ppInstances links origin instances splice unicode pkg qual
   -- force Splice = True to use line URLs
   where
     instName = getOccString origin
-    instDecl :: Int -> DocInstance DocNameI -> (SubDecl,Located DocName)
+    instDecl :: Int -> DocInstance DocNameI -> (SubDecl, Maybe Module, Located DocName)
     instDecl no (inst, mdoc, loc, mdl) =
-        ((ppInstHead links splice unicode qual mdoc origin False no inst mdl), loc)
+        ((ppInstHead links splice unicode qual mdoc origin False no inst mdl), mdl, loc)
 
 
 ppOrphanInstances :: LinksInfo
@@ -635,9 +635,9 @@ ppOrphanInstances links instances splice unicode pkg qual
     instOrigin :: InstHead name -> InstOrigin (IdP name)
     instOrigin inst = OriginClass (ihdClsName inst)
 
-    instDecl :: Int -> DocInstance DocNameI -> (SubDecl,Located DocName)
+    instDecl :: Int -> DocInstance DocNameI -> (SubDecl, Maybe Module, Located DocName)
     instDecl no (inst, mdoc, loc, mdl) =
-        ((ppInstHead links splice unicode qual mdoc (instOrigin inst) True no inst mdl), loc)
+        ((ppInstHead links splice unicode qual mdoc (instOrigin inst) True no inst Nothing), mdl, loc)
 
 
 ppInstHead :: LinksInfo -> Splice -> Unicode -> Qualification
