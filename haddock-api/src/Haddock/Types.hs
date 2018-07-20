@@ -28,6 +28,7 @@ module Haddock.Types (
 import Control.Exception
 import Control.Arrow hiding ((<+>))
 import Control.DeepSeq
+import Control.Monad.IO.Class (MonadIO(..))
 import Data.Typeable
 import Data.Map (Map)
 import Data.Data (Data)
@@ -661,6 +662,8 @@ instance Monad ErrMsgGhc where
   m >>= k = WriterGhc $ runWriterGhc m >>= \ (a, msgs1) ->
                fmap (second (msgs1 ++)) (runWriterGhc (k a))
 
+instance MonadIO ErrMsgGhc where
+  liftIO m = WriterGhc (fmap (\x -> (x, [])) (liftIO m))
 
 -----------------------------------------------------------------------------
 -- * Pass sensitive types

@@ -419,9 +419,12 @@ mkMaps dflags pkgName gre instances decls = do
     instanceMap = M.fromList [ (getSrcSpan n, n) | n <- instances ]
 
     names :: SrcSpan -> HsDecl GhcRn -> [Name]
-    names l (InstD d) = maybeToList (M.lookup loc instanceMap) -- See note [2].
+    names _ (InstD d) = maybeToList (M.lookup loc instanceMap) -- See note [2].
       where loc = case d of
-              TyFamInstD _ -> l -- The CoAx's loc is the whole line, but only for TFs
+              -- The CoAx's loc is the whole line, but only for TFs. The
+              -- workaround is to dig into the family instance declaration and
+              -- get the identifier with the right location.
+              TyFamInstD (TyFamInstDecl d') -> getLoc (feqn_tycon (hsib_body d'))
               _ -> getInstLoc d
     names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See note [2].
     names _ decl = getMainDeclBinder decl
