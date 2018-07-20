@@ -322,7 +322,7 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     let env_stk_ty = mkCorePairTy env_ty unitTy
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
     fail_expr <- mkFailExpr ProcExpr env_stk_ty
-    var <- selectSimpleMatchVarL pat
+    var <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: handle arrows properly
     match_code <- matchSimply (Var var) ProcExpr pat env_stk_expr fail_expr
     let pat_ty = hsLPatType pat
     let proc_code = do_premap meth_ids pat_ty env_stk_ty cmd_ty
@@ -878,7 +878,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd _ _) env_ids = do
         body_expr = coreCaseTuple uniqs env_id env_ids2 (mkBigCoreVarTup out_ids)
 
     fail_expr <- mkFailExpr (StmtCtxt DoExpr) out_ty
-    pat_id    <- selectSimpleMatchVarL pat
+    pat_id    <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: handle arrows correctly
     match_code <- matchSimply (Var pat_id) (StmtCtxt DoExpr) pat body_expr fail_expr
     pair_id   <- newSysLocalDs Omega after_c_ty -- TODO: arnaud: handle arrows correctly
     let

@@ -709,7 +709,8 @@ dsMcStmt (LetStmt _ binds) stmts
        ; dsLocalBinds binds rest }
 
 --   [ .. | a <- m, stmts ]
-dsMcStmt (BindStmt bind_ty pat rhs bind_op fail_op) stmts
+dsMcStmt (BindStmt (_w, bind_ty) pat rhs bind_op fail_op) stmts
+  -- TODO: arnaud: we're losing a multiplicity here
   = do { rhs' <- dsLExpr rhs
        ; dsMcBindStmt pat rhs' bind_op fail_op bind_ty stmts }
 
@@ -829,7 +830,7 @@ dsMcBindStmt :: LPat GhcTc
              -> DsM CoreExpr
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
-        ; var      <- selectSimpleMatchVarL pat
+        ; var      <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: the correct pat_weight is somewhere in the caller, but I'll fix later, when list comprehension have test cases.
         ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
                                   res1_ty (cantFailMatchResult body)
         ; match_code <- handle_failure pat match fail_op
