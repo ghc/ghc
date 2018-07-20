@@ -102,7 +102,9 @@
 			  >foo</a
 			  > :: (a <a href="#" title="Instances"
 			  >&lt;~~</a
-			  > Int) -&gt; a0 -&gt; a <a href="#" title="Instances"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  >) -&gt; a0 -&gt; a <a href="#" title="Instances"
 			  >&lt;~~</a
 			  > a0 <a href="#" class="selflink"
 			  >#</a
@@ -114,11 +116,15 @@
 			  >&lt;~~</a
 			  > (a <a href="#" title="Instances"
 			  >&lt;~~</a
-			  > a0)) -&gt; Int -&gt; a <a href="#" title="Instances"
+			  > a0)) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a <a href="#" title="Instances"
 			  >&lt;~~</a
 			  > (a <a href="#" title="Instances"
 			  >&lt;~~</a
-			  > Int) <a href="#" class="selflink"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -152,13 +158,19 @@
 	    ><p class="src"
 	    ><a id="v:foo" class="def"
 	      >foo</a
-	      > :: f Int -&gt; a -&gt; f a <a href="#" class="selflink"
+	      > :: f <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; a -&gt; f a <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><p class="src"
 	    ><a id="v:foo-39-" class="def"
 	      >foo'</a
-	      > :: f (f a) -&gt; Int -&gt; f (f Int) <a href="#" class="selflink"
+	      > :: f (f a) -&gt; <a href="#" title="Data.Int"
+	      >Int</a
+	      > -&gt; f (f <a href="#" title="Data.Int"
+	      >Int</a
+	      >) <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ></div
@@ -196,13 +208,19 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: [Int] -&gt; a -&gt; [a] <a href="#" class="selflink"
+			  > :: [<a href="#" title="Data.Int"
+			  >Int</a
+			  >] -&gt; a -&gt; [a] <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: [[a]] -&gt; Int -&gt; [[Int]] <a href="#" class="selflink"
+			  > :: [[a]] -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; [[<a href="#" title="Data.Int"
+			  >Int</a
+			  >]] <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -216,7 +234,9 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > Maybe</span
+		      > <a href="#" title="GHC.Maybe"
+		      >Maybe</a
+		      ></span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -238,13 +258,31 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: Maybe Int -&gt; a -&gt; Maybe a <a href="#" class="selflink"
+			  > :: <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a -&gt; <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > a <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: Maybe (Maybe a) -&gt; Int -&gt; Maybe (Maybe Int) <a href="#" class="selflink"
+			  > :: <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > a) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -258,7 +296,9 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > (Either a)</span
+		      > (<a href="#" title="Data.Either"
+		      >Either</a
+		      > a)</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -280,13 +320,31 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: Either a Int -&gt; a0 -&gt; Either a a0 <a href="#" class="selflink"
+			  > :: <a href="#" title="Data.Either"
+			  >Either</a
+			  > a <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a0 -&gt; <a href="#" title="Data.Either"
+			  >Either</a
+			  > a a0 <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: Either a (Either a a0) -&gt; Int -&gt; Either a (Either a Int) <a href="#" class="selflink"
+			  > :: <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a a0) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -298,11 +356,15 @@
 		  ><span class="inst-left"
 		    ><span class="instance details-toggle-control details-toggle" data-details-id="i:ic:Foo:Foo:4"
 		      ></span
-		      > (Eq a, <a href="#" title="Instances"
+		      > (<a href="#" title="Data.Eq"
+		      >Eq</a
+		      > a, <a href="#" title="Instances"
 		      >Foo</a
 		      > f) =&gt; <a href="#" title="Instances"
 		      >Foo</a
-		      > ((,) (f a))</span
+		      > (<a href="#" title="GHC.Tuple"
+		      >(,)</a
+		      > (f a))</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -324,13 +386,19 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: (f a, Int) -&gt; a0 -&gt; (f a, a0) <a href="#" class="selflink"
+			  > :: (f a, <a href="#" title="Data.Int"
+			  >Int</a
+			  >) -&gt; a0 -&gt; (f a, a0) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: (f a, (f a, a0)) -&gt; Int -&gt; (f a, (f a, Int)) <a href="#" class="selflink"
+			  > :: (f a, (f a, a0)) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; (f a, (f a, <a href="#" title="Data.Int"
+			  >Int</a
+			  >)) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -370,7 +438,9 @@
 			  >foo</a
 			  > :: (a <a href="#" title="Instances"
 			  >&lt;~~</a
-			  > Int) -&gt; a0 -&gt; a <a href="#" title="Instances"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  >) -&gt; a0 -&gt; a <a href="#" title="Instances"
 			  >&lt;~~</a
 			  > a0 <a href="#" class="selflink"
 			  >#</a
@@ -382,11 +452,15 @@
 			  >&lt;~~</a
 			  > (a <a href="#" title="Instances"
 			  >&lt;~~</a
-			  > a0)) -&gt; Int -&gt; a <a href="#" title="Instances"
+			  > a0)) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a <a href="#" title="Instances"
 			  >&lt;~~</a
 			  > (a <a href="#" title="Instances"
 			  >&lt;~~</a
-			  > Int) <a href="#" class="selflink"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -400,7 +474,9 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > ((,,) a a)</span
+		      > (<a href="#" title="GHC.Tuple"
+		      >(,,)</a
+		      > a a)</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -422,13 +498,19 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: (a, a, Int) -&gt; a0 -&gt; (a, a, a0) <a href="#" class="selflink"
+			  > :: (a, a, <a href="#" title="Data.Int"
+			  >Int</a
+			  >) -&gt; a0 -&gt; (a, a, a0) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: (a, a, (a, a, a0)) -&gt; Int -&gt; (a, a, (a, a, Int)) <a href="#" class="selflink"
+			  > :: (a, a, (a, a, a0)) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; (a, a, (a, a, <a href="#" title="Data.Int"
+			  >Int</a
+			  >)) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -468,7 +550,9 @@
 			  >foo</a
 			  > :: <a href="#" title="Instances"
 			  >Quux</a
-			  > a b Int -&gt; a0 -&gt; <a href="#" title="Instances"
+			  > a b <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a0 -&gt; <a href="#" title="Instances"
 			  >Quux</a
 			  > a b a0 <a href="#" class="selflink"
 			  >#</a
@@ -480,11 +564,15 @@
 			  >Quux</a
 			  > a b (<a href="#" title="Instances"
 			  >Quux</a
-			  > a b a0) -&gt; Int -&gt; <a href="#" title="Instances"
+			  > a b a0) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="Instances"
 			  >Quux</a
 			  > a b (<a href="#" title="Instances"
 			  >Quux</a
-			  > a b Int) <a href="#" class="selflink"
+			  > a b <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -498,7 +586,11 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > ((-&gt;) a :: * -&gt; *)</span
+		      > ((-&gt;) a :: <a href="#" title="Data.Kind"
+		      >Type</a
+		      > -&gt; <a href="#" title="Data.Kind"
+		      >Type</a
+		      >)</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -520,13 +612,19 @@
 			><p class="src"
 			><a href="#"
 			  >foo</a
-			  > :: (a -&gt; Int) -&gt; a0 -&gt; a -&gt; a0 <a href="#" class="selflink"
+			  > :: (a -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  >) -&gt; a0 -&gt; a -&gt; a0 <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >foo'</a
-			  > :: (a -&gt; (a -&gt; a0)) -&gt; Int -&gt; a -&gt; (a -&gt; Int) <a href="#" class="selflink"
+			  > :: (a -&gt; (a -&gt; a0)) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a -&gt; (a -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -562,7 +660,9 @@
 	    ><p class="src"
 	    ><a id="v:bar" class="def"
 	      >bar</a
-	      > :: f a -&gt; f Bool -&gt; a <a href="#" class="selflink"
+	      > :: f a -&gt; f <a href="#" title="Data.Bool"
+	      >Bool</a
+	      > -&gt; a <a href="#" class="selflink"
 	      >#</a
 	      ></p
 	    ><p class="src"
@@ -596,7 +696,11 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Bar</a
-		      > Maybe Bool</span
+		      > <a href="#" title="GHC.Maybe"
+		      >Maybe</a
+		      > <a href="#" title="Data.Bool"
+		      >Bool</a
+		      ></span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -618,25 +722,71 @@
 			><p class="src"
 			><a href="#"
 			  >bar</a
-			  > :: Maybe Bool -&gt; Maybe Bool -&gt; Bool <a href="#" class="selflink"
+			  > :: <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar'</a
-			  > :: Maybe (Maybe Bool) -&gt; Maybe (Maybe (Maybe b)) <a href="#" class="selflink"
+			  > :: <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  >) -&gt; <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > b)) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar0</a
-			  > :: (Maybe Bool, Maybe Bool) -&gt; (Maybe b, Maybe c) <a href="#" class="selflink"
+			  > :: (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  >, <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  >) -&gt; (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > b, <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > c) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar1</a
-			  > :: (Maybe Bool, Maybe Bool) -&gt; (Maybe b, Maybe c) <a href="#" class="selflink"
+			  > :: (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  >, <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  >) -&gt; (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > b, <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > c) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -650,7 +800,9 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Bar</a
-		      > Maybe [a]</span
+		      > <a href="#" title="GHC.Maybe"
+		      >Maybe</a
+		      > [a]</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -672,25 +824,57 @@
 			><p class="src"
 			><a href="#"
 			  >bar</a
-			  > :: Maybe [a] -&gt; Maybe Bool -&gt; [a] <a href="#" class="selflink"
+			  > :: <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > [a] -&gt; <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; [a] <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar'</a
-			  > :: Maybe (Maybe [a]) -&gt; Maybe (Maybe (Maybe b)) <a href="#" class="selflink"
+			  > :: <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > [a]) -&gt; <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > b)) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar0</a
-			  > :: (Maybe [a], Maybe [a]) -&gt; (Maybe b, Maybe c) <a href="#" class="selflink"
+			  > :: (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > [a], <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > [a]) -&gt; (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > b, <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > c) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar1</a
-			  > :: (Maybe [a], Maybe [a]) -&gt; (Maybe b, Maybe c) <a href="#" class="selflink"
+			  > :: (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > [a], <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > [a]) -&gt; (<a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > b, <a href="#" title="GHC.Maybe"
+			  >Maybe</a
+			  > c) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -726,7 +910,9 @@
 			><p class="src"
 			><a href="#"
 			  >bar</a
-			  > :: [(a, a)] -&gt; [Bool] -&gt; (a, a) <a href="#" class="selflink"
+			  > :: [(a, a)] -&gt; [<a href="#" title="Data.Bool"
+			  >Bool</a
+			  >] -&gt; (a, a) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
@@ -760,7 +946,9 @@
 		      >Foo</a
 		      > f =&gt; <a href="#" title="Instances"
 		      >Bar</a
-		      > (Either a) (f a)</span
+		      > (<a href="#" title="Data.Either"
+		      >Either</a
+		      > a) (f a)</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -782,25 +970,57 @@
 			><p class="src"
 			><a href="#"
 			  >bar</a
-			  > :: Either a (f a) -&gt; Either a Bool -&gt; f a <a href="#" class="selflink"
+			  > :: <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (f a) -&gt; <a href="#" title="Data.Either"
+			  >Either</a
+			  > a <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; f a <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar'</a
-			  > :: Either a (Either a (f a)) -&gt; Either a (Either a (Either a b)) <a href="#" class="selflink"
+			  > :: <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a (f a)) -&gt; <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a b)) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar0</a
-			  > :: (Either a (f a), Either a (f a)) -&gt; (Either a b, Either a c) <a href="#" class="selflink"
+			  > :: (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a (f a), <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (f a)) -&gt; (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a b, <a href="#" title="Data.Either"
+			  >Either</a
+			  > a c) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
 			><a href="#"
 			  >bar1</a
-			  > :: (Either a (f a), Either a (f a)) -&gt; (Either a b, Either a c) <a href="#" class="selflink"
+			  > :: (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a (f a), <a href="#" title="Data.Either"
+			  >Either</a
+			  > a (f a)) -&gt; (<a href="#" title="Data.Either"
+			  >Either</a
+			  > a b, <a href="#" title="Data.Either"
+			  >Either</a
+			  > a c) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -814,9 +1034,13 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Foo</a
-		      > ((,,) a b) =&gt; <a href="#" title="Instances"
+		      > (<a href="#" title="GHC.Tuple"
+		      >(,,)</a
+		      > a b) =&gt; <a href="#" title="Instances"
 		      >Bar</a
-		      > ((,,) a b) (a, b, a)</span
+		      > (<a href="#" title="GHC.Tuple"
+		      >(,,)</a
+		      > a b) (a, b, a)</span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -838,7 +1062,9 @@
 			><p class="src"
 			><a href="#"
 			  >bar</a
-			  > :: (a, b, (a, b, a)) -&gt; (a, b, Bool) -&gt; (a, b, a) <a href="#" class="selflink"
+			  > :: (a, b, (a, b, a)) -&gt; (a, b, <a href="#" title="Data.Bool"
+			  >Bool</a
+			  >) -&gt; (a, b, a) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
@@ -902,7 +1128,9 @@
 			  >Quux</a
 			  > a b c) -&gt; <a href="#" title="Instances"
 			  >Quux</a
-			  > a c Bool -&gt; <a href="#" title="Instances"
+			  > a c <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; <a href="#" title="Instances"
 			  >Quux</a
 			  > a b c <a href="#" class="selflink"
 			  >#</a
@@ -1432,7 +1660,9 @@
 			  >foo</a
 			  > :: <a href="#" title="Instances"
 			  >Quux</a
-			  > a b Int -&gt; a0 -&gt; <a href="#" title="Instances"
+			  > a b <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; a0 -&gt; <a href="#" title="Instances"
 			  >Quux</a
 			  > a b a0 <a href="#" class="selflink"
 			  >#</a
@@ -1444,11 +1674,15 @@
 			  >Quux</a
 			  > a b (<a href="#" title="Instances"
 			  >Quux</a
-			  > a b a0) -&gt; Int -&gt; <a href="#" title="Instances"
+			  > a b a0) -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; <a href="#" title="Instances"
 			  >Quux</a
 			  > a b (<a href="#" title="Instances"
 			  >Quux</a
-			  > a b Int) <a href="#" class="selflink"
+			  > a b <a href="#" title="Data.Int"
+			  >Int</a
+			  >) <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -1494,7 +1728,9 @@
 			  >Quux</a
 			  > a b c) -&gt; <a href="#" title="Instances"
 			  >Quux</a
-			  > a c Bool -&gt; <a href="#" title="Instances"
+			  > a c <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; <a href="#" title="Instances"
 			  >Quux</a
 			  > a b c <a href="#" class="selflink"
 			  >#</a
@@ -1642,7 +1878,9 @@
 		      >data</span
 		      > <a href="#" title="Instances"
 		      >Thud</a
-		      > Int (<a href="#" title="Instances"
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      > (<a href="#" title="Instances"
 		      >Quux</a
 		      > a [a] c)</span
 		    > <a href="#" class="selflink"
@@ -1665,7 +1903,9 @@
 			>data</span
 			> <a href="#" title="Instances"
 			>Thud</a
-			> Int (<a href="#" title="Instances"
+			> <a href="#" title="Data.Int"
+			>Int</a
+			> (<a href="#" title="Instances"
 			>Quux</a
 			> a [a] c) <ul class="inst"
 			><li class="inst"
@@ -1675,7 +1915,11 @@
 			  ><li class="inst"
 			  >| <a id="v:Thuuud" class="def"
 			    >Thuuud</a
-			    > Int Int</li
+			    > <a href="#" title="Data.Int"
+			    >Int</a
+			    > <a href="#" title="Data.Int"
+			    >Int</a
+			    ></li
 			  ></ul
 			></div
 		      ></details
@@ -1746,7 +1990,11 @@
 		      ></span
 		      > <a href="#" title="Instances"
 		      >Norf</a
-		      > Int Bool</span
+		      > <a href="#" title="Data.Int"
+		      >Int</a
+		      > <a href="#" title="Data.Bool"
+		      >Bool</a
+		      ></span
 		    > <a href="#" class="selflink"
 		    >#</a
 		    ></td
@@ -1770,7 +2018,13 @@
 			  >type</span
 			  > <a href="#" title="Instances"
 			  >Plugh</a
-			  > Int c Bool :: * <a href="#" class="selflink"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > c <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > :: <a href="#" title="Data.Kind"
+			  >Type</a
+			  > <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
@@ -1778,7 +2032,11 @@
 			  >data</span
 			  > <a href="#" title="Instances"
 			  >Thud</a
-			  > Int c :: * <a href="#" class="selflink"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > c :: <a href="#" title="Data.Kind"
+			  >Type</a
+			  > <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -1790,7 +2048,17 @@
 			  >norf</a
 			  > :: <a href="#" title="Instances"
 			  >Plugh</a
-			  > Int c Bool -&gt; Int -&gt; (Int -&gt; c) -&gt; Bool <a href="#" class="selflink"
+			  > <a href="#" title="Data.Int"
+			  >Int</a
+			  > c <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > -&gt; <a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; (<a href="#" title="Data.Int"
+			  >Int</a
+			  > -&gt; c) -&gt; <a href="#" title="Data.Bool"
+			  >Bool</a
+			  > <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div
@@ -1828,7 +2096,9 @@
 			  >type</span
 			  > <a href="#" title="Instances"
 			  >Plugh</a
-			  > [a] c [b] :: * <a href="#" class="selflink"
+			  > [a] c [b] :: <a href="#" title="Data.Kind"
+			  >Type</a
+			  > <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			><p class="src"
@@ -1836,7 +2106,9 @@
 			  >data</span
 			  > <a href="#" title="Instances"
 			  >Thud</a
-			  > [a] c :: * <a href="#" class="selflink"
+			  > [a] c :: <a href="#" title="Data.Kind"
+			  >Type</a
+			  > <a href="#" class="selflink"
 			  >#</a
 			  ></p
 			></div

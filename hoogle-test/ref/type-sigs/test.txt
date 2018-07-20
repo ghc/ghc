@@ -6,11 +6,11 @@
 
 module ReaderT
 newtype ReaderT r m a
-ReaderT :: r -> m a -> ReaderT r m a
+ReaderT :: (r -> m a) -> ReaderT r m a
 [runReaderT] :: ReaderT r m a -> r -> m a
 
 module ReaderTReexport
 newtype ReaderT r m a
-ReaderT :: r -> m a -> ReaderT r m a
+ReaderT :: (r -> m a) -> ReaderT r m a
 [runReaderT] :: ReaderT r m a -> r -> m a
 runReaderT :: ReaderT r m a -> r -> m a

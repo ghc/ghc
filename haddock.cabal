@@ -78,7 +78,7 @@ executable haddock
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
       ghc-boot,
-      ghc == 8.6.*,
+      ghc == 8.5.*,
       bytestring,
       parsec,
       text,
