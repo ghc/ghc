@@ -40,7 +40,6 @@ module Haddock.Backends.Xhtml.Layout (
   topDeclElem, declElem,
 ) where
 
-
 import Haddock.Backends.Xhtml.DocMarkup
 import Haddock.Backends.Xhtml.Types
 import Haddock.Backends.Xhtml.Utils
@@ -48,6 +47,7 @@ import Haddock.Types
 import Haddock.Utils (makeAnchorId, nameAnchorId)
 import qualified Data.Map as Map
 import Text.XHtml hiding ( name, title, quote )
+import Data.Maybe (fromMaybe)
 
 import FastString            ( unpackFS )
 import GHC
@@ -151,20 +151,22 @@ subTable pkg qual decls = Just $ table << aboves (concatMap subRow decls)
 
 -- | Sub table with source information (optional).
 subTableSrc :: Maybe Package -> Qualification -> LinksInfo -> Bool
-            -> [(SubDecl,Located DocName)] -> Maybe Html
+            -> [(SubDecl, Maybe Module, Located DocName)] -> Maybe Html
 subTableSrc _ _ _ _ [] = Nothing
 subTableSrc pkg qual lnks splice decls = Just $ table << aboves (concatMap subRow decls)
   where
-    subRow ((decl, mdoc, subs),L loc dn) =
+    subRow ((decl, mdoc, subs), mdl, L loc dn) =
       (td ! [theclass "src clearfix"] <<
         (thespan ! [theclass "inst-left"] << decl)
-        <+> linkHtml loc dn
+        <+> linkHtml loc mdl dn
       <->
       docElement td << fmap (docToHtml Nothing pkg qual) mdoc
       )
       : map (cell . (td <<)) subs
-    linkHtml loc@(RealSrcSpan _) dn = links lnks loc splice dn
-    linkHtml _ _ = noHtml
+
+    linkHtml :: SrcSpan -> Maybe Module -> DocName -> Html
+    linkHtml loc@(RealSrcSpan _) mdl dn = links lnks loc splice mdl dn
+    linkHtml _ _ _ = noHtml
 
 subBlock :: [Html] -> Maybe Html
 subBlock [] = Nothing
@@ -197,7 +199,7 @@ subEquations pkg qual = divSubDecls "equations" "Equations" . subTable pkg qual
 subInstances :: Maybe Package -> Qualification
              -> String -- ^ Class name, used for anchor generation
              -> LinksInfo -> Bool
-             -> [(SubDecl,Located DocName)] -> Html
+             -> [(SubDecl, Maybe Module, Located DocName)] -> Html
 subInstances pkg qual nm lnks splice = maybe noHtml wrap . instTable
   where
     wrap contents = subSection (collapseDetails id_ DetailsOpen (summary +++ contents))
@@ -209,7 +211,7 @@ subInstances pkg qual nm lnks splice = maybe noHtml wrap . instTable
 
 subOrphanInstances :: Maybe Package -> Qualification
                    -> LinksInfo -> Bool
-                   -> [(SubDecl,Located DocName)] -> Html
+                   -> [(SubDecl, Maybe Module, Located DocName)] -> Html
 subOrphanInstances pkg qual lnks splice  = maybe noHtml wrap . instTable
   where
     wrap = ((h1 << "Orphan instances") +++)
@@ -268,13 +270,13 @@ declElem = paragraph ! [theclass "src"]
 -- it adds a source and wiki link at the right hand side of the box
 topDeclElem :: LinksInfo -> SrcSpan -> Bool -> [DocName] -> Html -> Html
 topDeclElem lnks loc splice names html =
-    declElem << (html <+> (links lnks loc splice $ head names))
+    declElem << (html <+> (links lnks loc splice Nothing $ head names))
         -- FIXME: is it ok to simply take the first name?
 
 -- | Adds a source and wiki link at the right hand side of the box.
 -- Name must be documented, otherwise we wouldn't get here.
-links :: LinksInfo -> SrcSpan -> Bool -> DocName -> Html
-links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice docName@(Documented n mdl) =
+links :: LinksInfo -> SrcSpan -> Bool -> Maybe Module -> DocName -> Html
+links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice mdl' docName@(Documented n mdl) =
   srcLink <+> wikiLink <+> (selfLink ! [theclass "selflink"] << "#")
   where selfLink = linkedAnchor (nameAnchorId (nameOccName (getName docName)))
 
@@ -298,12 +300,13 @@ links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice docName@(Docume
 
         -- For source links, we want to point to the original module,
         -- because only that will have the source.
-        -- TODO: do something about type instances. They will point to
-        -- the module defining the type family, which is wrong.
-        origMod = nameModule n
+        --
+        -- 'mdl'' is a way of "overriding" the module. Without it, instances
+        -- will point to the module defining the class/family, which is wrong.
+        origMod = fromMaybe (nameModule n) mdl'
         origPkg = moduleUnitId origMod
 
         fname = case loc of
           RealSrcSpan l -> unpackFS (srcSpanFile l)
           UnhelpfulSpan _ -> error "links: UnhelpfulSpan"
-links _ _ _ _ = noHtml
+links _ _ _ _ _ = noHtml
