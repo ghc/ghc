@@ -796,7 +796,7 @@ hyperlink = choice' [ angleBracketLink, markdownLink, autoUrl ]
 
 angleBracketLink :: Parser (DocH mod a)
 angleBracketLink =
-    DocHyperlink . flip Hyperlink Nothing . T.unpack . removeEscapes
+    DocHyperlink . makeLabeled (\s -> Hyperlink s . fmap DocString)
     <$> disallowNewline ("<" *> takeUntil ">")
 
 markdownLink :: Parser (DocH mod Identifier)
