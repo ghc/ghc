@@ -49,6 +49,12 @@ StgWord findRetryFrameHelper (Capability *cap, StgTSO *tso);
 /* Entry point for a new worker */
 void scheduleWorker (Capability *cap, Task *task);
 
+#if defined(THREADED_RTS)
+void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type);
+void stopAllCapabilities (Capability **pCap, Task *task);
+void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task);
+#endif
+
 /* The state of the scheduler.  This is used to control the sequence
  * of events during shutdown.  See Note [shutdown] in Schedule.c.
  */
