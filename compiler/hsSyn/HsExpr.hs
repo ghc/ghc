@@ -2804,7 +2804,7 @@ pprMatchContextNoun PatBindGuards   = text "pattern binding guards"
 pprMatchContextNoun LambdaExpr      = text "lambda abstraction"
 pprMatchContextNoun ProcExpr        = text "arrow abstraction"
 pprMatchContextNoun (StmtCtxt ctxt) = text "pattern binding in"
-                                      $$ pprStmtContext ctxt
+                                      $$ pprAStmtContext ctxt
 pprMatchContextNoun PatSyn          = text "pattern synonym declaration"
 
 -----------------
