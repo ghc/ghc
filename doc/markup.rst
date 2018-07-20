@@ -859,9 +859,12 @@ Hyperlinked Identifiers
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Referring to a Haskell identifier, whether it be a type, class,
-constructor, or function, is done by surrounding it with single quotes: ::
+constructor, or function, is done by surrounding it with a combination
+of single quotes and backticks. For example: ::
 
     -- | This module defines the type 'T'.
+
+```T``` is also ok. ``'T``` and ```T'`` are accepted but less common.
 
 If there is an entity ``T`` in scope in the current module, then the
 documentation will hyperlink the reference in the text to the definition
@@ -889,14 +892,6 @@ Nothing special is needed to hyperlink identifiers which contain
 apostrophes themselves: to hyperlink ``foo'`` one would simply type
 ``'foo''``. To hyperlink identifiers written in infix form, simply put
 them in quotes as always: ``'`elem`'``.
-
-For compatibility with other systems, the following alternative form of
-markup is accepted [3]_: ```T'``.
-
-.. [3]
-   We chose not to use this as the primary markup for identifiers
-   because strictly speaking the ````` character should not be used as a
-   left quote, it is a grave accent.
 
 Emphasis, Bold and Monospaced Text
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

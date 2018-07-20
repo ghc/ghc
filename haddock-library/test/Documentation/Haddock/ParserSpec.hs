@@ -86,6 +86,18 @@ spec = do
       it "parses identifiers enclosed within backticks" $ do
         "`foo`" `shouldParseTo` DocIdentifier "foo"
 
+      it "parses identifiers preceded by a backtick and followed by a single quote" $ do
+        "`foo'" `shouldParseTo` DocIdentifier "foo"
+
+      it "parses identifiers preceded by a single quote and followed by a backtick" $ do
+        "'foo`" `shouldParseTo` DocIdentifier "foo"
+
+      it "can parse a constructor identifier" $ do
+        "'Foo'" `shouldParseTo` DocIdentifier "Foo"
+
+      it "can parse a qualified identifier" $ do
+        "'Foo.bar'" `shouldParseTo` DocIdentifier "Foo.bar"
+
       it "parses a word with an one of the delimiters in it as DocString" $ do
           "don't" `shouldParseTo` "don't"
 
@@ -99,8 +111,42 @@ spec = do
       it "doesn't parse empty identifiers" $ do
         "``" `shouldParseTo` "``"
 
-      it "can parse infix identifiers" $ do
+      it "can parse an identifier in infix notation enclosed within backticks" $ do
         "``infix``" `shouldParseTo` "`" <> DocIdentifier "infix" <> "`"
+
+      it "can parse identifiers containing a single quote" $ do
+        "'don't'" `shouldParseTo` DocIdentifier "don't"
+
+      it "can parse identifiers ending with a single quote" $ do
+        "'foo''" `shouldParseTo` DocIdentifier "foo'"
+
+      it "can parse an identifier containing a digit" $ do
+        "'f0'" `shouldParseTo` DocIdentifier "f0"
+
+      it "can parse an identifier containing unicode characters" $ do
+        "'λ'" `shouldParseTo` DocIdentifier "λ"
+
+      it "can parse a single quote followed by an identifier" $ do
+        "''foo'" `shouldParseTo` "'" <> DocIdentifier "foo"
+
+      it "can parse an identifier that starts with an underscore" $ do
+        "'_x'" `shouldParseTo` DocIdentifier "_x"
+
+    context "when parsing operators" $ do
+      it "can parse an operator enclosed within single quotes" $ do
+        "'.='" `shouldParseTo` DocIdentifier ".="
+
+      it "can parse a qualified operator" $ do
+        "'F..'" `shouldParseTo` DocIdentifier "F.."
+
+      it "can parse a constructor operator" $ do
+        "':='" `shouldParseTo` DocIdentifier ":="
+
+      it "can parse a qualified constructor operator" $ do
+        "'F.:='" `shouldParseTo` DocIdentifier "F.:="
+
+      it "can parse a unicode operator" $ do
+        "'∧'" `shouldParseTo` DocIdentifier "∧"
 
     context "when parsing URLs" $ do
       it "parses a URL" $ do
