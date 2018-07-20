@@ -924,7 +924,6 @@ data Coercion
   | ForAllCo TyVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  -- TODO: Change this Rig to coercion
   | FunCo Role Coercion Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
 

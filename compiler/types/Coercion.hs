@@ -332,7 +332,7 @@ splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
   where cos = [w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
 
--- TODO: This is wrong and should be ripped out when I change
+-- TODO: MattP: This is wrong and should be ripped out when I change
 -- Rig to Coercion in FunCo.
 rigToCo :: Rig -> Coercion
 rigToCo r = mkNomReflCo (rigToType r)

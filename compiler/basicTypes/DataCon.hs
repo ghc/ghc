@@ -586,6 +586,7 @@ data DataConRep
 -- (We could match on the wrappers,
 -- but that makes it less likely that rules will match
 -- when we bring bits of unfoldings together.)
+-- TODO: arnaud: revise this comment in view of the new wrapper policy
 
 -------------------------
 
@@ -928,18 +929,18 @@ mkDataCon name declared_infix prom_info
     rep_arg_tys = dataConRepArgTys con
 
     rep_ty =
+      -- TODO: arnaud: if we stay on the mode that all data constructors have
+      -- wrappers, then we need to remove this test.
       case rep of
         -- If the DataCon has no wrapper, then the worker's type *is* the
-        -- user-facing type, so we can simply use dataConUserType.
-        -- See Note [All data constructors have wrappers]
+        -- user-facing type, so we can simply use dataConUserType
 --        NoDataConRep -> dataConUserType con
         -- If the DataCon has a wrapper, then the worker's type is never seen
         -- by the user. The visibilities we pick do not matter here.
         _ -> mkInvForAllTys univ_tvs $ mkInvForAllTys ex_tvs $
                  mkFunTys rep_arg_tys $
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
-        -- MattP: We really should not use `setWeight` here but this makes
-        -- all the wrappers well typed. It is stop gap solution.
+        -- See Note [All data constructors have wrappers]
 
       -- See Note [Promoted data constructors] in TyCon
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
@@ -965,6 +966,7 @@ decision then this line will need to be restored. It is
 commented out to make it easy to add back with the correct
 information.
 -}
+-- TODO: arnaud: validate or invalidate this note
 
 mkCleanAnonTyConBinders :: [TyConBinder] -> [Type] -> [TyConBinder]
 -- Make sure that the "anonymous" tyvars don't clash in
