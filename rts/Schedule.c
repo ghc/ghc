@@ -110,6 +110,19 @@ Mutex sched_mutex;
 #define FORKPROCESS_PRIMOP_SUPPORTED
 #endif
 
+/*
+ * sync_finished_cond allows threads which do not own any capability (e.g. the
+ * concurrent mark thread) to participate in the sync protocol. In particular,
+ * if such a thread requests a sync while sync is already in progress it will
+ * block on sync_finished_cond, which will be signalled when the sync is
+ * finished (by releaseAllCapabilities).
+ */
+#if defined(THREADED_RTS)
+static Condition sync_finished_cond;
+static Mutex sync_finished_mutex;
+#endif
+
+
 /* -----------------------------------------------------------------------------
  * static function prototypes
  * -------------------------------------------------------------------------- */
@@ -130,7 +143,6 @@ static void scheduleYield (Capability **pcap, Task *task);
 static bool requestSync (Capability **pcap, Task *task,
                          PendingSync *sync_type, SyncType *prev_sync_type);
 static void acquireAllCapabilities(Capability *cap, Task *task);
-static void releaseAllCapabilities(uint32_t n, Capability *cap, Task *task);
 static void startWorkerTasks (uint32_t from USED_IF_THREADS,
                               uint32_t to USED_IF_THREADS);
 #endif
@@ -1368,17 +1380,24 @@ scheduleNeedHeapProfile( bool ready_to_gc )
  * change to the system, such as altering the number of capabilities, or
  * forking.
  *
+ * pCap may be NULL in the event that the caller doesn't yet own a capability.
+ *
  * To resume after stopAllCapabilities(), use releaseAllCapabilities().
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static void stopAllCapabilities (Capability **pCap, Task *task)
+void stopAllCapabilities (Capability **pCap, Task *task)
+{
+    stopAllCapabilitiesWith(pCap, task, SYNC_OTHER);
+}
+
+void stopAllCapabilitiesWith (Capability **pCap, Task *task, SyncType sync_type)
 {
     bool was_syncing;
     SyncType prev_sync_type;
 
     PendingSync sync = {
-        .type = SYNC_OTHER,
+        .type = sync_type,
         .idle = NULL,
         .task = task
     };
@@ -1387,9 +1406,10 @@ static void stopAllCapabilities (Capability **pCap, Task *task)
         was_syncing = requestSync(pCap, task, &sync, &prev_sync_type);
     } while (was_syncing);
 
-    acquireAllCapabilities(*pCap,task);
+    acquireAllCapabilities(pCap ? *pCap : NULL, task);
 
     pending_sync = 0;
+    signalCondition(&sync_finished_cond);
 }
 #endif
 
@@ -1399,6 +1419,16 @@ static void stopAllCapabilities (Capability **pCap, Task *task)
  * Commence a synchronisation between all capabilities.  Normally not called
  * directly, instead use stopAllCapabilities().  This is used by the GC, which
  * has some special synchronisation requirements.
+ *
+ * Note that this can be called in two ways:
+ *
+ * - where *pcap points to a capability owned by the caller: in this case
+ *   *prev_sync_type will reflect the in-progress sync type on return, if one
+ *   *was found
+ *
+ *  - where pcap == NULL: in this case the caller doesn't hold a capability.
+ *    we only return whether or not a pending sync was found and prev_sync_type
+ *    is unchanged.
  *
  * Returns:
  *    false if we successfully got a sync
@@ -1424,13 +1454,25 @@ static bool requestSync (
         // After the sync is completed, we cannot read that struct any
         // more because it has been freed.
         *prev_sync_type = sync->type;
-        do {
-            debugTrace(DEBUG_sched, "someone else is trying to sync (%d)...",
-                       sync->type);
-            ASSERT(*pcap);
-            yieldCapability(pcap,task,true);
-            sync = pending_sync;
-        } while (sync != NULL);
+        if (pcap == NULL) {
+            // The caller does not hold a capability (e.g. may be a concurrent
+            // mark thread). Consequently we must wait until the pending sync is
+            // finished before proceeding to ensure we don't loop.
+            // TODO: Don't busy-wait
+            ACQUIRE_LOCK(&sync_finished_mutex);
+            while (pending_sync) {
+                waitCondition(&sync_finished_cond, &sync_finished_mutex);
+            }
+            RELEASE_LOCK(&sync_finished_mutex);
+        } else {
+            do {
+                debugTrace(DEBUG_sched, "someone else is trying to sync (%d)...",
+                          sync->type);
+                ASSERT(*pcap);
+                yieldCapability(pcap,task,true);
+                sync = pending_sync;
+            } while (sync != NULL);
+        }
 
         // NOTE: task->cap might have changed now
         return true;
@@ -1445,9 +1487,9 @@ static bool requestSync (
 /* -----------------------------------------------------------------------------
  * acquireAllCapabilities()
  *
- * Grab all the capabilities except the one we already hold.  Used
- * when synchronising before a single-threaded GC (SYNC_SEQ_GC), and
- * before a fork (SYNC_OTHER).
+ * Grab all the capabilities except the one we already hold (cap may be NULL is
+ * the caller does not currently hold a capability). Used when synchronising
+ * before a single-threaded GC (SYNC_SEQ_GC), and before a fork (SYNC_OTHER).
  *
  * Only call this after requestSync(), otherwise a deadlock might
  * ensue if another thread is trying to synchronise.
@@ -1477,29 +1519,30 @@ static void acquireAllCapabilities(Capability *cap, Task *task)
             }
         }
     }
-    task->cap = cap;
+    task->cap = cap == NULL ? tmpcap : cap;
 }
 #endif
 
 /* -----------------------------------------------------------------------------
- * releaseAllcapabilities()
+ * releaseAllCapabilities()
  *
- * Assuming this thread holds all the capabilities, release them all except for
- * the one passed in as cap.
+ * Assuming this thread holds all the capabilities, release them all (except for
+ * the one passed in as keep_cap, if non-NULL).
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
-static void releaseAllCapabilities(uint32_t n, Capability *cap, Task *task)
+void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 {
     uint32_t i;
 
     for (i = 0; i < n; i++) {
-        if (cap->no != i) {
-            task->cap = capabilities[i];
-            releaseCapability(capabilities[i]);
+        Capability *tmpcap = capabilities[i];
+        if (keep_cap != tmpcap) {
+            task->cap = tmpcap;
+            releaseCapability(tmpcap);
         }
     }
-    task->cap = cap;
+    task->cap = keep_cap;
 }
 #endif
 
@@ -1801,6 +1844,7 @@ delete_threads_and_gc:
     // reset pending_sync *before* GC, so that when the GC threads
     // emerge they don't immediately re-enter the GC.
     pending_sync = 0;
+    signalCondition(&sync_finished_cond);
     GarbageCollect(collect_gen, heap_census, gc_type, cap, idle_cap);
 #else
     GarbageCollect(collect_gen, heap_census, 0, cap, NULL);
