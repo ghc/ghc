@@ -75,10 +75,11 @@ packageArgs = do
             , ghcProfiled <$> flavour ?
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
-          , builder CabalFlags ? mconcat
+         , builder CabalFlags ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , flag CrossCompiling ? arg "-terminfo" ]
+            , flag CrossCompiling ? arg "-terminfo"
+            , stage2 ? arg "integer-simple" ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
