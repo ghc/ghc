@@ -906,24 +906,6 @@ sumParens = ubxparens . hsep . punctuate (text " | ")
 -- Stolen from Html and tweaked for LaTeX generation
 -------------------------------------------------------------------------------
 
-
-pREC_TOP, pREC_FUN, pREC_OP, pREC_CON :: Int
-
-pREC_TOP = (0 :: Int)   -- type in ParseIface.y in GHC
-pREC_FUN = (1 :: Int)   -- btype in ParseIface.y in GHC
-                        -- Used for LH arg of (->)
-pREC_OP  = (2 :: Int)   -- Used for arg of any infix operator
-                        -- (we don't keep their fixities around)
-pREC_CON = (3 :: Int)   -- Used for arg of type applicn:
-                        -- always parenthesise unless atomic
-
-maybeParen :: Int           -- Precedence of context
-           -> Int           -- Precedence of top-level operator
-           -> LaTeX -> LaTeX  -- Wrap in parens if (ctxt >= op)
-maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
-                               | otherwise            = p
-
-
 ppLType, ppLParendType, ppLFunLhType :: Bool -> Located (HsType DocNameI) -> LaTeX
 ppLType       unicode y = ppType unicode (unLoc y)
 ppLParendType unicode y = ppParendType unicode (unLoc y)
@@ -931,72 +913,70 @@ ppLFunLhType  unicode y = ppFunLhType unicode (unLoc y)
 
 
 ppType, ppParendType, ppFunLhType :: Bool -> HsType DocNameI -> LaTeX
-ppType       unicode ty = ppr_mono_ty pREC_TOP ty unicode
-ppParendType unicode ty = ppr_mono_ty pREC_CON ty unicode
-ppFunLhType  unicode ty = ppr_mono_ty pREC_FUN ty unicode
+ppType       unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
+ppParendType unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
+ppFunLhType  unicode ty = ppr_mono_ty (reparenTypePrec PREC_FUN ty) unicode
 
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
 ppLKind unicode y = ppKind unicode (unLoc y)
 
 ppKind :: Bool -> HsKind DocNameI -> LaTeX
-ppKind unicode ki = ppr_mono_ty pREC_TOP ki unicode
+ppKind unicode ki = ppr_mono_ty (reparenTypePrec PREC_TOP ki) unicode
 
 
 -- Drop top-level for-all type variables in user style
 -- since they are implicit in Haskell
 
-ppr_mono_lty :: Int -> LHsType DocNameI -> Bool -> LaTeX
-ppr_mono_lty ctxt_prec ty unicode = ppr_mono_ty ctxt_prec (unLoc ty) unicode
+ppr_mono_lty :: LHsType DocNameI -> Bool -> LaTeX
+ppr_mono_lty ty unicode = ppr_mono_ty (unLoc ty) unicode
 
 
-ppr_mono_ty :: Int -> HsType DocNameI -> Bool -> LaTeX
-ppr_mono_ty ctxt_prec (HsForAllTy _ tvs ty) unicode
-  = maybeParen ctxt_prec pREC_FUN $
-    sep [ hsep (forallSymbol unicode : ppTyVars tvs) <> dot
-        , ppr_mono_lty pREC_TOP ty unicode ]
-ppr_mono_ty ctxt_prec (HsQualTy _ ctxt ty) unicode
-  = maybeParen ctxt_prec pREC_FUN $
-    sep [ ppLContext ctxt unicode
-        , ppr_mono_lty pREC_TOP ty unicode ]
+ppr_mono_ty :: HsType DocNameI -> Bool -> LaTeX
+ppr_mono_ty (HsForAllTy _ tvs ty) unicode
+  = sep [ hsep (forallSymbol unicode : ppTyVars tvs) <> dot
+        , ppr_mono_lty ty unicode ]
+ppr_mono_ty (HsQualTy _ ctxt ty) unicode
+  = sep [ ppLContext ctxt unicode
+        , ppr_mono_lty ty unicode ]
+ppr_mono_ty (HsFunTy _ ty1 ty2)   u
+  = sep [ ppr_mono_lty ty1 u
+        , arrow u <+> ppr_mono_lty ty2 u ]
 
-ppr_mono_ty _         (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
-ppr_mono_ty _         (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
-ppr_mono_ty _         (HsTyVar _ Promoted    (L _ name)) _ = char '\'' <> ppDocName name
-ppr_mono_ty ctxt_prec (HsFunTy _ ty1 ty2)   u = ppr_fun_ty ctxt_prec ty1 ty2 u
-ppr_mono_ty _         (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
-ppr_mono_ty _         (HsSumTy _ tys) u       = sumParens (map (ppLType u) tys)
-ppr_mono_ty _         (HsKindSig _ ty kind) u = parens (ppr_mono_lty pREC_TOP ty u <+> dcolon u <+> ppLKind u kind)
-ppr_mono_ty _         (HsListTy _ ty)       u = brackets (ppr_mono_lty pREC_TOP ty u)
-ppr_mono_ty _         (HsIParamTy _ (L _ n) ty) u = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u)
-ppr_mono_ty _         (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
-ppr_mono_ty _         (HsRecTy {})        _ = text "{..}"
-ppr_mono_ty _         (XHsType (NHsCoreTy {}))  _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ Promoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
-ppr_mono_ty _         (HsExplicitListTy _ NotPromoted tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
-ppr_mono_ty _         (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
+ppr_mono_ty (HsBangTy _ b ty)     u = ppBang b <> ppLParendType u ty
+ppr_mono_ty (HsTyVar _ NotPromoted (L _ name)) _ = ppDocName name
+ppr_mono_ty (HsTyVar _ Promoted    (L _ name)) _ = char '\'' <> ppDocName name
+ppr_mono_ty (HsTupleTy _ con tys) u = tupleParens con (map (ppLType u) tys)
+ppr_mono_ty (HsSumTy _ tys) u       = sumParens (map (ppLType u) tys)
+ppr_mono_ty (HsKindSig _ ty kind) u = parens (ppr_mono_lty ty u <+> dcolon u <+> ppLKind u kind)
+ppr_mono_ty (HsListTy _ ty)       u = brackets (ppr_mono_lty ty u)
+ppr_mono_ty (HsIParamTy _ (L _ n) ty) u = brackets (ppIPName n <+> dcolon u <+> ppr_mono_lty ty u)
+ppr_mono_ty (HsSpliceTy {})     _ = error "ppr_mono_ty HsSpliceTy"
+ppr_mono_ty (HsRecTy {})        _ = text "{..}"
+ppr_mono_ty (XHsType (NHsCoreTy {}))  _ = error "ppr_mono_ty HsCoreTy"
+ppr_mono_ty (HsExplicitListTy _ Promoted tys) u = Pretty.quote $ brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u = brackets $ hsep $ punctuate comma $ map (ppLType u) tys
+ppr_mono_ty (HsExplicitTupleTy _ tys) u = Pretty.quote $ parenList $ map (ppLType u) tys
 
-ppr_mono_ty ctxt_prec (HsAppTy _ fun_ty arg_ty) unicode
-  = maybeParen ctxt_prec pREC_CON $
-    hsep [ppr_mono_lty pREC_FUN fun_ty unicode, ppr_mono_lty pREC_CON arg_ty unicode]
+ppr_mono_ty (HsAppTy _ fun_ty arg_ty) unicode
+  = hsep [ppr_mono_lty fun_ty unicode, ppr_mono_lty arg_ty unicode]
 
-ppr_mono_ty ctxt_prec (HsOpTy _ ty1 op ty2) unicode
-  = maybeParen ctxt_prec pREC_FUN $
-    ppr_mono_lty pREC_OP ty1 unicode <+> ppr_op <+> ppr_mono_lty pREC_OP ty2 unicode
+ppr_mono_ty (HsOpTy _ ty1 op ty2) unicode
+  = ppr_mono_lty ty1 unicode <+> ppr_op <+> ppr_mono_lty ty2 unicode
   where
     ppr_op = if not (isSymOcc occName) then char '`' <> ppLDocName op <> char '`' else ppLDocName op
     occName = nameOccName . getName . unLoc $ op
 
-ppr_mono_ty ctxt_prec (HsParTy _ ty) unicode
---  = parens (ppr_mono_lty pREC_TOP ty)
-  = ppr_mono_lty ctxt_prec ty unicode
+ppr_mono_ty (HsParTy _ ty) unicode
+  = parens (ppr_mono_lty ty unicode)
+--  = ppr_mono_lty ty unicode
 
-ppr_mono_ty ctxt_prec (HsDocTy _ ty _) unicode
-  = ppr_mono_lty ctxt_prec ty unicode
+ppr_mono_ty (HsDocTy _ ty _) unicode
+  = ppr_mono_lty ty unicode
 
-ppr_mono_ty _ (HsWildCardTy (AnonWildCard _)) _ = char '_'
+ppr_mono_ty (HsWildCardTy (AnonWildCard _)) _ = char '_'
 
-ppr_mono_ty _ (HsTyLit _ t) u = ppr_tylit t u
-ppr_mono_ty _ (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
+ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
+ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
 
 
 ppr_tylit :: HsTyLit -> Bool -> LaTeX
@@ -1004,15 +984,6 @@ ppr_tylit (HsNumTy _ n) _ = integer n
 ppr_tylit (HsStrTy _ s) _ = text (show s)
   -- XXX: Ok in verbatim, but not otherwise
   -- XXX: Do something with Unicode parameter?
-
-
-ppr_fun_ty :: Int -> LHsType DocNameI -> LHsType DocNameI -> Bool -> LaTeX
-ppr_fun_ty ctxt_prec ty1 ty2 unicode
-  = let p1 = ppr_mono_lty pREC_FUN ty1 unicode
-        p2 = ppr_mono_lty pREC_TOP ty2 unicode
-    in
-    maybeParen ctxt_prec pREC_FUN $
-    sep [p1, arrow unicode <+> p2]
 
 
 -------------------------------------------------------------------------------

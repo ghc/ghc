@@ -89,7 +89,7 @@ dropHsDocTy = f
 
 outHsType :: (a ~ GhcPass p, OutputableBndrId a)
           => DynFlags -> HsType a -> String
-outHsType dflags = out dflags . dropHsDocTy
+outHsType dflags = out dflags . reparenType . dropHsDocTy
 
 
 dropComment :: String -> String

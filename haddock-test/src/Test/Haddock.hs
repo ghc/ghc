@@ -158,7 +158,9 @@ maybeAcceptFile :: Config c -> FilePath -> CheckResult -> IO CheckResult
 maybeAcceptFile cfg file result
     | cfgAccept cfg && result `elem` [NoRef, Fail] = do
         Just out <- readOut cfg file
-        writeFile (refFile dcfg file) $ ccfgDump ccfg out
+        let ref = refFile dcfg file
+        createDirectoryIfMissing True (takeDirectory ref)
+        writeFile ref $ ccfgDump ccfg out
         pure Accepted
   where
     dcfg = cfgDirConfig cfg
