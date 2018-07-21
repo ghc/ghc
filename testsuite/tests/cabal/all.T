@@ -57,3 +57,5 @@ test('shadow', [], run_command, ['$MAKE -s --no-print-directory shadow'])
 test('T12485a', [extra_files(['shadow1.pkg', 'shadow2.pkg', 'shadow3.pkg'])], run_command, ['$MAKE -s --no-print-directory T12485a'])
 
 test('T13703', [extra_files(['test13703a.pkg', 'test13703b.pkg'])], run_command, ['$MAKE -s --no-print-directory T13703'])
+
+test('T15396', [extra_files(['T15396.pkg', 'libT15396_odd.a'])], run_command, ['$MAKE -s --no-print-directory T15396'])

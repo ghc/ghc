@@ -295,3 +295,13 @@ T13703:
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf register --force test13703b.pkg 2>/dev/null
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-q lib-name
 	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-r lib-name
+
+PKGCONFT15396=localT15396.package.conf
+LOCAL_GHC_PKGT15396 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFT15396)
+
+T15396:
+	rm -rf $(PKGCONFT15396) T15396.hs T15396.o T15396.hi
+	$(LOCAL_GHC_PKGT15396) init $(PKGCONFT15396)
+	$(LOCAL_GHC_PKGT15396) register --force T15396.pkg
+	echo "main = return ()" >T15396.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFT15396) T15396.hs -package T15396 -staticlib

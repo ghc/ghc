@@ -1,0 +1,6 @@
+name: T15396
+version: 1
+id: T15396-1-XXX
+key: T15396-1-XXX
+extra-libraries: T15396_odd
+library-dirs: ${pkgroot}
