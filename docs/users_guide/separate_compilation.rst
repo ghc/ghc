@@ -790,7 +790,7 @@ be able to pick a particular implementation of strings::
         toString s = s
 
     module A where
-        import Text
+        import Str
         z = toString empty
 
 By replacing ``Str.hs`` with a signature ``Str.hsig``, ``A`` (and
