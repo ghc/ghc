@@ -99,3 +99,5 @@ test('T8557', normal, ghci_script, ['T8557.script'])
 test('T12458', normal, ghci_script, ['T12458.script'])
 test('T13825-debugger', when(arch('powerpc64'), expect_broken(14455)),
       ghci_script, ['T13825-debugger.script'])
+
+test('break029', extra_files(['break029.hs']), ghci_script, ['break029.script'])

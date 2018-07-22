@@ -1035,7 +1035,11 @@ collectStmtBinders (ParStmt _ xs _ _)      = collectLStmtsBinders
                                     $ [s | ParStmtBlock _ ss _ _ <- xs, s <- ss]
 collectStmtBinders (TransStmt { trS_stmts = stmts }) = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt { recS_stmts = ss })     = collectLStmtsBinders ss
-collectStmtBinders ApplicativeStmt{} = []
+collectStmtBinders (ApplicativeStmt _ args _) = concatMap collectArgBinders args
+ where
+  collectArgBinders (_, ApplicativeArgOne _ pat _ _) = collectPatBinders pat
+  collectArgBinders (_, ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
+  collectArgBinders _ = []
 collectStmtBinders XStmtLR{} = panic "collectStmtBinders"
 
 
