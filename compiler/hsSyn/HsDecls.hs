@@ -757,7 +757,7 @@ pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
          , hsep (map (ppr.unLoc) varsr)]
       | otherwise = hsep [ pprPrefixOcc (unLoc thing)
                   , hsep (map (ppr.unLoc) (varl:varsr))]
-    pp_tyvars [] = ppr thing
+    pp_tyvars [] = pprPrefixOcc (unLoc thing)
 pp_vanilla_decl_head _ (XLHsQTyVars x) _ _ = ppr x
 
 pprTyClDeclFlavour :: TyClDecl (GhcPass p) -> SDoc
@@ -2325,7 +2325,7 @@ type instance XXRoleAnnotDecl (GhcPass _) = NoExt
 instance (p ~ GhcPass pass, OutputableBndr (IdP p))
        => Outputable (RoleAnnotDecl p) where
   ppr (RoleAnnotDecl _ ltycon roles)
-    = text "type role" <+> ppr ltycon <+>
+    = text "type role" <+> pprPrefixOcc (unLoc ltycon) <+>
       hsep (map (pp_role . unLoc) roles)
     where
       pp_role Nothing  = underscore
