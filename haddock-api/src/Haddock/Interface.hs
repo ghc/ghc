@@ -81,6 +81,7 @@ processModules
 processModules verbosity modules flags extIfaces = do
 #if defined(mingw32_HOST_OS)
   -- Avoid internal error: <stderr>: hPutChar: invalid argument (invalid character)' non UTF-8 Windows
+  liftIO $ hSetEncoding stdout $ mkLocaleEncoding TransliterateCodingFailure
   liftIO $ hSetEncoding stderr $ mkLocaleEncoding TransliterateCodingFailure
 #endif
 
