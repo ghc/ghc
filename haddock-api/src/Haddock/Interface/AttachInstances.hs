@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, MagicHash #-}
+{-# LANGUAGE CPP, MagicHash, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
@@ -34,6 +34,7 @@ import FamInstEnv
 import FastString
 import GHC
 import InstEnv
+import Module ( ModuleSet, moduleSetElts )
 import MonadUtils (liftIO)
 import Name
 import NameEnv
@@ -51,11 +52,13 @@ type Modules = Set.Set Module
 type ExportInfo = (ExportedNames, Modules)
 
 -- Also attaches fixities
-attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
-attachInstances expInfo ifaces instIfaceMap = do
-  (_msgs, mb_index) <- getNameToInstancesIndex (map ifaceMod ifaces)
+attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> ModuleSet -> Ghc [Interface]
+attachInstances expInfo ifaces instIfaceMap mods = do
+  (_msgs, mb_index) <- getNameToInstancesIndex (map ifaceMod ifaces) mods'
   mapM (attach $ fromMaybe emptyNameEnv mb_index) ifaces
   where
+    mods' = Just (moduleSetElts mods)
+
     -- TODO: take an IfaceMap as input
     ifaceMap = Map.fromList [ (ifaceMod i, i) | i <- ifaces ]
 
