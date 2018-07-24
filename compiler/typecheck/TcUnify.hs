@@ -17,7 +17,7 @@ module TcUnify (
   buildImplicationFor,
 
   -- Various unifications
-  unifyType, unifyTheta, unifyKind,
+  unifyType, unifyKind,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
 
@@ -1235,18 +1235,6 @@ unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
                               , uo_visible = True } -- also always from a visible context
 
 ---------------
-unifyPred :: PredType -> PredType -> TcM TcCoercionN
--- Actual and expected types
-unifyPred = unifyType Nothing
-
----------------
-unifyTheta :: TcThetaType -> TcThetaType -> TcM [TcCoercionN]
--- Actual and expected types
-unifyTheta theta1 theta2
-  = do  { checkTc (equalLength theta1 theta2)
-                  (vcat [text "Contexts differ in length",
-                         nest 2 $ parens $ text "Use RelaxedPolyRec to allow this"])
-        ; zipWithM unifyPred theta1 theta2 }
 
 {-
 %************************************************************************
