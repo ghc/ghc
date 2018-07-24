@@ -641,3 +641,4 @@ def onlyHsParLocs(x):
                         and not "<no location info>" in loc)
     return '\n'.join(filteredLines)
 test('T15242', normalise_errmsg_fun(onlyHsParLocs), compile, [''])
+test('T15428', normal, compile, [''])

@@ -1032,13 +1032,12 @@ piResultTys ty orig_args@(arg:args)
       | ForAllTy (TvBndr tv _) res <- ty
       = go (extendVarEnv tv_env tv arg) res args
 
-      | TyVarTy tv <- ty
-      , Just ty' <- lookupVarEnv tv_env tv
-        -- Deals with piResultTys (forall a. a) [forall b.b, Int]
-      = piResultTys ty' all_args
-
-      | otherwise
-      = pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
+      | otherwise  -- See Note [Care with kind instantiation]
+      = ASSERT2( not (isEmptyVarEnv tv_env)
+               , ppr ty $$ ppr orig_args $$ ppr all_args )
+        go emptyTvSubstEnv
+          (substTy (mkTvSubst in_scope tv_env) ty)
+          all_args
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
@@ -1052,7 +1051,35 @@ applyTysX tvs body_ty arg_tys
     pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
     n_tvs = length tvs
 
-{-
+
+
+{- Note [Care with kind instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  T :: forall k. k
+and we are finding the kind of
+  T (forall b. b -> b) * Int
+Then
+  T (forall b. b->b) :: k[ k :-> forall b. b->b]
+                     :: forall b. b -> b
+So
+  T (forall b. b->b) * :: (b -> b)[ b :-> *]
+                       :: * -> *
+
+In other words wwe must intantiate the forall!
+
+Similarly (Trac #154218)
+   S :: forall k f. k -> f k
+and we are finding the kind of
+   S * (* ->) Int Bool
+We have
+   S * (* ->) :: (k -> f k)[ k :-> *, f :-> (* ->)]
+              :: * -> * -> *
+So again we must instantiate.
+
+The same thing happens in ToIface.toIfaceAppArgsX.
+
+
 ---------------------------------------------------------------------
                                 TyConApp
                                 ~~~~~~~~

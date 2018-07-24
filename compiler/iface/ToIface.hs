@@ -291,10 +291,10 @@ toIfaceTcArgsX fr tc ty_args
     go env (FunTy _ res) (t:ts) -- No type-class args in tycon apps
       = ITC_Vis (toIfaceTypeX fr t) (go env res ts)
 
-    go env (TyVarTy tv) ts
-      | Just ki <- lookupTyVar env tv = go env ki ts
-    go env kind (t:ts) = WARN( True, ppr tc $$ ppr (tyConKind tc) $$ ppr ty_args )
-                         ITC_Vis (toIfaceTypeX fr t) (go env kind ts) -- Ill-kinded
+    go env ty ts = ASSERT2( not (isEmptyTCvSubst env)
+                          , ppr (tyConKind tc) $$ ppr ty_args )
+                   go (zapTCvSubst env) (substTy env ty) ts
+        -- See Note [Care with kind instantiation] in Type.hs
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
