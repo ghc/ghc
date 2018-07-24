@@ -2844,19 +2844,18 @@ checkTvConstraintsTcS skol_info skol_tvs (TcS thing_inside)
                                         thing_inside new_tcs_env
 
        ; unless (null wanteds) $
-         do { tcl_env <- TcM.getLclEnv
-            ; ev_binds_var <- TcM.newNoTcEvBinds
+         do { ev_binds_var <- TcM.newNoTcEvBinds
+            ; imp <- newImplication
             ; let wc = emptyWC { wc_simple = wanteds }
-                  imp = newImplication { ic_tclvl  = new_tclvl
-                                       , ic_skols  = skol_tvs
-                                       , ic_wanted = wc
-                                       , ic_binds  = ev_binds_var
-                                       , ic_env    = tcl_env
-                                       , ic_info   = skol_info }
+                  imp' = imp { ic_tclvl  = new_tclvl
+                             , ic_skols  = skol_tvs
+                             , ic_wanted = wc
+                             , ic_binds  = ev_binds_var
+                             , ic_info   = skol_info }
 
            -- Add the implication to the work-list
            ; TcM.updTcRef (tcs_worklist tcs_env)
-                          (extendWorkListImplic (unitBag imp)) }
+                          (extendWorkListImplic (unitBag imp')) }
 
       ; return res }
 
@@ -2884,20 +2883,19 @@ checkConstraintsTcS skol_info skol_tvs given (TcS thing_inside)
        ; ((res, wanteds), new_tclvl) <- TcM.pushTcLevelM $
                                         thing_inside new_tcs_env
 
-       ; tcl_env <- TcM.getLclEnv
        ; ev_binds_var <- TcM.newTcEvBinds
+       ; imp <- newImplication
        ; let wc = emptyWC { wc_simple = wanteds }
-             imp = newImplication { ic_tclvl  = new_tclvl
-                                  , ic_skols  = skol_tvs
-                                  , ic_given  = given
-                                  , ic_wanted = wc
-                                  , ic_binds  = ev_binds_var
-                                  , ic_env    = tcl_env
-                                  , ic_info   = skol_info }
+             imp' = imp { ic_tclvl  = new_tclvl
+                        , ic_skols  = skol_tvs
+                        , ic_given  = given
+                        , ic_wanted = wc
+                        , ic_binds  = ev_binds_var
+                        , ic_info   = skol_info }
 
            -- Add the implication to the work-list
        ; TcM.updTcRef (tcs_worklist tcs_env)
-                      (extendWorkListImplic (unitBag imp))
+                      (extendWorkListImplic (unitBag imp'))
 
        ; return (res, TcEvBinds ev_binds_var) }
 

@@ -387,7 +387,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
                                  , ic_given = given
                                  , ic_wanted = wanted, ic_binds = evb
                                  , ic_status = status, ic_info = info
-                                 , ic_env = tcl_env, ic_tclvl = tc_lvl })
+                                 , ic_tclvl = tc_lvl })
   | BracketSkol <- info
   , not insoluble
   = return ()        -- For Template Haskell brackets report only
@@ -402,6 +402,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
          warnRedundantConstraints ctxt' tcl_env info' dead_givens
        ; when bad_telescope $ reportBadTelescope ctxt tcl_env m_telescope tvs }
   where
+    tcl_env      = implicLclEnv implic
     insoluble    = isInsolubleStatus status
     (env1, tvs') = mapAccumL tidyTyCoVarBndr (cec_tidy ctxt) tvs
     info'        = tidySkolemInfo env1 info
@@ -622,6 +623,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     find_gadt_match (implic : implics)
       | PatSkol {} <- ic_info implic
       , not (ic_no_eqs implic)
+      , wopt Opt_WarnInaccessibleCode (implicDynFlags implic)
+          -- Don't bother doing this if -Winaccessible-code isn't enabled.
+          -- See Note [Avoid -Winaccessible-code when deriving] in TcInstDcls.
       = Just implic
       | otherwise
       = find_gadt_match implics
@@ -698,7 +702,7 @@ mkGivenErrorReporter :: Implication -> Reporter
 mkGivenErrorReporter implic ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; dflags <- getDynFlags
-       ; let ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
+       ; let ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (implicLclEnv implic))
                    -- For given constraints we overwrite the env (and hence src-loc)
                   -- with one from the implication.  See Note [Inaccessible code]
 
@@ -1233,9 +1237,9 @@ givenConstraintsMsg :: ReportErrCtxt -> SDoc
 givenConstraintsMsg ctxt =
     let constraints :: [(Type, RealSrcSpan)]
         constraints =
-          do { Implic{ ic_given = given, ic_env = env } <- cec_encl ctxt
+          do { implic@Implic{ ic_given = given } <- cec_encl ctxt
              ; constraint <- given
-             ; return (varType constraint, tcl_loc env) }
+             ; return (varType constraint, tcl_loc (implicLclEnv implic)) }
 
         pprConstraint (constraint, loc) =
           ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
@@ -1679,7 +1683,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
 
   -- Check for skolem escape
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
-  , Implic { ic_env = env, ic_skols = skols, ic_info = skol_info } <- implic
+  , Implic { ic_skols = skols, ic_info = skol_info } <- implic
   , let esc_skols = filter (`elemVarSet` (tyCoVarsOfType ty2)) skols
   , not (null esc_skols)
   = do { let msg = important $ misMatchMsg ct oriented ty1 ty2
@@ -1697,7 +1701,8 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
                                            what <+> text "variables are")
                                <+> text "bound by"
                              , nest 2 $ ppr skol_info
-                             , nest 2 $ text "at" <+> ppr (tcl_loc env) ] ]
+                             , nest 2 $ text "at" <+>
+                               ppr (tcl_loc (implicLclEnv implic)) ] ]
        ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
@@ -1706,8 +1711,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   -- meta tyvar or a SigTv, else it'd have been unified
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
-  , Implic { ic_env = env, ic_given = given
-           , ic_tclvl = lvl, ic_info = skol_info } <- implic
+  , Implic { ic_given = given, ic_tclvl = lvl, ic_info = skol_info } <- implic
   = ASSERT2( not (isTouchableMetaTyVar lvl tv1)
            , ppr tv1 $$ ppr lvl )  -- See Note [Error messages for untouchables]
     do { let msg = important $ misMatchMsg ct oriented ty1 ty2
@@ -1716,7 +1720,8 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
                   sep [ quotes (ppr tv1) <+> text "is untouchable"
                       , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
                       , nest 2 $ text "bound by" <+> ppr skol_info
-                      , nest 2 $ text "at" <+> ppr (tcl_loc env) ]
+                      , nest 2 $ text "at" <+>
+                        ppr (tcl_loc (implicLclEnv implic)) ]
              tv_extra = important $ extraTyVarEqInfo ctxt tv1 ty2
              add_sig  = important $ suggestAddSig ctxt ty1 ty2
        ; mkErrorMsgFromCt ctxt ct $ mconcat
@@ -1819,11 +1824,10 @@ pp_givens givens
          (g:gs) ->      ppr_given (text "from the context:") g
                  : map (ppr_given (text "or from:")) gs
     where
-       ppr_given herald (Implic { ic_given = gs, ic_info = skol_info
-                                , ic_env = env })
+       ppr_given herald implic@(Implic { ic_given = gs, ic_info = skol_info })
            = hang (herald <+> pprEvVarTheta gs)
                 2 (sep [ text "bound by" <+> ppr skol_info
-                       , text "at" <+> ppr (tcl_loc env) ])
+                       , text "at" <+> ppr (tcl_loc (implicLclEnv implic)) ])
 
 extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
@@ -2501,12 +2505,13 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
 
     matching_givens = mapMaybe matchable useful_givens
 
-    matchable (Implic { ic_given = evvars, ic_info = skol_info, ic_env = env })
+    matchable implic@(Implic { ic_given = evvars, ic_info = skol_info })
       = case ev_vars_matching of
              [] -> Nothing
              _  -> Just $ hang (pprTheta ev_vars_matching)
                             2 (sep [ text "bound by" <+> ppr skol_info
-                                   , text "at" <+> ppr (tcl_loc env) ])
+                                   , text "at" <+>
+                                     ppr (tcl_loc (implicLclEnv implic)) ])
         where ev_vars_matching = filter ev_var_matches (map evVarPred evvars)
               ev_var_matches ty = case getClassPredTys_maybe ty of
                  Just (clas', tys')
