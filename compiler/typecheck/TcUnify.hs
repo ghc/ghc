@@ -1141,17 +1141,16 @@ checkTvConstraints skol_info m_telescope thing_inside
 
        ; if isEmptyWC wanted
          then return ()
-         else do { tc_lcl_env <- getLclEnv
-                 ; ev_binds   <- newNoTcEvBinds
+         else do { ev_binds <- newNoTcEvBinds
+                 ; implic   <- newImplication
                  ; emitImplication $
-                   newImplication { ic_tclvl     = tclvl
-                                  , ic_skols     = skol_tvs
-                                  , ic_no_eqs    = True
-                                  , ic_telescope = m_telescope
-                                  , ic_wanted    = wanted
-                                  , ic_binds     = ev_binds
-                                  , ic_info      = skol_info
-                                  , ic_env       = tc_lcl_env } }
+                   implic { ic_tclvl     = tclvl
+                          , ic_skols     = skol_tvs
+                          , ic_no_eqs    = True
+                          , ic_telescope = m_telescope
+                          , ic_wanted    = wanted
+                          , ic_binds     = ev_binds
+                          , ic_info      = skol_info } }
        ; return (skol_tvs, result) }
 
 
@@ -1196,16 +1195,15 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
       -- into scope as a skolem in an implication. This is OK, though,
       -- because SigTvs will always remain tyvars, even after unification.
     do { ev_binds_var <- newTcEvBinds
-       ; env <- getLclEnv
-       ; let implic = newImplication { ic_tclvl  = tclvl
-                                     , ic_skols  = skol_tvs
-                                     , ic_given  = given
-                                     , ic_wanted = wanted
-                                     , ic_binds  = ev_binds_var
-                                     , ic_env    = env
-                                     , ic_info   = skol_info }
+       ; implic <- newImplication
+       ; let implic' = implic { ic_tclvl  = tclvl
+                              , ic_skols  = skol_tvs
+                              , ic_given  = given
+                              , ic_wanted = wanted
+                              , ic_binds  = ev_binds_var
+                              , ic_info   = skol_info }
 
-       ; return (unitBag implic, TcEvBinds ev_binds_var) }
+       ; return (unitBag implic', TcEvBinds ev_binds_var) }
 
 {-
 ************************************************************************

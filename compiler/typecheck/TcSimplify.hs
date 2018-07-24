@@ -643,13 +643,14 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        -- bindings, so we can't just revert to the input
        -- constraint.
 
-       ; tc_lcl_env      <- TcM.getLclEnv
+       ; tc_env          <- TcM.getEnv
        ; ev_binds_var    <- TcM.newTcEvBinds
        ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds ev_binds_var $
-               do { let loc         = mkGivenLoc rhs_tclvl UnkSkol tc_lcl_env
+               do { let loc         = mkGivenLoc rhs_tclvl UnkSkol $
+                                      env_lcl tc_env
                         psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
@@ -692,7 +693,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                            | psig_theta_var <- psig_theta_vars ]
 
        -- Now we can emil the residual constraints
-       ; emitResidualConstraints rhs_tclvl tc_lcl_env ev_binds_var
+       ; emitResidualConstraints rhs_tclvl tc_env ev_binds_var
                                  name_taus co_vars qtvs
                                  bound_theta_vars
                                  (wanted_transformed `andWC` mkSimpleWC psig_wanted)
@@ -710,13 +711,13 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
 
 --------------------
-emitResidualConstraints :: TcLevel -> TcLclEnv -> EvBindsVar
+emitResidualConstraints :: TcLevel -> Env TcGblEnv TcLclEnv -> EvBindsVar
                         -> [(Name, TcTauType)]
                         -> VarSet -> [TcTyVar] -> [EvVar]
                         -> WantedConstraints -> TcM ()
 -- Emit the remaining constraints from the RHS.
 -- See Note [Emitting the residual implication in simplifyInfer]
-emitResidualConstraints rhs_tclvl tc_lcl_env ev_binds_var
+emitResidualConstraints rhs_tclvl tc_env ev_binds_var
                         name_taus co_vars qtvs full_theta_vars wanteds
   | isEmptyWC wanteds
   = return ()
@@ -731,21 +732,22 @@ emitResidualConstraints rhs_tclvl tc_lcl_env ev_binds_var
           do { traceTc "emitResidualConstrants:simple" (ppr outer_simple)
              ; emitSimples outer_simple }
 
+        ; implic <- newImplication
         ; let inner_wanted = wanteds { wc_simple = inner_simple }
-              implic       = mk_implic inner_wanted
+              implic'      = mk_implic inner_wanted implic
         ; unless (isEmptyWC inner_wanted) $
-          do { traceTc "emitResidualConstraints:implic" (ppr implic)
-             ; emitImplication implic }
+          do { traceTc "emitResidualConstraints:implic" (ppr implic')
+             ; emitImplication implic' }
      }
   where
-    mk_implic inner_wanted
-       = newImplication { ic_tclvl    = rhs_tclvl
-                        , ic_skols    = qtvs
-                        , ic_given    = full_theta_vars
-                        , ic_wanted   = inner_wanted
-                        , ic_binds    = ev_binds_var
-                        , ic_info     = skol_info
-                        , ic_env      = tc_lcl_env }
+    mk_implic inner_wanted implic
+       = implic { ic_tclvl  = rhs_tclvl
+                , ic_skols  = qtvs
+                , ic_given  = full_theta_vars
+                , ic_wanted = inner_wanted
+                , ic_binds  = ev_binds_var
+                , ic_info   = skol_info
+                , ic_env    = tc_env }
 
     full_theta = map idType full_theta_vars
     skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
@@ -1483,8 +1485,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                              , ic_given  = given_ids
                              , ic_wanted = wanteds
                              , ic_info   = info
-                             , ic_status = status
-                             , ic_env    = env })
+                             , ic_status = status })
   | isSolvedStatus status
   = return (emptyCts, Just imp)  -- Do nothing
 
@@ -1501,7 +1502,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
          -- Solve the nested constraints
        ; (no_given_eqs, given_insols, residual_wanted)
             <- nestImplicTcS ev_binds_var tclvl $
-               do { let loc    = mkGivenLoc tclvl info env
+               do { let loc    = mkGivenLoc tclvl info (implicLclEnv imp)
                         givens = mkGivens loc given_ids
                   ; solveSimpleGivens givens
 

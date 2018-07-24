@@ -813,15 +813,14 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                             , sc_binds   `unionBags` meth_binds
                             , sc_implics `unionBags` meth_implics ) }
 
-       ; env <- getLclEnv
+       ; imp <- newImplication
        ; emitImplication $
-         newImplication { ic_tclvl  = tclvl
-                        , ic_skols  = inst_tyvars
-                        , ic_given  = dfun_ev_vars
-                        , ic_wanted = mkImplicWC sc_meth_implics
-                        , ic_binds  = dfun_ev_binds_var
-                        , ic_env    = env
-                        , ic_info   = InstSkol }
+         imp { ic_tclvl  = tclvl
+             , ic_skols  = inst_tyvars
+             , ic_given  = dfun_ev_vars
+             , ic_wanted = mkImplicWC sc_meth_implics
+             , ic_binds  = dfun_ev_binds_var
+             , ic_info   = InstSkol }
 
        -- Create the result bindings
        ; self_dict <- newDict clas inst_tys
@@ -1035,14 +1034,13 @@ checkInstConstraints thing_inside
                                     thing_inside
 
        ; ev_binds_var <- newTcEvBinds
-       ; env <- getLclEnv
-       ; let implic = newImplication { ic_tclvl  = tclvl
-                                     , ic_wanted = wanted
-                                     , ic_binds  = ev_binds_var
-                                     , ic_env    = env
-                                     , ic_info   = InstSkol }
+       ; implic <- newImplication
+       ; let implic' = implic { ic_tclvl  = tclvl
+                              , ic_wanted = wanted
+                              , ic_binds  = ev_binds_var
+                              , ic_info   = InstSkol }
 
-       ; return (implic, ev_binds_var, result) }
+       ; return (implic', ev_binds_var, result) }
 
 {-
 Note [Recursive superclasses]
@@ -1265,11 +1263,18 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
        ; checkMinimalDefinition
        ; checkMethBindMembership
        ; (ids, binds, mb_implics) <- set_exts exts $
+                                     unset_warnings_deriving $
                                      mapAndUnzip3M tc_item op_items
        ; return (ids, listToBag binds, listToBag (catMaybes mb_implics)) }
   where
     set_exts :: [LangExt.Extension] -> TcM a -> TcM a
     set_exts es thing = foldr setXOptM thing es
+
+    -- See Note [Avoid -Winaccessible-code when deriving]
+    unset_warnings_deriving :: TcM a -> TcM a
+    unset_warnings_deriving
+      | is_derived = unsetWOptM Opt_WarnInaccessibleCode
+      | otherwise  = id
 
     hs_sig_fn = mkHsSigFun sigs
     inst_loc  = getSrcSpan dfun_id
@@ -1359,6 +1364,55 @@ case, Template Haskell will provide fully resolved names (e.g.,
 `GHC.Classes.compare`), so the renamer won't notice the sleight-of-hand going
 on. For this reason, we also put an extra validity check for this in the
 typechecker as a last resort.
+
+Note [Avoid -Winaccessible-code when deriving]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-Winaccessible-code can be particularly noisy when deriving instances for
+GADTs. Consider the following example (adapted from #8128):
+
+  data T a where
+    MkT1 :: Int -> T Int
+    MkT2 :: T Bool
+    MkT3 :: T Bool
+  deriving instance Eq (T a)
+  deriving instance Ord (T a)
+
+In the derived Ord instance, GHC will generate the following code:
+
+  instance Ord (T a) where
+    compare x y
+      = case x of
+          MkT2
+            -> case y of
+                 MkT1 {} -> GT
+                 MkT2    -> EQ
+                 _       -> LT
+          ...
+
+However, that MkT1 is unreachable, since the type indices for MkT1 and MkT2
+differ, so if -Winaccessible-code is enabled, then deriving this instance will
+result in unwelcome warnings.
+
+One conceivable approach to fixing this issue would be to change `deriving Ord`
+such that it becomes smarter about not generating unreachable cases. This,
+however, would be a highly nontrivial refactor, as we'd have to propagate
+through typing information everywhere in the algorithm that generates Ord
+instances in order to determine which cases were unreachable. This seems like
+a lot of work for minimal gain, so we have opted not to go for this approach.
+
+Instead, we take the much simpler approach of always disabling
+-Winaccessible-code for derived code. To accomplish this, we do the following:
+
+1. In tcMethods (which typechecks method bindings), disable
+   -Winaccessible-code.
+2. When creating Implications during typechecking, record the Env
+   (through ic_env) at the time of creation. Since the Env also stores
+   DynFlags, this will remember that -Winaccessible-code was disabled over
+   the scope of that implication.
+3. After typechecking comes error reporting, where GHC must decide how to
+   report inaccessible code to the user, on an Implication-by-Implication
+   basis. If an Implication's DynFlags indicate that -Winaccessible-code was
+   disabled, then don't bother reporting it. That's it!
 -}
 
 ------------------------
