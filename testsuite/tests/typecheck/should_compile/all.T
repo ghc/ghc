@@ -398,6 +398,7 @@ test('abstract_refinement_hole_fits', normal, compile, ['-fdefer-type-errors -fn
 test('free_monad_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -funclutter-valid-hole-fits'])
 test('constraint_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -fno-max-refinement-hole-fits -frefinement-level-hole-fits=2 -funclutter-valid-hole-fits'])
 test('type_in_type_hole_fits', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits'])
+test('T15370', normal, compile, ['-fdefer-type-errors -fno-max-valid-hole-fits -funclutter-valid-hole-fits'])
 test('T7408', normal, compile, [''])
 test('UnboxStrictPrimitiveFields', normal, compile, [''])
 test('T7541', normal, compile, [''])
