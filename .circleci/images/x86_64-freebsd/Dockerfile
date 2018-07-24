@@ -1,6 +1,8 @@
 FROM ubuntu:16.04
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update
+
+RUN apt-get install -y --no-install-recommends \
   autoconf \
   automake \
   bzip2 \
@@ -19,6 +21,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   sudo \
   wget \
   xz-utils
+
+# Documentation tools
+RUN apt-get install -qy python3-sphinx texlive-xetex texlive-latex-extra
 
 COPY build-toolchain.sh /tmp/
 RUN /tmp/build-toolchain.sh x86_64
