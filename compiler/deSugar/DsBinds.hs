@@ -184,8 +184,9 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_binds = binds, abs_sig = has_sig })
   = do { ds_binds <- addDictsDs (listToBag dicts) $
                      dsLHsBinds binds
-                                   -- addDictsDs: push type constraints deeper
-                                   --             for inner pattern match check
+                         -- addDictsDs: push type constraints deeper
+                         --             for inner pattern match check
+                         -- See Check, Note [Type and Term Equality Propagation]
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
