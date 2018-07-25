@@ -38,8 +38,9 @@ import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
 import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
-                   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons )
-import DataCon     ( DataCon, dataConTagZ, dataConTyCon, dataConWorkId )
+                   , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
+                   , tyConFamilySize )
+import DataCon     ( dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF )
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
@@ -1473,11 +1474,13 @@ match_smallIntegerTo _ _ _ _ _ = Nothing
 -- | Match the scrutinee of a case and potentially return a new scrutinee and a
 -- function to apply to each literal alternative.
 caseRules :: DynFlags
-          -> CoreExpr                    -- Scrutinee
-          -> Maybe ( CoreExpr            -- New scrutinee
-                   , AltCon -> AltCon    -- How to fix up the alt pattern
-                   , Id -> CoreExpr)     -- How to reconstruct the original scrutinee
-                                         -- from the new case-binder
+          -> CoreExpr                       -- Scrutinee
+          -> Maybe ( CoreExpr               -- New scrutinee
+                   , AltCon -> Maybe AltCon -- How to fix up the alt pattern
+                                            --   Nothing <=> Unreachable
+                                            -- See Note [Unreachable caseRules alternatives]
+                   , Id -> CoreExpr)        -- How to reconstruct the original scrutinee
+                                            -- from the new case-binder
 -- e.g  case e of b {
 --         ...;
 --         con bs -> rhs;
@@ -1526,9 +1529,9 @@ caseRules _ (App (App (Var f) (Type ty)) v)       -- dataToTag x
 caseRules _ _ = Nothing
 
 
-tx_lit_con :: DynFlags -> (Integer -> Integer) -> AltCon -> AltCon
-tx_lit_con _      _      DEFAULT    = DEFAULT
-tx_lit_con dflags adjust (LitAlt l) = LitAlt (mapLitValue dflags adjust l)
+tx_lit_con :: DynFlags -> (Integer -> Integer) -> AltCon -> Maybe AltCon
+tx_lit_con _      _      DEFAULT    = Just DEFAULT
+tx_lit_con dflags adjust (LitAlt l) = Just $ LitAlt (mapLitValue dflags adjust l)
 tx_lit_con _      _      alt        = pprPanic "caseRules" (ppr alt)
    -- NB: mapLitValue uses mkMachIntWrap etc, to ensure that the
    -- literal alternatives remain in Word/Int target ranges
@@ -1568,19 +1571,27 @@ adjustUnary op
          IntNegOp  -> Just (\y -> negate y    )
          _         -> Nothing
 
-tx_con_tte :: DynFlags -> AltCon -> AltCon
-tx_con_tte _      DEFAULT         = DEFAULT
+tx_con_tte :: DynFlags -> AltCon -> Maybe AltCon
+tx_con_tte _      DEFAULT         = Just DEFAULT
 tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
 tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
-  = LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
+  = Just $ LitAlt $ mkMachInt dflags $ toInteger $ dataConTagZ dc
 
-tx_con_dtt :: Type -> AltCon -> AltCon
-tx_con_dtt _  DEFAULT              = DEFAULT
-tx_con_dtt ty (LitAlt (MachInt i)) = DataAlt (get_con ty (fromInteger i))
+tx_con_dtt :: Type -> AltCon -> Maybe AltCon
+tx_con_dtt _  DEFAULT              = Just DEFAULT
+tx_con_dtt ty (LitAlt (MachInt i))
+  | tag >= 0
+  , tag < n_data_cons
+  = Just (DataAlt (data_cons !! tag))   -- tag is zero-indexed, as is (!!)
+  | otherwise
+  = Nothing
+  where
+    tag         = fromInteger i :: ConTagZ
+    tc          = tyConAppTyCon ty
+    n_data_cons = tyConFamilySize tc
+    data_cons   = tyConDataCons tc
+
 tx_con_dtt _  alt                  = pprPanic "caseRules" (ppr alt)
-
-get_con :: Type -> ConTagZ -> DataCon
-get_con ty tag = tyConDataCons (tyConAppTyCon ty) !! tag
 
 {- Note [caseRules for tagToEnum]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1639,4 +1650,19 @@ headed by a normal tycon. In particular, we do not apply this in the case of a
 data family tycon, since that would require carefully applying coercion(s)
 between the data family and the data family instance's representation type,
 which caseRules isn't currently engineered to handle (#14680).
+
+Note [Unreachable caseRules alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Take care if we see something like
+  case dataToTag x of
+    DEFAULT -> e1
+    -1# -> e2
+    100 -> e3
+because there isn't a data constructor with tag -1 or 100. In this case the
+out-of-range alterantive is dead code -- we know the range of tags for x.
+
+Hence caseRules returns (AltCon -> Maybe AltCon), with Nothing indicating
+an alternative that is unreachable.
+
+You may wonder how this can happen: check out Trac #15436.
 -}

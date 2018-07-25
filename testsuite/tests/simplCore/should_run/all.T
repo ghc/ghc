@@ -83,3 +83,4 @@ test('T14868',
      [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261))],
      compile_and_run, [''])
 test('T14894', normal, compile_and_run, [''])
+test('T15436', normal, compile_and_run, [''])
