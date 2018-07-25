@@ -27,7 +27,6 @@ import PrelNames
 
 import Id
 import Type
-import Kind( isConstraintKind )
 import MkCore ( mkStringExprFS, mkNaturalExpr )
 
 import Unique ( hasKey )
@@ -301,7 +300,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   -- Now cases that do work
   | k `eqType` typeNatKind                 = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
-  | isConstraintKind t                     = doTyConApp clas t constraintKindTyCon []
+  | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
   | Just (arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
