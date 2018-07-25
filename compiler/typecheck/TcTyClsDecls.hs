@@ -47,7 +47,6 @@ import FamInstEnv
 import Coercion
 import Type
 import TyCoRep   -- for checkValidRoles
-import Kind
 import Class
 import CoAxiom
 import TyCon
@@ -993,7 +992,8 @@ tcTyClDecl1 _parent roles_info
     do { clas <- fixM $ \ clas ->
             -- We need the knot because 'clas' is passed into tcClassATs
             tcTyClTyVars class_name $ \ binders res_kind ->
-            do { MASSERT( isConstraintKind res_kind )
+            do { MASSERT2( tcIsConstraintKind res_kind
+                         , ppr class_name $$ ppr res_kind )
                ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
                ; let tycon_name = class_name        -- We use the same name
                      roles = roles_info tycon_name  -- for TyCon and Class

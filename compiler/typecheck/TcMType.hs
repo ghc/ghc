@@ -98,7 +98,6 @@ import GhcPrelude
 import TyCoRep
 import TcType
 import Type
-import Kind
 import Coercion
 import Class
 import Var
@@ -723,9 +722,9 @@ writeMetaTyVarRef tyvar ref ty
        ; zonked_ty      <- zonkTcType ty
        ; let zonked_ty_kind = typeKind zonked_ty  -- need to zonk even before typeKind;
                                                   -- otherwise, we can panic in piResultTy
-             kind_check_ok = isConstraintKind zonked_tv_kind
+             kind_check_ok = tcIsConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
-             -- Hack alert! isConstraintKind: see TcHsType
+             -- Hack alert! tcIsConstraintKind: see TcHsType
              -- Note [Extra-constraint holes in partial type signatures]
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")

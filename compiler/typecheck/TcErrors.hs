@@ -20,7 +20,6 @@ import TcType
 import RnUnbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
-import Kind
 import Unify            ( tcMatchTys )
 import Module
 import FamInst
@@ -1933,8 +1932,7 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
   | KindLevel <- level, occurs_check_error       = (True, Nothing, empty)
   | isUnliftedTypeKind act, isLiftedTypeKind exp = (False, Nothing, msg2)
   | isLiftedTypeKind act, isUnliftedTypeKind exp = (False, Nothing, msg3)
-  | isLiftedTypeKind exp && not (isConstraintKind exp)
-                                                 = (False, Nothing, msg4)
+  | tcIsLiftedTypeKind exp                       = (False, Nothing, msg4)
   | Just msg <- num_args_msg                     = (False, Nothing, msg $$ msg1)
   | KindLevel <- level, Just th <- maybe_thing   = (False, Nothing, msg5 th)
   | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (True, Just NotSwapped, empty)
@@ -1989,7 +1987,7 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
                  2 (text "but" <+> quotes th <+> text "has kind" <+>
                     quotes (ppr act))
       where
-        kind_desc | isConstraintKind exp = text "a constraint"
+        kind_desc | tcIsConstraintKind exp = text "a constraint"
 
                     -- TYPE t0
                   | Just (tc, [arg]) <- tcSplitTyConApp_maybe exp

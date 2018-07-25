@@ -74,7 +74,6 @@ import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyBinder(..) )  -- Used in tcDataKindSig
 import Type
 import Coercion
-import Kind
 import RdrName( lookupLocalRdrOcc )
 import Var
 import VarSet
@@ -696,7 +695,7 @@ tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
   = do { ctxt' <- tc_hs_context mode ctxt
 
          -- See Note [Body kind of a HsQualTy]
-       ; ty' <- if isConstraintKind exp_kind
+       ; ty' <- if tcIsConstraintKind exp_kind
                 then tc_lhs_type mode ty constraintKind
                 else do { ek <- newOpenTypeKind
                                 -- The body kind (result of the function)
@@ -842,9 +841,9 @@ tupKindSort_maybe :: TcKind -> Maybe TupleSort
 tupKindSort_maybe k
   | Just (k', _) <- splitCastTy_maybe k = tupKindSort_maybe k'
   | Just k'      <- tcView k            = tupKindSort_maybe k'
-  | isConstraintKind k = Just ConstraintTuple
-  | isLiftedTypeKind k = Just BoxedTuple
-  | otherwise          = Nothing
+  | tcIsConstraintKind k = Just ConstraintTuple
+  | tcIsLiftedTypeKind k   = Just BoxedTuple
+  | otherwise            = Nothing
 
 tc_tuple :: HsType GhcRn -> TcTyMode -> TupleSort -> [LHsType GhcRn] -> TcKind -> TcM TcType
 tc_tuple rn_ty mode tup_sort tys exp_kind

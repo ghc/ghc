@@ -121,6 +121,7 @@ module Type (
 
         -- ** Finding the kind of a type
         typeKind, isTypeLevPoly, resultIsLevPoly,
+        tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
 
         -- ** Common Kind
         liftedTypeKind,
@@ -229,7 +230,13 @@ import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind )
 import PrelNames
 import CoAxiom
-import {-# SOURCE #-} Coercion
+import {-# SOURCE #-} Coercion( mkCoherenceCo, mkReflCo
+                              , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
+                              , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
+                              , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
+                              , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
+                              , decomposePiCos, coercionKind, coercionType
+                              , isReflexiveCo, seqCo )
 
 -- others
 import Util
@@ -322,34 +329,10 @@ See also Trac #11715, which tracks removing this inconsistency.
 
 -}
 
-{-# INLINE coreView #-}
-coreView :: Type -> Maybe Type
--- ^ This function Strips off the /top layer only/ of a type synonym
--- application (if any) its underlying representation type.
--- Returns Nothing if there is nothing to look through.
--- This function considers 'Constraint' to be a synonym of @TYPE LiftedRep@.
---
--- By being non-recursive and inlined, this case analysis gets efficiently
--- joined onto the case analysis that the caller is already doing
-coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
-  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
-               -- The free vars of 'rhs' should all be bound by 'tenv', so it's
-               -- ok to use 'substTy' here.
-               -- See also Note [The substitution invariant] in TyCoRep.
-               -- Its important to use mkAppTys, rather than (foldl AppTy),
-               -- because the function part might well return a
-               -- partially-applied type constructor; indeed, usually will!
-
-coreView (TyConApp tc [])       -- At the Core level, Constraint = Type
-  | isConstraintKindCon tc
-  = Just liftedTypeKind
-
-coreView _ = Nothing
-
 -- | Gives the typechecker view of a type. This unwraps synonyms but
 -- leaves 'Constraint' alone. c.f. coreView, which turns Constraint into
 -- TYPE LiftedRep. Returns Nothing if no unwrapping happens.
--- See also Note [coreView vs tcView] in Type.
+-- See also Note [coreView vs tcView]
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
@@ -361,6 +344,28 @@ tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
 tcView _ = Nothing
+
+{-# INLINE coreView #-}
+coreView :: Type -> Maybe Type
+-- ^ This function Strips off the /top layer only/ of a type synonym
+-- application (if any) its underlying representation type.
+-- Returns Nothing if there is nothing to look through.
+-- This function considers 'Constraint' to be a synonym of @TYPE LiftedRep@.
+--
+-- By being non-recursive and inlined, this case analysis gets efficiently
+-- joined onto the case analysis that the caller is already doing
+coreView ty@(TyConApp tc tys)
+  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+    -- This equation is exactly like tcView
+
+  -- At the Core level, Constraint = Type
+  -- See Note [coreView vs tcView]
+  | isConstraintKindCon tc
+  = ASSERT2( null tys, ppr ty )
+    Just liftedTypeKind
+
+coreView _ = Nothing
 
 -----------------------------------------------
 expandTypeSynonyms :: Type -> Type
@@ -731,14 +736,14 @@ repSplitAppTy_maybe (TyConApp tc tys)
 
 repSplitAppTy_maybe _other = Nothing
 
--- this one doesn't braek apart (c => t).
+-- This one doesn't break apart (c => t).
 -- See Note [Decomposing fat arrow c=>t]
 -- Defined here to avoid module loops between Unify and TcType.
 tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
 tcRepSplitAppTy_maybe (FunTy ty1 ty2)
-  | isConstraintKind (typeKind ty1)
+  | isPredTy ty1
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
 
   | otherwise
@@ -753,18 +758,6 @@ tcRepSplitAppTy_maybe (TyConApp tc tys)
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
 tcRepSplitAppTy_maybe _other = Nothing
-
--- | Split a type constructor application into its type constructor and
--- applied types. Note that this may fail in the case of a 'FunTy' with an
--- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
--- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
--- type before using this function.
---
--- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
-tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
--- Defined here to avoid module loops between Unify and TcType.
-tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-tcSplitTyConApp_maybe ty                         = tcRepSplitTyConApp_maybe ty
 
 -- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
 tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
@@ -1562,6 +1555,56 @@ But there are a number of complications:
   want to print it nicely in error messages.
 -}
 
+-- | Split a type constructor application into its type constructor and
+-- applied types. Note that this may fail in the case of a 'FunTy' with an
+-- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
+-- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
+-- type before using this function.
+--
+-- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
+tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
+tcSplitTyConApp_maybe ty                         = tcRepSplitTyConApp_maybe ty
+
+-- tcIsConstraintKind stuf only makes sense in the typechecker
+-- After that Constraint = Type
+-- See Note [coreView vs tcView]
+-- Defined here because it is used in isPredTy and tcRepSplitAppTy_maybe (sigh)
+tcIsConstraintKind :: Kind -> Bool
+tcIsConstraintKind ty
+  | Just (tc, args) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
+  , isConstraintKindCon tc
+  = ASSERT2( null args, ppr ty ) True
+
+  | otherwise
+  = False
+
+-- | Is this kind equivalent to @*@?
+--
+-- This considers 'Constraint' to be distinct from @*@. For a version that
+-- treats them as the same type, see 'isLiftedTypeKind'.
+tcIsLiftedTypeKind :: Kind -> Bool
+tcIsLiftedTypeKind ty
+  | Just (type_tc, [arg]) <- tcSplitTyConApp_maybe ty
+  , type_tc `hasKey` tYPETyConKey
+  , Just (lifted_rep_tc, args) <- tcSplitTyConApp_maybe arg
+  , lifted_rep_tc `hasKey` liftedRepDataConKey
+  = ASSERT2( null args, ppr ty ) True
+  | otherwise
+  = False
+
+tcReturnsConstraintKind :: Kind -> Bool
+-- True <=> the Kind ultimately returns a Constraint
+--   E.g.  * -> Constraint
+--         forall k. k -> Constraint
+tcReturnsConstraintKind kind
+  | Just kind' <- tcView kind = tcReturnsConstraintKind kind'
+tcReturnsConstraintKind (ForAllTy _ ty) = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (FunTy    _ ty) = tcReturnsConstraintKind ty
+tcReturnsConstraintKind (TyConApp tc _) = isConstraintKindCon tc
+tcReturnsConstraintKind _               = False
+
 -- | Is the type suitable to classify a given/wanted in the typechecker?
 isPredTy :: Type -> Bool
 -- See Note [isPredTy complications]
@@ -1589,7 +1632,7 @@ isPredTy ty = go ty []
 
     go_k :: Kind -> [KindOrType] -> Bool
     -- True <=> ('k' applied to 'kts') = Constraint
-    go_k k [] = isConstraintKind k
+    go_k k [] = tcIsConstraintKind k
     go_k k (arg:args) = case piResultTy_maybe k arg of
                           Just k' -> go_k k' args
                           Nothing -> WARN( True, text "isPredTy" <+> ppr ty )
