@@ -1115,7 +1115,7 @@ checkConstraints :: SkolemInfo
                  -> TcM (TcEvBinds, result)
 
 checkConstraints skol_info skol_tvs given thing_inside
-  = do { implication_needed <- implicationNeeded skol_tvs given
+  = do { implication_needed <- implicationNeeded skol_info skol_tvs given
 
        ; if implication_needed
          then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
@@ -1154,15 +1154,12 @@ checkTvConstraints skol_info m_telescope thing_inside
        ; return (skol_tvs, result) }
 
 
-implicationNeeded :: [TcTyVar] -> [EvVar] -> TcM Bool
--- With the solver producing unlifted equalities, we need
--- to have an EvBindsVar for them when they might be deferred to
--- runtime. Otherwise, they end up as top-level unlifted bindings,
--- which are verboten. See also Note [Deferred errors for coercion holes]
--- in TcErrors.  cf Trac #14149 for an example of what goes wrong.
-implicationNeeded skol_tvs given
+implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
+-- See Note [When to build an implication]
+implicationNeeded skol_info skol_tvs given
   | null skol_tvs
   , null given
+  , not (alwaysBuildImplication skol_info)
   = -- Empty skolems and givens
     do { tc_lvl <- getTcLevel
        ; if not (isTopTcLevel tc_lvl)  -- No implication needed if we are
@@ -1176,6 +1173,23 @@ implicationNeeded skol_tvs given
 
   | otherwise     -- Non-empty skolems or givens
   = return True   -- Definitely need an implication
+
+alwaysBuildImplication :: SkolemInfo -> Bool
+-- See Note [When to build an implication]
+alwaysBuildImplication _ = False
+
+{-  Commmented out for now while I figure out about error messages.
+    See Trac #14185
+
+alwaysBuildImplication (SigSkol ctxt _ _)
+  = case ctxt of
+      FunSigCtxt {} -> True  -- RHS of a binding with a signature
+      _             -> False
+alwaysBuildImplication (RuleSkol {})      = True
+alwaysBuildImplication (InstSkol {})      = True
+alwaysBuildImplication (FamInstSkol {})   = True
+alwaysBuildImplication _                  = False
+-}
 
 buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
                    -> [EvVar] -> WantedConstraints
@@ -1204,6 +1218,37 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
                               , ic_info   = skol_info }
 
        ; return (unitBag implic', TcEvBinds ev_binds_var) }
+
+{- Note [When to build an implication]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have some 'skolems' and some 'givens', and we are
+considering whether to wrap the constraints in their scope into an
+implication.  We must /always/ so if either 'skolems' or 'givens' are
+non-empty.  But what if both are empty?  You might think we could
+always drop the implication.  Other things being equal, the fewer
+implications the better.  Less clutter and overhead.  But we must
+take care:
+
+* If we have an unsolved [W] g :: a ~# b, and -fdefer-type-errors,
+  we'll make a /term-level/ evidence binding for 'g = error "blah"'.
+  We must have an EvBindsVar those bindings!, otherwise they end up as
+  top-level unlifted bindings, which are verboten. This only matters
+  at top level, so we check for that
+  See also Note [Deferred errors for coercion holes] in TcErrors.
+  cf Trac #14149 for an example of what goes wrong.
+
+* If you have
+     f :: Int;  f = f_blah
+     g :: Bool; g = g_blah
+  If we don't build an implication for f or g (no tyvars, no givens),
+  the constraints for f_blah and g_blah are solved together.  And that
+  can yield /very/ confusing error messages, because we can get
+      [W] C Int b1    -- from f_blah
+      [W] C Int b2    -- from g_blan
+  and fundpes can yield [D] b1 ~ b2, even though the two functions have
+  literally nothing to do with each other.  Trac #14185 is an example.
+  Building an implication keeps them separage.
+-}
 
 {-
 ************************************************************************
