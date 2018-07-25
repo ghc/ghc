@@ -408,7 +408,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
-    ctxt1 | NoEvBindsVar{} <- evb    = noDeferredBindings ctxt
+    ctxt1 | CoEvBindsVar{} <- evb    = noDeferredBindings ctxt
           | otherwise                = ctxt
           -- If we go inside an implication that has no term
           -- evidence (e.g. unifying under a forall), we can't defer

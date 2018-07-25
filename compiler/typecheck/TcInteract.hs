@@ -1082,7 +1082,7 @@ shortCutSolver dflags ev_w ev_i
  && gopt Opt_SolveConstantDicts dflags
  -- Enabled by the -fsolve-constant-dicts flag
   = do { ev_binds_var <- getTcEvBindsVar
-       ; ev_binds <- ASSERT2( not (isNoEvBindsVar ev_binds_var ), ppr ev_w )
+       ; ev_binds <- ASSERT2( not (isCoEvBindsVar ev_binds_var ), ppr ev_w )
                      getTcEvBindsMap ev_binds_var
        ; solved_dicts <- getSolvedDicts
 
@@ -2267,7 +2267,7 @@ chooseInstance work_item
       -- Precondition: evidence term matches the predicate workItem
      finish_wanted loc theta mk_ev
         = do { evb <- getTcEvBindsVar
-             ; if isNoEvBindsVar evb
+             ; if isCoEvBindsVar evb
                then -- See Note [Instances in no-evidence implications]
                     continueWith work_item
                else

@@ -1549,7 +1549,7 @@ zonkEvBindsVar :: ZonkEnv -> EvBindsVar -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBindsVar env (EvBindsVar { ebv_binds = ref })
   = do { bs <- readMutVar ref
        ; zonkEvBinds env (evBindMapBinds bs) }
-zonkEvBindsVar env (NoEvBindsVar {}) = return (env, emptyBag)
+zonkEvBindsVar env (CoEvBindsVar {}) = return (env, emptyBag)
 
 zonkEvBinds :: ZonkEnv -> Bag EvBind -> TcM (ZonkEnv, Bag EvBind)
 zonkEvBinds env binds

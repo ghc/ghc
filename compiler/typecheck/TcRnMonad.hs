@@ -89,7 +89,7 @@ module TcRnMonad(
   mkErrInfo,
 
   -- * Type constraints
-  newTcEvBinds, newNoTcEvBinds,
+  newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
   addTcEvBind,
   getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
@@ -1372,8 +1372,20 @@ newNoTcEvBinds
   = do { tcvs_ref  <- newTcRef emptyVarSet
        ; uniq <- newUnique
        ; traceTc "newNoTcEvBinds" (text "unique =" <+> ppr uniq)
-       ; return (NoEvBindsVar { ebv_tcvs = tcvs_ref
+       ; return (CoEvBindsVar { ebv_tcvs = tcvs_ref
                               , ebv_uniq = uniq }) }
+
+cloneEvBindsVar :: EvBindsVar -> TcM EvBindsVar
+-- Clone the refs, so that any binding created when
+-- solving don't pollute the original
+cloneEvBindsVar ebv@(EvBindsVar {})
+  = do { binds_ref <- newTcRef emptyEvBindMap
+       ; tcvs_ref  <- newTcRef emptyVarSet
+       ; return (ebv { ebv_binds = binds_ref
+                     , ebv_tcvs = tcvs_ref }) }
+cloneEvBindsVar ebv@(CoEvBindsVar {})
+  = do { tcvs_ref  <- newTcRef emptyVarSet
+       ; return (ebv { ebv_tcvs = tcvs_ref }) }
 
 getTcEvTyCoVars :: EvBindsVar -> TcM TyCoVarSet
 getTcEvTyCoVars ev_binds_var
@@ -1382,13 +1394,13 @@ getTcEvTyCoVars ev_binds_var
 getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
 getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
-getTcEvBindsMap (NoEvBindsVar {})
+getTcEvBindsMap (CoEvBindsVar {})
   = return emptyEvBindMap
 
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
 setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
   = writeTcRef ev_ref binds
-setTcEvBindsMap v@(NoEvBindsVar {}) ev_binds
+setTcEvBindsMap v@(CoEvBindsVar {}) ev_binds
   | isEmptyEvBindMap ev_binds
   = return ()
   | otherwise
@@ -1401,8 +1413,8 @@ addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
                                  ppr ev_bind
        ; bnds <- readTcRef ev_ref
        ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
-addTcEvBind (NoEvBindsVar { ebv_uniq = u }) ev_bind
-  = pprPanic "addTcEvBind NoEvBindsVar" (ppr ev_bind $$ ppr u)
+addTcEvBind (CoEvBindsVar { ebv_uniq = u }) ev_bind
+  = pprPanic "addTcEvBind CoEvBindsVar" (ppr ev_bind $$ ppr u)
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =
