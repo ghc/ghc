@@ -2309,24 +2309,30 @@ Note [Which equalities to float]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Which equalities should we float?  We want to float ones where there
 is a decent chance that floating outwards will allow unification to
-happen.  In particular:
+happen.  In particular, float out equalities that are:
 
-   Float out homogeneous equalities of form (alpha ~ ty) or (ty ~ alpha), where
-
+* Of form (alpha ~# ty) or (ty ~# alpha), where
    * alpha is a meta-tyvar.
-
    * And 'alpha' is not a SigTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
 
-Why homogeneous (i.e., the kinds of the types are the same)? Because heterogeneous
-equalities have derived kind equalities. See Note [Equalities with incompatible kinds]
-in TcCanonical. If we float out a hetero equality, then it will spit out the
-same derived kind equality again, which might create duplicate error messages.
-Instead, we do float out the kind equality (if it's worth floating out, as
-above). If/when we solve it, we'll be able to rewrite the original hetero equality
-to be homogeneous, and then perhaps make progress / float it out. The duplicate
-error message was spotted in typecheck/should_fail/T7368.
+* Homogeneous (both sides have the same kind). Why only homogeneous?
+  Because heterogeneous equalities have derived kind equalities.
+  See Note [Equalities with incompatible kinds] in TcCanonical.
+  If we float out a hetero equality, then it will spit out the same
+  derived kind equality again, which might create duplicate error
+  messages.
+
+  Instead, we do float out the kind equality (if it's worth floating
+  out, as above). If/when we solve it, we'll be able to rewrite the
+  original hetero equality to be homogeneous, and then perhaps make
+  progress / float it out. The duplicate error message was spotted in
+  typecheck/should_fail/T7368.
+
+* Nominal.  No point in floating (alpha ~R# ty), because we do not
+  unify representational equalities even if alpha is touchable.
+  See Note [Do not unify representational equalities] in TcInteract.
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~
