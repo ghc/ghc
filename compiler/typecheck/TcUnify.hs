@@ -758,8 +758,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
-           ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
+        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
+           ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
+                         -- GenSigCtxt: See Note [Setting the argument context]
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
@@ -807,6 +808,33 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
+
+{- Note [Settting the argument context]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider we are doing the ambiguity check for the (bogus)
+  f :: (forall a b. C b => a -> a) -> Int
+
+We'll call
+   tcSubType ((forall a b. C b => a->a) -> Int )
+             ((forall a b. C b => a->a) -> Int )
+
+with a UserTypeCtxt of (FunSigCtxt "f").  Then we'll do the co/contra thing
+on the argument type of the (->) -- and at that point we want to switch
+to a UserTypeCtxt of GenSigCtxt.  Why?
+
+* Error messages.  If we stick with FunSigCtxt we get errors like
+     * Could not deduce: C b
+       from the context: C b0
+        bound by the type signature for:
+            f :: forall a b. C b => a->a
+  But of course f does not have that type signature!
+  Example tests: T10508, T7220a, Simple14
+
+* Implications. We may decide to build an implication for the whole
+  ambiguity check, but we don't need one for each level within it,
+  and TcUnify.alwaysBuildImplication checks the UserTypeCtxt.
+  See Note [When to build an implication]
+-}
 
 -----------------
 -- needs both un-type-checked (for origins) and type-checked (for wrapping)

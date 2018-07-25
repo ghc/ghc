@@ -3,8 +3,8 @@ Simple14.hs:8:8: error:
     • Couldn't match type ‘z0’ with ‘z’
         ‘z0’ is untouchable
           inside the constraints: x ~ y
-          bound by the type signature for:
-                     eqE :: (x ~ y) => EQ_ z0 z0
+          bound by a type expected by the context:
+                     (x ~ y) => EQ_ z0 z0
           at Simple14.hs:8:8-39
       ‘z’ is a rigid type variable bound by
         the type signature for:
