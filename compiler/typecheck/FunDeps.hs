@@ -283,7 +283,14 @@ improveClsFD clas_tvs fd
                   -> []
 
                   | otherwise
-                  -> [(meta_tvs, fdeqs)]
+                  -> -- pprTrace "iproveClsFD" (vcat
+                     --  [ text "is_tvs =" <+> ppr qtvs
+                     --  , text "tys_inst =" <+> ppr tys_inst
+                     --  , text "tys_actual =" <+> ppr tys_actual
+                     --  , text "ltys1 =" <+> ppr ltys1
+                     --  , text "ltys2 =" <+> ppr ltys2
+                     --  , text "subst =" <+> ppr subst ]) $
+                     [(meta_tvs, fdeqs)]
                         -- We could avoid this substTy stuff by producing the eqn
                         -- (qtvs, ls1++rs1, ls2++rs2)
                         -- which will re-do the ls1/ls2 unification when the equation is

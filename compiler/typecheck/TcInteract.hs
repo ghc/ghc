@@ -1608,7 +1608,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
        ; stopWith ev "Solved from inert" }
 
   | ReprEq <- eq_rel   -- See Note [Do not unify representational equalities]
-  = continueWith workItem
+  = do { traceTcS "Not unifying representational equality" (ppr workItem)
+       ; continueWith workItem }
 
   | isGiven ev         -- See Note [Touchables and givens]
   = continueWith workItem

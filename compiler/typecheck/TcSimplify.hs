@@ -1357,7 +1357,10 @@ solveWanteds :: WantedConstraints -> TcS WantedConstraints
 -- so that the inert set doesn't mindlessly propagate.
 -- NB: wc_simples may be wanted /or/ derived now
 solveWanteds wc@(WC { wc_simple = simples, wc_impl = implics })
-  = do { traceTcS "solveWanteds {" (ppr wc)
+  = do { cur_lvl <- TcS.getTcLevel
+       ; traceTcS "solveWanteds {" $
+         vcat [ text "Level =" <+> ppr cur_lvl
+              , ppr wc ]
 
        ; wc1 <- solveSimpleWanteds simples
                 -- Any insoluble constraints are in 'simples' and so get rewritten
