@@ -62,6 +62,8 @@ import GHC.Exts
 import GHC.Int
 import GHC.Word
 
+#include "ghcconfig.h"
+
 class HasHeapRep (a :: TYPE rep) where
     getClosureData :: a -> IO Closure
 
@@ -169,8 +171,13 @@ getClosure x = do
                 fail $ "Expected at least 2 raw words to AP"
             let splitWord = rawWds !! 0
             pure $ APClosure itbl
+#if defined(WORDS_BIGENDIAN)
+                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                (fromIntegral splitWord)
+#else
                 (fromIntegral splitWord)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+#endif
                 (head pts) (tail pts)
 
         PAP -> do
@@ -181,8 +188,13 @@ getClosure x = do
                 fail "Expected at least 2 raw words to PAP"
             let splitWord = rawWds !! 0
             pure $ PAPClosure itbl
+#if defined(WORDS_BIGENDIAN)
+                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                (fromIntegral splitWord)
+#else
                 (fromIntegral splitWord)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+#endif
                 (head pts) (tail pts)
 
         AP_STACK -> do
@@ -214,8 +226,13 @@ getClosure x = do
                         ++ show (length rawWds)
             let splitWord = rawWds !! 3
             pure $ BCOClosure itbl (pts !! 0) (pts !! 1) (pts !! 2)
+#if defined(WORDS_BIGENDIAN)
+                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+                (fromIntegral splitWord)
+#else
                 (fromIntegral splitWord)
                 (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
+#endif
                 (drop 4 rawWds)
 
         ARR_WORDS -> do
