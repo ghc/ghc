@@ -156,9 +156,6 @@ typedef union {
 #if defined(x86_64_TARGET_ARCH) && defined(TABLES_NEXT_TO_CODE)
 // On x86_64 we can fit a pointer offset in half a word, so put the SRT offset
 // in the info->srt field directly.
-//
-// See the section "Referring to an SRT from the info table" in
-// Note [SRTs] in CmmBuildInfoTables.hs
 #define USE_INLINE_SRT_FIELD
 #endif
 
