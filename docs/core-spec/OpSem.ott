@@ -52,7 +52,7 @@ not e2 is_a_coercion
 g' = sym (nth Nom 0 g)
 t' = t |> g'
 -------------------------------------------------------- :: TPush
-((\n.e) |> g) t --> ((\n.e) t') |> (g @ (<t>_Nom |> g'))
+((\n.e) |> g) t --> ((\n.e) t') |> (g @ (sym <t> Nom MCo g'))
 
 % g : ((t1 ~rho# t2) -> t3) ~Rep# ((t4 ~rho# t5) -> t6)
 % g2 : t3 ~Rep# t6
@@ -103,7 +103,7 @@ case e as n return t of </ alti // i /> --> u[n |-> e]
 T </ taa // aa /> k'~Rep# k T </ t'aa // aa /> = coercionKind g
 </ Raa // aa /> = tyConRoles T
 forall </ alphaaa_kaa // aa />. forall </ betabb_k'bb // bb />. </ t1cc // cc /> $ -> T </ alphaaa_kaa // aa /> = dataConRepType K
-</ e'cc = ecc |> (t1cc $ </ [alphaaa_kaa |-> nth Raa aa g] // aa /> </ [betabb_k'bb |-> <sbb>_Nom] // bb />) // cc />
+</ e'cc = ecc |> (t1cc $ </ [alphaaa_kaa |-> nth Raa aa g] // aa /> </ [betabb_k'bb |-> <sbb>] // bb />) // cc />
 --------------------------- :: CasePush
 case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> \\ case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
 
