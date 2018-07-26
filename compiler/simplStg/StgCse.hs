@@ -302,7 +302,7 @@ stgCseExpr env (StgCase scrut bndr ty alts)
     env2 | StgApp trivial_scrut [] <- scrut' = addTrivCaseBndr bndr trivial_scrut env1
                  -- See Note [Trivial case scrutinee]
          | otherwise                         = env1
-    alts' = map (stgCseAlt env2 bndr') alts
+    alts' = map (stgCseAlt env2 ty bndr') alts
 
 
 -- A constructor application.
@@ -329,14 +329,24 @@ stgCseExpr env (StgLetNoEscape binds body)
 
 -- Case alternatives
 -- Extend the CSE environment
-stgCseAlt :: CseEnv -> OutId -> InStgAlt -> OutStgAlt
-stgCseAlt env case_bndr (DataAlt dataCon, args, rhs)
+stgCseAlt :: CseEnv -> AltType -> OutId -> InStgAlt -> OutStgAlt
+stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
     = let (env1, args') = substBndrs env args
-          env2 = addDataCon case_bndr dataCon (map StgVarArg args') env1
+          env2
+            -- To avoid dealing with unboxed sums StgCse runs after unarise and
+            -- should maintain invariants listed in Note [Post-unarisation
+            -- invariants]. One of the invariants is that some binders are not
+            -- used (unboxed tuple case binders) which is what we check with
+            -- `stgCaseBndrInScope` here. If the case binder is not in scope we
+            -- don't add it to the CSE env. See also #15300.
+            | stgCaseBndrInScope ty True -- CSE runs after unarise
+            = addDataCon case_bndr dataCon (map StgVarArg args') env1
+            | otherwise
+            = env1
             -- see note [Case 2: CSEing case binders]
           rhs' = stgCseExpr env2 rhs
       in (DataAlt dataCon, args', rhs')
-stgCseAlt env _ (altCon, args, rhs)
+stgCseAlt env _ _ (altCon, args, rhs)
     = let (env1, args') = substBndrs env args
           rhs' = stgCseExpr env1 rhs
       in (altCon, args', rhs')
