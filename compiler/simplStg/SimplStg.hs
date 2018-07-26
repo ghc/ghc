@@ -21,7 +21,6 @@ import StgCse           ( stgCse )
 
 import DynFlags
 import ErrUtils
-import SrcLoc
 import UniqSupply       ( mkSplitUniqSupply )
 import Outputable
 import Control.Monad
@@ -34,27 +33,19 @@ stg2stg dflags binds
   = do  { showPass dflags "Stg2Stg"
         ; us <- mkSplitUniqSupply 'g'
 
-        ; when (dopt Opt_D_verbose_stg2stg dflags)
-               (putLogMsg dflags NoReason SevDump noSrcSpan
-                  (defaultDumpStyle dflags) (text "VERBOSE STG-TO-STG:"))
-
-        ; binds' <- end_pass "Stg2Stg" binds
-
                 -- Do the main business!
-        ; processed_binds <- foldM do_stg_pass binds' (getStgToDo dflags)
-
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "Pre unarise:"
-                        (pprStgTopBindings processed_binds)
+                        (pprStgTopBindings binds)
 
-        ; let un_binds = unarise us processed_binds
-
+        ; stg_linter False "Pre-unarise" binds
+        ; let un_binds = unarise us binds
         ; stg_linter True "Unarise" un_binds
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:"
                         (pprStgTopBindings un_binds)
 
-        ; return un_binds
-   }
+        ; foldM do_stg_pass un_binds (getStgToDo dflags)
+        }
 
   where
     stg_linter unarised
@@ -65,8 +56,7 @@ stg2stg dflags binds
     do_stg_pass binds to_do
       = case to_do of
           D_stg_stats ->
-             trace (showStgStats binds)
-             end_pass "StgStats" binds
+             trace (showStgStats binds) (return binds)
 
           StgCSE ->
              {-# SCC "StgCse" #-}
@@ -78,8 +68,8 @@ stg2stg dflags binds
     end_pass what binds2
       = do -- report verbosely, if required
            dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
-              (vcat (map ppr binds2))
-           stg_linter False what binds2
+              (pprStgTopBindings binds2)
+           stg_linter True what binds2
            return binds2
 
 -- -----------------------------------------------------------------------------
