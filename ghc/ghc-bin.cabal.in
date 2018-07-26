@@ -84,3 +84,8 @@ Executable ghc
         CPP
         NondecreasingIndentation
         TupleSections
+
+    -- This should match the default-extensions used in 'ghc.cabal'. This way,
+    -- GHCi can be used to load it all at once.
+    Default-Extensions:
+        NoImplicitPrelude

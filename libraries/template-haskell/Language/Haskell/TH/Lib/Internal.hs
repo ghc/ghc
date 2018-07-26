@@ -18,6 +18,7 @@ import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Monad( liftM, liftM2 )
 import Data.Word( Word8 )
+import Prelude
 
 ----------------------------------------------------------
 -- * Type synonyms

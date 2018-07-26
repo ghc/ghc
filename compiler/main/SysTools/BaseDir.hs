@@ -22,6 +22,7 @@ import GhcPrelude
 
 import Panic
 
+import System.Environment (lookupEnv)
 import System.FilePath
 import Data.List
 
@@ -115,12 +116,21 @@ findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
            -> IO String    -- TopDir (in Unix format '/' separated)
 findTopDir (Just minusb) = return (normalise minusb)
 findTopDir Nothing
-    = do -- Get directory of executable
-         maybe_exec_dir <- getBaseDir
-         case maybe_exec_dir of
-             -- "Just" on Windows, "Nothing" on unix
-             Nothing  -> throwGhcExceptionIO (InstallationError "missing -B<dir> option")
-             Just dir -> return dir
+    = do -- The _GHC_TOP_DIR environment variable can be used to specify
+         -- the top dir when the -B argument is not specified. It is not
+         -- intended for use by users, it was added specifically for the
+         -- purpose of running GHC within GHCi.
+         maybe_env_top_dir <- lookupEnv "_GHC_TOP_DIR"
+         case maybe_env_top_dir of
+             Just env_top_dir -> return env_top_dir
+             Nothing -> do
+                 -- Get directory of executable
+                 maybe_exec_dir <- getBaseDir
+                 case maybe_exec_dir of
+                     -- "Just" on Windows, "Nothing" on unix
+                     Nothing -> throwGhcExceptionIO $
+                         InstallationError "missing -B<dir> option"
+                     Just dir -> return dir
 
 getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
