@@ -894,7 +894,9 @@ instance TH.Quasi TcM where
       l <- getSrcSpanM
       let either_hval = convertToHsDecls l thds
       ds <- case either_hval of
-              Left exn -> pprPanic "qAddTopDecls: can't convert top-level declarations" exn
+              Left exn -> failWithTc $
+                hang (text "Error in a declaration passed to addTopDecls:")
+                   2 exn
               Right ds -> return ds
       mapM_ (checkTopDecl . unLoc) ds
       th_topdecls_var <- fmap tcg_th_topdecls getGblEnv
