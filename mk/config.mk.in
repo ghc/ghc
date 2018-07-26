@@ -66,9 +66,12 @@ GhcHcOpts=-Rghc-timing
 # override options from $(GhcHcOpts).
 #
 # See Note [Stage number in build variables].
+#
+# -haddock is needed so the GHCi :doc command can find docs
+#   in the .hi-files for the ghc library
 GhcStage1HcOpts=
-GhcStage2HcOpts=-O2
-GhcStage3HcOpts=-O2
+GhcStage2HcOpts=-O2 -haddock
+GhcStage3HcOpts=-O2 -haddock
 
 
 # Note [Stage number in build variables].
