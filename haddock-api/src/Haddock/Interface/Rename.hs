@@ -23,7 +23,7 @@ import GHC hiding (NoLink)
 import Name
 import Outputable ( panic )
 import RdrName (RdrName(Exact))
-import PrelNames (eqTyCon_RDR)
+import TysWiredIn (eqTyCon_RDR)
 
 import Control.Applicative
 import Control.Monad hiding (mapM)

@@ -36,9 +36,10 @@ import TyCon
 import Type
 import TyCoRep
 import TysPrim ( alphaTyVars )
-import TysWiredIn ( listTyConName, liftedTypeKindTyConName, unitTy )
-import PrelNames ( hasKey, eqTyConKey, eqTyConName, ipClassKey
-                 , tYPETyConKey, liftedRepDataConKey )
+import TysWiredIn ( eqTyConName, listTyConName, liftedTypeKindTyConName
+                  , unitTy )
+import PrelNames ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
+                 , liftedRepDataConKey )
 import Unique ( getUnique )
 import Util ( chkAppend, compareLength, dropList, filterByList, filterOut
             , splitAtList )
