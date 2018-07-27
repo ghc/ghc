@@ -92,9 +92,9 @@ import Lexeme           ( isLexCon )
 import Type             ( TyThing(..) )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey )
+                          listTyConName, listTyConKey, eqTyCon_RDR )
 import ForeignCall
-import PrelNames        ( forall_tv_RDR, eqTyCon_RDR, allNameStrings )
+import PrelNames        ( forall_tv_RDR, allNameStrings )
 import SrcLoc
 import Unique           ( hasKey )
 import OrdList          ( OrdList, fromOL )

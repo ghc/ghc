@@ -934,9 +934,9 @@ trueValBool   = Var trueDataConId -- see Note [What's true and false]
 falseValBool  = Var falseDataConId
 
 ltVal, eqVal, gtVal :: Expr CoreBndr
-ltVal = Var ltDataConId
-eqVal = Var eqDataConId
-gtVal = Var gtDataConId
+ltVal = Var ordLTDataConId
+eqVal = Var ordEQDataConId
+gtVal = Var ordGTDataConId
 
 mkIntVal :: DynFlags -> Integer -> Expr CoreBndr
 mkIntVal dflags i = Lit (mkMachInt dflags i)

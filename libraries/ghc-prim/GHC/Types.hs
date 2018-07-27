@@ -211,6 +211,12 @@ inside GHC, to change the kind and type.
 class a ~~ b
   -- See also Note [The equality types story] in TysPrim
 
+-- | Lifted, homogeneous equality. By lifted, we mean that it
+-- can be bogus (deferred type error). By homogeneous, the two
+-- types @a@ and @b@ must have the sme kinds.
+class a ~ b
+  -- See also Note [The equality types story] in TysPrim
+
 -- | @Coercible@ is a two-parameter class that has instances for types @a@ and @b@ if
 --      the compiler can infer that they have the same representation. This class
 --      does not have regular instances; instead they are created on-the-fly during

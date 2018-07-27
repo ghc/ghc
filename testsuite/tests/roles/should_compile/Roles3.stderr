@@ -96,8 +96,7 @@ $krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []
 $krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
-      Data.Type.Equality.$tc~
-      ((:) GHC.Types.krep$* ((:) $krep ((:) $krep [])))
+      GHC.Types.$tc~ ((:) GHC.Types.krep$* ((:) $krep ((:) $krep [])))
 $krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles3.$tcC2 ((:) $krep ((:) $krep []))
 $krep [InlPrag=NOUSERINLINE[~]]

@@ -393,7 +393,7 @@ basicKnownKeyNames
 
         -- The Ordering type
         , orderingTyConName
-        , ltDataConName, eqDataConName, gtDataConName
+        , ordLTDataConName, ordEQDataConName, ordGTDataConName
 
         -- The SPEC type for SpecConstr
         , specTyConName
@@ -432,9 +432,6 @@ basicKnownKeyNames
         , typeErrorAppendDataConName
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
-
-        -- homogeneous equality
-        , eqTyConName
 
     ] ++ case cIntegerLibraryType of
            IntegerGMP    -> [integerSDataConName,naturalSDataConName]
@@ -859,9 +856,6 @@ traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
 mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
 
-eqTyCon_RDR :: RdrName
-eqTyCon_RDR = tcQual_RDR dATA_TYPE_EQUALITY (fsLit "~")
-
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
     :: Module -> FastString -> RdrName
@@ -889,11 +883,11 @@ runMainIOName, runRWName :: Name
 runMainIOName = varQual gHC_TOP_HANDLER (fsLit "runMainIO") runMainKey
 runRWName     = varQual gHC_MAGIC       (fsLit "runRW#")    runRWKey
 
-orderingTyConName, ltDataConName, eqDataConName, gtDataConName :: Name
+orderingTyConName, ordLTDataConName, ordEQDataConName, ordGTDataConName :: Name
 orderingTyConName = tcQual  gHC_TYPES (fsLit "Ordering") orderingTyConKey
-ltDataConName     = dcQual gHC_TYPES (fsLit "LT") ltDataConKey
-eqDataConName     = dcQual gHC_TYPES (fsLit "EQ") eqDataConKey
-gtDataConName     = dcQual gHC_TYPES (fsLit "GT") gtDataConKey
+ordLTDataConName     = dcQual gHC_TYPES (fsLit "LT") ordLTDataConKey
+ordEQDataConName     = dcQual gHC_TYPES (fsLit "EQ") ordEQDataConKey
+ordGTDataConName     = dcQual gHC_TYPES (fsLit "GT") ordGTDataConKey
 
 specTyConName :: Name
 specTyConName     = tcQual gHC_TYPES (fsLit "SPEC") specTyConKey
@@ -1531,10 +1525,6 @@ fingerprintDataConName :: Name
 fingerprintDataConName =
     dcQual gHC_FINGERPRINT_TYPE (fsLit "Fingerprint") fingerprintDataConKey
 
--- homogeneous equality. See Note [The equality types story] in TysPrim
-eqTyConName :: Name
-eqTyConName        = tcQual dATA_TYPE_EQUALITY (fsLit "~")         eqTyConKey
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1916,7 +1906,7 @@ charDataConKey, consDataConKey, doubleDataConKey, falseDataConKey,
     floatDataConKey, intDataConKey, integerSDataConKey, nilDataConKey,
     ratioDataConKey, stableNameDataConKey, trueDataConKey, wordDataConKey,
     word8DataConKey, ioDataConKey, integerDataConKey, heqDataConKey,
-    coercibleDataConKey, nothingDataConKey, justDataConKey :: Unique
+    coercibleDataConKey, eqDataConKey, nothingDataConKey, justDataConKey :: Unique
 
 charDataConKey                          = mkPreludeDataConUnique  1
 consDataConKey                          = mkPreludeDataConUnique  2
@@ -1927,6 +1917,7 @@ intDataConKey                           = mkPreludeDataConUnique  6
 integerSDataConKey                      = mkPreludeDataConUnique  7
 nothingDataConKey                       = mkPreludeDataConUnique  8
 justDataConKey                          = mkPreludeDataConUnique  9
+eqDataConKey                            = mkPreludeDataConUnique 10
 nilDataConKey                           = mkPreludeDataConUnique 11
 ratioDataConKey                         = mkPreludeDataConUnique 12
 word8DataConKey                         = mkPreludeDataConUnique 13
@@ -1948,10 +1939,11 @@ leftDataConKey, rightDataConKey :: Unique
 leftDataConKey                          = mkPreludeDataConUnique 25
 rightDataConKey                         = mkPreludeDataConUnique 26
 
-ltDataConKey, eqDataConKey, gtDataConKey :: Unique
-ltDataConKey                            = mkPreludeDataConUnique 27
-eqDataConKey                            = mkPreludeDataConUnique 28
-gtDataConKey                            = mkPreludeDataConUnique 29
+ordLTDataConKey, ordEQDataConKey, ordGTDataConKey :: Unique
+ordLTDataConKey                         = mkPreludeDataConUnique 27
+ordEQDataConKey                         = mkPreludeDataConUnique 28
+ordGTDataConKey                         = mkPreludeDataConUnique 29
+
 
 coercibleDataConKey                     = mkPreludeDataConUnique 32
 
@@ -2376,12 +2368,14 @@ starArrStarArrStarKindRepKey = mkPreludeMiscIdUnique 522
 
 -- Dynamic
 toDynIdKey :: Unique
-toDynIdKey            = mkPreludeMiscIdUnique 550
+toDynIdKey            = mkPreludeMiscIdUnique 523
+
 
 bitIntegerIdKey :: Unique
-bitIntegerIdKey       = mkPreludeMiscIdUnique 551
+bitIntegerIdKey       = mkPreludeMiscIdUnique 550
 
-heqSCSelIdKey, coercibleSCSelIdKey :: Unique
+heqSCSelIdKey, eqSCSelIdKey, coercibleSCSelIdKey :: Unique
+eqSCSelIdKey        = mkPreludeMiscIdUnique 551
 heqSCSelIdKey       = mkPreludeMiscIdUnique 552
 coercibleSCSelIdKey = mkPreludeMiscIdUnique 553
 
