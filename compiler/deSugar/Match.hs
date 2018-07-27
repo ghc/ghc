@@ -9,7 +9,8 @@ The @match@ function
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat ) where
+module Match ( match, matchEquations, matchWrapper, matchSimply
+             , matchSinglePat, matchSinglePatVar ) where
 
 #include "HsVersions.h"
 
@@ -152,6 +153,8 @@ is the scrutinee(s) of the match. The desugared expression may
 sometimes use that Id in a local binding or as a case binder.  So it
 should not have an External name; Lint rejects non-top-level binders
 with External names (Trac #13043).
+
+See also Note [Localise pattern binders] in DsUtils
 -}
 
 type MatchId = Id   -- See Note [Match Ids]
@@ -728,7 +731,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
                              addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
                              dsGRHSs ctxt grhss rhs_ty
-           ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
+           ; return (EqnInfo { eqn_pats = upats, eqn_rhs = match_result}) }
     mk_eqn_info _ (L _ (XMatch _)) = panic "matchWrapper"
 
     handleWarnings = if isGenerated origin
@@ -777,7 +780,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
 matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat GhcTc
                -> Type -> MatchResult -> DsM MatchResult
 -- matchSinglePat ensures that the scrutinee is a variable
--- and then calls match_single_pat_var
+-- and then calls matchSinglePatVar
 --
 -- matchSinglePat does not warn about incomplete patterns
 -- Used for things like [ e | pat <- stuff ], where
@@ -785,17 +788,17 @@ matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat GhcTc
 
 matchSinglePat (Var var) ctx pat ty match_result
   | not (isExternalName (idName var))
-  = match_single_pat_var var ctx pat ty match_result
+  = matchSinglePatVar var ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
   = do { var           <- selectSimpleMatchVarL pat
-       ; match_result' <- match_single_pat_var var hs_ctx pat ty match_result
+       ; match_result' <- matchSinglePatVar var hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 
-match_single_pat_var :: Id   -- See Note [Match Ids]
-                     -> HsMatchContext Name -> LPat GhcTc
-                     -> Type -> MatchResult -> DsM MatchResult
-match_single_pat_var var ctx pat ty match_result
+matchSinglePatVar :: Id   -- See Note [Match Ids]
+                  -> HsMatchContext Name -> LPat GhcTc
+                  -> Type -> MatchResult -> DsM MatchResult
+matchSinglePatVar var ctx pat ty match_result
   = ASSERT2( isInternalName (idName var), ppr var )
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
