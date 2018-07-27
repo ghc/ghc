@@ -3,13 +3,9 @@
 # (c) Simon Marlow 2002
 #
 
-from __future__ import print_function
-
 import io
 import shutil
 import os
-import errno
-import string
 import re
 import traceback
 import time
@@ -25,25 +21,21 @@ from testglobals import *
 from testutil import *
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
+global pool_sema
 if config.use_threads:
     import threading
-    try:
-        import thread
-    except ImportError: # Python 3
-        import _thread as thread
+    pool_sema = threading.BoundedSemaphore(value=config.threads)
 
 global wantToStop
 wantToStop = False
 
-global pool_sema
-if config.use_threads:
-    pool_sema = threading.BoundedSemaphore(value=config.threads)
-
 def stopNow():
     global wantToStop
     wantToStop = True
+
 def stopping():
     return wantToStop
+
 
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
@@ -504,7 +496,6 @@ def no_check_hp(name, opts):
 
 def filter_stdout_lines( regex ):
     """ Filter lines of stdout with the given regular expression """
-    import re
     def f( name, opts ):
         _normalise_fun(name, opts, lambda s: '\n'.join(re.findall(regex, s)))
     return f
@@ -1823,9 +1814,6 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
     cmd = cmd.format(**config.__dict__)
     if_verbose(3, cmd + ('< ' + os.path.basename(stdin) if stdin else ''))
 
-    # declare the buffers to a default
-    stdin_buffer  = None
-
     stdin_file = io.open(stdin, 'rb') if stdin else None
     stdout_buffer = b''
     stderr_buffer = b''
@@ -1949,7 +1937,6 @@ def find_expected_file(name, suff):
 
 if config.msys:
     import stat
-    import time
     def cleanup():
         testdir = getTestOpts().testdir
         max_attempts = 5

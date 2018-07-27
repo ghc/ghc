@@ -1,4 +1,3 @@
-import errno
 import os
 import platform
 import subprocess
@@ -24,15 +23,6 @@ def getStdout(cmd_and_args):
     if stderr:
         raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
     return stdout
-
-def mkdirp(path):
-    try:
-        os.makedirs(path)
-    except OSError as e:
-        if e.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
 
 def lndir(srcdir, dstdir):
     # Create symlinks for all files in src directory.
@@ -60,10 +50,6 @@ else:
     link_or_copy_file = os.symlink
 
 class Watcher(object):
-    global pool
-    global evt
-    global sync_lock
-    
     def __init__(self, count):
         self.pool = count
         self.evt = threading.Event()
