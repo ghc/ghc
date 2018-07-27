@@ -104,6 +104,9 @@ instance Outputable DsMatchContext where
 
 data EquationInfo
   = EqnInfo { eqn_pats :: [Pat GhcTc],  -- The patterns for an eqn
+                -- NB: We have /already/ applied decideBangHood to
+                -- these patterns.  See Note [decideBangHood] in DsUtils
+
               eqn_rhs  :: MatchResult } -- What to do after match
 
 instance Outputable EquationInfo where
