@@ -82,6 +82,8 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Widentities`
         * :ghc-flag:`-Wredundant-constraints`
         * :ghc-flag:`-Wpartial-fields`
+        * :ghc-flag:`-Wmissed-specialisations`
+        * :ghc-flag:`-Wall-missed-specialisations`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
