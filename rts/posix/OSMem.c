@@ -49,6 +49,29 @@
 #include <sys/sysctl.h>
 #endif
 
+#ifndef MAP_FAILED
+# define MAP_FAILED ((void *)-1)
+#endif
+
+#if defined(hpux_HOST_OS)
+# ifndef MAP_ANON
+#  define MAP_ANON MAP_ANONYMOUS
+# endif
+#endif
+
+#ifndef darwin_HOST_OS
+# undef RESERVE_FLAGS
+# if defined(MAP_GUARD)
+#  define RESERVE_FLAGS  MAP_GUARD /* FreeBSD */
+# elif defined(MAP_NORESERVE)
+#  define RESERVE_FLAGS  MAP_NORESERVE | MAP_ANON | MAP_PRIVATE;
+# else
+#  if defined(USE_LARGE_ADDRESS_SPACE)
+#   error USE_LARGE_ADDRESS_SPACE needs MAP_NORESERVE or MAP_GUARD
+#  endif
+# endif
+#endif
+
 static void *next_request = 0;
 
 void osMemInit(void)
@@ -102,8 +125,10 @@ void osMemInit(void)
  The naming is chosen from the Win32 API (VirtualAlloc) which does the
  same thing and has done so forever, while support for this in Unix systems
  has only been added recently and is hidden in the posix portability mess.
- It is confusing because to get the reserve behavior we need MAP_NORESERVE
- (which tells the kernel not to allocate backing space), but heh...
+ The Linux manpage suggests that mmap must be passed MAP_NORESERVE in order
+ to get reservation-only behavior. It is confusing because to get the reserve
+ behavior we need MAP_NORESERVE (which tells the kernel not to allocate backing
+ space), but heh...
 */
 enum
 {
@@ -111,6 +136,44 @@ enum
     MEM_COMMIT = 2,
     MEM_RESERVE_AND_COMMIT = MEM_RESERVE | MEM_COMMIT
 };
+
+#if defined(linux_HOST_OS)
+static void *
+linux_retry_mmap(int operation, W_ size, void *ret, void *addr, int prot, int flags)
+{
+    if (addr != 0 && (operation & MEM_RESERVE)) {
+        // Try again with no hint address.
+        // It's not clear that this can ever actually help,
+        // but since our alternative is to abort, we may as well try.
+        ret = mmap(0, size, prot, flags, -1, 0);
+    }
+    if (ret == MAP_FAILED && errno == EPERM) {
+        // Linux is not willing to give us any mapping,
+        // so treat this as an out-of-memory condition
+        // (really out of virtual address space).
+        errno = ENOMEM;
+    }
+    return ret;
+}
+#endif /* defined(linux_HOST_OS) */
+
+static void
+post_mmap_madvise(int operation, W_ size, void *ret)
+{
+#if defined(MADV_WILLNEED)
+    if (operation & MEM_COMMIT) {
+        madvise(ret, size, MADV_WILLNEED);
+# if defined(MADV_DODUMP)
+        madvise(ret, size, MADV_DODUMP);
+# endif
+    } else {
+        madvise(ret, size, MADV_DONTNEED);
+# if defined(MADV_DONTDUMP)
+        madvise(ret, size, MADV_DONTDUMP);
+# endif
+    }
+#endif
+}
 
 /* Returns NULL on failure; errno set */
 static void *
@@ -153,71 +216,43 @@ my_mmap (void *addr, W_ size, int operation)
                    VM_PROT_READ|VM_PROT_WRITE);
     }
 
-#else
+#else /* defined(darwin_HOST_OS) */
 
     int prot, flags;
-    if (operation & MEM_COMMIT)
+    if (operation & MEM_COMMIT) {
         prot = PROT_READ | PROT_WRITE;
-    else
+    } else {
         prot = PROT_NONE;
-    if (operation == MEM_RESERVE)
-# if defined(MAP_NORESERVE)
-        flags = MAP_NORESERVE;
+    }
+
+    if (operation == MEM_RESERVE) {
+# if defined(RESERVE_FLAGS)
+        flags = RESERVE_FLAGS;
 # else
-#  if defined(USE_LARGE_ADDRESS_SPACE)
-#   error USE_LARGE_ADDRESS_SPACE needs MAP_NORESERVE
-#  endif
         errorBelch("my_mmap(,,MEM_RESERVE) not supported on this platform");
 # endif
-    else if (operation == MEM_COMMIT)
-        flags = MAP_FIXED;
-    else
-        flags = 0;
+    } else if (operation == MEM_COMMIT) {
+        flags = MAP_FIXED | MAP_ANON | MAP_PRIVATE;
+    } else {
+        flags = MAP_ANON | MAP_PRIVATE;
+    }
 
-#if defined(hpux_HOST_OS)
-    ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-#elif defined(linux_HOST_OS)
-    ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
-    if (ret == (void *)-1 && errno == EPERM) {
+    ret = mmap(addr, size, prot, flags, -1, 0);
+# if defined(linux_HOST_OS)
+    if (ret == MAP_FAILED && errno == EPERM) {
         // Linux may return EPERM if it tried to give us
         // a chunk of address space below mmap_min_addr,
         // See Trac #7500.
-        if (addr != 0 && (operation & MEM_RESERVE)) {
-            // Try again with no hint address.
-            // It's not clear that this can ever actually help,
-            // but since our alternative is to abort, we may as well try.
-            ret = mmap(0, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
-        }
-        if (ret == (void *)-1 && errno == EPERM) {
-            // Linux is not willing to give us any mapping,
-            // so treat this as an out-of-memory condition
-            // (really out of virtual address space).
-            errno = ENOMEM;
-        }
+        ret = linux_retry_mmap(operation, size, ret, addr, prot, flags);
     }
-
-    if (ret != (void *)-1) {
-        if (operation & MEM_COMMIT) {
-            madvise(ret, size, MADV_WILLNEED);
-#if defined(MADV_DODUMP)
-            madvise(ret, size, MADV_DODUMP);
-#endif
-        } else {
-            madvise(ret, size, MADV_DONTNEED);
-#if defined(MADV_DONTDUMP)
-            madvise(ret, size, MADV_DONTDUMP);
-#endif
-        }
-    }
-
-#else
-    ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
-#endif
-#endif
-
-    if (ret == (void *)-1) {
+# endif
+    if (ret == MAP_FAILED) {
         return NULL;
     }
+    // Map in committed pages rather than take a fault for each chunk.
+    // Also arrange to include them in core-dump files.
+    post_mmap_madvise(operation, size, ret);
+#endif /* defined(darwin_HOST_OS) */
 
     return ret;
 }
