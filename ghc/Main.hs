@@ -213,9 +213,23 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   let
      -- To simplify the handling of filepaths, we normalise all filepaths right
-     -- away - e.g., for win32 platforms, backslashes are converted
-     -- into forward slashes.
-    normal_fileish_paths = map (normalise . unLoc) fileish_args
+     -- away. Note the asymmetry of FilePath.normalise:
+     --    Linux:   p/q -> p/q; p\q -> p\q
+     --    Windows: p/q -> p\q; p\q -> p\q
+     -- #12674: Filenames starting with a hypen get normalised from ./-foo.hs
+     -- to -foo.hs. We have to re-prepend the current directory.
+    normalise_hyp fp
+        | strt_dot_sl && "-" `isPrefixOf` nfp = cur_dir ++ nfp
+        | otherwise                           = nfp
+        where
+#if defined(mingw32_HOST_OS)
+          strt_dot_sl = "./" `isPrefixOf` fp || ".\\" `isPrefixOf` fp
+#else
+          strt_dot_sl = "./" `isPrefixOf` fp
+#endif
+          cur_dir = '.' : [pathSeparator]
+          nfp = normalise fp
+    normal_fileish_paths = map (normalise_hyp . unLoc) fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
     dflags5 = dflags4 { ldInputs = map (FileOption "") objs
