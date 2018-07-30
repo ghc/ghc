@@ -18,19 +18,15 @@
 --
 -- The matrix of platforms that:
 --
---   * support putenv("FOO") to unset environment variables,
---   * support putenv("FOO=") to unset environment variables or set them
+--   * support @putenv("FOO")@ to unset environment variables,
+--   * support @putenv("FOO=")@ to unset environment variables or set them
 --     to blank values,
---   * support unsetenv to unset environment variables,
---   * support setenv to set environment variables,
+--   * support @unsetenv@ to unset environment variables,
+--   * support @setenv@ to set environment variables,
 --   * etc.
 --
--- is very complicated. I think AIX is screwed, but we don't support it.
--- The whole situation with setenv(3), unsetenv(3), and putenv(3) is not
--- good. Even mingw32 adds its own crap to the pile, but luckily, we can
--- just use Windows' native environment functions to sidestep the issue.
---
--- #12494
+-- is very complicated. Some platforms don't support unsetting of environment
+-- variables at all.
 --
 -----------------------------------------------------------------------------
 
@@ -87,7 +83,7 @@ throwInvalidArgument :: String -> IO a
 throwInvalidArgument from =
   throwIO (mkIOError InvalidArgument from Nothing Nothing)
 
--- | `System.Environment.lookupEnv`.
+-- | Similar to 'System.Environment.lookupEnv'.
 getEnv :: String -> IO (Maybe String)
 #ifdef mingw32_HOST_OS
 getEnv = (<$> getEnvironment) . lookup
@@ -102,8 +98,8 @@ getEnvDefault ::
   IO String {- ^ variable value or fallback value -}
 getEnvDefault name fallback = fromMaybe fallback <$> getEnv name
 
--- | Like `System.Environment.setEnv`, but allows blank environment values
--- and mimics the function signature of `System.Posix.Env.setEnv` from the
+-- | Like 'System.Environment.setEnv', but allows blank environment values
+-- and mimics the function signature of 'System.Posix.Env.setEnv' from the
 -- @unix@ package.
 setEnv ::
   String {- ^ variable name  -} ->
@@ -144,8 +140,9 @@ foreign import ccall unsafe "setenv"
    c_setenv :: CString -> CString -> CInt -> IO CInt
 #endif
 
--- | Like `System.Environment.unsetEnv`, but allows for the removal of
--- blank environment variables.
+-- | Like 'System.Environment.unsetEnv', but allows for the removal of
+-- blank environment variables. May throw an exception if the underlying
+-- platform doesn't support unsetting of environment variables.
 unsetEnv :: String -> IO ()
 #if defined(mingw32_HOST_OS)
 unsetEnv key = withCWString key $ \k -> do
