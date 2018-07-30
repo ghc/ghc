@@ -1532,50 +1532,54 @@ type TyCoVarSetNotClosed = TyCoVarSet
 -- determinism info) and then drop the determinism. This is boring boiler plate code, but this
 -- is measurably faster than going via FV.
 tcvs_of_type :: Type -> TyCoVarSetNotClosed
-tcvs_of_type (TyVarTy v)                 = unitVarSet v
-tcvs_of_type (TyConApp _ tys)            = mapUnionVarSet tcvs_of_type tys
-tcvs_of_type (LitTy {})                  = emptyVarSet
-tcvs_of_type (AppTy fun arg)             = tcvs_of_type fun `unionVarSet` tcvs_of_type arg
-tcvs_of_type (FunTy arg res)             = tcvs_of_type arg `unionVarSet` tcvs_of_type res
-tcvs_of_type (ForAllTy (TvBndr tv _) ty) = tcvs_of_type ty `delVarSet` tv
-                                                           `unionVarSet` tcvs_of_type (tyVarKind tv)
-tcvs_of_type (CastTy ty co)              = tcvs_of_type ty `unionVarSet` tcvs_of_co co
-tcvs_of_type (CoercionTy co)             = tcvs_of_co co
-
+tcvs_of_type = fvVarSet . fvs_of_type
+-- tcvs_of_type (TyVarTy v)                 = unitVarSet v
+-- tcvs_of_type (TyConApp _ tys)            = mapUnionVarSet tcvs_of_type tys
+-- tcvs_of_type (LitTy {})                  = emptyVarSet
+-- tcvs_of_type (AppTy fun arg)             = tcvs_of_type fun `unionVarSet` tcvs_of_type arg
+-- tcvs_of_type (FunTy arg res)             = tcvs_of_type arg `unionVarSet` tcvs_of_type res
+-- tcvs_of_type (ForAllTy (TvBndr tv _) ty) = tcvs_of_type ty `delVarSet` tv
+--                                                            `unionVarSet` tcvs_of_type (tyVarKind tv)
+-- tcvs_of_type (CastTy ty co)              = tcvs_of_type ty `unionVarSet` tcvs_of_co co
+-- tcvs_of_type (CoercionTy co)             = tcvs_of_co co
+-- 
 tcvs_of_types :: [Type] -> TyCoVarSetNotClosed
-tcvs_of_types = mapUnionVarSet tcvs_of_type
-
+tcvs_of_types = fvVarSet . fvs_of_types
+-- tcvs_of_types = mapUnionVarSet tcvs_of_type
+-- 
 tcvs_of_co :: Coercion -> TyCoVarSetNotClosed
-tcvs_of_co (Refl _ ty)              = tcvs_of_type ty
-tcvs_of_co (TyConAppCo _ _ cos)     = tcvs_of_cos cos
-tcvs_of_co (AppCo co arg)           = tcvs_of_co co `unionVarSet` tcvs_of_co arg
-tcvs_of_co (ForAllCo tv kind_co co) = tcvs_of_co co `delVarSet` tv
-                                                    `unionVarSet` tcvs_of_co kind_co
-tcvs_of_co (FunCo _ co1 co2)        = tcvs_of_co co1 `unionVarSet` tcvs_of_co co2
-tcvs_of_co (CoVarCo v)              = unitVarSet v
-tcvs_of_co (HoleCo h)               = unitVarSet (coHoleCoVar h)
-    -- See Note [CoercionHoles and coercion free variables]
-tcvs_of_co (AxiomInstCo _ _ cos)    = tcvs_of_cos cos
-tcvs_of_co (UnivCo p _ t1 t2)       = tcvs_of_prov p `unionVarSet` tcvs_of_type t1
-                                                     `unionVarSet` tcvs_of_type t2
-tcvs_of_co (SymCo co)          = tcvs_of_co co
-tcvs_of_co (TransCo co1 co2)   = tcvs_of_co co1 `unionVarSet` tcvs_of_co co2
-tcvs_of_co (NthCo _ _ co)      = tcvs_of_co co
-tcvs_of_co (LRCo _ co)         = tcvs_of_co co
-tcvs_of_co (InstCo co arg)     = tcvs_of_co co `unionVarSet` tcvs_of_co arg
-tcvs_of_co (CoherenceCo c1 c2) = tcvs_of_co c1 `unionVarSet` tcvs_of_co c2
-tcvs_of_co (KindCo co)         = tcvs_of_co co
-tcvs_of_co (SubCo co)          = tcvs_of_co co
-tcvs_of_co (AxiomRuleCo _ cs)  = tcvs_of_cos cs
-
+tcvs_of_co = fvVarSet . fvs_of_co
+-- tcvs_of_co (Refl _ ty)              = tcvs_of_type ty
+-- tcvs_of_co (TyConAppCo _ _ cos)     = tcvs_of_cos cos
+-- tcvs_of_co (AppCo co arg)           = tcvs_of_co co `unionVarSet` tcvs_of_co arg
+-- tcvs_of_co (ForAllCo tv kind_co co) = tcvs_of_co co `delVarSet` tv
+--                                                     `unionVarSet` tcvs_of_co kind_co
+-- tcvs_of_co (FunCo _ co1 co2)        = tcvs_of_co co1 `unionVarSet` tcvs_of_co co2
+-- tcvs_of_co (CoVarCo v)              = unitVarSet v
+-- tcvs_of_co (HoleCo h)               = unitVarSet (coHoleCoVar h)
+--     -- See Note [CoercionHoles and coercion free variables]
+-- tcvs_of_co (AxiomInstCo _ _ cos)    = tcvs_of_cos cos
+-- tcvs_of_co (UnivCo p _ t1 t2)       = tcvs_of_prov p `unionVarSet` tcvs_of_type t1
+--                                                      `unionVarSet` tcvs_of_type t2
+-- tcvs_of_co (SymCo co)          = tcvs_of_co co
+-- tcvs_of_co (TransCo co1 co2)   = tcvs_of_co co1 `unionVarSet` tcvs_of_co co2
+-- tcvs_of_co (NthCo _ _ co)      = tcvs_of_co co
+-- tcvs_of_co (LRCo _ co)         = tcvs_of_co co
+-- tcvs_of_co (InstCo co arg)     = tcvs_of_co co `unionVarSet` tcvs_of_co arg
+-- tcvs_of_co (CoherenceCo c1 c2) = tcvs_of_co c1 `unionVarSet` tcvs_of_co c2
+-- tcvs_of_co (KindCo co)         = tcvs_of_co co
+-- tcvs_of_co (SubCo co)          = tcvs_of_co co
+-- tcvs_of_co (AxiomRuleCo _ cs)  = tcvs_of_cos cs
+-- 
 tcvs_of_cos :: [Coercion] -> TyCoVarSetNotClosed
-tcvs_of_cos = mapUnionVarSet tcvs_of_co
-
-tcvs_of_prov :: UnivCoProvenance -> TyCoVarSetNotClosed
-tcvs_of_prov UnsafeCoerceProv    = emptyVarSet
-tcvs_of_prov (PhantomProv co)    = tcvs_of_co co
-tcvs_of_prov (ProofIrrelProv co) = tcvs_of_co co
-tcvs_of_prov (PluginProv _)      = emptyVarSet
+tcvs_of_cos = fvVarSet . fvs_of_cos
+-- tcvs_of_cos = mapUnionVarSet tcvs_of_co
+-- 
+-- tcvs_of_prov :: UnivCoProvenance -> TyCoVarSetNotClosed
+-- tcvs_of_prov UnsafeCoerceProv    = emptyVarSet
+-- tcvs_of_prov (PhantomProv co)    = tcvs_of_co co
+-- tcvs_of_prov (ProofIrrelProv co) = tcvs_of_co co
+-- tcvs_of_prov (PluginProv _)      = emptyVarSet
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
