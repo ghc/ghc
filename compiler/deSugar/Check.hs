@@ -51,7 +51,7 @@ import Var           (EvVar)
 import TyCoRep
 import Type
 import UniqSupply
-import DsGRHSs       (isTrueLHsExpr)
+import DsUtils       (isTrueLHsExpr)
 import Maybes        (expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 

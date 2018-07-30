@@ -28,8 +28,8 @@ matchSimply
         -> CoreExpr
         -> DsM CoreExpr
 
-matchSinglePat
-        :: CoreExpr
+matchSinglePatVar
+        :: Id
         -> HsMatchContext Name
         -> LPat GhcTc
         -> Type

@@ -34,7 +34,7 @@ module HsPat (
         patNeedsParens, parenthesizePat,
         isIrrefutableHsPat,
 
-        collectEvVarsPats,
+        collectEvVarsPat, collectEvVarsPats,
 
         pprParendLPat, pprConArgs
     ) where
