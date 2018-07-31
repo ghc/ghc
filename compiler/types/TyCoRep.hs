@@ -1525,7 +1525,15 @@ so, so it's easiest to do it here.
 -- synonym.
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
+-- tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
+tyCoVarsOfType (TyVarTy v)        = extendVarSet (tyCoVarsOfType (tyVarKind v)) v
+tyCoVarsOfType (TyConApp _ tys)   = tyCoVarsOfTypes tys
+tyCoVarsOfType (LitTy {})         = emptyVarSet
+tyCoVarsOfType (AppTy fun arg)    = (tyCoVarsOfType fun `unionVarSet` tyCoVarsOfType arg)
+tyCoVarsOfType (FunTy arg res)    = (tyCoVarsOfType arg `unionVarSet` tyCoVarsOfType res)
+tyCoVarsOfType (ForAllTy bndr ty) = tyCoVarSetsBndr bndr (tyCoVarsOfType ty)
+tyCoVarsOfType (CastTy ty co)     = (tyCoVarsOfType ty `unionVarSet` tyCoVarsOfCo co)
+tyCoVarsOfType (CoercionTy co)    = tyCoVarsOfCo co
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
@@ -1533,6 +1541,11 @@ tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
+
+tyCoVarSetsBndr :: TyVarBinder -> VarSet -> VarSet
+-- Free vars of (forall b. <thing with fvs>)
+tyCoVarSetsBndr (TvBndr tv _) fvs = (delVarSet fvs tv)
+                                `unionVarSet` tyCoVarsOfType (tyVarKind tv)
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
