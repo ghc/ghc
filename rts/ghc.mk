@@ -155,8 +155,9 @@ rts_dist_$1_CC_OPTS := $$(GhcRtsCcOpts)
 ifneq "$$(findstring debug, $1)" ""
 rts_dist_$1_HC_OPTS += -O0
 rts_dist_$1_CC_OPTS += -fno-omit-frame-pointer -O0 -g3
-# Useful to ensure that inline functions can be called within GDB
-rts_dist_$1_CC_OPTS += -fkeep-inline-functions
+# Useful to ensure that inline functions can be called within GDB but not
+# supported by clang
+#rts_dist_$1_CC_OPTS += -fkeep-inline-functions
 endif
 
 ifneq "$$(findstring dyn, $1)" ""
