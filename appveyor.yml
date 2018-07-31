@@ -20,13 +20,6 @@ install:
     # Copy new Hadrian into ./ghc/hadrian
     - cp -r new-hadrian ghc\hadrian
 
-    # We checkout a patched Cabal.
-    # See: https://github.com/snowleopard/hadrian/issues/634
-    - cd ghc/libraries/Cabal/
-    - git remote add quasicomputational https://github.com/quasicomputational/cabal.git
-    - git fetch quasicomputational && git checkout cwd-independent-check
-    - cd ../../../
-
     # Install Alex and Happy
     - set PATH=C:\Users\appveyor\AppData\Roaming\local\bin;%PATH%
     - ghc\hadrian\stack install --install-ghc alex happy > nul
