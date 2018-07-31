@@ -1732,7 +1732,7 @@ liftCoSubstVarBndrUsing fun lc@(LC subst cenv) old_var
     Pair k1 _    = coercionKind eta
     new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
-    lifted   = Refl Nominal (TyVarTy new_var)
+    lifted   = mkNomReflCo (TyVarTy new_var) `mkCoherenceRightCo` eta
     new_cenv = extendVarEnv cenv old_var lifted
 
 -- | Is a var in the domain of a lifting context?
