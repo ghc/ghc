@@ -127,7 +127,7 @@ checkExternalInterpreter hsc_env =
   where
     dflags = hsc_dflags hsc_env
 
-loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, Module)
+loadPlugin' :: OccName -> Name -> HscEnv -> ModuleName -> IO (a, ModIface)
 loadPlugin' occ_name plugin_name hsc_env mod_name
   = do { let plugin_rdr_name = mkRdrQual mod_name occ_name
              dflags = hsc_dflags hsc_env
@@ -139,7 +139,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The module", ppr mod_name
                           , text "did not export the plugin name"
                           , ppr plugin_rdr_name ]) ;
-            Just (name, mod) ->
+            Just (name, mod_iface) ->
 
      do { plugin_tycon <- forceLoadTyCon hsc_env plugin_name
         ; mb_plugin <- getValueSafely hsc_env name (mkTyConTy plugin_tycon)
@@ -149,7 +149,7 @@ loadPlugin' occ_name plugin_name hsc_env mod_name
                           [ text "The value", ppr name
                           , text "did not have the type"
                           , ppr pluginTyConName, text "as required"])
-            Just plugin -> return (plugin, mod) } } }
+            Just plugin -> return (plugin, mod_iface) } } }
 
 
 -- | Force the interfaces for the given modules to be loaded. The 'SDoc' parameter is used
@@ -258,7 +258,8 @@ lessUnsafeCoerce dflags context what = do
 -- being compiled.  This was introduced by 57d6798.
 --
 -- Need the module as well to record information in the interface file
-lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName -> IO (Maybe (Name, Module))
+lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
+                                -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the package the module resides in by searching exposed packages and home modules
     found_module <- findPluginModule hsc_env mod_name
@@ -276,7 +277,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                         imp_spec = ImpSpec decl_spec ImpAll
                         env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))
                     case lookupGRE_RdrName rdr_name env of
-                        [gre] -> return (Just (gre_name gre, mi_module iface))
+                        [gre] -> return (Just (gre_name gre, iface))
                         []    -> return Nothing
                         _     -> panic "lookupRdrNameInModule"
 

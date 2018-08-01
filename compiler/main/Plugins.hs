@@ -99,14 +99,14 @@ data Plugin = Plugin {
 data LoadedPlugin = LoadedPlugin {
     lpPlugin :: Plugin
     -- ^ the actual callable plugin
-  , lpModule :: Module
+  , lpModule :: ModIface
     -- ^ the module containing the plugin
   , lpArguments :: [CommandLineOption]
     -- ^ command line arguments for the plugin
   }
 
 lpModuleName :: LoadedPlugin -> ModuleName
-lpModuleName = moduleName . lpModule
+lpModuleName = moduleName . mi_module . lpModule
 
 
 data PluginRecompile = ForceRecompile | NoForceRecompile | MaybeRecompile Fingerprint
