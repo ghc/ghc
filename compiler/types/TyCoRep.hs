@@ -1543,14 +1543,15 @@ tyCoFVsBndr (TvBndr tv _) fvs = (delFV tv fvs)
 -- synonym.
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfTypes tys = fvVarSet $ tyCoFVsOfTypes tys
+-- tyCoVarsOfTypes tys = fvVarSet $ tyCoFVsOfTypes tys
+tyCoVarsOfTypes tys = mapUnionVarSet tyCoVarsOfType tys
 
 -- | Returns free variables of types, including kind variables as
 -- a non-deterministic set. For type synonyms it does /not/ expand the
 -- synonym.
 tyCoVarsOfTypesSet :: TyVarEnv Type -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfTypesSet tys = fvVarSet $ tyCoFVsOfTypes $ nonDetEltsUFM tys
+tyCoVarsOfTypesSet tys = tyCoVarsOfTypes $ nonDetEltsUFM tys
   -- It's OK to use nonDetEltsUFM here because we immediately forget the
   -- ordering by returning a set
 
@@ -1575,8 +1576,38 @@ tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfCo co = fvVarSet $ tyCoFVsOfCo co
+-- tyCoVarsOfCo co = fvVarSet $ tyCoFVsOfCo co
+tyCoVarsOfCo (Refl _ ty)         = tyCoVarsOfType ty
+tyCoVarsOfCo (TyConAppCo _ _ cos) = tyCoVarsOfCos cos
+tyCoVarsOfCo (AppCo co arg)
+  = (tyCoVarsOfCo co `unionVarSet` tyCoVarsOfCo arg)
+tyCoVarsOfCo (ForAllCo tv kind_co co)
+  = (delVarSet (tyCoVarsOfCo co) tv `unionVarSet` tyCoVarsOfCo kind_co)
+tyCoVarsOfCo (FunCo _ co1 co2)
+  = (tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2)
+tyCoVarsOfCo (CoVarCo v)
+  = tyCoVarsOfCoVar v
+tyCoVarsOfCo (HoleCo h)
+  = tyCoVarsOfCoVar (coHoleCoVar h)
+    -- See Note [CoercionHoles and coercion free variables]
+tyCoVarsOfCo (AxiomInstCo _ _ cos) = tyCoVarsOfCos cos
+tyCoVarsOfCo (UnivCo p _ t1 t2)
+  = (tyCoVarsOfProv p `unionVarSet` tyCoVarsOfType t1
+                     `unionVarSet` tyCoVarsOfType t2)
+tyCoVarsOfCo (SymCo co)          = tyCoVarsOfCo co
+tyCoVarsOfCo (TransCo co1 co2)   = (tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2)
+tyCoVarsOfCo (NthCo _ _ co)      = tyCoVarsOfCo co
+tyCoVarsOfCo (LRCo _ co)         = tyCoVarsOfCo co
+tyCoVarsOfCo (InstCo co arg)     = (tyCoVarsOfCo co `unionVarSet` tyCoVarsOfCo arg)
+tyCoVarsOfCo (CoherenceCo c1 c2) = (tyCoVarsOfCo c1 `unionVarSet` tyCoVarsOfCo c2)
+tyCoVarsOfCo (KindCo co)         = tyCoVarsOfCo co
+tyCoVarsOfCo (SubCo co)          = tyCoVarsOfCo co
+tyCoVarsOfCo (AxiomRuleCo _ cs)  = tyCoVarsOfCos cs
 
+tyCoVarsOfCoVar :: CoVar -> VarSet
+tyCoVarsOfCoVar v
+  = (unitVarSet v `unionVarSet` tyCoVarsOfType (varType v))
+--
 -- | Get a deterministic set of the vars free in a coercion
 tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
 -- See Note [Free variables of types]
@@ -1630,10 +1661,12 @@ tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand 
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
+-- tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
+tyCoVarsOfCos cos = mapUnionVarSet tyCoVarsOfCo cos
 
 tyCoVarsOfCosSet :: CoVarEnv Coercion -> TyCoVarSet
-tyCoVarsOfCosSet cos = fvVarSet $ tyCoFVsOfCos $ nonDetEltsUFM cos
+-- tyCoVarsOfCosSet cos = fvVarSet $ tyCoFVsOfCos $ nonDetEltsUFM cos
+tyCoVarsOfCosSet cos = tyCoVarsOfCos $ nonDetEltsUFM cos
   -- It's OK to use nonDetEltsUFM here because we immediately forget the
   -- ordering by returning a set
 
