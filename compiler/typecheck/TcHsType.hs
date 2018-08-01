@@ -359,7 +359,7 @@ tcHsTypeApp wc_ty kind
   = do { ty <- solveLocalEqualities $
                -- We are looking at a user-written type, very like a
                -- signature so we want to solve its equalities right now
-               tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ _ ->
+               tcWildCardBinders sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        ; ty <- zonkPromoteType ty
        ; checkValidType TypeAppCtxt ty
@@ -1589,30 +1589,14 @@ in TcType.
 
 -}
 
-tcWildCardBinders :: SkolemInfo
-                  -> [Name]
+tcWildCardBinders :: [Name]
                   -> ([(Name, TcTyVar)] -> TcM a)
                   -> TcM a
-tcWildCardBinders info = tcWildCardBindersX new_tv (Just info)
-  where
-    new_tv name = do { kind <- newMetaKindVar
-                     ; newSkolemTyVar name kind }
-
-tcWildCardBindersX :: (Name -> TcM TcTyVar)
-                   -> Maybe SkolemInfo -- Just <=> we're bringing fresh vars
-                                       -- into scope; use scopeTyVars
-                   -> [Name]
-                   -> ([(Name, TcTyVar)] -> TcM a)
-                   -> TcM a
-tcWildCardBindersX new_wc maybe_skol_info wc_names thing_inside
-  = do { wcs <- mapM new_wc wc_names
+tcWildCardBinders wc_names thing_inside
+  = do { wcs <- mapM newWildTyVar wc_names
        ; let wc_prs = wc_names `zip` wcs
-       ; scope_tvs wc_prs $
+       ; tcExtendNameTyVarEnv wc_prs $
          thing_inside wc_prs }
-  where
-    scope_tvs
-      | Just info <- maybe_skol_info = scopeTyVars2 info
-      | otherwise                    = tcExtendNameTyVarEnv
 
 -- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
 -- user-supplied kind signature (CUSK), generalise the result.
@@ -2361,7 +2345,7 @@ tcHsPartialSigType ctxt sig_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
-            <- tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ wcs ->
+            <- tcWildCardBinders sig_wcs $ \ wcs ->
                tcImplicitTKBndrsSig skol_info implicit_hs_tvs      $
                tcExplicitTKBndrs    skol_info explicit_hs_tvs      $
                do {   -- Instantiate the type-class context; but if there
@@ -2429,7 +2413,7 @@ Consider
   the hswc_wcs field.
 
 * Then, in tcHsPartialSigType, we make a new hole TcTyVar, in
-  tcWildCardBindersX.
+  tcWildCardBinders.
 
 * TcBinds.chooseInferredQuantifiers fills in that hole TcTyVar
   with the inferred constraints, e.g. (Eq a, Show a)
@@ -2485,7 +2469,7 @@ tcHsPatSigType ctxt sig_ty
   = addSigCtxt ctxt hs_ty $
     do { sig_tkvs <- mapM new_implicit_tv sig_vars
        ; (wcs, sig_ty)
-            <- tcWildCardBindersX newWildTyVar    Nothing sig_wcs  $ \ wcs ->
+            <- tcWildCardBinders sig_wcs  $ \ wcs ->
                tcExtendTyVarEnv sig_tkvs                           $
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return (wcs, sig_ty) }
