@@ -249,10 +249,11 @@ my_mmap (void *addr, W_ size, int operation)
     if (ret == MAP_FAILED) {
         return NULL;
     }
+#endif /* defined(darwin_HOST_OS) */
+
     // Map in committed pages rather than take a fault for each chunk.
     // Also arrange to include them in core-dump files.
     post_mmap_madvise(operation, size, ret);
-#endif /* defined(darwin_HOST_OS) */
 
     return ret;
 }
