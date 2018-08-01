@@ -918,16 +918,14 @@ dynLoadObjs hsc_env pls objs = do
                       -- can resolve dependencies when it loads this
                       -- library.
                       ldInputs =
-                        concatMap
-                            (\(lp, l) ->
-                                 [ Option ("-L" ++ lp)
-                                 , Option "-Xlinker"
-                                 , Option "-rpath"
-                                 , Option "-Xlinker"
-                                 , Option lp
-                                 , Option ("-l" ++  l)
-                                 ])
-                            (temp_sos pls)
+                           concatMap (\l -> [ Option ("-l" ++ l) ])
+                                     (nub $ snd <$> temp_sos pls)
+                        ++ concatMap (\lp -> [ Option ("-L" ++ lp)
+                                                    , Option "-Xlinker"
+                                                    , Option "-rpath"
+                                                    , Option "-Xlinker"
+                                                    , Option lp ])
+                                     (nub $ fst <$> temp_sos pls)
                         ++ concatMap
                              (\lp ->
                                  [ Option ("-L" ++ lp)
