@@ -128,3 +128,9 @@ test('plugin-recomp-flags',
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      run_command, ['$MAKE -s --no-print-directory plugin-recomp-flags'])
+
+test('plugin-recomp-change',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     run_command, ['$MAKE -s --no-print-directory plugin-recomp-change'])
