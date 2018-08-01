@@ -46,8 +46,7 @@ import TysWiredIn       ( anyTypeOfKind )
 import Coercion
 import CoreTidy         ( tidyRules )
 import Id
-import IdInfo           ( IdInfo( ruleInfo, inlinePragInfo )
-                        , RuleInfo( RuleInfo ), setRuleInfo, setInlinePragInfo )
+import IdInfo           ( RuleInfo( RuleInfo ) )
 import Var
 import VarEnv
 import VarSet
@@ -56,7 +55,7 @@ import NameSet
 import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
-import BasicTypes
+import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
 import DynFlags         ( DynFlags )
 import Outputable
 import FastString
@@ -291,23 +290,11 @@ addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
   = RuleInfo (rs1 ++ rs2) (fvs1 `unionDVarSet` fvs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
--- See Note [Adding specialisations to an Id]
-addIdSpecialisations id rules
-  | null rules
+addIdSpecialisations id []
   = id
-  | otherwise
-  = modifyIdInfo (add_rules . add_activation) id
-  where
-    add_rules, add_activation :: IdInfo -> IdInfo
-    add_rules info = info `setRuleInfo` extendRuleInfo (ruleInfo info) rules
-    add_activation info
-       | AlwaysActive <- inlinePragmaActivation inl_prag
-       = info `setInlinePragInfo` inl_prag'
-       | otherwise
-       = info
-       where
-         inl_prag = inlinePragInfo info
-         inl_prag' = inl_prag `setInlinePragmaActivation` activeAfterInitial
+addIdSpecialisations id rules
+  = setIdSpecialisation id $
+    extendRuleInfo (idSpecialisation id) rules
 
 -- | Gather all the rules for locally bound identifiers from the supplied bindings
 rulesOfBinds :: [CoreBind] -> [CoreRule]
@@ -325,29 +312,7 @@ ruleIsVisible _ BuiltinRule{} = True
 ruleIsVisible vis_orphs Rule { ru_orphan = orph, ru_origin = origin }
     = notOrphan orph || origin `elemModuleSet` vis_orphs
 
-{- Note [Adding specialisations to an Id]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose (Trac #15445) we have
-   f,g :: Num a => a -> a
-   f x = ...f (x-1).....
-   g y = ...g (y-1) ....
-and we make some specialisations of 'g', either automatically, or via
-a SPECIALISE pragma.  Then CSE kicks in and notices that the RHSs of
-'f' and 'g' are identical, so we get
-   f x = ...f (x-1)...
-   g = f
-   {-# RULES g @Int _ = $sg #-}
-
-Now there is terrible danger that, in an importing module, we'll inline
-'g' before we have a chance to run its specialisation!
-
-This is admittedly a bit of an exotic case; but in general with RULES
-we want to delay inlining to give the rule a chance to fire.  So we
-attach a NOINLINE[2] activation to it, to ensure it's not inlined
-right away.  c.f. other uses of activeAfterInitial in the compiler
-e.g. Note [Wrapper activation] in WorkWrap, and
-     Note [Activation for data constructor wrappers] in MkId
-
+{-
 Note [Where rules are found]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The rules for an Id come from two places:

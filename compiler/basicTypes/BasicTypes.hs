@@ -81,7 +81,6 @@ module BasicTypes(
 
         Activation(..), isActive, isActiveIn, competesWith,
         isNeverActive, isAlwaysActive, isEarlyActive,
-        activeAfterInitial, activeDuringFinal,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1142,15 +1141,6 @@ data CompilerPhase
 instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
    ppr InitialPhase = text "InitialPhase"
-
-activeAfterInitial :: Activation
--- Active in the first phase after the initial phase
--- Currently we have just phases [2,1,0]
-activeAfterInitial = ActiveAfter NoSourceText 2
-
-activeDuringFinal :: Activation
--- Active in the final simplification phase (which is repeated)
-activeDuringFinal = ActiveAfter NoSourceText 0
 
 -- See note [Pragma source text]
 data Activation = NeverActive
