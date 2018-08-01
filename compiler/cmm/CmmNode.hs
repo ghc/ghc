@@ -24,6 +24,7 @@ module CmmNode (
 
 import GhcPrelude hiding (succ)
 
+import Binary
 import CodeGen.Platform
 import CmmExpr
 import CmmSwitch
@@ -225,6 +226,48 @@ is dangerous, so you'll need to disable inlining much in the same
 way is done in cmm/CmmOpt.hs currently.  We should fix this!
 -}
 
+instance Binary (CmmNode C O) where
+  put_ bh (CmmEntry a b) = putByte bh 0 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmEntry <$> get bh <*> get bh
+      _ -> fail "Binary.putCmmNodeCO: invalidTag"
+
+instance Binary (CmmNode O O) where
+  put_ bh (CmmComment a)               = putByte bh 0 >> put_ bh a
+  put_ bh (CmmTick a)                  = putByte bh 1 >> put_ bh a
+  put_ bh (CmmUnwind a)                = putByte bh 2 >> put_ bh a
+  put_ bh (CmmAssign a b)              = putByte bh 3 >> put_ bh a >> put_ bh b
+  put_ bh (CmmStore a b)               = putByte bh 4 >> put_ bh a >> put_ bh b
+  put_ bh (CmmUnsafeForeignCall a b c) = putByte bh 5 >> put_ bh a >> put_ bh b >> put_ bh c
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmComment <$> get bh
+      1 -> CmmTick <$> get bh
+      2 -> CmmUnwind <$> get bh
+      3 -> CmmAssign <$> get bh <*> get bh
+      4 -> CmmStore <$> get bh <*> get bh
+      5 -> CmmUnsafeForeignCall <$> get bh <*> get bh <*> get bh
+      _ -> fail "Binary.putCmmNodeOO: invalidTag"
+
+instance Binary (CmmNode O C) where
+  put_ bh (CmmBranch a)                  = putByte bh 0 >> put_ bh a
+  put_ bh (CmmCondBranch a b c d)        = putByte bh 1 >> put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  put_ bh (CmmSwitch a b)                = putByte bh 2 >> put_ bh a >> put_ bh b
+  put_ bh (CmmCall a b c d e f)          = putByte bh 3 >> put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d >> put_ bh e >> put_ bh f
+  put_ bh (CmmForeignCall a b c d e f g) = putByte bh 4 >> put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d >> put_ bh e >> put_ bh f >> put_ bh g
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmBranch <$> get bh
+      1 -> CmmCondBranch <$> get bh <*> get bh <*> get bh <*> get bh
+      2 -> CmmSwitch <$> get bh <*> get bh
+      3 -> CmmCall <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+      4 -> CmmForeignCall <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh <*> get bh
+      _ -> fail "Binary.putCmmNodeOC: invalidTag"
+
 ---------------------------------------------
 -- Eq instance of CmmNode
 
@@ -276,7 +319,11 @@ data Convention
   | GC
        -- ^ Entry to the garbage collector: uses the node reg!
        -- (TODO: I don't think we need this --SDM)
-  deriving( Eq )
+  deriving( Eq , Enum )
+
+instance Binary Convention where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 data ForeignConvention
   = ForeignConvention
@@ -286,10 +333,19 @@ data ForeignConvention
         CmmReturnInfo
   deriving Eq
 
+instance Binary ForeignConvention where
+  put_ bh (ForeignConvention a b c d) = put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  get bh = ForeignConvention <$> get bh <*> get bh <*> get bh <*> get bh
+
 data CmmReturnInfo
   = CmmMayReturn
   | CmmNeverReturns
-  deriving ( Eq )
+  deriving ( Eq , Enum )
+
+instance Binary CmmReturnInfo where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
+ 
 
 data ForeignTarget        -- The target of a foreign call
   = ForeignTarget                -- A foreign procedure
@@ -298,6 +354,16 @@ data ForeignTarget        -- The target of a foreign call
   | PrimTarget            -- A possibly-side-effecting machine operation
         CallishMachOp            -- Which one
   deriving Eq
+
+instance Binary ForeignTarget where
+  put_ bh (ForeignTarget a b) = putByte bh 0 >> put_ bh a >> put_ bh b
+  put_ bh (PrimTarget a)      = putByte bh 1 >> put_ bh a
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> ForeignTarget <$> get bh <*> get bh
+      1 -> PrimTarget <$> get bh
+      _ -> fail "Binary.putForeignTarget: invalid tag"
 
 foreignTargetHints :: ForeignTarget -> ([ForeignHint], [ForeignHint])
 foreignTargetHints target
@@ -619,6 +685,18 @@ data CmmTickScope
     -- the new block could have a combined tick scope a/c+b/d, which
     -- both tick<2> and tick<3> apply to.
 
+instance Binary CmmTickScope where
+  put_ bh GlobalScope = putByte bh 0
+  put_ bh (SubScope a b) = putByte bh 1 >> put_ bh a >> put_ bh b
+  put_ bh (CombinedScope a b) = putByte bh 2 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure GlobalScope
+      1 -> SubScope <$> get bh <*> get bh
+      2 -> CombinedScope <$> get bh <*> get bh
+      _ -> fail "Binary.CmmTickScope: invalidTag"
+  
 -- Note [CmmTick scoping details]:
 --
 -- The scope of a @CmmTick@ is given by the @CmmEntry@ node of the

@@ -185,6 +185,18 @@ data CostCentreStack
 
   deriving (Eq, Ord)    -- needed for Ord on CLabel
 
+instance Binary CostCentreStack where
+  put_ bh CurrentCCS = putByte bh 0
+  put_ bh DontCareCCS = putByte bh 1
+  put_ bh (SingletonCCS a) = putByte bh 2 >> put_ bh a
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure CurrentCCS
+      1 -> pure DontCareCCS
+      2 -> SingletonCCS <$> get bh
+      _ -> fail "Binary.putCostCentreStack: invalid tag"
+      
 
 -- synonym for triple which describes the cost centre info in the generated
 -- code for a module.

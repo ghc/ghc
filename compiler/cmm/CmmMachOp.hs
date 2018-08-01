@@ -31,6 +31,7 @@ import GhcPrelude
 import CmmType
 import Outputable
 import DynFlags
+import Binary
 
 -----------------------------------------------------------------------------
 --              MachOp
@@ -145,7 +146,135 @@ data MachOp
 pprMachOp :: MachOp -> SDoc
 pprMachOp mo = text (show mo)
 
+instance Binary MachOp where
+  put_ bh (MO_Add            a)   = putByte bh 0 >> put_ bh a
+  put_ bh (MO_Sub            a)   = putByte bh 1 >> put_ bh a
+  put_ bh (MO_Eq             a)   = putByte bh 2 >> put_ bh a
+  put_ bh (MO_Ne             a)   = putByte bh 3 >> put_ bh a
+  put_ bh (MO_Mul            a)   = putByte bh 4 >> put_ bh a
+  put_ bh (MO_S_MulMayOflo   a)   = putByte bh 5 >> put_ bh a
+  put_ bh (MO_S_Quot         a)   = putByte bh 6 >> put_ bh a
+  put_ bh (MO_S_Rem          a)   = putByte bh 7 >> put_ bh a
+  put_ bh (MO_S_Neg          a)   = putByte bh 8 >> put_ bh a
+  put_ bh (MO_U_MulMayOflo   a)   = putByte bh 9 >> put_ bh a
+  put_ bh (MO_U_Quot         a)   = putByte bh 10 >> put_ bh a
+  put_ bh (MO_U_Rem          a)   = putByte bh 11 >> put_ bh a
+  put_ bh (MO_S_Ge           a)   = putByte bh 12 >> put_ bh a
+  put_ bh (MO_S_Le           a)   = putByte bh 13 >> put_ bh a
+  put_ bh (MO_S_Gt           a)   = putByte bh 14 >> put_ bh a
+  put_ bh (MO_S_Lt           a)   = putByte bh 15 >> put_ bh a
+  put_ bh (MO_U_Ge           a)   = putByte bh 16 >> put_ bh a
+  put_ bh (MO_U_Le           a)   = putByte bh 17 >> put_ bh a
+  put_ bh (MO_U_Gt           a)   = putByte bh 18 >> put_ bh a
+  put_ bh (MO_U_Lt           a)   = putByte bh 19 >> put_ bh a
+  put_ bh (MO_F_Add          a)   = putByte bh 20 >> put_ bh a
+  put_ bh (MO_F_Sub          a)   = putByte bh 21 >> put_ bh a
+  put_ bh (MO_F_Neg          a)   = putByte bh 22 >> put_ bh a
+  put_ bh (MO_F_Mul          a)   = putByte bh 23 >> put_ bh a
+  put_ bh (MO_F_Quot         a)   = putByte bh 24 >> put_ bh a
+  put_ bh (MO_F_Eq           a)   = putByte bh 25 >> put_ bh a
+  put_ bh (MO_F_Ne           a)   = putByte bh 26 >> put_ bh a
+  put_ bh (MO_F_Ge           a)   = putByte bh 27 >> put_ bh a
+  put_ bh (MO_F_Le           a)   = putByte bh 28 >> put_ bh a
+  put_ bh (MO_F_Gt           a)   = putByte bh 29 >> put_ bh a
+  put_ bh (MO_F_Lt           a)   = putByte bh 30 >> put_ bh a
+  put_ bh (MO_And            a)   = putByte bh 31 >> put_ bh a
+  put_ bh (MO_Or             a)   = putByte bh 32 >> put_ bh a
+  put_ bh (MO_Xor            a)   = putByte bh 33 >> put_ bh a
+  put_ bh (MO_Not            a)   = putByte bh 34 >> put_ bh a
+  put_ bh (MO_Shl            a)   = putByte bh 35 >> put_ bh a
+  put_ bh (MO_U_Shr          a)   = putByte bh 36 >> put_ bh a
+  put_ bh (MO_S_Shr          a)   = putByte bh 37 >> put_ bh a
+  put_ bh (MO_SF_Conv        a b) = putByte bh 38 >> put_ bh a >> put_ bh b
+  put_ bh (MO_FS_Conv        a b) = putByte bh 39 >> put_ bh a >> put_ bh b
+  put_ bh (MO_SS_Conv        a b) = putByte bh 40 >> put_ bh a >> put_ bh b
+  put_ bh (MO_UU_Conv        a b) = putByte bh 41 >> put_ bh a >> put_ bh b
+  put_ bh (MO_FF_Conv        a b) = putByte bh 42 >> put_ bh a >> put_ bh b
+  put_ bh (MO_V_Insert       a b) = putByte bh 43 >> put_ bh a >> put_ bh b
+  put_ bh (MO_V_Extract      a b) = putByte bh 44 >> put_ bh a >> put_ bh b
+  put_ bh (MO_V_Add          a b) = putByte bh 45 >> put_ bh a >> put_ bh b
+  put_ bh (MO_V_Sub          a b) = putByte bh 46 >> put_ bh a >> put_ bh b
+  put_ bh (MO_V_Mul          a b) = putByte bh 47 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VS_Quot        a b) = putByte bh 48 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VS_Rem         a b) = putByte bh 49 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VS_Neg         a b) = putByte bh 50 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VU_Quot        a b) = putByte bh 51 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VU_Rem         a b) = putByte bh 52 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Insert      a b) = putByte bh 53 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Extract     a b) = putByte bh 54 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Add         a b) = putByte bh 55 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Sub         a b) = putByte bh 56 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Neg         a b) = putByte bh 57 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Mul         a b) = putByte bh 58 >> put_ bh a >> put_ bh b
+  put_ bh (MO_VF_Quot        a b) = putByte bh 59 >> put_ bh a >> put_ bh b
+  put_ bh (MO_AlignmentCheck a b) = putByte bh 60 >> put_ bh a >> put_ bh b
 
+  get bh = do
+    tag <- getByte bh
+    case tag of      
+      0 -> MO_Add            <$> get bh
+      1 -> MO_Sub            <$> get bh
+      2 -> MO_Eq             <$> get bh
+      3 -> MO_Ne             <$> get bh
+      4 -> MO_Mul            <$> get bh
+      5 -> MO_S_MulMayOflo   <$> get bh
+      6 -> MO_S_Quot         <$> get bh
+      7 -> MO_S_Rem          <$> get bh
+      8 -> MO_S_Neg          <$> get bh
+      9 -> MO_U_MulMayOflo   <$> get bh
+      10 -> MO_U_Quot         <$> get bh
+      11 -> MO_U_Rem          <$> get bh
+      12 -> MO_S_Ge           <$> get bh
+      13 -> MO_S_Le           <$> get bh
+      14 -> MO_S_Gt           <$> get bh
+      15 -> MO_S_Lt           <$> get bh
+      16 -> MO_U_Ge           <$> get bh
+      17 -> MO_U_Le           <$> get bh
+      18 -> MO_U_Gt           <$> get bh
+      19 -> MO_U_Lt           <$> get bh
+      20 -> MO_F_Add          <$> get bh
+      21 -> MO_F_Sub          <$> get bh
+      22 -> MO_F_Neg          <$> get bh
+      23 -> MO_F_Mul          <$> get bh
+      24 -> MO_F_Quot         <$> get bh
+      25 -> MO_F_Eq           <$> get bh
+      26 -> MO_F_Ne           <$> get bh
+      27 -> MO_F_Ge           <$> get bh
+      28 -> MO_F_Le           <$> get bh
+      29 -> MO_F_Gt           <$> get bh
+      30 -> MO_F_Lt           <$> get bh
+      31 -> MO_And            <$> get bh
+      32 -> MO_Or             <$> get bh
+      33 -> MO_Xor            <$> get bh
+      34 -> MO_Not            <$> get bh
+      35 -> MO_Shl            <$> get bh
+      36 -> MO_U_Shr          <$> get bh
+      37 -> MO_S_Shr          <$> get bh
+      38 -> MO_SF_Conv        <$> get bh <*> get bh
+      39 -> MO_FS_Conv        <$> get bh <*> get bh
+      40 -> MO_SS_Conv        <$> get bh <*> get bh
+      41 -> MO_UU_Conv        <$> get bh <*> get bh
+      42 -> MO_FF_Conv        <$> get bh <*> get bh
+      43 -> MO_V_Insert       <$> get bh <*> get bh
+      44 -> MO_V_Extract      <$> get bh <*> get bh
+      45 -> MO_V_Add          <$> get bh <*> get bh
+      46 -> MO_V_Sub          <$> get bh <*> get bh
+      47 -> MO_V_Mul          <$> get bh <*> get bh
+      48 -> MO_VS_Quot        <$> get bh <*> get bh
+      49 -> MO_VS_Rem         <$> get bh <*> get bh
+      50 -> MO_VS_Neg         <$> get bh <*> get bh
+      51 -> MO_VU_Quot        <$> get bh <*> get bh
+      52 -> MO_VU_Rem         <$> get bh <*> get bh
+      53 -> MO_VF_Insert      <$> get bh <*> get bh
+      54 -> MO_VF_Extract     <$> get bh <*> get bh
+      55 -> MO_VF_Add         <$> get bh <*> get bh
+      56 -> MO_VF_Sub         <$> get bh <*> get bh
+      57 -> MO_VF_Neg         <$> get bh <*> get bh
+      58 -> MO_VF_Mul         <$> get bh <*> get bh
+      59 -> MO_VF_Quot        <$> get bh <*> get bh
+      60 -> MO_AlignmentCheck <$> get bh <*> get bh
+      _ -> fail "Binary.putMachOp: invalid tag"
+  
 
 -- -----------------------------------------------------------------------------
 -- Some common MachReps
@@ -598,6 +727,124 @@ data CallishMachOp
   | MO_Cmpxchg Width
   deriving (Eq, Show)
 
+instance Binary CallishMachOp where
+  put_ bh MO_F64_Pwr             = putByte bh 0
+  put_ bh MO_F64_Sin             = putByte bh 1
+  put_ bh MO_F64_Cos             = putByte bh 2
+  put_ bh MO_F64_Tan             = putByte bh 3
+  put_ bh MO_F64_Sinh            = putByte bh 4
+  put_ bh MO_F64_Cosh            = putByte bh 5
+  put_ bh MO_F64_Tanh            = putByte bh 6
+  put_ bh MO_F64_Asin            = putByte bh 7
+  put_ bh MO_F64_Acos            = putByte bh 8
+  put_ bh MO_F64_Atan            = putByte bh 9
+  put_ bh MO_F64_Log             = putByte bh 10
+  put_ bh MO_F64_Exp             = putByte bh 11
+  put_ bh MO_F64_Fabs            = putByte bh 12
+  put_ bh MO_F64_Sqrt            = putByte bh 13
+  put_ bh MO_F32_Pwr             = putByte bh 14
+  put_ bh MO_F32_Sin             = putByte bh 15
+  put_ bh MO_F32_Cos             = putByte bh 16
+  put_ bh MO_F32_Tan             = putByte bh 17
+  put_ bh MO_F32_Sinh            = putByte bh 18
+  put_ bh MO_F32_Cosh            = putByte bh 19
+  put_ bh MO_F32_Tanh            = putByte bh 20
+  put_ bh MO_F32_Asin            = putByte bh 21
+  put_ bh MO_F32_Acos            = putByte bh 22
+  put_ bh MO_F32_Atan            = putByte bh 23
+  put_ bh MO_F32_Log             = putByte bh 24
+  put_ bh MO_F32_Exp             = putByte bh 25
+  put_ bh MO_F32_Fabs            = putByte bh 26
+  put_ bh MO_F32_Sqrt            = putByte bh 27
+  put_ bh (MO_UF_Conv       a)   = putByte bh 28 >> put_ bh a
+  put_ bh (MO_S_QuotRem     a)   = putByte bh 29 >> put_ bh a
+  put_ bh (MO_U_QuotRem     a)   = putByte bh 30 >> put_ bh a
+  put_ bh (MO_U_QuotRem2    a)   = putByte bh 31 >> put_ bh a
+  put_ bh (MO_Add2          a)   = putByte bh 32 >> put_ bh a
+  put_ bh (MO_AddWordC      a)   = putByte bh 33 >> put_ bh a
+  put_ bh (MO_SubWordC      a)   = putByte bh 34 >> put_ bh a
+  put_ bh (MO_AddIntC       a)   = putByte bh 35 >> put_ bh a
+  put_ bh (MO_SubIntC       a)   = putByte bh 36 >> put_ bh a
+  put_ bh (MO_U_Mul2        a)   = putByte bh 37 >> put_ bh a
+  put_ bh MO_WriteBarrier        = putByte bh 38
+  put_ bh MO_Touch               = putByte bh 39
+  put_ bh (MO_Prefetch_Data a)   = putByte bh 40 >> put_ bh a
+  put_ bh (MO_Memcpy        a)   = putByte bh 41 >> put_ bh a
+  put_ bh (MO_Memset        a)   = putByte bh 42 >> put_ bh a
+  put_ bh (MO_Memmove       a)   = putByte bh 43 >> put_ bh a
+  put_ bh (MO_Memcmp        a)   = putByte bh 44 >> put_ bh a
+  put_ bh (MO_PopCnt        a)   = putByte bh 45 >> put_ bh a
+  put_ bh (MO_Pdep          a)   = putByte bh 46 >> put_ bh a
+  put_ bh (MO_Pext          a)   = putByte bh 47 >> put_ bh a
+  put_ bh (MO_Clz           a)   = putByte bh 48 >> put_ bh a
+  put_ bh (MO_Ctz           a)   = putByte bh 49 >> put_ bh a
+  put_ bh (MO_BSwap         a)   = putByte bh 50 >> put_ bh a
+  put_ bh (MO_AtomicRMW     a b) = putByte bh 51 >> put_ bh a >> put_ bh b
+  put_ bh (MO_AtomicRead    a)   = putByte bh 52 >> put_ bh a
+  put_ bh (MO_AtomicWrite   a)   = putByte bh 53 >> put_ bh a
+  put_ bh (MO_Cmpxchg       a)   = putByte bh 54 >> put_ bh a
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure MO_F64_Pwr
+      1 -> pure MO_F64_Sin
+      2 -> pure MO_F64_Cos
+      3 -> pure MO_F64_Tan
+      4 -> pure MO_F64_Sinh
+      5 -> pure MO_F64_Cosh
+      6 -> pure MO_F64_Tanh
+      7 -> pure MO_F64_Asin
+      8 -> pure MO_F64_Acos
+      9 -> pure MO_F64_Atan
+      10 -> pure MO_F64_Log
+      11 -> pure MO_F64_Exp
+      12 -> pure MO_F64_Fabs
+      13 -> pure MO_F64_Sqrt
+      14 -> pure MO_F32_Pwr
+      15 -> pure MO_F32_Sin
+      16 -> pure MO_F32_Cos
+      17 -> pure MO_F32_Tan
+      18 -> pure MO_F32_Sinh
+      19 -> pure MO_F32_Cosh
+      20 -> pure MO_F32_Tanh
+      21 -> pure MO_F32_Asin
+      22 -> pure MO_F32_Acos
+      23 -> pure MO_F32_Atan
+      24 -> pure MO_F32_Log
+      25 -> pure MO_F32_Exp
+      26 -> pure MO_F32_Fabs
+      27 -> pure MO_F32_Sqrt
+      28 -> MO_UF_Conv       <$> get bh
+      29 -> MO_S_QuotRem     <$> get bh
+      30 -> MO_U_QuotRem     <$> get bh
+      31 -> MO_U_QuotRem2    <$> get bh
+      32 -> MO_Add2          <$> get bh
+      33 -> MO_AddWordC      <$> get bh
+      34 -> MO_SubWordC      <$> get bh
+      35 -> MO_AddIntC       <$> get bh
+      36 -> MO_SubIntC       <$> get bh
+      37 -> MO_U_Mul2        <$> get bh
+      38 -> pure MO_WriteBarrier
+      39 -> pure MO_Touch
+      40 -> MO_Prefetch_Data <$> get bh
+      41 -> MO_Memcpy        <$> get bh
+      42 -> MO_Memset        <$> get bh
+      43 -> MO_Memmove       <$> get bh
+      44 -> MO_Memcmp        <$> get bh
+      45 -> MO_PopCnt        <$> get bh
+      46 -> MO_Pdep          <$> get bh
+      47 -> MO_Pext          <$> get bh
+      48 -> MO_Clz           <$> get bh
+      49 -> MO_Ctz           <$> get bh
+      50 -> MO_BSwap         <$> get bh
+      51 -> MO_AtomicRMW     <$> get bh <*> get bh
+      52 -> MO_AtomicRead    <$> get bh
+      53 -> MO_AtomicWrite   <$> get bh
+      54 -> MO_Cmpxchg       <$> get bh
+      _  -> fail "Binary.putCallishMachOp: invalid tag"
+
+
 -- | The operation to perform atomically.
 data AtomicMachOp =
       AMO_Add
@@ -606,7 +853,12 @@ data AtomicMachOp =
     | AMO_Nand
     | AMO_Or
     | AMO_Xor
-      deriving (Eq, Show)
+      deriving (Eq, Show, Enum)
+
+instance Binary AtomicMachOp where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
+ 
 
 pprCallishMachOp :: CallishMachOp -> SDoc
 pprCallishMachOp mo = text (show mo)

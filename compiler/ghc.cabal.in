@@ -509,6 +509,7 @@ Library
         Unify
         Bag
         Binary
+        Binary.Class
         BooleanFormula
         BufWrite
         Digraph

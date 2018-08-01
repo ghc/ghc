@@ -12,6 +12,7 @@ module CmmSwitch (
   ) where
 
 import GhcPrelude
+import Binary
 
 import Outputable
 import DynFlags
@@ -108,6 +109,10 @@ data SwitchTargets =
         (Maybe Label)              -- Default value
         (M.Map Integer Label)      -- The branches
     deriving (Show, Eq)
+
+instance Binary SwitchTargets where
+  put_ bh (SwitchTargets a b c d) = put_ bh a >> put_ bh b >> put_ bh c >> put_ bh (M.toList d)
+  get bh = SwitchTargets <$> get bh <*> get bh <*> get bh <*> (M.fromList <$> get bh)
 
 -- | The smart constructor mkSwitchTargets normalises the map a bit:
 --  * No entries outside the range

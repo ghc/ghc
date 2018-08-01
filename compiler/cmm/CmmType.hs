@@ -37,6 +37,8 @@ import Outputable
 import Data.Word
 import Data.Int
 
+import Binary
+
 -----------------------------------------------------------------------------
 --              CmmType
 -----------------------------------------------------------------------------
@@ -50,6 +52,10 @@ import Data.Int
 data CmmType    -- The important one!
   = CmmType CmmCat Width
 
+instance Binary CmmType where
+  put_ bh (CmmType a b) = put_ bh a >> put_ bh b
+  get bh = CmmType <$> get bh <*> get bh
+
 data CmmCat                -- "Category" (not exported)
    = GcPtrCat              -- GC pointer
    | BitsCat               -- Non-pointer
@@ -57,6 +63,21 @@ data CmmCat                -- "Category" (not exported)
    | VecCat Length CmmCat  -- Vector
    deriving( Eq )
         -- See Note [Signed vs unsigned] at the end
+
+instance Binary CmmCat where
+  put_ bh GcPtrCat = putByte bh 0
+  put_ bh BitsCat  = putByte bh 1
+  put_ bh FloatCat = putByte bh 2
+  put_ bh (VecCat a b) = putByte bh 3 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure GcPtrCat
+      1 -> pure BitsCat
+      2 -> pure FloatCat
+      3 -> VecCat <$> get bh <*> get bh
+      _ -> fail "Binary.putCmmCat: invalid Tag"
+    
 
 instance Outputable CmmType where
   ppr (CmmType cat wid) = ppr cat <> ppr (widthInBits wid)
@@ -168,7 +189,11 @@ data Width   = W8 | W16 | W32 | W64
              | W128
              | W256
              | W512
-             deriving (Eq, Ord, Show)
+             deriving (Eq, Ord, Enum, Show)
+
+instance Binary Width where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 instance Outputable Width where
    ppr rep = ptext (mrStr rep)
@@ -322,9 +347,13 @@ isVecType _                       = False
 
 data ForeignHint
   = NoHint | AddrHint | SignedHint
-  deriving( Eq )
+  deriving( Eq, Enum )
         -- Used to give extra per-argument or per-result
         -- information needed by foreign calling conventions
+
+instance Binary ForeignHint where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 -------------------------------------------------------------------------
 

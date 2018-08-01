@@ -46,6 +46,8 @@ import Outputable
 import FastString
 import Module           ( UnitId )
 
+import Binary
+
 {-
 ************************************************************************
 *                                                                      *
@@ -65,6 +67,14 @@ These are in \tr{state-interface.verb} order.
 #include "primop-tag.hs-incl"
 primOpTag _ = error "primOpTag: unknown primop"
 
+tagToPrimOp :: Int -> PrimOp
+tagToPrimOp n = -- ASSERT ( primOpTag p == n)
+                p
+  where p = allThePrimOps !! (n - 1)
+
+instance Binary PrimOp where
+  put_ bh = put_ bh . primOpTag
+  get bh = tagToPrimOp <$> get bh
 
 instance Eq PrimOp where
     op1 == op2 = primOpTag op1 == primOpTag op2

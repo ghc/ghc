@@ -76,6 +76,7 @@ import BasicTypes
 import FastString
 import Outputable
 import Util
+import Binary.Class
 
 -- just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))
@@ -102,6 +103,10 @@ Fast comparison is everything on @Uniques@:
 --
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Int
+
+instance Binary Unique where
+  put_ bh (MkUnique a) = put_ bh a
+  get bh = MkUnique <$> get bh
 
 {-# INLINE uNIQUE_BITS #-}
 uNIQUE_BITS :: Int

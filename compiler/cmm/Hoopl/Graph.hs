@@ -21,6 +21,7 @@ module Hoopl.Graph
 
 import GhcPrelude
 import Util
+import Binary
 
 import Hoopl.Label
 import Hoopl.Block
@@ -82,7 +83,6 @@ data Graph' block (n :: * -> * -> *) e x where
         -> Body' block n
         -> MaybeO x (block n C O)
         -> Graph' block n e x
-
 
 -- -----------------------------------------------------------------------------
 -- Mapping over graphs

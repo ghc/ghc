@@ -90,6 +90,9 @@ import Data.Data
 import Data.List
 import Data.Ord
 
+import {-# SOURCE #-} Binary
+import Binary.Class
+
 {-
 ************************************************************************
 *                                                                      *
@@ -109,6 +112,15 @@ data RealSrcLoc
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
+
+instance Binary RealSrcLoc where
+  put_ bh (SrcLoc fs l c) = do
+    put_ bh fs
+    put_ bh l
+    put_ bh c
+
+  get bh = SrcLoc <$> get bh <*> get bh <*> get bh
+
 
 -- | Source Location
 data SrcLoc
@@ -233,6 +245,10 @@ data RealSrcSpan
           srcSpanECol     :: {-# UNPACK #-} !Int
         }
   deriving Eq
+
+instance Binary RealSrcSpan where
+  put_ bh (RealSrcSpan' a b c d e) = put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d >> put_ bh e
+  get bh = RealSrcSpan' <$> get bh <*> get bh <*> get bh <*> get bh <*> get bh
 
 -- | Source Span
 --

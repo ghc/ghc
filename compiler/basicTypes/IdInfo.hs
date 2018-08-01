@@ -100,6 +100,7 @@ import Outputable
 import Module
 import Demand
 import Util
+import Binary
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -458,6 +459,16 @@ data CafInfo
         | NoCafRefs                     -- ^ A function or static constructor
                                         -- that refers to no CAFs.
         deriving (Eq, Ord)
+
+instance Binary CafInfo where
+  put_ bh MayHaveCafRefs = putByte bh 0
+  put_ bh NoCafRefs      = putByte bh 1
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure MayHaveCafRefs
+      1 -> pure NoCafRefs
+      _ -> fail "Binary.putCafInfo: invalid tag"
 
 -- | Assumes that the 'Id' has CAF references: definitely safe
 vanillaCafInfo :: CafInfo

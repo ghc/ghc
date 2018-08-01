@@ -36,6 +36,7 @@
 module Name (
         -- * The main types
         Name,                                   -- Abstract
+        binPutName_, binGetName,
         BuiltInSyntax(..),
 
         -- ** Creating 'Name's
@@ -111,6 +112,11 @@ data Name = Name {
                 n_loc  :: !SrcSpan      -- Definition site
             }
 
+binPutName_ :: BinHandle -> Name -> IO ()
+binPutName_ bh (Name a b c d) = put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+binGetName :: BinHandle -> IO Name
+binGetName bh = Name <$> get bh <*> get bh <*> get bh <*> get bh
+
 -- NOTE: we make the n_loc field strict to eliminate some potential
 -- (and real!) space leaks, due to the fact that we don't look at
 -- the SrcLoc in a Name all that often.
@@ -127,6 +133,20 @@ data NameSort
 
   | System              -- A system-defined Id or TyVar.  Typically the
                         -- OccName is very uninformative (like 's')
+
+instance Binary NameSort where
+  put_ bh (External a) = putByte bh 0 >> put_ bh a
+  put_ bh (WiredIn a b c) = putByte bh 1 >> put_ bh a >> {- put_ bh b >> -} put_ bh c
+  put_ bh Internal = putByte bh 2
+  put_ bh System = putByte bh 3
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> External <$> get bh
+      1 -> WiredIn <$> get bh <*> {- get bh -} pure undefined <*> get bh
+      2 -> pure Internal
+      3 -> pure System
+      _ -> fail "Binary.putNameSort: invalid tag"
 
 instance Outputable NameSort where
   ppr (External _)    = text "external"
@@ -149,7 +169,11 @@ instance NFData NameSort where
 -- | BuiltInSyntax is for things like @(:)@, @[]@ and tuples,
 -- which have special syntactic forms.  They aren't in scope
 -- as such.
-data BuiltInSyntax = BuiltInSyntax | UserSyntax
+data BuiltInSyntax = BuiltInSyntax | UserSyntax deriving Enum
+
+instance Binary BuiltInSyntax where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 {-
 Note [About the NameSorts]

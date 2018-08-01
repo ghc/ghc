@@ -16,6 +16,7 @@ module Hoopl.Label
 import GhcPrelude
 
 import Outputable
+import Binary
 
 -- TODO: This should really just use GHC's Unique and Uniq{Set,FM}
 import Hoopl.Collections
@@ -42,6 +43,10 @@ instance Uniquable Label where
 
 instance Outputable Label where
   ppr label = ppr (getUnique label)
+
+instance Binary Label where
+  put_ bh = put_ bh . lblToUnique
+  get bh = Label <$> get bh
 
 -----------------------------------------------------------------------------
 -- LabelSet
@@ -129,6 +134,10 @@ instance TrieMap LabelMap where
   alterTM k f m = mapAlter f k m
   foldTM k m z = mapFoldr k z m
   mapTM f m = mapMap f m
+
+instance Binary a => Binary (LabelMap a) where
+  put_ bh = put_ bh . mapToList
+  get bh = mapFromList <$> get bh
 
 -----------------------------------------------------------------------------
 -- FactBase

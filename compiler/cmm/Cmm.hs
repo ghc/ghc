@@ -1,5 +1,5 @@
 -- Cmm representations using Hoopl's Graph CmmNode e x.
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, TypeSynonymInstances, FlexibleInstances #-}
 
 module Cmm (
      -- * Cmm top-level datatypes
@@ -41,6 +41,8 @@ import Hoopl.Label
 import Outputable
 
 import Data.Word        ( Word8 )
+
+import Binary
 
 -----------------------------------------------------------------------------
 --  Cmm, GenCmm
@@ -98,6 +100,16 @@ type RawCmmDecl
         (LabelMap CmmStatics)
         CmmGraph
 
+instance (Binary d, Binary h, Binary g) => Binary (GenCmmDecl d h g) where
+  put_ bh (CmmProc a b c d) = putByte bh 0 >> put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  put_ bh (CmmData a b)     = putByte bh 1 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmProc <$> get bh <*> get bh <*> get bh <*> get bh
+      1 -> CmmData <$> get bh <*> get bh
+      _ -> fail "Binary.putGenCmmDecl: invalid tag"
+
 -----------------------------------------------------------------------------
 --     Graphs
 -----------------------------------------------------------------------------
@@ -105,6 +117,70 @@ type RawCmmDecl
 type CmmGraph = GenCmmGraph CmmNode
 data GenCmmGraph n = CmmGraph { g_entry :: BlockId, g_graph :: Graph n C C }
 type CmmBlock = Block CmmNode C C
+
+-- These binary instances are pretty stupid;
+-- we might have a better solution if we adopt something
+-- like https://www.well-typed.com/blog/2017/06/rtti/
+
+instance Binary CmmGraph where
+  put_ bh (CmmGraph a b) = put_ bh a >> put_ bh b
+  get bh = CmmGraph <$> get bh <*> get bh
+
+-- Note: C C can only be GMany
+instance Binary (Graph CmmNode C C) where
+  put_ bh (GMany entry body exit)
+    = put_ bh entry >> put_ bh body >> put_ bh exit
+  get bh = GMany <$> get bh <*> get bh <*> get bh
+
+instance Binary (MaybeO C (Block CmmNode O C)) where
+  put_ bh (NothingO) = putByte bh 0
+  put_ bh (JustO x) = putByte bh 1 >> put_ bh x
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure NothingO
+--      1 -> JustO <$> get bh
+      _ -> fail "Binary.putMaybeO: invalidTag"
+
+instance Binary (MaybeO C (Block CmmNode C O)) where
+  put_ bh (NothingO) = putByte bh 0
+  put_ bh (JustO x) = putByte bh 1 >> put_ bh x
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure NothingO
+--      1 -> JustO <$> get bh
+      _ -> fail "Binary.putMaybeO: invalidTag"
+
+instance Binary (Block CmmNode O C) where
+  put_ bh (BlockOC a b) = put_ bh a >> put_ bh b
+  get bh = BlockOC <$> get bh <*> get bh
+
+instance Binary (Block CmmNode C C) where
+  put_ bh (BlockCC a b c) = put_ bh a >> put_ bh b >> put_ bh c
+  get bh = BlockCC <$> get bh <*> get bh <*> get bh
+
+instance Binary (Block CmmNode C O) where
+  put_ bh (BlockCO a b) = put_ bh a >> put_ bh b
+  get bh = BlockCO <$> get bh <*> get bh
+
+instance Binary (Block CmmNode O O) where
+  put_ bh BNil = putByte bh 0
+  put_ bh (BMiddle a) = putByte bh 1 >> put_ bh a
+  put_ bh (BCat a b)  = putByte bh 2 >> put_ bh a >> put_ bh b
+  put_ bh (BSnoc a b) = putByte bh 3 >> put_ bh a >> put_ bh b
+  put_ bh (BCons a b) = putByte bh 4 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure BNil
+      1 -> BMiddle <$> get bh
+      2 -> BCat    <$> get bh <*> get bh
+      3 -> BSnoc   <$> get bh <*> get bh
+      4 -> BCons   <$> get bh <*> get bh
+      _ -> fail "Binary.putBlockCmmNodeOO: invalidTag"
 
 -----------------------------------------------------------------------------
 --     Info Tables
@@ -176,6 +252,29 @@ data SectionType
   | OtherSection String
   deriving (Show)
 
+instance Binary SectionType where
+  put_ bh Text = putByte bh 0
+  put_ bh Data = putByte bh 1
+  put_ bh ReadOnlyData = putByte bh 2
+  put_ bh RelocatableReadOnlyData = putByte bh 3
+  put_ bh UninitialisedData = putByte bh 4
+  put_ bh ReadOnlyData16 = putByte bh 5
+  put_ bh CString = putByte bh 6
+  put_ bh (OtherSection a) = putByte bh 7 >> put_ bh a
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure Text
+      1 -> pure Data
+      2 -> pure ReadOnlyData
+      3 -> pure RelocatableReadOnlyData
+      4 -> pure UninitialisedData
+      5 -> pure ReadOnlyData16
+      6 -> pure CString
+      7 -> OtherSection <$> get bh
+      _ -> fail "Binary.putSectionType: invalid tag"
+      
+
 -- | Should a data in this section be considered constant
 isSecConstant :: Section -> Bool
 isSecConstant (Section t _) = case t of
@@ -190,6 +289,10 @@ isSecConstant (Section t _) = case t of
 
 data Section = Section SectionType CLabel
 
+instance Binary Section where
+  put_ bh (Section a b) = put_ bh a >> put_ bh b
+  get bh = Section <$> get bh <*> get bh
+
 data CmmStatic
   = CmmStaticLit CmmLit
         -- a literal value, size given by cmmLitRep of the literal.
@@ -198,10 +301,26 @@ data CmmStatic
   | CmmString [Word8]
         -- string of 8-bit values only, not zero terminated.
 
+instance Binary CmmStatic where
+  put_ bh (CmmStaticLit a) = putByte bh 0 >> put_ bh a
+  put_ bh (CmmUninitialised a) = putByte bh 1 >> put_ bh a
+  put_ bh (CmmString a) = putByte bh 2 >> put_ bh a
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmStaticLit <$> get bh
+      1 -> CmmUninitialised <$> get bh
+      2 -> CmmString <$> get bh
+      _ -> fail "Binary.putCmmStatic: invalid tag"
+
 data CmmStatics
    = Statics
        CLabel      -- Label of statics
        [CmmStatic] -- The static data itself
+
+instance Binary CmmStatics where
+  put_ bh (Statics a b) = put_ bh a >> put_ bh b
+  get bh = Statics <$> get bh <*> get bh
 
 -- -----------------------------------------------------------------------------
 -- Basic blocks consisting of lists

@@ -39,6 +39,7 @@ import CmmType
 import DynFlags
 import Outputable (panic)
 import Unique
+import Binary
 
 import Data.Set (Set)
 import Data.List
@@ -72,10 +73,38 @@ instance Eq CmmExpr where       -- Equality ignores the types
   CmmStackSlot a1 i1 == CmmStackSlot a2 i2 = a1==a2 && i1==i2
   _e1                == _e2                = False
 
+instance Binary CmmExpr where
+  put_ bh (CmmLit a) = putByte bh 0 >> put_ bh a
+  put_ bh (CmmLoad a b) = putByte bh 1 >> put_ bh a >> put_ bh b
+  put_ bh (CmmReg a) = putByte bh 2 >> put_ bh a
+  put_ bh (CmmMachOp a b) = putByte bh 3 >> put_ bh a >> put_ bh b
+  put_ bh (CmmStackSlot a b) = putByte bh 4 >> put_ bh a >> put_ bh b
+  put_ bh (CmmRegOff a b) = putByte bh 5 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmLit <$> get bh
+      1 -> CmmLoad <$> get bh <*> get bh
+      2 -> CmmReg <$> get bh
+      3 -> CmmMachOp <$> get bh <*> get bh
+      4 -> CmmStackSlot <$> get bh <*> get bh
+      5 -> CmmRegOff <$> get bh <*> get bh
+      _ -> fail "Binary.putCmmExpr: invalid Tag"
+  
 data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
   deriving( Eq, Ord )
+
+instance Binary CmmReg where
+  put_ bh (CmmLocal a) = putByte bh 0 >> put_ bh a
+  put_ bh (CmmGlobal a) = putByte bh 1 >> put_ bh a
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmLocal <$> get bh
+      1 -> CmmGlobal <$> get bh
+      _ -> fail "Binary.putCmmReg: invalid Tag"
 
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
@@ -84,6 +113,16 @@ data Area
   | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
                    -- See Note [Continuation BlockId] in CmmNode.
   deriving (Eq, Ord)
+
+instance Binary Area where
+  put_ bh Old = putByte bh 0
+  put_ bh (Young a) = putByte bh 1 >> put_ bh a
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> pure Old
+      1 -> Young <$> get bh
+      _ -> fail "Binary.putArea: invalid Tag"
 
 {- Note [Old Area]
 ~~~~~~~~~~~~~~~~~~
@@ -208,6 +247,28 @@ data CmmLit
                      -- of bytes used
   deriving Eq
 
+instance Binary CmmLit where
+  put_ bh (CmmInt a b)              = putByte bh 0 >> put_ bh a >> put_ bh b
+  put_ bh (CmmFloat a b)            = putByte bh 1 >> put_ bh a >> put_ bh b
+  put_ bh (CmmVec a)                = putByte bh 2 >> put_ bh a
+  put_ bh (CmmLabel a)              = putByte bh 3 >> put_ bh a
+  put_ bh (CmmLabelOff a b)         = putByte bh 4 >> put_ bh a >> put_ bh b
+  put_ bh (CmmLabelDiffOff a b c d) = putByte bh 5 >> put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  put_ bh (CmmBlock a)              = putByte bh 6 >> put_ bh a
+  put_ bh CmmHighStackMark          = putByte bh 7
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> CmmInt          <$> get bh <*> get bh
+      1 -> CmmFloat        <$> get bh <*> get bh
+      2 -> CmmVec          <$> get bh
+      3 -> CmmLabel        <$> get bh
+      4 -> CmmLabelOff     <$> get bh <*> get bh
+      5 -> CmmLabelDiffOff <$> get bh <*> get bh <*> get bh <*> get bh
+      6 -> CmmBlock        <$> get bh
+      7 -> pure CmmHighStackMark
+      _ -> fail "Binary.putCmmLit: invalid tag"
+
 cmmExprType :: DynFlags -> CmmExpr -> CmmType
 cmmExprType dflags (CmmLit lit)        = cmmLitType dflags lit
 cmmExprType _      (CmmLoad _ rep)     = rep
@@ -260,6 +321,10 @@ data LocalReg
 
 instance Eq LocalReg where
   (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
+
+instance Binary LocalReg where
+  put_ bh (LocalReg a b) = put_ bh a >> put_ bh b
+  get bh = LocalReg <$> get bh <*> get bh
 
 -- This is non-deterministic but we do not currently support deterministic
 -- code-generation. See Note [Unique Determinism and code generation]
@@ -374,7 +439,11 @@ instance DefinerOfRegs r a => DefinerOfRegs r [a] where
 --              Global STG registers
 -----------------------------------------------------------------------------
 
-data VGcPtr = VGcPtr | VNonGcPtr deriving( Eq, Show )
+data VGcPtr = VGcPtr | VNonGcPtr deriving( Enum, Eq, Show )
+
+instance Binary VGcPtr where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 -----------------------------------------------------------------------------
 --              Global STG registers
@@ -466,6 +535,57 @@ data GlobalReg
   | PicBaseReg
 
   deriving( Show )
+
+instance Binary GlobalReg where
+  put_ bh (VanillaReg a b) = putByte bh 0 >> put_ bh a >> put_ bh b
+  put_ bh (FloatReg a)     = putByte bh 1 >> put_ bh a
+  put_ bh (DoubleReg a)    = putByte bh 2 >> put_ bh a
+  put_ bh (LongReg a)      = putByte bh 3 >> put_ bh a
+  put_ bh (XmmReg a)       = putByte bh 4 >> put_ bh a
+  put_ bh (YmmReg a)       = putByte bh 5 >> put_ bh a
+  put_ bh (ZmmReg a)       = putByte bh 6 >> put_ bh a
+  put_ bh Sp               = putByte bh 7
+  put_ bh SpLim            = putByte bh 8
+  put_ bh Hp               = putByte bh 9
+  put_ bh HpLim            = putByte bh 10
+  put_ bh CCCS             = putByte bh 11
+  put_ bh CurrentTSO       = putByte bh 12
+  put_ bh CurrentNursery   = putByte bh 13
+  put_ bh HpAlloc          = putByte bh 14
+  put_ bh EagerBlackholeInfo = putByte bh 15
+  put_ bh GCEnter1         = putByte bh 16
+  put_ bh GCFun            = putByte bh 17
+  put_ bh BaseReg          = putByte bh 18
+  put_ bh MachSp           = putByte bh 19
+  put_ bh UnwindReturnReg  = putByte bh 20
+  put_ bh PicBaseReg       = putByte bh 21
+  
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> VanillaReg <$> get bh <*> get bh
+      1 -> FloatReg   <$> get bh
+      2 -> DoubleReg  <$> get bh
+      3 -> LongReg    <$> get bh
+      4 -> XmmReg     <$> get bh
+      5 -> YmmReg     <$> get bh
+      6 -> ZmmReg     <$> get bh
+      7 -> pure Sp
+      8 -> pure SpLim
+      9 -> pure Hp
+      10 -> pure HpLim
+      11 -> pure CCCS
+      12 -> pure CurrentTSO
+      13 -> pure CurrentNursery
+      14 -> pure HpAlloc
+      15 -> pure EagerBlackholeInfo
+      16 -> pure GCEnter1
+      17 -> pure GCFun
+      18 -> pure BaseReg
+      19 -> pure MachSp
+      20 -> pure UnwindReturnReg
+      21 -> pure PicBaseReg
+      _ -> fail "Binary.putGlobalReg: invalid tag"
 
 instance Eq GlobalReg where
    VanillaReg i _ == VanillaReg j _ = i==j -- Ignore type when seeking clashes

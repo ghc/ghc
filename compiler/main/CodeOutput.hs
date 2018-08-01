@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module CodeOutput( codeOutput, outputForeignStubs ) where
+module CodeOutput( codeOutput, outputForeignStubs, readCmmFromFile ) where
 
 #include "HsVersions.h"
 
@@ -33,11 +33,14 @@ import ErrUtils
 import Outputable
 import Module
 import SrcLoc
+import Binary
 
 import Control.Exception
 import System.Directory
 import System.FilePath
 import System.IO
+
+import Name ( binPutName_, binGetName )
 
 {-
 ************************************************************************
@@ -88,6 +91,12 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
+        
+        ; let (Just src_file_name) = ml_hs_file location
+        ; let bcmm_fname = dropExtension src_file_name ++ ".bcmm"
+        ; writeCmmToFile bcmm_fname =<< Stream.collect linted_cmm_stream
+        ; putStrLn $ "Wrote " ++ bcmm_fname
+        
         ; case hscTarget dflags of {
              HscAsm         -> outputAsm dflags this_mod location filenm
                                          linted_cmm_stream;
@@ -101,6 +110,27 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
 
 doOutput :: String -> (Handle -> IO a) -> IO a
 doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
+
+putWithUserData :: Binary a => BinHandle -> a -> IO ()
+putWithUserData bh payload = do
+  bh <- return $ setUserData bh $ newWriteState binPutName_ binPutName_ putFS
+  put_ bh payload
+
+getWithUserData :: Binary a => BinHandle -> IO a
+getWithUserData bh = do
+  bh <- return $ setUserData bh $ newReadState binGetName getFS
+  get bh
+
+writeCmmToFile :: Binary a => String -> a -> IO ()
+writeCmmToFile fname cmm = do
+  { bh <- openBinMem (1024 * 1024)
+  ; putWithUserData bh cmm
+  ; writeBinMem bh fname }
+
+readCmmFromFile :: String -> IO [RawCmmGroup]
+readCmmFromFile fname = do
+  { bh <- readBinMem fname
+  ; getWithUserData bh }
 
 {-
 ************************************************************************

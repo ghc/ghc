@@ -128,6 +128,7 @@ import Platform
 import UniqSet
 import Util
 import PprCore ( {- instances -} )
+import Binary
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -261,6 +262,45 @@ data CLabel
 
   deriving Eq
 
+instance Binary CLabel where
+  put_ bh (IdLabel a b c)           = putByte bh 0 >> put_ bh a >> put_ bh b >> put_ bh c
+  put_ bh (CmmLabel a b c)          = putByte bh 1 >> put_ bh a >> put_ bh b >> put_ bh c
+  put_ bh (RtsLabel a)              = putByte bh 2 >> put_ bh a
+  put_ bh (LocalBlockLabel a)       = putByte bh 3 >> put_ bh a
+  put_ bh (ForeignLabel a b c d)    = putByte bh 4 >> put_ bh a >> put_ bh b >> put_ bh c >> put_ bh d
+  put_ bh (AsmTempLabel a)          = putByte bh 5 >> put_ bh a
+  put_ bh (AsmTempDerivedLabel a b) = putByte bh 6 >> put_ bh a >> put_ bh b
+  put_ bh (StringLitLabel a)        = putByte bh 7 >> put_ bh a
+  put_ bh (CC_Label a)              = putByte bh 8 >> put_ bh a
+  put_ bh (CCS_Label a)             = putByte bh 9 >> put_ bh a
+  put_ bh (DynamicLinkerLabel a b)  = putByte bh 10 >> put_ bh a >> put_ bh b
+  put_ bh PicBaseLabel              = putByte bh 11
+  put_ bh (DeadStripPreventer a)    = putByte bh 12 >> put_ bh a
+  put_ bh (HpcTicksLabel a)         = putByte bh 13 >> put_ bh a
+  put_ bh (SRTLabel a)              = putByte bh 14 >> put_ bh a
+  put_ bh (LargeBitmapLabel a)      = putByte bh 15 >> put_ bh a
+
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> IdLabel <$> get bh <*> get bh <*> get bh
+      1 -> CmmLabel <$> get bh <*> get bh <*> get bh
+      2 -> RtsLabel <$> get bh
+      3 -> LocalBlockLabel <$> get bh
+      4 -> ForeignLabel <$> get bh <*> get bh <*> get bh <*> get bh
+      5 -> AsmTempLabel <$> get bh
+      6 -> AsmTempDerivedLabel <$> get bh <*> get bh
+      7 -> StringLitLabel <$> get bh
+      8 -> CC_Label <$> get bh
+      9 -> CCS_Label <$> get bh
+      10 -> DynamicLinkerLabel <$> get bh <*> get bh
+      11 -> pure PicBaseLabel
+      12 -> DeadStripPreventer <$> get bh
+      13 -> HpcTicksLabel <$> get bh
+      14 -> SRTLabel <$> get bh
+      15 -> LargeBitmapLabel <$> get bh
+      _  -> fail "Binary.putCLabel: invalid tag"
+
 -- This is laborious, but necessary. We can't derive Ord because
 -- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
 -- implementation. See Note [No Ord for Unique]
@@ -356,6 +396,17 @@ data ForeignLabelSource
 
    deriving (Eq, Ord)
 
+instance Binary ForeignLabelSource where
+  put_ bh (ForeignLabelInPackage a) = putByte bh 0 >> put_ bh a
+  put_ bh ForeignLabelInExternalPackage = putByte bh 1
+  put_ bh ForeignLabelInThisPackage = putByte bh 2
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> ForeignLabelInPackage <$> get bh
+      1 -> pure ForeignLabelInExternalPackage
+      2 -> pure ForeignLabelInThisPackage
+      _ -> fail "Binary.putForeignLabelSource: invalud tag"
 
 -- | For debugging problems with the CLabel representation.
 --      We can't make a Show instance for CLabel because lots of its components don't have instances.
@@ -402,7 +453,11 @@ data IdLabelInfo
                         -- instead of a closure entry-point.
                         -- See Note [Proc-point local block entry-point].
 
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Enum, Ord, Show)
+
+instance Binary IdLabelInfo where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 
 data RtsLabelInfo
@@ -420,6 +475,27 @@ data RtsLabelInfo
   -- NOTE: Eq on LitString compares the pointer only, so this isn't
   -- a real equality.
 
+instance Binary RtsLabelInfo where
+  put_ bh (RtsSelectorInfoTable a b) = putByte bh 0 >> put_ bh a >> put_ bh b
+  put_ bh (RtsSelectorEntry a b)     = putByte bh 1 >> put_ bh a >> put_ bh b
+  put_ bh (RtsApInfoTable a b)       = putByte bh 2 >> put_ bh a >> put_ bh b
+  put_ bh (RtsApEntry a b)           = putByte bh 3 >> put_ bh a >> put_ bh b
+  put_ bh (RtsPrimOp a)              = putByte bh 4 >> put_ bh a
+  put_ bh (RtsApFast a)              = putByte bh 5 >> put_ bh a
+  put_ bh (RtsSlowFastTickyCtr a)    = putByte bh 6 >> put_ bh a
+  
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> RtsSelectorInfoTable <$> get bh <*> get bh
+      1 -> RtsSelectorEntry     <$> get bh <*> get bh
+      2 -> RtsApInfoTable       <$> get bh <*> get bh
+      3 -> RtsApEntry           <$> get bh <*> get bh
+      4 -> RtsPrimOp            <$> get bh
+      5 -> RtsApFast            <$> get bh
+      6 -> RtsSlowFastTickyCtr  <$> get bh
+      _ -> fail "Binary.putRtsLabelInfo: invalid tag"
+
 
 -- | What type of Cmm label we're dealing with.
 --      Determines the suffix appended to the name when a CLabel.CmmLabel
@@ -433,7 +509,11 @@ data CmmLabelInfo
   | CmmCode                     -- ^ misc rts code
   | CmmClosure                  -- ^ closures eg CHARLIKE_closure
   | CmmPrimCall                 -- ^ a prim call to some hand written Cmm code
-  deriving (Eq, Ord)
+  deriving (Eq, Enum, Ord)
+
+instance Binary CmmLabelInfo where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 data DynamicLinkerLabelInfo
   = CodeStub                    -- MachO: Lfoo$stub, ELF: foo@plt
@@ -441,7 +521,11 @@ data DynamicLinkerLabelInfo
   | GotSymbolPtr                -- ELF: foo@got
   | GotSymbolOffset             -- ELF: foo@gotoff
 
-  deriving (Eq, Ord)
+  deriving (Eq, Enum, Ord)
+
+instance Binary DynamicLinkerLabelInfo where
+  put_ bh = putByte bh . fromIntegral . fromEnum
+  get bh = toEnum . fromIntegral <$> getByte bh
 
 
 -- -----------------------------------------------------------------------------

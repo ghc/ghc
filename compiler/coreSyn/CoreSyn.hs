@@ -862,6 +862,21 @@ data Tickish id =
 
   deriving (Eq, Ord, Data)
 
+instance Binary a => Binary (Tickish a) where
+  put_ bh (ProfNote a b c) = putByte bh 0 >> put_ bh a >> put_ bh b >> put_ bh c
+  put_ bh (HpcTick a b) = putByte bh 1 >> put_ bh a >> put_ bh b
+  put_ bh (Breakpoint a b) = putByte bh 2 >> put_ bh a >> put_ bh b
+  put_ bh (SourceNote a b) = putByte bh 3 >> put_ bh a >> put_ bh b
+  get bh = do
+    tag <- getByte bh
+    case tag of
+      0 -> ProfNote <$> get bh <*> get bh <*> get bh
+      1 -> HpcTick <$> get bh <*> get bh
+      2 -> Breakpoint <$> get bh <*> get bh
+      3 -> SourceNote <$> get bh <*> get bh
+      _ -> fail "Binary.putTickish: invalidTag"
+      
+
 -- | A "counting tick" (where tickishCounts is True) is one that
 -- counts evaluations in some way.  We cannot discard a counting tick,
 -- and the compiler should preserve the number of counting ticks as
