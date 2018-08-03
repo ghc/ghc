@@ -444,14 +444,12 @@ instance Semigroup a => Semigroup (IO a) where
 instance Monoid a => Monoid (IO a) where
     mempty = pure mempty
 
-{- | The 'Functor' class is used for types that can be mapped over.
-Instances of 'Functor' should satisfy the following laws:
+{- | A type @f@ is a Functor if it provides a function @fmap@ which, given any types @a@ and @b@
+lets you apply any function from @(a -> b)@ to turn an @f a@ into an @f b@, preserving the
+structure of @f@. Furthermore @f@ needs to adhere to the following laws:
 
-> fmap id  ==  id
-> fmap (f . g)  ==  fmap f . fmap g
-
-The instances of 'Functor' for lists, 'Data.Maybe.Maybe' and 'System.IO.IO'
-satisfy these laws.
+> fmap id == id
+> fmap (f . g) == fmap f . fmap g
 -}
 
 class  Functor f  where
