@@ -2,7 +2,25 @@ FROM fedora:27
 
 ENV LANG C.UTF-8
 
-RUN dnf -y install coreutils binutils which git make automake autoconf gcc perl python3 texinfo xz lbzip2 patch openssh-clients sudo curl zlib-devel sqlite ncurses-compat-libs gmp-devel ncurses-devel gcc-c++ findutils
+# Core build utilities
+RUN dnf -y install coreutils binutils which git make \
+    automake autoconf gcc perl python3 texinfo xz lbzip2 \
+    patch openssh-clients sudo curl zlib-devel sqlite \
+    ncurses-compat-libs gmp-devel ncurses-devel gcc-c++ findutils
+
+# Documentation tools
+RUN dnf -y install python3-sphinx \
+    texlive texlive-latex texlive-xetex \
+    texlive-collection-latex texlive-collection-latexrecommended \
+    texlive-xetex-def texlive-collection-xetex \
+    python-sphinx-latex dejavu-sans-fonts dejavu-serif-fonts \
+    dejavu-sans-mono-fonts
+
+# This is in the PATH when I ssh into the CircleCI machine but somehow
+# sphinx-build isn't found during configure unless we explicitly 
+# add it here as well; perhaps PATH is being overridden by CircleCI's
+# infrastructure?
+ENV PATH /usr/libexec/python3-sphinx:$PATH
 
 # systemd isn't running so remove it from nsswitch.conf
 # Failing to do this will result in testsuite failures due to

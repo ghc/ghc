@@ -5,7 +5,15 @@ ENV LANG C.UTF-8
 RUN echo 'deb http://ppa.launchpad.net/hvr/ghc/ubuntu trusty main' > /etc/apt/sources.list.d/ghc.list
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6F88286
 RUN apt-get update -qq
-RUN apt-get install -qy cabal-install-2.2 ghc-8.4.2 happy alex zlib1g-dev libtinfo-dev libsqlite3-0 libsqlite3-dev ca-certificates g++ git curl git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 patch openssh-client sudo
+
+# Core build utilities
+RUN apt-get install -qy cabal-install-2.2 ghc-8.4.2 happy alex zlib1g-dev \
+    libtinfo-dev libsqlite3-0 libsqlite3-dev ca-certificates g++ git curl \
+    git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 \
+    patch openssh-client sudo
+
+# Documentation tools
+RUN apt-get install -qy python3-sphinx texlive-xetex texlive-latex-extra
 
 # Stack intallation
 RUN curl -fSL https://github.com/commercialhaskell/stack/releases/download/v1.6.5/stack-1.6.5-linux-x86_64-static.tar.gz -o stack.tar.gz
