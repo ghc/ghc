@@ -15,9 +15,7 @@
 -----------------------------------------------------------------------------
 module Haddock.Backends.Xhtml.Decl (
   ppDecl,
-
-  ppTyName, ppTyFamHeader, ppTypeApp, ppOrphanInstances,
-  tyvarNames
+  ppOrphanInstances,
 ) where
 
 import Haddock.Backends.Xhtml.DocMarkup
@@ -56,7 +54,7 @@ ppDecl :: Bool                                     -- ^ print summary info only
        -> Qualification
        -> Html
 ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdocs splice unicode pkg qual = case decl of
-  TyClD _ (FamDecl _ d)          -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode pkg qual
+  TyClD _ (FamDecl _ d)          -> ppFamDecl summ False links instances fixities loc mbDoc d splice unicode pkg qual
   TyClD _ d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d pats splice unicode pkg qual
   TyClD _ d@(SynDecl {})         -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode pkg qual
   TyClD _ d@(ClassDecl {})       -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode pkg qual
@@ -67,7 +65,7 @@ ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdoc
   ForD _ d                       -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode pkg qual
   InstD _ _                      -> noHtml
   DerivD _ _                     -> noHtml
-  _                            -> error "declaration not supported by ppDecl"
+  _                              -> error "declaration not supported by ppDecl"
 
 
 ppLFunSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
@@ -222,9 +220,6 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
 ppTyVars :: Unicode -> Qualification -> [LHsTyVarBndr DocNameI] -> [Html]
 ppTyVars unicode qual tvs = map (ppHsTyVarBndr unicode qual . unLoc) tvs
 
-tyvarNames :: LHsQTyVars DocNameI -> [Name]
-tyvarNames = map (getName . hsLTyVarName) . hsQTvExplicit
-
 
 ppFor :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName
       -> ForeignDecl DocNameI -> [(DocName, Fixity)]
@@ -283,111 +278,111 @@ ppSimpleSig links splice unicode qual emptyCtxts loc names typ =
 --------------------------------------------------------------------------------
 
 
-ppFamilyInfo :: Bool -> FamilyInfo DocNameI -> Html
-ppFamilyInfo assoc OpenTypeFamily
-    | assoc = keyword "type"
-    | otherwise = keyword "type family"
-ppFamilyInfo assoc DataFamily
-    | assoc = keyword "data"
-    | otherwise = keyword "data family"
-ppFamilyInfo _ (ClosedTypeFamily _) = keyword "type family"
-
-
-ppTyFamHeader :: Bool -> Bool -> FamilyDecl DocNameI
-              -> Unicode -> Qualification -> Html
-ppTyFamHeader summary associated d@(FamilyDecl { fdInfo = info
-                                               , fdResultSig = L _ result
-                                               , fdInjectivityAnn = injectivity })
-              unicode qual =
-  (case info of
-     OpenTypeFamily
-       | associated -> keyword "type"
-       | otherwise  -> keyword "type family"
-     DataFamily
-       | associated -> keyword "data"
-       | otherwise  -> keyword "data family"
-     ClosedTypeFamily _
-                    -> keyword "type family"
-  ) <+>
-
-  ppFamDeclBinderWithVars summary unicode qual d <+>
-  ppResultSig result unicode qual <+>
-
-  (case injectivity of
-     Nothing                   -> noHtml
-     Just (L _ injectivityAnn) -> ppInjectivityAnn unicode qual injectivityAnn
-  ) <+>
-
-  (case info of
-     ClosedTypeFamily _ -> keyword "where ..."
-     _                  -> mempty
-  )
-ppTyFamHeader _ _ (XFamilyDecl _) _ _ = panic "haddock;ppTyFamHeader"
-
-ppResultSig :: FamilyResultSig DocNameI -> Unicode -> Qualification -> Html
-ppResultSig result unicode qual = case result of
-    NoSig _               -> noHtml
-    KindSig _ kind        -> dcolon unicode  <+> ppLKind unicode qual kind
-    TyVarSig _ (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
-    XFamilyResultSig _    -> panic "haddock:ppResultSig"
-
-ppPseudoFamilyHeader :: Unicode -> Qualification -> PseudoFamilyDecl DocNameI
-                     -> Html
-ppPseudoFamilyHeader unicode qual (PseudoFamilyDecl { .. }) =
-    ppFamilyInfo True pfdInfo <+>
-    ppAppNameTypes (unLoc pfdLName) (map unLoc pfdTyVars) unicode qual <+>
-    ppResultSig (unLoc pfdKindSig) unicode qual
-
-ppInjectivityAnn :: Bool -> Qualification -> InjectivityAnn DocNameI -> Html
-ppInjectivityAnn unicode qual (InjectivityAnn lhs rhs) =
-    char '|' <+> ppLDocName qual Raw lhs <+> arrow unicode <+>
-    hsep (map (ppLDocName qual Raw) rhs)
-
-
-ppTyFam :: Bool -> Bool -> LinksInfo -> [DocInstance DocNameI] ->
-           [(DocName, Fixity)] -> SrcSpan -> Documentation DocName ->
-           FamilyDecl DocNameI -> Splice -> Unicode -> Maybe Package ->
-           Qualification -> Html
-ppTyFam summary associated links instances fixities loc doc decl splice unicode
-        pkg qual
-
-  | summary   = ppTyFamHeader True associated decl unicode qual
+-- | Print a data\/type family declaration
+ppFamDecl :: Bool                     -- ^ is a summary
+          -> Bool                     -- ^ is an associated type
+          -> LinksInfo
+          -> [DocInstance DocNameI]   -- ^ relevant instances
+          -> [(DocName, Fixity)]      -- ^ relevant fixities
+          -> SrcSpan
+          -> Documentation DocName    -- ^ this decl's documentation
+          -> FamilyDecl DocNameI      -- ^ this decl
+          -> Splice -> Unicode -> Maybe Package -> Qualification -> Html
+ppFamDecl summary associated links instances fixities loc doc decl splice unicode pkg qual
+  | summary   = ppFamHeader True associated decl unicode qual
   | otherwise = header_ +++ docSection Nothing pkg qual doc +++ instancesBit
 
   where
     docname = unLoc $ fdLName decl
 
     header_ = topDeclElem links loc splice [docname] $
-       ppTyFamHeader summary associated decl unicode qual <+> ppFixities fixities qual
+       ppFamHeader summary associated decl unicode qual <+> ppFixities fixities qual
 
     instancesBit
       | FamilyDecl { fdInfo = ClosedTypeFamily mb_eqns } <- decl
       , not summary
-      = subEquations pkg qual $ map (ppTyFamEqn . unLoc) $ fromMaybe [] mb_eqns
+      = subEquations pkg qual $ map (ppFamDeclEqn . unLoc) $ fromMaybe [] mb_eqns
 
       | otherwise
       = ppInstances links (OriginFamily docname) instances splice unicode pkg qual
 
     -- Individual equation of a closed type family
-    ppTyFamEqn :: TyFamInstEqn DocNameI -> SubDecl
-    ppTyFamEqn (HsIB { hsib_body = FamEqn { feqn_tycon = n, feqn_rhs = rhs
-                                          , feqn_pats = ts } })
-      = ( ppAppNameTypes (unLoc n) (map unLoc ts) unicode qual
+    ppFamDeclEqn :: TyFamInstEqn DocNameI -> SubDecl
+    ppFamDeclEqn (HsIB { hsib_body = FamEqn { feqn_tycon = L _ n
+                                            , feqn_rhs = rhs
+                                            , feqn_pats = ts } })
+      = ( ppAppNameTypes n (map unLoc ts) unicode qual
           <+> equals <+> ppType unicode qual HideEmptyContexts (unLoc rhs)
-        , Nothing, [] )
-    ppTyFamEqn (XHsImplicitBndrs _) = panic "haddock:ppTyFam"
-    ppTyFamEqn (HsIB { hsib_body = XFamEqn _}) = panic "haddock:ppTyFam"
+        , Nothing
+        , []
+        )
+    ppFamDeclEqn (XHsImplicitBndrs _) = panic "haddock:ppFamDecl"
+    ppFamDeclEqn (HsIB { hsib_body = XFamEqn _}) = panic "haddock:ppFamDecl"
 
 
-
-ppPseudoFamilyDecl :: LinksInfo -> Splice -> Unicode -> Qualification
-                   -> PseudoFamilyDecl DocNameI
-                   -> Html
-ppPseudoFamilyDecl links splice unicode qual
-                   decl@(PseudoFamilyDecl { pfdLName = L loc name, .. }) =
-    wrapper $ ppPseudoFamilyHeader unicode qual decl
+-- | Print a pseudo family declaration
+ppPseudoFamDecl :: LinksInfo -> Splice
+                -> PseudoFamilyDecl DocNameI   -- ^ this decl
+                -> Unicode -> Qualification -> Html
+ppPseudoFamDecl links splice
+                (PseudoFamilyDecl { pfdInfo = info
+                                  , pfdKindSig = L _ kindSig
+                                  , pfdTyVars = tvs
+                                  , pfdLName = L loc name })
+                unicode qual =
+    topDeclElem links loc splice [name] leader
   where
-    wrapper = topDeclElem links loc splice [name]
+    leader = hsep [ ppFamilyLeader True info
+                  , ppAppNameTypes name (map unLoc tvs) unicode qual
+                  , ppResultSig kindSig unicode qual
+                  ]
+
+-- | Print the LHS of a type\/data family declaration
+ppFamHeader :: Bool                 -- ^ is a summary
+            -> Bool                 -- ^ is an associated type
+            -> FamilyDecl DocNameI  -- ^ family declaration
+            -> Unicode -> Qualification -> Html
+ppFamHeader _ _ (XFamilyDecl _) _ _ = panic "haddock;ppFamHeader"
+ppFamHeader summary associated (FamilyDecl { fdInfo = info
+                                           , fdResultSig = L _ result
+                                           , fdInjectivityAnn = injectivity
+                                           , fdLName = L _ name
+                                           , fdTyVars = tvs })
+              unicode qual =
+  hsep [ ppFamilyLeader associated info
+       , ppAppDocNameTyVarBndrs summary unicode qual name (hsq_explicit tvs)
+       , ppResultSig result unicode qual
+       , injAnn
+       , whereBit
+       ]
+  where
+    whereBit = case info of
+      ClosedTypeFamily _ -> keyword "where ..."
+      _                  -> noHtml
+
+    injAnn = case injectivity of
+      Nothing -> noHtml
+      Just (L _ (InjectivityAnn lhs rhs)) -> hsep ( keyword "|"
+                                                  : ppLDocName qual Raw lhs
+                                                  : arrow unicode
+                                                  : map (ppLDocName qual Raw) rhs)
+
+-- | Print the keywords that begin the family declaration
+ppFamilyLeader :: Bool -> FamilyInfo DocNameI -> Html
+ppFamilyLeader assoc info = keyword (typ ++ if assoc then "" else " family")
+  where
+    typ = case info of
+       OpenTypeFamily     -> "type"
+       ClosedTypeFamily _ -> "type"
+       DataFamily         -> "data"
+
+-- | Print the signature attached to a family
+ppResultSig :: FamilyResultSig DocNameI -> Unicode -> Qualification -> Html
+ppResultSig result unicode qual = case result of
+    NoSig _               -> noHtml
+    KindSig _ kind        -> dcolon unicode  <+> ppLKind unicode qual kind
+    TyVarSig _ (L _ bndr) -> equals <+> ppHsTyVarBndr unicode qual bndr
+    XFamilyResultSig _    -> panic "haddock:ppResultSig"
 
 
 --------------------------------------------------------------------------------
@@ -399,23 +394,8 @@ ppAssocType :: Bool -> LinksInfo -> DocForDecl DocName -> LFamilyDecl DocNameI
             -> [(DocName, Fixity)] -> Splice -> Unicode -> Maybe Package
             -> Qualification -> Html
 ppAssocType summ links doc (L loc decl) fixities splice unicode pkg qual =
-   ppTyFam summ True links [] fixities loc (fst doc) decl splice unicode pkg qual
+   ppFamDecl summ True links [] fixities loc (fst doc) decl splice unicode pkg qual
 
-
---------------------------------------------------------------------------------
--- * TyClDecl helpers
---------------------------------------------------------------------------------
-
--- | Print a type family and its variables
-ppFamDeclBinderWithVars :: Bool -> Unicode -> Qualification -> FamilyDecl DocNameI -> Html
-ppFamDeclBinderWithVars summ unicode qual (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
-  ppAppDocNameTyVarBndrs summ unicode qual (unLoc lname) (hsq_explicit tvs)
-ppFamDeclBinderWithVars _ _ _ (XFamilyDecl _) = panic "haddock:ppFamDeclBinderWithVars"
-
--- | Print a newtype / data binder and its variables
-ppDataBinderWithVars :: Bool -> Unicode -> Qualification -> TyClDecl DocNameI -> Html
-ppDataBinderWithVars summ unicode qual decl =
-  ppAppDocNameTyVarBndrs summ unicode qual (tcdName decl) (hsQTvExplicit $ tcdTyVars decl)
 
 --------------------------------------------------------------------------------
 -- * Type applications
@@ -672,7 +652,9 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) m
             , mdoc
             , [subFamInstDetails iid pdecl mname])
           where
-            pdata = keyword "data" <+> typ
+            nd = dd_ND (tcdDataDefn dd)
+            pref = case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }
+            pdata = pref <+> typ
             pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
   where
     mname = maybe noHtml (\m -> toHtml "Defined in" <+> ppModule m) mdl
@@ -684,9 +666,7 @@ ppInstanceAssocTys :: LinksInfo -> Splice -> Unicode -> Qualification
                    -> [PseudoFamilyDecl DocNameI]
                    -> [Html]
 ppInstanceAssocTys links splice unicode qual =
-    map ppFamilyDecl'
-  where
-    ppFamilyDecl' = ppPseudoFamilyDecl links splice unicode qual
+    map (\pseudo -> ppPseudoFamDecl links splice pseudo unicode qual)
 
 
 ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
@@ -1060,10 +1040,12 @@ ppSideBySidePat fixities unicode qual lnames typ (doc, argDocs) =
 -- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: Bool -> TyClDecl DocNameI -> Unicode -> Qualification -> Html
-ppDataHeader summary decl@(DataDecl { tcdDataDefn =
-                                         HsDataDefn { dd_ND = nd
-                                                    , dd_ctxt = ctxt
-                                                    , dd_kindSig = ks } })
+ppDataHeader summary (DataDecl { tcdDataDefn =
+                                    HsDataDefn { dd_ND = nd
+                                               , dd_ctxt = ctxt
+                                               , dd_kindSig = ks }
+                               , tcdLName = L _ name
+                               , tcdTyVars = tvs })
              unicode qual
   = -- newtype or data
     (case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" })
@@ -1071,7 +1053,7 @@ ppDataHeader summary decl@(DataDecl { tcdDataDefn =
     -- context
     ppLContext ctxt unicode qual HideEmptyContexts <+>
     -- T a b c ..., or a :+: b
-    ppDataBinderWithVars summary unicode qual decl
+    ppAppDocNameTyVarBndrs summary unicode qual name (hsQTvExplicit tvs)
     <+> case ks of
       Nothing -> mempty
       Just (L _ x) -> dcolon unicode <+> ppKind unicode qual x
@@ -1120,7 +1102,7 @@ ppHsTyVarBndr _       qual (UserTyVar _ (L _ name)) =
 ppHsTyVarBndr unicode qual (KindedTyVar _ name kind) =
     parens (ppDocName qual Raw False (unLoc name) <+> dcolon unicode <+>
             ppLKind unicode qual kind)
-ppHsTyVarBndr _ _ (XTyVarBndr _) = error "haddock:ppHsTyVarBndr"
+ppHsTyVarBndr _ _ (XTyVarBndr _) = panic "haddock:ppHsTyVarBndr"
 
 ppLKind :: Unicode -> Qualification -> LHsKind DocNameI -> Html
 ppLKind unicode qual y = ppKind unicode qual (unLoc y)
