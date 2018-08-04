@@ -12,9 +12,8 @@
 -- Portability :  portable
 -----------------------------------------------------------------------------
 module Haddock.Backends.LaTeX (
-  ppLaTeX
+  ppLaTeX,
 ) where
-
 
 import Documentation.Haddock.Markup
 import Haddock.Types
@@ -285,7 +284,7 @@ ppDecl :: LHsDecl DocNameI                         -- ^ decl to print
        -> LaTeX
 
 ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
-  TyClD _ d@FamDecl {}         -> ppTyFam False doc d unicode
+  TyClD _ d@FamDecl {}         -> ppFamDecl doc instances d unicode
   TyClD _ d@DataDecl {}        -> ppDataDecl pats instances subdocs (Just doc) d unicode
   TyClD _ d@SynDecl {}         -> ppTySyn (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
@@ -303,17 +302,88 @@ ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
     unicode = False
 
 
-ppTyFam :: Bool -> Documentation DocName ->
-              TyClDecl DocNameI -> Bool -> LaTeX
-ppTyFam _ _ _ _ =
-  error "type family declarations are currently not supported by --latex"
-
-
 ppFor :: DocForDecl DocName -> ForeignDecl DocNameI -> Bool -> LaTeX
 ppFor doc (ForeignImport _ (L _ name) typ _) unicode =
   ppFunSig doc [name] (hsSigType typ) unicode
 ppFor _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
 --  error "foreign declarations are currently not supported by --latex"
+
+
+-------------------------------------------------------------------------------
+-- * Type families
+-------------------------------------------------------------------------------
+
+-- | Pretty-print a data\/type family declaration
+ppFamDecl :: Documentation DocName    -- ^ this decl's docs
+          -> [DocInstance DocNameI]   -- ^ relevant instances
+          -> TyClDecl DocNameI        -- ^ family to print
+          -> Bool                     -- ^ unicode
+          -> LaTeX
+ppFamDecl doc instances decl unicode =
+  declWithDoc (ppFamHeader (tcdFam decl) unicode <+> whereBit)
+              (if null body then Nothing else Just (vcat body))
+  $$ instancesBit
+  where
+    body = catMaybes [familyEqns, documentationToLaTeX doc]
+
+    whereBit = case fdInfo (tcdFam decl) of
+      ClosedTypeFamily _ -> keyword "where"
+      _                  -> empty
+
+    familyEqns
+      | FamilyDecl { fdInfo = ClosedTypeFamily (Just eqns) } <- tcdFam decl
+      = Just (text "\\haddockbeginargs" $$
+              vcat [ decltt (ppFamDeclEqn eqn) <+> nl | L _ eqn <- eqns ] $$
+              text "\\end{tabulary}\\par")
+      | otherwise = Nothing
+
+    -- Individual equations of a closed type family
+    ppFamDeclEqn :: TyFamInstEqn DocNameI -> LaTeX
+    ppFamDeclEqn (HsIB { hsib_body = FamEqn { feqn_tycon = L _ n
+                                            , feqn_rhs = rhs
+                                            , feqn_pats = ts } })
+      = hsep [ ppAppNameTypes n (map unLoc ts) unicode
+             , equals
+             , ppType unicode (unLoc rhs)
+             ]
+    ppFamDeclEqn (XHsImplicitBndrs _) = panic "haddock:ppFamDecl"
+    ppFamDeclEqn (HsIB { hsib_body = XFamEqn _}) = panic "haddock:ppFamDecl"
+
+    instancesBit = ppDocInstances unicode instances
+
+-- | Print the LHS of a type\/data family declaration.
+ppFamHeader :: FamilyDecl DocNameI  -- ^ family header to print
+              -> Bool                 -- ^ unicode
+              -> LaTeX
+ppFamHeader (XFamilyDecl _) _ = panic "haddock;ppFamHeader"
+ppFamHeader (FamilyDecl { fdLName = L _ name
+                        , fdTyVars = tvs
+                        , fdInfo = info
+                        , fdResultSig = L _ result
+                        , fdInjectivityAnn = injectivity })
+              unicode =
+  leader <+> keyword "family" <+> famName <+> famSig <+> injAnn
+  where
+    leader = case info of
+      OpenTypeFamily     -> keyword "type"
+      ClosedTypeFamily _ -> keyword "type"
+      DataFamily         -> keyword "data"
+
+    famName = ppAppDocNameTyVarBndrs unicode name (hsq_explicit tvs)
+
+    famSig = case result of
+      NoSig _               -> empty
+      KindSig _ kind        -> dcolon unicode <+> ppLKind unicode kind
+      TyVarSig _ (L _ bndr) -> equals <+> ppHsTyVarBndr unicode bndr
+      XFamilyResultSig _    -> panic "haddock:ppFamHeader"
+
+    injAnn = case injectivity of
+      Nothing -> empty
+      Just (L _ (InjectivityAnn lhs rhs)) -> hsep ( decltt (text "|")
+                                                  : ppLDocName lhs
+                                                  : arrow unicode
+                                                  : map ppLDocName rhs)
+
 
 
 -------------------------------------------------------------------------------
@@ -538,12 +608,14 @@ ppClassDecl instances doc subdocs
       | otherwise = error "LaTeX.ppClassDecl"
 
     methodTable =
-      text "\\haddockpremethods{}\\textbf{Methods}" $$
-      vcat  [ ppFunSig doc [name] (hsSigWcType typ) unicode
+      text "\\haddockpremethods{}" <> emph (text "Methods") $$
+      vcat  [ ppFunSig doc names (hsSigWcType typ) unicode
             | L _ (TypeSig _ lnames typ) <- lsigs
-            , name <- map unLoc lnames
-            , let doc = lookupAnySubdoc name subdocs
-            ]
+            , let doc = lookupAnySubdoc (head names) subdocs
+                  names = map unLoc lnames ]
+              -- FIXME: is taking just the first name ok? Is it possible that
+              -- there are different subdocs for different names in a single
+              -- type signature?
 
     instancesBit = ppDocInstances unicode instances
 
@@ -573,14 +645,13 @@ ppDocInstance unicode (instHead, doc, _, _) =
 
 
 ppInstDecl :: Bool -> InstHead DocNameI -> LaTeX
-ppInstDecl unicode instHead = keyword "instance" <+> ppInstHead unicode instHead
-
-
-ppInstHead :: Bool -> InstHead DocNameI -> LaTeX
-ppInstHead unicode (InstHead {..}) = case ihdInstType of
-    ClassInst ctx _ _ _ -> ppContextNoLocs ctx unicode <+> typ
-    TypeInst rhs -> keyword "type" <+> typ <+> tibody rhs
-    DataInst _ -> error "data instances not supported by --latex yet"
+ppInstDecl unicode (InstHead {..}) = case ihdInstType of
+  ClassInst ctx _ _ _ -> keyword "instance" <+> ppContextNoLocs ctx unicode <+> typ
+  TypeInst rhs -> keyword "type" <+> keyword "instance" <+> typ <+> tibody rhs
+  DataInst dd ->
+    let nd = dd_ND (tcdDataDefn dd)
+        pref = case nd of { NewType -> keyword "newtype"; DataType -> keyword "data" }
+    in pref <+> keyword "instance" <+> typ
   where
     typ = ppAppNameTypes ihdClsName ihdTypes unicode
     tibody = maybe empty (\t -> equals <+> ppType unicode t)
@@ -613,7 +684,7 @@ ppDataDecl pats instances subdocs doc dataDecl unicode =
     cons      = dd_cons (tcdDataDefn dataDecl)
     resTy     = (unLoc . head) cons
 
-    body = catMaybes [constrBit,patternBit, doc >>= documentationToLaTeX]
+    body = catMaybes [doc >>= documentationToLaTeX, constrBit,patternBit]
 
     (whereBit, leaders)
       | null cons
@@ -823,6 +894,12 @@ ppDataHeader _ _ = error "ppDataHeader: illegal argument"
 -- * Type applications
 --------------------------------------------------------------------------------
 
+ppAppDocNameTyVarBndrs :: Bool -> DocName -> [LHsTyVarBndr DocNameI] -> LaTeX
+ppAppDocNameTyVarBndrs unicode n vs =
+    ppTypeApp n vs ppDN (ppHsTyVarBndr unicode . unLoc)
+  where
+    ppDN = ppBinder . nameOccName . getName
+
 
 -- | Print an application of a DocName to its list of HsTypes
 ppAppNameTypes :: DocName -> [HsType DocNameI] -> Bool -> LaTeX
@@ -917,6 +994,12 @@ ppType       unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
 ppParendType unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
 ppFunLhType  unicode ty = ppr_mono_ty (reparenTypePrec PREC_FUN ty) unicode
 
+ppHsTyVarBndr :: Bool -> HsTyVarBndr DocNameI -> LaTeX
+ppHsTyVarBndr _ (UserTyVar _ (L _ name)) = ppDocName name
+ppHsTyVarBndr unicode (KindedTyVar _ (L _ name) kind) =
+  parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+ppHsTyVarBndr _ (XTyVarBndr _) = panic "haddock:ppHsTyVarBndr"
+
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
 ppLKind unicode y = ppKind unicode (unLoc y)
 
@@ -973,7 +1056,7 @@ ppr_mono_ty (HsParTy _ ty) unicode
 ppr_mono_ty (HsDocTy _ ty _) unicode
   = ppr_mono_lty ty unicode
 
-ppr_mono_ty (HsWildCardTy (AnonWildCard _)) _ = char '_'
+ppr_mono_ty (HsWildCardTy (AnonWildCard _)) _ = text "\\_"
 
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
