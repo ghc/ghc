@@ -22,6 +22,8 @@ module RnNames (
         dodgyMsg,
         dodgyMsgInsert,
         findImportUsage,
+        getMinimalImports,
+        printMinimalImports,
         ImportDeclUsage
     ) where
 
@@ -1452,28 +1454,9 @@ decls, and simply trim their import lists.  NB that
     from it.  Instead we just trim to an empty import list
 -}
 
-printMinimalImports :: [ImportDeclUsage] -> RnM ()
--- See Note [Printing minimal imports]
-printMinimalImports imports_w_usage
-  = do { imports' <- mapM mk_minimal imports_w_usage
-       ; this_mod <- getModule
-       ; dflags   <- getDynFlags
-       ; liftIO $
-         do { h <- openFile (mkFilename dflags this_mod) WriteMode
-            ; printForUser dflags h neverQualify (vcat (map ppr imports')) }
-              -- The neverQualify is important.  We are printing Names
-              -- but they are in the context of an 'import' decl, and
-              -- we never qualify things inside there
-              -- E.g.   import Blag( f, b )
-              -- not    import Blag( Blag.f, Blag.g )!
-       }
+getMinimalImports :: [ImportDeclUsage] -> RnM [LImportDecl GhcRn]
+getMinimalImports = mapM mk_minimal
   where
-    mkFilename dflags this_mod
-      | Just d <- dumpDir dflags = d </> basefn
-      | otherwise                = basefn
-      where
-        basefn = moduleNameString (moduleName this_mod) ++ ".imports"
-
     mk_minimal (L l decl, used, unused)
       | null unused
       , Just (False, _) <- ideclHiding decl
@@ -1523,6 +1506,29 @@ printMinimalImports imports_w_usage
                     && all (`elem` fld_lbls) (map flLabel avail_flds)
 
           all_non_overloaded = all (not . flIsOverloaded)
+
+printMinimalImports :: [ImportDeclUsage] -> RnM ()
+-- See Note [Printing minimal imports]
+printMinimalImports imports_w_usage
+  = do { imports' <- getMinimalImports imports_w_usage
+       ; this_mod <- getModule
+       ; dflags   <- getDynFlags
+       ; liftIO $
+         do { h <- openFile (mkFilename dflags this_mod) WriteMode
+            ; printForUser dflags h neverQualify (vcat (map ppr imports')) }
+              -- The neverQualify is important.  We are printing Names
+              -- but they are in the context of an 'import' decl, and
+              -- we never qualify things inside there
+              -- E.g.   import Blag( f, b )
+              -- not    import Blag( Blag.f, Blag.g )!
+       }
+  where
+    mkFilename dflags this_mod
+      | Just d <- dumpDir dflags = d </> basefn
+      | otherwise                = basefn
+      where
+        basefn = moduleNameString (moduleName this_mod) ++ ".imports"
+
 
 to_ie_post_rn_var :: (HasOccName name) => Located name -> LIEWrappedName name
 to_ie_post_rn_var (L l n)
