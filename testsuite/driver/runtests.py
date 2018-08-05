@@ -285,7 +285,7 @@ for name in config.only:
         framework_fail(name, '', 'test not found')
     else:
         # Let user fix .T file errors before reporting on unfound tests.
-        # The reson the test can not be found is likely because of those
+        # The reason the test can not be found is likely because of those
         # .T file errors.
         pass
 

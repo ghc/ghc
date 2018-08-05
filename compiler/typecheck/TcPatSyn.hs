@@ -188,7 +188,7 @@ badUnivTvErr ex_tvs bad_tv
          , nest 2 (ppr_with_kind bad_tv)
          , hang (text "Existentially-bound variables:")
               2 (vcat (map ppr_with_kind ex_tvs))
-         , text "Probable fix: give the pattern synoym a type signature"
+         , text "Probable fix: give the pattern synonym a type signature"
          ]
   where
     ppr_with_kind tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
@@ -1016,7 +1016,7 @@ tcPatToExpr name args pat = go pat
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a bidirectional pattern synonym we need to produce an /expression/
 that matches the supplied /pattern/, given values for the arguments
-of the pattern synoymy.  For example
+of the pattern synonym.  For example
   pattern F x y = (Just x, [y])
 The 'builder' for F looks like
   $builderF x y = (Just x, [y])

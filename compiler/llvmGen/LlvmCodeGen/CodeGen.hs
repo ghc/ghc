@@ -1534,8 +1534,8 @@ genMachOp_slow opt op [x, y] = case op of
         panicOp = panic $ "LLVM.CodeGen.genMachOp_slow: unary op encountered"
                        ++ "with two arguments! (" ++ show op ++ ")"
 
--- More then two expression, invalid!
-genMachOp_slow _ _ _ = panic "genMachOp: More then 2 expressions in MachOp!"
+-- More than two expression, invalid!
+genMachOp_slow _ _ _ = panic "genMachOp: More than 2 expressions in MachOp!"
 
 
 -- | Handle CmmLoad expression.
