@@ -218,7 +218,7 @@ jobs:
       - *prepare
       - *submodules
       - *boot
-      - *configure_unreg
+      - *configure_unix
       - *make
       - *test
       - *store_test_results
