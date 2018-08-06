@@ -10430,11 +10430,6 @@ scope, because it is bound by the pattern match.
 The effect is to bring it into scope,
 standing for the existentially-bound type variable.
 
-When a pattern type signature binds a type variable in this way, GHC
-insists that the type variable is bound to a *rigid*, or fully-known,
-type variable. This means that any user-written type signature always
-stands for a completely known type.
-
 It does seem odd that the existentially-bound type variable *must not*
 be already in scope. Contrast that usually name-bindings merely shadow
 (make a 'hole') in a same-named outer variable's scope.

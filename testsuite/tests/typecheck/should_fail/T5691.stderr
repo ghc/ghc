@@ -1,13 +1,4 @@
 
-T5691.hs:14:9: error:
-    • Couldn't match type ‘p’ with ‘PrintRuleInterp’
-      Expected type: PrintRuleInterp a
-        Actual type: p a
-    • When checking that the pattern signature: p a
-        fits the type of its context: PrintRuleInterp a
-      In the pattern: f :: p a
-      In an equation for ‘test’: test (f :: p a) = MkPRI $ printRule_ f
-
 T5691.hs:24:10: error:
     • No instance for (Alternative RecDecParser)
         arising from the superclasses of an instance declaration

@@ -1,10 +1,6 @@
 
-T5689.hs:10:36: error:
-    • Couldn't match expected type ‘Bool’ with actual type ‘t’
-    • In the expression: v
-      In the expression: if v then False else True
-      In the second argument of ‘writeIORef’, namely
-        ‘(\ v -> if v then False else True)’
-    • Relevant bindings include
-        v :: t (bound at T5689.hs:10:28)
-        r :: IORef (t -> t) (bound at T5689.hs:7:14)
+T5689.hs:15:23: error:
+    • No instance for (Num Bool) arising from the literal ‘1234’
+    • In the first argument of ‘c’, namely ‘1234’
+      In the second argument of ‘($)’, namely ‘c 1234’
+      In a stmt of a 'do' block: print $ c 1234

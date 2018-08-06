@@ -1572,7 +1572,7 @@ kcLHsQTyVars name flav cusk
   | otherwise
   = do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why kcImplicitTKBndrs which uses newSigTyVar?
-           -- See Note [Kind generalisation and sigTvs]
+           -- See Note [Kind generalisation and SigTvs]
            <- kcImplicitTKBndrs kv_ns $
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
@@ -2421,9 +2421,8 @@ tcHsPatSigType ctxt sig_ty
 
     new_tv = case ctxt of
                RuleSigCtxt {} -> newSkolemTyVar
-               _              -> newSigTyVar
+               _              -> newTauTyVar
       -- See Note [Pattern signature binders]
-      -- See Note [Unifying SigTvs]
 
     mk_tv_pair tv = do { tv' <- zonkTcTyVarToTyVar tv
                        ; return (tyVarName tv, tv') }
@@ -2500,24 +2499,31 @@ patBindSigErr sig_tvs
 {- Note [Pattern signature binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-   data T = forall a. T a (a->Int)
-   f (T x (f :: b->Int)) = blah
+
+  data T where
+    MkT :: forall a. a -> (a -> Int) -> T
+
+  f :: T -> ...
+  f (MkT x (f :: b -> c)) = ...
 
 Here
- * The pattern (T p1 p2) creates a *skolem* type variable 'a_sk',
+ * The pattern (MkT p1 p2) creates a *skolem* type variable 'a_sk',
    It must be a skolem so that that it retains its identity, and
    TcErrors.getSkolemInfo can thereby find the binding site for the skolem.
 
- * The type signature pattern (f :: b->Int) makes a fresh meta-tyvar b_sig
-   (a SigTv), and binds "b" :-> b_sig in the envt
+ * The type signature pattern (f :: b -> c) makes freshs meta-tyvars
+   beta and gamma (TauTvs), and binds "b" :-> beta, "c" :-> gamma in the
+   environment
 
- * Then unification makes b_sig := a_sk
-   That's why we must make b_sig a MetaTv (albeit a SigTv),
-   not a SkolemTv, so that it can unify to a_sk.
+ * Then unification makes beta := a_sk, gamma := Int
+   That's why we must make beta and gamma a MetaTv,
+   not a SkolemTv, so that it can unify to a_sk rsp. Int.
+   Note that gamma unifies with a type, not just a type variable
+   (see https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0029-scoped-type-variables-types.rst)
 
- * Finally, in 'blah' we must have the envt "b" :-> a_sk.  The pair
-   ("b" :-> a_sk) is returned by tcHsPatSigType, constructed by
-   mk_tv_pair in that function.
+ * Finally, in 'blah' we must have the envt "b" :-> a_sk, "c" :-> Int.
+   The pairs ("b" :-> a_sk, "c" :-> Int) are returned by tcHsPatSigType,
+   constructed by mk_tv_pair in that function.
 
 Another example (Trac #13881):
    fl :: forall (l :: [a]). Sing l -> Sing l
@@ -2526,7 +2532,7 @@ When we reach the pattern signature, 'l' is in scope from the
 outer 'forall':
    "a" :-> a_sk :: *
    "l" :-> l_sk :: [a_sk]
-We make up a fresh meta-SigTv, y_sig, for 'y', and kind-check
+We make up a fresh meta-TauTv, y_sig, for 'y', and kind-check
 the pattern signature
    Sing (l :: [y])
 That unifies y_sig := a_sk.  We return from tcHsPatSigType with
@@ -2538,23 +2544,6 @@ Here this really is the binding site of the type variable so we'd like
 to use a skolem, so that we get a complaint if we unify two of them
 together.
 
-Note [Unifying SigTvs]
-~~~~~~~~~~~~~~~~~~~~~~
-ALAS we have no decent way of avoiding two SigTvs getting unified.
-Consider
-  f (x::(a,b)) (y::c)) = [fst x, y]
-Here we'd really like to complain that 'a' and 'c' are unified. But
-for the reasons above we can't make a,b,c into skolems, so they
-are just SigTvs that can unify.  And indeed, this would be ok,
-  f x (y::c) = case x of
-                 (x1 :: a1, True) -> [x,y]
-                 (x1 :: a2, False) -> [x,y,y]
-Here the type of x's first component is called 'a1' in one branch and
-'a2' in the other.  We could try insisting on the same OccName, but
-they definitely won't have the sane lexical Name.
-
-I think we could solve this by recording in a SigTv a list of all the
-in-scope variables that it should not unify with, but it's fiddly.
 
 
 ************************************************************************

@@ -51,7 +51,7 @@ module TcMType (
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaSigTyVars, newMetaSigTyVarX,
-  newSigTyVar, newSkolemTyVar, newWildCardX,
+  newSigTyVar, newTauTyVar, newSkolemTyVar, newWildCardX,
   tcInstType,
   tcInstSkolTyVars,tcInstSkolTyVarsX,
   tcInstSuperSkolTyVarsX,
@@ -620,19 +620,35 @@ instead of the buggous
 ************************************************************************
 -}
 
--- a SigTv can unify with type *variables* only, including other SigTvs
--- and skolems. Sometimes, they can unify with type variables that the
--- user would rather keep distinct; see #11203 for an example.
--- So, any client of this
--- function needs to either allow the SigTvs to unify with each other
--- (say, for pattern-bound scoped type variables), or check that they
--- don't (say, with a call to findDubSigTvs).
+{-
+Note [SigTv]
+~~~~~~~~~~~~
+
+A SigTv can unify with type *variables* only, including other SigTvs and
+skolems. Sometimes, they can unify with type variables that the user would
+rather keep distinct; see #11203 for an example.  So, any client of this
+function needs to either allow the SigTvs to unify with each other or check
+that they don't (say, with a call to findDubSigTvs).
+
+Before #15050 this was used for ScopedTypeVariables in patterns, to make sure
+these type variables only refer to other type variables, but this restriction
+was dropped, and ScopedTypeVariables can now refer to full types (GHC Proposal
+29).
+
+The remaining uses of newSigTyVars are
+* in kind signatures, see Note [Kind generalisation and SigTvs]
+  and Note [Use SigTvs in kind-checking pass]
+* in partial type signatures, see Note [Quantified variables in partial type signatures]
+-}
+
+-- see Note [SigTv]
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
   = do { details <- newMetaDetails SigTv
        ; let tyvar = mkTcTyVar name kind details
        ; traceTc "newSigTyVar" (ppr tyvar)
        ; return tyvar }
+
 
 -- makes a new skolem tv
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
@@ -806,6 +822,14 @@ data constructors, and patterns. These will never be quantified over
 coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
+
+newTauTyVar :: Name -> Kind -> TcM TcTyVar
+newTauTyVar name kind
+  = do { details <- newMetaDetails TauTv
+       ; let tyvar = mkTcTyVar name kind details
+       ; traceTc "newTauTyVar" (ppr tyvar)
+       ; return tyvar }
+
 
 mkMetaTyVarName :: Unique -> FastString -> Name
 -- Makes a /System/ Name, which is eagerly eliminated by
