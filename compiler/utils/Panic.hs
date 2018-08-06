@@ -20,6 +20,8 @@ module Panic (
      panic, sorry, assertPanic, trace,
      panicDoc, sorryDoc, pgmErrorDoc,
 
+     cmdLineError, cmdLineErrorIO,
+
      Exception.Exception(..), showException, safeShowException,
      try, tryMost, throwTo,
 
@@ -194,6 +196,17 @@ panicDoc, sorryDoc, pgmErrorDoc :: String -> SDoc -> a
 panicDoc    x doc = throwGhcException (PprPanic        x doc)
 sorryDoc    x doc = throwGhcException (PprSorry        x doc)
 pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
+
+cmdLineError :: String -> a
+cmdLineError = unsafeDupablePerformIO . cmdLineErrorIO
+
+cmdLineErrorIO :: String -> IO a
+cmdLineErrorIO x = do
+  stack <- ccsToStrings =<< getCurrentCCS x
+  if null stack
+    then throwGhcException (CmdLineError x)
+    else throwGhcException (CmdLineError (x ++ '\n' : renderStack stack))
+
 
 
 -- | Throw a failed assertion exception for a given filename and line number.
