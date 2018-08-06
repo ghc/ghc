@@ -1186,6 +1186,11 @@ test('MultiLayerModules',
           ]),
        pre_cmd('./genMultiLayerModules'),
        extra_files(['genMultiLayerModules']),
+       compile_timeout_multiplier(2)
+       # 2 is _a lot_ (timeout after 600s, to build 600 modules),
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      ['MultiLayerModules', '-v0'])
@@ -1229,6 +1234,11 @@ test('T13701',
           ]),
        pre_cmd('./genT13701'),
        extra_files(['genT13701']),
+       compile_timeout_multiplier(2)
+       # 2 is _a lot_ (timeout after 600s, to build 600 modules),
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      ['T13701', '-v0'])
@@ -1241,6 +1251,11 @@ test('T13719',
           ]),
        pre_cmd('./genT13719'),
        extra_files(['genT13719']),
+       compile_timeout_multiplier(2)
+       # 2 is _a lot_ (timeout after 600s, to build 600 modules),
+       # but this test has been failing every now and then,
+       # especially on i386. Let's just give it some room
+       # to complete successfully reliably everywhere.
      ],
      multimod_compile,
      ['T13719', '-v0'])
