@@ -1,59 +1,50 @@
-.. _release-8-4-2:
+.. _release-8-8-1:
 
-Release notes for version 8.4.2
+Release notes for version 8.8.1
 ===============================
 
-TODO
+The significant changes to the various parts of the compiler are listed in the
+following sections. There have also been numerous bug fixes and performance
+improvements over the 8.6.1 release.
+
 
 Highlights
 ----------
 
-The highlights, since the 8.4.1 release, are:
+The highlights, since the 8.6.1 release, are:
 
-- TODO
+- Many, many bug fixes.
 
 
 Full details
 ------------
 
-
 Language
-~~~~~~~~
+~~~~~~~
 
-- Fix a regression in which derived ``Read`` instances for record data types
-  with field names ending with ``#`` (by way of :ghc-flag:`-XMagicHash`) would
-  no longer parse valid output.
 
 Compiler
-~~~~~~~~
+~~~~~~~
 
 
 Runtime system
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 
 Template Haskell
-~~~~~~~~~~~~~~~~
-
-
-``ghc`` library
 ~~~~~~~~~~~~~~~
 
 
+``ghc`` library
+~~~~~~~~~~~~~~
+
+
 ``base`` library
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
-- Add the ``readFieldHash`` function to ``GHC.Read`` which behaves like
-  ``readField``, but for a field that ends with a ``#`` symbol.
-
-``integer-gmp`` library
-~~~~~~~~~~~~~~~~~~~~~~~
-
-- Define ``powModSecInteger``, a "secure" version of ``powModInteger`` using
-  the ``mpz_powm_sec`` function.
 
 Build system
-~~~~~~~~~~~~
+~~~~~~~~~~~
 
 
 Included libraries
@@ -77,7 +68,9 @@ for further change information.
     compiler/ghc.cabal:                      The compiler itself
     libraries/ghci/ghci.cabal:               The REPL interface
     libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
     libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
     libraries/ghc-prim/ghc-prim.cabal:       Core library
     libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
     libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
@@ -85,7 +78,9 @@ for further change information.
     libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
     libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
     libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
     libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
     libraries/text/text.cabal:               Dependency of ``Cabal`` library
     libraries/time/time.cabal:               Dependency of ``ghc`` library
     libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
