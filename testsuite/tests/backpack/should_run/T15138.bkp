@@ -1,0 +1,36 @@
+{-# LANGUAGE ConstraintKinds             #-}
+{-# LANGUAGE DataKinds                   #-}
+{-# LANGUAGE KindSignatures              #-}
+{-# LANGUAGE MultiParamTypeClasses       #-}
+{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE TypeFamilies                #-}
+{-# LANGUAGE FlexibleContexts            #-}
+
+unit indef where
+
+   signature Abstract where
+     import GHC.TypeLits
+     data NatType :: Nat
+
+   module Util where
+     import Abstract
+     import Data.Proxy
+     import GHC.TypeLits
+
+     natTypeToInteger :: KnownNat NatType => Proxy NatType -> Integer
+     natTypeToInteger = natVal
+
+unit concrete where
+   module Concrete where
+     type NatType = 32
+
+
+unit main where
+   dependency indef[Abstract=concrete:Concrete] (Util as MyUtil)
+
+   module Main where
+     import Data.Proxy
+     import MyUtil
+
+     main :: IO ()
+     main = do print $ natTypeToInteger Proxy

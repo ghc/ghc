@@ -48,6 +48,7 @@ module Type (
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
+        isLitTy,
 
         getRuntimeRep_maybe, getRuntimeRepFromKind_maybe,
 
@@ -856,6 +857,11 @@ isStrLitTy ty | Just ty1 <- coreView ty = isStrLitTy ty1
 isStrLitTy (LitTy (StrTyLit s)) = Just s
 isStrLitTy _                    = Nothing
 
+-- | Is this a type literal (symbol or numeric).
+isLitTy :: Type -> Maybe TyLit
+isLitTy ty | Just ty1 <- coreView ty = isLitTy ty1
+isLitTy (LitTy l)                    = Just l
+isLitTy _                            = Nothing
 
 -- | Is this type a custom user error?
 -- If so, give us the kind and the error message.
