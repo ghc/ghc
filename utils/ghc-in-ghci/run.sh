@@ -30,7 +30,5 @@ exec ./inplace/bin/ghc-stage2 \
     --interactive \
     -ghci-script ./utils/ghc-in-ghci/settings.ghci \
     -ghci-script ./utils/ghc-in-ghci/load-main.ghci \
-    -odir ./ghci-tmp \
-    -hidir ./ghci-tmp \
     +RTS -A128m -RTS \
     "$@"
