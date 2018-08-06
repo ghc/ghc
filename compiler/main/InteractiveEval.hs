@@ -942,7 +942,11 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
         ValBinds noExt
                      (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 
-  Just ([_id], hvals_io, fix_env) <- liftIO $ hscParsedStmt hsc_env let_stmt
+  pstmt <- liftIO $ hscParsedStmt hsc_env let_stmt
+  let (hvals_io, fix_env) = case pstmt of
+        Just ([_id], hvals_io', fix_env') -> (hvals_io', fix_env')
+        _ -> panic "compileParsedExprRemote"
+
   updateFixityEnv fix_env
   status <- liftIO $ evalStmt hsc_env False (EvalThis hvals_io)
   case status of

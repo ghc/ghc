@@ -571,7 +571,8 @@ genCallSimpleCast w t@(PrimTarget op) [dst] args = do
     (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
     (argsV', stmts4)            <- castVars Signed $ zip argsV [width]
     (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    ([retV'], stmts5)           <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
+    (retVs', stmts5)            <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
+    let retV'                    = singletonPanic "genCallSimpleCast" retVs'
     let s2                       = Store retV' dstV
 
     let stmts = stmts2 `appOL` stmts4 `snocOL`
@@ -602,7 +603,8 @@ genCallSimpleCast2 w t@(PrimTarget op) [dst] args = do
     (argsV, stmts2, top2)       <- arg_vars args_hints ([], nilOL, [])
     (argsV', stmts4)            <- castVars Signed $ zip argsV (const width <$> argsV)
     (retV, s1)                  <- doExpr width $ Call StdCall fptr argsV' []
-    ([retV'], stmts5)           <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
+    (retVs', stmts5)             <- castVars (cmmPrimOpRetValSignage op) [(retV,dstTy)]
+    let retV'                    = singletonPanic "genCallSimpleCast2" retVs'
     let s2                       = Store retV' dstV
 
     let stmts = stmts2 `appOL` stmts4 `snocOL`
@@ -1275,7 +1277,8 @@ genMachOp _ op [x] = case op of
 
         negateVec ty v2 negOp = do
             (vx, stmts1, top) <- exprToVar x
-            ([vx'], stmts2) <- castVars Signed [(vx, ty)]
+            (vxs', stmts2) <- castVars Signed [(vx, ty)]
+            let vx' = singletonPanic "genMachOp: negateVec" vxs'
             (v1, s1) <- doExpr ty $ LlvmOp negOp v2 vx'
             return (v1, stmts1 `appOL` stmts2 `snocOL` s1, top)
 
@@ -1338,7 +1341,8 @@ genMachOp_slow :: EOption -> MachOp -> [CmmExpr] -> LlvmM ExprData
 genMachOp_slow _ (MO_V_Extract l w) [val, idx] = runExprData $ do
     vval <- exprToVarW val
     vidx <- exprToVarW idx
-    [vval'] <- castVarsW Signed [(vval, LMVector l ty)]
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, LMVector l ty)]
     doExprW ty $ Extract vval' vidx
   where
     ty = widthToLlvmInt w
@@ -1346,7 +1350,8 @@ genMachOp_slow _ (MO_V_Extract l w) [val, idx] = runExprData $ do
 genMachOp_slow _ (MO_VF_Extract l w) [val, idx] = runExprData $ do
     vval <- exprToVarW val
     vidx <- exprToVarW idx
-    [vval'] <- castVarsW Signed [(vval, LMVector l ty)]
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, LMVector l ty)]
     doExprW ty $ Extract vval' vidx
   where
     ty = widthToLlvmFloat w
@@ -1356,7 +1361,8 @@ genMachOp_slow _ (MO_V_Insert l w) [val, elt, idx] = runExprData $ do
     vval <- exprToVarW val
     velt <- exprToVarW elt
     vidx <- exprToVarW idx
-    [vval'] <- castVarsW Signed [(vval, ty)]
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, ty)]
     doExprW ty $ Insert vval' velt vidx
   where
     ty = LMVector l (widthToLlvmInt w)
@@ -1365,7 +1371,8 @@ genMachOp_slow _ (MO_VF_Insert l w) [val, elt, idx] = runExprData $ do
     vval <- exprToVarW val
     velt <- exprToVarW elt
     vidx <- exprToVarW idx
-    [vval'] <- castVarsW Signed [(vval, ty)]
+    vval' <- singletonPanic "genMachOp_slow" <$>
+             castVarsW Signed [(vval, ty)]
     doExprW ty $ Insert vval' velt vidx
   where
     ty = LMVector l (widthToLlvmFloat w)
@@ -1477,8 +1484,10 @@ genMachOp_slow opt op [x, y] = case op of
         binCastLlvmOp ty binOp = runExprData $ do
             vx <- exprToVarW x
             vy <- exprToVarW y
-            [vx', vy'] <- castVarsW Signed [(vx, ty), (vy, ty)]
-            doExprW ty $ binOp vx' vy'
+            vxy' <- castVarsW Signed [(vx, ty), (vy, ty)]
+            case vxy' of
+              [vx',vy'] -> doExprW ty $ binOp vx' vy'
+              _         -> panic "genMachOp_slow: binCastLlvmOp"
 
         -- | Need to use EOption here as Cmm expects word size results from
         -- comparisons while LLVM return i1. Need to extend to llvmWord type
@@ -1981,3 +1990,8 @@ doTrashStmts :: WriterT LlvmAccum LlvmM ()
 doTrashStmts = do
     stmts <- lift getTrashStmts
     tell $ LlvmAccum stmts mempty
+
+-- | Return element of single-element list; 'panic' if list is not a single-element list
+singletonPanic :: String -> [a] -> a
+singletonPanic _ [x] = x
+singletonPanic s _ = panic s

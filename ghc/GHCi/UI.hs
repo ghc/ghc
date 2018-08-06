@@ -889,7 +889,10 @@ installInteractivePrint :: Maybe String -> Bool -> GHCi ()
 installInteractivePrint Nothing _  = return ()
 installInteractivePrint (Just ipFun) exprmode = do
   ok <- trySuccess $ do
-                (name:_) <- GHC.parseName ipFun
+                names <- GHC.parseName ipFun
+                let name = case names of
+                             name':_ -> name'
+                             [] -> panic "installInteractivePrint"
                 modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he{hsc_IC = new_ic})
                 return Succeeded
@@ -3248,7 +3251,7 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
       case mb_span of
         Nothing  -> stepCmd []
         Just loc -> do
-           Just md <- getCurrentBreakModule
+           md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc
            doContinue (`isSubspanOf` RealSrcSpan current_toplevel_decl) GHC.SingleStep
 
@@ -3739,7 +3742,7 @@ turnOffBreak loc = do
 
 getModBreak :: Module -> GHCi (ForeignRef BreakArray, Array Int SrcSpan)
 getModBreak m = do
-   Just mod_info <- GHC.getModuleInfo m
+   mod_info      <- fromMaybe (panic "getModBreak") <$> GHC.getModuleInfo m
    let modBreaks  = GHC.modInfoModBreaks mod_info
    let arr        = GHC.modBreaks_flags modBreaks
    let ticks      = GHC.modBreaks_locs  modBreaks
