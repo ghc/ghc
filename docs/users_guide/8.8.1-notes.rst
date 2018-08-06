@@ -22,6 +22,10 @@ Full details
 Language
 ~~~~~~~
 
+- :extension:`ScopedTypeVariables`: The type variable that a type signature on
+  a pattern can bring into scope can now stand for arbitrary types. Previously,
+  they could only stand in for other type variables, but this restriction was deemed
+  unnecessary in `GHC proposal #29 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0029-scoped-type-variables-types.rst>`__. Also see :ghc-ticket:`15050`.
 
 Compiler
 ~~~~~~~
