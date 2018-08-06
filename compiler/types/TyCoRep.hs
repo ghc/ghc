@@ -164,6 +164,7 @@ import TyCon
 import Class
 import CoAxiom
 import FV
+import NDFV
 
 -- others
 import BasicTypes ( LeftOrRight(..), TyPrec(..), maybeParen, pickLR )
@@ -1484,7 +1485,7 @@ so, so it's easiest to do it here.
 -- synonym.
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
+tyCoVarsOfType ty = ndfvVarSet $ tyCoNDFVsOfType ty
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
@@ -1525,6 +1526,31 @@ tyCoFVsBndr :: TyVarBinder -> FV -> FV
 tyCoFVsBndr (TvBndr tv _) fvs = (delFV tv fvs)
                                 `unionFV` tyCoFVsOfType (tyVarKind tv)
 
+-- | The worker for `tyCoNDFVsOfType` and `tyCoNDFVsOfTypeList`.
+-- The previous implementation used `unionVarSet` which is O(n+m) and can
+-- make the function quadratic.
+-- It's exported, so that it can be composed with
+-- other functions that compute free variables.
+-- See Note [NDFV naming conventions] in NDFV.
+--
+-- Eta-expanded because that makes it run faster (apparently)
+-- See Note [NDFV eta expansion] in NDFV for explanation.
+tyCoNDFVsOfType :: Type -> NDFV
+-- See Note [Free variables of types]
+tyCoNDFVsOfType (TyVarTy v)        a b c = (unitNDFV v `unionNDFV` tyCoNDFVsOfType (tyVarKind v)) a b c
+tyCoNDFVsOfType (TyConApp _ tys)   a b c = tyCoNDFVsOfTypes tys a b c
+tyCoNDFVsOfType (LitTy {})         a b c = emptyNDFV a b c
+tyCoNDFVsOfType (AppTy fun arg)    a b c = (tyCoNDFVsOfType fun `unionNDFV` tyCoNDFVsOfType arg) a b c
+tyCoNDFVsOfType (FunTy arg res)    a b c = (tyCoNDFVsOfType arg `unionNDFV` tyCoNDFVsOfType res) a b c
+tyCoNDFVsOfType (ForAllTy bndr ty) a b c = tyCoNDFVsBndr bndr (tyCoNDFVsOfType ty)  a b c
+tyCoNDFVsOfType (CastTy ty co)     a b c = (tyCoNDFVsOfType ty `unionNDFV` tyCoNDFVsOfCo co) a b c
+tyCoNDFVsOfType (CoercionTy co)    a b c = tyCoNDFVsOfCo co a b c
+
+tyCoNDFVsBndr :: TyVarBinder -> NDFV -> NDFV
+-- Free vars of (forall b. <thing with fvs>)
+tyCoNDFVsBndr (TvBndr tv _) fvs = (delNDFV tv fvs)
+                                `unionNDFV` tyCoNDFVsOfType (tyVarKind tv)
+
 -- | Returns free variables of types, including kind variables as
 -- a non-deterministic set. For type synonyms it does /not/ expand the
 -- synonym.
@@ -1559,6 +1585,11 @@ tyCoFVsOfTypes :: [Type] -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfTypes (ty:tys) fv_cand in_scope acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfTypes tys) fv_cand in_scope acc
 tyCoFVsOfTypes []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+
+tyCoNDFVsOfTypes :: [Type] -> NDFV
+-- See Note [Free variables of types]
+tyCoNDFVsOfTypes (ty:tys) fv_cand in_scope acc = (tyCoNDFVsOfType ty `unionNDFV` tyCoNDFVsOfTypes tys) fv_cand in_scope acc
+tyCoNDFVsOfTypes []       fv_cand in_scope acc = emptyNDFV fv_cand in_scope acc
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of types]
@@ -1607,6 +1638,40 @@ tyCoFVsOfCoVar :: CoVar -> FV
 tyCoFVsOfCoVar v fv_cand in_scope acc
   = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
 
+tyCoNDFVsOfCo :: Coercion -> NDFV
+-- Extracts type and coercion variables from a coercion
+-- See Note [Free variables of types]
+tyCoNDFVsOfCo (Refl _ ty)         fv_cand in_scope acc = tyCoNDFVsOfType ty fv_cand in_scope acc
+tyCoNDFVsOfCo (TyConAppCo _ _ cos) fv_cand in_scope acc = tyCoNDFVsOfCos cos fv_cand in_scope acc
+tyCoNDFVsOfCo (AppCo co arg) fv_cand in_scope acc
+  = (tyCoNDFVsOfCo co `unionNDFV` tyCoNDFVsOfCo arg) fv_cand in_scope acc
+tyCoNDFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
+  = (delNDFV tv (tyCoNDFVsOfCo co) `unionNDFV` tyCoNDFVsOfCo kind_co) fv_cand in_scope acc
+tyCoNDFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
+  = (tyCoNDFVsOfCo co1 `unionNDFV` tyCoNDFVsOfCo co2) fv_cand in_scope acc
+tyCoNDFVsOfCo (CoVarCo v) fv_cand in_scope acc
+  = tyCoNDFVsOfCoVar v fv_cand in_scope acc
+tyCoNDFVsOfCo (HoleCo h) fv_cand in_scope acc
+  = tyCoNDFVsOfCoVar (coHoleCoVar h) fv_cand in_scope acc
+    -- See Note [CoercionHoles and coercion free variables]
+tyCoNDFVsOfCo (AxiomInstCo _ _ cos) fv_cand in_scope acc = tyCoNDFVsOfCos cos fv_cand in_scope acc
+tyCoNDFVsOfCo (UnivCo p _ t1 t2) fv_cand in_scope acc
+  = (tyCoNDFVsOfProv p `unionNDFV` tyCoNDFVsOfType t1
+                     `unionNDFV` tyCoNDFVsOfType t2) fv_cand in_scope acc
+tyCoNDFVsOfCo (SymCo co)          fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoNDFVsOfCo co1 `unionNDFV` tyCoNDFVsOfCo co2) fv_cand in_scope acc
+tyCoNDFVsOfCo (NthCo _ _ co)      fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfCo (LRCo _ co)         fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoNDFVsOfCo co `unionNDFV` tyCoNDFVsOfCo arg) fv_cand in_scope acc
+tyCoNDFVsOfCo (CoherenceCo c1 c2) fv_cand in_scope acc = (tyCoNDFVsOfCo c1 `unionNDFV` tyCoNDFVsOfCo c2) fv_cand in_scope acc
+tyCoNDFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfCo (AxiomRuleCo _ cs)  fv_cand in_scope acc = tyCoNDFVsOfCos cs fv_cand in_scope acc
+
+tyCoNDFVsOfCoVar :: CoVar -> NDFV
+tyCoNDFVsOfCoVar v fv_cand in_scope acc
+  = (unitNDFV v `unionNDFV` tyCoNDFVsOfType (varType v)) fv_cand in_scope acc
+
 tyCoVarsOfProv :: UnivCoProvenance -> TyCoVarSet
 tyCoVarsOfProv prov = fvVarSet $ tyCoFVsOfProv prov
 
@@ -1615,6 +1680,12 @@ tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scop
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+
+tyCoNDFVsOfProv :: UnivCoProvenance -> NDFV
+tyCoNDFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyNDFV fv_cand in_scope acc
+tyCoNDFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoNDFVsOfCo co fv_cand in_scope acc
+tyCoNDFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyNDFV fv_cand in_scope acc
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
@@ -1627,6 +1698,10 @@ tyCoVarsOfCosSet cos = fvVarSet $ tyCoFVsOfCos $ nonDetEltsUFM cos
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCos cos) fv_cand in_scope acc
+
+tyCoNDFVsOfCos :: [Coercion] -> NDFV
+tyCoNDFVsOfCos []       fv_cand in_scope acc = emptyNDFV fv_cand in_scope acc
+tyCoNDFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoNDFVsOfCo co `unionNDFV` tyCoNDFVsOfCos cos) fv_cand in_scope acc
 
 coVarsOfType :: Type -> CoVarSet
 coVarsOfType (TyVarTy v)         = coVarsOfType (tyVarKind v)
