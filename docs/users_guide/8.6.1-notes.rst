@@ -134,6 +134,11 @@ Language
 
   See :ghc-ticket:`13833`.
 
+- :extension:`MonadFailDesugaring` is now enabled by default. See
+  `MonadFail Proposal (MFP)
+  <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__
+  for more details.
+
 Compiler
 ~~~~~~~~
 

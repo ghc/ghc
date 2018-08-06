@@ -1929,10 +1929,9 @@ doCopyMutableByteArrayOp = emitCopyByteArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
-        [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p bytes 1,
-            getCode $ emitMemcpyCall  dst_p src_p bytes 1
-            ]
+        (moveCall, cpyCall) <- forkAltPair
+            (getCode $ emitMemmoveCall dst_p src_p bytes 1)
+            (getCode $ emitMemcpyCall  dst_p src_p bytes 1)
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
 emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
@@ -2073,12 +2072,11 @@ doCopyMutableArrayOp = emitCopyArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
-        [moveCall, cpyCall] <- forkAlts [
-            getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
-            (wORD_SIZE dflags),
-            getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
-            (wORD_SIZE dflags)
-            ]
+        (moveCall, cpyCall) <- forkAltPair
+            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
+             (wORD_SIZE dflags))
+            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
+             (wORD_SIZE dflags))
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
 emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
@@ -2136,12 +2134,11 @@ doCopySmallMutableArrayOp = emitCopySmallArray copy
     -- TODO: Optimize branch for common case of no aliasing.
     copy src dst dst_p src_p bytes = do
         dflags <- getDynFlags
-        [moveCall, cpyCall] <- forkAlts
-            [ getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
-              (wORD_SIZE dflags)
-            , getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
-              (wORD_SIZE dflags)
-            ]
+        (moveCall, cpyCall) <- forkAltPair
+            (getCode $ emitMemmoveCall dst_p src_p (mkIntExpr dflags bytes)
+             (wORD_SIZE dflags))
+            (getCode $ emitMemcpyCall  dst_p src_p (mkIntExpr dflags bytes)
+             (wORD_SIZE dflags))
         emit =<< mkCmmIfThenElse (cmmEqWord dflags src dst) moveCall cpyCall
 
 emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff

@@ -997,8 +997,12 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
         IEThingWith xt ltc@(L l rdr_tc) wc rdr_ns rdr_fs ->
           ASSERT2(null rdr_fs, ppr rdr_fs) do
-           (name, AvailTC _ ns subflds, mb_parent)
+           (name, avail, mb_parent)
                <- lookup_name (IEThingAbs noExt ltc) (ieWrappedName rdr_tc)
+
+           let (ns,subflds) = case avail of
+                                AvailTC _ ns' subflds' -> (ns',subflds')
+                                Avail _                -> panic "filterImports"
 
            -- Look up the children in the sub-names of the parent
            let subnames = case ns of   -- The tc is first in ns,

@@ -2,6 +2,8 @@
 -- is reflected by calling the monadic 'fail', not by a
 -- runtime exception
 
+{-# LANGUAGE NoMonadFailDesugaring #-}
+
 import Control.Monad
 import Data.Maybe
 

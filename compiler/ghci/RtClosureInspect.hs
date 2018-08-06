@@ -308,8 +308,10 @@ cPprTerm printers_ = go 0 where
   go prec t = do
     let default_ = Just `liftM` pprTermM go prec t
         mb_customDocs = [pp prec t | pp <- printers] ++ [default_]
-    Just doc <- firstJustM mb_customDocs
-    return$ cparen (prec>app_prec+1) doc
+    mdoc <- firstJustM mb_customDocs
+    case mdoc of
+      Nothing -> panic "cPprTerm"
+      Just doc -> return $ cparen (prec>app_prec+1) doc
 
   firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
   firstJustM [] = return Nothing
