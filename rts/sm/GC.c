@@ -128,7 +128,11 @@ uint32_t mutlist_MUTVARS,
 gc_thread **gc_threads = NULL;
 
 #if !defined(THREADED_RTS)
-StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)];
+/* Use conservative alignment since we will cast this to a gc_thread and
+ * consequently the compiler may assume it is aligned. See #15482.
+ */
+StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
+    __attribute__((aligned(sizeof(W_))));
 #endif
 
 // Number of threads running in *this* GC.  Affects how many
