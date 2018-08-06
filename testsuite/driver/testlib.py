@@ -14,6 +14,7 @@ import copy
 import glob
 import sys
 from math import ceil, trunc
+from pathlib import PurePath
 import collections
 import subprocess
 
@@ -618,8 +619,9 @@ def newTestDir(tempdir, dir):
 testdir_suffix = '.run'
 
 def _newTestDir(name, opts, tempdir, dir):
+    testdir = os.path.join('', *(p for p in PurePath(dir).parts if p != '..'))
     opts.srcdir = os.path.join(os.getcwd(), dir)
-    opts.testdir = os.path.join(tempdir, dir, name + testdir_suffix)
+    opts.testdir = os.path.join(tempdir, testdir, name + testdir_suffix)
     opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
