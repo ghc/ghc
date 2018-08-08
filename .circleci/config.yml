@@ -50,7 +50,7 @@ aliases:
   - &make
     run:
       name: Build
-      command: "make -j$THREADS"
+      command: "make -j$THREADS V=0"
   - &build_hadrian
     run:
       name: Build GHC using Hadrian
