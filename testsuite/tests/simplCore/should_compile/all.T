@@ -151,8 +151,7 @@ test('T7702',
       # we say 18mb peak allocated +/- 70% because other compiler flags have
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
-      compiler_stats_num_field('peak_megabytes_allocated',
-          [(wordsize(32), 18, 70), (wordsize(64), 18, 70)])
+      collect_compiler_stats('peak_megabytes_allocated',70),
      ],
      compile,
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])

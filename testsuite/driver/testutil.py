@@ -5,6 +5,12 @@ import shutil
 
 import threading
 
+def passed():
+    return {'passFail': 'pass'}
+
+def failBecause(reason, tag=None):
+    return {'passFail': 'fail', 'reason': reason, 'tag': tag}
+
 def strip_quotes(s):
     # Don't wrap commands to subprocess.call/Popen in quotes.
     return s.strip('\'"')
