@@ -801,13 +801,13 @@ TAR_COMP      ?= xz
 
 # select compression command and .tar extension based on TAR_COMP value
 ifeq "$(TAR_COMP)" "bzip2"
-TAR_COMP_CMD  = $(BZIP2_CMD)
+TAR_COMP_CMD  = $(BZIP2_CMD) $(TAR_COMP_OPTS)
 TAR_COMP_EXT  = bz2
 else ifeq "$(TAR_COMP)" "gzip"
-TAR_COMP_CMD  = $(GZIP_CMD)
+TAR_COMP_CMD  = $(GZIP_CMD) $(TAR_COMP_OPTS)
 TAR_COMP_EXT  = gz
 else ifeq "$(TAR_COMP)" "xz"
-TAR_COMP_CMD  = $(XZ_CMD)
+TAR_COMP_CMD  = $(XZ_CMD) $(TAR_COMP_OPTS)
 TAR_COMP_EXT  = xz
 else
 $(error $$(TAR_COMP) set to unknown value "$(TAR_COMP)" (supported: "bzip2", "gzip", "xz"))
