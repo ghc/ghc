@@ -136,7 +136,7 @@ jobs:
     environment:
       # Disable sphinx PDF output as MacTeX apparently doesn't provide xelatex
       BUILD_SPHINX_PDF: "NO"
-      #MACOSX_DEPLOYMENT_TARGET: "10.7"
+      MACOSX_DEPLOYMENT_TARGET: "10.7"
       # Only Sierra and onwards supports clock_gettime. See #12858
       ac_cv_func_clock_gettime: "no"
       GHC_COLLECTOR_FLAVOR: x86_64-darwin
