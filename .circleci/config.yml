@@ -52,7 +52,7 @@ aliases:
   - &make
     run:
       name: Build
-      command: "make -j`mk/detect-cpu-count.sh`"
+      command: "make -j`mk/detect-cpu-count.sh` V=0"
   - &build_hadrian
     run:
       name: Build GHC using Hadrian
