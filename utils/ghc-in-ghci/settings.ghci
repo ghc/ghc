@@ -25,9 +25,6 @@
 :set -icompiler/vectorise
 :set -ighc
 :set -Icompiler
-:set -Icompiler/stage2
-:set -Icompiler/stage2/build
-:set -icompiler/stage2/build
 :set -Iincludes
 :set -Iincludes/dist-derivedconstants/header
 :set -package=ghc-boot-th
@@ -35,6 +32,25 @@
 :set -DGHCI
 :set -DGHC_LOADED_INTO_GHCI
 :set -XNoImplicitPrelude
+
+-- make it work for Make stage2
+:set -Icompiler/stage2
+:set -Icompiler/stage2/build
+:set -icompiler/stage2/build
+
+-- make it work for Make stage1
+:set -Icompiler/stage1
+:set -Icompiler/stage1/build
+:set -icompiler/stage1/build
+
+-- make it work for Hadrian stage2
+:set -I_build/generated
+:set -I_build/stage2/compiler/build
+:set -i_build/stage2/compiler/build
+
+-- make it work for Hadrian stage1
+:set -I_build/stage1/compiler/build
+:set -i_build/stage1/compiler/build
 
 -- -fobject-code is required because bytecode doesn't support unboxed tuples
 -- https://ghc.haskell.org/trac/ghc/ticket/1257
