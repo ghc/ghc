@@ -84,6 +84,11 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wpartial-fields`
         * :ghc-flag:`-Wmissed-specialisations`
         * :ghc-flag:`-Wall-missed-specialisations`
+        * :ghc-flag:`-Wunsafe`
+        * :ghc-flag:`-Wsafe`
+        * :ghc-flag:`-Wtrustworthy-safe`
+        * :ghc-flag:`-Wcpp-undef`
+        
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
