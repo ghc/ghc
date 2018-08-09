@@ -32,6 +32,9 @@ TARGETS=(
     # Linux ppc64le
     "powerpc64le-unknown-linux"
 
+    # FreeBSD amd64
+    "amd64-portbld-freebsd"
+
     # QNX
     "arm-unknown-nto-qnx-eabi"
 
