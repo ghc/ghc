@@ -1,2 +1,0 @@
-System.IO.writeFile "T12146.hs" "module Main where { ipmort Data.Char; }"
-:load T12146
