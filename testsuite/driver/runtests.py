@@ -297,7 +297,7 @@ if config.list_broken:
     print('')
 
     if t.framework_failures:
-        print('WARNING:', len(framework_failures), 'framework failures!')
+        print('WARNING:', len(t.framework_failures), 'framework failures!')
         print('')
 else:
     # completion watcher

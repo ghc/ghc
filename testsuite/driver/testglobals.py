@@ -43,9 +43,6 @@ class TestConfig:
         # with --verbose=0.
         self.no_print_summary = False
 
-        # File in which to save the times
-        self.times_file = ''
-
         # What platform are we running on?
         self.platform = ''
         self.os = ''
@@ -248,9 +245,6 @@ class TestOptions:
 
        # Command to run before the test
        self.pre_cmd = None
-
-       # Command to run for extra cleaning
-       self.clean_cmd = None
 
        # Command wrapper: a function to apply to the command before running it
        self.cmd_wrapper = None

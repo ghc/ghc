@@ -454,12 +454,6 @@ def _pre_cmd( name, opts, cmd ):
 
 # ----
 
-def clean_cmd( cmd ):
-    # TODO. Remove all calls to clean_cmd.
-    return lambda _name, _opts: None
-
-# ----
-
 def cmd_prefix( prefix ):
     return lambda name, opts, p=prefix: _cmd_prefix(name, opts, prefix)
 
@@ -1222,7 +1216,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
         if config.verbose >= 1 and _expect_pass(way):
             print('Compile failed (exit code {0}) errors were:'.format(exit_code))
             actual_stderr_path = in_testdir(name, 'comp.stderr')
-            if_verbose_dump(1, actual_stderr_path)
+            dump_file(actual_stderr_path)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
@@ -1636,7 +1630,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
-    return ' '.join(w for w in str.split())
+    return ' '.join(str.split())
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
 
@@ -1800,13 +1794,12 @@ def if_verbose( n, s ):
     if config.verbose >= n:
         print(s)
 
-def if_verbose_dump( n, f ):
-    if config.verbose >= n:
-        try:
-            with io.open(f) as file:
-                print(file.read())
-        except Exception:
-            print('')
+def dump_file(f):
+    try:
+        with io.open(f) as file:
+            print(file.read())
+    except Exception:
+        print('')
 
 def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=0):
     timeout_prog = strip_quotes(config.timeout_prog)
