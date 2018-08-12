@@ -117,3 +117,16 @@ test('T13986', normal, compile, [''])
 test('T10855', normal, compile, [''])
 test('T15139', normal, compile, ['-Wincomplete-patterns -fdiagnostics-show-caret'])
 test('T15323', normal, compile, ['-dsuppress-uniques -ddump-parsed-ast'])
+
+def only_MG_loc(x):
+    """
+    Only compares the location embedded inside the MatchGroup, which has the form
+    (MG
+      (NoExt)
+      ({ <location>
+    """
+    ls = x.split("\n")
+    mgLocs = (loc.strip() for (mg,loc) in zip(ls,ls[2:])
+                if mg.strip().startswith("(MG"))
+    return '\n'.join(mgLocs)
+test('T15279', normalise_errmsg_fun(only_MG_loc), compile, [''])
