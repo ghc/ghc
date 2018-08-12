@@ -18,8 +18,8 @@ from pathlib import PurePath
 import collections
 import subprocess
 
-from testglobals import *
-from testutil import *
+from testglobals import config, ghc_env, default_testopts, brokens, t
+from testutil import strip_quotes, lndir, link_or_copy_file
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 global pool_sema
@@ -203,7 +203,6 @@ def _expect_broken_for( name, opts, bug, ways ):
     opts.expect_fail_for = ways
 
 def record_broken(name, opts, bug):
-    global brokens
     me = (bug, opts.testdir, name)
     if not me in brokens:
         brokens.append(me)
@@ -1563,7 +1562,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
     # See Note [Output comparison].
     if whitespace_normaliser(expected_str) == whitespace_normaliser(actual_str):
-        return 1
+        return True
     else:
         if config.verbose >= 1 and _expect_pass(way):
             print('Actual ' + kind + ' output differs from expected:')
@@ -1590,7 +1589,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
-            return 0
+            return False
         elif config.accept and actual_raw:
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
@@ -1604,13 +1603,13 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
                 if_verbose(1, 'Accepting new output.')
 
             write_file(expected_path, actual_raw)
-            return 1
+            return True
         elif config.accept:
             if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
             os.remove(expected_path)
-            return 1
+            return True
         else:
-            return 0
+            return False
 
 # Note [Output comparison]
 #
@@ -1866,7 +1865,7 @@ def gsNotWorking():
     print("GhostScript not available for hp2ps tests")
 
 global gs_working
-gs_working = 0
+gs_working = False
 if config.have_profiling:
   if config.gs != '':
     resultGood = runCmd(genGSCmd(config.confdir + '/good.ps'));
@@ -1875,7 +1874,7 @@ if config.have_profiling:
                                    ' >/dev/null 2>&1')
         if resultBad != 0:
             print("GhostScript available for hp2ps tests")
-            gs_working = 1;
+            gs_working = True
         else:
             gsNotWorking();
     else:

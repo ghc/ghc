@@ -1,7 +1,7 @@
 # Test for bug #713, results in crashes in GHC prior to 20060315 with +RTS -N2
 
 # Add 'threaded2_hT' so that we have at least one test for bug #5127
-if (ghc_with_threaded_rts == 1 and ghc_with_smp == 1):
+if ghc_with_threaded_rts and ghc_with_smp:
    ways = ['threaded2_hT']
 else:
    ways = []
