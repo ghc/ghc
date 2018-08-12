@@ -207,7 +207,7 @@ jobs:
       - *boot
       - *configure_unix
       - *make
-      - *slowtest
+      - *test
 
   # Nightly build with -DDEBUG using devel2 flavour
   "validate-x86_64-linux-debug":
