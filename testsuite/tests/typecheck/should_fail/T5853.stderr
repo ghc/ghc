@@ -2,7 +2,7 @@
 T5853.hs:15:46: error:
     • Could not deduce: Subst (Subst fa a) b ~ Subst fa b
         arising from a use of ‘<$>’
-      from the context: (F fa, Elem fa ~ Elem fa, Elem (Subst fa b) ~ b,
+      from the context: (F fa, Elem (Subst fa b) ~ b,
                          Subst fa b ~ Subst fa b, Subst (Subst fa b) (Elem fa) ~ fa,
                          F (Subst fa a), Elem (Subst fa a) ~ a, Elem fa ~ Elem fa,
                          Subst (Subst fa a) (Elem fa) ~ fa, Subst fa a ~ Subst fa a)
