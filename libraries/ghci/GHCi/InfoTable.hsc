@@ -15,8 +15,8 @@ module GHCi.InfoTable
 #endif
   ) where
 
-#ifdef GHCI
 import Prelude
+#ifdef GHCI
 import Foreign
 import Foreign.C
 import GHC.Ptr
