@@ -8,6 +8,7 @@ module SizedSeq
   , sizeSS
   ) where
 
+import Prelude
 import Control.DeepSeq
 import Data.Binary
 import Data.List

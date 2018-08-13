@@ -7,6 +7,7 @@
 -- This module is full of orphans, unfortunately
 module GHCi.TH.Binary () where
 
+import Prelude
 import Data.Binary
 import qualified Data.ByteString as B
 import GHC.Serialized

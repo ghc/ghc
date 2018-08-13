@@ -28,6 +28,9 @@ library
 
   ghc-options:      -Wall
   cmm-sources:      cbits/HeapPrim.cmm
+
+  default-extensions: NoImplicitPrelude
+
   exposed-modules:  GHC.Exts.Heap
                     GHC.Exts.Heap.Closures
                     GHC.Exts.Heap.ClosureTypes

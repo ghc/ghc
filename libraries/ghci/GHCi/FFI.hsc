@@ -17,6 +17,7 @@ module GHCi.FFI
   , freeForeignCallInfo
   ) where
 
+import Prelude
 import Control.Exception
 import Data.Binary
 import GHC.Generics
