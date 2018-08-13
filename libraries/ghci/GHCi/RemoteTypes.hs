@@ -17,6 +17,7 @@ module GHCi.RemoteTypes
   , unsafeForeignRefToRemoteRef, finalizeForeignRef
   ) where
 
+import Prelude
 import Control.DeepSeq
 import Data.Word
 import Foreign hiding (newForeignPtr)

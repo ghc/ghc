@@ -6,6 +6,7 @@ module GHCi.ResolvedBCO
   , isLittleEndian
   ) where
 
+import Prelude
 import SizedSeq
 import GHCi.RemoteTypes
 import GHCi.BreakArray

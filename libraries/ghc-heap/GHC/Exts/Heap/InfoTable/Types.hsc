@@ -8,6 +8,7 @@ module GHC.Exts.Heap.InfoTable.Types
 
 #include "Rts.h"
 
+import Prelude
 import GHC.Generics
 import GHC.Exts.Heap.ClosureTypes
 import Foreign

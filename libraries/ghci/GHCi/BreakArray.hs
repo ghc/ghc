@@ -30,6 +30,7 @@ module GHCi.BreakArray
     ) where
 
 #ifdef GHCI
+import Prelude
 import Control.Monad
 import Data.Word
 import GHC.Word
