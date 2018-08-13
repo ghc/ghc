@@ -11,6 +11,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 module GHC.LanguageExtensions.Type ( Extension(..) ) where
 
+import Prelude
 import GHC.Generics
 
 -- | The language extensions known to GHC.

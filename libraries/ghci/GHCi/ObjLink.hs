@@ -25,6 +25,7 @@ module GHCi.ObjLink
   , findSystemLibrary
   )  where
 
+import Prelude
 import GHCi.RemoteTypes
 import Control.Exception (throwIO, ErrorCall(..))
 import Control.Monad    ( when )

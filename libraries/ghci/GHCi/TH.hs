@@ -91,6 +91,7 @@ Other Notes on TH / Remote GHCi
     compiler/typecheck/TcSplice.hs
 -}
 
+import Prelude
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHC.Serialized

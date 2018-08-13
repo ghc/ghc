@@ -20,6 +20,7 @@ module GHC.Exts.Heap.Closures (
     , asBox
     ) where
 
+import Prelude
 import GHC.Exts.Heap.Constants
 #if defined(PROFILING)
 import GHC.Exts.Heap.InfoTableProf

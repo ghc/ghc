@@ -22,6 +22,7 @@ module GHCi.Message
   , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
   ) where
 
+import Prelude
 import GHCi.RemoteTypes
 import GHCi.FFI
 import GHCi.TH.Binary ()

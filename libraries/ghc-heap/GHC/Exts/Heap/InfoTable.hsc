@@ -7,6 +7,7 @@ module GHC.Exts.Heap.InfoTable
 
 #include "Rts.h"
 
+import Prelude
 import GHC.Exts.Heap.InfoTable.Types
 #if !defined(TABLES_NEXT_TO_CODE)
 import GHC.Exts.Heap.Constants

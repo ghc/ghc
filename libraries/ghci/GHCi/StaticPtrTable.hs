@@ -3,6 +3,7 @@
 
 module GHCi.StaticPtrTable ( sptAddEntry ) where
 
+import Prelude
 import Data.Word
 import Foreign
 import GHC.Fingerprint

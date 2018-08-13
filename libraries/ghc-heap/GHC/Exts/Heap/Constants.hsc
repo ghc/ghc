@@ -8,6 +8,7 @@ module GHC.Exts.Heap.Constants
 
 #include "MachDeps.h"
 
+import Prelude
 import Data.Bits
 
 wORD_SIZE, tAG_MASK, wORD_SIZE_IN_BITS :: Int

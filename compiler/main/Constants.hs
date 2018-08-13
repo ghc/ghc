@@ -6,6 +6,7 @@
 
 module Constants (module Constants) where
 
+import Prelude
 import GhcPrelude
 
 import Config
