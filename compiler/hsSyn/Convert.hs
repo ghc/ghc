@@ -829,7 +829,7 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsLam noExt (mkMatchGroup FromSource
                                              [mkSimpleMatch LambdaExpr
                                              pats e'])}
-    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch LambdaExpr) ms
+    cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch CaseAlt) ms
                             ; return $ HsLamCase noExt
                                                    (mkMatchGroup FromSource ms')
                             }
