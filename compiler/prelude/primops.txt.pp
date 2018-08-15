@@ -91,10 +91,11 @@ section "The word size story."
          This is normally set based on the {\tt config.h} parameter
          {\tt SIZEOF\_HSWORD}, i.e., 32 bits on 32-bit machines, 64
          bits on 64-bit machines.  However, it can also be explicitly
-         set to a smaller number, e.g., 31 bits, to allow the
+         set to a smaller number than 64, e.g., 62 bits, to allow the
          possibility of using tag bits. Currently GHC itself has only
-         32-bit and 64-bit variants, but 30 or 31-bit code can be
+         32-bit and 64-bit variants, but 61, 62, or 63-bit code can be
          exported as an external core file for use in other back ends.
+         30 and 31-bit code is no longer supported.
 
          GHC also implements a primitive unsigned integer type {\tt
          Word\#} which always has the same number of bits as {\tt
@@ -179,7 +180,7 @@ primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
 
 ------------------------------------------------------------------------
 section "Int#"
-        {Operations on native-size integers (30+ bits).}
+        {Operations on native-size integers (32+ bits).}
 ------------------------------------------------------------------------
 
 primtype Int#
@@ -316,7 +317,7 @@ primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
 
 ------------------------------------------------------------------------
 section "Word#"
-        {Operations on native-sized unsigned words (30+ bits).}
+        {Operations on native-sized unsigned words (32+ bits).}
 ------------------------------------------------------------------------
 
 primtype Word#
