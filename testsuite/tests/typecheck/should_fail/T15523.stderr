@@ -1,0 +1,6 @@
+
+T15523.hs:5:20: error:
+    • The constructor of a newtype must have exactly one field
+        but ‘Foo’ has none
+    • In the definition of data constructor ‘Foo’
+      In the newtype declaration for ‘Duration’
