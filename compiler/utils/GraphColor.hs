@@ -193,7 +193,7 @@ colorScan_spin iterative triv spill graph
 
                 -- we were able to coalesce something
                 --      go back to Simplify and see if this frees up more nodes to be trivially colorable.
-                (graph2, kksCoalesceFound @(_:_))
+                (graph2, kksCoalesceFound@(_:_))
                  -> colorScan_spin iterative triv spill graph2
                         ksTriv ksSpill (reverse kksCoalesceFound ++ kksCoalesce)
 
