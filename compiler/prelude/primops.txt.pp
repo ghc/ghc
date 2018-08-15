@@ -142,13 +142,8 @@ section "The word size story."
 
 -- Define synonyms for indexing ops.
 
-#if WORD_SIZE_IN_BITS < 32
-#define INT32 Int32#
-#define WORD32 Word32#
-#else
 #define INT32 Int#
 #define WORD32 Word#
-#endif
 
 #if WORD_SIZE_IN_BITS < 64
 #define INT64 Int64#
@@ -478,28 +473,6 @@ primop   Narrow32IntOp     "narrow32Int#"     Monadic   Int# -> Int#
 primop   Narrow8WordOp     "narrow8Word#"     Monadic   Word# -> Word#
 primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
-
-
-#if WORD_SIZE_IN_BITS < 32
-------------------------------------------------------------------------
-section "Int32#"
-        {Operations on 32-bit integers ({\tt Int32\#}).  This type is only used
-         if plain {\tt Int\#} has less than 32 bits.  In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primtype Int32#
-
-------------------------------------------------------------------------
-section "Word32#"
-        {Operations on 32-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 32 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primtype Word32#
-
-#endif
 
 
 #if WORD_SIZE_IN_BITS < 64
