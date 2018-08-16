@@ -162,6 +162,10 @@ Compiler
   <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0024-no-kind-vars.rst>`__
   in a future release.
 
+- The :ghc-flag:`-package-env ⟨file⟩|⟨name⟩` flag and ``GHC_ENVIRONMENT``
+  environment variable now accept the ``-`` value, which instructs GHC to ignore
+  any package environment files.
+
 Plugins
 ~~~~~~~
 
