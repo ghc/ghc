@@ -635,8 +635,8 @@ isSkolemTy :: TcLevel -> Type -> Bool
 isSkolemTy tc_lvl ty
   | Just tv <- getTyVar_maybe ty
   =  isSkolemTyVar tv
-  || (isSigTyVar tv && isTouchableMetaTyVar tc_lvl tv)
-     -- The last case is for touchable SigTvs
+  || (isTyVarTyVar tv && isTouchableMetaTyVar tc_lvl tv)
+     -- The last case is for touchable TyVarTvs
      -- we postpone untouchables to a latter test (too obscure)
 
   | otherwise
@@ -1606,7 +1606,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
-    || isSigTyVar tv1 && not (isTyVarTy ty2)
+    || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
@@ -1669,7 +1669,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
-  -- it started life as a SigTv, else it'd have been unified, given
+  -- it started life as a TyVarTv, else it'd have been unified, given
   -- that there's no occurs-check or forall problem
   | (implic:_) <- cec_encl ctxt
   , Implic { ic_skols = skols } <- implic
@@ -1707,7 +1707,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   -- Nastiest case: attempt to unify an untouchable variable
   -- So tv is a meta tyvar (or started that way before we
   -- generalised it).  So presumably it is an *untouchable*
-  -- meta tyvar or a SigTv, else it'd have been unified
+  -- meta tyvar or a TyVarTv, else it'd have been unified
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_given = given, ic_tclvl = lvl, ic_info = skol_info } <- implic

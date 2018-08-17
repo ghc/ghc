@@ -40,14 +40,14 @@ module TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  isSigTyVar, isOverlappableTyVar,  isTyConableTyVar,
+  isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isFskTyVar, isFmvTyVar, isFlattenTyVar,
   isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
   metaTyVarTcLevel, setMetaTyVarTcLevel, metaTyVarTcLevel_maybe,
   isTouchableMetaTyVar,
   isFloatedTouchableMetaTyVar,
-  findDupSigTvs, mkTyVarNamePairs,
+  findDupTyVarTvs, mkTyVarNamePairs,
 
   --------------------------------
   -- Builders
@@ -453,31 +453,23 @@ why Var.hs shouldn't actually have the definition, but it "belongs" here.
 
 Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-A SigTv is a specialised variant of TauTv, with the following invarints:
+A TyVarTv is a specialised variant of TauTv, with the following invarints:
 
-    * A SigTv can be unified only with a TyVar,
+    * A TyVarTv can be unified only with a TyVar,
       not with any other type
 
-    * Its MetaDetails, if filled in, will always be another SigTv
+    * Its MetaDetails, if filled in, will always be another TyVarTv
       or a SkolemTv
 
-SigTvs are only distinguished to improve error messages.
+TyVarTvs are only distinguished to improve error messages.
 Consider this
 
-  f :: forall a. [a] -> Int
-  f (x::b : xs) = 3
-
-Here 'b' is a lexically scoped type variable, but it turns out to be
-the same as the skolem 'a'.  So we make them both SigTvs, which can unify
-with each other.
-
-Similarly consider
   data T (a:k1) = MkT (S a)
   data S (b:k2) = MkS (T b)
-When doing kind inference on {S,T} we don't want *skolems* for k1,k2,
-because they end up unifying; we want those SigTvs again.
 
-SigTvs are used *only* for pattern type signatures.
+When doing kind inference on {S,T} we don't want *skolems* for k1,k2,
+because they end up unifying; we want those TyVarTvs again.
+
 
 Note [TyVars and TcTyVars during type checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -536,7 +528,7 @@ data MetaInfo
                    -- A TauTv is always filled in with a tau-type, which
                    -- never contains any ForAlls.
 
-   | SigTv         -- A variant of TauTv, except that it should not be
+   | TyVarTv       -- A variant of TauTv, except that it should not be
                    --   unified with a type, only with a type variable
                    -- See Note [Signature skolems]
 
@@ -564,7 +556,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   where
     pp_info = case info of
                 TauTv      -> text "tau"
-                SigTv      -> text "sig"
+                TyVarTv    -> text "tyv"
                 FlatMetaTv -> text "fmv"
                 FlatSkolTv -> text "fsk"
 
@@ -716,7 +708,7 @@ Note [TcLevel and untouchable type variables]
 
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication,
-  and it is a TauTv or SigTv (but /not/ FlatMetaTv or FlatSkolTv
+  and it is a TauTv or TyVarTv (but /not/ FlatMetaTv or FlatSkolTv
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -1216,12 +1208,12 @@ isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
 isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
         -- with a type constructor application; in particular,
-        -- not a SigTv
+        -- not a TyVarTv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-        MetaTv { mtv_info = SigTv } -> False
-        _                           -> True
+        MetaTv { mtv_info = TyVarTv } -> False
+        _                             -> True
   | otherwise = True
 
 isFmvTyVar tv
@@ -1317,11 +1309,11 @@ setMetaTyVarTcLevel tv tclvl
       details@(MetaTv {}) -> setTcTyVarDetails tv (details { mtv_tclvl = tclvl })
       _ -> pprPanic "metaTyVarTcLevel" (ppr tv)
 
-isSigTyVar :: Var -> Bool
-isSigTyVar tv
+isTyVarTyVar :: Var -> Bool
+isTyVarTyVar tv
   = case tcTyVarDetails tv of
-        MetaTv { mtv_info = SigTv } -> True
-        _                           -> False
+        MetaTv { mtv_info = TyVarTv } -> True
+        _                             -> False
 
 isFlexi, isIndirect :: MetaDetails -> Bool
 isFlexi Flexi = True
@@ -1340,10 +1332,10 @@ mkTyVarNamePairs :: [TyVar] -> [(Name,TyVar)]
 -- Just pair each TyVar with its own name
 mkTyVarNamePairs tvs = [(tyVarName tv, tv) | tv <- tvs]
 
-findDupSigTvs :: [(Name,TcTyVar)] -> [(Name,Name)]
+findDupTyVarTvs :: [(Name,TcTyVar)] -> [(Name,Name)]
 -- If we have [...(x1,tv)...(x2,tv)...]
 -- return (x1,x2) in the result list
-findDupSigTvs prs
+findDupTyVarTvs prs
   = concatMap mk_result_prs $
     findDupsEq eq_snd prs
   where

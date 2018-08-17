@@ -50,8 +50,8 @@ module TcMType (
   --------------------------------
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
-  newMetaSigTyVars, newMetaSigTyVarX,
-  newSigTyVar, newTauTyVar, newSkolemTyVar, newWildCardX,
+  newMetaTyVarTyVars, newMetaTyVarTyVarX,
+  newTyVarTyVar, newTauTyVar, newSkolemTyVar, newWildCardX,
   tcInstType,
   tcInstSkolTyVars,tcInstSkolTyVarsX,
   tcInstSuperSkolTyVarsX,
@@ -65,7 +65,7 @@ module TcMType (
   tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseRuntimeUnk,
   zonkTcTyVar, zonkTcTyVars,
-  zonkTcTyVarToTyVar, zonkSigTyVarPairs,
+  zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
@@ -621,32 +621,32 @@ instead of the buggous
 -}
 
 {-
-Note [SigTv]
+Note [TyVarTv]
 ~~~~~~~~~~~~
 
-A SigTv can unify with type *variables* only, including other SigTvs and
+A TyVarTv can unify with type *variables* only, including other TyVarTvs and
 skolems. Sometimes, they can unify with type variables that the user would
 rather keep distinct; see #11203 for an example.  So, any client of this
-function needs to either allow the SigTvs to unify with each other or check
-that they don't (say, with a call to findDubSigTvs).
+function needs to either allow the TyVarTvs to unify with each other or check
+that they don't (say, with a call to findDubTyVarTvs).
 
-Before #15050 this was used for ScopedTypeVariables in patterns, to make sure
-these type variables only refer to other type variables, but this restriction
-was dropped, and ScopedTypeVariables can now refer to full types (GHC Proposal
-29).
+Before #15050 this (under the name SigTv) was used for ScopedTypeVariables in
+patterns, to make sure these type variables only refer to other type variables,
+but this restriction was dropped, and ScopedTypeVariables can now refer to full
+types (GHC Proposal 29).
 
-The remaining uses of newSigTyVars are
-* in kind signatures, see Note [Kind generalisation and SigTvs]
-  and Note [Use SigTvs in kind-checking pass]
+The remaining uses of newTyVarTyVars are
+* in kind signatures, see Note [Kind generalisation and TyVarTvs]
+  and Note [Use TyVarTvs in kind-checking pass]
 * in partial type signatures, see Note [Quantified variables in partial type signatures]
 -}
 
--- see Note [SigTv]
-newSigTyVar :: Name -> Kind -> TcM TcTyVar
-newSigTyVar name kind
-  = do { details <- newMetaDetails SigTv
+-- see Note [TyVarTv]
+newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
+newTyVarTyVar name kind
+  = do { details <- newMetaDetails TyVarTv
        ; let tyvar = mkTcTyVar name kind details
-       ; traceTc "newSigTyVar" (ppr tyvar)
+       ; traceTc "newTyVarTyVar" (ppr tyvar)
        ; return tyvar }
 
 
@@ -846,7 +846,7 @@ newAnonMetaTyVar meta_info kind
                         TauTv       -> fsLit "t"
                         FlatMetaTv  -> fsLit "fmv"
                         FlatSkolTv  -> fsLit "fsk"
-                        SigTv       -> fsLit "a"
+                        TyVarTv      -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; let tyvar = mkTcTyVar name kind details
         ; traceTc "newAnonMetaTyVar" (ppr tyvar)
@@ -892,8 +892,8 @@ newOpenFlexiTyVarTy
   = do { kind <- newOpenTypeKind
        ; newFlexiTyVarTy kind }
 
-newMetaSigTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
-newMetaSigTyVars = mapAccumLM newMetaSigTyVarX emptyTCvSubst
+newMetaTyVarTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaTyVarTyVars = mapAccumLM newMetaTyVarTyVarX emptyTCvSubst
 
 newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables
@@ -914,9 +914,9 @@ newMetaTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Just like newMetaTyVars, but start with an existing substitution.
 newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
 
-newMetaSigTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
--- Just like newMetaTyVarX, but make a SigTv
-newMetaSigTyVarX subst tyvar = new_meta_tv_x SigTv subst tyvar
+newMetaTyVarTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
+-- Just like newMetaTyVarX, but make a TyVarTv
+newMetaTyVarTyVarX subst tyvar = new_meta_tv_x TyVarTv subst tyvar
 
 newWildCardX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 newWildCardX subst tv
@@ -1102,16 +1102,16 @@ defaultTyVar default_kind tv
   | not (isMetaTyVar tv)
   = return False
 
-  | isSigTyVar tv
-    -- Do not default SigTvs. Doing so would violate the invariants
-    -- on SigTvs; see Note [Signature skolems] in TcType.
+  | isTyVarTyVar tv
+    -- Do not default TyVarTvs. Doing so would violate the invariants
+    -- on TyVarTvs; see Note [Signature skolems] in TcType.
     -- Trac #13343 is an example; #14555 is another
-    -- See Note [Kind generalisation and SigTvs]
+    -- See Note [Kind generalisation and TyVarTvs]
   = return False
 
 
   | isRuntimeRepVar tv  -- Do not quantify over a RuntimeRep var
-                        -- unless it is a SigTv, handled earlier
+                        -- unless it is a TyVarTv, handled earlier
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
@@ -1575,14 +1575,14 @@ zonkCo = mapCoercion zonkTcTypeMapper ()
 
 zonkTcTyCoVarBndr :: TcTyCoVar -> TcM TcTyCoVar
 -- A tyvar binder is never a unification variable (TauTv),
--- rather it is always a skolem. It *might* be a SigTv.
--- (Because non-CUSK type declarations use SigTvs.)
+-- rather it is always a skolem. It *might* be a TyVarTv.
+-- (Because non-CUSK type declarations use TyVarTvs.)
 -- Regardless, it may have a kind
 -- that has not yet been zonked, and may include kind
 -- unification variables.
 zonkTcTyCoVarBndr tyvar
-  | isSigTyVar tyvar
-  = tcGetTyVar "zonkTcTyCoVarBndr SigTv" <$> zonkTcTyVar tyvar
+  | isTyVarTyVar tyvar
+  = tcGetTyVar "zonkTcTyCoVarBndr TyVarTv" <$> zonkTcTyVar tyvar
 
   | otherwise
     -- can't use isCoVar, because it looks at a TyCon. Argh.
@@ -1614,7 +1614,7 @@ zonkTcTyVar tv
                               ; return (mkTyVarTy z_tv) }
 
 -- Variant that assumes that any result of zonking is still a TyVar.
--- Should be used only on skolems and SigTvs
+-- Should be used only on skolems and TyVarTvs
 zonkTcTyVarToTyVar :: HasDebugCallStack => TcTyVar -> TcM TcTyVar
 zonkTcTyVarToTyVar tv
   = do { ty <- zonkTcTyVar tv
@@ -1624,8 +1624,8 @@ zonkTcTyVarToTyVar tv
                                           (ppr tv $$ ppr ty)
        ; return tv' }
 
-zonkSigTyVarPairs :: [(Name,TcTyVar)] -> TcM [(Name,TcTyVar)]
-zonkSigTyVarPairs prs
+zonkTyVarTyVarPairs :: [(Name,TcTyVar)] -> TcM [(Name,TcTyVar)]
+zonkTyVarTyVarPairs prs
   = mapM do_one prs
   where
     do_one (nm, tv) = do { tv' <- zonkTcTyVarToTyVar tv

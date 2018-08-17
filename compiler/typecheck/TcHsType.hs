@@ -1367,7 +1367,7 @@ Sidenote: It's quite possible that later, we'll consider (t -> s)
 as a degenerate case of some (pi (x :: t) -> s) and then this will
 all get more permissive.
 
-Note [Kind generalisation and SigTvs]
+Note [Kind generalisation and TyVarTvs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data T (a :: k1) x = MkT (S a ())
@@ -1375,14 +1375,14 @@ Consider
 
 While we are doing kind inference for the mutually-recursive S,T,
 we will end up unifying k1 and k2 together. So they can't be skolems.
-We therefore make them SigTvs, which can unify with type variables,
+We therefore make them TyVarTvs, which can unify with type variables,
 but not with general types.  All this is very similar at the level
 of terms: see Note [Quantified variables in partial type signatures]
 in TcBinds.
 
 There are some wrinkles
 
-* We always want to kind-generalise over SigTvs, and /not/ default
+* We always want to kind-generalise over TyVarTvs, and /not/ default
   them to Type.  Another way to say this is: a SigTV should /never/
   stand for a type, even via defaulting. Hence the check in
   TcSimplify.defaultTyVarTcS, and TcMType.defaultTyVar.  Here's
@@ -1398,7 +1398,7 @@ There are some wrinkles
   Here we will unify k1 with k2, but this time doing so is an error,
   because k1 and k2 are bound in the same delcaration.
 
-  We sort this out using findDupSigTvs, in TcTyClTyVars; very much
+  We sort this out using findDupTyVarTvs, in TcTyClTyVars; very much
   as we do with partial type signatures in mk_psig_qtvs in
   TcBinds.chooseInferredQuantifiers
 
@@ -1571,8 +1571,8 @@ kcLHsQTyVars name flav cusk
 
   | otherwise
   = do { (scoped_kvs, (tc_tvs, res_kind))
-           -- Why kcImplicitTKBndrs which uses newSigTyVar?
-           -- See Note [Kind generalisation and SigTvs]
+           -- Why kcImplicitTKBndrs which uses newTyVarTyVar?
+           -- See Note [Kind generalisation and TyVarTvs]
            <- kcImplicitTKBndrs kv_ns $
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
@@ -1691,14 +1691,14 @@ Hence the use of tcImplicitQTKBndrs in tcFamTyPats.
 --------------------------------------
 
 -- | Bring implicitly quantified type/kind variables into scope during
--- kind checking. Uses SigTvs, as per Note [Use SigTvs in kind-checking pass]
+-- kind checking. Uses TyVarTvs, as per Note [Use TyVarTvs in kind-checking pass]
 -- in TcTyClsDecls.
 kcImplicitTKBndrs :: [Name]     -- of the vars
                   -> TcM a
                   -> TcM ([TcTyVar], a)  -- returns the tyvars created
                                          -- these are *not* dependency ordered
 kcImplicitTKBndrs var_ns thing_inside
-  = do { tkvs <- mapM newFlexiKindedSigTyVar var_ns
+  = do { tkvs <- mapM newFlexiKindedTyVarTyVar var_ns
        ; result <- tcExtendTyVarEnv tkvs thing_inside
        ; return (tkvs, result) }
 
@@ -1709,7 +1709,7 @@ tcImplicitTKBndrs, tcImplicitTKBndrsSig, tcImplicitQTKBndrs
   -> TcM a
   -> TcM ([TcTyVar], a)
 tcImplicitTKBndrs    = tcImplicitTKBndrsX newFlexiKindedSkolemTyVar
-tcImplicitTKBndrsSig = tcImplicitTKBndrsX newFlexiKindedSigTyVar
+tcImplicitTKBndrsSig = tcImplicitTKBndrsX newFlexiKindedTyVarTyVar
 tcImplicitQTKBndrs   = tcImplicitTKBndrsX newFlexiKindedQTyVar
 
 tcImplicitTKBndrsX :: (Name -> TcM TcTyVar) -- new_tv function
@@ -1741,7 +1741,7 @@ tcImplicitTKBndrsX new_tv skol_info tv_names thing_inside
                  ; return (tkvs, result) }
 
        ; skol_tvs <- mapM zonkTcTyCoVarBndr skol_tvs
-          -- use zonkTcTyCoVarBndr because a skol_tv might be a SigTv
+          -- use zonkTcTyCoVarBndr because a skol_tv might be a TyVarTv
 
           -- do a stable topological sort, following
           -- Note [Ordering of implicit variables] in HsTypes
@@ -1767,8 +1767,8 @@ newFlexiKindedTyVar new_tv name
 newFlexiKindedSkolemTyVar :: Name -> TcM TyVar
 newFlexiKindedSkolemTyVar = newFlexiKindedTyVar newSkolemTyVar
 
-newFlexiKindedSigTyVar :: Name -> TcM TyVar
-newFlexiKindedSigTyVar = newFlexiKindedTyVar newSigTyVar
+newFlexiKindedTyVarTyVar :: Name -> TcM TyVar
+newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
 
 --------------------------------------
 -- Explicit binders
@@ -1776,13 +1776,13 @@ newFlexiKindedSigTyVar = newFlexiKindedTyVar newSigTyVar
 
 -- | Used during the "kind-checking" pass in TcTyClsDecls only,
 -- and even then only for data-con declarations.
--- See Note [Use SigTvs in kind-checking pass] in TcTyClsDecls
+-- See Note [Use TyVarTvs in kind-checking pass] in TcTyClsDecls
 kcExplicitTKBndrs :: [LHsTyVarBndr GhcRn]
                   -> TcM a
                   -> TcM a
 kcExplicitTKBndrs [] thing_inside = thing_inside
 kcExplicitTKBndrs (L _ hs_tv : hs_tvs) thing_inside
-  = do { tv <- tcHsTyVarBndr newSigTyVar hs_tv
+  = do { tv <- tcHsTyVarBndr newTyVarTyVar hs_tv
        ; tcExtendTyVarEnv [tv] $
          kcExplicitTKBndrs hs_tvs thing_inside }
 
@@ -2067,7 +2067,7 @@ kcLookupTcTyCon nm
 -- Never emits constraints, though the thing_inside might.
 kcTyClTyVars :: Name -> TcM a -> TcM a
 kcTyClTyVars tycon_name thing_inside
-  -- See Note [Use SigTvs in kind-checking pass] in TcTyClsDecls
+  -- See Note [Use TyVarTvs in kind-checking pass] in TcTyClsDecls
   = do { tycon <- kcLookupTcTyCon tycon_name
        ; tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
 
@@ -2097,9 +2097,9 @@ tcTyClTyVars tycon_name thing_inside
        ; let flav = tyConFlavour tycon
              scoped_prs = tcTyConScopedTyVars tycon
              scoped_tvs = map snd scoped_prs
-             still_sig_tvs = filter isSigTyVar scoped_tvs
+             still_sig_tvs = filter isTyVarTyVar scoped_tvs
 
-       ; mapM_ report_sig_tv_err (findDupSigTvs scoped_prs)
+       ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_prs)
 
        ; checkNoErrs $ reportFloatingKvs tycon_name flav
                                          scoped_tvs still_sig_tvs
@@ -2284,7 +2284,7 @@ tcHsPartialSigType ctxt sig_ty
                   ; return (wcs, wcx, theta, tau) }
 
          -- We must return these separately, because all the zonking below
-         -- might change the name of a SigTv. This, in turn, causes trouble
+         -- might change the name of a TyVarTv. This, in turn, causes trouble
          -- in partial type signatures that bind scoped type variables, as
          -- we bring the wrong name into scope in the function body.
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
@@ -2295,17 +2295,17 @@ tcHsPartialSigType ctxt sig_ty
        -- See Note [Extra-constraint holes in partial type signatures]
        ; emitWildCardHoleConstraints wcs
 
-         -- The SigTvs created above will sometimes have too high a TcLevel
+         -- The TyVarTvs created above will sometimes have too high a TcLevel
          -- (note that they are generated *after* bumping the level in
          -- the tc{Im,Ex}plicitTKBndrsSig functions. Bumping the level
          -- is still important here, because the kinds of these variables
          -- do indeed need to have the higher level, so they can unify
          -- with other local type variables. But, now that we've type-checked
          -- everything (and solved equalities in the tcImplicit call)
-         -- we need to promote the SigTvs so we don't violate the TcLevel
+         -- we need to promote the TyVarTvs so we don't violate the TcLevel
          -- invariant
        ; all_tvs <- mapM zonkPromoteTyCoVarBndr (implicit_tvs ++ explicit_tvs)
-            -- zonkPromoteTyCoVarBndr deals well with SigTvs
+            -- zonkPromoteTyCoVarBndr deals well with TyVarTvs
 
        ; theta   <- mapM zonkPromoteType theta
        ; tau     <- zonkPromoteType tau
@@ -2427,7 +2427,7 @@ tcHsPatSigType ctxt sig_ty
     mk_tv_pair tv = do { tv' <- zonkTcTyVarToTyVar tv
                        ; return (tyVarName tv, tv') }
          -- The Name is one of sig_vars, the lexically scoped name
-         -- But if it's a SigTyVar, it might have been unified
+         -- But if it's a TyVarTv, it might have been unified
          -- with an existing in-scope skolem, so we must zonk
          -- here.  See Note [Pattern signature binders]
 tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPatSigType"
@@ -2470,7 +2470,7 @@ tcPatSig in_pat_bind sig res_ty
                 -- Here 'a' doesn't get a binding.  Sigh
         ; let bad_tvs = [ tv | (_,tv) <- sig_tvs
                              , not (tv `elemVarSet` exactTyCoVarsOfType sig_ty) ]
-        ; checkTc (null bad_tvs) (badPatSigTvs sig_ty bad_tvs)
+        ; checkTc (null bad_tvs) (badPatTyVarTvs sig_ty bad_tvs)
 
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
@@ -2625,8 +2625,8 @@ zonkPromoteTyCoVarKind = updateTyVarKindM zonkPromoteType
 
 zonkPromoteTyCoVarBndr :: TyCoVar -> TcM TyCoVar
 zonkPromoteTyCoVarBndr tv
-  | isSigTyVar tv
-  = tcGetTyVar "zonkPromoteTyCoVarBndr SigTv" <$> zonkPromoteTcTyVar tv
+  | isTyVarTyVar tv
+  = tcGetTyVar "zonkPromoteTyCoVarBndr TyVarTv" <$> zonkPromoteTcTyVar tv
 
   | isTcTyVar tv && isSkolemTyVar tv
   = do { tc_lvl <- getTcLevel
@@ -2699,8 +2699,8 @@ promotionErr name err
 ************************************************************************
 -}
 
-badPatSigTvs :: TcType -> [TyVar] -> SDoc
-badPatSigTvs sig_ty bad_tvs
+badPatTyVarTvs :: TcType -> [TyVar] -> SDoc
+badPatTyVarTvs sig_ty bad_tvs
   = vcat [ fsep [text "The type variable" <> plural bad_tvs,
                  quotes (pprWithCommas ppr bad_tvs),
                  text "should be bound by the pattern signature" <+> quotes (ppr sig_ty),

@@ -550,10 +550,10 @@ a pattern synonym.  What about the /building/ side?
   tcPatSynBuilderBind, by converting the pattern to an expression and
   typechecking it.
 
-  At one point, for ImplicitBidirectional I used SigTvs (instead of
+  At one point, for ImplicitBidirectional I used TyVarTvs (instead of
   TauTvs) in tcCheckPatSynDecl.  But (a) strengthening the check here
   is redundant since tcPatSynBuilderBind does the job, (b) it was
-  still incomplete (SigTvs can unify with each other), and (c) it
+  still incomplete (TyVarTvs can unify with each other), and (c) it
   didn't even work (Trac #13441 was accepted with
   ExplicitBidirectional, but rejected if expressed in
   ImplicitBidirectional form.  Conclusion: trying to be too clever is

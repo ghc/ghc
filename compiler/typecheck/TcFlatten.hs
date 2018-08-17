@@ -2075,9 +2075,9 @@ unflattenWanteds tv_eqs funeqs
       | Just (rhs_tv, co) <- getCastedTyVar_maybe rhs
                              -- co :: kind(rhs_tv) ~ kind(lhs_tv)
       , isFmvTyVar rhs_tv || (isTouchableMetaTyVar tclvl rhs_tv
-                              && not (isSigTyVar rhs_tv))
+                              && not (isTyVarTyVar rhs_tv))
                               -- LHS is a filled fmv, and so is a type
-                              -- family application, which a SigTv should
+                              -- family application, which a TyVarTv should
                               -- not unify with
       = do { is_filled <- isFilledMetaTyVar rhs_tv
            ; if is_filled then return False
