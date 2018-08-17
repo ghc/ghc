@@ -446,8 +446,8 @@ lookupChildrenExport spec_parent rdr_items =
           case name of
             NameNotFound -> do { ub <- reportUnboundName unboundName
                                ; let l = getLoc n
-                               ; return (Left (L l (IEName (L l ub))))}
-            FoundFL fls -> return $ Right (L (getLoc n) fls)
+                               ; return (Left (cL l (IEName (cL l ub))))}
+            FoundFL fls -> return $ Right (cL (getLoc n) fls)
             FoundName par name -> do { checkPatSynParent spec_parent par name
                                      ; return $ Left (replaceLWrappedName n name) }
             IncorrectParent p g td gs -> failWithDcErr p g td gs

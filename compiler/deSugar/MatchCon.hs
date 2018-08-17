@@ -8,6 +8,7 @@ Pattern-matching constructors
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module MatchCon ( matchConFamily, matchPatSyn ) where
 
@@ -202,7 +203,7 @@ compatible_pats _                 _                 = True -- Prefix or infix co
 same_fields :: HsRecFields GhcTc (LPat GhcTc) -> HsRecFields GhcTc (LPat GhcTc)
             -> Bool
 same_fields flds1 flds2
-  = all2 (\(L _ f1) (L _ f2)
+  = all2 (\(dL->(_ , f1)) (dL->(_ , f2))
                           -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
          (rec_flds flds1) (rec_flds flds2)
 

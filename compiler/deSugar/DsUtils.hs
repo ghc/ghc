@@ -11,6 +11,7 @@ This module exports some utility functions of no great interest.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Utility functions for constructing Core syntax, principally for desugaring
 module DsUtils (
@@ -664,7 +665,7 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
-  | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
+  | (dL->(_ , VarPat _ (dL->(_ , v)))) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
@@ -709,28 +710,28 @@ mkSelectorBinds ticks pat val_expr
     local_tuple   = mkBigCoreVarTup1 binders
     tuple_ty      = exprType local_tuple
 
-strip_bangs :: LPat a -> LPat a
+strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens
-strip_bangs (L _ (ParPat _ p))  = strip_bangs p
-strip_bangs (L _ (BangPat _ p)) = strip_bangs p
-strip_bangs lp                  = lp
+strip_bangs (dL->(_ , ParPat _ p))  = strip_bangs p
+strip_bangs (dL->(_ , BangPat _ p)) = strip_bangs p
+strip_bangs lp                      = lp
 
-is_flat_prod_lpat :: LPat a -> Bool
+is_flat_prod_lpat :: LPat (GhcPass p) -> Bool
 is_flat_prod_lpat p = is_flat_prod_pat (unLoc p)
 
-is_flat_prod_pat :: Pat a -> Bool
+is_flat_prod_pat :: Pat (GhcPass p) -> Bool
 is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
-is_flat_prod_pat (ConPatOut { pat_con  = L _ pcon, pat_args = ps})
+is_flat_prod_pat (ConPatOut { pat_con  = (dL->(_ , pcon)), pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
   = all is_triv_lpat (hsConPatArgs ps)
 is_flat_prod_pat _ = False
 
-is_triv_lpat :: LPat a -> Bool
+is_triv_lpat :: LPat (GhcPass p) -> Bool
 is_triv_lpat p = is_triv_pat (unLoc p)
 
-is_triv_pat :: Pat a -> Bool
+is_triv_pat :: Pat (GhcPass p) -> Bool
 is_triv_pat (VarPat {})  = True
 is_triv_pat (WildPat{})  = True
 is_triv_pat (ParPat _ p) = is_triv_lpat p
@@ -748,7 +749,7 @@ is_triv_pat _            = False
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
 mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = L (getLoc (head lpats)) $
+mkLHsPatTup lpats  = cL (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
 
 mkLHsVarPatTup :: [Id] -> LPat GhcTc
@@ -911,30 +912,30 @@ mkBinaryTickBox ixT ixF e = do
 -- pat     => !pat   -- when -XStrict
 -- pat     => pat    -- otherwise
 decideBangHood :: DynFlags
-               -> LPat GhcTc  -- ^ Original pattern
-               -> LPat GhcTc  -- Pattern with bang if necessary
+               -> Pat GhcTc  -- ^ Original pattern
+               -> Pat GhcTc  -- Pattern with bang if necessary
 decideBangHood dflags lpat
   | not (xopt LangExt.Strict dflags)
   = lpat
   | otherwise   --  -XStrict
   = go lpat
   where
-    go lp@(L l p)
+    go lp@(dL->(l , p))
       = case p of
-           ParPat x p    -> L l (ParPat x (go p))
+           ParPat x p    -> cL l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExt lp)
+           _             -> cL l (BangPat noExt lp)
 
 -- | Unconditionally make a 'Pat' strict.
-addBang :: LPat GhcTc -- ^ Original pattern
-        -> LPat GhcTc -- ^ Banged pattern
+addBang :: Pat GhcTc -- ^ Original pattern
+        -> Pat GhcTc -- ^ Banged pattern
 addBang = go
   where
-    go lp@(L l p)
+    go lp@(dL->(l , p))
       = case p of
-           ParPat x p    -> L l (ParPat x (go p))
-           LazyPat _ lp' -> L l (BangPat noExt lp')
+           ParPat x p    -> cL l (ParPat x (go p))
+           LazyPat _ lp' -> cL l (BangPat noExt lp')
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExt lp)
+           _             -> cL l (BangPat noExt lp)

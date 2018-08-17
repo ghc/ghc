@@ -704,7 +704,8 @@ kcTyClDecl :: TyClDecl GhcRn -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
   | HsDataDefn { dd_cons = cons@(L _ (ConDeclGADT {}) : _), dd_ctxt = L _ [] } <- defn
-  = mapM_ (wrapLocM kcConDecl) cons
+  = mapM_ (wrapLocM_ kcConDecl) cons
+
     -- hs_tvs and dd_kindSig already dealt with in getInitialKind
     -- This must be a GADT-style decl,
     --        (see invariants of DataDefn declaration)
@@ -715,7 +716,7 @@ kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
   = kcTyClTyVars name $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kcConDecl) cons }
+        ; mapM_ (wrapLocM_ kcConDecl) cons }
 
 kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = lrhs })
   = kcTyClTyVars name $
@@ -728,7 +729,7 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs })
   = kcTyClTyVars name $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kc_sig)     sigs }
+        ; mapM_ (wrapLocM_ kc_sig)     sigs }
   where
     kc_sig (ClassOpSig _ _ nms op_ty)
              = kcHsSigType (TyConSkol ClassFlavour name) nms op_ty
@@ -1463,7 +1464,7 @@ kcDataDefn mb_kind_env
                                                 , dd_kindSig = mb_kind } }}})
            res_k
   = do  { _ <- tcHsContext ctxt
-        ; checkNoErrs $ mapM_ (wrapLocM kcConDecl) cons
+        ; checkNoErrs $ mapM_ (wrapLocM_ kcConDecl) cons
           -- See Note [Failing early in kcDataDefn]
         ; exp_res_kind <- case mb_kind of
             Nothing -> return liftedTypeKind

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ViewPatterns, TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -77,12 +77,12 @@ getImports dflags buf filename source_filename = do
         then throwIO $ mkSrcErr errs
         else
           case rdr_module of
-            L _ hsmod ->
+            (dL->(_ , hsmod)) ->
               let
                 mb_mod = hsmodName hsmod
                 imps = hsmodImports hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename) 1 1)
-                mod = mb_mod `orElse` L main_loc mAIN_NAME
+                mod = mb_mod `orElse` cL main_loc mAIN_NAME
                 (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
 
                      -- GHC.Prim doesn't exist physically, so don't go looking for it.
@@ -92,7 +92,8 @@ getImports dflags buf filename source_filename = do
                 implicit_prelude = xopt LangExt.ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
-                convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
+                convImport (dL->(_ , i)) =
+                  (fmap sl_fs (ideclPkgQual i), ideclName i)
               in
               return (map convImport src_idecls,
                       map convImport (implicit_imports ++ ordinary_imps),
@@ -115,16 +116,16 @@ mkPrelImports this_mod loc implicit_prelude import_decls
   | otherwise = [preludeImportDecl]
   where
       explicit_prelude_import
-       = notNull [ () | L _ (ImportDecl { ideclName = mod
-                                        , ideclPkgQual = Nothing })
+       = notNull [ () | (dL->(_ , ImportDecl { ideclName = mod
+                                             , ideclPkgQual = Nothing }))
                           <- import_decls
                       , unLoc mod == pRELUDE_NAME ]
 
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = L loc $ ImportDecl { ideclExt       = noExt,
+        = cL loc $ ImportDecl { ideclExt       = noExt,
                                ideclSourceSrc = NoSourceText,
-                               ideclName      = L loc pRELUDE_NAME,
+                               ideclName      = cL loc pRELUDE_NAME,
                                ideclPkgQual   = Nothing,
                                ideclSource    = False,
                                ideclSafe      = False,  -- Not a safe import
@@ -186,11 +187,11 @@ lazyGetToks dflags filename handle = do
            -- be truncated, so read some more of the file and lex it again.
            then getMore handle state size
            else case t of
-                  L _ ITeof -> return [t]
+                  (dL->(_ , ITeof)) -> return [t]
                   _other    -> do rest <- lazyLexBuf handle state' eof size
                                   return (t : rest)
       _ | not eof   -> getMore handle state size
-        | otherwise -> return [L (RealSrcSpan (last_loc state)) ITeof]
+        | otherwise -> return [cL (RealSrcSpan (last_loc state)) ITeof]
                          -- parser assumes an ITeof sentinel at the end
 
   getMore :: Handle -> PState -> Int -> IO [Located Token]
@@ -212,9 +213,9 @@ getToks dflags filename buf = lexAll (pragState dflags buf loc)
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
-                   POk _      t@(L _ ITeof) -> [t]
+                   POk _      t@(dL->(_ , ITeof)) -> [t]
                    POk state' t -> t : lexAll state'
-                   _ -> [L (RealSrcSpan (last_loc state)) ITeof]
+                   _ -> [cL (RealSrcSpan (last_loc state)) ITeof]
 
 
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
@@ -237,38 +238,35 @@ getOptions' :: DynFlags
 getOptions' dflags toks
     = parseToks toks
     where
-          getToken (L _loc tok) = tok
-          getLoc (L loc _tok) = loc
-
           parseToks (open:close:xs)
-              | IToptions_prag str <- getToken open
-              , ITclose_prag       <- getToken close
+              | IToptions_prag str <- unLoc open
+              , ITclose_prag       <- unLoc close
               = case toArgs str of
                   Left err -> panic ("getOptions'.parseToks: " ++ err)
-                  Right args -> map (L (getLoc open)) args ++ parseToks xs
+                  Right args -> map (cL (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
-              | ITinclude_prag str <- getToken open
-              , ITclose_prag       <- getToken close
-              = map (L (getLoc open)) ["-#include",removeSpaces str] ++
+              | ITinclude_prag str <- unLoc open
+              , ITclose_prag       <- unLoc close
+              = map (cL (getLoc open)) ["-#include",removeSpaces str] ++
                 parseToks xs
           parseToks (open:close:xs)
-              | ITdocOptions str <- getToken open
-              , ITclose_prag     <- getToken close
-              = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
+              | ITdocOptions str <- unLoc open
+              , ITclose_prag     <- unLoc close
+              = map (cL (getLoc open)) ["-haddock-opts", removeSpaces str]
                 ++ parseToks xs
           parseToks (open:xs)
-              | ITlanguage_prag <- getToken open
+              | ITlanguage_prag <- unLoc open
               = parseLanguage xs
           parseToks (comment:xs) -- Skip over comments
-              | isComment (getToken comment)
+              | isComment (unLoc comment)
               = parseToks xs
           parseToks _ = []
-          parseLanguage (L loc (ITconid fs):rest)
-              = checkExtension dflags (L loc fs) :
+          parseLanguage ((dL->(loc , ITconid fs)):rest)
+              = checkExtension dflags (cL loc fs) :
                 case rest of
-                  (L _loc ITcomma):more -> parseLanguage more
-                  (L _loc ITclose_prag):more -> parseToks more
-                  (L loc _):_ -> languagePragParseError dflags loc
+                  (dL->(_loc , ITcomma)):more -> parseLanguage more
+                  (dL->(_loc , ITclose_prag)):more -> parseToks more
+                  (dL->(loc  , _)):_ -> languagePragParseError dflags loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
               = languagePragParseError dflags (getLoc tok)
@@ -296,7 +294,7 @@ checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
 checkProcessArgsResult dflags flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
-    where mkMsg (L loc flag)
+    where mkMsg (dL->(loc , flag))
               = mkPlainErrMsg dflags loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
@@ -304,12 +302,12 @@ checkProcessArgsResult dflags flags
 -----------------------------------------------------------------------------
 
 checkExtension :: DynFlags -> Located FastString -> Located String
-checkExtension dflags (L l ext)
+checkExtension dflags (dL->(l , ext))
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
  =  let ext' = unpackFS ext in
     if ext' `elem` supportedLanguagesAndExtensions
-    then L l ("-X"++ext')
+    then cL l ("-X"++ext')
     else unsupportedExtnError dflags l ext'
 
 languagePragParseError :: DynFlags -> SrcSpan -> a
@@ -334,9 +332,10 @@ unsupportedExtnError dflags loc unsup =
 optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
-  where unhandled_flags_lines = [ L l f | f <- unhandled_flags,
-                                          L l f' <- flags_lines, f == f' ]
-        mkMsg (L flagSpan flag) =
+  where unhandled_flags_lines :: [Located String]
+        unhandled_flags_lines = [ cL l f
+                                | f <- unhandled_flags
+                                , (dL->(l , f')) <- flags_lines, f == f' ]
+        mkMsg (dL->(flagSpan , flag)) =
             ErrUtils.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
-

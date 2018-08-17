@@ -1,4 +1,7 @@
-{-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE PatternGuards    #-}
+{-# LANGUAGE ViewPatterns     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies     #-}
 module Main where
 
 import System.IO
@@ -36,7 +39,7 @@ main = do
         = not (isEmptyBag (filterBag isDataCon bs))
       isDataCon (L l (f@FunBind {}))
         | (MG _ (L _ (m:_)) _) <- fun_matches f,
-          (L _ (c@ConPatOut{}):_)<-hsLMatchPats m,
+          ((dL->(_ , c@ConPatOut{})):_)<-hsLMatchPats m,
           (L l _)<-pat_con c
         = isGoodSrcSpan l       -- Check that the source location is a good one
       isDataCon _

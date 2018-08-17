@@ -7,6 +7,7 @@ Functions for working with the typechecker environment (setters, getters...).
 
 {-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcRnMonad(
   -- * Initalisation
@@ -55,7 +56,7 @@ module TcRnMonad(
 
   -- * Error management
   getSrcSpanM, setSrcSpan, addLocM,
-  wrapLocM, wrapLocFstM, wrapLocSndM,
+  wrapLocM, wrapLocM_, wrapLocFstM, wrapLocSndM,
   getErrsVar, setErrsVar,
   addErr,
   failWith, failAt,
@@ -832,23 +833,33 @@ setSrcSpan (RealSrcSpan real_loc) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
-addLocM :: (a -> TcM b) -> Located a -> TcM b
-addLocM fn (L loc a) = setSrcSpan loc $ fn a
+addLocM :: HasSrcSpan a => (SrcSpanLess a -> TcM b) -> a -> TcM b
+addLocM fn (dL->(loc , a)) = setSrcSpan loc $ fn a
 
-wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
-wrapLocM fn (L loc a) = setSrcSpan loc $ do b <- fn a; return (L loc b)
+wrapLocM_ :: HasSrcSpan a =>
+             (SrcSpanLess a -> TcM ()) -> a -> TcM ()
+wrapLocM_ fn (dL->(loc , a)) = setSrcSpan loc (fn a)
 
-wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
-wrapLocFstM fn (L loc a) =
+
+wrapLocM :: (HasSrcSpan a, HasSrcSpan b) =>
+            (SrcSpanLess a -> TcM (SrcSpanLess b)) -> a -> TcM b
+wrapLocM fn (dL->(loc , a)) = setSrcSpan loc
+                                $ do { b <- fn a
+                                     ; return (cL loc b) }
+
+wrapLocFstM :: (HasSrcSpan a, HasSrcSpan b) =>
+               (SrcSpanLess a -> TcM (SrcSpanLess b,c)) -> a -> TcM (b, c)
+wrapLocFstM fn (dL->(loc , a)) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (L loc b, c)
+    return (cL loc b, c)
 
-wrapLocSndM :: (a -> TcM (b,c)) -> Located a -> TcM (b, Located c)
-wrapLocSndM fn (L loc a) =
+wrapLocSndM :: (HasSrcSpan a, HasSrcSpan c) =>
+               (SrcSpanLess a -> TcM (b, SrcSpanLess c)) -> a -> TcM (b, c)
+wrapLocSndM fn (dL->(loc , a)) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (b, L loc c)
+    return (b, cL loc c)
 
 -- Reporting errors
 

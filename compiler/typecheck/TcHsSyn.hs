@@ -12,6 +12,7 @@ checker.
 {-# LANGUAGE CPP, TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcHsSyn (
         -- * Extracting types from HsSyn
@@ -88,7 +89,7 @@ import Control.Arrow ( second )
 -}
 
 hsLPatType :: OutPat GhcTc -> Type
-hsLPatType (L _ pat) = hsPatType pat
+hsLPatType (dL->(_ , pat)) = hsPatType pat
 
 hsPatType :: Pat GhcTc -> Type
 hsPatType (ParPat _ pat)                = hsLPatType pat

@@ -7,6 +7,9 @@
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE ViewPatterns       #-}
+{-# LANGUAGE FlexibleContexts   #-}
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
@@ -70,11 +73,17 @@ module SrcLoc (
 
         -- ** Deconstructing Located
         getLoc, unLoc,
+        unRealSrcSpan, getRealSrcSpan,
 
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost,
-        spans, isSubspanOf, sortLocated
+        spans, isSubspanOf, sortLocated,
+
+        -- ** HasSrcSpan
+        HasSrcSpan(..), SrcSpanLess, dL, cL,
+        onHasSrcSpan
+
     ) where
 
 import GhcPrelude
@@ -169,7 +178,7 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 ************************************************************************
 -}
 
-sortLocated :: [Located a] -> [Located a]
+sortLocated :: HasSrcSpan a => [a] -> [a]
 sortLocated things = sortBy (comparing getLoc) things
 
 instance Outputable RealSrcLoc where
@@ -515,35 +524,36 @@ data GenLocated l e = L l e
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
 
-unLoc :: GenLocated l e -> e
-unLoc (L _ e) = e
+unLoc :: HasSrcSpan a => a -> SrcSpanLess a
+unLoc = snd . decomposeSrcSpan
 
-getLoc :: GenLocated l e -> l
-getLoc (L l _) = l
+getLoc :: HasSrcSpan a => a -> SrcSpan
+getLoc = fst . decomposeSrcSpan
 
-noLoc :: e -> Located e
-noLoc e = L noSrcSpan e
+noLoc :: HasSrcSpan a => SrcSpanLess a -> a
+noLoc e = composeSrcSpan (noSrcSpan , e)
 
-mkGeneralLocated :: String -> e -> Located e
-mkGeneralLocated s e = L (mkGeneralSrcSpan (fsLit s)) e
+mkGeneralLocated :: HasSrcSpan e => String -> SrcSpanLess e -> e
+mkGeneralLocated s e = cL (mkGeneralSrcSpan (fsLit s)) e
 
-combineLocs :: Located a -> Located b -> SrcSpan
+combineLocs :: (HasSrcSpan a , HasSrcSpan b) => a -> b -> SrcSpan
 combineLocs a b = combineSrcSpans (getLoc a) (getLoc b)
 
 -- | Combine locations from two 'Located' things and add them to a third thing
-addCLoc :: Located a -> Located b -> c -> Located c
-addCLoc a b c = L (combineSrcSpans (getLoc a) (getLoc b)) c
+addCLoc :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c) =>
+           a -> b -> SrcSpanLess c -> c
+addCLoc a b c = cL (combineSrcSpans (getLoc a) (getLoc b)) c
 
 -- not clear whether to add a general Eq instance, but this is useful sometimes:
 
 -- | Tests whether the two located things are equal
-eqLocated :: Eq a => Located a -> Located a -> Bool
+eqLocated :: (HasSrcSpan a , Eq (SrcSpanLess a)) => a -> a -> Bool
 eqLocated a b = unLoc a == unLoc b
 
 -- not clear whether to add a general Ord instance, but this is useful sometimes:
 
 -- | Tests the ordering of the two located things
-cmpLocated :: Ord a => Located a -> Located a -> Ordering
+cmpLocated :: (HasSrcSpan a , Ord (SrcSpanLess a)) => a -> a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
 instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
@@ -584,3 +594,43 @@ isSubspanOf src parent
     | srcSpanFileName_maybe parent /= srcSpanFileName_maybe src = False
     | otherwise = srcSpanStart parent <= srcSpanStart src &&
                   srcSpanEnd parent   >= srcSpanEnd src
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Ordering SrcSpans for InteractiveUI}
+*                                                                      *
+************************************************************************
+-}
+
+
+type family SrcSpanLess a
+class HasSrcSpan a where
+  composeSrcSpan   :: (SrcSpan , SrcSpanLess a) -> a
+  decomposeSrcSpan :: a -> (SrcSpan , SrcSpanLess a)
+  {- laws:
+       composeSrcSpan . decomposeSrcSpan = id
+       decomposeSrcSpan . composeSrcSpan = id
+  -}
+
+onHasSrcSpan :: (HasSrcSpan a , HasSrcSpan b) =>
+                (SrcSpanLess a -> SrcSpanLess b) -> a -> b
+onHasSrcSpan f (dL->(l , e)) = cL l (f e)
+
+type instance SrcSpanLess (GenLocated l e) = e
+instance HasSrcSpan (Located a) where
+  composeSrcSpan   (sp , e) = L sp e
+  decomposeSrcSpan (L sp e) = (sp , e)
+
+dL :: HasSrcSpan a => a -> (SrcSpan , SrcSpanLess a)
+dL = decomposeSrcSpan
+
+cL :: HasSrcSpan a => SrcSpan -> SrcSpanLess a -> a
+cL sp e = composeSrcSpan (sp , e)
+
+getRealSrcSpan :: RealLocated a -> RealSrcSpan
+getRealSrcSpan (L l _) = l
+
+unRealSrcSpan :: RealLocated a -> a
+unRealSrcSpan  (L _ e) = e

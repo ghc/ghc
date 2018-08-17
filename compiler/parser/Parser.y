@@ -8,6 +8,8 @@
 -- ---------------------------------------------------------------------------
 
 {
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.
 -- A common usage pattern is to initialize the parser state with a given string
@@ -829,7 +831,7 @@ header_top_importdecls :: { [LImportDecl GhcPs] }
 -- The Export List
 
 maybeexports :: { (Maybe (Located [LIE GhcPs])) }
-        :  '(' exportlist ')'       {% ams (sLL $1 $> ()) [mop $1,mcp $3] >>
+        :  '(' exportlist ')'       {% amsL (comb2 $1 $>) [mop $1,mcp $3] >>
                                        return (Just (sLL $1 $> (fromOL $2))) }
         |  {- empty -}              { Nothing }
 
@@ -2303,11 +2305,11 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- [FunBind vs PatBind]
                                         case r of {
                                           (FunBind _ n _ _ _) ->
-                                                ams (L l ()) [mj AnnFunId n] >> return () ;
-                                          (PatBind _ (L lh _lhs) _rhs _) ->
-                                                ams (L lh ()) [] >> return () } ;
+                                                amsL l [mj AnnFunId n] >> return () ;
+                                          (PatBind _ (dL->(lh , _lhs)) _rhs _) ->
+                                                amsL lh [] >> return () } ;
 
-                                        _ <- ams (L l ()) (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
+                                        _ <- amsL l (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
                                         return $! (sL l $ ValD noExt r) } }
 
         | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty NoSrcStrict $1 (snd $2) $3;
@@ -2317,10 +2319,10 @@ decl_no_th :: { LHsDecl GhcPs }
                                         -- [FunBind vs PatBind]
                                         case r of {
                                           (FunBind _ n _ _ _) ->
-                                                ams (L l ()) (mj AnnFunId n:(fst $2)) >> return () ;
-                                          (PatBind _ (L lh _lhs) _rhs _) ->
-                                                ams (L lh ()) (fst $2) >> return () } ;
-                                        _ <- ams (L l ()) (ann ++ (fst $ unLoc $3));
+                                                amsL l (mj AnnFunId n:(fst $2)) >> return () ;
+                                          (PatBind _ (dL->(lh , _lhs)) _rhs _) ->
+                                                amsL lh (fst $2) >> return () } ;
+                                        _ <- amsL l (ann ++ (fst $ unLoc $3));
                                         return $! (sL l $ ValD noExt r) } }
         | pattern_synonym_decl  { $1 }
         | docdecl               { $1 }
@@ -2355,7 +2357,7 @@ sigdecl :: { LHsDecl GhcPs }
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp_top '::' sigtypedoc
                         {% do v <- checkValSigLhs $1
-                        ; _ <- ams (sLL $1 $> ()) [mu AnnDcolon $2]
+                        ; _ <- amsL (comb2 $1 $>) [mu AnnDcolon $2]
                         ; return (sLL $1 $> $ SigD noExt $
                                   TypeSig noExt [v] (mkLHsSigWcType $3)) }
 
@@ -2599,7 +2601,7 @@ aexp    :: { LHsExpr GhcPs }
 aexp1   :: { LHsExpr GhcPs }
         : aexp1 '{' fbinds '}' {% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4)
                                                                    (snd $3)
-                                     ; _ <- ams (sLL $1 $> ()) (moc $2:mcc $4:(fst $3))
+                                     ; _ <- amsL (comb2 $1 $>) (moc $2:mcc $4:(fst $3))
                                      ; checkRecordSyntax (sLL $1 $> r) }}
         | aexp2                { $1 }
 
@@ -2804,7 +2806,7 @@ squals :: { Located [LStmt GhcPs (LHsExpr GhcPs)] }   -- In reverse order, becau
                                         -- one can "grab" the earlier ones
     : squals ',' transformqual
              {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
-                ams (sLL $1 $> ()) (fst $ unLoc $3) >>
+                amsL (comb2 $1 $>) (fst $ unLoc $3) >>
                 return (sLL $1 $> [sLL $1 $> ((snd $ unLoc $3) (reverse (unLoc $1)))]) }
     | squals ',' qual
              {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
@@ -3166,11 +3168,14 @@ oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mi
                                           -- for variable constructor in export lists
                                           -- see Note [Type constructors in export list]
         :  qtycon            { $1 }
-        | '(' QCONSYM ')'    {% let name = sL1 $2 $! mkQual tcClsName (getQCONSYM $2)
+        | '(' QCONSYM ')'    {% let { name :: Located RdrName
+                                    ; name = sL1 $2 $! mkQual tcClsName (getQCONSYM $2) }
                                 in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
-        | '(' CONSYM ')'     {% let name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2)
+        | '(' CONSYM ')'     {% let { name :: Located RdrName
+                                    ; name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2) }
                                 in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
-        | '(' ':' ')'        {% let name = sL1 $2 $! consDataCon_RDR
+        | '(' ':' ')'        {% let { name :: Located RdrName
+                                    ; name = sL1 $2 $! consDataCon_RDR }
                                 in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
         | '(' '~' ')'        {% ams (sLL $1 $> $ eqTyCon_RDR) [mop $1,mj AnnTilde $2,mcp $3] }
 
@@ -3572,36 +3577,40 @@ getSCC lt = do let s = getSTRING lt
                    else return s
 
 -- Utilities for combining source spans
-comb2 :: Located a -> Located b -> SrcSpan
+comb2 :: (HasSrcSpan a , HasSrcSpan b) => a -> b -> SrcSpan
 comb2 a b = a `seq` b `seq` combineLocs a b
 
-comb3 :: Located a -> Located b -> Located c -> SrcSpan
+comb3 :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c) =>
+         a -> b -> c -> SrcSpan
 comb3 a b c = a `seq` b `seq` c `seq`
-    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLoc c))
+    combineSrcSpans (getLoc a)
+      (combineSrcSpans (getLoc b) (getLoc c))
 
-comb4 :: Located a -> Located b -> Located c -> Located d -> SrcSpan
+comb4 :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c , HasSrcSpan d) =>
+         a -> b -> c -> d -> SrcSpan
 comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
     (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
                 combineSrcSpans (getLoc c) (getLoc d))
 
 -- strict constructor version:
 {-# INLINE sL #-}
-sL :: SrcSpan -> a -> Located a
-sL span a = span `seq` a `seq` L span a
+sL :: HasSrcSpan a => SrcSpan -> SrcSpanLess a -> a
+sL span a = span `seq` a `seq` cL span a
 
 -- See Note [Adding location info] for how these utility functions are used
 
 -- replaced last 3 CPP macros in this file
 {-# INLINE sL0 #-}
-sL0 :: a -> Located a
-sL0 = L noSrcSpan       -- #define L0   L noSrcSpan
+sL0 :: HasSrcSpan a => SrcSpanLess a -> a
+sL0 = cL noSrcSpan       -- #define L0   L noSrcSpan
 
 {-# INLINE sL1 #-}
-sL1 :: Located a -> b -> Located b
+sL1 :: (HasSrcSpan a , HasSrcSpan b) => a -> SrcSpanLess b -> b
 sL1 x = sL (getLoc x)   -- #define sL1   sL (getLoc $1)
 
 {-# INLINE sLL #-}
-sLL :: Located a -> Located b -> c -> Located c
+sLL :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c) =>
+       a -> b -> SrcSpanLess c -> c
 sLL x y = sL (comb2 x y) -- #define LL   sL (comb2 $1 $>)
 
 {- Note [Adding location info]
@@ -3645,7 +3654,7 @@ incorrect.
 -- try to find the span of the whole file (ToDo).
 fileSrcSpan :: P SrcSpan
 fileSrcSpan = do
-  l <- getSrcLoc;
+  l <- getRealSrcLoc;
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
 
@@ -3676,7 +3685,7 @@ hintExplicitForall span = do
       ]
 
 -- Hint about explicit-forall, assuming UnicodeSyntax is off
-hintExplicitForall' :: SrcSpan -> P (GenLocated SrcSpan RdrName)
+hintExplicitForall' :: SrcSpan -> P (Located RdrName)
 hintExplicitForall' span = do
     forall    <- extension explicitForallEnabled
     let illegalDot = "Illegal symbol '.' in type"
@@ -3694,7 +3703,7 @@ hintExplicitForall' span = do
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type
 -- variable or constructor. See Trac #13450.
-reportEmptyDoubleQuotes :: SrcSpan -> P (GenLocated SrcSpan (HsExpr GhcPs))
+reportEmptyDoubleQuotes :: SrcSpan -> P (Located (HsExpr GhcPs))
 reportEmptyDoubleQuotes span = do
     thEnabled <- liftM ((LangExt.TemplateHaskellQuotes `extopt`) . options) getPState
     if thEnabled
@@ -3723,31 +3732,32 @@ in ApiAnnotation.hs
 
 -- |Construct an AddAnn from the annotation keyword and the location
 -- of the keyword itself
-mj :: AnnKeywordId -> Located e -> AddAnn
+mj :: HasSrcSpan e => AnnKeywordId -> e -> AddAnn
 mj a l s = addAnnotation s a (gl l)
 
 -- |Construct an AddAnn from the annotation keyword and the Located Token. If
 -- the token has a unicode equivalent and this has been used, provide the
 -- unicode variant of the annotation.
 mu :: AnnKeywordId -> Located Token -> AddAnn
-mu a lt@(L l t) = (\s -> addAnnotation s (toUnicodeAnn a lt) l)
+mu a lt@(dL->(l , t)) = (\s -> addAnnotation s (toUnicodeAnn a lt) l)
 
 -- | If the 'Token' is using its unicode variant return the unicode variant of
 --   the annotation
 toUnicodeAnn :: AnnKeywordId -> Located Token -> AnnKeywordId
 toUnicodeAnn a t = if isUnicode t then unicodeAnn a else a
 
+gl :: HasSrcSpan a => a -> SrcSpan
 gl = getLoc
 
 -- |Add an annotation to the located element, and return the located
 -- element as a pass through
-aa :: Located a -> (AnnKeywordId,Located c) -> P (Located a)
-aa a@(L l _) (b,s) = addAnnotation l b (gl s) >> return a
+aa :: (HasSrcSpan a , HasSrcSpan c) => a -> (AnnKeywordId, c) -> P a
+aa a@(dL->(l , _)) (b,s) = addAnnotation l b (gl s) >> return a
 
 -- |Add an annotation to a located element resulting from a monadic action
-am :: P (Located a) -> (AnnKeywordId, Located b) -> P (Located a)
+am :: (HasSrcSpan a , HasSrcSpan b) => P a -> (AnnKeywordId, b) -> P a
 am a (b,s) = do
-  av@(L l _) <- a
+  av@(dL->(l , _)) <- a
   addAnnotation l b (gl s)
   return av
 
@@ -3764,27 +3774,31 @@ am a (b,s) = do
 -- as any annotations that may arise in the binds. This will include open
 -- and closing braces if they are used to delimit the let expressions.
 --
-ams :: Located a -> [AddAnn] -> P (Located a)
-ams a@(L l _) bs = addAnnsAt l bs >> return a
+ams :: HasSrcSpan a => a -> [AddAnn] -> P a
+ams a bs = addAnnsAt (getLoc a) bs >> return a
+
+amsL :: SrcSpan -> [AddAnn] -> P ()
+amsL sp bs = addAnnsAt sp bs >> return ()
+
 
 -- |Add all [AddAnn] to an AST element wrapped in a Just
 aljs :: Located (Maybe a) -> [AddAnn] -> P (Located (Maybe a))
-aljs a@(L l _) bs = addAnnsAt l bs >> return a
+aljs a@(dL->(l , _)) bs = addAnnsAt l bs >> return a
 
 -- |Add all [AddAnn] to an AST element wrapped in a Just
-ajs a@(Just (L l _)) bs = addAnnsAt l bs >> return a
+ajs a@(Just (dL->(l , _))) bs = addAnnsAt l bs >> return a
 
 -- |Add a list of AddAnns to the given AST element, where the AST element is the
 --  result of a monadic action
-amms :: P (Located a) -> [AddAnn] -> P (Located a)
-amms a bs = do { av@(L l _) <- a
+amms :: HasSrcSpan a => P a -> [AddAnn] -> P a
+amms a bs = do { av@(dL->(l , _)) <- a
                ; addAnnsAt l bs
                ; return av }
 
 -- |Add a list of AddAnns to the AST element, and return the element as a
 --  OrdList
-amsu :: Located a -> [AddAnn] -> P (OrdList (Located a))
-amsu a@(L l _) bs = addAnnsAt l bs >> return (unitOL a)
+amsu :: HasSrcSpan a => a -> [AddAnn] -> P (OrdList a)
+amsu a@(dL->(l , _)) bs = addAnnsAt l bs >> return (unitOL a)
 
 -- |Synonyms for AddAnn versions of AnnOpen and AnnClose
 mo,mc :: Located Token -> AddAnn
@@ -3814,14 +3828,14 @@ mvbars :: [SrcSpan] -> [AddAnn]
 mvbars ss = map (\s -> mj AnnVbar (L s ())) ss
 
 -- |Get the location of the last element of a OrdList, or noSrcSpan
-oll :: OrdList (Located a) -> SrcSpan
+oll :: HasSrcSpan a => OrdList a -> SrcSpan
 oll l =
   if isNilOL l then noSrcSpan
                else getLoc (lastOL l)
 
 -- |Add a semicolon annotation in the right place in a list. If the
 -- leading list is empty, add it to the tail
-asl :: [Located a] -> Located b -> Located a -> P()
-asl [] (L ls _) (L l _) = addAnnotation l          AnnSemi ls
-asl (x:_xs) (L ls _) _x = addAnnotation (getLoc x) AnnSemi ls
+asl :: (HasSrcSpan a , HasSrcSpan b) => [a] -> b -> a -> P()
+asl [] (dL->(ls , _)) (dL->(l , _)) = addAnnotation l  AnnSemi ls
+asl (x:_xs) (dL->(ls , _)) _x = addAnnotation (getLoc x) AnnSemi ls
 }

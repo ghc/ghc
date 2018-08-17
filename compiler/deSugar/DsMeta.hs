@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -1692,7 +1693,7 @@ repLPs :: [LPat GhcRn] -> DsM (Core [TH.PatQ])
 repLPs ps = repList patQTyConName repLP ps
 
 repLP :: LPat GhcRn -> DsM (Core TH.PatQ)
-repLP (L _ p) = repP p
+repLP (dL->(_ , p)) = repP p
 
 repP :: Pat GhcRn -> DsM (Core TH.PatQ)
 repP (WildPat _)        = repPwild

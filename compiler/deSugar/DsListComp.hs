@@ -638,7 +638,7 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
       | otherwise
         = extractMatchResult match (error "It can't fail")
 
-    mk_fail_msg :: DynFlags -> Located e -> String
+    mk_fail_msg :: HasSrcSpan e => DynFlags -> e -> String
     mk_fail_msg dflags pat
         = "Pattern match failure in monad comprehension at " ++
           showPpr dflags (getLoc pat)

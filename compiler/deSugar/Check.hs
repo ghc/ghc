@@ -6,7 +6,7 @@ Pattern Matching Coverage Checking.
 
 {-# LANGUAGE CPP, GADTs, DataKinds, KindSignatures #-}
 {-# LANGUAGE TupleSections #-}
-
+{-# LANGUAGE ViewPatterns  #-}
 module Check (
         -- Checking and printing
         checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,
@@ -341,7 +341,7 @@ checkSingle' locn var p = do
     (Covered,  _    )         -> PmResult prov [] us' [] -- useful
     (NotCovered, NotDiverged) -> PmResult prov m  us' [] -- redundant
     (NotCovered, Diverged )   -> PmResult prov [] us' m  -- inaccessible rhs
-  where m = [L locn [L locn p]]
+  where m = [cL locn [cL locn p]]
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions.
@@ -352,7 +352,7 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     dflags <- getDynFlags
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
-        match = L combinedLoc $
+        match = cL combinedLoc $
                   Match { m_ext = noExt
                         , m_ctxt = hs_ctx
                         , m_pats = []
@@ -862,7 +862,7 @@ translatePat fam_insts pat = case pat of
   -- Not supposed to happen
   ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
-  XPat      {} -> panic "Check.translatePat: XPat"
+  NewPat    {} -> panic "Check.translatePat: NewPat" -- TODO:ShNajd: Not Sure!
 
 {- Note [Translate Overloaded Literal for Exhaustiveness Checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1088,7 +1088,7 @@ translateLet _binds = return []
 
 -- | Translate a pattern guard
 translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM PatVec
-translateBind fam_insts (L _ p) e = do
+translateBind fam_insts (dL->(_ , p)) e = do
   ps <- translatePat fam_insts p
   return [mkGuard ps (unLoc e)]
 
