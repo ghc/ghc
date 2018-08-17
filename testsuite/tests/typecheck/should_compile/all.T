@@ -595,3 +595,4 @@ test('T14763', normal, compile, [''])
 test('T14811', normal, compile, [''])
 test('T14934', [extra_files(['T14934.hs', 'T14934a.hs'])], run_command,
                ['$MAKE -s --no-print-directory T14934'])
+test('T15499', normal, compile, [''])
