@@ -954,10 +954,11 @@ pprTrustFlag flag = case flag of
 -- -----------------------------------------------------------------------------
 -- Wired-in packages
 
-wired_in_pkgids :: [String]
-wired_in_pkgids = map unitIdString wiredInUnitIds
-
+type WiredInUnitId = String
 type WiredPackagesMap = Map WiredUnitId WiredUnitId
+
+wired_in_pkgids :: [WiredInUnitId]
+wired_in_pkgids = map unitIdString wiredInUnitIds
 
 findWiredInPackages
    :: DynFlags
@@ -974,7 +975,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
   -- their canonical names (eg. base-1.0 ==> base).
   --
   let
-        matches :: PackageConfig -> String -> Bool
+        matches :: PackageConfig -> WiredInUnitId -> Bool
         pc `matches` "integer"
             = packageNameString pc `elem` ["integer-gmp", "integer-simple"]
         pc `matches` pid = packageNameString pc == pid
@@ -996,8 +997,8 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         -- this works even when there is no exposed wired in package
         -- available.
         --
-        findWiredInPackage :: [PackageConfig] -> String
-                           -> IO (Maybe PackageConfig)
+        findWiredInPackage :: [PackageConfig] -> WiredInUnitId
+                           -> IO (Maybe (WiredInUnitId, PackageConfig))
         findWiredInPackage pkgs wired_pkg =
            let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
                all_exposed_ps =
@@ -1016,20 +1017,19 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                                  <> text " not found."
                           return Nothing
                 pick :: PackageConfig
-                     -> IO (Maybe PackageConfig)
+                     -> IO (Maybe (WiredInUnitId, PackageConfig))
                 pick pkg = do
                         debugTraceMsg dflags 2 $
                             text "wired-in package "
                                  <> text wired_pkg
                                  <> text " mapped to "
                                  <> ppr (unitId pkg)
-                        return (Just pkg)
+                        return (Just (wired_pkg, pkg))
 
 
   mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wired_in_pkgids
   let
         wired_in_pkgs = catMaybes mb_wired_in_pkgs
-        wired_in_ids = mapMaybe definitePackageConfigId wired_in_pkgs
 
         -- this is old: we used to assume that if there were
         -- multiple versions of wired-in packages installed that
@@ -1045,18 +1045,17 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         -}
 
         wiredInMap :: Map WiredUnitId WiredUnitId
-        wiredInMap = foldl' add_mapping Map.empty pkgs
-          where add_mapping m pkg
-                  | Just key <- definitePackageConfigId pkg
-                  , key `elem` wired_in_ids
-                  = Map.insert key (DefUnitId (stringToInstalledUnitId (packageNameString pkg))) m
-                  | otherwise = m
+        wiredInMap = Map.fromList
+          [ (key, DefUnitId (stringToInstalledUnitId wiredInUnitId))
+          | (wiredInUnitId, pkg) <- wired_in_pkgs
+          , Just key <- pure $ definitePackageConfigId pkg
+          ]
 
         updateWiredInDependencies pkgs = map (upd_deps . upd_pkg) pkgs
           where upd_pkg pkg
                   | Just def_uid <- definitePackageConfigId pkg
-                  , def_uid `elem` wired_in_ids
-                  = let PackageName fs = packageName pkg
+                  , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
+                  = let fs = installedUnitIdFS (unDefUnitId wiredInUnitId)
                     in pkg {
                       unitId = fsToInstalledUnitId fs,
                       componentId = ComponentId fs
