@@ -1067,11 +1067,7 @@ integerUnitId, primUnitId,
   baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 primUnitId        = fsToUnitId (fsLit "ghc-prim")
-integerUnitId     = fsToUnitId (fsLit n)
-  where
-    n = case cIntegerLibraryType of
-        IntegerGMP    -> "integer-gmp"
-        IntegerSimple -> "integer-simple"
+integerUnitId     = fsToUnitId (fsLit "integer")
 baseUnitId        = fsToUnitId (fsLit "base")
 rtsUnitId         = fsToUnitId (fsLit "rts")
 thUnitId          = fsToUnitId (fsLit "template-haskell")

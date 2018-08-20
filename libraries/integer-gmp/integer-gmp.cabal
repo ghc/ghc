@@ -60,7 +60,7 @@ library
     UnliftedFFITypes
   build-depends:       ghc-prim ^>= 0.5.1.0
   hs-source-dirs:      src/
-  ghc-options: -this-unit-id integer-gmp -Wall
+  ghc-options: -this-unit-id integer -Wall
   cc-options: -std=c99 -Wall
 
   include-dirs: include

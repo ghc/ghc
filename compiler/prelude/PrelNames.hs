@@ -136,7 +136,6 @@ import Unique
 import Name
 import SrcLoc
 import FastString
-import Config ( cIntegerLibraryType, IntegerLibrary(..) )
 import Panic ( panic )
 
 {-
@@ -355,6 +354,7 @@ basicKnownKeyNames
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName, bitIntegerName,
+        integerSDataConName,naturalSDataConName,
 
         -- Natural
         naturalTyConName,
@@ -433,9 +433,7 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
-    ] ++ case cIntegerLibraryType of
-           IntegerGMP    -> [integerSDataConName,naturalSDataConName]
-           IntegerSimple -> []
+    ]
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -1117,11 +1115,8 @@ integerTyConName, mkIntegerName, integerSDataConName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName, bitIntegerName :: Name
-integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
-integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit n)                    integerSDataConKey
-  where n = case cIntegerLibraryType of
-            IntegerGMP    -> "S#"
-            IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
+integerTyConName      = tcQual gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit "S#")                integerSDataConKey
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
@@ -1168,10 +1163,7 @@ bitIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "bitInteger")        bit
 -- GHC.Natural types
 naturalTyConName, naturalSDataConName :: Name
 naturalTyConName     = tcQual gHC_NATURAL (fsLit "Natural") naturalTyConKey
-naturalSDataConName  = dcQual gHC_NATURAL (fsLit n)         naturalSDataConKey
-  where n = case cIntegerLibraryType of
-            IntegerGMP    -> "NatS#"
-            IntegerSimple -> panic "naturalSDataConName evaluated for integer-simple"
+naturalSDataConName  = dcQual gHC_NATURAL (fsLit "NatS#")   naturalSDataConKey
 
 naturalFromIntegerName :: Name
 naturalFromIntegerName = varQual gHC_NATURAL (fsLit "naturalFromInteger") naturalFromIntegerIdKey
