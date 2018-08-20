@@ -212,7 +212,12 @@ report_unsolved mb_binds_var type_errors expr_holes
                             , cec_expr_holes = expr_holes
                             , cec_type_holes = type_holes
                             , cec_out_of_scope_holes = out_of_scope_holes
-                            , cec_suppress = False -- See Note [Suppressing error messages]
+                            , cec_suppress = insolubleWC wanted
+                                 -- See Note [Suppressing error messages]
+                                 -- Suppress low-priority errors if there
+                                 -- are insolule errors anywhere;
+                                 -- See Trac #15539 and c.f. setting ic_status
+                                 -- in TcSimplify.setImplicationStatus
                             , cec_warn_redundant = warn_redundant
                             , cec_binds    = mb_binds_var }
 
