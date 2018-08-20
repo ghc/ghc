@@ -975,6 +975,8 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
   --
   let
         matches :: PackageConfig -> String -> Bool
+        pc `matches` "integer"
+            = packageNameString pc `elem` ["integer-gmp", "integer-simple"]
         pc `matches` pid = packageNameString pc == pid
 
         -- find which package corresponds to each wired-in package
