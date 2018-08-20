@@ -1,0 +1,3 @@
+
+T13064.hs:5:1: warning: [-Wunused-imports (in -Wextra)]
+    The import of ‘pure’ from module ‘Prelude’ is redundant

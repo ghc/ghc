@@ -19,7 +19,6 @@ import GhcPrelude
 
 import Outputable
 
-import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 
 infixl 5  `appOL`

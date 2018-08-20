@@ -85,7 +85,6 @@ module HscMain
 import GhcPrelude
 
 import Data.Data hiding (Fixity, TyCon)
-import DynFlags         (addPluginModuleName)
 import Id
 import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )

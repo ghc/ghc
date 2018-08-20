@@ -23,7 +23,6 @@ import RdrName
 import qualified Name
 import Module
 import RdrHsSyn
-import qualified OccName
 import OccName
 import SrcLoc
 import Type

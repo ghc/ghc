@@ -17,10 +17,9 @@ import GhcPrelude
 
 import HsSyn
 import TcPat
-import Type( mkEmptyTCvSubst, tidyTyVarBinders, tidyTypes, tidyType )
+import Type( tidyTyVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
-import TcType( mkMinimalBySCs )
 import TcEnv
 import TcMType
 import TcHsSyn( zonkTyVarBindersX, zonkTcTypeToTypes

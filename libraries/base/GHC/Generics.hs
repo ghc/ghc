@@ -749,7 +749,7 @@ import GHC.Show    ( Show(..), showString )
 
 -- Needed for metadata
 import Data.Proxy   ( Proxy(..) )
-import GHC.TypeLits ( Nat, Symbol, KnownSymbol, KnownNat, symbolVal, natVal )
+import GHC.TypeLits ( KnownSymbol, KnownNat, symbolVal, natVal )
 
 --------------------------------------------------------------------------------
 -- Representation types

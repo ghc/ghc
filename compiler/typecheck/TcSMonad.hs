@@ -143,7 +143,6 @@ import Kind
 import TcType
 import DynFlags
 import Type
-import TyCoRep( coHoleCoVar )
 import Coercion
 import Unify
 

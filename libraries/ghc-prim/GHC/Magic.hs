@@ -32,7 +32,7 @@ module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
 
 import GHC.Prim
 import GHC.CString ()
-import GHC.Types (RuntimeRep, TYPE)
+import GHC.Types ( RuntimeRep )
 
 -- | The call @inline f@ arranges that 'f' is inlined, regardless of
 -- its size. More precisely, the call @inline f@ rewrites to the

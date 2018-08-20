@@ -59,7 +59,6 @@ import Outputable as Ppr
 import GHC.Char
 import GHC.Exts
 import GHC.Exts.Heap
-import GHC.IO ( IO(..) )
 import SMRep ( roundUpTo )
 
 import Control.Monad

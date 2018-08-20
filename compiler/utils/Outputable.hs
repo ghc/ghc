@@ -108,7 +108,6 @@ import Panic
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 
-import Control.Exception (finally)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char

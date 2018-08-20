@@ -53,14 +53,14 @@ module RdrName (
 
         -- * GlobalRdrElts
         gresFromAvails, gresFromAvail, localGREsFromAvail, availFromGRE,
-        greUsedRdrName, greRdrNames, greSrcSpan, greQualModName,
+        greRdrNames, greSrcSpan, greQualModName,
         gresToAvailInfo,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
         GlobalRdrElt(..), isLocalGRE, isRecFldGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
-        Parent(..),
+        Parent(..), greParent_maybe,
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
         importSpecLoc, importSpecModule, isExplicitItem, bestImport,
 
@@ -657,18 +657,6 @@ greQualModName gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
  | (is:_) <- iss                          = is_as (is_decl is)
  | otherwise                              = pprPanic "greQualModName" (ppr gre)
 
-greUsedRdrName :: GlobalRdrElt -> RdrName
--- For imported things, return a RdrName to add to the used-RdrName
--- set, which is used to generate unused-import-decl warnings.
--- Return a Qual RdrName if poss, so that identifies the most
--- specific ImportSpec.  See Trac #10890 for some good examples.
-greUsedRdrName gre@GRE{ gre_name = name, gre_lcl = lcl, gre_imp = iss }
-  | lcl, Just mod <- nameModule_maybe name = Qual (moduleName mod)     occ
-  | not (null iss), is <- bestImport iss   = Qual (is_as (is_decl is)) occ
-  | otherwise                              = pprTrace "greUsedRdrName" (ppr gre) (Unqual occ)
-  where
-    occ = greOccName gre
-
 greRdrNames :: GlobalRdrElt -> [RdrName]
 greRdrNames gre@GRE{ gre_lcl = lcl, gre_imp = iss }
   = (if lcl then [unqual] else []) ++ concatMap do_spec (map is_decl iss)
@@ -696,11 +684,11 @@ mkParent _ (Avail _)           = NoParent
 mkParent n (AvailTC m _ _) | n == m    = NoParent
                          | otherwise = ParentIs m
 
-greParentName :: GlobalRdrElt -> Maybe Name
-greParentName gre = case gre_par gre of
-                      NoParent -> Nothing
-                      ParentIs n -> Just n
-                      FldParent n _ -> Just n
+greParent_maybe :: GlobalRdrElt -> Maybe Name
+greParent_maybe gre = case gre_par gre of
+                        NoParent      -> Nothing
+                        ParentIs n    -> Just n
+                        FldParent n _ -> Just n
 
 -- | Takes a list of distinct GREs and folds them
 -- into AvailInfos. This is more efficient than mapping each individual
@@ -716,7 +704,7 @@ gresToAvailInfo gres
     add :: NameEnv AvailInfo -> GlobalRdrElt -> NameEnv AvailInfo
     add env gre = extendNameEnv_Acc comb availFromGRE env
                     (fromMaybe (gre_name gre)
-                               (greParentName gre)) gre
+                               (greParent_maybe gre)) gre
 
       where
         -- We want to insert the child `k` into a list of children but
@@ -1192,10 +1180,7 @@ instance Ord ImpItemSpec where
 
 
 bestImport :: [ImportSpec] -> ImportSpec
--- Given a non-empty bunch of ImportSpecs, return the one that
--- imported the item most specifically (e.g. by name), using
--- textually-first as a tie breaker. This is used when reporting
--- redundant imports
+-- See Note [Choosing the best import declaration]
 bestImport iss
   = case sortBy best iss of
       (is:_) -> is
@@ -1203,17 +1188,76 @@ bestImport iss
   where
     best :: ImportSpec -> ImportSpec -> Ordering
     -- Less means better
+    -- Unqualified always wins over qualified; then
+    -- import-all wins over import-some; then
+    -- earlier declaration wins over later
     best (ImpSpec { is_item = item1, is_decl = d1 })
          (ImpSpec { is_item = item2, is_decl = d2 })
-      = best_item item1 item2 `thenCmp` (is_dloc d1 `compare` is_dloc d2)
+      = (is_qual d1 `compare` is_qual d2) `thenCmp`
+        (best_item item1 item2)           `thenCmp`
+        (is_dloc d1 `compare` is_dloc d2)
 
     best_item :: ImpItemSpec -> ImpItemSpec -> Ordering
     best_item ImpAll ImpAll = EQ
-    best_item ImpAll (ImpSome {}) = GT
-    best_item (ImpSome {}) ImpAll = LT
+    best_item ImpAll (ImpSome {}) = LT
+    best_item (ImpSome {}) ImpAll = GT
     best_item (ImpSome { is_explicit = e1 })
-              (ImpSome { is_explicit = e2 }) = e2 `compare` e1
-     -- False < True, so if e1 is explicit and e2 is not, we get LT
+              (ImpSome { is_explicit = e2 }) = e1 `compare` e2
+     -- False < True, so if e1 is explicit and e2 is not, we get GT
+
+{- Note [Choosing the best import declaration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When reporting unused import declarations we use the following rules.
+   (see [wiki:Commentary/Compiler/UnusedImports])
+
+Say that an import-item is either
+  * an entire import-all decl (eg import Foo), or
+  * a particular item in an import list (eg import Foo( ..., x, ...)).
+The general idea is that for each /occurrence/ of an imported name, we will
+attribute that use to one import-item. Once we have processed all the
+occurrences, any import items with no uses attributed to them are unused, and are
+warned about. More precisely:
+
+1. For every RdrName in the program text, find its GlobalRdrElt.
+
+2. Then, from the [ImportSpec] (gre_imp) of that GRE, choose one
+   the "chosen import-item", and mark it "used". This is done
+   by 'bestImport'
+
+3. After processing all the RdrNames, bleat about any
+   import-items that are unused.
+   This is done in RnNames.warnUnusedImportDecls.
+
+The function 'bestImport' returns the dominant import among the
+ImportSpecs it is given, implementing Step 2.  We say import-item A
+dominates import-item B if we choose A over B. In general, we try to
+choose the import that is most likely to render other imports
+unnecessary.  Here is the dominance relationship we choose:
+
+    a) import Foo dominates import qualified Foo.
+
+    b) import Foo dominates import Foo(x).
+
+    c) Otherwise choose the textually first one.
+
+Rationale for (a).  Consider
+   import qualified M  -- Import #1
+   import M( x )       -- Import #2
+   foo = M.x + x
+
+The unqualified 'x' can only come from import #2.  The qualified 'M.x'
+could come from either, but bestImport picks import #2, because it is
+more likely to be useful in other imports, as indeed it is in this
+case (see Trac #5211 for a concrete example).
+
+But the rules are not perfect; consider
+   import qualified M  -- Import #1
+   import M( x )       -- Import #2
+   foo = M.x + M.y
+
+The M.x will use import #2, but M.y can only use import #1.
+-}
+
 
 unQualSpecOK :: ImportSpec -> Bool
 -- ^ Is in scope unqualified?

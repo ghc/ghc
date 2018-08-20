@@ -291,7 +291,6 @@ import GhcPrelude hiding (init)
 import ByteCodeTypes
 import InteractiveEval
 import InteractiveEvalTypes
-import TcRnDriver       ( runTcInteractive )
 import GHCi
 import GHCi.RemoteTypes
 
@@ -358,7 +357,6 @@ import Data.Set (Set)
 import qualified Data.Sequence as Seq
 import System.Directory ( doesFileExist )
 import Data.Maybe
-import Data.List        ( find )
 import Data.Time
 import Data.Typeable    ( Typeable )
 import Data.Word        ( Word8 )

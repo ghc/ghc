@@ -56,7 +56,6 @@ import TcEvidence
 import TysPrim
 import TyCon
 import TysWiredIn
-import TyCoRep( CoercionHole(..) )
 import Type
 import Coercion
 import ConLike

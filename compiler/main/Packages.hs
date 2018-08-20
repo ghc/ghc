@@ -95,7 +95,6 @@ import Data.List as List
 import Data.Map (Map)
 import Data.Set (Set)
 import Data.Monoid (First(..))
-import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict

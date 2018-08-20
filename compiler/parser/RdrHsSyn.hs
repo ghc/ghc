@@ -104,7 +104,6 @@ import FastString
 import Maybes
 import Util
 import ApiAnnotation
-import HsExtension      ( noExt )
 import Data.List
 import qualified GHC.LanguageExtensions as LangExt
 import DynFlags ( WarningFlag(..) )

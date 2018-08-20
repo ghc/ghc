@@ -54,7 +54,6 @@ import Data.Functor.Sum
 import Data.Functor.Compose
 
 import Data.Monoid (Alt(..))
-import Data.Semigroup (Semigroup(..))
 import Data.Proxy
 import GHC.Generics
 

@@ -27,7 +27,7 @@ import Class
 import TyCon
 import FunDeps
 import FamInst
-import ClsInst( ClsInstResult(..), InstanceWhat(..), safeOverlap )
+import ClsInst( InstanceWhat(..), safeOverlap )
 import FamInstEnv
 import Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 

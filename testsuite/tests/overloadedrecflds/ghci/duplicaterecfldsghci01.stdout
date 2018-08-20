@@ -6,21 +6,21 @@ data T a = MkT {Ghci2.foo :: Bool, ...}
 
 <interactive>:1:1: error:
     Ambiguous occurrence ‘foo’
-    It could refer to either the field ‘foo’,
-                             defined at <interactive>:3:16
-                          or the field ‘foo’, defined at <interactive>:4:18
+    It could refer to
+       either the field ‘foo’, defined at <interactive>:3:16
+           or the field ‘foo’, defined at <interactive>:4:18
 
 <interactive>:9:1: error:
     Ambiguous occurrence ‘foo’
-    It could refer to either the field ‘foo’,
-                             defined at <interactive>:3:16
-                          or the field ‘foo’, defined at <interactive>:4:18
+    It could refer to
+       either the field ‘foo’, defined at <interactive>:3:16
+           or the field ‘foo’, defined at <interactive>:4:18
 True
 
 <interactive>:1:1: error:
     Ambiguous occurrence ‘foo’
-    It could refer to either the field ‘foo’,
-                             defined at <interactive>:3:16
-                          or the field ‘foo’, defined at <interactive>:4:18
+    It could refer to
+       either the field ‘foo’, defined at <interactive>:3:16
+           or the field ‘foo’, defined at <interactive>:4:18
 foo :: U -> Int
 42
