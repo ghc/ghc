@@ -1538,13 +1538,13 @@ lookupMkNaturalName dflags hsc_env
       lookupGlobal hsc_env mkNaturalName
 
 lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
-lookupIntegerSDataConName dflags hsc_env = case cIntegerLibraryType of
+lookupIntegerSDataConName dflags hsc_env = case integerLibrary dflags of
     IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $
                   lookupGlobal hsc_env integerSDataConName
     IntegerSimple -> return Nothing
 
 lookupNaturalSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
-lookupNaturalSDataConName dflags hsc_env = case cIntegerLibraryType of
+lookupNaturalSDataConName dflags hsc_env = case integerLibrary dflags of
     IntegerGMP -> guardNaturalUse dflags $ liftM (Just . tyThingDataCon) $
                   lookupGlobal hsc_env naturalSDataConName
     IntegerSimple -> return Nothing
