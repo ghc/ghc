@@ -1537,6 +1537,7 @@ lookupMkNaturalName dflags hsc_env
     = guardNaturalUse dflags $ liftM tyThingId $
       lookupGlobal hsc_env mkNaturalName
 
+-- See Note [The integer library] in PrelNames
 lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
 lookupIntegerSDataConName dflags hsc_env = case integerLibrary dflags of
     IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $

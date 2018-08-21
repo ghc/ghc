@@ -1066,7 +1066,8 @@ integerUnitId, primUnitId,
   baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 primUnitId        = fsToUnitId (fsLit "ghc-prim")
-integerUnitId     = fsToUnitId (fsLit "integer")
+integerUnitId     = fsToUnitId (fsLit "integer-wired-in")
+   -- See Note [The integer library] in PrelNames
 baseUnitId        = fsToUnitId (fsLit "base")
 rtsUnitId         = fsToUnitId (fsLit "rts")
 thUnitId          = fsToUnitId (fsLit "template-haskell")
