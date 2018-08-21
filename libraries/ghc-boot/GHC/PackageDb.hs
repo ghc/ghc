@@ -64,6 +64,7 @@ module GHC.PackageDb (
        writePackageDb
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import Data.Version (Version(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8

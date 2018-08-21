@@ -45,6 +45,7 @@ module GHC.Exts.Heap (
     , areBoxesEqual
     ) where
 
+import Prelude
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Constants
