@@ -2747,6 +2747,10 @@ outOfLineCmmOp mop res args
               MO_F32_Tanh  -> fsLit "tanhf"
               MO_F32_Pwr   -> fsLit "powf"
 
+              MO_F32_Asinh -> fsLit "asinhf"
+              MO_F32_Acosh -> fsLit "acoshf"
+              MO_F32_Atanh -> fsLit "atanhf"
+
               MO_F64_Sqrt  -> fsLit "sqrt"
               MO_F64_Fabs  -> fsLit "fabs"
               MO_F64_Sin   -> fsLit "sin"
@@ -2763,6 +2767,10 @@ outOfLineCmmOp mop res args
               MO_F64_Cosh  -> fsLit "cosh"
               MO_F64_Tanh  -> fsLit "tanh"
               MO_F64_Pwr   -> fsLit "pow"
+
+              MO_F64_Asinh  -> fsLit "asinh"
+              MO_F64_Acosh  -> fsLit "acosh"
+              MO_F64_Atanh  -> fsLit "atanh"
 
               MO_Memcpy _  -> fsLit "memcpy"
               MO_Memset _  -> fsLit "memset"

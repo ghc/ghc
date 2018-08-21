@@ -761,6 +761,10 @@ cmmPrimOpFunctions mop = do
     MO_F32_Cosh   -> fsLit "coshf"
     MO_F32_Tanh   -> fsLit "tanhf"
 
+    MO_F32_Asinh  -> fsLit "asinhf"
+    MO_F32_Acosh  -> fsLit "acoshf"
+    MO_F32_Atanh  -> fsLit "atanhf"
+
     MO_F64_Exp    -> fsLit "exp"
     MO_F64_Log    -> fsLit "log"
     MO_F64_Sqrt   -> fsLit "llvm.sqrt.f64"
@@ -778,6 +782,10 @@ cmmPrimOpFunctions mop = do
     MO_F64_Sinh   -> fsLit "sinh"
     MO_F64_Cosh   -> fsLit "cosh"
     MO_F64_Tanh   -> fsLit "tanh"
+
+    MO_F64_Asinh  -> fsLit "asinh"
+    MO_F64_Acosh  -> fsLit "acosh"
+    MO_F64_Atanh  -> fsLit "atanh"
 
     MO_Memcpy _   -> fsLit $ "llvm.memcpy."  ++ intrinTy1
     MO_Memmove _  -> fsLit $ "llvm.memmove." ++ intrinTy1

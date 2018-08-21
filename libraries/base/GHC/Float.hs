@@ -390,13 +390,9 @@ instance  Floating Float  where
     (**) x y            =  powerFloat x y
     logBase x y         =  log y / log x
 
-    asinh x
-      | x > huge   = log 2 + log x
-      | x < 0      = -asinh (-x)
-      | otherwise  = log (x + sqrt (1 + x*x))
-     where huge = 1e10
-    acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
-    atanh x = 0.5 * log ((1.0+x) / (1.0-x))
+    asinh x             =  asinhFloat x
+    acosh x             =  acoshFloat x
+    atanh x             =  atanhFloat x
 
     log1p = log1pFloat
     expm1 = expm1Float
@@ -535,13 +531,9 @@ instance  Floating Double  where
     (**) x y            =  powerDouble x y
     logBase x y         =  log y / log x
 
-    asinh x
-      | x > huge   = log 2 + log x
-      | x < 0      = -asinh (-x)
-      | otherwise  = log (x + sqrt (1 + x*x))
-     where huge = 1e20
-    acosh x = log (x + (x+1.0) * sqrt ((x-1.0)/(x+1.0)))
-    atanh x = 0.5 * log ((1.0+x) / (1.0-x))
+    asinh x             =  asinhDouble x
+    acosh x             =  acoshDouble x
+    atanh x             =  atanhDouble x
 
     log1p = log1pDouble
     expm1 = expm1Double
@@ -1149,6 +1141,7 @@ expFloat, logFloat, sqrtFloat, fabsFloat :: Float -> Float
 sinFloat, cosFloat, tanFloat  :: Float -> Float
 asinFloat, acosFloat, atanFloat  :: Float -> Float
 sinhFloat, coshFloat, tanhFloat  :: Float -> Float
+asinhFloat, acoshFloat, atanhFloat  :: Float -> Float
 expFloat    (F# x) = F# (expFloat# x)
 logFloat    (F# x) = F# (logFloat# x)
 sqrtFloat   (F# x) = F# (sqrtFloat# x)
@@ -1162,6 +1155,9 @@ atanFloat   (F# x) = F# (atanFloat# x)
 sinhFloat   (F# x) = F# (sinhFloat# x)
 coshFloat   (F# x) = F# (coshFloat# x)
 tanhFloat   (F# x) = F# (tanhFloat# x)
+asinhFloat  (F# x) = F# (asinhFloat# x)
+acoshFloat  (F# x) = F# (acoshFloat# x)
+atanhFloat  (F# x) = F# (atanhFloat# x)
 
 powerFloat :: Float -> Float -> Float
 powerFloat  (F# x) (F# y) = F# (powerFloat# x y)
@@ -1194,6 +1190,7 @@ expDouble, logDouble, sqrtDouble, fabsDouble :: Double -> Double
 sinDouble, cosDouble, tanDouble  :: Double -> Double
 asinDouble, acosDouble, atanDouble  :: Double -> Double
 sinhDouble, coshDouble, tanhDouble  :: Double -> Double
+asinhDouble, acoshDouble, atanhDouble  :: Double -> Double
 expDouble    (D# x) = D# (expDouble# x)
 logDouble    (D# x) = D# (logDouble# x)
 sqrtDouble   (D# x) = D# (sqrtDouble# x)
@@ -1207,6 +1204,9 @@ atanDouble   (D# x) = D# (atanDouble# x)
 sinhDouble   (D# x) = D# (sinhDouble# x)
 coshDouble   (D# x) = D# (coshDouble# x)
 tanhDouble   (D# x) = D# (tanhDouble# x)
+asinhDouble  (D# x) = D# (asinhDouble# x)
+acoshDouble  (D# x) = D# (acoshDouble# x)
+atanhDouble  (D# x) = D# (atanhDouble# x)
 
 powerDouble :: Double -> Double -> Double
 powerDouble  (D# x) (D# y) = D# (x **## y)

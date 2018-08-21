@@ -618,6 +618,21 @@ primop   DoubleTanhOp   "tanhDouble#"      Monadic
    with
    code_size = { primOpCodeSizeForeignCall }
 
+primop   DoubleAsinhOp   "asinhDouble#"      Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   DoubleAcoshOp   "acoshDouble#"      Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   DoubleAtanhOp   "atanhDouble#"      Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
 primop   DoublePowerOp   "**##" Dyadic
    Double# -> Double# -> Double#
    {Exponentiation.}
@@ -740,6 +755,21 @@ primop   FloatCoshOp   "coshFloat#"      Monadic
    code_size = { primOpCodeSizeForeignCall }
 
 primop   FloatTanhOp   "tanhFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatAsinhOp   "asinhFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatAcoshOp   "acoshFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatAtanhOp   "atanhFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
