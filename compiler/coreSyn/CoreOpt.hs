@@ -36,6 +36,7 @@ import Var      ( varType )
 import VarSet
 import VarEnv
 import DataCon
+import Demand( etaExpandStrictSig )
 import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -658,7 +659,11 @@ joinPointBinding_maybe bndr rhs
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  = Just (bndr `asJoinId` join_arity, mkLams bndrs body)
+  , let str_sig   = idStrictness bndr
+        str_arity = count isId bndrs  -- Strictness demands are for Ids only
+        join_bndr = bndr `asJoinId`        join_arity
+                         `setIdStrictness` etaExpandStrictSig str_arity str_sig
+  = Just (join_bndr, mkLams bndrs body)
 
   | otherwise
   = Nothing
@@ -667,6 +672,27 @@ joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
+
+{- Note [Strictness and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+   let f = \x.  if x>200 then e1 else e1
+
+and we know that f is strict in x.  Then if we subsequently
+discover that f is an arity-2 join point, we'll eta-expand it to
+
+   let f = \x y.  if x>200 then e1 else e1
+
+and now it's only strict if applied to two arguments.  So we should
+adjust the strictness info.
+
+A more common case is when
+
+   f = \x. error ".."
+
+and again its arity increses (Trac #15517)
+-}
 
 {- *********************************************************************
 *                                                                      *

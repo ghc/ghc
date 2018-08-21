@@ -39,7 +39,7 @@ module Demand (
         nopSig, botSig, exnSig, cprProdSig,
         isTopSig, hasDemandEnvSig,
         splitStrictSig, strictSigDmdEnv,
-        increaseStrictSigArity,
+        increaseStrictSigArity, etaExpandStrictSig,
 
         seqDemand, seqDemandList, seqDmdType, seqStrictSig,
 
@@ -1737,8 +1737,23 @@ splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
 increaseStrictSigArity :: Int -> StrictSig -> StrictSig
 -- Add extra arguments to a strictness signature
-increaseStrictSigArity arity_increase (StrictSig (DmdType env dmds res))
-  = StrictSig (DmdType env (replicate arity_increase topDmd ++ dmds) res)
+increaseStrictSigArity arity_increase sig@(StrictSig dmd_ty@(DmdType env dmds res))
+  | isTopDmdType dmd_ty = sig
+  | arity_increase <= 0 = sig
+  | otherwise           = StrictSig (DmdType env dmds' res)
+  where
+    dmds' = replicate arity_increase topDmd ++ dmds
+
+etaExpandStrictSig :: Arity -> StrictSig -> StrictSig
+-- We are expanding (\x y. e) to (\x y z. e z)
+-- Add exta demands to the /end/ of the arg demands if necessary
+etaExpandStrictSig arity sig@(StrictSig dmd_ty@(DmdType env dmds res))
+  | isTopDmdType dmd_ty = sig
+  | arity_increase <= 0 = sig
+  | otherwise           = StrictSig (DmdType env dmds' res)
+  where
+    arity_increase = arity - length dmds
+    dmds' = dmds ++ replicate arity_increase topDmd
 
 isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
