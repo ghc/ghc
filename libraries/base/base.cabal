@@ -278,6 +278,7 @@ Library
         GHC.STRef
         GHC.Show
         GHC.Stable
+        GHC.StableName
         GHC.Stack
         GHC.Stack.CCS
         GHC.Stack.Types
