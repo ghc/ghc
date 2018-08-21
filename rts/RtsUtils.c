@@ -275,7 +275,7 @@ int genericRaise(int sig) {
 #endif
 }
 
-static void mkRtsInfoPair(char *key, char *val) {
+static void mkRtsInfoPair(const char *key, const char *val) {
     /* XXX should check for "s, \s etc in key and val */
     printf(" ,(\"%s\", \"%s\")\n", key, val);
 }
@@ -285,7 +285,7 @@ static void mkRtsInfoPair(char *key, char *val) {
 #define TOSTRING2(x) #x
 #define TOSTRING(x)  TOSTRING2(x)
 
-void printRtsInfo(void) {
+void printRtsInfo(const RtsConfig rts_config) {
     /* The first entry is just a hack to make it easy to get the
      * commas right */
     printf(" [(\"GHC RTS\", \"YES\")\n");
@@ -306,6 +306,8 @@ void printRtsInfo(void) {
     mkRtsInfoPair("Word size",               TOSTRING(WORD_SIZE_IN_BITS));
     mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
     mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
+    mkRtsInfoPair("Flag -with-rtsopts",      /* See Trac #15261 */
+        rts_config.rts_opts != NULL ? rts_config.rts_opts : "");
     printf(" ]\n");
 }
 
