@@ -20,13 +20,16 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wdeprecations`
     * :ghc-flag:`-Wdeprecated-flags`
     * :ghc-flag:`-Wunrecognised-pragmas`
-    * :ghc-flag:`-Wduplicate-constraints`
     * :ghc-flag:`-Wduplicate-exports`
     * :ghc-flag:`-Woverflowed-literals`
     * :ghc-flag:`-Wempty-enumerations`
     * :ghc-flag:`-Wmissing-fields`
     * :ghc-flag:`-Wmissing-methods`
     * :ghc-flag:`-Wwrong-do-bind`
+    * :ghc-flag:`-Wsimplifiable-class-constraints`
+    * :ghc-flag:`-Wtyped-holes`
+    * :ghc-flag:`-Wdeferred-type-errors`
+    * :ghc-flag:`-Wpartial-type-signatures`
     * :ghc-flag:`-Wunsupported-calling-conventions`
     * :ghc-flag:`-Wdodgy-foreign-imports`
     * :ghc-flag:`-Winline-rule-shadowing`
@@ -286,7 +289,7 @@ of ``-W(no-)*``.
 
     Defer variable out-of-scope errors (errors about names without a leading underscore)
     until runtime. This will turn variable-out-of-scope errors into warnings.
-    Using a value that depends on a typed hole produces a runtime error,
+    Using a value that depends on an out-of-scope variable produces a runtime error,
     the same as :ghc-flag:`-fdefer-type-errors` (which implies this option).
     See :ref:`typed-holes` and :ref:`defer-type-errors`.
 
