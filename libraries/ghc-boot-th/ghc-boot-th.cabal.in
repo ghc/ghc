@@ -29,6 +29,7 @@ source-repository head
 Library
     default-language: Haskell2010
     other-extensions: DeriveGeneric
+    default-extensions: NoImplicitPrelude
 
     exposed-modules:
             GHC.LanguageExtensions.Type
