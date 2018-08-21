@@ -312,15 +312,18 @@ $tab          { warnTab }
 
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
-<line_prag1> @decimal                   { setLine line_prag1a }
-<line_prag1a> \" [$graphic \ ]* \"      { setFile line_prag1b }
-<line_prag1b> .*                        { pop }
+<line_prag1> {
+  @decimal $white_no_nl+ \" [$graphic \ ]* \"  { setLineAndFile line_prag1a }
+  ()                                           { failLinePrag1 }
+}
+<line_prag1a> .*                               { popLinePrag1 }
 
 -- Haskell-style line pragmas, of the form
 --    {-# LINE <line> "<file>" #-}
-<line_prag2> @decimal                   { setLine line_prag2a }
-<line_prag2a> \" [$graphic \ ]* \"      { setFile line_prag2b }
-<line_prag2b> "#-}"|"-}"                { pop }
+<line_prag2> {
+  @decimal $white_no_nl+ \" [$graphic \ ]* \"  { setLineAndFile line_prag2a }
+}
+<line_prag2a> "#-}"|"-}"                       { pop }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
 
@@ -668,6 +671,7 @@ data Token
   | IToverlaps_prag     SourceText  -- instance overlap mode
   | ITincoherent_prag   SourceText  -- instance overlap mode
   | ITctype             SourceText
+  | ITcomment_line_prag         -- See Note [Nested comment line pragmas]
 
   | ITdotdot                    -- reserved symbols
   | ITcolon
@@ -960,6 +964,20 @@ begin code _span _str _len = do pushLexState code; lexToken
 pop :: Action
 pop _span _buf _len = do _ <- popLexState
                          lexToken
+-- See Note [Nested comment line pragmas]
+failLinePrag1 :: Action
+failLinePrag1 span _buf _len = do
+  b <- extension inNestedComment
+  if b then return (L span ITcomment_line_prag)
+       else lexError "lexical error in pragma"
+
+-- See Note [Nested comment line pragmas]
+popLinePrag1 :: Action
+popLinePrag1 span _buf _len = do
+  b <- extension inNestedComment
+  if b then return (L span ITcomment_line_prag) else do
+    _ <- popLexState
+    lexToken
 
 hopefully_open_brace :: Action
 hopefully_open_brace span buf len
@@ -1099,6 +1117,12 @@ nested_comment cont span buf len = do
         Nothing  -> errBrace input span
         Just ('-',input) -> go ('-':'\123':commentAcc) (n+1) input
         Just (_,_)       -> go ('\123':commentAcc) n input
+      -- See Note [Nested comment line pragmas]
+      Just ('\n',input) -> case alexGetChar' input of
+        Nothing  -> errBrace input span
+        Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
+                           go (parsedAcc ++ '\n':commentAcc) n input
+        Just (_,_)   -> go ('\n':commentAcc) n input
       Just (c,input) -> go (c:commentAcc) n input
 
 nested_doc_comment :: Action
@@ -1118,7 +1142,59 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
           let cont = do input <- getInput; go commentAcc input docType False
           nested_comment cont span buf _len
         Just (_,_) -> go ('\123':commentAcc) input docType False
+      -- See Note [Nested comment line pragmas]
+      Just ('\n',input) -> case alexGetChar' input of
+        Nothing  -> errBrace input span
+        Just ('#',_) -> do (parsedAcc,input) <- parseNestedPragma input
+                           go (parsedAcc ++ '\n':commentAcc) input docType False
+        Just (_,_)   -> go ('\n':commentAcc) input docType False
       Just (c,input) -> go (c:commentAcc) input docType False
+
+-- See Note [Nested comment line pragmas]
+parseNestedPragma :: AlexInput -> P (String,AlexInput)
+parseNestedPragma input@(AI _ buf) = do
+  origInput <- getInput
+  setInput input
+  setExts (.|. xbit InNestedCommentBit)
+  pushLexState bol
+  lt <- lexToken
+  _ <- popLexState
+  setExts (.&. complement (xbit InNestedCommentBit))
+  postInput@(AI _ postBuf) <- getInput
+  setInput origInput
+  case unLoc lt of
+    ITcomment_line_prag -> do
+      let bytes = byteDiff buf postBuf
+          diff  = lexemeToString buf bytes
+      return (reverse diff, postInput)
+    lt' -> panic ("parseNestedPragma: unexpected token" ++ (show lt'))
+
+{-
+Note [Nested comment line pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to ignore cpp-preprocessor-generated #line pragmas if they were inside
+nested comments.
+
+Now, when parsing a nested comment, if we encounter a line starting with '#' we
+call parseNestedPragma, which executes the following:
+1. Save the current lexer input (loc, buf) for later
+2. Set the current lexer input to the beginning of the line starting with '#'
+3. Turn the 'InNestedComment' extension on
+4. Push the 'bol' lexer state
+5. Lex a token. Due to (2), (3), and (4), this should always lex a single line
+   or less and return the ITcomment_line_prag token. This may set source line
+   and file location if a #line pragma is successfully parsed
+6. Restore lexer input and state to what they were before we did all this
+7. Return control to the function parsing a nested comment, informing it of
+   what the lexer parsed
+
+Regarding (5) above:
+Every exit from the 'bol' lexer state (do_bol, popLinePrag1, failLinePrag1)
+checks if the 'InNestedComment' extension is set. If it is, that function will
+return control to parseNestedPragma by returning the ITcomment_line_prag token.
+
+See #314 for more background on the bug this fixes.
+-}
 
 withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (RealLocated Token))
                  -> P (RealLocated Token)
@@ -1373,20 +1449,23 @@ readHexFractionalLit str =
 -- we're at the first token on a line, insert layout tokens if necessary
 do_bol :: Action
 do_bol span _str _len = do
-        (pos, gen_semic) <- getOffside
-        case pos of
-            LT -> do
-                --trace "layout: inserting '}'" $ do
-                popContext
-                -- do NOT pop the lex state, we might have a ';' to insert
-                return (L span ITvccurly)
-            EQ | gen_semic -> do
-                --trace "layout: inserting ';'" $ do
-                _ <- popLexState
-                return (L span ITsemi)
-            _ -> do
-                _ <- popLexState
-                lexToken
+        -- See Note [Nested comment line pragmas]
+        b <- extension inNestedComment
+        if b then return (L span ITcomment_line_prag) else do
+          (pos, gen_semic) <- getOffside
+          case pos of
+              LT -> do
+                  --trace "layout: inserting '}'" $ do
+                  popContext
+                  -- do NOT pop the lex state, we might have a ';' to insert
+                  return (L span ITvccurly)
+              EQ | gen_semic -> do
+                  --trace "layout: inserting ';'" $ do
+                  _ <- popLexState
+                  return (L span ITsemi)
+              _ -> do
+                  _ <- popLexState
+                  lexToken
 
 -- certain keywords put us in the "layout" state, where we might
 -- add an opening curly brace.
@@ -1446,29 +1525,13 @@ do_layout_left span _buf _len = do
 -- -----------------------------------------------------------------------------
 -- LINE pragmas
 
-setLine :: Int -> Action
-setLine code span buf len = do
-  let line = parseUnsignedInteger buf len 10 octDecDigit
-  setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
-        -- subtract one: the line number refers to the *following* line
-  _ <- popLexState
-  pushLexState code
-  lexToken
-
-setColumn :: Action
-setColumn span buf len = do
-  let column =
-        case reads (lexemeToString buf len) of
-          [(column, _)] -> column
-          _ -> error "setColumn: expected integer" -- shouldn't happen
-  setSrcLoc (mkRealSrcLoc (srcSpanFile span) (srcSpanEndLine span)
-                          (fromIntegral (column :: Integer)))
-  _ <- popLexState
-  lexToken
-
-setFile :: Int -> Action
-setFile code span buf len = do
-  let file = mkFastString (go (lexemeToString (stepOn buf) (len-2)))
+setLineAndFile :: Int -> Action
+setLineAndFile code span buf len = do
+  let src = lexemeToString buf (len - 1)  -- drop trailing quotation mark
+      linenumLen = length $ head $ words src
+      linenum = parseUnsignedInteger buf linenumLen 10 octDecDigit
+      file = mkFastString $ go $ drop 1 $ dropWhile (/= '"') src
+          -- skip everything through first quotation mark to get to the filename
         where go ('\\':c:cs) = c : go cs
               go (c:cs)      = c : go cs
               go []          = []
@@ -1482,10 +1545,22 @@ setFile code span buf len = do
               -- filenames and it does not remove duplicate
               -- backslashes after the drive letter (should it?).
   setAlrLastLoc $ alrInitialLoc file
-  setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
+  setSrcLoc (mkRealSrcLoc file (fromIntegral linenum - 1) (srcSpanEndCol span))
+      -- subtract one: the line number refers to the *following* line
   addSrcFile file
   _ <- popLexState
   pushLexState code
+  lexToken
+
+setColumn :: Action
+setColumn span buf len = do
+  let column =
+        case reads (lexemeToString buf len) of
+          [(column, _)] -> column
+          _ -> error "setColumn: expected integer" -- shouldn't happen
+  setSrcLoc (mkRealSrcLoc (srcSpanFile span) (srcSpanEndLine span)
+                          (fromIntegral (column :: Integer)))
+  _ <- popLexState
   lexToken
 
 alrInitialLoc :: FastString -> RealSrcSpan
@@ -2247,6 +2322,7 @@ data ExtBits
   | TransformComprehensionsBit
   | QqBit -- enable quasiquoting
   | InRulePragBit
+  | InNestedCommentBit -- See Note [Nested comment line pragmas]
   | RawTokenStreamBit -- producing a token stream with all comments included
   | SccProfilingOnBit
   | HpcBit
@@ -2299,6 +2375,8 @@ qqEnabled :: ExtsBitmap -> Bool
 qqEnabled = xtest QqBit
 inRulePrag :: ExtsBitmap -> Bool
 inRulePrag = xtest InRulePragBit
+inNestedComment :: ExtsBitmap -> Bool
+inNestedComment = xtest InNestedCommentBit
 rawTokenStreamEnabled :: ExtsBitmap -> Bool
 rawTokenStreamEnabled = xtest RawTokenStreamBit
 alternativeLayoutRule :: ExtsBitmap -> Bool
