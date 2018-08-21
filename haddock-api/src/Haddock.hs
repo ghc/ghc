@@ -75,6 +75,7 @@ import Packages
 import Panic (handleGhcException)
 import Module
 import FastString
+import qualified DynamicLoading
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -437,7 +438,10 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
   -- that may need to be re-linked: Haddock doesn't do any
   -- dynamic or static linking at all!
   _ <- setSessionDynFlags dynflags''
-  ghcActs dynflags''
+  hscenv <- GHC.getSession
+  dynflags''' <- liftIO (DynamicLoading.initializePlugins hscenv dynflags'')
+  _ <- setSessionDynFlags dynflags'''
+  ghcActs dynflags'''
   where
 
     -- ignore sublists of flags that start with "+RTS" and end in "-RTS"
