@@ -2169,12 +2169,11 @@ joinObjectFiles dflags o_files output_fn = do
                      ++ (if osInfo == OSFreeBSD
                           then [SysTools.Option "-L/usr/lib"]
                           else [])
-                        -- gcc on sparc sets -Wl,--relax implicitly, but
-                        -- -r and --relax are incompatible for ld, so
+                        -- gcc on sparc sets -Wl,--relax implicitly (another
+                        -- use case is when use passes -optl-Wl,--relax)
+                        -- but -r and --relax are incompatible for ld, so
                         -- disable --relax explicitly.
-                     ++ (if platformArch (targetPlatform dflags)
-                                `elem` [ArchSPARC, ArchSPARC64]
-                         && ldIsGnuLd
+                     ++ (if ldIsGnuLd
                             then [SysTools.Option "-Wl,-no-relax"]
                             else [])
                      ++ map SysTools.Option ld_build_id
