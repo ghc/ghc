@@ -458,6 +458,10 @@ synifyType _ (TyConApp tc tys)
                               UnboxedTuple    -> HsUnboxedTuple)
                            (map (synifyType WithinType) vis_tys)
       | isUnboxedSumTyCon tc = noLoc $ HsSumTy noExt (map (synifyType WithinType) vis_tys)
+      | Just dc <- isPromotedDataCon_maybe tc
+      , isTupleDataCon dc
+      , dataConSourceArity dc == length vis_tys
+      = noLoc $ HsExplicitTupleTy noExt (map (synifyType WithinType) vis_tys)
       -- ditto for lists
       | getName tc == listTyConName, [ty] <- tys =
          noLoc $ HsListTy noExt (synifyType WithinType ty)
