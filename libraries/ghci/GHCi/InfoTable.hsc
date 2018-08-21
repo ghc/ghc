@@ -15,6 +15,7 @@ module GHCi.InfoTable
 #endif
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 #ifdef GHCI
 import Foreign
 import Foreign.C

@@ -13,6 +13,7 @@
 -- | Create real byte-code objects from 'ResolvedBCO's.
 module GHCi.CreateBCO (createBCOs) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.ResolvedBCO
 import GHCi.RemoteTypes
 import GHCi.BreakArray
