@@ -183,7 +183,7 @@ ubxSumList = ubxparens . hsep . punctuate (toHtml " | ")
 
 
 ubxparens :: Html -> Html
-ubxparens h = toHtml "(#" +++ h +++ toHtml "#)"
+ubxparens h = toHtml "(#" <+> h <+> toHtml "#)"
 
 
 dcolon, arrow, darrow, forallSymbol :: Bool -> Html

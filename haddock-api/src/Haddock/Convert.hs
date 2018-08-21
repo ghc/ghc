@@ -457,6 +457,7 @@ synifyType _ (TyConApp tc tys)
                               ConstraintTuple -> HsConstraintTuple
                               UnboxedTuple    -> HsUnboxedTuple)
                            (map (synifyType WithinType) vis_tys)
+      | isUnboxedSumTyCon tc = noLoc $ HsSumTy noExt (map (synifyType WithinType) vis_tys)
       -- ditto for lists
       | getName tc == listTyConName, [ty] <- tys =
          noLoc $ HsListTy noExt (synifyType WithinType ty)
