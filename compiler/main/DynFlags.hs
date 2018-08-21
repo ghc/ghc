@@ -850,7 +850,7 @@ data DynFlags = DynFlags {
   settings              :: Settings,
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
-    --   by GHC-API users
+    --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmTargets           :: LlvmTargets,
   llvmPasses            :: LlvmPasses,
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
