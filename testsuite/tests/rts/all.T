@@ -139,6 +139,10 @@ test('traceEvent', [ omit_ways(['dyn'] + prof_ways),
                      extra_run_opts('+RTS -ls -RTS') ],
                    compile_and_run, ['-eventlog'])
 
+test('traceBinaryEvent', [ omit_ways(['dyn'] + prof_ways),
+                           extra_run_opts('+RTS -ls -RTS') ],
+                         compile_and_run, ['-eventlog'])
+
 test('T4059', [], run_command, ['$MAKE -s --no-print-directory T4059'])
 
 # Test for #4274

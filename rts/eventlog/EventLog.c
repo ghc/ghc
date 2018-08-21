@@ -105,6 +105,7 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_SAMPLE_BEGIN]  = "Start of heap profile sample",
   [EVENT_HEAP_PROF_SAMPLE_STRING] = "Heap profile string sample",
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
+  [EVENT_USER_BINARY_MSG]     = "User binary message"
 };
 
 // Event type.
@@ -466,6 +467,10 @@ initEventLogging(const EventLogWriter *ev_writer)
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
             break;
 
+        case EVENT_USER_BINARY_MSG:
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
         default:
             continue; /* ignore deprecated events */
         }
@@ -745,6 +750,10 @@ void postCapsetStrEvent (EventTypeNum tag,
 {
     int strsize = strlen(msg);
     int size = strsize + sizeof(EventCapsetID);
+    if (size > EVENT_PAYLOAD_SIZE_MAX) {
+        errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, bail out");
+        return;
+    }
 
     ACQUIRE_LOCK(&eventBufMutex);
 
@@ -752,7 +761,7 @@ void postCapsetStrEvent (EventTypeNum tag,
         printAndClearEventBuf(&eventBuf);
 
         if (!hasRoomForVariableEvent(&eventBuf, size)){
-            // Event size exceeds buffer size, bail out:
+            errorBelch("Event size exceeds buffer size, bail out");
             RELEASE_LOCK(&eventBufMutex);
             return;
         }
@@ -785,7 +794,7 @@ void postCapsetVecEvent (EventTypeNum tag,
         printAndClearEventBuf(&eventBuf);
 
         if(!hasRoomForVariableEvent(&eventBuf, size)){
-            // Event size exceeds buffer size, bail out:
+            errorBelch("Event size exceeds buffer size, bail out");
             RELEASE_LOCK(&eventBufMutex);
             return;
         }
@@ -1024,14 +1033,43 @@ void postCapMsg(Capability *cap, char *msg, va_list ap)
 
 void postUserEvent(Capability *cap, EventTypeNum type, char *msg)
 {
-    const int size = strlen(msg);
-    EventsBuf *eb = &capEventBuf[cap->no];
+    const size_t size = strlen(msg);
+    if (size > EVENT_PAYLOAD_SIZE_MAX) {
+        errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, bail out");
+        return;
+    }
 
+    EventsBuf *eb = &capEventBuf[cap->no];
     if (!hasRoomForVariableEvent(eb, size)){
         printAndClearEventBuf(eb);
 
         if (!hasRoomForVariableEvent(eb, size)){
-            // Event size exceeds buffer size, bail out:
+            errorBelch("Event size exceeds buffer size, bail out");
+            return;
+        }
+    }
+
+    postEventHeader(eb, type);
+    postPayloadSize(eb, size);
+    postBuf(eb, (StgWord8*) msg, size);
+}
+
+void postUserBinaryEvent(Capability   *cap,
+                         EventTypeNum  type,
+                         uint8_t      *msg,
+                         size_t        size)
+{
+    if (size > EVENT_PAYLOAD_SIZE_MAX) {
+        errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, bail out");
+        return;
+    }
+
+    EventsBuf *eb = &capEventBuf[cap->no];
+    if (!hasRoomForVariableEvent(eb, size)){
+        printAndClearEventBuf(eb);
+
+        if (!hasRoomForVariableEvent(eb, size)){
+            errorBelch("Event size exceeds buffer size, bail out");
             return;
         }
     }
@@ -1047,13 +1085,17 @@ void postThreadLabel(Capability    *cap,
 {
     const int strsize = strlen(label);
     const int size = strsize + sizeof(EventThreadID);
-    EventsBuf *eb = &capEventBuf[cap->no];
+    if (size > EVENT_PAYLOAD_SIZE_MAX) {
+        errorBelch("Event size exceeds EVENT_PAYLOAD_SIZE_MAX, bail out");
+        return;
+    }
 
+    EventsBuf *eb = &capEventBuf[cap->no];
     if (!hasRoomForVariableEvent(eb, size)){
         printAndClearEventBuf(eb);
 
         if (!hasRoomForVariableEvent(eb, size)){
-            // Event size exceeds buffer size, bail out:
+            errorBelch("Event size exceeds buffer size, bail out");
             return;
         }
     }
