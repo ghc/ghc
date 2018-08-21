@@ -54,6 +54,8 @@ Template Haskell
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Support the characters from recent versions of Unicode (up to v. 12) in literals
+    (see :ghc-ticket:`5518`).
 
 Build system
 ~~~~~~~~~~~~
