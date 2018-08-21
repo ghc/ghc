@@ -24,7 +24,7 @@ module Control.Monad.ST.Imp (
         runST,
         fixST,
 
-        -- * Converting 'ST' to 'IO'
+        -- * Converting 'ST' to 'Prelude.IO'
         RealWorld,              -- abstract
         stToIO,
 

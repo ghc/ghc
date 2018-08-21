@@ -105,7 +105,7 @@ module GHC.Generics  (
 -- This is a lot of information! However, most of it is actually merely meta-information
 -- that makes names of datatypes and constructors and more available on the type level.
 --
--- Here is a reduced representation for 'Tree' with nearly all meta-information removed,
+-- Here is a reduced representation for @Tree@ with nearly all meta-information removed,
 -- for now keeping only the most essential aspects:
 --
 -- @
@@ -189,7 +189,7 @@ module GHC.Generics  (
 --
 -- Here, 'R' is a type-level proxy that does not have any associated values.
 --
--- There used to be another variant of 'K1' (namely 'Par0'), but it has since
+-- There used to be another variant of 'K1' (namely @Par0@), but it has since
 -- been deprecated.
 
 -- *** Meta information: 'M1'
@@ -273,7 +273,7 @@ module GHC.Generics  (
 --       between the original value and its `Rep`-based representation and then invokes the
 --       generic instances.
 --
--- As an example, let us look at a function 'encode' that produces a naive, but lossless
+-- As an example, let us look at a function @encode@ that produces a naive, but lossless
 -- bit encoding of values of various datatypes. So we are aiming to define a function
 --
 -- @
@@ -367,18 +367,15 @@ module GHC.Generics  (
 -- @
 --
 -- The case for 'K1' is rather interesting. Here, we call the final function
--- 'encode' that we yet have to define, recursively. We will use another type
--- class 'Encode' for that function:
+-- @encode@ that we yet have to define, recursively. We will use another type
+-- class @Encode@ for that function:
 --
 -- @
 -- instance (Encode c) => Encode' ('K1' i c) where
 --   encode' ('K1' x) = encode x
 -- @
 --
--- Note how 'Par0' and 'Rec0' both being mapped to 'K1' allows us to define
--- a uniform instance here.
---
--- Similarly, we can define a uniform instance for 'M1', because we completely
+-- Note how we can define a uniform instance for 'M1', because we completely
 -- disregard all meta-information:
 --
 -- @
@@ -386,13 +383,13 @@ module GHC.Generics  (
 --   encode' ('M1' x) = encode' x
 -- @
 --
--- Unlike in 'K1', the instance for 'M1' refers to 'encode'', not 'encode'.
+-- Unlike in 'K1', the instance for 'M1' refers to @encode'@, not @encode@.
 
 -- *** The wrapper and generic default
 --
 -- |
 --
--- We now define class 'Encode' for the actual 'encode' function:
+-- We now define class @Encode@ for the actual @encode@ function:
 --
 -- @
 -- class Encode a where
@@ -401,9 +398,9 @@ module GHC.Generics  (
 --   encode x = encode' ('from' x)
 -- @
 --
--- The incoming 'x' is converted using 'from', then we dispatch to the
--- generic instances using 'encode''. We use this as a default definition
--- for 'encode'. We need the 'default encode' signature because ordinary
+-- The incoming @x@ is converted using 'from', then we dispatch to the
+-- generic instances using @encode'@. We use this as a default definition
+-- for @encode@. We need the @default encode@ signature because ordinary
 -- Haskell default methods must not introduce additional class constraints,
 -- but our generic default does.
 --
@@ -421,10 +418,10 @@ module GHC.Generics  (
 -- possible to use @deriving Encode@ as well, but GHC does not yet support
 -- that syntax for this situation.
 --
--- Having 'Encode' as a class has the advantage that we can define
+-- Having @Encode@ as a class has the advantage that we can define
 -- non-generic special cases, which is particularly useful for abstract
 -- datatypes that have no structural representation. For example, given
--- a suitable integer encoding function 'encodeInt', we can define
+-- a suitable integer encoding function @encodeInt@, we can define
 --
 -- @
 -- instance Encode Int where
@@ -457,7 +454,7 @@ module GHC.Generics  (
 --      any datatype where each constructor has at least one field.
 --
 -- An 'M1' instance is always required (but it can just ignore the
--- meta-information, as is the case for 'encode' above).
+-- meta-information, as is the case for @encode@ above).
 #if 0
 -- *** Using meta-information
 --
@@ -470,14 +467,15 @@ module GHC.Generics  (
 -- |
 --
 -- Datatype-generic functions as defined above work for a large class
--- of datatypes, including parameterized datatypes. (We have used 'Tree'
+-- of datatypes, including parameterized datatypes. (We have used @Tree@
 -- as our example above, which is of kind @* -> *@.) However, the
 -- 'Generic' class ranges over types of kind @*@, and therefore, the
--- resulting generic functions (such as 'encode') must be parameterized
+-- resulting generic functions (such as @encode@) must be parameterized
 -- by a generic type argument of kind @*@.
 --
 -- What if we want to define generic classes that range over type
--- constructors (such as 'Functor', 'Traversable', or 'Foldable')?
+-- constructors (such as 'Data.Functor.Functor',
+-- 'Data.Traversable.Traversable', or 'Data.Foldable.Foldable')?
 
 -- *** The 'Generic1' class
 --
@@ -491,7 +489,7 @@ module GHC.Generics  (
 -- The 'Generic1' class is also derivable.
 --
 -- The representation 'Rep1' is ever so slightly different from 'Rep'.
--- Let us look at 'Tree' as an example again:
+-- Let us look at @Tree@ as an example again:
 --
 -- @
 -- data Tree a = Leaf a | Node (Tree a) (Tree a)
@@ -1335,8 +1333,8 @@ instance (SingI mn, SingI su, SingI ss, SingI ds)
 -- A 'Generic' instance must satisfy the following laws:
 --
 -- @
--- 'from' . 'to' ≡ 'id'
--- 'to' . 'from' ≡ 'id'
+-- 'from' . 'to' ≡ 'Prelude.id'
+-- 'to' . 'from' ≡ 'Prelude.id'
 -- @
 class Generic a where
   -- | Generic representation type
@@ -1354,8 +1352,8 @@ class Generic a where
 -- A 'Generic1' instance must satisfy the following laws:
 --
 -- @
--- 'from1' . 'to1' ≡ 'id'
--- 'to1' . 'from1' ≡ 'id'
+-- 'from1' . 'to1' ≡ 'Prelude.id'
+-- 'to1' . 'from1' ≡ 'Prelude.id'
 -- @
 class Generic1 (f :: k -> Type) where
   -- | Generic representation type
@@ -1484,8 +1482,6 @@ deriving instance Generic1 Down
 data family Sing (a :: k)
 
 -- | A 'SingI' constraint is essentially an implicitly-passed singleton.
--- If you need to satisfy this constraint with an explicit singleton, please
--- see 'withSingI'.
 class SingI (a :: k) where
   -- | Produce the singleton explicitly. You will likely need the @ScopedTypeVariables@
   -- extension to use this method the way you want.

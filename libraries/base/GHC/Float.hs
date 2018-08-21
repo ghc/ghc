@@ -166,7 +166,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     decodeFloat         :: a -> (Integer,Int)
     -- | 'encodeFloat' performs the inverse of 'decodeFloat' in the
     -- sense that for finite @x@ with the exception of @-0.0@,
-    -- @'uncurry' 'encodeFloat' ('decodeFloat' x) = x@.
+    -- @'Prelude.uncurry' 'encodeFloat' ('decodeFloat' x) = x@.
     -- @'encodeFloat' m n@ is one of the two closest representable
     -- floating-point numbers to @m*b^^n@ (or @&#177;Infinity@ if overflow
     -- occurs); usually the closer, but if @m@ contains too many bits,

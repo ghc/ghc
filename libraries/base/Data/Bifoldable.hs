@@ -76,7 +76,7 @@ import GHC.Generics (K1(..))
 -- 'bifoldr' f g z t ≡ 'appEndo' ('bifoldMap' (Endo . f) (Endo . g) t) z
 -- @
 --
--- If the type is also a 'Bifunctor' instance, it should satisfy:
+-- If the type is also a 'Data.Bifunctor.Bifunctor' instance, it should satisfy:
 --
 -- > 'bifoldMap' f g ≡ 'bifold' . 'bimap' f g
 --

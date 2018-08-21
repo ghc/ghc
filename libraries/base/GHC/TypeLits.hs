@@ -153,7 +153,7 @@ data {-kind-} ErrorMessage = Text Symbol
 infixl 5 :$$:
 infixl 6 :<>:
 
--- | The type-level equivalent of 'error'.
+-- | The type-level equivalent of 'Prelude.error'.
 --
 -- The polymorphic kind of this type allows it to be used in several settings.
 -- For instance, it can be used as a constraint, e.g. to provide a better error

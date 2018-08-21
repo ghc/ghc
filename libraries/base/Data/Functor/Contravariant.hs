@@ -103,7 +103,7 @@ class Contravariant f where
   (>$) :: b -> f b -> f a
   (>$) = contramap . const
 
--- | If 'f' is both 'Functor' and 'Contravariant' then by the time you factor
+-- | If @f@ is both 'Functor' and 'Contravariant' then by the time you factor
 -- in the laws of each of those classes, it can't actually use its argument in
 -- any meaningful capacity.
 --

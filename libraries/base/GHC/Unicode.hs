@@ -71,7 +71,7 @@ import GHC.Show ( Show )
 -- >>> enumFromTo ModifierLetter SpacingCombiningMark
 -- [ModifierLetter,OtherLetter,NonSpacingMark,SpacingCombiningMark]
 --
--- 'Read' instance:
+-- 'Text.Read.Read' instance:
 --
 -- >>> read "DashPunctuation" :: GeneralCategory
 -- DashPunctuation

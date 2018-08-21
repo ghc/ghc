@@ -543,8 +543,8 @@ data BlockReason
         -- ^currently in a foreign call
   | BlockedOnOther
         -- ^blocked on some other resource.  Without @-threaded@,
-        -- I\/O and 'threadDelay' show up as 'BlockedOnOther', with @-threaded@
-        -- they show up as 'BlockedOnMVar'.
+        -- I\/O and 'Control.Concurrent.threadDelay' show up as
+        -- 'BlockedOnOther', with @-threaded@ they show up as 'BlockedOnMVar'.
   deriving ( Eq   -- ^ @since 4.3.0.0
            , Ord  -- ^ @since 4.3.0.0
            , Show -- ^ @since 4.3.0.0
@@ -720,8 +720,11 @@ unsafeIOToSTM (IO m) = STM m
 --
 -- However, there are functions for creating transactional variables that
 -- can always be safely called in 'unsafePerformIO'. See: 'newTVarIO',
--- 'newTChanIO', 'newBroadcastTChanIO', 'newTQueueIO', 'newTBQueueIO',
--- and 'newTMVarIO'.
+-- 'Control.Concurrent.STM.TChan.newTChanIO',
+-- 'Control.Concurrent.STM.TChan.newBroadcastTChanIO',
+-- 'Control.Concurrent.STM.TQueue.newTQueueIO',
+-- 'Control.Concurrent.STM.TBQueue.newTBQueueIO', and
+-- 'Control.Concurrent.STM.TMVar.newTMVarIO'.
 --
 -- Using 'unsafePerformIO' inside of 'atomically' is also dangerous but for
 -- different reasons. See 'unsafeIOToSTM' for more on this.

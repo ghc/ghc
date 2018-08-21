@@ -48,7 +48,7 @@ And a response file @args.txt@:
 
 @
 --one 1
---'two' 2
+--\'two\' 2
 --"three" 3
 @
 

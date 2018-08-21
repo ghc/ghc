@@ -380,7 +380,7 @@ groupWith1 f = groupBy1 ((==) `on` f)
 groupAllWith1 :: (Ord b) => (a -> b) -> NonEmpty a -> NonEmpty (NonEmpty a)
 groupAllWith1 f = groupWith1 f . sortWith f
 
--- | The 'isPrefix' function returns @True@ if the first argument is
+-- | The 'isPrefixOf' function returns 'True' if the first argument is
 -- a prefix of the second.
 isPrefixOf :: Eq a => [a] -> NonEmpty a -> Bool
 isPrefixOf [] _ = True

@@ -33,12 +33,12 @@
 --
 -- === Applicability
 --
--- 'MVar's offer more flexibility than 'IORef's, but less flexibility
--- than 'STM'.  They are appropriate for building synchronization
+-- 'MVar's offer more flexibility than 'Data.IORef.IORef's, but less flexibility
+-- than 'GHC.Conc.STM'.  They are appropriate for building synchronization
 -- primitives and performing simple interthread communication; however
 -- they are very simple and susceptible to race conditions, deadlocks or
 -- uncaught exceptions.  Do not use them if you need perform larger
--- atomic operations such as reading from multiple variables: use 'STM'
+-- atomic operations such as reading from multiple variables: use 'GHC.Conc.STM'
 -- instead.
 --
 -- In particular, the "bigger" functions in this module ('swapMVar',
@@ -70,7 +70,7 @@
 --
 -- 'MVar' operations are always observed to take place in the order
 -- they are written in the program, regardless of the memory model of
--- the underlying machine.  This is in contrast to 'IORef' operations
+-- the underlying machine.  This is in contrast to 'Data.IORef.IORef' operations
 -- which may appear out-of-order to another thread in some cases.
 --
 -- === Example

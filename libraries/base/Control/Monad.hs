@@ -131,7 +131,7 @@ guard           :: (Alternative f) => Bool -> f ()
 guard True      =  pure ()
 guard False     =  empty
 
--- | This generalizes the list-based 'filter' function.
+-- | This generalizes the list-based 'Data.List.filter' function.
 
 {-# INLINE filterM #-}
 filterM          :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
@@ -203,7 +203,7 @@ zipWithM_         :: (Applicative m) => (a -> b -> m c) -> [a] -> [b] -> m ()
 {-# INLINE zipWithM_ #-}
 zipWithM_ f xs ys =  sequenceA_ (zipWith f xs ys)
 
-{- | The 'foldM' function is analogous to 'foldl', except that its result is
+{- | The 'foldM' function is analogous to 'Data.Foldable.foldl', except that its result is
 encapsulated in a monad. Note that 'foldM' works from left-to-right over
 the list arguments. This could be an issue where @('>>')@ and the `folded
 function' are not commutative.

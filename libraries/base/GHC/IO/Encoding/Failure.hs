@@ -34,8 +34,8 @@ import GHC.Real ( fromIntegral )
 
 --import System.Posix.Internals
 
--- | The 'CodingFailureMode' is used to construct 'TextEncoding's, and
--- specifies how they handle illegal sequences.
+-- | The 'CodingFailureMode' is used to construct 'System.IO.TextEncoding's,
+-- and specifies how they handle illegal sequences.
 data CodingFailureMode
   = ErrorOnCodingFailure
        -- ^ Throw an error when an illegal sequence is encountered

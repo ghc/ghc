@@ -21,10 +21,10 @@ import qualified GHC.Foreign as GHC
 # endif
 #endif
 
--- | Computation 'getFullArgs' is the "raw" version of 'getArgs', similar
--- to @argv@ in other languages. It returns a list of the program's
--- command line arguments, starting with the program name, and
--- including those normally eaten by the RTS (+RTS ... -RTS).
+-- | Computation 'getFullArgs' is the "raw" version of
+-- 'System.Environment.getArgs', similar to @argv@ in other languages. It
+-- returns a list of the program's command line arguments, starting with the
+-- program name, and including those normally eaten by the RTS (+RTS ... -RTS).
 getFullArgs :: IO [String]
 getFullArgs = do
   alloca $ \ p_argc -> do
