@@ -3545,10 +3545,10 @@ More details:
        module M where
          data R = R { a,b,c :: Int }
        module X where
-         import M( R(a,c) )
-         f b = R { .. }
+         import M( R(R,a,c) )
+         f a b = R { .. }
 
-   The ``R{..}`` expands to ``R{M.a=a}``, omitting ``b`` since the
+   The ``R{..}`` expands to ``R{a=a}``, omitting ``b`` since the
    record field is not in scope, and omitting ``c`` since the variable
    ``c`` is not in scope (apart from the binding of the record selector
    ``c``, of course).
