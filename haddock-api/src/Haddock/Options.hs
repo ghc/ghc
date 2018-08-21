@@ -189,7 +189,7 @@ options backwardsCompat =
     Option [] ["gen-index"] (NoArg Flag_GenIndex)
       "generate an HTML index from specified\ninterfaces",
     Option [] ["ignore-all-exports"] (NoArg Flag_IgnoreAllExports)
-      "behave as if all modules have the\nignore-exports atribute",
+      "behave as if all modules have the\nignore-exports attribute",
     Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
       "behave as if MODULE has the hide attribute",
     Option [] ["show"] (ReqArg Flag_ShowModule "MODULE")
