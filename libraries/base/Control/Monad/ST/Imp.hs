@@ -45,7 +45,7 @@ import Control.Exception.Base
                         ( catch, throwIO, NonTermination (..)
                         , BlockedIndefinitelyOnMVar (..) )
 
--- | Allow the result of a state transformer computation to be used (lazily)
+-- | Allow the result of an 'ST' computation to be used (lazily)
 -- inside the computation.
 --
 -- Note that if @f@ is strict, @'fixST' f = _|_@.

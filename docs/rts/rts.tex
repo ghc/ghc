@@ -310,7 +310,7 @@ argument: there's no cost for adding another argument.  But functions
 can only return one result: the cost of adding a second ``result'' is
 that the function must construct a tuple of ``results'' on the heap.
 The asymmetry is rather galling and can make certain programming
-styles quite expensive.  For example, consider a simple state transformer
+styles quite expensive.  For example, consider a simple state
 monad:
 \begin{verbatim}
 > type S a     = State -> (a,State)
@@ -321,7 +321,7 @@ monad:
 \end{verbatim}
 Here, every use of @returnS@, @getS@ or @setS@ constructs a new tuple
 in the heap which is instantly taken apart (and becomes garbage) by
-the case analysis in @bind@.  Even a short state-transformer program
+the case analysis in @bind@.  Even a short program using the state monad
 will construct a lot of these temporary tuples.
 
 Unboxed tuples provide a way for the programmer to indicate that they

@@ -30,13 +30,13 @@ import qualified Control.Monad.Fail as Fail
 
 default ()
 
--- The state-transformer monad proper.  By default the monad is strict;
+-- The 'ST' monad proper.  By default the monad is strict;
 -- too many people got bitten by space leaks when it was lazy.
 
--- | The strict state-transformer monad.
--- A computation of type @'ST' s a@ transforms an internal state indexed
--- by @s@, and returns a value of type @a@.
--- The @s@ parameter is either
+-- | The strict 'ST' monad.
+-- The 'ST' monad allows for destructive updates, but is escapable (unlike IO).
+-- A computation of type @'ST' s a@ returns a value of type @a@, and
+-- execute in "thread" @s@. The @s@ parameter is either
 --
 -- * an uninstantiated type variable (inside invocations of 'runST'), or
 --
@@ -131,7 +131,7 @@ instance  Show (ST s a)  where
     showList       = showList__ (showsPrec 0)
 
 {-# INLINE runST #-}
--- | Return the value computed by a state transformer computation.
+-- | Return the value computed by a state thread.
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a

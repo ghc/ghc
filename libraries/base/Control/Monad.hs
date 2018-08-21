@@ -188,7 +188,7 @@ forever a   = let a' = a *> a' in a'
 
 -- | The 'mapAndUnzipM' function maps its first argument over a list, returning
 -- the result as a pair of lists. This function is mainly used with complicated
--- data structures or a state-transforming monad.
+-- data structures or a state monad.
 mapAndUnzipM      :: (Applicative m) => (a -> m (b,c)) -> [a] -> m ([b], [c])
 {-# INLINE mapAndUnzipM #-}
 mapAndUnzipM f xs =  unzip <$> traverse f xs

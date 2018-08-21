@@ -48,7 +48,7 @@ instance Ord a => Semigroup (Min a) where
 instance Ord a => Monoid (Min a) where
     mempty = Min Nothing
 
--- left-to-right state transformer
+-- left-to-right state-transforming monad
 newtype StateL s a = StateL { runStateL :: s -> (s, a) }
 
 -- | @since 4.0
@@ -67,7 +67,7 @@ instance Applicative (StateL s) where
             (s'', y) = ky s'
         in (s'', f x y)
 
--- right-to-left state transformer
+-- right-to-left state-transforming monad
 newtype StateR s a = StateR { runStateR :: s -> (s, a) }
 
 -- | @since 4.0

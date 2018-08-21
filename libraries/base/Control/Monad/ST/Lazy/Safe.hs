@@ -11,7 +11,7 @@
 -- Portability :  non-portable (requires universal quantification for runST)
 --
 -- This module presents an identical interface to "Control.Monad.ST",
--- except that the monad delays evaluation of state operations until
+-- except that the monad delays evaluation of 'ST' operations until
 -- a value depending on them is required.
 --
 -- Safe API only.
