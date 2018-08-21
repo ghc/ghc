@@ -312,20 +312,20 @@ data StgConInfoTable = StgConInfoTable {
 
 
 pokeConItbl
-  :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
+  :: Bool -> Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
   -> IO ()
-pokeConItbl wr_ptr _ex_ptr itbl = do
-#if defined(TABLES_NEXT_TO_CODE)
-  -- Write the offset to the con_desc from the end of the standard InfoTable
-  -- at the first byte.
-  let con_desc_offset = conDesc itbl `minusPtr` (_ex_ptr `plusPtr` conInfoTableSizeB)
-  (#poke StgConInfoTable, con_desc) wr_ptr con_desc_offset
-#else
-  -- Write the con_desc address after the end of the info table.
-  -- Use itblSize because CPP will not pick up PROFILING when calculating
-  -- the offset.
-  pokeByteOff wr_ptr itblSize (conDesc itbl)
-#endif
+pokeConItbl tables_next_to_code wr_ptr _ex_ptr itbl = do
+  if tables_next_to_code
+  then do
+      -- Write the offset to the con_desc from the end of the standard InfoTable
+      -- at the first byte.
+      let con_desc_offset = conDesc itbl `minusPtr` (_ex_ptr `plusPtr` conInfoTableSizeB)
+      (#poke StgConInfoTable, con_desc) wr_ptr con_desc_offset
+  else do
+      -- Write the con_desc address after the end of the info table.
+      -- Use itblSize because CPP will not pick up PROFILING when calculating
+      -- the offset.
+      pokeByteOff wr_ptr itblSize (conDesc itbl)
   pokeItbl (wr_ptr `plusPtr` (#offset StgConInfoTable, i)) (infoTable itbl)
 
 sizeOfEntryCode :: Bool -> Int
@@ -352,14 +352,12 @@ newExecConItbl tables_next_to_code obj con_desc
         ex_ptr <- peek pcode
         let cinfo = StgConInfoTable { conDesc = ex_ptr `plusPtr` fromIntegral sz
                                     , infoTable = obj }
-        pokeConItbl wr_ptr ex_ptr cinfo
+        pokeConItbl tables_next_to_code wr_ptr ex_ptr cinfo
         pokeArray0 0 (castPtr wr_ptr `plusPtr` fromIntegral sz) con_desc
         _flushExec sz ex_ptr -- Cache flush (if needed)
-#if defined(TABLES_NEXT_TO_CODE)
-        return (castPtrToFunPtr (ex_ptr `plusPtr` conInfoTableSizeB))
-#else
-        return (castPtrToFunPtr ex_ptr)
-#endif
+        if tables_next_to_code
+          then return (castPtrToFunPtr (ex_ptr `plusPtr` conInfoTableSizeB))
+          else return (castPtrToFunPtr ex_ptr)
 
 foreign import ccall unsafe "allocateExec"
   _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)
