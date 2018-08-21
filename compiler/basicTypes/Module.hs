@@ -137,7 +137,6 @@ module Module
 
 import GhcPrelude
 
-import Config
 import Outputable
 import Unique
 import UniqFM

@@ -136,7 +136,6 @@ import Unique
 import Name
 import SrcLoc
 import FastString
-import Panic ( panic )
 
 {-
 ************************************************************************
