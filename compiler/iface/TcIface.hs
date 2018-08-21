@@ -75,7 +75,6 @@ import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
 
-import Data.List
 import Control.Monad
 import qualified Data.Map as Map
 

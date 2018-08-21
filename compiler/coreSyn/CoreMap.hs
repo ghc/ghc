@@ -483,7 +483,7 @@ trieMapView ty
   -- First check for TyConApps that need to be expanded to
   -- AppTy chains.
   | Just (tc, tys@(_:_)) <- tcSplitTyConApp_maybe ty
-  = Just $ foldl AppTy (TyConApp tc []) tys
+  = Just $ foldl' AppTy (TyConApp tc []) tys
 
   -- Then resolve any remaining nullary synonyms.
   | Just ty' <- tcView ty = Just ty'
@@ -716,7 +716,7 @@ extendCME (CME { cme_next = bv, cme_env = env }) v
   = CME { cme_next = bv+1, cme_env = extendVarEnv env v bv }
 
 extendCMEs :: CmEnv -> [Var] -> CmEnv
-extendCMEs env vs = foldl extendCME env vs
+extendCMEs env vs = foldl' extendCME env vs
 
 lookupCME :: CmEnv -> Var -> Maybe BoundVar
 lookupCME (CME { cme_env = env }) v = lookupVarEnv env v

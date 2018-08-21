@@ -1854,7 +1854,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
     check_injectivity prev_branches cur_branch
       | Injective inj <- injectivity
       = do { let conflicts =
-                     fst $ foldl (gather_conflicts inj prev_branches cur_branch)
+                     fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
                                  ([], 0) prev_branches
            ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
                    (makeInjectivityErrors ax cur_branch inj conflicts) }

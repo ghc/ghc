@@ -710,7 +710,7 @@ checkStability
         -> StableModules
 
 checkStability hpt sccs all_home_mods =
-  foldl checkSCC (emptyUniqSet, emptyUniqSet) sccs
+  foldl' checkSCC (emptyUniqSet, emptyUniqSet) sccs
   where
    checkSCC :: StableModules -> SCC ModSummary -> StableModules
    checkSCC (stable_obj, stable_bco) scc0

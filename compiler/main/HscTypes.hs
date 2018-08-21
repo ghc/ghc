@@ -203,7 +203,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
-import Data.Foldable    ( foldl' )
 import Data.IORef
 import Data.Time
 import Exception
@@ -1711,7 +1710,7 @@ icExtendGblRdrEnv env tythings
        | is_sub_bndr thing
        = env
        | otherwise
-       = foldl extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
+       = foldl' extendGlobalRdrEnv env1 (concatMap localGREsFromAvail avail)
        where
           env1  = shadowNames env (concatMap availNames avail)
           avail = tyThingAvailInfo thing
@@ -2115,7 +2114,7 @@ extendTypeEnv :: TypeEnv -> TyThing -> TypeEnv
 extendTypeEnv env thing = extendNameEnv env (getName thing) thing
 
 extendTypeEnvList :: TypeEnv -> [TyThing] -> TypeEnv
-extendTypeEnvList env things = foldl extendTypeEnv env things
+extendTypeEnvList env things = foldl' extendTypeEnv env things
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids

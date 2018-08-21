@@ -1815,12 +1815,12 @@ mkVarApps :: Expr b -> [Var] -> Expr b
 -- use 'MkCore.mkCoreConApps' if possible
 mkConApp      :: DataCon -> [Arg b] -> Expr b
 
-mkApps    f args = foldl App                       f args
-mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
-mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
+mkApps    f args = foldl' App                       f args
+mkCoApps  f args = foldl' (\ e a -> App e (Coercion a)) f args
+mkVarApps f vars = foldl' (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
-mkTyApps  f args = foldl (\ e a -> App e (mkTyArg a)) f args
+mkTyApps  f args = foldl' (\ e a -> App e (mkTyArg a)) f args
 
 mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
 mkConApp2 con tys arg_ids = Var (dataConWorkId con)

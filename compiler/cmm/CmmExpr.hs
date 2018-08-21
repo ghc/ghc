@@ -41,7 +41,6 @@ import Outputable (panic)
 import Unique
 
 import Data.Set (Set)
-import Data.List
 import qualified Data.Set as Set
 
 -----------------------------------------------------------------------------

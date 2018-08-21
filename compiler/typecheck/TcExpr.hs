@@ -2743,7 +2743,7 @@ missingFields con fields
     header = text "Fields of" <+> quotes (ppr con) <+>
              text "not initialised"
 
--- callCtxt fun args = text "In the call" <+> parens (ppr (foldl mkHsApp fun args))
+-- callCtxt fun args = text "In the call" <+> parens (ppr (foldl' mkHsApp fun args))
 
 noPossibleParents :: [LHsRecUpdField GhcRn] -> SDoc
 noPossibleParents rbinds

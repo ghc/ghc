@@ -131,7 +131,7 @@ extendInScopeSet (InScope in_scope n) v
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
-   = InScope (foldl (\s v -> extendVarSet s v) in_scope vs)
+   = InScope (foldl' (\s v -> extendVarSet s v) in_scope vs)
                     (n + length vs)
 
 extendInScopeSetSet :: InScopeSet -> VarSet -> InScopeSet

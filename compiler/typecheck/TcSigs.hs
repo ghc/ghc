@@ -492,7 +492,7 @@ extendPragEnv prag_fn (n, sig) = extendNameEnv_Acc (:) singleton prag_fn n sig
 ---------------
 mkPragEnv :: [LSig GhcRn] -> LHsBinds GhcRn -> TcPragEnv
 mkPragEnv sigs binds
-  = foldl extendPragEnv emptyNameEnv prs
+  = foldl' extendPragEnv emptyNameEnv prs
   where
     prs = mapMaybe get_sig sigs
 

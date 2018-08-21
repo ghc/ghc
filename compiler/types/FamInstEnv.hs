@@ -458,7 +458,7 @@ familyInstances (pkg_fie, home_fie) fam
                 Nothing                      -> []
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
-extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
+extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env

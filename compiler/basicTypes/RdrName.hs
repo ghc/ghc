@@ -88,7 +88,7 @@ import Util
 import NameEnv
 
 import Data.Data
-import Data.List( sortBy, foldl', nub )
+import Data.List( sortBy, nub )
 
 {-
 ************************************************************************
@@ -995,7 +995,7 @@ extendGlobalRdrEnv env gre
                      (greOccName gre) gre
 
 shadowNames :: GlobalRdrEnv -> [Name] -> GlobalRdrEnv
-shadowNames = foldl shadowName
+shadowNames = foldl' shadowName
 
 {- Note [GlobalRdrEnv shadowing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

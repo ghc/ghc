@@ -40,7 +40,7 @@ getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
 deleteBys :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 -- (deleteBys eq xs ys) returns xs-ys, using the given equality function
 -- Just like 'Data.List.delete' but with an equality function
-deleteBys eq xs ys = foldl (flip (deleteBy eq)) xs ys
+deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
 
 {-
 ************************************************************************

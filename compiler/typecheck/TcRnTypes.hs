@@ -1366,7 +1366,7 @@ data ImportAvails
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
           -> ModuleNameEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl add emptyUFM deps
+mkModDeps deps = foldl' add emptyUFM deps
                where
                  add env elt@(m,_) = addToUFM env m elt
 

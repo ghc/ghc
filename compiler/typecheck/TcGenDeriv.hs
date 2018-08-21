@@ -1362,7 +1362,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
-                   foldl mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
+                   foldl' mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1567,7 +1567,7 @@ gen_Lift_binds loc tycon = (unitBag lift_bind, emptyBag)
 
             lift_Expr
               | is_infix  = nlHsApps infixApp_RDR [a1, conE_Expr, a2]
-              | otherwise = foldl mk_appE_app conE_Expr lifted_as
+              | otherwise = foldl' mk_appE_app conE_Expr lifted_as
             (a1:a2:_) = lifted_as
 
 mk_appE_app :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs

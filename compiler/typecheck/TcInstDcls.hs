@@ -840,7 +840,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
-             con_app_args = foldl app_to_meth con_app_tys sc_meth_ids
+             con_app_args = foldl' app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr GhcTc -> Id -> HsExpr GhcTc
              app_to_meth fun meth_id = HsApp noExt (L loc fun)
@@ -1656,7 +1656,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
               fn   = noLoc (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderArgFlag tcb /= Inferred ]
-              rhs  = foldl mk_vta (nlHsVar dm_name) visible_inst_tys
+              rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = noLoc $ mkTopFunBind Generated fn $
                              [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 

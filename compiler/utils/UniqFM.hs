@@ -75,8 +75,6 @@ import GhcPrelude
 import Unique           ( Uniquable(..), Unique, getKey )
 import Outputable
 
-import Data.List (foldl')
-
 import qualified Data.IntMap as M
 import qualified Data.IntSet as S
 import Data.Data
@@ -105,26 +103,26 @@ unitDirectlyUFM :: Unique -> elt -> UniqFM elt
 unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
 
 listToUFM :: Uniquable key => [(key,elt)] -> UniqFM elt
-listToUFM = foldl (\m (k, v) -> addToUFM m k v) emptyUFM
+listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM
 
 listToUFM_Directly :: [(Unique, elt)] -> UniqFM elt
-listToUFM_Directly = foldl (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
+listToUFM_Directly = foldl' (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
 
 listToUFM_C
   :: Uniquable key
   => (elt -> elt -> elt)
   -> [(key, elt)]
   -> UniqFM elt
-listToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v) emptyUFM
+listToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v) emptyUFM
 
 addToUFM :: Uniquable key => UniqFM elt -> key -> elt  -> UniqFM elt
 addToUFM (UFM m) k v = UFM (M.insert (getKey $ getUnique k) v m)
 
 addListToUFM :: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
-addListToUFM = foldl (\m (k, v) -> addToUFM m k v)
+addListToUFM = foldl' (\m (k, v) -> addToUFM m k v)
 
 addListToUFM_Directly :: UniqFM elt -> [(Unique,elt)] -> UniqFM elt
-addListToUFM_Directly = foldl (\m (k, v) -> addToUFM_Directly m k v)
+addListToUFM_Directly = foldl' (\m (k, v) -> addToUFM_Directly m k v)
 
 addToUFM_Directly :: UniqFM elt -> Unique -> elt -> UniqFM elt
 addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
@@ -162,7 +160,7 @@ addListToUFM_C
   => (elt -> elt -> elt)
   -> UniqFM elt -> [(key,elt)]
   -> UniqFM elt
-addListToUFM_C f = foldl (\m (k, v) -> addToUFM_C f m k v)
+addListToUFM_C f = foldl' (\m (k, v) -> addToUFM_C f m k v)
 
 adjustUFM :: Uniquable key => (elt -> elt) -> UniqFM elt -> key -> UniqFM elt
 adjustUFM f (UFM m) k = UFM (M.adjust f (getKey $ getUnique k) m)
@@ -174,10 +172,10 @@ delFromUFM :: Uniquable key => UniqFM elt -> key    -> UniqFM elt
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
 
 delListFromUFM :: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
-delListFromUFM = foldl delFromUFM
+delListFromUFM = foldl' delFromUFM
 
 delListFromUFM_Directly :: UniqFM elt -> [Unique] -> UniqFM elt
-delListFromUFM_Directly = foldl delFromUFM_Directly
+delListFromUFM_Directly = foldl' delFromUFM_Directly
 
 delFromUFM_Directly :: UniqFM elt -> Unique -> UniqFM elt
 delFromUFM_Directly (UFM m) u = UFM (M.delete (getKey u) m)

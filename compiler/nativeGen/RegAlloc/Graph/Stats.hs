@@ -34,9 +34,6 @@ import UniqFM
 import UniqSet
 import State
 
-import Data.List
-
-
 -- | Holds interesting statistics from the register allocator.
 data RegAllocStats statics instr
 

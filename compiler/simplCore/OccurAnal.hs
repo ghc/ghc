@@ -2436,7 +2436,7 @@ andUDs = combineUsageDetailsWith addOccInfo
 orUDs  = combineUsageDetailsWith orOccInfo
 
 andUDsList :: [UsageDetails] -> UsageDetails
-andUDsList = foldl andUDs emptyDetails
+andUDsList = foldl' andUDs emptyDetails
 
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
 mkOneOcc env id int_cxt arity

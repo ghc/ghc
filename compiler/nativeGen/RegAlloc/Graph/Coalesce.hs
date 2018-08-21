@@ -16,8 +16,6 @@ import UniqFM
 import UniqSet
 import UniqSupply
 
-import Data.List
-
 
 -- | Do register coalescing on this top level thing
 --

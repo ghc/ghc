@@ -1014,7 +1014,7 @@ mkOrphMap :: (decl -> IsOrphan) -- Extract orphan status from decl
                                 --      each sublist in canonical order
               [decl])           -- Orphan decls; in canonical order
 mkOrphMap get_key decls
-  = foldl go (emptyOccEnv, []) decls
+  = foldl' go (emptyOccEnv, []) decls
   where
     go (non_orphs, orphs) d
         | NotOrphan occ <- get_key d

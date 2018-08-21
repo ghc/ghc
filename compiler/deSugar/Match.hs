@@ -53,8 +53,8 @@ import Unique
 import UniqDFM
 
 import Control.Monad( when, unless )
+import Data.List ( groupBy )
 import qualified Data.Map as Map
-import Data.List (groupBy)
 
 {-
 ************************************************************************
@@ -880,7 +880,7 @@ subGroup :: (m -> [[EquationInfo]]) -- Map.elems
 -- Parameterized by map operations to allow different implementations
 -- and constraints, eg. types without Ord instance.
 subGroup elems empty lookup insert group
-    = map reverse $ elems $ foldl accumulate empty group
+    = map reverse $ elems $ foldl' accumulate empty group
   where
     accumulate pg_map (pg, eqn)
       = case lookup pg pg_map of

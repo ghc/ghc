@@ -544,7 +544,7 @@ toIfaceApp (Var v) as
 toIfaceApp e as = mkIfaceApps (toIfaceExpr e) as
 
 mkIfaceApps :: IfaceExpr -> [CoreExpr] -> IfaceExpr
-mkIfaceApps f as = foldl (\f a -> IfaceApp f (toIfaceExpr a)) f as
+mkIfaceApps f as = foldl' (\f a -> IfaceApp f (toIfaceExpr a)) f as
 
 ---------------------
 toIfaceVar :: Id -> IfaceExpr

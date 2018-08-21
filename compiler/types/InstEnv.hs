@@ -460,7 +460,7 @@ memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     eqType (varType (is_dfun cls1)) (varType (is_dfun cls2))
 
 extendInstEnvList :: InstEnv -> [ClsInst] -> InstEnv
-extendInstEnvList inst_env ispecs = foldl extendInstEnv inst_env ispecs
+extendInstEnvList inst_env ispecs = foldl' extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
 extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })

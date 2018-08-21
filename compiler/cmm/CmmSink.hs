@@ -24,7 +24,6 @@ import PprCmm ()
 import qualified Data.IntSet as IntSet
 import Data.List (partition)
 import qualified Data.Set as Set
-import Data.List
 import Data.Maybe
 
 -- Compact sets for membership tests of local variables.

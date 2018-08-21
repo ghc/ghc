@@ -666,7 +666,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                           -- differently than `univ_tvs ++ ex_tvs) above.
                           -- See Note [DataCon user type variable binders]
                           -- in DataCon.
-                 rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
+                 rhs = foldl' (\a b -> nlHsApp a b) inst_con val_args
 
                         -- Tediously wrap the application in a cast
                         -- Note [Update for GADTs]

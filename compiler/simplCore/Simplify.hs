@@ -295,7 +295,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats (seDynFlags env) top_lvl
                                                                 tvs' body_floats2 body2
-                        ; let floats = foldl extendFloats (emptyFloats env) poly_binds
+                        ; let floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; rhs' <- mkLam env tvs' body3 rhs_cont
                         ; return (floats, rhs') }
 
@@ -2978,7 +2978,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
   = do { (floats1, cont') <- mkDupableCont env cont
        ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg (getMode env))
                                            (ai_args info)
-       ; return ( foldl addLetFloats floats1 floats_s
+       ; return ( foldl' addLetFloats floats1 floats_s
                 , StrictArg { sc_fun = info { ai_args = args' }
                             , sc_cci = cci
                             , sc_cont = cont'

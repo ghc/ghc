@@ -47,13 +47,13 @@ unitUniqDSet :: Uniquable a => a -> UniqDSet a
 unitUniqDSet x = unitUDFM x x
 
 mkUniqDSet :: Uniquable a => [a]  -> UniqDSet a
-mkUniqDSet = foldl addOneToUniqDSet emptyUniqDSet
+mkUniqDSet = foldl' addOneToUniqDSet emptyUniqDSet
 
 addOneToUniqDSet :: Uniquable a => UniqDSet a -> a -> UniqDSet a
 addOneToUniqDSet set x = addToUDFM set x x
 
 addListToUniqDSet :: Uniquable a => UniqDSet a -> [a] -> UniqDSet a
-addListToUniqDSet = foldl addOneToUniqDSet
+addListToUniqDSet = foldl' addOneToUniqDSet
 
 delOneFromUniqDSet :: Uniquable a => UniqDSet a -> a -> UniqDSet a
 delOneFromUniqDSet = delFromUDFM
