@@ -2141,8 +2141,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
 *********************************************************
 -}
 
-rnFds :: [Located (FunDep (Located RdrName))]
-  -> RnM [Located (FunDep (Located Name))]
+rnFds :: [LHsFunDep GhcPs] -> RnM [LHsFunDep GhcRn]
 rnFds fds
   = mapM (wrapLocM rn_fds) fds
   where

@@ -987,52 +987,222 @@ tcTyClDecl1 _parent roles_info
 
 tcTyClDecl1 _parent roles_info
             (ClassDecl { tcdLName = L _ class_name
-            , tcdCtxt = ctxt, tcdMeths = meths
+            , tcdCtxt = hs_ctxt, tcdMeths = meths
             , tcdFDs = fundeps, tcdSigs = sigs
             , tcdATs = ats, tcdATDefs = at_defs })
   = ASSERT( isNothing _parent )
-    do { clas <- fixM $ \ clas ->
-            -- We need the knot because 'clas' is passed into tcClassATs
-            tcTyClTyVars class_name $ \ binders res_kind ->
-            do { MASSERT2( tcIsConstraintKind res_kind
-                         , ppr class_name $$ ppr res_kind )
-               ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
-               ; let tycon_name = class_name        -- We use the same name
-                     roles = roles_info tycon_name  -- for TyCon and Class
+    do { clas <- tcClassDecl1 roles_info class_name hs_ctxt
+                              meths fundeps sigs ats at_defs
+       ; return (classTyCon clas) }
 
-               ; ctxt' <- solveEqualities $ tcHsContext ctxt
-               ; ctxt' <- zonkTcTypeToTypes emptyZonkEnv ctxt'
-                       -- Squeeze out any kind unification variables
-               ; fds'  <- mapM (addLocM tc_fundep) fundeps
-               ; sig_stuff <- tcClassSigs class_name sigs meths
-               ; at_stuff <- tcClassATs class_name clas ats at_defs
-               ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
-               -- TODO: Allow us to distinguish between abstract class,
-               -- and concrete class with no methods (maybe by
-               -- specifying a trailing where or not
-               ; sig_stuff' <- mapM zonkTcMethInfoToMethInfo sig_stuff
-                  -- this zonk is really just to squeeze out the TcTyCons
-                  -- and convert, e.g., Skolems to tyvars. We won't
-                  -- see any unfilled metavariables here.
+tcTyClDecl1 _ _ (XTyClDecl _) = panic "tcTyClDecl1"
 
-               ; is_boot <- tcIsHsBootOrSig
-               ; let body | is_boot, null ctxt', null at_stuff, null sig_stuff
-                          = Nothing
-                          | otherwise
-                          = Just (ctxt', at_stuff, sig_stuff', mindef)
 
-               ; clas <- buildClass class_name binders roles fds' body
-               ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
-                                        ppr fds')
-               ; return clas }
+{- *********************************************************************
+*                                                                      *
+          Class declarations
+*                                                                      *
+********************************************************************* -}
 
-         ; return (classTyCon clas) }
+tcClassDecl1 :: RolesInfo -> Name -> LHsContext GhcRn
+             -> LHsBinds GhcRn -> [LHsFunDep GhcRn] -> [LSig GhcRn]
+             -> [LFamilyDecl GhcRn] -> [LTyFamDefltEqn GhcRn]
+             -> TcM Class
+tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
+  = fixM $ \ clas ->
+    -- We need the knot because 'clas' is passed into tcClassATs
+    tcTyClTyVars class_name $ \ binders res_kind ->
+    do { MASSERT2( tcIsConstraintKind res_kind
+                 , ppr class_name $$ ppr res_kind )
+       ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
+       ; let tycon_name = class_name        -- We use the same name
+             roles = roles_info tycon_name  -- for TyCon and Class
+
+       ; (ctxt, fds, sig_stuff, at_stuff)
+            <- solveEqualities $
+               do { ctxt <- tcHsContext hs_ctxt
+                  ; fds  <- mapM (addLocM tc_fundep) fundeps
+                  ; sig_stuff <- tcClassSigs class_name sigs meths
+                  ; at_stuff  <- tcClassATs class_name clas ats at_defs
+                  ; return (ctxt, fds, sig_stuff, at_stuff) }
+
+       -- The solveEqualities will report errors for any
+       -- unsolved equalities, so these zonks should not encounter
+       -- any unfilled coercion variables unless there is such an error
+       -- The zonk also squeeze out the TcTyCons, and converts
+       -- Skolems to tyvars.
+       ; ctxt      <- zonkTcTypeToTypes emptyZonkEnv ctxt
+       ; sig_stuff <- mapM zonkTcMethInfoToMethInfo sig_stuff
+         -- ToDo: do we need to zonk at_stuff?
+
+       -- TODO: Allow us to distinguish between abstract class,
+       -- and concrete class with no methods (maybe by
+       -- specifying a trailing where or not
+
+       ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
+       ; is_boot <- tcIsHsBootOrSig
+       ; let body | is_boot, null ctxt, null at_stuff, null sig_stuff
+                  = Nothing
+                  | otherwise
+                  = Just (ctxt, at_stuff, sig_stuff, mindef)
+
+       ; clas <- buildClass class_name binders roles fds body
+       ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
+                                ppr fds)
+       ; return clas }
   where
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
                                 ; tvs2' <- mapM (tcLookupTyVar . unLoc) tvs2 ;
                                 ; return (tvs1', tvs2') }
 
-tcTyClDecl1 _ _ (XTyClDecl _) = panic "tcTyClDecl1"
+
+{- Note [Associated type defaults]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following is an example of associated type defaults:
+             class C a where
+               data D a
+
+               type F a b :: *
+               type F a b = [a]        -- Default
+
+Note that we can get default definitions only for type families, not data
+families.
+-}
+
+tcClassATs :: Name                   -- The class name (not knot-tied)
+           -> Class                  -- The class parent of this associated type
+           -> [LFamilyDecl GhcRn]    -- Associated types.
+           -> [LTyFamDefltEqn GhcRn] -- Associated type defaults.
+           -> TcM [ClassATItem]
+tcClassATs class_name cls ats at_defs
+  = do {  -- Complain about associated type defaults for non associated-types
+         sequence_ [ failWithTc (badATErr class_name n)
+                   | n <- map at_def_tycon at_defs
+                   , not (n `elemNameSet` at_names) ]
+       ; mapM tc_at ats }
+  where
+    at_def_tycon :: LTyFamDefltEqn GhcRn -> Name
+    at_def_tycon (L _ eqn) = unLoc (feqn_tycon eqn)
+
+    at_fam_name :: LFamilyDecl GhcRn -> Name
+    at_fam_name (L _ decl) = unLoc (fdLName decl)
+
+    at_names = mkNameSet (map at_fam_name ats)
+
+    at_defs_map :: NameEnv [LTyFamDefltEqn GhcRn]
+    -- Maps an AT in 'ats' to a list of all its default defs in 'at_defs'
+    at_defs_map = foldr (\at_def nenv -> extendNameEnv_C (++) nenv
+                                          (at_def_tycon at_def) [at_def])
+                        emptyNameEnv at_defs
+
+    tc_at at = do { fam_tc <- addLocM (tcFamDecl1 (Just cls)) at
+                  ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
+                                  `orElse` []
+                  ; atd <- tcDefaultAssocDecl fam_tc at_defs
+                  ; return (ATI fam_tc atd) }
+
+-------------------------
+tcDefaultAssocDecl :: TyCon                    -- ^ Family TyCon (not knot-tied)
+                   -> [LTyFamDefltEqn GhcRn]        -- ^ Defaults
+                   -> TcM (Maybe (KnotTied Type, SrcSpan))   -- ^ Type checked RHS
+tcDefaultAssocDecl _ []
+  = return Nothing  -- No default declaration
+
+tcDefaultAssocDecl _ (d1:_:_)
+  = failWithTc (text "More than one default declaration for"
+                <+> ppr (feqn_tycon (unLoc d1)))
+
+tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = L _ tc_name
+                                         , feqn_pats = hs_tvs
+                                         , feqn_rhs = rhs })]
+  | HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = imp_vars}
+           , hsq_explicit = exp_vars } <- hs_tvs
+  = -- See Note [Type-checking default assoc decls]
+    setSrcSpan loc $
+    tcAddFamInstCtxt (text "default type instance") tc_name $
+    do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
+       ; let fam_tc_name = tyConName fam_tc
+             fam_arity = length (tyConVisibleTyVars fam_tc)
+
+       -- Kind of family check
+       ; ASSERT( fam_tc_name == tc_name )
+         checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+
+       -- Arity check
+       ; checkTc (exp_vars `lengthIs` fam_arity)
+                 (wrongNumberOfParmsErr fam_arity)
+
+       -- Typecheck RHS
+       ; let all_vars = imp_vars ++ map hsLTyVarName exp_vars
+             pats     = map hsLTyVarBndrToType exp_vars
+
+          -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
+          -- the LHsQTyVars used for declaring a tycon, but the names here
+          -- are different.
+
+          -- You might think we should pass in some ClsInstInfo, as we're looking
+          -- at an associated type. But this would be wrong, because an associated
+          -- type default LHS can mention *different* type variables than the
+          -- enclosing class. So it's treated more as a freestanding beast.
+       ; (pats', rhs_ty)
+           <- tcFamTyPats fam_tc Nothing all_vars pats
+              (kcTyFamEqnRhs Nothing rhs) $
+              \tvs pats rhs_kind ->
+              do { rhs_ty <- solveEqualities $
+                             tcCheckLHsType rhs rhs_kind
+
+                     -- Zonk the patterns etc into the Type world
+                 ; (ze, _) <- zonkTyBndrsX emptyZonkEnv tvs
+                 ; pats'   <- zonkTcTypeToTypes ze pats
+                 ; rhs_ty'  <- zonkTcTypeToType ze rhs_ty
+                 ; return (pats', rhs_ty') }
+
+         -- See Note [Type-checking default assoc decls]
+       ; case tcMatchTys pats' (mkTyVarTys (tyConTyVars fam_tc)) of
+           Just subst -> return (Just (substTyUnchecked subst rhs_ty, loc) )
+           Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
+           -- We check for well-formedness and validity later,
+           -- in checkValidClass
+     }
+tcDefaultAssocDecl _ [L _ (XFamEqn _)] = panic "tcDefaultAssocDecl"
+tcDefaultAssocDecl _ [L _ (FamEqn _ (L _ _) (XLHsQTyVars _) _ _)]
+  = panic "tcDefaultAssocDecl"
+
+{- Note [Type-checking default assoc decls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this default declaration for an associated type
+
+   class C a where
+      type F (a :: k) b :: *
+      type F x y = Proxy x -> y
+
+Note that the class variable 'a' doesn't scope over the default assoc
+decl (rather oddly I think), and (less oddly) neither does the second
+argument 'b' of the associated type 'F', or the kind variable 'k'.
+Instead, the default decl is treated more like a top-level type
+instance.
+
+However we store the default rhs (Proxy x -> y) in F's TyCon, using
+F's own type variables, so we need to convert it to (Proxy a -> b).
+We do this by calling tcMatchTys to match them up.  This also ensures
+that x's kind matches a's and similarly for y and b.  The error
+message isn't great, mind you.  (Trac #11361 was caused by not doing a
+proper tcMatchTys here.)
+
+Recall also that the left-hand side of an associated type family
+default is always just variables -- no tycons here. Accordingly,
+the patterns used in the tcMatchTys won't actually be knot-tied,
+even though we're in the knot. This is too delicate for my taste,
+but it works.
+
+-}
+
+{- *********************************************************************
+*                                                                      *
+          Type family declarations
+*                                                                      *
+********************************************************************* -}
 
 tcFamDecl1 :: Maybe Class -> FamilyDecl GhcRn -> TcM TyCon
 tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_name)
@@ -1246,155 +1416,6 @@ tcDataDefn roles_info
                       mkNewTyConRhs tc_name tycon (head data_cons)
 tcDataDefn _ _ _ _ (XHsDataDefn _) = panic "tcDataDefn"
 
-{-
-************************************************************************
-*                                                                      *
-               Typechecking associated types (in class decls)
-               (including the associated-type defaults)
-*                                                                      *
-************************************************************************
-
-Note [Associated type defaults]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The following is an example of associated type defaults:
-             class C a where
-               data D a
-
-               type F a b :: *
-               type F a b = [a]        -- Default
-
-Note that we can get default definitions only for type families, not data
-families.
--}
-
-tcClassATs :: Name                   -- The class name (not knot-tied)
-           -> Class                  -- The class parent of this associated type
-           -> [LFamilyDecl GhcRn]    -- Associated types.
-           -> [LTyFamDefltEqn GhcRn] -- Associated type defaults.
-           -> TcM [ClassATItem]
-tcClassATs class_name cls ats at_defs
-  = do {  -- Complain about associated type defaults for non associated-types
-         sequence_ [ failWithTc (badATErr class_name n)
-                   | n <- map at_def_tycon at_defs
-                   , not (n `elemNameSet` at_names) ]
-       ; mapM tc_at ats }
-  where
-    at_def_tycon :: LTyFamDefltEqn GhcRn -> Name
-    at_def_tycon (L _ eqn) = unLoc (feqn_tycon eqn)
-
-    at_fam_name :: LFamilyDecl GhcRn -> Name
-    at_fam_name (L _ decl) = unLoc (fdLName decl)
-
-    at_names = mkNameSet (map at_fam_name ats)
-
-    at_defs_map :: NameEnv [LTyFamDefltEqn GhcRn]
-    -- Maps an AT in 'ats' to a list of all its default defs in 'at_defs'
-    at_defs_map = foldr (\at_def nenv -> extendNameEnv_C (++) nenv
-                                          (at_def_tycon at_def) [at_def])
-                        emptyNameEnv at_defs
-
-    tc_at at = do { fam_tc <- addLocM (tcFamDecl1 (Just cls)) at
-                  ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
-                                  `orElse` []
-                  ; atd <- tcDefaultAssocDecl fam_tc at_defs
-                  ; return (ATI fam_tc atd) }
-
--------------------------
-tcDefaultAssocDecl :: TyCon                    -- ^ Family TyCon (not knot-tied)
-                   -> [LTyFamDefltEqn GhcRn]        -- ^ Defaults
-                   -> TcM (Maybe (KnotTied Type, SrcSpan))   -- ^ Type checked RHS
-tcDefaultAssocDecl _ []
-  = return Nothing  -- No default declaration
-
-tcDefaultAssocDecl _ (d1:_:_)
-  = failWithTc (text "More than one default declaration for"
-                <+> ppr (feqn_tycon (unLoc d1)))
-
-tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = L _ tc_name
-                                         , feqn_pats = hs_tvs
-                                         , feqn_rhs = rhs })]
-  | HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = imp_vars}
-           , hsq_explicit = exp_vars } <- hs_tvs
-  = -- See Note [Type-checking default assoc decls]
-    setSrcSpan loc $
-    tcAddFamInstCtxt (text "default type instance") tc_name $
-    do { traceTc "tcDefaultAssocDecl" (ppr tc_name)
-       ; let fam_tc_name = tyConName fam_tc
-             fam_arity = length (tyConVisibleTyVars fam_tc)
-
-       -- Kind of family check
-       ; ASSERT( fam_tc_name == tc_name )
-         checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
-
-       -- Arity check
-       ; checkTc (exp_vars `lengthIs` fam_arity)
-                 (wrongNumberOfParmsErr fam_arity)
-
-       -- Typecheck RHS
-       ; let all_vars = imp_vars ++ map hsLTyVarName exp_vars
-             pats     = map hsLTyVarBndrToType exp_vars
-
-          -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
-          -- the LHsQTyVars used for declaring a tycon, but the names here
-          -- are different.
-
-          -- You might think we should pass in some ClsInstInfo, as we're looking
-          -- at an associated type. But this would be wrong, because an associated
-          -- type default LHS can mention *different* type variables than the
-          -- enclosing class. So it's treated more as a freestanding beast.
-       ; (pats', rhs_ty)
-           <- tcFamTyPats fam_tc Nothing all_vars pats
-              (kcTyFamEqnRhs Nothing rhs) $
-              \tvs pats rhs_kind ->
-              do { rhs_ty <- solveEqualities $
-                             tcCheckLHsType rhs rhs_kind
-
-                     -- Zonk the patterns etc into the Type world
-                 ; (ze, _) <- zonkTyBndrsX emptyZonkEnv tvs
-                 ; pats'   <- zonkTcTypeToTypes ze pats
-                 ; rhs_ty'  <- zonkTcTypeToType ze rhs_ty
-                 ; return (pats', rhs_ty') }
-
-         -- See Note [Type-checking default assoc decls]
-       ; case tcMatchTys pats' (mkTyVarTys (tyConTyVars fam_tc)) of
-           Just subst -> return (Just (substTyUnchecked subst rhs_ty, loc) )
-           Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
-           -- We check for well-formedness and validity later,
-           -- in checkValidClass
-     }
-tcDefaultAssocDecl _ [L _ (XFamEqn _)] = panic "tcDefaultAssocDecl"
-tcDefaultAssocDecl _ [L _ (FamEqn _ (L _ _) (XLHsQTyVars _) _ _)]
-  = panic "tcDefaultAssocDecl"
-
-{- Note [Type-checking default assoc decls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this default declaration for an associated type
-
-   class C a where
-      type F (a :: k) b :: *
-      type F x y = Proxy x -> y
-
-Note that the class variable 'a' doesn't scope over the default assoc
-decl (rather oddly I think), and (less oddly) neither does the second
-argument 'b' of the associated type 'F', or the kind variable 'k'.
-Instead, the default decl is treated more like a top-level type
-instance.
-
-However we store the default rhs (Proxy x -> y) in F's TyCon, using
-F's own type variables, so we need to convert it to (Proxy a -> b).
-We do this by calling tcMatchTys to match them up.  This also ensures
-that x's kind matches a's and similarly for y and b.  The error
-message isn't great, mind you.  (Trac #11361 was caused by not doing a
-proper tcMatchTys here.)
-
-Recall also that the left-hand side of an associated type family
-default is always just variables -- no tycons here. Accordingly,
-the patterns used in the tcMatchTys won't actually be knot-tied,
-even though we're in the knot. This is too delicate for my taste,
-but it works.
-
--}
 
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()

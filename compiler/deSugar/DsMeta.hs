@@ -470,10 +470,10 @@ repAssocTyFamDefaults = mapM rep_deflt
 -------------------------
 -- represent fundeps
 --
-repLFunDeps :: [Located (FunDep (Located Name))] -> DsM (Core [TH.FunDep])
+repLFunDeps :: [LHsFunDep GhcRn] -> DsM (Core [TH.FunDep])
 repLFunDeps fds = repList funDepTyConName repLFunDep fds
 
-repLFunDep :: Located (FunDep (Located Name)) -> DsM (Core TH.FunDep)
+repLFunDep :: LHsFunDep GhcRn -> DsM (Core TH.FunDep)
 repLFunDep (L _ (xs, ys))
    = do xs' <- repList nameTyConName (lookupBinder . unLoc) xs
         ys' <- repList nameTyConName (lookupBinder . unLoc) ys

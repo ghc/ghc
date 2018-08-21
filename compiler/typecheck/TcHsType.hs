@@ -207,7 +207,8 @@ tcHsSigType ctxt sig_ty
               -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- tc_hs_sig_type_and_gen skol_info sig_ty kind >>= zonkTcType
+       ; ty <- tc_hs_sig_type_and_gen skol_info sig_ty kind
+       ; ty <- zonkTcType ty
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -226,10 +227,9 @@ tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext = sig_vars
   = do { ((tkvs, ty), wanted) <- captureConstraints $
                                  tcImplicitTKBndrs skol_info sig_vars $
                                  tc_lhs_type typeLevelMode hs_ty kind
-         -- Any remaining variables (unsolved in the solveLocalEqualities in the
-         -- tcImplicitTKBndrs)
-         -- should be in the global tyvars, and therefore won't be quantified
-         -- over.
+         -- Any remaining variables (unsolved in the solveLocalEqualities
+         -- in the tcImplicitTKBndrs) should be in the global tyvars,
+         -- and therefore won't be quantified over
 
        ; let ty1 = mkSpecForAllTys tkvs ty
        ; kvs <- kindGeneralizeLocal wanted ty1
