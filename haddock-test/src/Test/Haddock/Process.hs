@@ -40,10 +40,10 @@ runProcess' :: FilePath -> ProcessConfig -> IO ProcessHandle
 runProcess' path (ProcessConfig { .. }) = runProcess
     path pcArgs pcWorkDir pcEnv pcStdIn pcStdOut pcStdErr
 
-
-waitForSuccess :: String -> ProcessHandle -> IO ()
-waitForSuccess msg handle = do
-    result <- waitForProcess handle
-    unless (result == ExitSuccess) $ do
-        hPutStrLn stderr $ msg
-        exitFailure
+-- | Wait for a process to finish running. If it ends up failing, print out the
+-- error message.
+waitForSuccess :: String -> Handle -> ProcessHandle -> IO Bool
+waitForSuccess msg out handle = do
+    succeeded <- fmap (== ExitSuccess) $ waitForProcess handle
+    unless succeeded $ hPutStrLn out msg
+    pure succeeded

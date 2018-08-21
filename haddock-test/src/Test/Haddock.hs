@@ -34,12 +34,12 @@ data CheckResult
 
 runAndCheck :: Config c -> IO ()
 runAndCheck cfg = do
-    runHaddock cfg
-    checkFiles cfg
+    crashed <- runHaddock cfg
+    checkFiles cfg crashed
 
 
-checkFiles :: Config c -> IO ()
-checkFiles cfg@(Config { .. }) = do
+checkFiles :: Config c -> Bool -> IO ()
+checkFiles cfg@(Config { .. }) somethingCrashed = do
     putStrLn "Testing output files..."
 
     files <- ignore <$> getDirectoryTree (cfgOutDir cfg)
@@ -54,13 +54,14 @@ checkFiles cfg@(Config { .. }) = do
             Error msg -> putStrLn ("ERROR (" ++ msg ++ ")") >> return Nothing
             Accepted -> putStrLn "ACCEPTED" >> return Nothing
 
-    if null failed
-        then do
-            putStrLn "All tests passed!"
-            exitSuccess
-        else do
-            maybeDiff cfg failed
-            exitFailure
+    if (null failed && not somethingCrashed)
+      then do
+          putStrLn "All tests passed!"
+          exitSuccess
+      else do
+          unless (null failed) $ maybeDiff cfg failed
+          when somethingCrashed $ putStrLn "Some tests crashed."
+          exitFailure
   where
     ignore = filter (not . dcfgCheckIgnore cfgDirConfig)
 
@@ -72,12 +73,14 @@ maybeDiff cfg@(Config { cfgDiffTool = (Just diff) }) files = do
     forM_ files $ diffFile cfg diff
 
 
-runHaddock :: Config c -> IO ()
+-- | Runs Haddock on all of the test packages, and returns whether 'True' if
+-- any of them caused Haddock to crash.
+runHaddock :: Config c -> IO Bool
 runHaddock cfg@(Config { .. }) = do
     createEmptyDirectory $ cfgOutDir cfg
 
     putStrLn "Generating documentation..."
-    forM_ cfgPackages $ \tpkg -> do
+    successes <- forM cfgPackages $ \tpkg -> do
         haddockStdOut <- openFile cfgHaddockStdOut WriteMode
         let pc = processConfig
                     { pcArgs = concat
@@ -87,9 +90,20 @@ runHaddock cfg@(Config { .. }) = do
                         ]
                     , pcEnv = Just $ cfgEnv
                     , pcStdOut = Just $ haddockStdOut
+                    , pcStdErr = Just $ haddockStdOut
                     }
-        handle <- runProcess' cfgHaddockPath pc
-        waitForSuccess "Failed to run Haddock on specified test files" handle
+
+        let msg = "Failed to run Haddock on test package '" ++ tpkgName tpkg ++ "'"
+        succeeded <- waitForSuccess msg stdout =<< runProcess' cfgHaddockPath pc
+        unless succeeded $ removeDirectoryRecursive (outDir cfgDirConfig tpkg)
+
+        pure succeeded
+
+    let somethingFailed = any not successes
+    when somethingFailed $
+      putStrLn ("Haddock output is at '" ++ cfgHaddockStdOut ++ "'. " ++
+                "This file can be set with `--haddock-stdout`.")
+    pure somethingFailed
 
 
 checkFile :: Config c -> FilePath -> IO CheckResult

@@ -224,13 +224,13 @@ printVersions env haddockPath = do
         { pcEnv = Just env
         , pcArgs = ["--version"]
         }
-    waitForSuccess "Failed to run `haddock --version`" handleHaddock
+    void $ waitForSuccess "Failed to run `haddock --version`" stderr handleHaddock
 
     handleGhc <- runProcess' haddockPath $ processConfig
         { pcEnv = Just env
         , pcArgs = ["--ghc-version"]
         }
-    waitForSuccess "Failed to run `haddock --ghc-version`" handleGhc
+    void $ waitForSuccess "Failed to run `haddock --ghc-version`" stderr handleGhc
 
 
 baseDependencies :: FilePath -> IO [String]
