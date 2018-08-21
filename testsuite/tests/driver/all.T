@@ -234,6 +234,8 @@ test('T10220', normal, run_command,
 
 test('T10182', [], run_command, ['$MAKE -s --no-print-directory T10182'])
 
+test('T10869', [], run_command, ['$MAKE -s --no-print-directory T10869'])
+
 test('T365',
      [pre_cmd('touch test_preprocessor.txt'), unless(opsys('mingw32'), skip)],
      compile_fail, [''])

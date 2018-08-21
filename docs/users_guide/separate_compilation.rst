@@ -397,6 +397,19 @@ compilation:
     Keep intermediate ``.hi`` files. This is the default. You may use
     ``-no-keep-hi-files`` if you are not interested in the ``.hi`` files.
 
+.. ghc-flag:: -keep-hscpp-file
+              -keep-hscpp-files
+    :shortdesc: Retain intermediate ``.hscpp`` files.
+    :type: dynamic
+    :category: keep-intermediates
+
+    .. index::
+       single: temporary files; keeping
+
+    Keep the output of the ``CPP`` pre-processor phase as ``.hscpp`` files.
+    A ``.hscpp`` file is only created, if a module gets compiled and uses the
+    C pre-processor.
+
 .. ghc-flag:: -keep-llvm-file
               -keep-llvm-files
     :shortdesc: Retain intermediate LLVM ``.ll`` files.

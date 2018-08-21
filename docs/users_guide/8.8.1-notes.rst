@@ -30,6 +30,7 @@ Language
 Compiler
 ~~~~~~~~
 
+- New :ghc-flag:`-keep-hscpp-files` to keep the output of the CPP pre-processor.
 
 Runtime system
 ~~~~~~~~~~~~~~
