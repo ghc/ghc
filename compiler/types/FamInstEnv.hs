@@ -191,22 +191,31 @@ Solution: eta-reduce both axioms, thus:
 Now
    d' = d |> Monad (sym (ax2 ; ax1))
 
-This eta reduction happens for data instances as well as newtype
-instances. Here we want to eta-reduce the data family axiom.
-All this is done in TcInstDcls.tcDataFamInstDecl.
+----- Bottom line ------
 
-See also Note [Newtype eta] in TyCon.
+For a FamInst with fi_flavour = DataFamilyInst rep_tc,
 
-Bottom line:
-  For a FamInst with fi_flavour = DataFamilyInst rep_tc,
-  - fi_tvs may be shorter than tyConTyVars of rep_tc.
+  - fi_tvs (and cab_tvs of its CoAxiom) may be shorter
+    than tyConTyVars of rep_tc.
+
   - fi_tys may be shorter than tyConArity of the family tycon
        i.e. LHS is unsaturated
+
   - fi_rhs will be (rep_tc fi_tvs)
        i.e. RHS is un-saturated
 
-  But when fi_flavour = SynFamilyInst,
+  - This eta reduction happens for data instances as well
+    as newtype instances. Here we want to eta-reduce the data family axiom.
+
+  - This eta-reduction is done in TcInstDcls.tcDataFamInstDecl.
+
+But when fi_flavour = SynFamilyInst,
   - fi_tys has the exact arity of the family tycon
+
+
+(See also Note [Newtype eta] in TyCon.  This is notionally separate
+and deals with the axiom connecting a newtype with its representation
+type; but it too is eta-reduced.)
 -}
 
 -- Obtain the axiom of a family instance

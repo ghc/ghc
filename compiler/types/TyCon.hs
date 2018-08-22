@@ -1172,6 +1172,9 @@ so the coercion tycon CoT must have
         kind:    T ~ []
  and    arity:   0
 
+This eta-reduction is implemented in BuildTyCl.mkNewTyConRhs.
+
+
 ************************************************************************
 *                                                                      *
                  TyConRepName
