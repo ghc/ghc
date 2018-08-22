@@ -1,13 +1,11 @@
 -- | We create a file <root>/test/ghcconfig containing configuration of test
--- | compiler. We need to search this file for required keys and setting 
--- | required for testsuite e.g. WORDSIZE, HOSTOS etc.  
+-- | compiler. We need to search this file for required keys and setting
+-- | required for testsuite e.g. WORDSIZE, HOSTOS etc.
 
-module Oracles.TestSettings (
-    TestSetting (..), testSetting, testRTSSettings
-    ) where
+module Oracles.TestSettings (TestSetting (..), testSetting, testRTSSettings) where
 
-import Hadrian.Oracles.TextFile
 import Base
+import Hadrian.Oracles.TextFile
 
 testConfigFile :: Action FilePath
 testConfigFile = buildRoot <&> (-/- "test/ghcconfig")
@@ -36,18 +34,18 @@ data TestSetting = TestHostOS
                  | TestMinGhcVersion801
                  deriving (Show)
 
--- | Lookup for testsettings in ghcconfig file
--- | To obtain RTS Ways supported in ghcconfig file, use testRTSSettings.
+-- | Lookup a test setting in @ghcconfig@ file.
+-- | To obtain RTS ways supported in @ghcconfig@ file, use 'testRTSSettings'.
 testSetting :: TestSetting -> Action String
 testSetting key = do
     file <- testConfigFile
     lookupValueOrError file $ case key of
         TestHostOS                -> "HostOS"
-        TestWORDSIZE              -> "WORDSIZE" 
+        TestWORDSIZE              -> "WORDSIZE"
         TestTARGETPLATFORM        -> "TARGETPLATFORM"
         TestTargetOS_CPP          -> "TargetOS_CPP"
         TestTargetARCH_CPP        -> "TargetARCH_CPP"
-        TestGhcStage              -> "GhcStage" 
+        TestGhcStage              -> "GhcStage"
         TestGhcDebugged           -> "GhcDebugged"
         TestGhcWithNativeCodeGen  -> "GhcWithNativeCodeGen"
         TestGhcWithInterpreter    -> "GhcWithInterpreter"
@@ -63,11 +61,9 @@ testSetting key = do
         TestGhcPackageDbFlag      -> "GhcPackageDbFlag"
         TestMinGhcVersion711      -> "MinGhcVersion711"
         TestMinGhcVersion801      -> "MinGhcVersion801"
-    
 
 -- | Get the RTS ways of the test compiler
 testRTSSettings :: Action [String]
-testRTSSettings = do 
+testRTSSettings = do
     file <- testConfigFile
-    fmap words $ lookupValueOrError file "GhcRTSWays"
-
+    words <$> lookupValueOrError file "GhcRTSWays"

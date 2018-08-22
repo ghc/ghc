@@ -4,7 +4,7 @@ module Hadrian.Utilities (
     fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll, chunksOfSize,
 
     -- * String manipulation
-    quote, yesNo, zeroOne,
+    quote, yesNo, parseYesNo, zeroOne,
 
     -- * FilePath manipulation
     unifyPath, (-/-),
@@ -105,7 +105,7 @@ chunksOfSize n = repeatedly f
   where
     f xs = splitAt (max 1 $ length $ takeWhile (<= n) $ scanl1 (+) $ map length xs) xs
 
--- | Add single quotes around a String.
+-- | Add single quotes around a string.
 quote :: String -> String
 quote s = "'" ++ s ++ "'"
 
@@ -114,10 +114,17 @@ yesNo :: Bool -> String
 yesNo True  = "YES"
 yesNo False = "NO"
 
--- | Pretty-print a `Bool` as a @"1"@ or @"0"@ string
+-- | Parse a 'Bool' from a @"YES"@ or @"NO"@ string. Returns @Nothing@ in case
+-- of a parse failure.
+parseYesNo :: String -> Maybe Bool
+parseYesNo "YES" = Just True
+parseYesNo "NO"  = Just False
+parseYesNo _     = Nothing
+
+-- | Pretty-print a 'Bool' as a @"0"@ or @"1"@ string
 zeroOne :: Bool -> String
-zeroOne True = "1"
 zeroOne False = "0"
+zeroOne True  = "1"
 
 -- | Normalise a path and convert all path separators to @/@, even on Windows.
 unifyPath :: FilePath -> FilePath

@@ -1,7 +1,6 @@
 module Settings.Builders.RunTest (runTestBuilderArgs) where
 
 import CommandLine (TestArgs(..), defaultTestArgs, TestSpeed(..))
-import Context
 import Flavour
 import GHC
 import Hadrian.Utilities
@@ -10,21 +9,17 @@ import Oracles.TestSettings
 import Rules.Test
 import Settings.Builders.Common
 
-oneZero :: String -> Bool -> String
-oneZero lbl False = lbl ++ "=0"
-oneZero lbl True = lbl ++ "=1"
+getTestSetting :: TestSetting -> Expr String
+getTestSetting key = expr $ testSetting key
 
-stringToBool :: String -> Bool
-stringToBool "YES"  = True
-stringToBool "NO"   = False
+-- | Parse the value of a Boolean test setting or report an error.
+getBooleanSetting :: TestSetting -> Expr Bool
+getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting key
+  where
+    msg = "Cannot parse test setting " ++ quote (show key)
 
--- | An abstraction to get boolean value of some settings
-getBooleanSetting :: TestSetting -> Action Bool
-getBooleanSetting key = fmap stringToBool $ testSetting key
-
--- Arguments to send to the runtest.py script.
---
--- A lot of this mirrors what's achieved at testsuite/mk/test.mk.
+-- Command line arguments for invoking the @runtest.py@ script. A lot of this
+-- mirrors @testsuite/mk/test.mk@.
 runTestBuilderArgs :: Args
 runTestBuilderArgs = builder RunTest ? do
     pkgs     <- expr $ stagePackages Stage1
@@ -32,59 +27,62 @@ runTestBuilderArgs = builder RunTest ? do
             [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
             | pkg <- pkgs, isLibrary pkg, pkg /= rts, pkg /= libffi ]
 
-    flav <- expr flavour
-    rtsways <- expr $ testRTSSettings
-    libways <- libraryWays flav
-    let hasRtsWay w = elem w rtsways
-        hasLibWay w = elem w libways
-        debugged = ghcDebugged flav
-    hasDynamic    <- expr $ getBooleanSetting TestGhcDynamic
-    hasDynamicByDefault <- expr $ getBooleanSetting TestGhcDynamicByDefault
-    withNativeCodeGen <- expr $ getBooleanSetting TestGhcWithNativeCodeGen
-    withInterpreter   <- expr $ getBooleanSetting TestGhcWithInterpreter
-    unregisterised    <- expr $ getBooleanSetting TestGhcUnregisterised
-    withSMP           <- expr $ getBooleanSetting TestGhcWithSMP
+    flav    <- expr flavour
+    rtsWays <- expr testRTSSettings
+    libWays <- libraryWays flav
+    let hasRtsWay w = elem w rtsWays
+        hasLibWay w = elem w libWays
+        debugged    = ghcDebugged flav
+    hasDynamic          <- getBooleanSetting TestGhcDynamic
+    hasDynamicByDefault <- getBooleanSetting TestGhcDynamicByDefault
+    withNativeCodeGen   <- getBooleanSetting TestGhcWithNativeCodeGen
+    withInterpreter     <- getBooleanSetting TestGhcWithInterpreter
+    unregisterised      <- getBooleanSetting TestGhcUnregisterised
+    withSMP             <- getBooleanSetting TestGhcWithSMP
 
-    windows  <- expr windowsHost
-    darwin   <- expr osxHost
-    threads  <- shakeThreads <$> expr getShakeOptions
-    os       <- expr $ testSetting TestHostOS
-    arch     <- expr $ testSetting TestTargetARCH_CPP
-    platform <- expr $ testSetting TestTARGETPLATFORM
-    wordsize <- expr $ testSetting TestWORDSIZE
-    top      <- expr topDirectory
+    windows     <- expr windowsHost
+    darwin      <- expr osxHost
+    threads     <- shakeThreads <$> expr getShakeOptions
+    os          <- getTestSetting TestHostOS
+    arch        <- getTestSetting TestTargetARCH_CPP
+    platform    <- getTestSetting TestTARGETPLATFORM
+    wordsize    <- getTestSetting TestWORDSIZE
+    top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     timeoutProg <- expr buildRoot <&> (-/- timeoutProgPath)
 
-    -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
+    let asZeroOne s b = s ++ zeroOne b
 
+    -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
             , arg $ "--rootdir=" ++ ("testsuite" -/- "tests")
             , pure ["--rootdir=" ++ test | test <- libTests]
             , arg "-e", arg $ "windows=" ++ show windows
             , arg "-e", arg $ "darwin=" ++ show darwin
             , arg "-e", arg $ "config.local=True"
-            , arg "-e", arg $ "config.cleanup=False"                  -- Don't clean up.
+            , arg "-e", arg $ "config.cleanup=False" -- Don't clean up.
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)
-            , arg "-e", arg $ oneZero "ghc_with_native_codegen" withNativeCodeGen
+            , arg "-e", arg $ asZeroOne "ghc_with_native_codegen" withNativeCodeGen
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ oneZero "ghc_with_dynamic_rts" (hasRtsWay "dyn")
-            , arg "-e", arg $ oneZero "ghc_with_threaded_rts" (hasRtsWay "thr")
-            , arg "-e", arg $ oneZero "config.have_vanilla" (hasLibWay vanilla)
-            , arg "-e", arg $ oneZero "config.have_dynamic" (hasLibWay dynamic)
-            , arg "-e", arg $ oneZero "config.have_profiling" (hasLibWay profiling)
-            , arg "-e", arg $ oneZero "ghc_with_smp" withSMP
-            , arg "-e", arg $ "ghc_with_llvm=0"                       -- TODO: support LLVM
+            , arg "-e", arg $ asZeroOne "ghc_with_dynamic_rts"  (hasRtsWay "dyn")
+            , arg "-e", arg $ asZeroOne "ghc_with_threaded_rts" (hasRtsWay "thr")
+            , arg "-e", arg $ asZeroOne "config.have_vanilla"   (hasLibWay vanilla)
+            , arg "-e", arg $ asZeroOne "config.have_dynamic"   (hasLibWay dynamic)
+            , arg "-e", arg $ asZeroOne "config.have_profiling" (hasLibWay profiling)
+            , arg "-e", arg $ asZeroOne "ghc_with_smp" withSMP
+            , arg "-e", arg $ "ghc_with_llvm=0" -- TODO: support LLVM
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
 
-            , arg "-e", arg $ "config.in_tree_compiler=True"          -- Use default value, see https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
+            -- Use default value, see:
+            -- https://github.com/ghc/ghc/blob/master/testsuite/mk/boilerplate.mk
+            , arg "-e", arg $ "config.in_tree_compiler=True"
             , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
@@ -97,7 +95,7 @@ runTestBuilderArgs = builder RunTest ? do
             , getTestArgs -- User-provided arguments from command line.
             ]
 
--- | Prepare the command-line arguments to run GHC's test script.
+-- | Command line arguments for running GHC's test script.
 getTestArgs :: Args
 getTestArgs = do
     args            <- expr $ userSetting defaultTestArgs
@@ -137,6 +135,7 @@ getTestArgs = do
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg
 
+-- TODO: Switch to 'Stage' as the first argument instead of 'String'.
 -- | Directory to look for Binaries
 -- | We assume that required programs are present in the same binary directory
 -- | in which ghc is stored and that they have their conventional name.
@@ -151,25 +150,25 @@ setBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
 setBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
 setBinaryDirectory compiler = pure $ parentPath compiler
 
--- | Set Test Compiler
+-- TODO: Switch to 'Stage' as the first argument instead of 'String'.
+-- | Set Test Compiler.
 setCompiler :: String -> Action FilePath
 setCompiler "stage0" = setting SystemGhc
-setCompiler "stage1" = liftM2 (-/-) topDirectory (fullpath Stage0 ghc)
-setCompiler "stage2" = liftM2 (-/-) topDirectory (fullpath Stage1 ghc)
+setCompiler "stage1" = liftM2 (-/-) topDirectory (fullPath Stage0 ghc)
+setCompiler "stage2" = liftM2 (-/-) topDirectory (fullPath Stage1 ghc)
 setCompiler compiler = pure compiler
 
 -- | Set speed for test
 setTestSpeed :: TestSpeed -> String
-setTestSpeed Fast    = "2"
-setTestSpeed Average = "1"
 setTestSpeed Slow    = "0"
+setTestSpeed Average = "1"
+setTestSpeed Fast    = "2"
 
 -- | Returns parent path of test compiler
--- | TODO : Is there a simpler way to find parent directory?
+-- | TODO: Is there a simpler way to find parent directory?
 parentPath :: String -> String
-parentPath path = let upPath = init $ splitOn "/" path
-                  in  intercalate "/" upPath
+parentPath path = intercalate "/" $ init $ splitOn "/" path
 
--- | TODO: move to hadrian utilities.
-fullpath :: Stage -> Package -> Action FilePath
-fullpath stage pkg = programPath =<< programContext stage pkg
+-- | TODO: Move to Hadrian utilities.
+fullPath :: Stage -> Package -> Action FilePath
+fullPath stage pkg = programPath =<< programContext stage pkg
