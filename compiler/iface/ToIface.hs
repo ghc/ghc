@@ -305,10 +305,19 @@ toIfaceAppArgsX fr kind ty_args
     go env (FunTy _ res) (t:ts) -- No type-class args in tycon apps
       = IA_Vis (toIfaceTypeX fr t) (go env res ts)
 
-    go env ty ts = ASSERT2( not (isEmptyTCvSubst env)
-                          , ppr kind $$ ppr ty_args )
-                   go (zapTCvSubst env) (substTy env ty) ts
+    go env ty ts@(t1:ts1)
+      | not (isEmptyTCvSubst env)
+      = go (zapTCvSubst env) (substTy env ty) ts
         -- See Note [Care with kind instantiation] in Type.hs
+
+      | otherwise
+      = -- There's a kind error in the type we are trying to print
+        -- e.g. kind = k, ty_args = [Int]
+        -- This is probably a compiler bug, so we print a trace and
+        -- carry on as if it were FunTy.  Without the test for
+        -- isEmptyTCvSubst we'd get an infinite loop (Trac #15473)
+        WARN( True, ppr kind $$ ppr ty_args )
+        IA_Vis (toIfaceTypeX fr t1) (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
