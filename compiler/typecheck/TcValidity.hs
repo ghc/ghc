@@ -60,7 +60,7 @@ import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List        ( (\\) )
+import Data.List        ( (\\), nub )
 import qualified Data.List.NonEmpty as NE
 
 {-
@@ -1441,13 +1441,14 @@ smallerMsg what inst_head
 
 noMoreMsg :: [TcTyVar] -> SDoc -> SDoc -> SDoc
 noMoreMsg tvs what inst_head
-  = vcat [ hang (text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
+  = vcat [ hang (text "Variable" <> plural tvs1 <+> quotes (pprWithCommas ppr tvs1)
                 <+> occurs <+> text "more often")
               2 (sep [ text "in the" <+> what
                      , text "than in the instance head" <+> quotes inst_head ])
          , parens undecidableMsg ]
   where
-   occurs = if isSingleton tvs then text "occurs"
+   tvs1   = nub tvs
+   occurs = if isSingleton tvs1 then text "occurs"
                                else text "occur"
 
 undecidableMsg, constraintKindsMsg :: SDoc
@@ -1799,22 +1800,25 @@ checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
 checkFamInstRhs :: TyCon -> [Type]         -- LHS
                 -> [(TyCon, [Type])]       -- type family calls in RHS
                 -> [MsgDoc]
-checkFamInstRhs tc lhsTys famInsts
+checkFamInstRhs lhs_tc lhs_tys famInsts
   = mapMaybe check famInsts
   where
-   lhs_size = sizeTyConAppArgs tc lhsTys
-   fvs      = fvTypes lhsTys
+   lhs_size  = sizeTyConAppArgs lhs_tc lhs_tys
+   inst_head = pprType (TyConApp lhs_tc lhs_tys)
+   lhs_fvs   = fvTypes lhs_tys
    check (tc, tys)
       | not (all isTyFamFree tys) = Just (nestedMsg what)
       | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what inst_head)
       | lhs_size <= fam_app_size  = Just (smallerMsg what inst_head)
       | otherwise                 = Nothing
       where
-        what         = text "type family application"
-                       <+> quotes (pprType (TyConApp tc tys))
-        inst_head    = pprType (TyConApp tc lhsTys)
-        bad_tvs      = fvTypes tys \\ fvs
+        what = text "type family application"
+               <+> quotes (pprType (TyConApp tc tys))
         fam_app_size = sizeTyConAppArgs tc tys
+        bad_tvs      = fvTypes tys \\ lhs_fvs
+                       -- The (\\) is list difference; e.g.
+                       --   [a,b,a,a] \\ [a,a] = [b,a]
+                       -- So we are counting repetitions
 
 checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
                   -> [Type]   -- ^ patterns the user wrote
