@@ -462,14 +462,14 @@ warnRedundantConstraints ctxt env info ev_vars
    redundant_evs =
        filterOut is_type_error $
        case info of -- See Note [Redundant constraints in instance decls]
-         InstSkol -> filterOut improving ev_vars
+         InstSkol -> filterOut (improving . idType) ev_vars
          _        -> ev_vars
 
    -- See #15232
    is_type_error = isJust . userTypeError_maybe . idType
 
-   improving ev_var = any isImprovementPred $
-                      transSuperClasses (idType ev_var)
+   improving pred -- (transSuperClasses p) does not include p
+     = any isImprovementPred (pred : transSuperClasses pred)
 
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> Maybe SDoc -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (Just telescope) skols
