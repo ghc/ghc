@@ -1558,9 +1558,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
     -- remaining commented out for now.
     {-
     check_tc_level = do { cur_lvl <- TcS.getTcLevel
-                        ; MASSERT2( tclvl == pushTcLevel cur_lvl
-                                  , text "Cur lvl =" <+> ppr cur_lvl $$
-                                    text "Imp lvl =" <+> ppr tclvl ) }
+                        ; MASSERT2( tclvl == pushTcLevel cur_lvl , text "Cur lvl =" <+> ppr cur_lvl $$ text "Imp lvl =" <+> ppr tclvl ) }
     -}
 
 ----------------------
