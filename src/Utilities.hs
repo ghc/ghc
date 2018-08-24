@@ -46,14 +46,13 @@ contextDependencies ctx@Context {..} = do
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
     step pkg = pkgDependencies (ctx { Context.package = pkg }) >>= \case
-      Nothing -> return [] -- Non-Cabal packages have no dependencies.
-      Just deps -> do
-        active <- sort <$> stagePackages depStage
-        return $ intersectOrd (compare . pkgName) active deps
+        Nothing -> return [] -- Non-Cabal packages have no dependencies.
+        Just deps -> do
+            active <- sort <$> stagePackages depStage
+            return $ intersectOrd (compare . pkgName) active deps
 
 cabalDependencies :: Context -> Action [String]
-cabalDependencies ctx = interpretInContext ctx $
-  getPackageData PD.depIpIds
+cabalDependencies ctx = interpretInContext ctx $ getPackageData PD.depIpIds
 
 -- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
 stage1Dependencies :: Package -> Action [Package]

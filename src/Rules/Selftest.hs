@@ -4,11 +4,14 @@ module Rules.Selftest (selftestRules) where
 import Test.QuickCheck
 
 import Base
+import Context
 import GHC
+import Hadrian.Haskell.Cabal
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Settings
 import Target
+import Utilities
 
 instance Arbitrary Way where
     arbitrary = wayFromUnits <$> arbitrary
@@ -24,6 +27,7 @@ selftestRules =
     "selftest" ~> do
         testBuilder
         testChunksOfSize
+        testDependencies
         testLookupAll
         testModuleName
         testPackages
@@ -46,6 +50,24 @@ testChunksOfSize = do
     test $ \n xs ->
         let res = chunksOfSize n xs
         in concat res == xs && all (\r -> length r == 1 || length (concat r) <= n) res
+
+testDependencies :: Action ()
+testDependencies = do
+    putBuild "==== pkgDependencies"
+    depLists <- mapM (pkgDependencies . vanillaContext Stage1) ghcPackages
+    test $ and [ deps == sort deps | Just deps <- depLists ]
+    putBuild "==== Dependencies of the 'ghc-bin' binary"
+    ghcDeps <- pkgDependencies (vanillaContext Stage1 ghc)
+    test $ isJust ghcDeps
+    test $ pkgName compiler `elem` fromJust ghcDeps
+    stage0Deps <- contextDependencies (vanillaContext Stage0 ghc)
+    stage1Deps <- contextDependencies (vanillaContext Stage1 ghc)
+    stage2Deps <- contextDependencies (vanillaContext Stage2 ghc)
+    test $ vanillaContext Stage0 compiler `notElem` stage1Deps
+    test $ vanillaContext Stage1 compiler `elem`    stage1Deps
+    test $ vanillaContext Stage2 compiler `notElem` stage1Deps
+    test $ stage1Deps /= stage0Deps
+    test $ stage1Deps == stage2Deps
 
 testLookupAll :: Action ()
 testLookupAll = do
@@ -89,4 +111,3 @@ testWay :: Action ()
 testWay = do
     putBuild "==== Read Way, Show Way"
     test $ \(x :: Way) -> read (show x) == x
-
