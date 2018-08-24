@@ -32,7 +32,7 @@ module TcHsSyn (
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs, zonkTyBndrsX,
         zonkTyVarBindersX, zonkTyVarBinderX,
-        emptyZonkEnv, mkEmptyZonkEnv,
+        ZonkEnv, ZonkFlexi(..), emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo,
         zonkEvBinds, zonkTcEvBinds,
@@ -189,59 +189,101 @@ the environment manipulation is tiresome.
 -}
 
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
-type UnboundTyVarZonker = TcTyVar -> TcM Type
-        -- How to zonk an unbound type variable
-        -- The TcTyVar is
-        --     (a) a MetaTv
-        --     (b) Flexi and
-        --     (c) its kind is already zonked
-        -- Note [Zonking the LHS of a RULE]
 
--- | A ZonkEnv carries around several bits.
--- The UnboundTyVarZonker just zaps unbouned meta-tyvars to Any (as
--- defined in zonkTypeZapping), except on the LHS of rules. See
--- Note [Zonking the LHS of a RULE].
---
--- The (TyCoVarEnv TyVar) and is just an optimisation: when binding a
--- tyvar or covar, we zonk the kind right away and add a mapping to
--- the env. This prevents re-zonking the kind at every occurrence. But
--- this is *just* an optimisation.
---
--- The final (IdEnv Var) optimises zonking for Ids. It is
--- knot-tied. We must be careful never to put coercion variables
--- (which are Ids, after all) in the knot-tied env, because coercions
--- can appear in types, and we sometimes inspect a zonked type in this
--- module.
---
+-- | See Note [The ZonkEnv]
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
-data ZonkEnv
-  = ZonkEnv
-      UnboundTyVarZonker
-      (TyCoVarEnv TyVar)
-      (IdEnv      Var)         -- What variables are in scope
-        -- Maps an Id or EvVar to its zonked version; both have the same Name
-        -- Note that all evidence (coercion variables as well as dictionaries)
-        --      are kept in the ZonkEnv
-        -- Only *type* abstraction is done by side effect
-        -- Is only consulted lazily; hence knot-tying
+data ZonkEnv  -- See Note [The ZonkEnv]
+  = ZonkEnv { ze_flexi  :: ZonkFlexi
+            , ze_tv_env :: TyCoVarEnv TyCoVar
+            , ze_id_env :: IdEnv      Id }
+
+{- Note [The ZonkEnv]
+~~~~~~~~~~~~~~~~~~~~~
+* ze_flexi :: ZonkFlexi says what to do with a
+  unification variable that is still un-unified.
+  See Note [Un-unified unification variables]
+
+* ze_tv_env :: TyCoVarEnv TyCoVar promotes sharing. At a binding site
+  of a tyvar or covar, we zonk the kind right away and add a mapping
+  to the env. This prevents re-zonking the kind at every
+  occurrence. But this is *just* an optimisation.
+
+* ze_id_env : IdEnv Id promotes sharing among Ids, by making all
+  occurrences of the Id point to a single zonked copy, built at the
+  binding site.
+
+  Unlike ze_tv_env, it is knot-tied: see extendIdZonkEnvRec.
+  In a mutually recusive group
+     rec { f = ...g...; g = ...f... }
+  we want the occurrence of g to point to the one zonked Id for g,
+  and the same for f.
+
+  Because it is knot-tied, we must be careful to consult it lazily.
+  Specifically, zonkIdOcc is not monadic.
+
+Notes:
+  * We must be careful never to put coercion variables (which are Ids,
+    after all) in the knot-tied ze_id_env, because coercions can
+    appear in types, and we sometimes inspect a zonked type in this
+    module.  [Question: where, precisely?]
+
+  * In zonkTyVarOcc we consult ze_tv_env in a monadic context,
+    a second reason that ze_tv_env can't be monadic.
+
+  * An obvious suggestion would be to have one VarEnv Var to
+    replace both ze_id_env and ze_tv_env, but that doesn't work
+    because of the knot-tying stuff mentioned above.
+
+Note [Un-unified unification variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What should we do if we find a Flexi unification variable?
+There are three possibilities:
+
+* DefaultFlexi: this is the common case, in situations like
+     length @alpha ([] @alpha)
+  It really doesn't matter what type we choose for alpha.  But
+  we must choose a type!  We can't leae mutable unification
+  variables floating around: after typecheck is complete, every
+  type variable occurrence must have a bindign site.
+
+  So we default it to 'Any' of the right kind.
+
+  All this works for both type and kind variables (indeed
+  the two are the same thign).
+
+* SkolemiseFlexi: is a special case for the LHS of RULES.
+  See Note [Zonking the LHS of a RULE]
+
+* RuntimeUnkFlexi: is a special case for the GHCi debugger.
+  It's a way to have a variable that is not a mutuable
+  unification variable, but doesn't have a binding site
+  either.
+-}
+
+data ZonkFlexi   -- See Note [Un-unified unification variables]
+  = DefaultFlexi    -- Default unbound unificaiton variables to Any
+  | SkolemiseFlexi  -- Skolemise unbound unification variables
+                    -- See Note [Zonking the LHS of a RULE]
+  | RuntimeUnkFlexi -- Used in the GHCi debugger
 
 instance Outputable ZonkEnv where
-  ppr (ZonkEnv _ _ty_env var_env) = pprUFM var_env (vcat . map ppr)
-
+  ppr (ZonkEnv { ze_id_env =  var_env}) = pprUFM var_env (vcat . map ppr)
 
 -- The EvBinds have to already be zonked, but that's usually the case.
 emptyZonkEnv :: ZonkEnv
-emptyZonkEnv = mkEmptyZonkEnv zonkTypeZapping
+emptyZonkEnv = mkEmptyZonkEnv DefaultFlexi
 
-mkEmptyZonkEnv :: UnboundTyVarZonker -> ZonkEnv
-mkEmptyZonkEnv zonker = ZonkEnv zonker emptyVarEnv emptyVarEnv
+mkEmptyZonkEnv :: ZonkFlexi -> ZonkEnv
+mkEmptyZonkEnv flexi = ZonkEnv { ze_flexi = flexi
+                               , ze_tv_env = emptyVarEnv
+                               , ze_id_env = emptyVarEnv }
 
 -- | Extend the knot-tied environment.
 extendIdZonkEnvRec :: ZonkEnv -> [Var] -> ZonkEnv
-extendIdZonkEnvRec (ZonkEnv zonk_ty ty_env id_env) ids
+extendIdZonkEnvRec ze@(ZonkEnv { ze_id_env = id_env }) ids
     -- NB: Don't look at the var to decide which env't to put it in. That
     -- would end up knot-tying all the env'ts.
-  = ZonkEnv zonk_ty ty_env (extendVarEnvList id_env [(id,id) | id <- ids])
+  = ze { ze_id_env = extendVarEnvList id_env [(id,id) | id <- ids] }
   -- Given coercion variables will actually end up here. That's OK though:
   -- coercion variables are never looked up in the knot-tied env't, so zonking
   -- them simply doesn't get optimised. No one gets hurt. An improvement (?)
@@ -250,26 +292,26 @@ extendIdZonkEnvRec (ZonkEnv zonk_ty ty_env id_env) ids
   -- more than the savings.
 
 extendZonkEnv :: ZonkEnv -> [Var] -> ZonkEnv
-extendZonkEnv (ZonkEnv zonk_ty tyco_env id_env) vars
-  = ZonkEnv zonk_ty (extendVarEnvList tyco_env [(tv,tv) | tv <- tycovars])
-                    (extendVarEnvList id_env   [(id,id) | id <- ids])
-  where (tycovars, ids) = partition isTyCoVar vars
+extendZonkEnv ze@(ZonkEnv { ze_tv_env = tyco_env, ze_id_env = id_env }) vars
+  = ze { ze_tv_env = extendVarEnvList tyco_env [(tv,tv) | tv <- tycovars]
+       , ze_id_env = extendVarEnvList id_env   [(id,id) | id <- ids] }
+  where
+    (tycovars, ids) = partition isTyCoVar vars
 
 extendIdZonkEnv1 :: ZonkEnv -> Var -> ZonkEnv
-extendIdZonkEnv1 (ZonkEnv zonk_ty ty_env id_env) id
-  = ZonkEnv zonk_ty ty_env (extendVarEnv id_env id id)
+extendIdZonkEnv1 ze@(ZonkEnv { ze_id_env = id_env }) id
+  = ze { ze_id_env = extendVarEnv id_env id id }
 
 extendTyZonkEnv1 :: ZonkEnv -> TyVar -> ZonkEnv
-extendTyZonkEnv1 (ZonkEnv zonk_ty ty_env id_env) tv
-  = ZonkEnv zonk_ty (extendVarEnv ty_env tv tv) id_env
+extendTyZonkEnv1 ze@(ZonkEnv { ze_tv_env = ty_env }) tv
+  = ze { ze_tv_env = extendVarEnv ty_env tv tv }
 
-setZonkType :: ZonkEnv -> UnboundTyVarZonker -> ZonkEnv
-setZonkType (ZonkEnv _ ty_env id_env) zonk_ty
-  = ZonkEnv zonk_ty ty_env id_env
+setZonkType :: ZonkEnv -> ZonkFlexi -> ZonkEnv
+setZonkType ze flexi = ze { ze_flexi = flexi }
 
 zonkEnvIds :: ZonkEnv -> TypeEnv
-zonkEnvIds (ZonkEnv _ _ id_env) =
-  mkNameEnv [(getName id, AnId id) | id <- nonDetEltsUFM id_env]
+zonkEnvIds (ZonkEnv { ze_id_env = id_env})
+  = mkNameEnv [(getName id, AnId id) | id <- nonDetEltsUFM id_env]
   -- It's OK to use nonDetEltsUFM here because we forget the ordering
   -- immediately by creating a TypeEnv
 
@@ -292,7 +334,7 @@ zonkIdOcc :: ZonkEnv -> TcId -> Id
 --
 -- Even without template splices, in module Main, the checking of
 -- 'main' is done as a separate chunk.
-zonkIdOcc (ZonkEnv _zonk_ty _ty_env id_env) id
+zonkIdOcc (ZonkEnv { ze_id_env = id_env}) id
   | isLocalVar id = lookupVarEnv id_env id `orElse`
                     id
   | otherwise     = id
@@ -1416,7 +1458,7 @@ zonkRule :: ZonkEnv -> RuleDecl GhcTcId -> TcM (RuleDecl GhcTc)
 zonkRule env (HsRule fvs name act (vars{-::[RuleBndr TcId]-}) lhs rhs)
   = do { (env_inside, new_bndrs) <- mapAccumLM zonk_bndr env vars
 
-       ; let env_lhs = setZonkType env_inside zonkTvSkolemising
+       ; let env_lhs = setZonkType env_inside SkolemiseFlexi
               -- See Note [Zonking the LHS of a RULE]
 
        ; new_lhs <- zonkLExpr env_lhs    lhs
@@ -1581,34 +1623,8 @@ zonkEvBind env bind@(EvBind { eb_lhs = var, eb_rhs = term })
 
        ; return (bind { eb_lhs = var', eb_rhs = term' }) }
 
-{-
-************************************************************************
-*                                                                      *
-                         Zonking types
-*                                                                      *
-************************************************************************
-
-Note [Zonking mutable unbound type or kind variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In zonkTypeZapping, we zonk mutable but unbound type or kind variables to an
-arbitrary type. We know if they are unbound even though we don't carry an
-environment, because at the binding site for a variable we bind the mutable
-var to a fresh immutable one.  So the mutable store plays the role of an
-environment.  If we come across a mutable variable that isn't so bound, it
-must be completely free. We zonk the expected kind to make sure we don't get
-some unbound meta variable as the kind.
-
-Note that since we have kind polymorphism, zonk_unbound_tyvar will handle both
-type and kind variables. Consider the following datatype:
-
-  data Phantom a = Phantom Int
-
-The type of Phantom is (forall (k : *). forall (a : k). Int). Both `a` and
-`k` are unbound variables. We want to zonk this to
-(forall (k : Any *). forall (a : Any (Any *)). Int).
-
-Note [Optimise coercion zonking]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Optimise coercion zonking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When optimising evidence binds we may come across situations where
 a coercion looks like
       cv = ReflCo ty
@@ -1622,10 +1638,16 @@ use Refl on the right, ignoring the actual coercion on the RHS.
 This can have a very big effect, because the constraint solver sometimes does go
 to a lot of effort to prove Refl!  (Eg when solving  10+3 = 10+3; cf Trac #5030)
 
+
+************************************************************************
+*                                                                      *
+                         Zonking types
+*                                                                      *
+************************************************************************
 -}
 
 zonkTyVarOcc :: ZonkEnv -> TyVar -> TcM TcType
-zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
+zonkTyVarOcc env@(ZonkEnv { ze_flexi = flexi, ze_tv_env = tv_env }) tv
   | isTcTyVar tv
   = case tcTyVarDetails tv of
          SkolemTv {}    -> lookup_in_env
@@ -1633,13 +1655,17 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
          MetaTv { mtv_ref = ref }
            -> do { cts <- readMutVar ref
                  ; case cts of
-                      Flexi -> do { kind <- {-# SCC "zonkKind1" #-}
-                                            zonkTcTypeToType env (tyVarKind tv)
-                                  ; zonk_unbound_tyvar (setTyVarKind tv kind) }
+                      Flexi -> do { kind <- zonkTcTypeToType env (tyVarKind tv)
+                                  ; let ty = commitFlexi flexi tv kind
+                                  ; writeMetaTyVarRef tv ref ty
+                                  ; return ty }
                       Indirect ty -> do { zty <- zonkTcTypeToType env ty
                                         -- Small optimisation: shortern-out indirect steps
                                         -- so that the old type may be more easily collected.
-                                        ; writeMutVar ref (Indirect zty)
+                                        -- Use writeTcRef because we are /over-writing/ an
+                                        -- existing Indirect, which is usually wrong, and
+                                        -- checked for by writeMetaVarRef
+                                        ; writeTcRef ref (Indirect zty)
                                         ; return zty } }
   | otherwise
   = lookup_in_env
@@ -1648,6 +1674,24 @@ zonkTyVarOcc env@(ZonkEnv zonk_unbound_tyvar tv_env _) tv
       = case lookupVarEnv tv_env tv of
           Nothing  -> mkTyVarTy <$> updateTyVarKindM (zonkTcTypeToType env) tv
           Just tv' -> return (mkTyVarTy tv')
+
+commitFlexi :: ZonkFlexi -> TcTyVar -> Kind -> Type
+commitFlexi flexi tv zonked_kind
+  = case flexi of
+      SkolemiseFlexi  -> mkTyVarTy (mkTyVar name zonked_kind)
+
+      DefaultFlexi    | isRuntimeRepTy zonked_kind
+                      -> liftedRepTy
+                      | otherwise
+                      -> anyTypeOfKind zonked_kind
+
+      RuntimeUnkFlexi -> mkTyVarTy (mkTcTyVar name zonked_kind RuntimeUnk)
+                        -- This is where RuntimeUnks are born:
+                        -- otherwise-unconstrained unification variables are
+                        -- turned into RuntimeUnks as they leave the
+                        -- typechecker's monad
+  where
+     name = tyVarName tv
 
 zonkCoVarOcc :: ZonkEnv -> CoVar -> TcM Coercion
 zonkCoVarOcc (ZonkEnv _ tyco_env _) cv
@@ -1716,29 +1760,6 @@ zonkTcMethInfoToMethInfo (name, ty, gdm_spec)
     zonk_gdm (Just (GenericDM (loc, ty)))
       = do { ty' <- zonkTcTypeToType emptyZonkEnv ty
            ; return (Just (GenericDM (loc, ty'))) }
-
-zonkTvSkolemising :: UnboundTyVarZonker
--- This variant is used for the LHS of rules
--- See Note [Zonking the LHS of a RULE].
-zonkTvSkolemising tv
-  = do { let tv' = mkTyVar (tyVarName tv) (tyVarKind tv)
-                  -- NB: the kind of tv is already zonked
-             ty = mkTyVarTy tv'
-                  -- Make a proper TyVar (remember we
-                  -- are now done with type checking)
-       ; writeMetaTyVar tv ty
-       ; return ty }
-
-zonkTypeZapping :: UnboundTyVarZonker
--- This variant is used for everything except the LHS of rules
--- It zaps unbound type variables to Any, except for RuntimeRep
--- vars which it zonks to LiftedRep
--- Works on both types and kinds
-zonkTypeZapping tv
-  = do { let ty | isRuntimeRepVar tv = liftedRepTy
-                | otherwise          = anyTypeOfKind (tyVarKind tv)
-       ; writeMetaTyVar tv ty
-       ; return ty }
 
 ---------------------------------------
 {- Note [Zonking the LHS of a RULE]

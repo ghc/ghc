@@ -39,7 +39,7 @@ import Var
 import TcRnMonad
 import TcType
 import TcMType
-import TcHsSyn ( zonkTcTypeToType, mkEmptyZonkEnv )
+import TcHsSyn ( zonkTcTypeToType, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi ) )
 import TcUnify
 import TcEnv
 
@@ -1257,17 +1257,8 @@ zonkTerm = foldTermM (TermFoldM
 
 zonkRttiType :: TcType -> TcM Type
 -- Zonk the type, replacing any unbound Meta tyvars
--- by skolems, safely out of Meta-tyvar-land
-zonkRttiType = zonkTcTypeToType (mkEmptyZonkEnv zonk_unbound_meta)
-  where
-    zonk_unbound_meta tv
-      = ASSERT( isTcTyVar tv )
-        do { tv' <- skolemiseRuntimeUnk tv
-             -- This is where RuntimeUnks are born:
-             -- otherwise-unconstrained unification variables are
-             -- turned into RuntimeUnks as they leave the
-             -- typechecker's monad
-           ; return (mkTyVarTy tv') }
+-- by RuntimeUnk skolems, safely out of Meta-tyvar-land
+zonkRttiType = zonkTcTypeToType (mkEmptyZonkEnv RuntimeUnkFlexi)
 
 --------------------------------------------------------------------------------
 -- Restore Class predicates out of a representation type
