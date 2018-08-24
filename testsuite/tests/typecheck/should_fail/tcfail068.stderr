@@ -4,7 +4,7 @@ tcfail068.hs:14:9: error:
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:(13,9)-(14,31)
+        at tcfail068.hs:(13,15)-(14,31)
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itgen :: forall a s.
@@ -27,7 +27,7 @@ tcfail068.hs:19:9: error:
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:(18,9)-(21,19)
+        at tcfail068.hs:(18,15)-(21,19)
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itiap :: forall a s.
@@ -58,7 +58,7 @@ tcfail068.hs:24:36: error:
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:24:29-46
+        at tcfail068.hs:24:35-46
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itrap :: forall a s.
@@ -95,7 +95,7 @@ tcfail068.hs:36:46: error:
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (c, IndTree s b)
-        at tcfail068.hs:36:40-63
+        at tcfail068.hs:36:45-63
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itrapstate :: forall b a c s.

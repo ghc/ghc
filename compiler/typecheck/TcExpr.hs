@@ -110,12 +110,10 @@ tc_poly_expr expr res_ty
     do { traceTc "tcPolyExpr" (ppr res_ty); tc_poly_expr_nc expr res_ty }
 
 tc_poly_expr_nc (L loc expr) res_ty
-  = do { traceTc "tcPolyExprNC" (ppr res_ty)
+  = setSrcSpan loc $
+    do { traceTc "tcPolyExprNC" (ppr res_ty)
        ; (wrap, expr')
            <- tcSkolemiseET GenSigCtxt res_ty $ \ res_ty ->
-              setSrcSpan loc $
-                -- NB: setSrcSpan *after* skolemising, so we get better
-                -- skolem locations
               tcExpr expr res_ty
        ; return $ L loc (mkHsWrap wrap expr') }
 
