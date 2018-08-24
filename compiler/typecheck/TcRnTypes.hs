@@ -2943,7 +2943,9 @@ ctFlavourRole (CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
 ctFlavourRole (CFunEqCan { cc_ev = ev })
   = (ctEvFlavour ev, NomEq)
 ctFlavourRole (CHoleCan { cc_ev = ev })
-  = (ctEvFlavour ev, NomEq)
+  = (ctEvFlavour ev, NomEq)  -- NomEq: CHoleCans can be rewritten by
+                             -- by nominal equalities but empahatically
+                             -- not by representational equalities
 ctFlavourRole ct
   = ctEvFlavourRole (ctEvidence ct)
 
