@@ -2713,7 +2713,11 @@ to an @IfaceType@. See Note [IfaceType and pretty-printing] in IfaceType.
 See Note [Precedence in types] in BasicTypes.
 -}
 
-------------------
+--------------------------------------------------------
+-- When pretty-printing types, we convert to IfaceType,
+--   and pretty-print that.
+-- See Note [Pretty printing via IfaceSyn] in PprTyThing
+--------------------------------------------------------
 
 pprType, pprParendType :: Type -> SDoc
 pprType       = pprPrecType topPrec
