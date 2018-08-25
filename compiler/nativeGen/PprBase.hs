@@ -11,7 +11,8 @@ module PprBase (
         castDoubleToWord8Array,
         floatToBytes,
         doubleToBytes,
-        pprSectionHeader
+        pprSectionHeader,
+        pprSectionHeaderData
 )
 
 where
@@ -33,6 +34,10 @@ import Control.Monad.ST
 
 import Data.Word
 
+import Foreign (withArrayLen)
+import GHC.IO (unsafeDupablePerformIO)
+import GHC.Fingerprint (fingerprintData)
+import GHC.Fingerprint.Type ()
 
 
 -- -----------------------------------------------------------------------------
@@ -92,42 +97,53 @@ doubleToBytes d
 -- For string literals, additional flags are specified to enable merging of
 -- identical strings in the linker. With -split-sections each string also gets
 -- a unique section to allow strings from unused code to be GC'd.
-
 pprSectionHeader :: Platform -> Section -> SDoc
-pprSectionHeader platform (Section t suffix) =
+pprSectionHeader platform sec = pprSectionHeaderData platform sec []
+
+pprSectionHeaderData :: Platform -> Section -> [Word8] -> SDoc
+pprSectionHeaderData platform (Section t suffix) datas =
  case platformOS platform of
    OSAIX     -> pprXcoffSectionHeader t
    OSDarwin  -> pprDarwinSectionHeader t
-   OSMinGW32 -> pprGNUSectionHeader (char '$') t suffix
-   _         -> pprGNUSectionHeader (char '.') t suffix
+   OSMinGW32 -> pprGNUSectionHeader (char '$') t suffix datas
+   _         -> pprGNUSectionHeader (char '.') t suffix datas
 
-pprGNUSectionHeader :: SDoc -> SectionType -> CLabel -> SDoc
-pprGNUSectionHeader sep t suffix = sdocWithDynFlags $ \dflags ->
+pprGNUSectionHeader :: SDoc -> SectionType -> CLabel -> [Word8] -> SDoc
+pprGNUSectionHeader sep t suffix datas = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
       subsection | splitSections = sep <> ppr suffix
                  | otherwise     = empty
-  in  text ".section " <> ptext (header dflags) <> subsection <>
+  in  text ".section " <> header dflags <> subsection <>
       flags dflags
   where
+    fingerprintWord8 :: [Word8] -> String
+    fingerprintWord8 word8s = show $ unsafeDupablePerformIO $
+      withArrayLen word8s $ \len p ->
+         fingerprintData p len
+
     header dflags = case t of
-      Text -> sLit ".text"
-      Data -> sLit ".data"
+      Text -> text ".text"
+      Data -> text ".data"
       ReadOnlyData  | OSMinGW32 <- platformOS (targetPlatform dflags)
-                                -> sLit ".rdata"
-                    | otherwise -> sLit ".rodata"
+                                -> text ".rdata"
+                    | otherwise -> text ".rodata"
       RelocatableReadOnlyData | OSMinGW32 <- platformOS (targetPlatform dflags)
                                 -- Concept does not exist on Windows,
-                                -- So map these to R/O data.
-                                          -> sLit ".rdata$rel.ro"
-                              | otherwise -> sLit ".data.rel.ro"
-      UninitialisedData -> sLit ".bss"
+                                -- but MinGW-w64 implements something similar
+                                -- for .rdata_runtime_pseudo_reloc.
+                                -- but this has a nasty bug
+                                -- https://sourceforge.net/p/mingw-w64/bugs/537/
+                                          -> text ".rdata"
+                              | otherwise -> text ".data.rel.ro"
+      UninitialisedData -> text ".bss"
       ReadOnlyData16 | OSMinGW32 <- platformOS (targetPlatform dflags)
-                                 -> sLit ".rdata$cst16"
-                     | otherwise -> sLit ".rodata.cst16"
+                                 -> text ".rdata$cst16"
+                     | otherwise -> text ".rodata.cst16"
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
-                    -> sLit ".rdata"
-        | otherwise -> sLit ".rodata.str"
+                    ->    text ".rdata$str." <> text (fingerprintWord8 datas)
+                      $+$ text ".linkonce"
+        | otherwise -> text ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
     flags dflags = case t of

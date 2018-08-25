@@ -79,7 +79,7 @@ pprProcAlignment = sdocWithDynFlags $ \dflags ->
 
 pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
-  pprSectionAlign section $$ pprDatas dats
+  pprSectionAlign section (concat $ getDatas dats) $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   sdocWithDynFlags $ \dflags ->
@@ -90,7 +90,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
          []     -> -- special case for split markers:
            pprLabel lbl
          blocks -> -- special case for code without info table:
-           pprSectionAlign (Section Text lbl) $$
+           pprSectionAlign (Section Text lbl) [] $$
            pprProcAlignment $$
            pprLabel lbl $$ -- blocks guaranteed not null, so label needed
            vcat (map (pprBasicBlock top_info) blocks) $$
@@ -100,7 +100,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->
-      pprSectionAlign (Section Text info_lbl) $$
+      pprSectionAlign (Section Text info_lbl) [] $$
       pprProcAlignment $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
@@ -149,6 +149,10 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     infoTableLoc = case instrs of
       (l@LOCATION{} : _) -> pprInstr l
       _other             -> empty
+
+getDatas :: (Alignment, CmmStatics) -> [[Word8]]
+getDatas (_, (Statics _ dats))
+ = map (\(CmmString str) -> str) dats
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 pprDatas (align, (Statics lbl dats))
@@ -443,12 +447,12 @@ pprAddr (AddrBaseIndex base index displacement)
     ppr_disp imm        = pprImm imm
 
 -- | Print section header and appropriate alignment for that section.
-pprSectionAlign :: Section -> SDoc
-pprSectionAlign (Section (OtherSection _) _) =
+pprSectionAlign :: Section -> [Word8] -> SDoc
+pprSectionAlign (Section (OtherSection _) _) _ =
      panic "X86.Ppr.pprSectionAlign: unknown section"
-pprSectionAlign sec@(Section seg _) =
+pprSectionAlign sec@(Section seg _) datas =
   sdocWithPlatform $ \platform ->
-    pprSectionHeader platform sec $$
+    pprSectionHeaderData platform sec datas $$
     pprAlignForSection seg
 
 -- | Print appropriate alignment for the given section type.
@@ -475,12 +479,14 @@ pprAlignForSection seg =
           case seg of
            Text              -> text "4,0x90"
            ReadOnlyData16    -> int 16
-           CString           -> int 1
+           ReadOnlyData      -> int 16
+           CString           -> int 16
            _                 -> int 4
        | otherwise ->
           case seg of
            ReadOnlyData16    -> int 16
-           CString           -> int 1
+           ReadOnlyData      -> int 16
+           CString           -> int 16
            _                 -> int 8
 
 pprDataItem :: CmmLit -> SDoc
