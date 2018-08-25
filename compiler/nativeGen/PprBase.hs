@@ -118,6 +118,12 @@ pprGNUSectionHeader sep t suffix datas = sdocWithDynFlags $ \dflags ->
   in  text ".section " <> header dflags <> subsection <>
       flags dflags
   where
+    -- I'm not sure which optimization does this, but this optimization relies
+    -- on constants being pooled.  This seems to be done at -O1 and higher
+    -- but otherwise it is very unsafe to carry out.
+    -- TODO: Check if the constant pooling is accidental or intended.
+    use_pool dflags = optLevel dflags > 0
+
     fingerprintWord8 :: [Word8] -> String
     fingerprintWord8 word8s = show $ unsafeDupablePerformIO $
       withArrayLen word8s $ \len p ->
@@ -143,8 +149,10 @@ pprGNUSectionHeader sep t suffix datas = sdocWithDynFlags $ \dflags ->
                      | otherwise -> text ".rodata.cst16"
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
-                    ->    text ".rdata$str." <> text (fingerprintWord8 datas)
+            -> if use_pool dflags
+                  then    text ".rdata$str." <> text (fingerprintWord8 datas)
                       $+$ text ".linkonce discard"
+                  else text ".rdata$str"
         | otherwise -> text ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
