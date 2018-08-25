@@ -111,8 +111,10 @@ pprSectionHeaderData platform (Section t suffix) datas =
 pprGNUSectionHeader :: SDoc -> SectionType -> CLabel -> [Word8] -> SDoc
 pprGNUSectionHeader sep t suffix datas = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
-      subsection | splitSections = sep <> ppr suffix
-                 | otherwise     = empty
+      subsection = case (t, platformOS (targetPlatform dflags)) of
+                     (CString, OSMinGW32) -> empty
+                     _ | splitSections    -> sep <> ppr suffix
+                       | otherwise        -> empty
   in  text ".section " <> header dflags <> subsection <>
       flags dflags
   where
@@ -142,7 +144,7 @@ pprGNUSectionHeader sep t suffix datas = sdocWithDynFlags $ \dflags ->
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
                     ->    text ".rdata$str." <> text (fingerprintWord8 datas)
-                      $+$ text ".linkonce"
+                      $+$ text ".linkonce discard"
         | otherwise -> text ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
