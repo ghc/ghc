@@ -307,7 +307,7 @@ synifyDataCon use_gadt_syntax dc =
   use_named_field_syntax = not (null field_tys)
   name = synifyName dc
   -- con_qvars means a different thing depending on gadt-syntax
-  (univ_tvs, ex_tvs, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
+  (univ_tvs, ex_tvs, _dep_spec, _eq_spec, theta, arg_tys, res_ty) = dataConFullSig dc
 
   -- skip any EqTheta, use 'orig'inal syntax
   ctx = synifyCtx theta
@@ -671,8 +671,8 @@ tcSplitSigmaTyPreserveSynonyms ty =
 tcSplitForAllTysPreserveSynonyms :: Type -> ([TyVar], Type)
 tcSplitForAllTysPreserveSynonyms ty = split ty ty []
   where
-    split _       (ForAllTy (TvBndr tv _) ty') tvs = split ty' ty' (tv:tvs)
-    split orig_ty _                            tvs = (reverse tvs, orig_ty)
+    split _       (ForAllTy (Bndr tv _) ty') tvs = split ty' ty' (tv:tvs)
+    split orig_ty _                          tvs = (reverse tvs, orig_ty)
 
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitPhiTyPreserveSynonyms :: Type -> (ThetaType, Type)
