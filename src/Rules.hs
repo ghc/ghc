@@ -72,11 +72,11 @@ packageTargets includeGhciLib stage pkg = do
     else if isLibrary pkg
         then do -- Collect all targets of a library package.
             let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
-            ways    <- interpretInContext context pkgWays
-            libs    <- mapM (pkgLibraryFile . Context stage pkg) ways
-            more    <- libraryTargets includeGhciLib context
-            setup   <- pkgSetupConfigFile context
-            return $ [ setup | not (nonCabalContext context) ] ++ libs ++ more
+            ways  <- interpretInContext context pkgWays
+            libs  <- mapM (pkgLibraryFile . Context stage pkg) ways
+            more  <- libraryTargets includeGhciLib context
+            setup <- pkgSetupConfigFile context
+            return $ [setup] ++ libs ++ more
         else do -- The only target of a program package is the executable.
             prgContext <- programContext stage pkg
             prgPath    <- programPath prgContext

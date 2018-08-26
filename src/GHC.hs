@@ -12,7 +12,7 @@ module GHC (
     testsuitePackages,
 
     -- * Package information
-    programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
+    programName, nonHsMainPackage, autogenPath, installStage,
 
     -- * Miscellaneous
     programPath, buildDll0, rtsContext, rtsBuildPath, libffiContext,
@@ -156,12 +156,6 @@ programPath context@Context {..} = do
       else stageBinPath stage
     pgm  <- programName context
     return $ path -/- pgm <.> exe
-
--- TODO: This is no longer true -- both @hp2ps@ and @touchy@ appear to have been
--- Cabal-ised, so we need to drop these special cases.
--- | Some contexts are special: their packages do not have @.cabal@ metadata.
-nonCabalContext :: Context -> Bool
-nonCabalContext Context {..} = (package `elem` [hp2ps, touchy])
 
 -- | Some program packages should not be linked with Haskell main function.
 nonHsMainPackage :: Package -> Bool
