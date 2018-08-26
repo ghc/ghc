@@ -479,14 +479,14 @@ pprAlignForSection seg =
           case seg of
            Text              -> text "4,0x90"
            ReadOnlyData16    -> int 16
-           ReadOnlyData      -> int 16
-           CString           -> int 16
+           ReadOnlyData      -> int 1
+           CString           -> int 1
            _                 -> int 4
        | otherwise ->
           case seg of
            ReadOnlyData16    -> int 16
-           ReadOnlyData      -> int 16
-           CString           -> int 16
+           ReadOnlyData      -> int 1
+           CString           -> int 1
            _                 -> int 8
 
 pprDataItem :: CmmLit -> SDoc
