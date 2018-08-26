@@ -33,6 +33,6 @@ ghc %ghcArgs%
 
 if %ERRORLEVEL% NEQ 0 EXIT /B %ERRORLEVEL%
 
-rem Unset GHC_PACKAGE_PATH variable, as otherwise ghc-cabal complains
+rem Unset GHC_PACKAGE_PATH variable, as otherwise Cabal complains
 set GHC_PACKAGE_PATH=
 bin\hadrian %hadrianArgs%

@@ -80,8 +80,8 @@ gmpRules = do
 
     -- This causes integerGmp package to be configured, hence creating the files
     root <//> "gmp/config.mk" %> \_ -> do
-        -- Calling 'need' on @setup-config@, triggers @ghc-cabal configure@
-        -- Building anything in a package transitively depends on its configuration.
+        -- Calling 'need' on @setup-config@ triggers 'configurePackage'.
+        -- TODO: Shall we run 'configurePackage' directly? Why this indirection?
         setupConfig <- pkgSetupConfigFile gmpContext
         need [setupConfig]
 

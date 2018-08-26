@@ -11,11 +11,11 @@ import Oracles.Flag
 import Settings
 import Settings.Builders.Alex
 import Settings.Builders.DeriveConstants
+import Settings.Builders.Cabal
 import Settings.Builders.Cc
 import Settings.Builders.Configure
 import Settings.Builders.GenPrimopCode
 import Settings.Builders.Ghc
-import Settings.Builders.GhcCabal
 import Settings.Builders.GhcPkg
 import Settings.Builders.Haddock
 import Settings.Builders.Happy
@@ -124,12 +124,12 @@ defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
     -- GHC-specific builders:
     [ alexBuilderArgs
+    , cabalBuilderArgs
     , ccBuilderArgs
     , configureBuilderArgs
     , deriveConstantsBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs
-    , ghcCabalBuilderArgs
     , ghcPkgBuilderArgs
     , haddockBuilderArgs
     , happyBuilderArgs

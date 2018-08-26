@@ -5,7 +5,7 @@ import Settings.Builders.Common
 ghcPkgBuilderArgs :: Args
 ghcPkgBuilderArgs = mconcat
     [ builder (GhcPkg Init) ? mconcat [ arg "init", arg =<< getOutput ]
-    , builder (GhcPkg Clone) ? do
+    , builder (GhcPkg Copy) ? do
         verbosity <- expr getVerbosity
         stage     <- getStage
         pkgDb     <- expr $ packageDbPath stage

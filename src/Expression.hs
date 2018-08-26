@@ -27,16 +27,16 @@ import {-# SOURCE #-} Builder
 import Context hiding (stage, package, way)
 import Expression.Type
 import Hadrian.Expression hiding (Expr, Predicate, Args)
-import Hadrian.Haskell.Cabal.PackageData (PackageData)
-import Hadrian.Oracles.TextFile (readPackageDataFile)
+import Hadrian.Haskell.Cabal.PackageData
+import Hadrian.Oracles.TextFile
 
 -- TODO: Get rid of partiality.
 -- | Get values from a configured cabal stage.
 getPackageData :: (PackageData -> a) -> Expr a
 getPackageData key = do
     ctx <- getContext
-    Just cabal <- expr (readPackageDataFile ctx)
-    return $ key cabal
+    Just packageData <- expr (readPackageData ctx)
+    return $ key packageData
 
 -- | Is the build currently in the provided stage?
 stage :: Stage -> Predicate

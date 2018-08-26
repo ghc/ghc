@@ -1,8 +1,8 @@
 module Hadrian.Haskell.Cabal.PackageData where
 
 import Development.Shake.Classes
-import Hadrian.Package.Type
 import GHC.Generics
+import Hadrian.Package.Type
 
 -- | Most of these fields used to be provided in @package-data.mk@ files.
 data PackageData = PackageData

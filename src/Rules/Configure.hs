@@ -34,6 +34,8 @@ configureRules = do
                 context = vanillaContext Stage0 compiler
             need srcs
             build $ target context (Configure ".") srcs outs
+            -- TODO: This is fragile: we should remove this from behind the
+            -- @--configure@ flag and add a proper dependency tracking.
             -- We need to copy the directory with unpacked Windows tarball to
             -- the build directory, so that the built GHC has access to it.
             -- See https://github.com/snowleopard/hadrian/issues/564.

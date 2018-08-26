@@ -7,7 +7,7 @@ import System.Environment
 -- for better robustness of the build system.
 setupEnvironment :: IO ()
 setupEnvironment = do
-    -- ghc-cabal refuses to work when GHC_PACKAGE_PATH is set (e.g. by Stack)
+    -- Cabal refuses to work when GHC_PACKAGE_PATH is set (e.g. by Stack)
     unsetEnv "GHC_PACKAGE_PATH"
 
     -- in MinGW if PWD is set to a Windows "C:\\" style path then configure

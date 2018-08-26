@@ -1,8 +1,9 @@
 {-# LANGUAGE InstanceSigs #-}
 module Builder (
     -- * Data types
-    ArMode (..), CcMode (..), GhcCabalMode (..), GhcMode (..), GhcPkgMode (..), HaddockMode (..),
-    SphinxMode (..), TarMode (..), Builder (..),
+    ArMode (..), CcMode (..), ConfigurationInfo (..), GhcMode (..),
+    GhcPkgMode (..), HaddockMode (..), SphinxMode (..), TarMode (..),
+    Builder (..),
 
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
@@ -53,20 +54,36 @@ instance Binary   GhcMode
 instance Hashable GhcMode
 instance NFData   GhcMode
 
--- | GHC cabal mode. Can configure, copy and register packages.
-data GhcCabalMode = Conf | HsColour | Check | Sdist
-    deriving (Eq, Generic, Show)
+-- | To configure a package we need two pieces of information, which we choose
+-- to record separately for convenience.
+--
+-- * Command line arguments to be passed to the setup script.
+--
+-- * Package configuration flags that enable/disable certain package features.
+--   Here is an example from "Settings.Packages":
+--
+--   > package rts
+--   >   ? builder (Cabal Flags)
+--   >   ? any (wayUnit Profiling) rtsWays
+--   >   ? arg "profiling"
+--
+--   This instructs package configuration functions (such as 'configurePackage')
+--   to enable the @profiling@ Cabal flag when processing @rts.cabal@ and
+--   building RTS with profiling information.
+data ConfigurationInfo = Setup | Flags deriving (Eq, Generic, Show)
 
-instance Binary   GhcCabalMode
-instance Hashable GhcCabalMode
-instance NFData   GhcCabalMode
+instance Binary   ConfigurationInfo
+instance Hashable ConfigurationInfo
+instance NFData   ConfigurationInfo
 
--- | GhcPkg can initialise a package database and register packages in it.
-data GhcPkgMode = Init         -- initialize a new database.
-                | Update       -- update a package.
-                | Clone        -- clone a package from one pkg database into another. @Copy@ is already taken by GhcCabalMode.
-                | Unregister   -- unregister a package
-                | Dependencies -- compute package dependencies.
+-- TODO: Do we really need all these modes? Why do we need 'Dependencies'? We
+-- can extract dependencies using the Cabal library.
+-- | 'GhcPkg' can initialise a package database and register packages in it.
+data GhcPkgMode = Init         -- ^ Initialize a new database.
+                | Update       -- ^ Update a package.
+                | Copy         -- ^ Copy a package from one database to another.
+                | Unregister   -- ^ Unregister a package.
+                | Dependencies -- ^ Compute package dependencies.
                 deriving (Eq, Generic, Show)
 
 instance Binary   GhcPkgMode
@@ -82,21 +99,24 @@ instance Binary   HaddockMode
 instance Hashable HaddockMode
 instance NFData   HaddockMode
 
--- | A 'Builder' is an external command invoked in a separate process via 'cmd'.
--- @Ghc Stage0@ is the bootstrapping compiler.
--- @Ghc StageN@, N > 0, is the one built in stage (N - 1).
--- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@.
--- @GhcPkg Stage1@ is the one built in Stage0.
+-- | A 'Builder' is a (usually external) command invoked in a separate process
+-- via 'cmd'. Here are some examples:
+-- * 'Alex' is a lexical analyser generator that builds @Lexer.hs@ from @Lexer.x@.
+-- * 'Ghc' 'Stage0' is the bootstrapping Haskell compiler used in 'Stage0'.
+-- * 'Ghc' @StageN@ (N > 0) is the GHC built in stage (N - 1) and used in @StageN@.
+--
+-- The 'Cabal' builder is unusual in that it does not correspond to an external
+-- program but instead relies on the Cabal library for package configuration.
 data Builder = Alex
              | Ar ArMode Stage
              | Autoreconf FilePath
              | DeriveConstants
+             | Cabal ConfigurationInfo Stage
              | Cc CcMode Stage
              | Configure FilePath
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
-             | GhcCabal GhcCabalMode Stage
              | GhcPkg GhcPkgMode Stage
              | Haddock HaddockMode
              | Happy
@@ -117,28 +137,6 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
-             | CabalFlags Stage
-               -- ^ A \"virtual\" builder (not backed by a program),
-               --   used a lot in Settings.Packages, that allows us to
-               --   toggle cabal flags of packages depending on some `Args`
-               --   predicates, and then collect all those when we are about to
-               --   configure the said packages, in Hadrian.Haskell.Cabal.Parse,
-               --   so that we end up passing the appropriate flags to the Cabal
-               --   library. For example:
-               --
-               --   > package rts
-               --   >   ? builder CabalFlags
-               --   >   ? any (wayUnit Profiling) rtsWays
-               --   >   ? arg "profiling"
-               --
-               --   (from Settings.Packages) specifies that if we're
-               --   processing the rts package with the `CabalFlag` builder,
-               --   and if we're building a profiling-enabled way of the rts,
-               --   then we pass the @profiling@ argument to the builder. This
-               --   argument is then collected by the code that performs the
-               --   package configuration, and @rts.cabal@ is processed as if
-               --   we were passing @-fprofiling@ to our build tool.
-
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -155,7 +153,6 @@ builderProvenance = \case
     GenPrimopCode    -> context Stage0 genprimopcode
     Ghc _ Stage0     -> Nothing
     Ghc _ stage      -> context (pred stage) ghc
-    GhcCabal _ _     -> context Stage1 ghcCabal
     GhcPkg _ Stage0  -> Nothing
     GhcPkg _ _       -> context Stage0 ghcPkg
     Haddock _        -> context Stage1 haddock
@@ -260,7 +257,7 @@ instance H.Builder Builder where
                     unit $ cmd [Cwd output] [path]        buildArgs
                     unit $ cmd [Cwd output] [path]        buildArgs
 
-                GhcPkg Clone _ -> do
+                GhcPkg Copy _ -> do
                     Stdout pkgDesc <- cmd [path]
                       [ "--expand-pkgroot"
                       , "--no-user-package-db"

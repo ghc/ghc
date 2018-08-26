@@ -99,7 +99,7 @@ copyConf rs context@Context {..} conf = do
         buildWithResources rs $
             target context (GhcPkg Unregister stage) [pkgName package] []
         buildWithResources rs $
-            target context (GhcPkg Clone stage) [pkgName package] [conf]
+            target context (GhcPkg Copy stage) [pkgName package] [conf]
   where
     stdOutToPkgIds :: String -> [String]
     stdOutToPkgIds = drop 1 . concatMap words . lines

@@ -23,7 +23,7 @@ packageArgs = do
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder CabalFlags ? arg ('+' : pkgName intLib)
+          [ builder (Cabal Flags) ? arg ('+' : pkgName intLib)
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
@@ -38,7 +38,7 @@ packageArgs = do
           ]
         ------------------------------ bytestring ------------------------------
         , package bytestring ?
-          builder CabalFlags ? intLib == integerSimple ? arg "integer-simple"
+          builder (Cabal Flags) ? intLib == integerSimple ? arg "integer-simple"
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -56,7 +56,7 @@ packageArgs = do
             , input "//Parser.hs" ?
               pure ["-O0", "-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
 
-          , builder (GhcCabal Conf) ? mconcat
+          , builder (Cabal Setup) ? mconcat
             [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
             , arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
@@ -75,7 +75,7 @@ packageArgs = do
             , ghcProfiled <$> flavour ?
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
-         , builder CabalFlags ? mconcat
+         , builder (Cabal Flags) ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , flag CrossCompiling ? arg "-terminfo"
@@ -87,17 +87,17 @@ packageArgs = do
         , package ghc ? mconcat
           [ builder Ghc ? arg ("-I" ++ compilerBuildPath)
 
-          , builder CabalFlags ? mconcat
+          , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
             , flag CrossCompiling ? arg "-terminfo" ] ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
-          builder CabalFlags ? flag CrossCompiling ? arg "-terminfo"
+          builder (Cabal Flags) ? flag CrossCompiling ? arg "-terminfo"
 
         -------------------------------- ghcPrim -------------------------------
         , package ghcPrim ? mconcat
-          [ builder CabalFlags ? arg "include-ghc-prim"
+          [ builder (Cabal Flags) ? arg "include-ghc-prim"
 
           , builder (Cc CompileC) ? (not <$> flag GccIsClang) ?
             input "//cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
@@ -117,26 +117,26 @@ packageArgs = do
         -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
         -- behind the @-fghci@ flag.
         , package ghci ? mconcat
-          [ notStage0 ? builder CabalFlags ? arg "ghci"
-          , flag CrossCompiling ? stage0 ? builder CabalFlags ? arg "ghci" ]
+          [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
+          , flag CrossCompiling ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
 
         -------------------------------- haddock -------------------------------
         , package haddock ?
-          builder CabalFlags ? arg "in-ghc-tree"
+          builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------- haskeline ------------------------------
         , package haskeline ?
-          builder CabalFlags ? flag CrossCompiling ? arg "-terminfo"
+          builder (Cabal Flags) ? flag CrossCompiling ? arg "-terminfo"
 
         -------------------------------- hsc2hs --------------------------------
         , package hsc2hs ?
-          builder CabalFlags ? arg "in-ghc-tree"
+          builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------ integerGmp ------------------------------
         , package integerGmp ? mconcat
           [ builder Cc ? arg includeGmp
 
-          , builder (GhcCabal Conf) ? mconcat
+          , builder (Cabal Setup) ? mconcat
             [ -- TODO: This should respect some settings flag "InTreeGmp".
               -- Depending on @IncludeDir@ and @LibDir@ is bound to fail, since
               -- these are only set if the configure script was explicilty
@@ -165,7 +165,7 @@ packageArgs = do
         -- detects the same integer library again, even though we don't build it
         -- in Stage1, and at that point the configuration is just wrong.
         , package text ?
-          builder CabalFlags ? notStage0 ? intLib == integerSimple ?
+          builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
           pure [ "+integer-simple", "-bytestring-builder"] ]
 
 -- | RTS-specific command line arguments.
@@ -287,7 +287,7 @@ rtsPackageArgs = package rts ? do
               anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
 
     mconcat
-        [ builder CabalFlags ? (any (wayUnit Profiling) rtsWays) ? arg "profiling"
+        [ builder (Cabal Flags) ? any (wayUnit Profiling) rtsWays ? arg "profiling"
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Ghc ? arg "-Irts"

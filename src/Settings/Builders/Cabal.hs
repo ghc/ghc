@@ -1,29 +1,27 @@
-module Settings.Builders.GhcCabal (
-    ghcCabalBuilderArgs
-    ) where
+module Settings.Builders.Cabal (cabalBuilderArgs) where
 
 import Data.Maybe (fromJust)
 
-import Builder ( ArMode ( Pack ) )
+import Builder (ArMode (Pack))
 import Context
 import Flavour
 import GHC.Packages
-import Hadrian.Builder (getBuilderPath, needBuilder )
+import Hadrian.Builder (getBuilderPath, needBuilder)
 import Hadrian.Haskell.Cabal
 import Settings.Builders.Common
 
-ghcCabalBuilderArgs :: Args
-ghcCabalBuilderArgs = mconcat
-  [ builder (GhcCabal Conf) ? do
+cabalBuilderArgs :: Args
+cabalBuilderArgs = builder (Cabal Setup) ? do
     verbosity <- expr getVerbosity
     top       <- expr topDirectory
     path      <- getContextPath
     stage     <- getStage
     mconcat [ arg "configure"
-            -- don't strip libraries when cross compiling.
-            -- XXX we need to set --with-strip= (stripCmdPath :: Action FilePath), and if it's ':' disable
-            --     stripping as well. As it is now, I believe we might have issues with stripping on
-            --     windows, as I can't see a consumer of `stripCmdPath`.
+            -- Don't strip libraries when cross compiling.
+            -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
+            -- and if it's @:@ disable stripping as well. As it is now, I believe
+            -- we might have issues with stripping on Windows, as I can't see a
+            -- consumer of 'stripCmdPath'.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
             , flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
@@ -49,16 +47,13 @@ ghcCabalBuilderArgs = mconcat
             , with Happy
             , verbosity < Chatty ?
               pure [ "-v0", "--configure-option=--quiet"
-                   , "--configure-option=--disable-option-checking"
-                   ]
-            ]
-  ]
+                   , "--configure-option=--disable-option-checking" ] ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 -- TODO: should `elem` be `wayUnit`?
--- This approach still doesn't work. Previously libraries were build only in the 
--- Default flavours and not using context. 
+-- This approach still doesn't work. Previously libraries were build only in the
+-- Default flavours and not using context.
 libraryArgs :: Args
 libraryArgs = do
     flavourWays <- getLibraryWays
@@ -159,4 +154,3 @@ with b = do
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
-

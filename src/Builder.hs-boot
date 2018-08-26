@@ -7,20 +7,20 @@ import Hadrian.Builder.Tar
 
 data CcMode = CompileC | FindCDependencies
 data GhcMode =  CompileHs | CompileCWithGhc | FindHsDependencies | LinkHs
-data GhcCabalMode = Conf | HsColour | Check | Sdist
-data GhcPkgMode = Init | Update | Clone | Unregister | Dependencies
+data ConfigurationInfo = Setup | Flags
+data GhcPkgMode = Init | Update | Copy | Unregister | Dependencies
 data HaddockMode = BuildPackage | BuildIndex
 
 data Builder = Alex
              | Ar ArMode Stage
              | Autoreconf FilePath
              | DeriveConstants
+             | Cabal ConfigurationInfo Stage
              | Cc CcMode Stage
              | Configure FilePath
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
-             | GhcCabal GhcCabalMode Stage
              | GhcPkg GhcPkgMode Stage
              | Haddock HaddockMode
              | Happy
@@ -41,7 +41,6 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
-             | CabalFlags Stage
 
 instance Eq Builder
 instance Show Builder

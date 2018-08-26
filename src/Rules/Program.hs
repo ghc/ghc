@@ -58,17 +58,14 @@ buildProgram rs = do
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do
-    binDeps <- if stage == Stage0 && package == ghcCabal
-        then hsSources context
-        else do
-            needLibrary =<< contextDependencies context
-            when (stage > Stage0) $ do
-                ways <- interpretInContext context (getLibraryWays <> getRtsWays)
-                needLibrary [ rtsContext { way = w } | w <- ways ]
-            cSrcs  <- interpretInContext context (getPackageData PD.cSrcs)
-            cObjs  <- mapM (objectPath context) cSrcs
-            hsObjs <- hsObjects context
-            return $ cObjs ++ hsObjs
+    needLibrary =<< contextDependencies context
+    when (stage > Stage0) $ do
+        ways <- interpretInContext context (getLibraryWays <> getRtsWays)
+        needLibrary [ rtsContext { way = w } | w <- ways ]
+    cSrcs  <- interpretInContext context (getPackageData PD.cSrcs)
+    cObjs  <- mapM (objectPath context) cSrcs
+    hsObjs <- hsObjects context
+    let binDeps = cObjs ++ hsObjs
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- pkgSynopsis context

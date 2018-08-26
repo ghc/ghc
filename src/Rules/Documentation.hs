@@ -152,26 +152,23 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1 && packag
 
     -- Per-package haddocks
     root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" %> \file -> do
-      -- this is how ghc-cabal produces "haddock-prologue.txt" files
-      (syn, desc) <- interpretInContext context . getPackageData $ \p ->
-        (PD.synopsis p, PD.description p)
-      let prologue = if null desc
-                     then syn
-                     else desc
-      liftIO (writeFile file prologue)
+        -- This is how @ghc-cabal@ used to produces "haddock-prologue.txt" files.
+        (syn, desc) <- interpretInContext context . getPackageData $ \p ->
+            (PD.synopsis p, PD.description p)
+        let prologue = if null desc then syn else desc
+        liftIO (writeFile file prologue)
 
     root -/- htmlRoot -/- "libraries" -/- pkgName package -/- pkgName package <.> "haddock" %> \file -> do
-      need [ root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" ]
-      haddocks <- haddockDependencies context
-      srcs <- hsSources context
-      need $ srcs ++ haddocks ++ [root -/- haddockHtmlLib]
+        need [ root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" ]
+        haddocks <- haddockDependencies context
+        srcs <- hsSources context
+        need $ srcs ++ haddocks ++ [root -/- haddockHtmlLib]
 
-      -- Build Haddock documentation
-      -- TODO: pass the correct way from Rules via Context
-      dynamicPrograms <- dynamicGhcPrograms <$> flavour
-      let haddockWay = if dynamicPrograms then dynamic else vanilla
-      build $ target (context {way = haddockWay}) (Haddock BuildPackage)
-                     srcs [file]
+        -- Build Haddock documentation
+        -- TODO: Pass the correct way from Rules via Context.
+        dynamicPrograms <- dynamicGhcPrograms <$> flavour
+        let haddockWay = if dynamicPrograms then dynamic else vanilla
+        build $ target (context {way = haddockWay}) (Haddock BuildPackage) srcs [file]
 
 ----------------------------------------------------------------------
 -- PDF

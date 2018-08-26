@@ -36,13 +36,15 @@ executable hadrian
                        , Hadrian.Builder.Tar
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
+                       , Hadrian.Haskell.Cabal.CabalData
                        , Hadrian.Haskell.Cabal.PackageData
                        , Hadrian.Haskell.Cabal.Parse
-                       , Hadrian.Haskell.Cabal.Type
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Oracles.Path
                        , Hadrian.Oracles.TextFile
+                       , Hadrian.Oracles.TextFile.Rules
+                       , Hadrian.Oracles.TextFile.Type
                        , Hadrian.Package
                        , Hadrian.Package.Type
                        , Hadrian.Target
@@ -70,13 +72,13 @@ executable hadrian
                        , Rules.Test
                        , Settings
                        , Settings.Builders.Alex
+                       , Settings.Builders.Cabal
                        , Settings.Builders.Common
                        , Settings.Builders.Cc
                        , Settings.Builders.Configure
                        , Settings.Builders.DeriveConstants
                        , Settings.Builders.GenPrimopCode
                        , Settings.Builders.Ghc
-                       , Settings.Builders.GhcCabal
                        , Settings.Builders.GhcPkg
                        , Settings.Builders.Haddock
                        , Settings.Builders.Happy
