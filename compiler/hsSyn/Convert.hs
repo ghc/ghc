@@ -706,8 +706,8 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; rhs'   <- cvtl rhs
        ; returnJustL $ Hs.RuleD noExt
             $ HsRules noExt (SourceText "{-# RULES")
-                      [noLoc $ HsRule noExt (noLoc (SourceText nm,nm')) act
-                                                  bndrs' lhs' rhs']
+                      [noLoc $ HsRule noExt (noLoc (quotedSourceText nm,nm'))
+                                                  act bndrs' lhs' rhs']
        }
 
 cvtPragmaD (AnnP target exp)
