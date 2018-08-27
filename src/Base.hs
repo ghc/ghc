@@ -82,10 +82,10 @@ generatedDir = "generated"
 generatedPath :: Action FilePath
 generatedPath = buildRoot <&> (-/- generatedDir)
 
--- | Path to the package database for the given stage of GHC,
---   relative to the build root.
+-- | Path to the package database for a given build stage, relative to the build
+-- root. Note that @StageN@, where @N > 1@, uses the 'Stage1' package database.
 relativePackageDbPath :: Stage -> FilePath
-relativePackageDbPath stage = stageString stage -/- "lib" -/- "package.conf.d"
+relativePackageDbPath stage = stageString (min stage Stage1) -/- "lib/package.conf.d"
 
 -- | Path to the package database used in a given 'Stage', including
 --   the build root.

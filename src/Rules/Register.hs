@@ -28,10 +28,10 @@ configurePackage context@Context {..} = do
     root -/- contextDir context -/- "setup-config" %> \_ ->
         Cabal.configurePackage context
 
--- | Registering a package and initialise the corresponding package database if
--- need be.
+-- | Register a package and initialise the corresponding package database if
+-- need be. Note that we only register packages in 'Stage0' and 'Stage1'.
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
-registerPackage rs context@Context {..} = do
+registerPackage rs context@Context {..} = when (stage < Stage2) $ do
     root <- buildRootRules
 
     -- Initialise the package database.

@@ -3,8 +3,8 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    userFlavours, userPackages, verboseCommand,
-    buildProgressColour, successColour, stage1Only
+    userFlavours, userPackages, verboseCommand, buildProgressColour,
+    successColour, stage1Only
     ) where
 
 import Flavour
@@ -46,11 +46,8 @@ successColour :: SuccessColour
 successColour = mkSuccessColour (Dull Green)
 
 -- TODO: Set this flag from the command line.
--- | Set this flag to 'True' to disable building Stage2 GHC (i.e. the @ghc-stage2@
--- executable) and Stage2 utilities (such as @haddock@). Note that all Stage0
--- and Stage1 libraries (including 'compiler') will still be built. Enabling
--- this flag during installation leads to installing @ghc-stage1@ instead of
--- @ghc-stage2@, and @ghc-pkg@ that was build with the Stage0 compiler.
+-- | Set this flag to 'True' to disable building Stage2 GHC and Stage2 utilities
+-- such as @haddock@. All Stage0 and Stage1 libraries will still be built.
 -- Also see Note [No stage2 packages when CrossCompiling or Stage1Only] in the
 -- top-level @ghc.mk@.
 stage1Only :: Bool
