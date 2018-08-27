@@ -52,6 +52,21 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
+- Reifying type classes no longer shows redundant class type variables and
+  contexts in the type signature of each class method. For instance,
+  reifying the following class: ::
+
+    class C a where
+      method :: a
+
+  Used to produce the following: ::
+
+    class C a where
+      method :: forall a. C a => a
+
+  Where the ``forall a. C a =>`` part is entirely redundant. This part is no
+  longer included when reifying ``C``. It's possible that this may break some
+  code which assumes the existence of ``forall a. C a =>``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

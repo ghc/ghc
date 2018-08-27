@@ -1576,13 +1576,17 @@ reifyClass cls
     (_, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
     reify_op (op, def_meth)
-      = do { ty <- reifyType (idType op)
+      = do { let (_, _, ty) = tcSplitMethodTy (idType op)
+               -- Use tcSplitMethodTy to get rid of the extraneous class
+               -- variables and predicates at the beginning of op's type
+               -- (see #15551).
+           ; ty' <- reifyType ty
            ; let nm' = reifyName op
            ; case def_meth of
                 Just (_, GenericDM gdm_ty) ->
                   do { gdm_ty' <- reifyType gdm_ty
-                     ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty'] }
-                _ -> return [TH.SigD nm' ty] }
+                     ; return [TH.SigD nm' ty', TH.DefaultSigD nm' gdm_ty'] }
+                _ -> return [TH.SigD nm' ty'] }
 
     reifyAT :: ClassATItem -> TcM [TH.Dec]
     reifyAT (ATI tycon def) = do
