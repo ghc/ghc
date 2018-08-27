@@ -37,17 +37,17 @@ import qualified Distribution.Types.LocalBuildInfo             as C
 import qualified Distribution.Text                             as C
 import qualified Distribution.Types.MungedPackageId            as C
 import qualified Distribution.Verbosity                        as C
-
-import Base
-import Builder
-import Context
-import Flavour
-import GHC.Packages
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal.CabalData
 import Hadrian.Haskell.Cabal.PackageData
 import Hadrian.Oracles.TextFile
 import Hadrian.Target
+
+import Base
+import Builder
+import Context
+import Flavour
+import Packages
 import Settings
 
 -- | Parse the Cabal package identifier from a @.cabal@ file.

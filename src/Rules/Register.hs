@@ -2,19 +2,17 @@ module Rules.Register (configurePackage, registerPackage) where
 
 import Distribution.ParseUtils
 import Distribution.Version (Version)
+import qualified Distribution.Compat.ReadP   as Parse
+import qualified Hadrian.Haskell.Cabal.Parse as Cabal
+import Hadrian.Expression
+import qualified System.Directory            as IO
 
 import Base
 import Context
-import GHC
+import Packages
 import Settings
 import Target
 import Utilities
-
-import Hadrian.Expression
-
-import qualified Distribution.Compat.ReadP   as Parse
-import qualified System.Directory            as IO
-import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 
 parseCabalName :: String -> Maybe (String, Version)
 parseCabalName = readPToMaybe parse

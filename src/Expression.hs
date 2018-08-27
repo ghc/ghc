@@ -23,7 +23,7 @@ module Expression (
     ) where
 
 import Base
-import {-# SOURCE #-} Builder
+import Builder
 import Context hiding (stage, package, way)
 import Expression.Type
 import Hadrian.Expression hiding (Expr, Predicate, Args)

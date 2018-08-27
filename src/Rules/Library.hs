@@ -1,23 +1,22 @@
 module Rules.Library (libraryRules) where
 
+import Data.Functor
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.PackageData as PD
 import Hadrian.Package.Type
+import qualified System.Directory as IO
+import qualified Text.Parsec      as Parsec
 
 import Base
 import Context
 import Expression hiding (way, package)
 import Flavour
-import GHC.Packages
 import Oracles.ModuleFiles
+import Packages
 import Rules.Gmp
 import Settings
 import Target
 import Utilities
-
-import Data.Functor
-import qualified System.Directory as IO
-import qualified Text.Parsec      as Parsec
 
 -- * Library 'Rules'
 

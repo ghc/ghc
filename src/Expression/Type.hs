@@ -3,7 +3,7 @@ module Expression.Type where
 import Context.Type
 import Way.Type
 
-import {-# SOURCE #-} Builder
+import Builder
 import qualified Hadrian.Expression as H
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can

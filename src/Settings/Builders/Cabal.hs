@@ -1,13 +1,13 @@
 module Settings.Builders.Cabal (cabalBuilderArgs) where
 
 import Data.Maybe (fromJust)
-
-import Builder (ArMode (Pack))
-import Context
-import Flavour
-import GHC.Packages
 import Hadrian.Builder (getBuilderPath, needBuilder)
 import Hadrian.Haskell.Cabal
+
+import Builder
+import Context
+import Flavour
+import Packages
 import Settings.Builders.Common
 
 cabalBuilderArgs :: Args

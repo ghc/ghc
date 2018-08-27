@@ -1,9 +1,9 @@
 module Settings.Warnings (defaultGhcWarningsArgs, warningArgs) where
 
 import Expression
-import GHC.Packages
 import Oracles.Flag
 import Oracles.Setting
+import Packages
 import Settings
 
 -- See @mk/warnings.mk@ for warning-related arguments in the Make build system.

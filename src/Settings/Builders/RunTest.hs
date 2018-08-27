@@ -1,12 +1,13 @@
-module Settings.Builders.RunTest (runTestBuilderArgs) where
+module Settings.Builders.RunTest (runTestBuilderArgs, runTestGhcFlags) where
 
-import CommandLine (TestArgs(..), defaultTestArgs, TestSpeed(..))
-import Flavour
-import GHC
 import Hadrian.Utilities
+import System.Environment
+
+import CommandLine
+import Flavour
 import Oracles.Setting (setting)
 import Oracles.TestSettings
-import Rules.Test
+import Packages
 import Settings.Builders.Common
 
 getTestSetting :: TestSetting -> Expr String
@@ -17,6 +18,36 @@ getBooleanSetting :: TestSetting -> Expr Bool
 getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting key
   where
     msg = "Cannot parse test setting " ++ quote (show key)
+
+-- | Extra flags to send to the Haskell compiler to run tests.
+runTestGhcFlags :: Action String
+runTestGhcFlags = do
+    unregisterised <- flag GhcUnregisterised
+
+    let ifMinGhcVer ver opt = do v <- ghcCanonVersion
+                                 if ver <= v then pure opt
+                                             else pure ""
+
+    -- Read extra argument for test from command line, like `-fvectorize`.
+    ghcOpts <- fromMaybe "" <$> (liftIO $ lookupEnv "EXTRA_HC_OPTS")
+
+    -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L28
+    let ghcExtraFlags = if unregisterised
+                           then "-optc-fno-builtin"
+                           else ""
+
+    -- Take flags to send to the Haskell compiler from test.mk.
+    -- See: https://github.com/ghc/ghc/blob/master/testsuite/mk/test.mk#L37
+    unwords <$> sequence
+        [ pure " -dcore-lint -dcmm-lint -no-user-package-db -rtsopts"
+        , pure ghcOpts
+        , pure ghcExtraFlags
+        , ifMinGhcVer "711" "-fno-warn-missed-specialisations"
+        , ifMinGhcVer "711" "-fshow-warning-groups"
+        , ifMinGhcVer "801" "-fdiagnostics-color=never"
+        , ifMinGhcVer "801" "-fno-diagnostics-show-caret"
+        , pure "-dno-debug-output"
+        ]
 
 -- Command line arguments for invoking the @runtest.py@ script. A lot of this
 -- mirrors @testsuite/mk/test.mk@.
@@ -49,7 +80,7 @@ runTestBuilderArgs = builder RunTest ? do
     wordsize    <- getTestSetting TestWORDSIZE
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
-    timeoutProg <- expr buildRoot <&> (-/- timeoutProgPath)
+    timeoutProg <- expr buildRoot <&> (-/- timeoutPath)
 
     let asZeroOne s b = s ++ zeroOne b
 

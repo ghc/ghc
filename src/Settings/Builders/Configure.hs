@@ -1,6 +1,6 @@
 module Settings.Builders.Configure (configureBuilderArgs) where
 
-import GHC
+import Packages
 import Rules.Gmp
 import Settings.Builders.Common
 

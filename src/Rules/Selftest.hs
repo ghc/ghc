@@ -1,14 +1,14 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Rules.Selftest (selftestRules) where
 
+import Hadrian.Haskell.Cabal
 import Test.QuickCheck
 
 import Base
 import Context
-import GHC
-import Hadrian.Haskell.Cabal
 import Oracles.ModuleFiles
 import Oracles.Setting
+import Packages
 import Settings
 import Target
 import Utilities

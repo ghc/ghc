@@ -2,8 +2,8 @@ module Rules.BinaryDist where
 
 import Context
 import Expression
-import GHC
 import Oracles.Setting
+import Packages
 import Settings
 import Target
 import Utilities
@@ -25,7 +25,7 @@ bindistRules = do
           bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
           ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
           distDir          = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
-          rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir 
+          rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
                              -/- "include"
 
       -- we create the bindist directory at <root>/bindist/ghc-X.Y.Z-platform/
@@ -33,7 +33,7 @@ bindistRules = do
       createDirectory bindistFilesDir
       copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
       copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
-      copyDirectory (rtsIncludeDir)         bindistFilesDir        
+      copyDirectory (rtsIncludeDir)         bindistFilesDir
       {- SHOULD WE SHIP DOCS?
       need ["docs"]
       copyDirectory (root -/- "docs") bindistFilesDir
@@ -72,8 +72,8 @@ bindistRules = do
     -- generate the Makefile that enables the "make install" part
     root -/- "bindist" -/- "ghc-*" -/- "Makefile" %> \makefilePath ->
       writeFile' makefilePath bindistMakefile
-    
-    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath -> 
+
+    root -/- "bindist" -/- "ghc-*" -/- "wrappers/*" %> \wrapperPath ->
       writeFile' wrapperPath $ wrapper (takeFileName wrapperPath)
 
     -- copy over the various configure-related files needed for a working
@@ -148,7 +148,7 @@ bindistMakefile = unlines
   , "# This implementation is a bit hacky and depends on consistency of program"
   , "# names. For hadrian build this will work as programs have a consistent "
   , "# naming procefure. This file is tested on Linux(Ubuntu)"
-  , "# TODO : Check implementation in other distributions" 
+  , "# TODO : Check implementation in other distributions"
   , "\trm -f $2"
   , "\t$(CREATE_SCRIPT) $2"
   , "\t@echo \"#!$(SHELL)\" >>  $2"
@@ -160,7 +160,7 @@ bindistMakefile = unlines
   , "\t@echo \"docdir=\\\"$7\\\"\" >> $2"
   , "\t@echo \"includedir=\\\"$8\\\"\" >> $2"
   , "\t@echo \"\" >> $2 "
-  , "\tcat wrappers/$1 >> $2" 
+  , "\tcat wrappers/$1 >> $2"
   , "\t$(EXECUTABLE_FILE) $2 ;"
   , "endef"
   , ""
@@ -181,13 +181,13 @@ bindistMakefile = unlines
   , "endif"
   , ""
   , "# If the relative path of binaries and libraries are altered, we will need to"
-  , "# install additional wrapper scripts at bindir."   
+  , "# install additional wrapper scripts at bindir."
   , "ifneq \"$(LIBPARENT)/bin\" \"$(bindir)\""
   , "install: install_wrappers"
   , "endif"
   , ""
   , "# We need to install binaries relative to libraries."
-  , "BINARIES = $(wildcard ./bin/*)" 
+  , "BINARIES = $(wildcard ./bin/*)"
   , "install_bin:"
   , "\t@echo \"Copying Binaries to $(GHCBINDIR)\""
   , "\t$(INSTALL_DIR) \"$(GHCBINDIR)\""
@@ -215,7 +215,7 @@ bindistMakefile = unlines
   , "\t$(INSTALL_DIR) \"$(includedir)\""
   , "\tfor i in $(INCLUDES); do \\"
   , "\t\tcp -R $$i \"$(includedir)/\"; \\"
-  , "\tdone" 
+  , "\tdone"
   , ""
   , "DOCS = $(wildcard ./docs/*)"
   , "install_docs:"
@@ -242,11 +242,11 @@ wrapper "ghc-pkg"     = ghcPkgWrapper
 wrapper "ghci"        = ghciWrapper
 wrapper "ghci-script" = ghciScriptWrapper
 wrapper "haddock"     = haddockWrapper
-wrapper "hsc2hs"      = hsc2hsWrapper                          
+wrapper "hsc2hs"      = hsc2hsWrapper
 wrapper "runhaskell"  = runhaskellWrapper
 wrapper _             = commonWrapper
 
--- | Wrapper scripts for different programs. Common is default wrapper. 
+-- | Wrapper scripts for different programs. Common is default wrapper.
 
 ghcWrapper :: String
 ghcWrapper = unlines
@@ -303,7 +303,7 @@ runhaskellWrapper = unlines
   ]
 
 -- | We need to ship ghci executable, which basically just calls ghc with
--- | --interactive flag. 
+-- | --interactive flag.
 ghciScriptWrapper :: String
 ghciScriptWrapper = unlines
   [ "DIR=`dirname \"$0\"`"

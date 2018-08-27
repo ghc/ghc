@@ -6,10 +6,11 @@ import Hadrian.Haskell.Cabal.PackageData as PD
 import Base
 import Context
 import Expression hiding (stage, way)
-import GHC
 import Oracles.Flag
 import Oracles.ModuleFiles
+import Packages
 import Settings
+import Settings.Default
 import Target
 import Utilities
 

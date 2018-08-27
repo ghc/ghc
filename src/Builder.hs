@@ -27,9 +27,9 @@ import Hadrian.Utilities
 
 import Base
 import Context
-import GHC
 import Oracles.Flag
 import Oracles.Setting
+import Packages
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.

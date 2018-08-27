@@ -28,8 +28,6 @@ executable hadrian
                        , Expression
                        , Expression.Type
                        , Flavour
-                       , GHC
-                       , GHC.Packages
                        , Hadrian.Builder
                        , Hadrian.Builder.Ar
                        , Hadrian.Builder.Sphinx
@@ -53,6 +51,7 @@ executable hadrian
                        , Oracles.Setting
                        , Oracles.ModuleFiles
                        , Oracles.TestSettings
+                       , Packages
                        , Rules
                        , Rules.BinaryDist
                        , Rules.Clean

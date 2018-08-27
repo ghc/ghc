@@ -1,6 +1,6 @@
 module Settings.Builders.HsCpp (hsCppBuilderArgs) where
 
-import GHC.Packages
+import Packages
 import Settings.Builders.Common
 
 hsCppBuilderArgs :: Args

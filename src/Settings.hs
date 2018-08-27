@@ -7,7 +7,7 @@ module Settings (
 import CommandLine
 import Expression
 import Flavour
-import GHC.Packages
+import Packages
 import UserSettings
 
 import {-# SOURCE #-} Settings.Default

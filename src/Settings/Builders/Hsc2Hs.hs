@@ -1,9 +1,9 @@
 module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 
-import Builder ()
-import GHC (autogenPath)
-import Hadrian.Builder (getBuilderPath)
 import Hadrian.Haskell.Cabal.PackageData as PD
+
+import Builder
+import Packages
 import Settings.Builders.Common
 
 hsc2hsBuilderArgs :: Args

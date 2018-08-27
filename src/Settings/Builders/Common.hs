@@ -9,12 +9,13 @@ module Settings.Builders.Common (
     packageDatabaseArgs, bootPackageDatabaseArgs
     ) where
 
+import Hadrian.Haskell.Cabal.PackageData
+
 import Base
 import Expression
-import GHC.Packages
-import Hadrian.Haskell.Cabal.PackageData
 import Oracles.Flag
 import Oracles.Setting
+import Packages
 import Settings
 import UserSettings
 

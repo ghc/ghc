@@ -5,12 +5,13 @@ module Oracles.ModuleFiles (
 
 import qualified Data.HashMap.Strict as Map
 
+import Hadrian.Haskell.Cabal.PackageData as PD
+
 import Base
 import Builder
 import Context
 import Expression
-import GHC
-import Hadrian.Haskell.Cabal.PackageData as PD
+import Packages
 
 newtype ModuleFiles = ModuleFiles (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

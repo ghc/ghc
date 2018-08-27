@@ -2,9 +2,9 @@ module Settings.Packages (packageArgs) where
 
 import Expression
 import Flavour
-import GHC
 import Oracles.Setting
 import Oracles.Flag
+import Packages
 import Rules.Gmp
 import Settings
 
