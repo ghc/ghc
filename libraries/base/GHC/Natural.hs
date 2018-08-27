@@ -124,7 +124,7 @@ divZeroError = raise# divZeroException
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
--- >>> 2^20 :: Natural
+-- >>> 2^100 :: Natural
 -- 1267650600228229401496703205376
 --
 -- Operations whose result would be negative @'Control.Exception.throw'
