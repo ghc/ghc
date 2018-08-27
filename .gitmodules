@@ -38,21 +38,9 @@
 	path = libraries/Win32
 	url = ../packages/Win32.git
 	ignore = untracked
-[submodule "libraries/primitive"]
-	path = libraries/primitive
-	url = ../packages/primitive.git
-	ignore = untracked
-[submodule "libraries/vector"]
-	path = libraries/vector
-	url = ../packages/vector.git
-	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
 	url = ../packages/time.git
-	ignore = untracked
-[submodule "libraries/random"]
-	path = libraries/random
-	url = ../packages/random.git
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
@@ -101,10 +89,6 @@
 [submodule "libraries/stm"]
 	path = libraries/stm
 	url = ../packages/stm.git
-	ignore = untracked
-[submodule "libraries/dph"]
-	path = libraries/dph
-	url = ../packages/dph.git
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
