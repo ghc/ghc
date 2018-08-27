@@ -11,13 +11,12 @@ import Settings
 -- | Package-specific command-line arguments.
 packageArgs :: Args
 packageArgs = do
-    intLib            <- getIntegerPackage
-    stage             <- getStage
-    path              <- getBuildPath
-    rtsWays           <- getRtsWays
-    compilerBuildPath <- expr $ buildPath (vanillaContext stage compiler)
-    gmpBuildPath      <- expr gmpBuildPath
-
+    stage        <- getStage
+    rtsWays      <- getRtsWays
+    path         <- getBuildPath
+    intLib       <- getIntegerPackage
+    compilerPath <- expr $ buildPath (vanillaContext stage compiler)
+    gmpBuildPath <- expr gmpBuildPath
     let includeGmp = "-I" ++ gmpBuildPath -/- "include"
 
     mconcat
@@ -85,7 +84,7 @@ packageArgs = do
 
         ---------------------------------- ghc ---------------------------------
         , package ghc ? mconcat
-          [ builder Ghc ? arg ("-I" ++ compilerBuildPath)
+          [ builder Ghc ? arg ("-I" ++ compilerPath)
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"

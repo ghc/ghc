@@ -67,27 +67,24 @@ findHsDependencies = builder (Ghc FindHsDependencies) ? do
 haddockGhcArgs :: Args
 haddockGhcArgs = mconcat [ commonGhcArgs, getPackageData PD.hcOpts ]
 
--- Used in ghcBuilderArgs, ghcCBuilderArgs, ghcMBuilderArgs and haddockGhcArgs.
+-- | Common GHC command line arguments used in 'ghcBuilderArgs',
+-- 'ghcCBuilderArgs', 'ghcMBuilderArgs' and 'haddockGhcArgs'.
 commonGhcArgs :: Args
 commonGhcArgs = do
-    way     <- getWay
-    path    <- getBuildPath
-    pkg     <- getPackage
-    ghcVersion <- expr $ ghcVersionH
+    way  <- getWay
+    path <- getBuildPath
+    ghcVersion <- expr ghcVersionH
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
             , wayGhcArgs
             , packageGhcArgs
             , includeGhcArgs
-            -- when compiling the rts for stage1 or stage2
-            -- we do not have the rts in the package db at
-            -- the time of builind it.  As such we need to
-            -- explicity supply the path to the ghc-version
-            -- file, to prevent ghc from trying to open the
-            -- rts package from the package db, and failing
-            -- over while doing so.
-            , (pkg == rts) ? notStage0 ? arg ("-ghcversion-file=" ++ ghcVersion)
+            -- When compiling RTS for Stage1 or Stage2 we do not have it (yet)
+            -- in the package database. We therefore explicity supply the path
+            -- to the @ghc-version@ file, to prevent GHC from trying to open the
+            -- RTS package in the package database and failing.
+            , package rts ? notStage0 ? arg ("-ghcversion-file=" ++ ghcVersion)
             , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
             , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
             , map ("-optP" ++) <$> getPackageData PD.cppOpts
@@ -133,4 +130,4 @@ includeGhcArgs = do
             , cIncludeArgs
             , arg $      "-I" ++ root -/- generatedDir
             , arg $ "-optc-I" ++ root -/- generatedDir
-            , pure [ "-optP-include", "-optP" ++ autogen -/- "cabal_macros.h" ] ]
+            , pure ["-optP-include", "-optP" ++ autogen -/- "cabal_macros.h"] ]

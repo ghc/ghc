@@ -133,7 +133,7 @@ withBuilderKey b = case b of
     GhcPkg _ _ -> "--with-ghc-pkg="
     _          -> error $ "withBuilderKey: not supported builder " ++ show b
 
--- Adds arguments to builders if needed.
+-- | Add arguments to builders if needed.
 withBuilderArgs :: Builder -> Args
 withBuilderArgs b = case b of
     GhcPkg _ stage -> do
@@ -142,15 +142,14 @@ withBuilderArgs b = case b of
       notStage0 ? arg ("--ghc-pkg-option=--global-package-db=" ++ top -/- pkgDb)
     _          -> return [] -- no arguments
 
-
--- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
+-- | Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
 with b = do
     path <- getBuilderPath b
-    if (null path) then mempty else do
-        top  <- expr topDirectory
+    if null path then mempty else do
+        top <- expr topDirectory
         expr $ needBuilder b
-        arg $ withBuilderKey b ++ unifyPath (top </> path)
+        arg  $ withBuilderKey b ++ unifyPath (top </> path)
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage

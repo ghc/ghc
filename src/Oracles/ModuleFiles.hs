@@ -1,10 +1,10 @@
 {-# LANGUAGE TypeFamilies #-}
 module Oracles.ModuleFiles (
-    decodeModule, encodeModule, findGenerator, hsSources, hsObjects, moduleFilesOracle
+    decodeModule, encodeModule, findGenerator, hsSources, hsObjects,
+    moduleFilesOracle
     ) where
 
 import qualified Data.HashMap.Strict as Map
-
 import Hadrian.Haskell.Cabal.PackageData as PD
 
 import Base
@@ -12,6 +12,8 @@ import Builder
 import Context
 import Expression
 import Packages
+
+type ModuleName = String
 
 newtype ModuleFiles = ModuleFiles (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -42,21 +44,21 @@ moduleFilePatterns stage = map ("*" ++) $ haskellExtensions ++ map fst (otherExt
 determineBuilder :: Stage -> FilePath -> Maybe Builder
 determineBuilder stage file = lookup (takeExtension file) (otherExtensions stage)
 
--- | Given a module name extract the directory and file name, e.g.:
+-- | Given a non-empty module name extract the directory and file name, e.g.:
 --
 -- > decodeModule "Data.Functor.Identity" == ("Data/Functor", "Identity")
 -- > decodeModule "Prelude"               == ("", "Prelude")
-decodeModule :: String -> (FilePath, String)
-decodeModule modName = (intercalate "/" (init xs), last xs)
+decodeModule :: ModuleName -> (FilePath, String)
+decodeModule moduleName = (intercalate "/" (init xs), last xs)
   where
-    xs = words $ replaceEq '.' ' ' modName
+    xs = words $ replaceEq '.' ' ' moduleName
 
 -- | Given the directory and file name find the corresponding module name, e.g.:
 --
 -- > encodeModule "Data/Functor" "Identity.hs" == "Data.Functor.Identity"
 -- > encodeModule "" "Prelude"                 == "Prelude"
 -- > uncurry encodeModule (decodeModule name)  == name
-encodeModule :: FilePath -> String -> String
+encodeModule :: FilePath -> String -> ModuleName
 encodeModule dir file
     | dir == "" =                                takeBaseName file
     | otherwise = replaceEq '/' '.' dir ++ '.' : takeBaseName file
@@ -94,19 +96,18 @@ hsObjects context = do
     mapM (objectPath context . moduleSource) modules
 
 -- | Generated module files live in the 'Context' specific build directory.
-generatedFile :: Context -> String -> Action FilePath
-generatedFile context moduleName = do
-    path <- buildPath context
-    return $ path -/- moduleSource moduleName
+generatedFile :: Context -> ModuleName -> Action FilePath
+generatedFile context moduleName = buildPath context <&> (-/- moduleSource moduleName)
 
-moduleSource :: String -> FilePath
+-- | Turn a module name (e.g. @Data.Functor@) to a path (e.g. @Data/Functor.hs@).
+moduleSource :: ModuleName -> FilePath
 moduleSource moduleName = replaceEq '.' '/' moduleName <.> "hs"
 
 -- | Module files for a given 'Context'.
-contextFiles :: Context -> Action [(String, Maybe FilePath)]
+contextFiles :: Context -> Action [(ModuleName, Maybe FilePath)]
 contextFiles context@Context {..} = do
     modules <- fmap sort . interpretInContext context $
-      getPackageData PD.modules
+        getPackageData PD.modules
     zip modules <$> askOracle (ModuleFiles (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
@@ -143,21 +144,21 @@ moduleFilesOracle = void $ do
                     found = intersectOrd cmp files mFiles
                 return (map (fullDir -/-) found, mDir)
 
-        -- For a BuildInfo, it may be a library, which deosn't have the `Main`
-        -- module, or an executable, which must have the `Main` module and the
-        -- file path of `Main` module is indicated by the `main-is` field in it's
-        -- .cabal file.
+        -- For a BuildInfo, it may be a library, which doesn't have the @Main@
+        -- module, or an executable, which must have the @Main@ module and the
+        -- file path of @Main@ module is indicated by the @main-is@ field in its
+        -- Cabal file.
         --
-        -- For `Main` module, the file name may not be `Main.hs`, unlike other
+        -- For the Main module, the file name may not be @Main.hs@, unlike other
         -- exposed modules. We could get the file path by the module name for
-        -- other exposed modules, but for `Main`, we must resolve the file path
-        -- via the `main-is` field in the .cabal file.
+        -- other exposed modules, but for @Main@ we must resolve the file path
+        -- via the @main-is@ field in the Cabal file.
         mainpairs <- case mainIs of
             Just (mod, filepath) ->
                 concatForM dirs $ \dir -> do
                     found <- doesFileExist (dir -/- filepath)
                     return [(mod, unifyPath $ dir -/- filepath) | found]
-            Nothing              -> return []
+            Nothing -> return []
 
         let pairs = sort $ mainpairs ++ [ (encodeModule d f, f) | (fs, d) <- result, f <- fs ]
             multi = [ (m, f1, f2) | (m, f1):(n, f2):_ <- tails pairs, m == n ]
