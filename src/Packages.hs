@@ -12,8 +12,7 @@ module Packages (
 
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
-    buildDll0, rtsContext, rtsBuildPath, libffiContext, libffiBuildPath,
-    libffiLibraryName
+    rtsContext, rtsBuildPath, libffiContext, libffiBuildPath, libffiLibraryName
     ) where
 
 import Hadrian.Package
@@ -177,11 +176,6 @@ autogenPath context@Context {..}
     | otherwise         = autogen $ "build" -/- pkgName package
   where
     autogen dir = contextPath context <&> (-/- dir -/- "autogen")
-
-buildDll0 :: Context -> Action Bool
-buildDll0 Context {..} = do
-    windows <- windowsHost
-    return $ windows && stage == Stage1 && package == compiler
 
 -- | RTS is considered a Stage1 package.
 rtsContext :: Context
