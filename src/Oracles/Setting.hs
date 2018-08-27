@@ -3,7 +3,7 @@ module Oracles.Setting (
     getSettingList,  anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
     ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost,
-    topDirectory, relocatableBuild, installDocDir, installGhcLibDir, libsuf
+    topDirectory, libsuf
     ) where
 
 import Hadrian.Expression
@@ -24,16 +24,24 @@ data Setting = BuildArch
              | BuildVendor
              | CcClangBackend
              | CcLlvmBackend
+             | CursesLibDir
              | DynamicExtension
+             | FfiIncludeDir
+             | FfiLibDir
              | GhcMajorVersion
              | GhcMinorVersion
              | GhcPatchLevel
              | GhcVersion
              | GhcSourcePath
+             | GmpIncludeDir
+             | GmpLibDir
              | HostArch
              | HostOs
              | HostPlatform
              | HostVendor
+             | IconvIncludeDir
+             | IconvLibDir
+             | LlvmTarget
              | ProjectGitCommitId
              | ProjectName
              | ProjectVersion
@@ -47,27 +55,6 @@ data Setting = BuildArch
              | TargetPlatform
              | TargetPlatformFull
              | TargetVendor
-             | LlvmTarget
-             | FfiIncludeDir
-             | FfiLibDir
-             | GmpIncludeDir
-             | GmpLibDir
-             | IconvIncludeDir
-             | IconvLibDir
-             | CursesLibDir
-             -- Paths to where GHC is installed (ref: mk/install.mk)
-             | InstallPrefix
-             | InstallBinDir
-             | InstallLibDir
-             | InstallDataRootDir
-             -- Command lines for invoking the @install@ utility
-             | Install
-             | InstallData
-             | InstallProgram
-             | InstallScript
-             | InstallDir
-             -- Command line for creating a symbolic link
-             | LnS
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
@@ -84,16 +71,24 @@ setting key = lookupValueOrError configFile $ case key of
     BuildVendor        -> "build-vendor"
     CcClangBackend     -> "cc-clang-backend"
     CcLlvmBackend      -> "cc-llvm-backend"
+    CursesLibDir       -> "curses-lib-dir"
     DynamicExtension   -> "dynamic-extension"
+    FfiIncludeDir      -> "ffi-include-dir"
+    FfiLibDir          -> "ffi-lib-dir"
     GhcMajorVersion    -> "ghc-major-version"
     GhcMinorVersion    -> "ghc-minor-version"
     GhcPatchLevel      -> "ghc-patch-level"
     GhcVersion         -> "ghc-version"
     GhcSourcePath      -> "ghc-source-path"
+    GmpIncludeDir      -> "gmp-include-dir"
+    GmpLibDir          -> "gmp-lib-dir"
     HostArch           -> "host-arch"
     HostOs             -> "host-os"
     HostPlatform       -> "host-platform"
     HostVendor         -> "host-vendor"
+    IconvIncludeDir    -> "iconv-include-dir"
+    IconvLibDir        -> "iconv-lib-dir"
+    LlvmTarget         -> "llvm-target"
     ProjectGitCommitId -> "project-git-commit-id"
     ProjectName        -> "project-name"
     ProjectVersion     -> "project-version"
@@ -107,24 +102,6 @@ setting key = lookupValueOrError configFile $ case key of
     TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
     TargetVendor       -> "target-vendor"
-    LlvmTarget         -> "llvm-target"
-    FfiIncludeDir      -> "ffi-include-dir"
-    FfiLibDir          -> "ffi-lib-dir"
-    GmpIncludeDir      -> "gmp-include-dir"
-    GmpLibDir          -> "gmp-lib-dir"
-    IconvIncludeDir    -> "iconv-include-dir"
-    IconvLibDir        -> "iconv-lib-dir"
-    CursesLibDir       -> "curses-lib-dir"
-    InstallPrefix      -> "install-prefix"
-    InstallBinDir      -> "install-bindir"
-    InstallLibDir      -> "install-libdir"
-    InstallDataRootDir -> "install-datarootdir"
-    Install            -> "install"
-    InstallDir         -> "install-dir"
-    InstallProgram     -> "install-program"
-    InstallScript      -> "install-script"
-    InstallData        -> "install-data"
-    LnS                -> "ln-s"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ lookupValueOrError configFile $ case key of
@@ -190,35 +167,9 @@ ghcCanonVersion = do
     let leadingZero = [ '0' | length ghcMinorVersion == 1 ]
     return $ ghcMajorVersion ++ leadingZero ++ ghcMinorVersion
 
--- ref: https://ghc.haskell.org/trac/ghc/wiki/Building/Installing#HowGHCfindsitsfiles
--- | On Windows we normally build a relocatable installation, which assumes that
--- the library directory @libdir@ is in a fixed location relative to the GHC
--- binary, namely @../lib@.
-relocatableBuild :: Action Bool
-relocatableBuild = windowsHost
-
-installDocDir :: Action String
-installDocDir = do
-    version <- setting ProjectVersion
-    dataDir <- setting InstallDataRootDir
-    return $ dataDir -/- ("doc/ghc-" ++ version)
-
 -- | Path to the GHC source tree.
 topDirectory :: Action FilePath
 topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
-
--- ref: mk/install.mk:101
--- TODO: CroosCompilePrefix
--- | Unix: override @libdir@ and @datadir@ to put GHC-specific files in a
--- subdirectory with the version number included.
-installGhcLibDir :: Action String
-installGhcLibDir = do
-    rBuild <- relocatableBuild
-    libdir <- setting InstallLibDir
-    if rBuild then return libdir
-         else do
-             version <- setting ProjectVersion
-             return $ libdir -/- ("ghc-" ++ version)
 
 -- TODO: find out why we need version number in the dynamic suffix
 -- The current theory: dynamic libraries are eventually placed in a single

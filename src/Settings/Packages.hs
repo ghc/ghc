@@ -193,8 +193,6 @@ rtsPackageArgs = package rts ? do
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    ghclibDir      <- expr installGhcLibDir
-    destDir        <- expr getDestDir
     let cArgs = mconcat
           [ arg "-Irts"
           , rtsWarnings
@@ -297,13 +295,6 @@ rtsPackageArgs = package rts ? do
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
           , "-DFFI_LIB="         ++ show libffiName ]
-
-        , builder HsCpp ?
-          input "//package.conf.in" ?
-          output "//package.conf.install.raw" ?
-          pure [ "-DINSTALLING"
-               , "-DLIB_DIR=\"" ++ destDir ++ ghclibDir ++ "\""
-               , "-DINCLUDE_DIR=\"" ++ destDir ++ ghclibDir -/- "include\"" ]
 
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
 

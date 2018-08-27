@@ -10,9 +10,8 @@ module Builder (
     runBuilder, runBuilderWith, runBuilderWithCmdOptions, getBuilderPath,
     builderEnvironment,
 
-    -- * Ad hoc builder invokation
-    applyPatch, installDirectory, installData, installScript, installProgram,
-    linkSymbolic
+    -- * Ad hoc builder invocation
+    applyPatch
     ) where
 
 import Development.Shake.Classes
@@ -25,7 +24,6 @@ import Hadrian.Builder.Tar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
-import qualified System.Directory.Extra as IO
 
 import Base
 import Context
@@ -340,46 +338,3 @@ applyPatch dir patch = do
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd [Cwd dir, FileStdin file] [path, "-p0"]
-
--- | Install a directory.
-installDirectory :: FilePath -> Action ()
-installDirectory dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallDir
-    putBuild $ "| Install directory " ++ dir
-    quietly $ cmd path dir
-
--- | Install data files to a directory and track them.
-installData :: [FilePath] -> FilePath -> Action ()
-installData fs dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallData
-    need fs
-    forM_ fs $ \f -> putBuild $ "| Install data " ++ f ++ " to " ++ dir
-    quietly $ cmd path fs dir
-
--- | Install an executable file to a directory and track it.
-installProgram :: FilePath -> FilePath -> Action ()
-installProgram f dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallProgram
-    need [f]
-    putBuild $ "| Install program " ++ f ++ " to " ++ dir
-    quietly $ cmd path f dir
-
--- | Install an executable script to a directory and track it.
-installScript :: FilePath -> FilePath -> Action ()
-installScript f dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallScript
-    need [f]
-    putBuild $ "| Install script " ++ f ++ " to " ++ dir
-    quietly $ cmd path f dir
-
--- | Create a symbolic link from source file to target file (when symbolic links
--- are supported) and track the source file.
-linkSymbolic :: FilePath -> FilePath -> Action ()
-linkSymbolic source target = do
-    lns <- setting LnS
-    unless (null lns) $ do
-        need [source] -- Guarantee source is built before printing progress info.
-        let dir = takeDirectory target
-        liftIO $ IO.createDirectoryIfMissing True dir
-        putProgressInfo =<< renderAction "Create symbolic link" source target
-        quietly $ cmd lns source target

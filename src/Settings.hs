@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
-    findPackageByName, isLibrary, stagePackages,
-    programContext, getIntegerPackage, getDestDir
+    findPackageByName, isLibrary, stagePackages, programContext,
+    getIntegerPackage
     ) where
 
 import CommandLine
@@ -64,7 +64,3 @@ knownPackages = sort $ ghcPackages ++ userPackages
 -- Note: this is slow but we keep it simple as there are just ~50 packages
 findPackageByName :: PackageName -> Maybe Package
 findPackageByName name = find (\pkg -> pkgName pkg == name) knownPackages
-
--- | Install's DESTDIR setting.
-getDestDir :: Action FilePath
-getDestDir = fromMaybe "" <$> cmdInstallDestDir

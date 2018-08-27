@@ -12,7 +12,7 @@ module GHC (
     testsuitePackages,
 
     -- * Package information
-    programName, nonHsMainPackage, autogenPath, installStage,
+    programName, nonHsMainPackage, autogenPath,
 
     -- * Miscellaneous
     programPath, buildDll0, rtsContext, rtsBuildPath, libffiContext,
@@ -133,16 +133,6 @@ programName Context {..} = do
                                 | p == runGhc -> "runhaskell"
                                 | p == iserv  -> "ghc-iserv"
                               _               ->  pkgName package
-
--- | The build stage whose results are used when installing a package, or
--- @Nothing@ if the package is not installed, e.g. because it is a user package.
--- The current implementation installs the /latest/ build stage of a package.
-installStage :: Package -> Action (Maybe Stage)
-installStage pkg
-    | not (isGhcPackage pkg) = return Nothing -- Only GHC packages are installed
-    | otherwise = do
-        stages <- filterM (fmap (pkg `elem`) . defaultPackages) [Stage0 ..]
-        return $ if null stages then Nothing else Just (maximum stages)
 
 -- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Action FilePath

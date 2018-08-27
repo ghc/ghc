@@ -13,9 +13,8 @@ makeBuilderArgs = do
     libffiPath <- expr libffiBuildPath
     let t = show $ max 4 (threads - 2) -- Don't use all Shake's threads
     mconcat
-        [ builder (Make gmpPath          ) ? pure ["MAKEFLAGS=-j" ++ t]
-        , builder (Make libffiPath       ) ? pure ["MAKEFLAGS=-j" ++ t, "install"]
-        ]
+        [ builder (Make gmpPath   ) ? pure ["MAKEFLAGS=-j" ++ t]
+        , builder (Make libffiPath) ? pure ["MAKEFLAGS=-j" ++ t, "install"] ]
 
 validateBuilderArgs :: Args
 validateBuilderArgs = builder (Make "testsuite/tests") ? do
@@ -35,8 +34,8 @@ validateBuilderArgs = builder (Make "testsuite/tests") ? do
     fullpath :: Package -> Action FilePath
     fullpath pkg = programPath =<< programContext Stage1 pkg
 
--- | Support for speed of validation 
+-- | Support for speed of validation
 setTestSpeed :: TestSpeed -> String
 setTestSpeed Fast    = "fasttest"
 setTestSpeed Average = "test"
-setTestSpeed Slow    = "slowtest" 
+setTestSpeed Slow    = "slowtest"

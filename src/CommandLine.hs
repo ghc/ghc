@@ -1,8 +1,7 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
     cmdProgressColour, cmdProgressInfo, cmdConfigure, cmdSplitObjects,
-    cmdInstallDestDir, lookupBuildRoot, TestArgs(..), TestSpeed(..), 
-    defaultTestArgs
+    lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
 import Data.Either
@@ -20,7 +19,6 @@ data CommandLineArgs = CommandLineArgs
     { configure      :: Bool
     , flavour        :: Maybe String
     , freeze1        :: Bool
-    , installDestDir :: Maybe String
     , integerSimple  :: Bool
     , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
@@ -35,7 +33,6 @@ defaultCommandLineArgs = CommandLineArgs
     { configure      = False
     , flavour        = Nothing
     , freeze1        = False
-    , installDestDir = Nothing
     , integerSimple  = False
     , progressColour = Auto
     , progressInfo   = Brief
@@ -91,9 +88,6 @@ readBuildRoot ms =
 readFreeze1 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 
-readInstallDestDir :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readInstallDestDir ms = Right $ \flags -> flags { installDestDir = ms }
-
 readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
 readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
 
@@ -126,7 +120,7 @@ readSplitObjects :: Either String (CommandLineArgs -> CommandLineArgs)
 readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 
 readTestCompiler :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestCompiler compiler = maybe (Left "Cannot parse compiler") (Right . set) compiler  
+readTestCompiler compiler = maybe (Left "Cannot parse compiler") (Right . set) compiler
   where
      set compiler  = \flags -> flags { testArgs = (testArgs flags) { testCompiler = compiler } }
 
@@ -139,10 +133,10 @@ readTestConfig config =
                         in flags { testArgs = (testArgs flags) { testConfigs = configs } }
 
 readTestConfigFile :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestConfigFile filepath = 
+readTestConfigFile filepath =
     maybe (Left "Cannot parse test-speed") (Right . set) filepath
   where
-    set filepath flags =  flags { testArgs = (testArgs flags) { testConfigFile = filepath } } 
+    set filepath flags =  flags { testArgs = (testArgs flags) { testConfigFile = filepath } }
 
 readTestJUnit :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
@@ -175,13 +169,13 @@ readTestVerbose :: Maybe String -> Either String (CommandLineArgs -> CommandLine
 readTestVerbose verbose = Right $ \flags -> flags { testArgs = (testArgs flags) { testVerbosity = verbose } }
 
 readTestWay :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestWay way = 
+readTestWay way =
     case way of
         Nothing -> Right id
-        Just way -> Right $ \flags -> 
+        Just way -> Right $ \flags ->
             let newWays = way : testWays (testArgs flags)
             in flags { testArgs = (testArgs flags) {testWays = newWays} }
- 
+
 -- | Standard 'OptDescr' descriptions of Hadrian's command line arguments.
 optDescrs :: [OptDescr (Either String (CommandLineArgs -> CommandLineArgs))]
 optDescrs =
@@ -193,8 +187,6 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["freeze1"] (NoArg readFreeze1)
       "Freeze Stage1 GHC."
-    , Option [] ["install-destdir"] (OptArg readInstallDestDir "DESTDIR")
-      "Installation destination directory."
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
       "Build GHC with integer-simple library."
     , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
@@ -225,7 +217,7 @@ optDescrs =
       "A verbosity value between 0 and 5. 0 is silent, 4 and higher activates extra output."
     , Option [] ["test-way"] (OptArg readTestWay "TEST_WAY")
       "only run these ways" ]
-    
+
 -- | A type-indexed map containing Hadrian command line arguments to be passed
 -- to Shake via 'shakeExtra'.
 cmdLineArgsMap :: IO (Map.HashMap TypeRep Dynamic)
@@ -252,9 +244,6 @@ lookupBuildRoot = buildRoot . lookupExtra defaultCommandLineArgs
 
 lookupFreeze1 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
-
-cmdInstallDestDir :: Action (Maybe String)
-cmdInstallDestDir = installDestDir <$> cmdLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs

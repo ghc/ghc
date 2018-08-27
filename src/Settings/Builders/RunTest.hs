@@ -145,7 +145,7 @@ getTestArgs = do
 -- | inputs for these directory also. boilerplate soes not account for this
 -- | problem, but simply returns an error. How should we handle such cases?
 setBinaryDirectory :: String -> Action FilePath
-setBinaryDirectory "stage0" = setting InstallBinDir
+setBinaryDirectory "stage0" = takeDirectory <$> setting SystemGhc
 setBinaryDirectory "stage1" = liftM2 (-/-) topDirectory (stageBinPath Stage0)
 setBinaryDirectory "stage2" = liftM2 (-/-) topDirectory (stageBinPath Stage1)
 setBinaryDirectory compiler = pure $ parentPath compiler
