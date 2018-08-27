@@ -811,6 +811,10 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case MUT_ARR_PTRS_DIRTY:
         case MUT_ARR_PTRS_FROZEN_CLEAN:
         case MUT_ARR_PTRS_FROZEN_DIRTY:
+        case SMALL_MUT_ARR_PTRS_CLEAN:
+        case SMALL_MUT_ARR_PTRS_DIRTY:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
             *c = find_ptrs(&se->info);
             if (*c == NULL) {
                 popOff();
