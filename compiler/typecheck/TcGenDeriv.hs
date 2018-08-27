@@ -214,7 +214,9 @@ gen_Eq_binds loc tycon = do
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
-          = foldl1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+          = foldr1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+          -- Using 'foldr1' here ensures that the derived code is correctly
+          -- associated. See Trac #10859.
           where
             nested_eq ty a b = nlHsPar (eq_Expr tycon ty (nlHsVar a) (nlHsVar b))
 
