@@ -2698,11 +2698,8 @@ allNonDeprecatedFlags = allFlagsDeps False
 allFlagsDeps :: Bool -> [String]
 allFlagsDeps keepDeprecated = [ '-':flagName flag
                               | (deprecated, flag) <- flagsAllDeps
-                              , ok (flagOptKind flag)
                               , keepDeprecated || not (isDeprecated deprecated)]
-  where ok (PrefixPred _ _) = False
-        ok _   = True
-        isDeprecated Deprecated = True
+  where isDeprecated Deprecated = True
         isDeprecated _ = False
 
 {-
@@ -2762,10 +2759,6 @@ add_dep_message (PassFlag f) message =
                                    PassFlag $ \s -> f s >> deprecate message
 add_dep_message (AnySuffix f) message =
                                   AnySuffix $ \s -> f s >> deprecate message
-add_dep_message (PrefixPred pred f) message =
-                            PrefixPred pred $ \s -> f s >> deprecate message
-add_dep_message (AnySuffixPred pred f) message =
-                         AnySuffixPred pred $ \s -> f s >> deprecate message
 
 ----------------------- The main flags themselves ------------------------------
 -- See Note [Updating flag description in the User's Guide]
