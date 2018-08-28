@@ -19,6 +19,7 @@ import Haddock.Types
 import Haddock.Convert
 import Haddock.GhcUtils
 
+import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)
@@ -63,16 +64,24 @@ attachInstances expInfo ifaces instIfaceMap mods = do
     ifaceMap = Map.fromList [ (ifaceMod i, i) | i <- ifaces ]
 
     attach index iface = do
-      newItems <- mapM (attachToExportItem index expInfo iface ifaceMap instIfaceMap)
+
+      let getInstDoc = findInstDoc iface ifaceMap instIfaceMap
+          getFixity = findFixity iface ifaceMap instIfaceMap
+
+      newItems <- mapM (attachToExportItem index expInfo getInstDoc getFixity)
                        (ifaceExportItems iface)
-      let orphanInstances = attachOrphanInstances expInfo iface ifaceMap instIfaceMap (ifaceInstances iface)
+      let orphanInstances = attachOrphanInstances expInfo getInstDoc (ifaceInstances iface)
       return $ iface { ifaceExportItems = newItems
                      , ifaceOrphanInstances = orphanInstances
                      }
 
-attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance GhcRn]
-attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
-  [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, (L (getSrcSpan n) n), Nothing)
+attachOrphanInstances
+  :: ExportInfo
+  -> (Name -> Maybe (MDoc Name))      -- ^ how to lookup the doc of an instance
+  -> [ClsInst]                        -- ^ a list of orphan instances
+  -> [DocInstance GhcRn]
+attachOrphanInstances expInfo getInstDoc cls_instances =
+  [ (synifyInstHead i, getInstDoc n, (L (getSrcSpan n) n), Nothing)
   | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
   , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
   , not $ isInstanceHidden expInfo cls tys
@@ -80,40 +89,40 @@ attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
 
 
 attachToExportItem
-  :: NameEnv ([ClsInst], [FamInst])
+  :: NameEnv ([ClsInst], [FamInst])   -- ^ all instances (that we know of)
   -> ExportInfo
-  -> Interface
-  -> IfaceMap
-  -> InstIfaceMap
+  -> (Name -> Maybe (MDoc Name))      -- ^ how to lookup the doc of an instance
+  -> (Name -> Maybe Fixity)           -- ^ how to lookup a fixity
   -> ExportItem GhcRn
   -> Ghc (ExportItem GhcRn)
-attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
+attachToExportItem index expInfo getInstDoc getFixity export =
   case attachFixities export of
     e@ExportDecl { expItemDecl = L eSpan (TyClD _ d) } -> do
       insts <-
         let mb_instances  = lookupNameEnv index (tcdName d)
             cls_instances = maybeToList mb_instances >>= fst
             fam_instances = maybeToList mb_instances >>= snd
-            fam_insts = [ ( synifyFamInst i opaque
-                          , doc
-                          , spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d))
+            fam_insts = [ ( synFamInst
+                          , getInstDoc n
+                          , spanNameE n synFamInst (L eSpan (tcdName d))
                           , nameModule_maybe n
                           )
                         | i <- sortBy (comparing instFam) fam_instances
                         , let n = getName i
-                        , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
                         , not $ isNameHidden expInfo (fi_fam i)
                         , not $ any (isTypeHidden expInfo) (fi_tys i)
                         , let opaque = isTypeHidden expInfo (fi_rhs i)
+                        , let synFamInst = synifyFamInst i opaque
                         ]
-            cls_insts = [ ( synifyInstHead i
-                          , instLookup instDocMap n iface ifaceMap instIfaceMap
-                          , spanName n (synifyInstHead i) (L eSpan (tcdName d))
+            cls_insts = [ ( synClsInst
+                          , getInstDoc n
+                          , spanName n synClsInst (L eSpan (tcdName d))
                           , nameModule_maybe n
                           )
                         | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
                         , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
                         , not $ isInstanceHidden expInfo cls tys
+                        , let synClsInst = synifyInstHead i
                         ]
               -- fam_insts but with failing type fams filtered out
             cleanFamInsts = [ (fi, n, L l r, m) | (Right fi, n, L l (Right r), m) <- fam_insts ]
@@ -133,7 +142,7 @@ attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
       nubByName fst $ expItemFixities e ++
       [ (n',f) | n <- getMainDeclBinder d
                , n' <- n : (map fst subDocs ++ patsyn_names)
-               , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
+               , f <- maybeToList (getFixity n')
       ] }
       where
         patsyn_names = concatMap (getMainDeclBinder . fst) patsyns
@@ -152,16 +161,20 @@ attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
       let L l r = spanName s ok linst
       in L l (Right r)
 
+-- | Lookup the doc associated with a certain instance
+findInstDoc :: Interface -> IfaceMap -> InstIfaceMap -> Name -> Maybe (MDoc Name)
+findInstDoc iface ifaceMap instIfaceMap = \name ->
+  (Map.lookup name . ifaceDocMap $ iface) <|>
+  (Map.lookup name . ifaceDocMap =<< Map.lookup (nameModule name) ifaceMap) <|>
+  (Map.lookup name . instDocMap =<< Map.lookup (nameModule name) instIfaceMap)
 
-instLookup :: (InstalledInterface -> Map.Map Name a) -> Name
-            -> Interface -> IfaceMap -> InstIfaceMap -> Maybe a
-instLookup f name iface ifaceMap instIfaceMap =
-  case Map.lookup name (f $ toInstalledIface iface) of
-    res@(Just _) -> res
-    Nothing -> do
-      let ifaceMaps = Map.union (fmap toInstalledIface ifaceMap) instIfaceMap
-      iface' <- Map.lookup (nameModule name) ifaceMaps
-      Map.lookup name (f iface')
+-- | Lookup the fixity associated with a certain name
+findFixity :: Interface -> IfaceMap -> InstIfaceMap -> Name -> Maybe Fixity
+findFixity iface ifaceMap instIfaceMap = \name ->
+  (Map.lookup name . ifaceFixMap $ iface) <|>
+  (Map.lookup name . ifaceFixMap =<< Map.lookup (nameModule name) ifaceMap) <|>
+  (Map.lookup name . instFixMap =<< Map.lookup (nameModule name) instIfaceMap)
+
 
 --------------------------------------------------------------------------------
 -- Collecting and sorting instances
