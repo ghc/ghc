@@ -47,14 +47,13 @@ specialize specs = go spec_map0
     -- one by one, we should avoid infinite loops.
     spec_map0 = foldr (\(n,t) acc -> Map.insert n (go acc t) acc) mempty specs
 
+{-# SPECIALIZE specialize :: [(Name, HsType GhcRn)] -> HsType GhcRn -> HsType GhcRn #-}
 
 -- | Instantiate given binders with corresponding types.
 --
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
-specializeTyVarBndrs :: Data a
-                     => LHsQTyVars GhcRn -> [HsType GhcRn]
-                     -> a -> a
+specializeTyVarBndrs :: LHsQTyVars GhcRn -> [HsType GhcRn] -> HsType GhcRn -> HsType GhcRn
 specializeTyVarBndrs bndrs typs =
     specialize $ zip bndrs' typs
   where
@@ -64,11 +63,12 @@ specializeTyVarBndrs bndrs typs =
     bname (XTyVarBndr _) = error "haddock:specializeTyVarBndrs"
 
 
+
 specializePseudoFamilyDecl :: LHsQTyVars GhcRn -> [HsType GhcRn]
                            -> PseudoFamilyDecl GhcRn
                            -> PseudoFamilyDecl GhcRn
 specializePseudoFamilyDecl bndrs typs decl =
-  decl {pfdTyVars = map (specializeTyVarBndrs bndrs typs) (pfdTyVars decl)}
+  decl {pfdTyVars = map (fmap (specializeTyVarBndrs bndrs typs)) (pfdTyVars decl)}
 
 specializeSig :: LHsQTyVars GhcRn -> [HsType GhcRn]
               -> Sig GhcRn
