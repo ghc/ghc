@@ -1302,7 +1302,14 @@ cvtTypeKind ty_str ty
            VarT nm -> do { nm' <- tNameL nm
                          ; mk_apps (HsTyVar noExt NotPromoted nm') tys' }
            ConT nm -> do { nm' <- tconName nm
-                         ; mk_apps (HsTyVar noExt NotPromoted (noLoc nm')) tys'}
+                         ; -- ConT can contain both data constructor (i.e.,
+                           -- promoted) names and other (i.e, unpromoted)
+                           -- names, as opposed to PromotedT, which can only
+                           -- contain data constructor names. See #15572.
+                           let prom = if isRdrDataCon nm'
+                                      then Promoted
+                                      else NotPromoted
+                         ; mk_apps (HsTyVar noExt prom (noLoc nm')) tys'}
 
            ForallT tvs cxt ty
              | null tys'
