@@ -26,11 +26,11 @@ import RdrName (RdrName(Exact))
 import TysWiredIn (eqTyCon_RDR)
 
 import Control.Applicative
+import Control.Arrow ( first )
 import Control.Monad hiding (mapM)
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding (mapM)
-
 
 renameInterface :: DynFlags -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
 renameInterface dflags renamingEnv warnings iface =
@@ -92,56 +92,53 @@ renameInterface dflags renamingEnv warnings iface =
 
 --------------------------------------------------------------------------------
 -- Monad for renaming
---
--- The monad does two things for us: it passes around the environment for
--- renaming, and it returns a list of names which couldn't be found in
--- the environment.
 --------------------------------------------------------------------------------
 
 
+-- | The monad does two things for us: it passes around the environment for
+-- renaming, and it returns a list of names which couldn't be found in
+-- the environment.
 newtype RnM a =
-  RnM { unRn :: (Name -> (Bool, DocName))  -- name lookup function
-             -> (a,[Name])
+  RnM { unRn :: (Name -> (Bool, DocName))
+                -- Name lookup function. The 'Bool' indicates that if the name
+                -- was \"found\" in the environment.
+
+             -> (a, [Name] -> [Name])
+                -- Value returned, as well as a difference list of the names not
+                -- found
       }
 
 instance Monad RnM where
-  (>>=) = thenRn
-  return = pure
+  m >>= k = RnM $ \lkp -> let (a, out1) = unRn m lkp
+                              (b, out2) = unRn (k a) lkp
+                          in (b, out1 . out2)
 
 instance Functor RnM where
-  fmap f x = do a <- x; return (f a)
+  fmap f (RnM lkp) = RnM (first f . lkp)
 
 instance Applicative RnM where
-  pure = returnRn
-  (<*>) = ap
+  pure a = RnM (const (a, id))
+  mf <*> mx = RnM $ \lkp -> let (f, out1) = unRn mf lkp
+                                (x, out2) = unRn mx lkp
+                            in (f x, out1 . out2)
 
-returnRn :: a -> RnM a
-returnRn a   = RnM (const (a,[]))
-thenRn :: RnM a -> (a -> RnM b) -> RnM b
-m `thenRn` k = RnM (\lkp -> case unRn m lkp of
-  (a,out1) -> case unRn (k a) lkp of
-    (b,out2) -> (b,out1++out2))
-
-getLookupRn :: RnM (Name -> (Bool, DocName))
-getLookupRn = RnM (\lkp -> (lkp,[]))
-
-outRn :: Name -> RnM ()
-outRn name = RnM (const ((),[name]))
-
+-- | Look up a 'Name' in the renaming environment.
 lookupRn :: Name -> RnM DocName
-lookupRn name = do
-  lkp <- getLookupRn
+lookupRn name = RnM $ \lkp ->
   case lkp name of
-    (False,maps_to) -> do outRn name; return maps_to
-    (True, maps_to) -> return maps_to
+    (False,maps_to) -> (maps_to, (name :))
+    (True, maps_to) -> (maps_to, id)
 
-
-runRnFM :: LinkEnv -> RnM a -> (a,[Name])
-runRnFM env rn = unRn rn lkp
+-- | Run the renamer action using lookup in a 'LinkEnv' as the lookup function.
+-- Returns the renamed value along with a list of `Name`'s that could not be
+-- renamed because they weren't in the environment.
+runRnFM :: LinkEnv -> RnM a -> (a, [Name])
+runRnFM env rn = let (x, dlist) = unRn rn lkp in (x, dlist [])
   where
-    lkp n = case Map.lookup n env of
-      Nothing  -> (False, Undocumented n)
-      Just mdl -> (True,  Documented n mdl)
+    lkp n | isTyVarName n = (True, Undocumented n)
+          | otherwise = case Map.lookup n env of
+                          Nothing  -> (False, Undocumented n)
+                          Just mdl -> (True,  Documented n mdl)
 
 
 --------------------------------------------------------------------------------
