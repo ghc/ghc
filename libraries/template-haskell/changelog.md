@@ -1,6 +1,6 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
-## 2.14.0.0 *TBA*
+## 2.14.0.0 *August 2018*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
     `qAddForeignFile` class method to `Quasi`. Unlike `addForeingFile`, which

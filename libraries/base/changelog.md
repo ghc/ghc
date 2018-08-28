@@ -1,7 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.12.0.0 *TBA*
-  * Bundled with GHC *TBA*
+## 4.12.0.0 *August 2018*
+  * Bundled with GHC 8.6.1
 
   * The STM invariant-checking mechanism (`always` and `alwaysSucceeds`), which
     was deprecated in GHC 8.4, has been removed (as proposed in
@@ -28,8 +28,8 @@
   * `asinh` for `Float` and `Double` is now numerically stable in the face of
     non-small negative arguments and enormous arguments of either sign. (#14927)
 
-  * `Numeric.showEFloat (Just 0)` now respects the user's requested precision.
-    (#15115)
+	* `Numeric.showEFloat (Just 0)` and `Numeric.showGFloat (Just 0)`
+    now respect the user's requested precision. (#15115)
 
   * `Data.Monoid.Alt` now has `Foldable` and `Traversable` instances. (#15099)
 
@@ -42,13 +42,13 @@
     `Read1`, `Show1`, `Generic`, `Generic1`. (#15098)
 
 
-## 4.11.1.0 *TBA*
+## 4.11.1.0 *April 2018*
   * Bundled with GHC 8.4.2
 
   * Add the `readFieldHash` function to `GHC.Read` which behaves like
     `readField`, but for a field that ends with a `#` symbol (#14918).
 
-## 4.11.0.0 *TBA*
+## 4.11.0.0 *March 2018*
   * Bundled with GHC 8.4.1
 
   * `System.IO.openTempFile` is now thread-safe on Windows.

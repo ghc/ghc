@@ -1,4 +1,4 @@
-## 0.5.3 (edit as necessary)
+## 0.5.3 *August 2018*
 
 - Shipped with GHC 8.6.1
 
@@ -9,7 +9,7 @@
   Previously it returned empty pointer and non-pointer arrays
   for thunks.
 
-## 0.5.2.0
+## 0.5.2.0 *March 2018*
 
 - Shipped with GHC 8.4.1
 
