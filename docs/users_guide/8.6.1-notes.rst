@@ -35,7 +35,7 @@ Language
   the common ``MonadTrans`` typeclass could now make the expectation that an
   applied transformer is must be a ``Monad`` ::
 
-      class (forall a. Monad m => Monad (t m)) => MonadTrans t where {- ... -}
+      class (forall m. Monad m => Monad (t m)) => MonadTrans t where {- ... -}
 
   Additionally, quantification can enable terminating instance resolution
   where this previously was not possible. See :ref:`quantified-constraints` for
