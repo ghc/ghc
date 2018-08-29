@@ -360,32 +360,34 @@ table = do
     parseFirstRow :: Parser Text
     parseFirstRow = do
         skipHorizontalSpace
-        -- upper-left corner is +
-        c <- Parsec.char '+'
-        cs <- some (Parsec.char '-' <|> Parsec.char '+')
+        cs <- takeWhile (\c -> c == '-' || c == '+')
 
-        -- upper right corner is + too
-        guard (last cs == '+')
+        -- upper-left and upper-right corners are `+`
+        guard (T.length cs >= 2 &&
+               T.head cs == '+' &&
+               T.last cs == '+')
 
         -- trailing space
         skipHorizontalSpace
         _ <- Parsec.newline
 
-        return (T.cons c $ T.pack cs)
+        return cs
 
     parseRestRows :: Int -> Parser Text
     parseRestRows l = do
         skipHorizontalSpace
+        bs <- scan predicate l
 
-        c <- Parsec.char '|' <|> Parsec.char '+'
-        bs <- scan predicate (l - 2)
-        c2 <- Parsec.char '|' <|> Parsec.char '+'
+        -- Left and right edges are `|` or `+`
+        guard (T.length bs >= 2 &&
+               (T.head bs == '|' || T.head bs == '+') &&
+               (T.last bs == '|' || T.last bs == '+'))
 
         -- trailing space
         skipHorizontalSpace
         _ <- Parsec.newline
 
-        return (T.cons c (T.snoc bs c2))
+        return bs
       where
         predicate n c
             | n <= 0    = Nothing
@@ -662,7 +664,7 @@ nonSpace xs
 --  Doesn't discard the trailing newline.
 takeNonEmptyLine :: Parser Text
 takeNonEmptyLine = do
-    l <- takeWhile1 (Parsec.noneOf "\n") >>= nonSpace
+    l <- takeWhile1 (/= '\n') >>= nonSpace
     _ <- "\n"
     pure (l <> "\n")
 
@@ -732,7 +734,7 @@ nonEmptyLine :: Parser Text
 nonEmptyLine = try (mfilter (T.any (not . isSpace)) takeLine)
 
 takeLine :: Parser Text
-takeLine = try (takeWhile (Parsec.noneOf "\n") <* endOfLine)
+takeLine = try (takeWhile (/= '\n') <* endOfLine)
 
 endOfLine :: Parser ()
 endOfLine = void "\n" <|> Parsec.eof 
@@ -742,7 +744,7 @@ endOfLine = void "\n" <|> Parsec.eof
 -- >>> snd <$> parseOnly property "prop> hello world"
 -- Right (DocProperty "hello world")
 property :: Parser (DocH mod a)
-property = DocProperty . T.unpack . T.strip <$> ("prop>" *> takeWhile1 (Parsec.noneOf "\n"))
+property = DocProperty . T.unpack . T.strip <$> ("prop>" *> takeWhile1 (/= '\n'))
 
 -- |
 -- Paragraph level codeblock. Anything between the two delimiting \@ is parsed
@@ -816,7 +818,7 @@ linkParser = flip Hyperlink <$> label <*> (whitespace *> url)
 autoUrl :: Parser (DocH mod a)
 autoUrl = mkLink <$> url
   where
-    url = mappend <$> choice' [ "http://", "https://", "ftp://"] <*> takeWhile1 (Parsec.satisfy (not . isSpace))
+    url = mappend <$> choice' [ "http://", "https://", "ftp://"] <*> takeWhile1 (not . isSpace)
     
     mkLink :: Text -> DocH mod a
     mkLink s = case T.unsnoc s of

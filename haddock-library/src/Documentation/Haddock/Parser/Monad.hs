@@ -9,10 +9,15 @@ module Documentation.Haddock.Parser.Monad where
 
 import qualified Text.Parsec.Char as Parsec
 import qualified Text.Parsec as Parsec
+import           Text.Parsec.Pos             ( updatePosChar )
+import           Text.Parsec                 ( State(..)
+                                             , getParserState, setParserState )
 
 import qualified Data.Text as T
 import           Data.Text                   ( Text )
 
+import           Control.Monad               ( mfilter )
+import           Data.Functor                ( ($>) )
 import           Data.String                 ( IsString(..) )
 import           Data.Bits                   ( Bits(..) )
 import           Data.Char                   ( ord )
@@ -20,7 +25,11 @@ import           Data.List                   ( foldl' )
 import           Control.Applicative as App
 
 import           Documentation.Haddock.Types ( Version )
+import           Prelude hiding (takeWhile)
 
+-- | The only bit of information we really care about truding along with us
+-- through parsing is the version attached to a @\@since@ annotation - if
+-- the doc even contained one.
 newtype ParserState = ParserState {
   parserStateSince :: Maybe Version
 } deriving (Eq, Show)
@@ -29,7 +38,7 @@ initialParserState :: ParserState
 initialParserState = ParserState Nothing
 
 setSince :: Version -> Parser ()
-setSince since = Parsec.modifyState (\st -> st {parserStateSince = Just since})
+setSince since = Parsec.modifyState (\st -> st{ parserStateSince = Just since })
 
 type Parser = Parsec.Parsec Text ParserState
 
@@ -44,38 +53,75 @@ parseOnly p t = case Parsec.runParser p' initialParserState "<haddock>" t of
 
 -- | Always succeeds, but returns 'Nothing' if at the end of input. Does not
 -- consume input.
+--
+-- Equivalent to @Parsec.optionMaybe . Parsec.lookAhead $ Parsec.anyChar@, but
+-- more efficient.
 peekChar :: Parser (Maybe Char)
-peekChar = Parsec.optionMaybe . Parsec.try . Parsec.lookAhead $ Parsec.anyChar
+peekChar = headOpt . stateInput <$> getParserState
+  where headOpt t | T.null t = Nothing
+                  | otherwise = Just (T.head t)
+{-# INLINE peekChar #-}
 
 -- | Fails if at the end of input. Does not consume input.
+--
+-- Equivalent to @Parsec.lookAhead Parsec.anyChar@, but more efficient.
 peekChar' :: Parser Char
-peekChar' = Parsec.lookAhead Parsec.anyChar 
+peekChar' = headFail . stateInput =<< getParserState
+  where headFail t | T.null t = Parsec.parserFail "peekChar': reached EOF"
+                   | otherwise = App.pure (T.head t)
+{-# INLINE peekChar' #-}
 
 -- | Parses the given string. Returns the parsed string.
+--
+-- Equivalent to @Parsec.string (T.unpack t) $> t@, but more efficient.
 string :: Text -> Parser Text
-string t = Parsec.string (T.unpack t) *> App.pure t
+string t = do
+  s@State{ stateInput = inp, statePos = pos } <- getParserState
+  case T.stripPrefix t inp of
+    Nothing -> Parsec.parserFail "string: Failed to match the input string"
+    Just inp' ->
+      let pos' = T.foldl updatePosChar pos t
+          s' = s{ stateInput = inp', statePos = pos' }
+      in setParserState s' $> t
+
+-- | Keep matching characters as long as the predicate function holds (and
+-- return them).
+--
+-- Equivalent to @fmap T.pack . Parsec.many@, but more efficient.
+takeWhile :: (Char -> Bool) -> Parser Text
+takeWhile f = do
+  s@State{ stateInput = inp, statePos = pos } <- getParserState
+  let (t, inp') = T.span f inp
+      pos' = T.foldl updatePosChar pos t
+      s' = s{ stateInput = inp', statePos = pos' }
+  setParserState s' $> t
+
+
+-- | Like 'takeWhile', but fails if no characters matched.
+--
+-- Equivalent to @fmap T.pack . Parsec.many1@, but more efficient.
+takeWhile1 :: (Char -> Bool) -> Parser Text
+takeWhile1 = mfilter (not . T.null) . takeWhile
 
 -- | Scan the input text, accumulating characters as long as the scanning
 -- function returns true.
 scan :: (s -> Char -> Maybe s) -- ^ scan function
      -> s                      -- ^ initial state
      -> Parser Text 
-scan f = fmap T.pack . go
-  where go s1 = do { cOpt <- peekChar
-                   ; case cOpt >>= f s1 of
-                       Nothing -> pure ""
-                       Just s2 -> (:) <$> Parsec.anyChar <*> go s2
-                   }
+scan f st = do
+  s@State{ stateInput = inp, statePos = pos } <- getParserState
+  go inp st pos 0 $ \inp' pos' n ->
+    let s' = s{ Parsec.stateInput = inp', Parsec.statePos = pos' }
+    in setParserState s' $> T.take n inp
+  where
+    go inp s !pos !n cont
+      = case T.uncons inp of
+          Nothing -> cont inp pos n        -- ran out of input
+          Just (c, inp') ->
+             case f s c of
+               Nothing -> cont inp pos n   -- scan function failed
+               Just s' -> go inp' s' (updatePosChar pos c) (n+1) cont
 
--- | Apply a parser for a character zero or more times and collect the result in
--- a string.
-takeWhile :: Parser Char -> Parser Text
-takeWhile = fmap T.pack . Parsec.many
-
--- | Apply a parser for a character one or more times and collect the result in
--- a string.
-takeWhile1 :: Parser Char -> Parser Text
-takeWhile1 =  fmap T.pack . Parsec.many1
 
 -- | Parse a decimal number.
 decimal :: Integral a => Parser a

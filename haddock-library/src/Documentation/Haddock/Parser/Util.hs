@@ -40,7 +40,7 @@ skipHorizontalSpace = Parsec.skipMany (Parsec.oneOf horizontalSpace)
 
 -- | Take leading horizontal space
 takeHorizontalSpace :: Parser Text 
-takeHorizontalSpace = takeWhile (Parsec.oneOf horizontalSpace)
+takeHorizontalSpace = takeWhile (`elem` horizontalSpace)
 
 makeLabeled :: (String -> Maybe String -> a) -> Text -> a
 makeLabeled f input = case T.break isSpace $ removeEscapes $ T.strip input of
