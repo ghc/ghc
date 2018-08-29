@@ -1,5 +1,7 @@
 module Rules.BinaryDist where
 
+import Hadrian.Haskell.Cabal
+
 import Context
 import Expression
 import Oracles.Setting
@@ -19,7 +21,7 @@ bindistRules = do
       targetPlatform <- setting TargetPlatformFull
       hostOs         <- setting BuildOs
       hostArch       <- setting BuildArch
-      rtsDir         <- pkgId $ vanillaContext Stage1 rts
+      rtsDir         <- pkgIdentifier $ vanillaContext Stage1 rts
 
       let ghcBuildDir      = root -/- stageString Stage1
           bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty

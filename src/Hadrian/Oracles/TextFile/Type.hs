@@ -26,11 +26,11 @@ type instance RuleResult TextFile = String
 
 newtype CabalFile = CabalFile Context
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-type instance RuleResult CabalFile = Maybe CabalData
+type instance RuleResult CabalFile = CabalData
 
 newtype PackageDataFile = PackageDataFile Context
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-type instance RuleResult PackageDataFile = Maybe PackageData
+type instance RuleResult PackageDataFile = PackageData
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)

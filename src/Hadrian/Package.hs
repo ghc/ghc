@@ -13,79 +13,72 @@
 -----------------------------------------------------------------------------
 module Hadrian.Package (
     -- * Data types
-    Package (..), PackageName, PackageLanguage, PackageType,
+    Package (..), PackageName, PackageType,
 
     -- * Construction and properties
-    cLibrary, cProgram, hsLibrary, hsProgram, dummyPackage,
-    isLibrary, isProgram, isCPackage, isHsPackage,
+    library, program, dummyPackage, isLibrary, isProgram,
 
     -- * Package directory structure
-    pkgCabalFile, unsafePkgCabalFile
+    pkgCabalFile
     ) where
 
-import Data.Maybe
+import Development.Shake.Classes
 import Development.Shake.FilePath
-import GHC.Stack
+import GHC.Generics
 
-import Hadrian.Package.Type
 import Hadrian.Utilities
 
--- | Construct a C library package.
-cLibrary :: PackageName -> FilePath -> Package
-cLibrary = Package C Library
+-- TODO: Make PackageType more precise.
+-- See https://github.com/snowleopard/hadrian/issues/12.
+data PackageType = Library | Program deriving (Eq, Generic, Ord, Show)
 
--- | Construct a C program package.
-cProgram :: PackageName -> FilePath -> Package
-cProgram = Package C Program
+type PackageName = String
 
--- | Construct a Haskell library package.
-hsLibrary :: PackageName -> FilePath -> Package
-hsLibrary = Package Haskell Library
+-- TODO: Consider turning Package into a GADT indexed with language and type.
+data Package = Package {
+    -- | The package type. 'Library' and 'Program' packages are supported.
+    pkgType :: PackageType,
+    -- | The package name. We assume that all packages have different names,
+    -- hence two packages with the same name are considered equal.
+    pkgName :: PackageName,
+    -- | The path to the package source code relative to the root of the build
+    -- system. For example, @libraries/Cabal/Cabal@ and @ghc@ are paths to the
+    -- @Cabal@ and @ghc-bin@ packages in GHC.
+    pkgPath :: FilePath
+    } deriving (Eq, Generic, Ord, Show)
 
--- | Construct a Haskell program package.
-hsProgram :: PackageName -> FilePath -> Package
-hsProgram = Package Haskell Program
+-- | Construct a library package.
+library :: PackageName -> FilePath -> Package
+library = Package Library
 
--- | A dummy package, which we never try to build
---   but just use as a better @undefined@ in code
---   where we need a 'Package' to set up a Context
---   but will not really operate over one.
+-- | Construct a program package.
+program :: PackageName -> FilePath -> Package
+program = Package Program
+
+-- TODO: Remove this hack.
+-- | A dummy package that we never try to build but use when we need a 'Package'
+-- to construct a 'Context' but do not need to access the package field.
 dummyPackage :: Package
-dummyPackage = hsLibrary "dummy" "dummy/path/"
+dummyPackage = library "dummy" "dummy/path/"
 
 -- | Is this a library package?
 isLibrary :: Package -> Bool
-isLibrary (Package _ Library _ _) = True
+isLibrary (Package Library _ _) = True
 isLibrary _ = False
 
 -- | Is this a program package?
 isProgram :: Package -> Bool
-isProgram (Package _ Program _ _) = True
+isProgram (Package Program _ _) = True
 isProgram _ = False
 
--- | Is this a C package?
-isCPackage :: Package -> Bool
-isCPackage (Package C _ _ _) = True
-isCPackage _ = False
+-- | The path to the Cabal file of a Haskell package, e.g. @ghc/ghc-bin.cabal@.
+pkgCabalFile :: Package -> FilePath
+pkgCabalFile p = pkgPath p -/- pkgName p <.> "cabal"
 
--- | Is this a Haskell package?
-isHsPackage :: Package -> Bool
-isHsPackage (Package Haskell _ _ _) = True
--- we consider the RTS as a haskell package because we
--- use information from its Cabal file to build it,
--- and we e.g want 'pkgCabalFile' to point us to
--- 'rts/rts.cabal' when passed the rts package as argument.
-isHsPackage (Package _ _ "rts" _)   = True
-isHsPackage _ = False
+instance Binary   PackageType
+instance Hashable PackageType
+instance NFData   PackageType
 
--- | The path to the Cabal file of a Haskell package, e.g. @ghc/ghc-bin.cabal@,
--- or @Nothing@ if the argument is not a Haskell package.
-pkgCabalFile :: Package -> Maybe FilePath
-pkgCabalFile p | isHsPackage p = Just $ pkgPath p -/- pkgName p <.> "cabal"
-               | otherwise     = Nothing
-
--- | Like 'pkgCabalFile' but raises an error on a non-Cabal package.
-unsafePkgCabalFile :: HasCallStack => Package -> FilePath
-unsafePkgCabalFile p = fromMaybe (error msg) (pkgCabalFile p)
-  where
-    msg = "[unsafePkgCabalFile] Non-Cabal package: " ++ show p
+instance Binary   Package
+instance Hashable Package
+instance NFData   Package

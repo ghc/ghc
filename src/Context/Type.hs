@@ -1,11 +1,11 @@
 module Context.Type where
 
-import Hadrian.Package.Type
+import Development.Shake.Classes
+import GHC.Generics
+import Hadrian.Package
+
 import Stage
 import Way.Type
-
-import GHC.Generics
-import Development.Shake.Classes
 
 -- | Build context for a currently built 'Target'. We generate potentially
 -- different build rules for each 'Context'.

@@ -45,11 +45,10 @@ contextDependencies ctx@Context {..} = do
         deps <- concatMapM step pkgs
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
-    step pkg = pkgDependencies (ctx { Context.package = pkg }) >>= \case
-        Nothing -> return [] -- Non-Cabal packages have no dependencies.
-        Just deps -> do
-            active <- sort <$> stagePackages depStage
-            return $ intersectOrd (compare . pkgName) active deps
+    step pkg = do
+        deps   <- pkgDependencies $ ctx { Context.package = pkg }
+        active <- sort <$> stagePackages depStage
+        return $ intersectOrd (compare . pkgName) active deps
 
 cabalDependencies :: Context -> Action [String]
 cabalDependencies ctx = interpretInContext ctx $ getPackageData PD.depIpIds

@@ -408,22 +408,21 @@ renderActionNoOutput what input = do
     i = unifyPath input
 
 -- | Render the successful build of a program.
-renderProgram :: String -> String -> Maybe String -> String
+renderProgram :: String -> String -> String -> String
 renderProgram name bin synopsis = renderBox $
     [ "Successfully built program " ++ name
     , "Executable: " ++ bin ] ++
-    [ "Program synopsis: " ++ prettySynopsis synopsis | isJust synopsis ]
+    [ "Program synopsis: " ++ endWithADot synopsis | not (null synopsis) ]
 
 -- | Render the successful build of a library.
-renderLibrary :: String -> String -> Maybe String -> String
+renderLibrary :: String -> String -> String -> String
 renderLibrary name lib synopsis = renderBox $
     [ "Successfully built library " ++ name
     , "Library: " ++ lib ] ++
-    [ "Library synopsis: " ++ prettySynopsis synopsis | isJust synopsis ]
+    [ "Library synopsis: " ++ endWithADot synopsis | not (null synopsis) ]
 
-prettySynopsis :: Maybe String -> String
-prettySynopsis Nothing  = ""
-prettySynopsis (Just s) = dropWhileEnd isPunctuation s ++ "."
+endWithADot :: String -> String
+endWithADot s = dropWhileEnd isPunctuation s ++ "."
 
 -- | Render the given set of lines in an ASCII box. The minimum width and
 -- whether to use Unicode symbols are hardcoded in the function's body.

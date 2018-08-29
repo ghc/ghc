@@ -42,13 +42,13 @@ documentationRules = do
 manPageBuildPath :: FilePath
 manPageBuildPath = "docs/users_guide/build-man/ghc.1"
 
--- TODO: Add support for Documentation Packages so we can
--- run the builders without this hack.
+-- TODO: Add support for Documentation Packages so we can run the builders
+-- without this hack.
 docPackage :: Package
-docPackage = hsLibrary "Documentation" "docs"
+docPackage = library "Documentation" "docs"
 
 docPaths :: [FilePath]
-docPaths = [ "libraries", "users_guide", "Haddock" ]
+docPaths = ["libraries", "users_guide", "Haddock"]
 
 docRoot :: FilePath
 docRoot = "docs"
@@ -131,7 +131,7 @@ allHaddocks :: Action [FilePath]
 allHaddocks = do
     pkgs <- stagePackages Stage1
     sequence [ pkgHaddockFile $ vanillaContext Stage1 pkg
-             | pkg <- pkgs, isLibrary pkg, isHsPackage pkg ]
+             | pkg <- pkgs, isLibrary pkg ]
 
 haddockHtmlLib ::FilePath
 haddockHtmlLib = "docs/html/haddock-bundle.min.js"

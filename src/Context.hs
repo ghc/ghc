@@ -4,10 +4,9 @@ module Context (
 
     -- * Expressions
     getStage, getPackage, getWay, getStagedSettingList, getBuildPath,
-    withHsPackage,
 
     -- * Paths
-    contextDir, buildPath, buildDir, pkgId, pkgInplaceConfig, pkgSetupConfigFile,
+    contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgLibraryFile, pkgGhciLibraryFile, pkgConfFile, objectPath,
     contextPath, getContextPath, libDir, libPath
     ) where
@@ -44,21 +43,6 @@ getWay = way <$> getContext
 getStagedSettingList :: (Stage -> SettingList) -> Args Context b
 getStagedSettingList f = getSettingList . f =<< getStage
 
--- | Construct an expression that depends on the Cabal file of the current
--- package and is empty in a non-Haskell context.
-withHsPackage :: (Monoid a, Semigroup a) => (Context -> Expr Context b a) -> Expr Context b a
-withHsPackage expr = do
-    pkg <- getPackage
-    ctx <- getContext
-    case pkgCabalFile pkg of
-        Just _  -> expr ctx
-        Nothing -> mempty
-
-pkgId :: Context -> Action FilePath
-pkgId ctx@Context {..} = case pkgCabalFile package of
-    Just _  -> pkgIdentifier ctx
-    Nothing -> return (pkgName package) -- Non-Haskell packages, e.g. rts
-
 libDir :: Context -> FilePath
 libDir Context {..} = stageString stage -/- "lib"
 
@@ -69,7 +53,7 @@ libPath context = buildRoot <&> (-/- libDir context)
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context@Context {..} prefix suffix = do
     path <- buildPath context
-    pid  <- pkgId context
+    pid  <- pkgIdentifier context
     return $ path -/- prefix ++ pid ++ suffix
 
 -- | Path to inplace package configuration file of a given 'Context'.
@@ -108,8 +92,8 @@ pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile ctx@Context {..} = do
-    root  <- buildRoot
-    pid   <- pkgId ctx
+    root <- buildRoot
+    pid  <- pkgIdentifier ctx
     return $ root -/- relativePackageDbPath stage -/- pid <.> "conf"
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'

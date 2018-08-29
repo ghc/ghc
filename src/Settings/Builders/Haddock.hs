@@ -3,6 +3,8 @@ module Settings.Builders.Haddock (haddockBuilderArgs) where
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.PackageData as PD
 import Hadrian.Utilities
+
+import Packages
 import Rules.Documentation
 import Settings.Builders.Common
 import Settings.Builders.Ghc
@@ -11,9 +13,8 @@ import Settings.Builders.Ghc
 versionToInt :: String -> Int
 versionToInt = read . dropWhile (=='0') . filter (/='.')
 
--- TODO: Get rid of partiality (see @Just foo <- @).
 haddockBuilderArgs :: Args
-haddockBuilderArgs = withHsPackage $ \ctx -> mconcat
+haddockBuilderArgs = mconcat
     [ builder (Haddock BuildIndex) ? do
         output <- getOutput
         inputs <- getInputs
@@ -31,16 +32,17 @@ haddockBuilderArgs = withHsPackage $ \ctx -> mconcat
                      ++ "," ++ haddock | haddock <- inputs ] ]
 
     , builder (Haddock BuildPackage) ? do
-        output        <- getOutput
-        pkg           <- getPackage
-        root          <- getBuildRoot
-        path          <- getBuildPath
-        Just version  <- expr $ pkgVersion  ctx
-        Just synopsis <- expr $ pkgSynopsis ctx
-        deps          <- getPackageData PD.depNames
-        haddocks      <- expr . haddockDependencies =<< getContext
-        Just hVersion <- expr $ pkgVersion ctx
-        ghcOpts       <- haddockGhcArgs
+        output   <- getOutput
+        pkg      <- getPackage
+        root     <- getBuildRoot
+        path     <- getBuildPath
+        context  <- getContext
+        version  <- expr $ pkgVersion  context
+        synopsis <- expr $ pkgSynopsis context
+        deps     <- getPackageData PD.depNames
+        haddocks <- expr $ haddockDependencies context
+        hVersion <- expr $ pkgVersion (vanillaContext Stage2 haddock)
+        ghcOpts  <- haddockGhcArgs
         mconcat
             [ arg "--verbosity=0"
             , arg $ "-B" ++ root -/- "stage1" -/- "lib"

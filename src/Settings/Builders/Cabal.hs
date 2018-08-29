@@ -1,6 +1,5 @@
 module Settings.Builders.Cabal (cabalBuilderArgs) where
 
-import Data.Maybe (fromJust)
 import Hadrian.Builder (getBuilderPath, needBuilder)
 import Hadrian.Haskell.Cabal
 
@@ -26,7 +25,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
             , arg "--cabal-file"
-            , arg =<< fromJust . pkgCabalFile <$> getPackage
+            , arg =<< pkgCabalFile <$> getPackage
             , arg "--distdir"
             , arg $ top -/- path
             , arg "--ipid"
@@ -111,10 +110,10 @@ bootPackageConstraints :: Args
 bootPackageConstraints = stage0 ? do
     bootPkgs <- expr $ stagePackages Stage0
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
-    ctx <- getContext
-    constraints <- expr $ fmap catMaybes $ forM (sort pkgs) $ \pkg -> do
-        version <- pkgVersion (ctx { Context.package = pkg})
-        return $ fmap ((pkgName pkg ++ " == ") ++) version
+    context <- getContext
+    constraints <- expr $ forM (sort pkgs) $ \pkg -> do
+        version <- pkgVersion (context { Context.package = pkg })
+        return $ ((pkgName pkg ++ " == ") ++) version
     pure $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args

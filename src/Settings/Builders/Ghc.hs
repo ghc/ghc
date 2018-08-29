@@ -107,8 +107,9 @@ wayGhcArgs = do
               pure ["-ticky", "-DTICKY_TICKY"] ]
 
 packageGhcArgs :: Args
-packageGhcArgs = withHsPackage $ \ctx -> do
-    pkgId <- expr $ pkgIdentifier ctx
+packageGhcArgs = do
+    context <- getContext
+    pkgId   <- expr $ pkgIdentifier context
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , packageDatabaseArgs

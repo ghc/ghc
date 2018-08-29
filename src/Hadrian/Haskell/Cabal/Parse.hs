@@ -83,7 +83,7 @@ biModules pd = go [ comp | comp@(bi,_,_) <-
 -- such as platform, compiler version conditionals, and package flags.
 parseCabalFile :: Context -> Action CabalData
 parseCabalFile context@Context {..} = do
-    let file = unsafePkgCabalFile package
+    let file = pkgCabalFile package
 
     -- Read the package description from the Cabal file
     gpd <- liftIO $ C.readGenericPackageDescription C.verbose file
@@ -124,7 +124,7 @@ configurePackage :: Context -> Action ()
 configurePackage context@Context {..} = do
     putLoud $ "| Configure package " ++ quote (pkgName package)
 
-    CabalData _ _ _ gpd _pd depPkgs <- unsafeReadCabalData context
+    CabalData _ _ _ gpd _pd depPkgs <- readCabalData context
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
@@ -141,7 +141,7 @@ configurePackage context@Context {..} = do
         -- "Custom", but doesn't have a configure script.
         C.Custom -> do
             configureExists <- doesFileExist $
-                replaceFileName (unsafePkgCabalFile package) "configure"
+                replaceFileName (pkgCabalFile package) "configure"
             pure $ if configureExists then C.autoconfUserHooks else C.simpleUserHooks
         -- Not quite right, but good enough for us:
         _ | package == rts ->
@@ -165,7 +165,7 @@ configurePackage context@Context {..} = do
 copyPackage :: Context -> Action ()
 copyPackage context@Context {..} = do
     putLoud $ "| Copy package " ++ quote (pkgName package)
-    CabalData _ _ _ gpd _ _ <- unsafeReadCabalData context
+    CabalData _ _ _ gpd _ _ <- readCabalData context
     ctxPath   <- Context.contextPath context
     pkgDbPath <- packageDbPath stage
     verbosity <- getVerbosity
@@ -178,7 +178,7 @@ registerPackage :: Context -> Action ()
 registerPackage context@Context {..} = do
     putLoud $ "| Register package " ++ quote (pkgName package)
     ctxPath <- Context.contextPath context
-    CabalData _ _ _ gpd _ _ <- unsafeReadCabalData context
+    CabalData _ _ _ gpd _ _ <- readCabalData context
     verbosity <- getVerbosity
     let v = if verbosity >= Loud then "-v3" else "-v0"
     liftIO $ C.defaultMainWithHooksNoReadArgs C.autoconfUserHooks gpd
@@ -195,7 +195,7 @@ parsePackageData context@Context {..} = do
     -- let (Right (pd,_)) = C.finalizePackageDescription flags (const True) platform (compilerInfo compiler) [] gpd
     --
     -- However when using the new-build path's this might change.
-    CabalData _ _ _ _gpd pd _depPkgs <- unsafeReadCabalData context
+    CabalData _ _ _ _gpd pd _depPkgs <- readCabalData context
 
     cPath <- Context.contextPath context
     need [cPath -/- "setup-config"]

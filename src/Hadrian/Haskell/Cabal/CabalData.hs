@@ -3,7 +3,7 @@ module Hadrian.Haskell.Cabal.CabalData where
 import Development.Shake.Classes
 import Distribution.PackageDescription
 import GHC.Generics
-import Hadrian.Package.Type
+import Hadrian.Package
 
 -- | Haskell package metadata extracted from a Cabal file, without performing
 -- the resolution of package configuration flags and associated conditionals.

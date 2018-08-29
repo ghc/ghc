@@ -44,7 +44,6 @@ executable hadrian
                        , Hadrian.Oracles.TextFile.Rules
                        , Hadrian.Oracles.TextFile.Type
                        , Hadrian.Package
-                       , Hadrian.Package.Type
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Flag

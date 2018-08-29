@@ -3,7 +3,6 @@ module Rules.Library (libraryRules) where
 import Data.Functor
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.PackageData as PD
-import Hadrian.Package.Type
 import qualified System.Directory as IO
 import qualified Text.Parsec      as Parsec
 
@@ -161,21 +160,21 @@ libAContext :: BuildPath LibA -> Context
 libAContext (BuildPath _ stage pkgpath (LibA pkgname _ way)) =
     Context stage pkg way
   where
-    pkg = Package (if pkgname == "rts" then C else Haskell) Library pkgname pkgpath
+    pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given GHCi library.
 libGhciContext :: BuildPath LibGhci -> Context
 libGhciContext (BuildPath _ stage pkgpath (LibGhci pkgname _ way)) =
     Context stage pkg way
   where
-    pkg = Package (if pkgname == "rts" then C else Haskell) Library pkgname pkgpath
+    pkg = library pkgname pkgpath
 
 -- | Get the 'Context' corresponding to the build path for a given dynamic library.
 libDynContext :: BuildPath LibDyn -> Context
 libDynContext (BuildPath _ stage pkgpath (LibDyn pkgname _ way _)) =
     Context stage pkg way
   where
-    pkg = Package (if pkgname == "rts" then C else Haskell) Library pkgname pkgpath
+    pkg = library pkgname pkgpath
 
 -- | Parse a build path for a library to be built under the given build root,
 -- where the filename will be parsed with the given parser argument.
