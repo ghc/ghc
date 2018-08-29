@@ -40,7 +40,7 @@ Haskell side.
 #include "Rts.h"
 
 #include "RtsUtils.h"
-#include "Stable.h"
+#include "StablePtr.h"
 
 #if defined(USE_LIBFFI_FOR_ADJUSTORS)
 #include "ffi.h"

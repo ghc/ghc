@@ -12,7 +12,7 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "Hash.h"
-#include "Stable.h"
+#include "StablePtr.h"
 
 static HashTable * spt = NULL;
 
