@@ -26,7 +26,8 @@
 #include "ThreadLabels.h"
 #include "sm/BlockAlloc.h"
 #include "Trace.h"
-#include "Stable.h"
+#include "StableName.h"
+#include "StablePtr.h"
 #include "StaticPtrTable.h"
 #include "Hash.h"
 #include "Profiling.h"
@@ -243,7 +244,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initStorage();
 
     /* initialise the stable pointer table */
-    initStableTables();
+    initStablePtrTable();
+
+    /* initialise the stable name table */
+    initStableNameTable();
 
     /* Add some GC roots for things in the base package that the RTS
      * knows about.  We don't know whether these turn out to be CAFs
@@ -451,7 +455,10 @@ hs_exit_(bool wait_foreign)
     exitTopHandler();
 
     /* free the stable pointer table */
-    exitStableTables();
+    exitStablePtrTable();
+
+    /* free the stable name table */
+    exitStableNameTable();
 
 #if defined(DEBUG)
     /* free the thread label table */

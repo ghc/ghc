@@ -16,7 +16,7 @@
 #include "Schedule.h"
 #include "Updates.h"
 #include "Prelude.h"
-#include "Stable.h"
+#include "StablePtr.h"
 #include "Printer.h"
 #include "Profiling.h"
 #include "Disassembler.h"

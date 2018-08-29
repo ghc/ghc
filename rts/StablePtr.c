@@ -4,7 +4,7 @@
  *
  * (c) The GHC Team, 1998-2002
  *
- * Stable names and stable pointers.
+ * Stable pointers
  *
  * ---------------------------------------------------------------------------*/
 
@@ -15,7 +15,7 @@
 #include "Hash.h"
 #include "RtsUtils.h"
 #include "Trace.h"
-#include "Stable.h"
+#include "StablePtr.h"
 
 #include <string.h>
 
@@ -88,11 +88,6 @@
   http://ghc.haskell.org/trac/ghc/ticket/7670 for details.
 */
 
-snEntry *stable_name_table = NULL;
-static snEntry *stable_name_free = NULL;
-static unsigned int SNT_size = 0;
-#define INIT_SNT_SIZE 64
-
 spEntry *stable_ptr_table = NULL;
 static spEntry *stable_ptr_free = NULL;
 static unsigned int SPT_size = 0;
@@ -116,19 +111,10 @@ static spEntry *old_SPTs[MAX_N_OLD_SPTS];
 static uint32_t n_old_SPTs = 0;
 
 #if defined(THREADED_RTS)
-Mutex stable_mutex;
+Mutex stable_ptr_mutex;
 #endif
 
-static void enlargeStableNameTable(void);
 static void enlargeStablePtrTable(void);
-
-/*
- * This hash table maps Haskell objects to stable names, so that every
- * call to lookupStableName on a given object will return the same
- * stable name.
- */
-
-static HashTable *addrToStableHash = NULL;
 
 /* -----------------------------------------------------------------------------
  * We must lock the StablePtr table during GC, to prevent simultaneous
@@ -136,34 +122,21 @@ static HashTable *addrToStableHash = NULL;
  * -------------------------------------------------------------------------- */
 
 void
-stableLock(void)
+stablePtrLock(void)
 {
-    initStableTables();
-    ACQUIRE_LOCK(&stable_mutex);
+    initStablePtrTable();
+    ACQUIRE_LOCK(&stable_ptr_mutex);
 }
 
 void
-stableUnlock(void)
+stablePtrUnlock(void)
 {
-    RELEASE_LOCK(&stable_mutex);
+    RELEASE_LOCK(&stable_ptr_mutex);
 }
 
 /* -----------------------------------------------------------------------------
- * Initialising the tables
+ * Initialising the table
  * -------------------------------------------------------------------------- */
-
-STATIC_INLINE void
-initSnEntryFreeList(snEntry *table, uint32_t n, snEntry *free)
-{
-  snEntry *p;
-  for (p = table + n - 1; p >= table; p--) {
-    p->addr   = (P_)free;
-    p->old    = NULL;
-    p->sn_obj = NULL;
-    free = p;
-  }
-  stable_name_free = table;
-}
 
 STATIC_INLINE void
 initSpEntryFreeList(spEntry *table, uint32_t n, spEntry *free)
@@ -177,19 +150,8 @@ initSpEntryFreeList(spEntry *table, uint32_t n, spEntry *free)
 }
 
 void
-initStableTables(void)
+initStablePtrTable(void)
 {
-    if (SNT_size > 0) return;
-    SNT_size = INIT_SNT_SIZE;
-    stable_name_table = stgMallocBytes(SNT_size * sizeof(snEntry),
-                                       "initStableNameTable");
-    /* we don't use index 0 in the stable name table, because that
-     * would conflict with the hash table lookup operations which
-     * return NULL if an entry isn't found in the hash table.
-     */
-    initSnEntryFreeList(stable_name_table + 1,INIT_SNT_SIZE-1,NULL);
-    addrToStableHash = allocHashTable();
-
     if (SPT_size > 0) return;
     SPT_size = INIT_SPT_SIZE;
     stable_ptr_table = stgMallocBytes(SPT_size * sizeof(spEntry),
@@ -197,30 +159,15 @@ initStableTables(void)
     initSpEntryFreeList(stable_ptr_table,INIT_SPT_SIZE,NULL);
 
 #if defined(THREADED_RTS)
-    initMutex(&stable_mutex);
+    initMutex(&stable_ptr_mutex);
 #endif
 }
 
 /* -----------------------------------------------------------------------------
- * Enlarging the tables
+ * Enlarging the table
  * -------------------------------------------------------------------------- */
 
-static void
-enlargeStableNameTable(void)
-{
-    uint32_t old_SNT_size = SNT_size;
-
-    // 2nd and subsequent times
-    SNT_size *= 2;
-    stable_name_table =
-        stgReallocBytes(stable_name_table,
-                        SNT_size * sizeof(snEntry),
-                        "enlargeStableNameTable");
-
-    initSnEntryFreeList(stable_name_table + old_SNT_size, old_SNT_size, NULL);
-}
-
-// Must be holding stable_mutex
+// Must be holding stable_ptr_mutex
 static void
 enlargeStablePtrTable(void)
 {
@@ -283,17 +230,8 @@ freeOldSPTs(void)
 }
 
 void
-exitStableTables(void)
+exitStablePtrTable(void)
 {
-    if (addrToStableHash)
-        freeHashTable(addrToStableHash, NULL);
-    addrToStableHash = NULL;
-
-    if (stable_name_table)
-        stgFree(stable_name_table);
-    stable_name_table = NULL;
-    SNT_size = 0;
-
     if (stable_ptr_table)
         stgFree(stable_ptr_table);
     stable_ptr_table = NULL;
@@ -302,17 +240,8 @@ exitStableTables(void)
     freeOldSPTs();
 
 #if defined(THREADED_RTS)
-    closeMutex(&stable_mutex);
+    closeMutex(&stable_ptr_mutex);
 #endif
-}
-
-STATIC_INLINE void
-freeSnEntry(snEntry *sn)
-{
-  ASSERT(sn->sn_obj == NULL);
-  removeHashTable(addrToStableHash, (W_)sn->old, NULL);
-  sn->addr = (P_)stable_name_free;
-  stable_name_free = sn;
 }
 
 STATIC_INLINE void
@@ -332,99 +261,26 @@ freeStablePtrUnsafe(StgStablePtr sp)
 void
 freeStablePtr(StgStablePtr sp)
 {
-    stableLock();
+    stablePtrLock();
     freeStablePtrUnsafe(sp);
-    stableUnlock();
+    stablePtrUnlock();
 }
 
 /* -----------------------------------------------------------------------------
  * Looking up
  * -------------------------------------------------------------------------- */
 
-/*
- * get at the real stuff...remove indirections.
- */
-static StgClosure*
-removeIndirections (StgClosure* p)
-{
-    StgClosure* q;
-
-    while (1)
-    {
-        q = UNTAG_CLOSURE(p);
-
-        switch (get_itbl(q)->type) {
-        case IND:
-        case IND_STATIC:
-            p = ((StgInd *)q)->indirectee;
-            continue;
-
-        case BLACKHOLE:
-            p = ((StgInd *)q)->indirectee;
-            if (GET_CLOSURE_TAG(p) != 0) {
-                continue;
-            } else {
-                break;
-            }
-
-        default:
-            break;
-        }
-        return p;
-    }
-}
-
-StgWord
-lookupStableName (StgPtr p)
-{
-  stableLock();
-
-  if (stable_name_free == NULL) {
-    enlargeStableNameTable();
-  }
-
-  /* removing indirections increases the likelihood
-   * of finding a match in the stable name hash table.
-   */
-  p = (StgPtr)removeIndirections((StgClosure*)p);
-
-  // register the untagged pointer.  This just makes things simpler.
-  p = (StgPtr)UNTAG_CLOSURE((StgClosure*)p);
-
-  StgWord sn = (StgWord)lookupHashTable(addrToStableHash,(W_)p);
-
-  if (sn != 0) {
-    ASSERT(stable_name_table[sn].addr == p);
-    debugTrace(DEBUG_stable, "cached stable name %ld at %p",sn,p);
-    stableUnlock();
-    return sn;
-  }
-
-  sn = stable_name_free - stable_name_table;
-  stable_name_free  = (snEntry*)(stable_name_free->addr);
-  stable_name_table[sn].addr = p;
-  stable_name_table[sn].sn_obj = NULL;
-  /* debugTrace(DEBUG_stable, "new stable name %d at %p\n",sn,p); */
-
-  /* add the new stable name to the hash table */
-  insertHashTable(addrToStableHash, (W_)p, (void *)sn);
-
-  stableUnlock();
-
-  return sn;
-}
-
 StgStablePtr
 getStablePtr(StgPtr p)
 {
   StgWord sp;
 
-  stableLock();
+  stablePtrLock();
   if (!stable_ptr_free) enlargeStablePtrTable();
   sp = stable_ptr_free - stable_ptr_table;
   stable_ptr_free  = (spEntry*)(stable_ptr_free->addr);
   stable_ptr_table[sp].addr = p;
-  stableUnlock();
+  stablePtrUnlock();
   return (StgStablePtr)(sp);
 }
 
@@ -447,50 +303,15 @@ getStablePtr(StgPtr p)
         }                                                               \
     } while(0)
 
-#define FOR_EACH_STABLE_NAME(p, CODE)                                   \
-    do {                                                                \
-        snEntry *p;                                                     \
-        snEntry *__end_ptr = &stable_name_table[SNT_size];              \
-        for (p = stable_name_table + 1; p < __end_ptr; p++) {           \
-            /* Internal pointers are free slots.  */                    \
-            /* If p->addr == NULL, it's a */                            \
-            /* stable name where the object has been GC'd, but the */   \
-            /* StableName object (sn_obj) is still alive. */            \
-            if ((p->addr < (P_)stable_name_table ||                     \
-                 p->addr >= (P_)__end_ptr))                             \
-            {                                                           \
-                /* NOTE: There is an ambiguity here if p->addr == NULL */ \
-                /* it is either the last item in the free list or it */ \
-                /* is a stable name whose pointee died. sn_obj == NULL */ \
-                /* disambiguates as last free list item. */             \
-                do { CODE } while(0);                                   \
-            }                                                           \
-        }                                                               \
-    } while(0)
-
-STATIC_INLINE void
-markStablePtrTable(evac_fn evac, void *user)
-{
-    FOR_EACH_STABLE_PTR(p, evac(user, (StgClosure **)&p->addr););
-}
-
-STATIC_INLINE void
-rememberOldStableNameAddresses(void)
-{
-    /* TODO: Only if !full GC */
-    FOR_EACH_STABLE_NAME(p, p->old = p->addr;);
-}
-
 void
-markStableTables(evac_fn evac, void *user)
+markStablePtrTable(evac_fn evac, void *user)
 {
     /* Since no other thread can currently be dereferencing a stable pointer, it
      * is safe to free the old versions of the table.
      */
     freeOldSPTs();
 
-    markStablePtrTable(evac, user);
-    rememberOldStableNameAddresses();
+    FOR_EACH_STABLE_PTR(p, evac(user, (StgClosure **)&p->addr););
 }
 
 /* -----------------------------------------------------------------------------
@@ -501,109 +322,8 @@ markStableTables(evac_fn evac, void *user)
  * collector may move the object it points to.
  * -------------------------------------------------------------------------- */
 
-STATIC_INLINE void
-threadStableNameTable( evac_fn evac, void *user )
-{
-    FOR_EACH_STABLE_NAME(p, {
-        if (p->sn_obj != NULL) {
-            evac(user, (StgClosure **)&p->sn_obj);
-        }
-        if (p->addr != NULL) {
-            evac(user, (StgClosure **)&p->addr);
-        }
-    });
-}
-
-STATIC_INLINE void
+void
 threadStablePtrTable( evac_fn evac, void *user )
 {
     FOR_EACH_STABLE_PTR(p, evac(user, (StgClosure **)&p->addr););
-}
-
-void
-threadStableTables( evac_fn evac, void *user )
-{
-    threadStableNameTable(evac, user);
-    threadStablePtrTable(evac, user);
-}
-
-/* -----------------------------------------------------------------------------
- * Garbage collect any dead entries in the stable name table.
- *
- * A dead entry has:
- *
- *          - a zero reference count
- *          - a dead sn_obj
- *
- * Both of these conditions must be true in order to re-use the stable
- * name table entry.  We can re-use stable name table entries for live
- * heap objects, as long as the program has no StableName objects that
- * refer to the entry.
- * -------------------------------------------------------------------------- */
-
-void
-gcStableTables( void )
-{
-    FOR_EACH_STABLE_NAME(
-        p, {
-            // FOR_EACH_STABLE_NAME traverses free entries too, so
-            // check sn_obj
-            if (p->sn_obj != NULL) {
-                // Update the pointer to the StableName object, if there is one
-                p->sn_obj = isAlive(p->sn_obj);
-                if (p->sn_obj == NULL) {
-                    // StableName object died
-                    debugTrace(DEBUG_stable, "GC'd StableName %ld (addr=%p)",
-                               (long)(p - stable_name_table), p->addr);
-                    freeSnEntry(p);
-                } else if (p->addr != NULL) {
-                    // sn_obj is alive, update pointee
-                    p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-                    if (p->addr == NULL) {
-                        // Pointee died
-                        debugTrace(DEBUG_stable, "GC'd pointee %ld",
-                                   (long)(p - stable_name_table));
-                    }
-                }
-            }
-        });
-}
-
-/* -----------------------------------------------------------------------------
- * Update the StableName hash table
- *
- * The boolean argument 'full' indicates that a major collection is
- * being done, so we might as well throw away the hash table and build
- * a new one.  For a minor collection, we just re-hash the elements
- * that changed.
- * -------------------------------------------------------------------------- */
-
-void
-updateStableTables(bool full)
-{
-    if (full && addrToStableHash != NULL && 0 != keyCountHashTable(addrToStableHash)) {
-        freeHashTable(addrToStableHash,NULL);
-        addrToStableHash = allocHashTable();
-    }
-
-    if(full) {
-        FOR_EACH_STABLE_NAME(
-            p, {
-                if (p->addr != NULL) {
-                    // Target still alive, Re-hash this stable name
-                    insertHashTable(addrToStableHash, (W_)p->addr, (void *)(p - stable_name_table));
-                }
-            });
-    } else {
-        FOR_EACH_STABLE_NAME(
-            p, {
-                if (p->addr != p->old) {
-                    removeHashTable(addrToStableHash, (W_)p->old, NULL);
-                    /* Movement happened: */
-                    if (p->addr != NULL) {
-                        insertHashTable(addrToStableHash, (W_)p->addr, (void *)(p - stable_name_table));
-                    }
-                }
-            });
-    }
 }
