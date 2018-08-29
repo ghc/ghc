@@ -59,12 +59,11 @@ In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
 
 * `--build-root=PATH` or `-oPATH`: specify the directory in which you want to store all
-the build artifacts. If none is specified by the user, hadrian will store everything
-under `_build/` at the top of ghc's source tree. Unlike GHC's make build system,
-hadrian doesn't have any "inplace" logic left anymore. This option is therefore
-useful for GHC developers who want to build GHC in different ways or at different
-commits, from the same directory, and have the build products sit in different,
-isolated folders.
+build products. By default Hadrian builds everything in the `_build/` subdirectory of
+the GHC source tree. Unlike the Make build system, Hadrian doesn't have any "inplace"
+logic left anymore. This option is therefore useful for GHC developers who want to build
+GHC in different ways or at different commits, from the same source directory, and have
+the build products sit in different, isolated folders.
 
 * `--configure` or `-c`: use this flag to run the `boot` and `configure` scripts
 automatically, so that you don't have to remember to run them manually as you normally
