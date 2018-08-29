@@ -23,7 +23,7 @@ import Fingerprint
 import Data.List
 import Outputable (Outputable(..), text, (<+>))
 
-#if __GLASGOW_HASKELL__ < 840
+#if __GLASGOW_HASKELL__ < 804
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
