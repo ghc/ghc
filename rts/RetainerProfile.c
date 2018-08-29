@@ -30,7 +30,8 @@
 #include "Stats.h"
 #include "ProfHeap.h"
 #include "Apply.h"
-#include "Stable.h" /* markStableTables */
+#include "StablePtr.h" /* markStablePtrTable */
+#include "StableName.h" /* rememberOldStableNameAddresses */
 #include "sm/Storage.h" // for END_OF_STATIC_LIST
 
 /* Note [What is a retainer?]
@@ -1693,7 +1694,9 @@ computeRetainerSet( void )
     }
 
     // Consider roots from the stable ptr table.
-    markStableTables(retainRoot, NULL);
+    markStablePtrTable(retainRoot, NULL);
+    // Remember old stable name addresses.
+    rememberOldStableNameAddresses ();
 
     // The following code resets the rs field of each unvisited mutable
     // object (computing sumOfNewCostExtra and updating costArray[] when

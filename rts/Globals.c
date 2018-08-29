@@ -21,7 +21,7 @@
 #include "Rts.h"
 
 #include "Globals.h"
-#include "Stable.h"
+#include "StablePtr.h"
 
 typedef enum {
     GHCConcSignalSignalHandlerStore,

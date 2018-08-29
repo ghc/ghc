@@ -15,7 +15,6 @@
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Ticker.h"
-#include "Stable.h"
 #include "ThreadLabels.h"
 #include "Libdw.h"
 
