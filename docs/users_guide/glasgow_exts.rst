@@ -2307,8 +2307,16 @@ Data types with no constructors
 
     Allow definition of empty ``data`` types.
 
-With the :extension:`EmptyDataDecls` extension, GHC
-lets you declare a data type with no constructors. For example: ::
+With the :extension:`EmptyDataDecls` extension, GHC lets you declare a
+data type with no constructors.
+
+You only need to enable this extension if the language you're using
+is Haskell 98, in which a data type must have at least one constructor.
+Haskell 2010 relaxed this rule to allow data types with no constructors,
+and thus :extension:`EmptyDataDecls` is enabled by default when the
+language is Haskell 2010.
+
+For example: ::
 
       data S      -- S :: Type
       data T a    -- T :: Type -> Type
