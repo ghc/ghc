@@ -427,7 +427,7 @@ Note [Typeable for Nat and Symbol]
 We have special Typeable instances for Nat and Symbol.  Roughly we
 have this instance, implemented here by doTyLit:
       instance KnownNat n => Typeable (n :: Nat) where
-         typeRep = tyepNatTypeRep @n
+         typeRep = typeNatTypeRep @n
 where
    Data.Typeable.Internals.typeNatTypeRep :: KnownNat a => TypeRep a
 
