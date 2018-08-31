@@ -1273,12 +1273,6 @@ topNormaliseType_maybe env ty
 
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
-          -- NB: It's OK to use normaliseTcArgs here instead of
-          -- normalise_tc_args (which takes the LiftingContext described
-          -- in Note [Normalising types]) because the reduceTyFamApp below
-          -- works only at top level. We'll never recur in this function
-          -- after reducing the kind of a bound tyvar.
-
         case reduceTyFamApp_maybe env Representational tc ntys of
           Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
           _              -> NS_Done

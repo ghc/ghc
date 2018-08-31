@@ -1464,7 +1464,7 @@ kind-generalize correctly.
 
 In Step 4, we have to deal with the fact that metatyvars generated
 in the type may have a bumped TcLevel, because explicit foralls
-raise the TcLevel. To avoid these variables from every being visible
+raise the TcLevel. To avoid these variables from ever being visible
 in the surrounding context, we must obey the following dictum:
 
   Every metavariable in a type must either be
@@ -1476,18 +1476,20 @@ has a proper TcLevel. (I'm ignoring the TcLevel on a skolem here, as
 it's not really in play here.) On the other hand, if it is not
 generalized (because we're not generalizing the construct -- e.g., pattern
 sig -- or because the metavars are constrained -- see kindGeneralizeLocal)
-we need to promote to (MetaTvInv) of Note [TcLevel and untouchable type variables]
+we need to promote to maintain (MetaTvInv) of Note [TcLevel and untouchable type variables]
 in TcType.
 
 After promoting/generalizing, we need to zonk *again* because both
 promoting and generalizing fill in metavariables.
 
 To avoid the double-zonk, we do two things:
- 1. zonkPromoteType and friends zonk and promote at the same time.
-    Accordingly, the function does setps 3-5 all at once, preventing
+ 1. When we're not generalizing:
+    zonkPromoteType and friends zonk and promote at the same time.
+    Accordingly, the function does steps 3-5 all at once, preventing
     the need for multiple traversals.
 
- 2. kindGeneralize does not require a zonked type -- it zonks as it
+ 2. When we are generalizing:
+    kindGeneralize does not require a zonked type -- it zonks as it
     gathers free variables. So this way effectively sidesteps step 3.
 
 -}
