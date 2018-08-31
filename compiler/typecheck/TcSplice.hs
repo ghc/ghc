@@ -1183,7 +1183,7 @@ reifyInstances th_nm th_tys
             <- failIfEmitsConstraints $  -- avoid error cascade if there are unsolved
                tcImplicitTKBndrs ReifySkol tv_names $
                fst <$> tcLHsType rn_ty
-        ; ty <- zonkTcTypeToType emptyZonkEnv ty
+        ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind
                 -- variables inside it (Trac #7477)

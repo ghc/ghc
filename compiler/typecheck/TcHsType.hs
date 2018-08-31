@@ -253,8 +253,8 @@ tcHsDeriv hs_ty
        ; ty <- checkNoErrs $
                  -- avoid redundant error report with "illegal deriving", below
                tc_hs_sig_type_and_gen (SigTypeSkol DerivClauseCtxt) hs_ty cls_kind
-       ; cls_kind <- zonkTcTypeToType emptyZonkEnv cls_kind
-       ; ty <- zonkTcTypeToType emptyZonkEnv ty
+       ; cls_kind <- zonkTcTypeToType cls_kind
+       ; ty <- zonkTcTypeToType ty
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
@@ -297,7 +297,7 @@ tcDerivStrategy user_ctxt mds thing_inside
       cls_kind <- newMetaKindVar
       ty' <- checkNoErrs $
              tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty cls_kind
-      ty' <- zonkTcTypeToType emptyZonkEnv ty'
+      ty' <- zonkTcTypeToType ty'
       let (via_tvs, via_pred) = splitForAllTys ty'
       tcExtendTyVarEnv via_tvs $ do
         (thing_tvs, thing) <- thing_inside
@@ -322,7 +322,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
        types. Much better just to report the kind error directly. -}
     do { inst_ty <- failIfEmitsConstraints $
                     tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
-       ; inst_ty <- zonkTcTypeToType emptyZonkEnv inst_ty
+       ; inst_ty <- zonkTcTypeToType inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
 ----------------------------------------------

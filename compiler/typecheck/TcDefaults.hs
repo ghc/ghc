@@ -73,7 +73,7 @@ tc_default_ty :: [Class] -> LHsType GhcRn -> TcM Type
 tc_default_ty deflt_clss hs_ty
  = do   { (ty, _kind) <- solveEqualities $
                          tcLHsType hs_ty
-        ; ty <- zonkTcTypeToType emptyZonkEnv ty   -- establish Type invariants
+        ; ty <- zonkTcTypeToType ty   -- establish Type invariants
         ; checkValidType DefaultDeclCtxt ty
 
         -- Check that the type is an instance of at least one of the deflt_clss

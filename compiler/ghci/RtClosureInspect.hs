@@ -39,7 +39,7 @@ import Var
 import TcRnMonad
 import TcType
 import TcMType
-import TcHsSyn ( zonkTcTypeToType, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi ) )
+import TcHsSyn ( zonkTcTypeToTypeX, mkEmptyZonkEnv, ZonkFlexi( RuntimeUnkFlexi ) )
 import TcUnify
 import TcEnv
 
@@ -1258,7 +1258,8 @@ zonkTerm = foldTermM (TermFoldM
 zonkRttiType :: TcType -> TcM Type
 -- Zonk the type, replacing any unbound Meta tyvars
 -- by RuntimeUnk skolems, safely out of Meta-tyvar-land
-zonkRttiType = zonkTcTypeToType (mkEmptyZonkEnv RuntimeUnkFlexi)
+zonkRttiType ty= do { ze <- mkEmptyZonkEnv RuntimeUnkFlexi
+                    ; zonkTcTypeToTypeX ze ty }
 
 --------------------------------------------------------------------------------
 -- Restore Class predicates out of a representation type
