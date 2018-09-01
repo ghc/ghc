@@ -1,37 +1,17 @@
 #!/usr/bin/env bash
 
 CABAL=cabal
+CABFLAGS="--disable-documentation --disable-profiling"
+
+# It is currently more robust to pass Cabal an absolute path to the project file.
+PROJ="$PWD/hadrian/cabal.project"
 
 set -euo pipefail
 
-# readlink on os x, doesn't support -f, to prevent the
-# need of installing coreutils (e.g. through brew, just
-# for readlink, we use the follownig substitute.
-#
-# source: http://stackoverflow.com/a/1116890
-function rl {
-    TARGET_FILE="$1"
-
-    cd "$(dirname "$TARGET_FILE")"
-    TARGET_FILE="$(basename "$TARGET_FILE")"
-
-    # Iterate down a (possible) chain of symlinks
-    while [ -L "$TARGET_FILE" ]
-    do
-        TARGET_FILE="$(readlink "$TARGET_FILE")"
-        cd "$(dirname "$TARGET_FILE")"
-        TARGET_FILE="$(basename "$TARGET_FILE")"
-    done
-
-    # Compute the canonicalized name by finding the physical path
-    # for the directory we're in and appending the target file.
-    PHYS_DIR="$(pwd -P)"
-    RESULT="$PHYS_DIR/$TARGET_FILE"
-    echo "$RESULT"
-}
-
-absoluteRoot="$(dirname "$(rl "$0")")"
-cd "$absoluteRoot"
+if ! [ -f "$PROJ" ]; then
+    echo "Current working directory must be GHC's top-level folder"
+    exit 2
+fi
 
 if ! type "$CABAL" > /dev/null; then
     echo "Please make sure 'cabal' is in your PATH"
@@ -39,37 +19,16 @@ if ! type "$CABAL" > /dev/null; then
 fi
 
 CABVERSTR=$("$CABAL" --numeric-version)
-
 CABVER=( ${CABVERSTR//./ } )
 
-if [ "${CABVER[0]}" -gt 2 -o "${CABVER[0]}" -eq 2 -a "${CABVER[1]}" -ge 1 ]; then
-    # New enough Cabal version detected, so let's use the superior new-build + new-run
-    # modes. Note that pre-2.1 Cabal does not support passing additional parameters
-    # to the executable (hadrian) after the separator '--', see #438.
-
-    "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
-    "$CABAL" new-run hadrian --        \
-        --lint                         \
-        --directory "$absoluteRoot/.." \
+if [ "${CABVER[0]}" -gt 2 -o "${CABVER[0]}" -eq 2 -a "${CABVER[1]}" -ge 2 ];
+then
+    "$CABAL" --project-file="$PROJ" new-build $CABFLAGS -j exe:hadrian
+    "$CABAL" --project-file="$PROJ" new-run   $CABFLAGS    exe:hadrian -- \
+        --lint             \
+        --directory "$PWD" \
         "$@"
-
 else
-    # The logic below is quite fragile, but it's better than nothing for pre-2.1 Cabal.
-    echo "Old pre cabal 2.1 version detected. Falling back to legacy 'cabal sandbox' mode."
-
-    # Initialize sandbox if necessary
-    if ! ( "$CABAL" sandbox hc-pkg list > /dev/null 2>&1); then
-        "$CABAL" sandbox init
-        "$CABAL" sandbox add-source ../libraries/Cabal/Cabal
-    fi
-
-    "$CABAL" install                \
-	--dependencies-only         \
-	--disable-library-profiling \
-	--disable-shared
-
-    "$CABAL" run hadrian --            \
-        --lint                         \
-        --directory "$absoluteRoot/.." \
-        "$@"
+    echo "Cabal version is too old; you need at least cabal-install 2.2"
+    exit 2
 fi

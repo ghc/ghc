@@ -8,13 +8,13 @@ matrix:
               apt:
                   packages:
                       - ghc-8.2.2
-                      - cabal-install-2.0
+                      - cabal-install-2.2
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
               - PATH="/opt/ghc/8.2.2/bin:$PATH"
-              - PATH="/opt/cabal/2.0/bin:$PATH"
+              - PATH="/opt/cabal/2.2/bin:$PATH"
 
           script:
               # Run internal Hadrian tests, after boot and configure.
@@ -27,13 +27,13 @@ matrix:
               apt:
                   packages:
                       - ghc-8.2.2
-                      - cabal-install-2.0
+                      - cabal-install-2.2
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
               - PATH="/opt/ghc/8.2.2/bin:$PATH"
-              - PATH="/opt/cabal/2.0/bin:$PATH"
+              - PATH="/opt/cabal/2.2/bin:$PATH"
 
           script:
               # Build GHC, letting hadrian boot & configure the ghc source tree

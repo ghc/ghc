@@ -35,10 +35,10 @@ compile:
 
     # XXX: export PATH doesn't work well either, so we use inline env
     # Self test
-    - PATH=~/.cabal/bin:$PATH ghc/hadrian/build.sh selftest
+    - cd ghc; PATH=~/.cabal/bin:$PATH hadrian/build.sh selftest
 
     # Build GHC
-    - PATH=~/.cabal/bin:$PATH ghc/hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
+    - cd ghc; PATH=~/.cabal/bin:$PATH hadrian/build.sh -j $MODE --no-progress --progress-colour=never --profile=-
 
 test:
   override:
