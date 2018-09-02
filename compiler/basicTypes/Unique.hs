@@ -325,7 +325,7 @@ iToBase62 n_
     go n cs | n < 62
             = let !c = chooseChar62 n in c : cs
             | otherwise
-            = go q (c : cs) where (q, r) = quotRem n 62
+            = go q (c : cs) where (!q, r) = quotRem n 62
                                   !c = chooseChar62 r
 
     chooseChar62 :: Int -> Char
