@@ -132,11 +132,9 @@ programName Context {..} = do
     targetPlatform <- setting TargetPlatformFull
     let prefix = if cross then targetPlatform ++ "-" else ""
     -- TODO: Can we extract this information from Cabal files?
-    -- Also, why @runhaskell@ instead of @runghc@?
     return $ prefix ++ case package of
                               p | p == ghc    -> "ghc"
                                 | p == hpcBin -> "hpc"
-                                | p == runGhc -> "runhaskell"
                                 | p == iserv  -> "ghc-iserv"
                               _               -> pkgName package
 

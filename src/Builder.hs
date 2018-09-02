@@ -171,7 +171,7 @@ instance H.Builder Builder where
     runtimeDependencies :: Builder -> Action [FilePath]
     runtimeDependencies = \case
         Autoreconf dir -> return [dir -/- "configure.ac"]
-        Configure dir -> return [dir -/- "configure"]
+        Configure  dir -> return [dir -/- "configure"]
 
         Ghc _ Stage0 -> return []
         Ghc _ stage -> do
@@ -230,7 +230,7 @@ instance H.Builder Builder where
                 Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
                 Autoreconf dir -> cmd echo [Cwd dir] [path] buildArgs
-                Configure dir -> do
+                Configure  dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
                     bash <- bashPath

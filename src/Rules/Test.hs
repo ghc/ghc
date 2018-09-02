@@ -79,17 +79,13 @@ testRules = do
 -- | Build extra programs and libraries required by testsuite
 needTestsuitePackages :: Action ()
 needTestsuitePackages = do
-    targets        <- mapM (needFile Stage1) =<< testsuitePackages
-    binPath        <- stageBinPath Stage1
-    libPath        <- stageLibPath Stage1
-    iservPath      <- needFile Stage1 iserv
-    runhaskellPath <- needFile Stage1 runGhc
+    targets   <- mapM (needFile Stage1) =<< testsuitePackages
+    libPath   <- stageLibPath Stage1
+    iservPath <- needFile Stage1 iserv
     need targets
     -- | We need to copy iserv bin to lib/bin as this is where testsuite looks
-    -- | for iserv. Also, using runhaskell gives different stdout due to
-    -- | difference in program name. This causes StdMismatch errors.
+    -- | for iserv.
     copyFile iservPath $ libPath -/- "bin/ghc-iserv"
-    copyFile runhaskellPath $ binPath -/- "runghc"
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
