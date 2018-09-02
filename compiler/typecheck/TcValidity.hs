@@ -63,6 +63,7 @@ import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Foldable
 import Data.List        ( (\\), nub )
 import qualified Data.List.NonEmpty as NE
 
@@ -1174,7 +1175,7 @@ check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
   = failWithTc (instTypeErr clas cls_args msg)
 
   | otherwise
-  = mapM_ checkValidTypePat ty_args
+  = checkValidTypePats (classTyCon clas) cls_args
   where
     clas_nm = getName clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
@@ -1963,7 +1964,7 @@ checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
 --         type instance F (T a) = a
 -- c) For associated types, are consistently instantiated
 checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
-  = do { mapM_ checkValidTypePat user_ty_pats
+  = do { checkValidTypePats fam_tc user_ty_pats
 
        ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes user_ty_pats)
                                       (tvs ++ cvs)
@@ -1972,19 +1973,44 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pat
          -- Check that type patterns match the class instance head
        ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
 
-checkValidTypePat :: Type -> TcM ()
--- Used for type patterns in class instances,
--- and in type/data family instances
-checkValidTypePat pat_ty
-  = do { -- Check that pat_ty is a monotype
-         checkValidMonoType pat_ty
-             -- One could imagine generalising to allow
-             --      instance C (forall a. a->a)
-             -- but we don't know what all the consequences might be
+-- | Checks for occurrences of type families in class instances and type/data
+-- family instances.
+checkValidTypePats :: TyCon -> [Type] -> TcM ()
+checkValidTypePats tc pat_ty_args =
+  traverse_ (check_valid_type_pat False) invis_ty_args *>
+  traverse_ (check_valid_type_pat True)  vis_ty_args
+  where
+    (invis_ty_args, vis_ty_args) = partitionInvisibleTypes tc pat_ty_args
+    inst_ty = mkTyConApp tc pat_ty_args
 
-          -- Ensure that no type family instances occur a type pattern
-       ; checkTc (isTyFamFree pat_ty) $
-         tyFamInstIllegalErr pat_ty }
+    check_valid_type_pat
+      :: Bool -- True if this is an /visible/ argument to the TyCon.
+      -> Type -> TcM ()
+    -- Used for type patterns in class instances,
+    -- and in type/data family instances
+    check_valid_type_pat vis_arg pat_ty
+      = do { -- Check that pat_ty is a monotype
+             checkValidMonoType pat_ty
+                 -- One could imagine generalising to allow
+                 --      instance C (forall a. a->a)
+                 -- but we don't know what all the consequences might be
+
+              -- Ensure that no type family instances occur a type pattern
+           ; case tcTyFamInsts pat_ty of
+               [] -> pure ()
+               ((tf_tc, tf_args):_) ->
+                 failWithTc $
+                 ty_fam_inst_illegal_err vis_arg (mkTyConApp tf_tc tf_args) }
+
+    ty_fam_inst_illegal_err :: Bool -> Type -> SDoc
+    ty_fam_inst_illegal_err vis_arg ty
+      = sdocWithDynFlags $ \dflags ->
+        hang (text "Illegal type synonym family application"
+                <+> quotes (ppr ty) <+> text "in instance" <>
+             colon) 2 $
+          vcat [ ppr inst_ty
+               , ppUnless (vis_arg || gopt Opt_PrintExplicitKinds dflags) $
+                 text "Use -fprint-explicit-kinds to see the kind arguments" ]
 
 -- Error messages
 
@@ -1992,12 +2018,6 @@ inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch fi_ax cur_branch
   = text "Type family instance equation is overlapped:" $$
     nest 2 (pprCoAxBranch fi_ax cur_branch)
-
-tyFamInstIllegalErr :: Type -> SDoc
-tyFamInstIllegalErr ty
-  = hang (text "Illegal type synonym family application in instance" <>
-         colon) 2 $
-      ppr ty
 
 nestedMsg :: SDoc -> SDoc
 nestedMsg what
