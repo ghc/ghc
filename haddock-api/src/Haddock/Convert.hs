@@ -37,7 +37,7 @@ import Type
 import TyCoRep
 import TysPrim ( alphaTyVars )
 import TysWiredIn ( eqTyConName, listTyConName, liftedTypeKindTyConName
-                  , unitTy )
+                  , unitTy, promotedNilDataCon, promotedConsDataCon )
 import PrelNames ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedRepDataConKey )
 import Unique ( getUnique )
@@ -463,8 +463,18 @@ synifyType _ (TyConApp tc tys)
       , dataConSourceArity dc == length vis_tys
       = noLoc $ HsExplicitTupleTy noExt (map (synifyType WithinType) vis_tys)
       -- ditto for lists
-      | getName tc == listTyConName, [ty] <- tys =
+      | getName tc == listTyConName, [ty] <- vis_tys =
          noLoc $ HsListTy noExt (synifyType WithinType ty)
+      | tc == promotedNilDataCon, [] <- vis_tys
+      = noLoc $ HsExplicitListTy noExt Promoted []
+      | tc == promotedConsDataCon
+      , [ty1, ty2] <- vis_tys
+      = let hTy = synifyType WithinType ty1
+        in case synifyType WithinType ty2 of
+             tTy | L _ (HsExplicitListTy _ Promoted tTy') <- stripKindSig tTy
+                 -> noLoc $ HsExplicitListTy noExt Promoted (hTy : tTy')
+                 | otherwise
+                 -> noLoc $ HsOpTy noExt hTy (noLoc $ getName tc) tTy
       -- ditto for implicit parameter tycons
       | tc `hasKey` ipClassKey
       , [name, ty] <- tys
@@ -571,6 +581,10 @@ synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
 
 synifyKindSig :: Kind -> LHsKind GhcRn
 synifyKindSig k = synifyType WithinType k
+
+stripKindSig :: LHsType GhcRn -> LHsType GhcRn
+stripKindSig (L _ (HsKindSig _ t _)) = t
+stripKindSig t = t
 
 synifyInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead GhcRn
 synifyInstHead (_, preds, cls, types) = specializeInstHead $ InstHead
