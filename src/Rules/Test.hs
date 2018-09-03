@@ -29,6 +29,7 @@ testRules = do
     -- | Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath ~> do
         ghc <- builderPath $ Ghc CompileHs Stage0
+        createDirectory $ takeDirectory (root -/- ghcConfigProgPath)
         cmd ghc [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
 
     -- | TODO : Use input test compiler and not just stage2 compiler.

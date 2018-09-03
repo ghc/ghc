@@ -94,18 +94,18 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.cleanup=False" -- Don't clean up.
             , arg "-e", arg $ "config.compiler_debugged=" ++ quote (yesNo debugged)
             , arg "-e", arg $ "ghc_debugged=" ++ quote (yesNo debugged)
-            , arg "-e", arg $ asZeroOne "ghc_with_native_codegen" withNativeCodeGen
+            , arg "-e", arg $ asZeroOne "ghc_with_native_codegen=" withNativeCodeGen
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ asZeroOne "ghc_with_dynamic_rts"  (hasRtsWay "dyn")
-            , arg "-e", arg $ asZeroOne "ghc_with_threaded_rts" (hasRtsWay "thr")
-            , arg "-e", arg $ asZeroOne "config.have_vanilla"   (hasLibWay vanilla)
-            , arg "-e", arg $ asZeroOne "config.have_dynamic"   (hasLibWay dynamic)
-            , arg "-e", arg $ asZeroOne "config.have_profiling" (hasLibWay profiling)
-            , arg "-e", arg $ asZeroOne "ghc_with_smp" withSMP
+            , arg "-e", arg $ asZeroOne "ghc_with_dynamic_rts="  (hasRtsWay "dyn")
+            , arg "-e", arg $ asZeroOne "ghc_with_threaded_rts=" (hasRtsWay "thr")
+            , arg "-e", arg $ asZeroOne "config.have_vanilla="   (hasLibWay vanilla)
+            , arg "-e", arg $ asZeroOne "config.have_dynamic="   (hasLibWay dynamic)
+            , arg "-e", arg $ asZeroOne "config.have_profiling=" (hasLibWay profiling)
+            , arg "-e", arg $ asZeroOne "ghc_with_smp=" withSMP
             , arg "-e", arg $ "ghc_with_llvm=0" -- TODO: support LLVM
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault

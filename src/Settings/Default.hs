@@ -133,6 +133,7 @@ testsuitePackages = do
              , ghci
              , ghcPkg
              , hp2ps
+             , hsc2hs
              , iserv
              , parallel
              , runGhc        ] ++
