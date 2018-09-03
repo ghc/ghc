@@ -17,3 +17,4 @@ test('overloadedlabelsrun04', [extra_files(['OverloadedLabelsRun04_A.hs']),
 test('hasfieldrun01', normal, compile_and_run, [''])
 test('hasfieldrun02', normal, compile_and_run, [''])
 test('T12243', normal, compile_and_run, [''])
+test('T11671', normal, compile_and_run, [''])

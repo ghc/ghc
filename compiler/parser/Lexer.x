@@ -439,6 +439,8 @@ $tab          { warnTab }
 <0> {
   "#" @varid / { ifExtension overloadedLabelsEnabled }
                { skip_one_varid ITlabelvarid }
+  "#" @conid / { ifExtension overloadedLabelsEnabled }
+               { skip_one_varid ITlabelvarid }
 }
 
 <0> {
