@@ -1714,6 +1714,11 @@ the new one, so we use dischargeFmv. This also kicks out constraints
 from the inert set; this behavior is correct, as the kind-change may
 allow more constraints to be solved.
 
+We use `isTcReflexiveCo`, to ensure that we only use the hetero-kinded case
+if we really need to.  Of course `flattenArgsNom` should return `Refl`
+whenever possible, but Trac #15577 was an infinite loop because even
+though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
+made a new (identical) CFunEqCan, and then the entire process repeated.
 -}
 
 canCFunEqCan :: CtEvidence
@@ -1733,13 +1738,20 @@ canCFunEqCan ev fn tys fsk
 
              flav    = ctEvFlavour ev
        ; (ev', fsk')
-              -- See Note [canCFunEqCan]
-           <- if isTcReflCo kind_co
-              then do { let fsk_ty = mkTyVarTy fsk
+           <- if isTcReflexiveCo kind_co   -- See Note [canCFunEqCan]
+              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs $$ ppr lhs_co)
+                      ; let fsk_ty = mkTyVarTy fsk
                       ; ev' <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty
                                                  lhs_co (mkTcNomReflCo fsk_ty)
                       ; return (ev', fsk) }
-              else do { (ev', new_co, new_fsk)
+              else do { traceTcS "canCFunEqCan: non-refl" $
+                        vcat [ text "Kind co:" <+> ppr kind_co
+                             , text "RHS:" <+> ppr fsk <+> dcolon <+> ppr (tyVarKind fsk)
+                             , text "LHS:" <+> hang (ppr (mkTyConApp fn tys))
+                                                  2 (dcolon <+> ppr (typeKind (mkTyConApp fn tys)))
+                             , text "New LHS" <+> hang (ppr new_lhs)
+                                                     2 (dcolon <+> ppr (typeKind new_lhs)) ]
+                      ; (ev', new_co, new_fsk)
                           <- newFlattenSkolem flav (ctEvLoc ev) fn tys'
                       ; let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
                                -- sym lhs_co :: F tys ~ F tys'
