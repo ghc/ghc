@@ -463,7 +463,7 @@ synifyType _ (TyConApp tc tys)
       , dataConSourceArity dc == length vis_tys
       = noLoc $ HsExplicitTupleTy noExt (map (synifyType WithinType) vis_tys)
       -- ditto for lists
-      | getName tc == listTyConName, [ty] <- tys =
+      | getName tc == listTyConName, [ty] <- vis_tys =
          noLoc $ HsListTy noExt (synifyType WithinType ty)
       | tc == promotedNilDataCon, [] <- vis_tys
       = noLoc $ HsExplicitListTy noExt Promoted []
