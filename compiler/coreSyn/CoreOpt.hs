@@ -1031,7 +1031,14 @@ pushCoValArg co
   = Just (mkRepReflCo arg, Nothing)
 
   | isFunTy tyL
-  , (co1, co2) <- decomposeFunCo Representational co
+  , (co_mult, co1, co2) <- decomposeFunCo Representational co
+  , isReflCo co_mult
+    -- We can't push the coercion in the case where co_mult isn't reflexivity:
+    -- it could be an unsafe axiom, and losing this information could yield
+    -- ill-typed terms. For instance (fun x ::(1) Int -> (fun _ -> () |> co) x)
+    -- with co :: (Int -> ()) ~ (Int ->. ()), would reduce to (fun x ::(1) Int
+    -- -> (fun _ ::(ω) Int -> ()) x) which is ill-typed
+
               -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
@@ -1055,7 +1062,11 @@ pushCoercionIntoLambda in_scope x e co
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_s1,_s2) <- splitFunTy_maybe s1s2
     , Just (t1,_t2) <- splitFunTy_maybe t1t2
-    = let (co1, co2) = decomposeFunCo Representational co
+    , (co_mult, co1, co2) <- decomposeFunCo Representational co
+    , isReflCo co_mult
+      -- We can't push the coercion in the case where co_mult isn't
+      -- reflexivity. See pushCoValArg for more details.
+    = let
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
           x' = x `setIdType` weightedThing t1
@@ -1174,7 +1185,8 @@ collectBindersPushingCo e
       | isId b
       , let Pair tyL tyR = coercionKind co
       , ASSERT( isFunTy tyL) isFunTy tyR
-      , (co_arg, co_res) <- decomposeFunCo Representational co
+      , (co_mult, co_arg, co_res) <- decomposeFunCo Representational co
+      , isReflCo co_mult
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res
 
