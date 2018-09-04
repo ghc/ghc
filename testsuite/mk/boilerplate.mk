@@ -219,8 +219,14 @@ CP = cp
 RM = rm -f
 PYTHON = python3
 
+ifeq "$(CHECK_API_ANNOTATIONS)" ""
 CHECK_API_ANNOTATIONS := $(abspath $(TOP)/../inplace/bin/check-api-annotations)
-CHECK_PPR             := $(abspath $(TOP)/../inplace/bin/check-ppr)
+endif
+
+ifeq "$(CHECK_PPR)" ""
+CHECK_PPR := $(abspath $(TOP)/../inplace/bin/check-ppr)
+endif
+
 
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC
