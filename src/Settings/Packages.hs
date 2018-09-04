@@ -31,8 +31,8 @@ packageArgs = do
           -- See https://ghc.haskell.org/trac/ghc/ticket/15286 and
           -- https://phabricator.haskell.org/D4880
           , builder (Ghc CompileHs) ? mconcat
-             [ input "//Natural.hs" ? pure ["-O0", "-fno-omit-interface-pragmas"]
-             , input "//Num.hs" ? pure ["-O0", "-fno-ignore-interface-pragmas"]
+             [ input "//Natural.hs" ? pure ["-fno-omit-interface-pragmas"]
+             , input "//Num.hs" ? pure ["-fno-ignore-interface-pragmas"]
              ]
           ]
         ------------------------------ bytestring ------------------------------
@@ -53,7 +53,7 @@ packageArgs = do
           , builder (Ghc CompileHs) ? mconcat
             [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
             , input "//Parser.hs" ?
-              pure ["-O0", "-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
+              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
 
           , builder (Cabal Setup) ? mconcat
             [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
@@ -213,8 +213,7 @@ rtsPackageArgs = package rts ? do
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
-                                                    , "-g"
-                                                    , "-O0" ]
+                                                    , "-g" ]
           , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
