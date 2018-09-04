@@ -1673,8 +1673,9 @@ tyCoVarsOfCos cos = ty_co_vars_of_cos cos emptyVarSet emptyVarSet
 
 
 ty_co_vars_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_co (Refl ty)          is acc = ty_co_vars_of_type ty is acc
--- ty_co_vars_of_co (Refl _ ty)          is acc = ty_co_vars_of_type ty is acc
+ty_co_vars_of_co (Refl ty)            is acc = ty_co_vars_of_type ty is acc
+ty_co_vars_of_co (GRefl _ ty mrefl)   is acc = ty_co_vars_of_type ty is $
+                                               ty_co_vars_of_mco mrefl is acc
 ty_co_vars_of_co (TyConAppCo _ _ cos) is acc = ty_co_vars_of_cos cos is acc
 ty_co_vars_of_co (AppCo co arg)       is acc = ty_co_vars_of_co co is $
                                                ty_co_vars_of_co arg is acc
@@ -1696,11 +1697,15 @@ ty_co_vars_of_co (NthCo _ _ co)      is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_co (LRCo _ co)         is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_co (InstCo co arg)     is acc = ty_co_vars_of_co co is $
                                               ty_co_vars_of_co arg is acc
-ty_co_vars_of_co (CoherenceCo c1 c2) is acc = ty_co_vars_of_co c1 is $
-                                              ty_co_vars_of_co c2 is acc
+-- ty_co_vars_of_co (CoherenceCo c1 c2) is acc = ty_co_vars_of_co c1 is $
+--                                               ty_co_vars_of_co c2 is acc
 ty_co_vars_of_co (KindCo co)         is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_co (SubCo co)          is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_co (AxiomRuleCo _ cs)  is acc = ty_co_vars_of_cos cs is acc
+
+ty_co_vars_of_mco :: MCoercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
+ty_co_vars_of_mco MRefl    _is acc = acc
+ty_co_vars_of_mco (MCo co) is  acc = ty_co_vars_of_co co is acc
 
 ty_co_vars_of_co_var :: CoVar -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_co_var v is acc
@@ -1875,9 +1880,9 @@ coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
 coVarsOfTypes :: [Type] -> TyCoVarSet
 coVarsOfTypes tys = getCoVarSet (tyCoFVsOfTypes tys)
 
-coVarsOfMCo :: MCoercion -> CoVarSet
-coVarsOfMCo MRefl    = emptyVarSet
-coVarsOfMCo (MCo co) = coVarsOfCo co
+-- coVarsOfMCo :: MCoercion -> CoVarSet
+-- coVarsOfMCo MRefl    = emptyVarSet
+-- coVarsOfMCo (MCo co) = coVarsOfCo co
 
 coVarsOfCo :: Coercion -> CoVarSet
 coVarsOfCo co = getCoVarSet (tyCoFVsOfCo co)
@@ -1903,14 +1908,14 @@ coVarsOfCo co = getCoVarSet (tyCoFVsOfCo co)
 -- coVarsOfCo (SubCo co)           = coVarsOfCo co
 -- coVarsOfCo (AxiomRuleCo _ cs)   = coVarsOfCos cs
 
-coVarsOfCoVar :: CoVar -> CoVarSet
-coVarsOfCoVar v = unitVarSet v `unionVarSet` coVarsOfType (varType v)
-
-coVarsOfProv :: UnivCoProvenance -> CoVarSet
-coVarsOfProv UnsafeCoerceProv    = emptyVarSet
-coVarsOfProv (PhantomProv co)    = coVarsOfCo co
-coVarsOfProv (ProofIrrelProv co) = coVarsOfCo co
-coVarsOfProv (PluginProv _)      = emptyVarSet
+-- coVarsOfCoVar :: CoVar -> CoVarSet
+-- coVarsOfCoVar v = unitVarSet v `unionVarSet` coVarsOfType (varType v)
+-- 
+-- coVarsOfProv :: UnivCoProvenance -> CoVarSet
+-- coVarsOfProv UnsafeCoerceProv    = emptyVarSet
+-- coVarsOfProv (PhantomProv co)    = coVarsOfCo co
+-- coVarsOfProv (ProofIrrelProv co) = coVarsOfCo co
+-- coVarsOfProv (PluginProv _)      = emptyVarSet
 
 coVarsOfCos :: [Coercion] -> CoVarSet
 coVarsOfCos cos = getCoVarSet (tyCoFVsOfCos cos)
