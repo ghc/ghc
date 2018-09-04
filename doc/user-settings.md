@@ -139,21 +139,20 @@ Note that `rtsWays` is computed from `libraryWays` by default, therefore the abo
 change will lead to the removal of `threadedProfiling` way from `rtsWays`. To
 change this behaviour, you can override the default `rtsWays` setting.
 
-Similarly, if we want to completely turn off dynamic linking,
-we can define a custom `Flavour` to this effect:
+Similarly, if we want to completely turn off dynamic linking, we can define a custom
+`Flavour` to this effect:
 ``` haskell
 noDynamicFlavour :: Flavour
 noDynamicFlavour = defaultFlavour
-  { name = "no-dynamic"
-  , libraryWays = remove [dynamic] defaultLibraryWays
-  }
+    { name = "no-dynamic"
+    , libraryWays = remove [dynamic] defaultLibraryWays }
 ```
 
 ## Verbose command lines
 
 By default Hadrian does not print full command lines during the build process
 and instead prints short human readable digests for each executed command. You
-can suppress this behaviour completely or partially using `verboseCommands` setting:
+can suppress this behaviour completely or partially using `verboseCommand` setting:
 ```haskell
 -- | Set to 'True' to print full command lines during the build process. Note:
 -- this is a 'Predicate', hence you can enable verbose output only for certain
@@ -166,22 +165,22 @@ verboseCommand = do
 For example, to print the full command lines used to compile GHC executables,
 set `verboseCommands` to:
 ```haskell
-verboseCommands :: Predicate
-verboseCommands = input "ghc/Main.hs"
+verboseCommand :: Predicate
+verboseCommand = input "ghc/Main.hs"
 ```
 Below are a few other examples:
 ```haskell
 -- Print command lines for all Ghc Link invocations:
-verboseCommands = builder (Ghc Link)
+verboseCommand = builder (Ghc Link)
 
 -- Print command lines when compiling files in package compiler using Gcc:
-verboseCommands = builder (Gcc Compile) &&^ package compiler
+verboseCommand = builder (Gcc Compile) &&^ package compiler
 
 -- Use patterns when matching files:
-verboseCommands = output "//rts/sm/*" &&^ way threaded
+verboseCommand = output "//rts/sm/*" &&^ way threaded
 
 -- Print all commands:
-verboseCommands = return True
+verboseCommand = return True
 ```
 
 ## Miscellaneous
