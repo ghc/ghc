@@ -126,4 +126,4 @@ test('typeops_A', normal, compile_fail, [''])
 test('typeops_B', normal, compile_fail, [''])
 test('typeops_C', normal, compile_fail, [''])
 test('typeops_D', normal, compile_fail, [''])
-test('T15053', expect_broken(15053), compile_fail, ['']) # shouldn't panic
+test('T15053', normal, compile_fail, [''])
