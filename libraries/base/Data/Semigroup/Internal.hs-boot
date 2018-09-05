@@ -4,7 +4,7 @@ module Data.Semigroup.Internal where
 
 import {-# SOURCE #-} GHC.Real (Integral)
 import {-# SOURCE #-} GHC.Base (Semigroup,Monoid,Maybe)
-import GHC.Integer ()   -- Note [Depend on GHC.Integer]
+import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 
 stimesIdempotentMonoid :: (Integral b, Monoid a) => b -> a -> a
 
