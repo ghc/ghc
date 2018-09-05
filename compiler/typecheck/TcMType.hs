@@ -303,7 +303,7 @@ unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 -- so that the input coercion is forced only when the output is forced.
 checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
 checkCoercionHole cv co
-  | debugIsOn && False -- TODO: MattP disable this for now as it sometimes fails, see in particular Data.ByteString.Builder.Internal
+  | debugIsOn
   = do { cv_ty <- zonkTcType (varType cv)
                   -- co is already zonked, but cv might not be
        ; return $
