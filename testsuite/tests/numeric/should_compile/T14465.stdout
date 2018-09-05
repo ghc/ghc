@@ -93,7 +93,7 @@ plusOne :: Natural -> Natural
 plusOne = \ (n :: Natural) -> plusNatural n M.minusOne1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-one :: Natural
+one [InlPrag=NOUSERINLINE[2]] :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,

@@ -65,7 +65,7 @@ dr
       case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-dl :: Double -> Double
+dl [InlPrag=NOUSERINLINE[2]] :: Double -> Double
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
@@ -97,7 +97,7 @@ fr
       }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-fl :: Float -> Float
+fl [InlPrag=NOUSERINLINE[2]] :: Float -> Float
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
