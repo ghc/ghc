@@ -952,7 +952,7 @@ exactTyCoVarsOfType ty
     goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (ForAllCo tv k_co co)
       = goCo co `delVarSet` tv `unionVarSet` goCo k_co
-    goCo (FunCo _ _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
+    goCo (FunCo _ co_mult co1 co2) = goCo co_mult `unionVarSet` goCo co1 `unionVarSet` goCo co2
     goCo (CoVarCo v)         = goVar v
     goCo (HoleCo h)          = goVar (coHoleCoVar h)
     goCo (AxiomInstCo _ _ args) = goCos args

@@ -1629,7 +1629,7 @@ allTyVarsInTy = go
     go_co (AppCo co arg)        = go_co co `unionVarSet` go_co arg
     go_co (ForAllCo tv h co)
       = unionVarSets [unitVarSet tv, go_co co, go_co h]
-    go_co (FunCo _ _ c1 c2)     = go_co c1 `unionVarSet` go_co c2
+    go_co (FunCo _ co_mult c1 c2) = go_co co_mult `unionVarSet` go_co c1 `unionVarSet` go_co c2
     go_co (CoVarCo cv)          = unitVarSet cv
     go_co (HoleCo h)            = unitVarSet (coHoleCoVar h)
     go_co (AxiomInstCo _ _ cos) = go_cos cos

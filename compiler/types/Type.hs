@@ -2471,7 +2471,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (ForAllCo _ kind_co co) = go_co kind_co `unionUniqSets` go_co co
-     go_co (FunCo _ _ co1 co2)     = go_co co1 `unionUniqSets` go_co co2
+     go_co (FunCo _ co_mult co1 co2) = go_co co_mult `unionUniqSets` go_co co1 `unionUniqSets` go_co co2
      go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
      go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
      go_co (CoVarCo {})            = emptyUniqSet

@@ -117,7 +117,7 @@ synonymTyConsOfType ty
      go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
      go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
      go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
-     go_co (FunCo _ _ co co')     = go_co co `plusNameEnv` go_co co'
+     go_co (FunCo _ co_mult co co') = go_co co_mult `plusNameEnv` go_co co `plusNameEnv` go_co co'
      go_co (CoVarCo _)            = emptyNameEnv
      go_co (HoleCo {})            = emptyNameEnv
      go_co (AxiomInstCo _ _ cs)   = go_co_s cs
