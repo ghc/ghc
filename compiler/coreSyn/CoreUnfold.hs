@@ -159,7 +159,8 @@ mkInlineUnfoldingWithArity arity expr
     guide = UnfWhen { ug_arity = arity
                     , ug_unsat_ok = needSaturated
                     , ug_boring_ok = boring_ok }
-    boring_ok = inlineBoringOk expr'
+    boring_ok | arity == 0 = True
+              | otherwise  = inlineBoringOk expr'
 
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkInlinableUnfolding dflags expr
