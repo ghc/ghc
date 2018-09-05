@@ -221,9 +221,9 @@ Remember that
   (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> TYPE LiftedRep
 
 Hence
-  FunCo r co1 co2 :: (s1->t1) ~r (s2->t2)
+  FunCo r mult co1 co2 :: (s1->t1) ~r (s2->t2)
 is short for
-  TyConAppCo (->) co_rep1 co_rep2 co1 co2
+  TyConAppCo (->) mult co_rep1 co_rep2 co1 co2
 where co_rep1, co_rep2 are the coercions on the representations.
 -}
 
@@ -244,15 +244,12 @@ decomposeCo arity co rs
 decomposeFunCo :: HasDebugCallStack
                => Role      -- Role of the input coercion
                -> Coercion  -- Input coercion
-               -> (Coercion, Coercion)
+               -> (Coercion, Coercion, Coercion)
 -- Expects co :: (s1 -> t1) ~ (s2 -> t2)
 -- Returns (co1 :: s1~s2, co2 :: t1~t2)
 -- See Note [Function coercions] for the "3" and "4"
--- Include this list here to that grepping for a list of exactly
--- length 5 points to here.
--- [w, r1, r2, a1, a2]
 decomposeFunCo r co = ASSERT2( all_ok, ppr co )
-                      (mkNthCo r 3 co, mkNthCo r 4 co)
+                      (mkNthCo r 0 co, mkNthCo r 3 co, mkNthCo r 4 co)
   where
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
@@ -298,7 +295,9 @@ decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_arg
         --          ty :: s2
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1 ~ t2
-      = let (sym_arg_co, res_co) = decomposeFunCo Nominal co
+      = let (_, sym_arg_co, res_co) = decomposeFunCo Nominal co
+            -- TODO: arnaud: because the coercion must be nominal, I believe it
+            -- means we can safely ignore the multiplicity argument.<
             arg_co               = mkSymCo sym_arg_co
         in
         go (arg_co : acc_arg_cos) subst res_ki tys res_co
@@ -332,7 +331,7 @@ splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
   where cos = [w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
 
--- TODO: This is wrong and should be ripped out when I change
+-- TODO: MattP: This is wrong and should be ripped out when I change
 -- Rig to Coercion in FunCo.
 rigToCo :: Rig -> Coercion
 rigToCo r = mkNomReflCo (rigToType r)
@@ -893,21 +892,20 @@ mkNthCo r n co
 
     go r n co@(FunCo r0 w arg res)
       -- See Note [Function coercions]
-      -- If FunCo _ arg_co res_co ::   (s1:TYPE sk1 -> s2:TYPE sk2)
-      --                             ~ (t1:TYPE tk1 -> t2:TYPE tk2)
+      -- If FunCo _ mult arg_co res_co ::   (s1:TYPE sk1 :mult-> s2:TYPE sk2)
+      --                                  ~ (t1:TYPE tk1 :mult-> t2:TYPE tk2)
       -- Then we want to behave as if co was
-      --    TyConAppCo argk_co resk_co arg_co res_co
+      --    TyConAppCo mult argk_co resk_co arg_co res_co
       -- where
       --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
       --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
       --                             i.e. mkRuntimeRepCo
       = case n of
-          -- TODO: MattP, this is probably wrong, the correct coercion
-          -- needs to be placed here. And need to update the comment
+          -- TODO: MattP, There may be comments to update.
           -- Include this list here to that grepping for a list of exactly
           -- length 5 points to here.
           -- [w, r1, r2, a1, a2]
-          0 -> pprPanic "multiplicityCo" (ppr co)
+          0 -> ASSERT( r == r0 )      w
           1 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
           2 -> ASSERT( r == Nominal ) mkRuntimeRepCo res
           3 -> ASSERT( r == r0 )      arg

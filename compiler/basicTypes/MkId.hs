@@ -568,6 +568,7 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
 -- See Note [All data constructors have wrappers]
 --  | not wrapper_reqd
 --  = return NoDataConRep
+-- TODO: arnaud: clean this up
 
   | otherwise
   = do { wrap_args <- mkArgs wrap_arg_tys
@@ -789,10 +790,13 @@ The way we ensure this is by scaling the weight of the field by the multiplicity
 variable. This works because..
 
 1 * p = p
-w * p = w
+ω * p = ω
 
 So the arguments end up with the right multiplicity all very elegantly.
 -}
+
+-- TODO: arnaud: we've changed what data constructors have wrappers. So we will
+-- need to update the notes in this file.
 
 -------------------------
 newLocal :: Weighted Type -> UniqSM Var

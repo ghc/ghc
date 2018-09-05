@@ -1931,7 +1931,7 @@ fvCo (Refl _ ty)            = fvType ty
 fvCo (TyConAppCo _ _ args)  = concatMap fvCo args
 fvCo (AppCo co arg)         = fvCo co ++ fvCo arg
 fvCo (ForAllCo tv h co)     = filter (/= tv) (fvCo co) ++ fvCo h
-fvCo (FunCo _ _ co1 co2)    = fvCo co1 ++ fvCo co2
+fvCo (FunCo _ co_mult co1 co2) = fvCo co_mult ++ fvCo co1 ++ fvCo co2
 fvCo (CoVarCo v)            = [v]
 fvCo (AxiomInstCo _ _ args) = concatMap fvCo args
 fvCo (UnivCo p _ t1 t2)     = fvProv p ++ fvType t1 ++ fvType t2
