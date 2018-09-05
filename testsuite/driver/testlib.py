@@ -84,7 +84,7 @@ def normal( name, opts ):
     return;
 
 def skip( name, opts ):
-    opts.skip = 1
+    opts.skip = True
 
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
@@ -423,19 +423,19 @@ def multi_cpu_race(name, opts):
 
 # ---
 def literate( name, opts ):
-    opts.literate = 1;
+    opts.literate = True
 
 def c_src( name, opts ):
-    opts.c_src = 1;
+    opts.c_src = True
 
 def objc_src( name, opts ):
-    opts.objc_src = 1;
+    opts.objc_src = True
 
 def objcpp_src( name, opts ):
-    opts.objcpp_src = 1;
+    opts.objcpp_src = True
 
 def cmm_src( name, opts ):
-    opts.cmm_src = 1;
+    opts.cmm_src = True
 
 def outputdir( odir ):
     return lambda name, opts, d=odir: _outputdir(name, opts, d)
@@ -973,19 +973,19 @@ def compile_fail( name, way, extra_hc_opts ):
     return do_compile( name, way, 1, '', [], extra_hc_opts )
 
 def backpack_typecheck( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=1 )
+    return do_compile( name, way, 0, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_typecheck_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=1 )
+    return do_compile( name, way, 1, '', [], "-fno-code -fwrite-interface " + extra_hc_opts, backpack=True )
 
 def backpack_compile( name, way, extra_hc_opts ):
-    return do_compile( name, way, 0, '', [], extra_hc_opts, backpack=1 )
+    return do_compile( name, way, 0, '', [], extra_hc_opts, backpack=True )
 
 def backpack_compile_fail( name, way, extra_hc_opts ):
-    return do_compile( name, way, 1, '', [], extra_hc_opts, backpack=1 )
+    return do_compile( name, way, 1, '', [], extra_hc_opts, backpack=True )
 
 def backpack_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, '', [], extra_hc_opts, backpack=1 )
+    return compile_and_run__( name, way, '', [], extra_hc_opts, backpack=True )
 
 def multimod_compile( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, 0, top_mod, [], extra_hc_opts )
@@ -1577,14 +1577,14 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
             # See Note [Output comparison].
             r = runCmd('diff -uw "{0}" "{1}"'.format(expected_normalised_path,
                                                         actual_normalised_path),
-                        print_output = 1)
+                        print_output=True)
 
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
                 r = runCmd('diff -u "{0}" "{1}"'.format(expected_normalised_path,
                                                            actual_normalised_path),
-                           print_output = 1)
+                           print_output=True)
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -1800,7 +1800,7 @@ def dump_file(f):
     except Exception:
         print('')
 
-def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=0):
+def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=False):
     timeout_prog = strip_quotes(config.timeout_prog)
     timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
@@ -1832,7 +1832,7 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
     finally:
         if stdin_file:
             stdin_file.close()
-        if config.verbose >= 1 and print_output >= 1:
+        if config.verbose >= 1 and print_output:
             if stdout_buffer:
                 sys.stdout.buffer.write(stdout_buffer)
             if stderr_buffer:
