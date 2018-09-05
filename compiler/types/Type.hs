@@ -569,7 +569,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
            ; co' <- mapCoercion mapper env' co
            ; return $ mkforallco tv' kind_co' co' }
         -- See Note [Efficiency for mapCoercion ForAllCo case]
-    go (FunCo r w c1 c2) = mkFunCo r w <$> go c1 <*> go c2
+    go (FunCo r w c1 c2) = mkFunCo r <$> go w <*> go c1 <*> go c2
     go (CoVarCo cv) = covar env cv
     go (AxiomInstCo ax i args)
       = mkaxiominstco ax i <$> mapM go args
