@@ -55,7 +55,7 @@ import NameSet
 import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
-import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
+import BasicTypes
 import DynFlags         ( DynFlags )
 import Outputable
 import FastString
@@ -290,9 +290,10 @@ addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
   = RuleInfo (rs1 ++ rs2) (fvs1 `unionDVarSet` fvs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
-addIdSpecialisations id []
-  = id
 addIdSpecialisations id rules
+  | null rules
+  = id
+  | otherwise
   = setIdSpecialisation id $
     extendRuleInfo (idSpecialisation id) rules
 
@@ -312,9 +313,8 @@ ruleIsVisible _ BuiltinRule{} = True
 ruleIsVisible vis_orphs Rule { ru_orphan = orph, ru_origin = origin }
     = notOrphan orph || origin `elemModuleSet` vis_orphs
 
-{-
-Note [Where rules are found]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Where rules are found]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The rules for an Id come from two places:
   (a) the ones it is born with, stored inside the Id iself (idCoreRules fn),
   (b) rules added in other modules, stored in the global RuleBase (imp_rules)

@@ -551,8 +551,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
             wrap_rhs  = wrap_fn work_id
             wrap_act  = case fn_act of  -- See Note [Wrapper activation]
                            ActiveAfter {} -> fn_act
-                           NeverActive    -> ActiveAfter NoSourceText 0
-                           _              -> ActiveAfter NoSourceText 2
+                           NeverActive    -> activeDuringFinal
+                           _              -> activeAfterInitial
             wrap_prag = InlinePragma { inl_src    = SourceText "{-# INLINE"
                                      , inl_inline = NoUserInline
                                      , inl_sat    = Nothing

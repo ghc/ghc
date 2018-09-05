@@ -594,7 +594,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                         | otherwise           = topDmd
 
              wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
-                         ActiveAfter NoSourceText 2
+                         activeAfterInitial
                          -- See Note [Activation for data constructor wrappers]
 
              -- The wrapper will usually be inlined (see wrap_unf), so its
