@@ -332,7 +332,7 @@ import Annotations
 import Module
 import Panic
 import Platform
-import Bag              ( listToBag, unitBag )
+import Bag              ( unitBag )
 import ErrUtils
 import MonadUtils
 import Util
@@ -344,7 +344,6 @@ import FastString
 import qualified Parser
 import Lexer
 import ApiAnnotation
-import qualified GHC.LanguageExtensions as LangExt
 import NameEnv
 import CoreFVs          ( orphNamesOfFamInst )
 import FamInstEnv       ( famInstEnvElts )
@@ -677,14 +676,8 @@ checkNewDynFlags dflags = do
 
 checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags
 checkNewInteractiveDynFlags dflags0 = do
-  dflags1 <-
-      if xopt LangExt.StaticPointers dflags0
-      then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
-                [mkPlainWarnMsg dflags0 interactiveSrcSpan
-                 $ text "StaticPointers is not supported in GHCi interactive expressions."]
-              return $ xopt_unset dflags0 LangExt.StaticPointers
-      else return dflags0
-  return dflags1
+  -- Nothing to be done here
+  return dflags0
 
 
 -- %************************************************************************
