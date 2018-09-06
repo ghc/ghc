@@ -81,6 +81,14 @@ freeChain_sync(bdescr *bd)
     RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
 }
 
+void
+freeGroup_sync(bdescr *bd)
+{
+    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    freeGroup(bd);
+    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+}
+
 /* -----------------------------------------------------------------------------
    Workspace utilities
    -------------------------------------------------------------------------- */
@@ -261,7 +269,7 @@ todo_block_full (uint32_t size, gen_workspace *ws)
                 // object.  However, if the object we're copying is
                 // larger than a block, then we might have an empty
                 // block here.
-                freeGroup(bd);
+                freeGroup_sync(bd);
             } else {
                 push_scanned_block(bd, ws);
             }
