@@ -26,15 +26,8 @@ packageArgs = do
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
-          , builder (Ghc CompileCWithGhc) ? arg "-optc-O2"
+          , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
 
-          -- See https://ghc.haskell.org/trac/ghc/ticket/15286 and
-          -- https://phabricator.haskell.org/D4880
-          , builder (Ghc CompileHs) ? mconcat
-             [ input "//Natural.hs" ? pure ["-fno-omit-interface-pragmas"]
-             , input "//Num.hs" ? pure ["-fno-ignore-interface-pragmas"]
-             ]
-          ]
         ------------------------------ bytestring ------------------------------
         , package bytestring ?
           builder (Cabal Flags) ? intLib == integerSimple ? arg "integer-simple"

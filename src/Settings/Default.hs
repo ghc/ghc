@@ -131,6 +131,7 @@ testsuitePackages = do
     return $ [ checkApiAnnotations
              , checkPpr
              , ghci
+             , ghcCompact
              , ghcPkg
              , hp2ps
              , hsc2hs
