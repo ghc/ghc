@@ -1,5 +1,6 @@
 module Rules.Clean (clean, cleanSourceTree, cleanRules) where
 
+import qualified System.Directory as IO
 import Base
 
 clean :: Action ()
@@ -7,7 +8,8 @@ clean = do
     putBuild "| Removing Hadrian files..."
     cleanSourceTree
     path <- buildRoot
-    removeDirectory path
+    putBuild $ "| Remove directory " ++ path ++ " (after build completes)"
+    runAfter $ IO.removeDirectoryRecursive path -- since we can't delete the Shake database while Shake is running
     putSuccess "| Done. "
 
 cleanSourceTree :: Action ()
