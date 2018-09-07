@@ -123,7 +123,7 @@ data SimplCont
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_weight :: Rig } -- TODO: arnaud: not needed, I think, because the hole is in the function, not the argument.
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type

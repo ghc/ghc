@@ -321,3 +321,6 @@ readScaling (SM k) = SM (\st_env us sc -> do
 
 reportScaling :: Id -> SimplM ()
 reportScaling r = SM (\_st_env us sc -> return ((), [r], us, sc))
+
+-- TODO: arnaud: revert the scaling logic (superseeded by scaling floats when
+-- they commute with a scaling site)
