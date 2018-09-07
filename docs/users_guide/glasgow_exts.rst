@@ -585,7 +585,9 @@ That is, underscores in numeric literals are ignored when
 :extension:`NumericUnderscores` is enabled.
 See also :ghc-ticket:`14473`.
 
-For example: ::
+For example:
+
+.. code-block:: none
 
     -- decimal
     million    = 1_000_000
@@ -617,7 +619,9 @@ For example: ::
 
     test8bit x = (0b01_0000_0000 .&. x) /= 0
 
-About validity: ::
+About validity:
+
+.. code-block:: none
 
     x0 = 1_000_000   -- valid
     x1 = 1__000000   -- valid
