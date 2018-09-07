@@ -211,7 +211,7 @@ INFO_TABLE_RET( stg_apply_interp, RET_BCO )
    Entry code for a BCO
    ------------------------------------------------------------------------- */
 
-INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
+INFO_TABLE_FUN( stg_BCO, 3, 0, BCO, "BCO", "BCO", ARG_BCO )
     /* explicit stack */
 {
   /* entering a BCO means "apply it", same as a function */
