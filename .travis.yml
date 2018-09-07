@@ -70,6 +70,9 @@ matrix:
               - brew upgrade python
 
           script:
+              - git remote add alp https://github.com/alpmestan/ghc.git
+              - git fetch alp
+              - git checkout alp/osx-findPtr
               # Due to timeout limit of OS X build on Travis CI,
               # we will ignore selftest and build only stage1
               - hadrian/build.sh -j -c $MODE --no-progress --progress-colour=never --profile=-
