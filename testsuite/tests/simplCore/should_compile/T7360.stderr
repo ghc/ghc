@@ -26,7 +26,7 @@ fun1 [InlPrag=NOINLINE] :: Foo -> ()
  Str=<S,1*U>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
-         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
          Tmpl= \ (x [Occ=Once] :: Foo) ->
                  case x of { __DEFAULT -> GHC.Tuple.() }}]
 fun1 = \ (x :: Foo) -> case x of { __DEFAULT -> GHC.Tuple.() }
