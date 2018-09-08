@@ -1,12 +1,12 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash, ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Array
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -82,11 +82,8 @@ import GHC.Base
 -- |Allocate storage for the given number of elements of a storable type
 -- (like 'Foreign.Marshal.Alloc.malloc', but for multiple elements).
 --
-mallocArray :: Storable a => Int -> IO (Ptr a)
-mallocArray  = doMalloc undefined
-  where
-    doMalloc            :: Storable a' => a' -> Int -> IO (Ptr a')
-    doMalloc dummy size  = mallocBytes (size * sizeOf dummy)
+mallocArray :: forall a . Storable a => Int -> IO (Ptr a)
+mallocArray  size = mallocBytes (size * sizeOf (undefined :: a))
 
 -- |Like 'mallocArray', but add an extra position to hold a special
 -- termination element.
@@ -96,11 +93,8 @@ mallocArray0 size  = mallocArray (size + 1)
 
 -- |Like 'mallocArray', but allocated memory is filled with bytes of value zero.
 --
-callocArray :: Storable a => Int -> IO (Ptr a)
-callocArray  = doCalloc undefined
-  where
-    doCalloc :: Storable a' => a' -> Int -> IO (Ptr a')
-    doCalloc dummy size  = callocBytes (size * sizeOf dummy)
+callocArray :: forall a . Storable a => Int -> IO (Ptr a)
+callocArray size = callocBytes (size * sizeOf (undefined :: a))
 
 -- |Like 'callocArray0', but allocated memory is filled with bytes of value
 -- zero.
@@ -111,12 +105,9 @@ callocArray0 size  = callocArray (size + 1)
 -- |Temporarily allocate space for the given number of elements
 -- (like 'Foreign.Marshal.Alloc.alloca', but for multiple elements).
 --
-allocaArray :: Storable a => Int -> (Ptr a -> IO b) -> IO b
-allocaArray  = doAlloca undefined
-  where
-    doAlloca            :: Storable a' => a' -> Int -> (Ptr a' -> IO b') -> IO b'
-    doAlloca dummy size  = allocaBytesAligned (size * sizeOf dummy)
-                                              (alignment dummy)
+allocaArray :: forall a b . Storable a => Int -> (Ptr a -> IO b) -> IO b
+allocaArray size = allocaBytesAligned (size * sizeOf (undefined :: a))
+                                      (alignment (undefined :: a))
 
 -- |Like 'allocaArray', but add an extra position to hold a special
 -- termination element.
@@ -129,11 +120,8 @@ allocaArray0 size  = allocaArray (size + 1)
 
 -- |Adjust the size of an array
 --
-reallocArray :: Storable a => Ptr a -> Int -> IO (Ptr a)
-reallocArray  = doRealloc undefined
-  where
-    doRealloc                :: Storable a' => a' -> Ptr a' -> Int -> IO (Ptr a')
-    doRealloc dummy ptr size  = reallocBytes ptr (size * sizeOf dummy)
+reallocArray :: forall a . Storable a => Ptr a -> Int -> IO (Ptr a)
+reallocArray ptr size = reallocBytes ptr (size * sizeOf (undefined :: a))
 
 -- |Adjust the size of an array including an extra position for the end marker.
 --
@@ -153,7 +141,7 @@ peekArray size ptr | size <= 0 = return []
   where
     f 0 acc = do e <- peekElemOff ptr 0; return (e:acc)
     f n acc = do e <- peekElemOff ptr n; f (n-1) (e:acc)
-  
+
 -- |Convert an array terminated by the given end marker into a Haskell list
 --
 peekArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO [a]
@@ -238,20 +226,14 @@ withArrayLen0 marker vals f  =
 -- |Copy the given number of elements from the second array (source) into the
 -- first array (destination); the copied areas may /not/ overlap
 --
-copyArray :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
-copyArray  = doCopy undefined
-  where
-    doCopy                     :: Storable a' => a' -> Ptr a' -> Ptr a' -> Int -> IO ()
-    doCopy dummy dest src size  = copyBytes dest src (size * sizeOf dummy)
+copyArray :: forall a . Storable a => Ptr a -> Ptr a -> Int -> IO ()
+copyArray dest src size = copyBytes dest src (size * sizeOf (undefined :: a))
 
 -- |Copy the given number of elements from the second array (source) into the
 -- first array (destination); the copied areas /may/ overlap
 --
-moveArray :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
-moveArray  = doMove undefined
-  where
-    doMove                     :: Storable a' => a' -> Ptr a' -> Ptr a' -> Int -> IO ()
-    doMove dummy dest src size  = moveBytes dest src (size * sizeOf dummy)
+moveArray :: forall a . Storable a => Ptr a -> Ptr a -> Int -> IO ()
+moveArray  dest src size = moveBytes dest src (size * sizeOf (undefined :: a))
 
 
 -- finding the length
@@ -272,9 +254,5 @@ lengthArray0 marker ptr  = loop 0
 
 -- |Advance a pointer into an array by the given number of elements
 --
-advancePtr :: Storable a => Ptr a -> Int -> Ptr a
-advancePtr  = doAdvance undefined
-  where
-    doAdvance             :: Storable a' => a' -> Ptr a' -> Int -> Ptr a'
-    doAdvance dummy ptr i  = ptr `plusPtr` (i * sizeOf dummy)
-
+advancePtr :: forall a . Storable a => Ptr a -> Int -> Ptr a
+advancePtr ptr i = ptr `plusPtr` (i * sizeOf (undefined :: a))

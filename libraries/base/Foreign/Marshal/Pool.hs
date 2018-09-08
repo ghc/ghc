@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude, ScopedTypeVariables #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -102,11 +102,8 @@ withPool act =   -- ATTENTION: cut-n-paste from Control.Exception below!
 -- allocated is determined by the 'sizeOf' method from the instance of
 -- 'Storable' for the appropriate type.
 
-pooledMalloc :: Storable a => Pool -> IO (Ptr a)
-pooledMalloc = pm undefined
-  where
-    pm           :: Storable a' => a' -> Pool -> IO (Ptr a')
-    pm dummy pool = pooledMallocBytes pool (sizeOf dummy)
+pooledMalloc :: forall a . Storable a => Pool -> IO (Ptr a)
+pooledMalloc pool = pooledMallocBytes pool (sizeOf (undefined :: a))
 
 -- | Allocate the given number of bytes of storage in the pool.
 
@@ -120,11 +117,8 @@ pooledMallocBytes (Pool pool) size = do
 -- | Adjust the storage area for an element in the pool to the given size of
 -- the required type.
 
-pooledRealloc :: Storable a => Pool -> Ptr a -> IO (Ptr a)
-pooledRealloc = pr undefined
-  where
-    pr               :: Storable a' => a' -> Pool -> Ptr a' -> IO (Ptr a')
-    pr dummy pool ptr = pooledReallocBytes pool ptr (sizeOf dummy)
+pooledRealloc :: forall a . Storable a => Pool -> Ptr a -> IO (Ptr a)
+pooledRealloc pool ptr = pooledReallocBytes pool ptr (sizeOf (undefined :: a))
 
 -- | Adjust the storage area for an element in the pool to the given size.
 
@@ -140,11 +134,9 @@ pooledReallocBytes (Pool pool) ptr size = do
 -- | Allocate storage for the given number of elements of a storable type in the
 -- pool.
 
-pooledMallocArray :: Storable a => Pool -> Int -> IO (Ptr a)
-pooledMallocArray = pma undefined
-  where
-    pma                :: Storable a' => a' -> Pool -> Int -> IO (Ptr a')
-    pma dummy pool size = pooledMallocBytes pool (size * sizeOf dummy)
+pooledMallocArray :: forall a . Storable a => Pool -> Int -> IO (Ptr a)
+pooledMallocArray pool size =
+    pooledMallocBytes pool (size * sizeOf (undefined :: a))
 
 -- | Allocate storage for the given number of elements of a storable type in the
 -- pool, but leave room for an extra element to signal the end of the array.
@@ -155,11 +147,9 @@ pooledMallocArray0 pool size =
 
 -- | Adjust the size of an array in the given pool.
 
-pooledReallocArray :: Storable a => Pool -> Ptr a -> Int -> IO (Ptr a)
-pooledReallocArray = pra undefined
-  where
-    pra                ::  Storable a' => a' -> Pool -> Ptr a' -> Int -> IO (Ptr a')
-    pra dummy pool ptr size  = pooledReallocBytes pool ptr (size * sizeOf dummy)
+pooledReallocArray :: forall a . Storable a => Pool -> Ptr a -> Int -> IO (Ptr a)
+pooledReallocArray pool ptr size =
+    pooledReallocBytes pool ptr (size * sizeOf (undefined :: a))
 
 -- | Adjust the size of an array with an end marker in the given pool.
 
@@ -195,4 +185,3 @@ pooledNewArray0 pool marker vals = do
    ptr <- pooledMallocArray0 pool (length vals)
    pokeArray0 marker ptr vals
    return ptr
-
