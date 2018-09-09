@@ -1191,7 +1191,7 @@ parLatexMarkup ppId = Markup {
   markupIdentifier           = markupId ppId,
   markupIdentifierUnchecked  = markupId (ppVerbOccName . fmap snd),
   markupModule               = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
-  markupWarning              = \p v -> emph (p v),
+  markupWarning              = \p v -> p v,
   markupEmphasis             = \p v -> emph (p v),
   markupBold                 = \p v -> bold (p v),
   markupMonospaced           = \p _ -> tt (p Mono),
