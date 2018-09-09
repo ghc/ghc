@@ -26,6 +26,9 @@
  * Render associated type defaults and also improve rendering of
    default method signatures
 
+ * Many fixes to the LaTeX backend, mostly focused on not crashing
+   as well as generating LaTeX source that compiles
+
 ## Changes in version 2.22.0
 
  * Make `--package-version` optional for `--hoogle` (#899)

@@ -3,15 +3,16 @@
 \haddockbeginheader
 {\haddockverb\begin{verbatim}
 module ConstructorArgs (
-    Foo((:|), Rec, Baz, Boa, (:*), x, y),  Boo(Foo, Foa, Fo, Fo'),  pattern Bo, 
-    pattern Bo'
+    Foo((:|), Rec, Baz, Boa, (:*), x, y), Boo(Foo, Foa, Fo, Fo'),
+    pattern Bo, pattern Bo'
   ) where\end{verbatim}}
 \haddockendheader
 
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-data\ Foo
-\end{tabular}]\haddockbegindoc
+data Foo
+\end{tabular}]
+{\haddockbegindoc
 \enspace \emph{Constructors}\par
 \haddockbeginconstrs
 \haddockdecltt{=} & \haddockdecltt{Rec} & doc on a record \\
@@ -25,12 +26,13 @@ data\ Foo
 \haddockdecltt{|} & \haddockdecltt{(:*)} & doc on the \haddockid{:*} constructor \\
                                            & \qquad \haddockdecltt{Int} & doc on the \haddockid{Int} field of the \haddockid{:*} constructor \\
                                            & \qquad \haddockdecltt{String} & doc on the \haddockid{String} field of the \haddockid{:*} constructor \\
-\end{tabulary}\par
+\end{tabulary}\par}
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-data\ Boo\ where
-\end{tabular}]\haddockbegindoc
+data Boo where
+\end{tabular}]
+{\haddockbegindoc
 \enspace \emph{Constructors}\par
 \haddockbeginconstrs
 & \haddockdecltt{Foo} & Info about a \haddockid{Foo} \\
@@ -46,24 +48,24 @@ data\ Boo\ where
                                & \qquad \haddockdecltt{->} \enspace \haddockdecltt{String} & a \haddockid{String} \\
                                & \qquad \haddockdecltt{->} \enspace \haddockdecltt{Boo} & a \haddockid{Boo} \\
 & \haddockdecltt{pattern Fo' :: Boo} & Bundled and no argument docs \\
-\end{tabulary}\par
+\end{tabulary}\par}
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-pattern\ Bo
-\end{tabular}]\haddockbegindoc
+pattern Bo
+\end{tabular}]
+{\haddockbegindoc
 \haddockbeginargs
 \haddockdecltt{::} & \haddockdecltt{Int} & an \haddockid{Int} \\
 \haddockdecltt{->} & \haddockdecltt{String} & a \haddockid{String} \\
 \haddockdecltt{->} & \haddockdecltt{Boo} & a \haddockid{Boo} pattern \\
 \end{tabulary}\par
-Info about not-bundled \haddockid{Bo}\par
-
+Info about not-bundled \haddockid{Bo}\par}
 \end{haddockdesc}
 \begin{haddockdesc}
 \item[\begin{tabular}{@{}l}
-pattern\ Bo'\ ::\ Int\ ->\ String\ ->\ Boo
-\end{tabular}]\haddockbegindoc
-Not bunded and no argument docs\par
-
+pattern Bo' :: Int -> String -> Boo
+\end{tabular}]
+{\haddockbegindoc
+Not bunded and no argument docs\par}
 \end{haddockdesc}

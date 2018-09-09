@@ -103,6 +103,10 @@ haddockSty = "haddock.sty"
 
 type LaTeX = Pretty.Doc
 
+-- | Default way of rendering a 'LaTeX'. The width is 90 by default (since 100
+-- often overflows the line).
+latex2String :: LaTeX -> String
+latex2String = fullRender PageMode 90 1 txtPrinter ""
 
 ppLaTeXTop
    :: String
@@ -156,7 +160,7 @@ ppLaTeXModule _title odir iface = do
         text "\\haddockbeginheader",
         verb $ vcat [
            text "module" <+> text mdl_str <+> lparen,
-           text "    " <> fsep (punctuate (text ", ") $
+           text "    " <> fsep (punctuate (char ',') $
                                map exportListItem $
                                filter forSummary exports),
            text "  ) where"
@@ -171,7 +175,7 @@ ppLaTeXModule _title odir iface = do
 
       body = processExports exports
   --
-  writeUtf8File (odir </> moduleLaTeXFile mdl) (fullRender PageMode 80 1 txtPrinter "" tex)
+  writeUtf8File (odir </> moduleLaTeXFile mdl) (show tex)
 
 -- | Prints out an entry in a module export list.
 exportListItem :: ExportItem DocNameI -> LaTeX
@@ -287,7 +291,7 @@ ppDecl :: LHsDecl DocNameI                         -- ^ decl to print
        -> LaTeX
 
 ppDecl decl pats (doc, fnArgsDoc) instances subdocs _fxts = case unLoc decl of
-  TyClD _ d@FamDecl {}         -> ppFamDecl doc instances d unicode
+  TyClD _ d@FamDecl {}         -> ppFamDecl False doc instances d unicode
   TyClD _ d@DataDecl {}        -> ppDataDecl pats instances subdocs (Just doc) d unicode
   TyClD _ d@SynDecl {}         -> ppTySyn (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
@@ -317,13 +321,14 @@ ppFor _ _ _ = error "ppFor error in Haddock.Backends.LaTeX"
 -------------------------------------------------------------------------------
 
 -- | Pretty-print a data\/type family declaration
-ppFamDecl :: Documentation DocName    -- ^ this decl's docs
+ppFamDecl :: Bool                     -- ^ is the family associated?
+          -> Documentation DocName    -- ^ this decl's docs
           -> [DocInstance DocNameI]   -- ^ relevant instances
           -> TyClDecl DocNameI        -- ^ family to print
           -> Bool                     -- ^ unicode
           -> LaTeX
-ppFamDecl doc instances decl unicode =
-  declWithDoc (ppFamHeader (tcdFam decl) unicode <+> whereBit)
+ppFamDecl associated doc instances decl unicode =
+  declWithDoc (ppFamHeader (tcdFam decl) unicode associated <+> whereBit)
               (if null body then Nothing else Just (vcat body))
   $$ instancesBit
   where
@@ -335,6 +340,7 @@ ppFamDecl doc instances decl unicode =
 
     familyEqns
       | FamilyDecl { fdInfo = ClosedTypeFamily (Just eqns) } <- tcdFam decl
+      , not (null eqns)
       = Just (text "\\haddockbeginargs" $$
               vcat [ decltt (ppFamDeclEqn eqn) <+> nl | L _ eqn <- eqns ] $$
               text "\\end{tabulary}\\par")
@@ -356,21 +362,25 @@ ppFamDecl doc instances decl unicode =
 
 -- | Print the LHS of a type\/data family declaration.
 ppFamHeader :: FamilyDecl DocNameI  -- ^ family header to print
-              -> Bool                 -- ^ unicode
-              -> LaTeX
-ppFamHeader (XFamilyDecl _) _ = panic "haddock;ppFamHeader"
+            -> Bool                 -- ^ unicode
+            -> Bool                 -- ^ is the family associated?
+            -> LaTeX
+ppFamHeader (XFamilyDecl _) _ _ = panic "haddock;ppFamHeader"
 ppFamHeader (FamilyDecl { fdLName = L _ name
                         , fdTyVars = tvs
                         , fdInfo = info
                         , fdResultSig = L _ result
                         , fdInjectivityAnn = injectivity })
-              unicode =
-  leader <+> keyword "family" <+> famName <+> famSig <+> injAnn
+              unicode associated =
+  famly leader <+> famName <+> famSig <+> injAnn
   where
     leader = case info of
       OpenTypeFamily     -> keyword "type"
       ClosedTypeFamily _ -> keyword "type"
       DataFamily         -> keyword "data"
+
+    famly | associated = id
+          | otherwise = (<+> keyword "family")
 
     famName = ppAppDocNameTyVarBndrs unicode name (hsq_explicit tvs)
 
@@ -475,11 +485,15 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
     do_args :: Int -> LaTeX -> HsType DocNameI -> [(LaTeX, LaTeX)]
-    do_args n leader (HsForAllTy _ tvs ltype)
-      = do_largs n (leader <+> decltt (ppForAllPart unicode tvs)) ltype
+    do_args _n leader (HsForAllTy _ tvs ltype)
+      = [ ( decltt leader
+          , decltt (ppForAllPart unicode tvs)
+              <+> ppLType unicode ltype
+          ) ]
     do_args n leader (HsQualTy _ lctxt ltype)
-      = (decltt leader, decltt (ppLContextNoArrow lctxt unicode) <+> nl)
-        : do_largs n (darrow unicode) ltype
+      = ( decltt leader
+        , decltt (ppLContextNoArrow lctxt unicode) <+> nl
+        ) : do_largs n (darrow unicode) ltype
 
     do_args n leader (HsFunTy _ (L _ (HsRecTy _ fields)) r)
       = [ (decltt ldr, latex <+> nl)
@@ -498,9 +512,9 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     -- We need 'gadtComma' and 'gadtEnd' to line up with the `{` from
     -- 'gadtOpen', so we add 3 spaces to cover for `-> `/`:: ` (3 in unicode
     -- mode since `->` and `::` are rendered as single characters.
-    gadtComma = hcat (replicate (if unicode then 3 else 4) (text "\\ ")) <> text ","
-    gadtEnd = hcat (replicate (if unicode then 3 else 4) (text "\\ ")) <> text "\\}"
-    gadtOpen = text "\\{"
+    gadtComma = hcat (replicate (if unicode then 3 else 4) (char ' ')) <> char ','
+    gadtEnd = hcat (replicate (if unicode then 3 else 4) (char ' ')) <> char '}'
+    gadtOpen = char '{'
 
 
 ppTypeSig :: [Name] -> HsType DocNameI  -> Bool -> LaTeX
@@ -512,7 +526,7 @@ ppTypeSig nms ty unicode =
 
 -- | Pretty-print type variables.
 ppTyVars :: Bool -> [LHsTyVarBndr DocNameI] -> [LaTeX]
-ppTyVars unicode tvs = map (ppHsTyVarBndr unicode . unLoc) tvs
+ppTyVars unicode = map (ppHsTyVarBndr unicode . unLoc)
 
 
 tyvarNames :: LHsQTyVars DocNameI -> [Name]
@@ -523,10 +537,9 @@ declWithDoc :: LaTeX -> Maybe LaTeX -> LaTeX
 declWithDoc decl doc =
    text "\\begin{haddockdesc}" $$
    text "\\item[\\begin{tabular}{@{}l}" $$
-   text (latexMonoFilter (show decl)) $$
-   text "\\end{tabular}]" <>
-       (if isNothing doc then empty else text "\\haddockbegindoc") $$
-   maybe empty id doc $$
+   text (latexMonoFilter (latex2String decl)) $$
+   text "\\end{tabular}]" $$
+   maybe empty (\x -> text "{\\haddockbegindoc" $$ x <> text "}") doc $$
    text "\\end{haddockdesc}"
 
 
@@ -537,9 +550,9 @@ multiDecl :: [LaTeX] -> LaTeX
 multiDecl decls =
    text "\\begin{haddockdesc}" $$
    vcat [
-      text "\\item[" $$
-      text (latexMonoFilter (show decl)) $$
-      text "]"
+      text "\\item[\\begin{tabular}{@{}l}" $$
+      text (latexMonoFilter (latex2String decl)) $$
+      text "\\end{tabular}]"
       | decl <- decls ] $$
    text "\\end{haddockdesc}"
 
@@ -583,7 +596,7 @@ ppFds fds unicode =
                            hsep (map (ppDocName . unLoc) vars2)
 
 
--- TODO: associated types, associated type defaults, docs on default methods
+-- TODO: associated type defaults, docs on default methods
 ppClassDecl :: [DocInstance DocNameI]
             -> Documentation DocName -> [(DocName, DocForDecl DocName)]
             -> TyClDecl DocNameI -> Bool -> LaTeX
@@ -604,8 +617,16 @@ ppClassDecl instances doc subdocs
     body_
       | null lsigs, null ats, null at_defs = Nothing
       | null ats, null at_defs = Just methodTable
----     | otherwise = atTable $$ methodTable
-      | otherwise = error "LaTeX.ppClassDecl"
+      | otherwise = Just (atTable $$ methodTable)
+
+    atTable =
+      text "\\haddockpremethods{}" <> emph (text "Associated Types") $$
+      vcat  [ ppFamDecl True (fst doc) [] (FamDecl noExt decl) True
+            | L _ decl <- ats
+            , let name = unL . fdLName $ decl
+                  doc = lookupAnySubdoc name subdocs
+            ]
+
 
     methodTable =
       text "\\haddockpremethods{}" <> emph (text "Methods") $$
@@ -636,6 +657,7 @@ ppDocInstances unicode (i : rest)
 
 isUndocdInstance :: DocInstance a -> Maybe (InstHead a)
 isUndocdInstance (i,Nothing,_,_) = Just i
+isUndocdInstance (i,Just (MetaDoc _ DocEmpty),_,_) = Just i
 isUndocdInstance _ = Nothing
 
 -- | Print a possibly commented instance. The instance header is printed inside
@@ -1001,7 +1023,7 @@ ppLFunLhType  unicode y = ppFunLhType unicode (unLoc y)
 
 ppType, ppParendType, ppFunLhType, ppCtxType :: Bool -> HsType DocNameI -> LaTeX
 ppType       unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
-ppParendType unicode ty = ppr_mono_ty (reparenTypePrec PREC_TOP ty) unicode
+ppParendType unicode ty = ppr_mono_ty (reparenTypePrec PREC_CON ty) unicode
 ppFunLhType  unicode ty = ppr_mono_ty (reparenTypePrec PREC_FUN ty) unicode
 ppCtxType    unicode ty = ppr_mono_ty (reparenTypePrec PREC_CTX ty) unicode
 
@@ -1014,7 +1036,7 @@ ppLHsTypeArg _ (HsArgPar _) = text ""
 ppHsTyVarBndr :: Bool -> HsTyVarBndr DocNameI -> LaTeX
 ppHsTyVarBndr _ (UserTyVar _ (L _ name)) = ppDocName name
 ppHsTyVarBndr unicode (KindedTyVar _ (L _ name) kind) =
-  parens (ppDocName name) <+> dcolon unicode <+> ppLKind unicode kind
+  parens (ppDocName name <+> dcolon unicode <+> ppLKind unicode kind)
 ppHsTyVarBndr _ (XTyVarBndr _) = panic "haddock:ppHsTyVarBndr"
 
 ppLKind :: Bool -> LHsKind DocNameI -> LaTeX
@@ -1080,7 +1102,7 @@ ppr_mono_ty (HsParTy _ ty) unicode
 ppr_mono_ty (HsDocTy _ ty _) unicode
   = ppr_mono_lty ty unicode
 
-ppr_mono_ty (HsWildCardTy _) _ = text "\\_"
+ppr_mono_ty (HsWildCardTy _) _ = char '_'
 
 ppr_mono_ty (HsTyLit _ t) u = ppr_tylit t u
 ppr_mono_ty (HsStarTy _ isUni) unicode = starSymbol (isUni || unicode)
@@ -1114,26 +1136,15 @@ ppSymName name
   | otherwise = ppName name
 
 
-ppVerbOccName :: Wrap OccName -> LaTeX
-ppVerbOccName = text . latexFilter . showWrapped occNameString
-
 ppIPName :: HsIPName -> LaTeX
 ppIPName = text . ('?':) . unpackFS . hsIPNameFS
 
 ppOccName :: OccName -> LaTeX
 ppOccName = text . occNameString
 
-ppVerbDocName :: Wrap DocName -> LaTeX
-ppVerbDocName = text . latexFilter . showWrapped (occNameString . nameOccName . getName)
-
-
-ppVerbRdrName :: Wrap RdrName -> LaTeX
-ppVerbRdrName = text . latexFilter . showWrapped (occNameString . rdrNameOcc)
-
 
 ppDocName :: DocName -> LaTeX
 ppDocName = ppOccName . nameOccName . getName
-
 
 ppLDocName :: Located DocName -> LaTeX
 ppLDocName (L _ d) = ppDocName d
@@ -1172,9 +1183,10 @@ latexMunge c    s = c : s
 
 
 latexMonoMunge :: Char -> String -> String
-latexMonoMunge ' ' s = '\\' : ' ' : s
+latexMonoMunge ' '      (' ':s) = "\\ \\ " ++ s
+latexMonoMunge ' ' ('\\':' ':s) = "\\ \\ " ++ s
 latexMonoMunge '\n' s = '\\' : '\\' : s
-latexMonoMunge c   s = latexMunge c s
+latexMonoMunge c s = latexMunge c s
 
 
 -------------------------------------------------------------------------------
@@ -1182,34 +1194,40 @@ latexMonoMunge c   s = latexMunge c s
 -------------------------------------------------------------------------------
 
 
-parLatexMarkup :: (a -> LaTeX) -> DocMarkup a (StringContext -> LaTeX)
-parLatexMarkup ppId = Markup {
-  markupParagraph            = \p v -> p v <> text "\\par" $$ text "",
-  markupEmpty                = \_ -> empty,
-  markupString               = \s v -> text (fixString v s),
-  markupAppend               = \l r v -> l v <> r v,
-  markupIdentifier           = markupId ppId,
-  markupIdentifierUnchecked  = markupId (ppVerbOccName . fmap snd),
-  markupModule               = \m _ -> let (mdl,_ref) = break (=='#') m in tt (text mdl),
-  markupWarning              = \p v -> p v,
-  markupEmphasis             = \p v -> emph (p v),
-  markupBold                 = \p v -> bold (p v),
-  markupMonospaced           = \p _ -> tt (p Mono),
-  markupUnorderedList        = \p v -> itemizedList (map ($v) p) $$ text "",
-  markupPic                  = \p _ -> markupPic p,
-  markupMathInline           = \p _ -> markupMathInline p,
-  markupMathDisplay          = \p _ -> markupMathDisplay p,
-  markupOrderedList          = \p v -> enumeratedList (map ($v) p) $$ text "",
-  markupDefList              = \l v -> descriptionList (map (\(a,b) -> (a v, b v)) l),
-  markupCodeBlock            = \p _ -> quote (verb (p Verb)) $$ text "",
-  markupHyperlink            = \(Hyperlink u l) p -> markupLink u (fmap ($p) l),
-  markupAName                = \_ _ -> empty,
-  markupProperty             = \p _ -> quote $ verb $ text p,
-  markupExample              = \e _ -> quote $ verb $ text $ unlines $ map exampleToString e,
-  markupHeader               = \(Header l h) p -> header l (h p),
-  markupTable                = \(Table h b) p -> table h b p
+latexMarkup :: HasOccName a => DocMarkup (Wrap a) (StringContext -> LaTeX -> LaTeX)
+latexMarkup = Markup
+  { markupParagraph            = \p v -> blockElem (p v (text "\\par"))
+  , markupEmpty                = \_ -> id
+  , markupString               = \s v -> inlineElem (text (fixString v s))
+  , markupAppend               = \l r v -> l v . r v
+  , markupIdentifier           = \i v -> inlineElem (markupId v (fmap occName i))
+  , markupIdentifierUnchecked  = \i v -> inlineElem (markupId v (fmap snd i))
+  , markupModule               = \m _ -> inlineElem (let (mdl,_ref) = break (=='#') m in (tt (text mdl)))
+  , markupWarning              = \p v -> p v
+  , markupEmphasis             = \p v -> inlineElem (emph (p v empty))
+  , markupBold                 = \p v -> inlineElem (bold (p v empty))
+  , markupMonospaced           = \p v -> inlineElem (markupMonospace p v)
+  , markupUnorderedList        = \p v -> blockElem (itemizedList (map (\p' -> p' v empty) p))
+  , markupPic                  = \p _ -> inlineElem (markupPic p)
+  , markupMathInline           = \p _ -> inlineElem (markupMathInline p)
+  , markupMathDisplay          = \p _ -> blockElem (markupMathDisplay p)
+  , markupOrderedList          = \p v -> blockElem (enumeratedList (map (\p' -> p' v empty) p))
+  , markupDefList              = \l v -> blockElem (descriptionList (map (\(a,b) -> (a v empty, b v empty)) l))
+  , markupCodeBlock            = \p _ -> blockElem (quote (verb (p Verb empty)))
+  , markupHyperlink            = \(Hyperlink u l) v -> inlineElem (markupLink u (fmap (\x -> x v empty) l))
+  , markupAName                = \_ _ -> id -- TODO
+  , markupProperty             = \p _ -> blockElem (quote (verb (text p)))
+  , markupExample              = \e _ -> blockElem (quote (verb (text $ unlines $ map exampleToString e)))
+  , markupHeader               = \(Header l h) p -> blockElem (header l (h p empty))
+  , markupTable                = \(Table h b) p -> blockElem (table h b p)
   }
   where
+    blockElem :: LaTeX -> LaTeX -> LaTeX
+    blockElem = ($$)
+
+    inlineElem :: LaTeX -> LaTeX -> LaTeX
+    inlineElem = (<>)
+
     header 1 d = text "\\section*" <> braces d
     header 2 d = text "\\subsection*" <> braces d
     header l d
@@ -1221,6 +1239,9 @@ parLatexMarkup ppId = Markup {
     fixString Plain s = latexFilter s
     fixString Verb  s = s
     fixString Mono  s = latexMonoFilter s
+
+    markupMonospace p Verb = p Verb empty
+    markupMonospace p _ = tt (p Mono empty)
 
     markupLink url mLabel = case mLabel of
       Just label -> text "\\href" <> braces (text url) <> braces label
@@ -1238,35 +1259,28 @@ parLatexMarkup ppId = Markup {
 
     markupMathDisplay mathjax = text "\\[" <> text mathjax <> text "\\]"
 
-    markupId ppId_ id v =
+    markupId v wrappedOcc =
       case v of
-        Verb  -> theid
-        Mono  -> theid
-        Plain -> text "\\haddockid" <> braces theid
-      where theid = ppId_ id
-
-
-latexMarkup :: DocMarkup (Wrap DocName) (StringContext -> LaTeX)
-latexMarkup = parLatexMarkup ppVerbDocName
-
-
-rdrLatexMarkup :: DocMarkup (Wrap RdrName) (StringContext -> LaTeX)
-rdrLatexMarkup = parLatexMarkup ppVerbRdrName
-
+        Verb  -> text i
+        Mono  -> text "\\haddockid" <> braces (text . latexMonoFilter $ i)
+        Plain -> text "\\haddockid" <> braces (text . latexFilter $ i)
+      where i = showWrapped occNameString wrappedOcc
 
 docToLaTeX :: Doc DocName -> LaTeX
-docToLaTeX doc = markup latexMarkup doc Plain
-
+docToLaTeX doc = markup latexMarkup doc Plain empty
 
 documentationToLaTeX :: Documentation DocName -> Maybe LaTeX
 documentationToLaTeX = fmap docToLaTeX . fmap _doc . combineDocumentation
 
 
 rdrDocToLaTeX :: Doc RdrName -> LaTeX
-rdrDocToLaTeX doc = markup rdrLatexMarkup doc Plain
+rdrDocToLaTeX doc = markup latexMarkup doc Plain empty
 
 
-data StringContext = Plain | Verb | Mono
+data StringContext
+  = Plain  -- ^ all special characters have to be escape
+  | Mono   -- ^ on top of special characters, escape space chraacters
+  | Verb   -- ^ don't escape anything
 
 
 latexStripTrailingWhitespace :: Doc a -> Doc a
@@ -1291,23 +1305,23 @@ latexStripTrailingWhitespace other = other
 
 itemizedList :: [LaTeX] -> LaTeX
 itemizedList items =
-  text "\\begin{itemize}" $$
+  text "\\vbox{\\begin{itemize}" $$
   vcat (map (text "\\item" $$) items) $$
-  text "\\end{itemize}"
+  text "\\end{itemize}}"
 
 
 enumeratedList :: [LaTeX] -> LaTeX
 enumeratedList items =
-  text "\\begin{enumerate}" $$
+  text "\\vbox{\\begin{enumerate}" $$
   vcat (map (text "\\item " $$) items) $$
-  text "\\end{enumerate}"
+  text "\\end{enumerate}}"
 
 
 descriptionList :: [(LaTeX,LaTeX)] -> LaTeX
 descriptionList items =
-  text "\\begin{description}" $$
-  vcat (map (\(a,b) -> text "\\item" <> brackets a <+> b) items) $$
-  text "\\end{description}"
+  text "\\vbox{\\begin{description}" $$
+  vcat (map (\(a,b) -> text "\\item" <> brackets a <> text "\\hfill \\par" $$ b) items) $$
+  text "\\end{description}}"
 
 
 tt :: LaTeX -> LaTeX
@@ -1315,8 +1329,8 @@ tt ltx = text "\\haddocktt" <> braces ltx
 
 
 decltt :: LaTeX -> LaTeX
-decltt ltx = text "\\haddockdecltt" <> braces ltx
-
+decltt ltx = text "\\haddockdecltt" <> braces (text filtered)
+  where filtered = latexMonoFilter (latex2String ltx)
 
 emph :: LaTeX -> LaTeX
 emph ltx = text "\\emph" <> braces ltx
@@ -1324,6 +1338,12 @@ emph ltx = text "\\emph" <> braces ltx
 bold :: LaTeX -> LaTeX
 bold ltx = text "\\textbf" <> braces ltx
 
+-- TODO: @verbatim@ is too much since
+--
+--   * Haddock supports markup _inside_ of codeblocks. Right now, the LaTeX
+--     representing that markup gets printed verbatim
+--   * Verbatim environments are not supported everywhere (example: not nested
+--     inside a @tabulary@ environment)
 verb :: LaTeX -> LaTeX
 verb doc = text "{\\haddockverb\\begin{verbatim}" $$ doc <> text "\\end{verbatim}}"
    -- NB. swallow a trailing \n in the verbatim text by appending the
