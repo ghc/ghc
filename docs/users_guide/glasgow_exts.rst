@@ -4512,7 +4512,7 @@ Deriving ``Lift`` instances
 .. extension:: DeriveLift
     :shortdesc: Enable deriving for the Lift class
 
-    :since: 7.2.1
+    :since: 8.0.1
 
     Enable automatic deriving of instances for the ``Lift`` typeclass for
     Template Haskell.
