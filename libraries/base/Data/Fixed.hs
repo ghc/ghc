@@ -1,5 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Trustworthy         #-}
+
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,6 +30,7 @@ module Data.Fixed
 
     Fixed(..), HasResolution(..),
     showFixed,
+    E,
     E0,Uni,
     E1,Deci,
     E2,Centi,
@@ -40,6 +44,8 @@ import Data.Data
 import GHC.Read
 import Text.ParserCombinators.ReadPrec
 import Text.Read.Lex
+
+import GHC.TypeLits (Nat, KnownNat, natVal)
 
 default () -- avoid any defaulting shenanigans
 
@@ -177,58 +183,44 @@ convertFixed (Number n)
           e = ceiling (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
-data E0
+-- @E n@ generalises @E2/E3/E6/E12@ from to give more precise fixed-precision
+-- arithmetic: @Fixed (E 30)@ has 30 decimal places.
+data E (n :: Nat)
 
--- | @since 4.1.0.0
-instance HasResolution E0 where
-    resolution _ = 1
--- | resolution of 1, this works the same as Integer
+instance KnownNat n => HasResolution (E n) where
+    resolution _ = 10^natVal (undefined :: E n)
+
+type E0 = E 0
+
+-- | Resolution of 1, this works the same as Integer
 type Uni = Fixed E0
 
-data E1
+type E1 = E 1
 
--- | @since 4.1.0.0
-instance HasResolution E1 where
-    resolution _ = 10
--- | resolution of 10^-1 = .1
+-- | Resolution of 10^-1 = .1
 type Deci = Fixed E1
 
-data E2
+type E2 = E 2
 
--- | @since 4.1.0.0
-instance HasResolution E2 where
-    resolution _ = 100
--- | resolution of 10^-2 = .01, useful for many monetary currencies
+-- | Resolution of 10^-2 = .01, useful for many monetary currencies
 type Centi = Fixed E2
 
-data E3
+type E3 = E 3
 
--- | @since 4.1.0.0
-instance HasResolution E3 where
-    resolution _ = 1000
--- | resolution of 10^-3 = .001
+-- | Resolution of 10^-3 = .001
 type Milli = Fixed E3
 
-data E6
+type E6 = E 6
 
--- | @since 2.01
-instance HasResolution E6 where
-    resolution _ = 1000000
--- | resolution of 10^-6 = .000001
+-- | Resolution of 10^-6 = .000001
 type Micro = Fixed E6
 
-data E9
+type E9 = E 9
 
--- | @since 4.1.0.0
-instance HasResolution E9 where
-    resolution _ = 1000000000
--- | resolution of 10^-9 = .000000001
+-- | Resolution of 10^-9 = .000000001
 type Nano = Fixed E9
 
-data E12
+type E12 = E 12
 
--- | @since 2.01
-instance HasResolution E12 where
-    resolution _ = 1000000000000
--- | resolution of 10^-12 = .000000000001
+-- | Resolution of 10^-12 = .000000000001
 type Pico = Fixed E12
