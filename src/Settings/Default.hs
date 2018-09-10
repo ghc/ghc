@@ -157,7 +157,12 @@ defaultRtsWays = do
     ways <- getLibraryWays
     mconcat
         [ pure [ logging, debug, threaded, threadedDebug, threadedLogging ]
-        , (profiling `elem` ways) ? pure [threadedProfiling]
+        , (profiling `elem` ways) ?
+          pure [ profiling, threadedProfiling, debugProfiling
+               , threadedDebugProfiling ]
+          -- we don't add the 'logging' variants of those for now, but we might
+          -- in the future?
+
         {- , (dynamic `elem` ways) ?
           pure [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
                , loggingDynamic, threadedLoggingDynamic ] -}
