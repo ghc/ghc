@@ -1906,8 +1906,8 @@ ty_co_vars_of_mco (MCo co) is  acc = ty_co_vars_of_co co is acc
 
 ty_co_vars_of_co_var :: CoVar -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_co_var v is acc
-  | v `elemVarSet` is = acc
   | v `elemVarSet` is  = acc
+  | v `elemVarSet` acc = acc
   | otherwise         = ty_co_vars_of_type (varType v) is (extendVarSet acc v)
 
 ty_co_vars_of_cos :: [Coercion] -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
