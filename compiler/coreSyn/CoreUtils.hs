@@ -20,6 +20,7 @@ module CoreUtils (
         findDefault, addDefault, findAlt, isDefaultAlt,
         mergeAlts, trimConArgs,
         filterAlts, combineIdenticalAlts, refineDefaultAlt,
+        scaleAltsBy,
 
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType, isExprLevPoly,
@@ -894,6 +895,18 @@ combineIdenticalAlts imposs_deflt_cons ((con1,bndrs1,rhs1) : rest_alts)
 
 combineIdenticalAlts imposs_cons alts
   = (False, imposs_cons, alts)
+
+-- Scales the multiplicity of the binders of a list of case alternatives. That
+-- is, in [C x1…xn -> u], the multiplicity of x1…xn is scaled.
+scaleAltsBy :: Rig -> [CoreAlt] -> [CoreAlt]
+scaleAltsBy w alts = map scaleAlt alts
+  where
+    scaleAlt :: CoreAlt -> CoreAlt
+    scaleAlt (con, bndrs, rhs) = (con, map scaleBndr bndrs, rhs)
+
+    scaleBndr :: CoreBndr -> CoreBndr
+    scaleBndr bndr = scaleVarBy bndr w
+
 
 {- *********************************************************************
 *                                                                      *

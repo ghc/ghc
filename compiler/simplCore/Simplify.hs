@@ -1190,15 +1190,14 @@ rebuild env (floats, expr) cont
 
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (se `setInScopeFromE` env) (floats, expr) bndr alts cont
-           -- TODO: arnaud: I think I may be able to do like `StrictArg` here
-           -- and simply scale the floats there and not pass them down to
-           -- rebuildCase, hence preserving the original logic.
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_weight = w }
         -> do { (floats', expr') <- rebuildCall env (fun `addValArgTo` (w, expr)) cont
               ; return
                 ( scaleFloatsBy w floats `addFloats` floats'
                 , expr' )
+                -- TODO: arnaud: this is not quite correct. See the remark I
+                -- left in rebuildCall.
               }
       StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
                  , sc_env = se, sc_cont = cont }
@@ -1878,6 +1877,11 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
   = rebuild env (emptyFloats env, argInfoExpr fun rev_args) cont
+-- TODO: arnaud: this is most certainly wrong. The floats that we got in
+-- `rebuild` in the StrictArg case may still have to float through cont
+-- above. Hence be scaled further. So the floats must be threaded through
+-- rebuildCall (which is not obvious how to do), then the emptyfloats above must
+-- be replace by the argument floats.
 
 {- Note [Trying rewrite rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2481,10 +2485,17 @@ reallyRebuildCase env (floats, scrut) case_bndr alts cont
   | otherwise
   = do { (floats', cont') <- mkDupableCaseCont env alts cont
        ; case_expr <- simplAlts (env `setInScopeFromF` floats')
-                                scrut case_bndr alts cont'
+                                scrut
+                                (scaleIdBy case_bndr holeScaling)
+                                (scaleAltsBy holeScaling alts)
+                                cont'
        ; return
          (scaleFloatsBy (idWeight case_bndr) floats `addFloats` floats'
          , case_expr) }
+  where
+    holeScaling = contHoleScaling cont
+    -- This assume that cont and cont' have the same scaling factor. Which they
+    -- should.
 
 {-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
