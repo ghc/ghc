@@ -183,7 +183,7 @@ convertFixed (Number n)
           e = ceiling (logBase 10 (fromInteger r) :: Double)
 convertFixed _ = pfail
 
--- @E n@ generalises @E2/E3/E6/E12@ from to give more precise fixed-precision
+-- @E n@ generalises @E2/E3/E6/E12@ to give more precise fixed-precision
 -- arithmetic: @Fixed (E 30)@ has 30 decimal places.
 data E (n :: Nat)
 
