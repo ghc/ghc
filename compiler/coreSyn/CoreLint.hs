@@ -761,8 +761,8 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
                   addGoodJoins [bndr] $
                   lintCoreExpr body)
         ; let l_weight = idWeight bndr
-        ; checkLinearity body_ue bndr
-        ; return (body_ty, body_ue `addUE` (l_weight `scaleUE` let_ue))}
+        ; body_ue' <- checkLinearity body_ue bndr
+        ; return (body_ty, body_ue' `addUE` (l_weight `scaleUE` let_ue))}
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
@@ -798,8 +798,8 @@ lintCoreExpr (Lam var expr)
     markAllJoinsBad $
     lintBinder LambdaBind var $ \ var' ->
     do { (body_ty, ue) <- lintCoreExpr expr
-       ; checkLinearity ue var'
-       ; return $ (mkLamType var' body_ty, ue) }
+       ; ue' <- checkLinearity ue var'
+       ; return $ (mkLamType var' body_ty, ue') }
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
@@ -841,7 +841,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
 
      ; lintIdBndr NotTopLevel CaseBind var $ \_ ->
        do { -- Check the alternatives
-          ; alt_ues <- mapM (lintCoreAlt (\e -> lookupUE e var) scrut_ty scrut_weight alt_ty) alts
+          ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_weight alt_ty) alts
           ; let case_ue = (scaleUE scrut_weight scrut_ue) `addUE` supUEs alt_ues
           ; checkCaseAlts e scrut_ty alts
           ; return (alt_ty, case_ue) } }
@@ -938,13 +938,15 @@ checkJoinOcc var n_args
   = return ()
 
 
--- Check that the usage of var is consistent with var itself
-checkLinearity :: UsageEnv -> Var -> LintM ()
+-- Check that the usage of var is consistent with var itself, and pops the var
+-- from the usage environment (this is important because of shadowing).
+checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
 checkLinearity body_ue lam_var =
   case varWeightMaybe lam_var of
-    Just mult ->
+    Just mult -> do
       ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
-    Nothing   -> return () -- A type variable
+      return $ deleteUE lam_var body_ue
+    Nothing   -> return body_ue -- A type variable
   where
     lhs = lookupUE body_ue lam_var
     err_msg mult = text "Linearity failure in lambda:" <+> ppr lam_var
@@ -1058,41 +1060,46 @@ lintCoreArg (fun_ty, fun_ue) arg
        ; lintValApp arg fun_ty arg_ty fun_ue arg_ue }
 
 -----------------
-lintAltBinders :: (Rig, Var -> Rig, Rig)
+lintAltBinders :: UsageEnv
+               -> Var         -- Scrutinee name
                -> OutType     -- Scrutinee type
                -> OutType     -- Constructor type
                -> [(Rig, OutVar)]    -- Binders
-               -> LintM ()
+               -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintAltBinders _rhs_ue scrut_ty con_ty []
-  = ensureEqTys con_ty scrut_ty (mkBadPatMsg con_ty scrut_ty)
-lintAltBinders rhs_ue scrut_ty con_ty ((var_w, bndr):bndrs)
+lintAltBinders rhs_ue _scrut scrut_ty con_ty []
+  = do { ensureEqTys con_ty scrut_ty (mkBadPatMsg con_ty scrut_ty)
+       ; return rhs_ue }
+lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
   | isTyVar bndr
   = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
-       ; lintAltBinders rhs_ue scrut_ty con_ty'  bndrs }
+       ; lintAltBinders rhs_ue scrut scrut_ty con_ty'  bndrs }
   | otherwise
-  = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE -- TODO
-       ; checkCaseLinearity rhs_ue var_w bndr
-       ; lintAltBinders rhs_ue scrut_ty con_ty' bndrs }
+  = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE -- TODO: arnaud: there was a TODO there, presumably MattP wasn't happy with how this line handles multiplicities. I don't know yet what this function does.
+       ; rhs_ue' <- checkCaseLinearity rhs_ue scrut var_w bndr
+       ; lintAltBinders rhs_ue' scrut scrut_ty con_ty' bndrs }
 
 -- | Implements the case rules for linearity
-checkCaseLinearity :: (Rig, Var -> Rig, Rig) ->  Rig -> Var -> LintM ()
-checkCaseLinearity (flattenRig -> scrut_usage, var_usage, flattenRig -> scrut_w) (flattenRig -> var_w) bndr = do
+checkCaseLinearity :: UsageEnv -> Var ->  Rig -> Var -> LintM UsageEnv
+checkCaseLinearity ue scrut (flattenRig -> var_w) bndr = do
   ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
+  return $ deleteUE bndr ue
   where
-    lhs = var_usage bndr + (scrut_usage * var_w)
+    lhs = bndr_usage + (scrut_usage * var_w)
     rhs = scrut_w * var_w
     err_msg  = (text "Linearity failure in variable:" <+> ppr bndr
                 $$ ppr lhs <+> text "⊈" <+> ppr rhs
                 $$ text "Computed by:"
                 <+> text "LHS:" <+> lhs_formula
                 <+> text "RHS:" <+> rhs_formula)
-    lhs_formula = ppr (var_usage bndr) <+> text "+"
-                                   <+> parens (ppr scrut_usage <+> text "*" <+> ppr var_w)
+    lhs_formula = ppr bndr_usage <+> text "+"
+                                 <+> parens (ppr scrut_usage <+> text "*" <+> ppr var_w)
     rhs_formula = ppr scrut_w <+> text "*" <+> ppr var_w
-
+    scrut_w = flattenRig $ varWeight scrut
+    scrut_usage = flattenRig $ lookupUE ue scrut
+    bndr_usage = flattenRig $ lookupUE ue bndr
 
 
 
@@ -1190,7 +1197,7 @@ lintAltExpr expr ann_ty
        ; ensureEqTys actual_ty ann_ty (mkCaseAltMsg expr actual_ty ann_ty)
        ; return ue }
 
-lintCoreAlt :: (UsageEnv -> Rig) -- Scrut Var Lookup
+lintCoreAlt :: Var              -- Scrut Var
             -> OutType          -- Type of scrutinee
             -> Rig              -- Weight of scrutinee
             -> OutType          -- Type of the alternative
@@ -1202,7 +1209,7 @@ lintCoreAlt _ _ _ alt_ty (DEFAULT, args, rhs) =
   do { lintL (null args) (mkDefaultArgsMsg args)
      ; lintAltExpr rhs alt_ty }
 
-lintCoreAlt _lookup_scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
+lintCoreAlt _scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
   | litIsLifted lit
   = failWithL integerScrutinisedMsg
   | otherwise
@@ -1212,7 +1219,7 @@ lintCoreAlt _lookup_scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
   where
     lit_ty = literalType lit
 
-lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
+lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
   | isNewTyCon (dataConTyCon con)
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
@@ -1231,10 +1238,9 @@ lintCoreAlt lookup_scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rh
     ; lintBinders CasePatBind args $ \ args' -> do
     {
     rhs_ue <- lintAltExpr rhs alt_ty ;
-    let scrut_usage = lookup_scrut rhs_ue
 --    ; pprTrace "lintCoreAlt" (ppr weights $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
-    ; addLoc (CasePat alt) (lintAltBinders (scrut_usage, flattenRig . lookupUE rhs_ue, scrut_weight) scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
-    return rhs_ue
+    ; rhs_ue' <- addLoc (CasePat alt) (lintAltBinders rhs_ue scrut scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
+    return $ deleteUE scrut rhs_ue'
     } }
 
   | otherwise   -- Scrut-ty is wrong shape

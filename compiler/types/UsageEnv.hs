@@ -74,8 +74,8 @@ deleteUEAsserting w _x (UsageEnv e) = do
   guard (subweight Zero w)
   return $ UsageEnv e
 
-deleteUE :: Name -> UsageEnv -> UsageEnv
-deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e x
+deleteUE :: NamedThing n => n -> UsageEnv -> UsageEnv
+deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e (getName x)
 
 
 -- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
