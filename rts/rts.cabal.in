@@ -51,14 +51,14 @@ library
     -- libCffi_thr libCffi_thr_debug libCffi_thr_l libCffi_thr_p
     extra-library-flavours: _debug _l _thr _thr_debug _thr_l
 
-    -- The make build system seems to be doing something "magic"/special
+    -- The make build system does something special in config.mk.in
     -- for generating profiled builds of those libraries, but we need to
     -- be transparent for hadrian which gets information about the rts
     -- "package" through Cabal and this cabal file. We therefore declare
-    -- two profiling-enabled flavours to be available when passing the
+    -- several profiling-enabled flavours to be available when passing the
     -- 'profiling' flag when configuring the RTS from hadrian, using Cabal.
     if flag(profiling)
-      extra-library-flavours: _p _thr_p
+      extra-library-flavours: _p _thr_p _debug_p _thr_debug_p
 
     exposed: True
     exposed-modules:
