@@ -2247,7 +2247,7 @@ We treat the unlifted and lifted cases separately:
   However, we can turn the case into a /strict/ let if the 'r' is
   used strictly in the body.  Then we won't lose divergence; and
   we won't build a thunk because the let is strict.
-  See also Note [Eliminating redundant seqs]
+  See also Note [Case-to-let for strictly-used binders]
 
   NB: absentError satisfies exprIsHNF: see Note [aBSENT_ERROR_ID] in MkCore.
   We want to turn
@@ -2256,13 +2256,18 @@ We treat the unlifted and lifted cases separately:
      let r = absentError "foo" in ...MkT r...
 
 
-Note [Eliminating redundant seqs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Case-to-let for strictly-used binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have this:
-   case x of r { _ -> ..r.. }
-where 'r' is used strictly in (..r..), the case is effectively a 'seq'
-on 'x', but since 'r' is used strictly anyway, we can safely transform to
-   (...x...)
+   case <scrut> of r { _ -> ..r.. }
+
+where 'r' is used strictly in (..r..), we can safely transform to
+   let r = <scrut> in ...r...
+
+This is a Good Thing, because 'r' might be dead (if the body just
+calls error), or might be used just once (in which case it can be
+inlined); or we might be able to float the let-binding up or down.
+E.g. Trac #15631 has an example.
 
 Note that this can change the error behaviour.  For example, we might
 transform
@@ -2278,7 +2283,24 @@ transformation bit us in practice.
 
 See also Note [Empty case alternatives] in CoreSyn.
 
-Just for reference, the original code (added Jan 13) looked like this:
+Historical notes
+
+There have been various earlier versions of this patch:
+
+* By Sept 18 the code looked like this:
+     || scrut_is_demanded_var scrut
+
+    scrut_is_demanded_var :: CoreExpr -> Bool
+    scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
+    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
+    scrut_is_demanded_var _          = False
+
+  This only fired if the scrutinee was a /variable/, which seems
+  an unnecessary restriction. So in Trac #15631 I relaxed it to allow
+  arbitrary scrutinees.  Less code, less to explain -- but the change
+  had 0.00% effect on nofib.
+
+* Previously, in Jan 13 the code looked like this:
      || case_bndr_evald_next rhs
 
     case_bndr_evald_next :: CoreExpr -> Bool
@@ -2289,8 +2311,8 @@ Just for reference, the original code (added Jan 13) looked like this:
     case_bndr_evald_next (Case e _ _ _)  = case_bndr_evald_next e
     case_bndr_evald_next _               = False
 
-(This came up when fixing Trac #7542. See also Note [Eta reduction of
-an eval'd function] in CoreUtils.)
+  This patch was part of fixing Trac #7542. See also
+  Note [Eta reduction of an eval'd function] in CoreUtils.)
 
 
 Further notes about case elimination
@@ -2405,7 +2427,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   | all_dead_bndrs
   , if isUnliftedType (idType case_bndr)
     then exprOkForSpeculation scrut
-    else exprIsHNF scrut || scrut_is_demanded_var scrut
+    else exprIsHNF scrut || case_bndr_is_demanded
   = do { tick (CaseElim case_bndr)
        ; (floats1, env') <- simplNonRecX env case_bndr scrut
        ; (floats2, expr') <- simplExprF env' rhs cont
@@ -2424,12 +2446,8 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
-    scrut_is_demanded_var :: CoreExpr -> Bool
-            -- See Note [Eliminating redundant seqs]
-    scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
-    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
-    scrut_is_demanded_var _          = False
-
+    case_bndr_is_demanded = isStrictDmd (idDemandInfo case_bndr)
+    -- See Note [Case-to-let for strictly-used binders]
 
 rebuildCase env scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
