@@ -63,8 +63,7 @@ mkEmptyContInfoTable info_lbl
   = CmmInfoTable { cit_lbl  = info_lbl
                  , cit_rep  = mkStackRep []
                  , cit_prof = NoProfilingInfo
-                 , cit_srt  = Nothing
-                 , cit_clo  = Nothing }
+                 , cit_srt  = Nothing }
 
 cmmToRawCmm :: DynFlags -> Stream IO CmmGroup ()
             -> IO (Stream IO RawCmmGroup ())

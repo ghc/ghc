@@ -1707,11 +1707,7 @@ scavenge_static(void)
 
     case FUN_STATIC:
       scavenge_fun_srt(info);
-      /* fallthrough */
-
-      // a FUN_STATIC can also be an SRT, so it may have pointer
-      // fields.  See Note [SRTs] in CmmBuildInfoTables, specifically
-      // the [FUN] optimisation.
+      break;
 
     case CONSTR:
     case CONSTR_NOCAF:
