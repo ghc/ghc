@@ -92,7 +92,7 @@ cObjects :: Context -> Action [FilePath]
 cObjects context = do
     srcs <- interpretInContext context (getPackageData PD.cSrcs)
     objs <- mapM (objectPath context) srcs
-    return $ if way context == threaded
+    return $ if Threaded `wayUnit` way context
         then objs
         else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
 
