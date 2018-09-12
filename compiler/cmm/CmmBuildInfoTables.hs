@@ -102,6 +102,8 @@ In each case, the info table points to the SRT.
 - info->srt is zero if there's no SRT, otherwise:
 - info->srt == 1 and info->f.srt_offset points to the SRT
 
+(but see TODO below, we can improve this)
+
 e.g. for a FUN with an SRT:
 
 StgFunInfoTable       +------+
@@ -111,23 +113,6 @@ StgStdInfoTable       +------+
   info->layout.nptrs  | ...  |
   info->srt           |  1   |
   info->type          | ...  |
-                      |------|
-
-On x86_64, we optimise the info table representation further.  The
-offset to the SRT can be stored in 32 bits (all code lives within a
-2GB region in x86_64's small memory model), so we can save a word in
-the info table by storing the srt_offset in the srt field, which is
-half a word.
-
-On x86_64 with TABLES_NEXT_TO_CODE:
-
-- info->srt is zero if there's no SRT, otherwise:
-- info->srt is an offset from the info pointer to the SRT object
-
-StgStdInfoTable       +------+
-  info->layout.ptrs   |      |
-  info->layout.nptrs  |      |
-  info->srt           |  ------------> offset to SRT object
                       |------|
 
 
@@ -296,6 +281,9 @@ implemented.
 As an alternative to [FUN]: we could merge the FUN's SRT with the FUN
 object itself.
 
+TODO: make info->srt be an offset to the SRT, or zero if none (save
+one word per info table that has an SRT)
+
 Note that there are many other optimisations that we could do, but
 aren't implemented. In general, we could omit any reference from an
 SRT if everything reachable from it is also reachable from the other
@@ -309,6 +297,7 @@ B = {Y,Z}
 C = {X,B}
 
 Here we could use C = {A} and therefore [Shortcut] C = A.
+
 -}
 
 -- ---------------------------------------------------------------------

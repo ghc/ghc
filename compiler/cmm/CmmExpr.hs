@@ -189,13 +189,9 @@ data CmmLit
         -- It is also used inside the NCG during when generating
         -- position-independent code.
   | CmmLabelDiffOff CLabel CLabel Int Width -- label1 - label2 + offset
-        -- In an expression, the width just has the effect of MO_SS_Conv
-        -- from wordWidth to the desired width.
-        --
-        -- In a static literal, the supported Widths depend on the
-        -- architecture: wordWidth is supported on all
-        -- architectures. Additionally W32 is supported on x86_64 when
-        -- using the small memory model.
+        -- The supported Widths depend on the architecture.  wordWidth
+        -- is supported on all architectures. Additionally W32 is
+        -- supported on x86_64 when using the small memory model.
 
   | CmmBlock {-# UNPACK #-} !BlockId     -- Code label
         -- Invariant: must be a continuation BlockId
