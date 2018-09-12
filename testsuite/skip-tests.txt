@@ -148,3 +148,6 @@ EtaExpandLevPoly
 T5363
 T3245
 list003
+
+# This profiling test fails with a timeout on CI (but not on local machines)
+callstack002
