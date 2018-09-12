@@ -19,7 +19,7 @@ module SimplUtils (
         -- The continuation type
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
-        contIsDupable, contResultType, contHoleType,
+        contIsDupable, contResultType, contHoleType, contHoleScaling,
         contIsTrivial, contArgs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
@@ -123,7 +123,7 @@ data SimplCont
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_weight :: Rig } -- TODO: arnaud: not needed, I think, because the hole is in the function, not the argument.
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -422,6 +422,28 @@ contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
                   (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
+
+
+-- Computes the multiplicity scaling factor at the hole. That is, in (case [] of
+-- x ::(p) _ { … }) (respectively for arguments of functions), the scaling
+-- factor is p. And in E[G[]], the scaling factor is the product of the scaling
+-- factor of E and that of G.
+--
+-- The scaling factor at the hole of E[] is used to determine how a binder
+-- should be scaled if it commutes with E. This appears, in particular, in the
+-- case-of-case transformation.
+contHoleScaling :: SimplCont -> Rig
+contHoleScaling (Stop _ _) = One
+contHoleScaling (CastIt _ k) = contHoleScaling k
+contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k }) =
+  (idWeight id) * contHoleScaling k
+contHoleScaling (StrictArg { sc_weight = w, sc_cont = k }) =
+  w * contHoleScaling k
+contHoleScaling (Select { sc_bndr = id, sc_cont = k }) =
+  (idWeight id) * contHoleScaling k
+contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
+contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
+contHoleScaling (TickIt _ k) = contHoleScaling k
 
 -------------------
 countArgs :: SimplCont -> Int

@@ -605,8 +605,10 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   , cs `equalLength` inst_con_arg_tys
       -- See Note [mkWWstr and unsafeCoerce]
   = do { (uniq1:uniqs) <- getUniquesM
-        ; let   unpk_args = zipWith3 mk_ww_arg uniqs inst_con_arg_tys cs
-                unbox_fn  = mkUnpackCase (Var arg) co uniq1
+        ; let   scale = scaleWeighted (idWeight arg)
+                scaled_inst_con_arg_tys = map (\(t,s) -> (scale t, s)) inst_con_arg_tys
+                unpk_args = zipWith3 mk_ww_arg uniqs scaled_inst_con_arg_tys cs
+                unbox_fn  = mkUnpackCase (Var arg) co (idWeight arg) uniq1
                                          data_con unpk_args
                 arg_no_unf = zapStableUnfolding arg
                              -- See Note [Zap unfolding when beta-reducing]
@@ -721,9 +723,7 @@ deepSplitProductType_maybe fam_envs ty
                     `orElse` (mkRepReflCo ty, ty)
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
-  , let arg_tys = map (scaleWeighted Omega) (dataConInstArgTys con tc_args)
-        -- MattP otherwise we end up with linear arguments for ww definitions
-        -- which complicates things a lot for now. Keep it simple.
+  , let arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dspt" arg_tys strict_marks, co)
 deepSplitProductType_maybe _ _ = Nothing
@@ -747,8 +747,17 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , let con = cons `getNth` (con_tag - fIRST_TAG)
         arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
+  , all isLinear arg_tys -- TODO: arnaud: I deactivated worker/wrapper splits on constructors with non-linear arguments, because they require unboxed tuple with variable multiplicity fields.
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
+
+-- TODO: arnaud: if used after strictness analysis handles fields with
+-- non-linear multiplicity, document and move to a more appropriate place.
+isLinear :: Weighted a -> Bool
+isLinear (Weighted w _ ) =
+  case flattenRig w of
+    One -> True
+    _ -> False
 
 findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- Uncover the arrow and product shape of a type
@@ -821,13 +830,14 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
         --
         -- Wrapper:     case (..call worker..) of x -> C x
         -- Worker:      case (   ..body..    ) of C x -> x
+    -- TODO: arnaud: this only ought to apply when C has a _linear_ parameter. I need to add a check.
   = do { (work_uniq : arg_uniq : _) <- getUniquesM
        ; let arg       = mk_ww_local arg_uniq arg1
              con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
        ; return ( True
                 , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)] -- arnaud: TODO: I don't understand where the multiplicity for this is coming from. It ought to be 1, as below. I guess.
-                , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
+                , \ body     -> mkUnpackCase body co One work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused Trac #10658
                 , weightedThing arg_ty1 ) }
@@ -835,32 +845,39 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | otherwise   -- The general case
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
         -- Worker:  case (   ...body...  ) of C a b -> (# a, b #)
+        --
+        -- Remark on linearity: in both the case of the wrapper and the worker,
+        -- we build a linear case. All the multiplicity information is kept in
+        -- the constructors (both C and (#, #)). In particular (#,#) is
+        -- parametrised by the multiplicity of its fields. Specifically, in this
+        -- instance, the multiplicity of the fields of (#,#) is chosen to be the
+        -- same as those of C.
   = do { (work_uniq : wild_uniq : uniqs) <- getUniquesM
-       ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- This case can always be linear because the variables introduced by the pattern are only used as argument to a constructor
-             args        = zipWith mk_ww_local uniqs (map (\(ty, s) -> (scaleWeighted Omega ty, s)) arg_tys) -- TODO: MattP: This is like this becuase we are making an Omega case, it will have to
-          -- be changed later when we don't always generate an Omega case.
+       ; let wrap_wild   = mk_ww_local wild_uniq (linear ubx_tup_ty,MarkedStrict)
+             args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
+               -- TODO: arnaud: ^ the above line loses the multiplicity information because unboxed tuples don't have multiplicity parameters yet. Needs fixing.
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
                 , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)] -- arnaud: TODO: What about constructors with unrestricted arguments, unboxed tuples will have troubles with them, won't they? I probably need a unboxed tuple with mixed multiplicity in Core.
-                , \ body     -> mkUnpackCase body co work_uniq data_con args ubx_tup_app
+                , \ body     -> mkUnpackCase body co One work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
-mkUnpackCase ::  CoreExpr -> Coercion -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
+mkUnpackCase ::  CoreExpr -> Coercion -> Rig -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
 -- (mkUnpackCase e co uniq Con args body)
 --      returns
 -- case e |> co of bndr { Con args -> body }
 
-mkUnpackCase (Tick tickish e) co uniq con args body   -- See Note [Profiling and unpacking]
-  = Tick tickish (mkUnpackCase e co uniq con args body)
-mkUnpackCase scrut co uniq boxing_con unpk_args body
+mkUnpackCase (Tick tickish e) co mult uniq con args body   -- See Note [Profiling and unpacking]
+  = Tick tickish (mkUnpackCase e co mult uniq con args body)
+mkUnpackCase scrut co mult uniq boxing_con unpk_args body
   = Case casted_scrut bndr (exprType body)
          [(DataAlt boxing_con, unpk_args, body)]
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq (unrestricted (exprType casted_scrut), MarkedStrict)
+    bndr = mk_ww_local uniq (Weighted mult (exprType casted_scrut), MarkedStrict)
       -- An unpacking case can always be chosen linear, because the variables
       -- are always passed to a constructor. This limits the
 {-
@@ -986,9 +1003,6 @@ mk_ww_local :: Unique -> (Weighted Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says
 -- whether this field is strict
 -- See Note [Record evaluated-ness in worker/wrapper]
-mk_ww_local uniq (Weighted _w ty,str)
+mk_ww_local uniq (Weighted w ty,str)
   = setCaseBndrEvald str $
-    mkSysLocalOrCoVar (fsLit "ww") uniq Omega ty
-    -- MattP: TODO - Imprecise and should be passed from call sites
-    -- but for now, we need to do this as we just generating unrestricted
-    -- wws so all binders also need to be unrestricted.
+    mkSysLocalOrCoVar (fsLit "ww") uniq w ty
