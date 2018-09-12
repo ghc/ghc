@@ -40,6 +40,7 @@ import VarEnv
 import VarSet
 import Name
 import Id
+import NameEnv
 import IdInfo
 import PprCore
 import ErrUtils
@@ -755,14 +756,18 @@ lintCoreExpr (Let (NonRec tv (Type ty)) body)
 lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
   = do  { let_ue <- lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
+        ; let (rhs_ue, update_ue) =
+                case varWeightedness bndr of
+                  Regular w -> (w `scaleUE` let_ue, id)
+                  Alias -> (zeroUE, addAliasUE bndr let_ue)
         ; (body_ty, body_ue) <-
-            addLoc (BodyOfLetRec [bndr])
+            addLoc (BodyOfLetRec [bndr]) $
+            update_ue
                  (lintIdBndr NotTopLevel LetBind bndr $ \_ ->
                   addGoodJoins [bndr] $
                   lintCoreExpr body)
-        ; let l_weight = idWeight bndr
         ; body_ue' <- checkLinearity body_ue bndr
-        ; return (body_ty, body_ue' `addUE` (l_weight `scaleUE` let_ue))}
+        ; return (body_ty, body_ue' `addUE` rhs_ue)}
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
@@ -880,7 +885,9 @@ lintVarOcc var nargs
         ; checkDeadIdOcc var
         ; checkJoinOcc var nargs
 
-        ; return ((idType var'), unitUE var' One) }
+        ; usage <- varCallSiteUsage var'
+
+        ; return ((idType var'), usage) }
 
 lintCoreFun :: CoreExpr
             -> Int        -- Number of arguments (type or val) being passed
@@ -942,16 +949,28 @@ checkJoinOcc var n_args
 -- from the usage environment (this is important because of shadowing).
 checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
 checkLinearity body_ue lam_var =
-  case varWeightMaybe lam_var of
-    Just mult -> do
+  case varWeightednessMaybe lam_var of
+    Just (Regular mult) -> do
       ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
       return $ deleteUE lam_var body_ue
+    Just Alias -> return body_ue -- aliases do not generate multiplicity constraints
     Nothing   -> return body_ue -- A type variable
   where
     lhs = lookupUE body_ue lam_var
     err_msg mult = text "Linearity failure in lambda:" <+> ppr lam_var
                 $$ ppr lhs <+> text "⊈" <+> ppr mult
 
+-- Checks that both UsageEnv are equal. This is used to check that alias-like
+-- binders have the correct UsageEnv annotation. The variable is only here for
+-- error messages.
+checkSubUE :: Var -> UsageEnv -> UsageEnv -> LintM ()
+checkSubUE var ue1 ue2 =
+  lintL (ue1 `subweightUE` ue2) $
+  text "Alias-like variable" <+> ppr var
+  <+> text "doesn't have the same usage environment as its right-hand side"
+  $$ text "Recorded (var's) environment:" <+> ppr ue2
+  $$ text "Computed (rhs's) environment:" <+> ppr ue1
+  -- TODO: arnaud: more informative error message
 
 {-
 Note [No alternatives lint check]
@@ -2036,6 +2055,9 @@ data LintEnv
                                      -- A subset of teh InScopeSet in le_subst
                                      -- See Note [Join points]
        , le_dynflags :: DynFlags     -- DynamicFlags
+       , le_ue_aliases :: NameEnv UsageEnv -- Assigns usage environments to the
+                                           -- alias-like binders, as found in
+                                           -- non-recursive lets.
        }
 
 data LintFlags
@@ -2181,7 +2203,8 @@ initL dflags flags in_scope m
              , le_subst = mkEmptyTCvSubst in_scope
              , le_joins = emptyVarSet
              , le_loc = []
-             , le_dynflags = dflags }
+             , le_dynflags = dflags
+             , le_ue_aliases = emptyNameEnv }
 
 setReportUnsat :: Bool -> LintM a -> LintM a
 -- Switch off lf_report_unsat_syns
@@ -2312,6 +2335,20 @@ lookupJoinId id
        ; case lookupVarSet join_set id of
             Just id' -> return (isJoinId_maybe id')
             Nothing  -> return Nothing }
+
+addAliasUE :: Id -> UsageEnv -> LintM a -> LintM a
+addAliasUE id ue thing_inside = LintM $ \ env errs ->
+  let new_ue_aliases =
+        extendNameEnv (le_ue_aliases env) (getName id) ue
+  in
+    unLintM thing_inside (env { le_ue_aliases = new_ue_aliases }) errs
+
+varCallSiteUsage :: Id -> LintM UsageEnv
+varCallSiteUsage id = LintM $ \env errs ->
+  let id_ue =
+        lookupNameEnv (le_ue_aliases env) (getName id)
+  in
+    (id_ue, errs)
 
 lintTyCoVarInScope :: Var -> LintM ()
 lintTyCoVarInScope v = lintInScope (text "is out of scope") v

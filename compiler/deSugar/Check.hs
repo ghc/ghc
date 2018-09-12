@@ -1245,7 +1245,7 @@ mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "$pm"
       name    = mkInternalName unique occname noSrcSpan
-  in  return (mkLocalId name Omega ty)
+  in  return (mkLocalId name (Regular Omega) ty)
   -- TODO: arnaud: I don't think these interfere with lambda-binders. Strictly speaking, these variables should probably have more precise multiplicity, and I'm introducing a bug though. But I believe that the simple solution of not caring about variables inside pattern-matching expression is good enough for now.
 
 -- | Generate a fresh term variable of a given and return it in two forms:
@@ -1332,7 +1332,7 @@ allCompleteMatches cl tys = do
 -- * Types and constraints
 
 newEvVar :: Name -> Type -> EvVar
-newEvVar name ty = mkLocalId name Omega (toTcType ty)
+newEvVar name ty = mkLocalId name (Regular Omega) (toTcType ty)
 
 nameType :: String -> Type -> DsM EvVar
 nameType name ty = do

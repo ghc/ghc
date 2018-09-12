@@ -1889,7 +1889,7 @@ tcUnboundId rn_expr unbound res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (Trac #12531)
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
-      ; let ev = mkLocalId name Omega ty
+      ; let ev = mkLocalId name (Regular Omega) ty
       ; loc <- getCtLocM HoleOrigin Nothing
       ; let can = CHoleCan { cc_ev = CtWanted { ctev_pred = ty
                                               , ctev_dest = EvVarDest ev

@@ -1,9 +1,12 @@
 {-# LANGUAGE ViewPatterns #-}
 module UsageEnv where
 
+import Data.Foldable
 import GhcPrelude
 import Weight
+import Name
 import NameEnv
+import UniqFM ( nonDetEltsUFM, plusUFM_CD )
 import Outputable
 import Name
 import TyCoRep ( Rig, Weighted )
@@ -47,6 +50,9 @@ addUE :: UsageEnv -> UsageEnv -> UsageEnv
 addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
   plusNameEnv_C (+) e1 e2
 
+addUEs :: Foldable t => t UsageEnv -> UsageEnv
+addUEs = foldr addUE zeroUE
+
 scaleUE :: Rig -> UsageEnv -> UsageEnv
 scaleUE w (UsageEnv e) = UsageEnv $
   mapNameEnv (w*) e
@@ -79,6 +85,9 @@ deleteUEAsserting w _x (UsageEnv e) = do
 deleteUE :: NamedThing n => n -> UsageEnv -> UsageEnv
 deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e (getName x)
 
+deleteListUE :: NamedThing n => [n] -> UsageEnv -> UsageEnv
+deleteListUE xs e = foldl' (flip deleteUE) e xs
+
 
 -- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
 -- bound in |env|, then returns |Zero|.
@@ -88,6 +97,12 @@ lookupUE (UsageEnv e) x =
     Just w  -> w
     Nothing -> Zero
 
+mapUE :: (Rig -> Rig) -> UsageEnv -> UsageEnv
+mapUE f (UsageEnv ue) = UsageEnv $ fmap f ue
+
+allUE :: (Rig -> Bool) -> UsageEnv -> Bool
+allUE p (UsageEnv ue) = all p (nonDetEltsUFM ue)
+
 instance Outputable UsageEnv where
   ppr (UsageEnv ne) = text "UsageEnv:" <+> ppr ne
 
@@ -96,6 +111,12 @@ subweight r1 r2 = case subweightMaybe r1 r2 of
                     Smaller -> True
                     _ -> False
 
+subweightUE :: UsageEnv -> UsageEnv -> Bool
+subweightUE (UsageEnv lhs) (UsageEnv rhs) =
+    all (uncurry subweight) (nonDetEltsUFM pairs)
+  where
+    pairs =
+      plusUFM_CD (,) lhs Zero rhs Zero
 
 data IsSubweight = Smaller -- Definitely a subweight
                  | Larger  -- Definitely not a subweight

@@ -151,3 +151,6 @@ list003
 
 # This profiling test fails with a timeout on CI (but not on local machines)
 callstack002
+
+# Other tests which timeout on CI, but not locally
+concprog001

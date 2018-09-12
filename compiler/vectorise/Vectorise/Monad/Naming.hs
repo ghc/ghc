@@ -75,7 +75,7 @@ mkVectId id ty
   = do { name <- mkLocalisedName mkVectOcc (getName id)
        ; let id' | isDFunId id     = MkId.mkDictFunId name tvs theta cls tys
                  | isExportedId id = Id.mkExportedLocalId VanillaId name ty
-                 | otherwise       = Id.mkLocalIdOrCoVar name Omega ty -- TODO: arnaud: I don't know if Omega is right, here.
+                 | otherwise       = Id.mkLocalIdOrCoVar name (Regular Omega) ty -- TODO: arnaud: I don't know if Omega is right, here.
        ; return id'
        }
   where

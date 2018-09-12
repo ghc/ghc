@@ -150,7 +150,7 @@ tidyIdBndr env@(tidy_env, var_env) id
         --
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
-        id'      = mkLocalIdWithInfo name' (idWeight id) ty' new_info
+        id'      = mkLocalIdWithInfo name' (idWeightedness id) ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]
@@ -176,7 +176,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
         ty'      = tidyType env (idType id)
         name'    = mkInternalName (idUnique id) occ' noSrcSpan
         details  = idDetails id
-        id'      = mkLocalVar details name' (idWeight id) ty' new_info
+        id'      = mkLocalVar details name' (idWeightedness id) ty' new_info
         var_env' = extendVarEnv var_env id id'
 
         -- Note [Tidy IdInfo]

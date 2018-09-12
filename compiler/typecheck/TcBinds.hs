@@ -648,7 +648,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name Omega forall_a_a
+      = mkLocalId name (Regular Omega) forall_a_a
 
 forall_a_a :: TcType
 forall_a_a = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] openAlphaTy
@@ -708,7 +708,7 @@ tcPolyCheck prag_fn
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
        ; ev_vars   <- newEvVars theta
-       ; let mono_id   = mkLocalId mono_name (idWeight poly_id) tau
+       ; let mono_id   = mkLocalId mono_name (varWeightedness poly_id) tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
 
@@ -932,7 +932,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
          -- do this check; otherwise (Trac #14000) we may report an ambiguity
          -- error for a rather bogus type.
 
-       ; return (mkLocalIdOrCoVar poly_name Omega inferred_poly_ty) }
+       ; return (mkLocalIdOrCoVar poly_name (Regular Omega) inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: TcThetaType   -- inferred
@@ -1360,7 +1360,7 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- type of the thing whose rhs we are type checking
                tcMatchesFun (L nm_loc name) matches exp_ty
 
-        ; mono_id <- newLetBndr no_gen name Omega rhs_ty -- TODO: arnaud: I don't know what binders we are creating here, so I don't know yet where the multiplicity is supposed to come from
+        ; mono_id <- newLetBndr no_gen name Alias rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches', fun_ext = fvs,
@@ -1435,7 +1435,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name, fun_matches = matches })
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name Omega mono_ty -- TODO: arnaud: I don't know what binder we are creating here, so I don't know where the multiplicity should come from
+       ; mono_id <- newLetBndr no_gen name Alias mono_ty -- TODO: arnaud: double check the multiplicity
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
                              , mbi_mono_id   = mono_id }
@@ -1503,7 +1503,7 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name Omega tau -- TODO: arnaud: I don't know what binder we are creating here, so I don't know where the multiplicity should come from
+  = newLetBndr no_gen name Alias tau -- TODO: arnaud: I don't know what binder we are creating here, so I don't know where the multiplicity should come from
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind GhcTcId)

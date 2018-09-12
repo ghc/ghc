@@ -2392,7 +2392,7 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
                       , Just (localise v, rhs) )
 
     case_bndr' = Var (zapIdOccInfo case_bndr) -- See Note [Zap case binders in proxy bindings]
-    localise scrut_var = mkLocalIdOrCoVar (localiseName (idName scrut_var)) (idWeight scrut_var) (idType scrut_var)
+    localise scrut_var = mkLocalIdOrCoVar (localiseName (idName scrut_var)) (idWeightedness scrut_var) (idType scrut_var)
         -- Localise the scrut_var before shadowing it; we're making a
         -- new binding for it, and it might have an External Name, or
         -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]

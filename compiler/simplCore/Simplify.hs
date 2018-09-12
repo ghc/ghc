@@ -546,10 +546,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var = mkLocalIdOrCoVarWithInfo name One expr_ty info
-                    -- The variable's multiplicity is later scaled if it floats
-                    -- past an argument position, or a case or a let.
-
+              var = mkLocalIdOrCoVarWithInfo name Alias expr_ty info
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
         ; (arity, is_bot, expr2) <- tryEtaExpandRhs mode var expr1
