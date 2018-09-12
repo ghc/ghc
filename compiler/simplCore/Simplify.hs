@@ -3011,7 +3011,7 @@ mkDupableCont env (ApplyToTy { sc_cont = cont
                                     , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
 
 mkDupableCont env full_cont@(ApplyToVal { sc_arg = arg, sc_dup = dup
-                              , sc_env = se, sc_cont = cont })
+                              , sc_env = se, sc_cont = cont, sc_weight = arg_mult })
   =     -- e.g.         [...hole...] (...arg...)
         --      ==>
         --              let a = ...arg...
@@ -3030,11 +3030,7 @@ mkDupableCont env full_cont@(ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- arg'' in its in-scope set, even if makeTrivial
                                          -- has turned arg'' into a fresh variable
                                          -- See Note [StaticEnv invariant] in SimplUtils
-                              , sc_dup = OkToDup, sc_cont = cont', sc_weight = Omega }) }
-  where
-    (Weighted arg_mult _, _) = splitFunTy hole_ty
-    hole_ty = contHoleType full_cont
-
+                              , sc_dup = OkToDup, sc_cont = cont', sc_weight = arg_mult }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })
