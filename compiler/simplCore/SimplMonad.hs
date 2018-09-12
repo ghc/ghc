@@ -17,9 +17,6 @@ module SimplMonad (
         SimplCount, tick, freeTick, checkedTick,
         getSimplCount, zeroSimplCount, pprSimplCount,
         plusSimplCount, isZeroSimplCount,
-
-        -- Scaling
-        reportScaling, readScaling
     ) where
 
 import GhcPrelude
@@ -58,7 +55,7 @@ newtype SimplM result
                 -> UniqSupply   -- We thread the unique supply because
                                 -- constantly splitting it is rather expensive
                 -> SimplCount
-                -> IO (result, [Id], UniqSupply, SimplCount)}
+                -> IO (result, UniqSupply, SimplCount)}
   -- we only need IO here for dump output
 
 data SimplTopEnv
@@ -75,7 +72,7 @@ initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> IO (a, SimplCount)
 
 initSmpl dflags rules fam_envs us size m
-  = do (result, _, _, count) <- unSM m env us (zeroSimplCount dflags)
+  = do (result, _, count) <- unSM m env us (zeroSimplCount dflags)
        return (result, count)
   where
     env = STE { st_flags = dflags, st_rules = rules
@@ -120,23 +117,23 @@ instance Monad SimplM where
    (>>=)  = thenSmpl
 
 returnSmpl :: a -> SimplM a
-returnSmpl e = SM (\_st_env us sc -> return (e, [], us, sc))
+returnSmpl e = SM (\_st_env us sc -> return (e, us, sc))
 
 thenSmpl  :: SimplM a -> (a -> SimplM b) -> SimplM b
 thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
 
 thenSmpl m k
   = SM $ \st_env us0 sc0 -> do
-      (m_result, w1, us1, sc1) <- unSM m st_env us0 sc0
-      (r, w2, us2, sc2) <- unSM (k m_result) st_env us1 sc1
-      return (r, w1 ++ w2, us2, sc2)
+      (m_result, us1, sc1) <- unSM m st_env us0 sc0
+      (r, us2, sc2) <- unSM (k m_result) st_env us1 sc1
+      return (r, us2, sc2)
 
 
 thenSmpl_ m k
   = SM $ \st_env us0 sc0 -> do
-      (_, w1, us1, sc1) <- unSM m st_env us0 sc0
-      (r, w2, us2, sc2) <- unSM k st_env us1 sc1
-      return (r, w1 ++ w2, us2, sc2)
+      (_, us1, sc1) <- unSM m st_env us0 sc0
+      (r, us2, sc2) <- unSM k st_env us1 sc1
+      return (r, us2, sc2)
 
 -- TODO: this specializing is not allowed
 -- {-# SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
@@ -161,29 +158,29 @@ traceSmpl herald doc
 instance MonadUnique SimplM where
     getUniqueSupplyM
        = SM (\_st_env us sc -> case splitUniqSupply us of
-                                (us1, us2) -> return (us1, [], us2, sc))
+                                (us1, us2) -> return (us1, us2, sc))
 
     getUniqueM
        = SM (\_st_env us sc -> case takeUniqFromSupply us of
-                                (u, us') -> return (u, [], us', sc))
+                                (u, us') -> return (u, us', sc))
 
     getUniquesM
         = SM (\_st_env us sc -> case splitUniqSupply us of
-                                (us1, us2) -> return (uniqsFromSupply us1, [], us2, sc))
+                                (us1, us2) -> return (uniqsFromSupply us1, us2, sc))
 
 instance HasDynFlags SimplM where
-    getDynFlags = SM (\st_env us sc -> return (st_flags st_env, [], us, sc))
+    getDynFlags = SM (\st_env us sc -> return (st_flags st_env, us, sc))
 
 instance MonadIO SimplM where
     liftIO m = SM $ \_ us sc -> do
       x <- m
-      return (x, [], us, sc)
+      return (x, us, sc)
 
 getSimplRules :: SimplM RuleEnv
-getSimplRules = SM (\st_env us sc -> return (st_rules st_env, [], us, sc))
+getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
-getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, [], us, sc))
+getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
 newId :: FastString -> Rig -> Type -> SimplM Id
 newId fs w ty = do uniq <- getUniqueM
@@ -212,11 +209,11 @@ newJoinId bndrs body_ty
 -}
 
 getSimplCount :: SimplM SimplCount
-getSimplCount = SM (\_st_env us sc -> return (sc, [], us, sc))
+getSimplCount = SM (\_st_env us sc -> return (sc, us, sc))
 
 tick :: Tick -> SimplM ()
 tick t = SM (\st_env us sc -> let sc' = doSimplTick (st_flags st_env) t sc
-                              in sc' `seq` return ((),[], us, sc'))
+                              in sc' `seq` return ((),us, sc'))
 
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
@@ -226,7 +223,7 @@ checkedTick t
            then throwGhcExceptionIO $
                   PprProgramError "Simplifier ticks exhausted" (msg sc)
            else let sc' = doSimplTick (st_flags st_env) t sc
-                in sc' `seq` return ((), [], us, sc'))
+                in sc' `seq` return ((), us, sc'))
   where
     msg sc = vcat
       [ text "When trying" <+> ppr t
@@ -255,7 +252,7 @@ freeTick :: Tick -> SimplM ()
 -- used to decide when nothing further has happened
 freeTick t
    = SM (\_st_env us sc -> let sc' = doFreeSimplTick t sc
-                           in sc' `seq` return ((), [], us, sc'))
+                           in sc' `seq` return ((), us, sc'))
 
 {-
 ************************************************************************
@@ -314,13 +311,4 @@ be thread this information through to get it right at definition site.
 For now, I leave warnings and this message to my future self.
 -}
 
-readScaling :: SimplM a -> SimplM (a, Rig)
-readScaling (SM k) = SM (\st_env us sc -> do
-                            (r, w, u, s) <- k st_env us sc
-                            return ((r, foldr (*) One (map idWeight w)), w, u, s))
-
-reportScaling :: Id -> SimplM ()
-reportScaling r = SM (\_st_env us sc -> return ((), [r], us, sc))
-
--- TODO: arnaud: revert the scaling logic (superseeded by scaling floats when
--- they commute with a scaling site)
+-- TODO: arnaud move note to a better place (Simplify, maybe?)
