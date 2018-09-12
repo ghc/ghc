@@ -137,7 +137,8 @@ testsuitePackages = do
              , hsc2hs
              , iserv
              , parallel
-             , runGhc        ] ++
+             , runGhc
+             , unlit         ] ++
              [ timeout | win ]
 
 -- | Default build ways for library packages:
