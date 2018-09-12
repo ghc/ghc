@@ -22,7 +22,7 @@ packageArgs = do
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder (Cabal Flags) ? arg ('+' : pkgName intLib)
+          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName intLib)
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
@@ -71,7 +71,8 @@ packageArgs = do
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , flag CrossCompiling ? arg "-terminfo"
-            , stage2 ? arg "integer-simple" ]
+            , notStage0 ? intLib == integerGmp ?
+              arg "integer-gmp" ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
