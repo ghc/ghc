@@ -694,6 +694,34 @@ lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 
 
 These functions are in the monad only so that they can be made strict via seq.
+
+Note [Return type for join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+   (join j :: Char -> Int -> Int) 77
+   (     j x = \y. y + ord x    )
+   (in case v of                )
+   (     A -> j 'x'             )
+   (     B -> j 'y'             )
+   (     C -> <blah>            )
+
+The simplifier pushes the "apply to 77" continuation inwards to give
+
+   join j :: Char -> Int
+        j x = (\y. y + ord x) 77
+   in case v of
+        A -> j 'x'
+        B -> j 'y'
+        C -> <blah> 77
+
+Notice that the "apply to 77" continuation went into the RHS of the
+join point.  And that meant that the return type of the join point
+changed!!
+
+That's why we pass res_ty into simplNonRecJoinBndr, and substIdBndr
+takes a (Just res_ty) argument so that it knows to do the type-changing
+thing.
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
@@ -722,8 +750,9 @@ simplNonRecBndr env id
 ---------------
 simplNonRecJoinBndr :: SimplEnv -> OutType -> InBndr
                     -> SimplM (SimplEnv, OutBndr)
--- A non-recursive let binder for a join point; context being pushed inward may
--- change the type
+-- A non-recursive let binder for a join point;
+-- context being pushed inward may change the type
+-- See Note [Return type for join points]
 simplNonRecJoinBndr env res_ty id
   = do  { let (env1, id1) = substIdBndr (Just res_ty) env id
         ; seqId id1 `seq` return (env1, id1) }
@@ -738,8 +767,9 @@ simplRecBndrs env@(SimplEnv {}) ids
 
 ---------------
 simplRecJoinBndrs :: SimplEnv -> OutType -> [InBndr] -> SimplM SimplEnv
--- Recursive let binders for join points; context being pushed inward may
--- change types
+-- Recursive let binders for join points;
+-- context being pushed inward may change types
+-- See Note [Return type for join points]
 simplRecJoinBndrs env@(SimplEnv {}) res_ty ids
   = ASSERT(all isJoinId ids)
     do  { let (env1, ids1) = mapAccumL (substIdBndr (Just res_ty)) env ids
@@ -755,6 +785,7 @@ substIdBndr new_res_ty env bndr
 ---------------
 substNonCoVarIdBndr
    :: Maybe OutType -- New result type, if a join binder
+                    -- See Note [Return type for join points]
    -> SimplEnv
    -> InBndr    -- Env and binder to transform
    -> (SimplEnv, OutBndr)
@@ -785,10 +816,13 @@ substNonCoVarIdBndr new_res_ty
   where
     id1    = uniqAway in_scope old_id
     id2    = substIdType env id1
+
     id3    | Just res_ty <- new_res_ty
            = id2 `setIdType` setJoinResTy (idJoinArity id2) res_ty (idType id2)
+                             -- See Note [Return type for join points]
            | otherwise
            = id2
+
     new_id = zapFragileIdInfo id3       -- Zaps rules, worker-info, unfolding
                                         -- and fragile OccInfo
 
