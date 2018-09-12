@@ -13,7 +13,7 @@ module VarSet (
         emptyVarSet, unitVarSet, mkVarSet,
         extendVarSet, extendVarSetList,
         elemVarSet, subVarSet,
-        unionVarSet, unionVarSets, mapUnionVarSet,
+        unionVarSet, unionVarSets, mapUnionVarSet, mapUnionVarSetSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
         minusVarSet, filterVarSet, mapVarSet,
@@ -85,6 +85,9 @@ unionVarSets    :: [VarSet] -> VarSet
 mapUnionVarSet  :: (a -> VarSet) -> [a] -> VarSet
 -- ^ map the function over the list, and union the results
 
+mapUnionVarSetSet :: (Var -> VarSet) -> VarSet -> VarSet
+-- ^ map the function over the set, and union the results
+
 unitVarSet      :: Var -> VarSet
 extendVarSet    :: VarSet -> Var -> VarSet
 extendVarSetList:: VarSet -> [Var] -> VarSet
@@ -136,6 +139,9 @@ elemVarSetByKey = elemUniqSet_Directly
 partitionVarSet = partitionUniqSet
 
 mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
+
+mapUnionVarSetSet get_set =
+  nonDetFoldUniqSet (\var acc -> get_set var `unionVarSet` acc) emptyVarSet
 
 -- See comments with type signatures
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)

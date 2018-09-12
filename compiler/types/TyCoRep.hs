@@ -1898,9 +1898,8 @@ coVarsOfCos = mapUnionVarSet coVarsOfCo
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
-  -- It's OK to use nonDetEltsUniqSet here because we immediately forget
-  -- about the ordering by returning a set.
+closeOverKinds tvs =
+  mapUnionVarSetSet (tyCoVarsOfType . tyVarKind) tvs `unionVarSet` tvs
 
 -- | Given a list of tyvars returns a deterministic FV computation that
 -- returns the given tyvars with the kind variables free in the kinds of the
