@@ -30,7 +30,6 @@ import CostCentre
 import StgCmmHeap
 
 import PprCmm()
-import Control.Monad
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
@@ -446,44 +445,20 @@ getLabelledBlocks (CmmProc top_info _ _ _) =
   ]
 
 
--- | Put the labelled blocks that we will be annotating with SRTs into
--- dependency order.  This is so that we can process them one at a
--- time, resolving references to earlier blocks to point to their
--- SRTs. CAFs themselves are not included here; see getCAFs below.
-depAnalSRTs
-  :: CAFEnv
-  -> [CmmDecl]
-  -> [SCC (Label, CAFLabel, Set CAFLabel)]
-depAnalSRTs cafEnv decls =
-  srtTrace "depAnalSRTs" (ppr graph) graph
- where
-  labelledBlocks = concatMap getLabelledBlocks decls
-  labelToBlock = Map.fromList (map swap labelledBlocks)
-  graph = stronglyConnCompFromEdgedVerticesOrd
-             [ let cafs' = Set.delete lbl cafs in
-               DigraphNode (l,lbl,cafs') l
-                 (mapMaybe (flip Map.lookup labelToBlock) (Set.toList cafs'))
-             | (l, lbl) <- labelledBlocks
-             , Just cafs <- [mapLookup l cafEnv] ]
-
-
--- | Get (Label, CAFLabel, Set CAFLabel) for each block that represents a CAF.
+-- | Get (Label,CLabel) pairs for each block that represents a CAF.
 -- These are treated differently from other labelled blocks:
---  - we never [Shortcut] a reference to a CAF to the contents of its
---    SRT, since the point of SRTs is to keep CAFs alive.
+--  - we never resolve a reference to a CAF to the contents of its SRT, since
+--    the point of SRTs is to keep CAFs alive.
 --  - CAFs therefore don't take part in the dependency analysis in depAnalSRTs.
 --    instead we generate their SRTs after everything else, so that we can
---    [Shortcut] references from the CAF's SRT.
-getCAFs :: CAFEnv -> [CmmDecl] -> [(Label, CAFLabel, Set CAFLabel)]
-getCAFs cafEnv decls =
-  [ (g_entry g, mkCAFLabel topLbl, cafs)
-  | CmmProc top_info topLbl _ g <- decls
-  , Just info <- [mapLookup (g_entry g) (info_tbls top_info)]
+--    resolve references in the CAF's SRT.
+getCAFs :: CmmDecl -> [(Label, CAFLabel)]
+getCAFs (CmmData _ _) = []
+getCAFs (CmmProc top_info topLbl _ g)
+  | Just info <- mapLookup (g_entry g) (info_tbls top_info)
   , let rep = cit_rep info
-  , isStaticRep rep && isThunkRep rep
-  , Just cafs <- [mapLookup (g_entry g) cafEnv]
-  ]
-
+  , isStaticRep rep && isThunkRep rep = [(g_entry g, mkCAFLabel topLbl)]
+  | otherwise = []
 
 -- | Get the list of blocks that correspond to the entry points for
 -- FUN_STATIC closures.  These are the blocks for which if we have an
@@ -498,6 +473,35 @@ getStaticFuns decls =
   , isStaticRep rep && isFunRep rep
   , let lbl = mkLocalClosureLabel (idName id) (idCafInfo id)
   ]
+
+
+-- | Put the labelled blocks that we will be annotating with SRTs into
+-- dependency order.  This is so that we can process them one at a
+-- time, resolving references to earlier blocks to point to their
+-- SRTs.
+depAnalSRTs
+  :: CAFEnv
+  -> [CmmDecl]
+  -> [SCC (Label, CAFLabel, Set CAFLabel)]
+
+depAnalSRTs cafEnv decls =
+  srtTrace "depAnalSRTs" (ppr blockToLabel $$ ppr (graph ++ cafSCCs)) $
+  (graph ++ cafSCCs)
+ where
+  cafs = concatMap getCAFs decls
+  cafSCCs = [ AcyclicSCC (blockid, lbl, cafs)
+            | (blockid, lbl) <- cafs
+            , Just cafs <- [mapLookup blockid cafEnv] ]
+  labelledBlocks = concatMap getLabelledBlocks decls
+  blockToLabel :: LabelMap CAFLabel
+  blockToLabel = mapFromList (cafs ++ labelledBlocks)
+  labelToBlock = Map.fromList (map swap labelledBlocks)
+  graph = stronglyConnCompFromEdgedVerticesOrd
+             [ let cafs' = Set.delete lbl cafs in
+               DigraphNode (l,lbl,cafs') l
+                 (mapMaybe (flip Map.lookup labelToBlock) (Set.toList cafs'))
+             | (l, lbl) <- labelledBlocks
+             , Just cafs <- [mapLookup l cafEnv] ]
 
 
 -- | Maps labels from 'cafAnal' to the final CLabel that will appear
@@ -540,9 +544,7 @@ doSRTs dflags moduleSRTInfo tops = do
   -- don't need to generate the singleton SRT in the first place.  But
   -- to do this we need to process blocks before things that depend on
   -- them.
-  let
-    sccs = depAnalSRTs cafEnv decls
-    cafsWithSRTs = getCAFs cafEnv decls
+  let sccs = depAnalSRTs cafEnv decls
 
   -- On each strongly-connected group of decls, construct the SRT
   -- closures and the SRT fields for info tables.
@@ -554,11 +556,8 @@ doSRTs dflags moduleSRTInfo tops = do
       ((result, _srtMap), moduleSRTInfo') =
         initUs_ us $
         flip runStateT moduleSRTInfo $
-        flip runStateT Map.empty $ do
-          nonCAFs <- mapM (doSCC dflags staticFuns) sccs
-          cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
-            oneSRT dflags staticFuns [l] [cafLbl] True{-is a CAF-} cafs
-          return (nonCAFs ++ cAFs)
+        flip runStateT Map.empty $
+        mapM (doSCC dflags staticFuns) sccs
 
       (declss, pairs, funSRTs) = unzip3 result
 
@@ -584,13 +583,13 @@ doSCC
         )
 
 doSCC dflags staticFuns  (AcyclicSCC (l, cafLbl, cafs)) =
-  oneSRT dflags staticFuns [l] [cafLbl] False cafs
+  oneSRT dflags staticFuns [l] [cafLbl] cafs
 
 doSCC dflags staticFuns (CyclicSCC nodes) = do
   -- build a single SRT for the whole cycle
   let (blockids, lbls, cafsets) = unzip3 nodes
       cafs = Set.unions cafsets `Set.difference` Set.fromList lbls
-  oneSRT dflags staticFuns blockids lbls False cafs
+  oneSRT dflags staticFuns blockids lbls cafs
 
 
 -- | Build an SRT for a set of blocks
@@ -599,7 +598,6 @@ oneSRT
   -> LabelMap CLabel            -- which blocks are static function entry points
   -> [Label]                    -- blocks in this set
   -> [CAFLabel]                 -- labels for those blocks
-  -> Bool                       -- True <=> this SRT is for a CAF
   -> Set CAFLabel               -- SRT for this set
   -> StateT SRTMap
        (StateT ModuleSRTInfo UniqSM)
@@ -608,7 +606,7 @@ oneSRT
        , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
        )
 
-oneSRT dflags staticFuns blockids lbls isCAF cafs = do
+oneSRT dflags staticFuns blockids lbls cafs = do
   srtMap <- get
   topSRT <- lift get
   let
@@ -631,10 +629,9 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
      (ppr cafs <+> ppr resolved <+> ppr allBelow <+> ppr filtered) $ return ()
 
   let
-    updateSRTMap srtEntry =
-      when (not isCAF) $ do   -- NB. no [Shortcut] for CAFs
-        let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- lbls]
-        put (Map.union newSRTMap srtMap)
+    updateSRTMap srtEntry = do
+      let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- lbls]
+      put (Map.union newSRTMap srtMap)
 
   case Set.toList filtered of
     [] -> do
