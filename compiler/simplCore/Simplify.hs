@@ -297,7 +297,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              top_lvl Nothing bndr bndr1 rhs'
-        ; return (rhs_floats `addFloats` bind_float, env2) }
+        ; return (scaleFloatsBy (idWeight bndr1) rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
 simplJoinBind :: SimplEnv
@@ -362,7 +362,8 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              NotTopLevel Nothing
                                              old_bndr new_bndr rhs2
-        ; return (rhs_floats `addFloats` bind_float, env2) }
+        ; let scaled_rhs_floats = scaleFloatsBy (idWeight new_bndr) rhs_floats
+        ; return (scaled_rhs_floats `addFloats` bind_float, env2) }
 
 
 {- *********************************************************************
@@ -424,7 +425,12 @@ prepareRhs mode top_lvl occ _ rhs0
              ; case is_exp of
                 False -> return (False, emptyLetFloats, App fun arg)
                 True  -> do { (floats2, arg') <- makeTrivial mode top_lvl occ arg
-                            ; return (True, floats1 `addLetFlts` floats2, App fun' arg') } }
+                            ; let scaled_floats2 = scaleLetFloatsBy arg_mult floats2
+                            ; return (True, floats1 `addLetFlts` scaled_floats2, App fun' arg') } }
+        where
+          (Weighted arg_mult _, _) = splitFunTy fun_ty
+          fun_ty = exprType fun
+
     go n_val_args (Var fun)
         = return (is_exp, emptyLetFloats, Var fun)
         where
@@ -506,8 +512,8 @@ These strange casts can happen as a result of case-of-case
 makeTrivialArg :: SimplMode -> ArgSpec -> SimplM (LetFloats, ArgSpec)
 makeTrivialArg mode (ValArg w e)
   = do { (floats, e') <- makeTrivial mode NotTopLevel (fsLit "arg") e
-       -- TODO: MattP looks like this should be propagated
-       ; return (floats, ValArg w e') }
+       ; let scaled_floats = scaleLetFloatsBy w floats
+       ; return (scaled_floats, ValArg w e') }
 makeTrivialArg _ arg
   = return (emptyLetFloats, arg)  -- CastBy, TyArg
 
@@ -540,7 +546,9 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var = mkLocalIdOrCoVarWithInfo name Omega expr_ty info -- TODO: arnaud: another place where it's not obvious how to choose the multiplicity for a binding.
+              var = mkLocalIdOrCoVarWithInfo name One expr_ty info
+                    -- The variable's multiplicity is later scaled if it floats
+                    -- past an argument position, or a case or a let.
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
@@ -881,7 +889,6 @@ simplExprF1 env (App fun arg) cont
                                 , sc_cont    = cont } }
       _       ->
         -- MattP: TODO: This could be quite expensive.
-        -- TODO: arnaud: but not needed, will remove.
         let fun_ty = exprType fun
             (Weighted w _, _) = splitFunTy fun_ty
         in
@@ -2068,9 +2075,22 @@ trySeqRules in_env scrut rhs cont
                         , as_hole_ty = seq_id_ty }
                 , TyArg { as_arg_ty  = rhs_ty
                        , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
-                , ValArg Omega no_cast_scrut] -- TODO: MattP: Check
+                , ValArg Omega no_cast_scrut]
+                -- The multiplicity of the scrutiny above is ω because the type
+                -- of seq requires that its first argument is unrestricted. The
+                -- typing rule of case also guarantees it though. In a more
+                -- general world, where the first argument of seq would have
+                -- affine multiplicity, then we could use the multiplicity of
+                -- the case (held in the case binder) instead.
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont, sc_weight = Omega}
+                           -- The multiplicity in sc_weight above is the
+                           -- multiplicity of the second argument of seq. Since
+                           -- seq's type, as it stands, imposes that its second
+                           -- argument be unrestricted, so is
+                           -- sc_weight. However, a more precise typing rule,
+                           -- for seq, would be to have it be linear. In which
+                           -- case, sc_weight should be 1.
     -- Lazily evaluated, so we don't do most of this
 
     drop_casts (Cast e _) = drop_casts e
@@ -2984,7 +3004,7 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
-mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
+mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_weight = weight })
         -- See Note [Duplicating StrictArg]
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   = do { (floats1, cont') <- mkDupableCont env cont
@@ -2995,7 +3015,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
                             , sc_cci = cci
                             , sc_cont = cont'
                             , sc_dup = OkToDup
-                            , sc_weight = Omega } ) } -- TODO: Arnaud: is this Omega correct? if so explain why.
+                            , sc_weight = weight } ) }
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
                              , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
@@ -3003,8 +3023,8 @@ mkDupableCont env (ApplyToTy { sc_cont = cont
         ; return (floats, ApplyToTy { sc_cont = cont'
                                     , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
 
-mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
-                              , sc_env = se, sc_cont = cont })
+mkDupableCont env full_cont@(ApplyToVal { sc_arg = arg, sc_dup = dup
+                              , sc_env = se, sc_cont = cont, sc_weight = arg_mult })
   =     -- e.g.         [...hole...] (...arg...)
         --      ==>
         --              let a = ...arg...
@@ -3014,7 +3034,8 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
         ; let env' = env `setInScopeFromF` floats1
         ; (_, se', arg') <- simplArg env' dup se arg
         ; (let_floats2, arg'') <- makeTrivial (getMode env) NotTopLevel (fsLit "karg") arg'
-        ; let all_floats = floats1 `addLetFloats` let_floats2
+        ; let scaled_floats2 = scaleLetFloatsBy arg_mult let_floats2
+        ; let all_floats = floats1 `addLetFloats` scaled_floats2
         ; return ( all_floats
                  , ApplyToVal { sc_arg = arg''
                               , sc_env = se' `setInScopeFromF` all_floats
@@ -3022,7 +3043,7 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- arg'' in its in-scope set, even if makeTrivial
                                          -- has turned arg'' into a fresh variable
                                          -- See Note [StaticEnv invariant] in SimplUtils
-                              , sc_dup = OkToDup, sc_cont = cont', sc_weight = Omega }) }
+                              , sc_dup = OkToDup, sc_cont = cont', sc_weight = arg_mult }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })
