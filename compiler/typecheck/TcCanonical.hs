@@ -672,7 +672,6 @@ Here are the moving parts
   * TcCanonical.canForAll deals with solving a
     forall-constraint.  See
        Note [Solving a Wanted forall-constraint]
-       Note [Solving a Wanted forall-constraint]
 
   * We augment the kick-out code to kick out an inert
     forall constraint if it can be rewritten by a new
