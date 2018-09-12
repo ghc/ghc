@@ -32,22 +32,21 @@ import Platform
 -- | Top level driver for C-- pipeline
 -----------------------------------------------------------------------------
 
-cmmPipeline
- :: HscEnv -- Compilation env including
-           -- dynamic flags: -dcmm-lint -ddump-cmm-cps
- -> ModuleSRTInfo        -- Info about SRTs generated so far
- -> CmmGroup             -- Input C-- with Procedures
- -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
+cmmPipeline  :: HscEnv -- Compilation env including
+                       -- dynamic flags: -dcmm-lint -ddump-cmm-cps
+             -> TopSRT     -- SRT table and accumulating list of compiled procs
+             -> CmmGroup             -- Input C-- with Procedures
+             -> IO (TopSRT, CmmGroup) -- Output CPS transformed C--
 
-cmmPipeline hsc_env srtInfo prog =
+cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
+     (topSRT, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags topSRT tops
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
-     return (srtInfo, cmms)
+     return (topSRT, cmms)
 
 
 cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
@@ -106,7 +105,7 @@ cpsTop hsc_env proc =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" (ppr cafEnv)
 
        g <- if splitting_proc_points

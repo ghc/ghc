@@ -62,7 +62,7 @@ mkEmptyContInfoTable info_lbl
   = CmmInfoTable { cit_lbl  = info_lbl
                  , cit_rep  = mkStackRep []
                  , cit_prof = NoProfilingInfo
-                 , cit_srt  = Nothing }
+                 , cit_srt  = NoC_SRT }
 
 cmmToRawCmm :: DynFlags -> Stream IO CmmGroup ()
             -> IO (Stream IO RawCmmGroup ())
@@ -255,11 +255,12 @@ packIntsCLit dflags a b = packHalfWordsCLit dflags
 
 
 mkSRTLit :: DynFlags
-         -> Maybe CLabel
+         -> C_SRT
          -> ([CmmLit],    -- srt_label, if any
              StgHalfWord) -- srt_bitmap
-mkSRTLit dflags Nothing    = ([], toStgHalfWord dflags 0)
-mkSRTLit dflags (Just lbl) = ([CmmLabel lbl], toStgHalfWord dflags 1)
+mkSRTLit dflags NoC_SRT                = ([], toStgHalfWord dflags 0)
+mkSRTLit dflags (C_SRT lbl off bitmap) = ([cmmLabelOffW dflags lbl off], bitmap)
+
 
 -------------------------------------------------------------------------
 --

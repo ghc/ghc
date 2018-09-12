@@ -750,7 +750,7 @@ mkCmmInfo ClosureInfo {..}
   = CmmInfoTable { cit_lbl  = closureInfoLabel
                  , cit_rep  = closureSMRep
                  , cit_prof = closureProf
-                 , cit_srt  = Nothing }
+                 , cit_srt  = NoC_SRT }
 
 --------------------------------------
 --        Building ClosureInfos
@@ -1035,7 +1035,7 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
  = CmmInfoTable { cit_lbl  = info_lbl
                 , cit_rep  = sm_rep
                 , cit_prof = prof
-                , cit_srt  = Nothing }
+                , cit_srt  = NoC_SRT }
  where
    name = dataConName data_con
    info_lbl = mkConInfoTableLabel name NoCafRefs
@@ -1058,14 +1058,14 @@ cafBlackHoleInfoTable
   = CmmInfoTable { cit_lbl  = mkCAFBlackHoleInfoTableLabel
                  , cit_rep  = blackHoleRep
                  , cit_prof = NoProfilingInfo
-                 , cit_srt  = Nothing }
+                 , cit_srt  = NoC_SRT }
 
 indStaticInfoTable :: CmmInfoTable
 indStaticInfoTable
   = CmmInfoTable { cit_lbl  = mkIndStaticInfoLabel
                  , cit_rep  = indStaticRep
                  , cit_prof = NoProfilingInfo
-                 , cit_srt  = Nothing }
+                 , cit_srt  = NoC_SRT }
 
 staticClosureNeedsLink :: Bool -> CmmInfoTable -> Bool
 -- A static closure needs a link field to aid the GC when traversing
@@ -1076,4 +1076,4 @@ staticClosureNeedsLink :: Bool -> CmmInfoTable -> Bool
 -- of the SRT.
 staticClosureNeedsLink has_srt CmmInfoTable{ cit_rep = smrep }
   | isConRep smrep         = not (isStaticNoCafCon smrep)
-  | otherwise              = has_srt
+  | otherwise              = has_srt -- needsSRT (cit_srt info_tbl)
