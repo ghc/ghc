@@ -889,7 +889,6 @@ simplExprF1 env (App fun arg) cont
                                 , sc_cont    = cont } }
       _       ->
         -- MattP: TODO: This could be quite expensive.
-        -- TODO: arnaud: but not needed, will remove.
         let fun_ty = exprType fun
             (Weighted w _, _) = splitFunTy fun_ty
         in
