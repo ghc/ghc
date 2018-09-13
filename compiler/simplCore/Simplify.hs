@@ -44,6 +44,7 @@ import Demand           ( mkClosedStrictSig, topDmd, exnRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
+import Var              ( isTyCoVar )
 import Maybes           (  orElse )
 import Control.Monad
 import Outputable
@@ -2425,9 +2426,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   --           lifted case: the scrutinee is in HNF (or will later be demanded)
   -- See Note [Case to let transformation]
   | all_dead_bndrs
-  , if isUnliftedType (idType case_bndr)
-    then exprOkForSpeculation scrut
-    else exprIsHNF scrut || case_bndr_is_demanded
+  , doCaseToLet scrut case_bndr
   = do { tick (CaseElim case_bndr)
        ; (floats1, env') <- simplNonRecX env case_bndr scrut
        ; (floats2, expr') <- simplExprF env' rhs cont
@@ -2446,11 +2445,26 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
-    case_bndr_is_demanded = isStrictDmd (idDemandInfo case_bndr)
-    -- See Note [Case-to-let for strictly-used binders]
-
 rebuildCase env scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
+
+
+doCaseToLet :: OutExpr          -- Scrutinee
+            -> InId             -- Case binder
+            -> Bool
+-- The situation is         case scrut of b { DEFAULT -> body }
+-- Can we transform thus?   let { b = scrut } in body
+doCaseToLet scrut case_bndr
+  | isTyCoVar case_bndr    -- Respect CoreSyn
+  = isTyCoArg scrut        -- Note [CoreSyn type and coercion invariant]
+
+  | isUnliftedType (idType case_bndr)
+  = exprOkForSpeculation scrut
+
+  | otherwise  -- Scrut has a lifted type
+  = exprIsHNF scrut
+    || isStrictDmd (idDemandInfo case_bndr)
+    -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------
 --      3. Catch-all case

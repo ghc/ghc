@@ -23,6 +23,7 @@ import TcEvTerm
 import Class
 import TyCon
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
+import TysWiredIn( cTupleTyConName )
 import Coercion
 import CoreSyn
 import Id( idType, mkTemplateLocals )
@@ -487,16 +488,31 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
     size      = sizeTypes tys
 
     do_one_given evar given_loc sel_id
-      = do { let sc_pred = funResultTy (piResultTys (idType sel_id) tys)
-                 given_ty = mkInfSigmaTy tvs theta sc_pred
-           ; given_ev <- newGivenEvVar given_loc $
-                         (given_ty, mk_sc_sel evar sel_id)
+      | not (null tvs)
+      , null theta
+      , isUnliftedType sc_pred
+      -- Very special case for equality
+      -- See Note [Equality superclasses in quantified constraints]
+      = do { empty_ctuple_cls <- tcLookupClass (cTupleTyConName 0)
+           ; let theta1    = [mkClassPred empty_ctuple_cls []]
+                 dict_ids1 = mkTemplateLocals theta1
+           ; given_ev <- new_given theta1 dict_ids1 []
+           ; return [mkNonCanonical given_ev] }
+
+      | otherwise  -- Normal case
+      = do { given_ev <- new_given theta dict_ids dict_ids
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
 
-    mk_sc_sel evar sel_id
-      = EvExpr $ mkLams tvs $ mkLams dict_ids $
-        Var sel_id `mkTyApps` tys `App`
-        (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids)
+      where
+        sc_pred = funResultTy (piResultTys (idType sel_id) tys)
+
+        new_given theta_abs dict_ids_abs dict_ids_app
+          = newGivenEvVar given_loc (given_ty, given_ev)
+          where
+            given_ty = mkInfSigmaTy tvs theta_abs sc_pred
+            given_ev = EvExpr $ mkLams tvs $ mkLams dict_ids_abs $
+                       Var sel_id `mkTyApps` tys `App`
+                       (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids_app)
 
     mk_given_loc loc
        | isCTupleClass cls
@@ -574,7 +590,45 @@ mk_superclasses_of rec_clss ev tvs theta cls tys
                              , qci_pend_sc = loop_found })
 
 
-{-
+{- Note [Equality superclasses in quantified constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #15359, #15593, #15625)
+  f :: (forall a. theta => a ~ b) => stuff
+
+It's a bit odd to have a local, quantified constraint for `(a~b)`,
+but some people want such a thing (see the tickets). And for
+Coercible it is definitely useful
+  f :: forall m. (forall p q. Coercible p q => Coercible (m p) (m q)))
+                 => stuff
+
+Moreover it's not hard to arrange; we just need to look up /equality/
+constraints in the quantified-constraint environment, which we do in
+TcInteract.doTopReactOther.
+
+There is a wrinkle though, in the case where 'theta' is empty, so
+we have
+  f :: (forall a. a~b) => stuff
+
+Now the superclass machinery kicks in, in makeSuperClasses,
+giving us a a second quantified constrait
+       (forall a. a ~# b)
+BUT this is an unboxed value!  And nothing has prepared us for
+dictionary "functions" that are unboxed.  Actually it does just
+about work, but the simplier ends up with stuff like
+   case (/\a. eq_sel d) of df -> ...(df @Int)...
+and fails to simplify that any further.
+
+It seems eaiser to give such unboxed quantifed constraints a
+dummmy () argument, thus
+      (forall a. (% %) => a ~# b)
+where (% %) is the empty constraint tuple.  That makes everything
+be nicely boxed.
+
+(One might wonder about using void# instead, but this seems more
+uniform -- it's a constraint argument -- and I'm not worried about
+the last drop of efficiency for this very rare case.)
+
+
 ************************************************************************
 *                                                                      *
 *                      Irreducibles canonicalization
@@ -2013,7 +2067,7 @@ canEqTyVarTyVar, are these
    gets eliminated (improves error messages)
 
  * If one is a flatten-skolem, put it on the left so that it is
-   substituted out  Note [Elminate flat-skols]
+   substituted out  Note [Eliminate flat-skols] in TcUinfy
         fsk ~ a
 
 Note [Equalities with incompatible kinds]

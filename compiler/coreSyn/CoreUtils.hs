@@ -481,8 +481,15 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- the simplifier deals with them perfectly well. See
 -- also 'MkCore.mkCoreLet'
 bindNonRec bndr rhs body
-  | needsCaseBinding (idType bndr) rhs = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
-  | otherwise                          = Let (NonRec bndr rhs) body
+  | isTyVar bndr                       = let_bind
+  | isCoVar bndr                       = if isCoArg rhs then let_bind
+    {- See Note [Binding coercions] -}                  else case_bind
+  | isJoinId bndr                      = let_bind
+  | needsCaseBinding (idType bndr) rhs = case_bind
+  | otherwise                          = let_bind
+  where
+    case_bind = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
+    let_bind  = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
 -- as per the invariants of 'CoreExpr': see "CoreSyn#let_app_invariant"
@@ -505,7 +512,12 @@ mkAltExpr (LitAlt lit) [] []
 mkAltExpr (LitAlt _) _ _ = panic "mkAltExpr LitAlt"
 mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 
-{-
+{- Note [Binding coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider binding a CoVar, c = e.  Then, we must atisfy
+Note [CoreSyn type and coercion invariant] in CoreSyn,
+which allows only (Coercion co) on the RHS.
+
 ************************************************************************
 *                                                                      *
                Operations oer case alternatives

@@ -46,7 +46,7 @@ module CoreSyn (
         exprToType, exprToCoercion_maybe,
         applyTypeToArg,
 
-        isValArg, isTypeArg, isTyCoArg, valArgCount, valBndrCount,
+        isValArg, isTypeArg, isCoArg, isTyCoArg, valArgCount, valBndrCount,
         isRuntimeArg, isRuntimeVar,
 
         -- * Tick-related functions
@@ -173,6 +173,7 @@ These data types are the heart of the compiler
 -- The language consists of the following elements:
 --
 -- *  Variables
+--    See Note [Variable occurrences in Core]
 --
 -- *  Primitive literals
 --
@@ -187,29 +188,10 @@ These data types are the heart of the compiler
 --    this corresponds to allocating a thunk for the things
 --    bound and then executing the sub-expression.
 --
---    #top_level_invariant#
---    #letrec_invariant#
---
---    The right hand sides of all top-level and recursive @let@s
---    /must/ be of lifted type (see "Type#type_classification" for
---    the meaning of /lifted/ vs. /unlifted/). There is one exception
---    to this rule, top-level @let@s are allowed to bind primitive
---    string literals, see Note [CoreSyn top-level string literals].
---
+--    See Note [CoreSyn letrec invariant]
 --    See Note [CoreSyn let/app invariant]
 --    See Note [Levity polymorphism invariants]
---
---    #type_let#
---    We allow a /non-recursive/ let to bind a type variable, thus:
---
---    > Let (NonRec tv (Type ty)) body
---
---    This can be very convenient for postponing type substitutions until
---    the next run of the simplifier.
---
---    At the moment, the rest of the compiler only deals with type-let
---    in a Let expression, rather than at top level.  We may want to revist
---    this choice.
+--    See Note [CoreSyn type and coercion invariant]
 --
 -- *  Case expression. Operationally this corresponds to evaluating
 --    the scrutinee (expression examined) to weak head normal form
@@ -371,13 +353,25 @@ PrelRules for the rationale for this restriction.
 
 -------------------------- CoreSyn INVARIANTS ---------------------------
 
-Note [CoreSyn top-level invariant]
+Note [Variable occurrences in Core]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See #toplevel_invariant#
+Variable /occurrences/ are never CoVars, though /bindings/ can be.
+All CoVars appear in Coercions.
+
+For example
+  \(c :: Age~#Int) (d::Int). d |> (sym c)
+Here 'c' is a CoVar, which is lambda-bound, but it /occurs/ in
+a Coercion, (sym c).
 
 Note [CoreSyn letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See #letrec_invariant#
+The right hand sides of all top-level and recursive @let@s
+/must/ be of lifted type (see "Type#type_classification" for
+the meaning of /lifted/ vs. /unlifted/).
+
+There is one exception to this rule, top-level @let@s are
+allowed to bind primitive string literals: see
+Note [CoreSyn top-level string literals].
 
 Note [CoreSyn top-level string literals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -450,6 +444,27 @@ which will generate a @case@ if necessary
 
 The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
 coreSyn/MkCore.
+
+Note [CoreSyn type and coercion invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow a /non-recursive/, /non-top-level/ let to bind type and
+coercion variables.  These can be very convenient for postponing type
+substitutions until the next run of the simplifier.
+
+* A type variable binding must have a RHS of (Type ty)
+
+* A coercion variable binding must have a RHS of (Coercion co)
+
+  It is possible to have terms that return a coercion, but we use
+  case-binding for those; e.g.
+     case (eq_sel d) of (co :: a ~# b) -> blah
+  where eq_sel :: (a~b) -> (a~#b)
+
+  Or even even
+      case (df @Int) of (co :: a ~# b) -> blah
+  Which is very exotic, and I think never encountered; but see
+  Note [Equality superclasses in quantified constraints]
+  in TcCanonical
 
 Note [CoreSyn case invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2101,6 +2116,12 @@ isTyCoArg :: Expr b -> Bool
 isTyCoArg (Type {})     = True
 isTyCoArg (Coercion {}) = True
 isTyCoArg _             = False
+
+-- | Returns @True@ iff the expression is a 'Coercion'
+-- expression at its top level
+isCoArg :: Expr b -> Bool
+isCoArg (Coercion {}) = True
+isCoArg _             = False
 
 -- | Returns @True@ iff the expression is a 'Type' expression at its
 -- top level.  Note this does NOT include 'Coercion's.

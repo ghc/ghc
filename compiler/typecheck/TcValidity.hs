@@ -1142,19 +1142,12 @@ check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
-  -- For the most part we don't allow instances for Coercible;
+  -- For the most part we don't allow
+  -- instances for (~), (~~), or Coercible;
   -- but we DO want to allow them in quantified constraints:
   --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
-  | clas_nm == coercibleTyConName
+  | clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName ]
   , not quantified_constraint
-  = failWithTc rejected_class_msg
-
-  -- Handwritten instances of other nonminal-equality classes
-  -- is forbidden, except in the defining module to allow
-  --    instance a ~~ b => a ~ b
-  -- which occurs in Data.Type.Equality
-  | clas_nm `elem` [ heqTyConName, eqTyConName]
-  , nameModule clas_nm /= this_mod
   = failWithTc rejected_class_msg
 
   -- Check for hand-written Generic instances (disallowed in Safe Haskell)
