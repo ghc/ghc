@@ -170,7 +170,7 @@ needExtInt = throwIO
 -- the command directly here.
 iservCmd :: Binary a => HscEnv -> Message a -> IO a
 iservCmd hsc_env@HscEnv{..} msg
- | gopt Opt_ExternalInterpreter hsc_dflags =
+ | gopt Opt_ExternalInterpreter $ hsc_dflags hsc_env =
      withIServ hsc_env $ \iserv ->
        uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
          iservCall iserv msg
@@ -195,11 +195,11 @@ iservCmd hsc_env@HscEnv{..} msg
 withIServ
   :: (MonadIO m, ExceptionMonad m)
   => HscEnv -> (IServ -> m a) -> m a
-withIServ HscEnv{..} action =
+withIServ hsc_env@HscEnv{..} action =
   gmask $ \restore -> do
     m <- liftIO $ takeMVar hsc_iserv
       -- start the iserv process if we haven't done so yet
-    iserv <- maybe (liftIO $ startIServ hsc_dflags) return m
+    iserv <- maybe (liftIO $ startIServ $ hsc_dflags hsc_env) return m
                `gonException` (liftIO $ putMVar hsc_iserv Nothing)
       -- free any ForeignHValues that have been garbage collected.
     let iserv' = iserv{ iservPendingFrees = [] }
@@ -372,7 +372,7 @@ initObjLinker hsc_env = iservCmd hsc_env InitLinker
 
 lookupSymbol :: HscEnv -> FastString -> IO (Maybe (Ptr ()))
 lookupSymbol hsc_env@HscEnv{..} str
- | gopt Opt_ExternalInterpreter hsc_dflags =
+ | gopt Opt_ExternalInterpreter $ hsc_dflags hsc_env =
      -- Profiling of GHCi showed a lot of time and allocation spent
      -- making cross-process LookupSymbol calls, so I added a GHC-side
      -- cache which sped things up quite a lot.  We have to be careful
@@ -403,7 +403,7 @@ lookupClosure hsc_env str =
 
 purgeLookupSymbolCache :: HscEnv -> IO ()
 purgeLookupSymbolCache hsc_env@HscEnv{..} =
- when (gopt Opt_ExternalInterpreter hsc_dflags) $
+ when (gopt Opt_ExternalInterpreter $ hsc_dflags hsc_env) $
    withIServ hsc_env $ \IServ{..} ->
      writeIORef iservLookupSymbolCache emptyUFM
 
@@ -609,9 +609,9 @@ principle it would probably be ok, but it seems less hairy this way.
 -- | Creates a 'ForeignRef' that will automatically release the
 -- 'RemoteRef' when it is no longer referenced.
 mkFinalizedHValue :: HscEnv -> RemoteRef a -> IO (ForeignRef a)
-mkFinalizedHValue HscEnv{..} rref = mkForeignRef rref free
+mkFinalizedHValue hsc_env@HscEnv{..} rref = mkForeignRef rref free
  where
-  !external = gopt Opt_ExternalInterpreter hsc_dflags
+  !external = gopt Opt_ExternalInterpreter $ hsc_dflags hsc_env
   hvref = toHValueRef rref
 
   free :: IO ()

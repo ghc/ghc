@@ -296,7 +296,7 @@ compileOne' m_tc_result mHscMessage
                   -- not the one cached in the summary.  This is so
                   -- that we can change the log_action without having
                   -- to re-summarize all the source files.
-       hsc_env     = hsc_env0 {hsc_dflags = dflags}
+       hsc_env     = set_hsc_dflags hsc_env0 dflags
 
        -- Figure out what lang we're generating
        hsc_lang = hscTarget dflags
@@ -596,7 +596,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
 
              -- Decide where dump files should go based on the pipeline output
              dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
-             hsc_env = hsc_env0 {hsc_dflags = dflags}
+             hsc_env = set_hsc_dflags hsc_env0 dflags
 
              (input_basename, suffix) = splitExtension input_fn
              suffix' = drop 1 suffix -- strip off the .
@@ -1092,7 +1092,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
         PipeState{hsc_env=hsc_env'} <- getPipeState
 
   -- Tell the finder cache about this module
-        mod <- liftIO $ addHomeModuleToFinder hsc_env' mod_name location
+        mod <- liftIO $ addHomeModuleToFinder hsc_env' mod_name location $ hsc_currentPackage hsc_env'
 
   -- Make the ModSummary to hand to hscMain
         let

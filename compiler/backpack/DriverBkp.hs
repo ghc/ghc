@@ -73,7 +73,7 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
-    modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
+    modifySession $ \hsc_env -> set_hsc_dflags hsc_env dflags
     -- Cribbed from: preprocessFile / DriverPipeline
     liftIO $ checkProcessArgsResult dflags unhandled_flags
     liftIO $ handleFlagWarnings dflags warns
@@ -151,7 +151,7 @@ withBkpSession cid insts deps session_type do_this = do
                  -- Special case when package is definite
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
-    withTempSession (overHscDynFlags (\dflags ->
+    withTempSession (flip modify_hsc_dflags (\dflags ->
       -- If we're type-checking an indefinite package, we want to
       -- turn on interface writing.  However, if the user also
       -- explicitly passed in `-fno-code`, we DON'T want to write
@@ -449,10 +449,6 @@ getBkpEnv = getEnv
 getBkpLevel :: BkpM Int
 getBkpLevel = bkp_level `fmap` getBkpEnv
 
--- | Apply a function on 'DynFlags' on an 'HscEnv'
-overHscDynFlags :: (DynFlags -> DynFlags) -> HscEnv -> HscEnv
-overHscDynFlags f hsc_env = hsc_env { hsc_dflags = f (hsc_dflags hsc_env) }
-
 -- | Run a 'BkpM' computation, with the nesting level bumped one.
 innerBkpM :: BkpM a -> BkpM a
 innerBkpM do_this = do
@@ -646,7 +642,7 @@ hsunitModuleGraph dflags unit = do
           let hsc_src = case dt of
                           ModuleD    -> HsSrcFile
                           SignatureD -> HsigFile
-          Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod
+          Just `fmap` summariseDecl pn (thisPackage dflags) hsc_src lmodname mb_hsmod
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls
 
@@ -679,7 +675,7 @@ summariseRequirement pn mod_name = do
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
-    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location $ hsc_currentPackage hsc_env
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -711,12 +707,13 @@ summariseRequirement pn mod_name = do
         }
 
 summariseDecl :: PackageName
+              -> UnitId
               -> HscSource
               -> Located ModuleName
               -> Maybe (Located (HsModule GhcPs))
               -> BkpM ModSummary
-summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
-summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
+summariseDecl pn _myUnitId hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
+summariseDecl _pn myUnitId hsc_src lmodname@(L loc modname) Nothing
     = do hsc_env <- getSession
          let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
@@ -724,6 +721,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Map.empty -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
+                         myUnitId
                          True -- Target lets you disallow, but not here
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
@@ -792,7 +790,7 @@ hsModuleToModSummary pn hsc_src modname
     required_by_imports <- liftIO $ implicitRequirements hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
-    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
+    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location $ hsc_currentPackage hsc_env
     return ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
