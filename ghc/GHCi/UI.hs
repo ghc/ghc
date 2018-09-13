@@ -55,7 +55,8 @@ import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
 import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
-                  setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc )
+                  setInteractivePrintName, hsc_dflags, set_hsc_dflags,
+                  msObjFilePath, runInteractiveHsc )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -1610,7 +1611,7 @@ chooseEditFile =
               Just file -> return file
               Nothing   -> throwGhcException (CmdLineError "No files to edit.")
 
-  where fromTarget (GHC.Target (GHC.TargetFile f _) _ _) = Just f
+  where fromTarget (GHC.Target (GHC.TargetFile f _) _ _ _) = Just f
         fromTarget _ = Nothing -- when would we get a module target?
 
 
@@ -1848,14 +1849,14 @@ addModule files = do
   targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
   targets' <- filterM checkTarget targets
   -- remove old targets with the same id; e.g. for :add *M
-  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets' ]
+  mapM_ GHC.removeTarget [ tid | Target tid _ _ _ <- targets' ]
   mapM_ GHC.addTarget targets'
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
   where
     checkTarget :: GHC.GhcMonad m => Target -> m Bool
-    checkTarget (Target (TargetModule m) _ _) = checkTargetModule m
-    checkTarget (Target (TargetFile f _) _ _) = liftIO $ checkTargetFile f
+    checkTarget (Target (TargetModule m) _ _ _) = checkTargetModule m
+    checkTarget (Target (TargetFile f _) _ _ _) = liftIO $ checkTargetFile f
 
     checkTargetModule :: GHC.GhcMonad m => ModuleName -> m Bool
     checkTargetModule m = do
@@ -1878,7 +1879,7 @@ unAddModule :: GhciMonad m => [FilePath] -> m ()
 unAddModule files = do
   files' <- mapM expandPath files
   targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
-  mapM_ GHC.removeTarget [ tid | Target tid _ _ <- targets ]
+  mapM_ GHC.removeTarget [ tid | Target tid _ _ _ <- targets ]
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
 
@@ -1969,9 +1970,9 @@ setContextAfterLoad keep_ctxt ms = do
         []    -> Nothing
         (m:_) -> Just m
 
-   summary `matches` Target (TargetModule m) _ _
+   summary `matches` Target (TargetModule m) _ _ _
         = GHC.ms_mod_name summary == m
-   summary `matches` Target (TargetFile f _) _ _
+   summary `matches` Target (TargetFile f _) _ _ _
         | Just f' <- GHC.ml_hs_file (GHC.ms_location summary)   = f == f'
    _ `matches` _
         = False
@@ -2912,9 +2913,9 @@ newDynFlags interactive_only minus_opts = do
             newLdInputs     = drop ld0length (ldInputs dflags2)
             newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
-            hsc_env' = hsc_env { hsc_dflags =
+            hsc_env' = set_hsc_dflags hsc_env $
                          dflags2 { ldInputs = newLdInputs
-                                 , cmdlineFrameworks = newCLFrameworks } }
+                                 , cmdlineFrameworks = newCLFrameworks }
 
         when (not (null newLdInputs && null newCLFrameworks)) $
           liftIO $ linkCmdLineLibs hsc_env'
@@ -3219,8 +3220,8 @@ showTargets :: GHC.GhcMonad m => m ()
 showTargets = mapM_ showTarget =<< GHC.getTargets
   where
     showTarget :: GHC.GhcMonad m => Target -> m ()
-    showTarget (Target (TargetFile f _) _ _) = liftIO (putStrLn f)
-    showTarget (Target (TargetModule m) _ _) =
+    showTarget (Target (TargetFile f _) _ _ _) = liftIO (putStrLn f)
+    showTarget (Target (TargetModule m) _ _ _) =
       liftIO (putStrLn $ moduleNameString m)
 
 -- -----------------------------------------------------------------------------

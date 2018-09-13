@@ -478,19 +478,19 @@ woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
 
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = xopt_set (hsc_dflags top) flag})
+  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> xopt_set dflags flag)
 
 unsetXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetXOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = xopt_unset (hsc_dflags top) flag})
+  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> xopt_unset dflags flag)
 
 unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetGOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = gopt_unset (hsc_dflags top) flag})
+  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> gopt_unset dflags flag)
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetWOptM flag =
-  updTopEnv (\top -> top { hsc_dflags = wopt_unset (hsc_dflags top) flag})
+  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> wopt_unset dflags flag)
 
 -- | Do it flag is true
 whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
@@ -518,8 +518,7 @@ getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
 withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withDoDynamicToo =
-  updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
-              top { hsc_dflags = dynamicTooMkDynamicDynFlags dflags })
+  updTopEnv (\top -> modify_hsc_dflags top dynamicTooMkDynamicDynFlags)
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
 getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }

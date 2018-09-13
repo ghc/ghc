@@ -73,7 +73,7 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
-    modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
+    modifySession $ \hsc_env -> set_hsc_dflags hsc_env dflags
     -- Cribbed from: preprocessFile / DriverPipeline
     liftIO $ checkProcessArgsResult dflags unhandled_flags
     liftIO $ handleFlagWarnings dflags warns
@@ -151,7 +151,7 @@ withBkpSession cid insts deps session_type do_this = do
                  -- Special case when package is definite
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
-    withTempSession (overHscDynFlags (\dflags ->
+    withTempSession (flip modify_hsc_dflags (\dflags ->
       -- If we're type-checking an indefinite package, we want to
       -- turn on interface writing.  However, if the user also
       -- explicitly passed in `-fno-code`, we DON'T want to write
@@ -448,10 +448,6 @@ getBkpEnv = getEnv
 -- | Get the nesting level, when recursively compiling modules.
 getBkpLevel :: BkpM Int
 getBkpLevel = bkp_level `fmap` getBkpEnv
-
--- | Apply a function on 'DynFlags' on an 'HscEnv'
-overHscDynFlags :: (DynFlags -> DynFlags) -> HscEnv -> HscEnv
-overHscDynFlags f hsc_env = hsc_env { hsc_dflags = f (hsc_dflags hsc_env) }
 
 -- | Run a 'BkpM' computation, with the nesting level bumped one.
 innerBkpM :: BkpM a -> BkpM a

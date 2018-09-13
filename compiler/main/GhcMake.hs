@@ -309,7 +309,7 @@ load' how_much mHscMessage mod_graph = do
     -- before we unload anything, make sure we don't leave an old
     -- interactive context around pointing to dead bindings.  Also,
     -- write the pruned HPT to allow the old HPT to be GC'd.
-    setSession $ discardIC $ hsc_env { hsc_HPT = pruned_hpt }
+    setSession $ discardIC $ set_hsc_HPT hsc_env pruned_hpt
 
     liftIO $ debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
                             text "Stable BCO:" <+> ppr stable_bco)
@@ -394,7 +394,7 @@ load' how_much mHscMessage mod_graph = do
     let upsweep_fn | n_jobs > 1 = parUpsweep n_jobs
                    | otherwise  = upsweep
 
-    setSession hsc_env{ hsc_HPT = emptyHomePackageTable }
+    setSession hsc_env { hsc_unitEnv = (\ue -> ue { unitEnv_homePackageTable = emptyHomePackageTable }) <$> hsc_unitEnv hsc_env }
     (upsweep_ok, modsUpswept) <- withDeferredDiagnostics $
       upsweep_fn mHscMessage pruned_hpt stable_mods cleanup mg
 
@@ -491,7 +491,7 @@ load' how_much mHscMessage mod_graph = do
           -- Link everything together
           linkresult <- liftIO $ link (ghcLink dflags) dflags False hpt5
 
-          modifySession $ \hsc_env -> hsc_env{ hsc_HPT = hpt5 }
+          modifySession $ \hsc_env -> set_hsc_HPT hsc_env hpt5
           loadFinish Failed linkresult
 
 
@@ -516,7 +516,7 @@ loadFinish all_ok Succeeded
 discardProg :: HscEnv -> HscEnv
 discardProg hsc_env
   = discardIC $ hsc_env { hsc_mod_graph = emptyMG
-                        , hsc_HPT = emptyHomePackageTable }
+                        , hsc_unitEnv = (\ue -> ue { unitEnv_homePackageTable = emptyHomePackageTable }) <$> hsc_unitEnv hsc_env }
 
 -- | Discard the contents of the InteractiveContext, but keep the DynFlags.
 -- It will also keep ic_int_print and ic_monad if their names are from
@@ -571,7 +571,7 @@ guessOutputFile = modifySession $ \env ->
     in
     case outputFile dflags of
         Just _ -> env
-        Nothing -> env { hsc_dflags = dflags { outputFile = name_exe } }
+        Nothing -> modify_hsc_dflags env $ \dflags -> dflags { outputFile = name_exe }
 
 -- -----------------------------------------------------------------------------
 --
@@ -1201,9 +1201,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
 
                 -- Update and fetch the global HscEnv.
                 lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                    let hsc_env' = hsc_env
-                                     { hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                                           this_mod mod_info }
+                    let hsc_env' = modify_hsc_HPT hsc_env $ \hpt -> addToHpt hpt this_mod mod_info
                     -- We've finished typechecking the module, now we must
                     -- retypecheck the loop AGAIN to ensure unfoldings are
                     -- updated.  This time, however, we include the loop
@@ -1225,9 +1223,9 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                  , filesToClean = filesToClean lcl_dflags } }
 
     localize_hsc_env hsc_env
-        = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                     { log_action = log_action lcl_dflags
-                     , filesToClean = filesToClean lcl_dflags } }
+        = modify_hsc_dflags hsc_env $ \dflags -> dflags
+              { log_action = log_action lcl_dflags
+              , filesToClean = filesToClean lcl_dflags }
 
 -- -----------------------------------------------------------------------------
 --
@@ -1334,8 +1332,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                 let this_mod = ms_mod_name mod
 
                         -- Add new info to hsc_env
-                    hpt1     = addToHpt (hsc_HPT hsc_env2) this_mod mod_info
-                    hsc_env3 = hsc_env2 { hsc_HPT = hpt1, hsc_type_env_var = Nothing }
+                    hsc_env3 = modify_hsc_HPT (hsc_env2 { hsc_type_env_var = Nothing }) $ \hpt -> addToHpt hpt this_mod mod_info
 
                         -- Space-saving: delete the old HPT entry
                         -- for mod BUT if mod is a hs-boot
@@ -1742,14 +1739,14 @@ typecheckLoop dflags hsc_env mods = do
      text "Re-typechecking loop: " <> ppr mods
   new_hpt <-
     fixIO $ \new_hpt -> do
-      let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
+      let new_hsc_env = set_hsc_HPT hsc_env new_hpt
       mds <- initIfaceCheck (text "typecheckLoop") new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
       let new_hpt = addListToHpt old_hpt
                         (zip mods [ hmi{ hm_details = details }
                                   | (hmi,details) <- zip hmis mds ])
       return new_hpt
-  return hsc_env{ hsc_HPT = new_hpt }
+  return set_hsc_HPT hsc_env new_hpt
   where
     old_hpt = hsc_HPT hsc_env
     hmis    = map (expectJust "typecheckLoop" . lookupHpt old_hpt) mods
@@ -1967,16 +1964,16 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map = mkNodeMap old_summaries
 
         getRootSummary :: Target -> IO (Either ErrMsg ModSummary)
-        getRootSummary (Target (TargetFile file mb_phase) obj_allowed maybe_buf)
+        getRootSummary (Target (TargetFile file mb_phase) package obj_allowed maybe_buf)
            = do exists <- liftIO $ doesFileExist file
                 if exists
-                    then Right `fmap` summariseFile hsc_env old_summaries file mb_phase
+                    then Right `fmap` summariseFile hsc_env old_summaries file package mb_phase
                                        obj_allowed maybe_buf
                     else return $ Left $ mkPlainErrMsg dflags noSrcSpan $
                            text "can't find file:" <+> text file
-        getRootSummary (Target (TargetModule modl) obj_allowed maybe_buf)
+        getRootSummary (Target (TargetModule modl) package obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
-                                           (L rootLoc modl) obj_allowed
+                                           (L rootLoc modl) package obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
                    Nothing -> return $ Left $ moduleNotFoundErr dflags modl
@@ -1997,7 +1994,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              dup_roots :: [[ModSummary]]        -- Each at least of length 2
              dup_roots = filterOut isSingleton $ map rights $ nodeMapElts root_map
 
-        loop :: [(Located ModuleName,IsBoot)]
+        loop :: [(Located ModuleName, UnitId, IsBoot)]
                         -- Work list: process these modules
              -> NodeMap [Either ErrMsg ModSummary]
                         -- Visited set; the range is a list because
@@ -2006,7 +2003,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              -> IO (NodeMap [Either ErrMsg ModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
-        loop ((wanted_mod, is_boot) : ss) done
+        loop ((wanted_mod, package, is_boot) : ss) done
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
                 loop ss done
@@ -2014,7 +2011,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 do { multiRootsErr dflags (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
-                                       is_boot wanted_mod True
+                                       is_boot wanted_mod package True
                                        Nothing excl_mods
                case mb_s of
                    Nothing -> loop ss done
@@ -2155,12 +2152,13 @@ summariseFile
         :: HscEnv
         -> [ModSummary]                 -- old summaries
         -> FilePath                     -- source file name
+        -> UnitId
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
         -> IO ModSummary
 
-summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
+summariseFile hsc_env old_summaries file package mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,  But we have to look up the summary
         -- by source file, rather than module name as we do in summarise.
@@ -2191,7 +2189,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
                   -- We have to repopulate the Finder's cache because it
                   -- was flushed before the downsweep.
                   _ <- liftIO $ addHomeModuleToFinder hsc_env
-                    (moduleName (ms_mod old_summary)) (ms_location old_summary)
+                    (moduleName (ms_mod old_summary)) (ms_location old_summary) package
 
                   return old_summary{ ms_obj_date = obj_timestamp
                                     , ms_iface_date = hi_timestamp
@@ -2223,7 +2221,7 @@ summariseFile hsc_env old_summaries file mb_phase obj_allowed maybe_buf
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+        mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location package
 
         -- when the user asks to load a source file by name, we only
         -- use an object file if -fobject-code is on.  See #1205.
@@ -2266,13 +2264,14 @@ summariseModule
           -> NodeMap ModSummary -- Map of old summaries
           -> IsBoot             -- IsBoot <=> a {-# SOURCE #-} import
           -> Located ModuleName -- Imported module to be summarised
+          -> UnitId
           -> Bool               -- object code allowed?
           -> Maybe (StringBuffer, UTCTime)
           -> [ModuleName]               -- Modules to exclude
           -> IO (Maybe (Either ErrMsg ModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
-                obj_allowed maybe_buf excl_mods
+                package obj_allowed maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -2488,7 +2487,7 @@ withDeferredDiagnostics f = do
             sequence_ $ reverse actions
 
         setLogAction action = modifySession $ \hsc_env ->
-          hsc_env{ hsc_dflags = (hsc_dflags hsc_env){ log_action = action } }
+          modify_hsc_dflags hs_env $ \dflags -> dflags { log_action = action }
 
     gbracket
       (setLogAction deferDiagnostics)

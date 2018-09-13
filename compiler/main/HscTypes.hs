@@ -11,7 +11,8 @@
 -- | Types for the per-module compiler
 module HscTypes (
         -- * compilation state
-        HscEnv(..), hscEPS,
+        HscEnv(..), hscEPS, hsc_HPT, hsc_dflags, set_hsc_dflags, modify_hsc_dflags,
+        UnitEnv(..), modify_hsc_HPT,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
         HscStatus(..),
@@ -73,7 +74,7 @@ module HscTypes (
         extendInteractiveContext, extendInteractiveContextWithIds,
         substInteractiveContext,
         setInteractivePrintName, icInteractiveModule,
-        InteractiveImport(..), setInteractivePackage,
+        InteractiveImport(..),
         mkPrintUnqualified, pprModulePrefix,
         mkQualPackage, mkQualModule, pkgQual,
 
@@ -208,6 +209,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
 import Data.IORef
+import qualified Data.Map as M
 import Data.Time
 import Exception
 import System.FilePath
@@ -249,6 +251,38 @@ instance MonadIO Hsc where
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
+hsc_currentUnitEnv :: HscEnv -> UnitEnv
+hsc_currentUnitEnv e = case M.lookup (hsc_currentPackage e) (hsc_unitEnv e) of
+    Just unitEnv -> unitEnv
+    Nothing -> pprPanic "packageNotFound" $
+      pprUnitId $ hsc_currentPackage e
+
+hsc_dflags :: HscEnv -> DynFlags
+hsc_dflags = unitEnv_dflags . hsc_currentUnitEnv
+
+set_hsc_dflags :: HscEnv -> DynFlags -> HscEnv
+set_hsc_dflags e dflags = modify_hsc_dflags e $ const dflags
+
+modify_hsc_dflags :: HscEnv -> (DynFlags -> DynFlags) -> HscEnv
+modify_hsc_dflags e f = e
+  { hsc_unitEnv = M.adjust update (hsc_currentPackage e) $ hsc_unitEnv e
+  }
+  where
+    update unitEnv = unitEnv { unitEnv_dflags = f $ unitEnv_dflags unitEnv }
+
+hsc_HPT :: HscEnv -> HomePackageTable
+hsc_HPT = unitEnv_homePackageTable . hsc_currentUnitEnv
+
+set_hsc_HPT :: HscEnv -> HomePackageTable -> HscEnv
+set_hsc_HPT e hpt = modify_hsc_HPT e $ const hpt
+
+modify_hsc_HPT :: HscEnv -> (HomePackageTable -> HomePackageTable) -> HscEnv
+modify_hsc_HPT e f = e
+  { hsc_unitEnv = M.adjust update (hsc_currentPackage e) $ hsc_unitEnv e
+  }
+  where
+    update unitEnv = unitEnv { unitEnv_homePackageTable = f $ unitEnv_homePackageTable unitEnv }
+
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
@@ -256,9 +290,14 @@ runHsc hsc_env (Hsc hsc) = do
     return a
 
 mkInteractiveHscEnv :: HscEnv -> HscEnv
-mkInteractiveHscEnv hsc_env = hsc_env{ hsc_dflags = interactive_dflags }
+mkInteractiveHscEnv hsc_env = hsc_env
+    { hsc_unitEnv = M.insert interactiveUnitId interactiveUnitEnv $ hsc_unitEnv hsc_env
+    }
   where
-    interactive_dflags = ic_dflags (hsc_IC hsc_env)
+    interactiveUnitEnv = UnitEnv
+        { unitEnv_dflags = ic_dflags (hsc_IC hsc_env)
+        , unitEnv_homePackageTable = hsc_HPT hsc_env
+        }
 
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 -- A variant of runHsc that switches in the DynFlags from the
@@ -373,6 +412,11 @@ shouldPrintWarning _ _
 ************************************************************************
 -}
 
+data UnitEnv = UnitEnv
+  { unitEnv_dflags :: DynFlags
+  , unitEnv_homePackageTable :: HomePackageTable
+  }
+
 -- | HscEnv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
 -- code (after preprocessing) to either C, assembly or C--.  Things like
@@ -385,8 +429,13 @@ shouldPrintWarning _ _
 -- a single module.
 data HscEnv
   = HscEnv {
-        hsc_dflags :: DynFlags,
+
+        hsc_unitEnv :: M.Map UnitId UnitEnv,
+
+        -- hsc_dflagsPerUnit :: M.Map UnitId DynFlags,
                 -- ^ The dynamic flag settings
+
+        hsc_currentPackage :: UnitId,
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
@@ -397,7 +446,7 @@ data HscEnv
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
 
-        hsc_HPT    :: HomePackageTable,
+        -- hsc_HPT    :: HomePackageTable,
                 -- ^ The home package table describes already-compiled
                 -- home-package modules, /excluding/ the module we
                 -- are compiling right now.
@@ -503,6 +552,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
+      targetPackage      :: UnitId,   -- ^ target's package
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
       targetContents     :: Maybe (StringBuffer,UTCTime)
                                         -- ^ in-memory text buffer?
@@ -519,7 +569,8 @@ data TargetId
   deriving Eq
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id obj _) =
+pprTarget (Target id package obj _) =
+    text "\"" <> pprUnitId package <> text "\" " <>
     (if obj then char '*' else empty) <> pprTargetId id
 
 instance Outputable Target where
@@ -1695,12 +1746,6 @@ shadowed_by ids = shadowed
   where
     shadowed id = getOccName id `elemOccSet` new_occs
     new_occs = mkOccSet (map getOccName ids)
-
-setInteractivePackage :: HscEnv -> HscEnv
--- Set the 'thisPackage' DynFlag to 'interactive'
-setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { thisInstalledUnitId = toInstalledUnitId interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}

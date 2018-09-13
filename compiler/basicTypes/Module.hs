@@ -30,6 +30,7 @@ module Module
         -- * The UnitId type
         ComponentId(..),
         UnitId(..),
+        pprUnitId,
         unitIdFS,
         unitIdKey,
         IndefUnitId(..),
