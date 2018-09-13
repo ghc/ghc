@@ -1,3 +1,4 @@
+
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -52,6 +53,7 @@ import GHC.Driver.Finder
 import GHC.Utils.Misc
 
 import qualified GHC.LanguageExtensions as LangExt
+import qualified GHC.Data.EnumSet as EnumSet
 
 import GHC.Utils.Panic
 import Data.List ( partition )
@@ -73,7 +75,7 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
-    modifySession (\hsc_env -> hsc_env {hsc_dflags = dflags})
+    modifySession $ \hsc_env -> set_hsc_dflags hsc_env dflags
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult dflags unhandled_flags
     liftIO $ handleFlagWarnings dflags warns
@@ -135,7 +137,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a        -- actual action to run
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
-    dflags <- getDynFlags
+    dflags0 <- getSessionDynFlags
     let cid_fs = unitIdFS (indefUnit cid)
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
@@ -145,7 +147,7 @@ withBkpSession cid insts deps session_type do_this = do
         -- we follow this hierarchy:
         --      $outputdir/$compid          --> typecheck results
         --      $outputdir/$compid/$unitid  --> compile results
-        key_base p | Just f <- p dflags = f
+        key_base p | Just f <- p dflags0 = f
                    | otherwise          = "."
         sub_comp p | is_primary = p
                    | otherwise = p </> cid_str
@@ -153,50 +155,55 @@ withBkpSession cid insts deps session_type do_this = do
                  -- Special case when package is definite
                  , not (null insts) = sub_comp (key_base p) </> uid_str
                  | otherwise = sub_comp (key_base p)
-    withTempSession (overHscDynFlags (\dflags ->
-      -- If we're type-checking an indefinite package, we want to
-      -- turn on interface writing.  However, if the user also
-      -- explicitly passed in `-fno-code`, we DON'T want to write
-      -- interfaces unless the user also asked for `-fwrite-interface`.
-      -- See Note [-fno-code mode]
-      (case session_type of
-        -- Make sure to write interfaces when we are type-checking
-        -- indefinite packages.
-        TcSession | hscTarget dflags /= HscNothing
-                  -> flip gopt_set Opt_WriteInterface
-                  | otherwise -> id
-        CompSession -> id
-        ExeSession -> id) $
-      dflags {
-        hscTarget   = case session_type of
-                        TcSession -> HscNothing
-                        _ -> hscTarget dflags,
-        thisUnitIdInsts_ = Just insts,
-        thisComponentId_ = Just cid,
-        thisUnitId =
-            case session_type of
-                TcSession -> newUnitId cid Nothing
-                -- No hash passed if no instances
-                _ | null insts -> newUnitId cid Nothing
-                  | otherwise  -> newUnitId cid (Just (mkInstantiatedUnitHash cid insts)),
-        -- Setup all of the output directories according to our hierarchy
-        objectDir   = Just (outdir objectDir),
-        hiDir       = Just (outdir hiDir),
-        stubDir     = Just (outdir stubDir),
-        -- Unset output-file for non exe builds
-        outputFile  = if session_type == ExeSession
-                        then outputFile dflags
-                        else Nothing,
-        -- Clear the import path so we don't accidentally grab anything
-        importPaths = [],
-        -- Synthesized the flags
-        packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnit dflags (improveUnit (unitInfoMap (pkgState dflags)) $ renameHoleUnit (pkgState dflags) (listToUFM insts) uid0)
-          in ExposePackage
-            (showSDoc dflags
-                (text "-unit-id" <+> ppr uid <+> ppr rn))
-            (UnitIdArg uid) rn) deps
-      } )) $ do
+        dflags = dflags0
+          { hscTarget   = case session_type of
+                          TcSession -> HscNothing
+                          _ -> hscTarget dflags0
+          , -- If we're type-checking an indefinite package, we want to
+            -- turn on interface writing.  However, if the user also
+            -- explicitly passed in `-fno-code`, we DON'T want to write
+            -- interfaces unless the user also asked for `-fwrite-interface`.
+            -- See Note [-fno-code mode]
+            generalFlags = case session_type of
+              TcSession | hscTarget dflags0 /= HscNothing
+                          -> EnumSet.insert Opt_WriteInterface $ generalFlags dflags0
+                        | otherwise -> generalFlags dflags0
+              CompSession -> generalFlags dflags0
+              ExeSession -> generalFlags dflags0
+          , thisUnitIdInsts_ = Just insts
+          , thisComponentId_ = Just cid
+          , thisUnitId = newUnitId cid $ case session_type of
+              TcSession -> Nothing
+              -- No hash passed if no instances
+              _ | null insts -> Nothing
+                | otherwise  -> Just $ mkInstantiatedUnitHash cid insts
+          -- Setup all of the output directories according to our hierarchy
+          , objectDir   = Just (outdir objectDir)
+          , hiDir       = Just (outdir hiDir)
+          , stubDir     = Just (outdir stubDir)
+          -- Unset output-file for non exe builds
+          , outputFile  = if session_type == ExeSession
+                          then outputFile dflags0
+                          else Nothing
+          -- Clear the import path so we don't accidentally grab anything
+          , importPaths = []
+          -- Synthesized the flags
+          , packageFlags = packageFlags dflags0 ++ map (\(uid0, rn) ->
+            let uid = unwireUnit dflags0 (improveUnit (unitInfoMap (pkgState dflags0)) $ renameHoleUnit (pkgState dflags0) (listToUFM insts) uid0)
+            in ExposePackage
+              (showSDoc dflags0
+                  (text "-unit-id" <+> ppr uid <+> ppr rn))
+              (UnitIdArg uid) rn) deps
+          }
+        unitId = thisPackage dflags
+    modifySession $ \hsc_env -> hsc_env
+      { hsc_internalUnitEnv = hsc_internalUnitEnv hsc_env `mappend` Map.singleton unitId
+        (InternalUnitEnv
+          { internalUnitEnv_dflags = dflags
+          , internalUnitEnv_homePackageTable = emptyHomePackageTable
+          })
+      }
+    withTempSession (\hsc_env -> hsc_env { hsc_currentPackage = unitId }) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
         -- Calls initPackages
@@ -447,10 +454,6 @@ getBkpEnv = getEnv
 getBkpLevel :: BkpM Int
 getBkpLevel = bkp_level `fmap` getBkpEnv
 
--- | Apply a function on 'DynFlags' on an 'HscEnv'
-overHscDynFlags :: (DynFlags -> DynFlags) -> HscEnv -> HscEnv
-overHscDynFlags f hsc_env = hsc_env { hsc_dflags = f (hsc_dflags hsc_env) }
-
 -- | Run a 'BkpM' computation, with the nesting level bumped one.
 innerBkpM :: BkpM a -> BkpM a
 innerBkpM do_this = do
@@ -643,7 +646,7 @@ hsunitModuleGraph dflags unit = do
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
     let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) = do
-          Just `fmap` summariseDecl pn hsc_src lmodname mb_hsmod
+          Just `fmap` summariseDecl pn (thisPackage dflags) hsc_src lmodname mb_hsmod
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls
 
@@ -676,7 +679,7 @@ summariseRequirement pn mod_name = do
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
-    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
+    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location $ hsc_currentPackage hsc_env
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -708,12 +711,13 @@ summariseRequirement pn mod_name = do
         }
 
 summariseDecl :: PackageName
+              -> Unit
               -> HscSource
               -> Located ModuleName
               -> Maybe (Located HsModule)
               -> BkpM ModSummary
-summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
-summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
+summariseDecl pn _myUnitId hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
+summariseDecl _pn myUnitId hsc_src lmodname@(L loc modname) Nothing
     = do hsc_env <- getSession
          let dflags = hsc_dflags hsc_env
          -- TODO: this looks for modules in the wrong place
@@ -721,6 +725,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Map.empty -- GHC API recomp not supported
                          (hscSourceToIsBoot hsc_src)
                          lmodname
+                         myUnitId
                          True -- Target lets you disallow, but not here
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
@@ -789,7 +794,7 @@ hsModuleToModSummary pn hsc_src modname
     required_by_imports <- liftIO $ implicitRequirements hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
-    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
+    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location $ hsc_currentPackage hsc_env
     return ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
