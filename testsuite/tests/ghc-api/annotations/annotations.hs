@@ -30,6 +30,7 @@ testOneFile libdir fileName = do
                         setSessionDynFlags dflags
                         let mn =mkModuleName fileName
                         addTarget Target { targetId = TargetModule mn
+                                         , targetPackage = homeUnitId_ dflags
                                          , targetAllowObjCode = True
                                          , targetContents = Nothing }
                         load LoadAllTargets
