@@ -47,6 +47,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Data.Maybe    ( expectJust )
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
+import qualified Data.Map as M
 import System.Directory
 import System.FilePath
 import Control.Monad
@@ -106,16 +107,18 @@ findImportedModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
 findImportedModule hsc_env mod_name mb_pkg =
   case mb_pkg of
         Nothing                        -> unqual_import
-        Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
-                 | otherwise           -> pkg_import
+        Just pkg | pkg == fsLit "this" -> current_home_import -- "this" is special
+                 | otherwise           -> non_current_import
   where
-    home_import   = findHomeModule hsc_env mod_name
+    current_home_import = findHomeModule hsc_env mod_name
 
-    pkg_import    = findExposedPackageModule hsc_env mod_name mb_pkg
+    any_home_import = findAnyHomeModule hsc_env mod_name mb_pkg
 
-    unqual_import = home_import
-                    `orIfNotFound`
-                    findExposedPackageModule hsc_env mod_name Nothing
+    prebuilt_import = findExposedPackageModule hsc_env mod_name mb_pkg
+
+    non_current_import = any_home_import `orIfNotFound` prebuilt_import
+
+    unqual_import = current_home_import `orIfNotFound` non_current_import
 
 -- | Locate a plugin module requested by the user, for a compiler
 -- plugin.  This consults the same set of exposed packages as
@@ -142,6 +145,44 @@ findExactModule hsc_env mod =
 
 -- -----------------------------------------------------------------------------
 -- Helpers
+
+
+-- TODO use mb_pkg to narrow search
+findAnyHomeModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
+findAnyHomeModule hsc_env mod_name _mb_pkg = do
+    foldM (handleAnyHomeModule hsc_env mod_name) notFound homeDeps
+ where
+    notFound = NotFound [] Nothing [] [] [] []
+    deps = explicitUnits $ unitState $ hsc_dflags hsc_env
+    homeDeps = filter (flip M.member $ hsc_internalUnitEnv hsc_env) deps
+
+-- TODO: fix this
+emptyModuleOrigin :: ModuleOrigin
+emptyModuleOrigin = ModOrigin Nothing [] [] False
+
+handleAnyHomeModule :: HscEnv -> ModuleName -> FindResult -> Unit -> IO FindResult
+handleAnyHomeModule hsc_env mod_name fr unitId = do
+  result <- flip findInstalledHomeModule mod_name $ hsc_env { hsc_currentPackage = unitId }
+  return $ case (result, fr) of
+    (InstalledFound iml _, Found ml m) ->
+      FoundMultiple [(m, emptyModuleOrigin), (mkModule unitId mod_name, emptyModuleOrigin)]
+    (InstalledFound iml _, FoundMultiple results) ->
+      FoundMultiple $ results ++ [(mkModule unitId mod_name, emptyModuleOrigin)]
+    (InstalledFound iml _, _) ->
+      Found iml $ mkModule unitId mod_name
+
+    (InstalledNoPackage _, fr') -> fr'
+
+    (InstalledNotFound ipaths _, NotFound paths pkg mods_hidden pkgs_hidden unusables suggestions) ->
+      NotFound
+        { fr_paths = paths ++ ipaths
+        , fr_pkg = Just unitId
+        , fr_mods_hidden = mods_hidden
+        , fr_pkgs_hidden = pkgs_hidden
+        , fr_unusables = unusables
+        , fr_suggestions = suggestions
+        }
+    (InstalledNotFound ipaths _, fr') -> fr'
 
 -- | Given a monadic actions @this@ and @or_this@, first execute
 -- @this@.  If the returned 'FindResult' is successful, return
@@ -253,8 +294,8 @@ mkHomeInstalledModule dflags mod_name =
   in Module iuid mod_name
 
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
-addHomeModuleToFinder hsc_env mod_name loc = do
+addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> Unit -> IO Module
+addHomeModuleToFinder hsc_env mod_name loc package = do
   let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
   return (mkHomeModule (hsc_dflags hsc_env) mod_name)
