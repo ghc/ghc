@@ -30,8 +30,6 @@ compile:
     # NOTE: we must write them in the same line because each line
     # in CircleCI is a separate process, thus you can't "cd" for the other lines
     - cd ghc/hadrian; git reset --hard HEAD
-    - cd ghc; git remote add alp https://github.com/alpmestan/ghc.git
-    - cd ghc; git fetch alp; git checkout alp/osx-findPtr
     - cd ghc; ./boot && PATH=~/.cabal/bin:$PATH ./configure
 
     # XXX: export PATH doesn't work well either, so we use inline env
