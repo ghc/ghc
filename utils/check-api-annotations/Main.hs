@@ -4,6 +4,8 @@ import Data.Data
 import Data.List
 import GHC
 import GHC.Driver.Ppr
+import GHC.Driver.Session
+import GHC.Driver.Types
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import System.Environment( getArgs )
@@ -26,11 +28,14 @@ testOneFile libdir fileName = do
                Nothing -> False
                Just fn -> fn == fileName
        (anns,p) <- runGhc (Just libdir) $ do
+                        hsc_env <- getSession
                         dflags <- getSessionDynFlags
                         _ <- setSessionDynFlags dflags
                         addTarget Target { targetId = TargetFile fileName Nothing
                                          , targetAllowObjCode = True
-                                         , targetContents = Nothing }
+                                         , targetContents = Nothing
+                                         , targetPackage = hsc_currentUnit hsc_env
+                                         }
                         _ <- load LoadAllTargets
                         graph <- getModuleGraph
                         let modSum =

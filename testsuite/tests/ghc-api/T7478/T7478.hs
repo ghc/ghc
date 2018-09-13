@@ -23,16 +23,16 @@ compileInGhc targets handlerOutput = do
     -- Set up targets.
     oldTargets <- getTargets
     let oldFiles = map fileFromTarget oldTargets
-    mapM_ addSingle (targets \\ oldFiles)
+    mapM_ (addSingle (homeUnitId flags)) (targets \\ oldFiles)
     mapM_ (removeTarget . targetIdFromFile) $ oldFiles \\ targets
     -- Load modules to typecheck
     void $ load LoadAllTargets
   where
     targetIdFromFile file = TargetFile file Nothing
-
-    addSingle filename =
+    addSingle unitId filename =
       addTarget Target
         { targetId           = targetIdFromFile filename
+        , targetPackage      = unitId
         , targetAllowObjCode = True
         , targetContents     = Nothing
         }

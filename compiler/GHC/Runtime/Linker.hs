@@ -200,6 +200,7 @@ linkDependencies :: HscEnv -> PersistentLinkerState
 linkDependencies hsc_env pls span needed_mods = do
 --   initDynLinker (hsc_dflags hsc_env) dl
    let hpt = hsc_HPT hsc_env
+       dflags = hsc_dflags hsc_env
    -- The interpreter and dynamic linker can only handle object code built
    -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
    -- So here we check the build tag: if we're building a non-standard way
@@ -207,7 +208,7 @@ linkDependencies hsc_env pls span needed_mods = do
    maybe_normal_osuf <- checkNonStdWay hsc_env span
 
    -- Find what packages and linkables are required
-   (lnks, pkgs) <- getLinkDeps hsc_env hpt pls
+   (lnks, pkgs) <- getLinkDeps hsc_env dflags hpt pls
                                maybe_normal_osuf span needed_mods
 
    -- Link the packages and modules required
@@ -623,7 +624,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             | hostIsProfiled = text "with -prof"
             | otherwise = text "the normal way"
 
-getLinkDeps :: HscEnv -> HomePackageTable
+getLinkDeps :: HscEnv -> DynFlags -> HomePackageTable
             -> PersistentLinkerState
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
@@ -631,7 +632,7 @@ getLinkDeps :: HscEnv -> HomePackageTable
             -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env hpt pls replace_osuf span mods
+getLinkDeps hsc_env dflags hpt pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
@@ -656,7 +657,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
 
       ; return (lnks_needed, pkgs_needed) }
   where
-    dflags = hsc_dflags hsc_env
 
         -- The ModIface contains the transitive closure of the module dependencies
         -- within the current package, *except* for boot modules: if we encounter
@@ -725,7 +725,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
                 -- so use the Finder to get a ModLocation...
-             mb_stuff <- findHomeModule hsc_env mod_name
+             mb_stuff <- findHomeModule hsc_env dflags mod_name
              case mb_stuff of
                   Found loc mod -> found loc mod
                   _ -> no_obj mod_name
