@@ -1650,7 +1650,7 @@ ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_type (TyVarTy v) is acc
   | v `elemVarSet` is  = acc
   | v `elemVarSet` acc = acc
-  | otherwise          = ty_co_vars_of_type (tyVarKind v) is (extendVarSet acc v)
+  | otherwise          = ty_co_vars_of_type (tyVarKind v) emptyVarSet (extendVarSet acc v)
 ty_co_vars_of_type (TyConApp _ tys)   is acc = ty_co_vars_of_types tys is acc
 ty_co_vars_of_type (LitTy {})         _  acc = acc
 ty_co_vars_of_type (AppTy fun arg)    is acc = ty_co_vars_of_type fun is (ty_co_vars_of_type arg is acc)
@@ -1782,14 +1782,18 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- See Note [FV eta expansion] in FV for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
-tyCoFVsOfType (TyVarTy v)        a b c = (unitFV v `unionFV` tyCoFVsOfType (tyVarKind v)) a b c
-tyCoFVsOfType (TyConApp _ tys)   a b c = tyCoFVsOfTypes tys a b c
-tyCoFVsOfType (LitTy {})         a b c = emptyFV a b c
-tyCoFVsOfType (AppTy fun arg)    a b c = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) a b c
-tyCoFVsOfType (FunTy arg res)    a b c = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) a b c
-tyCoFVsOfType (ForAllTy bndr ty) a b c = tyCoFVsBndr bndr (tyCoFVsOfType ty)  a b c
-tyCoFVsOfType (CastTy ty co)     a b c = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) a b c
-tyCoFVsOfType (CoercionTy co)    a b c = tyCoFVsOfCo co a b c
+tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
+  | not (f v) = (acc_list, acc_set)
+  | v `elemVarSet` bound_vars = (acc_list, acc_set)
+  | v `elemVarSet` acc_set = (acc_list, acc_set)
+  | otherwise = tyCoFVsOfType (tyVarKind v) f emptyVarSet (v:acc_list, extendVarSet acc_set v)
+tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
+tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
+tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
+tyCoFVsOfType (FunTy arg res)    f bound_vars acc = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
+tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
+tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
 
 tyCoFVsBndr :: TyVarBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
