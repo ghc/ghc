@@ -71,7 +71,7 @@ initializePlugins hsc_env df
             (cachedPlugins df) -- arguments not changed
   = return df -- no need to reload plugins
   | otherwise
-  = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
+  = do loadedPlugins <- loadPlugins $ set_hsc_dflags hsc_env df
        let df' = df { cachedPlugins = loadedPlugins }
        df'' <- withPlugins df' runDflagsPlugin df'
        return df''
@@ -246,7 +246,7 @@ lookupRdrNameInModuleForPlugins :: HscEnv -> ModuleName -> RdrName
                                 -> IO (Maybe (Name, ModIface))
 lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
     -- First find the unit the module resides in by searching exposed units and home modules
-    found_module <- findPluginModule hsc_env mod_name
+    found_module <- findPluginModule hsc_env (hsc_dflags hsc_env) mod_name
     case found_module of
         Found _ mod -> do
             -- Find the exports of the module
