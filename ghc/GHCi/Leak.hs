@@ -34,9 +34,9 @@ data LeakModIndicators = LeakModIndicators
 -- | Grab weak references to some of the data structures representing
 -- the currently loaded modules.
 getLeakIndicators :: HscEnv -> IO LeakIndicators
-getLeakIndicators HscEnv{..} =
+getLeakIndicators hsc_env@HscEnv{..} =
   fmap LeakIndicators $
-    forM (eltsUDFM hsc_HPT) $ \hmi@HomeModInfo{..} -> do
+    forM (eltsUDFM (hsc_HPT hsc_env)) $ \hmi@HomeModInfo{..} -> do
       leakMod <- mkWeakPtr hmi Nothing
       leakIface <- mkWeakPtr hm_iface Nothing
       leakDetails <- mkWeakPtr hm_details Nothing
