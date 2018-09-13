@@ -18,7 +18,15 @@
 -- | Types for the per-module compiler
 module GHC.Driver.Types (
         -- * compilation state
-        HscEnv(..), hscEPS,
+        HscEnv(..), hscEPS, hsc_HPT, hsc_dflags, hsc_unitDflags, hsc_unitDflags_maybe,
+        set_hsc_dflags, set_hsc_unitDflags,
+        set_hsc_HPT, set_hsc_unitHPT, hsc_unitHPT_maybe, hsc_unitHPT,
+        modify_hsc_dflags, modify_hsc_unitDflags, modify_hsc_unitHPT, modify_hsc_HPT,
+        InternalUnitEnv(..), singleton_hsc_unitEnv, insert_hsc_unitEnv,
+        set_hsc_internalUnitEnv, set_hsc_internalUnitEnvList,
+        hsc_findInternalUnitEnv, hsc_findInternalUnitEnv_maybe,
+        hsc_memberInternalUnitEnv,
+        pprInternalUnitMap,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
@@ -38,7 +46,7 @@ module GHC.Driver.Types (
         ForeignSrcLang(..),
         phaseForeignLanguage,
 
-        ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, ms_home_imps,
+        ModSummary(..), ms_unit, ms_imps, ms_installed_mod, ms_mod_name, ms_home_imps,
         home_imps, ms_home_allimps, ms_home_srcimps, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
         SourceModified(..), isTemplateHaskellOrQQNonBoot,
@@ -295,6 +303,117 @@ instance MonadIO Hsc where
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
+assertHscEnv :: HasCallStack => HscEnv -> HscEnv
+assertHscEnv e = assertUnitKnown (hsc_currentUnit e) e
+
+assertUnitKnown :: HasCallStack => UnitId -> HscEnv -> HscEnv
+assertUnitKnown pkg e =
+  ASSERT2(Map.member pkg (hsc_internalUnitEnv e), errMsg) e
+  where
+    errMsg = text "assertUnitKnown" <+> ppr (hsc_currentUnit e) $$ nest 2 (ppr (pprInternalUnitMap e))
+
+pprInternalUnitMap :: HasCallStack => HscEnv -> SDoc
+pprInternalUnitMap env = text "pprInternalUnitMap:" <+> text "(package: " <>  ppr (hsc_currentUnit env) <> text ")"
+  $$ nest 2 (vcat (map (\(k, v) -> pprInternalUnitEnv k v) $ Map.assocs $ hsc_internalUnitEnv env))
+
+pprInternalUnitEnv :: HasCallStack => UnitId -> InternalUnitEnv -> SDoc
+pprInternalUnitEnv uid InternalUnitEnv {..} = ppr uid <+> text "->" <+> pprHPT internalUnitEnv_homePackageTable
+
+hsc_currentInternalUnitEnv :: HasCallStack => HscEnv -> InternalUnitEnv
+hsc_currentInternalUnitEnv e =
+  case hsc_findInternalUnitEnv_maybe (assertHscEnv e) (hsc_currentUnit e) of
+    Just unitEnv -> unitEnv
+    Nothing -> pprPanic "packageNotFound" $
+      ppr $ hsc_currentUnit e
+
+hsc_findInternalUnitEnv_maybe :: HasCallStack => HscEnv -> UnitId -> Maybe InternalUnitEnv
+hsc_findInternalUnitEnv_maybe e uid = Map.lookup uid (hsc_internalUnitEnv e)
+
+hsc_findInternalUnitEnv :: HasCallStack => HscEnv -> UnitId -> InternalUnitEnv
+hsc_findInternalUnitEnv e uid = fromJust $ hsc_findInternalUnitEnv_maybe (assertUnitKnown uid e) uid
+
+hsc_memberInternalUnitEnv :: HasCallStack => HscEnv -> UnitId -> Bool
+hsc_memberInternalUnitEnv e uid = Map.member uid (hsc_internalUnitEnv e)
+
+singleton_hsc_unitEnv :: HasCallStack => HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
+singleton_hsc_unitEnv e unitId unitEnv = assertHscEnv $ e
+  { hsc_internalUnitEnv = Map.singleton unitId unitEnv
+  , hsc_currentUnit = unitId
+  }
+
+set_hsc_internalUnitEnvList :: HasCallStack => HscEnv -> [(UnitId, InternalUnitEnv)] -> HscEnv
+set_hsc_internalUnitEnvList e env = set_hsc_internalUnitEnv e (Map.fromList env)
+
+set_hsc_internalUnitEnv :: HasCallStack => HscEnv -> Map UnitId InternalUnitEnv -> HscEnv
+set_hsc_internalUnitEnv e env = e { hsc_internalUnitEnv = env }
+
+hsc_dflags :: HasCallStack => HscEnv -> DynFlags
+hsc_dflags = internalUnitEnv_dflags . hsc_currentInternalUnitEnv
+
+hsc_unitDflags_maybe ::HasCallStack =>  HscEnv -> UnitId -> Maybe DynFlags
+hsc_unitDflags_maybe e uid =
+  fmap internalUnitEnv_dflags (hsc_findInternalUnitEnv_maybe e uid)
+
+hsc_unitDflags :: HasCallStack => HscEnv -> UnitId -> DynFlags
+hsc_unitDflags e uid = case hsc_unitDflags_maybe e uid of
+    Nothing -> pprPanic "Unit unknown to the internal unit environment"
+        $ text "unit (" <> ppr uid <> text ")"
+          $$ pprInternalUnitMap e
+
+    Just dflags -> dflags
+
+set_hsc_unitDflags :: HasCallStack => HscEnv -> UnitId -> DynFlags -> HscEnv
+set_hsc_unitDflags e uid dflags = modify_hsc_unitDflags e uid $ const dflags
+
+set_hsc_dflags :: HasCallStack => HscEnv -> DynFlags -> HscEnv
+set_hsc_dflags e dflags = set_hsc_unitDflags e (hsc_currentUnit e) dflags
+
+modify_hsc_unitDflags :: HasCallStack => HscEnv -> UnitId -> (DynFlags -> DynFlags) -> HscEnv
+modify_hsc_unitDflags e uid f = (assertUnitKnown uid e)
+  { hsc_internalUnitEnv = Map.adjust update uid $ hsc_internalUnitEnv e
+  }
+  where
+    update unitEnv = unitEnv { internalUnitEnv_dflags = f $ internalUnitEnv_dflags unitEnv }
+
+modify_hsc_dflags :: HasCallStack => HscEnv -> (DynFlags -> DynFlags) -> HscEnv
+modify_hsc_dflags e f = modify_hsc_unitDflags e (hsc_currentUnit e) f
+
+hsc_HPT :: HasCallStack => HscEnv -> HomePackageTable
+hsc_HPT = internalUnitEnv_homePackageTable . hsc_currentInternalUnitEnv
+
+hsc_unitHPT_maybe :: HasCallStack => HscEnv -> UnitId -> Maybe HomePackageTable
+hsc_unitHPT_maybe e uid =
+  fmap internalUnitEnv_homePackageTable (hsc_findInternalUnitEnv_maybe e uid)
+
+hsc_unitHPT :: HasCallStack => HscEnv -> UnitId -> HomePackageTable
+hsc_unitHPT e uid = case hsc_unitHPT_maybe e uid of
+    Nothing -> pprPanic "Unit unknown to the internal unit environment"
+        $ text "unit (" <> ppr uid <> text ")"
+          $$ pprInternalUnitMap e
+
+    Just hpt -> hpt
+
+set_hsc_HPT :: HasCallStack => HscEnv -> HomePackageTable -> HscEnv
+set_hsc_HPT e hpt = modify_hsc_HPT e $ const hpt
+
+set_hsc_unitHPT :: HasCallStack => HscEnv -> UnitId -> HomePackageTable -> HscEnv
+set_hsc_unitHPT e uid hpt = modify_hsc_unitHPT e uid $ const hpt
+
+modify_hsc_unitHPT :: HasCallStack => HscEnv -> UnitId -> (HomePackageTable -> HomePackageTable) -> HscEnv
+modify_hsc_unitHPT e uid f = (assertUnitKnown uid e)
+  { hsc_internalUnitEnv = Map.adjust update uid $ hsc_internalUnitEnv e
+  }
+  where
+    update unitEnv = unitEnv { internalUnitEnv_homePackageTable = f $ internalUnitEnv_homePackageTable unitEnv }
+
+modify_hsc_HPT :: HasCallStack => HscEnv -> (HomePackageTable -> HomePackageTable) -> HscEnv
+modify_hsc_HPT e f = modify_hsc_unitHPT e (hsc_currentUnit e) f
+
+insert_hsc_unitEnv :: HasCallStack => HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
+insert_hsc_unitEnv e unitId unitEnv = assertHscEnv $ e
+  { hsc_internalUnitEnv = Map.insert unitId unitEnv $ hsc_internalUnitEnv e
+  }
+
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
@@ -302,9 +421,12 @@ runHsc hsc_env (Hsc hsc) = do
     return a
 
 mkInteractiveHscEnv :: HscEnv -> HscEnv
-mkInteractiveHscEnv hsc_env = hsc_env{ hsc_dflags = interactive_dflags }
+mkInteractiveHscEnv hsc_env = singleton_hsc_unitEnv hsc_env interactiveUnitId interactiveInternalUnitEnv
   where
-    interactive_dflags = ic_dflags (hsc_IC hsc_env)
+    interactiveInternalUnitEnv = InternalUnitEnv
+        { internalUnitEnv_dflags = ic_dflags (hsc_IC hsc_env)
+        , internalUnitEnv_homePackageTable = hsc_HPT hsc_env
+        }
 
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 -- A variant of runHsc that switches in the DynFlags from the
@@ -419,6 +541,30 @@ shouldPrintWarning _ _
 ************************************************************************
 -}
 
+data InternalUnitEnv = InternalUnitEnv
+  { internalUnitEnv_dflags :: DynFlags
+    -- ^ The dynamic flag settings
+  , internalUnitEnv_homePackageTable :: HomePackageTable
+    -- ^ The home package table describes already-compiled
+    -- home-package modules, /excluding/ the module we
+    -- are compiling right now.
+    -- (In one-shot mode the current module is the only
+    -- home-package module, so hsc_HPT is empty.  All other
+    -- modules count as \"external-package\" modules.
+    -- However, even in GHCi mode, hi-boot interfaces are
+    -- demand-loaded into the external-package table.)
+    --
+    -- 'hsc_HPT' is not mutable because we only demand-load
+    -- external packages; the home package is eagerly
+    -- loaded, module by module, by the compilation manager.
+    --
+    -- The HPT may contain modules compiled earlier by @--make@
+    -- but not actually below the current module in the dependency
+    -- graph.
+    --
+    -- (This changes a previous invariant: changed Jan 05.)
+  }
+
 -- | HscEnv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
 -- code (after preprocessing) to either C, assembly or C--. It's also used
@@ -433,8 +579,12 @@ shouldPrintWarning _ _
 -- a single module.
 data HscEnv
   = HscEnv {
-        hsc_dflags :: DynFlags,
-                -- ^ The dynamic flag settings
+
+        hsc_internalUnitEnv :: Map UnitId InternalUnitEnv,
+                -- ^ Information per package / unit, for "internal" (not already
+                -- installed) units.
+
+        hsc_currentUnit :: UnitId,
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
@@ -445,25 +595,7 @@ data HscEnv
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
 
-        hsc_HPT    :: HomePackageTable,
-                -- ^ The home package table describes already-compiled
-                -- home-package modules, /excluding/ the module we
-                -- are compiling right now.
-                -- (In one-shot mode the current module is the only
-                -- home-package module, so hsc_HPT is empty.  All other
-                -- modules count as \"external-package\" modules.
-                -- However, even in GHCi mode, hi-boot interfaces are
-                -- demand-loaded into the external-package table.)
-                --
-                -- 'hsc_HPT' is not mutable because we only demand-load
-                -- external packages; the home package is eagerly
-                -- loaded, module by module, by the compilation manager.
-                --
-                -- The HPT may contain modules compiled earlier by @--make@
-                -- but not actually below the current module in the dependency
-                -- graph.
-                --
-                -- (This changes a previous invariant: changed Jan 05.)
+        -- hsc_HPT    :: HomePackageTable,
 
         hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
                 -- ^ Information about the currently loaded external packages.
@@ -575,6 +707,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
+      targetPackage      :: UnitId,   -- ^ target's package
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
       targetContents     :: Maybe (InputFileBuffer, UTCTime)
       -- ^ Optional in-memory buffer containing the source code GHC should
@@ -602,7 +735,8 @@ data TargetId
 type InputFileBuffer = StringBuffer
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id obj _) =
+pprTarget (Target id package obj _) =
+    text "\"" <> ppr package <> text "\" " <>
     (if obj then char '*' else empty) <> pprTargetId id
 
 instance Outputable Target where
@@ -1566,7 +1700,7 @@ as if they were defined in modules
    interactive:Ghci2
    ...etc...
 with each bunch of declarations using a new module, all sharing a
-common package 'interactive' (see Module.interactiveUnitId, and
+common package 'interactive' (see Module.interactiveInstalledUnitId, and
 GHC.Builtin.Names.mkInteractiveModule).
 
 This scheme deals well with shadowing.  For example:
@@ -2926,6 +3060,9 @@ data ModSummary
         ms_hspp_buf     :: Maybe StringBuffer
           -- ^ The actual preprocessed source, if we have it
      }
+
+ms_unit :: ModSummary -> UnitId
+ms_unit = homeUnitId_ . ms_hspp_opts
 
 ms_installed_mod :: ModSummary -> InstalledModule
 ms_installed_mod = fst . getModuleInstantiation . ms_mod

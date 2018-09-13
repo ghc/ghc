@@ -199,18 +199,22 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyDynLinker <- uninitializedLinker
-    return HscEnv {  hsc_dflags       = dflags
-                  ,  hsc_targets      = []
-                  ,  hsc_mod_graph    = emptyMG
-                  ,  hsc_IC           = emptyInteractiveContext dflags
-                  ,  hsc_HPT          = emptyHomePackageTable
-                  ,  hsc_EPS          = eps_var
-                  ,  hsc_NC           = nc_var
-                  ,  hsc_FC           = fc_var
-                  ,  hsc_type_env_var = Nothing
-                  ,  hsc_interp       = Nothing
-                  ,  hsc_dynLinker    = emptyDynLinker
-                  }
+    return HscEnv
+      { hsc_internalUnitEnv = M.singleton (homeUnitId_ dflags) $ InternalUnitEnv
+          { internalUnitEnv_dflags = dflags
+          , internalUnitEnv_homePackageTable = emptyHomePackageTable
+          }
+      , hsc_currentUnit  = homeUnitId_ dflags
+      , hsc_targets         = []
+      , hsc_mod_graph       = emptyMG
+      , hsc_IC              = emptyInteractiveContext dflags
+      , hsc_EPS             = eps_var
+      , hsc_NC              = nc_var
+      , hsc_FC              = fc_var
+      , hsc_type_env_var    = Nothing
+      , hsc_interp          = Nothing
+      , hsc_dynLinker       = emptyDynLinker
+      }
 
 -- -----------------------------------------------------------------------------
 
@@ -468,7 +472,7 @@ hsc_typecheck :: Bool -- ^ Keep renamed source?
 hsc_typecheck keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
-        dflags = hsc_dflags hsc_env
+        dflags = hsc_unitDflags hsc_env (ms_unit mod_summary)
         home_unit = mkHomeUnitFromFlags dflags
         outer_mod = ms_mod mod_summary
         mod_name = moduleName outer_mod
@@ -721,8 +725,11 @@ hscIncrementalCompile :: Bool
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
-    dflags <- initializePlugins hsc_env' (hsc_dflags hsc_env')
-    let hsc_env'' = hsc_env' { hsc_dflags = dflags }
+    unitEnvs <- forM (hsc_internalUnitEnv hsc_env') $ \ue -> do
+      dflags <- initializePlugins hsc_env' $ internalUnitEnv_dflags ue
+      dflags <- initUnits dflags
+      return $ ue { internalUnitEnv_dflags = dflags }
+    let hsc_env'' = hsc_env' { hsc_internalUnitEnv = unitEnvs }
 
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
@@ -747,25 +754,22 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         Left iface -> do
             -- Knot tying!  See Note [Knot-tying typecheckIface]
             details <- liftIO . fixIO $ \details' -> do
-                let hsc_env' =
-                        hsc_env {
-                            hsc_HPT = addToHpt (hsc_HPT hsc_env)
-                                        (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
-                        }
+                let hsc_env' = modify_hsc_HPT hsc_env $ \hpt ->
+                      addToHpt hpt (ms_mod_name mod_summary) (HomeModInfo iface details' Nothing)
                 -- NB: This result is actually not that useful
                 -- in one-shot mode, since we're not going to do
                 -- any further typechecking.  It's much more useful
                 -- in make mode, since this HMI will go into the HPT.
                 details <- genModDetails hsc_env' iface
                 return details
-            return (HscUpToDate iface details, dflags)
+            return (HscUpToDate iface details, hsc_dflags hsc_env)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
         Right (FrontendTypecheck tc_result, mb_old_hash) -> do
             status <- finish mod_summary tc_result mb_old_hash
-            return (status, dflags)
+            return (status, hsc_dflags hsc_env)
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
@@ -1300,9 +1304,8 @@ hscSimplify hsc_env plugins modguts =
 hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
 hscSimplify' plugins ds_result = do
     hsc_env <- getHscEnv
-    let hsc_env_with_plugins = hsc_env
-          { hsc_dflags = foldr addPluginModuleName (hsc_dflags hsc_env) plugins
-          }
+    let hsc_env_with_plugins = modify_hsc_dflags hsc_env $ \dflags ->
+            foldr addPluginModuleName dflags plugins
     {-# SCC "Core2Core" #-}
       liftIO $ core2core hsc_env_with_plugins ds_result
 
