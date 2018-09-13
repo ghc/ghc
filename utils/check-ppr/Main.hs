@@ -9,6 +9,7 @@ import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
 import GHC.Driver.Session
+import GHC.Driver.Types ( hsc_currentPackage )
 import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
@@ -75,10 +76,12 @@ parseOneFile libdir fileName = do
                Nothing -> False
                Just fn -> fn == fileName
        runGhc (Just libdir) $ do
+         hsc_env <- getSession
          dflags <- getSessionDynFlags
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          addTarget Target { targetId = TargetFile fileName Nothing
+                          , targetPackage = hsc_currentPackage hsc_env
                           , targetAllowObjCode = True
                           , targetContents = Nothing }
          _ <- load LoadAllTargets
