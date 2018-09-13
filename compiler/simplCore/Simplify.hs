@@ -3420,14 +3420,24 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
                            Just cont -> simplJoinRhs unf_env id expr cont
                            Nothing   -> simplExprC unf_env expr (mkBoringStop rhs_ty)
               ; case guide of
-                  UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things
-                     -> let guide' = UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok
-                                             , ug_boring_ok = inlineBoringOk expr' }
+                  UnfWhen { ug_arity = arity
+                          , ug_unsat_ok = sat_ok
+                          , ug_boring_ok = boring_ok
+                          }
+                          -- Happens for INLINE things
+                     -> let guide' =
+                              UnfWhen { ug_arity = arity
+                                      , ug_unsat_ok = sat_ok
+                                      , ug_boring_ok =
+                                          boring_ok || inlineBoringOk expr'
+                                      }
                         -- Refresh the boring-ok flag, in case expr'
                         -- has got small. This happens, notably in the inlinings
                         -- for dfuns for single-method classes; see
                         -- Note [Single-method classes] in TcInstDcls.
                         -- A test case is Trac #4138
+                        -- But retain a previous boring_ok of True; e.g. see
+                        -- the way it is set in calcUnfoldingGuidanceWithArity
                         in return (mkCoreUnfolding src is_top_lvl expr' guide')
                             -- See Note [Top-level flag on inline rules] in CoreUnfold
 

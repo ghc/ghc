@@ -159,7 +159,10 @@ mkInlineUnfoldingWithArity arity expr
     guide = UnfWhen { ug_arity = arity
                     , ug_unsat_ok = needSaturated
                     , ug_boring_ok = boring_ok }
-    boring_ok = inlineBoringOk expr'
+    -- See Note [INLINE pragmas and boring contexts] as to why we need to look
+    -- at the arity here.
+    boring_ok | arity == 0 = True
+              | otherwise  = inlineBoringOk expr'
 
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkInlinableUnfolding dflags expr
@@ -236,6 +239,72 @@ specUnfolding to specialise its unfolding.  Some important points:
         we keep it (so the specialised thing too will always inline)
      if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
         (which arises from INLINABLE), we discard it
+
+Note [Honour INLINE on 0-ary bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+   x = <expensive>
+   {-# INLINE x #-}
+
+   f y = ...x...
+
+The semantics of an INLINE pragma is
+
+  inline x at every call site, provided it is saturated;
+  that is, applied to at least as many arguments as appear
+  on the LHS of the Haskell source definition.
+
+(This soure-code-derived arity is stored in the `ug_arity` field of
+the `UnfoldingGuidance`.)
+
+In the example, x's ug_arity is 0, so we should inline it at every use
+site.  It's rare to have such an INLINE pragma (usually INLINE Is on
+functions), but it's occasionally very important (Trac #15578, #15519).
+In #15519 we had something like
+   x = case (g a b) of I# r -> T r
+   {-# INLINE x #-}
+   f y = ...(h x)....
+
+where h is strict.  So we got
+   f y = ...(case g a b of I# r -> h (T r))...
+
+and that in turn allowed SpecConstr to ramp up performance.
+
+How do we deliver on this?  By adjusting the ug_boring_ok
+flag in mkInlineUnfoldingWithArity; see
+Note [INLINE pragmas and boring contexts]
+
+NB: there is a real risk that full laziness will float it right back
+out again. Consider again
+  x = factorial 200
+  {-# INLINE x #-}
+  f y = ...x...
+
+After inlining we get
+  f y = ...(factorial 200)...
+
+but it's entirely possible that full laziness will do
+  lvl23 = factorial 200
+  f y = ...lvl23...
+
+That's a problem for another day.
+
+Note [INLINE pragmas and boring contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An INLINE pragma uses mkInlineUnfoldingWithArity to build the
+unfolding.  That sets the ug_boring_ok flag to False if the function
+is not tiny (inlineBorkingOK), so that even INLINE functions are not
+inlined in an utterly boring context.  E.g.
+     \x y. Just (f y x)
+Nothing is gained by inlining f here, even if it has an INLINE
+pragma.
+
+But for 0-ary bindings, we want to inline regardless; see
+Note [Honour INLINE on 0-ary bindings].
+
+I'm a bit worried that it's possible for the same kind of problem
+to arise for non-0-ary functions too, but let's wait and see.
 -}
 
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
@@ -1449,6 +1518,8 @@ This kind of thing can occur if you have
         foo = let x = e in (x,x)
 
 which Roman did.
+
+
 -}
 
 computeDiscount :: DynFlags -> [Int] -> Int -> [ArgSummary] -> CallCtxt
