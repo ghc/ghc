@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -28,7 +29,12 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     let mod_nm = mkModuleName "Annrun01_Help"
 
     liftIO $ putStrLn "Setting Target"
-    setTargets [Target (TargetModule mod_nm) True Nothing]
+    setTargets $ pure @[] $ Target
+      { targetId = TargetModule mod_nm
+      , targetPackage = homeUnitId_ dflags
+      , targetAllowObjCode = True
+      , targetContents = Nothing
+      }
     liftIO $ putStrLn "Loading Targets"
     load LoadAllTargets
 
