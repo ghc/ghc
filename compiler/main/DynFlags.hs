@@ -2630,16 +2630,9 @@ thisUnitIdInsts dflags =
         Nothing    -> []
 
 thisPackage :: DynFlags -> UnitId
-thisPackage dflags =
-    case thisUnitIdInsts_ dflags of
-        Nothing -> default_uid
-        Just insts
-          | all (\(x,y) -> mkHoleModule x == y) insts
-          -> newUnitId (thisComponentId dflags) insts
-          | otherwise
-          -> default_uid
-  where
-    default_uid = DefiniteUnitId (DefUnitId (thisInstalledUnitId dflags))
+thisPackage dflags = instantiateUnitId
+  (thisInstalledUnitId dflags)
+  ((\insts -> (insts, thisComponentId dflags)) <$> thisUnitIdInsts_ dflags)
 
 parseUnitIdInsts :: String -> [(ModuleName, Module)]
 parseUnitIdInsts str = case filter ((=="").snd) (readP_to_S parse str) of

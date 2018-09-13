@@ -9,6 +9,7 @@ These are Uniquable, hence we can build Maps with Modules as
 the keys.
 -}
 
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -30,6 +31,7 @@ module Module
         -- * The UnitId type
         ComponentId(..),
         UnitId(..),
+        pprUnitId,
         unitIdFS,
         unitIdKey,
         IndefUnitId(..),
@@ -51,6 +53,7 @@ module Module
         fsToUnitId,
         stringToUnitId,
         stableUnitIdCmp,
+        instantiateUnitId,
 
         -- * HOLE renaming
         renameHoleUnitId,
@@ -926,6 +929,20 @@ stringToUnitId = fsToUnitId . mkFastString
 unitIdString :: UnitId -> String
 unitIdString = unpackFS . unitIdFS
 
+instantiateUnitId
+  :: InstalledUnitId
+  -> Maybe ([(ModuleName, Module)], ComponentId)
+  -> UnitId
+instantiateUnitId installedUnitId = \case
+    Nothing -> default_uid
+    Just (insts, componentId)
+      | all (\(x,y) -> mkHoleModule x == y) insts
+      -> newUnitId componentId insts
+      | otherwise
+      -> default_uid
+  where
+    default_uid = DefiniteUnitId $ DefUnitId installedUnitId
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1050,7 +1067,6 @@ parseModSubst = Parse.between (Parse.char '[') (Parse.char ']')
            _ <- Parse.char '='
            v <- parseModuleId
            return (k, v)
-
 
 {-
 Note [Wired-in packages]
