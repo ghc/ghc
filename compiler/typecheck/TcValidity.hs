@@ -57,7 +57,6 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
-import Module
 import Bag         ( emptyBag )
 import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
