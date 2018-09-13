@@ -1899,7 +1899,9 @@ coVarsOfCos = mapUnionVarSet coVarsOfCo
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
 closeOverKinds tvs =
-  mapUnionVarSetSet (tyCoVarsOfType . tyVarKind) tvs `unionVarSet` tvs
+  mapUnionVarSetSet (tvs_of_type . tyVarKind) tvs `unionVarSet` tvs
+  where
+    tvs_of_type ts = ty_co_vars_of_type ts emptyVarSet emptyVarSet
 
 -- | Given a list of tyvars returns a deterministic FV computation that
 -- returns the given tyvars with the kind variables free in the kinds of the
