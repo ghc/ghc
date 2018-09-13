@@ -223,8 +223,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
   let (dflags5, srcs, objs) = parseTargetFiles dflags4 (map unLoc fileish_args)
 
-  -- we've finished manipulating the DynFlags, update the session
   _ <- GHC.setSessionDynFlags dflags5
+  -- we've finished manipulating the DynFlags, update the session
   dflags6 <- GHC.getSessionDynFlags
   hsc_env <- GHC.getSession
 

@@ -2,6 +2,7 @@
 -- (ModuleGraph)
 module GHC.Unit.Module.ModSummary
    ( ModSummary (..)
+   , ms_unit
    , ms_installed_mod
    , ms_mod_name
    , ms_imps
@@ -81,6 +82,9 @@ data ModSummary
         ms_hspp_buf     :: Maybe StringBuffer
           -- ^ The actual preprocessed source, if we have it
      }
+
+ms_unit :: ModSummary -> UnitId
+ms_unit = toUnitId . moduleUnit . ms_mod
 
 ms_installed_mod :: ModSummary -> InstalledModule
 ms_installed_mod = fst . getModuleInstantiation . ms_mod
@@ -181,10 +185,10 @@ findTarget ms ts =
         []    -> Nothing
         (t:_) -> Just t
   where
-    summary `matches` Target (TargetModule m) _ _
-        = ms_mod_name summary == m
-    summary `matches` Target (TargetFile f _) _ _
+    summary `matches` Target (TargetModule m) uid _ _
+        = ms_mod_name summary == m && ms_unit summary == uid
+    summary `matches` Target (TargetFile f _) uid _ _
         | Just f' <- ml_hs_file (ms_location summary)
-        = f == f'
+        = f == f' && ms_unit summary == uid
     _ `matches` _
         = False

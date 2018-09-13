@@ -16,6 +16,7 @@ module GHC.Unit.Finder (
     findPluginModule,
     findExactModule,
     findHomeModule,
+    findAnyHomeModule,
     findExposedPackageModule,
     mkHomeModLocation,
     mkHomeModLocation2,
@@ -62,6 +63,7 @@ import GHC.Utils.Panic
 import GHC.Runtime.Linker.Types
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
+import qualified Data.Map as M
 import System.Directory
 import System.FilePath
 import Control.Monad
@@ -123,11 +125,13 @@ findImportedModule hsc_env mod_name mb_pkg =
         Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
                  | otherwise           -> pkg_import
   where
-    home_import   = findHomeModule hsc_env mod_name
+    home_import   = findHomeModule hsc_env (hsc_home_unit hsc_env) mod_name
+
+    any_home_import = findAnyHomeModule hsc_env mod_name mb_pkg
 
     pkg_import    = findExposedPackageModule hsc_env mod_name mb_pkg
 
-    unqual_import = home_import
+    unqual_import = any_home_import
                     `orIfNotFound`
                     findExposedPackageModule hsc_env mod_name Nothing
 
@@ -135,11 +139,13 @@ findImportedModule hsc_env mod_name mb_pkg =
 -- plugin.  This consults the same set of exposed packages as
 -- 'findImportedModule', unless @-hide-all-plugin-packages@ or
 -- @-plugin-package@ are specified.
-findPluginModule :: HscEnv -> ModuleName -> IO FindResult
-findPluginModule hsc_env mod_name =
-  findHomeModule hsc_env mod_name
+findPluginModule :: HscEnv -> HomeUnit -> ModuleName -> IO FindResult
+findPluginModule hsc_env home_unit mod_name =
+  findHomeModule hsc_env home_unit mod_name
   `orIfNotFound`
-  findExposedPluginPackageModule hsc_env mod_name
+  findExposedPluginPackageModule hsc_env (unitState dflags) mod_name
+  where
+    dflags = hsc_unitDflags (homeUnitId home_unit) hsc_env
 
 -- | Locate a specific 'Module'.  The purpose of this function is to
 -- create a 'ModLocation' for a given 'Module', that is to find out
@@ -149,10 +155,28 @@ findPluginModule hsc_env mod_name =
 
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
-    let home_unit = hsc_home_unit hsc_env
-    in if isHomeInstalledModule home_unit mod
-       then findInstalledHomeModule hsc_env (moduleName mod)
-       else findPackageModule hsc_env mod
+  case hsc_unitHomeUnit_maybe (moduleUnit mod) hsc_env of
+    Just home_unit -> findInstalledHomeModule hsc_env home_unit (moduleName mod)
+    Nothing -> findPackageModule hsc_env mod
+
+-- TODO use mb_pkg to narrow search
+findAnyHomeModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
+findAnyHomeModule hsc_env mod_name _mb_pkg =
+    foldl' orIfNotFound (pure notFound)
+    $ fmap (\home_unit -> findHomeModule hsc_env home_unit mod_name)
+    --  $ filter (\dflags ->
+    --     let
+    --         deps = explicitPackages $ pkgState dflags
+    --     in
+    --         thisPackage dflags `elem` deps
+    --     )
+    $ fmap internalUnitEnv_home_unit
+    $ M.elems
+    $ unitEnv_graph
+    $ hsc_internalUnitEnv hsc_env
+  where
+    notFound = NotFound [] Nothing [] [] [] []
+
 
 -- -----------------------------------------------------------------------------
 -- Helpers
@@ -187,10 +211,9 @@ orIfNotFound this or_this = do
 -- been done.  Otherwise, do the lookup (with the IO action) and save
 -- the result in the finder cache and the module location cache (if it
 -- was successful.)
-homeSearchCache :: HscEnv -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
-homeSearchCache hsc_env mod_name do_this = do
-  let home_unit = hsc_home_unit hsc_env
-      mod = mkHomeInstalledModule home_unit mod_name
+homeSearchCache :: HscEnv -> HomeUnit -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
+homeSearchCache hsc_env home_unit mod_name do_this = do
+  let mod = mkHomeInstalledModule home_unit mod_name
   modLocationCache hsc_env mod do_this
 
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
@@ -200,12 +223,12 @@ findExposedPackageModule hsc_env mod_name mb_pkg
   $ lookupModuleWithSuggestions
         (unitState (hsc_dflags hsc_env)) mod_name mb_pkg
 
-findExposedPluginPackageModule :: HscEnv -> ModuleName
+findExposedPluginPackageModule :: HscEnv -> UnitState -> ModuleName
                                -> IO FindResult
-findExposedPluginPackageModule hsc_env mod_name
+findExposedPluginPackageModule hsc_env unit_state mod_name
   = findLookupResult hsc_env
   $ lookupPluginModuleWithSuggestions
-        (unitState (hsc_dflags hsc_env)) mod_name Nothing
+        unit_state mod_name Nothing
 
 findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
@@ -263,10 +286,9 @@ modLocationCache hsc_env mod do_this = do
         return result
 
 -- This returns a module because it's more convenient for users
-addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
-addHomeModuleToFinder hsc_env mod_name loc = do
-  let home_unit = hsc_home_unit hsc_env
-      mod = mkHomeInstalledModule home_unit mod_name
+addHomeModuleToFinder :: HscEnv -> HomeUnit -> ModuleName -> ModLocation -> IO Module
+addHomeModuleToFinder hsc_env home_unit mod_name loc = do
+  let  mod = mkHomeInstalledModule home_unit mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
   return (mkHomeModule home_unit mod_name)
 
@@ -276,26 +298,26 @@ uncacheModule hsc_env mod_name = do
       mod = mkHomeInstalledModule home_unit mod_name
   removeFromFinderCache (hsc_FC hsc_env) mod
 
+
 -- -----------------------------------------------------------------------------
 --      The internal workers
 
-findHomeModule :: HscEnv -> ModuleName -> IO FindResult
-findHomeModule hsc_env mod_name = do
-  r <- findInstalledHomeModule hsc_env mod_name
+findHomeModule :: HscEnv -> HomeUnit -> ModuleName -> IO FindResult
+findHomeModule hsc_env home_unit mod_name = do
+  r <- findInstalledHomeModule hsc_env home_unit mod_name
   return $ case r of
     InstalledFound loc _ -> Found loc (mkHomeModule home_unit mod_name)
-    InstalledNoPackage _ -> NoPackage uid -- impossible
+    InstalledNoPackage _ -> NoPackage unit -- impossible
     InstalledNotFound fps _ -> NotFound {
         fr_paths = fps,
-        fr_pkg = Just uid,
+        fr_pkg = Just unit,
         fr_mods_hidden = [],
         fr_pkgs_hidden = [],
         fr_unusables = [],
         fr_suggestions = []
       }
  where
-  home_unit = hsc_home_unit hsc_env
-  uid       = homeUnitAsUnit home_unit
+  unit = homeUnitAsUnit home_unit
 
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
@@ -313,12 +335,11 @@ findHomeModule hsc_env mod_name = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findInstalledHomeModule :: HscEnv -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule hsc_env mod_name =
-   homeSearchCache hsc_env mod_name $
+findInstalledHomeModule :: HscEnv -> HomeUnit -> ModuleName -> IO InstalledFindResult
+findInstalledHomeModule hsc_env home_unit mod_name =
+   homeSearchCache hsc_env home_unit mod_name $
    let
-     dflags = hsc_dflags hsc_env
-     home_unit = hsc_home_unit hsc_env
+     dflags = hsc_unitDflags (homeUnitId home_unit) hsc_env
      home_path = importPaths dflags
      hisuf = hiSuf dflags
      mod = mkHomeInstalledModule home_unit mod_name

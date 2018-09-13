@@ -101,12 +101,13 @@ readSync 'D' = OnDisk
 readSync 'M' = InMemory
 
 go label targets mods = do
+    dflags <- getSessionDynFlags
     liftIO $ createDirectoryIfMissing False "./outdir"
     setTargets []; _ <- load LoadAllTargets
 
     liftIO $ hPutStrLn stderr $ "== " ++ label
     t <- liftIO getCurrentTime
-    setTargets =<< catMaybes <$> mapM (mkTarget t) mods
+    setTargets =<< catMaybes <$> mapM (mkTarget dflags t) mods
     ex <- MC.try $ load LoadAllTargets
     case ex of
       Left ex -> liftIO $ hPutStrLn stderr $ show (ex :: SourceError)
@@ -116,12 +117,13 @@ go label targets mods = do
     liftIO $ removeDirectoryRecursive "./outdir"
 
   where
-    mkTarget t mod@(name,_,_,_,sync) = do
+    mkTarget dflags t mod@(name,_,_,_,sync) = do
       src <- liftIO $ genMod mod
       return $ if not (name `elem` targets)
          then Nothing
          else Just $ Target
            { targetId = TargetFile (name++".hs") Nothing
+           , targetPackage = homeUnitId_ dflags
            , targetAllowObjCode = False
            , targetContents =
                case sync of

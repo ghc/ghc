@@ -1,12 +1,84 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module GHC.Driver.Env
    ( Hsc(..)
    , HscEnv (..)
    , runHsc
+   , runHscWithHomeUnit
    , mkInteractiveHscEnv
    , runInteractiveHsc
+   , hsc_HPT
+   , hsc_dflags
+   , hsc_home_unit
+   , hsc_currentUnit
+   , set_hsc_currentUnit
+   -- * Functions to modify the current unit of the 'InternalUnitEnv'
+   , set_hsc_dflags
+   , modify_hsc_dflags
+   , set_hsc_HPT
+   , modify_hsc_HPT
+   , set_hsc_home_unit
+   , modify_hsc_home_unit
+   -- * Modify arbitrary elements of the unit environment
+   , hsc_findInternalUnitEnv_maybe
+   , hsc_findInternalUnitEnv
+   , hsc_memberInternalUnitEnv
+   , hsc_unitHPT_maybe
+   , hsc_unitHPT
+   , set_hsc_unitHPT
+   , modify_hsc_unitHPT
+   , hsc_unitHomeUnit_maybe
+   , hsc_unitHomeUnit
+   , set_hsc_unitHomeUnit
+   , modify_hsc_unitHomeUnit
+   , hsc_unitDflags_maybe
+   , hsc_unitDflags
+   , set_hsc_unitDflags
+   , modify_hsc_unitDflags
+   -- * Internal Unit Env
+   , InternalUnitEnv(..)
+   -- * Get all elements of a unit environment
+   , hsc_HPTs
+   , hsc_allDflags
+   , hsc_allHomeUnits
+   , hsc_allUnitIds
+   , hsc_internalUnitEnvs
+   -- * Create and modify the unit environment
+   , new_hsc_internalUnitEnv
+   , singleton_hsc_unitEnv
+   , insert_hsc_unitEnv
+   , set_hsc_internalUnitEnvList
+   , set_hsc_internalUnitEnv
+   , set_hsc_internalUnitEnvGraph
+   , modify_hsc_internalUnitenv
+   -- * Dependency functionality for unit environment
+   , hsc_currentHomeUnitDependencies
+   , hsc_homeUnitDependencies
+   , hsc_homeUnitDependencies_unitEnv
+   , unitEnv_homeUnitDependencies
+   , unitEnv_restrictHomeUnitDependencies
+   -- * Pretty print internal unit environment
+   , pprInternalUnitMap
+   , pprUnitEnv
+   , pprInternalUnitEnv
+
+   -- * Unit Env type and functions
+   , UnitEnvGraph(..)
+   , UnitEnv
+   , unitEnv_new
+   , unitEnv_singleton
+   , unitEnv_setCurrentUnit
+   , unitEnv_insert
+   , unitEnv_delete
+   , unitEnv_adjust
+   , unitEnv_setGraph
+   , unitEnv_member
+   , unitEnv_lookup_maybe
+   , unitEnv_lookup
+
    , hscEPS
    , hptCompleteSigs
    , hptInstances
@@ -68,6 +140,11 @@ import GHC.Utils.Misc
 
 import Control.Monad    ( guard, ap )
 import Data.IORef
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
+import GHC.Unit.State (UnitState(explicitUnits))
 
 -- | The Hsc monad: Passing an environment and warning state
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
@@ -94,15 +171,28 @@ runHsc hsc_env (Hsc hsc) = do
     printOrThrowWarnings (hsc_dflags hsc_env) w
     return a
 
-mkInteractiveHscEnv :: HscEnv -> HscEnv
-mkInteractiveHscEnv hsc_env = hsc_env{ hsc_dflags = interactive_dflags }
-  where
-    interactive_dflags = ic_dflags (hsc_IC hsc_env)
+runHscWithHomeUnit :: HscEnv -> UnitId -> Hsc a -> IO a
+runHscWithHomeUnit hsc_env uid (Hsc hsc) = do
+    let hsc_env' = set_hsc_currentUnit uid hsc_env
+    (a, w) <- hsc hsc_env' emptyBag
+    printOrThrowWarnings (hsc_dflags hsc_env') w
+    return a
 
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 -- A variant of runHsc that switches in the DynFlags from the
 -- InteractiveContext before running the Hsc computation.
-runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
+runInteractiveHsc hsc_env action = do
+  runHsc (mkInteractiveHscEnv hsc_env) action
+
+
+mkInteractiveHscEnv :: HscEnv -> HscEnv
+mkInteractiveHscEnv hsc_env = set_hsc_currentInternalUnitEnv hsc_env interactiveInternalUnitEnv
+  where
+  interactiveInternalUnitEnv = InternalUnitEnv
+      { internalUnitEnv_dflags = ic_dflags (hsc_IC hsc_env)
+      , internalUnitEnv_homePackageTable = hsc_HPT hsc_env
+      , internalUnitEnv_home_unit = mkHomeUnitFromFlags (ic_dflags (hsc_IC hsc_env))
+      }
 
 -- | HscEnv is like 'GHC.Driver.Monad.Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
@@ -118,8 +208,10 @@ runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 -- a single module.
 data HscEnv
   = HscEnv {
-        hsc_dflags :: DynFlags,
-                -- ^ The dynamic flag settings
+        hsc_internalUnitEnv :: UnitEnv,
+                -- ^ Information per package / unit, for "internal" (not already
+                -- installed) units.
+
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
@@ -129,26 +221,6 @@ data HscEnv
 
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
-
-        hsc_HPT    :: HomePackageTable,
-                -- ^ The home package table describes already-compiled
-                -- home-package modules, /excluding/ the module we
-                -- are compiling right now.
-                -- (In one-shot mode the current module is the only
-                -- home-package module, so hsc_HPT is empty.  All other
-                -- modules count as \"external-package\" modules.
-                -- However, even in GHCi mode, hi-boot interfaces are
-                -- demand-loaded into the external-package table.)
-                --
-                -- 'hsc_HPT' is not mutable because we only demand-load
-                -- external packages; the home package is eagerly
-                -- loaded, module by module, by the compilation manager.
-                --
-                -- The HPT may contain modules compiled earlier by @--make@
-                -- but not actually below the current module in the dependency
-                -- graph.
-                --
-                -- (This changes a previous invariant: changed Jan 05.)
 
         hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
                 -- ^ Information about the currently loaded external packages.
@@ -175,10 +247,401 @@ data HscEnv
         , hsc_dynLinker :: DynLinker
                 -- ^ dynamic linker.
 
-        , hsc_home_unit :: !HomeUnit
-                -- ^ Home-unit
-
  }
+
+
+data InternalUnitEnv = InternalUnitEnv
+  { internalUnitEnv_dflags :: DynFlags
+    -- ^ The dynamic flag settings
+  , internalUnitEnv_homePackageTable :: HomePackageTable
+    -- ^ The home package table describes already-compiled
+    -- home-package modules, /excluding/ the module we
+    -- are compiling right now.
+    -- (In one-shot mode the current module is the only
+    -- home-package module, so hsc_HPT is empty.  All other
+    -- modules count as \"external-package\" modules.
+    -- However, even in GHCi mode, hi-boot interfaces are
+    -- demand-loaded into the external-package table.)
+    --
+    -- 'hsc_HPT' is not mutable because we only demand-load
+    -- external packages; the home package is eagerly
+    -- loaded, module by module, by the compilation manager.
+    --
+    -- The HPT may contain modules compiled earlier by @--make@
+    -- but not actually below the current module in the dependency
+    -- graph.
+    --
+    -- (This changes a previous invariant: changed Jan 05.)
+  , internalUnitEnv_home_unit :: HomeUnit
+    -- ^ Home-unit
+  }
+
+-- -----------------------------------------------------------------------------
+
+type UnitEnv = UnitEnvGraph InternalUnitEnv
+
+data UnitEnvGraph v = UnitEnvGraph
+  { unitEnv_graph :: !(Map UnitId v)
+  , unitEnv_currentUnit :: !UnitId
+  } deriving (Functor, Foldable, Traversable)
+
+unitEnv_setCurrentUnit :: UnitId -> UnitEnvGraph v -> UnitEnvGraph v
+unitEnv_setCurrentUnit u env = env { unitEnv_currentUnit = u }
+
+unitEnv_insert :: UnitId -> v -> UnitEnvGraph v -> UnitEnvGraph v
+unitEnv_insert unitId env unitEnv = unitEnv
+  { unitEnv_graph = Map.insert unitId  env (unitEnv_graph unitEnv)
+  }
+
+unitEnv_delete :: UnitId -> UnitEnvGraph v -> UnitEnvGraph v
+unitEnv_delete uid unitEnv = unitEnv
+  { unitEnv_graph = Map.delete uid (unitEnv_graph unitEnv)
+  }
+
+unitEnv_adjust :: (v -> v) -> UnitId -> UnitEnvGraph v -> UnitEnvGraph v
+unitEnv_adjust f uid unitEnv = unitEnv
+  { unitEnv_graph = Map.adjust f uid (unitEnv_graph unitEnv)
+  }
+
+unitEnv_new :: UnitId -> Map UnitId v -> UnitEnvGraph v
+unitEnv_new active m = UnitEnvGraph
+  { unitEnv_graph = m
+  , unitEnv_currentUnit = active
+  }
+
+unitEnv_singleton :: UnitId -> v -> UnitEnvGraph v
+unitEnv_singleton active m = UnitEnvGraph
+  { unitEnv_graph = Map.singleton active m
+  , unitEnv_currentUnit = active
+  }
+
+unitEnv_setGraph :: Map UnitId v -> UnitEnvGraph v -> UnitEnvGraph v
+unitEnv_setGraph m unitEnv = unitEnv
+  { unitEnv_graph = m
+  }
+
+unitEnv_member :: UnitId -> UnitEnvGraph v -> Bool
+unitEnv_member u env = Map.member u (unitEnv_graph env)
+
+unitEnv_lookup_maybe :: UnitId -> UnitEnvGraph v -> Maybe v
+unitEnv_lookup_maybe u env = Map.lookup u (unitEnv_graph env)
+
+unitEnv_lookup :: UnitId -> UnitEnvGraph v -> v
+unitEnv_lookup u env = fromJust $ unitEnv_lookup_maybe u env
+
+-- -----------------------------------------------------------------------------
+-- Asserts to enforce invariants for the UnitEnv.
+-- -----------------------------------------------------------------------------
+
+assertUnitEnvKnownUnit :: HasCallStack => UnitId -> UnitEnv -> UnitEnv
+assertUnitEnvKnownUnit pkg e =
+  ASSERT2(unitEnv_member pkg e, errMsg) e
+  where
+    errMsg = text "assertUnitKnown" <+> ppr (unitEnv_currentUnit e) $$ nest 2 (ppr (Map.keys $ unitEnv_graph e))
+
+assertUnitEnvInvariant :: HasCallStack => UnitEnv -> UnitEnv
+assertUnitEnvInvariant e = assertUnitEnvKnownUnit (unitEnv_currentUnit e) $ assertUnitEnvConsistent e
+
+assertUnitEnvConsistent :: HasCallStack => UnitEnv -> UnitEnv
+assertUnitEnvConsistent env =
+  ASSERT2(all sameUnitId entries, inconsistentDflagsMsg) env
+  where
+    entries = Map.assocs $ unitEnv_graph env
+
+    sameUnitId (uid, env) = homeUnitId (internalUnitEnv_home_unit env) == uid
+
+    inconsistentDflagsMsg =
+      text "Unit Environment is inconsistent. An Entry has a different unit than its dflags homeUnitId:"
+      $$ nest 2
+          ( vcat
+            $ map
+                (\(uid, e) ->
+                  ppr uid <+> text "->" <+> ppr (homeUnitId_ $ internalUnitEnv_dflags e)
+                )
+                entries
+          )
+
+assertHscEnvInvariant :: HasCallStack => HscEnv -> HscEnv
+assertHscEnvInvariant e = e { hsc_internalUnitEnv = assertUnitEnvInvariant $ hsc_internalUnitEnv e }
+
+-- -----------------------------------------------------------------------------
+-- Pretty output functions
+-- -----------------------------------------------------------------------------
+
+pprInternalUnitMap :: HasCallStack => HscEnv -> SDoc
+pprInternalUnitMap env = text "pprInternalUnitMap"
+  $$ nest 2 (pprUnitEnv $ hsc_internalUnitEnv env)
+
+pprUnitEnv :: HasCallStack => UnitEnv -> SDoc
+pprUnitEnv unitEnv = text "Active unit:" <+> ppr (unitEnv_currentUnit unitEnv) $$ vcat (map (\(k, v) -> pprInternalUnitEnv k v) $ Map.assocs $ unitEnv_graph unitEnv)
+
+pprInternalUnitEnv :: HasCallStack => UnitId -> InternalUnitEnv -> SDoc
+pprInternalUnitEnv uid env = ppr uid <+> text "->" $$ nest 4 (pprHPT $ internalUnitEnv_homePackageTable env)
+
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- Functions to access the currently active home unit
+-- -----------------------------------------------------------------------------
+
+hsc_HPT :: HasCallStack => HscEnv -> HomePackageTable
+hsc_HPT = internalUnitEnv_homePackageTable . hsc_currentInternalUnitEnv
+
+hsc_dflags :: HasCallStack => HscEnv -> DynFlags
+hsc_dflags = internalUnitEnv_dflags . hsc_currentInternalUnitEnv
+
+hsc_home_unit :: HasCallStack => HscEnv -> HomeUnit
+hsc_home_unit = internalUnitEnv_home_unit . hsc_currentInternalUnitEnv
+
+set_hsc_dflags :: HasCallStack => DynFlags -> HscEnv -> HscEnv
+set_hsc_dflags dflags hsc_env = set_hsc_unitDflags (hsc_currentUnit hsc_env) dflags hsc_env
+
+modify_hsc_dflags :: HasCallStack => (DynFlags -> DynFlags) -> HscEnv -> HscEnv
+modify_hsc_dflags f e = modify_hsc_unitDflags f (hsc_currentUnit e) e
+
+set_hsc_unitDflags :: HasCallStack => UnitId -> DynFlags -> HscEnv -> HscEnv
+set_hsc_unitDflags uid dflags e =
+  modify_hsc_unitDflags (const dflags) uid e
+
+modify_hsc_unitDflags :: HasCallStack => (DynFlags -> DynFlags) -> UnitId -> HscEnv -> HscEnv
+modify_hsc_unitDflags f uid e = modify_hsc_internalUnitenv update uid (assertHscEnvInvariant e)
+  where
+    update unitEnv = unitEnv { internalUnitEnv_dflags = f $ internalUnitEnv_dflags unitEnv }
+
+set_hsc_home_unit :: HasCallStack => HomeUnit -> HscEnv -> HscEnv
+set_hsc_home_unit homeUnit hsc_env = set_hsc_unitHomeUnit (hsc_currentUnit hsc_env) homeUnit hsc_env
+
+modify_hsc_home_unit :: HasCallStack => (HomeUnit -> HomeUnit) -> HscEnv -> HscEnv
+modify_hsc_home_unit f e = modify_hsc_unitHomeUnit f (hsc_currentUnit e) e
+
+set_hsc_unitHomeUnit :: HasCallStack => UnitId -> HomeUnit -> HscEnv -> HscEnv
+set_hsc_unitHomeUnit uid homeUnit e =
+  modify_hsc_unitHomeUnit (const homeUnit) uid e
+
+modify_hsc_unitHomeUnit :: HasCallStack => (HomeUnit -> HomeUnit) -> UnitId -> HscEnv -> HscEnv
+modify_hsc_unitHomeUnit f uid e = modify_hsc_internalUnitenv update uid (assertHscEnvInvariant e)
+  where
+    update unitEnv = unitEnv { internalUnitEnv_home_unit = f $ internalUnitEnv_home_unit unitEnv }
+
+set_hsc_HPT :: HasCallStack => HomePackageTable -> HscEnv -> HscEnv
+set_hsc_HPT hpt hsc_env = modify_hsc_HPT (const hpt) hsc_env
+
+set_hsc_unitHPT :: HasCallStack => UnitId -> HomePackageTable -> HscEnv -> HscEnv
+set_hsc_unitHPT uid hpt e = modify_hsc_unitHPT (const hpt) uid e
+
+modify_hsc_unitHPT :: HasCallStack => (HomePackageTable -> HomePackageTable) -> UnitId -> HscEnv -> HscEnv
+modify_hsc_unitHPT f uid hsc_env = modify_hsc_internalUnitenv update uid hsc_env
+  where
+    update unitEnv = unitEnv { internalUnitEnv_homePackageTable = f $ internalUnitEnv_homePackageTable unitEnv }
+
+modify_hsc_HPT :: HasCallStack => (HomePackageTable -> HomePackageTable) -> HscEnv -> HscEnv
+modify_hsc_HPT f e = modify_hsc_unitHPT f (hsc_currentUnit e) e
+
+-- -----------------------------------------------------------------------------
+
+hsc_currentInternalUnitEnv :: HasCallStack => HscEnv -> InternalUnitEnv
+hsc_currentInternalUnitEnv e =
+  case hsc_findInternalUnitEnv_maybe (hsc_currentUnit e) $ assertHscEnvInvariant e of
+    Just unitEnv -> unitEnv
+    Nothing -> pprPanic "packageNotFound" $
+      ppr $ hsc_currentUnit e
+
+set_hsc_currentUnit :: HasCallStack => UnitId -> HscEnv -> HscEnv
+set_hsc_currentUnit u hsc_env = hsc_env
+  { hsc_internalUnitEnv = unitEnv_setCurrentUnit u (hsc_internalUnitEnv hsc_env)
+  }
+
+-- -----------------------------------------------------------------------------
+-- Operations on arbitrary elements of the home unit graph
+-- -----------------------------------------------------------------------------
+
+hsc_findInternalUnitEnv_maybe :: HasCallStack => UnitId -> HscEnv -> Maybe InternalUnitEnv
+hsc_findInternalUnitEnv_maybe uid e =
+  unitEnv_lookup_maybe uid (hsc_internalUnitEnv $ assertHscEnvInvariant e)
+
+hsc_findInternalUnitEnv :: HasCallStack => UnitId -> HscEnv -> InternalUnitEnv
+hsc_findInternalUnitEnv uid e =
+  unitEnv_lookup uid (hsc_internalUnitEnv $ assertHscEnvInvariant e)
+
+hsc_memberInternalUnitEnv :: HasCallStack => UnitId -> HscEnv -> Bool
+hsc_memberInternalUnitEnv uid e =
+  unitEnv_member uid (hsc_internalUnitEnv $ assertHscEnvInvariant e)
+
+hsc_unitHPT_maybe :: HasCallStack => UnitId -> HscEnv -> Maybe HomePackageTable
+hsc_unitHPT_maybe uid hsc_env =
+  fmap internalUnitEnv_homePackageTable (hsc_findInternalUnitEnv_maybe uid hsc_env)
+
+hsc_unitHPT :: HasCallStack => UnitId -> HscEnv -> HomePackageTable
+hsc_unitHPT uid hsc_env = case hsc_unitHPT_maybe uid hsc_env of
+    Nothing -> pprPanic "Unit unknown to the internal unit environment"
+        $ text "unit (" <> ppr uid <> text ")"
+          $$ pprInternalUnitMap hsc_env
+    Just hpt -> hpt
+
+hsc_unitHomeUnit_maybe :: HasCallStack => UnitId -> HscEnv -> Maybe HomeUnit
+hsc_unitHomeUnit_maybe uid hsc_env =
+  fmap internalUnitEnv_home_unit (hsc_findInternalUnitEnv_maybe uid hsc_env)
+
+hsc_unitHomeUnit :: HasCallStack => UnitId -> HscEnv -> HomeUnit
+hsc_unitHomeUnit uid hsc_env = case hsc_unitHomeUnit_maybe uid hsc_env of
+    Nothing -> pprPanic "Unit unknown to the internal unit environment"
+        $ text "unit (" <> ppr uid <> text ")"
+          $$ pprInternalUnitMap hsc_env
+    Just homeUnit -> homeUnit
+
+hsc_unitDflags_maybe ::HasCallStack => UnitId -> HscEnv -> Maybe DynFlags
+hsc_unitDflags_maybe uid e =
+  fmap internalUnitEnv_dflags (hsc_findInternalUnitEnv_maybe uid e)
+
+hsc_unitDflags :: HasCallStack => UnitId -> HscEnv -> DynFlags
+hsc_unitDflags uid e = case hsc_unitDflags_maybe uid e of
+    Nothing -> pprPanic "Unit unknown to the internal unit environment"
+        $ text "unit (" <> ppr uid <> text ")"
+          $$ pprInternalUnitMap e
+
+    Just dflags -> dflags
+
+new_hsc_internalUnitEnv :: HasCallStack => UnitId -> Map UnitId InternalUnitEnv -> HscEnv ->  HscEnv
+new_hsc_internalUnitEnv unitId home_unit_env e = assertHscEnvInvariant e
+  { hsc_internalUnitEnv = unitEnv_new unitId home_unit_env
+  }
+
+singleton_hsc_unitEnv :: HasCallStack => HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
+singleton_hsc_unitEnv hsc_env unitId unitEnv = assertHscEnvInvariant $ hsc_env
+  { hsc_internalUnitEnv = unitEnv_new unitId (Map.singleton unitId unitEnv)
+  }
+
+insert_hsc_unitEnv :: HasCallStack => HscEnv -> InternalUnitEnv -> HscEnv
+insert_hsc_unitEnv e internalUnitEnv = assertHscEnvInvariant $ e
+  { hsc_internalUnitEnv = unitEnv_insert (homeUnitId_ $ internalUnitEnv_dflags internalUnitEnv) internalUnitEnv $ hsc_internalUnitEnv e
+  }
+
+set_hsc_internalUnitEnvList :: HasCallStack => [(UnitId, InternalUnitEnv)] -> HscEnv -> HscEnv
+set_hsc_internalUnitEnvList home_unit_env hsc_env =
+  set_hsc_internalUnitEnv (Map.fromList home_unit_env) hsc_env
+
+set_hsc_internalUnitEnv :: HasCallStack => Map UnitId InternalUnitEnv -> HscEnv ->  HscEnv
+set_hsc_internalUnitEnv home_unit_env e = assertHscEnvInvariant e
+  { hsc_internalUnitEnv = unitEnv_new (hsc_currentUnit e) home_unit_env
+  }
+
+set_hsc_internalUnitEnvGraph :: HasCallStack => UnitEnv -> HscEnv ->  HscEnv
+set_hsc_internalUnitEnvGraph unitEnv e = assertHscEnvInvariant e
+  { hsc_internalUnitEnv = unitEnv
+  }
+
+modify_hsc_internalUnitenv :: HasCallStack => (InternalUnitEnv -> InternalUnitEnv) -> UnitId -> HscEnv -> HscEnv
+modify_hsc_internalUnitenv f uid e = assertHscEnvInvariant e
+  { hsc_internalUnitEnv = unitEnv_adjust f uid $ hsc_internalUnitEnv e
+  }
+
+-- | Rename a unit id in the internal unit env.
+--
+-- @'rename_hsc_unitId' oldUnit newUnit hscEnv@, it is assumed that the 'oldUnit' exists in the map,
+-- otherwise we panic.
+-- The 'DynFlags' associated with the home unit will have its field 'homeUnitId' set to 'newUnit'.
+-- rename_hsc_unitId :: HasCallStack => UnitId -> UnitId -> HscEnv -> HscEnv
+-- rename_hsc_unitId oldUnit newUnit hscEnv = case hsc_findInternalUnitEnv_maybe oldUnit hscEnv of
+--   Nothing ->
+--     pprPanic "Tried to rename unit, but it didn't exist"
+--               $ text "Rename old unit \"" <> ppr oldUnit <> text "\" to \""<> ppr newUnit <> text "\""
+--               $$ nest 2 (pprInternalUnitMap hscEnv)
+--   Just oldEnv ->
+--     let
+--       activeUnit :: UnitId
+--       !activeUnit = if hsc_currentUnit hscEnv == oldUnit
+--                 then newUnit
+--                 else hsc_currentUnit hscEnv
+
+--       newInternalUnitEnv = oldEnv
+--         { internalUnitEnv_dflags = (internalUnitEnv_dflags oldEnv)
+--             { homeUnitId_ = newUnit
+--             }
+--         }
+--     in
+--     assertHscEnvInvariant $ hscEnv
+--       { hsc_internalUnitEnv =
+--           unitEnv_setCurrentUnit activeUnit
+--           $ unitEnv_insert newUnit newInternalUnitEnv
+--           $ unitEnv_delete oldUnit
+--           $ hsc_internalUnitEnv hscEnv
+--       }
+
+-- -----------------------------------------------------------------------------
+-- Getters
+-- -----------------------------------------------------------------------------
+
+hsc_HPTs :: HasCallStack => HscEnv -> [HomePackageTable]
+hsc_HPTs = map internalUnitEnv_homePackageTable . hsc_internalUnitEnvs
+
+hsc_internalUnitEnvs :: HasCallStack => HscEnv -> [InternalUnitEnv]
+hsc_internalUnitEnvs = Map.elems . unitEnv_graph . hsc_internalUnitEnv . assertHscEnvInvariant
+
+hsc_allDflags :: HasCallStack => HscEnv -> [DynFlags]
+hsc_allDflags = map internalUnitEnv_dflags . hsc_internalUnitEnvs
+
+hsc_allHomeUnits :: HasCallStack => HscEnv -> [HomeUnit]
+hsc_allHomeUnits = map internalUnitEnv_home_unit . hsc_internalUnitEnvs
+
+hsc_allUnitIds :: HasCallStack => HscEnv -> Set UnitId
+hsc_allUnitIds = Map.keysSet . unitEnv_graph . hsc_internalUnitEnv . assertHscEnvInvariant
+
+-- -----------------------------------------------------------------------------
+-- Functionality for home units
+-- -----------------------------------------------------------------------------
+
+hsc_currentHomeUnitDependencies :: HasCallStack => HscEnv -> Set UnitId
+hsc_currentHomeUnitDependencies e = hsc_homeUnitDependencies e (hsc_currentUnit e)
+
+hsc_homeUnitDependencies :: HasCallStack => HscEnv -> UnitId -> Set UnitId
+hsc_homeUnitDependencies hsc_env unitId =
+  Map.keysSet . unitEnv_graph
+    $ unitEnv_restrictHomeUnitDependencies (hsc_internalUnitEnv hsc_env) unitId
+
+hsc_homeUnitDependencies_unitEnv :: HasCallStack => HscEnv -> UnitId -> [InternalUnitEnv]
+hsc_homeUnitDependencies_unitEnv hsc_env unitId =
+  Map.elems . unitEnv_graph
+    $ unitEnv_restrictHomeUnitDependencies (hsc_internalUnitEnv  hsc_env) unitId
+
+unitEnv_homeUnitDependencies :: HasCallStack => UnitEnv -> UnitId -> [UnitId]
+unitEnv_homeUnitDependencies unitEnv unitId = filter (`unitEnv_member` unitEnv) deps
+  where
+    dflags = internalUnitEnv_dflags $ unitEnv_lookup unitId unitEnv
+    deps = map toUnitId $ explicitUnits (unitState dflags)
+
+unitEnv_restrictHomeUnitDependencies :: HasCallStack => UnitEnv -> UnitId -> UnitEnv
+unitEnv_restrictHomeUnitDependencies unitEnv unitId = unitEnv_setGraph
+  (Map.restrictKeys
+      (unitEnv_graph unitEnv)
+      deps
+  )
+  unitEnv
+  where
+    dflags = internalUnitEnv_dflags $ unitEnv_lookup unitId unitEnv    --
+    -- Always remove the current home unit from the list of home unit dependencies.
+    -- We do this, since if "-this-unit-id" is set to "base" (or any other wired-in unit)
+    -- but we are not compiling the wired-in unit, the unit id key in 'UnitEnvGraph' will be
+    -- "base-<wired-in version>" and it will also have a dependency on "base-<wired-in version>".
+    -- Those units are actually not the same unit, but it will look like it.
+    -- So, "base-<wired-in version>" is both home unit id and a dependency for the current unit id.
+    -- Therefore, it will be in the Set of Unit Ids and violate our post-condition
+    -- that the function result does not include the given Unit Id's key.
+    deps = Set.delete unitId $  Set.fromList $ map toUnitId $ explicitUnits (unitState dflags)
+
+-- -----------------------------------------------------------------------------
+
+set_hsc_currentInternalUnitEnv :: HscEnv -> InternalUnitEnv -> HscEnv
+set_hsc_currentInternalUnitEnv hsc_env unitEnv = hsc_env
+  { hsc_internalUnitEnv = unitEnv_adjust (const unitEnv) (hsc_currentUnit hsc_env) (hsc_internalUnitEnv hsc_env)
+  }
+
+hsc_currentUnit :: HscEnv -> UnitId
+hsc_currentUnit = unitEnv_currentUnit . hsc_internalUnitEnv
+
+-- -- | Test if the module comes from the home unit
+-- isAnyHomeModule :: HscEnv -> Module -> Bool
+-- isAnyHomeModule hsc_env m = isJust $ hsc_findInternalUnitEnv_maybe (toUnitId $ moduleUnit m) hsc_env
+
 
 {-
 

@@ -115,7 +115,7 @@ instance HasDynFlags CompPipeline where
 
 setDynFlags :: DynFlags -> CompPipeline ()
 setDynFlags dflags = P $ \_env state ->
-  return (state{hsc_env= (hsc_env state){ hsc_dflags = dflags }}, ())
+  return (state {hsc_env = set_hsc_dflags dflags (hsc_env state) }, ())
 
 setModLocation :: ModLocation -> CompPipeline ()
 setModLocation loc = P $ \_env state ->

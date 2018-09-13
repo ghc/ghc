@@ -24,6 +24,7 @@ import Data.Time
 data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
+      targetUnitId       :: UnitId,   -- ^ Unit Id of the target
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
       targetContents     :: Maybe (InputFileBuffer, UTCTime)
       -- ^ Optional in-memory buffer containing the source code GHC should
@@ -52,8 +53,8 @@ type InputFileBuffer = StringBuffer
 
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id obj _) =
-    (if obj then empty else char '*') <> pprTargetId id
+pprTarget (Target id uid obj _) =
+    (if obj then empty else char '*') <> pprTargetId id <+> ppr uid
 
 instance Outputable Target where
     ppr = pprTarget
