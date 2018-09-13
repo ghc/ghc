@@ -3,6 +3,7 @@
 import Data.Data
 import Data.List
 import GHC
+import HscTypes
 import DynFlags
 import Outputable
 import ApiAnnotation
@@ -25,11 +26,14 @@ testOneFile libdir fileName = do
                Nothing -> False
                Just fn -> fn == fileName
        ((anns,_cs),p) <- runGhc (Just libdir) $ do
+                        hsc_env <- getSession
                         dflags <- getSessionDynFlags
                         _ <- setSessionDynFlags dflags
                         addTarget Target { targetId = TargetFile fileName Nothing
                                          , targetAllowObjCode = True
-                                         , targetContents = Nothing }
+                                         , targetContents = Nothing
+                                         , targetPackage = hsc_currentPackage hsc_env
+                                         }
                         _ <- load LoadAllTargets
                         graph <- getModuleGraph
                         let modSum =

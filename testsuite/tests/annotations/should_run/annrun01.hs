@@ -1,11 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
 import GHC
 import MonadUtils  ( liftIO )
 import Data.Maybe
-import DynFlags    ( defaultFatalMessager, defaultFlushOut )
+import DynFlags    ( defaultFatalMessager, defaultFlushOut, thisPackage )
 import Annotations ( AnnTarget(..), CoreAnnTarget )
 import GHC.Serialized  ( deserializeWithData )
 import Panic
@@ -28,7 +29,12 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     let mod_nm = mkModuleName "Annrun01_Help"
 
     liftIO $ putStrLn "Setting Target"
-    setTargets [Target (TargetModule mod_nm) True Nothing]
+    setTargets $ pure @[] $ Target
+      { targetId = TargetModule mod_nm
+      , targetPackage = thisPackage dflags
+      , targetAllowObjCode = True
+      , targetContents = Nothing
+      }
     liftIO $ putStrLn "Loading Targets"
     load LoadAllTargets
 

@@ -90,7 +90,7 @@ initializePlugins hsc_env df
             (cachedPlugins df) -- arguments not changed
   = return df -- no need to reload plugins
   | otherwise
-  = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
+  = do loadedPlugins <- loadPlugins $ set_hsc_dflags hsc_env df
        return $ df { cachedPlugins = loadedPlugins }
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
 #endif
