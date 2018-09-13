@@ -1259,8 +1259,8 @@ obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
   hv <- Linker.getHValue hsc_env (varName id)
   cvObtainTerm (updEnv hsc_env) bound force (idType id) hv
- where updEnv env = env {hsc_dflags =                             -- #14828
-            xopt_set (hsc_dflags env) ImpredicativeTypes}
+ where updEnv env = modify_hsc_dflags hsc_env $
+         flip xopt_set ImpredicativeTypes -- #14828
          -- See Note [Setting ImpredicativeTypes for :print command]
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
