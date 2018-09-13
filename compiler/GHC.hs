@@ -635,12 +635,25 @@ setSessionDynFlags dflags = do
       return Nothing
 #endif
 
-  modifySession $ \h -> h{ hsc_dflags = dflags'''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
-                         , hsc_interp = hsc_interp h <|> interp
-                           -- we only update the interpreter if there wasn't
-                           -- already one set up
-                         }
+  modifySession $ \h -> h
+    { hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
+    , hsc_interp = hsc_interp h <|> interp
+      -- we only update the interpreter if there wasn't already one set up
+    }
+  -- Actually modify the session dflags.
+  -- If the dflags have a different homeUnitId than the current package,
+  -- then we assume it has been renamed.
+  -- We overwrite the old value in the Internal Unit Env and set
+  -- current package to the new home unit id.
+  -- This is absolutely necessary to maintain backwards compatibility.
+  modifySession $ \h ->
+    if hsc_currentUnit h == homeUnitId_ dflags'''
+        then set_hsc_dflags h dflags'''
+        else singleton_hsc_unitEnv h (homeUnitId_ dflags''')
+                InternalUnitEnv
+                  { internalUnitEnv_dflags = dflags'''
+                  , internalUnitEnv_homePackageTable = hsc_HPT h
+                  }
   invalidateModSummaryCache
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
@@ -669,7 +682,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags'' <- if changed
                then liftIO $ initUnits dflags'
                else return dflags'
-  modifySession $ \h -> h{ hsc_dflags = dflags'' }
+  modifySession $ \h -> set_hsc_dflags h dflags''
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 
@@ -779,7 +792,7 @@ removeTarget :: GhcMonad m => TargetId -> m ()
 removeTarget target_id
   = modifySession (\h -> h{ hsc_targets = filter (hsc_targets h) })
   where
-   filter targets = [ t | t@(Target id _ _) <- targets, id /= target_id ]
+   filter targets = [ t | t@Target { targetId = tid } <- targets, tid /= target_id ]
 
 -- | Attempts to guess what Target a string refers to.  This function
 -- implements the @--make@/GHCi command-line syntax for filenames:
@@ -793,22 +806,23 @@ removeTarget target_id
 --   - otherwise interpret the string as a module name
 --
 guessTarget :: GhcMonad m => String -> Maybe Phase -> m Target
-guessTarget str (Just phase)
-   = return (Target (TargetFile str (Just phase)) True Nothing)
+guessTarget str (Just phase) = do
+   hsc_env <- getSession
+   return (Target (TargetFile str (Just phase)) (hsc_currentUnit hsc_env) True Nothing)
 guessTarget str Nothing
    | isHaskellSrcFilename file
-   = return (target (TargetFile file Nothing))
+   = target $ TargetFile file Nothing
    | otherwise
    = do exists <- liftIO $ doesFileExist hs_file
         if exists
-           then return (target (TargetFile hs_file Nothing))
+           then target $ TargetFile hs_file Nothing
            else do
         exists <- liftIO $ doesFileExist lhs_file
         if exists
-           then return (target (TargetFile lhs_file Nothing))
+           then target $ TargetFile lhs_file Nothing
            else do
         if looksLikeModuleName file
-           then return (target (TargetModule (mkModuleName file)))
+           then target $ TargetModule (mkModuleName file)
            else do
         dflags <- getDynFlags
         liftIO $ throwGhcExceptionIO
@@ -823,7 +837,9 @@ guessTarget str Nothing
          hs_file  = file <.> "hs"
          lhs_file = file <.> "lhs"
 
-         target tid = Target tid obj_allowed Nothing
+         target tid = do
+             hsc_env <- getSession
+             return $ Target tid (hsc_currentUnit hsc_env) obj_allowed Nothing
 
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
@@ -957,7 +973,7 @@ getModSummary mod = do
 parseModule :: GhcMonad m => ModSummary -> m ParsedModule
 parseModule ms = do
    hsc_env <- getSession
-   let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
+   let hsc_env_tmp = set_hsc_dflags hsc_env $ ms_hspp_opts ms
    hpm <- liftIO $ hscParse hsc_env_tmp ms
    return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm)
                            (hpm_annotations hpm))
@@ -970,7 +986,7 @@ typecheckModule :: GhcMonad m => ParsedModule -> m TypecheckedModule
 typecheckModule pmod = do
  let ms = modSummary pmod
  hsc_env <- getSession
- let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
+ let hsc_env_tmp = set_hsc_dflags hsc_env $ ms_hspp_opts ms
  (tc_gbl_env, rn_info)
        <- liftIO $ hscTypecheckRename hsc_env_tmp ms $
                       HsParsedModule { hpm_module = parsedSource pmod,
@@ -1002,7 +1018,7 @@ desugarModule tcm = do
  let ms = modSummary tcm
  let (tcg, _) = tm_internals tcm
  hsc_env <- getSession
- let hsc_env_tmp = hsc_env { hsc_dflags = ms_hspp_opts ms }
+ let hsc_env_tmp = set_hsc_dflags hsc_env $ ms_hspp_opts ms
  guts <- liftIO $ hscDesugar hsc_env_tmp ms tcg
  return $
      DesugaredModule {
@@ -1043,7 +1059,7 @@ loadModule tcm = do
                                     hsc_env ms 1 1 Nothing mb_linkable
                                     source_modified
 
-   modifySession $ \e -> e{ hsc_HPT = addToHpt (hsc_HPT e) mod mod_info }
+   modifySession $ \e -> modify_hsc_HPT e $ \hpt -> addToHpt hpt mod mod_info
    return tcm
 
 

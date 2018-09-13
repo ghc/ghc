@@ -87,7 +87,7 @@ import GHC.Unit.Home
 import Control.Monad
 import Control.Exception
 import Data.IORef
-import Data.Map ( toList )
+import qualified Data.Map as Map
 import System.FilePath
 import System.Directory
 
@@ -589,25 +589,24 @@ home-package modules however, so it's safe for the HPT to be empty.
 dontLeakTheHPT :: IfL a -> IfL a
 dontLeakTheHPT thing_inside = do
   let
-    cleanTopEnv HscEnv{..} =
-       let
-         -- wrinkle: when we're typechecking in --backpack mode, the
-         -- instantiation of a signature might reside in the HPT, so
-         -- this case breaks the assumption that EPS interfaces only
-         -- refer to other EPS interfaces. We can detect when we're in
-         -- typechecking-only mode by using backend==NoBackend, and
-         -- in that case we don't empty the HPT.  (admittedly this is
-         -- a bit of a hack, better suggestions welcome). A number of
-         -- tests in testsuite/tests/backpack break without this
-         -- tweak.
-         !hpt | backend hsc_dflags == NoBackend = hsc_HPT
-              | otherwise = emptyHomePackageTable
-       in
-       HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
-              ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
-              ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
-              ,  hsc_HPT          = hpt
-              , .. }
+    cleanTopEnv HscEnv{..} = HscEnv
+      { hsc_targets      = panic "cleanTopEnv: hsc_targets"
+      , hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
+      , hsc_IC           = panic "cleanTopEnv: hsc_IC"
+      -- wrinkle: when we're typechecking in --backpack mode, the instantiation
+      -- of a signature might reside in the HPT, so this case breaks the
+      -- assumption that EPS interfaces only refer to other EPS interfaces. We
+      -- can detect when we're in typechecking-only mode by using
+      -- hscTarget==HscNothing, and in that case we don't empty the HPT.
+      -- (admittedly this is a bit of a hack, better suggestions welcome). A
+      -- number of tests in testsuite/tests/backpack break without this tweak.
+      , hsc_internalUnitEnv = (\f -> Map.adjust f hsc_currentUnit hsc_internalUnitEnv) $
+        \(InternalUnitEnv dflags hpt) -> InternalUnitEnv dflags $!
+          if backend dflags == NoBackend
+          then hpt
+          else emptyHomePackageTable
+      , ..
+      }
 
   updTopEnv cleanTopEnv $ do
   !_ <- getTopEnv        -- force the updTopEnv
@@ -1273,7 +1272,7 @@ pprIfaceAnnotation (IfaceAnnotation { ifAnnotatedTarget = target, ifAnnotatedVal
   = ppr target <+> text "annotated by" <+> ppr serialized
 
 pprExtensibleFields :: ExtensibleFields -> SDoc
-pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ toList fs
+pprExtensibleFields (ExtensibleFields fs) = vcat . map pprField $ Map.toList fs
   where
     pprField (name, (BinData size _data)) = text name <+> text "-" <+> ppr size <+> text "bytes"
 
