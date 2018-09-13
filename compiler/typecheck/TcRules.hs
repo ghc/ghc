@@ -86,8 +86,8 @@ tcRule (HsRule { rd_ext  = ext
        ; (stuff,_) <- pushTcLevelM $
                       generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
 
-       ; let (id_bndrs, lhs', lhs_wanted
-                      , rhs', rhs_wanted, rule_ty, tc_lvl) = stuff
+       ; let (tv_bndrs, id_bndrs, lhs', lhs_wanted
+                                , rhs', rhs_wanted, rule_ty, tc_lvl) = stuff
 
        ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
                                   , ppr lhs_wanted
@@ -110,14 +110,16 @@ tcRule (HsRule { rd_ext  = ext
        -- during zonking (see TcHsSyn.zonkRule)
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
-       ; forall_tkvs <- zonkTcTypesAndSplitDepVars $
-                        rule_ty : map idType tpl_ids
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
+       ; forall_tkvs <- candidateQTyVarsOfTypes gbls $
+                        map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
+                        rule_ty : map idType tpl_ids
        ; qtkvs <- quantifyTyVars gbls forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs
+                                , ppr tv_bndrs
                                 , ppr rule_ty
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
@@ -127,10 +129,11 @@ tcRule (HsRule { rd_ext  = ext
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; let skol_info = RuleSkol name
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
+       ; let all_qtkvs = qtkvs ++ tv_bndrs
+             skol_info = RuleSkol name
+       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
                                          lhs_evs residual_lhs_wanted
-       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
+       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
@@ -138,14 +141,15 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_name = rname
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
-                         , rd_tmvs = map (noLoc . RuleBndr noExt . noLoc) (qtkvs ++ tpl_ids)
+                         , rd_tmvs = map (noLoc . RuleBndr noExt . noLoc) (all_qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
 tcRule (XRuleDecl _) = panic "tcRule"
 
 generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
-                        -> TcM ( [TcId]
+                        -> TcM ( [TyVar]
+                               , [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
                                , TcType
@@ -166,9 +170,7 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
        ; (rhs',            rhs_wanted) <- captureConstraints $
                                           tcMonoExpr rhs (mkCheckExpType rule_ty)
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; return (id_bndrs, lhs', all_lhs_wanted
-                         , rhs', rhs_wanted, rule_ty, lvl) } }
-                -- Slightly curious that tv_bndrs is not returned
+       ; return (tv_bndrs, id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty, lvl) } }
 
 -- See Note [TcLevel in type checking rules]
 tcRuleBndrs :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]

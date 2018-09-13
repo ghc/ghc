@@ -1,19 +1,15 @@
 
 T13895.hs:8:14: error:
-    • Could not deduce (Typeable (t dict0))
+    • Could not deduce (Typeable (t dict))
       from the context: (Data a, Typeable (t dict))
         bound by the type signature for:
-                   dataCast1 :: forall k (dict :: Typeable k) (dict1 :: Typeable
-                                                                          *) a (c :: *
-                                                                                     -> *) (t :: forall k1.
-                                                                                                 Typeable
-                                                                                                   k1 =>
-                                                                                                 k1
-                                                                                                 -> *).
+                   dataCast1 :: forall k1 a (c :: * -> *) (t :: forall k2.
+                                                                Typeable k2 =>
+                                                                k2 -> *).
                                 (Data a, Typeable (t dict)) =>
                                 (forall d. Data d => c (t dict1 d)) -> Maybe (c a)
         at T13895.hs:(8,14)-(14,24)
-      The type variable ‘dict0’ is ambiguous
+      The type variable ‘k0’ is ambiguous
     • In the ambiguity check for ‘dataCast1’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       In the type signature:

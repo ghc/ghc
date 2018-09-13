@@ -862,7 +862,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
         -- Add extra tyvar binders: Note [Free tyvars in rule LHS]
         -- and extra dict binders: Note [Free dictionaries in rule LHS]
    mk_extra_bndrs fn_id args
-     = toposortTyVars unbound_tvs ++ unbound_dicts
+     = scopedSort unbound_tvs ++ unbound_dicts
      where
        unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
        unbound_dicts = [ mkLocalId (localiseName (idName d)) (idType d)

@@ -25,7 +25,7 @@ module TcMType (
   newFmvTyVar, newFskTyVar,
 
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
+  newMetaDetails, isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
   -- Expected types
@@ -67,10 +67,11 @@ module TcMType (
   zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
-  zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
+  candidateQTyVarsOfType, candidateQTyVarsOfKind,
+  candidateQTyVarsOfTypes, CandidatesQTvs(..),
   zonkQuantifiedTyVar, defaultTyVar,
   quantifyTyVars,
-  zonkTcTyCoVarBndr, zonkTcTyVarBinder,
+  zonkTcTyCoVarBndr, zonkTyConBinders,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind,
 
@@ -93,6 +94,7 @@ import GhcPrelude
 import TyCoRep
 import TcType
 import Type
+import TyCon
 import Coercion
 import Class
 import Var
@@ -119,8 +121,9 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
-import Data.List        ( mapAccumL )
+import Data.List        ( mapAccumL, partition )
 import Control.Arrow    ( second )
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -703,16 +706,23 @@ readMetaTyVar :: TyVar -> TcM MetaDetails
 readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
                       readMutVar (metaTyVarRef tyvar)
 
+isFilledMetaTyVar_maybe :: TcTyVar -> TcM (Maybe Type)
+isFilledMetaTyVar_maybe tv
+ | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
+ = do { cts <- readTcRef ref
+      ; case cts of
+          Indirect ty -> return (Just ty)
+          Flexi       -> return Nothing }
+ | otherwise
+ = return Nothing
+
 isFilledMetaTyVar :: TyVar -> TcM Bool
 -- True of a filled-in (Indirect) meta type variable
-isFilledMetaTyVar tv
-  | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
-  = do  { details <- readMutVar ref
-        ; return (isIndirect details) }
-  | otherwise = return False
+isFilledMetaTyVar tv = isJust <$> isFilledMetaTyVar_maybe tv
 
 isUnfilledMetaTyVar :: TyVar -> TcM Bool
 -- True of a un-filled-in (Flexi) meta type variable
+-- NB: Not the opposite of isFilledMetaTyVar
 isUnfilledMetaTyVar tv
   | MetaTv { mtv_ref = ref } <- tcTyVarDetails tv
   = do  { details <- readMutVar ref
@@ -793,7 +803,6 @@ writeMetaTyVarRef tyvar ref ty
 
     double_upd_msg details = hang (text "Double update of meta tyvar")
                                 2 (ppr tyvar $$ ppr details)
-
 
 {- Note [Level check when unifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -961,6 +970,291 @@ newMetaTyVarTyAtLevel tc_lvl kind
 
 {- *********************************************************************
 *                                                                      *
+          Finding variables to quantify over
+*                                                                      *
+********************************************************************* -}
+
+data CandidatesQTvs  -- See Note [Dependent type variables]
+                     -- See Note [CandidatesQTvs determinism and order]
+  -- NB: All variables stored here are MetaTvs. No exceptions.
+  = DV { dv_kvs :: DTyVarSet    -- "kind" metavariables (dependent)
+       , dv_tvs :: DTyVarSet    -- "type" metavariables (non-dependent)
+         -- A variable may appear in both sets
+         -- E.g.   T k (x::k)    The first occurrence of k makes it
+         --                      show up in dv_tvs, the second in dv_kvs
+         -- See Note [Dependent type variables]
+       , dv_cvs :: CoVarSet
+         -- These are covars. We will *not* quantify over these, but
+         -- we must make sure also not to quantify over any cv's kinds,
+         -- so we include them here as further direction for quantifyTyVars
+    }
+
+instance Semi.Semigroup CandidatesQTvs where
+   (DV { dv_kvs = kv1, dv_tvs = tv1, dv_cvs = cv1 })
+     <> (DV { dv_kvs = kv2, dv_tvs = tv2, dv_cvs = cv2 })
+          = DV { dv_kvs = kv1 `unionDVarSet` kv2
+               , dv_tvs = tv1 `unionDVarSet` tv2
+               , dv_cvs = cv1 `unionVarSet` cv2 }
+
+instance Monoid CandidatesQTvs where
+   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
+   mappend = (Semi.<>)
+
+instance Outputable CandidatesQTvs where
+  ppr (DV {dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs })
+    = text "DV" <+> braces (pprWithCommas id [ text "dv_kvs =" <+> ppr kvs
+                                             , text "dv_tvs =" <+> ppr tvs
+                                             , text "dv_cvs =" <+> ppr cvs ])
+
+closeOverKindsCQTvs :: TyCoVarSet  -- globals
+                    -> CandidatesQTvs -> TcM CandidatesQTvs
+-- Don't close the covars; this is done in quantifyTyVars. Note that
+-- closing over the CoVars would introduce tyvars into the CoVarSet.
+closeOverKindsCQTvs gbl_tvs dv@(DV { dv_kvs = kvs, dv_tvs = tvs })
+  = do { let all_kinds = map tyVarKind (dVarSetElems (kvs `unionDVarSet` tvs))
+       ; foldlM (collect_cand_qtvs True gbl_tvs) dv all_kinds }
+
+{- Note [Dependent type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell type inference we quantify over type variables; but we only
+quantify over /kind/ variables when -XPolyKinds is on.  Without -XPolyKinds
+we default the kind variables to *.
+
+So, to support this defaulting, and only for that reason, when
+collecting the free vars of a type, prior to quantifying, we must keep
+the type and kind variables separate.
+
+But what does that mean in a system where kind variables /are/ type
+variables? It's a fairly arbitrary distinction based on how the
+variables appear:
+
+  - "Kind variables" appear in the kind of some other free variable
+
+     These are the ones we default to * if -XPolyKinds is off
+
+  - "Type variables" are all free vars that are not kind variables
+
+E.g.  In the type    T k (a::k)
+      'k' is a kind variable, because it occurs in the kind of 'a',
+          even though it also appears at "top level" of the type
+      'a' is a type variable, because it doesn't
+
+We gather these variables using a CandidatesQTvs record:
+  DV { dv_kvs: Variables free in the kind of a free type variable
+               or of a forall-bound type variable
+     , dv_tvs: Variables sytactically free in the type }
+
+So:  dv_kvs            are the kind variables of the type
+     (dv_tvs - dv_kvs) are the type variable of the type
+
+Note that
+
+* A variable can occur in both.
+      T k (x::k)    The first occurrence of k makes it
+                    show up in dv_tvs, the second in dv_kvs
+
+* We include any coercion variables in the "dependent",
+  "kind-variable" set because we never quantify over them.
+
+* The "kind variables" might depend on each other; e.g
+     (k1 :: k2), (k2 :: *)
+  The "type variables" do not depend on each other; if
+  one did, it'd be classified as a kind variable!
+
+Note [CandidatesQTvs determinism and order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Determinism: when we quantify over type variables we decide the
+  order in which they appear in the final type. Because the order of
+  type variables in the type can end up in the interface file and
+  affects some optimizations like worker-wrapper, we want this order to
+  be deterministic.
+
+  To achieve that we use deterministic sets of variables that can be
+  converted to lists in a deterministic order. For more information
+  about deterministic sets see Note [Deterministic UniqFM] in UniqDFM.
+
+* Order: as well as being deterministic, we use an
+  accumulating-parameter style for candidateQTyVarsOfType so that we
+  add variables one at a time, left to right.  That means we tend to
+  produce the variables in left-to-right order.  This is just to make
+  it bit more predicatable for the programmer.
+
+Note [Naughty quantification candidates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#14880, dependent/should_compile/T14880-2)
+
+  forall arg. ... (alpha[tau]:arg) ...
+
+We have a metavariable alpha whose kind is a locally bound (skolem) variable.
+This can arise while type-checking a user-written type signature
+(see the test case for the full code). According to
+Note [Recipe for checking a signature] in TcHsType, we try to solve
+all constraints that arise during checking before looking to kind-generalize.
+However, in the case above, this solving pass does not unify alpha, because
+it is utterly unconstrained. The question is: what to do with alpha?
+
+We can't generalize it, because it would have to be generalized *after*
+arg, and implicit generalization always goes before explicit generalization.
+We can't simply leave it be, because this type is about to go into the
+typing environment (as the type of some let-bound variable, say), and then
+chaos erupts when we try to instantiate. In any case, we'll never learn
+anything more about alpha anyway.
+
+So, we zap it, eagerly, to Any. We don't have to do this eager zapping
+in terms (say, in `length []`) because terms are never re-examined before
+the final zonk (which zaps any lingering metavariables to Any).
+
+The right time to do this eager zapping is during generalization, when
+every metavariable is either (A) promoted, (B) generalized, or (C) zapped
+(according again to Note [Recipe for checking a signature] in TcHsType).
+
+Accordingly, when quantifyTyVars is skolemizing the variables to quantify,
+these naughty ones are zapped to Any. We identify the naughty ones by
+looking for out-of-scope tyvars in the candidate tyvars' kinds, where
+we assume that all in-scope tyvars are in the gbl_tvs passed to quantifyTyVars.
+In the example above, we would have `alpha` in the CandidatesQTvs, but
+`arg` wouldn't be in the gbl_tvs. Hence, alpha is naughty, and zapped to
+Any. Naughty variables are discovered by is_naughty_tv in quantifyTyVars.
+
+-}
+
+-- | Gathers free variables to use as quantification candidates (in
+-- 'quantifyTyVars'). This might output the same var
+-- in both sets, if it's used in both a type and a kind.
+-- See Note [CandidatesQTvs determinism and order]
+-- See Note [Dependent type variables]
+candidateQTyVarsOfType :: TcTyVarSet   -- zonked set of global/mono tyvars
+                       -> TcType       -- not necessarily zonked
+                       -> TcM CandidatesQTvs
+candidateQTyVarsOfType gbl_tvs ty = closeOverKindsCQTvs gbl_tvs =<<
+                                    collect_cand_qtvs False gbl_tvs mempty ty
+
+-- | Like 'candidateQTyVarsOfType', but consider every free variable
+-- to be dependent. This is appropriate when generalizing a *kind*,
+-- instead of a type. (That way, -XNoPolyKinds will default the variables
+-- to Type.)
+candidateQTyVarsOfKind :: TcTyVarSet   -- zonked set of global/mono tyvars
+                       -> TcKind       -- not necessarily zonked
+                       -> TcM CandidatesQTvs
+candidateQTyVarsOfKind gbl_tvs ty = closeOverKindsCQTvs gbl_tvs =<<
+                                    collect_cand_qtvs True gbl_tvs mempty ty
+
+collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependent
+                  -> VarSet -- bound variables (both locally bound and globally bound)
+                  -> CandidatesQTvs -> Type -> TcM CandidatesQTvs
+collect_cand_qtvs is_dep bound dvs ty
+  = go dvs ty
+  where
+    go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
+    go dv (TyConApp _ tys) = foldlM go dv tys
+    go dv (FunTy arg res)  = foldlM go dv [arg, res]
+    go dv (LitTy {})       = return dv
+    go dv (CastTy ty co)   = do dv1 <- go dv ty
+                                collect_cand_qtvs_co bound dv1 co
+    go dv (CoercionTy co)  = collect_cand_qtvs_co bound dv co
+
+    go dv (TyVarTy tv)
+      | is_bound tv
+      = return dv
+
+      | isImmutableTyVar tv
+      = WARN(True, (sep [ text "Note [Naughty quantification candidates] skolem:"
+                        , ppr tv <+> dcolon <+> ppr (tyVarKind tv) ]))
+        return dv  -- This happens when processing kinds of variables affected by
+                   -- Note [Naughty quantification candidates]
+                   -- NB: CandidatesQTvs stores only MetaTvs, so don't store an
+                   -- immutable tyvar here.
+
+      | otherwise
+      = ASSERT2( isMetaTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) $$ ppr ty $$ ppr bound )
+        do { m_contents <- isFilledMetaTyVar_maybe tv
+           ; case m_contents of
+               Just ind_ty -> go dv ind_ty
+
+               Nothing -> return $ insert_tv dv tv }
+
+    go dv (ForAllTy (Bndr tv _) ty)
+      = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
+           ; collect_cand_qtvs is_dep (bound `extendVarSet` tv) dv1 ty }
+
+    is_bound tv = tv `elemVarSet` bound
+
+    insert_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
+      | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv }
+      | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv }
+    -- You might be tempted (like I was) to use unitDVarSet and mappend here.
+    -- However, the union algorithm for deterministic sets depends on (roughly)
+    -- the size of the sets. The elements from the smaller set end up to the
+    -- right of the elements from the larger one. When sets are equal, the
+    -- left-hand argument to `mappend` goes to the right of the right-hand
+    -- argument. In our case, if we use unitDVarSet and mappend, we learn that
+    -- the free variables of (a -> b -> c -> d) are [b, a, c, d], and we then
+    -- quantify over them in that order. (The a comes after the b because we
+    -- union the singleton sets as ({a} `mappend` {b}), producing {b, a}. Thereafter,
+    -- the size criterion works to our advantage.) This is just annoying to
+    -- users, so I use `extendDVarSet`, which unambiguously puts the new element
+    -- to the right. Note that the unitDVarSet/mappend implementation would not
+    -- be wrong against any specification -- just suboptimal and confounding to users.
+
+collect_cand_qtvs_co :: VarSet -- bound variables
+                     -> CandidatesQTvs -> Coercion -> TcM CandidatesQTvs
+collect_cand_qtvs_co bound = go_co
+  where
+    go_co dv (Refl ty)             = collect_cand_qtvs True bound dv ty
+    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True bound dv ty
+                                        go_mco dv1 mco
+    go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
+    go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
+    go_co dv (FunCo _ co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
+    go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
+    go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov
+                                        dv2 <- collect_cand_qtvs True bound dv1 t1
+                                        collect_cand_qtvs True bound dv2 t2
+    go_co dv (SymCo co)            = go_co dv co
+    go_co dv (TransCo co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (NthCo _ _ co)        = go_co dv co
+    go_co dv (LRCo _ co)           = go_co dv co
+    go_co dv (InstCo co1 co2)      = foldlM go_co dv [co1, co2]
+    go_co dv (KindCo co)           = go_co dv co
+    go_co dv (SubCo co)            = go_co dv co
+
+    go_co dv (HoleCo hole) = do m_co <- unpackCoercionHole_maybe hole
+                                case m_co of
+                                  Just co -> go_co dv co
+                                  Nothing -> return $ insert_cv dv (coHoleCoVar hole)
+
+    go_co dv (CoVarCo cv)
+      | is_bound cv
+      = return dv
+      | otherwise
+      = return $ insert_cv dv cv
+
+    go_co dv (ForAllCo tcv kind_co co)
+      = do { dv1 <- go_co dv kind_co
+           ; collect_cand_qtvs_co (bound `extendVarSet` tcv) dv1 co }
+
+    go_mco dv MRefl    = return dv
+    go_mco dv (MCo co) = go_co dv co
+
+    go_prov dv UnsafeCoerceProv    = return dv
+    go_prov dv (PhantomProv co)    = go_co dv co
+    go_prov dv (ProofIrrelProv co) = go_co dv co
+    go_prov dv (PluginProv _)      = return dv
+
+    insert_cv dv@(DV { dv_cvs = cvs }) cv
+      = dv { dv_cvs = cvs `extendVarSet` cv }
+
+    is_bound tv = tv `elemVarSet` bound
+
+-- | Like 'splitDepVarsOfType', but over a list of types
+candidateQTyVarsOfTypes :: TyCoVarSet  -- zonked global ty/covars
+                        -> [Type] -> TcM CandidatesQTvs
+candidateQTyVarsOfTypes gbl_tvs tys = closeOverKindsCQTvs gbl_tvs =<<
+                                      foldlM (collect_cand_qtvs False gbl_tvs) mempty tys
+
+{- *********************************************************************
+*                                                                      *
              Quantification
 *                                                                      *
 ************************************************************************
@@ -988,7 +1282,7 @@ has free vars {f,a}, but we must add 'k' as well! Hence step (2).
   With -XPolyKinds, it treats both classes of variables identically.
 
 * quantifyTyVars never quantifies over
-    - a coercion variable
+    - a coercion variable (or any tv mentioned in the kind of a covar)
     - a runtime-rep variable
 
 Note [quantifyTyVars determinism]
@@ -1007,52 +1301,61 @@ Note [Deterministic UniqFM] in UniqDFM.
 
 quantifyTyVars
   :: TcTyCoVarSet     -- Global tvs; already zonked
-  -> CandidatesQTvs   -- See Note [Dependent type variables] in TcType
+  -> CandidatesQTvs   -- See Note [Dependent type variables]
                       -- Already zonked
   -> TcM [TcTyVar]
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
+quantifyTyVars gbl_tvs
+               dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs, dv_cvs = covars })
+  = do { traceTc "quantifyTyVars 1" (vcat [ppr dvs, ppr gbl_tvs])
+       ; let mono_tvs = gbl_tvs `unionVarSet` closeOverKinds covars
+              -- NB: All variables in the kind of a covar must not be
+              -- quantified over, as we don't quantify over the covar.
 
-quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { traceTc "quantifyTyVars" (vcat [ppr dvs, ppr gbl_tvs])
-       ; let dep_kvs = dVarSetElemsWellScoped $
-                       dep_tkvs `dVarSetMinusVarSet` gbl_tvs
+             dep_kvs = dVarSetElemsWellScoped $
+                       dep_tkvs `dVarSetMinusVarSet` mono_tvs
                        -- dVarSetElemsWellScoped: put the kind variables into
                        --    well-scoped order.
                        --    E.g.  [k, (a::k)] not the other way roud
 
              nondep_tvs = dVarSetElems $
                           (nondep_tkvs `minusDVarSet` dep_tkvs)
-                           `dVarSetMinusVarSet` gbl_tvs
-                 -- See Note [Dependent type variables] in TcType
+                           `dVarSetMinusVarSet` mono_tvs
+                 -- See Note [Dependent type variables]
                  -- The `minus` dep_tkvs removes any kind-level vars
                  --    e.g. T k (a::k)   Since k appear in a kind it'll
                  --    be in dv_kvs, and is dependent. So remove it from
                  --    dv_tvs which will also contain k
                  -- No worry about dependent covars here;
                  --    they are all in dep_tkvs
-                 -- No worry about scoping, because these are all
-                 --    type variables
                  -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
+
+               -- See Note [Naughty quantification candidates]
+             (naughty_deps, final_dep_kvs)       = partition (is_naughty_tv mono_tvs) dep_kvs
+             (naughty_nondeps, final_nondep_tvs) = partition (is_naughty_tv mono_tvs) nondep_tvs
+
+       ; mapM_ zap_naughty_tv (naughty_deps ++ naughty_nondeps)
 
              -- In the non-PolyKinds case, default the kind variables
              -- to *, and zonk the tyvars as usual.  Notice that this
              -- may make quantifyTyVars return a shorter list
              -- than it was passed, but that's ok
        ; poly_kinds  <- xoptM LangExt.PolyKinds
-       ; dep_kvs'    <- mapMaybeM (zonk_quant (not poly_kinds)) dep_kvs
-       ; nondep_tvs' <- mapMaybeM (zonk_quant False)            nondep_tvs
+       ; dep_kvs'    <- mapMaybeM (zonk_quant (not poly_kinds)) final_dep_kvs
+       ; nondep_tvs' <- mapMaybeM (zonk_quant False)            final_nondep_tvs
        ; let final_qtvs = dep_kvs' ++ nondep_tvs'
            -- Because of the order, any kind variables
            -- mentioned in the kinds of the nondep_tvs'
            -- now refer to the dep_kvs'
 
-       ; traceTc "quantifyTyVars"
-           (vcat [ text "globals:" <+> ppr gbl_tvs
-                 , text "nondep:"  <+> pprTyVars nondep_tvs
-                 , text "dep:"     <+> pprTyVars dep_kvs
-                 , text "dep_kvs'" <+> pprTyVars dep_kvs'
+       ; traceTc "quantifyTyVars 2"
+           (vcat [ text "globals:"    <+> ppr gbl_tvs
+                 , text "mono_tvs:"   <+> ppr mono_tvs
+                 , text "nondep:"     <+> pprTyVars nondep_tvs
+                 , text "dep:"        <+> pprTyVars dep_kvs
+                 , text "dep_kvs'"    <+> pprTyVars dep_kvs'
                  , text "nondep_tvs'" <+> pprTyVars nondep_tvs' ])
 
        -- We should never quantify over coercion variables; check this
@@ -1061,6 +1364,11 @@ quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
 
        ; return final_qtvs }
   where
+    -- See Note [Naughty quantification candidates]
+    is_naughty_tv mono_tvs tv
+      = anyVarSet (isSkolemTyVar <&&> (not . (`elemVarSet` mono_tvs))) $
+        tyCoVarsOfType (tyVarKind tv)
+
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for
     --    * Kind variables, with -XNoPolyKinds: don't quantify over these
@@ -1079,6 +1387,10 @@ quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
                True  -> return Nothing
                False -> do { tv <- zonkQuantifiedTyVar tkv
                            ; return (Just tv) } }
+
+    zap_naughty_tv tv
+      = WARN(True, text "naughty quantification candidate: " <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv))
+        writeMetaTyVar tv (anyTypeOfKind (tyVarKind tv))
 
 zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables
@@ -1162,7 +1474,7 @@ skolemiseUnboundMetaTyVar tv
         ; kind <- zonkTcType (tyVarKind tv)
         ; let uniq        = getUnique tv
                 -- NB: Use same Unique as original tyvar. This is
-                -- important for TcHsType.splitTelescopeTvs to work properly
+                -- convenient in reading dumps, but is otherwise inessential.
 
               tv_name     = getOccName tv
               final_name  = mkInternalName uniq tv_name span
@@ -1352,15 +1664,6 @@ zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 zonkTcTypeAndFV ty
   = tyCoVarsOfTypeDSet <$> zonkTcType ty
 
--- | Zonk a type and call 'candidateQTyVarsOfType' on it.
-zonkTcTypeAndSplitDepVars :: TcType -> TcM CandidatesQTvs
-zonkTcTypeAndSplitDepVars ty
-  = candidateQTyVarsOfType <$> zonkTcType ty
-
-zonkTcTypesAndSplitDepVars :: [TcType] -> TcM CandidatesQTvs
-zonkTcTypesAndSplitDepVars tys
-  = candidateQTyVarsOfTypes <$> mapM zonkTcType tys
-
 zonkTyCoVar :: TyCoVar -> TcM TcType
 -- Works on TyVars and TcTyVars
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
@@ -1409,8 +1712,8 @@ zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_given  = given
                                , ic_wanted = wanted
                                , ic_info   = info })
-  = do { skols'  <- mapM zonkTcTyCoVarBndr skols  -- Need to zonk their kinds!
-                                                  -- as Trac #7230 showed
+  = do { skols'  <- mapM zonkTyCoVarKind skols  -- Need to zonk their kinds!
+                                                -- as Trac #7230 showed
        ; given'  <- mapM zonkEvVar given
        ; info'   <- zonkSkolemInfo info
        ; wanted' <- zonkWCRec wanted
@@ -1552,7 +1855,7 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_tyvar = const zonkTcTyVar
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
   , tcm_hole  = hole
-  , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTcTyCoVarBndr tv
+  , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
   , tcm_tycon = return }
   where
     hole :: () -> CoercionHole -> TcM Coercion
@@ -1583,17 +1886,25 @@ zonkTcTyCoVarBndr :: TcTyCoVar -> TcM TcTyCoVar
 -- unification variables.
 zonkTcTyCoVarBndr tyvar
   | isTyVarTyVar tyvar
-  = tcGetTyVar "zonkTcTyCoVarBndr TyVarTv" <$> zonkTcTyVar tyvar
+     -- We want to preserve the binding location of the original TyVarTv.
+     -- This is important for error messages. If we don't do this, then
+     -- we get bad locations in, e.g., typecheck/should_fail/T2688
+  = do { zonked_ty <- zonkTcTyVar tyvar
+       ; let zonked_tyvar = tcGetTyVar "zonkTcTyCoVarBndr TyVarTv" zonked_ty
+             zonked_name  = getName zonked_tyvar
+             reloc'd_name = setNameLoc zonked_name (getSrcSpan tyvar)
+       ; return (setTyVarName zonked_tyvar reloc'd_name) }
 
   | otherwise
-    -- can't use isCoVar, because it looks at a TyCon. Argh.
-  = ASSERT2( isImmutableTyVar tyvar || (not $ isTyVar tyvar), pprTyVar tyvar )
-    updateTyVarKindM zonkTcType tyvar
+  = ASSERT2( isImmutableTyVar tyvar || isCoVar tyvar, pprTyVar tyvar )
+    zonkTyCoVarKind tyvar
 
-zonkTcTyVarBinder :: VarBndr TcTyVar vis -> TcM (VarBndr TcTyVar vis)
-zonkTcTyVarBinder (Bndr tv vis)
-  = do { tv' <- zonkTcTyCoVarBndr tv
-       ; return (Bndr tv' vis) }
+zonkTyConBinders :: [TyConBinder] -> TcM [TyConBinder]
+zonkTyConBinders = mapM zonk1
+  where
+    zonk1 (Bndr tv vis)
+      = do { tv' <- zonkTcTyCoVarBndr tv
+           ; return (Bndr tv' vis) }
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis

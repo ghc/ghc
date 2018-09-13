@@ -4,6 +4,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
 -- | Highly random utility functions
 --
@@ -47,7 +48,7 @@ module Util (
 
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
-        firstM, first3M,
+        firstM, first3M, secondM,
         fst3, snd3, third3,
         uncurry3,
         liftFst, liftSnd,
@@ -270,6 +271,9 @@ firstM f (x, y) = liftM (\x' -> (x', y)) (f x)
 
 first3M :: Monad m => (a -> m d) -> (a, b, c) -> m (d, b, c)
 first3M f (x, y, z) = liftM (\x' -> (x', y, z)) (f x)
+
+secondM :: Monad m => (b -> m c) -> (a, b) -> m (a, c)
+secondM f (x, y) = (x,) <$> f y
 
 {-
 ************************************************************************

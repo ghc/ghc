@@ -140,15 +140,18 @@ module Type (
         tyCoVarsOfType, tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet,
         coVarsOfType,
-        coVarsOfTypes, closeOverKinds, closeOverKindsList,
+        coVarsOfTypes,
+        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
+        closeOverKinds,
+
         noFreeVarsOfType,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize, occCheckExpand,
 
         -- * Well-scoped lists of variables
-        dVarSetElemsWellScoped, toposortTyVars, tyCoVarsOfTypeWellScoped,
-        tyCoVarsOfTypesWellScoped,
+        dVarSetElemsWellScoped, scopedSort, tyCoVarsOfTypeWellScoped,
+        tyCoVarsOfTypesWellScoped, tyCoVarsOfBindersWellScoped,
 
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
@@ -239,7 +242,7 @@ import UniqSet
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
+import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
                                  , typeSymbolKind, liftedTypeKind )
 import PrelNames
 import CoAxiom
@@ -253,16 +256,16 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
 
 -- others
 import Util
+import FV
 import Outputable
 import FastString
 import Pair
 import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
-import Digraph
 import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
-import Data.Maybe       ( isJust, mapMaybe )
+import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
 
 -- $type_classification
@@ -2101,6 +2104,41 @@ predTypeEqRel ty
          Well-scoped tyvars
 *                                                                      *
 ************************************************************************
+
+Note [ScopedSort]
+~~~~~~~~~~~~~~~~~
+Consider
+
+  foo :: Proxy a -> Proxy (b :: k) -> Proxy (a :: k2) -> ()
+
+This function type is implicitly generalised over [a, b, k, k2]. These
+variables will be Specified; that is, they will be available for visible
+type application. This is because they are written in the type signature
+by the user.
+
+However, we must ask: what order will they appear in? In cases without
+dependency, this is easy: we just use the lexical left-to-right ordering
+of first occurrence. With dependency, we cannot get off the hook so
+easily.
+
+We thus state:
+
+ * These variables appear in the order as given by ScopedSort, where
+   the input to ScopedSort is the left-to-right order of first occurrence.
+
+Note that this applies only to *implicit* quantification, without a
+`forall`. If the user writes a `forall`, then we just use the order given.
+
+ScopedSort is defined thusly (as proposed in #15743):
+  * Work left-to-right through the input list, with a cursor.
+  * If variable v at the cursor is depended on by any earlier variable w,
+    move v immediately before the leftmost such w.
+
+INVARIANT: The prefix of variables before the cursor form a valid telescope.
+
+Note that ScopedSort makes sense only after type inference is done and all
+types/kinds are fully settled and zonked.
+
 -}
 
 -- | Do a topological sort on a list of tyvars,
@@ -2112,24 +2150,47 @@ predTypeEqRel ty
 -- (that is, doesn't depend on Uniques).
 --
 -- It is also meant to be stable: that is, variables should not
--- be reordered unnecessarily. The implementation of this
--- has been observed to be stable, though it is not proven to
--- be so. See also Note [Ordering of implicit variables] in RnTypes
-toposortTyVars :: [TyCoVar] -> [TyCoVar]
-toposortTyVars tvs = reverse $
-                     [ node_payload node | node <- topologicalSortG $
-                                          graphFromEdgedVerticesOrd nodes ]
-  where
-    var_ids :: VarEnv Int
-    var_ids = mkVarEnv (zip tvs [1..])
+-- be reordered unnecessarily. This is specified in Note [ScopedSort]
+-- See also Note [Ordering of implicit variables] in RnTypes
 
-    nodes :: [ Node Int TyVar ]
-    nodes = [ DigraphNode
-                tv
-                (lookupVarEnv_NF var_ids tv)
-                (mapMaybe (lookupVarEnv var_ids)
-                         (tyCoVarsOfTypeList (tyVarKind tv)))
-            | tv <- tvs ]
+scopedSort :: [TyCoVar] -> [TyCoVar]
+scopedSort = go [] []
+  where
+    go :: [TyCoVar] -- already sorted, in reverse order
+       -> [TyCoVarSet] -- each set contains all the variables which must be placed
+                       -- before the tv corresponding to the set; they are accumulations
+                       -- of the fvs in the sorted tvs' kinds
+
+                       -- This list is in 1-to-1 correspondence with the sorted tyvars
+                       -- INVARIANT:
+                       --   all (\tl -> all (`subVarSet` head tl) (tail tl)) (tails fv_list)
+                       -- That is, each set in the list is a superset of all later sets.
+
+       -> [TyCoVar] -- yet to be sorted
+       -> [TyCoVar]
+    go acc _fv_list [] = reverse acc
+    go acc  fv_list (tv:tvs)
+      = go acc' fv_list' tvs
+      where
+        (acc', fv_list') = insert tv acc fv_list
+
+    insert :: TyCoVar       -- var to insert
+           -> [TyCoVar]     -- sorted list, in reverse order
+           -> [TyCoVarSet]  -- list of fvs, as above
+           -> ([TyCoVar], [TyCoVarSet])   -- augmented lists
+    insert tv []     []         = ([tv], [tyCoVarsOfType (tyVarKind tv)])
+    insert tv (a:as) (fvs:fvss)
+      | tv `elemVarSet` fvs
+      , (as', fvss') <- insert tv as fvss
+      = (a:as', fvs `unionVarSet` fv_tv : fvss')
+
+      | otherwise
+      = (tv:a:as, fvs `unionVarSet` fv_tv : fvs : fvss)
+      where
+        fv_tv = tyCoVarsOfType (tyVarKind tv)
+
+       -- lists not in correspondence
+    insert _ _ _ = panic "scopedSort"
 
 -- | Extract a well-scoped list of variables from a deterministic set of
 -- variables. The result is deterministic.
@@ -2138,15 +2199,47 @@ toposortTyVars tvs = reverse $
 -- well-scoped list. If you care about the list being well-scoped you also
 -- most likely care about it being in deterministic order.
 dVarSetElemsWellScoped :: DVarSet -> [Var]
-dVarSetElemsWellScoped = toposortTyVars . dVarSetElems
+dVarSetElemsWellScoped = scopedSort . dVarSetElems
 
 -- | Get the free vars of a type in scoped order
 tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
-tyCoVarsOfTypeWellScoped = toposortTyVars . tyCoVarsOfTypeList
+tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-tyCoVarsOfTypesWellScoped = toposortTyVars . tyCoVarsOfTypesList
+tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
+
+-- | Given the suffix of a telescope, returns the prefix.
+-- Ex: given [(k :: j), (a :: Proxy k)], returns [(j :: *)].
+tyCoVarsOfBindersWellScoped :: [TyVar] -> [TyVar]
+tyCoVarsOfBindersWellScoped tvs
+  = tyCoVarsOfTypeWellScoped (mkInvForAllTys tvs unitTy)
+
+------------- Closing over kinds -----------------
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a non-deterministic set.
+closeOverKinds :: TyVarSet -> TyVarSet
+closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+  -- It's OK to use nonDetEltsUniqSet here because we immediately forget
+  -- about the ordering by returning a set.
+
+-- | Given a list of tyvars returns a deterministic FV computation that
+-- returns the given tyvars with the kind variables free in the kinds of the
+-- given tyvars.
+closeOverKindsFV :: [TyVar] -> FV
+closeOverKindsFV tvs =
+  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministically ordered list.
+closeOverKindsList :: [TyVar] -> [TyVar]
+closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministic set.
+closeOverKindsDSet :: DTyVarSet -> DTyVarSet
+closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
 
 {-
 ************************************************************************

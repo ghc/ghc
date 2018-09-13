@@ -1840,8 +1840,8 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         rep_rhs_ty  = mkTyConApp fam_tc rep_rhs_tys
         rep_tcvs    = tyCoVarsOfTypesList rep_lhs_tys
         (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
-        rep_tvs'    = toposortTyVars rep_tvs
-        rep_cvs'    = toposortTyVars rep_cvs
+        rep_tvs'    = scopedSort rep_tvs
+        rep_cvs'    = scopedSort rep_cvs
         pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
 
     -- Same as inst_tys, but with the last argument type replaced by the

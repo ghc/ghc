@@ -1,7 +1,7 @@
 pattern Foo :: () => (b ~ a) => a :~~: b
   	-- Defined at <interactive>:5:1
 pattern Bar
-  :: forall k2 k1 (a :: k1) (b :: k2).
+  :: forall k1 k2 (a :: k1) (b :: k2).
      () =>
      (k2 ~ k1, b ~~ a) =>
      a :~~: b

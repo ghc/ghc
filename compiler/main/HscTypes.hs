@@ -2015,8 +2015,8 @@ tyThingParent_maybe (AConLike cl) = case cl of
     RealDataCon dc  -> Just (ATyCon (dataConTyCon dc))
     PatSynCon{}     -> Nothing
 tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
-                                      Just cls -> Just (ATyCon (classTyCon cls))
-                                      Nothing  -> Nothing
+                                      Just tc -> Just (ATyCon tc)
+                                      Nothing -> Nothing
 tyThingParent_maybe (AnId id)     = case idDetails id of
                                       RecSelId { sel_tycon = RecSelData tc } ->
                                           Just (ATyCon tc)

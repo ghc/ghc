@@ -1,0 +1,7 @@
+
+T15591b.hs:9:3: error:
+    • These kind and type variables: a c
+      are out of dependency order. Perhaps try this ordering:
+        a (b :: Proxy a) (c :: Proxy b)
+      NB: Implicitly declared variables come before others.
+    • In the associated type family declaration for ‘T4’

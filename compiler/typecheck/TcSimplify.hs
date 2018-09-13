@@ -674,7 +674,7 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
 simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
+       ; dep_vars <- candidateQTyVarsOfTypes gbl_tvs (map snd name_taus)
        ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
@@ -1083,8 +1083,12 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
        ; (prom, _) <- promoteTyVarSet mono_tvs
 
        -- Default any kind/levity vars
-       ; let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-                = candidateQTyVarsOfTypes candidates
+       ; DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
+                <- candidateQTyVarsOfTypes mono_tvs candidates
+                -- any covars should already be handled by
+                -- the logic in decideMonoTyVars, which looks at
+                -- the constraints generated
+
        ; poly_kinds  <- xoptM LangExt.PolyKinds
        ; default_kvs <- mapM (default_one poly_kinds True)
                              (dVarSetElems cand_kvs)
@@ -1150,11 +1154,10 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
        -- order as the partial signatures do (Trac #13524)
-       ; let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-                      = candidateQTyVarsOfTypes $
-                        psig_tys ++ candidates ++ tau_tys
-             pick     = (`dVarSetIntersectVarSet` grown_tcvs)
-             dvs_plus = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
+       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes mono_tvs $
+                                                         psig_tys ++ candidates ++ tau_tys
+       ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
+             dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; traceTc "decideQuantifiedTyVars" (vcat
            [ text "seed_tys =" <+> ppr seed_tys
@@ -1696,7 +1699,7 @@ checkBadTelescope :: Implication -> TcS Bool
 checkBadTelescope (Implic { ic_telescope  = m_telescope
                           , ic_skols      = skols })
   | isJust m_telescope
-  = do{ skols <- mapM TcS.zonkTcTyCoVarBndr skols
+  = do{ skols <- mapM TcS.zonkTyCoVarKind skols
       ; return (go emptyVarSet (reverse skols))}
 
   | otherwise

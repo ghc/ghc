@@ -1,6 +1,6 @@
 
 T14350.hs:59:15: error:
-    • Couldn't match expected type ‘Proxy a2
+    • Couldn't match expected type ‘Proxy a1
                                     -> Apply (Apply c 'Proxy) (Apply g 'Proxy)’
                   with actual type ‘Sing (f @@ t0)’
     • The function ‘applySing’ is applied to three arguments,
@@ -8,11 +8,11 @@ T14350.hs:59:15: error:
       In the expression: applySing f Proxy Proxy
       In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy
     • Relevant bindings include
-        x :: Sing x3 (bound at T14350.hs:59:11)
+        x :: Sing x (bound at T14350.hs:59:11)
         g :: Sing g (bound at T14350.hs:59:9)
         f :: Sing f (bound at T14350.hs:59:7)
         dcomp :: Sing f
-                 -> Sing g -> Sing x3 -> (c @@ 'Proxy) @@ (g @@ 'Proxy)
+                 -> Sing g -> Sing x -> (c @@ 'Proxy) @@ (g @@ 'Proxy)
           (bound at T14350.hs:59:1)
 
 T14350.hs:59:27: error:
@@ -22,9 +22,9 @@ T14350.hs:59:27: error:
       In the expression: applySing f Proxy Proxy
       In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy
     • Relevant bindings include
-        x :: Sing x3 (bound at T14350.hs:59:11)
+        x :: Sing x (bound at T14350.hs:59:11)
         g :: Sing g (bound at T14350.hs:59:9)
         f :: Sing f (bound at T14350.hs:59:7)
         dcomp :: Sing f
-                 -> Sing g -> Sing x3 -> (c @@ 'Proxy) @@ (g @@ 'Proxy)
+                 -> Sing g -> Sing x -> (c @@ 'Proxy) @@ (g @@ 'Proxy)
           (bound at T14350.hs:59:1)

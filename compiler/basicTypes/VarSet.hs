@@ -237,6 +237,7 @@ unitDVarSet = unitUniqDSet
 mkDVarSet :: [Var] -> DVarSet
 mkDVarSet = mkUniqDSet
 
+-- The new element always goes to the right of existing ones.
 extendDVarSet :: DVarSet -> Var -> DVarSet
 extendDVarSet = addOneToUniqDSet
 

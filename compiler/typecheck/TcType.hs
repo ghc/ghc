@@ -104,7 +104,6 @@ module TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  candidateQTyVarsOfType, candidateQTyVarsOfTypes, CandidatesQTvs(..),
   anyRewritableTyVar,
 
   ---------------------------------
@@ -181,7 +180,7 @@ module TcType (
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTCvBndr, pprTCvBndrs,
 
-  TypeSize, sizeType, sizeTypes, toposortTyVars,
+  TypeSize, sizeType, sizeTypes, scopedSort,
 
   ---------------------------------
   -- argument visibility
@@ -225,11 +224,10 @@ import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List  ( mapAccumL )
+import Data.List  ( mapAccumL, foldl' )
 import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
-import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -1006,149 +1004,6 @@ Moreover, if we were to kick out the inert item the exact same situation
 would re-occur and we end up with an infinite loop in which each kicks
 out the other (Trac #14363).
 -}
-
-{- *********************************************************************
-*                                                                      *
-          Type and kind variables in a type
-*                                                                      *
-********************************************************************* -}
-
-data CandidatesQTvs  -- See Note [Dependent type variables]
-                     -- See Note [CandidatesQTvs determinism and order]
-  = DV { dv_kvs :: DTyCoVarSet  -- "kind" variables (dependent)
-       , dv_tvs :: DTyVarSet    -- "type" variables (non-dependent)
-         -- A variable may appear in both sets
-         -- E.g.   T k (x::k)    The first occurrence of k makes it
-         --                      show up in dv_tvs, the second in dv_kvs
-         -- See Note [Dependent type variables]
-    }
-
-instance Semi.Semigroup CandidatesQTvs where
-   (DV { dv_kvs = kv1, dv_tvs = tv1 }) <> (DV { dv_kvs = kv2, dv_tvs = tv2 })
-          = DV { dv_kvs = kv1 `unionDVarSet` kv2
-               , dv_tvs = tv1 `unionDVarSet` tv2}
-
-instance Monoid CandidatesQTvs where
-   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
-   mappend = (Semi.<>)
-
-instance Outputable CandidatesQTvs where
-  ppr (DV {dv_kvs = kvs, dv_tvs = tvs })
-    = text "DV" <+> braces (sep [ text "dv_kvs =" <+> ppr kvs
-                                , text "dv_tvs =" <+> ppr tvs ])
-
-{- Note [Dependent type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Haskell type inference we quantify over type variables; but we only
-quantify over /kind/ variables when -XPolyKinds is on.  Without -XPolyKinds
-we default the kind variables to *.
-
-So, to support this defaulting, and only for that reason, when
-collecting the free vars of a type, prior to quantifying, we must keep
-the type and kind variables separate.
-
-But what does that mean in a system where kind variables /are/ type
-variables? It's a fairly arbitrary distinction based on how the
-variables appear:
-
-  - "Kind variables" appear in the kind of some other free variable
-     PLUS any free coercion variables
-
-     These are the ones we default to * if -XPolyKinds is off
-
-  - "Type variables" are all free vars that are not kind variables
-
-E.g.  In the type    T k (a::k)
-      'k' is a kind variable, because it occurs in the kind of 'a',
-          even though it also appears at "top level" of the type
-      'a' is a type variable, because it doesn't
-
-We gather these variables using a CandidatesQTvs record:
-  DV { dv_kvs: Variables free in the kind of a free type variable
-               or of a forall-bound type variable
-     , dv_tvs: Variables sytactically free in the type }
-
-So:  dv_kvs            are the kind variables of the type
-     (dv_tvs - dv_kvs) are the type variable of the type
-
-Note that
-
-* A variable can occur in both.
-      T k (x::k)    The first occurrence of k makes it
-                    show up in dv_tvs, the second in dv_kvs
-
-* We include any coercion variables in the "dependent",
-  "kind-variable" set because we never quantify over them.
-
-* Both sets are un-ordered, of course.
-
-* The "kind variables" might depend on each other; e.g
-     (k1 :: k2), (k2 :: *)
-  The "type variables" do not depend on each other; if
-  one did, it'd be classified as a kind variable!
-
-Note [CandidatesQTvs determinism and order]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Determinism: when we quantify over type variables we decide the
-  order in which they appear in the final type. Because the order of
-  type variables in the type can end up in the interface file and
-  affects some optimizations like worker-wrapper, we want this order to
-  be deterministic.
-
-  To achieve that we use deterministic sets of variables that can be
-  converted to lists in a deterministic order. For more information
-  about deterministic sets see Note [Deterministic UniqFM] in UniqDFM.
-
-* Order: as well as being deterministic, we use an
-  accumulating-parameter style for candidateQTyVarsOfType so that we
-  add variables one at a time, left to right.  That means we tend to
-  produce the variables in left-to-right order.  This is just to make
-  it bit more predicatable for the programmer.
--}
-
--- | Worker for 'splitDepVarsOfType'. This might output the same var
--- in both sets, if it's used in both a type and a kind.
--- See Note [CandidatesQTvs determinism and order]
--- See Note [Dependent type variables]
-candidateQTyVarsOfType :: Type -> CandidatesQTvs
-candidateQTyVarsOfType = split_dvs emptyVarSet mempty
-
-split_dvs :: VarSet -> CandidatesQTvs -> Type -> CandidatesQTvs
-split_dvs bound dvs ty
-  = go dvs ty
-  where
-    go dv (AppTy t1 t2)    = go (go dv t1) t2
-    go dv (TyConApp _ tys) = foldl' go dv tys
-    go dv (FunTy arg res)  = go (go dv arg) res
-    go dv (LitTy {})       = dv
-    go dv (CastTy ty co)   = go dv ty `mappend` go_co co
-    go dv (CoercionTy co)  = dv `mappend` go_co co
-
-    go dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) (TyVarTy tv)
-      | tv `elemVarSet` bound
-      = dv
-      | otherwise
-      = DV { dv_kvs = kvs `unionDVarSet`
-                      kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
-           , dv_tvs = tvs `extendDVarSet` tv }
-
-    go dv (ForAllTy (Bndr tv _) ty)
-      = DV { dv_kvs = kvs `unionDVarSet`
-                      kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
-           , dv_tvs = tvs }
-      where
-        DV { dv_kvs = kvs, dv_tvs = tvs } = split_dvs (bound `extendVarSet` tv) dv ty
-
-    go_co co = DV { dv_kvs = kill_bound (tyCoVarsOfCoDSet co)
-                  , dv_tvs = emptyDVarSet }
-
-    kill_bound free
-      | isEmptyVarSet bound = free
-      | otherwise           = free `dVarSetMinusVarSet` bound
-
--- | Like 'splitDepVarsOfType', but over a list of types
-candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs
-candidateQTyVarsOfTypes = foldl' (split_dvs emptyVarSet) mempty
 
 {-
 ************************************************************************

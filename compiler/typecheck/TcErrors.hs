@@ -485,7 +485,7 @@ reportBadTelescope ctxt env (Just telescope) skols
                 text "are out of dependency order. Perhaps try this ordering:")
              2 (pprTyVars sorted_tvs)
 
-    sorted_tvs = toposortTyVars skols
+    sorted_tvs = scopedSort skols
 
 reportBadTelescope _ _ Nothing skols
   = pprPanic "reportBadTelescope" (ppr skols)

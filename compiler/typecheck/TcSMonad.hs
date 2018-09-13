@@ -105,7 +105,7 @@ module TcSMonad (
     zonkTyCoVarsAndFV, zonkTcType, zonkTcTypes, zonkTcTyVar, zonkCo,
     zonkTyCoVarsAndFVList,
     zonkSimples, zonkWC,
-    zonkTcTyCoVarBndr,
+    zonkTyCoVarKind,
 
     -- References
     newTcRef, readTcRef, writeTcRef, updTcRef,
@@ -3095,14 +3095,7 @@ pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
 
 isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
-isFilledMetaTyVar_maybe tv
- = case tcTyVarDetails tv of
-     MetaTv { mtv_ref = ref }
-        -> do { cts <- readTcRef ref
-              ; case cts of
-                  Indirect ty -> return (Just ty)
-                  Flexi       -> return Nothing }
-     _ -> return Nothing
+isFilledMetaTyVar_maybe tv = wrapTcS (TcM.isFilledMetaTyVar_maybe tv)
 
 isFilledMetaTyVar :: TcTyVar -> TcS Bool
 isFilledMetaTyVar tv = wrapTcS (TcM.isFilledMetaTyVar tv)
@@ -3131,8 +3124,8 @@ zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
 zonkWC :: WantedConstraints -> TcS WantedConstraints
 zonkWC wc = wrapTcS (TcM.zonkWC wc)
 
-zonkTcTyCoVarBndr :: TcTyCoVar -> TcS TcTyCoVar
-zonkTcTyCoVarBndr tv = wrapTcS (TcM.zonkTcTyCoVarBndr tv)
+zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
+zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
 {- *********************************************************************
 *                                                                      *
