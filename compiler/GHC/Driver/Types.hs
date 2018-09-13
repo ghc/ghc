@@ -18,7 +18,8 @@
 -- | Types for the per-module compiler
 module GHC.Driver.Types (
         -- * compilation state
-        HscEnv(..), hscEPS,
+        HscEnv(..), hscEPS, hsc_HPT, hsc_dflags, set_hsc_dflags, set_hsc_HPT, modify_hsc_dflags,
+        InternalUnitEnv(..), modify_hsc_HPT,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
@@ -80,7 +81,7 @@ module GHC.Driver.Types (
         extendInteractiveContext, extendInteractiveContextWithIds,
         substInteractiveContext,
         setInteractivePrintName, icInteractiveModule,
-        InteractiveImport(..), setInteractivePackage,
+        InteractiveImport(..),
         mkPrintUnqualified, pprModulePrefix,
         mkQualPackage, mkQualModule, pkgQual,
 
@@ -291,6 +292,38 @@ instance MonadIO Hsc where
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
+hsc_currentInternalUnitEnv :: HscEnv -> InternalUnitEnv
+hsc_currentInternalUnitEnv e = case Map.lookup (hsc_currentPackage e) (hsc_internalUnitEnv e) of
+    Just unitEnv -> unitEnv
+    Nothing -> pprPanic "packageNotFound" $
+      ppr $ hsc_currentPackage e
+
+hsc_dflags :: HscEnv -> DynFlags
+hsc_dflags = internalUnitEnv_dflags . hsc_currentInternalUnitEnv
+
+set_hsc_dflags :: HscEnv -> DynFlags -> HscEnv
+set_hsc_dflags e dflags = modify_hsc_dflags e $ const dflags
+
+modify_hsc_dflags :: HscEnv -> (DynFlags -> DynFlags) -> HscEnv
+modify_hsc_dflags e f = e
+  { hsc_internalUnitEnv = Map.adjust update (hsc_currentPackage e) $ hsc_internalUnitEnv e
+  }
+  where
+    update unitEnv = unitEnv { internalUnitEnv_dflags = f $ internalUnitEnv_dflags unitEnv }
+
+hsc_HPT :: HscEnv -> HomePackageTable
+hsc_HPT = internalUnitEnv_homePackageTable . hsc_currentInternalUnitEnv
+
+set_hsc_HPT :: HscEnv -> HomePackageTable -> HscEnv
+set_hsc_HPT e hpt = modify_hsc_HPT e $ const hpt
+
+modify_hsc_HPT :: HscEnv -> (HomePackageTable -> HomePackageTable) -> HscEnv
+modify_hsc_HPT e f = e
+  { hsc_internalUnitEnv = Map.adjust update (hsc_currentPackage e) $ hsc_internalUnitEnv e
+  }
+  where
+    update unitEnv = unitEnv { internalUnitEnv_homePackageTable = f $ internalUnitEnv_homePackageTable unitEnv }
+
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
     (a, w) <- hsc hsc_env emptyBag
@@ -298,9 +331,14 @@ runHsc hsc_env (Hsc hsc) = do
     return a
 
 mkInteractiveHscEnv :: HscEnv -> HscEnv
-mkInteractiveHscEnv hsc_env = hsc_env{ hsc_dflags = interactive_dflags }
+mkInteractiveHscEnv hsc_env = hsc_env
+    { hsc_internalUnitEnv = Map.insert interactiveUnitId interactiveInternalUnitEnv $ hsc_internalUnitEnv hsc_env
+    }
   where
-    interactive_dflags = ic_dflags (hsc_IC hsc_env)
+    interactiveInternalUnitEnv = InternalUnitEnv
+        { internalUnitEnv_dflags = ic_dflags (hsc_IC hsc_env)
+        , internalUnitEnv_homePackageTable = hsc_HPT hsc_env
+        }
 
 runInteractiveHsc :: HscEnv -> Hsc a -> IO a
 -- A variant of runHsc that switches in the DynFlags from the
@@ -415,6 +453,30 @@ shouldPrintWarning _ _
 ************************************************************************
 -}
 
+data InternalUnitEnv = InternalUnitEnv
+  { internalUnitEnv_dflags :: DynFlags
+    -- ^ The dynamic flag settings
+  , internalUnitEnv_homePackageTable :: HomePackageTable
+    -- ^ The home package table describes already-compiled
+    -- home-package modules, /excluding/ the module we
+    -- are compiling right now.
+    -- (In one-shot mode the current module is the only
+    -- home-package module, so hsc_HPT is empty.  All other
+    -- modules count as \"external-package\" modules.
+    -- However, even in GHCi mode, hi-boot interfaces are
+    -- demand-loaded into the external-package table.)
+    --
+    -- 'hsc_HPT' is not mutable because we only demand-load
+    -- external packages; the home package is eagerly
+    -- loaded, module by module, by the compilation manager.
+    --
+    -- The HPT may contain modules compiled earlier by @--make@
+    -- but not actually below the current module in the dependency
+    -- graph.
+    --
+    -- (This changes a previous invariant: changed Jan 05.)
+  }
+
 -- | HscEnv is like 'Session', except that some of the fields are immutable.
 -- An HscEnv is used to compile a single module from plain Haskell source
 -- code (after preprocessing) to either C, assembly or C--. It's also used
@@ -429,8 +491,12 @@ shouldPrintWarning _ _
 -- a single module.
 data HscEnv
   = HscEnv {
-        hsc_dflags :: DynFlags,
-                -- ^ The dynamic flag settings
+
+        hsc_internalUnitEnv :: Map UnitId InternalUnitEnv,
+                -- ^ Information per package / unit, for "internal" (not already
+                -- installed) units.
+
+        hsc_currentPackage :: UnitId,
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session
@@ -441,25 +507,7 @@ data HscEnv
         hsc_IC :: InteractiveContext,
                 -- ^ The context for evaluating interactive statements
 
-        hsc_HPT    :: HomePackageTable,
-                -- ^ The home package table describes already-compiled
-                -- home-package modules, /excluding/ the module we
-                -- are compiling right now.
-                -- (In one-shot mode the current module is the only
-                -- home-package module, so hsc_HPT is empty.  All other
-                -- modules count as \"external-package\" modules.
-                -- However, even in GHCi mode, hi-boot interfaces are
-                -- demand-loaded into the external-package table.)
-                --
-                -- 'hsc_HPT' is not mutable because we only demand-load
-                -- external packages; the home package is eagerly
-                -- loaded, module by module, by the compilation manager.
-                --
-                -- The HPT may contain modules compiled earlier by @--make@
-                -- but not actually below the current module in the dependency
-                -- graph.
-                --
-                -- (This changes a previous invariant: changed Jan 05.)
+        -- hsc_HPT    :: HomePackageTable,
 
         hsc_EPS :: {-# UNPACK #-} !(IORef ExternalPackageState),
                 -- ^ Information about the currently loaded external packages.
@@ -571,6 +619,7 @@ hscEPS hsc_env = readIORef (hsc_EPS hsc_env)
 data Target
   = Target {
       targetId           :: TargetId, -- ^ module or filename
+      targetPackage      :: UnitId,   -- ^ target's package
       targetAllowObjCode :: Bool,     -- ^ object code allowed?
       targetContents     :: Maybe (InputFileBuffer, UTCTime)
       -- ^ Optional in-memory buffer containing the source code GHC should
@@ -598,7 +647,8 @@ data TargetId
 type InputFileBuffer = StringBuffer
 
 pprTarget :: Target -> SDoc
-pprTarget (Target id obj _) =
+pprTarget (Target id package obj _) =
+    text "\"" <> ppr package <> text "\" " <>
     (if obj then char '*' else empty) <> pprTargetId id
 
 instance Outputable Target where
@@ -1845,12 +1895,6 @@ shadowed_by ids = shadowed
   where
     shadowed id = getOccName id `elemOccSet` new_occs
     new_occs = mkOccSet (map getOccName ids)
-
-setInteractivePackage :: HscEnv -> HscEnv
--- Set the 'thisPackage' DynFlag to 'interactive'
-setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { thisInstalledUnitId = toInstalledUnitId interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
