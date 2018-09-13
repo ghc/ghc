@@ -1115,14 +1115,13 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
-       ; this_mod <- getModule
        ; is_boot  <- tcIsHsBootOrSig
-       ; check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args }
+       ; check_valid_inst_head dflags is_boot ctxt clas cls_args }
 
-check_valid_inst_head :: DynFlags -> Module -> Bool
+check_valid_inst_head :: DynFlags -> Bool
                       -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
+check_valid_inst_head dflags is_boot ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
