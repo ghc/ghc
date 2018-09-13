@@ -3,6 +3,8 @@
 import Data.List
 import SrcLoc
 import GHC hiding (moduleName)
+import GhcMonad ( getSession )
+import HscTypes ( hsc_currentPackage )
 import HsDumpAst
 import DynFlags
 import Outputable hiding (space)
@@ -71,10 +73,12 @@ parseOneFile libdir fileName = do
                Nothing -> False
                Just fn -> fn == fileName
        runGhc (Just libdir) $ do
+         hsc_env <- getSession
          dflags <- getSessionDynFlags
          let dflags2 = dflags `gopt_set` Opt_KeepRawTokenStream
          _ <- setSessionDynFlags dflags2
          addTarget Target { targetId = TargetFile fileName Nothing
+                          , targetPackage = hsc_currentPackage hsc_env
                           , targetAllowObjCode = True
                           , targetContents = Nothing }
          _ <- load LoadAllTargets
