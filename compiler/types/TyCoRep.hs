@@ -1648,6 +1648,7 @@ tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
 
 ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_type (TyVarTy v) is acc
+  -- See Note [Closing over free variable kinds]
   | v `elemVarSet` is  = acc
   | v `elemVarSet` acc = acc
   | otherwise          = ty_co_vars_of_type (tyVarKind v) emptyVarSet (extendVarSet acc v)
@@ -1781,7 +1782,7 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- Eta-expanded because that makes it run faster (apparently)
 -- See Note [FV eta expansion] in FV for explanation.
 tyCoFVsOfType :: Type -> FV
--- See Note [Free variables of types]
+-- See Note [Free variables of types] and Note [Closing over free variable kinds]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
   | not (f v) = (acc_list, acc_set)
   | v `elemVarSet` bound_vars = (acc_list, acc_set)
@@ -1868,6 +1869,82 @@ tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scop
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCos cos) fv_cand in_scope acc
+
+{-
+
+Note [Closing over free variable kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+tyCoVarsOfType and tyCoFVsOfType, while traversing a type, will also close over
+free variable kinds. In previous GHC versions, this happened naively: whenever
+we would encounter an occurrence of a free type variable, we would close over
+its kind. This, however is wrong for two reasons (see Trac #14880):
+
+1. Efficiency. If we have Proxy (a::k) -> Proxy (a::k) -> Proxy (a::k), then
+   we don't want to have to traverse k more than once.
+
+2. Correctness. Imagine we have forall k. b -> k, where b has
+   kind k, for some k bound in an outer scope. If we look at b's kind inside
+   the forall, we'll collect that k is free and then remove k from the set of
+   free variables. This is plain wrong. We must instead compute that b is free
+   and then conclude that b's kind is free.
+
+An obvious first approach is to move the closing-over-kinds from the
+occurrences of a type variable to after finding the free vars - however, this
+turns out to introduce performance regressions, and isn't even entirely
+correct.
+
+In fact, it isn't even important *when* we close over kinds; what matters is
+that we handle each type var exactly once, and that we do it in the right
+context.
+
+So the next approach we tried was to use the "in-scope set" part of FV or the
+equivalent argument in the accumulator-style `ty_co_vars_of_type` function, to
+say "don't bother with variables we have already closed over". This should work
+fine in theory, but the code is complicated and doesn't perform well.
+
+But there is a simpler way, which is implemented here. Consider the two points
+above:
+
+1. Efficiency: we now have an accumulator, so the second time we encounter 'a',
+   we'll ignore it, certainly not looking at its kind - this is why
+   pre-checking set membership before inserting ends up not only being faster,
+   but also being correct.
+
+2. Correctness: we have an "in-scope set" (I think we should call it it a
+  "bound-var set"), specifying variables that are bound by a forall in the type
+  we are traversing; we simply ignore these variables, certainly not looking at
+  their kind.
+
+So consider:
+
+    forall k. b -> k
+
+where b :: k->Type is free; but of course, it's a different k! When looking at
+b -> k we'll have k in the bound-var set. So we'll ignore the k. But suppose
+this is our first encounter with b; we want the free vars of its kind. But we
+want to behave as if we took the free vars of its kind at the end; that is,
+with no bound vars in scope.
+
+So the solution is easy. The old code was this:
+
+  ty_co_vars_of_type (TyVarTy v) is acc
+    | v `elemVarSet` is  = acc
+    | v `elemVarSet` acc = acc
+    | otherwise          = ty_co_vars_of_type (tyVarKind v) is (extendVarSet acc v)
+
+Now all we need to do is take the free vars of tyVarKind v *with an empty
+bound-var set*, thus:
+
+ty_co_vars_of_type (TyVarTy v) is acc
+  | v `elemVarSet` is  = acc
+  | v `elemVarSet` acc = acc
+  | otherwise          = ty_co_vars_of_type (tyVarKind v) emptyVarSet (extendVarSet acc v)
+                                                          ^^^^^^^^^^^
+
+And that's it.
+
+-}
 
 ------------- Extracting the CoVars of a type or coercion -----------
 
