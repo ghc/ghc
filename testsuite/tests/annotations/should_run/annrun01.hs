@@ -1,11 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
 import GHC
 import GHC.Utils.Monad  ( liftIO )
 import Data.Maybe
-import GHC.Driver.Session    ( defaultFatalMessager, defaultFlushOut )
+import GHC.Driver.Session    ( defaultFatalMessager, defaultFlushOut, thisPackage )
 import GHC.Types.Annotations ( AnnTarget(..), CoreAnnTarget )
 import GHC.Serialized  ( deserializeWithData )
 import GHC.Utils.Panic
@@ -28,7 +29,12 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     let mod_nm = mkModuleName "Annrun01_Help"
 
     liftIO $ putStrLn "Setting Target"
-    setTargets [Target (TargetModule mod_nm) True Nothing]
+    setTargets $ pure @[] $ Target
+      { targetId = TargetModule mod_nm
+      , targetPackage = thisPackage dflags
+      , targetAllowObjCode = True
+      , targetContents = Nothing
+      }
     liftIO $ putStrLn "Loading Targets"
     load LoadAllTargets
 
