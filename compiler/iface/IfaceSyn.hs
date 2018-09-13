@@ -182,9 +182,11 @@ data IfaceClassBody
 
 data IfaceTyConParent
   = IfNoParent
-  | IfDataInstance IfExtName
-                   IfaceTyCon
-                   IfaceAppArgs
+  | IfDataInstance
+       IfExtName     -- Axiom name
+       IfaceTyCon    -- Family TyCon (pretty-printing only, not used in TcIface)
+                     -- see Note [Pretty printing via IfaceSyn] in PprTyThing
+       IfaceAppArgs  -- Arguments of the family TyCon
 
 data IfaceFamTyConFlav
   = IfaceDataFamilyTyCon                      -- Data family
@@ -192,7 +194,7 @@ data IfaceFamTyConFlav
   | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
     -- or 'Nothing' for an empty closed family without an axiom
-    -- See Note [Pretty-printing via IfaceSyn] in PprTyThing
+    -- See Note [Pretty printing via IfaceSyn] in PprTyThing
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
