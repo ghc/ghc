@@ -18,6 +18,11 @@
 
   * Add a `ViaStrategy` constructor to `DerivStrategy`.
 
+  * Add support for `-XImplicitParams` via `ImplicitParamT`,
+    `ImplicitParamVarE`, and `ImplicitParamBindD`.
+
+  * Add support for `-XRecursiveDo` via `MDoE` and `RecS`.
+
 ## 2.13.0.0 *March 2018*
 
   * Bundled with GHC 8.4.1

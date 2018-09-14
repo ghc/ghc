@@ -165,6 +165,9 @@ noBindS e = do { e1 <- e; return (NoBindS e1) }
 parS :: [[StmtQ]] -> StmtQ
 parS sss = do { sss1 <- mapM sequence sss; return (ParS sss1) }
 
+recS :: [StmtQ] -> StmtQ
+recS ss = do { ss1 <- sequence ss; return (RecS ss1) }
+
 -------------------------------------------------------------------------------
 -- *   Range
 
@@ -305,6 +308,9 @@ caseE e ms = do { e1 <- e; ms1 <- sequence ms; return (CaseE e1 ms1) }
 doE :: [StmtQ] -> ExpQ
 doE ss = do { ss1 <- sequence ss; return (DoE ss1) }
 
+mdoE :: [StmtQ] -> ExpQ
+mdoE ss = do { ss1 <- sequence ss; return (MDoE ss1) }
+
 compE :: [StmtQ] -> ExpQ
 compE ss = do { ss1 <- sequence ss; return (CompE ss1) }
 
@@ -338,6 +344,9 @@ unboundVarE s = return (UnboundVarE s)
 
 labelE :: String -> ExpQ
 labelE s = return (LabelE s)
+
+implicitParamVarE :: String -> ExpQ
+implicitParamVarE n = return (ImplicitParamVarE n)
 
 -- ** 'arithSeqE' Shortcuts
 fromE :: ExpQ -> ExpQ
@@ -563,6 +572,14 @@ patSynSigD nm ty =
   do ty' <- ty
      return $ PatSynSigD nm ty'
 
+-- | Implicit parameter binding declaration. Can only be used in let
+-- and where clauses which consist entirely of implicit bindings.
+implicitParamBindD :: String -> ExpQ -> DecQ
+implicitParamBindD n e =
+  do
+    e' <- e
+    return $ ImplicitParamBindD n e'
+
 tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
 tySynEqn lhs rhs =
   do
@@ -680,6 +697,12 @@ equalityT = return EqualityT
 
 wildCardT :: TypeQ
 wildCardT = return WildCardT
+
+implicitParamT :: String -> TypeQ -> TypeQ
+implicitParamT n t
+  = do
+      t' <- t
+      return $ ImplicitParamT n t'
 
 {-# DEPRECATED classP "As of template-haskell-2.10, constraint predicates (Pred) are just types (Type), in keeping with ConstraintKinds. Please use 'conT' and 'appT'." #-}
 classP :: Name -> [Q Type] -> Q Pred
