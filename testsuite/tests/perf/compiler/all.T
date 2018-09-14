@@ -1186,8 +1186,8 @@ test('MultiLayerModules',
           ]),
        pre_cmd('./genMultiLayerModules'),
        extra_files(['genMultiLayerModules']),
-       compile_timeout_multiplier(2)
-       # 2 is _a lot_ (timeout after 600s, to build 600 modules),
+       compile_timeout_multiplier(5)
+       # this is _a lot_
        # but this test has been failing every now and then,
        # especially on i386. Let's just give it some room
        # to complete successfully reliably everywhere.
@@ -1234,8 +1234,8 @@ test('T13701',
           ]),
        pre_cmd('./genT13701'),
        extra_files(['genT13701']),
-       compile_timeout_multiplier(2)
-       # 2 is _a lot_ (timeout after 600s, to build 600 modules),
+       compile_timeout_multiplier(4)
+       # 4 is _a lot_ (timeout after 1200s),
        # but this test has been failing every now and then,
        # especially on i386. Let's just give it some room
        # to complete successfully reliably everywhere.
