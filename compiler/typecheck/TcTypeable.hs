@@ -36,7 +36,7 @@ import Module
 import HsSyn
 import DynFlags
 import Bag
-import Var ( TyVarBndr(..) )
+import Var ( VarBndr(..) )
 import CoreMap
 import Constants
 import Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
@@ -401,7 +401,7 @@ mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds GhcTc)
 mkTyConRepBinds stuff@(Stuff {..}) todo (TypeableTyCon {..})
   = do -- Make a KindRep
-       let (bndrs, kind) = splitForAllTyVarBndrs (tyConKind tycon)
+       let (bndrs, kind) = splitForAllVarBndrs (tyConKind tycon)
        liftTc $ traceTc "mkTyConKindRepBinds"
                         (ppr tycon $$ ppr (tyConKind tycon) $$ ppr kind)
        let ctx = mkDeBruijnContext (map binderVar bndrs)
@@ -579,7 +579,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
       | otherwise
       = pprPanic "mkTyConKindRepBinds(TyConApp)" (ppr tc $$ ppr k)
 
-    new_kind_rep (ForAllTy (TvBndr var _) ty)
+    new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
     new_kind_rep (FunTy t1 t2)

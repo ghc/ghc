@@ -55,6 +55,7 @@ opt_co2.
 
 Note [Optimising InstCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~
+(1) tv is a type variable
 When we have (InstCo (ForAllCo tv h g) g2), we want to optimise.
 
 Let's look at the typing rules.
@@ -81,6 +82,30 @@ this operation already exists: it's called *lifting*, and defined in Coercion.
 We just need to enhance the lifting operation to be able to deal with
 an ambient substitution, which is why a LiftingContext stores a TCvSubst.
 
+(2) cv is a coercion variable
+Now consider we have (InstCo (ForAllCo cv h g) g2), we want to optimise.
+
+h : (t1 ~r t2) ~N (t3 ~r t4)
+cv : t1 ~r t2 |- g : t1' ~r2 t2'
+n1 = nth r 2 (downgradeRole r N h) :: t1 ~r t3
+n2 = nth r 3 (downgradeRole r N h) :: t2 ~r t4
+------------------------------------------------
+ForAllCo cv h g : (all cv:t1 ~r t2. t1') ~r2
+                  (all cv:t3 ~r t4. t2'[cv |-> n1 ; cv ; sym n2])
+
+g1 : (all cv:t1 ~r t2. t1') ~ (all cv: t3 ~r t4. t2')
+g2 : h1 ~N h2
+h1 : t1 ~r t2
+h2 : t3 ~r t4
+------------------------------------------------
+InstCo g1 g2 : t1'[cv |-> h1] ~ t2'[cv |-> h2]
+
+We thus want some coercion proving this:
+
+  t1'[cv |-> h1] ~ t2'[cv |-> n1 ; h2; sym n2]
+
+So we substitute the coercion variable c for the coercion
+(h1 ~N (n1; h2; sym n2)) in g.
 -}
 
 optCoercion :: DynFlags -> TCvSubst -> Coercion -> NormalCo
@@ -299,13 +324,15 @@ opt_co4 env _sym rep r (NthCo _r n co)
   | Just (ty, _) <- isReflCo_maybe co
   , n == 0
   , Just (tv, _) <- splitForAllTy_maybe ty
-  = liftCoSubst (chooseRole rep r) env (tyVarKind tv)
+      -- works for both tyvar and covar
+  = liftCoSubst (chooseRole rep r) env (varType tv)
 
 opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
   = ASSERT( r == r1 )
     opt_co4_wrap env sym rep r (cos `getNth` n)
 
 opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
+      -- works for both tyvar and covar
   = ASSERT( r == _r )
     ASSERT( n == 0 )
     opt_co4_wrap env sym rep Nominal eta
@@ -348,26 +375,58 @@ opt_co4 env sym rep r (LRCo lr co)
 -- See Note [Optimising InstCo]
 opt_co4 env sym rep r (InstCo co1 arg)
     -- forall over type...
-  | Just (tv, kind_co, co_body) <- splitForAllCo_maybe co1
+  | Just (tv, kind_co, co_body) <- splitForAllCo_ty_maybe co1
   = opt_co4_wrap (extendLiftingContext env tv
                     (mkCoherenceRightCo Nominal t2 (mkSymCo kind_co) arg'))
+                   -- kind_co :: k1 ~ k2
+                   -- arg' :: (t1 :: k1) ~ (t2 :: k2)
+                   -- tv |-> (t1 :: k1) ~ (((t2 :: k2) |> (sym kind_co)) :: k1)
                  sym rep r co_body
+
+    -- forall over coercion...
+  | Just (cv, kind_co, co_body) <- splitForAllCo_co_maybe co1
+  , CoercionTy h1 <- t1
+  , CoercionTy h2 <- t2
+  = let new_co = mk_new_co cv (opt_co4_wrap env sym False Nominal kind_co) h1 h2
+    in opt_co4_wrap (extendLiftingContext env cv new_co) sym rep r co_body
 
     -- See if it is a forall after optimization
     -- If so, do an inefficient one-variable substitution, then re-optimize
 
     -- forall over type...
-  | Just (tv', kind_co', co_body') <- splitForAllCo_maybe co1'
+  | Just (tv', kind_co', co_body') <- splitForAllCo_ty_maybe co1'
   = opt_co4_wrap (extendLiftingContext (zapLiftingContext env) tv'
                     (mkCoherenceRightCo Nominal t2 (mkSymCo kind_co') arg'))
             False False r' co_body'
+
+    -- forall over coercion...
+  | Just (cv', kind_co', co_body') <- splitForAllCo_co_maybe co1'
+  , CoercionTy h1 <- t1
+  , CoercionTy h2 <- t2
+  = let new_co = mk_new_co cv' kind_co' h1 h2
+    in opt_co4_wrap (extendLiftingContext (zapLiftingContext env) cv' new_co)
+                    False False r' co_body'
 
   | otherwise = InstCo co1' arg'
   where
     co1' = opt_co4_wrap env sym rep r co1
     r'   = chooseRole rep r
     arg' = opt_co4_wrap env sym False Nominal arg
-    Pair _ t2 = coercionKind arg'
+    Pair t1 t2 = coercionKind arg'
+
+    mk_new_co cv kind_co h1 h2
+      = let -- h1 :: (t1 ~ t2)
+            -- h2 :: (t3 ~ t4)
+            -- kind_co :: (t1 ~ t2) ~ (t3 ~ t4)
+            -- n1 :: t1 ~ t3
+            -- n2 :: t2 ~ t4
+            -- new_co = (h1 :: t1 ~ t2) ~ ((n1;h2;sym n2) :: t1 ~ t2)
+            r2  = coVarRole cv
+            kind_co' = downgradeRole r2 Nominal kind_co
+            n1 = mkNthCo r2 2 kind_co'
+            n2 = mkNthCo r2 3 kind_co'
+         in mkProofIrrelCo Nominal (Refl (coercionType h1)) h1
+                           (n1 `mkTransCo` h2 `mkTransCo` (mkSymCo n2))
 
 opt_co4 env sym _rep r (KindCo co)
   = ASSERT( r == Nominal )
@@ -446,8 +505,8 @@ opt_univ env sym prov role oty1 oty2
 
   -- can't optimize the AppTy case because we can't build the kind coercions.
 
-  | Just (tv1, ty1) <- splitForAllTy_maybe oty1
-  , Just (tv2, ty2) <- splitForAllTy_maybe oty2
+  | Just (tv1, ty1) <- splitForAllTy_ty_maybe oty1
+  , Just (tv2, ty2) <- splitForAllTy_ty_maybe oty2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
         k2   = tyVarKind tv2
@@ -458,6 +517,24 @@ opt_univ env sym prov role oty1 oty2
         (env', tv1', eta') = optForAllCoBndr env sym tv1 eta
     in
     mkForAllCo tv1' eta' (opt_univ env' sym prov' role ty1 ty2')
+
+  | Just (cv1, ty1) <- splitForAllTy_co_maybe oty1
+  , Just (cv2, ty2) <- splitForAllTy_co_maybe oty2
+      -- NB: prov isn't interesting here either
+  = let k1    = varType cv1
+        k2    = varType cv2
+        r'    = coVarRole cv1
+        eta   = mkUnivCo prov' Nominal k1 k2
+        eta_d = downgradeRole r' Nominal eta
+          -- eta gets opt'ed soon, but not yet.
+        n_co  = (mkSymCo $ mkNthCo r' 2 eta_d) `mkTransCo`
+                (mkCoVarCo cv1) `mkTransCo`
+                (mkNthCo r' 3 eta_d)
+        ty2'  = substTyWithCoVars [cv2] [n_co] ty2
+
+        (env', cv1', eta') = optForAllCoBndr env sym cv1 eta
+    in
+    mkForAllCo cv1' eta' (opt_univ env' sym prov' role ty1 ty2')
 
   | otherwise
   = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1
@@ -595,27 +672,60 @@ opt_trans_rule is co1 co2@(AppCo co2a co2b)
   = opt_trans_rule_app is co1 co2 co1a [co1b] co2a [co2b]
 
 -- Push transitivity inside forall
+-- forall over types.
 opt_trans_rule is co1 co2
-  | ForAllCo tv1 eta1 r1 <- co1
-  , Just (tv2,eta2,r2) <- etaForAllCo_maybe co2
+  | Just (tv1, eta1, r1) <- splitForAllCo_ty_maybe co1
+  , Just (tv2, eta2, r2) <- etaForAllCo_ty_maybe co2
   = push_trans tv1 eta1 r1 tv2 eta2 r2
 
-  | ForAllCo tv2 eta2 r2 <- co2
-  , Just (tv1,eta1,r1) <- etaForAllCo_maybe co1
+  | Just (tv2, eta2, r2) <- splitForAllCo_ty_maybe co2
+  , Just (tv1, eta1, r1) <- etaForAllCo_ty_maybe co1
   = push_trans tv1 eta1 r1 tv2 eta2 r2
 
   where
   push_trans tv1 eta1 r1 tv2 eta2 r2
     -- Given:
-    --   co1 = \/ tv1 : eta1. r1
-    --   co2 = \/ tv2 : eta2. r2
+    --   co1 = /\ tv1 : eta1. r1
+    --   co2 = /\ tv2 : eta2. r2
     -- Wanted:
-    --   \/tv1 : (eta1;eta2).  (r1; r2[tv2 |-> tv1 |> eta1])
-    = fireTransRule "EtaAllTy" co1 co2 $
+    --   /\tv1 : (eta1;eta2).  (r1; r2[tv2 |-> tv1 |> eta1])
+    = fireTransRule "EtaAllTy_ty" co1 co2 $
       mkForAllCo tv1 (opt_trans is eta1 eta2) (opt_trans is' r1 r2')
     where
       is' = is `extendInScopeSet` tv1
       r2' = substCoWithUnchecked [tv2] [mkCastTy (TyVarTy tv1) eta1] r2
+
+-- Push transitivity inside forall
+-- forall over coercions.
+opt_trans_rule is co1 co2
+  | Just (cv1, eta1, r1) <- splitForAllCo_co_maybe co1
+  , Just (cv2, eta2, r2) <- etaForAllCo_co_maybe co2
+  = push_trans cv1 eta1 r1 cv2 eta2 r2
+
+  | Just (cv2, eta2, r2) <- splitForAllCo_co_maybe co2
+  , Just (cv1, eta1, r1) <- etaForAllCo_co_maybe co1
+  = push_trans cv1 eta1 r1 cv2 eta2 r2
+
+  where
+  push_trans cv1 eta1 r1 cv2 eta2 r2
+    -- Given:
+    --   co1 = /\ cv1 : eta1. r1
+    --   co2 = /\ cv2 : eta2. r2
+    -- Wanted:
+    --   n1 = nth 2 eta1
+    --   n2 = nth 3 eta1
+    --   nco = /\ cv1 : (eta1;eta2). (r1; r2[cv2 |-> (sym n1);cv1;n2])
+    = fireTransRule "EtaAllTy_co" co1 co2 $
+      mkForAllCo cv1 (opt_trans is eta1 eta2) (opt_trans is' r1 r2')
+    where
+      is'  = is `extendInScopeSet` cv1
+      role = coVarRole cv1
+      eta1' = downgradeRole role Nominal eta1
+      n1   = mkNthCo role 2 eta1'
+      n2   = mkNthCo role 3 eta1'
+      r2'  = substCo (zipCvSubst [cv2] [(mkSymCo n1) `mkTransCo`
+                                        (mkCoVarCo cv1) `mkTransCo` n2])
+                    r2
 
 -- Push transitivity inside axioms
 opt_trans_rule is co1 co2
@@ -932,8 +1042,9 @@ compatible_co co1 co2
 
 -------------
 {-
-etaForAllCo_maybe
+etaForAllCo
 ~~~~~~~~~~~~~~~~~
+(1) etaForAllCo_ty_maybe
 Suppose we have
 
   g : all a1:k1.t1  ~  all a2:k2.t2
@@ -955,19 +1066,59 @@ or
   g' : all a1:k1.t1  ~  all a1:k2.(t2[a2 |-> a1])
 
 as desired.
+
+(2) etaForAllCo_co_maybe
+Suppose we have
+
+  g : all c1:(s1~s2). t1 ~ all c2:(s3~s4). t2
+
+Similarly, we do this
+
+  g' = all c1:h1. h2
+     : all c1:(s1~s2). t1 ~ all c1:(s3~s4). t2[c2 |-> (sym eta1;c1;eta2)]
+                                              [c1 |-> eta1;c1;sym eta2]
+
+Here,
+
+  h1   = mkNthCo Nominal 0 g :: (s1~s2)~(s3~s4)
+  eta1 = mkNthCo r 2 h1      :: (s1 ~ s3)
+  eta2 = mkNthCo r 3 h1      :: (s2 ~ s4)
+  h2   = mkInstCo g (cv1 ~ (sym eta1;c1;eta2))
 -}
-etaForAllCo_maybe :: Coercion -> Maybe (TyVar, Coercion, Coercion)
+etaForAllCo_ty_maybe :: Coercion -> Maybe (TyVar, Coercion, Coercion)
 -- Try to make the coercion be of form (forall tv:kind_co. co)
-etaForAllCo_maybe co
-  | ForAllCo tv kind_co r <- co
+etaForAllCo_ty_maybe co
+  | Just (tv, kind_co, r) <- splitForAllCo_ty_maybe co
   = Just (tv, kind_co, r)
 
   | Pair ty1 ty2  <- coercionKind co
-  , Just (tv1, _) <- splitForAllTy_maybe ty1
-  , isForAllTy ty2
+  , Just (tv1, _) <- splitForAllTy_ty_maybe ty1
+  , isForAllTy_ty ty2
   , let kind_co = mkNthCo Nominal 0 co
   = Just ( tv1, kind_co
          , mkInstCo co (mkGReflRightCo Nominal (TyVarTy tv1) kind_co))
+
+  | otherwise
+  = Nothing
+
+etaForAllCo_co_maybe :: Coercion -> Maybe (CoVar, Coercion, Coercion)
+-- Try to make the coercion be of form (forall cv:kind_co. co)
+etaForAllCo_co_maybe co
+  | Just (cv, kind_co, r) <- splitForAllCo_co_maybe co
+  = Just (cv, kind_co, r)
+
+  | Pair ty1 ty2  <- coercionKind co
+  , Just (cv1, _) <- splitForAllTy_co_maybe ty1
+  , isForAllTy_co ty2
+  = let kind_co  = mkNthCo Nominal 0 co
+        r        = coVarRole cv1
+        l_co     = mkCoVarCo cv1
+        kind_co' = downgradeRole r Nominal kind_co
+        r_co     = (mkSymCo (mkNthCo r 2 kind_co')) `mkTransCo`
+                   l_co `mkTransCo`
+                   (mkNthCo r 3 kind_co')
+    in Just ( cv1, kind_co
+            , mkInstCo co (mkProofIrrelCo Nominal kind_co l_co r_co))
 
   | otherwise
   = Nothing
@@ -1041,6 +1192,6 @@ and these two imply
 -}
 
 optForAllCoBndr :: LiftingContext -> Bool
-                -> TyVar -> Coercion -> (LiftingContext, TyVar, Coercion)
+                -> TyCoVar -> Coercion -> (LiftingContext, TyCoVar, Coercion)
 optForAllCoBndr env sym
   = substForAllCoBndrUsingLC sym (opt_co4_wrap env sym False Nominal) env

@@ -1,7 +1,7 @@
 module DataCon where
 
 import GhcPrelude
-import Var( TyVar, TyVarBinder )
+import Var( TyVar, TyCoVar, TyVarBinder )
 import Name( Name, NamedThing )
 import {-# SOURCE #-} TyCon( TyCon )
 import FieldLabel ( FieldLabel )
@@ -16,7 +16,7 @@ data EqSpec
 
 dataConName      :: DataCon -> Name
 dataConTyCon     :: DataCon -> TyCon
-dataConExTyVars  :: DataCon -> [TyVar]
+dataConExTyCoVars :: DataCon -> [TyCoVar]
 dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConSourceArity  :: DataCon -> Arity
@@ -24,7 +24,7 @@ dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Type], Type)
+               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Type], Type)
 isUnboxedSumCon :: DataCon -> Bool
 
 instance Eq DataCon

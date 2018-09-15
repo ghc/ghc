@@ -1527,7 +1527,9 @@ reifyDataCon isGadtDataCon tys dc
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 
        ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
-                               | otherwise     = (ex_tvs, theta)
+                               | otherwise     = ASSERT( all isTyVar ex_tvs )
+                                                 -- no covars for haskell syntax
+                                                 (ex_tvs, theta)
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'

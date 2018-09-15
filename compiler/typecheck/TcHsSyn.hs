@@ -429,20 +429,20 @@ zonkTyBndrX env tv
        ; let tv' = mkTyVar (tyVarName tv) ki
        ; return (extendTyZonkEnv1 env tv', tv') }
 
-zonkTyVarBinders ::  [TyVarBndr TcTyVar vis]
-                 -> TcM (ZonkEnv, [TyVarBndr TyVar vis])
+zonkTyVarBinders ::  [VarBndr TcTyVar vis]
+                 -> TcM (ZonkEnv, [VarBndr TyVar vis])
 zonkTyVarBinders = initZonkEnv zonkTyVarBindersX
 
-zonkTyVarBindersX :: ZonkEnv -> [TyVarBndr TcTyVar vis]
-                             -> TcM (ZonkEnv, [TyVarBndr TyVar vis])
+zonkTyVarBindersX :: ZonkEnv -> [VarBndr TcTyVar vis]
+                             -> TcM (ZonkEnv, [VarBndr TyVar vis])
 zonkTyVarBindersX = mapAccumLM zonkTyVarBinderX
 
-zonkTyVarBinderX :: ZonkEnv -> TyVarBndr TcTyVar vis
-                            -> TcM (ZonkEnv, TyVarBndr TyVar vis)
+zonkTyVarBinderX :: ZonkEnv -> VarBndr TcTyVar vis
+                            -> TcM (ZonkEnv, VarBndr TyVar vis)
 -- Takes a TcTyVar and guarantees to return a TyVar
-zonkTyVarBinderX env (TvBndr tv vis)
+zonkTyVarBinderX env (Bndr tv vis)
   = do { (env', tv') <- zonkTyBndrX env tv
-       ; return (env', TvBndr tv' vis) }
+       ; return (env', Bndr tv' vis) }
 
 zonkTopExpr :: HsExpr GhcTcId -> TcM (HsExpr GhcTc)
 zonkTopExpr e = initZonkEnv zonkExpr e
@@ -1814,7 +1814,7 @@ zonk_tycomapper = TyCoMapper
   , tcm_tyvar = zonkTyVarOcc
   , tcm_covar = zonkCoVarOcc
   , tcm_hole  = zonkCoHole
-  , tcm_tybinder = \env tv _vis -> zonkTyBndrX env tv
+  , tcm_tycobinder = \env tv _vis -> zonkTyBndrX env tv
   , tcm_tycon = zonkTcTyConToTyCon }
 
 -- Zonk a TyCon by changing a TcTyCon to a regular TyCon

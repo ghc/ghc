@@ -22,7 +22,7 @@ import CoreArity
 import Id
 import IdInfo
 import Demand ( zapUsageEnvSig )
-import Type( tidyType, tidyTyCoVarBndr )
+import Type( tidyType, tidyVarBndr )
 import Coercion( tidyCo )
 import Var
 import VarEnv
@@ -130,7 +130,7 @@ tidyVarOcc (_, var_env) v = lookupVarEnv var_env v `orElse` v
 -- tidyBndr is used for lambda and case binders
 tidyBndr :: TidyEnv -> Var -> (TidyEnv, Var)
 tidyBndr env var
-  | isTyCoVar var = tidyTyCoVarBndr env var
+  | isTyCoVar var = tidyVarBndr env var
   | otherwise     = tidyIdBndr env var
 
 tidyBndrs :: TidyEnv -> [Var] -> (TidyEnv, [Var])

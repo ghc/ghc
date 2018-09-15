@@ -12,7 +12,7 @@ module ConLike (
         , conLikeArity
         , conLikeFieldLabels
         , conLikeInstOrigArgTys
-        , conLikeExTyVars
+        , conLikeExTyCoVars
         , conLikeName
         , conLikeStupidTheta
         , conLikeWrapId_maybe
@@ -113,10 +113,10 @@ conLikeInstOrigArgTys (RealDataCon data_con) tys =
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
     patSynInstArgTys pat_syn tys
 
--- | Existentially quantified type variables
-conLikeExTyVars :: ConLike -> [TyVar]
-conLikeExTyVars (RealDataCon dcon1) = dataConExTyVars dcon1
-conLikeExTyVars (PatSynCon psyn1)   = patSynExTyVars psyn1
+-- | Existentially quantified type/coercion variables
+conLikeExTyCoVars :: ConLike -> [TyCoVar]
+conLikeExTyCoVars (RealDataCon dcon1) = dataConExTyCoVars dcon1
+conLikeExTyCoVars (PatSynCon psyn1)   = patSynExTyVars psyn1
 
 conLikeName :: ConLike -> Name
 conLikeName (RealDataCon data_con) = dataConName data_con
@@ -152,7 +152,7 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 --
 -- 1) The universally quantified type variables
 --
--- 2) The existentially quantified type variables
+-- 2) The existentially quantified type/coercion variables
 --
 -- 3) The equality specification
 --
@@ -165,7 +165,9 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 --
 -- 7) The original result type
 conLikeFullSig :: ConLike
-               -> ([TyVar], [TyVar], [EqSpec]
+               -> ([TyVar], [TyCoVar], [EqSpec]
+                   -- Why tyvars for universal but tycovars for existential?
+                   -- See Note [Existential coercion variables] in DataCon
                   , ThetaType, ThetaType, [Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con

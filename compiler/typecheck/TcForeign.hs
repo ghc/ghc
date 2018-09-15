@@ -131,7 +131,7 @@ normaliseFfiType' env ty0 = go initRecTc ty0
       | Just (tc, tys) <- splitTyConApp_maybe ty
       = go_tc_app rec_nts tc tys
 
-      | (bndrs, inner_ty) <- splitForAllTyVarBndrs ty
+      | (bndrs, inner_ty) <- splitForAllVarBndrs ty
       , not (null bndrs)
       = do (coi, nty1, gres1) <- go rec_nts inner_ty
            return ( mkHomoForAllCos (binderVars bndrs) coi

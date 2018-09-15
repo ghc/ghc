@@ -394,7 +394,8 @@ mkDictSelRhs clas val_index
     dict_id        = mkTemplateLocal 1 pred
     arg_ids        = mkTemplateLocalsNum 2 arg_tys
 
-    rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars) (Var dict_id)
+    rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
+                                                   (Var dict_id)
              | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
                                 [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
                                 -- varToCoreExpr needed for equality superclass selectors
@@ -465,7 +466,7 @@ mkDataConWorkId wkr_name data_con
 
         ----------- Workers for newtypes --------------
     (nt_tvs, _, nt_arg_tys, _) = dataConSig data_con
-    res_ty_args  = mkTyVarTys nt_tvs
+    res_ty_args  = mkTyCoVarTys nt_tvs
     nt_wrap_ty   = dataConUserType data_con
     nt_work_info = noCafIdInfo          -- The NoCaf-ness is set by noCafIdInfo
                   `setArityInfo` 1      -- Arity 1
@@ -484,7 +485,7 @@ dataConCPR :: DataCon -> DmdResult
 dataConCPR con
   | isDataTyCon tycon     -- Real data types only; that is,
                           -- not unboxed tuples or newtypes
-  , null (dataConExTyVars con)  -- No existentials
+  , null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
   = if is_prod then vanillaCprProdRes (dataConRepArity con)
@@ -631,7 +632,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     orig_bangs   = dataConSrcBangs data_con
 
     wrap_arg_tys = theta ++ orig_arg_tys
-    wrap_arity   = length wrap_arg_tys
+    wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
              -- wrapper
@@ -672,8 +673,8 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
     mk_boxer boxers = DCB (\ ty_args src_vars ->
                       do { let (ex_vars, term_vars) = splitAtList ex_tvs src_vars
                                subst1 = zipTvSubst univ_tvs ty_args
-                               subst2 = extendTvSubstList subst1 ex_tvs
-                                                          (mkTyVarTys ex_vars)
+                               subst2 = extendTCvSubstList subst1 ex_tvs
+                                                           (mkTyCoVarTys ex_vars)
                          ; (rep_ids, binds) <- go subst2 boxers term_vars
                          ; return (ex_vars ++ rep_ids, binds) } )
 
@@ -892,7 +893,8 @@ dataConArgUnpack arg_ty
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
   , let rep_tys = dataConInstArgTys con tc_args
-  = ASSERT( null (dataConExTyVars con) )  -- Note [Unpacking GADTs and existentials]
+  = ASSERT( null (dataConExTyCoVars con) )
+      -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
@@ -959,7 +961,8 @@ isUnpackableType dflags fam_envs ty
     unpackable_type ty
       | Just (tc, _) <- splitTyConApp_maybe ty
       , Just data_con <- tyConSingleAlgDataCon_maybe tc
-      , null (dataConExTyVars data_con)  -- See Note [Unpacking GADTs and existentials]
+      , null (dataConExTyCoVars data_con)
+          -- See Note [Unpacking GADTs and existentials]
       = Just data_con
       | otherwise
       = Nothing
@@ -975,7 +978,7 @@ components, like
 And it'd be fine to unpack a product type with existential components
 too, but that would require a bit more plumbing, so currently we don't.
 
-So for now we require: null (dataConExTyVars data_con)
+So for now we require: null (dataConExTyCoVars data_con)
 See Trac #14978
 
 Note [Unpack one-wide fields]
@@ -1136,7 +1139,7 @@ mkFCallId dflags uniq fcall ty
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty
-    arity      = count isAnonTyBinder bndrs
+    arity      = count isAnonTyCoBinder bndrs
     strict_sig = mkClosedStrictSig (replicate arity topDmd) topRes
     -- the call does not claim to be strict in its arguments, since they
     -- may be lifted (foreign import prim) and the called code doesn't

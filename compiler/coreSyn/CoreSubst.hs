@@ -89,7 +89,7 @@ data Subst
           TvSubstEnv  -- Substitution from TyVars to Types
           CvSubstEnv  -- Substitution from CoVars to Coercions
 
-        -- INVARIANT 1: See TyCORep Note [The substitution invariant]
+        -- INVARIANT 1: See TyCoRep Note [The substitution invariant]
         -- This is what lets us deal with name capture properly
         -- It's a hard invariant to check...
         --
@@ -171,7 +171,7 @@ mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 mkSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> IdSubstEnv -> Subst
 mkSubst in_scope tvs cvs ids = Subst in_scope ids tvs cvs
 
--- | Find the in-scope set: see TyCORep Note [The substitution invariant]
+-- | Find the in-scope set: see TyCoRep Note [The substitution invariant]
 substInScope :: Subst -> InScopeSet
 substInScope (Subst in_scope _ _ _) = in_scope
 
@@ -181,7 +181,7 @@ zapSubstEnv :: Subst -> Subst
 zapSubstEnv (Subst in_scope _ _ _) = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 
 -- | Add a substitution for an 'Id' to the 'Subst': you must ensure that the in-scope set is
--- such that TyCORep Note [The substitution invariant]
+-- such that TyCoRep Note [The substitution invariant]
 -- holds after extending the substitution like this
 extendIdSubst :: Subst -> Id -> CoreExpr -> Subst
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
@@ -198,7 +198,7 @@ extendIdSubstList (Subst in_scope ids tvs cvs) prs
 -- | Add a substitution for a 'TyVar' to the 'Subst'
 -- The 'TyVar' *must* be a real TyVar, and not a CoVar
 -- You must ensure that the in-scope set is such that
--- TyCORep Note [The substitution invariant] holds
+-- TyCoRep Note [The substitution invariant] holds
 -- after extending the substitution like this.
 extendTvSubst :: Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
@@ -214,7 +214,7 @@ extendTvSubstList subst vrs
 
 -- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst':
 -- you must ensure that the in-scope set satisfies
--- TyCORep Note [The substitution invariant]
+-- TyCoRep Note [The substitution invariant]
 -- after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r

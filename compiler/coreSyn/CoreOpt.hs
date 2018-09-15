@@ -1010,8 +1010,8 @@ pushCoTyArg co ty
   | isReflCo co
   = Just (ty, MRefl)
 
-  | isForAllTy tyL
-  = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
+  | isForAllTy_ty tyL
+  = ASSERT2( isForAllTy_ty tyR, ppr co $$ ppr ty )
     Just (ty `mkCastTy` co1, MCo co2)
 
   | otherwise
@@ -1112,11 +1112,11 @@ pushCoDataCon dc dc_args co
   = let
         tc_arity       = tyConArity to_tc
         dc_univ_tyvars = dataConUnivTyVars dc
-        dc_ex_tyvars   = dataConExTyVars dc
+        dc_ex_tcvars   = dataConExTyCoVars dc
         arg_tys        = dataConRepArgTys dc
 
         non_univ_args  = dropList dc_univ_tyvars dc_args
-        (ex_args, val_args) = splitAtList dc_ex_tyvars non_univ_args
+        (ex_args, val_args) = splitAtList dc_ex_tcvars non_univ_args
 
         -- Make the "Psi" from the paper
         omegas = decomposeCo tc_arity co (tyConRolesRepresentational to_tc)
@@ -1124,7 +1124,7 @@ pushCoDataCon dc dc_args co
           = liftCoSubstWithEx Representational
                               dc_univ_tyvars
                               omegas
-                              dc_ex_tyvars
+                              dc_ex_tcvars
                               (map exprToType ex_args)
 
           -- Cast the value arguments (which include dictionaries)
@@ -1133,7 +1133,7 @@ pushCoDataCon dc dc_args co
 
         to_ex_args = map Type to_ex_arg_tys
 
-        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
+        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tcvars,
                          ppr arg_tys, ppr dc_args,
                          ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc ]
     in
@@ -1179,10 +1179,18 @@ collectBindersPushingCo e
     go_lam bs b e co
       | isTyVar b
       , let Pair tyL tyR = coercionKind co
-      , ASSERT( isForAllTy tyL )
-        isForAllTy tyR
+      , ASSERT( isForAllTy_ty tyL )
+        isForAllTy_ty tyR
       , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
+
+      | isCoVar b
+      , let Pair tyL tyR = coercionKind co
+      , ASSERT( isForAllTy_co tyL )
+        isForAllTy_co tyR
+      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
+      , let cov = mkCoVarCo b
+      = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
 
       | isId b
       , let Pair tyL tyR = coercionKind co

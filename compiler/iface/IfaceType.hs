@@ -22,8 +22,8 @@ module IfaceType (
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
         IfaceForAllBndr, ArgFlag(..), ShowForAllFlag(..),
 
-        ifForAllBndrTyVar, ifForAllBndrName,
-        ifTyConBinderTyVar, ifTyConBinderName,
+        ifForAllBndrVar, ifForAllBndrName,
+        ifTyConBinderVar, ifTyConBinderName,
 
         -- Equality testing
         isIfaceLiftedTypeKind,
@@ -96,6 +96,13 @@ type IfaceTvBndr  = (IfLclName, IfaceKind)
 ifaceTvBndrName :: IfaceTvBndr -> IfLclName
 ifaceTvBndrName (n,_) = n
 
+ifaceIdBndrName :: IfaceIdBndr -> IfLclName
+ifaceIdBndrName (n,_) = n
+
+ifaceBndrName :: IfaceBndr -> IfLclName
+ifaceBndrName (IfaceTvBndr bndr) = ifaceTvBndrName bndr
+ifaceBndrName (IfaceIdBndr bndr) = ifaceIdBndrName bndr
+
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
 
 data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
@@ -148,8 +155,8 @@ data IfaceTyLit
   | IfaceStrTyLit FastString
   deriving (Eq)
 
-type IfaceTyConBinder = TyVarBndr IfaceTvBndr TyConBndrVis
-type IfaceForAllBndr  = TyVarBndr IfaceTvBndr ArgFlag
+type IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
+type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
 
 -- See Note [Suppressing invisible arguments]
 -- We use a new list type (rather than [(IfaceType,Bool)], because
@@ -297,7 +304,7 @@ data IfaceCoercion
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
-  | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
+  | IfaceForAllCo     IfaceBndr IfaceCoercion IfaceCoercion
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
   | IfaceAxiomRuleCo  IfLclName [IfaceCoercion]
@@ -398,21 +405,21 @@ stripIfaceInvisVars dflags tyvars
   | gopt Opt_PrintExplicitKinds dflags = tyvars
   | otherwise = filterOut isInvisibleTyConBinder tyvars
 
--- | Extract an 'IfaceTvBndr' from an 'IfaceForAllBndr'.
-ifForAllBndrTyVar :: IfaceForAllBndr -> IfaceTvBndr
-ifForAllBndrTyVar = binderVar
+-- | Extract an 'IfaceBndr' from an 'IfaceForAllBndr'.
+ifForAllBndrVar :: IfaceForAllBndr -> IfaceBndr
+ifForAllBndrVar = binderVar
 
 -- | Extract the variable name from an 'IfaceForAllBndr'.
 ifForAllBndrName :: IfaceForAllBndr -> IfLclName
-ifForAllBndrName fab = ifaceTvBndrName (ifForAllBndrTyVar fab)
+ifForAllBndrName fab = ifaceBndrName (ifForAllBndrVar fab)
 
--- | Extract an 'IfaceTvBndr' from an 'IfaceTyConBinder'.
-ifTyConBinderTyVar :: IfaceTyConBinder -> IfaceTvBndr
-ifTyConBinderTyVar = binderVar
+-- | Extract an 'IfaceBndr' from an 'IfaceTyConBinder'.
+ifTyConBinderVar :: IfaceTyConBinder -> IfaceBndr
+ifTyConBinderVar = binderVar
 
 -- | Extract the variable name from an 'IfaceTyConBinder'.
 ifTyConBinderName :: IfaceTyConBinder -> IfLclName
-ifTyConBinderName tcb = ifaceTvBndrName (ifTyConBinderTyVar tcb)
+ifTyConBinderName tcb = ifaceBndrName (ifTyConBinderVar tcb)
 
 ifTypeIsVarFree :: IfaceType -> Bool
 -- Returns True if the type definitely has no variables at all
@@ -532,8 +539,8 @@ stripInvisArgs dflags tys
             IA_Vis   t ts -> IA_Vis t $ suppress_invis ts
               -- Keep recursing through the remainder of the arguments, as it's
               -- possible that there are remaining invisible ones.
-              -- See the "In type declarations" section of Note [TyVarBndrs,
-              -- TyVarBinders, TyConBinders, and visibility] in TyCoRep.
+              -- See the "In type declarations" section of Note [VarBndrs,
+              -- TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
 
 appArgsIfaceTypes :: IfaceAppArgs -> [IfaceType]
 appArgsIfaceTypes IA_Nil = []
@@ -660,9 +667,10 @@ pprIfaceTvBndr use_parens (tv, ki)
                  | otherwise  = id
 
 pprIfaceTyConBinders :: [IfaceTyConBinder] -> SDoc
-pprIfaceTyConBinders = sep . map go
+pprIfaceTyConBinders = sep . map (go . ifTyConBinderVar)
   where
-    go tcb = pprIfaceTvBndr True (ifTyConBinderTyVar tcb)
+    go (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
+    go (IfaceTvBndr bndr) = pprIfaceTvBndr True bndr
 
 instance Binary IfaceBndr where
     put_ bh (IfaceIdBndr aa) = do
@@ -756,7 +764,7 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
       (ppr_co ctxt_prec co)
       (text "<>")
 
-ppr_ty ctxt_prec ty
+ppr_ty ctxt_prec ty -- IfaceForAllTy
   = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
 {-
@@ -804,18 +812,15 @@ defaultRuntimeRepVars :: PprStyle -> IfaceType -> IfaceType
 defaultRuntimeRepVars sty = go emptyFsEnv
   where
     go :: FastStringEnv () -> IfaceType -> IfaceType
-    go subs (IfaceForAllTy bndr ty)
+    go subs (IfaceForAllTy (Bndr (IfaceTvBndr (var, var_kind)) argf) ty)
       | isRuntimeRep var_kind
-      , isInvisibleArgFlag (binderArgFlag bndr) -- don't default *visible* quantification
-                                                -- or we get the mess in #13963
+      , isInvisibleArgFlag argf -- don't default *visible* quantification
+                                -- or we get the mess in #13963
       = let subs' = extendFsEnv subs var ()
         in go subs' ty
-      | otherwise
-      = IfaceForAllTy (TvBndr (var, go subs var_kind) (binderArgFlag bndr))
-                      (go subs ty)
-      where
-        var :: IfLclName
-        (var, var_kind) = binderVar bndr
+
+    go subs (IfaceForAllTy bndr ty)
+      = IfaceForAllTy (go_ifacebndr subs bndr) (go subs ty)
 
     go subs ty@(IfaceTyVar tv)
       | tv `elemFsEnv` subs
@@ -850,6 +855,12 @@ defaultRuntimeRepVars sty = go emptyFsEnv
 
     go _ ty@(IfaceLitTy {}) = ty
     go _ ty@(IfaceCoercionTy {}) = ty
+
+    go_ifacebndr :: FastStringEnv () -> IfaceForAllBndr -> IfaceForAllBndr
+    go_ifacebndr subs (Bndr (IfaceIdBndr (n, t)) argf)
+      = Bndr (IfaceIdBndr (n, go subs t)) argf
+    go_ifacebndr subs (Bndr (IfaceTvBndr (n, t)) argf)
+      = Bndr (IfaceTvBndr (n, go subs t)) argf
 
     go_args :: FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
     go_args _ IA_Nil = IA_Nil
@@ -917,7 +928,7 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
 -- | Render the "forall ... ." or "forall ... ->" bit of a type.
 pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprIfaceForAll [] = empty
-pprIfaceForAll bndrs@(TvBndr _ vis : _)
+pprIfaceForAll bndrs@(Bndr _ vis : _)
   = add_separator (forAllLit <+> doc) <+> pprIfaceForAll bndrs'
   where
     (bndrs', doc) = ppr_itv_bndrs bndrs vis
@@ -933,7 +944,7 @@ pprIfaceForAll bndrs@(TvBndr _ vis : _)
 ppr_itv_bndrs :: [IfaceForAllBndr]
              -> ArgFlag  -- ^ visibility of the first binder in the list
              -> ([IfaceForAllBndr], SDoc)
-ppr_itv_bndrs all_bndrs@(bndr@(TvBndr _ vis) : bndrs) vis1
+ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
                          (bndrs', pprIfaceForAllBndr bndr <+> doc)
   | otherwise   = (all_bndrs, empty)
@@ -947,11 +958,13 @@ pprIfaceForAllCoBndrs :: [(IfLclName, IfaceCoercion)] -> SDoc
 pprIfaceForAllCoBndrs bndrs = hsep $ map pprIfaceForAllCoBndr bndrs
 
 pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
-pprIfaceForAllBndr (TvBndr tv Inferred) = sdocWithDynFlags $ \dflags ->
-                                           if gopt Opt_PrintExplicitForalls dflags
-                                           then braces $ pprIfaceTvBndr False tv
-                                           else pprIfaceTvBndr True tv
-pprIfaceForAllBndr (TvBndr tv _)        = pprIfaceTvBndr True tv
+pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) Inferred)
+  = sdocWithDynFlags $ \dflags ->
+                          if gopt Opt_PrintExplicitForalls dflags
+                          then braces $ pprIfaceTvBndr False tv
+                          else pprIfaceTvBndr True tv
+pprIfaceForAllBndr (Bndr (IfaceTvBndr tv) _)  = pprIfaceTvBndr True tv
+pprIfaceForAllBndr (Bndr (IfaceIdBndr idv) _) = pprIfaceIdBndr idv
 
 pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc
 pprIfaceForAllCoBndr (tv, kind_co)
@@ -981,7 +994,10 @@ pprUserIfaceForAll tvs
              || gopt Opt_PrintExplicitForalls dflags) $
      pprIfaceForAll tvs
    where
-     tv_has_kind_var (TvBndr (_,kind) _) = not (ifTypeIsVarFree kind)
+     tv_has_kind_var (Bndr (IfaceTvBndr (_,kind)) _)
+       = not (ifTypeIsVarFree kind)
+     tv_has_kind_var _ = False
+
      tv_is_required = isVisibleArgFlag . binderArgFlag
 
 {-
@@ -1012,8 +1028,10 @@ criteria are met:
    because omitting it and printing "T :: k -> Type" would be
    utterly misleading.
 
-   See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
+   See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
    in TyCoRep.
+
+N.B. Until now (Aug 2018) we didn't check anything for coercion variables.
 -}
 
 -------------------
@@ -1108,7 +1126,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
 -- of   eqTyCon          (~)
 --      eqPrimTyCon      (~#)
 --      eqReprPrimTyCon  (~R#)
---      hEqTyCon         (~~)
+--      heqTyCon         (~~)
 --
 -- See Note [Equality predicates in IfaceType]
 -- and Note [The equality types story] in TysPrim
@@ -1280,7 +1298,9 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
   where
     (tvs, inner_co) = split_co co
 
-    split_co (IfaceForAllCo (name, _) kind_co co')
+    split_co (IfaceForAllCo (IfaceTvBndr (name, _)) kind_co co')
+      = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
+    split_co (IfaceForAllCo (IfaceIdBndr (name, _)) kind_co co')
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
     split_co co' = ([], co')
 

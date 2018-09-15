@@ -17,7 +17,7 @@ module TyCon(
         RuntimeRepInfo(..), TyConFlavour(..),
 
         -- * TyConBinder
-        TyConBinder, TyConBndrVis(..),
+        TyConBinder, TyConBndrVis(..), TyConTyCoBinder,
         mkNamedTyConBinder, mkNamedTyConBinders,
         mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderArgFlag, tyConBndrVisArgFlag, isNamedTyConBinder,
@@ -134,7 +134,7 @@ import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
                                  , mkFunKind, mkForAllKind )
-import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyVars, dataConFieldLabels
+import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
                                  , dataConTyCon, dataConFullSig )
 
 import Binary
@@ -248,7 +248,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
 
   Here's the FC version of the above declaration:
 
-        data R:TPair a where
+        data R:TPair a b where
           X1 :: R:TPair Int Bool
           X2 :: a -> b -> R:TPair a b
         axiom ax_pr :: T (a,b)  ~R  R:TPair a b
@@ -266,7 +266,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         DataFamInstTyCon T [(a,b)] ax_pr
 
 * Notice that T is NOT translated to a FC type function; it just
-  becomes a "data type" with no constructors, which can be coerced inot
+  becomes a "data type" with no constructors, which can be coerced
   into R:TInt, R:TPair by the axioms.  These axioms
   axioms come into play when (and *only* when) you
         - use a data constructor
@@ -312,7 +312,7 @@ parent class.
 
 However there is an important sharing relationship between
   * the tyConTyVars of the parent Class
-  * the tyConTyvars of the associated TyCon
+  * the tyConTyVars of the associated TyCon
 
    class C a b where
      data T p a
@@ -386,13 +386,16 @@ See also:
 
 ************************************************************************
 *                                                                      *
-                    TyConBinder
+                    TyConBinder, TyConTyCoBinder
 *                                                                      *
 ************************************************************************
 -}
 
-type TyConBinder = TyVarBndr TyVar TyConBndrVis
-                   -- See also Note [TyBinders] in TyCoRep
+type TyConBinder = VarBndr TyVar TyConBndrVis
+
+-- In the whole definition of @data TyCon@, only @PromotedDataCon@ will really
+-- contain CoVar.
+type TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
 
 data TyConBndrVis
   = NamedTCB ArgFlag
@@ -403,21 +406,23 @@ instance Outputable TyConBndrVis where
   ppr AnonTCB         = text "AnonTCB"
 
 mkAnonTyConBinder :: TyVar -> TyConBinder
-mkAnonTyConBinder tv = TvBndr tv AnonTCB
+mkAnonTyConBinder tv = ASSERT( isTyVar tv)
+                       Bndr tv AnonTCB
 
 mkAnonTyConBinders :: [TyVar] -> [TyConBinder]
 mkAnonTyConBinders tvs = map mkAnonTyConBinder tvs
 
 mkNamedTyConBinder :: ArgFlag -> TyVar -> TyConBinder
 -- The odd argument order supports currying
-mkNamedTyConBinder vis tv = TvBndr tv (NamedTCB vis)
+mkNamedTyConBinder vis tv = ASSERT( isTyVar tv )
+                            Bndr tv (NamedTCB vis)
 
 mkNamedTyConBinders :: ArgFlag -> [TyVar] -> [TyConBinder]
 -- The odd argument order supports currying
 mkNamedTyConBinders vis tvs = map (mkNamedTyConBinder vis) tvs
 
 tyConBinderArgFlag :: TyConBinder -> ArgFlag
-tyConBinderArgFlag (TvBndr _ vis) = tyConBndrVisArgFlag vis
+tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
 
 tyConBndrVisArgFlag :: TyConBndrVis -> ArgFlag
 tyConBndrVisArgFlag (NamedTCB vis) = vis
@@ -427,18 +432,18 @@ isNamedTyConBinder :: TyConBinder -> Bool
 -- Identifies kind variables
 -- E.g. data T k (a:k) = blah
 -- Here 'k' is a NamedTCB, a variable used in the kind of other binders
-isNamedTyConBinder (TvBndr _ (NamedTCB {})) = True
-isNamedTyConBinder _                        = False
+isNamedTyConBinder (Bndr _ (NamedTCB {})) = True
+isNamedTyConBinder _                      = False
 
-isVisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
+isVisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
-isVisibleTyConBinder (TvBndr _ tcb_vis) = isVisibleTcbVis tcb_vis
+isVisibleTyConBinder (Bndr _ tcb_vis) = isVisibleTcbVis tcb_vis
 
 isVisibleTcbVis :: TyConBndrVis -> Bool
 isVisibleTcbVis (NamedTCB vis) = isVisibleArgFlag vis
 isVisibleTcbVis AnonTCB        = True
 
-isInvisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
+isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
 
@@ -446,8 +451,8 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (TvBndr tv AnonTCB)        k = mkFunKind (tyVarKind tv) k
-    mk (TvBndr tv (NamedTCB vis)) k = mkForAllKind tv vis k
+    mk (Bndr tv AnonTCB)        k = mkFunKind (varType tv) k
+    mk (Bndr tv (NamedTCB vis)) k = mkForAllKind tv vis k
 
 tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
                   -> [TyVarBinder]   -- Suitable for the foralls of a term function
@@ -455,16 +460,17 @@ tyConTyVarBinders :: [TyConBinder]   -- From the TyCon
 tyConTyVarBinders tc_bndrs
  = map mk_binder tc_bndrs
  where
-   mk_binder (TvBndr tv tc_vis) = mkTyVarBinder vis tv
+   mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
                 AnonTCB           -> Specified
                 NamedTCB Required -> Specified
                 NamedTCB vis      -> vis
 
+-- Returns only tyvars, as covars are always inferred
 tyConVisibleTyVars :: TyCon -> [TyVar]
 tyConVisibleTyVars tc
-  = [ tv | TvBndr tv vis <- tyConBinders tc
+  = [ tv | Bndr tv vis <- tyConBinders tc
          , isVisibleTcbVis vis ]
 
 {- Note [Building TyVarBinders from TyConBinders]
@@ -476,12 +482,12 @@ TyConBinders but TyVarBinders (used in forall-type)  E.g:
  *  From   data T a = MkT (Maybe a)
     we are going to make a data constructor with type
            MkT :: forall a. Maybe a -> T a
-    See the TyVarBinders passed to buildDataCon
+    See the TyCoVarBinders passed to buildDataCon
 
  * From    class C a where { op :: a -> Maybe a }
    we are going to make a default method
            $dmop :: forall a. C a => a -> Maybe a
-   See the TyVarBindres passed to mkSigmaTy in mkDefaultMethodType
+   See the TyCoVarBinders passed to mkSigmaTy in mkDefaultMethodType
 
 Both of these are user-callable.  (NB: default methods are not callable
 directly by the user but rather via the code generated by 'deriving',
@@ -495,18 +501,18 @@ Here is an example:
 
 The TyCon has
 
-  tyConTyBinders = [ Named (TvBndr (k :: *) Inferred), Anon (k->*), Anon k ]
+  tyConTyBinders = [ Named (Bndr (k :: *) Inferred), Anon (k->*), Anon k ]
 
 The TyConBinders for App line up with App's kind, given above.
 
 But the DataCon MkApp has the type
   MkApp :: forall {k} (a:k->*) (b:k). a b -> App k a b
 
-That is, its TyVarBinders should be
+That is, its TyCoVarBinders should be
 
-  dataConUnivTyVarBinders = [ TvBndr (k:*)    Inferred
-                            , TvBndr (a:k->*) Specified
-                            , TvBndr (b:k)    Specified ]
+  dataConUnivTyVarBinders = [ Bndr (k:*)    Inferred
+                            , Bndr (a:k->*) Specified
+                            , Bndr (b:k)    Specified ]
 
 So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
   - variable names from the TyConBinders
@@ -515,43 +521,46 @@ So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
 The last part about Required->Specified comes from this:
   data T k (a:k) b = MkT (a b)
 Here k is Required in T's kind, but we don't have Required binders in
-the TyBinders for a term (see Note [No Required TyBinder in terms]
-in TyCoRep), so we change it to Specified when making MkT's TyBinders
+the TyCoBinders for a term (see Note [No Required TyCoBinder in terms]
+in TyCoRep), so we change it to Specified when making MkT's TyCoBinders
 -}
 
 
 {- Note [The binders/kind/arity fields of a TyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 All TyCons have this group of fields
-  tyConBinders :: [TyConBinder]
-  tyConResKind :: Kind
-  tyConTyVars  :: [TyVar] -- Cached = binderVars tyConBinders
-  tyConKind    :: Kind    -- Cached = mkTyConKind tyConBinders tyConResKind
-  tyConArity   :: Arity   -- Cached = length tyConBinders
+  tyConBinders   :: [TyConBinder/TyConTyCoBinder]
+  tyConResKind   :: Kind
+  tyConTyVars    :: [TyVar]   -- Cached = binderVars tyConBinders
+                              --   NB: Currently (Aug 2018), TyCons that own this
+                              --   field really only contain TyVars. So it is
+                              --   [TyVar] instead of [TyCoVar].
+  tyConKind      :: Kind      -- Cached = mkTyConKind tyConBinders tyConResKind
+  tyConArity     :: Arity     -- Cached = length tyConBinders
 
 They fit together like so:
 
-* tyConBinders gives the telescope of type variables on the LHS of the
+* tyConBinders gives the telescope of type/coercion variables on the LHS of the
   type declaration.  For example:
 
     type App a (b :: k) = a b
 
-  tyConBinders = [ TvBndr (k::*)   (NamedTCB Inferred)
-                 , TvBndr (a:k->*) AnonTCB
-                 , TvBndr (b:k)    AnonTCB ]
+  tyConBinders = [ Bndr (k::*)   (NamedTCB Inferred)
+                 , Bndr (a:k->*) AnonTCB
+                 , Bndr (b:k)    AnonTCB ]
 
   Note that that are three binders here, including the
   kind variable k.
 
-- See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility] in TyCoRep
+- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
   for what the visibility flag means.
 
-* Each TyConBinder tyConBinders has a TyVar, and that TyVar may
-  scope over some other part of the TyCon's definition. Eg
-      type T a = a->a
+* Each TyConBinder tyConBinders has a TyVar (sometimes it is TyCoVar), and
+  that TyVar may scope over some other part of the TyCon's definition. Eg
+      type T a = a -> a
   we have
-      tyConBinders = [ TvBndr (a:*) AnonTCB ]
-      synTcRhs     = a->a
+      tyConBinders = [ Bndr (a:*) AnonTCB ]
+      synTcRhs     = a -> a
   So the 'a' scopes over the synTcRhs
 
 * From the tyConBinders and tyConResKind we can get the tyConKind
@@ -569,11 +578,11 @@ They fit together like so:
   So it's just (length tyConBinders)
 -}
 
-instance Outputable tv => Outputable (TyVarBndr tv TyConBndrVis) where
-  ppr (TvBndr v AnonTCB)              = text "anon" <+> parens (ppr v)
-  ppr (TvBndr v (NamedTCB Required))  = text "req"  <+> parens (ppr v)
-  ppr (TvBndr v (NamedTCB Specified)) = text "spec" <+> parens (ppr v)
-  ppr (TvBndr v (NamedTCB Inferred))  = text "inf"  <+> parens (ppr v)
+instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
+  ppr (Bndr v AnonTCB)              = text "anon" <+> parens (ppr v)
+  ppr (Bndr v (NamedTCB Required))  = text "req"  <+> parens (ppr v)
+  ppr (Bndr v (NamedTCB Specified)) = text "spec" <+> parens (ppr v)
+  ppr (Bndr v (NamedTCB Inferred))  = text "inf"  <+> parens (ppr v)
 
 instance Binary TyConBndrVis where
   put_ bh AnonTCB        = putByte bh 0
@@ -802,7 +811,7 @@ data TyCon
         tyConName    :: Name,       -- ^ Same Name as the data constructor
 
         -- See Note [The binders/kind/arity fields of a TyCon]
-        tyConBinders :: [TyConBinder], -- ^ Full binders
+        tyConBinders :: [TyConTyCoBinder], -- ^ Full binders
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
@@ -1648,7 +1657,7 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
 -- as the data constructor itself; when we pretty-print
 -- the TyCon we add a quote; see the Outputable TyCon instance
 mkPromotedDataCon :: DataCon -> Name -> TyConRepName
-                  -> [TyConBinder] -> Kind -> [Role]
+                  -> [TyConTyCoBinder] -> Kind -> [Role]
                   -> RuntimeRepInfo -> TyCon
 mkPromotedDataCon con name rep_name binders res_kind roles rep_info
   = PromotedDataCon {
@@ -1780,8 +1789,9 @@ isNewTyCon :: TyCon -> Bool
 isNewTyCon (AlgTyCon {algTcRhs = NewTyCon {}}) = True
 isNewTyCon _                                   = False
 
--- | Take a 'TyCon' apart into the 'TyVar's it scopes over, the 'Type' it expands
--- into, and (possibly) a coercion from the representation type to the @newtype@.
+-- | Take a 'TyCon' apart into the 'TyVar's it scopes over, the 'Type' it
+-- expands into, and (possibly) a coercion from the representation type to the
+-- @newtype@.
 -- Returns @Nothing@ if this is not possible.
 unwrapNewTyCon_maybe :: TyCon -> Maybe ([TyVar], Type, CoAxiom Unbranched)
 unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs,
@@ -1804,7 +1814,7 @@ isProductTyCon tc@(AlgTyCon {})
   = case algTcRhs tc of
       TupleTyCon {} -> True
       DataTyCon{ data_cons = [data_con] }
-                    -> null (dataConExTyVars data_con)
+                    -> null (dataConExTyCoVars data_con)
       NewTyCon {}   -> True
       _             -> False
 isProductTyCon _ = False
@@ -1816,7 +1826,7 @@ isDataProductTyCon_maybe :: TyCon -> Maybe DataCon
 isDataProductTyCon_maybe (AlgTyCon { algTcRhs = rhs })
   = case rhs of
        DataTyCon { data_cons = [con] }
-         | null (dataConExTyVars con)  -- non-existential
+         | null (dataConExTyCoVars con)  -- non-existential
          -> Just con
        TupleTyCon { data_con = con }
          -> Just con
@@ -1828,10 +1838,10 @@ isDataSumTyCon_maybe (AlgTyCon { algTcRhs = rhs })
   = case rhs of
       DataTyCon { data_cons = cons }
         | cons `lengthExceeds` 1
-        , all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
+        , all (null . dataConExTyCoVars) cons -- FIXME(osa): Why do we need this?
         -> Just cons
       SumTyCon { data_cons = cons }
-        | all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
+        | all (null . dataConExTyCoVars) cons -- FIXME(osa): Why do we need this?
         -> Just cons
       _ -> Nothing
 isDataSumTyCon_maybe _ = Nothing

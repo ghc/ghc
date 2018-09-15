@@ -58,7 +58,7 @@ import MkId( mkDictFunId )
 import CoreSyn( Expr(..) )  -- For the Coercion constructor
 import Id
 import Name
-import Var      ( EvVar, mkTyVar, tyVarName, TyVarBndr(..) )
+import Var      ( EvVar, mkTyVar, tyVarName, VarBndr(..) )
 import DataCon
 import VarEnv
 import PrelNames
@@ -223,7 +223,7 @@ top_instantiate inst_all orig ty
 
   | otherwise = return (idHsWrapper, ty)
   where
-    (binders, phi) = tcSplitForAllTyVarBndrs ty
+    (binders, phi) = tcSplitForAllVarBndrs ty
     (theta, rho)   = tcSplitPhiTy phi
 
     should_inst bndr
@@ -499,7 +499,7 @@ tcInstTyBinders subst mb_kind_info bndrs
 -- | Used only in *types*
 tcInstTyBinder :: Maybe (VarEnv Kind)
                -> TCvSubst -> TyBinder -> TcM (TCvSubst, TcType)
-tcInstTyBinder mb_kind_info subst (Named (TvBndr tv _))
+tcInstTyBinder mb_kind_info subst (Named (Bndr tv _))
   = case lookup_tv tv of
       Just ki -> return (extendTvSubstAndInScope subst tv ki, ki)
       Nothing -> do { (subst', tv') <- newMetaTyVarX subst tv

@@ -392,7 +392,7 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
          -- variables in a unboxed tuple pattern match and expression as it
          -- actually needs. See Trac #12399
          (xrs,xcs) = unzip (map (go co) (dropRuntimeRepArgs args))
-    go co (ForAllTy (TvBndr v vis) x)
+    go co (ForAllTy (Bndr v vis) x)
        | isVisibleArgFlag vis = panic "unexpected visible binder"
        | v /= var && xc       = (caseForAll v xr,True)
        where (xr,xc) = go co x

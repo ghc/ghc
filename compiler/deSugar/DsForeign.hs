@@ -203,7 +203,7 @@ dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
 dsFCall fn_id co fcall mDeclHeader = do
     let
         ty                   = pFst $ coercionKind co
-        (tv_bndrs, rho)      = tcSplitForAllTyVarBndrs ty
+        (tv_bndrs, rho)      = tcSplitForAllVarBndrs ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism

@@ -120,7 +120,10 @@ matchOneConLike :: [Id]
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
 matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
-  = do  { let inst_tys = ASSERT( tvs1 `equalLength` ex_tvs )
+  = do  { let inst_tys = ASSERT( all tcIsTcTyVar ex_tvs )
+                           -- ex_tvs can only be tyvars as data types in source
+                           -- Haskell cannot mention covar yet (Aug 2018).
+                         ASSERT( tvs1 `equalLength` ex_tvs )
                          arg_tys ++ mkTyVarTys tvs1
 
               val_arg_tys = conLikeInstOrigArgTys con1 inst_tys
@@ -169,7 +172,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
               = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
 
-    ex_tvs = conLikeExTyVars con1
+    ex_tvs = conLikeExTyCoVars con1
 
     -- Choose the right arg_vars in the right order for this group
     -- Note [Record patterns]

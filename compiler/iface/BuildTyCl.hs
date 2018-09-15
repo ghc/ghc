@@ -101,7 +101,7 @@ buildDataCon :: FamInstEnvs
                 -- See Note [Bangs on imported data constructors] in MkId
            -> [FieldLabel]             -- Field labels
            -> [TyVar]                  -- Universals
-           -> [TyVar]                  -- Existentials
+           -> [TyCoVar]                -- Existentials
            -> [TyVarBinder]            -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
            -> KnotTied ThetaType       -- Does not include the "stupid theta"
