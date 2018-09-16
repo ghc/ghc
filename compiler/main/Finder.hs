@@ -652,7 +652,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
                 -> not_found_in_package pkg files
 
                 | not (null suggest)
-                -> pp_suggestions suggest $$ tried_these files
+                -> pp_suggestions suggest $$ tried_these files dflags
 
                 | null files && null mod_hiddens &&
                   null pkg_hiddens && null unusables
@@ -662,7 +662,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
                 -> vcat (map pkg_hidden pkg_hiddens) $$
                    vcat (map mod_hidden mod_hiddens) $$
                    vcat (map unusable unusables) $$
-                   tried_these files
+                   tried_these files dflags
 
             _ -> panic "cantFindErr"
 
@@ -676,20 +676,13 @@ cantFindErr cannot_find _ dflags mod_name find_result
          in
          text "Perhaps you haven't installed the " <> text build <>
          text " libraries for package " <> quotes (ppr pkg) <> char '?' $$
-         tried_these files
+         tried_these files dflags
 
        | otherwise
        = text "There are files missing in the " <> quotes (ppr pkg) <>
          text " package," $$
          text "try running 'ghc-pkg check'." $$
-         tried_these files
-
-    tried_these files
-        | null files = Outputable.empty
-        | verbosity dflags < 3 =
-              text "Use -v to see a list of the files searched for."
-        | otherwise =
-               hang (text "Locations searched:") 2 $ vcat (map text files)
+         tried_these files dflags
 
     pkg_hidden :: UnitId -> SDoc
     pkg_hidden pkgid =
@@ -778,7 +771,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
                 -> text "It is not a module in the current program, or in any known package."
 
                 | otherwise
-                -> tried_these files
+                -> tried_these files dflags
 
             _ -> panic "cantFindInstalledErr"
 
@@ -804,17 +797,19 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
          in
          text "Perhaps you haven't installed the " <> text build <>
          text " libraries for package " <> quotes (ppr pkg) <> char '?' $$
-         tried_these files
+         tried_these files dflags
 
        | otherwise
        = text "There are files missing in the " <> quotes (ppr pkg) <>
          text " package," $$
          text "try running 'ghc-pkg check'." $$
-         tried_these files
+         tried_these files dflags
 
-    tried_these files
-        | null files = Outputable.empty
-        | verbosity dflags < 3 =
-              text "Use -v to see a list of the files searched for."
-        | otherwise =
-               hang (text "Locations searched:") 2 $ vcat (map text files)
+tried_these :: [FilePath] -> DynFlags -> SDoc
+tried_these files dflags
+    | null files = Outputable.empty
+    | verbosity dflags < 3 =
+          text "Use -v (or `:set -v` in ghci) " <>
+              text "to see a list of the files searched for."
+    | otherwise =
+          hang (text "Locations searched:") 2 $ vcat (map text files)
