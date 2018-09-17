@@ -133,7 +133,7 @@ when invoked:
     import DynFlags ( defaultLogAction )
 
     main =
-        defaultErrorHandler defaultLogAction $ do
+        defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
           runGhc (Just libdir) $ do
             dflags <- getSessionDynFlags
             setSessionDynFlags dflags
