@@ -9713,7 +9713,7 @@ This idea is very old; see Seciton 7 of `Derivable type classes <https://www.mic
 Syntax changes
 ----------------
 
-`Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this ::
+`Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this
 
 .. code-block:: none
 
@@ -9723,7 +9723,7 @@ Syntax changes
     class ::= qtycls tyvar
             |  qtycls (tyvar atype1 ... atypen)
 
-We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration ::
+We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration
 
 .. code-block:: none
 
@@ -9736,9 +9736,9 @@ That is the only syntactic change to the language.
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes ::
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes
 
-.. code-block:: none
+  .. code-block:: none
 
     class ::= ...
            | [forall tyavrs .] context => qtycls inst1 ... instn
