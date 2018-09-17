@@ -512,20 +512,27 @@ deriving instance Foldable Down
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
 foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b
-foldrM f z0 xs = foldl f' return xs z0
-  where f' k x z = f x z >>= k
+foldrM f z0 xs = foldl c return xs z0
+  -- See Note [List fusion and continuations in 'c']
+  where c k x z = f x z >>= k
+        {-# INLINE c #-}
 
 -- | Monadic fold over the elements of a structure,
 -- associating to the left, i.e. from left to right.
 foldlM :: (Foldable t, Monad m) => (b -> a -> m b) -> b -> t a -> m b
-foldlM f z0 xs = foldr f' return xs z0
-  where f' x k z = f z x >>= k
+foldlM f z0 xs = foldr c return xs z0
+  -- See Note [List fusion and continuations in 'c']
+  where c x k z = f z x >>= k
+        {-# INLINE c #-}
 
 -- | Map each element of a structure to an action, evaluate these
 -- actions from left to right, and ignore the results. For a version
 -- that doesn't ignore the results see 'Data.Traversable.traverse'.
 traverse_ :: (Foldable t, Applicative f) => (a -> f b) -> t a -> f ()
-traverse_ f = foldr ((*>) . f) (pure ())
+traverse_ f = foldr c (pure ())
+  -- See Note [List fusion and continuations in 'c']
+  where c x k = f x *> k
+        {-# INLINE c #-}
 
 -- | 'for_' is 'traverse_' with its arguments flipped. For a version
 -- that doesn't ignore the results see 'Data.Traversable.for'.
@@ -547,7 +554,10 @@ for_ = flip traverse_
 -- As of base 4.8.0.0, 'mapM_' is just 'traverse_', specialized to
 -- 'Monad'.
 mapM_ :: (Foldable t, Monad m) => (a -> m b) -> t a -> m ()
-mapM_ f= foldr ((>>) . f) (return ())
+mapM_ f = foldr c (return ())
+  -- See Note [List fusion and continuations in 'c']
+  where c x k = f x >> k
+        {-# INLINE c #-}
 
 -- | 'forM_' is 'mapM_' with its arguments flipped. For a version that
 -- doesn't ignore the results see 'Data.Traversable.forM'.
@@ -561,7 +571,10 @@ forM_ = flip mapM_
 -- ignore the results. For a version that doesn't ignore the results
 -- see 'Data.Traversable.sequenceA'.
 sequenceA_ :: (Foldable t, Applicative f) => t (f a) -> f ()
-sequenceA_ = foldr (*>) (pure ())
+sequenceA_ = foldr c (pure ())
+  -- See Note [List fusion and continuations in 'c']
+  where c m k = m *> k
+        {-# INLINE c #-}
 
 -- | Evaluate each monadic action in the structure from left to right,
 -- and ignore the results. For a version that doesn't ignore the
@@ -570,7 +583,10 @@ sequenceA_ = foldr (*>) (pure ())
 -- As of base 4.8.0.0, 'sequence_' is just 'sequenceA_', specialized
 -- to 'Monad'.
 sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
-sequence_ = foldr (>>) (return ())
+sequence_ = foldr c (return ())
+  -- See Note [List fusion and continuations in 'c']
+  where c m k = m >> k
+        {-# INLINE c #-}
 
 -- | The sum of a collection of actions, generalizing 'concat'.
 --
@@ -648,6 +664,84 @@ notElem x = not . elem x
 -- 'Nothing' if there is no such element.
 find :: Foldable t => (a -> Bool) -> t a -> Maybe a
 find p = getFirst . foldMap (\ x -> First (if p x then Just x else Nothing))
+
+{-
+Note [List fusion and continuations in 'c']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we define
+  mapM_ f = foldr ((>>) . f) (return ())
+(this is the way it used to be).
+
+Now suppose we want to optimise the call
+
+  mapM_ <big> (build g)
+    where
+  g c n = ...(c x1 y1)...(c x2 y2)....n...
+
+GHC used to proceed like this:
+
+  mapM_ <big> (build g)
+
+  = { Defintion of mapM_ }
+    foldr ((>>) . <big>) (return ()) (build g)
+
+  = { foldr/build rule }
+    g ((>>) . <big>) (return ())
+
+  = { Inline g }
+    let c = (>>) . <big>
+        n = return ()
+    in ...(c x1 y1)...(c x2 y2)....n...
+
+The trouble is that `c`, being big, will not be inlined.  And that can
+be absolutely terrible for performance, as we saw in Trac #8763.
+
+It's much better to define
+
+  mapM_ f = foldr c (return ())
+    where
+      c x k = f x >> k
+      {-# INLINE c #-}
+
+Now we get
+  mapM_ <big> (build g)
+
+  = { inline mapM_ }
+    foldr c (return ()) (build g)
+      where c x k = f x >> k
+            {-# INLINE c #-}
+            f = <big>
+
+Notice that `f` does not inline into the RHS of `c`,
+because the INLINE pragma stops it; see
+Note [Simplifying inside stable unfoldings] in SimplUtils.
+Continuing:
+
+  = { foldr/build rule }
+    g c (return ())
+      where ...
+         c x k = f x >> k
+         {-# INLINE c #-}
+            f = <big>
+
+  = { inline g }
+    ...(c x1 y1)...(c x2 y2)....n...
+      where c x k = f x >> k
+            {-# INLINE c #-}
+            f = <big>
+            n = return ()
+
+      Now, crucially, `c` does inline
+
+  = { inline c }
+    ...(f x1 >> y1)...(f x2 >> y2)....n...
+      where f = <big>
+            n = return ()
+
+And all is well!  The key thing is that the fragment
+`(f x1 >> y1)` is inlined into the body of the builder
+`g`.
+-}
 
 {-
 Note [maximumBy/minimumBy space usage]

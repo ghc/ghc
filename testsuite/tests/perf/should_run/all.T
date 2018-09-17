@@ -518,6 +518,13 @@ test('T13001',
      compile_and_run,
      ['-O2'])
 
+test('T8763',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64),    41056, 20) ]),
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O2'])
+
 test('T12990',
     [stats_num_field('bytes allocated',
                      [ (wordsize(64), 20040936, 5) ]),
