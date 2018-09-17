@@ -177,6 +177,11 @@ T11788:
 T12497:
 	echo main | "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE)) T12497.hs
 
+.PHONY: T13617
+T13617:
+	"$(TEST_CC)"  -O3 -ffast-math -ftree-vectorize -c T13617.c -o T13617_sse.o
+	echo main | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T13617.hs T13617_sse.o
+
 .PHONY: T14695
 T14695:
 	echo ":quit" | LD_LIBRARY_PATH="foo:" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE))

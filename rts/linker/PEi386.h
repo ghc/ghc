@@ -14,6 +14,8 @@
 #define PEi386_IMAGE_OFFSET 0
 #endif
 
+#define PEi386_STRTAB_OFFSET 4
+
 /********************************************
  * COFF/PE types
  ********************************************/
@@ -40,6 +42,7 @@ typedef struct _COFF_HEADER_INFO {
  ********************************************/
 
 void initLinker_PEi386( void );
+void exitLinker_PEi386( void );
 const char * addDLL_PEi386( pathchar *dll_name, HINSTANCE *instance  );
 void freePreloadObjectFile_PEi386( ObjectCode *oc );
 
@@ -55,17 +58,32 @@ bool ocGetNames_PEi386    ( ObjectCode* oc );
 bool ocVerifyImage_PEi386 ( ObjectCode* oc );
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl);
 bool ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc );
-SymbolAddr *lookupSymbolInDLLs ( unsigned char *lbl );
+SymbolAddr *lookupSymbolInDLLs ( const SymbolName* lbl );
 /* See Note [mingw-w64 name decoration scheme] */
+/* We use myindex to calculate array addresses, rather than
+   simply doing the normal subscript thing.  That's because
+   some of the above structs have sizes which are not
+   a whole number of words.  GCC rounds their sizes up to a
+   whole number of words, which means that the address calcs
+   arising from using normal C indexing or pointer arithmetic
+   are just plain wrong.  Sigh.
+*/
+INLINE_HEADER unsigned char *
+myindex ( int scale, void* base, int index )
+{
+    return
+        ((unsigned char*)base) + scale * index;
+}
 pathchar* resolveSymbolAddr_PEi386 ( pathchar* buffer, int size,
                                      SymbolAddr* symbol, uintptr_t* top );
 
-char *
-allocateImageAndTrampolines (
-    pathchar* arch_name, char* member_name,
-    FILE* f,
-    int size,
-    int isThin);
+char *get_name_string(
+    unsigned char* name,
+    ObjectCode* oc);
+
+char* get_sym_name(
+    uint8_t* name,
+    ObjectCode* oc);
 
 /********************************************
  * COFF/PE headers
@@ -112,6 +130,13 @@ struct _IndirectAddr {
     SymbolAddr*           addr;
     struct _IndirectAddr* next;
 } IndirectAddr;
+
+/* Some alignment information.  */
+typedef
+struct _Alignments {
+    uint32_t mask;
+    uint32_t value;
+} Alignments;
 
 /* Util symbol handling functions.  */
 COFF_OBJ_TYPE getObjectType ( char* image, pathchar* fileName );

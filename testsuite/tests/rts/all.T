@@ -391,6 +391,9 @@ test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])
 
+test('T13617', [ unless(opsys('mingw32'), skip)],
+               run_command, ['$MAKE -s --no-print-directory T13617'])
+
 # This test sometimes produces out of sequence samples in the profasm way, but
 # not reliably, so we just skip it. See ticket #15065.
 # Test is being skipped on darwin due to it's flakiness.

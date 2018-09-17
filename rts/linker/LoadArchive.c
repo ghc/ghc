@@ -490,12 +490,7 @@ static HsInt loadArchive_ (pathchar *path)
 
             DEBUG_LOG("Member is an object file...loading...\n");
 
-#if defined(mingw32_HOST_OS)
-            // TODO: We would like to use allocateExec here, but allocateExec
-            //       cannot currently allocate blocks large enough.
-            image = allocateImageAndTrampolines(path, fileName, f, memberSize,
-                                                isThin);
-#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
             else {
@@ -506,7 +501,7 @@ static HsInt loadArchive_ (pathchar *path)
                 image += misalignment;
             }
 
-#else // not windows or darwin
+#else // not darwin
             image = stgMallocBytes(memberSize, "loadArchive(image)");
 #endif
             if (isThin) {
