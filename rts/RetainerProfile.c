@@ -120,7 +120,6 @@ typedef enum {
     posTypeStep,
     posTypePtrs,
     posTypeSRT,
-    posTypeLargeSRT,
 } nextPosType;
 
 typedef union {
@@ -137,16 +136,8 @@ typedef union {
 
     // SRT
     struct {
-        StgClosure **srt;
-        StgWord    srt_bitmap;
+        StgClosure *srt;
     } srt;
-
-    // Large SRT
-    struct {
-        StgLargeSRT *srt;
-        StgWord offset;
-    } large_srt;
-
 } nextPos;
 
 typedef struct {
@@ -334,28 +325,21 @@ find_ptrs( stackPos *info )
 static INLINE void
 init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
-    if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
-        info->type = posTypeLargeSRT;
-        info->next.large_srt.srt = (StgLargeSRT *)GET_FUN_SRT(infoTable);
-        info->next.large_srt.offset = 0;
+    info->type = posTypeSRT;
+    if (infoTable->i.srt) {
+        info->next.srt.srt = (StgClosure*)GET_FUN_SRT(infoTable);
     } else {
-        info->type = posTypeSRT;
-        info->next.srt.srt = (StgClosure **)GET_FUN_SRT(infoTable);
-        info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
+        info->next.srt.srt = NULL;
     }
 }
 
 static INLINE void
 init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
-    if (infoTable->i.srt_bitmap == (StgHalfWord)(-1)) {
-        info->type = posTypeLargeSRT;
-        info->next.large_srt.srt = (StgLargeSRT *)GET_SRT(infoTable);
-        info->next.large_srt.offset = 0;
+    if (infoTable->i.srt) {
+        info->next.srt.srt = (StgClosure*)GET_SRT(infoTable);
     } else {
-        info->type = posTypeSRT;
-        info->next.srt.srt = (StgClosure **)GET_SRT(infoTable);
-        info->next.srt.srt_bitmap = infoTable->i.srt_bitmap;
+        info->next.srt.srt = NULL;
     }
 }
 
@@ -366,57 +350,10 @@ static INLINE StgClosure *
 find_srt( stackPos *info )
 {
     StgClosure *c;
-    StgWord bitmap;
-
     if (info->type == posTypeSRT) {
-        // Small SRT bitmap
-        bitmap = info->next.srt.srt_bitmap;
-        while (bitmap != 0) {
-            if ((bitmap & 1) != 0) {
-#if defined(COMPILING_WINDOWS_DLL)
-                if ((unsigned long)(*(info->next.srt.srt)) & 0x1)
-                    c = (* (StgClosure **)((unsigned long)*(info->next.srt.srt)) & ~0x1);
-                else
-                    c = *(info->next.srt.srt);
-#else
-                c = *(info->next.srt.srt);
-#endif
-                bitmap = bitmap >> 1;
-                info->next.srt.srt++;
-                info->next.srt.srt_bitmap = bitmap;
-                return c;
-            }
-            bitmap = bitmap >> 1;
-            info->next.srt.srt++;
-        }
-        // bitmap is now zero...
-        return NULL;
-    }
-    else {
-        // Large SRT bitmap
-        uint32_t i = info->next.large_srt.offset;
-        StgWord bitmap;
-
-        // Follow the pattern from GC.c:scavenge_large_srt_bitmap().
-        bitmap = info->next.large_srt.srt->l.bitmap[i / BITS_IN(W_)];
-        bitmap = bitmap >> (i % BITS_IN(StgWord));
-        while (i < info->next.large_srt.srt->l.size) {
-            if ((bitmap & 1) != 0) {
-                c = ((StgClosure **)info->next.large_srt.srt->srt)[i];
-                i++;
-                info->next.large_srt.offset = i;
-                return c;
-            }
-            i++;
-            if (i % BITS_IN(W_) == 0) {
-                bitmap = info->next.large_srt.srt->l.bitmap[i / BITS_IN(W_)];
-            } else {
-                bitmap = bitmap >> 1;
-            }
-        }
-        // reached the end of this bitmap.
-        info->next.large_srt.offset = i;
-        return NULL;
+        c = info->next.srt.srt;
+        info->next.srt.srt = NULL;
+        return c;
     }
 }
 
@@ -550,6 +487,9 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         break;
 
     // layout.payload.ptrs, SRT
+    case FUN_STATIC:
+        ASSERT(get_itbl(c)->srt != 0);
+        /* fallthrough */
     case FUN:           // *c is a heap object.
     case FUN_2_0:
         init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
@@ -584,9 +524,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         init_srt_thunk(&se.info, get_thunk_itbl(c));
         break;
 
-    case FUN_STATIC:      // *c is a heap object.
-        ASSERT(get_itbl(c)->srt_bitmap != 0);
-    case FUN_0_1:
+    case FUN_0_1:      // *c is a heap object.
     case FUN_0_2:
     fun_srt_only:
         init_srt_fun(&se.info, get_fun_itbl(c));
@@ -888,6 +826,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 
             // layout.payload.ptrs, SRT
         case FUN:         // always a heap object
+        case FUN_STATIC:
         case FUN_2_0:
             if (se->info.type == posTypePtrs) {
                 *c = find_ptrs(&se->info);
@@ -916,7 +855,6 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             // SRT
         do_srt:
         case THUNK_STATIC:
-        case FUN_STATIC:
         case FUN_0_1:
         case FUN_0_2:
         case THUNK_0_1:
@@ -1209,69 +1147,6 @@ retain_small_bitmap (StgPtr p, uint32_t size, StgWord bitmap,
 }
 
 /* -----------------------------------------------------------------------------
- * Call retainClosure for each of the closures in an SRT.
- * ------------------------------------------------------------------------- */
-
-static void
-retain_large_srt_bitmap (StgLargeSRT *srt, StgClosure *c, retainer c_child_r)
-{
-    uint32_t i, b, size;
-    StgWord bitmap;
-    StgClosure **p;
-
-    b = 0;
-    p = (StgClosure **)srt->srt;
-    size   = srt->l.size;
-    bitmap = srt->l.bitmap[b];
-    for (i = 0; i < size; ) {
-        if ((bitmap & 1) != 0) {
-            retainClosure((StgClosure *)*p, c, c_child_r);
-        }
-        i++;
-        p++;
-        if (i % BITS_IN(W_) == 0) {
-            b++;
-            bitmap = srt->l.bitmap[b];
-        } else {
-            bitmap = bitmap >> 1;
-        }
-    }
-}
-
-static INLINE void
-retainSRT (StgClosure **srt, uint32_t srt_bitmap, StgClosure *c,
-            retainer c_child_r)
-{
-  uint32_t bitmap;
-  StgClosure **p;
-
-  bitmap = srt_bitmap;
-  p = srt;
-
-  if (bitmap == (StgHalfWord)(-1)) {
-      retain_large_srt_bitmap( (StgLargeSRT *)srt, c, c_child_r );
-      return;
-  }
-
-  while (bitmap != 0) {
-      if ((bitmap & 1) != 0) {
-#if defined(COMPILING_WINDOWS_DLL)
-          if ( (unsigned long)(*srt) & 0x1 ) {
-              retainClosure(* (StgClosure**) ((unsigned long) (*srt) & ~0x1),
-                            c, c_child_r);
-          } else {
-              retainClosure(*srt,c,c_child_r);
-          }
-#else
-          retainClosure(*srt,c,c_child_r);
-#endif
-      }
-      p++;
-      bitmap = bitmap >> 1;
-  }
-}
-
-/* -----------------------------------------------------------------------------
  *  Process all the objects in the stack chunk from stackStart to stackEnd
  *  with *c and *c_child_r being their parent and their most recent retainer,
  *  respectively. Treat stackOptionalFun as another child of *c if it is
@@ -1343,7 +1218,9 @@ retainStack( StgClosure *c, retainer c_child_r,
             p = retain_small_bitmap(p, size, bitmap, c, c_child_r);
 
         follow_srt:
-            retainSRT((StgClosure **)GET_SRT(info), info->i.srt_bitmap, c, c_child_r);
+            if (info->i.srt) {
+                retainClosure(GET_SRT(info),c,c_child_r);
+            }
             continue;
 
         case RET_BCO: {
@@ -1575,8 +1452,7 @@ inner_loop:
         // all static objects after major garbage collections.
         goto loop;
     case THUNK_STATIC:
-    case FUN_STATIC:
-        if (get_itbl(c)->srt_bitmap == 0) {
+        if (get_itbl(c)->srt == 0) {
             // No need to compute the retainer set; no dynamic objects
             // are reachable from *c.
             //
@@ -1603,6 +1479,14 @@ inner_loop:
             // reachable static objects.
             goto loop;
         }
+    case FUN_STATIC: {
+        StgInfoTable *info = get_itbl(c);
+        if (info->srt == 0 && info->layout.payload.ptrs == 0) {
+            goto loop;
+        } else {
+            break;
+        }
+    }
     default:
         break;
     }
@@ -1911,9 +1795,6 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
             p = (StgClosure*)*THUNK_STATIC_LINK(p);
             break;
         case FUN_STATIC:
-            maybeInitRetainerSet(p);
-            p = (StgClosure*)*STATIC_LINK(p);
-            break;
         case CONSTR:
         case CONSTR_1_0:
         case CONSTR_2_0:
