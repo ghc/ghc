@@ -271,7 +271,10 @@ mkSRTLit dflags _ Nothing    = ([], CmmInt 0 (halfWordWidth dflags))
 mkSRTLit dflags _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth dflags))
 
 
--- | is the SRT offset field inline in the info table on this platform?
+-- | Is the SRT offset field inline in the info table on this platform?
+--
+-- See the section "Referring to an SRT from the info table" in
+-- Note [SRTs] in CmmBuildInfoTables.hs
 inlineSRT :: DynFlags -> Bool
 inlineSRT dflags = platformArch (targetPlatform dflags) == ArchX86_64
   && tablesNextToCode dflags

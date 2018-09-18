@@ -16,6 +16,7 @@ import Hoopl.Label
 import Hoopl.Collections
 import Hoopl.Dataflow
 import Module
+import Platform
 import Digraph
 import CLabel
 import PprCmmDecl ()
@@ -120,7 +121,7 @@ offset to the SRT can be stored in 32 bits (all code lives within a
 the info table by storing the srt_offset in the srt field, which is
 half a word.
 
-On x86_64 with TABLES_NEXT_TO_CODE:
+On x86_64 with TABLES_NEXT_TO_CODE (except on MachO, due to #15169):
 
 - info->srt is zero if there's no SRT, otherwise:
 - info->srt is an offset from the info pointer to the SRT object
@@ -636,14 +637,27 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
         let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- lbls]
         put (Map.union newSRTMap srtMap)
 
+    this_mod = thisModule topSRT
+
   case Set.toList filtered of
     [] -> do
       srtTrace "oneSRT: empty" (ppr lbls) $ return ()
       updateSRTMap Nothing
       return ([], [], [])
 
+    -- When we have only one entry there is no need to build a new SRT at all.
     [one@(SRTEntry lbl)]
-      | not (labelDynamic dflags (thisModule topSRT) lbl) -> do
+      | -- Info tables refer to SRTs by offset (as noted in the section
+        -- "Referring to an SRT from the info table" of Note [SRTs]). However,
+        -- when dynamic linking is used we cannot guarantee that the offset
+        -- between the SRT and the info table will fit in the offset field.
+        -- Consequently we build a singleton SRT in in this case.
+        not (labelDynamic dflags this_mod lbl)
+
+        -- MachO relocations can't express offsets between compilation units at
+        -- all, so we are always forced to build a singleton SRT in this case.
+          && (not (osMachOTarget $ platformOS $ targetPlatform dflags)
+             || isLocalCLabel this_mod lbl) -> do
         updateSRTMap (Just one)
         return ([], map (,lbl) blockids, [])
 

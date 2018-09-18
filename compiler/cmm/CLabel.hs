@@ -94,10 +94,12 @@ module CLabel (
 
         mkHpcTicksLabel,
 
+        -- * Predicates
         hasCAF,
         needsCDecl, maybeLocalBlockLabel, externallyVisibleCLabel,
         isMathFun,
         isCFunctionLabel, isGcPtrLabel, labelDynamic,
+        isLocalCLabel,
 
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
@@ -974,13 +976,29 @@ idInfoLabelType info =
 
 
 -- -----------------------------------------------------------------------------
--- Does a CLabel need dynamic linkage?
 
+-- | Is a 'CLabel' defined in the current module being compiled?
+--
+-- Sometimes we can optimise references within a compilation unit in ways that
+-- we couldn't for inter-module references. This provides a conservative
+-- estimate of whether a 'CLabel' lives in the current module.
+isLocalCLabel :: Module -> CLabel -> Bool
+isLocalCLabel this_mod lbl =
+  case lbl of
+    IdLabel name _ _
+      | isInternalName name -> True
+      | otherwise           -> nameModule name == this_mod
+    LocalBlockLabel _       -> True
+    _                       -> False
+
+-- -----------------------------------------------------------------------------
+
+-- | Does a 'CLabel' need dynamic linkage?
+--
 -- When referring to data in code, we need to know whether
 -- that data resides in a DLL or not. [Win32 only.]
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
-
 labelDynamic :: DynFlags -> Module -> CLabel -> Bool
 labelDynamic dflags this_mod lbl =
   case lbl of
