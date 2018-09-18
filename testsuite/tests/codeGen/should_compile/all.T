@@ -43,3 +43,9 @@ test('T14999',
       unless(opsys('linux') and arch('x86_64') and have_gdb() and
         have_readelf(), skip)],
      run_command, ['$MAKE -s --no-print-directory T14999'])
+
+# Verify that we optimize away redundant jumps for unordered comparisons.
+test('T15196',
+  [ unless(arch('x86_64'),skip),
+    only_ways('normal'),
+  ], run_command, ['$MAKE -s --no-print-directory T15196'])
