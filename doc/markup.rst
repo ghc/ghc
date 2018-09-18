@@ -8,6 +8,8 @@ will just generate documentation that contains the type signatures, data
 type declarations, and class declarations exported by each of the
 modules being processed.
 
+.. _top-level-declaration
+
 Documenting a Top-Level Declaration
 -----------------------------------
 
@@ -46,6 +48,8 @@ the following:
 -  A ``type`` declaration
 
 -  A ``class`` declaration,
+
+-  An ``instance`` declaration,
 
 -  A ``data family`` or ``type family`` declaration, or
 
@@ -105,6 +109,8 @@ signatures, by using either the ``-- |`` or ``-- ^`` annotations: ::
        f :: a -> Int
        -- | This is the documentation for the 'g' method
        g :: Int -> a
+
+Associated type and data families can also be annotated in this way.
 
 Constructors and Record Fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -166,6 +172,32 @@ would join up documentation of each field and render the result. The
 reason for this seemingly weird behaviour is the fact that ``someField``
 is actually the same (partial) function.
 
+Deriving clauses
+~~~~~~~~~~~~~~~~
+
+Most instances are top-level, so can be documented as in
+:ref:`top-level-declaration`. The exception to this is instance that are
+come from a ``deriving`` clause on a datatype declaration. These can
+the documented like this: ::
+
+    data D a = L a | M
+      deriving ( Eq   -- ^ @since 4.5
+               , Ord  -- ^ default 'Ord' instance
+               )
+
+This also scales to the various GHC extensions for deriving: ::
+
+    newtype T a = T a
+      deriving          Show     -- ^ derivation of 'Show'
+      deriving stock  ( Eq       -- ^ stock derivation of 'Eq'
+                      , Foldable -- ^ stock derivation of 'Foldable'
+                      )
+      deriving newtype  Ord      -- ^ newtype derivation of 'Ord'
+      deriving anyclass Read     -- ^ unsafe derivation of 'Read'
+      deriving        ( Eq1      -- ^ deriving 'Eq1' via 'Identity'
+                      , Ord1     -- ^ deriving 'Ord1' via 'Identity'
+                      ) via Identity
+
 Function Arguments
 ~~~~~~~~~~~~~~~~~~
 
@@ -175,8 +207,8 @@ Individual arguments to a function may be documented like this: ::
        -> Float    -- ^ The 'Float' argument
        -> IO ()    -- ^ The return value
 
-Pattern synonyms and GADT-style data constructors also support this
-style of documentation.
+Pattern synonyms, GADT-style data constructors, and class methods also
+support this style of documentation.
 
 .. _module-description:
 
@@ -890,8 +922,14 @@ necessary to escape the single quote when used as an apostrophe: ::
 
 Nothing special is needed to hyperlink identifiers which contain
 apostrophes themselves: to hyperlink ``foo'`` one would simply type
-``'foo''``. To hyperlink identifiers written in infix form, simply put
-them in quotes as always: ``'`elem`'``.
+``'foo''``. Hyperlinking operators works in exactly the same way.
+
+Note that it is not possible to directly hyperlink an identifier in infix
+form or an operator in prefix form. The next best thing to do is to wrap
+the whole identifier in monospaced text and put the parentheses/backticks
+outside of the identifier, but inside the link: ::
+
+    -- | A prefix operator @('++')@ and an infix identifier @\``elem`\`@.
 
 Emphasis, Bold and Monospaced Text
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -85,7 +85,7 @@ definitions with "[thing]"
   -- \[
   --   f(n) = \Sum_{i=1}^{n} i
   -- \]
-  \\ when \(n > 0\)
+  -- when \(n > 0\)
 ```
 
 # Headings in Documentation
