@@ -38,7 +38,7 @@ peekItbl a0 = do
   nptrs'  <- (#peek struct StgInfoTable_, layout.payload.nptrs) ptr
   tipe'   <- (#peek struct StgInfoTable_, type) ptr
 #if __GLASGOW_HASKELL__ > 804
-  srtlen' <- (#peek struct StgInfoTable_, has_srt) a0
+  srtlen' <- (#peek struct StgInfoTable_, srt) a0
 #else
   srtlen' <- (#peek struct StgInfoTable_, srt_bitmap) ptr
 #endif
@@ -60,7 +60,7 @@ pokeItbl a0 itbl = do
   (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs itbl)
   (#poke StgInfoTable, type) a0 (fromEnum (tipe itbl))
 #if __GLASGOW_HASKELL__ > 804
-  (#poke StgInfoTable, has_srt) a0 (srtlen itbl)
+  (#poke StgInfoTable, srt) a0 (srtlen itbl)
 #else
   (#poke StgInfoTable, srt_bitmap) a0 (srtlen itbl)
 #endif

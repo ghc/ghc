@@ -381,5 +381,4 @@ wORD_SIZE = (#const SIZEOF_HSINT)
 
 conInfoTableSizeB :: Int
 conInfoTableSizeB = wORD_SIZE + itblSize
-
 #endif /* GHCI */
