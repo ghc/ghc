@@ -130,7 +130,7 @@ when invoked:
 
     import GHC
     import GHC.Paths ( libdir )
-    import DynFlags ( defaultLogAction )
+    import DynFlags ( defaultFatalMessager, defaultFlushOut )
 
     main =
         defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
