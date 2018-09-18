@@ -195,9 +195,8 @@ the following optimisations.  Each has a [keyword]; search for the
 keyword in the code below to see where the optimisation is
 implemented.
 
-1. [Shortcut] we never create an SRT with a single entry, instead
-   we replace all references to the singleton SRT with a reference
-   to its element.  This includes references from info tables.
+1. [Inline] we never create an SRT with a single entry, instead we
+   point to the single entry directly from the info table.
 
    i.e. instead of
 
@@ -209,19 +208,22 @@ implemented.
     |      |             |
     | code |             |
     |      |             v
-                      closure
+                         C
 
    we can point directly to the closure:
 
     +------+
     | info |
     |      |
-    |   -------->closure
+    |   -------->C
     |------|
     |      |
     | code |
     |      |
 
+
+   Furthermore, the SRT for any code that refers to this info table
+   can point directly to C.
 
    The exception to this is when we're doing dynamic linking. In that
    case, if the closure is not locally defined then we can't point to
@@ -291,7 +293,63 @@ A = {X,Y,Z}
 B = {Y,Z}
 C = {X,B}
 
-Here we could use C = {A} and therefore [Shortcut] C = A.
+Here we could use C = {A} and therefore [Inline] C = A.
+-}
+
+-- ---------------------------------------------------------------------
+{- Note [Invalid optimisation: shortcutting]
+
+You might think that if we have something like
+
+A's SRT = {B}
+B's SRT = {X}
+
+that we could replace the reference to B in A's SRT with X.
+
+A's SRT = {X}
+B's SRT = {X}
+
+and thereby perhaps save a little work at runtime, because we don't
+have to visit B.
+
+But this is NOT valid.
+
+Consider these cases:
+
+0. B can't be a constructor, because constructors don't have SRTs
+
+1. B is a CAF. This is the easy one. Obviously we want A's SRT to
+   point to B, so that it keeps B alive.
+
+2. B is a function.  This is the tricky one. The reason we can't
+shortcut in this case is that we aren't allowed to resurrect static
+objects.
+
+== How does this cause a problem? ==
+
+The particular case that cropped up when we tried this was #15544.
+- A is a thunk
+- B is a static function
+- X is a CAF
+- suppose we GC when A is alive, and B is not otherwise reachable.
+- B is "collected", meaning that it doesn't make it onto the static
+  objects list during this GC, but nothing bad happens yet.
+- Next, suppose we enter A, and then call B. (remember that A refers to B)
+  At the entry point to B, we GC. This puts B on the stack, as part of the
+  RET_FUN stack frame that gets pushed when we GC at a function entry point.
+- This GC will now reach B
+- But because B was previous "collected", it breaks the assumption
+  that static objects are never resurrected. See Note [STATIC_LINK
+  fields] in rts/sm/Storage.h for why this is bad.
+- In practice, the GC thinks that B has already been visited, and so
+  doesn't visit X, and catastrophe ensues.
+
+== Isn't this caused by the RET_FUN business? ==
+
+Maybe, but could you prove that RET_FUN is the only way that
+resurrection can occur?
+
+So, no shortcutting.
 -}
 
 -- ---------------------------------------------------------------------
@@ -470,11 +528,10 @@ depAnalSRTs cafEnv decls =
 
 -- | Get (Label, CAFLabel, Set CAFLabel) for each block that represents a CAF.
 -- These are treated differently from other labelled blocks:
---  - we never [Shortcut] a reference to a CAF to the contents of its
+--  - we never shortcut a reference to a CAF to the contents of its
 --    SRT, since the point of SRTs is to keep CAFs alive.
 --  - CAFs therefore don't take part in the dependency analysis in depAnalSRTs.
---    instead we generate their SRTs after everything else, so that we can
---    [Shortcut] references from the CAF's SRT.
+--    instead we generate their SRTs after everything else.
 getCAFs :: CAFEnv -> [CmmDecl] -> [(Label, CAFLabel, Set CAFLabel)]
 getCAFs cafEnv decls =
   [ (g_entry g, mkCAFLabel topLbl, cafs)
@@ -536,7 +593,7 @@ doSRTs dflags moduleSRTInfo tops = do
       staticFuns = mapFromList (getStaticFuns decls)
 
   -- Put the decls in dependency order. Why? So that we can implement
-  -- [Shortcut] and [Filter].  If we need to refer to an SRT that has
+  -- [Inline] and [Filter].  If we need to refer to an SRT that has
   -- a single entry, we use the entry itself, which means that we
   -- don't need to generate the singleton SRT in the first place.  But
   -- to do this we need to process blocks before things that depend on
@@ -588,11 +645,35 @@ doSCC dflags staticFuns  (AcyclicSCC (l, cafLbl, cafs)) =
   oneSRT dflags staticFuns [l] [cafLbl] False cafs
 
 doSCC dflags staticFuns (CyclicSCC nodes) = do
-  -- build a single SRT for the whole cycle
+  -- build a single SRT for the whole cycle, see Note [recursive SRTs]
   let (blockids, lbls, cafsets) = unzip3 nodes
-      cafs = Set.unions cafsets `Set.difference` Set.fromList lbls
+      cafs = Set.unions cafsets
   oneSRT dflags staticFuns blockids lbls False cafs
 
+
+{- Note [recursive SRTs]
+
+If the dependency analyser has found us a recursive group of
+declarations, then we build a single SRT for the whole group, on the
+grounds that everything in the group is reachable from everything
+else, so we lose nothing by having a single SRT.
+
+However, there are a couple of wrinkles to be aware of.
+
+* The Set CAFLabel for this SRT will contain labels in the group
+itself. The SRTMap will therefore not contain entries for these labels
+yet, so we can't turn them into SRTEntries using resolveCAF. BUT we
+can just remove recursive references from the Set CAFLabel before
+generating the SRT - the SRT will still contain all the CAFLabels that
+we need to refer to from this group's SRT.
+
+* That is, EXCEPT for static function closures. For the same reason
+described in Note [Invalid optimisation: shortcutting], we cannot omit
+references to static function closures.
+  - But, since we will merge the SRT with one of the static function
+    closures (see [FUN]), we can omit references to *that* static
+    function closure from the SRT.
+-}
 
 -- | Build an SRT for a set of blocks
 oneSRT
@@ -613,11 +694,22 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
   srtMap <- get
   topSRT <- lift get
   let
+    -- Can we merge this SRT with a FUN_STATIC closure?
+    (maybeFunClosure, otherFunLabels) =
+      case [ (l,b) | b <- blockids, Just l <- [mapLookup b staticFuns] ] of
+        [] -> (Nothing, [])
+        ((l,b):xs) -> (Just (l,b), map (mkCAFLabel . fst) xs)
+
+    -- Remove recursive references from the SRT, except for (all but
+    -- one of the) static functions. See Note [recursive SRTs].
+    nonRec = cafs `Set.difference`
+      Set.fromList lbls `Set.difference` Set.fromList otherFunLabels
+
     -- First resolve all the CAFLabels to SRTEntries
-    -- implements the [Shortcut] optimisation.
+    -- Implements the [Inline] optimisation.
     resolved =
        Set.fromList $
-       catMaybes (map (resolveCAF srtMap) (Set.toList cafs))
+       catMaybes (map (resolveCAF srtMap) (Set.toList nonRec))
 
     -- The set of all SRTEntries in SRTs that we refer to from here.
     allBelow =
@@ -632,8 +724,14 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
      (ppr cafs <+> ppr resolved <+> ppr allBelow <+> ppr filtered) $ return ()
 
   let
+    isStaticFun = isJust maybeFunClosure
+
+    -- For a label without a closure (e.g. a continuation), we must
+    -- update the SRTMap for the label to point to a closure. It's
+    -- important that we don't do this for static functions or CAFs,
+    -- see Note [Invalid optimisation: shortcutting].
     updateSRTMap srtEntry =
-      when (not isCAF) $ do   -- NB. no [Shortcut] for CAFs
+      when (not isCAF && not isStaticFun) $ do
         let newSRTMap = Map.fromList [(cafLbl, srtEntry) | cafLbl <- lbls]
         put (Map.union newSRTMap srtMap)
 
@@ -645,7 +743,9 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
       updateSRTMap Nothing
       return ([], [], [])
 
-    -- When we have only one entry there is no need to build a new SRT at all.
+    -- [Inline] - when we have only one entry there is no need to
+    -- build an SRT object at all, instead we put the singleton SRT
+    -- entry in the info table.
     [one@(SRTEntry lbl)]
       | -- Info tables refer to SRTs by offset (as noted in the section
         -- "Referring to an SRT from the info table" of Note [SRTs]). However,
@@ -658,8 +758,20 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
         -- all, so we are always forced to build a singleton SRT in this case.
           && (not (osMachOTarget $ platformOS $ targetPlatform dflags)
              || isLocalCLabel this_mod lbl) -> do
-        updateSRTMap (Just one)
-        return ([], map (,lbl) blockids, [])
+
+        -- If we have a static function closure, then it becomes the
+        -- SRT object, and everything else points to it. (the only way
+        -- we could have multiple labels here is if this is a
+        -- recursive group, see Note [recursive SRTs])
+        case maybeFunClosure of
+          Just (staticFunLbl,staticFunBlock) -> return ([], withLabels, [])
+            where
+              withLabels =
+                [ (b, if b == staticFunBlock then lbl else staticFunLbl)
+                | b <- blockids ]
+          Nothing -> do
+            updateSRTMap (Just one)
+            return ([], map (,lbl) blockids, [])
 
     cafList ->
       -- Check whether an SRT with the same entries has been emitted already.
@@ -672,10 +784,6 @@ oneSRT dflags staticFuns blockids lbls isCAF cafs = do
         Nothing -> do
           -- No duplicates: we have to build a new SRT object
           srtTrace "oneSRT: new" (ppr lbls <+> ppr filtered) $ return ()
-          let
-            -- Can we merge this SRT with a FUN_STATIC closure?
-            maybeFunClosure = listToMaybe
-              [ (l,b) | b <- blockids, Just l <- [mapLookup b staticFuns] ]
           (decls, funSRTs, srtEntry) <-
             case maybeFunClosure of
               Just (fun,block) ->
