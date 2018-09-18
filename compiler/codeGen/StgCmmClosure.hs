@@ -73,6 +73,7 @@ import SMRep
 import Cmm
 import PprCmmExpr()
 
+import CostCentre
 import BlockId
 import CLabel
 import Id
@@ -745,12 +746,15 @@ data ClosureInfo
     }
 
 -- | Convert from 'ClosureInfo' to 'CmmInfoTable'.
-mkCmmInfo :: ClosureInfo -> CmmInfoTable
-mkCmmInfo ClosureInfo {..}
+mkCmmInfo :: ClosureInfo -> Id -> CostCentreStack -> CmmInfoTable
+mkCmmInfo ClosureInfo {..} id ccs
   = CmmInfoTable { cit_lbl  = closureInfoLabel
                  , cit_rep  = closureSMRep
                  , cit_prof = closureProf
-                 , cit_srt  = Nothing }
+                 , cit_srt  = Nothing
+                 , cit_clo  = if isStaticRep closureSMRep
+                                then Just (id,ccs)
+                                else Nothing }
 
 --------------------------------------
 --        Building ClosureInfos
@@ -1035,7 +1039,8 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
  = CmmInfoTable { cit_lbl  = info_lbl
                 , cit_rep  = sm_rep
                 , cit_prof = prof
-                , cit_srt  = Nothing }
+                , cit_srt  = Nothing
+                , cit_clo = Nothing }
  where
    name = dataConName data_con
    info_lbl = mkConInfoTableLabel name NoCafRefs
@@ -1058,14 +1063,16 @@ cafBlackHoleInfoTable
   = CmmInfoTable { cit_lbl  = mkCAFBlackHoleInfoTableLabel
                  , cit_rep  = blackHoleRep
                  , cit_prof = NoProfilingInfo
-                 , cit_srt  = Nothing }
+                 , cit_srt  = Nothing
+                 , cit_clo  = Nothing }
 
 indStaticInfoTable :: CmmInfoTable
 indStaticInfoTable
   = CmmInfoTable { cit_lbl  = mkIndStaticInfoLabel
                  , cit_rep  = indStaticRep
                  , cit_prof = NoProfilingInfo
-                 , cit_srt  = Nothing }
+                 , cit_srt  = Nothing
+                 , cit_clo  = Nothing }
 
 staticClosureNeedsLink :: Bool -> CmmInfoTable -> Bool
 -- A static closure needs a link field to aid the GC when traversing

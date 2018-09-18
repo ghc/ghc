@@ -212,7 +212,7 @@ thread_static( StgClosure* p )
         p = *THUNK_STATIC_LINK(p);
         continue;
     case FUN_STATIC:
-        p = *FUN_STATIC_LINK(p);
+        p = *STATIC_LINK(info,p);
         continue;
     case CONSTR:
     case CONSTR_NOCAF:
