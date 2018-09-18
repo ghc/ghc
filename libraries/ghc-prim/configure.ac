@@ -8,7 +8,7 @@ dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
 AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
 
-if test "x$CONF_GCC_SUPPORTS__ATOMICS" = YES
+if test "$CONF_GCC_SUPPORTS__ATOMICS" = "YES"
 then PRIM_CFLAGS=-DHAVE_C11_ATOMICS
      PRIM_EXTRA_LIBRARIES=atomic
 fi
