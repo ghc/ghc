@@ -1,2 +1,0 @@
-cc-options: @PRIM_CFLAGS@
-extra-libraries: @PRIM_EXTRA_LIBRARIES@

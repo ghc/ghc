@@ -739,6 +739,11 @@ FP_GCC_VERSION
 dnl ** See whether gcc supports -no-pie
 FP_GCC_SUPPORTS_NO_PIE
 
+dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
+dnl    unregisterised, Sparc, and PPC backends.
+FP_GCC_SUPPORTS__ATOMICS
+AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
+
 FP_GCC_EXTRA_FLAGS
 
 dnl ** look to see if we have a C compiler using an llvm back end.
