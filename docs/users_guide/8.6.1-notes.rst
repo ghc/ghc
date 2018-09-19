@@ -13,6 +13,17 @@ Highlights
 
 The highlights, since the 8.4.1 release, are:
 
+- Support for :extension:`QuantifiedConstraints`.
+
+- A new flexible deriving scheme, :extension:`DerivingVia`.
+
+- A new plugin mechanism and support for plugins to modify their effect on GHC's
+  recompilation checking logic.
+
+- :ref:`Valid hole fits <typed-hole-valid-hole-fits>` in error messages.
+
+- A number of syntactic language extensions.
+
 - Programs are no longer constrained by the Windows ``MAX_PATH`` file path
   length limit. The file path limit is now approximately 32,767 characters. Note
   that GHC itself is still somewhat limited due to GCC not supporting file
@@ -231,6 +242,8 @@ Template Haskell
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+- The ``Plugin`` record now has a several new fields for the new source plugins
+  and recompilation checking mechanisms.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
@@ -244,8 +257,6 @@ Template Haskell
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
-
--  Version number 0.5.2.1 (was 0.5.2.0)
 
 -  Added new ``addWordC#`` operation for unsigned addition with carry.
 
