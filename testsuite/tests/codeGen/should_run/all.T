@@ -173,3 +173,6 @@ test('T13825-unit',
      ['-package ghc'])
 test('T14619', normal, compile_and_run, [''])
 test('T14754', normal, compile_and_run, [''])
+test('T14251', [extra_ways(['llvm', 'optllvm']),
+                expect_broken_for(14251, ['optllvm'])],
+     compile_and_run, [''])
