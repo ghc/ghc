@@ -1241,7 +1241,7 @@ hsExprNeedsParens p = go
     go (HsMultiIf{})                  = p > topPrec
     go (HsLet{})                      = p > topPrec
     go (HsDo _ sc _)
-      | isListCompExpr sc             = False
+      | isComprehensionContext sc     = False
       | otherwise                     = p > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
@@ -1855,18 +1855,17 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data StmtLR idL idR body -- body should always be (LHs**** idR)
   = LastStmt  -- Always the last Stmt in ListComp, MonadComp,
-              -- and (after the renamer) DoExpr, MDoExpr
+              -- and (after the renamer, see RnExpr.checkLastStmt) DoExpr, MDoExpr
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
           (XLastStmt idL idR body)
           body
           Bool               -- True <=> return was stripped by ApplicativeDo
-          (SyntaxExpr idR)   -- The return operator, used only for
-                             -- MonadComp For ListComp we
-                             -- use the baked-in 'return' For DoExpr,
-                             -- MDoExpr, we don't apply a 'return' at
-                             -- all See Note [Monad Comprehensions] |
-                             -- - 'ApiAnnotation.AnnKeywordId' :
-                             -- 'ApiAnnotation.AnnLarrow'
+          (SyntaxExpr idR)   -- The return operator
+            -- The return operator is used only for MonadComp
+            -- For ListComp we use the baked-in 'return'
+            -- For DoExpr, MDoExpr, we don't apply a 'return' at all
+            -- See Note [Monad Comprehensions]
+            -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | BindStmt (XBindStmt idL idR body) -- Post typechecking,
@@ -2752,13 +2751,13 @@ data HsStmtContext id
   deriving Functor
 deriving instance (Data id) => Data (HsStmtContext id)
 
-isListCompExpr :: HsStmtContext id -> Bool
--- Uses syntax [ e | quals ]
-isListCompExpr ListComp          = True
-isListCompExpr MonadComp         = True
-isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
-isListCompExpr (TransStmtCtxt c) = isListCompExpr c
-isListCompExpr _ = False
+isComprehensionContext :: HsStmtContext id -> Bool
+-- Uses comprehension syntax [ e | quals ]
+isComprehensionContext ListComp          = True
+isComprehensionContext MonadComp         = True
+isComprehensionContext (ParStmtCtxt c)   = isComprehensionContext c
+isComprehensionContext (TransStmtCtxt c) = isComprehensionContext c
+isComprehensionContext _ = False
 
 -- | Should pattern match failure in a 'HsStmtContext' be desugared using
 -- 'MonadFail'?
@@ -2770,6 +2769,10 @@ isMonadFailStmtContext GhciStmtCtxt         = True
 isMonadFailStmtContext (ParStmtCtxt ctxt)   = isMonadFailStmtContext ctxt
 isMonadFailStmtContext (TransStmtCtxt ctxt) = isMonadFailStmtContext ctxt
 isMonadFailStmtContext _ = False -- ListComp, PatGuard, ArrowExpr
+
+isMonadCompContext :: HsStmtContext id -> Bool
+isMonadCompContext MonadComp = True
+isMonadCompContext _         = False
 
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})   = text "="
@@ -2893,7 +2896,7 @@ pprStmtInCtxt :: (OutputableBndrId (GhcPass idL),
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)
-  | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
+  | isComprehensionContext ctxt      -- For [ e | .. ], do not mutter about "stmts"
   = hang (text "In the expression:") 2 (ppr e)
 
 pprStmtInCtxt ctxt stmt
