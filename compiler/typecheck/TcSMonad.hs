@@ -2196,7 +2196,7 @@ are some wrinkles:
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 If   * the inert set contains a canonical Given CTyEqCan (a ~ ty)
-and  * 'a' is a skolem bound in this very implication, b
+and  * 'a' is a skolem bound in this very implication,
 
 then:
 a) The Given is pretty much a let-binding, like
