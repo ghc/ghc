@@ -29,7 +29,7 @@ import RnUtils          ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNames, inHsDocContext, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn )
-import RnUnbound        ( mkUnboundName )
+import RnUnbound        ( mkUnboundName, notInScopeErr )
 import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcAnnotations    ( annCtxt )
@@ -1093,14 +1093,14 @@ badRuleVar name var
 badRuleLhsErr :: FastString -> LHsExpr GhcRn -> HsExpr GhcRn -> SDoc
 badRuleLhsErr name lhs bad_e
   = sep [text "Rule" <+> pprRuleName name <> colon,
-         nest 4 (vcat [err,
+         nest 2 (vcat [err,
                        text "in left-hand side:" <+> ppr lhs])]
     $$
     text "LHS must be of form (f e1 .. en) where f is not forall'd"
   where
     err = case bad_e of
-            HsUnboundVar _ uv -> text "Not in scope:" <+> ppr uv
-            _ -> text "Illegal expression:" <+> ppr bad_e
+            HsUnboundVar _ uv -> notInScopeErr (mkRdrUnqual (unboundVarOcc uv))
+            _                 -> text "Illegal expression:" <+> ppr bad_e
 
 {- **************************************************************
          *                                                      *

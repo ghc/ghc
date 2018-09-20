@@ -134,4 +134,4 @@ test('T14591', normal, compile_fail, [''])
 test('T15214', normal, compile_fail, [''])
 test('T15539', normal, compile_fail, [''])
 test('T15487', normal, multimod_compile_fail, ['T15487','-v0'])
-
+test('T15659', normal, compile_fail, [''])

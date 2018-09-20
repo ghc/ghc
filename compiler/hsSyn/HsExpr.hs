@@ -179,8 +179,15 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
--- | An unbound variable; used for treating out-of-scope variables as
--- expression holes
+-- | An unbound variable; used for treating
+-- out-of-scope variables as expression holes
+--
+-- Either "x", "y"     Plain OutOfScope
+-- or     "_", "_x"    A TrueExprHole
+--
+-- Both forms indicate an out-of-scope variable,  but the latter
+-- indicates that the user /expects/ it to be out of scope, and
+-- just wants GHC to report its type
 data UnboundVar
   = OutOfScope OccName GlobalRdrEnv  -- ^ An (unqualified) out-of-scope
                                      -- variable, together with the GlobalRdrEnv
