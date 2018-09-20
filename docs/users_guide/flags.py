@@ -48,8 +48,6 @@ from docutils import nodes
 from docutils.parsers.rst import Directive, directives
 from sphinx import addnodes
 from sphinx.domains.std import GenericObject
-from sphinx.domains import ObjType
-from sphinx.roles import XRefRole
 from sphinx.errors import SphinxError
 from utils import build_table_from_list
 
@@ -601,20 +599,15 @@ def purge_flags(app, env, docname):
 ### Initialization
 
 def setup(app):
-    # Yuck: We can't use app.add_object_type since we need to provide the
-    # Directive instance ourselves.
-    std_object_types = app.registry.domain_object_types.setdefault('std', {})
 
     # Add ghc-flag directive, and override the class with our own
-    app.add_directive_to_domain('std', 'ghc-flag', Flag)
-    app.add_role_to_domain('std', 'ghc-flag', XRefRole())
-    std_object_types['ghc-flag'] = ObjType('ghc-flag', 'ghc-flag')
+    app.add_object_type('ghc-flag', 'ghc-flag')
+    app.add_directive_to_domain('std', 'ghc-flag', Flag, override=True)
 
     # Add extension directive, and override the class with our own
-    app.add_directive_to_domain('std', 'extension', LanguageExtension)
-    app.add_role_to_domain('std', 'extension', XRefRole())
-    std_object_types['extension'] = ObjType('ghc-flag', 'ghc-flag')
-
+    app.add_object_type('extension', 'extension')
+    app.add_directive_to_domain('std', 'extension', LanguageExtension,
+            override=True)
     # NB: language-extension would be misinterpreted by sphinx, and produce
     # lang="extensions" XML attributes
 
