@@ -679,6 +679,11 @@ for:
 
   R1 = StgAP_STACK_fun(ap);
 
+  // Because of eager blackholing the closure no longer has correct size so
+  // threadPaused() can't correctly zero the slop, so we do it here. See #15571
+  // and Note [zeroing slop].
+  OVERWRITING_CLOSURE_SIZE(ap, BYTES_TO_WDS(SIZEOF_StgThunkHeader) + 2 + Words);
+
   ENTER_R1();
 }
 
