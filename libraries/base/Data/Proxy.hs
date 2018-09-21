@@ -38,7 +38,7 @@ import GHC.Arr
 -- create one).
 --
 -- Historically, @'Proxy' :: 'Proxy' a@ is a safer alternative to the
--- @'undefined :: a'@ idiom.
+-- @'undefined' :: a@ idiom.
 --
 -- >>> Proxy :: Proxy (Void, Int -> Int)
 -- Proxy
