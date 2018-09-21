@@ -55,6 +55,9 @@ buildProgram rs = do
                         (True, s) | s > Stage0 -> do
                             srcDir <- buildRoot <&> (-/- (stageString Stage0 -/- "bin"))
                             copyFile (srcDir -/- takeFileName bin) bin
+                        (False, s) | s > Stage0 && (package `elem` [touchy, unlit]) -> do
+                            srcDir <- stageLibPath Stage0 <&> (-/- "bin")
+                            copyFile (srcDir -/- takeFileName bin) bin
                         _ -> buildBinary rs bin =<< programContext stage package
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
