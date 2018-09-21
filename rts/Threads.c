@@ -371,12 +371,6 @@ wakeBlockingQueue(Capability *cap, StgBlockingQueue *bq)
 
     // overwrite the BQ with an indirection so it will be
     // collected at the next GC.
-#if defined(DEBUG) && !defined(THREADED_RTS)
-    // XXX FILL_SLOP, but not if THREADED_RTS because in that case
-    // another thread might be looking at this BLOCKING_QUEUE and
-    // checking the owner field at the same time.
-    bq->bh = 0; bq->queue = 0; bq->owner = 0;
-#endif
     OVERWRITE_INFO(bq, &stg_IND_info);
 }
 
