@@ -44,7 +44,7 @@ case "$(uname)" in
         fail "TARGET=$target not supported"
       fi
     else
-      cabal update
+      cabal update -v
       cabal install --reinstall hscolour
       sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     fi
