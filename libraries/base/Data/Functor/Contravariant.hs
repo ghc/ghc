@@ -87,8 +87,8 @@ import Prelude hiding ((.),id)
 --
 -- Any instance should be subject to the following laws:
 --
--- > contramap id = id
--- > contramap f . contramap g = contramap (g . f)
+-- [Identity]    @'contramap' 'id' = 'id'@
+-- [Composition] @'contramap' (g . f) = 'contramap' f . 'contramap' g@
 --
 -- Note, that the second law follows from the free theorem of the type of
 -- 'contramap' and the first law, so you need only check that the former
@@ -206,22 +206,11 @@ defaultComparison = Comparison compare
 --
 -- Equivalence relations are expected to satisfy three laws:
 --
--- __Reflexivity__:
---
--- @
--- 'getEquivalence' f a a = True
--- @
---
--- __Symmetry__:
---
--- @
--- 'getEquivalence' f a b = 'getEquivalence' f b a
--- @
---
--- __Transitivity__:
---
--- If @'getEquivalence' f a b@ and @'getEquivalence' f b c@ are both 'True'
--- then so is @'getEquivalence' f a c@.
+-- [Reflexivity]:  @'getEquivalence' f a a = True@
+-- [Symmetry]:     @'getEquivalence' f a b = 'getEquivalence' f b a@
+-- [Transitivity]:
+--    If @'getEquivalence' f a b@ and @'getEquivalence' f b c@ are both 'True'
+--    then so is @'getEquivalence' f a c@.
 --
 -- The types alone do not enforce these laws, so you'll have to check them
 -- yourself.
