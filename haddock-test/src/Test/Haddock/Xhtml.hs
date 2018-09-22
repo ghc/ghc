@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
-
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Test.Haddock.Xhtml
     ( Xml(..)
@@ -22,7 +22,6 @@ newtype Xml = Xml
     } deriving Eq
 
 
--- TODO: Find a way to avoid warning about orphan instances.
 deriving instance Eq Element
 deriving instance Eq Content
 deriving instance Eq CData
