@@ -1,4 +1,4 @@
-## Changes in version 1.7.0
+## Changes in version 1.6.1
 
  * Replace `attoparsec` with `parsec` (#799)
 
