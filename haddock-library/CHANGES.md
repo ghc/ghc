@@ -1,3 +1,7 @@
+## Changes in version 1.7.0
+
+ * Replace `attoparsec` with `parsec` (#799)
+
 ## Changes in version 1.6.0
 
  * `MetaDoc` stores package name for since annotations
