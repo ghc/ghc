@@ -955,6 +955,8 @@ it off at source.
 -}
 
 exprIsTrivial :: CoreExpr -> Bool
+-- If you modify this function, you may also
+-- need to modify getIdFromTrivialExpr
 exprIsTrivial (Var _)          = True        -- See Note [Variables are trivial]
 exprIsTrivial (Type _)         = True
 exprIsTrivial (Coercion _)     = True
@@ -984,20 +986,24 @@ if the variable actually refers to a literal; thus we use
 T12076lit for an example where this matters.
 -}
 
-getIdFromTrivialExpr :: CoreExpr -> Id
+getIdFromTrivialExpr :: HasDebugCallStack => CoreExpr -> Id
 getIdFromTrivialExpr e
     = fromMaybe (pprPanic "getIdFromTrivialExpr" (ppr e))
                 (getIdFromTrivialExpr_maybe e)
 
 getIdFromTrivialExpr_maybe :: CoreExpr -> Maybe Id
 -- See Note [getIdFromTrivialExpr]
-getIdFromTrivialExpr_maybe e = go e
-  where go (Var v) = Just v
-        go (App f t) | not (isRuntimeArg t) = go f
-        go (Tick t e) | not (tickishIsCode t) = go e
-        go (Cast e _) = go e
-        go (Lam b e) | not (isRuntimeVar b) = go e
-        go _ = Nothing
+-- Th equations for this should line up with those for exprIsTrivial
+getIdFromTrivialExpr_maybe e
+  = go e
+  where
+    go (App f t) | not (isRuntimeArg t)   = go f
+    go (Tick t e) | not (tickishIsCode t) = go e
+    go (Cast e _)                         = go e
+    go (Lam b e) | not (isRuntimeVar b)   = go e
+    go (Case e _ _ [])                    = go e
+    go (Var v) = Just v
+    go _       = Nothing
 
 {-
 exprIsBottom is a very cheap and cheerful function; it may return
