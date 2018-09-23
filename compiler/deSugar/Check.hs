@@ -438,7 +438,7 @@ checkEmptyCase' var = do
 
     -- A list of inhabitant candidates is available: Check for each
     -- one for the satisfiability of the constraints it gives rise to.
-    Right candidates -> do
+    Right (_, candidates) -> do
       missing_m <- flip mapMaybeM candidates $
           \InhabitationCandidate{ ic_val_abs = va, ic_tm_ct = tm_ct
                                 , ic_ty_cs = ty_cs
@@ -610,18 +610,15 @@ pmIsSatisfiable amb_cs new_tm_c new_ty_cs strict_arg_tys = do
     Just delta -> do
       -- We know that the term and type constraints are inhabitable, so now
       -- check if each strict argument type is inhabitable.
-      non_voids <- traverse (nonVoid delta) strict_arg_tys
-      pure $ if and non_voids -- Check if each strict argument type
-                              -- is inhabitable
+      all_non_void <- checkAllNonVoid initRecTc delta strict_arg_tys
+      pure $ if all_non_void -- Check if each strict argument type
+                             -- is inhabitable
                 then Just delta
                 else Nothing
 
 -- | Like 'pmIsSatisfiable', but only checks if term and type constraints are
 -- satisfiable, and doesn't bother checking anything related to strict argument
--- types. It's handy to have this factored out into is own function since term
--- and type constraints are the only forms of constraints that are checked for
--- each 'InhabitationCandidate' in 'nonVoid'
--- (as discussed in @Note [Extensions to GADTs Meet Their Match]@).
+-- types.
 tmTyCsAreSatisfiable
   :: Delta     -- ^ The ambient term and type constraints
                --   (known to be satisfiable).
@@ -642,38 +639,85 @@ tmTyCsAreSatisfiable
                                                  , delta_tm_cs = term_cs }
            _unsat               -> Nothing
 
+-- | Implements two performance optimizations, as described in the
+-- \"Strict argument type constraints\" section of
+-- @Note [Extensions to GADTs Meet Their Match]@.
+checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> PmM Bool
+checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
+  fam_insts <- liftD dsGetFamInstEnvs
+  let tys_to_check = filterOut (definitelyInhabitedType fam_insts)
+                               strict_arg_tys
+      rec_max_bound | tys_to_check `lengthExceeds` 1
+                    = 1
+                    | otherwise
+                    = defaultRecTcMaxBound
+      rec_ts' = setRecTcMaxBound rec_max_bound rec_ts
+  allM (nonVoid rec_ts' amb_cs) tys_to_check
+
 -- | Checks if a strict argument type of a conlike is inhabitable by a
 -- terminating value (i.e, an 'InhabitationCandidate').
 -- See @Note [Extensions to GADTs Meet Their Match]@.
 nonVoid
-  :: Delta    -- ^ The ambient term/type constraints (known to be satisfiable).
-  -> Type     -- ^ The strict argument type.
-  -> PmM Bool -- ^ 'True' if the strict argument type might be inhabited by a
-              --   terminating value (i.e., an 'InhabitationCandidate').
-              --   'False' if it is definitely uninhabitable by anything
-              --   (except bottom).
-nonVoid amb_cs strict_arg_ty = do
+  :: RecTcChecker -- ^ The per-'TyCon' recursion depth limit.
+  -> Delta        -- ^ The ambient term/type constraints (known to be
+                  --   satisfiable).
+  -> Type         -- ^ The strict argument type.
+  -> PmM Bool     -- ^ 'True' if the strict argument type might be inhabited by
+                  --   a terminating value (i.e., an 'InhabitationCandidate').
+                  --   'False' if it is definitely uninhabitable by anything
+                  --   (except bottom).
+nonVoid rec_ts amb_cs strict_arg_ty = do
   fam_insts <- liftD dsGetFamInstEnvs
   mb_cands <- inhabitationCandidates fam_insts strict_arg_ty
   case mb_cands of
-    Left _ -> pure True -- The type is trivially inhabited
-    Right cands -> do
-      cand_inhabs <- traverse cand_tm_ty_cs_are_satisfiable cands
-      pure $ or cand_inhabs
-        -- A strict argument type is inhabitable by a terminating value if at
-        -- least one InhabitationCandidate is satisfiable
+    Right (tc, cands)
+      |  Just rec_ts' <- checkRecTc rec_ts tc
+      -> anyM (cand_is_inhabitable rec_ts' amb_cs) cands
+           -- A strict argument type is inhabitable by a terminating value if
+           -- at least one InhabitationCandidate is inhabitable.
+    _ -> pure True
+           -- Either the type is trivially inhabited or we have exceeded the
+           -- recursion depth for some TyCon (so bail out and conservatively
+           -- claim the type is inhabited).
   where
-    -- Checks if an InhabitationCandidate for a strict argument type has
-    -- satisfiable term and type constraints. We deliberately don't call
-    -- nonVoid on the InhabitationCandidate's own strict argument types, since
-    -- that can result in infinite loops.
+    -- Checks if an InhabitationCandidate for a strict argument type:
+    --
+    -- (1) Has satisfiable term and type constraints.
+    -- (2) Has 'nonVoid' strict argument types (we bail out of this
+    --     check if recursion is detected).
+    --
     -- See Note [Extensions to GADTs Meet Their Match]
-    cand_tm_ty_cs_are_satisfiable :: InhabitationCandidate -> PmM Bool
-    cand_tm_ty_cs_are_satisfiable
-      (InhabitationCandidate{ ic_tm_ct = new_term_c
-                            , ic_ty_cs = new_ty_cs }) = do
+    cand_is_inhabitable :: RecTcChecker -> Delta
+                        -> InhabitationCandidate -> PmM Bool
+    cand_is_inhabitable rec_ts amb_cs
+      (InhabitationCandidate{ ic_tm_ct          = new_term_c
+                            , ic_ty_cs          = new_ty_cs
+                            , ic_strict_arg_tys = new_strict_arg_tys }) = do
         mb_sat <- tmTyCsAreSatisfiable amb_cs new_term_c new_ty_cs
-        pure $ isJust mb_sat
+        case mb_sat of
+          Nothing -> pure False
+          Just new_delta -> do
+            checkAllNonVoid rec_ts new_delta new_strict_arg_tys
+
+-- | @'definitelyInhabitedType' ty@ returns 'True' if @ty@ has at least one
+-- constructor @C@ such that:
+--
+-- 1. @C@ has no equality constraints.
+-- 2. @C@ has no strict argument types.
+--
+-- See the \"Strict argument type constraints\" section of
+-- @Note [Extensions to GADTs Meet Their Match]@.
+definitelyInhabitedType :: FamInstEnvs -> Type -> Bool
+definitelyInhabitedType env ty
+  | Just (_, cons, _) <- pmTopNormaliseType_maybe env ty
+  = any meets_criteria cons
+  | otherwise
+  = False
+  where
+    meets_criteria :: DataCon -> Bool
+    meets_criteria con =
+      null (dataConEqSpec con) && -- (1)
+      null (dataConImplBangs con) -- (2)
 
 {- Note [Type normalisation for EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -733,7 +777,7 @@ Which means that in source Haskell:
 -- one accompanied by the term- and type- constraints it gives rise to.
 -- See also Note [Checking EmptyCase Expressions]
 inhabitationCandidates :: FamInstEnvs -> Type
-                       -> PmM (Either Type [InhabitationCandidate])
+                       -> PmM (Either Type (TyCon, [InhabitationCandidate]))
 inhabitationCandidates fam_insts ty
   = case pmTopNormaliseType_maybe fam_insts ty of
       Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
@@ -751,7 +795,7 @@ inhabitationCandidates fam_insts ty
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType_maybe
     alts_to_check :: Type -> Type -> [DataCon]
-                  -> PmM (Either Type [InhabitationCandidate])
+                  -> PmM (Either Type (TyCon, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
       Just (tc, _)
         |  tc `elem` trivially_inhabited
@@ -759,9 +803,9 @@ inhabitationCandidates fam_insts ty
              []    -> return (Left src_ty)
              (_:_) -> do var <- liftD $ mkPmId core_ty
                          let va = build_tm (PmVar var) dcs
-                         return $ Right [InhabitationCandidate
+                         return $ Right (tc, [InhabitationCandidate
                            { ic_val_abs = va, ic_tm_ct = mkIdEq var
-                           , ic_ty_cs = emptyBag, ic_strict_arg_tys = [] }]
+                           , ic_ty_cs = emptyBag, ic_strict_arg_tys = [] }])
 
         |  pmIsClosedType core_ty && not (isAbstractTyCon tc)
            -- Don't consider abstract tycons since we don't know what their
@@ -770,8 +814,9 @@ inhabitationCandidates fam_insts ty
         -> liftD $ do
              var  <- mkPmId core_ty -- it would be wrong to unify x
              alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
-             return $ Right [ alt{ic_val_abs = build_tm (ic_val_abs alt) dcs}
-                            | alt <- alts ]
+             return $ Right
+               (tc, [ alt{ic_val_abs = build_tm (ic_val_abs alt) dcs}
+                    | alt <- alts ])
       -- For other types conservatively assume that they are inhabited.
       _other -> return (Left src_ty)
 
@@ -1419,7 +1464,8 @@ determine whether a strict type is inhabitable by a terminating value or not.
 
 `nonVoid ty` returns True when either:
 1. `ty` has at least one InhabitationCandidate for which both its term and type
-   constraints are satifiable.
+   constraints are satifiable, and `nonVoid` returns `True` for all of the
+   strict argument types in that InhabitationCandidate.
 2. We're unsure if it's inhabited by a terminating value.
 
 `nonVoid ty` returns False when `ty` is definitely uninhabited by anything
@@ -1433,12 +1479,19 @@ determine whether a strict type is inhabitable by a terminating value or not.
 * `nonVoid (Int :~: Bool)` returns False. Although it has an
   InhabitationCandidate (by way of Refl), its type constraint (Int ~ Bool) is
   not satisfiable.
+* Given the following definition of `MyVoid`:
 
-Observe that the definition of `nonVoid ty` does not say whether `ty`'s
-InhabitationCandidate must itself have `nonVoid` return True for all its own
-strict argument types. This is a deliberate choice, because trying to take
-these into account in a naïve way can lead to infinite loops. Consider the
-following example:
+    data MyVoid = MkMyVoid !Void
+
+  `nonVoid MyVoid` returns False. The InhabitationCandidate for the MkMyVoid
+  constructor contains Void as a strict argument type, and since `nonVoid Void`
+  returns False, that InhabitationCandidate is discarded, leaving no others.
+
+* Performance considerations
+
+We must be careful when recursively calling `nonVoid` on the strict argument
+types of an InhabitationCandidate, because doing so naïvely can cause GHC to
+fall into an infinite loop. Consider the following example:
 
   data Abyss = MkAbyss !Abyss
 
@@ -1453,13 +1506,53 @@ There is only one InhabitationCandidate for Abyss—MkAbyss—and both its term
 and type constraints are satisfiable, so we'd need to check if `nonVoid Abyss`
 returns False... and now we've entered an infinite loop!
 
-To avoid this sort of conundrum, `nonVoid ty` doesn't call `nonVoid` on any of
-the strict argument types of `ty`'s InhabitationCandidates. This means
-that `nonVoid` is incomplete. For instance, GHC will warn that
-stareIntoTheAbyss is non-exhaustive, even though it actually is. Properly
-detecting that stareIntoTheAbyss is non-exhaustive would require a much more
-sophisticated implementation for `nonVoid`, however, so for now we simply
-implement the current, more straightforward approach.
+To avoid this sort of conundrum, `nonVoid` uses a simple test to detect the
+presence of recursive types (through `checkRecTc`), and if recursion is
+detected, we bail out and conservatively assume that the type is inhabited by
+some terminating value. This avoids infinite loops at the expense of making
+the coverage checker incomplete with respect to functions like
+stareIntoTheAbyss above. Then again, the same problem occurs with recursive
+newtypes, like in the following code:
+
+  newtype Chasm = MkChasm Chasm
+
+  gazeIntoTheChasm :: Chasm -> a
+  gazeIntoTheChasm x = case x of {} -- Erroneously warned as non-exhaustive
+
+So this limitation is somewhat understandable.
+
+Note that even with this recursion detection, there is still a possibility that
+`nonVoid` can run in exponential time. Consider the following data type:
+
+  data T = MkT !T !T !T
+
+If we call `nonVoid` on each of its fields, that will require us to once again
+check if `MkT` is inhabitable in each of those three fields, which in turn will
+require us to check if `MkT` is inhabitable again... As you can see, the
+branching factor adds up quickly, and if the recursion depth limit is, say,
+100, then `nonVoid T` will effectively take forever.
+
+To mitigate this, we check the branching factor every time we are about to call
+`nonVoid` on a list of strict argument types. If the branching factor exceeds 1
+(i.e., if there is potential for exponential runtime), then we limit the
+maximum recursion depth to 1 to mitigate the problem. If the branching factor
+is exactly 1 (i.e., we have a linear chain instead of a tree), then it's okay
+to stick with a larger maximum recursion depth.
+
+Another microoptimization applies to data types like this one:
+
+  data S a = ![a] !T
+
+Even though there is a strict field of type [a], it's quite silly to call
+nonVoid on it, since it's "obvious" that it is inhabitable. To make this
+intuition formal, we say that a type is definitely inhabitable (DI) if:
+
+  * It has at least one constructor C such that:
+    1. C has no equality constraints (since they might be unsatisfiable)
+    2. C has no strict argument types (since they might be uninhabitable)
+
+It's relatively cheap to cheap if a type is DI, so before we call `nonVoid`
+on a list of strict argument types, we filter out all of the DI ones.
 -}
 
 instance Outputable InhabitationCandidate where

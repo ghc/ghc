@@ -122,7 +122,8 @@ module TyCon(
         primRepIsFloat,
 
         -- * Recursion breaking
-        RecTcChecker, initRecTc, checkRecTc
+        RecTcChecker, initRecTc, defaultRecTcMaxBound,
+        setRecTcMaxBound, checkRecTc
 
 ) where
 
@@ -2571,10 +2572,20 @@ data RecTcChecker = RC !Int (NameEnv Int)
   -- The upper bound, and the number of times
   -- we have encountered each TyCon
 
+-- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
--- Initialise with a fixed max bound of 100
--- We should probably have a flag for this
-initRecTc = RC 100 emptyNameEnv
+initRecTc = RC defaultRecTcMaxBound emptyNameEnv
+
+-- | The default upper bound (100) for the number of times a 'RecTcChecker' is
+-- allowed to encounter each 'TyCon'.
+defaultRecTcMaxBound :: Int
+defaultRecTcMaxBound = 100
+-- Should we have a flag for this?
+
+-- | Change the upper bound for the number of times a 'RecTcChecker' is allowed
+-- to encounter each 'TyCon'.
+setRecTcMaxBound :: Int -> RecTcChecker -> RecTcChecker
+setRecTcMaxBound new_bound (RC _old_bound rec_nts) = RC new_bound rec_nts
 
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
