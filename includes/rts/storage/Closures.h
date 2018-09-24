@@ -130,10 +130,13 @@ typedef struct {
 
 typedef struct StgBlockingQueue_ {
     StgHeader   header;
-    struct StgBlockingQueue_ *link; // here so it looks like an IND
+    struct StgBlockingQueue_ *link;
+        // here so it looks like an IND, to be able to skip the queue without
+        // deleting it (done in wakeBlockingQueue())
     StgClosure *bh;  // the BLACKHOLE
     StgTSO     *owner;
     struct MessageBlackHole_ *queue;
+        // holds TSOs blocked on `bh`
 } StgBlockingQueue;
 
 typedef struct {
@@ -400,6 +403,8 @@ typedef struct MessageThrowTo_ {
 typedef struct MessageBlackHole_ {
     StgHeader   header;
     struct MessageBlackHole_ *link;
+        // here so it looks like an IND, to be able to skip the message without
+        // deleting it (done in throwToMsg())
     StgTSO     *tso;
     StgClosure *bh;
 } MessageBlackHole;
