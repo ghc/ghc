@@ -1626,8 +1626,8 @@ flatten_exact_fam_app_fully tc tys
   = do { let reduce_co = mkNomReflCo (typeKind (mkTyConApp tc tys))
        ; mOut <- try_to_reduce_nocache tc tys reduce_co id
        ; case mOut of
-           Just out -> pure out
-           Nothing -> do
+           Right out -> pure out
+           Left _ -> do
                { -- First, flatten the arguments
                ; (xis, cos, kind_co)
                    <- setEqRel NomEq $  -- just do this once, instead of for
@@ -1670,8 +1670,8 @@ flatten_exact_fam_app_fully tc tys
                                                    kind_co
                                                    (`mkTransCo` ret_co)
                            ; case mOut of
-                               Just out -> pure out
-                               Nothing -> do
+                               Right out -> pure out
+                               Left _ -> do
                                  { loc <- getLoc
                                  ; (ev, co, fsk) <- liftTcS $
                                      newFlattenSkolem cur_flav loc tc xis
@@ -1715,14 +1715,14 @@ flatten_exact_fam_app_fully tc tys
                                -- function
                   -> (   Coercion     -- :: (xi |> kind_co) ~ F args
                       -> Coercion )   -- what to return from outer function
-                  -> FlatM (Maybe (Xi, Coercion))
+                  -> FlatM (Either Int (Xi, Coercion))
     try_to_reduce tc tys kind_co update_co
       = do { checkStackDepth (mkTyConApp tc tys)
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
                  -- NB: norm_co will always be homogeneous. All type families
                  -- are homogeneous.
-               Just (norm_co, norm_ty)
+               TyFamAppOk (norm_co, norm_ty)
                  -> do { traceFlat "Eager T.F. reduction success" $
                          vcat [ ppr tc, ppr tys, ppr norm_ty
                               , ppr norm_co <+> dcolon
@@ -1737,12 +1737,11 @@ flatten_exact_fam_app_fully tc tys
                        ; when (eq_rel == NomEq) $
                          liftTcS $
                          extendFlatCache tc tys ( co, xi, flavour )
-                       ; let role = eqRelRole eq_rel
-                             xi' = xi `mkCastTy` kind_co
-                             co' = update_co $
-                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
-                       ; return $ Just (xi', co') }
-               Nothing -> pure Nothing }
+                       ; let xi' = xi `mkCastTy` kind_co
+                             co' = update_co $ mkSymCo co
+                                                `mkTcCoherenceLeftCo` kind_co
+                       ; return $ Right (xi', co') }
+               TyFamAppErr a -> pure (Left a) }
 
     try_to_reduce_nocache :: TyCon   -- F, family tycon
                           -> [Type]  -- args, not necessarily flattened
@@ -1754,24 +1753,24 @@ flatten_exact_fam_app_fully tc tys
                           -> (   Coercion     -- :: (xi |> kind_co) ~ F args
                               -> Coercion )   -- what to return from outer
                                               -- function
-                          -> FlatM (Maybe (Xi, Coercion))
+                          -> FlatM (Either Int (Xi, Coercion))
     try_to_reduce_nocache tc tys kind_co update_co
       = do { checkStackDepth (mkTyConApp tc tys)
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
                  -- NB: norm_co will always be homogeneous. All type families
                  -- are homogeneous.
-               Just (norm_co, norm_ty)
+               TyFamAppOk (norm_co, norm_ty)
                  -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
                        ; let co  = maybeSubCo eq_rel norm_co
                                     `mkTransCo` mkSymCo final_co
                              role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
-                             co' = update_co $
-                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
-                       ; return $ Just (xi', co') }
-               Nothing -> pure Nothing }
+                             co' = update_co $ mkSymCo co
+                                                `mkTcCoherenceLeftCo` kind_co
+                       ; return $ Right (xi', co') }
+               TyFamAppErr a -> pure (Left a) }
 
 {- Note [Reduce type family applications eagerly]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

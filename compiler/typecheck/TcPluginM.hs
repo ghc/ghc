@@ -63,7 +63,7 @@ import qualified FamInst   as TcM
 import qualified IfaceEnv
 import qualified Finder
 
-import FamInstEnv ( FamInstEnv )
+import FamInstEnv ( FamInstEnv, TyFamAppRes )
 import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
                   , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
@@ -138,7 +138,7 @@ getFamInstEnvs :: TcPluginM (FamInstEnv, FamInstEnv)
 getFamInstEnvs = unsafeTcPluginTcM TcM.tcGetFamInstEnvs
 
 matchFam :: TyCon -> [Type]
-         -> TcPluginM (Maybe (TcCoercion, TcType))
+         -> TcPluginM TyFamAppRes
 matchFam tycon args = unsafeTcPluginTcM $ TcS.matchFamTcM tycon args
 
 newUnique :: TcPluginM Unique

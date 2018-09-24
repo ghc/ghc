@@ -111,6 +111,7 @@ module TcSMonad (
     newTcRef, readTcRef, writeTcRef, updTcRef,
 
     -- Misc
+    TyFamAppRes (..),
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
     matchFam, matchFamTcM,
     checkWellStagedDFun,
@@ -3500,22 +3501,22 @@ checkReductionDepth loc ty
          wrapErrTcS $
          solverDepthErrorTcS loc ty }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe (Coercion, TcType))
+matchFam :: TyCon -> [Type] -> TcS TyFamAppRes
 matchFam tycon args = wrapTcS $ matchFamTcM tycon args
 
-matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (Coercion, TcType))
+matchFamTcM :: TyCon -> [Type] -> TcM TyFamAppRes
 -- Given (F tys) return (ty, co), where co :: F tys ~ ty
 matchFamTcM tycon args
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
        ; let match_fam_result
-              = reduceTyFamApp_maybe fam_envs Nominal tycon args
+              = reduceTyFamApp fam_envs Nominal tycon args
        ; TcM.traceTc "matchFamTcM" $
          vcat [ text "Matching:" <+> ppr (mkTyConApp tycon args)
               , ppr_res match_fam_result ]
        ; return match_fam_result }
   where
-    ppr_res Nothing        = text "Match failed"
-    ppr_res (Just (co,ty)) = hang (text "Match succeeded:")
+    ppr_res (TyFamAppErr _)      = text "Match failed"
+    ppr_res (TyFamAppOk (co,ty)) = hang (text "Match succeeded:")
                                 2 (vcat [ text "Rewrites to:" <+> ppr ty
                                         , text "Coercion:" <+> ppr co ])
 

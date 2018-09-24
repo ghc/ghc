@@ -3302,7 +3302,7 @@ pprTypeApp tc tys
 
 ------------------
 ppSuggestExplicitKinds :: SDoc
--- Print a helpful suggstion about -fprint-explicit-kinds,
+-- Print a helpful suggestion about -fprint-explicit-kinds,
 -- if it is not already on
 ppSuggestExplicitKinds
   = sdocWithDynFlags $ \ dflags ->

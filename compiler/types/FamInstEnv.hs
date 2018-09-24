@@ -28,9 +28,10 @@ module FamInstEnv (
         lookupFamInstEnvInjectivityConflicts, injectiveBranches,
 
         -- Normalisation
+        TyFamAppRes (..),
         topNormaliseType, topNormaliseType_maybe,
         normaliseType, normaliseTcApp, normaliseTcArgs,
-        reduceTyFamApp_maybe,
+        reduceTyFamApp,
 
         -- Flattening
         flattenTys
@@ -125,6 +126,13 @@ data FamInst  -- See Note [FamInsts and CoAxioms]
 data FamFlavor
   = SynFamilyInst         -- A synonym family
   | DataFamilyInst TyCon  -- A data family, with its representation TyCon
+
+-- Result of a reduction of a type-family application
+data TyFamAppRes
+  = TyFamAppErr Int
+  -- if result is an error we return and Int that corresponds
+  -- to the index of the first argument that mismatches
+  | TyFamAppOk (Coercion, Type) -- result is correct
 
 {-
 Note [Arity of data families]
@@ -1068,18 +1076,19 @@ isDominatedBy branch branches
 ************************************************************************
 
 The lookupFamInstEnv function does a nice job for *open* type families,
+
 but we also need to handle closed ones when normalising a type:
 -}
 
-reduceTyFamApp_maybe :: FamInstEnvs
+reduceTyFamApp :: FamInstEnvs
                      -> Role              -- Desired role of result coercion
                      -> TyCon -> [Type]
-                     -> Maybe (Coercion, Type)
+                     -> TyFamAppRes
 -- Attempt to do a *one-step* reduction of a type-family application
 --    but *not* newtypes
 -- Works on type-synonym families always; data-families only if
 --     the role we seek is representational
--- It does *not* normlise the type arguments first, so this may not
+-- It does *not* normalise the type arguments first, so this may not
 --     go as far as you want. If you want normalised type arguments,
 --     use normaliseTcArgs first.
 --
@@ -1088,9 +1097,9 @@ reduceTyFamApp_maybe :: FamInstEnvs
 --
 -- Always returns a *homogeneous* coercion -- type family reductions are always
 -- homogeneous
-reduceTyFamApp_maybe envs role tc tys
+reduceTyFamApp envs role tc tys
   | Phantom <- role
-  = Nothing
+  = TyFamAppErr 0
 
   | case role of
       Representational -> isOpenFamilyTyCon     tc
@@ -1106,21 +1115,26 @@ reduceTyFamApp_maybe envs role tc tys
 
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos
         ty = pSnd (coercionKind co)
-    in Just (co, ty)
+    in  TyFamAppOk (co, ty)
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
   = let co = mkAxInstCo role ax ind inst_tys inst_cos
         ty = pSnd (coercionKind co)
-    in Just (co, ty)
+    in TyFamAppOk (co, ty)
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
   , Just (coax,ts,ty) <- sfMatchFam ax tys
   = let co = mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
-    in Just (co, ty)
+    in TyFamAppOk (co, ty)
 
+  | Nominal <- role, isOpenTypeFamilyTyCon tc, length invisibleParamL > 0
+  = TyFamAppErr $ invParIndex tys invisibleParamL
   | otherwise
-  = Nothing
+  = TyFamAppErr 0
+  where
+    invisibleParamL = getInvisibleArgs tc tys
+
 
 -- The axiom can be oversaturated. (Closed families only.)
 chooseBranch :: CoAxiom Branched -> [Type]
@@ -1273,8 +1287,14 @@ topNormaliseType_maybe env ty
 
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
+          -- NB: It's OK to use normaliseTcArgs here instead of
+          -- normalise_tc_args (which takes the LiftingContext described
+          -- in Note [Normalising types]) because the reduceTyFamApp below
+          -- works only at top level. We'll never recur in this function
+          -- after reducing the kind of a bound tyvar.
+
+        case reduceTyFamApp env Representational tc ntys of
+          TyFamAppOk (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
           _              -> NS_Done
 
 ---------------
@@ -1299,8 +1319,8 @@ normalise_tc_app tc tys
     do { env <- getEnv
        ; role <- getRole
        ; (args_co, ntys) <- normalise_tc_args tc tys
-       ; case reduceTyFamApp_maybe env role tc ntys of
-           Just (first_co, ty')
+       ; case reduceTyFamApp env role tc ntys of
+           TyFamAppOk (first_co, ty')
              -> do { (rest_co,nty) <- normalise_type ty'
                    ; return ( args_co `mkTransCo` first_co `mkTransCo` rest_co
                             , nty ) }

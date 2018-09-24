@@ -260,7 +260,9 @@ import Digraph
 import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
-import Data.Maybe       ( isJust, mapMaybe )
+import Data.Bool ()
+import Data.List        ( elemIndex )
+import Data.Maybe       ( isJust, mapMaybe, fromMaybe )
 import Control.Monad    ( guard )
 
 -- $type_classification
@@ -1564,19 +1566,15 @@ partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
 partitionInvisibleTypes tc tys =
   partitionByList (map isInvisibleArgFlag $ tyConArgFlags tc tys) tys
 
--- | Given a list of things paired with their visibilities, partition the
--- things into (invisible things, visible things).
-partitionInvisibles :: [(a, ArgFlag)] -> ([a], [a])
-partitionInvisibles = partitionWith pick_invis
-  where
-    pick_invis :: (a, ArgFlag) -> Either a a
-    pick_invis (thing, vis) | isInvisibleArgFlag vis = Left thing
-                            | otherwise              = Right thing
+-- | Given a tycon and its arguments return invisible arguments
+getInvisibleArgs :: TyCon -> [Type] -> [Type]
+getInvisibleArgs tc tys = fst $ partitionInvisibles tc id tys
 
--- | Given a 'TyCon' and a list of argument types, determine each argument's
--- visibility ('Inferred', 'Specified', or 'Required').
---
--- Wrinkle: consider the following scenario:
+-- | Given a tycon and a list of things (which correspond to arguments),
+-- partitions the things into
+--      Inferred or Specified ones and
+--      Required ones
+-- The callback function is necessary for this scenario:
 --
 -- > T :: forall k. k -> k
 -- > tyConArgFlags T [forall m. m -> m -> m, S, R, Q]
