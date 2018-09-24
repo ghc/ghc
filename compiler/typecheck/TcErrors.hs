@@ -2003,6 +2003,7 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
   | KindLevel <- level, Just th <- maybe_thing   = (False, Nothing, msg5 th)
   | act `pickyEqType` ty1, exp `pickyEqType` ty2 = (True, Just NotSwapped, empty)
   | exp `pickyEqType` ty1, act `pickyEqType` ty2 = (True, Just IsSwapped, empty)
+  | KindLevel <- level, occurs_stuck_error       = (True, Nothing, msg6)
   | otherwise                                    = (True, Nothing, msg1)
   where
     level = m_level `orElse` TypeLevel
@@ -2021,6 +2022,7 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
       TypeLevel -> text "type"
       KindLevel -> text "kind"
 
+    occurs_stuck_error = undefined -- ??? figure out this
     msg1 = case level of
       KindLevel
         | Just th <- maybe_thing
@@ -2065,6 +2067,25 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
                                       else text "a type"
 
                   | otherwise       = text "kind" <+> quotes (ppr exp)
+
+    msg6 = case level of
+      KindLevel
+        | Just th <- maybe_thing
+        -> hang (ppr exp <+> text "is stuck because there is no defining clause for" <+> kind_desc <> comma)
+              2 (quotes th <+> text "has kind" <+> quotes (ppr act) <+> text " maybe try -fprint-explicit-kinds")
+           where
+             kind_desc | isConstraintKind exp = text "a constraint"
+
+                         -- TYPE t0
+                       | Just (tc, [arg]) <- tcSplitTyConApp_maybe exp
+                       , tc `hasKey` tYPETyConKey
+                       , tcIsTyVarTy arg      = sdocWithDynFlags $ \dflags ->
+                                               if gopt Opt_PrintExplicitRuntimeReps dflags
+                                               then text "kind" <+> quotes (ppr exp)
+                                               else text "a type"
+
+                       | otherwise            = text "kind" <+> quotes (ppr exp)
+      _ -> empty
 
     num_args_msg = case level of
       KindLevel

@@ -543,9 +543,9 @@ pmTopNormaliseType_maybe env ty_cs typ
           -- works only at top level. We'll never recur in this function
           -- after reducing the kind of a bound tyvar.
 
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
-          _               -> NS_Done
+        case reduceTyFamApp env Representational tc ntys of
+          TyFamAppOk (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
+          _                -> NS_Done
 
 -- | Determine suitable constraints to use at the beginning of pattern-match
 -- coverage checking by consulting the sets of term and type constraints

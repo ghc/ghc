@@ -57,3 +57,4 @@ test('T14306', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T1430
 test('T14343', normal, compile_fail, [''])
 test('T14343b', normal, compile_fail, [''])
 test('T15761', normal, compile_fail, [''])
+test('T10789', normal, compile_fail, [''])

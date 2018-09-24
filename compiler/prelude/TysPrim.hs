@@ -664,7 +664,7 @@ Coercible  C        L      homo     repr      coercibleTyCon   GHC.Types
 Coercion   T        L      homo     repr      (not built-in)   Data.Type.Coercion
 ~P#        T        U      hetero   phantom   eqPhantPrimTyCon GHC.Prim
 
-Recall that "hetero" means the equality can related types of different
+Recall that "hetero" means the equality can relate types of different
 kinds. Knowing that (t1 ~# t2) or (t1 ~R# t2) or even that (t1 ~P# t2)
 also means that (k1 ~# k2), where (t1 :: k1) and (t2 :: k2).
 
