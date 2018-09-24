@@ -292,8 +292,12 @@ checkClosure( const StgClosure* p )
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(bq->bh));
 
         ASSERT(get_itbl((StgClosure *)(bq->owner))->type == TSO);
-        ASSERT(bq->queue == (MessageBlackHole*)END_TSO_QUEUE
-               || bq->queue->header.info == &stg_MSG_BLACKHOLE_info);
+        ASSERT(// A bq with no other blocked TSOs:
+               bq->queue == (MessageBlackHole*)END_TSO_QUEUE ||
+               // A bq with blocked TSOs in its queue:
+               bq->queue->header.info == &stg_MSG_BLACKHOLE_info ||
+               // A bq with a deleted (in throwToMsg()) MSG_BLACKHOLE:
+               bq->queue->header.info == &stg_IND_info);
         ASSERT(bq->link == (StgBlockingQueue*)END_TSO_QUEUE ||
                get_itbl((StgClosure *)(bq->link))->type == IND ||
                get_itbl((StgClosure *)(bq->link))->type == BLOCKING_QUEUE);
