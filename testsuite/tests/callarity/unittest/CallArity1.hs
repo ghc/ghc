@@ -1,8 +1,9 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, PatternSynonyms #-}
 import CoreSyn
 import CoreUtils
 import Id
 import Type
+import Weight ( pattern Omega )
 import MkCore
 import CallArity (callArityRHS)
 import MkId

@@ -190,7 +190,7 @@ STG programs after unarisation have these invariants:
   * Alt binders (binders in patterns) are always non-void.
 -}
 
-{-# LANGUAGE CPP, TupleSections #-}
+{-# LANGUAGE CPP, TupleSections, PatternSynonyms #-}
 
 module UnariseStg (unarise) where
 
@@ -216,6 +216,7 @@ import TysWiredIn
 import UniqSupply
 import Util
 import VarEnv
+import Weight ( pattern Omega )
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)

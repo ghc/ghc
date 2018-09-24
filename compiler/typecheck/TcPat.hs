@@ -34,7 +34,7 @@ import UsageEnv (subweight)
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
-import Type ( pprTyVars )
+import Type ( Weighted, pprTyVars )
 import TcType
 import TcUnify
 import TcHsType

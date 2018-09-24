@@ -28,7 +28,7 @@ module TyCoRep (
         KindOrType, Kind,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..),
-        Rig(..),
+        Rig, Weighted,
 
         -- * Coercions
         Coercion(..),
@@ -152,9 +152,11 @@ import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
                           , toposortTyVars
-                          , coreView, tcView )
+                          , coreView, tcView
+                          , eqType )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
+import {-# SOURCE #-} TysWiredIn ( oneDataConTy, omegaDataConTy )
 import {-# SOURCE #-} Coercion
 import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
 import {-# SOURCE #-} ToIface( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
@@ -323,6 +325,25 @@ data Type
                     -- GADT data constructor
 
   deriving Data.Data
+
+-- | Common short-hands
+type Rig = GMult Type
+type Weighted = GWeighted Type
+
+instance Multable Type where
+  fromMult One = oneDataConTy
+  fromMult Omega = omegaDataConTy
+  fromMult (RigThing ty) = ty
+  fromMult Zero =
+    pprPanic "Type.fromMult" (text"A multiplicity 0 leaked into a type")
+  fromMult r =
+    pprPanic "Type.fromMult" (text"TODO:" <+> ppr r)
+
+  toMult ty
+    | oneDataConTy `eqType` ty = One
+    | omegaDataConTy `eqType` ty = Omega
+    | otherwise = unsafeRigThing ty
+
 
 
 -- NOTE:  Other parts of the code assume that type literals do not contain
@@ -1570,7 +1591,7 @@ tyCoFVsOfType (CastTy ty co)     a b c = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo
 tyCoFVsOfType (CoercionTy co)    a b c = tyCoFVsOfCo co a b c
 
 tyCoFVsOfRig :: Rig -> FV
-tyCoFVsOfRig (RigTy t) a b c = (tyCoFVsOfType t) a b c
+tyCoFVsOfRig (RigThing t) a b c = (tyCoFVsOfType t) a b c
 tyCoFVsOfRig (RigAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
 tyCoFVsOfRig (RigMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
 tyCoFVsOfRig _ a b c = emptyFV a b c
@@ -1700,7 +1721,7 @@ coVarsOfType (CastTy ty co)      = coVarsOfType ty `unionVarSet` coVarsOfCo co
 coVarsOfType (CoercionTy co)     = coVarsOfCo co
 
 coVarsOfRig :: Rig -> CoVarSet
-coVarsOfRig (RigTy t) = coVarsOfType t
+coVarsOfRig (RigThing t) = coVarsOfType t
 coVarsOfRig _ = emptyVarSet
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
@@ -1815,7 +1836,7 @@ noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
 noFreeVarsOfRig :: Rig -> Bool
-noFreeVarsOfRig (RigTy ty) = noFreeVarsOfType ty
+noFreeVarsOfRig (RigThing ty) = noFreeVarsOfType ty
 noFreeVarsOfRig (RigAdd m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
 noFreeVarsOfRig (RigMul m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
 noFreeVarsOfRig _ = True
@@ -2455,7 +2476,7 @@ subst_ty subst ty
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 subst_rig :: TCvSubst -> Rig -> Rig
-subst_rig subst (RigTy t) = RigTy (subst_ty subst t)
+subst_rig subst (RigThing t) = RigThing (subst_ty subst t)
 subst_rig subst (RigAdd m1 m2) = RigAdd (subst_rig subst m1) (subst_rig subst m2)
 subst_rig subst (RigMul m1 m2) = RigMul (subst_rig subst m1) (subst_rig subst m2)
 subst_rig _ r = r

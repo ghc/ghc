@@ -172,7 +172,7 @@ toIfaceForAllBndrX :: VarSet -> TyVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (TvBndr v vis) = TvBndr (toIfaceTvBndrX fr v) vis
 
 toIfaceRig :: Rig -> IfaceRig
-toIfaceRig = toIfaceType . rigToType
+toIfaceRig = toIfaceType . fromMult
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon

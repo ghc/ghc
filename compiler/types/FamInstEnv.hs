@@ -41,6 +41,7 @@ module FamInstEnv (
 import GhcPrelude
 
 import Unify
+import Weight
 import Type
 import TyCoRep
 import TyCon
@@ -1364,9 +1365,9 @@ normalise_type ty
     go (FunTy w ty1 ty2)
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
-           ; (wco, wty) <- go (rigToType w)
+           ; (wco, wty) <- go (fromMult w)
            ; r <- getRole
-           ; return (mkFunCo r wco co1 co2, mkFunTy (typeToRig wty) nty1 nty2) }
+           ; return (mkFunCo r wco co1 co2, mkFunTy (toMult wty) nty1 nty2) }
     go (ForAllTy (TvBndr tyvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_tyvar_bndr tyvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty

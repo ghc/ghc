@@ -49,7 +49,7 @@
   the scrutinee of the case, and we can inline it.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms #-}
 module SetLevels (
         setLevels,
 
@@ -87,7 +87,8 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType, Rig(..) )
+import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType, Rig )
+import Weight           ( pattern Omega )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn

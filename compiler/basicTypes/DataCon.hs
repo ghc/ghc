@@ -1264,7 +1264,7 @@ dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
   = let tvb = mkTyVarBinder Inferred multiplicityTyVar
         ty  = mkTyVarTy multiplicityTyVar
         -- See Note [Wrapper weights]
-        arg_tys' = map (scaleWeighted (RigTy ty)) arg_tys
+        arg_tys' = map (scaleWeighted (RigThing ty)) arg_tys
     in
       mkForAllTys (tvb : user_tvbs) $
       mkFunTys (map unrestricted theta) $

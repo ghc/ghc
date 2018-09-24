@@ -4,7 +4,7 @@
 \section[Specialise]{Stamping out overloading, and (optionally) polymorphism}
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, PatternSynonyms #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -14,6 +14,7 @@ import GhcPrelude
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )
+import Weight ( pattern Omega )
 import Module( Module, HasModule(..) )
 import Coercion( Coercion )
 import CoreMonad

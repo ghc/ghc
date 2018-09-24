@@ -22,6 +22,7 @@ import DsBinds
 import ConLike
 import TcType
 import Weight
+import Type ( Weighted )
 import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )

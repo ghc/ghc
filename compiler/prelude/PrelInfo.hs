@@ -62,7 +62,6 @@ import Id
 import Name
 import NameEnv
 import MkId
-import Weight           ( Rig(..) )
 import Outputable
 import TysPrim
 import TysWiredIn

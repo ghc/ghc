@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- |Computations in the vectorisation monad concerned with naming and fresh variable generation.
 
 module Vectorise.Monad.Naming
@@ -21,6 +23,7 @@ import Vectorise.Monad.Base
 import DsMonad
 import TcType
 import Type
+import Weight ( pattern Omega )
 import Var
 import Module
 import Name

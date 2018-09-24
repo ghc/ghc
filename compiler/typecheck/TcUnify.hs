@@ -825,7 +825,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
 tc_sub_weight_ds :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM HsWrapper
 tc_sub_weight_ds eq_orig inst_orig ctxt w_actual w_expected =
-  tc_sub_type_ds eq_orig inst_orig ctxt (rigToType w_actual) (rigToType w_expected)
+  tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
 
 -- TODO: MattP fix the origins
 -- As an approximation to checking w1 * w2 <= w we check that w1 <= w and
@@ -1379,7 +1379,7 @@ uType t_or_k origin orig_ty1 orig_ty2
     go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2)
       = do { co_l <- uType t_or_k origin fun1 fun2
            ; co_r <- uType t_or_k origin arg1 arg2
-           ; co_w <- uType t_or_k origin (rigToType w1) (rigToType w2)
+           ; co_w <- uType t_or_k origin (fromMult w1) (fromMult w2)
            ; return $ mkFunCo Nominal co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)

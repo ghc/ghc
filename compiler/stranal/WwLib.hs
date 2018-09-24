@@ -755,7 +755,7 @@ deepSplitCprType_maybe _ _ _ = Nothing
 -- non-linear multiplicity, document and move to a more appropriate place.
 isLinear :: Weighted a -> Bool
 isLinear (Weighted w _ ) =
-  case flattenRig w of
+  case w of
     One -> True
     _ -> False
 

@@ -18,6 +18,7 @@ import TyCon
 import Class
 import CoreSyn
 import Type
+import Weight
 import NameEnv
 import Name
 import Id

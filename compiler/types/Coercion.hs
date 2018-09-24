@@ -131,6 +131,7 @@ import TysPrim          ( eqPhantPrimTyCon )
 import ListSetOps
 import Maybes
 import UniqFM
+import Weight
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -334,7 +335,7 @@ splitTyConAppCo_maybe _                     = Nothing
 -- TODO: MattP: This is wrong and should be ripped out when I change
 -- Rig to Coercion in FunCo.
 rigToCo :: Rig -> Coercion
-rigToCo r = mkNomReflCo (rigToType r)
+rigToCo r = mkNomReflCo (fromMult r)
 
 -- first result has role equal to input; third result is Nominal
 splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
@@ -569,7 +570,7 @@ mkTyConAppCo r tc cos
 coercionToRig :: Coercion -> Rig
 coercionToRig co
   | Just (ty, _) <- isReflCo_maybe co
-  = typeToRig ty
+  = toMult ty
   | otherwise = pprPanic "coercionToRig" (ppr co)
 
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
@@ -580,7 +581,7 @@ mkFunCo r w co1 co2
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
   , Just (w, _) <- isReflCo_maybe w
-  = Refl r (mkFunTy (RigTy w) ty1 ty2)
+  = Refl r (mkFunTy (RigThing w) ty1 ty2)
   | otherwise = FunCo r w co1 co2
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -1649,7 +1650,7 @@ ty_co_subst lc role ty
                              liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
-    go r (FunTy w ty1 ty2) = mkFunCo r (go r $ rigToType w) (go r ty1) (go r ty2)
+    go r (FunTy w ty1 ty2) = mkFunCo r (go r $ fromMult w) (go r ty1) (go r ty2)
                              -- only in Core, which ignores linearity so we can leave Omega here.
     go r (ForAllTy (TvBndr v _) ty)
                            = let (lc', v', h) = liftCoSubstVarBndr lc v in
@@ -1856,7 +1857,7 @@ coercionKind co =
        | otherwise                = go_forall empty_subst co
        where
          empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfCo co)
-    go (FunCo _ w co1 co2)    = mkFunTy <$> (fmap typeToRig (go w)) <*> go co1 <*> go co2
+    go (FunCo _ w co1 co2)    = mkFunTy <$> (fmap toMult (go w)) <*> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (HoleCo h)           = coVarTypes (coHoleCoVar h)
     go (AxiomInstCo ax ind cos)
@@ -2008,7 +2009,7 @@ buildCoercion orig_ty1 orig_ty2 = go orig_ty1 orig_ty2
         mkNomReflCo ty1
 
     go (FunTy w arg1 res1) (FunTy w1 arg2 res2)
-      = mkFunCo Nominal (go (rigToType w) (rigToType w1)) (go arg1 arg2) (go res1 res2)
+      = mkFunCo Nominal (go (fromMult w) (fromMult w1)) (go arg1 arg2) (go res1 res2)
 
     go (TyConApp tc1 args1) (TyConApp tc2 args2)
       = ASSERT( tc1 == tc2 )
