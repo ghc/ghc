@@ -261,8 +261,7 @@ import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
 import Data.Bool ()
-import Data.List        ( elemIndex )
-import Data.Maybe       ( isJust, mapMaybe, fromMaybe )
+import Data.Maybe       ( isJust, mapMaybe )
 import Control.Monad    ( guard )
 
 -- $type_classification
@@ -1565,10 +1564,6 @@ filterOutInferredTypes tc tys =
 partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
 partitionInvisibleTypes tc tys =
   partitionByList (map isInvisibleArgFlag $ tyConArgFlags tc tys) tys
-
--- | Given a tycon and its arguments return invisible arguments
-getInvisibleArgs :: TyCon -> [Type] -> [Type]
-getInvisibleArgs tc tys = fst $ partitionInvisibles tc id tys
 
 -- | Given a tycon and a list of things (which correspond to arguments),
 -- partitions the things into
