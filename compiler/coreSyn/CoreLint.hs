@@ -1324,9 +1324,9 @@ lintType ty@(AppTy t1 t2)
        ; lint_ty_app ty k1 [(t2,k2)] }
 
 lintType ty@(TyConApp tc tys)
-  | isTypeSynonymTyCon tc
+  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
   = do { report_unsat <- lf_report_unsat_syns <$> getLintFlags
-       ; lintTySynApp report_unsat ty tc tys }
+       ; lintTySynFamApp report_unsat ty tc tys }
 
   | isFunTyCon tc
   , tys `lengthIs` 4
@@ -1336,13 +1336,9 @@ lintType ty@(TyConApp tc tys)
     -- Note [Representation of function types].
   = failWithL (hang (text "Saturated application of (->)") 2 (ppr ty))
 
-  | isTypeFamilyTyCon tc -- Check for unsaturated type family
-  , tys `lengthLessThan` tyConArity tc
-  = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
-
-  | otherwise
+  | otherwise  -- Data types, data families, primitive types
   = do { checkTyCon tc
-       ; ks <- setReportUnsat True (mapM lintType tys)
+       ; ks <- mapM lintType tys
        ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
@@ -1355,7 +1351,7 @@ lintType ty@(FunTy t1 t2)
 lintType t@(ForAllTy (Bndr tv _vis) ty)
   -- forall over types
   | isTyVar tv
-  = do { lintTyBndr tv $ \tv' ->
+  = lintTyBndr tv $ \tv' ->
     do { k <- lintType ty
        ; checkValueKind k (text "the body of forall:" <+> ppr t)
        ; case occCheckExpand [tv'] k of  -- See Note [Stupid type synonyms]
@@ -1363,7 +1359,7 @@ lintType t@(ForAllTy (Bndr tv _vis) ty)
            Nothing -> failWithL (hang (text "Variable escape in forall:")
                                     2 (vcat [ text "type:" <+> ppr t
                                             , text "kind:" <+> ppr k ]))
-    }}
+    }
 
 lintType t@(ForAllTy (Bndr cv _vis) ty)
   -- forall over coercions
@@ -1407,25 +1403,31 @@ with the same problem. A single systematic solution eludes me.
 -}
 
 -----------------
-lintTySynApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind
+lintTySynFamApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind
+-- The TyCon is a type synonym or a type family (not a data family)
 -- See Note [Linting type synonym applications]
-lintTySynApp report_unsat ty tc tys
+-- c.f. TcValidity.check_syn_tc_app
+lintTySynFamApp report_unsat ty tc tys
   | report_unsat   -- Report unsaturated only if report_unsat is on
   , tys `lengthLessThan` tyConArity tc
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
-  | otherwise
-  = do { ks <- setReportUnsat False (mapM lintType tys)
+  -- Deal with type synonyms
+  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+  = do { -- Kind-check the argument types, but without reporting
+         -- un-saturated type families/synonyms
+         ks <- setReportUnsat False (mapM lintType tys)
 
        ; when report_unsat $
-         case expandSynTyCon_maybe tc tys of
-            Nothing -> pprPanic "lintTySynApp" (ppr tc <+> ppr tys)
-                       -- Previous guards should have made this impossible
-            Just (tenv, rhs, tys') -> do { _ <- lintType expanded_ty
-                                         ; return () }
-                where
-                  expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+         do { _ <- lintType expanded_ty
+            ; return () }
 
+       ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
+
+  -- Otherwise this must be a type family
+  | otherwise
+  = do { ks <- mapM lintType tys
        ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
 
 -----------------
@@ -2108,12 +2110,12 @@ Here we substitute 'ty' for 'a' in 'body', on the fly.
 
 Note [Linting type synonym applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When lining a type-synonym application
+When linting a type-synonym, or type-family, application
   S ty1 .. tyn
-we behave as follows (Trac #15057):
+we behave as follows (Trac #15057, #T15664):
 
 * If lf_report_unsat_syns = True, and S has arity < n,
-  complain about an unsaturated type synonym.
+  complain about an unsaturated type synonym or type family
 
 * Switch off lf_report_unsat_syns, and lint ty1 .. tyn.
 
