@@ -1129,13 +1129,10 @@ reduceTyFamApp envs role tc tys
   = let co = mkAxiomRuleCo coax (zipWith mkReflCo (coaxrAsmpRoles coax) ts)
     in TyFamAppOk (co, ty)
 
-  | Nominal <- role, isOpenTypeFamilyTyCon tc, length invisibleParamL > 0
-  = TyFamAppStuck $ invParIndex tys invisibleParamL
+  | Nominal <- role
+  = TyFamAppStuck 0
   | otherwise
   = TyFamAppStuck 0
-  where
-    invisibleParamL = getInvisibleArgs tc tys
-
 
 -- The axiom can be oversaturated. (Closed families only.)
 chooseBranch :: CoAxiom Branched -> [Type]
