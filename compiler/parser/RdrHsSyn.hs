@@ -25,6 +25,7 @@ module   RdrHsSyn (
         mkTyClD, mkInstD,
         mkRdrRecordCon, mkRdrRecordUpd,
         setRdrNameSpace,
+        filterCTuple,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -92,7 +93,8 @@ import Lexeme           ( isLexCon )
 import Type             ( TyThing(..) )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
-                          listTyConName, listTyConKey )
+                          listTyConName, listTyConKey,
+                          cTupleTyConNameArity_maybe  )
 import ForeignCall
 import PrelNames        ( forall_tv_RDR, eqTyCon_RDR, allNameStrings )
 import SrcLoc
@@ -766,6 +768,13 @@ data_con_ty_con dc
   | otherwise  -- See Note [setRdrNameSpace for wired-in names]
   = Unqual (setOccNameSpace tcClsName (getOccName dc))
 
+-- | Replaces constraint tuple names with corresponding boxed ones.
+filterCTuple :: RdrName -> RdrName
+filterCTuple (Exact n)
+  | Just arity <- cTupleTyConNameArity_maybe n
+  = Exact $ tupleTyConName BoxedTuple arity
+filterCTuple rdr = rdr
+
 
 {- Note [setRdrNameSpace for wired-in names]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -810,11 +819,18 @@ checkTyVars pp_what equals_or_where tc tparms
     chk t@(L loc _)
         = Left (loc,
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
-                     , text "In the" <+> pp_what <+> ptext (sLit "declaration for") <+> quotes (ppr tc)
+                     , text "In the" <+> pp_what <+> ptext (sLit "declaration for") <+> quotes tc'
                      , vcat[ (text "A" <+> pp_what <+> ptext (sLit "declaration should have form"))
-                     , nest 2 (pp_what <+> ppr tc
+                     , nest 2 (pp_what <+> tc'
                                        <+> hsep (map text (takeList tparms allNameStrings))
                                        <+> equals_or_where) ] ])
+
+    -- Avoid printing a constraint tuple in the error message. Print
+    -- a plain old tuple instead (since that's what the user probably
+    -- wrote). See #14907
+    tc' = ppr $ fmap filterCTuple tc
+
+
 
 whereDots, equalsDots :: SDoc
 -- Second argument to checkTyVars
