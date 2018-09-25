@@ -1,0 +1,6 @@
+
+T14907b.hs:5:1: error: Illegal binding of built-in syntax: ()
+
+T14907b.hs:6:1: error: Illegal binding of built-in syntax: (,)
+
+T14907b.hs:7:1: error: Illegal binding of built-in syntax: (,,)
