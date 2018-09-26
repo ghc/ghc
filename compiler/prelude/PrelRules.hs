@@ -463,7 +463,10 @@ wordOpC2 op dflags (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _) =
 wordOpC2 _ _ _ _ = Nothing  -- Could find LitLit
 
 shiftRule :: (DynFlags -> Integer -> Int -> Integer) -> RuleM CoreExpr
-                 -- Shifts take an Int; hence third arg of op is Int
+-- Shifts take an Int; hence third arg of op is Int
+-- Used for shift primops
+--    ISllOp, ISraOp, ISrlOp :: Word# -> Int# -> Word#
+--    SllOp, SrlOp           :: Word# -> Int# -> Word#
 -- See Note [Guarding against silly shifts]
 shiftRule shift_op
   = do { dflags <- getDynFlags
@@ -690,13 +693,32 @@ Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
                 } } } }
 
 Note the massive shift on line "!!!!".  It can't happen, because we've checked
-that w < 64, but the optimiser didn't spot that. We DO NO want to constant-fold this!
+that w < 64, but the optimiser didn't spot that. We DO NOT want to constant-fold this!
 Moreover, if the programmer writes (n `uncheckedShiftL` 9223372036854775807), we
 can't constant fold it, but if it gets to the assember we get
      Error: operand type mismatch for `shl'
 
 So the best thing to do is to rewrite the shift with a call to error,
 when the second arg is stupid.
+
+There are two cases:
+
+- Shifting fixed-width things: the primops ISll, Sll, etc
+  These are handled by shiftRule.
+
+  We are happy to shift by any amount up to wordSize but no more.
+
+- Shifting Integers: the function shiftLInteger, shiftRInteger
+  from the 'integer' library.   These are handled by rule_shift_op,
+  and match_Integer_shift_op.
+
+  Here we could in principle shift by any amount, but we arbitary
+  limit the shift to 4 bits; in particualr we do not want shift by a
+  huge amount, which can happen in code like that above.
+
+The two cases are more different in their code paths that is comfortable,
+but that is only a historical accident.
+
 
 ************************************************************************
 *                                                                      *
@@ -1215,8 +1237,8 @@ builtinIntegerRules =
   rule_binop          "orInteger"           orIntegerName           (.|.),
   rule_binop          "xorInteger"          xorIntegerName          xor,
   rule_unop           "complementInteger"   complementIntegerName   complement,
-  rule_Int_binop      "shiftLInteger"       shiftLIntegerName       shiftL,
-  rule_Int_binop      "shiftRInteger"       shiftRIntegerName       shiftR,
+  rule_shift_op       "shiftLInteger"       shiftLIntegerName       shiftL,
+  rule_shift_op       "shiftRInteger"       shiftRIntegerName       shiftR,
   rule_bitInteger     "bitInteger"          bitIntegerName,
   -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
   rule_divop_one      "quotInteger"         quotIntegerName         quot,
@@ -1266,9 +1288,9 @@ builtinIntegerRules =
           rule_divop_one str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_divop_one op }
-          rule_Int_binop str name op
+          rule_shift_op str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
-                           ru_try = match_Integer_Int_binop op }
+                           ru_try = match_Integer_shift_op op }
           rule_binop_Prim str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop_Prim op }
@@ -1569,12 +1591,18 @@ match_Integer_divop_one divop _ id_unf _ [xl,yl]
   = Just (Lit (mkLitInteger (x `divop` y) i))
 match_Integer_divop_one _ _ _ _ _ = Nothing
 
-match_Integer_Int_binop :: (Integer -> Int -> Integer) -> RuleFun
-match_Integer_Int_binop binop _ id_unf _ [xl,yl]
+match_Integer_shift_op :: (Integer -> Int -> Integer) -> RuleFun
+-- Used for shiftLInteger, shiftRInteger :: Integer -> Int# -> Integer
+-- See Note [Guarding against silly shifts]
+match_Integer_shift_op binop _ id_unf _ [xl,yl]
   | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
   , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
+  , y >= 0
+  , y <= 4   -- Restrict constant-folding of shifts on Integers, somewhat
+             -- arbitrary.  We can get huge shifts in inaccessible code
+             -- (Trac #15673)
   = Just (Lit (mkLitInteger (x `binop` fromIntegral y) i))
-match_Integer_Int_binop _ _ _ _ _ = Nothing
+match_Integer_shift_op _ _ _ _ _ = Nothing
 
 match_Integer_binop_Prim :: (Integer -> Integer -> Bool) -> RuleFun
 match_Integer_binop_Prim binop dflags id_unf _ [xl, yl]
