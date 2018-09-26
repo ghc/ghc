@@ -998,6 +998,16 @@ messages and in GHCi:
     start at zero. This choice was made to follow existing convention
     (i.e. this is how Emacs does it).
 
+.. ghc-flag:: -freverse-errors
+    :shortdesc: Output errors in reverse order
+    :type: dynamic
+    :reverse: -fno-reverse-errors
+    :category: verbosity
+
+    Causes GHC to output errors in reverse line-number order, so that
+    the errors and warnings that originate later in the file are
+    displayed first.
+
 .. ghc-flag:: -H ⟨size⟩
     :shortdesc: Set the minimum size of the heap to ⟨size⟩
     :type: dynamic
