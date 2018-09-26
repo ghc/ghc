@@ -32,7 +32,7 @@ module DynFlags (
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
-        wopt_fatal,
+        wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
         xopt, xopt_set, xopt_unset,
         lang_set,
         useUnicodeSyntax,
