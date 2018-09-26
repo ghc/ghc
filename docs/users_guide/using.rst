@@ -910,6 +910,17 @@ messages and in GHCi:
                   in a’
         or by using the flag -fno-warn-unused-do-bind
 
+
+.. ghc-flag:: -freverse-errors
+    :shortdesc: Output errors in reverse order
+    :type: dynamic
+    :reverse: -fno-reverse-errors
+    :category: verbosity
+
+    Causes GHC to output errors in reverse line-number order, so that
+    the errors and warnings that originate later in the file are
+    displayed first.
+
 .. ghc-flag:: -fdiagnostics-color=⟨always|auto|never⟩
     :shortdesc: Use colors in error messages
     :type: dynamic
