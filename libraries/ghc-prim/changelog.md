@@ -3,7 +3,8 @@
 - Shipped with GHC 8.8.1
 
 - Added to `GHC.Prim`:
-        traveBinaryEvent# :: Addr# -> Int# -> State# s -> State# s
+
+        traceBinaryEvent# :: Addr# -> Int# -> State# s -> State# s
 
 ## 0.5.3 (edit as necessary)
 
