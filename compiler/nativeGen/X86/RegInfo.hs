@@ -22,6 +22,8 @@ import UniqFM
 import X86.Regs
 
 
+--TODO:
+-- Add VirtualRegAVX and inspect VecFormat and allocate
 mkVirtualReg :: Unique -> Format -> VirtualReg
 mkVirtualReg u format
    = case format of
@@ -31,6 +33,7 @@ mkVirtualReg u format
         -- For now we map both to being allocated as "Double" Registers
         -- on X86/X86_64
         FF64    -> VirtualRegD u
+        VecFormat {} -> VirtualRegVec u
         _other  -> VirtualRegI u
 
 regDotColor :: Platform -> RealReg -> SDoc

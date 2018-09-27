@@ -45,7 +45,6 @@ import CLabel
 import Hoopl.Label
 import Hoopl.Collections
 
-import Unique           ( pprUniqueAlways )
 import Outputable
 import GHC.Platform
 import FastString
@@ -148,12 +147,7 @@ pprReg :: Reg -> SDoc
 pprReg reg
  = case reg of
         RegVirtual vr
-         -> case vr of
-                VirtualRegI   u -> text "%vI_"   <> pprUniqueAlways u
-                VirtualRegHi  u -> text "%vHi_"  <> pprUniqueAlways u
-                VirtualRegF   u -> text "%vF_"   <> pprUniqueAlways u
-                VirtualRegD   u -> text "%vD_"   <> pprUniqueAlways u
-
+         -> ppr vr
 
         RegReal rr
          -> case rr of
@@ -221,7 +215,8 @@ pprFormat x
         II32    -> sLit ""
         II64    -> sLit "d"
         FF32    -> sLit ""
-        FF64    -> sLit "d")
+        FF64    -> sLit "d"
+        VecFormat _ _ _ -> panic "SPARC.Ppr.pprFormat: VecFormat")
 
 
 -- | Pretty print a format for an instruction suffix.
@@ -235,7 +230,8 @@ pprStFormat x
         II32  -> sLit ""
         II64  -> sLit "x"
         FF32  -> sLit ""
-        FF64  -> sLit "d")
+        FF64  -> sLit "d"
+        VecFormat _ _ _ -> panic "SPARC.Ppr.pprFormat: VecFormat")
 
 
 

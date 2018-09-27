@@ -195,7 +195,6 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
 
 
 
-
 -- Specification Code ----------------------------------------------------------
 --
 --      The trivColorable function for each particular architecture should
