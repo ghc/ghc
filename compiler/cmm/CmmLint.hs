@@ -148,9 +148,13 @@ lintCmmMiddle node = case node of
             dflags <- getDynFlags
             erep <- lintCmmExpr expr
             let reg_ty = cmmRegType dflags reg
-            if (erep `cmmEqType_ignoring_ptrhood` reg_ty)
-                then return ()
-                else cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
+            case isVecCatType reg_ty of
+              True -> if ((typeWidth reg_ty) == (typeWidth erep))
+                         then return ()
+                         else cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
+              _    -> if (erep `cmmEqType_ignoring_ptrhood` reg_ty)
+                         then return ()
+                          else cmmLintAssignErr (CmmAssign reg expr) erep reg_ty
 
   CmmStore l r -> do
             _ <- lintCmmExpr l

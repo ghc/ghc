@@ -136,8 +136,9 @@ data MachOp
   | MO_VU_Rem  Length Width
 
   -- Floting point vector element insertion and extraction operations
-  | MO_VF_Insert  Length Width   -- Insert scalar into vector
-  | MO_VF_Extract Length Width   -- Extract scalar from vector
+  | MO_VF_Broadcast Length Width   -- Broadcast a scalar into a vector
+  | MO_VF_Insert    Length Width   -- Insert scalar into vector
+  | MO_VF_Extract   Length Width   -- Extract scalar from vector
 
   -- Floating point vector operations
   | MO_VF_Add  Length Width
@@ -430,6 +431,7 @@ machOpResultType dflags mop tys =
     MO_VU_Quot l w      -> cmmVec l (cmmBits w)
     MO_VU_Rem  l w      -> cmmVec l (cmmBits w)
 
+    MO_VF_Broadcast l w -> cmmVec l (cmmFloat w)
     MO_VF_Insert  l w   -> cmmVec l (cmmFloat w)
     MO_VF_Extract _ w   -> cmmFloat w
 
@@ -522,16 +524,21 @@ machOpArgReps dflags op =
     MO_VU_Quot _ r      -> [r,r]
     MO_VU_Rem  _ r      -> [r,r]
 
-    MO_VF_Insert  l r   -> [typeWidth (vec l (cmmFloat r)),r,wordWidth dflags]
-    MO_VF_Extract l r   -> [typeWidth (vec l (cmmFloat r)),wordWidth dflags]
+    -- offset is always W32 as mentioned in StgCmmPrim.hs
+    MO_VF_Broadcast l r -> [vecwidth l r, r]
+    MO_VF_Insert    l r -> [vecwidth l r, r, W32]
+    MO_VF_Extract   l r -> [vecwidth l r, W32]
 
-    MO_VF_Add  _ r      -> [r,r]
-    MO_VF_Sub  _ r      -> [r,r]
-    MO_VF_Mul  _ r      -> [r,r]
-    MO_VF_Quot _ r      -> [r,r]
-    MO_VF_Neg  _ r      -> [r]
+    -- NOTE: The below is owing to the fact that floats use the SSE registers
+    MO_VF_Add  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Sub  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Mul  l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Quot l w      -> [vecwidth l w, vecwidth l w]
+    MO_VF_Neg  l w      -> [vecwidth l w]
 
     MO_AlignmentCheck _ r -> [r]
+    where
+      vecwidth l w = widthFromBytes (l*widthInBytes w)
 
 -----------------------------------------------------------------------------
 -- CallishMachOp
