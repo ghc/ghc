@@ -2,6 +2,7 @@
 
 module RegAlloc.Linear.FreeRegs (
     FR(..),
+    allFreeRegs,
     maxSpillSlots
 )
 
@@ -68,6 +69,10 @@ instance FR SPARC.FreeRegs where
     frGetFreeRegs  = \_ -> SPARC.getFreeRegs
     frInitFreeRegs = SPARC.initFreeRegs
     frReleaseReg   = SPARC.releaseReg
+
+-- | For debugging output.
+allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
+allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
 
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags

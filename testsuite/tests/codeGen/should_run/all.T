@@ -80,10 +80,19 @@ test('cgrun069',
 test('cgrun070', normal, compile_and_run, [''])
 test('cgrun071', [when(have_cpu_feature('sse4_2'), extra_hc_opts('-msse4.2'))], compile_and_run, [''])
 test('cgrun072', normal, compile_and_run, [''])
+test('cgrun074', normal, compile_and_run, [''])
 test('cgrun075', normal, compile_and_run, [''])
 test('cgrun076', normal, compile_and_run, [''])
 test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
 test('cgrun078', omit_ways(['ghci']), compile_and_run, [''])
+
+# N.B. Only NCG and LLVM backends support SIMD operations
+test('simd000', when(unregisterised(), skip), compile_and_run, [''])
+test('simd001', when(unregisterised(), skip), compile_and_run, [''])
+test('simd002', when(unregisterised(), skip), compile_and_run, [''])
+test('simd003', when(unregisterised(), skip), compile_and_run, [''])
+test('simd004', when(unregisterised(), skip), compile_and_run, [''])
+test('simd005', when(unregisterised(), skip), compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
@@ -143,7 +152,6 @@ test('T9001', normal, compile_and_run, [''])
 test('T9013', omit_ways(['ghci']),  # ghci doesn't support unboxed tuples
      compile_and_run, [''])
 test('T9340', normal, compile_and_run, [''])
-test('cgrun074', normal, compile_and_run, [''])
 test('CmmSwitchTest32', unless(wordsize(32), skip), compile_and_run, [''])
 test('CmmSwitchTest64', unless(wordsize(64), skip), compile_and_run, [''])
 # Skipping WAY=ghci, because it is not broken.

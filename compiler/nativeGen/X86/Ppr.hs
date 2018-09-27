@@ -41,7 +41,6 @@ import DynFlags
 import Cmm              hiding (topInfoTable)
 import BlockId
 import CLabel
-import Unique           ( pprUniqueAlways )
 import GHC.Platform
 import FastString
 import Outputable
@@ -280,10 +279,7 @@ pprReg f r
           if target32Bit platform then ppr32_reg_no f i
                                   else ppr64_reg_no f i
       RegReal    (RealRegPair _ _) -> panic "X86.Ppr: no reg pairs on this arch"
-      RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
-      RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
-      RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
+      RegVirtual v                 -> ppr v
 
   where
     ppr32_reg_no :: Format -> Int -> SDoc
@@ -395,6 +391,11 @@ pprFormat x
                 II64  -> sLit "q"
                 FF32  -> sLit "ss"      -- "scalar single-precision float" (SSE2)
                 FF64  -> sLit "sd"      -- "scalar double-precision float" (SSE2)
+
+                VecFormat _ FmtFloat W32  -> sLit "ps"
+                VecFormat _ FmtDouble W64 -> sLit "pd"
+                -- TODO: Add Ints and remove panic
+                VecFormat {} -> panic "Incorrect width"
                 )
 
 pprFormat_x87 :: Format -> SDoc
@@ -783,6 +784,41 @@ pprInstr (IDIV fmt op)   = pprFormatOp (sLit "idiv") fmt op
 pprInstr (DIV fmt op)    = pprFormatOp (sLit "div")  fmt op
 pprInstr (IMUL2 fmt op)  = pprFormatOp (sLit "imul") fmt op
 
+-- Vector Instructions
+
+pprInstr (VADD format s1 s2 dst)
+  = pprFormatOpRegReg (sLit "vadd") format s1 s2 dst
+pprInstr (VSUB format s1 s2 dst)
+  = pprFormatOpRegReg (sLit "vsub") format s1 s2 dst
+pprInstr (VMUL format s1 s2 dst)
+  = pprFormatOpRegReg (sLit "vmul") format s1 s2 dst
+pprInstr (VDIV format s1 s2 dst)
+  = pprFormatOpRegReg (sLit "vdiv") format s1 s2 dst
+pprInstr (VBROADCAST format from to)
+  = pprBroadcast (sLit "vbroadcast") format from to
+pprInstr (VMOVU format from to)
+  = pprFormatOpOp (sLit "vmovu") format from to
+pprInstr (MOVU format from to)
+  = pprFormatOpOp (sLit "movu") format from to
+pprInstr (MOVL format from to)
+  = pprFormatOpOp (sLit "movl") format from to
+pprInstr (MOVH format from to)
+  = pprFormatOpOp (sLit "movh") format from to
+pprInstr (VPXOR format s1 s2 dst)
+  = pprXor (sLit "vpxor") format s1 s2 dst
+pprInstr (VEXTRACT format offset from to)
+  = pprFormatOpRegOp (sLit "vextract") format offset from to
+pprInstr (INSERTPS format offset addr dst)
+  = pprInsert (sLit "insertps") format offset addr dst
+pprInstr (VPSHUFD format offset src dst)
+  = pprShuf (sLit "vpshufd") format offset src dst
+pprInstr (PSHUFD format offset src dst)
+  = pprShuf (sLit "pshufd") format offset src dst
+pprInstr (PSLLDQ format offset dst)
+  = pprShiftLeft (sLit "pslldq") format offset dst
+pprInstr (PSRLDQ format offset dst)
+  = pprShiftRight (sLit "psrldq") format offset dst
+
 -- x86_64 only
 pprInstr (MUL format op1 op2) = pprFormatOpOp (sLit "mul") format op1 op2
 pprInstr (MUL2 format op) = pprFormatOp (sLit "mul") format op
@@ -875,6 +911,23 @@ pprMnemonic  :: PtrString -> Format -> SDoc
 pprMnemonic name format =
    char '\t' <> ptext name <> pprFormat format <> space
 
+pprGenMnemonic  :: PtrString -> Format -> SDoc
+pprGenMnemonic name _ =
+   char '\t' <> ptext name <> ptext (sLit "") <> space
+
+pprBroadcastMnemonic  :: PtrString -> Format -> SDoc
+pprBroadcastMnemonic name format =
+   char '\t' <> ptext name <> pprBroadcastFormat format <> space
+
+pprBroadcastFormat :: Format -> SDoc
+pprBroadcastFormat x
+  = ptext (case x of
+             VecFormat _ FmtFloat W32  -> sLit "ss"
+             VecFormat _ FmtDouble W64 -> sLit "sd"
+             -- TODO: Add Ints and remove panic
+             VecFormat {} -> panic "Incorrect width"
+             _ -> panic "Scalar Format invading vector operation"
+          )
 
 pprFormatImmOp :: PtrString -> Format -> Imm -> Operand -> SDoc
 pprFormatImmOp name format imm op1
@@ -921,7 +974,16 @@ pprOpOp name format op1 op2
         pprOperand format op2
     ]
 
-
+pprFormatOpRegOp :: PtrString -> Format -> Operand -> Reg -> Operand -> SDoc
+pprFormatOpRegOp name format off reg1 op2
+  = hcat [
+        pprMnemonic name format,
+        pprOperand format off,
+        comma,
+        pprReg format reg1,
+        comma,
+        pprOperand format op2
+    ]
 
 pprRegReg :: PtrString -> Reg -> Reg -> SDoc
 pprRegReg name reg1 reg2
@@ -942,6 +1004,17 @@ pprFormatOpReg name format op1 reg2
         pprOperand format op1,
         comma,
         pprReg (archWordFormat (target32Bit platform)) reg2
+    ]
+
+pprFormatOpRegReg :: PtrString -> Format -> Operand -> Reg -> Reg -> SDoc
+pprFormatOpRegReg name format op1 reg2 reg3
+  = hcat [
+        pprMnemonic name format,
+        pprOperand format op1,
+        comma,
+        pprReg format reg2,
+        comma,
+        pprReg format reg3
     ]
 
 pprCondOpReg :: PtrString -> Format -> Cond -> Operand -> Reg -> SDoc
@@ -1008,3 +1081,68 @@ pprFormatOpOpCoerce name format1 format2 op1 op2
 pprCondInstr :: PtrString -> Cond -> SDoc -> SDoc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]
+
+
+-- Custom pretty printers
+-- These instructions currently don't follow a uniform suffix pattern
+-- in their names, so we have custom pretty printers for them.
+
+pprBroadcast :: PtrString -> Format -> AddrMode -> Reg -> SDoc
+pprBroadcast name format op dst
+  = hcat [
+        pprBroadcastMnemonic name format,
+        pprAddr op,
+        comma,
+        pprReg format dst
+    ]
+
+pprXor :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprXor name format reg1 reg2 reg3
+  = hcat [
+        pprGenMnemonic name format,
+        pprReg format reg1,
+        comma,
+        pprReg format reg2,
+        comma,
+        pprReg format reg3
+    ]
+
+pprInsert :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
+pprInsert name format off src dst
+  = hcat [
+        pprGenMnemonic name format,
+        pprOperand format off,
+        comma,
+        pprOperand format src,
+        comma,
+        pprReg format dst
+    ]
+
+pprShuf :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
+pprShuf name format op1 op2 reg3
+  = hcat [
+        pprGenMnemonic name format,
+        pprOperand format op1,
+        comma,
+        pprOperand format op2,
+        comma,
+        pprReg format reg3
+    ]
+
+pprShiftLeft :: PtrString -> Format -> Operand -> Reg -> SDoc
+pprShiftLeft name format off reg
+  = hcat [
+        pprGenMnemonic name format,
+        pprOperand format off,
+        comma,
+        pprReg format reg
+    ]
+
+pprShiftRight :: PtrString -> Format -> Operand -> Reg -> SDoc
+pprShiftRight name format off reg
+  = hcat [
+        pprGenMnemonic name format,
+        pprOperand format off,
+        comma,
+        pprReg format reg
+    ]
