@@ -431,3 +431,25 @@ test('nursery-chunks1',
   ],
   compile_and_run,
   [''])
+
+# Test for the "Evaluated a CAF that was GC'd" assertion in the debug
+# runtime, by dynamically loading code that re-evaluates the CAF.
+# Also tests the -rdynamic and -fwhole-archive-hs-libs flags for constructing
+# binaries that support runtime dynamic loading.
+test('keep-cafs-fail',
+  [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
+                 'KeepCafs2.hs', 'KeepCafsMain.hs']),
+    filter_stdout_lines('Evaluated a CAF|exit.*'),
+    ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
+  ],
+  run_command,
+  ['$MAKE -s --no-print-directory KeepCafsFail'])
+
+# Test the -fkeep-cafs flag
+test('keep-cafs',
+  [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
+                 'KeepCafs2.hs', 'KeepCafsMain.hs'])
+  ],
+  run_command,
+  ['$MAKE -s --no-print-directory KeepCafs'])
+

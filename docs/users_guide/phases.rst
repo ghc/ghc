@@ -1169,3 +1169,17 @@ for example).
 
     Also, you may need to use the :ghc-flag:`-rdynamic` flag to ensure that
     that symbols are not dropped from your PIE objects.
+
+.. ghc-flag:: -keep-cafs
+    :shortdesc: Do not garbage-collect CAFs (top-level expressions) at runtime
+    :type: dynamic
+    :category: linking
+
+    :since: 8.8.1
+
+    Disables the RTS's normal behaviour of garbage-collecting CAFs
+    (Constant Applicative Forms, in other words top-level
+    expressions). This option is useful for specialised applications
+    that do runtime dynamic linking, where code dynamically linked in
+    the future might require the value of a CAF that would otherwise
+    be garbage-collected.
