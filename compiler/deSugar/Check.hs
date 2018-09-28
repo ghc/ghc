@@ -12,10 +12,7 @@ module Check (
         checkSingle, checkMatches, checkGuardMatches, isAnyPmCheckEnabled,
 
         -- See Note [Type and Term Equality Propagation]
-        genCaseTmCs1, genCaseTmCs2,
-
-        -- Pattern-match-specific type operations
-        pmIsClosedType, pmTopNormaliseType_maybe
+        genCaseTmCs1, genCaseTmCs2
     ) where
 
 #include "HsVersions.h"
@@ -60,6 +57,7 @@ import Data.Maybe    (catMaybes, isJust, fromMaybe)
 import Control.Monad (forM, when, forM_, zipWithM)
 import Coercion
 import TcEvidence
+import TcSimplify    (tcNormalise)
 import IOEnv
 import qualified Data.Semigroup as Semi
 
@@ -430,8 +428,7 @@ checkMatches' vars matches
 checkEmptyCase' :: Id -> PmM PmResult
 checkEmptyCase' var = do
   tm_ty_css     <- pmInitialTmTyCs
-  fam_insts     <- liftD dsGetFamInstEnvs
-  mb_candidates <- inhabitationCandidates fam_insts (idType var)
+  mb_candidates <- inhabitationCandidates (delta_ty_cs tm_ty_css) (idType var)
   case mb_candidates of
     -- Inhabitation checking failed / the type is trivially inhabited
     Left ty -> return (uncoveredWithTy ty)
@@ -483,7 +480,8 @@ pmIsClosedType ty
     is_algebraic_like :: TyCon -> Bool
     is_algebraic_like tc = isAlgTyCon tc || tc == tYPETyCon
 
-pmTopNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Type, [DataCon], Type)
+pmTopNormaliseType_maybe :: FamInstEnvs -> Bag EvVar -> Type
+                         -> PmM (Maybe (Type, [DataCon], Type))
 -- ^ Get rid of *outermost* (or toplevel)
 --      * type function redex
 --      * data family redex
@@ -492,9 +490,18 @@ pmTopNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Type, [DataCon], Type)
 -- Behaves exactly like `topNormaliseType_maybe`, but instead of returning a
 -- coercion, it returns useful information for issuing pattern matching
 -- warnings. See Note [Type normalisation for EmptyCase] for details.
-pmTopNormaliseType_maybe env typ
-  = do ((ty_f,tm_f), ty) <- topNormaliseTypeX stepper comb typ
-       return (eq_src_ty ty (typ : ty_f [ty]), tm_f [], ty)
+pmTopNormaliseType_maybe env ty_cs typ
+  = do (_, mb_typ') <- liftD $ initTcDsForSolver $ tcNormalise ty_cs typ
+         -- Before proceeding, we chuck typ into the constraint solver, in case
+         -- solving for given equalities may reduce typ some. See
+         -- "Wrinkle: local equalities" in
+         -- Note [Type normalisation for EmptyCase].
+       pure $ do typ' <- mb_typ'
+                 ((ty_f,tm_f), ty) <- topNormaliseTypeX stepper comb typ'
+                 -- We need to do topNormaliseTypeX in addition to tcNormalise,
+                 -- since topNormaliseX looks through newtypes, which
+                 -- tcNormalise does not do.
+                 Just (eq_src_ty ty (typ' : ty_f [ty]), tm_f [], ty)
   where
     -- Find the first type in the sequence of rewrites that is a data type,
     -- newtype, or a data family application (not the representation tycon!).
@@ -645,9 +652,10 @@ tmTyCsAreSatisfiable
 checkAllNonVoid :: RecTcChecker -> Delta -> [Type] -> PmM Bool
 checkAllNonVoid rec_ts amb_cs strict_arg_tys = do
   fam_insts <- liftD dsGetFamInstEnvs
-  let tys_to_check = filterOut (definitelyInhabitedType fam_insts)
-                               strict_arg_tys
-      rec_max_bound | tys_to_check `lengthExceeds` 1
+  let definitely_inhabited =
+        definitelyInhabitedType fam_insts (delta_ty_cs amb_cs)
+  tys_to_check <- filterOutM definitely_inhabited strict_arg_tys
+  let rec_max_bound | tys_to_check `lengthExceeds` 1
                     = 1
                     | otherwise
                     = defaultRecTcMaxBound
@@ -667,8 +675,7 @@ nonVoid
                   --   'False' if it is definitely uninhabitable by anything
                   --   (except bottom).
 nonVoid rec_ts amb_cs strict_arg_ty = do
-  fam_insts <- liftD dsGetFamInstEnvs
-  mb_cands <- inhabitationCandidates fam_insts strict_arg_ty
+  mb_cands <- inhabitationCandidates (delta_ty_cs amb_cs) strict_arg_ty
   case mb_cands of
     Right (tc, cands)
       |  Just rec_ts' <- checkRecTc rec_ts tc
@@ -707,12 +714,12 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
 --
 -- See the \"Strict argument type constraints\" section of
 -- @Note [Extensions to GADTs Meet Their Match]@.
-definitelyInhabitedType :: FamInstEnvs -> Type -> Bool
-definitelyInhabitedType env ty
-  | Just (_, cons, _) <- pmTopNormaliseType_maybe env ty
-  = any meets_criteria cons
-  | otherwise
-  = False
+definitelyInhabitedType :: FamInstEnvs -> Bag EvVar -> Type -> PmM Bool
+definitelyInhabitedType env ty_cs ty = do
+  mb_res <- pmTopNormaliseType_maybe env ty_cs ty
+  pure $ case mb_res of
+           Just (_, cons, _) -> any meets_criteria cons
+           Nothing           -> False
   where
     meets_criteria :: DataCon -> Bool
     meets_criteria con =
@@ -733,7 +740,8 @@ It returns 3 results instead of one, because there are 2 subtle points:
 2. The representational data family tycon is used internally but should not be
    shown to the user
 
-Hence, if pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty), then
+Hence, if pmTopNormaliseType_maybe env ty_cs ty = Just (src_ty, dcs, core_ty),
+then
   (a) src_ty is the rewritten type which we can show to the user. That is, the
       type we get if we rewrite type families but not data families or
       newtypes.
@@ -741,7 +749,7 @@ Hence, if pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty), then
       newtype to it's core representation, we keep track of the source data
       constructor.
   (c) core_ty is the rewritten type. That is,
-        pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty)
+        pmTopNormaliseType_maybe env ty_cs ty = Just (src_ty, dcs, core_ty)
       implies
         topNormaliseType_maybe env ty = Just (co, core_ty)
       for some coercion co.
@@ -761,13 +769,34 @@ To see how all cases come into play, consider the following example:
   type instance F Int  = F Char
   type instance F Char = G2
 
-In this case pmTopNormaliseType_maybe env (F Int) results in
+In this case pmTopNormaliseType_maybe env ty_cs (F Int) results in
 
   Just (G2, [MkG2,MkG1], R:TInt)
 
 Which means that in source Haskell:
   - G2 is equivalent to F Int (in contrast, G1 isn't).
   - if (x : R:TInt) then (MkG2 (MkG1 x) : F Int).
+
+-----
+-- Wrinkle: Local equalities
+-----
+
+Given the following type family:
+
+  type family F a
+  type instance F Int = Void
+
+Should the following program (from #14813) be considered exhaustive?
+
+  f :: (i ~ Int) => F i -> a
+  f x = case x of {}
+
+You might think "of course, since `x` is obviously of type Void". But the
+idType of `x` is technically F i, not Void, so if we pass F i to
+inhabitationCandidates, we'll mistakenly conclude that `f` is non-exhaustive.
+In order to avoid this pitfall, we need to normalise the type passed to
+pmTopNormaliseType_maybe, using the constraint solver to solve for any local
+equalities (such as i ~ Int) that may be in scope.
 -}
 
 -- | Generate all 'InhabitationCandidate's for a given type. The result is
@@ -776,12 +805,14 @@ Which means that in source Haskell:
 -- if it can. In this case, the candidates are the signature of the tycon, each
 -- one accompanied by the term- and type- constraints it gives rise to.
 -- See also Note [Checking EmptyCase Expressions]
-inhabitationCandidates :: FamInstEnvs -> Type
+inhabitationCandidates :: Bag EvVar -> Type
                        -> PmM (Either Type (TyCon, [InhabitationCandidate]))
-inhabitationCandidates fam_insts ty
-  = case pmTopNormaliseType_maybe fam_insts ty of
-      Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
-      Nothing                     -> alts_to_check ty     ty      []
+inhabitationCandidates ty_cs ty = do
+  fam_insts   <- liftD dsGetFamInstEnvs
+  mb_norm_res <- pmTopNormaliseType_maybe fam_insts ty_cs ty
+  case mb_norm_res of
+    Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
+    Nothing                     -> alts_to_check ty     ty      []
   where
     -- All these types are trivially inhabited
     trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon

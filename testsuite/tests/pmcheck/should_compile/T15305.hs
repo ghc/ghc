@@ -36,14 +36,9 @@ data HsImplicitBndrs pass
 
 fun2 :: HsImplicitBndrs (GhcPass pass) -> ()
 fun2 UsefulConstructor = ()
-{-
-NB: the seemingly equivalent function
 
 fun2' :: (p ~ GhcPass pass) => HsImplicitBndrs p -> ()
 fun2' UsefulConstructor = ()
-
-Is mistakenly deemed non-exhaustive at the moment due to #14813.
--}
 
 -- Example 3
 

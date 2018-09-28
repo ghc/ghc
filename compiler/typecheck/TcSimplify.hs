@@ -10,6 +10,7 @@ module TcSimplify(
        solveEqualities, solveLocalEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
+       tcNormalise,
 
        captureTopConstraints,
 
@@ -32,13 +33,15 @@ import Class         ( Class, classKey, classTyCon )
 import DynFlags      ( WarningFlag ( Opt_WarnMonomorphism )
                      , WarnReason ( Reason )
                      , DynFlags( solverIterations ) )
-import Id            ( idType )
+import HsExpr        ( UnboundVar(..) )
+import Id            ( idType, mkLocalId )
 import Inst
 import ListSetOps
 import Name
 import Outputable
 import PrelInfo
 import PrelNames
+import RdrName       ( emptyGlobalRdrEnv )
 import TcErrors
 import TcEvidence
 import TcInteract
@@ -546,6 +549,35 @@ tcCheckSatisfiability given_ids
            ; solveSimpleGivens new_given
            ; getInertInsols }
 
+-- | Normalise a type as much as possible using the given constraints.
+-- See @Note [tcNormalise]@.
+tcNormalise :: Bag EvVar -> Type -> TcM Type
+tcNormalise given_ids ty
+  = do { lcl_env <- TcM.getLclEnv
+       ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
+       ; wanted_ct <- mk_wanted_ct
+       ; (res, _ev_binds) <- runTcS $
+             do { traceTcS "tcNormalise {" (ppr given_ids)
+                ; let given_cts = mkGivens given_loc (bagToList given_ids)
+                ; solveSimpleGivens given_cts
+                ; wcs <- solveSimpleWanteds (unitBag wanted_ct)
+                  -- It's an invariant that this wc_simple will always be
+                  -- a singleton Ct, since that's what we fed in as input.
+                ; let ty' = case bagToList (wc_simple wcs) of
+                              (ct:_) -> ctEvPred (ctEvidence ct)
+                              cts    -> pprPanic "tcNormalise" (ppr cts)
+                ; traceTcS "tcNormalise }" (ppr ty')
+                ; pure ty' }
+       ; return res }
+  where
+    mk_wanted_ct :: TcM Ct
+    mk_wanted_ct = do
+      let occ = mkVarOcc "$tcNorm"
+      name <- newSysName occ
+      let ev = mkLocalId name ty
+          hole = ExprHole $ OutOfScope occ emptyGlobalRdrEnv
+      newHoleCt hole ev ty
+
 {- Note [Superclasses and satisfiability]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Expand superclasses before starting, because (Int ~ Bool), has
@@ -566,6 +598,25 @@ the constraints /are/ satisfiable (Trac #10592 comment:12!).
 For stratightforard situations without type functions the try_harder
 step does nothing.
 
+Note [tcNormalise]
+~~~~~~~~~~~~~~~~~~
+tcNormalise is a rather atypical entrypoint to the constraint solver. Whereas
+most invocations of the constraint solver are intended to simplify a set of
+constraints or to decide if a particular set of constraints is satisfiable,
+the purpose of tcNormalise is to take a type, plus some local constraints, and
+normalise the type as much as possible with respect to those constraints.
+
+Why is this useful? As one example, when coverage-checking an EmptyCase
+expression, it's possible that the type of the scrutinee will only reduce
+if some local equalities are solved for. See "Wrinkle: Local equalities"
+in Note [Type normalisation for EmptyCase] in Check.
+
+To accomplish its stated goal, tcNormalise first feeds the local constraints
+into solveSimpleGivens, then stuffs the argument type in a CHoleCan, and feeds
+that singleton Ct into solveSimpleWanteds, which reduces the type in the
+CHoleCan as much as possible with respect to the local given constraints. When
+solveSimpleWanteds is finished, we dig out the type from the CHoleCan and
+return that.
 
 ***********************************************************************************
 *                                                                                 *

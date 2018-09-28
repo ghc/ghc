@@ -39,7 +39,7 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
-  newWanted, newWanteds, cloneWanted, cloneWC,
+  newWanted, newWanteds, newHoleCt, cloneWanted, cloneWC,
   emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
@@ -178,6 +178,16 @@ newWanted orig t_or_k pty
 
 newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
 newWanteds orig = mapM (newWanted orig Nothing)
+
+-- | Create a new 'CHoleCan' 'Ct'.
+newHoleCt :: Hole -> Id -> Type -> TcM Ct
+newHoleCt hole ev ty = do
+  loc <- getCtLocM HoleOrigin Nothing
+  pure $ CHoleCan { cc_ev = CtWanted { ctev_pred = ty
+                                     , ctev_dest = EvVarDest ev
+                                     , ctev_nosh = WDeriv
+                                     , ctev_loc  = loc }
+                  , cc_hole = hole }
 
 ----------------------------------------------
 -- Cloning constraints
