@@ -2,7 +2,7 @@ module Rules.Library (libraryRules) where
 
 import Data.Functor
 import Hadrian.Haskell.Cabal
-import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal.Type
 import qualified System.Directory as IO
 import qualified Text.Parsec      as Parsec
 
@@ -41,7 +41,7 @@ buildStaticLib root archivePath = do
     objs <- libraryObjects context
     removeFile archivePath
     build $ target context (Ar Pack stage) objs [archivePath]
-    synopsis <- pkgSynopsis context
+    synopsis <- pkgSynopsis (package context)
     putSuccess $ renderLibrary
         (quote pkgname ++ " (" ++ show stage ++ ", way " ++ show way ++ ").")
         archivePath synopsis
@@ -82,7 +82,7 @@ allObjects context = (++) <$> nonHsObjects context <*> hsObjects context
 nonHsObjects :: Context -> Action [FilePath]
 nonHsObjects context = do
     cObjs   <- cObjects context
-    cmmSrcs <- interpretInContext context (getPackageData PD.cmmSrcs)
+    cmmSrcs <- interpretInContext context (getContextData cmmSrcs)
     cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
     return $ cObjs ++ cmmObjs ++ eObjs
@@ -90,7 +90,7 @@ nonHsObjects context = do
 -- | Return all the C object files needed to build the given library context.
 cObjects :: Context -> Action [FilePath]
 cObjects context = do
-    srcs <- interpretInContext context (getPackageData PD.cSrcs)
+    srcs <- interpretInContext context (getContextData cSrcs)
     objs <- mapM (objectPath context) srcs
     return $ if Threaded `wayUnit` way context
         then objs

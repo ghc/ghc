@@ -6,11 +6,12 @@ module Rules.Documentation (
     haddockDependencies
     ) where
 
-import qualified Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal
+import Hadrian.Haskell.Cabal.Type
 
 import Base
 import Context
-import Expression (getPackageData, interpretInContext)
+import Expression (getContextData, interpretInContext)
 import Flavour
 import Oracles.ModuleFiles
 import Packages
@@ -141,8 +142,8 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1 && packag
     root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt" %> \file -> do
         need [root -/- haddockHtmlLib]
         -- This is how @ghc-cabal@ used to produces "haddock-prologue.txt" files.
-        (syn, desc) <- interpretInContext context . getPackageData $ \p ->
-            (PD.synopsis p, PD.description p)
+        syn  <- pkgSynopsis    package
+        desc <- pkgDescription package
         let prologue = if null desc then syn else desc
         liftIO $ writeFile file prologue
 
@@ -204,6 +205,6 @@ buildManPage = do
 -- | Find the Haddock files for the dependencies of the current library.
 haddockDependencies :: Context -> Action [FilePath]
 haddockDependencies context = do
-    depNames <- interpretInContext context (getPackageData PD.depNames)
+    depNames <- interpretInContext context (getContextData depNames)
     sequence [ pkgHaddockFile $ vanillaContext Stage1 depPkg
              | Just depPkg <- map findPackageByName depNames, depPkg /= rts ]

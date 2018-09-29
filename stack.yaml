@@ -1,16 +1,13 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-12.9
+resolver: lts-12.10
 
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
 - '../libraries/Cabal/Cabal'
 - '../libraries/text'
-
-extra-deps:
-- shake-0.16.1
 
 # This is necessary to build until happy's version bounds are updated to work
 # with the new Cabal version.  Stack's error message explains the issue:

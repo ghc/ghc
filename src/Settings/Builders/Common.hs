@@ -9,7 +9,7 @@ module Settings.Builders.Common (
     packageDatabaseArgs, bootPackageDatabaseArgs
     ) where
 
-import Hadrian.Haskell.Cabal.PackageData
+import Hadrian.Haskell.Cabal.Type
 
 import Base
 import Expression
@@ -24,8 +24,8 @@ cIncludeArgs = do
     pkg     <- getPackage
     root    <- getBuildRoot
     path    <- getBuildPath
-    incDirs <- getPackageData includeDirs
-    depDirs <- getPackageData depIncludeDirs
+    incDirs <- getContextData includeDirs
+    depDirs <- getContextData depIncludeDirs
     iconvIncludeDir <- getSetting IconvIncludeDir
     gmpIncludeDir   <- getSetting GmpIncludeDir
     ffiIncludeDir   <- getSetting FfiIncludeDir

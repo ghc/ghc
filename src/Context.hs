@@ -53,7 +53,7 @@ libPath context = buildRoot <&> (-/- libDir context)
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context@Context {..} prefix suffix = do
     path <- buildPath context
-    pid  <- pkgIdentifier context
+    pid  <- pkgIdentifier package
     return $ path -/- prefix ++ pid ++ suffix
 
 -- | Path to inplace package configuration file of a given 'Context'.
@@ -91,9 +91,9 @@ pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
-pkgConfFile ctx@Context {..} = do
+pkgConfFile Context {..} = do
     root <- buildRoot
-    pid  <- pkgIdentifier ctx
+    pid  <- pkgIdentifier package
     return $ root -/- relativePackageDbPath stage -/- pid <.> "conf"
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'

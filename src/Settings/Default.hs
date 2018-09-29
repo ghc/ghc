@@ -16,7 +16,7 @@ module Settings.Default (
 import qualified Hadrian.Builder.Ar
 import qualified Hadrian.Builder.Sphinx
 import qualified Hadrian.Builder.Tar
-import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal.Type
 
 import CommandLine
 import Expression
@@ -181,7 +181,7 @@ data SourceArgs = SourceArgs
 sourceArgs :: SourceArgs -> Args
 sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     [ hsDefault
-    , getPackageData PD.hcOpts
+    , getContextData hcOpts
     , libraryPackage   ? hsLibrary
     , package compiler ? hsCompiler
     , package ghc      ? hsGhc ]

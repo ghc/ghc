@@ -49,13 +49,13 @@ type instance RuleResult WindowsPath = String
 -- | Oracles for looking up paths. These are slow and require caching.
 pathOracle :: Rules ()
 pathOracle = do
-    void $ addOracle $ \(WindowsPath path) -> do
+    void $ addOracleCache $ \(WindowsPath path) -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
         putLoud $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
 
-    void $ addOracle $ \(LookupInPath name) -> do
+    void $ addOracleCache $ \(LookupInPath name) -> do
         let unpack = fromMaybe . error $ "Cannot find executable " ++ quote name
         path <- unifyPath . unpack <$> liftIO (findExecutable name)
         putLoud $ "| Executable found: " ++ name ++ " => " ++ path

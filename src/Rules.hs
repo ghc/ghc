@@ -1,9 +1,10 @@
 module Rules (buildRules, oracleRules, packageTargets, topLevelTargets) where
 
 import qualified Hadrian.Oracles.ArgsHash
+import qualified Hadrian.Oracles.Cabal.Rules
 import qualified Hadrian.Oracles.DirectoryContents
 import qualified Hadrian.Oracles.Path
-import qualified Hadrian.Oracles.TextFile.Rules
+import qualified Hadrian.Oracles.TextFile
 
 import Expression
 import qualified Oracles.ModuleFiles
@@ -135,7 +136,8 @@ buildRules = do
 oracleRules :: Rules ()
 oracleRules = do
     Hadrian.Oracles.ArgsHash.argsHashOracle trackArgument getArgs
+    Hadrian.Oracles.Cabal.Rules.cabalOracle
     Hadrian.Oracles.DirectoryContents.directoryContentsOracle
     Hadrian.Oracles.Path.pathOracle
-    Hadrian.Oracles.TextFile.Rules.textFileOracle
+    Hadrian.Oracles.TextFile.textFileOracle
     Oracles.ModuleFiles.moduleFilesOracle

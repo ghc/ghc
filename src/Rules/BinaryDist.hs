@@ -21,7 +21,7 @@ bindistRules = do
         targetPlatform <- setting TargetPlatformFull
         hostOs         <- setting BuildOs
         hostArch       <- setting BuildArch
-        rtsDir         <- pkgIdentifier $ vanillaContext Stage1 rts
+        rtsDir         <- pkgIdentifier rts
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty

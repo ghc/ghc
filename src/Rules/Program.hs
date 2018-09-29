@@ -1,7 +1,7 @@
 module Rules.Program (buildProgram) where
 
 import Hadrian.Haskell.Cabal
-import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal.Type
 
 import Base
 import Context
@@ -66,12 +66,12 @@ buildBinary rs bin context@Context {..} = do
     when (stage > Stage0) $ do
         ways <- interpretInContext context (getLibraryWays <> getRtsWays)
         needLibrary [ rtsContext { way = w } | w <- ways ]
-    cSrcs  <- interpretInContext context (getPackageData PD.cSrcs)
+    cSrcs  <- interpretInContext context (getContextData cSrcs)
     cObjs  <- mapM (objectPath context) cSrcs
     hsObjs <- hsObjects context
     let binDeps = cObjs ++ hsObjs
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
-    synopsis <- pkgSynopsis context
+    synopsis <- pkgSynopsis package
     putSuccess $ renderProgram
         (quote (pkgName package) ++ " (" ++ show stage ++ ").") bin synopsis

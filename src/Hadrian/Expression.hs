@@ -19,7 +19,7 @@ module Hadrian.Expression (
 import Control.Monad.Extra
 import Control.Monad.Trans
 import Control.Monad.Trans.Reader
-import Data.Semigroup
+import Data.Semigroup (Semigroup, (<>))
 import Development.Shake
 import Development.Shake.Classes
 

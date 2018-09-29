@@ -110,9 +110,8 @@ bootPackageConstraints :: Args
 bootPackageConstraints = stage0 ? do
     bootPkgs <- expr $ stagePackages Stage0
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
-    context <- getContext
     constraints <- expr $ forM (sort pkgs) $ \pkg -> do
-        version <- pkgVersion (context { Context.package = pkg })
+        version <- pkgVersion pkg
         return $ ((pkgName pkg ++ " == ") ++) version
     pure $ concat [ ["--constraint", c] | c <- constraints ]
 

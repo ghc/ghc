@@ -34,15 +34,15 @@ executable hadrian
                        , Hadrian.Builder.Tar
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
-                       , Hadrian.Haskell.Cabal.CabalData
-                       , Hadrian.Haskell.Cabal.PackageData
+                       , Hadrian.Haskell.Cabal.Type
                        , Hadrian.Haskell.Cabal.Parse
                        , Hadrian.Oracles.ArgsHash
+                       , Hadrian.Oracles.Cabal
+                       , Hadrian.Oracles.Cabal.Rules
+                       , Hadrian.Oracles.Cabal.Type
                        , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Oracles.Path
                        , Hadrian.Oracles.TextFile
-                       , Hadrian.Oracles.TextFile.Rules
-                       , Hadrian.Oracles.TextFile.Type
                        , Hadrian.Package
                        , Hadrian.Target
                        , Hadrian.Utilities
@@ -121,7 +121,7 @@ executable hadrian
                        , mtl                  == 2.2.*
                        , parsec               >= 3.1     && < 3.2
                        , QuickCheck           >= 2.6     && < 2.11
-                       , shake                >= 0.16.1
+                       , shake                >= 0.16.4
                        , transformers         >= 0.4     && < 0.6
                        , unordered-containers >= 0.2.1   && < 0.3
     build-tools:         alex  >= 3.1

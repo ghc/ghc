@@ -8,7 +8,7 @@ module Utilities (
 
 import qualified Hadrian.Builder as H
 import Hadrian.Haskell.Cabal
-import Hadrian.Haskell.Cabal.PackageData as PD
+import Hadrian.Haskell.Cabal.Type
 import Hadrian.Utilities
 
 import Context
@@ -33,10 +33,10 @@ askWithResources rs target = H.askWithResources rs target getArgs
 -- the results in appropriate contexts. The only subtlety here is that we never
 -- depend on packages built in 'Stage2' or later, therefore the stage of the
 -- resulting dependencies is bounded from above at 'Stage1'. To compute package
--- dependencies we transitively scan @.cabal@ files using 'pkgDependencies'
--- defined in "Hadrian.Haskell.Cabal".
+-- dependencies we transitively scan Cabal files using 'pkgDependencies' defined
+-- in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
-contextDependencies ctx@Context {..} = do
+contextDependencies Context {..} = do
     depPkgs <- go [package]
     return [ Context depStage pkg way | pkg <- depPkgs, pkg /= package ]
   where
@@ -46,14 +46,14 @@ contextDependencies ctx@Context {..} = do
         let newPkgs = nubOrd $ sort (deps ++ pkgs)
         if pkgs == newPkgs then return pkgs else go newPkgs
     step pkg = do
-        deps   <- pkgDependencies $ ctx { Context.package = pkg }
+        deps   <- pkgDependencies pkg
         active <- sort <$> stagePackages depStage
         return $ intersectOrd (compare . pkgName) active deps
 
 cabalDependencies :: Context -> Action [String]
-cabalDependencies ctx = interpretInContext ctx $ getPackageData PD.depIpIds
+cabalDependencies ctx = interpretInContext ctx $ getContextData depIds
 
--- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
+-- | Lookup dependencies of a 'Package' in the @vanilla Stage1 context@.
 stage1Dependencies :: Package -> Action [Package]
 stage1Dependencies =
     fmap (map Context.package) . contextDependencies . vanillaContext Stage1
@@ -65,7 +65,7 @@ libraryTargets includeGhciLib context = do
     libFile  <- pkgLibraryFile     context
     ghciLib  <- pkgGhciLibraryFile context
     ghci     <- if includeGhciLib
-                then interpretInContext context $ getPackageData PD.buildGhciLib
+                then interpretInContext context $ getContextData buildGhciLib
                 else return False
     return $ [ libFile ] ++ [ ghciLib | ghci ]
 
