@@ -66,10 +66,6 @@ lookupDependencies depFile file = do
         Just [] -> error $ "No source file found for file " ++ quote file
         Just (source : files) -> return (source, files)
 
-newtype TextFile = TextFile FilePath
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-type instance RuleResult TextFile = String
-
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 type instance RuleResult KeyValue = Maybe String
@@ -90,12 +86,6 @@ type instance RuleResult KeyValues = Maybe [String]
 --    see 'lookupDependencies'.
 textFileOracle :: Rules ()
 textFileOracle = do
-    text <- newCache $ \file -> do
-        need [file]
-        putLoud $ "| TextFile oracle: reading " ++ quote file ++ "..."
-        liftIO $ readFile file
-    void $ addOracleCache $ \(TextFile file) -> text file
-
     kv <- newCache $ \file -> do
         need [file]
         putLoud $ "| KeyValue oracle: reading " ++ quote file ++ "..."

@@ -36,21 +36,19 @@ import Hadrian.Utilities
 -- 3) 'Hadrian.Oracles.Cabal.configurePackageGHC' that configures a package.
 cabalOracle :: Rules ()
 cabalOracle = do
-    packageData <- newCache $ \package -> do
+    void $ addOracleCache $ \(PackageDataKey package) -> do
         let file = pkgCabalFile package
         need [file]
         putLoud $ "| PackageData oracle: parsing " ++ quote file ++ "..."
         parsePackageData package
-    void $ addOracleCache $ \(PackageDataKey package) -> packageData package
 
-    contextData <- newCache $ \(context@Context {..}) -> do
+    void $ addOracleCache $ \(ContextDataKey context@Context {..}) -> do
         putLoud $ "| ContextData oracle: resolving data for "
                ++ quote (pkgName package) ++ " (" ++ show stage
                ++ ", " ++ show way ++ ")..."
         resolveContextData context
-    void $ addOracleCache $ \(ContextDataKey context) -> contextData context
 
-    conf <- newCache $ \(pkg, stage) -> do
+    void $ addOracleCache $ \(PackageConfigurationKey (pkg, stage)) -> do
         putLoud $ "| PackageConfiguration oracle: configuring "
                ++ quote (pkgName pkg) ++ " (" ++ show stage ++ ")..."
         -- Configure the package with the GHC corresponding to the given stage
@@ -60,4 +58,3 @@ cabalOracle = do
         let platform = fromMaybe (error msg) maybePlatform
             msg      = "PackageConfiguration oracle: cannot detect platform"
         return $ PackageConfiguration (compiler, platform)
-    void $ addOracleCache $ \(PackageConfigurationKey pkgStage) -> conf pkgStage
