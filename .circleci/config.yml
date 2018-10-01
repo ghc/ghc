@@ -71,7 +71,7 @@ aliases:
   - &slowtest
     run:
       name: Full Test
-      command: make slowtest SKIP_PERF_TESTS=YES
+      command: make slowtest SKIP_PERF_TESTS=YES THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../test-results/junit.xml
   - &bindist
     run:
       name: Create bindist
