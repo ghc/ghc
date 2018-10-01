@@ -3305,12 +3305,15 @@ checkValidRoleAnnots role_annots tc
     -- but a tycon stores roles for all variables.
     -- So, we drop the implicit roles (which are all Nominal, anyway).
     name                   = tyConName tc
-    tyvars                 = tyConTyVars tc
     roles                  = tyConRoles tc
-    (vis_roles, vis_vars)  = unzip $ snd $
-                             partitionInvisibles tc (mkTyVarTy . snd) $
-                             zip roles tyvars
+    (vis_roles, vis_vars)  = unzip $ mapMaybe pick_vis $
+                             zip roles (tyConBinders tc)
     role_annot_decl_maybe  = lookupRoleAnnot role_annots name
+
+    pick_vis :: (Role, TyConBinder) -> Maybe (Role, TyVar)
+    pick_vis (role, tvb)
+      | isVisibleTyConBinder tvb = Just (role, binderVar tvb)
+      | otherwise                = Nothing
 
     check_roles
       = whenIsJust role_annot_decl_maybe $
