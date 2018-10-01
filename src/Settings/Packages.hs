@@ -82,7 +82,11 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , flag CrossCompiling ? arg "-terminfo" ] ]
+            , flag CrossCompiling ? arg "-terminfo"
+            -- the 'threaded' flag is True by default, but
+            -- let's record explicitly that we link all ghc
+            -- executables with the threaded runtime.
+            , arg "threaded" ] ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
