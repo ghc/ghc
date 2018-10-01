@@ -1,0 +1,4 @@
+:load T15591
+:set -fprint-explicit-foralls
+:kind T1
+:kind T2

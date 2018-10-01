@@ -1,0 +1,2 @@
+T1 :: forall (f :: * -> *) a. f a -> *
+T2 :: forall a (f :: * -> *). f a -> *

@@ -1514,10 +1514,13 @@ tcWildCardBinders wc_names thing_inside
 kcLHsQTyVars :: Name              -- ^ of the thing being checked
              -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
              -> Bool              -- ^ True <=> the decl being checked has a CUSK
+             -> [(Name, TyVar)]   -- ^ If the thing being checked is associated
+                                  --   with a class, this is the class's scoped
+                                  --   type variables. Empty otherwise.
              -> LHsQTyVars GhcRn
              -> TcM Kind          -- ^ The result kind
              -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
-kcLHsQTyVars name flav cusk
+kcLHsQTyVars name flav cusk parent_tv_prs
   user_tyvars@(HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
                                            , hsq_dependent = dep_names }
                       , hsq_explicit = hs_tvs }) thing_inside
@@ -1532,7 +1535,16 @@ kcLHsQTyVars name flav cusk
        ; let tc_binders_unzonked = zipWith mk_tc_binder hs_tvs tc_tvs
        ; dvs  <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys scoped_kvs $
                                             mkTyConKind tc_binders_unzonked res_kind)
-       ; qkvs <- quantifyTyVars emptyVarSet dvs
+       ; let -- Any type variables bound by the parent class that are specified
+             -- in this declaration (associated with the class). We single
+             -- these out because we want to bind these first in this
+             -- declaration's kind.
+             -- See Note [Kind variable ordering for associated types].
+             reused_from_parent_tv_prs =
+               filter (\(_, tv) -> tv `elemDVarSet` dv_kvs dvs
+                                || tv `elemDVarSet` dv_tvs dvs) parent_tv_prs
+             reused_from_parent_tvs = map snd reused_from_parent_tv_prs
+       ; qkvs <- quantifyTyVars (mkVarSet reused_from_parent_tvs) dvs
          -- don't call tcGetGlobalTyCoVars. For associated types, it gets the
          -- tyvars from the enclosing class -- but that's wrong. We *do* want
          -- to quantify over those tyvars.
@@ -1553,21 +1565,37 @@ kcLHsQTyVars name flav cusk
                                            scoped_kvs
        ; reportFloatingKvs name flav all_tc_tvs unmentioned_kvs
 
-       ; let final_binders =  map (mkNamedTyConBinder Inferred) qkvs
-                           ++ map (mkNamedTyConBinder Specified) scoped_kvs
+       ; let all_scoped_kvs = reused_from_parent_tvs ++ scoped_kvs
+             final_binders =  map (mkNamedTyConBinder Inferred) qkvs
+                           ++ map (mkNamedTyConBinder Specified) all_scoped_kvs
                            ++ tc_binders
+             all_tv_prs = reused_from_parent_tv_prs ++
+                          mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
              tycon = mkTcTyCon name (ppr user_tyvars) final_binders res_kind
-                               (mkTyVarNamePairs (scoped_kvs ++ tc_tvs))
-                               flav
+                               all_tv_prs flav
                            -- the tvs contain the binders already
                            -- in scope from an enclosing class, but
                            -- re-adding tvs to the env't doesn't cause
                            -- harm
 
        ; traceTc "kcLHsQTyVars: cusk" $
-         vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
-              , ppr tc_tvs, ppr (mkTyConKind final_binders res_kind)
-              , ppr qkvs, ppr final_binders ]
+         vcat [ text "name" <+> ppr name
+              , text "kv_ns" <+> ppr kv_ns
+              , text "hs_tvs" <+> ppr hs_tvs
+              , text "dep_names" <+> ppr dep_names
+              , text "scoped_kvs" <+> ppr scoped_kvs
+              , text "reused_from_parent_tv_prs"
+                <+> ppr reused_from_parent_tv_prs
+              , text "tc_tvs" <+> ppr tc_tvs
+              , text "res_kind" <+> ppr res_kind
+              , text "dvs" <+> ppr dvs
+              , text "qkvs" <+> ppr qkvs
+              , text "all_scoped_kvs" <+> ppr all_scoped_kvs
+              , text "tc_binders" <+> ppr tc_binders
+              , text "final_binders" <+> ppr final_binders
+              , text "mkTyConKind final_binders res_kind"
+                <+> ppr (mkTyConKind final_binders res_kind)
+              , text "all_tv_prs" <+> ppr all_tv_prs ]
 
        ; return tycon }
 
@@ -1601,7 +1629,7 @@ kcLHsQTyVars name flav cusk
        | otherwise
        = mkAnonTyConBinder tv
 
-kcLHsQTyVars _ _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
+kcLHsQTyVars _ _ _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
 kcLHsQTyVarBndrs :: Bool   -- True <=> bump the TcLevel when bringing vars into scope
                  -> Bool   -- True <=> Default un-annotated tyvar
@@ -1685,6 +1713,40 @@ See Note [Associated type tyvar names] in Class and
 We must do the same for family instance decls, where the in-scope
 variables may be bound by the enclosing class instance decl.
 Hence the use of tcImplicitQTKBndrs in tcFamTyPats.
+
+Note [Kind variable ordering for associated types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What should be the kind of `T` in the following example? (#15591)
+
+  class C (a :: Type) where
+    type T (x :: f a)
+
+As per Note [Ordering of implicit variables] in RnTypes, we want to quantify
+the kind variables in left-to-right order of first occurrence in order to
+support visible kind application. But we cannot perform this analysis on just
+T alone, since its variable `a` actually occurs /before/ `f` if you consider
+the fact that `a` was previously bound by the parent class `C`. That is to say,
+the kind of `T` should end up being:
+
+  T :: forall a f. f a -> Type
+
+(It wouldn't necessarily be /wrong/ if the kind ended up being, say,
+forall f a. f a -> Type, but that would not be as predictable for users of
+visible kind application.)
+
+In contrast, if `T` were redefined to be a top-level type family, like `T2`
+below:
+
+  type family T2 (x :: f (a :: Type))
+
+Then `a` first appears /after/ `f`, so the kind of `T2` should be:
+
+  T2 :: forall f a. f a -> Type
+
+In order to make this distinction, we need to know (in kcLHsQTyVars) which
+type variables have been bound by the parent class (if there is one). With
+the class-bound variables in hand, we can ensure that we always quantify
+these first.
 -}
 
 
