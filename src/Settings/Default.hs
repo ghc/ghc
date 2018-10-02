@@ -149,25 +149,23 @@ defaultLibraryWays :: Ways
 defaultLibraryWays = mconcat
     [ pure [vanilla]
     , notStage0 ? pure [profiling]
-    -- , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
+    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic]
     ]
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways
-defaultRtsWays = do
-    ways <- getLibraryWays
-    mconcat
-        [ pure [ logging, debug, threaded, threadedDebug, threadedLogging ]
-        , (profiling `elem` ways) ?
-          pure [ profiling, threadedProfiling, debugProfiling
-               , threadedDebugProfiling ]
-          -- we don't add the 'logging' variants of those for now, but we might
-          -- in the future?
-
-        {- , (dynamic `elem` ways) ?
-          pure [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
-               , loggingDynamic, threadedLoggingDynamic ] -}
-        ]
+defaultRtsWays = mconcat
+  [ pure [vanilla, threaded]
+  , notStage0 ? pure
+      [ profiling, threadedProfiling, debugProfiling, threadedDebugProfiling
+      , logging, threadedLogging
+      , debug, threadedDebug
+      ]
+  , notStage0 ? platformSupportsSharedLibs ? pure
+      [ dynamic, threadedDynamic, debugDynamic, loggingDynamic
+      , threadedDebugDynamic, threadedLoggingDynamic
+      ]
+  ]
 
 -- TODO: Move C source arguments here
 -- | Default and package-specific source arguments.
@@ -215,10 +213,21 @@ defaultFlavour = Flavour
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , splitObjects       = defaultSplitObjects
-    , dynamicGhcPrograms = False
+    , dynamicGhcPrograms = defaultDynamicGhcPrograms
     , ghciWithDebugger   = False
     , ghcProfiled        = False
     , ghcDebugged        = False }
+
+-- | Default logic for determining whether to build
+--   dynamic GHC programs.
+--
+--   It corresponds to the DYNAMIC_GHC_PROGRAMS logic implemented
+--   in @mk/config.mk.in@.
+defaultDynamicGhcPrograms :: Action Bool
+defaultDynamicGhcPrograms = do
+  win <- windowsHost
+  supportsShared <- platformSupportsSharedLibs
+  return (not win && supportsShared)
 
 -- | Default condition for building split objects.
 defaultSplitObjects :: Predicate

@@ -155,7 +155,7 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1 && packag
 
         -- Build Haddock documentation
         -- TODO: Pass the correct way from Rules via Context.
-        dynamicPrograms <- dynamicGhcPrograms <$> flavour
+        dynamicPrograms <- dynamicGhcPrograms =<< flavour
         let haddockWay = if dynamicPrograms then dynamic else vanilla
         build $ target (context {way = haddockWay}) (Haddock BuildPackage) srcs [file]
 

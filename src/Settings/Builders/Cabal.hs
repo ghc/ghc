@@ -58,7 +58,7 @@ libraryArgs = do
     flavourWays <- getLibraryWays
     contextWay  <- getWay
     withGhci    <- expr ghcWithInterpreter
-    dynPrograms <- dynamicGhcPrograms <$> expr flavour
+    dynPrograms <- expr (flavour >>= dynamicGhcPrograms)
     let ways = flavourWays ++ [contextWay]
     pure [ if vanilla `elem` ways
            then  "--enable-library-vanilla"

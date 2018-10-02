@@ -11,9 +11,18 @@ quickCrossFlavour :: Flavour
 quickCrossFlavour = defaultFlavour
     { name        = "quick-cross"
     , args        = defaultBuilderArgs <> quickCrossArgs <> defaultPackageArgs
+    , dynamicGhcPrograms = pure False
     , libraryWays = mconcat
                     [ pure [vanilla]
-                    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ] }
+                    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
+    , rtsWays     = mconcat
+                    [ pure
+                      [ vanilla, threaded, logging, debug
+                      , threadedDebug, threadedLogging, threaded ]
+                    , notStage0 ? platformSupportsSharedLibs ? pure
+                      [ dynamic, debugDynamic, threadedDynamic, loggingDynamic
+                      , threadedDebugDynamic, threadedLoggingDynamic ]
+                    ] }
 
 quickCrossArgs :: Args
 quickCrossArgs = sourceArgs SourceArgs

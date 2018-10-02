@@ -1,6 +1,7 @@
 module Settings.Default (
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
-    defaultArgs, defaultLibraryWays, defaultRtsWays, defaultFlavour, defaultSplitObjects
+    defaultArgs, defaultLibraryWays, defaultRtsWays,
+    defaultFlavour, defaultSplitObjects
     ) where
 
 import Flavour

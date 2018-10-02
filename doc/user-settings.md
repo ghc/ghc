@@ -26,7 +26,7 @@ data Flavour = Flavour {
     -- | Build split objects.
     splitObjects :: Predicate,
     -- | Build dynamic GHC programs.
-    dynamicGhcPrograms :: Bool,
+    dynamicGhcPrograms :: Action Bool,
     -- | Enable GHCi debugger.
     ghciWithDebugger :: Bool,
     -- | Build profiled GHC.

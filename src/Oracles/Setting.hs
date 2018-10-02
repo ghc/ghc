@@ -11,6 +11,7 @@ import Hadrian.Oracles.TextFile
 import Hadrian.Oracles.Path
 
 import Base
+import Way.Type
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
 -- | Each 'Setting' comes from @system.config@ file, e.g. 'target-os = mingw32'.
@@ -179,11 +180,10 @@ topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
 -- We also need to respect the system's dynamic extension, e.g. .dll or .so.
 libsuf :: Way -> Action String
 libsuf way =
-    if not (wayUnit Dynamic way)
-    then return $ waySuffix way ++ ".a" -- e.g., _p.a
-    else do
-        extension <- setting DynamicExtension  -- e.g., .dll or .so
-        version   <- setting ProjectVersion    -- e.g., 7.11.20141222
-        let prefix = wayPrefix $ removeWayUnit Dynamic way
-        -- e.g., p_ghc7.11.20141222.dll (the result)
-        return $ prefix ++ "-ghc" ++ version ++ extension
+  if not (wayUnit Dynamic way)
+  then return $ waySuffix way ++ ".a" -- e.g., _p.a
+  else do
+    extension <- setting DynamicExtension  -- e.g., .dll or .so
+    version   <- setting ProjectVersion    -- e.g., 7.11.20141222
+    let suffix = waySuffix $ removeWayUnit Dynamic way
+    return $ "-ghc" ++ version ++ suffix ++ extension

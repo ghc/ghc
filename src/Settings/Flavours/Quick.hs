@@ -4,7 +4,7 @@ import Expression
 import Flavour
 import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
-import Settings.Flavours.Common (naturalInBaseFixArgs)
+import Settings.Flavours.Common
 
 -- Please update doc/flavours.md when changing this file.
 quickFlavour :: Flavour
@@ -13,7 +13,15 @@ quickFlavour = defaultFlavour
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
     , libraryWays = mconcat
                     [ pure [vanilla]
-                    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ] }
+                    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
+    , rtsWays     = mconcat
+                    [ pure
+                      [ vanilla, threaded, logging, debug
+                      , threadedDebug, threadedLogging, threaded ]
+                    , notStage0 ? platformSupportsSharedLibs ? pure
+                      [ dynamic, debugDynamic, threadedDynamic, loggingDynamic
+                      , threadedDebugDynamic, threadedLoggingDynamic ]
+                    ] }
 
 quickArgs :: Args
 quickArgs = sourceArgs SourceArgs

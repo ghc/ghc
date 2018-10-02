@@ -281,7 +281,11 @@ rtsPackageArgs = package rts ? do
               anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
 
     mconcat
-        [ builder (Cabal Flags) ? any (wayUnit Profiling) rtsWays ? arg "profiling"
+        [ builder (Cabal Flags) ? mconcat
+          [ any (wayUnit Profiling) rtsWays ? arg "profiling"
+          , any (wayUnit Debug) rtsWays ? arg "debug"
+          , any (wayUnit Logging) rtsWays ? arg "logging"
+          ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Ghc ? arg "-Irts"
