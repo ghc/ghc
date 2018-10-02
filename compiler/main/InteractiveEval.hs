@@ -76,6 +76,7 @@ import UniqSupply
 import MonadUtils
 import Module
 import PrelNames  ( toDynName, pretendNameIsInScope )
+import TysWiredIn ( isCTupleTyConName )
 import Panic
 import Maybes
 import ErrUtils
@@ -758,6 +759,7 @@ getInfo allInfo name
                        -- The one we looked for in the first place!
                | pretendNameIsInScope n = True
                | isBuiltInSyntax n      = True
+               | isCTupleTyConName n    = True
                | isExternalName n       = isJust (lookupGRE_Name rdr_env n)
                | otherwise              = True
 

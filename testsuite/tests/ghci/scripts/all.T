@@ -252,6 +252,7 @@ test('T12007', normal, ghci_script, ['T12007.script'])
 test('T11975', normal, ghci_script, ['T11975.script'])
 test('T10963', normal, ghci_script, ['T10963.script'])
 test('T11721', normal, ghci_script, ['T11721.script'])
+test('T12005', normal, ghci_script, ['T12005.script'])
 test('T12023', normal, run_command,
                ['$MAKE -s --no-print-directory T12023'])
 test('T12520', normal, ghci_script, ['T12520.script'])
