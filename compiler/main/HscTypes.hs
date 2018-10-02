@@ -1532,7 +1532,7 @@ It's exactly the same for type-family instances.  See Trac #7102
 -}
 
 -- | Interactive context, recording information about the state of the
--- context in which statements are executed in a GHC session.
+-- context in which statements are executed in a GHCi session.
 data InteractiveContext
   = InteractiveContext {
          ic_dflags     :: DynFlags,
