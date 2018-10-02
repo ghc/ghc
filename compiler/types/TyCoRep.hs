@@ -29,7 +29,7 @@ module TyCoRep (
         -- * Types
         Type( TyVarTy, AppTy, TyConApp, ForAllTy
             , LitTy, CastTy, CoercionTy
-            , FunTy, ft_arg, ft_res, ft_af
+            , FunTy, FunTildeTy, ft_arg, ft_res, ft_af
             ),  -- Export the type synonym FunTy too
 
         TyLit(..),
@@ -49,6 +49,7 @@ module TyCoRep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
         mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
+        mkFunTildeTy, mkFunTildeTys,
         mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
 
@@ -218,6 +219,10 @@ data Type
                 -- See Note [Function types]
      { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
      , ft_arg :: Type           -- Argument type
+     , ft_res :: Type }         -- Result type
+
+  | FunTildeTy -- ^ t1 ~> t2  Call-by-name function types
+     { ft_arg :: Type           -- Argument type
      , ft_res :: Type }         -- Result type
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
@@ -940,6 +945,15 @@ mkVisFunTys, mkInvisFunTys :: [Type] -> Type -> Type
 mkVisFunTys   tys ty = foldr mkVisFunTy   ty tys
 mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
 
+infixr 3 `mkFunTildeTy`      -- Associates to the right
+-- | Make a (visible) tilde arrow type
+mkFunTildeTy :: Type -> Type -> Type
+mkFunTildeTy arg res = FunTildeTy arg res
+
+-- | Make nested (visible) tilde arrow types
+mkFunTildeTys :: [Type] -> Type -> Type
+mkFunTildeTys tys ty = foldr mkFunTildeTy ty tys
+
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
 mkForAllTy :: TyCoVar -> ArgFlag -> Type -> Type
@@ -1104,6 +1118,9 @@ data Coercion
          -- there to guide implicit instantiation of Haskell source
          -- types, and that is irrelevant for coercions, which are
          -- Core-only.
+
+  | FunTildeCo Role Coercion Coercion         -- lift FunTy
+         -- FunCo :: "e" -> e -> e -> e
 
   -- These are special
   | CoVarCo CoVar      -- :: _ -> (N or R)
@@ -1744,6 +1761,7 @@ typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
 typeSize (FunTy _ t1 t2)            = typeSize t1 + typeSize t2
+typeSize (FunTildeTy t1 t2)         = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
@@ -1757,6 +1775,7 @@ coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
 coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunTildeCo _ co1 co2) = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)

@@ -603,6 +603,8 @@ collectStgFArgTypes = go []
     go  _ (CoercionTy{}) = panic "myCollectTypeArgs: CoercionTy"
     go bs (FunTy {ft_arg = arg, ft_res=res}) =
       go (typeToStgFArgType arg:bs) res
+    go bs (FunTildeTy {ft_arg = arg, ft_res=res}) =
+      go (typeToStgFArgType arg:bs) res
 
 -- Choose the offset based on the type. For anything other
 -- than an unlifted boxed type, there is no offset.
@@ -624,4 +626,3 @@ typeToStgFArgType typ
   -- a type in a foreign function signature with a representationally
   -- equivalent newtype.
   tycon = tyConAppTyCon (unwrapType typ)
-

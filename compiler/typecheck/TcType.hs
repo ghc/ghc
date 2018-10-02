@@ -797,28 +797,30 @@ tcTyFamInstsAndVisX
 tcTyFamInstsAndVisX = go
   where
     go is_invis_arg ty
-      | Just exp_ty <- tcView ty       = go is_invis_arg exp_ty
-    go _ (TyVarTy _)                   = []
+      | Just exp_ty <- tcView ty          = go is_invis_arg exp_ty
+    go _ (TyVarTy _)                      = []
     go is_invis_arg (TyConApp tc tys)
       | isTypeFamilyTyCon tc
       = [(is_invis_arg, tc, take (tyConArity tc) tys)]
       | otherwise
       = tcTyConAppTyFamInstsAndVisX is_invis_arg tc tys
-    go _            (LitTy {})         = []
-    go is_invis_arg (ForAllTy bndr ty) = go is_invis_arg (binderType bndr)
-                                         ++ go is_invis_arg ty
-    go is_invis_arg (FunTy _ ty1 ty2)  = go is_invis_arg ty1
-                                         ++ go is_invis_arg ty2
-    go is_invis_arg ty@(AppTy _ _)     =
+    go _            (LitTy {})            = []
+    go is_invis_arg (ForAllTy bndr ty)    = go is_invis_arg (binderType bndr)
+                                          ++ go is_invis_arg ty
+    go is_invis_arg (FunTy _ ty1 ty2)     = go is_invis_arg ty1
+                                          ++ go is_invis_arg ty2
+    go is_invis_arg (FunTildeTy ty1 ty2)  = go is_invis_arg ty1
+                                          ++ go is_invis_arg ty2
+    go is_invis_arg ty@(AppTy _ _)        =
       let (ty_head, ty_args) = splitAppTys ty
           ty_arg_flags       = appTyArgFlags ty_head ty_args
       in go is_invis_arg ty_head
          ++ concat (zipWith (\flag -> go (isInvisibleArgFlag flag))
                             ty_arg_flags ty_args)
-    go is_invis_arg (CastTy ty _)      = go is_invis_arg ty
-    go _            (CoercionTy _)     = [] -- don't count tyfams in coercions,
-                                            -- as they never get normalized,
-                                            -- anyway
+    go is_invis_arg (CastTy ty _)         = go is_invis_arg ty
+    go _            (CoercionTy _)        = [] -- don't count tyfams in coercions,
+                                               -- as they never get normalized,
+                                               -- anyway
 
 -- | In an application of a 'TyCon' to some arguments, find the outermost
 -- occurrences of type family applications within the arguments. This function
@@ -861,6 +863,7 @@ anyRewritableTyVar ignore_cos role pred ty
     go rl bvs (TyConApp tc tys)  = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
     go rl bvs (FunTy _ arg res)  = go rl bvs arg || go rl bvs res
+    go rl bvs (FunTildeTy arg res) = go rl bvs arg || go rl bvs res
     go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty
     go rl bvs (CastTy ty co)     = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)    = go_co rl bvs co  -- ToDo: check
@@ -1104,6 +1107,7 @@ getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
 getDFunTyKey (FunTy {})              = getOccName funTyCon
+getDFunTyKey (FunTildeTy {})         = getOccName funTildeTyCon
 getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
@@ -1815,6 +1819,7 @@ isInsolubleOccursCheck eq_rel tv ty
                          NomEq  -> go t1 || go t2
                          ReprEq -> go t1
     go (FunTy _ t1 t2) = go t1 || go t2
+    go (FunTildeTy t1 t2) = go t1 || go t2
     go (ForAllTy (Bndr tv' _) inner_ty)
       | tv' == tv = False
       | otherwise = go (varType tv') || go inner_ty
@@ -2035,6 +2040,7 @@ isTyVarHead _ (TyConApp {})    = False
 isTyVarHead _  (LitTy {})      = False
 isTyVarHead _  (ForAllTy {})   = False
 isTyVarHead _  (FunTy {})      = False
+isTyVarHead _  (FunTildeTy {}) = False
 isTyVarHead _  (CoercionTy {}) = False
 
 
@@ -2070,6 +2076,8 @@ isAlmostFunctionFree (TyConApp tc args)
   | otherwise            = all isAlmostFunctionFree args
 isAlmostFunctionFree (ForAllTy bndr _) = isAlmostFunctionFree (binderType bndr)
 isAlmostFunctionFree (FunTy _ ty1 ty2) = isAlmostFunctionFree ty1 &&
+                                         isAlmostFunctionFree ty2
+isAlmostFunctionFree (FunTildeTy ty1 ty2) = isAlmostFunctionFree ty1 &&
                                          isAlmostFunctionFree ty2
 isAlmostFunctionFree (LitTy {})        = True
 isAlmostFunctionFree (CastTy ty _)     = isAlmostFunctionFree ty
@@ -2412,6 +2420,7 @@ sizeType = go
                                    -- I came across this when investigating #14010.
     go (LitTy {})                = 1
     go (FunTy _ arg res)         = go arg + go res + 1
+    go (FunTildeTy arg res)      = go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
     go (ForAllTy (Bndr tv vis) ty)
         | isVisibleArgFlag vis   = go (tyVarKind tv) + go ty + 1

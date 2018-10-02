@@ -32,7 +32,7 @@ module Coercion (
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo, mkTransMCo,
         mkNthCo, nthCoRole, mkLRCo,
-        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
+        mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunTildeCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
@@ -699,6 +699,14 @@ mkFunCo r co1 co2
   , Just (ty2, _) <- isReflCo_maybe co2
   = mkReflCo r (mkVisFunTy ty1 ty2)
   | otherwise = FunCo r co1 co2
+
+mkFunTildeCo :: Role -> Coercion -> Coercion -> Coercion
+mkFunTildeCo r co1 co2
+    -- See Note [Refl invariant]
+  | Just (ty1, _) <- isReflCo_maybe co1
+  , Just (ty2, _) <- isReflCo_maybe co2
+  = mkReflCo r (mkFunTildeTy ty1 ty2)
+  | otherwise = FunTildeCo r co1 co2
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -1379,6 +1387,9 @@ promoteCoercion co = case co of
       -> ASSERT( False )
          mkNomReflCo liftedTypeKind
 
+    FunTildeCo _ _ _
+      -> mkNomReflCo liftedTypeKind
+
     CoVarCo {}     -> mkKindCo co
     HoleCo {}      -> mkKindCo co
     AxiomInstCo {} -> mkKindCo co
@@ -1889,6 +1900,7 @@ ty_co_subst lc role ty
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
     go r (FunTy _ ty1 ty2) = mkFunCo r (go r ty1) (go r ty2)
+    go r (FunTildeTy ty1 ty2) = mkFunTildeCo r (go r ty1) (go r ty2)
     go r t@(ForAllTy (Bndr v _) ty)
        = let (lc', v', h) = liftCoSubstVarBndr lc v
              body_co = ty_co_subst lc' r ty in
@@ -2126,6 +2138,7 @@ seqCo (AppCo co1 co2)           = seqCo co1 `seq` seqCo co2
 seqCo (ForAllCo tv k co)        = seqType (varType tv) `seq` seqCo k
                                                        `seq` seqCo co
 seqCo (FunCo r co1 co2)         = r `seq` seqCo co1 `seq` seqCo co2
+seqCo (FunTildeCo r co1 co2)    = r `seq` seqCo co1 `seq` seqCo co2
 seqCo (CoVarCo cv)              = cv `seq` ()
 seqCo (HoleCo h)                = coHoleCoVar h `seq` ()
 seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
@@ -2185,6 +2198,7 @@ coercionKind co =
        where
          empty_subst = mkEmptyTCvSubst (mkInScopeSet $ tyCoVarsOfCo co)
     go (FunCo _ co1 co2)    = mkVisFunTy <$> go co1 <*> go co2
+    go (FunTildeCo _ co1 co2) = mkVisFunTy <$> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (HoleCo h)           = coVarTypes (coHoleCoVar h)
     go (AxiomInstCo ax ind cos)
@@ -2306,6 +2320,7 @@ coercionRole = go
     go (AppCo co1 _) = go co1
     go (ForAllCo _ _ co) = go co
     go (FunCo r _ _) = r
+    go (FunTildeCo r _ _) = r
     go (CoVarCo cv) = coVarRole cv
     go (HoleCo h)   = coVarRole (coHoleCoVar h)
     go (AxiomInstCo ax _ _) = coAxiomRole ax

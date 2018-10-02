@@ -570,6 +570,7 @@ lkT (D env ty) m = go ty m
     go (ForAllTy (Bndr tv _) ty)   = tm_forall >.> lkG (D (extendCME env tv) ty)
                                                >=> lkBndr env tv
     go ty@(FunTy {})               = pprPanic "lkT FunTy" (ppr ty)
+    go ty@(FunTildeTy {})          = pprPanic "lkT FunTildeTy" (ppr ty)
     go (CastTy t _)                = go t
     go (CoercionTy {})             = tm_coerce
 
@@ -589,6 +590,7 @@ xtT (D env (ForAllTy (Bndr tv _) ty))  f m
                                 |>> xtBndr env tv f }
 xtT (D _   ty@(TyConApp _ (_:_))) _ _ = pprPanic "xtT TyConApp" (ppr ty)
 xtT (D _   ty@(FunTy {}))         _ _ = pprPanic "xtT FunTy" (ppr ty)
+xtT (D _   ty@(FunTildeTy {}))    _ _ = pprPanic "xtT FunTy" (ppr ty)
 
 fdT :: (a -> b -> b) -> TypeMapX a -> b -> b
 fdT k m = foldTM k (tm_var m)

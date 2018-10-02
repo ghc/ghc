@@ -92,7 +92,7 @@ module TysWiredIn (
 
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
-        isLiftedTypeKindTyConName, liftedTypeKind,
+        isLiftedTypeKindTyConName, liftedTypeKind, unliftedTypeKind,
         typeToTypeKind, constraintKind,
         liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
         liftedTypeKindTyConName,
@@ -613,8 +613,9 @@ typeSymbolKind = mkTyConTy typeSymbolKindCon
 constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
-liftedTypeKind, typeToTypeKind, constraintKind :: Kind
+liftedTypeKind, unliftedTypeKind, typeToTypeKind, constraintKind :: Kind
 liftedTypeKind   = tYPE liftedRepTy
+unliftedTypeKind   = tYPE unliftedRepTy
 typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
@@ -1290,6 +1291,10 @@ liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
 -- The type ('LiftedRep)
 liftedRepTy :: Type
 liftedRepTy = liftedRepDataConTy
+
+-- The type ('UnliftedRep)
+unliftedRepTy :: Type
+unliftedRepTy = unliftedRepDataConTy
 
 {- *********************************************************************
 *                                                                      *

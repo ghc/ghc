@@ -935,6 +935,7 @@ getTyDescription ty
       AppTy fun _            -> getTyDescription fun
       TyConApp tycon _       -> getOccString tycon
       FunTy {}              -> '-' : fun_result tau_ty
+      FunTildeTy {}         -> '~' : fun_result tau_ty
       ForAllTy _  ty         -> getTyDescription ty
       LitTy n                -> getTyLitDescription n
       CastTy ty _            -> getTyDescription ty

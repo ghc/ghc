@@ -189,6 +189,7 @@ ty_co_vars_of_type (TyConApp _ tys)   is acc = ty_co_vars_of_types tys is acc
 ty_co_vars_of_type (LitTy {})         _  acc = acc
 ty_co_vars_of_type (AppTy fun arg)    is acc = ty_co_vars_of_type fun is (ty_co_vars_of_type arg is acc)
 ty_co_vars_of_type (FunTy _ arg res)  is acc = ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc)
+ty_co_vars_of_type (FunTildeTy arg res)  is acc = ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc)
 ty_co_vars_of_type (ForAllTy (Bndr tv _) ty) is acc = ty_co_vars_of_type (varType tv) is $
                                                       ty_co_vars_of_type ty (extendVarSet is tv) acc
 ty_co_vars_of_type (CastTy ty co)     is acc = ty_co_vars_of_type ty is (ty_co_vars_of_co co is acc)
@@ -334,6 +335,7 @@ exactTyCoVarsOfType ty
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
     go (FunTy _ arg res)    = go arg `unionVarSet` go res
+    go (FunTildeTy arg res) = go arg `unionVarSet` go res
     go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
@@ -395,6 +397,7 @@ tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_v
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
 tyCoFVsOfType (FunTy _ arg res)  f bound_vars acc = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (FunTildeTy arg res)  f bound_vars acc = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
@@ -592,6 +595,9 @@ almost_devoid_co_var_of_type (AppTy fun arg) cv
 almost_devoid_co_var_of_type (FunTy _ arg res) cv
   = almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
+almost_devoid_co_var_of_type (FunTildeTy arg res) cv
+  = almost_devoid_co_var_of_type arg cv
+  && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
   && (v == cv || almost_devoid_co_var_of_type ty cv)
@@ -644,6 +650,7 @@ injectiveVarsOfType look_under_tfs = go
     go (TyVarTy v)        = unitFV v `unionFV` go (tyVarKind v)
     go (AppTy f a)        = go f `unionFV` go a
     go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
+    go (FunTildeTy ty1 ty2)  = go ty1 `unionFV` go ty2
     go (TyConApp tc tys)  =
       case tyConInjectivityInfo tc of
         Injective inj
@@ -692,6 +699,7 @@ invisibleVarsOfType = go
     go (TyVarTy v)        = go (tyVarKind v)
     go (AppTy f a)        = go f `unionFV` go a
     go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
+    go (FunTildeTy ty1 ty2)  = go ty1 `unionFV` go ty2
     go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
                             invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys
@@ -715,6 +723,7 @@ noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
 noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
 noFreeVarsOfType (FunTy _ t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
+noFreeVarsOfType (FunTildeTy t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co

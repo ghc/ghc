@@ -260,6 +260,15 @@ opt_co4 env sym rep r (FunCo _r co1 co2)
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2
 
+opt_co4 env sym rep r (FunTildeCo _r co1 co2)
+  = ASSERT( r == _r )
+    if rep
+    then mkFunTildeCo Representational co1' co2'
+    else mkFunTildeCo r co1' co2'
+  where
+    co1' = opt_co4_wrap env sym rep r co1
+    co2' = opt_co4_wrap env sym rep r co2
+
 opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lookupCoVar (lcTCvSubst env) cv
   = opt_co4_wrap (zapLiftingContext env) sym rep r co

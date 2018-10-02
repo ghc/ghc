@@ -646,7 +646,7 @@ typeToLHsType ty
                    -> noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                                       , hst_xqual = noExtField
                                       , hst_body = go tau })
-
+    go (FunTildeTy _ _) = panic "~> types are not available in HsSyn"
     go ty@(ForAllTy (Bndr _ argf) _)
       | (tvs, tau) <- tcSplitForAllTysSameVis argf ty
       = noLoc (HsForAllTy { hst_fvf = argToForallVisFlag argf

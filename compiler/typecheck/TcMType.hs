@@ -1289,6 +1289,7 @@ collect_cand_qtvs is_dep bound dvs ty
     go dv (AppTy t1 t2)     = foldlM go dv [t1, t2]
     go dv (TyConApp _ tys)  = foldlM go dv tys
     go dv (FunTy _ arg res) = foldlM go dv [arg, res]
+    go dv (FunTildeTy arg res) = foldlM go dv [arg, res]
     go dv (LitTy {})        = return dv
     go dv (CastTy ty co)    = do dv1 <- go dv ty
                                  collect_cand_qtvs_co bound dv1 co
@@ -1361,6 +1362,7 @@ collect_cand_qtvs_co bound = go_co
     go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
     go_co dv (FunCo _ co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (FunTildeCo _ co1 co2) = foldlM go_co dv [co1, co2]
     go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
     go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov

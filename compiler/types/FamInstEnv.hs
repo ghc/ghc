@@ -1409,6 +1409,11 @@ normalise_type ty
            ; (co2, nty2) <- go ty2
            ; r <- getRole
            ; return (mkFunCo r co1 co2, ty { ft_arg = nty1, ft_res = nty2 }) }
+    go ty@(FunTildeTy { ft_arg = ty1, ft_res = ty2 })
+      = do { (co1, nty1) <- go ty1
+           ; (co2, nty2) <- go ty2
+           ; r <- getRole
+           ; return (mkFunTildeCo r co1 co2, ty { ft_arg = nty1, ft_res = nty2 }) }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_var_bndr tcvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1738,6 +1743,11 @@ coreFlattenTy subst = go
         (env', mkTyConApp tc tys')
 
     go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+      = let (env1, ty1') = go env  ty1
+            (env2, ty2') = go env1 ty2 in
+        (env2, ty { ft_arg = ty1', ft_res = ty2' })
+
+    go env ty@(FunTildeTy { ft_arg = ty1, ft_res = ty2 })
       = let (env1, ty1') = go env  ty1
             (env2, ty2') = go env1 ty2 in
         (env2, ty { ft_arg = ty1', ft_res = ty2' })
