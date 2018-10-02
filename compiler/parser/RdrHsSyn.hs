@@ -91,7 +91,8 @@ import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
 import Type             ( TyThing(..) )
-import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
+import TysWiredIn       ( cTupleTyConName, tupleTyConName, tupleTyCon,
+                          tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey,
                           cTupleTyConNameArity_maybe  )
