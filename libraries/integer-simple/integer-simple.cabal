@@ -26,6 +26,7 @@ Library
     other-modules: GHC.Integer.Type
     default-extensions: CPP, MagicHash, BangPatterns, UnboxedTuples,
                 UnliftedFFITypes, NoImplicitPrelude
-    -- We need to set the unit ID to integer-simple
+    -- We need to set the unit ID to integer-wired-in
     -- (without a version number) as it's magic.
-    ghc-options: -this-unit-id integer-simple -Wall
+    -- See Note [The integer library] in PrelNames
+    ghc-options: -this-unit-id integer-wired-in -Wall

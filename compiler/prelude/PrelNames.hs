@@ -110,6 +110,36 @@ by the user. For those things that *can* appear in source programs,
      original-name cache.
 
      See also Note [Built-in syntax and the OrigNameCache]
+
+
+Note [The integer library]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Clearly, we need to know the names of various definitions of the integer
+library, e.g. the type itself, `mkInteger` etc. But there are two possible
+implementations of the integer library:
+
+ * integer-gmp (fast, but uses libgmp, which may not be available on all
+   targets and is GPL licensed)
+ * integer-simple (slow, but pure Haskell and BSD-licensed)
+
+We want the compiler to work with either one. The way we achieve this is:
+
+ * When compiling the integer-{gmp,simple} library, we pass
+     -this-unit-id  integer-wired-in
+   to GHC (see the cabal file libraries/integer-{gmp,simple}.
+ * This way, GHC can use just this UnitID (see Module.integerUnitId) when
+   generating code, and the linker will succeed.
+
+Unfortuately, the abstraction is not complete: When using integer-gmp, we
+really want to use the S# constructor directly. This is controlled by
+the `integerLibrary` field of `DynFlags`: If it is IntegerGMP, we use
+this constructor directly (see  CorePrep.lookupIntegerSDataConName)
+
+When GHC reads the package data base, it (internally only) pretends it has UnitId
+`integer-wired-in` instead of the actual UnitId (which includes the version
+number); just like for `base` and other packages, as described in
+Note [Wired-in packages] in Module. This is done in Packages.findWiredInPackages.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -136,8 +166,6 @@ import Unique
 import Name
 import SrcLoc
 import FastString
-import Config ( cIntegerLibraryType, IntegerLibrary(..) )
-import Panic ( panic )
 
 {-
 ************************************************************************
@@ -355,6 +383,7 @@ basicKnownKeyNames
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName, bitIntegerName,
+        integerSDataConName,naturalSDataConName,
 
         -- Natural
         naturalTyConName,
@@ -436,9 +465,7 @@ basicKnownKeyNames
         -- homogeneous equality
         , eqTyConName
 
-    ] ++ case cIntegerLibraryType of
-           IntegerGMP    -> [integerSDataConName,naturalSDataConName]
-           IntegerSimple -> []
+    ]
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -1123,11 +1150,8 @@ integerTyConName, mkIntegerName, integerSDataConName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName, bitIntegerName :: Name
-integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
-integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit n)                    integerSDataConKey
-  where n = case cIntegerLibraryType of
-            IntegerGMP    -> "S#"
-            IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
+integerTyConName      = tcQual gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit "S#")                integerSDataConKey
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
@@ -1174,10 +1198,7 @@ bitIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "bitInteger")        bit
 -- GHC.Natural types
 naturalTyConName, naturalSDataConName :: Name
 naturalTyConName     = tcQual gHC_NATURAL (fsLit "Natural") naturalTyConKey
-naturalSDataConName  = dcQual gHC_NATURAL (fsLit n)         naturalSDataConKey
-  where n = case cIntegerLibraryType of
-            IntegerGMP    -> "NatS#"
-            IntegerSimple -> panic "naturalSDataConName evaluated for integer-simple"
+naturalSDataConName  = dcQual gHC_NATURAL (fsLit "NatS#")   naturalSDataConKey
 
 naturalFromIntegerName :: Name
 naturalFromIntegerName = varQual gHC_NATURAL (fsLit "naturalFromInteger") naturalFromIntegerIdKey
