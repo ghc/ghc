@@ -364,7 +364,7 @@ void freeSegments(ObjectCode *oc);
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
 #  include "linker/PEi386Types.h"
-#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#elif defined(darwin_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"
 #else

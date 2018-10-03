@@ -1,6 +1,6 @@
 #include "HsBase.h"
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
 #include <mach/mach_time.h>
 
 static double scaling_factor = 0.0;
