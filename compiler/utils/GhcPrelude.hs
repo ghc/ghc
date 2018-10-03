@@ -12,13 +12,7 @@ module GhcPrelude (module X) where
 -- clashing with the (Outputable.<>) operator which is heavily used
 -- through GHC's code-base.
 
-#if MIN_VERSION_base(4,11,0)
 import Prelude as X hiding ((<>))
-#else
-import Prelude as X
-import Data.Semigroup as X (Semigroup)
-#endif
-
 import Data.Foldable as X (foldl')
 
 {-
