@@ -150,7 +150,7 @@ callbackTableVar mgr fd = emFds mgr ! hashFd fd
 
 haveOneShot :: Bool
 {-# INLINE haveOneShot #-}
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
 haveOneShot = False
 #elif defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
 haveOneShot = True
@@ -376,7 +376,7 @@ registerFd mgr cb fd evs lt = do
 -}
 -- | Wake up the event manager.
 wakeManager :: EventManager -> IO ()
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
 wakeManager mgr = sendWakeup (emControl mgr)
 #elif defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
 wakeManager _ = return ()

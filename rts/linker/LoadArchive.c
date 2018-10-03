@@ -31,7 +31,7 @@
 
 #define DEBUG_LOG(...) IF_DEBUG(linker, debugBelch("loadArchive: " __VA_ARGS__))
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
 /* Read 4 bytes and convert to host byte order */
 static uint32_t read4Bytes(const char buf[static 4])
 {
@@ -150,7 +150,7 @@ static StgBool checkFatArchive(char magic[static 20], FILE* f, pathchar* path)
 {
     StgBool success;
     success = false;
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
     /* Not a standard archive, look for a fat archive magic number: */
     if (read4Bytes(magic) == FAT_MAGIC)
         success = loadFatArchive(magic, f, path);
@@ -342,7 +342,7 @@ static HsInt loadArchive_ (pathchar *path)
             }
         }
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
         if (strncmp(fileName, "!<arch>\n", 8) == 0) {
             DEBUG_LOG("found the start of another archive, breaking\n");
             break;
@@ -486,7 +486,7 @@ static HsInt loadArchive_ (pathchar *path)
 
             DEBUG_LOG("Member is an object file...loading...\n");
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
             else {

@@ -32,9 +32,9 @@
 /*
  * We want to avoid using the SIGALRM signals whenever possible as these signals
  * interrupt system calls (see #10840) and can be overridden by user code. On
- * Darwin we can use a dedicated thread and usleep.
+ * macOS we can use a dedicated thread and usleep.
  */
-#if defined(darwin_HOST_OS)
+#if defined(macos_HOST_OS)
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
