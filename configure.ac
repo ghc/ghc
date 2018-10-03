@@ -206,7 +206,8 @@ dnl we ask the bootstrapping compiler what platform it is for
 if test "${WithGhc}" != ""
 then
         bootstrap_host=`"${WithGhc}" +RTS --info | grep '^ ,("Host platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
-        bootstrap_target=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r'`
+        # Turn darwin -> macos to deal with the changing default
+        bootstrap_target=`"${WithGhc}" +RTS --info | grep '^ ,("Target platform"' | sed -e 's/.*, "//' -e 's/")//' | tr -d '\r' | sed s/darwin/macos/`
         if test "$bootstrap_host" != "$bootstrap_target"
         then
                 echo "Bootstrapping GHC is a cross compiler. This probably isn't going to work"
@@ -1155,14 +1156,18 @@ AC_ARG_ENABLE(large-address-space,
 use_large_address_space=no
 if test "$ac_cv_sizeof_void_p" -eq 8 ; then
     if test "x$EnableLargeAddressSpace" = "xyes" ; then
-        if test "$ghc_host_os" = "darwin" ; then
+        case "$ghc_host_os" in
+          # Darwin for back-compat
+          darwin|macos|ios|watchos|tvos)
             use_large_address_space=yes
-	elif test "$ghc_host_os" = "openbsd" ; then
-	    # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
-	    # The flag MAP_NORESERVE is supported for source compatibility reasons,
-	    # but is completely ignored by OS mmap
+            ;;
+          openbsd)
+            # as of OpenBSD 5.8 (2015), OpenBSD does not support mmap with MAP_NORESERVE.
+            # The flag MAP_NORESERVE is supported for source compatibility reasons,
+            # but is completely ignored by OS mmap
             use_large_address_space=no
-        else
+            ;;
+          *)
             AC_CHECK_DECLS([MAP_NORESERVE, MADV_FREE, MADV_DONTNEED],[],[],
                 [
                 #include <unistd.h>
@@ -1175,7 +1180,8 @@ if test "$ac_cv_sizeof_void_p" -eq 8 ; then
                 test "$ac_cv_have_decl_MADV_DONTNEED" = "yes" ; then
                     use_large_address_space=yes
             fi
-        fi
+            ;;
+        esac
     fi
 fi
 if test "$use_large_address_space" = "yes" ; then
@@ -1189,7 +1195,7 @@ case ${TargetOS} in
     linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
         RtsLinkerUseMmap=1
         ;;
-    darwin|ios|watchos|tvos)
+    macos|ios|watchos|tvos)
         RtsLinkerUseMmap=1
         ;;
     *)

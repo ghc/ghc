@@ -9,7 +9,7 @@
 #include "Rts.h"
 #include "GetEnv.h"
 
-#if defined(darwin_HOST_OS)
+#if defined(macos_HOST_OS)
 
 /* While the "extern char** environ" var does exist on OSX, it is not
  * available to shared libs. See ghc ticket #2458 and
@@ -18,6 +18,13 @@
 #include <crt_externs.h>
 
 static char** get_environ(void) { return *(_NSGetEnviron()); }
+
+#elif defined(ios_HOST_OS)
+
+/* `_NSGetEnviron` is a "private API" and will cause an app store rejection.
+ */
+static char* const fake_envion[] = { NULL };
+static char** get_environ(void) { return fake_envion; }
 
 #else
 

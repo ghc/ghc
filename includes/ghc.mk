@@ -144,6 +144,13 @@ $(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	@echo "#define BUILD_OS  \"$(HostOS_CPP)\"" >> $@
 	@echo "#define HOST_OS  \"$(TargetOS_CPP)\"" >> $@
 	@echo >> $@
+	@echo "#if defined(macos_BUILD_OS) || defined(ios_BUILD_OS)" >> $@
+	@echo "#  define darwin_BUILD_OS  1" >> $@
+	@echo "#endif" >> $@
+	@echo "#if defined(macos_HOST_OS) || defined(ios_HOST_OS)" >> $@
+	@echo "#  define darwin_HOST_OS  1" >> $@
+	@echo "#endif" >> $@
+	@echo >> $@
 	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR  1" >> $@
 	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR  1" >> $@
 	@echo "#define BUILD_VENDOR  \"$(HostVendor_CPP)\"" >> $@
