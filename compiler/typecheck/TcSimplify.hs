@@ -668,15 +668,16 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints (fully zonked)
                       TcEvBinds,    -- ... binding these evidence variables
-                      Bool)         -- True <=> there was an insoluble type error
-                                    --          in these bindings
+                      WantedConstraints, -- Redidual as-yet-unsolved constraints
+                      Bool)         -- True <=> the residual constraints are insoluble
+
 simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
        ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
-       ; return (qtkvs, [], emptyTcEvBinds, False) }
+       ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
 
   | otherwise
   = do { traceTc "simplifyInfer {"  $ vcat
@@ -747,10 +748,9 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                                       , ctev_loc  = ct_loc }
                            | psig_theta_var <- psig_theta_vars ]
 
-       -- Now we can emil the residual constraints
-       ; emitResidualConstraints rhs_tclvl tc_env ev_binds_var
-                                 name_taus co_vars qtvs
-                                 bound_theta_vars
+       -- Now construct the residual constraint
+       ; residual_wanted <- mkResidualConstraints rhs_tclvl tc_env ev_binds_var
+                                 name_taus co_vars qtvs bound_theta_vars
                                  (wanted_transformed `andWC` mkSimpleWC psig_wanted)
 
          -- All done!
@@ -761,21 +761,23 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
               , text "qtvs ="       <+> ppr qtvs
               , text "definite_error =" <+> ppr definite_error ]
 
-       ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var, definite_error ) }
+       ; return ( qtvs, bound_theta_vars, TcEvBinds ev_binds_var
+                , residual_wanted, definite_error ) }
          -- NB: bound_theta_vars must be fully zonked
 
 
 --------------------
-emitResidualConstraints :: TcLevel -> Env TcGblEnv TcLclEnv -> EvBindsVar
-                        -> [(Name, TcTauType)]
-                        -> VarSet -> [TcTyVar] -> [EvVar]
-                        -> WantedConstraints -> TcM ()
+mkResidualConstraints :: TcLevel -> Env TcGblEnv TcLclEnv -> EvBindsVar
+                      -> [(Name, TcTauType)]
+                      -> VarSet -> [TcTyVar] -> [EvVar]
+                      -> WantedConstraints -> TcM WantedConstraints
 -- Emit the remaining constraints from the RHS.
 -- See Note [Emitting the residual implication in simplifyInfer]
-emitResidualConstraints rhs_tclvl tc_env ev_binds_var
+mkResidualConstraints rhs_tclvl tc_env ev_binds_var
                         name_taus co_vars qtvs full_theta_vars wanteds
   | isEmptyWC wanteds
-  = return ()
+  = return wanteds
+
   | otherwise
   = do { wanted_simple <- TcM.zonkSimples (wc_simple wanteds)
        ; let (outer_simple, inner_simple) = partitionBag is_mono wanted_simple
@@ -783,26 +785,23 @@ emitResidualConstraints rhs_tclvl tc_env ev_binds_var
 
         ; _ <- promoteTyVarSet (tyCoVarsOfCts outer_simple)
 
-        ; unless (isEmptyCts outer_simple) $
-          do { traceTc "emitResidualConstrants:simple" (ppr outer_simple)
-             ; emitSimples outer_simple }
-
-        ; implic <- newImplication
         ; let inner_wanted = wanteds { wc_simple = inner_simple }
-              implic'      = mk_implic inner_wanted implic
-        ; unless (isEmptyWC inner_wanted) $
-          do { traceTc "emitResidualConstraints:implic" (ppr implic')
-             ; emitImplication implic' }
-     }
+        ; return (WC { wc_simple = outer_simple
+                     , wc_impl   = mk_implic inner_wanted })}
   where
-    mk_implic inner_wanted implic
-       = implic { ic_tclvl  = rhs_tclvl
-                , ic_skols  = qtvs
-                , ic_given  = full_theta_vars
-                , ic_wanted = inner_wanted
-                , ic_binds  = ev_binds_var
-                , ic_info   = skol_info
-                , ic_env    = tc_env }
+    mk_implic inner_wanted
+      | isEmptyWC inner_wanted
+      = emptyBag
+      | otherwise
+      = unitBag (implicationPrototype { ic_tclvl  = rhs_tclvl
+                                      , ic_skols  = qtvs
+                                      , ic_telescope = Nothing
+                                      , ic_given  = full_theta_vars
+                                      , ic_wanted = inner_wanted
+                                      , ic_binds  = ev_binds_var
+                                      , ic_no_eqs = False
+                                      , ic_info   = skol_info
+                                      , ic_env    = tc_env })
 
     full_theta = map idType full_theta_vars
     skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
@@ -838,8 +837,7 @@ put it outside.
 
 That is the reason for the partitionBag in emitResidualConstraints,
 which takes the CoVars free in the inferred type, and pulls their
-constraints out.  (NB: this set of CoVars should be
-closed-over-kinds.)
+constraints out.  (NB: this set of CoVars should be closed-over-kinds.)
 
 All rather subtle; see Trac #14584.
 

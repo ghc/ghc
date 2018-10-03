@@ -90,7 +90,7 @@ module TcRnMonad(
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
-  addTcEvBind,
+  addTcEvBind, addTopEvBinds,
   getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
@@ -1359,6 +1359,13 @@ debugTc thing
 ************************************************************************
 -}
 
+addTopEvBinds :: Bag EvBind -> TcM a -> TcM a
+addTopEvBinds new_ev_binds thing_inside
+  =updGblEnv upd_env thing_inside
+  where
+    upd_env tcg_env = tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env
+                                               `unionBags` new_ev_binds }
+
 newTcEvBinds :: TcM EvBindsVar
 newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
                   ; tcvs_ref  <- newTcRef emptyVarSet
@@ -1442,6 +1449,9 @@ emitStaticConstraints static_lie
 
 emitConstraints :: WantedConstraints -> TcM ()
 emitConstraints ct
+  | isEmptyWC ct
+  = return ()
+  | otherwise
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`andWC` ct) }
 

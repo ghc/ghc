@@ -52,7 +52,7 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
-import Control.Monad ( zipWithM, when )
+import Control.Monad ( zipWithM )
 import Data.List( partition )
 
 #include "HsVersions.h"
@@ -68,21 +68,23 @@ import Data.List( partition )
 tcPatSynDecl :: PatSynBind GhcRn GhcRn
              -> Maybe TcSigInfo
              -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcPatSynDecl psb@(PSB { psb_id = L _ name, psb_args = details }) mb_sig
-  = recoverM recover $
+tcPatSynDecl psb mb_sig
+  = recoverM (recoverPSB psb) $
     case mb_sig of
       Nothing                 -> tcInferPatSynDecl psb
       Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi
-      _ -> panic "tcPatSynDecl"
+      _                       -> panic "tcPatSynDecl"
 
+recoverPSB :: PatSynBind GhcRn GhcRn
+           -> TcM (LHsBinds GhcTc, TcGblEnv)
+-- See Note [Pattern synonym error recovery]
+recoverPSB (PSB { psb_id = L _ name, psb_args = details })
+ = do { matcher_name <- newImplicitBinder name mkMatcherOcc
+      ; let placeholder = AConLike $ PatSynCon $
+                          mk_placeholder matcher_name
+      ; gbl_env <- tcExtendGlobalEnv [placeholder] getGblEnv
+      ; return (emptyBag, gbl_env) }
   where
-    -- See Note [Pattern synonym error recovery]
-    recover = do { matcher_name <- newImplicitBinder name mkMatcherOcc
-                 ; let placeholder = AConLike $ PatSynCon $
-                                     mk_placeholder matcher_name
-                 ; gbl_env <- tcExtendGlobalEnv [placeholder] getGblEnv
-                 ; return (emptyBag, gbl_env) }
-
     (_arg_names, _rec_fields, is_infix) = collectPatSynArgInfo details
     mk_placeholder matcher_name
       = mkPatSyn name is_infix
@@ -97,30 +99,40 @@ tcPatSynDecl psb@(PSB { psb_id = L _ name, psb_args = details }) mb_sig
          matcher_id = mkLocalId matcher_name $
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
-tcPatSynDecl (XPatSynBind {}) _ = panic "tcPatSynDecl"
+recoverPSB (XPatSynBind {}) = panic "recoverPSB"
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If type inference for a pattern synonym fails , we can't continue with
+If type inference for a pattern synonym fails, we can't continue with
 the rest of tc_patsyn_finish, because we may get knock-on errors, or
 even a crash.  E.g. from
    pattern What = True :: Maybe
 we get a kind error; and we must stop right away (Trac #15289).
-Hence the 'when insoluble failM' in tcInferPatSyn.
 
-But does that abort compilation entirely?  No -- we can recover
-and carry on, just as we do for value bindings, provided we plug in
-placeholder for the pattern synonym.  The goal of the placeholder
-is not to cause a raft of follow-on errors.  I've used the simplest
-thing for now, but we might need to elaborate it a bit later.  (e.g.
-I've given it zero args, which may cause knock-on errors if it is
-used in a pattern.) But it'll do for now.
+We stop if there are /any/ unsolved constraints, not just insoluble
+ones; because pattern synonyms are top-level things, we will never
+solve them later if we can't solve them now.  And if we were to carry
+on, tc_patsyn_finish does zonkTcTypeToType, which defaults any
+unsolved unificatdion variables to Any, which confuses the error
+reporting no end (Trac #15685).
+
+So we use simplifyTop to completely solve the constraint, report
+any errors, throw an exception.
+
+Even in the event of such an error we can recover and carry on, just
+as we do for value bindings, provided we plug in placeholder for the
+pattern synonym: see recoverPSB.  The goal of the placeholder is not
+to cause a raft of follow-on errors.  I've used the simplest thing for
+now, but we might need to elaborate it a bit later.  (e.g.  I've given
+it zero args, which may cause knock-on errors if it is used in a
+pattern.) But it'll do for now.
+
 -}
 
 tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
-                       psb_def = lpat, psb_dir = dir }
+tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
+                       , psb_def = lpat, psb_dir = dir })
   = addPatSynCtxt lname $
     do { traceTc "tcInferPatSynDecl {" $ ppr name
 
@@ -133,15 +145,12 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
-       ; (qtvs, req_dicts, ev_binds, insoluble)
+       ; (qtvs, req_dicts, ev_binds, residual, _)
                <- simplifyInfer tclvl NoRestrictions [] named_taus wanted
+       ; top_ev_binds <- checkNoErrs (simplifyTop residual)
+       ; addTopEvBinds top_ev_binds $
 
-       ; when insoluble failM
-              -- simplifyInfer doesn't fail if there are errors.  But to avoid
-              -- knock-on errors, or even crashes, we want to stop here.
-              -- See Note [Pattern synonym error recovery]
-
-       ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
+    do { let (ex_tvs, prov_dicts) = tcCollectEx lpat'
              ex_tv_set  = mkVarSet ex_tvs
              univ_tvs   = filterOut (`elemVarSet` ex_tv_set) qtvs
              req_theta  = map evVarPred req_dicts
@@ -175,7 +184,7 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                             , mkTyVarTys ex_tvs, prov_theta
                             , map (EvExpr . evId) filtered_prov_dicts)
                           (map nlHsVar args, map idType args)
-                          pat_ty rec_fields }
+                          pat_ty rec_fields } }
 tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
 
 badUnivTvErr :: [TyVar] -> TyVar -> TcM ()

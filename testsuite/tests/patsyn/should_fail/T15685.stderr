@@ -1,0 +1,10 @@
+
+T15685.hs:13:24: error:
+    • Kind mismatch: cannot unify (f :: a -> *) with:
+        NP a0 :: [k0] -> *
+      Their kinds differ.
+      Expected type: f a1
+        Actual type: NP a0 b0
+    • In the pattern: Nil
+      In the pattern: Here Nil
+      In the declaration for pattern synonym ‘HereNil’
