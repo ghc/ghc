@@ -480,11 +480,8 @@ run_th_modfinalizers = do
       -- (see #12777).
       new_ev_binds <- {-# SCC "simplifyTop2" #-}
                       simplifyTop lie
-      updGblEnv (\tcg_env ->
-        tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env `unionBags` new_ev_binds }
-        )
+      addTopEvBinds new_ev_binds run_th_modfinalizers
         -- addTopDecls can add declarations which add new finalizers.
-        run_th_modfinalizers
 
 tc_rn_src_decls :: [LHsDecl GhcPs]
                 -> TcM (TcGblEnv, TcLclEnv)
@@ -2306,17 +2303,15 @@ tcRnExpr hsc_env mode rdr_expr
                   else return expr_ty } ;
 
     -- Generalise
-    ((qtvs, dicts, _, _), lie_top) <- captureTopConstraints $
-                                      {-# SCC "simplifyInfer" #-}
-                                      simplifyInfer tclvl
-                                                 infer_mode
-                                                 []    {- No sig vars -}
-                                                 [(fresh_it, res_ty)]
-                                                 lie ;
+    (qtvs, dicts, _, residual, _)
+         <- simplifyInfer tclvl infer_mode
+                          []    {- No sig vars -}
+                          [(fresh_it, res_ty)]
+                          lie ;
 
     -- Ignore the dictionary bindings
     _ <- perhaps_disable_default_warnings $
-         simplifyInteractive lie_top ;
+         simplifyInteractive residual ;
 
     let { all_expr_ty = mkInvForAllTys qtvs (mkLamTypes dicts res_ty) } ;
     ty <- zonkTcType all_expr_ty ;

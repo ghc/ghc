@@ -795,8 +795,9 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; mapM_ (checkOverloadedSig mono) sigs
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
-       ; (qtvs, givens, ev_binds, insoluble)
+       ; (qtvs, givens, ev_binds, residual, insoluble)
                  <- simplifyInfer tclvl infer_mode sigs name_taus wanted
+       ; emitConstraints residual
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $

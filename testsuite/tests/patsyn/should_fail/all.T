@@ -44,3 +44,5 @@ test('T14498', normal, compile_fail, [''])
 test('T14552', normal, compile_fail, [''])
 test('T14507', normal, compile_fail, ['-dsuppress-uniques'])
 test('T15289', normal, compile_fail, [''])
+test('T15685', normal, compile_fail, [''])
+test('T15692', normal, compile, [''])   # It has -fdefer-type-errors inside
