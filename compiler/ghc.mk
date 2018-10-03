@@ -175,6 +175,16 @@ compiler/stage1/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo "#define HOST_OS \"$(HostOS_CPP)\""                 >> $@
 	@echo "#define TARGET_OS \"$(TargetOS_CPP)\""             >> $@
 	@echo                                                     >> $@
+	@echo "#if defined(macos_BUILD_OS) || defined(ios_BUILD_OS)"   >> $@
+	@echo "#  define darwin_BUILD_OS 1"                            >> $@
+	@echo "#endif"                                                 >> $@
+	@echo "#if defined(macos_HOST_OS) || defined(ios_HOST_OS)"     >> $@
+	@echo "#  define darwin_HOST_OS 1"                             >> $@
+	@echo "#endif"                                                 >> $@
+	@echo "#if defined(macos_TARGET_OS) || defined(ios_TARGET_OS)" >> $@
+	@echo "#  define darwin_TARGET_OS 1"                           >> $@
+	@echo "#endif"                                                 >> $@
+	@echo                                                     >> $@
 	@echo "#define $(BuildVendor_CPP)_BUILD_VENDOR 1"         >> $@
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR 1"           >> $@
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1"      >> $@
@@ -216,6 +226,16 @@ compiler/stage2/$(PLATFORM_H) : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo "#define BUILD_OS \"$(HostOS_CPP)\""                >> $@
 	@echo "#define HOST_OS \"$(TargetOS_CPP)\""               >> $@
 	@echo "#define TARGET_OS \"$(TargetOS_CPP)\""             >> $@
+	@echo                                                     >> $@
+	@echo "#if defined(macos_BUILD_OS) || defined(ios_BUILD_OS)"   >> $@
+	@echo "#  define darwin_BUILD_OS 1"                            >> $@
+	@echo "#endif"                                                 >> $@
+	@echo "#if defined(macos_HOST_OS) || defined(ios_HOST_OS)"     >> $@
+	@echo "#  define darwin_HOST_OS 1"                             >> $@
+	@echo "#endif"                                                 >> $@
+	@echo "#if defined(macos_TARGET_OS) || defined(ios_TARGET_OS)" >> $@
+	@echo "#  define darwin_TARGET_OS 1"                           >> $@
+	@echo "#endif"                                                 >> $@
 	@echo                                                     >> $@
 	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 1"          >> $@
 	@echo "#define $(TargetVendor_CPP)_HOST_VENDOR 1"         >> $@
