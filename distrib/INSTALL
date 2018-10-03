@@ -22,9 +22,6 @@ Now run:
 
 	make install 
 
-(`make show-install-setup' prints the details of where the different
-pieces of the bundle are heading when -- possibly helpful).
-
 For more information, full GHC documentation is available from the
 main GHC site:
 
