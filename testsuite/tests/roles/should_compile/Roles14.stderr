@@ -2,9 +2,7 @@ TYPE SIGNATURES
   meth2 :: forall a. C2 a => a -> a
 TYPE CONSTRUCTORS
   type role C2 representational
-  class C2 a where
-    meth2 :: a -> a
-    {-# MINIMAL meth2 #-}
+  C2 :: * -> Constraint
 COERCION AXIOMS
   axiom Roles12.N:C2 :: C2 a = a -> a -- Defined at Roles14.hs:6:1
 Dependent modules: []

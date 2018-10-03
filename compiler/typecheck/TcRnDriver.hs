@@ -66,6 +66,7 @@ import DynFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
 import IfaceType( ShowForAllFlag(..) )
+import PatSyn( pprPatSynType )
 import PrelNames
 import PrelInfo
 import RdrName
@@ -76,7 +77,6 @@ import TcRnExports
 import TcEvidence
 import qualified BooleanFormula as BF
 import PprTyThing( pprTyThingInContext )
-import MkIface( tyThingToIfaceDecl )
 import Coercion( pprCoAxiom )
 import CoreFVs( orphNamesOfFamInst )
 import FamInst
@@ -2683,15 +2683,22 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                         tcg_imports   = imports })
   = vcat [ ppr_types type_env
          , ppr_tycons fam_insts type_env
+         , ppr_patsyns type_env
          , ppr_insts insts
          , ppr_fam_insts fam_insts
-         , vcat (map ppr rules)
+         , ppr_rules rules
          , text "Dependent modules:" <+>
                 pprUFM (imp_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
                 ppr (S.toList $ imp_dep_pkgs imports)]
   where         -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
+
+ppr_rules :: [LRuleDecl GhcTc] -> SDoc
+ppr_rules rules
+  = ppUnless (null rules) $
+    hang (text "RULES")
+       2 (vcat (map ppr rules))
 
 ppr_types :: TypeEnv -> SDoc
 ppr_types type_env = getPprDebug $ \dbg ->
@@ -2705,7 +2712,7 @@ ppr_types type_env = getPprDebug $ \dbg ->
         -- Top-level user-defined things have External names.
         -- Suppress internally-generated things unless -dppr-debug
   in
-  text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
+  ppr_sigs ids
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
 ppr_tycons fam_insts type_env = getPprDebug $ \dbg ->
@@ -2717,24 +2724,35 @@ ppr_tycons fam_insts type_env = getPprDebug $ \dbg ->
                                     isExternalName (tyConName tycon) &&
                                     not (tycon `elem` fi_tycons)
   in
-  vcat [ text "TYPE CONSTRUCTORS"
-       ,   nest 2 (ppr_tydecls tycons)
-       , text "COERCION AXIOMS"
-       ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
+  vcat [ hang (text "TYPE CONSTRUCTORS")
+            2 (ppr_tydecls tycons)
+       , hang (text "COERCION AXIOMS")
+            2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
+
+ppr_patsyns :: TypeEnv -> SDoc
+ppr_patsyns type_env
+  = ppUnless (null patsyns) $
+    hang (text "PATTERN SYNONYMS")
+       2 (vcat (map ppr_ps patsyns))
+  where
+    patsyns = typeEnvPatSyns type_env
+    ppr_ps ps = ppr ps <+> dcolon <+> pprPatSynType ps
 
 ppr_insts :: [ClsInst] -> SDoc
-ppr_insts []     = empty
-ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
+ppr_insts ispecs
+  = ppUnless (null ispecs) $
+    hang (text "INSTANCES") 2 (pprInstances ispecs)
 
 ppr_fam_insts :: [FamInst] -> SDoc
-ppr_fam_insts []        = empty
-ppr_fam_insts fam_insts =
-  text "FAMILY INSTANCES" $$ nest 2 (pprFamInsts fam_insts)
+ppr_fam_insts fam_insts
+  = ppUnless (null fam_insts) $
+    hang (text "FAMILY INSTANCES")
+       2 (pprFamInsts fam_insts)
 
 ppr_sigs :: [Var] -> SDoc
-ppr_sigs ids
-        -- Print type signatures; sort by OccName
-  = vcat (map ppr_sig (sortBy (comparing getOccName) ids))
+ppr_sigs ids -- Print type signatures; sort by OccName
+  = hang (text "TYPE SIGNATURES")
+       2 (vcat (map ppr_sig (sortBy (comparing getOccName) ids)))
   where
     ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
@@ -2742,11 +2760,21 @@ ppr_tydecls :: [TyCon] -> SDoc
 ppr_tydecls tycons
   -- Print type constructor info for debug purposes
   -- Sort by OccName to reduce unnecessary changes
-  = vcat [ ppr (tyThingToIfaceDecl (ATyCon tc))
-         | tc <- sortBy (comparing getOccName) tycons ]
-    -- The Outputable instance for IfaceDecl uses
-    -- showToIface, which is what we want here, whereas
-    -- pprTyThing uses ShowSome.
+  = getPprDebug $ \ debug ->
+    vcat $ map (ppr_tc debug) $ sortBy (comparing getOccName) tycons
+  where
+    ppr_tc debug tc
+       = vcat [ ppWhen show_roles $
+                hang (text "type role" <+> ppr tc)
+                   2 (hsep (map ppr roles))
+              , hang (ppr tc <+> dcolon)
+                   2 (ppr (tidyTopType (tyConKind tc))) ]
+       where
+         roles = tyConRoles tc
+         show_roles = debug || not (all (== boring_role) roles)
+         boring_role | isClassTyCon tc = Nominal
+                     | otherwise       = Representational
+            -- Matches the choice in IfaceSyn, calls to pprRoles
 
 {-
 ********************************************************************************
