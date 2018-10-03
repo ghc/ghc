@@ -57,8 +57,8 @@ datatypeName
     Datatype d ⇒
     t d f a → [Char]
 class Datatype (d ∷ k) where
-  datatypeName ∷ ∀ k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1
-                                                       → ★) (a ∷ k1).
+  datatypeName ∷ ∀ k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)
+                   (a ∷ k1).
                  t d f a → [Char]
   ...
   	-- Defined in ‘GHC.Generics’
