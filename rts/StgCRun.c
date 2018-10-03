@@ -114,7 +114,7 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
 
 #if defined(i386_HOST_ARCH)
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
 #define STG_GLOBAL ".globl "
 #define STG_HIDDEN ".private_extern "
 #else
@@ -243,7 +243,7 @@ StgRunIsImplementedInAssembler(void)
 
 #define STG_GLOBAL ".globl "
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(darwin_HOST_OS)
 #define STG_HIDDEN ".private_extern "
 #else
 #define STG_HIDDEN ".hidden "

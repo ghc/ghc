@@ -241,6 +241,17 @@ generateGhcPlatformH = do
         , "#define " ++ targetOs ++ "_TARGET_OS 1"
         , "#define TARGET_OS " ++ show targetOs
         , "#define " ++ targetVendor ++ "_TARGET_VENDOR 1" ]
+        , ""
+        , "#if defined(macos_BUILD_OS) || defined(ios_BUILD_OS)"
+        , "#  define darwin_BUILD_OS 1"
+        , "#endif"
+        , "#if defined(macos_HOST_OS) || defined(ios_HOST_OS)"
+        , "#  define darwin_HOST_OS 1"
+        , "#endif"
+        , "#if defined(macos_TARGET_OS) || defined(ios_TARGET_OS)" >> $@
+        , "#  define darwin_TARGET_OS 1"
+        , "#endif"
+        , ""
         ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
@@ -416,6 +427,16 @@ generateGhcBootPlatformH = do
         , "#define BUILD_VENDOR "  ++ show buildVendor
         , "#define HOST_VENDOR "   ++ show hostVendor
         , "#define TARGET_VENDOR " ++ show targetVendor
+        , ""
+        , "#if defined(macos_BUILD_OS) || defined(ios_BUILD_OS)"
+        , "#  define darwin_BUILD_OS 1"
+        , "#endif"
+        , "#if defined(macos_HOST_OS) || defined(ios_HOST_OS)"
+        , "#  define darwin_HOST_OS 1"
+        , "#endif"
+        , "#if defined(macos_TARGET_OS) || defined(ios_TARGET_OS)"
+        , "#  define darwin_TARGET_OS 1"
+        , "#endif"
         , ""
         , "#endif /* __PLATFORM_H__ */" ]
 

@@ -546,11 +546,15 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 }
 #endif
 
-#if darwin_HOST_OS
+#if macos_HOST_OS
 // You should not access _environ directly on Darwin in a bundle/shared library.
 // See #2458 and http://developer.apple.com/library/mac/#documentation/Darwin/Reference/ManPages/man7/environ.7.html
 #include <crt_externs.h>
 INLINE char **__hscore_environ(void) { return *(_NSGetEnviron()); }
+#elif ios_HOST_OS
+// _NSGetEnviron is a "private API" and will cause an app store rejection.
+char* const __hscore_fake_envion[] = { NULL };
+INLINE char **__hscore_environ(void) { return __hscore_fake_envion; }
 #else
 /* ToDo: write a feature test that doesn't assume 'environ' to
  *    be in scope at link-time. */

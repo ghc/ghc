@@ -242,7 +242,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         linux|linux-android)
             test -z "[$]2" || eval "[$]2=OSLinux"
             ;;
-        darwin|ios|watchos|tvos)
+        # Plain "darwin" is turned into "macos" in FPTOOLS_SET_PLATFORM_VARS,
+        # which must be and always is called first.
+        macos|ios|watchos|tvos)
             test -z "[$]2" || eval "[$]2=OSDarwin"
             ;;
         solaris2)
@@ -1997,7 +1999,7 @@ AC_DEFUN([GHC_CONVERT_OS],[
         $3="openbsd"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
       msys)
@@ -2006,8 +2008,10 @@ AC_DEFUN([GHC_CONVERT_OS],[
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
         $3="aix"
         ;;
-      darwin*) # e.g. aarch64-apple-darwin14
-        $3="darwin"
+      darwin*|macos*) # like aarch64-apple-darwin14
+                      #      aarch64-apple-macos
+                      #      aarch64-apple-macosx
+        $3="macos"
         ;;
       solaris2*)
         $3="solaris2"
