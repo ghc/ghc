@@ -954,6 +954,8 @@ reportWarning reason err
 
 try_m :: TcRn r -> TcRn (Either IOEnvFailure r)
 -- Does tryM, with a debug-trace on failure
+-- If we do recover from an exception, /insoluble/ constraints
+-- (only) in 'thing' are are propagated
 try_m thing
   = do { (mb_r, lie) <- tryCaptureConstraints thing
        ; emitConstraints lie
@@ -961,7 +963,7 @@ try_m thing
        -- Debug trace
        ; case mb_r of
             Left exn -> traceTc "tryTc/recoverM recovering from" $
-                        text (showException exn)
+                        (text (showException exn) $$ ppr lie)
             Right {} -> return ()
 
        ; return mb_r }
@@ -972,6 +974,8 @@ recoverM :: TcRn r      -- Recovery action; do this if the main one fails
                         --  if it generates errors, propagate them all
          -> TcRn r
 -- Errors in 'thing' are retained
+-- If we do recover from an exception, /insoluble/ constraints
+-- (only) in 'thing' are are propagated
 recoverM recover thing
   = do { mb_res <- try_m thing ;
          case mb_res of
@@ -1483,7 +1487,7 @@ tryCaptureConstraints :: TcM a -> TcM (Either IOEnvFailure a, WantedConstraints)
 -- (captureConstraints_maybe m) runs m,
 -- and returns the type constraints it generates
 -- It never throws an exception; instead if thing_inside fails,
---   it returns Left exn and the insoluble constraints
+--   it returns Left exn and the /insoluble/ constraints
 tryCaptureConstraints thing_inside
   = do { lie_var <- newTcRef emptyWC
        ; mb_res <- tryM $
