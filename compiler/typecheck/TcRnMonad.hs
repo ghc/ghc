@@ -183,7 +183,6 @@ import Control.Monad
 import Data.Set ( Set )
 import qualified Data.Set as Set
 
-import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
 import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
@@ -1715,8 +1714,7 @@ addModFinalizersWithLclEnv mod_finalizers
   = do lcl_env <- getLclEnv
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
        updTcRef th_modfinalizers_var $ \fins ->
-         setLclEnv lcl_env (runRemoteModFinalizers mod_finalizers)
-         : fins
+         (lcl_env, mod_finalizers) : fins
 
 {-
 ************************************************************************
