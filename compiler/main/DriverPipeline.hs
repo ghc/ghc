@@ -1465,7 +1465,7 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
         llvmOpts = case optLevel dflags of
-          0 -> "-mem2reg -globalopt"
+          0 -> "-mem2reg -globalopt -lower-expect"
           1 -> "-O1 -globalopt"
           _ -> "-O2"
 
