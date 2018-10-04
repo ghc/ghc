@@ -1235,6 +1235,12 @@ void freeObjectCode (ObjectCode *oc)
 * Sets the initial status of a fresh ObjectCode
 */
 static void setOcInitialStatus(ObjectCode* oc) {
+    /* If a target has requested the ObjectCode not to be resolved then
+       honor this requests.  Usually this means the ObjectCode has not been
+       initialized and can't be.  */
+    if (oc->status == OBJECT_DONT_RESOLVE)
+      return;
+
     if (oc->archiveMemberName == NULL) {
         oc->status = OBJECT_NEEDED;
     } else {
