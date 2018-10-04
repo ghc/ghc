@@ -1122,9 +1122,9 @@ wrapHsArgs f (HsTypeArg t : args) = wrapHsArgs (mkHsAppType f t) args
 wrapHsArgs f (HsArgPar sp : args) = wrapHsArgs (L sp $ HsPar noExt f) args
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm) = text "HsValArg" <> ppr tm
-  ppr (HsTypeArg ty) = text "HsTypeArg" <> ppr ty
-  ppr (HsArgPar sp) = text "HsArgPar" <> ppr sp
+  ppr (HsValArg tm)  = text "HsValArg"  <+> ppr tm
+  ppr (HsTypeArg ty) = text "HsTypeArg" <+> ppr ty
+  ppr (HsArgPar sp)  = text "HsArgPar"  <+> ppr sp
 
 isHsValArg :: HsArg tm ty -> Bool
 isHsValArg (HsValArg {})  = True
@@ -1232,6 +1232,7 @@ tcFunApp :: Maybe SDoc  -- like "The function `f' is applied to"
 tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
   = do { let orig = lexprCtOrigin rn_fun
 
+       ; traceTc "tcFunApp" (ppr rn_fun <+> dcolon <+> ppr fun_sigma $$ ppr rn_args $$ ppr res_ty)
        ; (wrap_fun, tc_args, actual_res_ty)
            <- tcArgs rn_fun fun_sigma orig rn_args
                      (m_herald `orElse` mk_app_msg rn_fun rn_args)
