@@ -1410,7 +1410,7 @@ ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
 ppr_mono_ty (HsSumTy _ tys)
   = tupleParens UnboxedTuple (pprWithBars ppr tys)
 ppr_mono_ty (HsKindSig _ ty kind)
-  = parens (ppr_mono_lty ty <+> dcolon <+> ppr kind)
+  = ppr_mono_lty ty <+> dcolon <+> ppr kind
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
 ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
@@ -1473,7 +1473,7 @@ hsTypeNeedsParens p = go
     go (HsFunTy{})           = p >= funPrec
     go (HsTupleTy{})         = False
     go (HsSumTy{})           = False
-    go (HsKindSig{})         = False
+    go (HsKindSig{})         = p >= sigPrec
     go (HsListTy{})          = False
     go (HsIParamTy{})        = p > topPrec
     go (HsSpliceTy{})        = False

@@ -674,7 +674,7 @@ typeToLHsType ty
       | any isInvisibleTyConBinder (tyConBinders tc)
         -- We must produce an explicit kind signature here to make certain
         -- programs kind-check. See Note [Kind signatures in typeToLHsType].
-      = noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
+      = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
       | otherwise = lhs_ty
        where
         lhs_ty = nlHsTyConApp (getRdrName tc) (map go args')

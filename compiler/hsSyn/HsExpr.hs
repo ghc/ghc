@@ -1245,7 +1245,7 @@ hsExprNeedsParens p = go
       | otherwise                     = p > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
-    go (ExprWithTySig{})              = p > topPrec
+    go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
     go (EWildPat{})                   = False
     go (ELazyPat{})                   = False

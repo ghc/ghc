@@ -50,6 +50,10 @@ Language
     data D1 = forall a b. (a + b) => D1 a b
     data D2 = forall a b.  a + b  => D2 a b -- now allowed
 
+- The requirement that kind signatures always be parenthesized has been relaxed.
+  For instance, it is now permissible to write ``Proxy '(a :: A, b :: B)``
+  (previous GHC versions required extra parens: ``Proxy '((a :: A), (b :: B))``).
+
 Compiler
 ~~~~~~~~
 

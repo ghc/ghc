@@ -257,7 +257,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
     cvt_at_def :: LTyFamInstDecl GhcPs -> CvtM (LTyFamDefltEqn GhcPs)
     -- Very similar to what happens in RdrHsSyn.mkClassDecl
     cvt_at_def decl = case RdrHsSyn.mkATDefault decl of
-                        Right def     -> return def
+                        Right (def, _) -> return def
                         Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD o ctxt ty decs)
