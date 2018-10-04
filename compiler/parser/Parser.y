@@ -3238,6 +3238,7 @@ tyconsym :: { Located RdrName }
 op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
+        | '->'                  { sL1 $1 $ getRdrName funTyCon }
 
 varop   :: { Located RdrName }
         : varsym                { $1 }

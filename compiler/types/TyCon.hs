@@ -2288,6 +2288,7 @@ newTyConDataCon_maybe _ = Nothing
 -- @data Eq a => T a ...@
 tyConStupidTheta :: TyCon -> [PredType]
 tyConStupidTheta (AlgTyCon {algTcStupidTheta = stupid}) = stupid
+tyConStupidTheta (FunTyCon {}) = []
 tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)
 
 -- | Extract the 'TyVar's bound by a vanilla type synonym

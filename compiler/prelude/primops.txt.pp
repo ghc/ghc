@@ -19,6 +19,9 @@
 -- add a new one can be found in the Commentary:
 --
 --  http://ghc.haskell.org/trac/ghc/wiki/Commentary/PrimOps
+--
+-- Note in particular that Haskell block-style comments are not recognized
+-- here, so stick to '--' (even for Notes spanning mutliple lines).
 
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:
@@ -73,6 +76,7 @@ defaults
    fixity           = Nothing
    llvm_only        = False
    vector           = []
+   deprecated_msg   = {}      -- A non-empty message indicates deprecation
 
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
@@ -153,6 +157,21 @@ section "The word size story."
 #define INT64 Int#
 #define WORD64 Word#
 #endif
+
+-- This type won't be exported directly (since there is no concrete
+-- syntax for this sort of export) so we'll have to manually patch
+-- export lists in both GHC and Haddock.
+primtype (->) a b
+  {The builtin function type, written in infix form as {\tt a -> b} and
+   in prefix form as {\tt (->) a b}. Values of this type are functions
+   taking inputs of type {\tt a} and producing outputs of type {\tt b}.
+
+   Note that {\tt a -> b} permits levity-polymorphism in both {\tt a} and
+   {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
+  }
+  with fixity = infixr 0
+         -- This fixity is only the one picked up by Haddock. If you
+         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -243,17 +262,26 @@ primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    with can_fail = True
 
 primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
+   {Bitwise "and".}
    with commutable = True
 
 primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
+   {Bitwise "or".}
    with commutable = True
 
 primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
+   {Bitwise "xor".}
    with commutable = True
 
 primop   NotIOp   "notI#"   Monadic   Int# -> Int#
+   {Bitwise "not", also known as the binary complement.}
 
 primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
+   {Unary negation.
+    Since the negative {\tt Int#} range extends one further than the
+    positive range, {\tt negateInt#} of the most negative number is an
+    identity operation. This way, {\tt negateInt#} is always its own inverse.}
+
 primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
          {Add signed integers reporting overflow.
           First member of result is the sum truncated to an {\tt Int#};
@@ -1194,7 +1222,8 @@ primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
    {Return the size of the array in bytes. Note that this is deprecated as it is
    unsafe in the presence of concurrent resize operations on the same byte
-   array. See {\tt getSizeofMutableByteArray}.}
+   array.}
+   with deprecated_msg = { Use 'getSizeofMutableByteArray#' instead }
 
 primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, Int# #)
@@ -1813,7 +1842,7 @@ primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
 section "Arrays of arrays"
         {Operations on {\tt ArrayArray\#}. An {\tt ArrayArray\#} contains references to {\em unpointed}
          arrays, such as {\tt ByteArray\#s}. Hence, it is not parameterised by the element types,
-         just like a {\tt ByteArray\#}, but it needs to be scanned during GC, just like an {\tt Array#}.
+         just like a {\tt ByteArray\#}, but it needs to be scanned during GC, just like an {\tt Array\#}.
          We represent an {\tt ArrayArray\#} exactly as a {\tt Array\#}, but provide element-type-specific
          indexing, reading, and writing.}
 ------------------------------------------------------------------------
@@ -1939,11 +1968,13 @@ primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
           is divided by the {\tt Int\#} arg.}
 #if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
-        {Coerce directly from address to int. Strongly deprecated.}
+        {Coerce directly from address to int.}
    with code_size = 0
+        deprecated_msg = { This operation is strongly deprecated. }
 primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
-        {Coerce directly from int to address. Strongly deprecated.}
+        {Coerce directly from int to address.}
    with code_size = 0
+        deprecated_msg = { This operation is strongly deprecated. }
 #endif
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
@@ -2924,6 +2955,7 @@ primop  ParOp "par#" GenPrimOp
       -- gets evaluated strictly, which it should *not* be
    has_side_effects = True
    code_size = { primOpCodeSizeForeignCall }
+   deprecated_msg = { Use 'spark#' instead }
 
 primop SparkOp "spark#" GenPrimOp
    a -> State# s -> (# State# s, a #)
@@ -2963,29 +2995,28 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a
 
-{- Note [dataToTag#]
-~~~~~~~~~~~~~~~~~~~~
-The dataToTag# primop should always be applied to an evaluated argument.
-The way to ensure this is to invoke it via the 'getTag' wrapper in GHC.Base:
-   getTag :: a -> Int#
-   getTag !x = dataToTag# x
-
-But now consider
-    \z. case x of y -> let v = dataToTag# y in ...
-
-To improve floating, the FloatOut pass (deliberately) does a
-binder-swap on the case, to give
-    \z. case x of y -> let v = dataToTag# x in ...
-
-Now FloatOut might float that v-binding outside the \z.  But that is
-bad because that might mean x gets evaluated much too early!  (CorePrep
-adds an eval to a dataToTag# call, to ensure that the argument really is
-evaluated; see CorePrep Note [dataToTag magic].)
-
-Solution: make DataToTag into a can_fail primop.  That will stop it floating
-(see Note [PrimOp can_fail and has_side_effects] in PrimOp).  It's a bit of
-a hack but never mind.
--}
+-- Note [dataToTag#]
+-- ~~~~~~~~~~~~~~~~~~~~
+-- The dataToTag# primop should always be applied to an evaluated argument.
+-- The way to ensure this is to invoke it via the 'getTag' wrapper in GHC.Base:
+--    getTag :: a -> Int#
+--    getTag !x = dataToTag# x
+--
+-- But now consider
+--     \z. case x of y -> let v = dataToTag# y in ...
+--
+-- To improve floating, the FloatOut pass (deliberately) does a
+-- binder-swap on the case, to give
+--     \z. case x of y -> let v = dataToTag# x in ...
+--
+-- Now FloatOut might float that v-binding outside the \z.  But that is
+-- bad because that might mean x gets evaluated much too early!  (CorePrep
+-- adds an eval to a dataToTag# call, to ensure that the argument really is
+-- evaluated; see CorePrep Note [dataToTag magic].)
+--
+-- Solution: make DataToTag into a can_fail primop.  That will stop it floating
+-- (see Note [PrimOp can_fail and has_side_effects] in PrimOp).  It's a bit of
+-- a hack but never mind.
 
 ------------------------------------------------------------------------
 section "Bytecode operations"
@@ -3106,6 +3137,9 @@ pseudoop   "seq"
      In particular, this means that {\tt b} may be evaluated before
      {\tt a}. If you need to guarantee a specific order of evaluation,
      you must use the function {\tt pseq} from the "parallel" package. }
+   with fixity = infixr 0
+         -- This fixity is only the one picked up by Haddock. If you
+         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
 
 pseudoop   "unsafeCoerce#"
    a -> b
@@ -3141,6 +3175,7 @@ pseudoop   "unsafeCoerce#"
         to, use {\tt Any}, which is not an algebraic data type.
 
         }
+   with can_fail = True
 
 -- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
 -- as long as you don't "do anything" with the value in its cast form, such as seq on it.  This

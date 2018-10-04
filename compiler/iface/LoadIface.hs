@@ -1012,8 +1012,9 @@ ghcPrimIface
         mi_fix_fn  = mkIfaceFixCache fixities
     }
   where
+    -- The fixities listed here for @`seq`@ or @->@ should match
+    -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
-                                      -- seq is infixr 0
              : (occName funTyConName, funTyFixity)  -- trac #10145
              : mapMaybe mkFixity allThePrimOps
     mkFixity op = (,) (primOpOcc op) <$> primOpFixity op

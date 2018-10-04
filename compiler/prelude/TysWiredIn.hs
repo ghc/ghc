@@ -691,6 +691,9 @@ isBuiltInOcc_maybe occ =
       -- equality tycon
       "~"    -> Just eqTyConName
 
+      -- function tycon
+      "->"   -> Just funTyConName
+
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
       _ | Just rest <- "(" `BS.stripPrefix` name
