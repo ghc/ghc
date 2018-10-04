@@ -64,6 +64,9 @@ module TysPrim(
         weakPrimTyCon,                  mkWeakPrimTy,
         threadIdPrimTyCon,              threadIdPrimTy,
 
+        int8PrimTyCon,          int8PrimTy,
+        word8PrimTyCon,         word8PrimTy,
+
         int32PrimTyCon,         int32PrimTy,
         word32PrimTyCon,        word32PrimTy,
 
@@ -85,8 +88,9 @@ import GhcPrelude
 import {-# SOURCE #-} TysWiredIn
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy
-  , wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy
+  , liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy
+  , wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy
+  , addrRepDataConTy
   , floatRepDataConTy, doubleRepDataConTy
   , vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy
   , vec64DataConTy
@@ -143,6 +147,7 @@ exposedPrimTyCons
     , doublePrimTyCon
     , floatPrimTyCon
     , intPrimTyCon
+    , int8PrimTyCon
     , int32PrimTyCon
     , int64PrimTyCon
     , bcoPrimTyCon
@@ -163,6 +168,7 @@ exposedPrimTyCons
     , proxyPrimTyCon
     , threadIdPrimTyCon
     , wordPrimTyCon
+    , word8PrimTyCon
     , word32PrimTyCon
     , word64PrimTyCon
 
@@ -186,12 +192,14 @@ mkBuiltInPrimTc fs unique tycon
                   BuiltInSyntax
 
 
-charPrimTyConName, intPrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int8PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
+int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
 int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
 int64PrimTyConName            = mkPrimTc (fsLit "Int64#") int64PrimTyConKey int64PrimTyCon
 wordPrimTyConName             = mkPrimTc (fsLit "Word#") wordPrimTyConKey wordPrimTyCon
+word8PrimTyConName            = mkPrimTc (fsLit "Word8#") word8PrimTyConKey word8PrimTyCon
 word32PrimTyConName           = mkPrimTc (fsLit "Word32#") word32PrimTyConKey word32PrimTyCon
 word64PrimTyConName           = mkPrimTc (fsLit "Word64#") word64PrimTyConKey word64PrimTyCon
 addrPrimTyConName             = mkPrimTc (fsLit "Addr#") addrPrimTyConKey addrPrimTyCon
@@ -500,8 +508,10 @@ primRepToRuntimeRep rep = case rep of
   LiftedRep     -> liftedRepDataConTy
   UnliftedRep   -> unliftedRepDataConTy
   IntRep        -> intRepDataConTy
+  Int8Rep       -> int8RepDataConTy
   WordRep       -> wordRepDataConTy
   Int64Rep      -> int64RepDataConTy
+  Word8Rep      -> word8RepDataConTy
   Word64Rep     -> word64RepDataConTy
   AddrRep       -> addrRepDataConTy
   FloatRep      -> floatRepDataConTy
@@ -543,6 +553,11 @@ intPrimTy       = mkTyConTy intPrimTyCon
 intPrimTyCon :: TyCon
 intPrimTyCon    = pcPrimTyCon0 intPrimTyConName IntRep
 
+int8PrimTy :: Type
+int8PrimTy     = mkTyConTy int8PrimTyCon
+int8PrimTyCon :: TyCon
+int8PrimTyCon  = pcPrimTyCon0 int8PrimTyConName Int8Rep
+
 int32PrimTy :: Type
 int32PrimTy     = mkTyConTy int32PrimTyCon
 int32PrimTyCon :: TyCon
@@ -557,6 +572,11 @@ wordPrimTy :: Type
 wordPrimTy      = mkTyConTy wordPrimTyCon
 wordPrimTyCon :: TyCon
 wordPrimTyCon   = pcPrimTyCon0 wordPrimTyConName WordRep
+
+word8PrimTy :: Type
+word8PrimTy     = mkTyConTy word8PrimTyCon
+word8PrimTyCon :: TyCon
+word8PrimTyCon  = pcPrimTyCon0 word8PrimTyConName Word8Rep
 
 word32PrimTy :: Type
 word32PrimTy    = mkTyConTy word32PrimTyCon

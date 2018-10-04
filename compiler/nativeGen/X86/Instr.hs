@@ -383,7 +383,13 @@ x86_regUsageOfInstr platform instr
     SUB    _ src dst    -> usageRM src dst
     SBB    _ src dst    -> usageRM src dst
     IMUL   _ src dst    -> usageRM src dst
-    IMUL2  _ src       -> mkRU (eax:use_R src []) [eax,edx]
+
+    -- Result of IMULB will be in just in %ax
+    IMUL2  II8 src       -> mkRU (eax:use_R src []) [eax]
+    -- Result of IMUL for wider values, will be split between %dx/%edx/%rdx and
+    -- %ax/%eax/%rax.
+    IMUL2  _ src        -> mkRU (eax:use_R src []) [eax,edx]
+
     MUL    _ src dst    -> usageRM src dst
     MUL2   _ src        -> mkRU (eax:use_R src []) [eax,edx]
     DIV    _ op -> mkRU (eax:edx:use_R op []) [eax,edx]
