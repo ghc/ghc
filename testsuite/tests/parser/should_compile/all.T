@@ -130,3 +130,5 @@ def only_MG_loc(x):
                 if mg.strip().startswith("(MG"))
     return '\n'.join(mgLocs)
 test('T15279', normalise_errmsg_fun(only_MG_loc), compile, [''])
+test('T15457', normal, compile, [''])
+test('T15675', normal, compile, [''])

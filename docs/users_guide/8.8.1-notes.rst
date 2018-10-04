@@ -40,6 +40,16 @@ Language
   terminating value of type ``Void``. Accordingly, GHC will not warn about
   ``K2`` (whereas previous versions of GHC would).
 
+- ``(!)`` is now a valid type operator: ::
+
+      type family a ! b
+
+- An existential context no longer requires parenthesization: ::
+
+    class a + b
+    data D1 = forall a b. (a + b) => D1 a b
+    data D2 = forall a b.  a + b  => D2 a b -- now allowed
+
 Compiler
 ~~~~~~~~
 
