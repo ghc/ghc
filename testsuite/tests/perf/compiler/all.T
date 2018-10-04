@@ -670,10 +670,11 @@ test('T5837',
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
              # 2017-03-24: 27028956  (x86/Linux, 64-bit machine)
 
-           (platform('x86_64-unknown-mingw32'), 54793816, 7),
+           (platform('x86_64-unknown-mingw32'), 61806136, 7),
              # 2017-02-19                       59161648 (x64/Windows) - Unknown
              # 2017-04-21                       54985248 (x64/Windows) - Unknown
              # 2017-12-24                       54793816 (x64/Windows) - Unknown
+             # 2018-09-23                       61806136 (x64/Windows) - Unknown
 
            (wordsize(64), 55813608, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
@@ -897,7 +898,7 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 578498120, 5),
+          [(wordsize(64), 578498120, 7),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
@@ -1156,7 +1157,7 @@ test('T12707',
 test('T12150',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 77557800, 5)
+          [(wordsize(64), 77557800, 10)
           # initial:    70773000
           # 2017-08-25: 74358208  Refactor the Mighty Simplifier
           # 2017-08-25: 78300680  Drift
