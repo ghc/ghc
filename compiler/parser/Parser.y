@@ -998,7 +998,7 @@ impspec :: { Located (Bool, Located [LIE GhcPs]) }
 prec    :: { Located (SourceText,Int) }
         : {- empty -}           { noLoc (NoSourceText,9) }
         | INTEGER
-                 {% checkPrecP (sL1 $1 (getINTEGERs $1,fromInteger (il_value (getINTEGER $1)))) }
+                 { sL1 $1 (getINTEGERs $1,fromInteger (il_value (getINTEGER $1))) }
 
 infix   :: { Located FixityDirection }
         : 'infix'                               { sL1 $1 InfixN  }
@@ -2378,7 +2378,8 @@ sigdecl :: { LHsDecl GhcPs }
                        [mu AnnDcolon $4] } }
 
         | infix prec ops
-              {% ams (sLL $1 $> $ SigD noExt
+              {% checkPrecP $2 $3 >>
+                 ams (sLL $1 $> $ SigD noExt
                         (FixSig noExt (FixitySig noExt (fromOL $ unLoc $3)
                                 (Fixity (fst $ unLoc $2) (snd $ unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
@@ -3243,6 +3244,7 @@ op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
         | '->'                  { sL1 $1 $ getRdrName funTyCon }
+        | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 varop   :: { Located RdrName }
         : varsym                { $1 }

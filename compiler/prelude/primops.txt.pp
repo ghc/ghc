@@ -169,7 +169,7 @@ primtype (->) a b
    Note that {\tt a -> b} permits levity-polymorphism in both {\tt a} and
    {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
   }
-  with fixity = infixr 0
+  with fixity = infixr -1
          -- This fixity is only the one picked up by Haddock. If you
          -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
 

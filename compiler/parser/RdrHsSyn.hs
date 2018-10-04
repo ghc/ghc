@@ -87,7 +87,7 @@ import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
-import Type             ( TyThing(..) )
+import Type             ( TyThing(..), funTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
@@ -1756,11 +1756,19 @@ cmdStmtFail loc e = parseErrorSDoc loc
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities
 
-checkPrecP :: Located (SourceText,Int) -> P (Located (SourceText,Int))
-checkPrecP (L l (src,i))
- | 0 <= i && i <= maxPrecedence = return (L l (src,i))
- | otherwise
-    = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
+-- | Check if a fixity is valid. We support bypassing the usual bound checks
+-- for some special operators.
+checkPrecP
+        :: Located (SourceText,Int)             -- ^ precedence
+        -> Located (OrdList (Located RdrName))  -- ^ operators
+        -> P ()
+checkPrecP (L l (_,i)) (L _ ol)
+ | 0 <= i, i <= maxPrecedence = pure ()
+ | all specialOp ol = pure ()
+ | otherwise = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
+  where
+    specialOp op = unLoc op `elem` [ eqTyCon_RDR
+                                   , getRdrName funTyCon ]
 
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs

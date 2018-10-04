@@ -244,6 +244,7 @@ gen_hs_source (Info defaults entries) =
         ++ "{-# LANGUAGE MultiParamTypeClasses #-}\n"
         ++ "{-# LANGUAGE NoImplicitPrelude #-}\n"
         ++ "{-# LANGUAGE UnboxedTuples #-}\n"
+        ++ "{-# LANGUAGE NegativeLiterals #-}\n"
 
         ++ "{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}\n"
                 -- We generate a binding for coerce, like
