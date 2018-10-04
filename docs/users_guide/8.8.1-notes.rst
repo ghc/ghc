@@ -104,6 +104,10 @@ Template Haskell
   eventlog events similar to ``traceBinaryEvent#`` but allows the user to pass
   the event payload as a binary blob instead of a ``String``.
 
+- The ``StableName#`` type parameter now has a phantom role instead of
+  a representational one. There is really no reason to care about the
+  type of the underlying object.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -113,6 +117,10 @@ Template Haskell
 
 - Support the characters from recent versions of Unicode (up to v. 12) in literals
     (see :ghc-ticket:`5518`).
+
+- The ``StableName`` type parameter now has a phantom role instead of
+  a representational one. There is really no reason to care about the
+  type of the underlying object.
 
 Build system
 ~~~~~~~~~~~~

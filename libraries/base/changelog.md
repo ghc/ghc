@@ -6,6 +6,10 @@
   * Support the characters from recent versions of Unicode (up to v. 12) in
     literals (#5518).
 
+  * The `StableName` type parameter now has a phantom role instead of
+    a representational one. There is really no reason to care about the
+    type of the underlying object.
+
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 
