@@ -15,7 +15,7 @@ module Type (
 
         -- $representation_types
         TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
-        Var, TyVar, isTyVar, TyCoVar, TyBinder, TyVarBinder, Rig(..),
+        Var, TyVar, isTyVar, TyCoVar, TyBinder, TyVarBinder, Rig, Weighted,
 
         -- ** Constructing and deconstructing types
         mkTyVarTy, mkTyVarTys, getTyVar, getTyVar_maybe, repGetTyVar_maybe,
@@ -208,9 +208,7 @@ module Type (
         tidyTyVarOcc,
         tidyTopType,
         tidyKind,
-        tidyTyVarBinder, tidyTyVarBinders,
-
-        rigToType, typeToRig, flattenRig
+        tidyTyVarBinder, tidyTyVarBinders
     ) where
 
 #include "HsVersions.h"
@@ -544,7 +542,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
-    go_rig (RigTy t) = typeToRig <$> go t
+    go_rig (RigThing t) = toMult <$> go t
     go_rig t = pure t
 
     (mktyconapp, mkappty, mkcastty)
@@ -718,34 +716,13 @@ splitAppTy_maybe ty | Just ty' <- coreView ty
                     = splitAppTy_maybe ty'
 splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
-rigToType :: HasCallStack => Rig -> Type
-rigToType r =
-  case r of
-    One ->  oneDataConTy
-    Omega -> omegaDataConTy
-    RigTy ty -> ty
-    r -> pprPanic "rigToType" (ppr r $$ callStackDoc )
-
-typeToRig :: Type -> Rig
-typeToRig ty = flattenRig (RigTy ty)
-
--- | Change occurence of types to their constructors
-flattenRig :: Rig -> Rig
-flattenRig (RigTy r)
-  | oneDataConTy `eqType` r = One
-  | omegaDataConTy `eqType` r = Omega
-  | otherwise = RigTy r
-flattenRig (RigMul m1 m2) = flattenRig m1 * flattenRig m2
-flattenRig r = r
-
-
 
 -------------
 repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy w ty1 ty2)
-  = Just (TyConApp funTyCon [rigToType w, rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [fromMult w, rep1, rep2, ty1], ty2)
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -770,7 +747,7 @@ tcRepSplitAppTy_maybe (FunTy w ty1 ty2)
   | isConstraintKind (typeKind ty1)
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
   | otherwise
-  = Just (TyConApp funTyCon [rigToType w, rep1, rep2, ty1], ty2)
+  = Just (TyConApp funTyCon [fromMult w, rep1, rep2, ty1], ty2)
   where
     rep1 = getRuntimeRep ty1
     rep2 = getRuntimeRep ty2
@@ -801,7 +778,7 @@ tcRepSplitTyConApp_maybe (TyConApp tc tys)
   = Just (tc, tys)
 
 tcRepSplitTyConApp_maybe (FunTy w arg res)
-  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [fromMult w, arg_rep, res_rep, arg, res])
   where
     arg_rep = getRuntimeRep arg
     res_rep = getRuntimeRep res
@@ -835,7 +812,7 @@ splitAppTys ty = split ty ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _   (FunTy w ty1 ty2) args
       = ASSERT( null args )
-        (TyConApp funTyCon [], [rigToType w, rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], [fromMult w, rep1, rep2, ty1, ty2])
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -855,7 +832,7 @@ repSplitAppTys ty = split ty []
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split (FunTy w ty1 ty2) args
       = ASSERT( null args )
-        (TyConApp funTyCon [], [rigToType w, rep1, rep2, ty1, ty2])
+        (TyConApp funTyCon [], [fromMult w, rep1, rep2, ty1, ty2])
       where
         rep1 = getRuntimeRep ty1
         rep2 = getRuntimeRep ty2
@@ -1114,7 +1091,7 @@ mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
   | isFunTyCon tycon
   , [w, _rep1,_rep2,ty1,ty2] <- tys
-  = FunTy (typeToRig w) ty1 ty2
+  = FunTy (toMult w) ty1 ty2
 
   | otherwise
   = TyConApp tycon tys
@@ -1148,7 +1125,7 @@ tyConAppArgs_maybe (TyConApp _ tys) = Just tys
 tyConAppArgs_maybe (FunTy w arg res)
   | Just rep1 <- getRuntimeRep_maybe arg
   , Just rep2 <- getRuntimeRep_maybe res
-  = Just [rigToType w, rep1, rep2, arg, res]
+  = Just [fromMult w, rep1, rep2, arg, res]
 tyConAppArgs_maybe _  = Nothing
 
 tyConAppArgs :: Type -> [Type]
@@ -1182,7 +1159,7 @@ repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy w arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [fromMult w, arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 
 -- | Attempts to tease a list type apart and gives the type of the elements if
@@ -2338,14 +2315,14 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
 
     go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
-    go_rig env (flattenRig -> r1) (flattenRig -> r2) =
+    go_rig env r1 r2 =
       if r1 `eqRig` r2
         then TEQ
         else
           case subweightMaybe r1 r2 of
             Smaller -> TLT
             Larger  -> TGT
-            Unknown -> go env (rigToType r1) (rigToType r2)
+            Unknown -> go env (fromMult r1) (fromMult r2)
 
     gos :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
     gos _   []         []         = TEQ
@@ -2357,7 +2334,7 @@ eqRig :: Rig -> Rig -> Bool
 eqRig Zero Zero = True
 eqRig One One = True
 eqRig Omega Omega = True
-eqRig (RigTy ty) (RigTy ty') = eqType ty ty'
+eqRig (RigThing ty) (RigThing ty') = eqType ty ty'
 eqRig (RigAdd r1 r2) (RigAdd r1' r2') = eqRig r1 r1' && eqRig r2 r2'
 eqRig (RigMul r1 r2) (RigMul r1' r2') = eqRig r1 r1' && eqRig r2 r2'
 eqRig _ _ = False

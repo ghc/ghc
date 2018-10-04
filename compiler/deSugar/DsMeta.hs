@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 --
@@ -47,6 +48,7 @@ import NameSet
 import TcType
 import TyCon
 import TysWiredIn
+import Weight ( pattern Omega )
 import CoreSyn
 import MkCore
 import CoreUtils

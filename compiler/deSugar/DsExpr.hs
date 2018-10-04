@@ -376,7 +376,7 @@ ds_expr _ (ExplicitTuple _ tup_args boxity)
                     -- For every missing expression, we need
                     -- another lambda in the desugaring. This lambda is linear
                     -- since tuples are linear
-               = do { lam_var <- newSysLocalDsNoLP (RigTy (mkTyVarTy multiplicityTyVar)) ty
+               = do { lam_var <- newSysLocalDsNoLP (RigThing (mkTyVarTy multiplicityTyVar)) ty
                     ; return (lam_var : lam_vars, Var lam_var : args, True) }
              go (lam_vars, args, missing) (L _ (Present _ expr))
                     -- Expressions that are present don't generate

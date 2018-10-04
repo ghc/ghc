@@ -401,7 +401,7 @@
            [(TyConApp
              ({abstract:TyCon})
              [])])
-          (Omega))
+          (Omega_))
          ({ DumpTypecheckedAst.hs:11:1-23 }
           [({ DumpTypecheckedAst.hs:11:1-23 }
             (Match

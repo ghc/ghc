@@ -1082,7 +1082,7 @@ lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
 
 -- | Implements the case rules for linearity
 checkCaseLinearity :: UsageEnv -> Var ->  Rig -> Var -> LintM UsageEnv
-checkCaseLinearity ue scrut (flattenRig -> var_w) bndr = do
+checkCaseLinearity ue scrut var_w bndr = do
   ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
   return $ deleteUE bndr ue
@@ -1097,9 +1097,9 @@ checkCaseLinearity ue scrut (flattenRig -> var_w) bndr = do
     lhs_formula = ppr bndr_usage <+> text "+"
                                  <+> parens (ppr scrut_usage <+> text "*" <+> ppr var_w)
     rhs_formula = ppr scrut_w <+> text "*" <+> ppr var_w
-    scrut_w = flattenRig $ varWeight scrut
-    scrut_usage = flattenRig $ lookupUE ue scrut
-    bndr_usage = flattenRig $ lookupUE ue bndr
+    scrut_w = varWeight scrut
+    scrut_usage = lookupUE ue scrut
+    bndr_usage = lookupUE ue bndr
 
 
 
@@ -1767,7 +1767,7 @@ lintCoercion co@(FunCo r w co1 co2)
        -- TODO: MattP, this check needs to be reenabled. The problem lies
        -- somewhere in 30e7ecb805c2eb2d53b6cf02308a382e492cc64c
        --; lintRole w Nominal r3
-       ; return (k, k', mkFunTy (typeToRig s3) s1 s2, mkFunTy (typeToRig t3) t1 t2, r) }
+       ; return (k, k', mkFunTy (toMult s3) s1 s2, mkFunTy (toMult t3) t1 t2, r) }
 
 lintCoercion (CoVarCo cv)
   | not (isCoVar cv)
@@ -2333,8 +2333,8 @@ ensureEqWeights actual_usage described_usage err_msg =
     case (actual_usage `subweightMaybe` described_usage) of
       Smaller -> return ()
       Larger -> addErrL err_msg
-      Unknown -> ensureEqTys (rigToType actual_usage)
-                             (rigToType described_usage) err_msg
+      Unknown -> ensureEqTys (fromMult actual_usage)
+                             (fromMult described_usage) err_msg
 
 lintRole :: Outputable thing
           => thing     -- where the role appeared

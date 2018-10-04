@@ -942,7 +942,7 @@ exactTyCoVarsOfType ty
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
 
-    go_rig (RigTy ty)       = go ty
+    go_rig (RigThing ty)       = go ty
     go_rig (RigAdd m1 m2)   = go_rig m1 `unionVarSet` go_rig m2
     go_rig (RigMul m1 m2)   = go_rig m1 `unionVarSet` go_rig m2
     go_rig _                = emptyVarSet
@@ -1002,7 +1002,7 @@ anyRewritableTyVar ignore_cos role pred ty
     go rl bvs (CastTy ty co)    = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
 
-    go_rig rl bvs (RigTy ty) = go rl bvs ty
+    go_rig rl bvs (RigThing ty) = go rl bvs ty
     go_rig rl bvs (RigAdd m1 m2) = go_rig rl bvs m1 || go_rig rl bvs m2
     go_rig rl bvs (RigMul m1 m2) = go_rig rl bvs m1 || go_rig rl bvs m2
     go_rig _ _ _ = False
@@ -1172,7 +1172,7 @@ split_dvs bound dvs ty
       where
         DV { dv_kvs = kvs, dv_tvs = tvs } = split_dvs (bound `extendVarSet` tv) dv ty
 
-    go_rig dv (RigTy ty) =  go dv ty
+    go_rig dv (RigThing ty) =  go dv ty
     go_rig dv (RigAdd m1 m2) = go_rig dv m1 `mappend` go_rig dv m2
     go_rig dv (RigMul m1 m2) = go_rig dv m1 `mappend` go_rig dv m2
     go_rig dv _              = dv
@@ -1627,7 +1627,7 @@ tcRepSplitTyConApp_maybe' (TyConApp tc tys)          = Just (tc, tys)
 tcRepSplitTyConApp_maybe' (FunTy w arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon, [rigToType w, arg_rep, res_rep, arg, res])
+  = Just (funTyCon, [fromMult w, arg_rep, res_rep, arg, res])
 tcRepSplitTyConApp_maybe' _                          = Nothing
 
 

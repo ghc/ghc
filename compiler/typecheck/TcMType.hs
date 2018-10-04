@@ -9,7 +9,7 @@ This module contains monadic operations over types that contain
 mutable type variables
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
+{-# LANGUAGE CPP, TupleSections, MultiWayIf, PatternSynonyms #-}
 
 module TcMType (
   TcTyVar, TcKind, TcType, TcTauType, TcThetaType, TcTyVarSet,
@@ -101,6 +101,7 @@ import GhcPrelude
 import TyCoRep
 import TcType
 import Type
+import Weight ( pattern Omega )
 import Kind
 import Coercion
 import Class

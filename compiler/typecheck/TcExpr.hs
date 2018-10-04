@@ -523,7 +523,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                  -- relevant.
                  -- MattP: I made this polymorphic on 26-06-2018
                  =  mkForAllTys [w_tvb] $
-                    mkFunTys [ mkWeighted (RigTy w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                    mkFunTys [ mkWeighted (RigThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")

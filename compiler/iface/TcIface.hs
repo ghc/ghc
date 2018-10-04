@@ -1286,7 +1286,7 @@ tcIfaceType = go
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
 tcIfaceRig :: IfaceType -> IfL Rig
-tcIfaceRig if_ty = typeToRig <$> tcIfaceType if_ty
+tcIfaceRig if_ty = toMult <$> tcIfaceType if_ty
 
 tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceTcArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args

@@ -611,7 +611,7 @@ tc_weight mode r = case r of
                           case ty' of
                             t | isOneMultiplicity t -> return One
                             t | isOmegaMultiplicity t -> return Omega
-                            t -> return $ RigTy t
+                            t -> return $ RigThing t
                          _ -> panic "tc_weight: polymorphism"
 
 

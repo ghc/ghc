@@ -31,7 +31,7 @@ import TcUnify
 import TcHsType
 import TcMType
 import Type     ( getClassPredTys_maybe, piResultTys )
-import Weight   ( unrestricted )
+import Weight
 import TcType
 import TcRnMonad
 import DriverPhases (HscSource(..))

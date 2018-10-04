@@ -48,7 +48,7 @@ The previous patch, to fix polymorphic floatout demand signatures, is
 essential to make this work well!
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, PatternSynonyms #-}
 module SAT ( doStaticArgs ) where
 
 import GhcPrelude
@@ -56,6 +56,7 @@ import GhcPrelude
 import Var
 import CoreSyn
 import CoreUtils
+import Weight ( pattern Omega )
 import Type
 import Coercion
 import Id

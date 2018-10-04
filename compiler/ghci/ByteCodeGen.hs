@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, MagicHash, RecordWildCards, BangPatterns #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, PatternSynonyms #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -34,6 +34,7 @@ import PprCore
 import Literal
 import PrimOp
 import CoreFVs
+import Weight ( pattern Omega )
 import Type
 import RepType
 import Kind            ( isLiftedTypeKind )

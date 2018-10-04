@@ -17,6 +17,7 @@ which deal with the instantiated versions are located elsewhere:
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module HsUtils(
   -- Terms
@@ -104,6 +105,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
+import Weight ( pattern Zero, pattern One, pattern Omega )
 import Type   ( filterOutInvisibleTypes )
 import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType

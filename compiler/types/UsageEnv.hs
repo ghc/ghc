@@ -6,10 +6,12 @@ import Weight
 import NameEnv
 import Outputable
 import Name
-import Type (flattenRig)
+import TyCoRep ( Rig, Weighted )
 
 import Control.Monad
 import Data.Maybe
+
+-- TODO: arnaud: try and make this non-recursive with the rest
 
 --
 -- * Usage environments
@@ -108,10 +110,12 @@ instance Outputable IsSubweight where
   ppr = text . show
 
 
+-- TODO: arnaud: this should move to Weight.
+
 -- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
-subweightMaybe :: Rig -> Rig -> IsSubweight
-subweightMaybe (flattenRig -> r1) (flattenRig -> r2) = go r1 r2
+subweightMaybe :: GMult t -> GMult t -> IsSubweight
+subweightMaybe r1 r2 = go r1 r2
   where
     go _     Omega = Smaller
     go Zero  Zero  = Smaller
@@ -125,5 +129,5 @@ subweightMaybe (flattenRig -> r1) (flattenRig -> r2) = go r1 r2
     go One   One   = Smaller
     -- The 1 <= p rule
     go One   _     = Smaller
---    go (RigTy t) (RigTy t') = Unknown
+--    go (RigThing t) (RigThing t') = Unknown
     go _     _     = Unknown

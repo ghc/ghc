@@ -35,7 +35,7 @@ import Unique
 import Util
 import Name
 import BasicTypes
-import TyCoRep (Type, ThetaType)
+import TyCoRep (Type, ThetaType, Weighted)
 import Var
 import Type (mkTyConApp)
 import Weight

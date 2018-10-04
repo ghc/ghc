@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module Exitify ( exitifyProgram ) where
 
 {-
@@ -48,6 +50,7 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
+import Weight ( pattern Omega )
 import Util( mapSnd )
 
 import Data.Bifunctor
