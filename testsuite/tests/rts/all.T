@@ -428,6 +428,7 @@ test('alloccounter1', normal, compile_and_run,
 
 test('nursery-chunks1',
   [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
+  , req_smp
   , only_ways(['threaded1','threaded2'])
   ],
   compile_and_run,
