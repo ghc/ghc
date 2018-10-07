@@ -12,7 +12,6 @@ Contents:
 
    license
    intro
-   8.4.2-notes
    8.6.1-notes
    ghci
    runghc
