@@ -1596,127 +1596,38 @@ Example: The tyCoVars of this ((a:* -> k) Int) is {a, k}.
 We could /not/ close over the kinds of the variable occurrences, and
 instead do so at call sites, but it seems that we always want to do
 so, so it's easiest to do it here.
+
+It turns out that getting the free variables of types is performance critical,
+so we profiled several versions, exploring different implementation strategies.
+
+1. Baseline version: uses FV naively. Essentially:
+
+   tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
+
+   This is not nice, because FV introduces some overhead to implement
+   determinism, and throught its "interesting var" function, neither of which
+   we need here, so they are a complete waste.
+
+2. UnionVarSet version: instead of reusing the FV-based code, we simply used
+   VarSets directly, trying to avoid the overhead of FV. E.g.:
+
+   -- FV version:
+   tyCoFVsOfType (AppTy fun arg)    a b c = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) a b c
+
+   -- UnionVarSet version:
+   tyCoVarsOfType (AppTy fun arg)    = (tyCoVarsOfType fun `unionVarSet` tyCoVarsOfType arg)
+
+   This looks deceptively similar, but while FV internally builds a list- and
+   set-generating function, the VarSet functions manipulate sets directly, and
+   the latter peforms a lot worse than the naive FV version.
+
+3. Accumulator-style VarSet version: this is what we use now. We do use VarSet
+   as our data structure, but delegate the actual work to a new
+   ty_co_vars_of_...  family of functions, which use accumulator style and the
+   "in-scope set" filter found in the internals of FV, but without the
+   determinism overhead.
+
 -}
-
-
-{-
------------------------------------------------------------------
---------------------- Baseline version (uses FV) ----------------
-
--- | Returns free variables of a type, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-tyCoVarsOfType :: Type -> TyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
-
--- | Returns free variables of types, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-tyCoVarsOfTypes :: [Type] -> TyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfTypes tys = fvVarSet $ tyCoFVsOfTypes tys
-
-tyCoVarsOfCo :: Coercion -> TyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfCo co = fvVarSet $ tyCoFVsOfCo co
-
-tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
-
-tyCoVarsOfProv :: UnivCoProvenance -> TyCoVarSet
-tyCoVarsOfProv prov = fvVarSet $ tyCoFVsOfProv prov
-
--- | Generates an in-scope set from the free variables in a list of types
--- and a list of coercions
-mkTyCoInScopeSet :: [Type] -> [Coercion] -> InScopeSet
-mkTyCoInScopeSet tys cos
-  = mkInScopeSet (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
-
---------------------- End of Baseline version ----------------
------------------------------------------------------------------
--}
-
-{-
------------------------------------------------------------------
---------------------- UnionVarSet version ----------------
--- | Returns free variables of types, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-tyCoVarsOfTypes :: [Type] -> TyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfTypes tys = mapUnionVarSet tyCoVarsOfType tys
-
-tyCoVarsOfType :: Type -> TyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfType (TyVarTy v)        = extendVarSet (tyCoVarsOfType (tyVarKind v)) v
-tyCoVarsOfType (TyConApp _ tys)   = tyCoVarsOfTypes tys
-tyCoVarsOfType (LitTy {})         = emptyVarSet
-tyCoVarsOfType (AppTy fun arg)    = (tyCoVarsOfType fun `unionVarSet` tyCoVarsOfType arg)
-tyCoVarsOfType (FunTy arg res)    = (tyCoVarsOfType arg `unionVarSet` tyCoVarsOfType res)
-tyCoVarsOfType (ForAllTy bndr ty) = tyCoVarSetsBndr bndr (tyCoVarsOfType ty)
-tyCoVarsOfType (CastTy ty co)     = (tyCoVarsOfType ty `unionVarSet` tyCoVarsOfCo co)
-tyCoVarsOfType (CoercionTy co)    = tyCoVarsOfCo co
-
-tyCoVarSetsBndr :: TyVarBinder -> VarSet -> VarSet
--- Free vars of (forall b. <thing with fvs>)
-tyCoVarSetsBndr (TvBndr tv _) fvs = (delVarSet fvs tv)
-                                `unionVarSet` tyCoVarsOfType (tyVarKind tv)
-
-tyCoVarsOfCo :: Coercion -> TyCoVarSet
--- See Note [Free variables of types]
-tyCoVarsOfCo (Refl _ ty)         = tyCoVarsOfType ty
-tyCoVarsOfCo (TyConAppCo _ _ cos) = tyCoVarsOfCos cos
-tyCoVarsOfCo (AppCo co arg)
-  = (tyCoVarsOfCo co `unionVarSet` tyCoVarsOfCo arg)
-tyCoVarsOfCo (ForAllCo tv kind_co co)
-  = (delVarSet (tyCoVarsOfCo co) tv `unionVarSet` tyCoVarsOfCo kind_co)
-tyCoVarsOfCo (FunCo _ co1 co2)
-  = (tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2)
-tyCoVarsOfCo (CoVarCo v)
-  = tyCoVarsOfCoVar v
-tyCoVarsOfCo (HoleCo h)
-  = tyCoVarsOfCoVar (coHoleCoVar h)
-    -- See Note [CoercionHoles and coercion free variables]
-tyCoVarsOfCo (AxiomInstCo _ _ cos) = tyCoVarsOfCos cos
-tyCoVarsOfCo (UnivCo p _ t1 t2)
-  = (tyCoVarsOfProv p `unionVarSet` tyCoVarsOfType t1
-                     `unionVarSet` tyCoVarsOfType t2)
-tyCoVarsOfCo (SymCo co)          = tyCoVarsOfCo co
-tyCoVarsOfCo (TransCo co1 co2)   = (tyCoVarsOfCo co1 `unionVarSet` tyCoVarsOfCo co2)
-tyCoVarsOfCo (NthCo _ _ co)      = tyCoVarsOfCo co
-tyCoVarsOfCo (LRCo _ co)         = tyCoVarsOfCo co
-tyCoVarsOfCo (InstCo co arg)     = (tyCoVarsOfCo co `unionVarSet` tyCoVarsOfCo arg)
-tyCoVarsOfCo (CoherenceCo c1 c2) = (tyCoVarsOfCo c1 `unionVarSet` tyCoVarsOfCo c2)
-tyCoVarsOfCo (KindCo co)         = tyCoVarsOfCo co
-tyCoVarsOfCo (SubCo co)          = tyCoVarsOfCo co
-tyCoVarsOfCo (AxiomRuleCo _ cs)  = tyCoVarsOfCos cs
-
-tyCoVarsOfCoVar :: CoVar -> VarSet
-tyCoVarsOfCoVar v = (unitVarSet v `unionVarSet` tyCoVarsOfType (varType v))
-
-tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
--- tyCoVarsOfCos cos = fvVarSet $ tyCoFVsOfCos cos
-tyCoVarsOfCos cos = mapUnionVarSet tyCoVarsOfCo cos
-
-tyCoVarsOfProv :: UnivCoProvenance -> TyCoVarSet
-tyCoVarsOfProv prov = fvVarSet $ tyCoFVsOfProv pro
-tyCoVarsOfProv (PhantomProv co)    = tyTyCoVarsOfCo co
-tyCoVarsOfProv (ProofIrrelProv co) = tyTyCoVarsOfCo co
-tyCoVarsOfProv UnsafeCoerceProv    = acc
-tyCoVarsOfProv (PluginProv _)      = acc
-
--- | Generates an in-scope set from the free variables in a list of types
--- and a list of coercions
-mkTyCoInScopeSet :: [Type] -> [Coercion] -> InScopeSet
-mkTyCoInScopeSet tys cos
-  = mkInScopeSet (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
---------------------- End of UnionVarSet version ----------------
------------------------------------------------------------------
--}
-
------------------------------------------------------------------
---------------------- Accumulator version  ----------------
 
 tyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
@@ -1955,42 +1866,8 @@ coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
 coVarsOfTypes :: [Type] -> TyCoVarSet
 coVarsOfTypes tys = getCoVarSet (tyCoFVsOfTypes tys)
 
--- coVarsOfMCo :: MCoercion -> CoVarSet
--- coVarsOfMCo MRefl    = emptyVarSet
--- coVarsOfMCo (MCo co) = coVarsOfCo co
-
 coVarsOfCo :: Coercion -> CoVarSet
 coVarsOfCo co = getCoVarSet (tyCoFVsOfCo co)
--- -- Extract *coercion* variables only.  Tiresome to repeat the code, but easy.
--- coVarsOfCo (Refl ty)             = coVarsOfType ty
--- coVarsOfCo (GRefl _ ty co)       = coVarsOfType ty `unionVarSet` coVarsOfMCo co
--- coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
--- coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
--- coVarsOfCo (ForAllCo tv kind_co co)
---   = coVarsOfCo co `delVarSet` tv `unionVarSet` coVarsOfCo kind_co
--- coVarsOfCo (FunCo _ co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
--- coVarsOfCo (CoVarCo v)          = coVarsOfCoVar v
--- coVarsOfCo (HoleCo h)           = coVarsOfCoVar (coHoleCoVar h)
---                                   -- See Note [CoercionHoles and coercion free variables]
--- coVarsOfCo (AxiomInstCo _ _ as) = coVarsOfCos as
--- coVarsOfCo (UnivCo p _ t1 t2)   = coVarsOfProv p `unionVarSet` coVarsOfTypes [t1, t2]
--- coVarsOfCo (SymCo co)           = coVarsOfCo co
--- coVarsOfCo (TransCo co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
--- coVarsOfCo (NthCo _ _ co)       = coVarsOfCo co
--- coVarsOfCo (LRCo _ co)          = coVarsOfCo co
--- coVarsOfCo (InstCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
--- coVarsOfCo (KindCo co)          = coVarsOfCo co
--- coVarsOfCo (SubCo co)           = coVarsOfCo co
--- coVarsOfCo (AxiomRuleCo _ cs)   = coVarsOfCos cs
-
--- coVarsOfCoVar :: CoVar -> CoVarSet
--- coVarsOfCoVar v = unitVarSet v `unionVarSet` coVarsOfType (varType v)
---
--- coVarsOfProv :: UnivCoProvenance -> CoVarSet
--- coVarsOfProv UnsafeCoerceProv    = emptyVarSet
--- coVarsOfProv (PhantomProv co)    = coVarsOfCo co
--- coVarsOfProv (ProofIrrelProv co) = coVarsOfCo co
--- coVarsOfProv (PluginProv _)      = emptyVarSet
 
 coVarsOfCos :: [Coercion] -> CoVarSet
 coVarsOfCos cos = getCoVarSet (tyCoFVsOfCos cos)
