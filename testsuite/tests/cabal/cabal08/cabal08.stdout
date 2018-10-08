@@ -1,5 +1,3 @@
-ignoring (possibly broken) abi-depends field for packages
-ignoring (possibly broken) abi-depends field for packages
 [1 of 1] Compiling Main             ( Main.hs, Main.o )
 Linking Main ...
 p2

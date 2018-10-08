@@ -1,4 +1,3 @@
-ignoring (possibly broken) abi-depends field for packages
 databases 1 and 2:
 localshadow1.package.conf
     (shadow-1)

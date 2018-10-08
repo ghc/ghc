@@ -1219,7 +1219,7 @@ updateDBCache verbosity db = do
 
   -- warn when we find any (possibly-)bogus abi-depends fields;
   -- Note [Recompute abi-depends]
-  when (any hasAnyAbiDepends pkgsCabalFormat) $
+  when (any hasAnyAbiDepends pkgsCabalFormat && verbosity > Normal) $
       infoLn "ignoring (possibly broken) abi-depends field for packages"
 
   when (verbosity > Normal) $
