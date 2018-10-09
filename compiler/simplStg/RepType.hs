@@ -228,9 +228,6 @@ layoutUbxSum sum_slots0 arg_slots0 =
 --   - Float slots: Shared between floating point types.
 --
 --   - Void slots: Shared between void types. Not used in sums.
---
--- TODO(michalt): We should probably introduce `SlotTy`s for 8-/16-/32-bit
--- values, so that we can pack things more tightly.
 data SlotTy = PtrSlot | WordSlot | Word64Slot | FloatSlot | DoubleSlot
   deriving (Eq, Ord)
     -- Constructor order is important! If slot A could fit into slot B
@@ -258,10 +255,8 @@ primRepSlot VoidRep     = pprPanic "primRepSlot" (text "No slot for VoidRep")
 primRepSlot LiftedRep   = PtrSlot
 primRepSlot UnliftedRep = PtrSlot
 primRepSlot IntRep      = WordSlot
-primRepSlot Int8Rep     = WordSlot
-primRepSlot Int64Rep    = Word64Slot
 primRepSlot WordRep     = WordSlot
-primRepSlot Word8Rep    = WordSlot
+primRepSlot Int64Rep    = Word64Slot
 primRepSlot Word64Rep   = Word64Slot
 primRepSlot AddrRep     = WordSlot
 primRepSlot FloatRep    = FloatSlot

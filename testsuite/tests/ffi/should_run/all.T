@@ -188,7 +188,3 @@ test('ffi023', [ omit_ways(['ghci']),
 test('T12134', [omit_ways(['ghci'])], compile_and_run, ['T12134_c.c'])
 
 test('T12614', [omit_ways(['ghci'])], compile_and_run, ['T12614_c.c'])
-
-test('PrimFFIInt8', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIInt8_c.c'])
-
-test('PrimFFIWord8', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord8_c.c'])

@@ -107,14 +107,6 @@ data MachOp
   | MO_FS_Conv Width Width      -- Float -> Signed int
   | MO_SS_Conv Width Width      -- Signed int -> Signed int
   | MO_UU_Conv Width Width      -- unsigned int -> unsigned int
-  | MO_XX_Conv Width Width      -- int -> int; puts no requirements on the
-                                -- contents of upper bits when extending;
-                                -- narrowing is simply truncation; the only
-                                -- expectation is that we can recover the
-                                -- original value by applying the opposite
-                                -- MO_XX_Conv, e.g.,
-                                --   MO_XX_CONV W64 W8 (MO_XX_CONV W8 W64 x)
-                                -- is equivalent to just x.
   | MO_FF_Conv Width Width      -- Float -> Float
 
   -- Vector element insertion and extraction operations
@@ -400,7 +392,6 @@ machOpResultType dflags mop tys =
 
     MO_SS_Conv _ to     -> cmmBits to
     MO_UU_Conv _ to     -> cmmBits to
-    MO_XX_Conv _ to     -> cmmBits to
     MO_FS_Conv _ to     -> cmmBits to
     MO_SF_Conv _ to     -> cmmFloat to
     MO_FF_Conv _ to     -> cmmFloat to
@@ -492,7 +483,6 @@ machOpArgReps dflags op =
 
     MO_SS_Conv from _   -> [from]
     MO_UU_Conv from _   -> [from]
-    MO_XX_Conv from _   -> [from]
     MO_SF_Conv from _   -> [from]
     MO_FS_Conv from _   -> [from]
     MO_FF_Conv from _   -> [from]

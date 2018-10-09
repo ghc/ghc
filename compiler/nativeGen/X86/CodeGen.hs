@@ -644,27 +644,20 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       -- Nop conversions
       MO_UU_Conv W32 W8  -> toI8Reg  W32 x
       MO_SS_Conv W32 W8  -> toI8Reg  W32 x
-      MO_XX_Conv W32 W8  -> toI8Reg  W32 x
       MO_UU_Conv W16 W8  -> toI8Reg  W16 x
       MO_SS_Conv W16 W8  -> toI8Reg  W16 x
-      MO_XX_Conv W16 W8  -> toI8Reg  W16 x
       MO_UU_Conv W32 W16 -> toI16Reg W32 x
       MO_SS_Conv W32 W16 -> toI16Reg W32 x
-      MO_XX_Conv W32 W16 -> toI16Reg W32 x
 
       MO_UU_Conv W64 W32 | not is32Bit -> conversionNop II64 x
       MO_SS_Conv W64 W32 | not is32Bit -> conversionNop II64 x
-      MO_XX_Conv W64 W32 | not is32Bit -> conversionNop II64 x
       MO_UU_Conv W64 W16 | not is32Bit -> toI16Reg W64 x
       MO_SS_Conv W64 W16 | not is32Bit -> toI16Reg W64 x
-      MO_XX_Conv W64 W16 | not is32Bit -> toI16Reg W64 x
       MO_UU_Conv W64 W8  | not is32Bit -> toI8Reg  W64 x
       MO_SS_Conv W64 W8  | not is32Bit -> toI8Reg  W64 x
-      MO_XX_Conv W64 W8  | not is32Bit -> toI8Reg  W64 x
 
       MO_UU_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intFormat rep1) x
       MO_SS_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intFormat rep1) x
-      MO_XX_Conv rep1 rep2 | rep1 == rep2 -> conversionNop (intFormat rep1) x
 
       -- widenings
       MO_UU_Conv W8  W32 -> integerExtend W8  W32 MOVZxL x
@@ -675,26 +668,16 @@ getRegister' dflags is32Bit (CmmMachOp mop [x]) = do -- unary MachOps
       MO_SS_Conv W16 W32 -> integerExtend W16 W32 MOVSxL x
       MO_SS_Conv W8  W16 -> integerExtend W8  W16 MOVSxL x
 
-      -- We don't care about the upper bits for MO_XX_Conv, so MOV is enough.
-      MO_XX_Conv W8  W32 -> integerExtend W8  W32 MOV x
-      MO_XX_Conv W16 W32 -> integerExtend W16 W32 MOV x
-      MO_XX_Conv W8  W16 -> integerExtend W8  W16 MOV x
-
       MO_UU_Conv W8  W64 | not is32Bit -> integerExtend W8  W64 MOVZxL x
       MO_UU_Conv W16 W64 | not is32Bit -> integerExtend W16 W64 MOVZxL x
       MO_UU_Conv W32 W64 | not is32Bit -> integerExtend W32 W64 MOVZxL x
       MO_SS_Conv W8  W64 | not is32Bit -> integerExtend W8  W64 MOVSxL x
       MO_SS_Conv W16 W64 | not is32Bit -> integerExtend W16 W64 MOVSxL x
       MO_SS_Conv W32 W64 | not is32Bit -> integerExtend W32 W64 MOVSxL x
-      -- For 32-to-64 bit zero extension, amd64 uses an ordinary movl.
-      -- However, we don't want the register allocator to throw it
-      -- away as an unnecessary reg-to-reg move, so we keep it in
-      -- the form of a movzl and print it as a movl later.
-      -- This doesn't apply to MO_XX_Conv since in this case we don't care about
-      -- the upper bits. So we can just use MOV.
-      MO_XX_Conv W8  W64 | not is32Bit -> integerExtend W8  W64 MOV x
-      MO_XX_Conv W16 W64 | not is32Bit -> integerExtend W16 W64 MOV x
-      MO_XX_Conv W32 W64 | not is32Bit -> integerExtend W32 W64 MOV x
+        -- for 32-to-64 bit zero extension, amd64 uses an ordinary movl.
+        -- However, we don't want the register allocator to throw it
+        -- away as an unnecessary reg-to-reg move, so we keep it in
+        -- the form of a movzl and print it as a movl later.
 
       MO_FF_Conv W32 W64
         | sse2      -> coerceFP2FP W64 x
@@ -804,7 +787,6 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
 
       MO_S_MulMayOflo rep -> imulMayOflo rep x y
 
-      MO_Mul W8  -> imulW8 x y
       MO_Mul rep -> triv_op rep IMUL
       MO_And rep -> triv_op rep AND
       MO_Or  rep -> triv_op rep OR
@@ -839,21 +821,6 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
     --------------------
     triv_op width instr = trivialCode width op (Just op) x y
                         where op   = instr (intFormat width)
-
-    -- Special case for IMUL for bytes, since the result of IMULB will be in
-    -- %ax, the split to %dx/%edx/%rdx and %ax/%eax/%rax happens only for wider
-    -- values.
-    imulW8 :: CmmExpr -> CmmExpr -> NatM Register
-    imulW8 arg_a arg_b = do
-        (a_reg, a_code) <- getNonClobberedReg arg_a
-        b_code <- getAnyReg arg_b
-
-        let code = a_code `appOL` b_code eax `appOL`
-                   toOL [ IMUL2 format (OpReg a_reg) ]
-            format = intFormat W8
-
-        return (Fixed format eax code)
-
 
     imulMayOflo :: Width -> CmmExpr -> CmmExpr -> NatM Register
     imulMayOflo rep a b = do
@@ -949,18 +916,6 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
         return (Any format code)
 
     ----------------------
-
-    -- See Note [DIV/IDIV for bytes]
-    div_code W8 signed quotient x y = do
-        let widen | signed    = MO_SS_Conv W8 W16
-                  | otherwise = MO_UU_Conv W8 W16
-        div_code
-            W16
-            signed
-            quotient
-            (CmmMachOp widen [x])
-            (CmmMachOp widen [y])
-
     div_code width signed quotient x y = do
            (y_op, y_code) <- getRegOrMem y -- cannot be clobbered
            x_code <- getAnyReg x
@@ -2322,18 +2277,6 @@ genCCall _ is32Bit target dest_regs args = do
             = divOp platform signed width results (Just arg_x_high) arg_x_low arg_y
         divOp2 _ _ _ _ _
             = panic "genCCall: Wrong number of arguments for divOp2"
-
-        -- See Note [DIV/IDIV for bytes]
-        divOp platform signed W8 [res_q, res_r] m_arg_x_high arg_x_low arg_y =
-            let widen | signed = MO_SS_Conv W8 W16
-                      | otherwise = MO_UU_Conv W8 W16
-                arg_x_low_16 = CmmMachOp widen [arg_x_low]
-                arg_y_16 = CmmMachOp widen [arg_y]
-                m_arg_x_high_16 = (\p -> CmmMachOp widen [p]) <$> m_arg_x_high
-            in divOp
-                  platform signed W16 [res_q, res_r]
-                  m_arg_x_high_16 arg_x_low_16 arg_y_16
-
         divOp platform signed width [res_q, res_r]
               m_arg_x_high arg_x_low arg_y
             = do let format = intFormat width
@@ -2374,22 +2317,6 @@ genCCall _ is32Bit target dest_regs args = do
                  return code
         addSubIntC _ _ _ _ _ _ _ _
             = panic "genCCall: Wrong number of arguments/results for addSubIntC"
-
--- Note [DIV/IDIV for bytes]
---
--- IDIV reminder:
---   Size    Dividend   Divisor   Quotient    Remainder
---   byte    %ax         r/m8      %al          %ah
---   word    %dx:%ax     r/m16     %ax          %dx
---   dword   %edx:%eax   r/m32     %eax         %edx
---   qword   %rdx:%rax   r/m64     %rax         %rdx
---
--- We do a special case for the byte division because the current
--- codegen doesn't deal well with accessing %ah register (also,
--- accessing %ah in 64-bit mode is complicated because it cannot be an
--- operand of many instructions). So we just widen operands to 16 bits
--- and get the results from %al, %dl. This is not optimal, but a few
--- register moves are probably not a huge deal when doing division.
 
 genCCall32' :: DynFlags
             -> ForeignTarget            -- function to call
@@ -2534,10 +2461,6 @@ genCCall32' dflags target dest_regs args = do
                            )
 
           | otherwise = do
-            -- Arguments can be smaller than 32-bit, but we still use @PUSH
-            -- II32@ - the usual calling conventions expect integers to be
-            -- 4-byte aligned.
-            ASSERT((typeWidth arg_ty) <= W32) return ()
             (operand, code) <- getOperand arg
             delta <- getDeltaNat
             setDeltaNat (delta-size)
@@ -2777,10 +2700,7 @@ genCCall64' dflags target dest_regs args = do
              push_args rest code'
 
            | otherwise = do
-             -- Arguments can be smaller than 64-bit, but we still use @PUSH
-             -- II64@ - the usual calling conventions expect integers to be
-             -- 8-byte aligned.
-             ASSERT(width <= W64) return ()
+             ASSERT(width == W64) return ()
              (arg_op, arg_code) <- getOperand arg
              delta <- getDeltaNat
              setDeltaNat (delta-arg_size)
