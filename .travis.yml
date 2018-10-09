@@ -3,18 +3,18 @@ matrix:
     include:
         - os: linux
           env: MODE="selftest"
-          compiler: "GHC 8.2.2"
+          compiler: "GHC 8.4.3"
           addons:
               apt:
                   packages:
-                      - ghc-8.2.2
-                      - cabal-install-2.2
+                      - ghc-8.4.3
+                      - cabal-install-2.4
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
-              - PATH="/opt/ghc/8.2.2/bin:$PATH"
-              - PATH="/opt/cabal/2.2/bin:$PATH"
+              - PATH="/opt/ghc/8.4.3/bin:$PATH"
+              - PATH="/opt/cabal/2.4/bin:$PATH"
 
           script:
               # Run internal Hadrian tests, after boot and configure.
@@ -22,18 +22,18 @@ matrix:
 
         - os: linux
           env: MODE="--flavour=quickest"
-          compiler: "GHC 8.2.2"
+          compiler: "GHC 8.4.3"
           addons:
               apt:
                   packages:
-                      - ghc-8.2.2
-                      - cabal-install-2.2
+                      - ghc-8.4.3
+                      - cabal-install-2.4
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
-              - PATH="/opt/ghc/8.2.2/bin:$PATH"
-              - PATH="/opt/cabal/2.2/bin:$PATH"
+              - PATH="/opt/ghc/8.4.3/bin:$PATH"
+              - PATH="/opt/cabal/2.4/bin:$PATH"
 
           script:
               # Build GHC, letting hadrian boot & configure the ghc source tree
@@ -41,18 +41,18 @@ matrix:
 
         - os: linux
           env: MODE="--flavour=quickest --integer-simple"
-          compiler: "GHC 8.4.1"
+          compiler: "GHC 8.6.1"
           addons:
               apt:
                   packages:
-                      - ghc-8.4.1
-                      - cabal-install-2.2
+                      - ghc-8.6.1
+                      - cabal-install-2.4
                       - zlib1g-dev
                   sources: hvr-ghc
 
           before_install:
-              - PATH="/opt/ghc/8.4.1/bin:$PATH"
-              - PATH="/opt/cabal/2.2/bin:$PATH"
+              - PATH="/opt/ghc/8.6.1/bin:$PATH"
+              - PATH="/opt/cabal/2.4/bin:$PATH"
 
           script:
               # boot, configure and build GHC
