@@ -36,7 +36,7 @@ module HscTypes (
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
-        HscSource(..), isHsBootOrSig, hscSourceString,
+        HscSource(..), isHsBootOrSig, isHsigFile, hscSourceString,
 
 
         -- * State relating to modules in this package
@@ -179,7 +179,8 @@ import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser
 import DynFlags
-import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
+import DriverPhases     ( Phase, HscSource(..), hscSourceString
+                        , isHsBootOrSig, isHsigFile )
 import BasicTypes
 import IfaceSyn
 import Maybes

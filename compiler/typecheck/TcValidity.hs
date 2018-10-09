@@ -1115,12 +1115,39 @@ checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
        ; is_boot  <- tcIsHsBootOrSig
-       ; check_valid_inst_head dflags is_boot ctxt clas cls_args }
+       ; is_sig   <- tcIsHsig
+       ; check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+       }
 
-check_valid_inst_head :: DynFlags -> Bool
+{-
+
+Note [Instances of built-in classes in signature files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+User defined instances for KnownNat, KnownSymbol and Typeable are
+disallowed -- they are generated when needed by GHC itself on-the-fly.
+
+However, if they occur in a Backpack signature file, they have an
+entirely different meaning. Suppose in M.hsig we see
+
+  signature M where
+    data T :: Nat
+    instance KnownNat T
+
+That says that any module satisfying M.hsig must provide a KnownNat
+instance for T.  We absolultely need that instance when compiling a
+module that imports M.hsig: see Trac #15379 and
+Note [Fabricating Evidence for Literals in Backpack] in ClsInst.
+
+Hence, checkValidInstHead accepts a user-written instance declaration
+in hsig files, where `is_sig` is True.
+
+-}
+
+check_valid_inst_head :: DynFlags -> Bool -> Bool
                       -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags is_boot ctxt clas cls_args
+check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
@@ -1129,14 +1156,18 @@ check_valid_inst_head dflags is_boot ctxt clas cls_args
 
   -- For Typeable, don't complain about instances for
   -- standalone deriving; they are no-ops, and we warn about
-  -- it in TcDeriv.deriveStandalone
+  -- it in TcDeriv.deriveStandalone.
   | clas_nm == typeableClassName
+  , not is_sig
+    -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
   -- Handwritten instances of KnownNat/KnownSymbol class
   -- are always forbidden (#12837)
   | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
+  , not is_sig
+    -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
