@@ -279,7 +279,6 @@ Invariants:
 
 These primops are pretty weird.
 
-        dataToTag# :: a -> Int    (arg must be an evaluated data type)
         tagToEnum# :: Int -> a    (result type must be an enumerated type)
 
 The constraints aren't currently checked by the front end, but the

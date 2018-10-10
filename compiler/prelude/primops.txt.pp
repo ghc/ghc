@@ -1070,7 +1070,7 @@ primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
    to the destination array. The source and destination arrays can
    refer to the same array. Both arrays must fully contain the
    specified ranges, but this is not checked.
-   The regions are allowed to overlap, although this is only possible when the same 
+   The regions are allowed to overlap, although this is only possible when the same
    array is provided as both the source and the destination. }
   with
   out_of_line      = True
@@ -1940,7 +1940,7 @@ primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
   {Copy a range of the first MutableArrayArray# to the specified region in the second
    MutableArrayArray#.
    Both arrays must fully contain the specified ranges, but this is not checked.
-   The regions are allowed to overlap, although this is only possible when the same 
+   The regions are allowed to overlap, although this is only possible when the same
    array is provided as both the source and the destination.
    }
   with
@@ -2915,7 +2915,7 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 
 -- Note [reallyUnsafePtrEquality#]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- 
+--
 -- reallyUnsafePtrEquality# can't actually fail, per se, but we mark it can_fail
 -- anyway. Until 5a9a1738023a, GHC considered primops okay for speculation only
 -- when their arguments were known to be forced. This was unnecessarily
@@ -2924,22 +2924,20 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- sometimes lose track of whether those arguments were forced, leading to let/app
 -- invariant failures (see Trac 13027 and the discussion in Trac 11444). Now that
 -- ok_for_speculation skips over lifted arguments, we need to explicitly prevent
--- reallyUnsafePtrEquality# from floating out. The reasons are closely related
--- to those described in Note [dataToTag#], although the consequences are less
--- severe. Imagine if we had
--- 
+-- reallyUnsafePtrEquality# from floating out. Imagine if we had
+--
 --     \x y . case x of x'
 --              DEFAULT ->
 --            case y of y'
 --              DEFAULT ->
 --               let eq = reallyUnsafePtrEquality# x' y'
 --               in ...
--- 
+--
 -- If the let floats out, we'll get
--- 
+--
 --     \x y . let eq = reallyUnsafePtrEquality# x y
 --            in case x of ...
--- 
+--
 -- The trouble is that pointer equality between thunks is very different
 -- from pointer equality between the values those thunks reduce to, and the latter
 -- is typically much more precise.
@@ -2990,31 +2988,29 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
    with
    can_fail   = True -- See Note [dataToTag#]
    strictness = { \ _arity -> mkClosedStrictSig [evalDmd] topRes }
-                -- dataToTag# must have an evaluated argument
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a
 
 -- Note [dataToTag#]
--- ~~~~~~~~~~~~~~~~~~~~
--- The dataToTag# primop should always be applied to an evaluated argument.
--- The way to ensure this is to invoke it via the 'getTag' wrapper in GHC.Base:
---    getTag :: a -> Int#
---    getTag !x = dataToTag# x
+-- ~~~~~~~~~~~~~~~~~
+-- dataToTag# evaluates its argument, so we don't want to float it out.
+-- Consider:
 --
--- But now consider
 --     \z. case x of y -> let v = dataToTag# y in ...
 --
 -- To improve floating, the FloatOut pass (deliberately) does a
 -- binder-swap on the case, to give
+--
 --     \z. case x of y -> let v = dataToTag# x in ...
 --
--- Now FloatOut might float that v-binding outside the \z.  But that is
--- bad because that might mean x gets evaluated much too early!  (CorePrep
--- adds an eval to a dataToTag# call, to ensure that the argument really is
--- evaluated; see CorePrep Note [dataToTag magic].)
+-- Now FloatOut might float that v-binding outside the \z
 --
--- Solution: make DataToTag into a can_fail primop.  That will stop it floating
+--     let v = dataToTag# x in \z. case x of y -> ...
+--
+-- But that is bad because that might mean x gets evaluated much too early!
+--
+-- Solution: make dataToTag# into a can_fail primop.  That will stop it floating
 -- (see Note [PrimOp can_fail and has_side_effects] in PrimOp).  It's a bit of
 -- a hack but never mind.
 
@@ -3126,8 +3122,8 @@ pseudoop "proxy#"
 pseudoop   "seq"
    a -> b -> b
    { The value of {\tt seq a b} is bottom if {\tt a} is bottom, and
-     otherwise equal to {\tt b}. In other words, it evaluates the first 
-     argument {\tt a} to weak head normal form (WHNF). {\tt seq} is usually 
+     otherwise equal to {\tt b}. In other words, it evaluates the first
+     argument {\tt a} to weak head normal form (WHNF). {\tt seq} is usually
      introduced to improve performance by avoiding unneeded laziness.
 
      A note on evaluation order: the expression {\tt seq a b} does

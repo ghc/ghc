@@ -1696,23 +1696,6 @@ Well, yes.  The primop accepts lifted arguments and does not
 evaluate them.  Indeed, in general primops are, well, primitive
 and do not perform evaluation.
 
-There is one primop, dataToTag#, which does /require/ a lifted
-argument to be evaluated.  To ensure this, CorePrep adds an
-eval if it can't see the argument is definitely evaluated
-(see [dataToTag magic] in CorePrep).
-
-We make no attempt to guarantee that dataToTag#'s argument is
-evaluated here.  Main reason: it's very fragile to test for the
-evaluatedness of a lifted argument.  Consider
-    case x of y -> let v = dataToTag# y in ...
-
-where x/y have type Int, say.  'y' looks evaluated (by the enclosing
-case) so all is well.  Now the FloatOut pass does a binder-swap (for
-very good reasons), changing to
-   case x of y -> let v = dataToTag# x in ...
-
-See also Note [dataToTag#] in primops.txt.pp.
-
 Bottom line:
   * in exprOkForSpeculation we simply ignore all lifted arguments.
   * except see Note [seq# and expr_ok] for an exception
