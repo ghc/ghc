@@ -1627,6 +1627,8 @@ so we profiled several versions, exploring different implementation strategies.
    "in-scope set" filter found in the internals of FV, but without the
    determinism overhead.
 
+See Trac #14880.
+
 -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
@@ -1720,9 +1722,6 @@ mkTyCoInScopeSet :: [Type] -> [Coercion] -> InScopeSet
 mkTyCoInScopeSet tys cos
   = mkInScopeSet (ty_co_vars_of_types tys emptyVarSet $
                   ty_co_vars_of_cos   cos emptyVarSet emptyVarSet)
-
---------------------- End of accumulator version  ----------------
------------------------------------------------------------------
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
@@ -1856,6 +1855,24 @@ tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCos cos) fv_cand in_scope acc
 
 ------------- Extracting the CoVars of a type or coercion -----------
+
+{-
+
+Note [CoVarsOfX and the InterestingVarFun]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The coVarsOfType, coVarsOfTypes, coVarsOfCo, and coVarsOfCos functions are
+implemented in terms of the respective FV equivalents (tyCoFVsOf...), rather
+than the VarSet-based flavors (tyCoVarsOf...), despite the performance
+considerations outlined in Note [Free variables of types].
+
+This is because FV includes the InterestingVarFun, which is useful here,
+because we can cleverly use it to restrict our calculations to CoVars - this
+is what getCoVarSet achieves.
+
+See Trac #14880.
+
+-}
 
 getCoVarSet :: FV -> CoVarSet
 getCoVarSet fv = snd (fv isCoVar emptyVarSet ([], emptyVarSet))
