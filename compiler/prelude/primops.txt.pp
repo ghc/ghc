@@ -2877,10 +2877,8 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- sometimes lose track of whether those arguments were forced, leading to let/app
 -- invariant failures (see Trac 13027 and the discussion in Trac 11444). Now that
 -- ok_for_speculation skips over lifted arguments, we need to explicitly prevent
--- reallyUnsafePtrEquality# from floating out. The reasons are closely related
--- to those described in Note [dataToTag#], although the consequences are less
--- severe. Imagine if we had
--- 
+-- reallyUnsafePtrEquality# from floating out. Imagine if we had
+--
 --     \x y . case x of x'
 --              DEFAULT ->
 --            case y of y'
@@ -2942,34 +2940,31 @@ primop  DataToTagOp "dataToTag#" GenPrimOp
    with
    can_fail   = True -- See Note [dataToTag#]
    strictness = { \ _arity -> mkClosedStrictSig [evalDmd] topRes }
-                -- dataToTag# must have an evaluated argument
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp
    Int# -> a
 
-{- Note [dataToTag#]
-~~~~~~~~~~~~~~~~~~~~
-The dataToTag# primop should always be applied to an evaluated argument.
-The way to ensure this is to invoke it via the 'getTag' wrapper in GHC.Base:
-   getTag :: a -> Int#
-   getTag !x = dataToTag# x
-
-But now consider
-    \z. case x of y -> let v = dataToTag# y in ...
-
-To improve floating, the FloatOut pass (deliberately) does a
-binder-swap on the case, to give
-    \z. case x of y -> let v = dataToTag# x in ...
-
-Now FloatOut might float that v-binding outside the \z.  But that is
-bad because that might mean x gets evaluated much too early!  (CorePrep
-adds an eval to a dataToTag# call, to ensure that the argument really is
-evaluated; see CorePrep Note [dataToTag magic].)
-
-Solution: make DataToTag into a can_fail primop.  That will stop it floating
-(see Note [PrimOp can_fail and has_side_effects] in PrimOp).  It's a bit of
-a hack but never mind.
--}
+-- Note [dataToTag#]
+-- ~~~~~~~~~~~~~~~~~
+-- dataToTag# evaluates its argument, so we don't want to float it out.
+-- Consider:
+--
+--     \z. case x of y -> let v = dataToTag# y in ...
+--
+-- To improve floating, the FloatOut pass (deliberately) does a
+-- binder-swap on the case, to give
+--
+--     \z. case x of y -> let v = dataToTag# x in ...
+--
+-- Now FloatOut might float that v-binding outside the \z
+--
+--     let v = dataToTag# x in \z. case x of y -> ...
+--
+-- But that is bad because that might mean x gets evaluated much too early!
+--
+-- Solution: make dataToTag# into a can_fail primop.  That will stop it floating
+-- (see Note [PrimOp can_fail and has_side_effects] in PrimOp).  It's a bit of
+-- a hack but never mind.
 
 ------------------------------------------------------------------------
 section "Bytecode operations"

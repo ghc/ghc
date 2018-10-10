@@ -35,9 +35,6 @@ test('T10667', [ when((arch('powerpc64') or arch('powerpc64le')),
      compile, ['-g'])
 test('T12115', normal, compile, [''])
 test('T12355', normal, compile, [''])
-test('T14626',
-     normal,
-     run_command, ['$MAKE -s --no-print-directory T14626'])
 test('T14999',
      [when((arch('powerpc64') or arch('powerpc64le')), expect_broken(11261)),
       unless(opsys('linux') and arch('x86_64') and have_gdb() and

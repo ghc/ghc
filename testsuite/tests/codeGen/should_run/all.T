@@ -172,4 +172,12 @@ test('T13825-unit',
 test('T14619', normal, compile_and_run, [''])
 test('T14754', normal, compile_and_run, [''])
 test('T14346', only_ways(['threaded1','threaded2']), compile_and_run, ['-O -threaded'])
-test('T14251', normal, compile_and_run, [''])
+test('T14251', [expect_broken_for(14251, [''])],
+     compile_and_run, [''])
+
+# These actually used to fail with all optimisation settings, but adding -O just
+# to make sure
+test('T15696_1', normal, compile_and_run, ['-O'])
+test('T15696_2', normal, compile_and_run, ['-O'])
+# This requires -O
+test('T15696_3', normal, compile_and_run, ['-O'])
