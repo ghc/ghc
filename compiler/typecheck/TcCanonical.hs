@@ -1575,7 +1575,7 @@ canEqTyVarTyVar, are these
 
 Note [Avoid unnecessary swaps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we swap without actually improving matters, we can get an infnite loop.
+If we swap without actually improving matters, we can get an infinite loop.
 Consider
     work item:  a ~ b
    inert item:  b ~ c

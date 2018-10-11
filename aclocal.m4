@@ -20,14 +20,8 @@ AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
         $2='.exe'
         $3='.dll'
         ;;
-    i386-apple-darwin|powerpc-apple-darwin)
-        $3='.dylib'
-        ;;
-    x86_64-apple-darwin)
-        $3='.dylib'
-        ;;
-    arm-apple-darwin10|i386-apple-darwin11|aarch64-apple-darwin14|x86_64-apple-darwin14)
-        $2='.a'
+    # apple platform uses .dylib (macOS, iOS, ...)
+    *-apple-*)
         $3='.dylib'
         ;;
     esac
@@ -115,6 +109,8 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
         GHC_CONVERT_OS([$target_os], [$TargetArch], [TargetOS])
     fi
 
+    GHC_LLVM_TARGET([$target_cpu],[$target_vendor],[$target_os],[LlvmTarget])
+
     GHC_SELECT_FILE_EXTENSIONS([$host], [exeext_host], [soext_host])
     GHC_SELECT_FILE_EXTENSIONS([$target], [exeext_target], [soext_target])
     windows=NO
@@ -142,9 +138,13 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
     TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
+    # we intend to pass trough --targets to llvm as is.
+    LLVMTarget_CPP=`    echo "$LlvmTarget"`
+
     echo "GHC build  : $BuildPlatform"
     echo "GHC host   : $HostPlatform"
     echo "GHC target : $TargetPlatform"
+    echo "LLVM target: $LlvmTarget"
 
     AC_SUBST(BuildPlatform)
     AC_SUBST(HostPlatform)
@@ -160,6 +160,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     AC_SUBST(HostOS_CPP)
     AC_SUBST(BuildOS_CPP)
     AC_SUBST(TargetOS_CPP)
+    AC_SUBST(LLVMTarget_CPP)
 
     AC_SUBST(HostVendor_CPP)
     AC_SUBST(BuildVendor_CPP)
@@ -238,13 +239,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkOS() {
         case [$]1 in
-        linux)
+        linux|linux-android)
             test -z "[$]2" || eval "[$]2=OSLinux"
             ;;
-        ios)
-            test -z "[$]2" || eval "[$]2=OSiOS"
-            ;;
-        darwin)
+        darwin|ios|watchos|tvos)
             test -z "[$]2" || eval "[$]2=OSDarwin"
             ;;
         solaris2)
@@ -279,9 +277,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         aix)
             test -z "[$]2" || eval "[$]2=OSAIX"
-            ;;
-        linux-android)
-            test -z "[$]2" || eval "[$]2=OSAndroid"
             ;;
         *)
             echo "Unknown OS '[$]1'"
@@ -482,6 +477,12 @@ AC_DEFUN([FP_SETTINGS],
         SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
     fi
+    if test -z "$ClangCmd"
+    then
+        SettingsClangCommand="clang"
+    else
+        SettingsClangCommand="$ClangCmd"
+    fi
     if test -z "$LlcCmd"
     then
       SettingsLlcCommand="llc"
@@ -512,6 +513,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLibtoolCommand)
     AC_SUBST(SettingsTouchCommand)
+    AC_SUBST(SettingsClangCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
 ])
@@ -865,20 +867,17 @@ AC_CACHE_CHECK([leading underscore in symbol names], [fptools_cv_leading_undersc
 # Hack!: nlist() under Digital UNIX insist on there being an _,
 # but symbol table listings shows none. What is going on here?!?
 case $TargetPlatform in
-*linux-android*) fptools_cv_leading_underscore=no;;
-*openbsd*) # x86 openbsd is ELF from 3.4 >, meaning no leading uscore
-  case $build in
-    i386-*2\.@<:@0-9@:>@ | i386-*3\.@<:@0-3@:>@ ) fptools_cv_leading_underscore=yes ;;
-    *) fptools_cv_leading_underscore=no ;;
-  esac ;;
-i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
-x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
-
-    # HACK: Apple doesn't seem to provide nlist in the 64-bit-libraries
-x86_64-apple-darwin*) fptools_cv_leading_underscore=yes;;
-*-apple-ios) fptools_cv_leading_underscore=yes;;
-
-*) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
+    # Apples mach-o platforms use leading underscores
+    *-apple-*) fptools_cv_leading_underscore=yes;;
+    *linux-android*) fptools_cv_leading_underscore=no;;
+    *openbsd*) # x86 openbsd is ELF from 3.4 >, meaning no leading uscore
+      case $build in
+        i386-*2\.@<:@0-9@:>@ | i386-*3\.@<:@0-3@:>@ ) fptools_cv_leading_underscore=yes ;;
+        *) fptools_cv_leading_underscore=no ;;
+      esac ;;
+    i386-unknown-mingw32) fptools_cv_leading_underscore=yes;;
+    x86_64-unknown-mingw32) fptools_cv_leading_underscore=no;;
+    *) AC_RUN_IFELSE([AC_LANG_SOURCE([[#ifdef HAVE_NLIST_H
 #include <nlist.h>
 struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
 struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
@@ -1214,7 +1213,7 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
     if test $fp_prog_ar_is_gnu = yes
     then
         fp_cv_prog_ar_needs_ranlib=no
-    elif test "$TargetOS_CPP" = "darwin"
+    elif test "$TargetVendor_CPP" = "apple"
     then
         # It's quite tedious to check for Apple's crazy timestamps in
         # .a files, so we hardcode it.
@@ -1926,6 +1925,24 @@ case "$1" in
   esac
 ])
 
+# GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
+# --------------------------------
+# converts the canonicalized target into someting llvm can understand
+AC_DEFUN([GHC_LLVM_TARGET], [
+  case "$2-$3" in
+    hardfloat-*eabi)
+      llvm_target_vendor="unknown"
+      llvm_target_os="$3""hf"
+      ;;
+    *)
+      GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
+      GHC_CONVERT_OS([$3],[$1],[llvm_target_os])
+      ;;
+  esac
+  $4="$1-$llvm_target_vendor-$llvm_target_os"
+])
+
+
 # GHC_CONVERT_VENDOR(vendor, target_var)
 # --------------------------------
 # converts vendor from gnu to ghc naming, and assigns the result to $target_var
@@ -1951,12 +1968,11 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # --------------------------------
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
-case "$1-$2" in
-  darwin10-arm|darwin11-i386|darwin14-aarch64|darwin14-x86_64)
-    $3="ios"
-    ;;
-  *)
     case "$1" in
+      # watchos and tvos are ios variant as of May 2017.
+      ios|watchos|tvos)
+        $3="ios"
+        ;;
       linux-android*)
         $3="linux-android"
         ;;
@@ -1983,8 +1999,6 @@ case "$1-$2" in
         exit 1
         ;;
       esac
-      ;;
-  esac
 ])
 
 # BOOTSTRAPPING_GHC_INFO_FIELD
@@ -2016,7 +2030,7 @@ AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 # --------------------------------
 # Gets the version number of XCode, if on a Mac
 AC_DEFUN([XCODE_VERSION],[
-    if test "$TargetOS_CPP" = "darwin"
+    if test "$TargetVendor_CPP" = "apple"
     then
         AC_MSG_CHECKING(XCode version)
         XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`

@@ -646,7 +646,7 @@ test('T5837',
              # 2017-02-19                       59161648 (x64/Windows) - Unknown
              # 2017-03-14                       53787192 (x64/Windows) - Unknown
 
-           (wordsize(64), 52625920, 7)])
+           (wordsize(64), 56782344, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -682,6 +682,7 @@ test('T5837',
              # 2017-02-20 58648600  amd64/Linux Type-indexed Typeable
              # 2017-02-28 54151864  amd64/Linux Likely drift due to recent simplifier improvements
              # 2017-02-25 52625920  amd64/Linux Early inlining patch
+             # 2017-09-06 56782344  amd64/Linux Drift manifest in unrelated LLVM patch
       ],
       compile, ['-freduction-depth=50'])
 
@@ -1009,13 +1010,14 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 127500136, 5),
+          [(wordsize(64), 134780272, 5),
           # initial:      125831400
           # 2017-01-18:   133380960  Allow top-level string literals in Core
           # 2017-02-17:   153611448  Type-indexed Typeable
           # 2017-03-03:   142256192  Share Typeable KindReps
           # 2017-03-21:   134334800  Unclear
           # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
+          # 2017-05-23:   134780272  Addition of llvm-targets in dynflags (D3352)
           ]),
      ],
      compile,

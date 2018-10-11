@@ -16,7 +16,6 @@ module Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
-        platformBinariesAreStaticLibs,
 )
 
 where
@@ -76,7 +75,6 @@ data OS
         = OSUnknown
         | OSLinux
         | OSDarwin
-        | OSiOS
         | OSSolaris2
         | OSMinGW32
         | OSFreeBSD
@@ -86,7 +84,6 @@ data OS
         | OSKFreeBSD
         | OSHaiku
         | OSQNXNTO
-        | OSAndroid
         | OSAIX
         deriving (Read, Show, Eq)
 
@@ -132,12 +129,10 @@ osElfTarget OSOpenBSD   = True
 osElfTarget OSNetBSD    = True
 osElfTarget OSSolaris2  = True
 osElfTarget OSDarwin    = False
-osElfTarget OSiOS       = False
 osElfTarget OSMinGW32   = False
 osElfTarget OSKFreeBSD  = True
 osElfTarget OSHaiku     = True
 osElfTarget OSQNXNTO    = False
-osElfTarget OSAndroid   = True
 osElfTarget OSAIX       = False
 osElfTarget OSUnknown   = False
  -- Defaulting to False is safe; it means don't rely on any
@@ -152,21 +147,12 @@ osMachOTarget _ = False
 
 osUsesFrameworks :: OS -> Bool
 osUsesFrameworks OSDarwin = True
-osUsesFrameworks OSiOS    = True
 osUsesFrameworks _        = False
 
 platformUsesFrameworks :: Platform -> Bool
 platformUsesFrameworks = osUsesFrameworks . platformOS
 
-osBinariesAreStaticLibs :: OS -> Bool
-osBinariesAreStaticLibs OSiOS = True
-osBinariesAreStaticLibs _     = False
-
 osSubsectionsViaSymbols :: OS -> Bool
 osSubsectionsViaSymbols OSDarwin = True
-osSubsectionsViaSymbols OSiOS    = True
 osSubsectionsViaSymbols _        = False
-
-platformBinariesAreStaticLibs :: Platform -> Bool
-platformBinariesAreStaticLibs = osBinariesAreStaticLibs . platformOS
 

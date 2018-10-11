@@ -11,9 +11,10 @@ linkingOptions =
          }
   , flag { flagName = "-staticlib"
          , flagDescription =
-           "On Darwin/OS X/iOS only, generate a standalone static library " ++
-           "(as opposed to an executable). This is the usual way to " ++
-           "compile for iOS."
+           "Generate a standalone static library (as opposed to an " ++
+           "executable). This is useful when cross compiling. The " ++
+           "library together with all its dependencies ends up in in a " ++
+           "single static library that can be linked against."
          , flagType = DynamicFlag
          }
   , flag { flagName = "-fPIC"
