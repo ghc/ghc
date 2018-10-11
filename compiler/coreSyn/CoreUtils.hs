@@ -1557,14 +1557,15 @@ app_ok primop_ok fun args
         | SeqOp <- op    -- See Note [seq# and expr_ok]
         -> all (expr_ok primop_ok) args
 
+        | DataToTagOp <- op
+        -> False -- all (expr_ok primop_ok) args
+
         | otherwise
         -> primop_ok op  -- Check the primop itself
         && and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
-             || (n_val_args == 0 &&
-                 isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args
   where
