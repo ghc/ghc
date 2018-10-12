@@ -142,7 +142,7 @@ fiExpr :: DynFlags
        -> CoreExprWithFVs   -- Input expr
        -> CoreExpr          -- Result
 
-fiExpr _ to_drop (_, AnnLit lit)     = ASSERT( null to_drop ) Lit lit
+fiExpr _ to_drop (_, AnnLit lit)     = wrapFloats to_drop (Lit lit)
 fiExpr _ to_drop (_, AnnType ty)     = ASSERT( null to_drop ) Type ty
 fiExpr _ to_drop (_, AnnVar v)       = wrapFloats to_drop (Var v)
 fiExpr _ to_drop (_, AnnCoercion co) = wrapFloats to_drop (Coercion co)
