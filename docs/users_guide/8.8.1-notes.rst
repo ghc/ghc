@@ -59,6 +59,8 @@ Compiler
 
 - New :ghc-flag:`-keep-hscpp-files` to keep the output of the CPP pre-processor.
 
+- The :ghc-flag:`-Wcompat` warning group now includes :ghc-flag:`-Wstar-is-type`.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

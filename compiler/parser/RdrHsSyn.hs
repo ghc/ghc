@@ -2049,7 +2049,8 @@ warnStarIsType span = addWarning Opt_WarnStarIsType span msg
     msg =  text "Using" <+> quotes (text "*")
            <+> text "(or its Unicode variant) to mean"
            <+> quotes (text "Data.Kind.Type")
-        $$ text "relies on the StarIsType extension."
+        $$ text "relies on the StarIsType extension, which will become"
+        $$ text "deprecated in the future."
         $$ text "Suggested fix: use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 

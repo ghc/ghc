@@ -4614,6 +4614,7 @@ minusWcompatOpts
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
       , Opt_WarnImplicitKindVars
+      , Opt_WarnStarIsType
       ]
 
 enableUnusedBinds :: DynP ()
