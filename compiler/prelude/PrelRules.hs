@@ -1020,7 +1020,7 @@ tagToEnumRule = do
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
--- Rules for dataToTag#
+-- See Note [dataToTag#] in primops.txt.pp
 dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
@@ -2105,6 +2105,8 @@ Instead, we deal with turning one branch into DEFAULT in SimplUtils
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [dataToTag#] in primpops.txt.pp
+
 We want to transform
   case dataToTag x of
     DEFAULT -> e1
