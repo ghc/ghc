@@ -25,7 +25,7 @@ T15039c.hs:22:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
 
 T15039c.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Dict (a ~~ b)’
-      Where: ‘a’, ‘b’, ‘k’ are rigid type variables bound by
+      Where: ‘a’, ‘k’, ‘b’ are rigid type variables bound by
                the type signature for:
                  ex3 :: forall k a (b :: k). Dict (a ~~ b) -> ()
                at T15039c.hs:24:1-43
