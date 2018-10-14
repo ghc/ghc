@@ -20,7 +20,7 @@ The highlights, since the 8.4.3 release, are:
   version shipped with GHC 8.4.3 (see `#227
   <https://github.com/haskell/text/issues/227>`_,
   `#221 <https://github.com/haskell/text/issues/221>`_, and `#197
-  <https://github.com/haskell/text/issues/197>`_.
+  <https://github.com/haskell/text/issues/197>`_).
 
 - A serious code generation bug in the LLVM code generation, potentially resulting
   in incorrect evaluation of floating point expressions, has been fixed
