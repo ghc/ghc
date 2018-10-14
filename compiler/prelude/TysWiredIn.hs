@@ -1234,7 +1234,7 @@ liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
 
 -- The type ('LiftedRep)
 liftedRepTy :: Type
-liftedRepTy = mkTyConTy liftedRepDataConTyCon
+liftedRepTy = liftedRepDataConTy
 
 {- *********************************************************************
 *                                                                      *

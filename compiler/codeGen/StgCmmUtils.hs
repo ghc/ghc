@@ -105,6 +105,7 @@ mkSimpleLit _      (MachLabel fs ms fod)
         where
                 -- TODO: Literal labels might not actually be in the current package...
                 labelSrc = ForeignLabelInThisPackage
+-- NB: RubbishLit should have been lowered in "CoreToStg"
 mkSimpleLit _ other             = pprPanic "mkSimpleLit" (ppr other)
 
 --------------------------------------------------------------------------

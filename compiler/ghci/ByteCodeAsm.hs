@@ -460,6 +460,10 @@ assembleI dflags i = case i of
       LitNumWord64  -> int64 (fromIntegral i)
       LitNumInteger -> panic "ByteCodeAsm.literal: LitNumInteger"
       LitNumNatural -> panic "ByteCodeAsm.literal: LitNumNatural"
+    -- We can lower 'RubbishLit' to an arbitrary constant, but @NULL@ is most
+    -- likely to elicit a crash (rather than corrupt memory) in case absence
+    -- analysis messed up.
+    literal RubbishLit         = int 0
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]

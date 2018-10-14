@@ -1539,6 +1539,7 @@ pushAtom _ _ (AnnLit lit) = do
           -- representation.
           LitNumInteger -> panic "pushAtom: LitInteger"
           LitNumNatural -> panic "pushAtom: LitNatural"
+        RubbishLit    -> code N
 
 pushAtom _ _ expr
    = pprPanic "ByteCodeGen.pushAtom"

@@ -44,7 +44,7 @@ module Literal
         , narrow8WordLit, narrow16WordLit, narrow32WordLit
         , char2IntLit, int2CharLit
         , float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-        , nullAddrLit, float2DoubleLit, double2FloatLit
+        , nullAddrLit, rubbishLit, float2DoubleLit, double2FloatLit
         ) where
 
 #include "HsVersions.h"
@@ -96,6 +96,9 @@ import Numeric ( fromRat )
 --
 -- * The literal derived from the label mentioned in a \"foreign label\"
 --   declaration ('MachLabel')
+--
+-- * A 'RubbishLit' to be used in place of values of 'UnliftedRep'
+--   (i.e. 'MutVar#') when the the value is never used.
 data Literal
   =     ------------------
         -- First the primitive guys
@@ -113,6 +116,12 @@ data Literal
   | MachNullAddr                -- ^ The @NULL@ pointer, the only pointer value
                                 -- that can be represented as a Literal. Create
                                 -- with 'nullAddrLit'
+
+  | RubbishLit                  -- ^ A nonsense value, used when an unlifted
+                                -- binding is absent and has type
+                                -- @forall (a :: 'TYPE' 'UnliftedRep'). a@.
+                                -- May be lowered by code-gen to any possible
+                                -- value. Also see Note [RubbishLit]
 
   | MachFloat   Rational        -- ^ @Float#@. Create with 'mkMachFloat'
   | MachDouble  Rational        -- ^ @Double#@. Create with 'mkMachDouble'
@@ -195,6 +204,7 @@ instance Binary Literal where
         = do putByte bh 6
              put_ bh nt
              put_ bh i
+    put_ bh (RubbishLit)      = do putByte bh 7
     get bh = do
             h <- getByte bh
             case h of
@@ -217,7 +227,7 @@ instance Binary Literal where
                     mb <- get bh
                     fod <- get bh
                     return (MachLabel aj mb fod)
-              _ -> do
+              6 -> do
                     nt <- get bh
                     i  <- get bh
                     let t = case nt of
@@ -232,6 +242,8 @@ instance Binary Literal where
                             LitNumNatural ->
                               panic "Evaluated the place holder for mkNatural"
                     return (LitNumber nt i t)
+              _ -> do
+                    return (RubbishLit)
 
 instance Outputable Literal where
     ppr lit = pprLiteral (\d -> d) lit
@@ -240,6 +252,8 @@ instance Eq Literal where
     a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
     a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
 
+-- | Needed for the @Ord@ instance of 'AltCon', which in turn is needed in
+-- 'TrieMap.CoreMap'.
 instance Ord Literal where
     a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
     a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
@@ -518,6 +532,10 @@ double2FloatLit l              = pprPanic "double2FloatLit" (ppr l)
 nullAddrLit :: Literal
 nullAddrLit = MachNullAddr
 
+-- | A nonsense literal of type @forall (a :: 'TYPE' 'UnliftedRep'). a@.
+rubbishLit :: Literal
+rubbishLit = RubbishLit
+
 {-
         Predicates
         ~~~~~~~~~~
@@ -610,10 +628,16 @@ literalType (MachFloat _)     = floatPrimTy
 literalType (MachDouble _)    = doublePrimTy
 literalType (MachLabel _ _ _) = addrPrimTy
 literalType (LitNumber _ _ t) = t
+literalType (RubbishLit)      = mkForAllTy a Inferred (mkTyVarTy a)
+  where
+    a = alphaTyVarUnliftedRep
 
 absentLiteralOf :: TyCon -> Maybe Literal
 -- Return a literal of the appropriate primitive
 -- TyCon, to use as a placeholder when it doesn't matter
+-- RubbishLits are handled in WwLib, because
+--  1. Looking at the TyCon is not enough, we need the actual type
+--  2. This would need to return a type application to a literal
 absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
 
 absent_lits :: UniqFM Literal
@@ -642,6 +666,7 @@ cmpLit (MachLabel     a _ _) (MachLabel      b _ _) = a `compare` b
 cmpLit (LitNumber nt1 a _)   (LitNumber nt2  b _)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
+cmpLit (RubbishLit)          (RubbishLit)           = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
@@ -654,6 +679,7 @@ litTag (MachFloat     _)   = 4
 litTag (MachDouble    _)   = 5
 litTag (MachLabel _ _ _)   = 6
 litTag (LitNumber  {})     = 7
+litTag (RubbishLit)        = 8
 
 {-
         Printing
@@ -679,6 +705,7 @@ pprLiteral add_par (MachLabel l mb fod) = add_par (text "__label" <+> b <+> ppr 
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
+pprLiteral _       (RubbishLit)     = text "__RUBBISH"
 
 pprIntegerVal :: (SDoc -> SDoc) -> Integer -> SDoc
 -- See Note [Printing of literals in Core].
@@ -720,4 +747,60 @@ MachFloat       -1.0#
 MachDouble      -1.0##
 LitInteger      -1                 (-1)
 MachLabel       "__label" ...      ("__label" ...)
+RubbishLit      "__RUBBISH"
+
+Note [RubbishLit]
+~~~~~~~~~~~~~~~~~
+During worker/wrapper after demand analysis, where an argument
+is unused (absent) we do the following w/w split (supposing that
+y is absent):
+
+  f x y z = e
+===>
+  f x y z = $wf x z
+  $wf x z = let y = <absent value>
+            in e
+
+Usually the binding for y is ultimately optimised away, and
+even if not it should never be evaluated -- but that's the
+way the w/w split starts off.
+
+What is <absent value>?
+* For lifted values <absent value> can be a call to 'error'.
+* For primitive types like Int# or Word# we can use any random
+  value of that type.
+* But what about /unlifted/ but /boxed/ types like MutVar# or
+  Array#?   We need a literal value of that type.
+
+That is 'RubbishLit'.  Since we need a rubbish literal for
+many boxed, unlifted types, we say that RubbishLit has type
+  RubbishLit :: forall (a :: TYPE UnliftedRep). a
+
+So we might see a w/w split like
+  $wf x z = let y :: Array# Int = RubbishLit @(Array# Int)
+            in e
+
+Recall that (TYPE UnliftedRep) is the kind of boxed, unlifted
+heap pointers.
+
+Here are the moving parts:
+
+* We define RubbishLit as a constructor in Literal.Literal
+
+* It is given its polymoprhic type by Literal.literalType
+
+* WwLib.mk_absent_let introduces a RubbishLit for absent
+  arguments of boxed, unliftd type.
+
+* In CoreToSTG we convert (RubishLit @t) to just ().  STG is
+  untyped, so it doesn't matter that it points to a lifted
+  value. The important thing is that it is a heap pointer,
+  which the garbage collector can follow if it encounters it.
+
+  We considered maintaining RubbishLit in STG, and lowering
+  it in the code genreators, but it seems simpler to do it
+  once and for all in CoreToSTG.
+
+  In ByteCodeAsm we just lower it as a 0 literal, because
+  it's all boxed and lifted to the host GC anyway.
 -}
