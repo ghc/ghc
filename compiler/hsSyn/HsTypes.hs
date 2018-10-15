@@ -65,7 +65,7 @@ module HsTypes (
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
-        hsTypeNeedsParens, parenthesizeHsType
+        hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
 
 import GhcPrelude
@@ -1495,3 +1495,15 @@ parenthesizeHsType :: PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 parenthesizeHsType p lty@(L loc ty)
   | hsTypeNeedsParens p ty = L loc (HsParTy NoExt lty)
   | otherwise              = lty
+
+-- | @'parenthesizeHsContext' p ctxt@ checks if @ctxt@ is a single constraint
+-- @c@ such that @'hsTypeNeedsParens' p c@ is true, and if so, surrounds @c@
+-- with an 'HsParTy' to form a parenthesized @ctxt@. Otherwise, it simply
+-- returns @ctxt@ unchanged.
+parenthesizeHsContext :: PprPrec
+                      -> LHsContext (GhcPass p) -> LHsContext (GhcPass p)
+parenthesizeHsContext p lctxt@(L loc ctxt) =
+  case ctxt of
+    [c] -> L loc [parenthesizeHsType p c]
+    _   -> lctxt -- Other contexts are already "parenthesized" by virtue of
+                 -- being tuples.

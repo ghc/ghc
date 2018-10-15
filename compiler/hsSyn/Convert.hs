@@ -1341,10 +1341,11 @@ cvtTypeKind ty_str ty
              | null tys'
              -> do { tvs' <- cvtTvs tvs
                    ; cxt' <- cvtContext cxt
+                   ; let pcxt = parenthesizeHsContext funPrec cxt'
                    ; ty'  <- cvtType ty
                    ; loc <- getL
                    ; let hs_ty  = mkHsForAllTy tvs loc tvs' rho_ty
-                         rho_ty = mkHsQualTy cxt loc cxt' ty'
+                         rho_ty = mkHsQualTy cxt loc pcxt ty'
 
                    ; return hs_ty }
 
