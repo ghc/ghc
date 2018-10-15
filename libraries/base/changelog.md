@@ -12,8 +12,8 @@
 
   * Add `foldMap'`, a strict version of `foldMap`, to `Foldable`.
 
-## 4.12.0.0 *TBA*
-  * Bundled with GHC *TBA*
+## 4.12.0.0 *21 September 2018*
+  * Bundled with GHC 8.6.1
 
   * The STM invariant-checking mechanism (`always` and `alwaysSucceeds`), which
     was deprecated in GHC 8.4, has been removed (as proposed in
@@ -54,13 +54,13 @@
     `Read1`, `Show1`, `Generic`, `Generic1`. (#15098)
 
 
-## 4.11.1.0 *TBA*
+## 4.11.1.0 *19 April 2018*
   * Bundled with GHC 8.4.2
 
   * Add the `readFieldHash` function to `GHC.Read` which behaves like
     `readField`, but for a field that ends with a `#` symbol (#14918).
 
-## 4.11.0.0 *TBA*
+## 4.11.0.0 *8 March 2018*
   * Bundled with GHC 8.4.1
 
   * `System.IO.openTempFile` is now thread-safe on Windows.
