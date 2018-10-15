@@ -1,23 +1,6 @@
 -- CI Failures but not locally #85
 scc002
 T3001-2
--- ETA-expansion tests
-cgrun075
-cgrun076
-T10414
-T11108
-T11459
-T13454
-T14171
-T3731
-T7264
-T7919
-T9892
-ds055
-qq005
-qq006
-tcfail206
-T1735
 -- Type of data constructors are now linear
 ADT
 Roles1
@@ -25,19 +8,9 @@ Roles2
 SkipMany
 T12550
 T3017
-T7627
 ghci025
-holes
-holes3
 tc231
-tcfail099
-tcfail156
-tcfail179
-valid_substitutions
 T8958
-T2414
-T12083a
-TypeAppData
 -- Fails on CI but not locally
 scc001
 ghcpkg05
@@ -47,31 +20,13 @@ T7360
 T14682
 -- #41
 T3234
--- #38
-TcCoercible
 -- #39
 T13233
 T13244
 -- #82
 
-# 78
---T12944
-
-
 ### Simplifier
 T3591
-determ017
-galois_raytrace
-T4945
-hpc_raytrace
-T5366
-joao-circular
-unboxedsums12
-### PrepareRHS variable
-cholewo-eval
-
-### Core Prep
-ds046
 
 ### Polymorphism See #91
 
