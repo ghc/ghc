@@ -56,7 +56,7 @@ module Demand (
         useCount, isUsedOnce, reuseEnv,
         killUsageDemand, killUsageSig, zapUsageDemand, zapUsageEnvSig,
         zapUsedOnceDemand, zapUsedOnceSig,
-        strictifyDictDmd
+        strictifyDictDmd, strictifyDmd
 
      ) where
 
@@ -2032,6 +2032,10 @@ strictifyDictDmd ty dmd = case getUseDmd dmd of
              -- TODO could optimize with an aborting variant of zipWith since
              -- the superclass dicts are always a prefix
   _ -> dmd -- unused or not a dictionary
+
+strictifyDmd :: Demand -> Demand
+strictifyDmd dmd@(JD { sd = str })
+  = dmd { sd = str `bothArgStr` Str VanStr HeadStr }
 
 {-
 Note [HyperStr and Use demands]

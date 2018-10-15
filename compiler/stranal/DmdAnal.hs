@@ -1222,7 +1222,7 @@ addDataConStrictness con ds
   where
     strs = dataConRepStrictness con
     add dmd str | isMarkedStrict str
-                , not (isAbsDmd dmd) = dmd `bothDmd` seqDmd
+                , not (isAbsDmd dmd) = strictifyDmd dmd
                 | otherwise          = dmd
 
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
