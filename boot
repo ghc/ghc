@@ -13,7 +13,6 @@ cwd = os.getcwd()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--validate', action='store_true', help='Run in validate mode')
-parser.add_argument('--required-tag', type=str, action='append', default=set())
 parser.add_argument('--hadrian', action='store_true', help='Do not assume the make base build system')
 args = parser.parse_args()
 
@@ -65,16 +64,16 @@ def check_boot_packages():
         if l.startswith('#'):
             continue
 
-        parts = l.split(' ')
+        parts = [part for part in l.split(' ') if part]
         if len(parts) != 4:
             die("Error: Bad line in packages file: " + l)
 
         dir_ = parts[0]
         tag = parts[1]
 
-        # If $tag is not "-" then it is an optional repository, so its
+        # If tag is not "-" then it is an optional repository, so its
         # absence isn't an error.
-        if tag in args.required_tag:
+        if tag == '-':
             # We would like to just check for a .git directory here,
             # but in an lndir tree we avoid making .git directories,
             # so it doesn't exist. We therefore require that every repo
@@ -82,9 +81,9 @@ def check_boot_packages():
             license_path = os.path.join(dir_, 'LICENSE')
             if not os.path.isfile(license_path):
                 die("""\
-                    Error: %s doesn't exist" % license_path)
+                    Error: %s doesn't exist
                     Maybe you haven't run 'git submodule update --init'?
-                    """)
+                    """ % license_path)
 
 # Create libraries/*/{ghc.mk,GNUmakefile}
 def boot_pkgs():
@@ -191,6 +190,7 @@ def check_build_mk():
             """))
 
 check_for_url_rewrites()
+check_boot_packages()
 if not args.hadrian:
     boot_pkgs()
 autoreconf()

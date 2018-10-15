@@ -23,7 +23,6 @@ Flags:
   --slow            Build stage2 with -DDEBUG. Run tests for all WAYS,
                     but skip those that call compiler_stats_num_field.
                     2008-07-01: 14% slower than the default.
-  --dph             Also build libraries/dph and run associated tests.
   --quiet           More pretty build log.
                     See Note [Default build system verbosity].
   --help            shows this usage help.
@@ -50,7 +49,6 @@ testsuite_only=0
 build_only=0
 hpc=NO
 speed=NORMAL
-use_dph=0
 be_quiet=0
 # Validate uses gzip compression for the binary distribution to avoid the rather
 # heavy cost of xz, which is the typical default. The options are defined in
@@ -80,12 +78,6 @@ do
         ;;
     --normal) # for backward compat
         speed=NORMAL
-        ;;
-    --no-dph) # for backward compat
-        use_dph=0
-        ;;
-    --dph)
-        use_dph=1
         ;;
     --quiet)
         be_quiet=1
@@ -158,11 +150,7 @@ if [ $no_clean -eq 0 ]; then
 
     INSTDIR="$thisdir/inst"
 
-    if [ $use_dph -eq 1 ]; then
-        python3 ./boot --validate --required-tag=dph
-    else
-        python3 ./boot --validate
-    fi
+    python3 ./boot --validate
     ./configure --prefix="$INSTDIR" $config_args
 fi
 
