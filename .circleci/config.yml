@@ -25,6 +25,8 @@ aliases:
         ifneq "\$(BuildFlavour)" ""
         include mk/flavours/\$(BuildFlavour).mk
         endif
+        GhcLibHcOpts       = -O -dcore-lint
+        # TODO: arnaud: revert the above line before merge (hack)
         EOF
   - &configure_unix
     run:
