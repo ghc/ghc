@@ -185,7 +185,7 @@ getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
 newId :: FastString -> Rig -> Type -> SimplM Id
 newId fs w ty = do uniq <- getUniqueM
-                   return (mkSysLocalOrCoVar fs uniq w ty)
+                   return (mkSysLocalOrCoVar fs uniq (Regular w) ty)
 
 newJoinId :: [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty

@@ -107,7 +107,7 @@ newExportedVar occ_name ty
 newLocalVar :: FastString -> Type -> VM Var
 newLocalVar fs ty
  = do u <- liftDs newUnique
-      return $ mkSysLocalOrCoVar fs u Omega ty
+      return $ mkSysLocalOrCoVar fs u (Regular Omega) ty
 
 -- |Make several fresh local variables with the given types.
 -- The variable's names are formed using the given string as the prefix.
