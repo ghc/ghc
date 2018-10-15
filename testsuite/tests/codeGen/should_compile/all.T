@@ -46,3 +46,8 @@ test('T15196',
   [ unless(arch('x86_64'),skip),
     only_ways('normal'),
   ], run_command, ['$MAKE -s --no-print-directory T15196'])
+
+test('T15723',
+  [ unless(have_profiling(), skip),
+    unless(have_dynamic(), skip),
+  ], run_command, ['$MAKE -s --no-print-directory T15723'])
