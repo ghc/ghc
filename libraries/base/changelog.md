@@ -28,7 +28,7 @@
   * `asinh` for `Float` and `Double` is now numerically stable in the face of
     non-small negative arguments and enormous arguments of either sign. (#14927)
 
-	* `Numeric.showEFloat (Just 0)` and `Numeric.showGFloat (Just 0)`
+  * `Numeric.showEFloat (Just 0)` and `Numeric.showGFloat (Just 0)`
     now respect the user's requested precision. (#15115)
 
   * `Data.Monoid.Alt` now has `Foldable` and `Traversable` instances. (#15099)
