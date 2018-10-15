@@ -792,6 +792,9 @@ injTyVarsOfType :: TcTauType -> TcTyVarSet
 -- E.g.   Suppose F is injective in its second arg, but not its first
 --        then injVarOfType (Either a (F [b] (a,c))) = {a,c}
 --        Determining the overall type determines a,c but not b.
+injTyVarsOfType ty
+  | Just ty' <- coreView ty -- #12430
+  = injTyVarsOfType ty'
 injTyVarsOfType (TyVarTy v)
   = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
 injTyVarsOfType (TyConApp tc tys)
