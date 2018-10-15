@@ -335,16 +335,16 @@ mkSysLocal fs uniq w ty = ASSERT( not (isCoercionType ty) )
                         mkLocalId (mkSystemVarName uniq fs) (Regular w) ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
-mkSysLocalOrCoVar :: FastString -> Unique -> Rig -> Type -> Id
+mkSysLocalOrCoVar :: FastString -> Unique -> VarMult -> Type -> Id
 mkSysLocalOrCoVar fs uniq w ty
-  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) (Regular w) ty
+  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
 
 mkSysLocalM :: MonadUnique m => FastString -> Rig -> Type -> m Id
 mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
 mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Rig -> Type -> m Id
 mkSysLocalOrCoVarM fs w ty
-  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
+  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq (Regular w) ty))
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
@@ -372,7 +372,7 @@ mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkTemplateLocalW i (unrestricted ty)
 
 mkTemplateLocalW :: Int -> Weighted Type -> Id
-mkTemplateLocalW i (Weighted w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) w ty
+mkTemplateLocalW i (Weighted w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (Regular w) ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]

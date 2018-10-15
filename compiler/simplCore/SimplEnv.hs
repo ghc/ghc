@@ -32,7 +32,7 @@ module SimplEnv (
         SimplFloats(..), emptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
-        doFloatFromRhs, getTopFloatBinds, scaleLetFloatsBy, scaleFloatsBy,
+        doFloatFromRhs, getTopFloatBinds, scaleFloatsBy,
 
         -- * LetFloats
         LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
@@ -639,13 +639,11 @@ mapLetFloats (LetFloats fs ff) fun
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
     app (Rec bs)     = Rec (map fun bs)
 
-scaleLetFloatsBy :: Rig -> LetFloats -> LetFloats
-scaleLetFloatsBy w lfs =
-  mapLetFloats lfs (\(bndr, e) -> (scaleIdBy bndr w, e))
-
 scaleFloatsBy :: Rig -> SimplFloats -> SimplFloats
 scaleFloatsBy w (SimplFloats lfs jfs in_scope) =
-  SimplFloats (scaleLetFloatsBy w lfs) jfs in_scope
+  SimplFloats lfs' jfs in_scope
+  where
+    lfs' = mapLetFloats lfs (\(bndr, e) -> (scaleIdBy bndr w, e))
 
 
 

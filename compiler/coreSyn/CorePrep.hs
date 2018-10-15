@@ -492,7 +492,7 @@ cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
                then return (floats2, cpeEtaExpand arity rhs2)
                else WARN(True, text "CorePrep: silly extra arguments:" <+> ppr bndr)
                                -- Note [Silly extra arguments]
-                    (do { v <- newVar One (idType bndr)
+                    (do { v <- newVar (idType bndr)
                         ; let float = mkFloat topDmd False v rhs2
                         ; return ( addFloat floats2 float
                                  , cpeEtaExpand arity (Var v)) })
@@ -650,7 +650,6 @@ cpeRhsE env expr@(Lam {})
 
 cpeRhsE env (Case scrut bndr ty alts)
   = do { (floats, scrut') <- cpeBody env scrut
-       ; let scaled_floats = scaleFloatsBy (varWeight bndr) floats
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
                  -- This flag is intended to aid in debugging strictness
@@ -666,7 +665,7 @@ cpeRhsE env (Case scrut bndr ty alts)
                where err = mkRuntimeErrorApp rUNTIME_ERROR_ID ty
                                              "Bottoming expression returned"
        ; alts'' <- mapM (sat_alt env') alts'
-       ; return (scaled_floats, Case scrut' bndr2 ty alts'') }
+       ; return (floats, Case scrut' bndr2 ty alts'') }
   where
     sat_alt env (con, bs, rhs)
        = do { (env2, bs') <- cpCloneBndrs env bs
@@ -746,7 +745,7 @@ rhsToBody expr@(Lam {})
   | all isTyVar bndrs           -- Type lambdas are ok
   = return (emptyFloats, expr)
   | otherwise                   -- Some value lambdas
-  = do { fn <- newVar One (exprType expr)
+  = do { fn <- newVar (exprType expr)
        ; let rhs   = cpeEtaExpand (exprArity expr) expr
              float = FloatLet (NonRec fn rhs)
        ; return (unitFloat float, Var fn) }
@@ -865,7 +864,7 @@ cpeApp top_env expr
 
         -- N-variable fun, better let-bind it
     cpe_app env fun args depth
-      = do { (fun_floats, fun') <- cpeArg env evalDmd fun (linear ty)
+      = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
                           -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
            ; (app, floats) <- rebuild_app args fun' ty fun_floats []
@@ -908,8 +907,8 @@ cpeApp top_env expr
                    ([],            _)     -> (topDmd, [])
             (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
                                splitFunTy_maybe fun_ty
-        (fs, arg') <- cpeArg top_env ss1 arg arg_ty
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
+        (fs, arg') <- cpeArg top_env ss1 arg (weightedThing arg_ty)
+        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest -- TODO: arnaud: I'm not sure, but I may have to provide the multiplicity information in this line
       CpeCast co ->
         let Pair _ty1 ty2 = coercionKind co
         in rebuild_app as (Cast fun' co) ty2 floats ss
@@ -1004,21 +1003,21 @@ okCpeArg expr    = not (exprIsTrivial expr)
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
-       -> CoreArg -> Weighted Type -> UniqSM (Floats, CpeArg)
-cpeArg env dmd arg (Weighted arg_mult arg_ty)
+       -> CoreArg -> Type -> UniqSM (Floats, CpeArg)
+cpeArg env dmd arg arg_ty
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; (floats2, arg2) <- if want_float floats1 arg1
                             then return (floats1, arg1)
                             else dontFloat floats1 arg1
                 -- Else case: arg1 might have lambdas, and we can't
                 --            put them inside a wrapBinds
-       ; let scaled_floats = scaleFloatsBy arg_mult floats2
+
        ; if okCpeArg arg2
-         then do { v <- newVar arg_mult arg_ty
+         then do { v <- newVar arg_ty
                  ; let arg3      = cpeEtaExpand (exprArity arg2) arg2
                        arg_float = mkFloat dmd is_unlifted v arg3
-                 ; return (addFloat scaled_floats arg_float, varToCoreExpr v) }
-         else return (scaled_floats, arg2)
+                 ; return (addFloat floats2 arg_float, varToCoreExpr v) }
+         else return (floats2, arg2)
        }
   where
     is_unlifted = isUnliftedType arg_ty
@@ -1076,7 +1075,7 @@ saturateDataToTag sat_expr
         | exprIsHNF arg         -- Includes nullary constructors
         = return app            -- The arg is evaluated
         | otherwise                     -- Arg not evaluated, so evaluate it
-        = do { arg_id <- newVar One (exprType arg)
+        = do { arg_id <- newVar (exprType arg)
              ; let arg_id1 = setIdUnfolding arg_id evaldUnfolding
              ; return (Case arg arg_id1 (exprType app)
                             [(DEFAULT, [], fun `App` Var arg_id1)]) }
@@ -1324,19 +1323,6 @@ combine _ NotOkToSpec = NotOkToSpec
 combine IfUnboxedOk _ = IfUnboxedOk
 combine _ IfUnboxedOk = IfUnboxedOk
 combine _ _           = OkToSpec
-
-scaleFloatsBy :: Rig -> Floats -> Floats
-scaleFloatsBy mult (Floats flag binds) = Floats flag (fmap scaleBind binds)
-  where
-    scaleBind (FloatLet (NonRec b expr)) =
-      FloatLet $ NonRec (scaleVarBy b mult) expr
-    scaleBind (FloatLet b) =
-      FloatLet b -- No need to scale recursive bindings as their multiplicity is always ω
-    scaleBind (FloatCase id body flg) =
-      FloatCase (scaleIdBy id mult) body flg
-    scaleBind (FloatTick id) =
-      FloatTick id
-      -- TODO: arnaud: I'm not sure whether I should scale the tick's id.
 
 deFloatTop :: Floats -> [CoreBind]
 -- For top level only; we don't expect any FloatCases
@@ -1649,11 +1635,11 @@ fiddleCCall id
 -- Generating new binders
 -- ---------------------------------------------------------------------------
 
-newVar :: Rig -> Type -> UniqSM Id
-newVar mult ty
+newVar :: Type -> UniqSM Id
+newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq mult ty)
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq Alias ty)
 
 
 ------------------------------------------------------------------------------

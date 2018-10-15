@@ -801,7 +801,7 @@ So the arguments end up with the right multiplicity all very elegantly.
 -------------------------
 newLocal :: Weighted Type -> UniqSM Var
 newLocal (Weighted w ty) = do { uniq <- getUniqueM
-                              ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
+                              ; return (mkSysLocalOrCoVar (fsLit "dt") uniq (Regular w) ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang

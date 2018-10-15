@@ -455,7 +455,7 @@ applyToVars vars fn = mkVarApps fn vars
 
 mk_wrap_arg :: Unique -> Weighted Type -> Demand -> Id
 mk_wrap_arg uniq (Weighted w ty) dmd
-  = mkSysLocalOrCoVar (fsLit "w") uniq w ty
+  = mkSysLocalOrCoVar (fsLit "w") uniq (Regular w) ty
        `setIdDemandInfo` dmd
 
 {- Note [Freshen WW arguments]
@@ -1005,4 +1005,4 @@ mk_ww_local :: Unique -> (Weighted Type, StrictnessMark) -> Id
 -- See Note [Record evaluated-ness in worker/wrapper]
 mk_ww_local uniq (Weighted w ty,str)
   = setCaseBndrEvald str $
-    mkSysLocalOrCoVar (fsLit "ww") uniq w ty
+    mkSysLocalOrCoVar (fsLit "ww") uniq (Regular w) ty

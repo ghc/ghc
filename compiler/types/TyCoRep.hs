@@ -170,7 +170,6 @@ import VarEnv
 import VarSet
 import Name hiding ( varName )
 import Weight
-import {-# SOURCE #-}UsageEnv
 import TyCon
 import Class
 import CoAxiom

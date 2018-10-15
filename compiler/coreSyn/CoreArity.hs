@@ -1150,5 +1150,5 @@ freshEtaId n subst ty
       where
         ty'     = Type.substTy subst (weightedThing ty)
         eta_id' = uniqAway (getTCvInScope subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (weightedWeight ty) ty'
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) (Regular $ weightedWeight ty) ty'
         subst'  = extendTCvInScope subst eta_id'
