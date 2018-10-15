@@ -130,6 +130,12 @@ class Foldable t where
     -- This INLINE allows more list functions to fuse. See Trac #9848.
     foldMap f = foldr (mappend . f) mempty
 
+    -- | A variant of 'foldMap' that is strict in the accumulator.
+    --
+    -- @since 4.13.0.0
+    foldMap' :: Monoid m => (a -> m) -> t a -> m
+    foldMap' f = foldl' (\ acc a -> acc <> f a) mempty
+
     -- | Right-associative fold of a structure.
     --
     -- In the case of lists, 'foldr', when applied to a binary operator, a

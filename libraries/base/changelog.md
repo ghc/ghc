@@ -10,6 +10,8 @@
     a representational one. There is really no reason to care about the
     type of the underlying object.
 
+  * Add `foldMap'`, a strict version of `foldMap`, to `Foldable`.
+
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 
