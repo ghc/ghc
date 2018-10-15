@@ -134,3 +134,8 @@ T14708:
 	"$(TEST_HC)" -c add.c -o T14708scratch/add.o
 	"$(AR)" cqs T14708scratch/libadd.a T14708scratch/add.o
 	-"$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -LT14708scratch -ladd T14708.hs
+
+.PHONY: T15729
+T15729:
+	"$(TEST_HC)" -c T15729.c -o bss.o
+	echo "main" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) bss.o T15729.hs

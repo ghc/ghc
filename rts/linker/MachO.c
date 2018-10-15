@@ -186,10 +186,10 @@ resolveImports(
 #if NEED_SYMBOL_EXTRAS
 #if defined(powerpc_HOST_ARCH)
 int
-ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+ocAllocateExtras_MachO(ObjectCode* oc)
 {
 
-    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
+    IF_DEBUG(linker, debugBelch("ocAllocateExtras_MachO: start\n"));
 
     // Find out the first and last undefined external
     // symbol, so we don't have to allocate too many
@@ -218,28 +218,31 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
     }
 
     if (max >= min) {
-        return ocAllocateSymbolExtras(oc, max - min + 1, min);
+        return ocAllocateExtras(oc, max - min + 1, min, 0);
     }
 
-    return ocAllocateSymbolExtras(oc,0,0);
+    return ocAllocateExtras(oc, 0, 0, 0);
 }
 
 #elif defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 
 int
-ocAllocateSymbolExtras_MachO(ObjectCode* oc)
+ocAllocateExtras_MachO(ObjectCode* oc)
 {
-    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: start\n"));
+    IF_DEBUG(linker, debugBelch("ocAllocateExtras_MachO: start\n"));
 
     if (NULL != oc->info->symCmd) {
-        IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: allocate %d symbols\n", oc->info->symCmd->nsyms));
-        IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: done\n"));
-        return ocAllocateSymbolExtras(oc, oc->info->symCmd->nsyms, 0);
+        IF_DEBUG(linker,
+            debugBelch("ocAllocateExtras_MachO: allocate %d symbols\n",
+                oc->info->symCmd->nsyms));
+        IF_DEBUG(linker, debugBelch("ocAllocateExtras_MachO: done\n"));
+        return ocAllocateExtras(oc, oc->info->symCmd->nsyms, 0, 0);
     }
 
-    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: allocated no symbols\n"));
-    IF_DEBUG(linker, debugBelch("ocAllocateSymbolExtras_MachO: done\n"));
-    return ocAllocateSymbolExtras(oc,0,0);
+    IF_DEBUG(linker,
+        debugBelch("ocAllocateExtras_MachO: allocated no symbols\n"));
+    IF_DEBUG(linker, debugBelch("ocAllocateExtras_MachO: done\n"));
+    return ocAllocateExtras(oc, 0, 0, 0);
 }
 
 #else
