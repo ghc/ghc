@@ -506,7 +506,6 @@ These strange casts can happen as a result of case-of-case
 makeTrivialArg :: SimplMode -> ArgSpec -> SimplM (LetFloats, ArgSpec)
 makeTrivialArg mode (ValArg w e)
   = do { (floats, e') <- makeTrivial mode NotTopLevel (fsLit "arg") e
-       -- TODO: MattP looks like this should be propagated
        ; return (floats, ValArg w e') }
 makeTrivialArg _ arg
   = return (emptyLetFloats, arg)  -- CastBy, TyArg
@@ -2067,9 +2066,22 @@ trySeqRules in_env scrut rhs cont
                         , as_hole_ty = seq_id_ty }
                 , TyArg { as_arg_ty  = rhs_ty
                        , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
-                , ValArg Omega no_cast_scrut] -- TODO: MattP: Check
+                , ValArg Omega no_cast_scrut]
+                -- The multiplicity of the scrutiny above is ω because the type
+                -- of seq requires that its first argument is unrestricted. The
+                -- typing rule of case also guarantees it though. In a more
+                -- general world, where the first argument of seq would have
+                -- affine multiplicity, then we could use the multiplicity of
+                -- the case (held in the case binder) instead.
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont, sc_weight = Omega}
+                           -- The multiplicity in sc_weight above is the
+                           -- multiplicity of the second argument of seq. Since
+                           -- seq's type, as it stands, imposes that its second
+                           -- argument be unrestricted, so is
+                           -- sc_weight. However, a more precise typing rule,
+                           -- for seq, would be to have it be linear. In which
+                           -- case, sc_weight should be 1.
     -- Lazily evaluated, so we don't do most of this
 
     drop_casts (Cast e _) = drop_casts e
