@@ -377,9 +377,9 @@ opt_co4 env sym rep r (InstCo co1 arg)
     -- forall over type...
   | Just (tv, kind_co, co_body) <- splitForAllCo_ty_maybe co1
   = opt_co4_wrap (extendLiftingContext env tv
-                    (mkCoherenceRightCo Nominal t2 (mkSymCo kind_co) arg'))
-                   -- kind_co :: k1 ~ k2
-                   -- arg' :: (t1 :: k1) ~ (t2 :: k2)
+                    (mkCoherenceRightCo Nominal t2 (mkSymCo kind_co) sym_arg))
+                   -- mkSymCo kind_co :: k1 ~ k2
+                   -- sym_arg :: (t1 :: k1) ~ (t2 :: k2)
                    -- tv |-> (t1 :: k1) ~ (((t2 :: k2) |> (sym kind_co)) :: k1)
                  sym rep r co_body
 
@@ -396,23 +396,34 @@ opt_co4 env sym rep r (InstCo co1 arg)
     -- forall over type...
   | Just (tv', kind_co', co_body') <- splitForAllCo_ty_maybe co1'
   = opt_co4_wrap (extendLiftingContext (zapLiftingContext env) tv'
-                    (mkCoherenceRightCo Nominal t2 (mkSymCo kind_co') arg'))
+                    (mkCoherenceRightCo Nominal t2' (mkSymCo kind_co') arg'))
             False False r' co_body'
 
     -- forall over coercion...
   | Just (cv', kind_co', co_body') <- splitForAllCo_co_maybe co1'
-  , CoercionTy h1 <- t1
-  , CoercionTy h2 <- t2
-  = let new_co = mk_new_co cv' kind_co' h1 h2
+  , CoercionTy h1' <- t1'
+  , CoercionTy h2' <- t2'
+  = let new_co = mk_new_co cv' kind_co' h1' h2'
     in opt_co4_wrap (extendLiftingContext (zapLiftingContext env) cv' new_co)
                     False False r' co_body'
 
   | otherwise = InstCo co1' arg'
   where
-    co1' = opt_co4_wrap env sym rep r co1
-    r'   = chooseRole rep r
-    arg' = opt_co4_wrap env sym False Nominal arg
-    Pair t1 t2 = coercionKind arg'
+    co1'    = opt_co4_wrap env sym rep r co1
+    r'      = chooseRole rep r
+    arg'    = opt_co4_wrap env sym False Nominal arg
+    sym_arg = wrapSym sym arg'
+
+    -- Performance note: don't be alarmed by the two calls to coercionKind
+    -- here, as only one call to coercionKind is actually demanded per guard.
+    -- t1/t2 are used when checking if co1 is a forall, and t1'/t2' are used
+    -- when checking if co1' (i.e., co1 post-optimization) is a forall.
+    --
+    -- t1/t2 must come from sym_arg, not arg', since it's possible that arg'
+    -- might have an extra Sym at the front (after being optimized) that co1
+    -- lacks, so we need to use sym_arg to balance the number of Syms. (#15725)
+    Pair t1  t2  = coercionKind sym_arg
+    Pair t1' t2' = coercionKind arg'
 
     mk_new_co cv kind_co h1 h2
       = let -- h1 :: (t1 ~ t2)
