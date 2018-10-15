@@ -1649,7 +1649,9 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) Omega rhs_ty -- arnaud: TODO: ouch! we're creating a new binder for an expression which may contain linear variables, but we don't know that, so we're acting blind. On the other hand, we can't necessarily make a linear binder, because of the use-site.
+      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) Alias rhs_ty
+        -- The let-bind is made alias-like, because it allows float out to
+        -- preserve type even when floating out of a branch.
 
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })

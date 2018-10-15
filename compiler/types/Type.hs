@@ -136,7 +136,7 @@ module Type (
         tyCoVarsOfTypeDSet,
         coVarsOfType,
         coVarsOfTypes, closeOverKinds, closeOverKindsList,
-        noFreeVarsOfType, noFreeVarsOfRig,
+        noFreeVarsOfType, noFreeVarsOfRig, noFreeVarsOfVarMult,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize,
@@ -186,7 +186,7 @@ module Type (
         substTyVarBndr, substTyVar, substTyVars,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        substRigUnchecked,
+        substRigUnchecked, substVarMult,
 
         -- * Pretty-printing
         pprType, pprParendType, pprPrecType,

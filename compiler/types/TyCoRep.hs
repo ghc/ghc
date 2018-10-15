@@ -88,6 +88,7 @@ module TyCoRep (
         injectiveVarsOfBinder, injectiveVarsOfType,
 
         noFreeVarsOfType, noFreeVarsOfCo, noFreeVarsOfRig,
+        noFreeVarsOfVarMult,
 
         -- * Substitutions
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
@@ -123,7 +124,7 @@ module TyCoRep (
         substTyVarBndrCallback, substForAllCoBndrCallback,
         checkValidSubst, isValidTCvSubst,
 
-        substRigUnchecked,
+        substRigUnchecked, substVarMult,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -169,6 +170,7 @@ import VarEnv
 import VarSet
 import Name hiding ( varName )
 import Weight
+import {-# SOURCE #-}UsageEnv
 import TyCon
 import Class
 import CoAxiom
@@ -1841,6 +1843,10 @@ noFreeVarsOfRig (RigAdd m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
 noFreeVarsOfRig (RigMul m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
 noFreeVarsOfRig _ = True
 
+noFreeVarsOfVarMult :: VarMult -> Bool
+noFreeVarsOfVarMult (Regular w) = noFreeVarsOfRig w
+noFreeVarsOfVarMult Alias = True
+
 -- | Returns True if this coercion has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
 noFreeVarsOfCo :: Coercion -> Bool
@@ -2406,6 +2412,9 @@ substRigUnchecked subst r
   | isEmptyTCvSubst subst = r
   | otherwise             = subst_rig subst r
 
+substVarMult :: TCvSubst -> VarMult -> VarMult
+substVarMult subst (Regular w) = Regular $ substRigUnchecked subst w
+substVarMult subst Alias = Alias
 
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in

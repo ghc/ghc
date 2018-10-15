@@ -691,7 +691,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
              spec_unf  = specUnfolding spec_bndrs core_app arity_decrease fn_unf
-             spec_id   = mkLocalId spec_name Omega spec_ty -- Specialised binding is toplevel, hence Omega.
+             spec_id   = mkLocalId spec_name (Regular Omega) spec_ty -- Specialised binding is toplevel, hence Omega.
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
              arity_decrease = count isValArg args - count isId spec_bndrs
@@ -864,7 +864,7 @@ decomposeRuleLhs orig_bndrs orig_lhs
      = toposortTyVars unbound_tvs ++ unbound_dicts
      where
        unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
-       unbound_dicts = [ mkLocalId (localiseName (idName d)) Omega (idType d)
+       unbound_dicts = [ mkLocalId (localiseName (idName d)) (Regular Omega) (idType d)
                        | d <- unbound_vars, isDictId d ]
        unbound_vars  = [ v | v <- exprsFreeVarsList args
                            , not (v `elemVarSet` orig_bndr_set)

@@ -210,12 +210,12 @@ plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
 --    == {A: f 1 42, B: f 2 3, C: f 23 4 }
 -- @
 plusUFM_CD
-  :: (elt -> elt -> elt)
-  -> UniqFM elt  -- map X
-  -> elt         -- default for X
-  -> UniqFM elt  -- map Y
-  -> elt         -- default for Y
-  -> UniqFM elt
+  :: (elta -> eltb -> eltc)
+  -> UniqFM elta  -- map X
+  -> elta         -- default for X
+  -> UniqFM eltb  -- map Y
+  -> eltb         -- default for Y
+  -> UniqFM eltc
 plusUFM_CD f (UFM xm) dx (UFM ym) dy
   = UFM $ M.mergeWithKey
       (\_ x y -> Just (x `f` y))

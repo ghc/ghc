@@ -175,5 +175,3 @@ setWeight r x = x { weightedWeight = r }
 scaleWeighted :: GMult t -> GWeighted t a -> GWeighted t a
 scaleWeighted w x =
   x { weightedWeight = w * weightedWeight x }
-
-

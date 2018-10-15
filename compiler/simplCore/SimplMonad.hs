@@ -21,7 +21,7 @@ module SimplMonad (
 
 import GhcPrelude
 
-import Var              ( Var, isTyVar, mkLocalVar )
+import Var              ( Var, isTyVar, mkLocalVar, VarMult(..) )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar, idWeight )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
@@ -199,7 +199,7 @@ newJoinId bndrs body_ty
 --                                        `setOccInfo` strongLoopBreaker
 
        ; -- pprTrace "newJoinId" (ppr name $$ ppr join_id_ty) $
-          return (mkLocalVar details name Omega join_id_ty id_info) } -- arnaud: check
+          return (mkLocalVar details name (Regular Omega) join_id_ty id_info) } -- TODO: arnaud: I'm guessing this is used to create join points, in which case, the is really not the right multiplicity.
 
 {-
 ************************************************************************

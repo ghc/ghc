@@ -614,13 +614,13 @@ substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst _ _ tv_env cv_env) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
     || (noFreeVarsOfType old_ty && noFreeVarsOfRig old_w) = id
-  -- TODO: MattP, we need to substitute weight here as well
   | otherwise   =
 
       setIdWeight
         (setIdType id
           (substTy subst old_ty))
           (substRig subst old_w)
+        -- TODO: arnaud: ^ this is the problem
 
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type

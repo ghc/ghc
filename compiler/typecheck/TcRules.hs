@@ -145,14 +145,14 @@ tcRuleBndrs []
 tcRuleBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; vars <- tcRuleBndrs rule_bndrs
-        ; return (mkLocalId name Omega ty : vars) }
+        ; return (mkLocalId name (Regular Omega) ty : vars) }
 tcRuleBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a
   = do  { let ctxt = RuleSigCtxt name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
-        ; let id  = mkLocalIdOrCoVar name Omega id_ty
+        ; let id  = mkLocalIdOrCoVar name (Regular Omega) id_ty
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk

@@ -45,7 +45,7 @@ import DynFlags
 import Var      ( TyVar, tyVarKind )
 import VarSet
 import VarEnv   ( mkInScopeSet )
-import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import Id       ( Id, VarMult(..), idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
 import Bag( foldrBag )
@@ -222,7 +222,7 @@ tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name Omega sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name (Regular Omega) sigma_ty
                                    -- We use `Omega' as the multiplicity here,
                                    -- as if this identifier corresponds to
                                    -- anything, it is a top-level

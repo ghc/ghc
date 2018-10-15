@@ -1789,7 +1789,7 @@ mkGenSyms :: [Name] -> DsM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [(nm, mkLocalId (localiseName nm) Omega var_ty) | nm <- ns] }
+                  ; return [(nm, mkLocalId (localiseName nm) (Regular Omega) var_ty) | nm <- ns] }
   -- TODO: arnaud: these are Template Haskell names. The Omega above may need to be replaced when I figured out TH.
 
 

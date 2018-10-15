@@ -254,7 +254,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
            -- structure of the foreign type.
              (bndrs, res_ty)   = tcSplitPiTys norm_sig_ty
              arg_tys           = mapMaybe binderRelevantType_maybe bndrs
-             id                = mkLocalId nm Omega sig_ty
+             id                = mkLocalId nm (Regular Omega) sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so TcHsSyn.zonkForeignExports ignores it).

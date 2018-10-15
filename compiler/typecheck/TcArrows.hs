@@ -26,7 +26,7 @@ import TcUnify
 import TcRnMonad
 import TcEnv
 import TcEvidence
-import Id( mkLocalId )
+import Id( mkLocalId, VarMult(..) )
 import Inst
 import Name
 import TysWiredIn
@@ -382,7 +382,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n p -> mkLocalId n Omega p) tup_names tup_elt_tys -- Omega because it's a recursive definition
+        ; let tup_ids = zipWith (\n p -> mkLocalId n (Regular Omega) p) tup_names tup_elt_tys -- Omega because it's a recursive definition
         ; tcExtendIdEnv (map unrestricted tup_ids) $ do
         { (stmts', tup_rets)
                 <- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty   $ \ _res_ty' ->

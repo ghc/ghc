@@ -44,7 +44,8 @@ module Id (
         mkWorkerId,
 
         -- ** Taking an Id apart
-        idName, idType, idWeight, idUnique, idInfo, idDetails,
+        VarMult(..),
+        idName, idType, idWeight, idWeightedness, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
 
         -- ** Modifying an Id
@@ -130,6 +131,7 @@ import BasicTypes
 import Var( Id, CoVar, DictId, JoinId,
             InId,  InVar,
             OutId, OutVar,
+            VarMult(..),
             idInfo, idDetails, setIdDetails, globaliseId, varType, varWeight,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
@@ -193,6 +195,9 @@ idWeight x =
  -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
   Var.varWeight x
 
+idWeightedness :: Id -> VarMult
+idWeightedness = Var.varWeightedness
+
 scaleIdBy :: Id -> Rig -> Id
 scaleIdBy = Var.scaleVarBy
 
@@ -223,7 +228,8 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (idWeight id)(idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Regular $ idWeight id) (idType id) (idInfo id)
+  -- TODO: arnaud: maybe (probably) we should preserve the kind of multiplicity annotation here ^
   where
     name = idName id
 
@@ -278,7 +284,7 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkLocalId :: Name -> Rig -> Type -> Id
+mkLocalId :: Name -> VarMult -> Type -> Id
 mkLocalId name w ty = mkLocalIdWithInfo name w ty vanillaIdInfo
  -- It's tempting to ASSERT( not (isCoercionType ty) ), but don't. Sometimes,
  -- the type is a panic. (Search invented_id)
@@ -287,18 +293,18 @@ mkLocalId name w ty = mkLocalIdWithInfo name w ty vanillaIdInfo
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoercionType ty )
-    Var.mkLocalVar CoVarId name Omega ty vanillaIdInfo
+    Var.mkLocalVar CoVarId name (Var.Regular Omega) ty vanillaIdInfo
     -- TODO: arnaud: should coercions be of multiplicity 0?
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: Name -> Rig -> Type -> Id
+mkLocalIdOrCoVar :: Name -> VarMult -> Type -> Id
 mkLocalIdOrCoVar name w ty
   | isCoercionType ty = mkLocalCoVar name   ty -- TODO: arnaud: is it the right thing to ignore the multiplicity for coercion variables?
   | otherwise         = mkLocalId    name w ty
 
 -- | Make a local id, with the IdDetails set to CoVarId if the type indicates
 -- so.
-mkLocalIdOrCoVarWithInfo :: Name -> Rig -> Type -> IdInfo -> Id
+mkLocalIdOrCoVarWithInfo :: Name -> VarMult -> Type -> IdInfo -> Id
 mkLocalIdOrCoVarWithInfo name w ty info
   = Var.mkLocalVar details name w ty info -- TODO: arnaud: contrary to the above function, I don't ignore the multiplicity for coercion variables here…
   where
@@ -306,7 +312,7 @@ mkLocalIdOrCoVarWithInfo name w ty info
             | otherwise         = VanillaId
 
     -- proper ids only; no covars!
-mkLocalIdWithInfo :: Name -> Rig -> Type -> IdInfo -> Id
+mkLocalIdWithInfo :: Name -> VarMult -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name w ty info = Var.mkLocalVar VanillaId name w ty info
         -- Note [Free type variables]
 
@@ -326,12 +332,12 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Rig -> Type -> Id
 mkSysLocal fs uniq w ty = ASSERT( not (isCoercionType ty) )
-                        mkLocalId (mkSystemVarName uniq fs) w ty
+                        mkLocalId (mkSystemVarName uniq fs) (Regular w) ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
 mkSysLocalOrCoVar :: FastString -> Unique -> Rig -> Type -> Id
 mkSysLocalOrCoVar fs uniq w ty
-  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
+  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) (Regular w) ty
 
 mkSysLocalM :: MonadUnique m => FastString -> Rig -> Type -> m Id
 mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
@@ -343,12 +349,12 @@ mkSysLocalOrCoVarM fs w ty
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq w ty loc = ASSERT( not (isCoercionType ty) )
-                                mkLocalId (mkInternalName uniq occ loc) w ty
+                                mkLocalId (mkInternalName uniq occ loc) (Regular w) ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
 mkUserLocalOrCoVar :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
 mkUserLocalOrCoVar occ uniq w ty loc
-  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) w ty
+  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) (Regular w) ty
 
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -359,7 +365,7 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) Omega ty
+  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) (Regular Omega) ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id

@@ -80,6 +80,7 @@ import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyBinder(..) )
 import Weight
+import UsageEnv
 import Coercion
 import TyCon
 import Unique
@@ -182,7 +183,6 @@ isExprLevPoly = go
    go_app (Tick _ e)      = go_app e
    go_app e@(Type {})     = pprPanic "isExprLevPoly app ty" (ppr e)
    go_app e@(Coercion {}) = pprPanic "isExprLevPoly app co" (ppr e)
-
 
 {-
 Note [Type bindings]
@@ -1958,7 +1958,7 @@ dataConInstPat fss uniqs weight con inst_tys
       -- Ignore the weights above, as there are Core ignores linearity at the moment.
     mk_id_var uniq fs (Weighted w ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
-        mkLocalIdOrCoVar name (weight * w) (Type.substTy full_subst ty)
+        mkLocalIdOrCoVar name (Regular $ weight * w) (Type.substTy full_subst ty)
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
 

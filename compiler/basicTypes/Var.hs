@@ -42,11 +42,13 @@ module Var (
         OutVar, OutCoVar, OutId, OutTyVar,
 
         -- ** Taking 'Var's apart
+        VarMult(..),
         varName, varUnique, varType, varWeight, varWeightMaybe, varWeightDef,
+        varWeightedness, varWeightednessMaybe,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType, updateVarType,
-        updateVarTypeM, scaleVarBy, setVarWeight,
+        updateVarTypeM, scaleVarBy, setVarWeight, setVarWeightedness,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -58,7 +60,7 @@ module Var (
         isId, isTyVar, isTcTyVar,
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
-        mustHaveLocalBinding,
+        mustHaveLocalBinding, isUnrestrictedVar, isAliasLikeVar,
 
         -- * TyVar's
         TyVarBndr(..), ArgFlag(..), TyVarBinder,
@@ -89,6 +91,7 @@ import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolem
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
 import Weight
+import {-# SOURCE #-} UsageEnv
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -241,7 +244,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
-        varWeight  :: Rig,
+        varWeightedness  :: VarMult,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -254,6 +257,16 @@ data IdScope    -- See Note [GlobalId/LocalId]
 data ExportFlag   -- See Note [ExportFlag on binders]
   = NotExported   -- ^ Not exported: may be discarded as dead code.
   | Exported      -- ^ Exported: kept alive
+
+data VarMult
+  = Regular Rig
+  -- ^ a normal variable, carrying a multiplicity like in the Linear Haskell
+  -- paper
+  | Alias
+  -- ^ a variable typed as a alias for the multiplicity of other variables, this
+  -- lets the variable be used differently depending on the branch. Tremendously
+  -- useful for join points. But also used for regular lets because of inlining,
+  -- float out, and common subexpression elimination.
 
 {- Note [ExportFlag on binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -298,14 +311,14 @@ instance Outputable Var where
   ppr var = sdocWithDynFlags $ \dflags ->
             getPprStyle $ \ppr_style ->
             if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
-                 -> parens (ppr (varName var) <+> ppr (varWeightMaybe var)
+                 -> parens (ppr (varName var) <+> ppr (varWeightednessMaybe var)
                                               <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
 
                |  codeStyle ppr_style
                  -> ppr (varName var) <> ppr_debug var ppr_style
                |  otherwise
-                 -> ppr (varName var)  -- <> maybe empty (brackets . ppr) (varWeightMaybe var)
+                 -> ppr (varName var)  -- <> maybe empty (brackets . ppr) (varWeightednessMaybe var)
                                         -- Types don't have multiplicites
                                       <> ppr_debug var ppr_style
 
@@ -383,20 +396,57 @@ updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
                          ; return (id { varType = ty' }) }
 
+varWeightednessMaybe :: Id -> Maybe VarMult
+varWeightednessMaybe (Id { varWeightedness = mult }) = Just mult
+varWeightednessMaybe _ = Nothing
+
 varWeightMaybe :: Id -> Maybe Rig
-varWeightMaybe (Id { varWeight = w }) = Just w
-varWeightMaybe _ = Nothing
+varWeightMaybe v =
+  case varWeightednessMaybe v of
+    Just (Regular w) -> Just w
+    Just Alias -> Just One
+  -- It may be preferable to fail returning a multiplicity in the 'Alias' case,
+  -- varWeight probably isn't called on alias-like variables. Until it poses a
+  -- problem, however, let's just pretend that these are secretly linear
+  -- binders.
+    Nothing -> Nothing
 
 varWeightDef :: Id -> Rig
 varWeightDef = fromMaybe Omega . varWeightMaybe
 
+-- Assumes that `id` is a term variable (`Id`)
+varWeight :: Id -> Rig
+varWeight id = case varWeightMaybe id of
+  Just x -> x
+  Nothing -> error "Attempted to retrieve the weight of a non-Id variable"
+
 scaleVarBy :: Id -> Rig -> Id
-scaleVarBy id r | isId id  = id { varWeight = r * (varWeight id) }
+scaleVarBy id@(Id { varWeightedness = Regular w }) r =
+  id { varWeightedness = Regular (r * w) }
+  -- Note that alias-like variables are preserved by scaling. Consider the
+  -- transformation `let x_π = let y_ue = u in v in e ==> let y_ue = u in let
+  -- x_π = v in e` if `y` were regular it would need to be scaled (by a factor
+  -- of π) for typing to be preserved; in contrast, since `ue` is the computed
+  -- usage environment of `u`, it is scaled implicitly by the fact that the
+  -- call-sites of `y` are in `v`, hence scaled by the typing rule of `let
+  -- x_π`. The difference, can be summed up to the fact that a regular let
+  -- introduces a multiplicity constraint, while an alias-like let doesn't.
 scaleVarBy id _ = id
 
+setVarWeightedness :: Id -> VarMult -> Id
+setVarWeightedness id r | isId id = id { varWeightedness = r }
+setVarWeightedness id _ = id
+
 setVarWeight :: Id -> Rig -> Id
-setVarWeight id r | isId id = id { varWeight = r }
-setVarWeight id r = id
+setVarWeight id w = setVarWeightedness id (Regular w)
+
+isUnrestrictedVar :: Id -> Bool
+isUnrestrictedVar Id { varWeightedness = Regular Omega } = True
+isUnrestrictedVar _ = False
+
+isAliasLikeVar :: Id -> Bool
+isAliasLikeVar Id { varWeightedness = Alias } = True
+isAliasLikeVar _ = False
 
 {- *********************************************************************
 *                                                                      *
@@ -557,6 +607,10 @@ instance Binary ArgFlag where
       1 -> return Specified
       _ -> return Inferred
 
+instance Outputable VarMult where
+  ppr (Regular w) = ppr w
+  ppr Alias = text"alias"
+
 {-
 %************************************************************************
 %*                                                                      *
@@ -577,30 +631,30 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name Omega ty GlobalId details info
+  = mk_id name (Regular Omega) ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Rig -> Type -> IdInfo -> Id
+mkLocalVar :: IdDetails -> Name -> VarMult -> Type -> IdInfo -> Id
 mkLocalVar details name w ty info
   = mk_id name w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name Omega ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name (Regular Omega) ty (LocalId NotExported) coVarDetails vanillaIdInfo
   -- TODO: arnaud: maybe coercions should have multiplicity 0? Them being entirely static.
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name Omega ty (LocalId Exported) details info
+  = mk_id name (Regular Omega) ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Rig -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id :: Name -> VarMult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
-         varWeight  = w,
+         varWeightedness  = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,

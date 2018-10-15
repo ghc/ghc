@@ -204,7 +204,7 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
                                 do { bndr_ty <- inferResultToType infer_res
                                    ; return (mkTcNomReflCo bndr_ty, bndr_ty) }
        ; let bndr_mult = weightedWeight exp_pat_ty
-       ; bndr_id <- newLetBndr no_gen bndr_name bndr_mult bndr_ty
+       ; bndr_id <- newLetBndr no_gen bndr_name (Regular bndr_mult) bndr_ty
        ; traceTc "tcPatBndr(nosig)" (vcat [ ppr bind_lvl
                                           , ppr exp_pat_ty, ppr bndr_ty, ppr co
                                           , ppr bndr_id ])
@@ -214,11 +214,11 @@ tcPatBndr _ bndr_name pat_ty
   = do { let pat_weight = weightedWeight pat_ty
        ; pat_ty <- expTypeToType (weightedThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalId bndr_name pat_weight pat_ty) }
+       ; return (idHsWrapper, mkLocalId bndr_name (Regular pat_weight) pat_ty) }
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
-newLetBndr :: LetBndrSpec -> Name -> Rig -> TcType -> TcM TcId
+newLetBndr :: LetBndrSpec -> Name -> VarMult -> TcType -> TcM TcId
 -- Make up a suitable Id for the pattern-binder.
 -- See Note [Typechecking pattern bindings], item (4) in TcBinds
 --
