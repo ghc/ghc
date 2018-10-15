@@ -1,8 +1,6 @@
 -- CI Failures but not locally #85
 scc002
 T3001-2
--- ETA-expansion tests
-T1735
 -- Type of data constructors are now linear
 ADT
 Roles1
