@@ -185,6 +185,7 @@ def get_compiler_info():
         config.package_conf_cache_file = ''
 
     # See Note [WayFlags]
+    # See Note [PluginWay]
     if config.ghc_dynamic:
         config.ghc_th_way_flags = "-dynamic"
         config.ghci_way_flags   = "-dynamic"
@@ -200,12 +201,28 @@ def get_compiler_info():
     else:
         config.ghc_th_way_flags = "-static"
         config.ghci_way_flags   = "-static"
-        config.plugin_way_flags = "-static"
+        config.plugin_way_flags = "-dynamic"
         config.ghc_th_way       = "normal"
-        config.ghc_plugin_way   = "normal"
+        config.ghc_plugin_way   = "dyn"
+
+# Note [PluginWay]
+#
+# Unfortunately the implementation has confused the ability to make dynamic
+# libraries with dynamic way.
+#
+# This constraint is only true for systems that require -fPIC for
+# shared libraries.
+#
+# It may not be worth fixing this assumption since the only platform that doesn't
+# require -fPIC is Windows.  These plugins require libghc to be linked so in
+# doing so you would exceed the amount of allowed symbols in a single shared
+# library.  The only way these would ever work is thus with DynWay.
+#
+# Since the implementation has this implicit assumption, mark the tests as
+# always requiring DynWay.
 
 # Note [Replacing backward slashes in config.libdir]
-# 
+#
 # We *do* need to replace backslashes in config.libdir, for the following
 # reason:
 #
