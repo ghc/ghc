@@ -10,5 +10,5 @@ import Prelude hiding ( (-) )
 as        = ShouldCompile.as
 hiding    = ShouldCompile.hiding
 qualified = ShouldCompile.qualified
-x!y       = x ShouldCompile.! y
-x-y       = x ShouldCompile.- y
+x ! y     = x ShouldCompile.! y
+x - y     = x ShouldCompile.- y
