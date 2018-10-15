@@ -19,6 +19,12 @@
 #include "linker/SymbolExtras.h"
 #include "linker/M32Alloc.h"
 
+#if defined(OBJFORMAT_ELF)
+#  include "linker/Elf.h"
+#elif defined(OBJFORMAT_MACHO)
+#  include "linker/MachO.h"
+#endif
+
 #include <string.h>
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
@@ -46,8 +52,24 @@
 int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
   size_t n;
+  void* oldImage = oc->image;
 
-  if (RTS_LINKER_USE_MMAP && USE_CONTIGUOUS_MMAP) {
+  if (count > 0) {
+    if (!RTS_LINKER_USE_MMAP) {
+
+      // round up to the nearest 4
+      int aligned = (oc->fileSize + 3) & ~3;
+      int misalignment = oc->misalignment;
+
+      oc->image -= misalignment;
+      oc->image = stgReallocBytes( oc->image,
+                               misalignment +
+                               aligned + sizeof (SymbolExtra) * count,
+                               "ocAllocateSymbolExtras" );
+      oc->image += misalignment;
+
+      oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
+    } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
       n = roundUpToPage(oc->fileSize);
 
       /* Keep image and symbol_extras contiguous */
@@ -63,40 +85,35 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
           oc->imageMapped = true;
           oc->fileSize = n + (sizeof(SymbolExtra) * count);
           oc->symbol_extras = (SymbolExtra *) (oc->image + n);
-          if(mprotect(new, allocated_size, PROT_READ | PROT_EXEC) != 0) {
-              sysErrorBelch("unable to protect memory");
+          if (mprotect(new, allocated_size,
+                       PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+            sysErrorBelch("unable to protect memory");
           }
       }
       else {
           oc->symbol_extras = NULL;
           return 0;
       }
-  }
-  else if( count > 0 ) {
-    if (RTS_LINKER_USE_MMAP) {
-        n = roundUpToPage(oc->fileSize);
-
+    } else {
         oc->symbol_extras = m32_alloc(sizeof(SymbolExtra) * count, 8);
         if (oc->symbol_extras == NULL) return 0;
-    }
-    else {
-        // round up to the nearest 4
-        int aligned = (oc->fileSize + 3) & ~3;
-        int misalignment = oc->misalignment;
-
-        oc->image -= misalignment;
-        oc->image = stgReallocBytes( oc->image,
-                                 misalignment +
-                                 aligned + sizeof (SymbolExtra) * count,
-                                 "ocAllocateSymbolExtras" );
-        oc->image += misalignment;
-
-        oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
     }
   }
 
   if (oc->symbol_extras != NULL) {
       memset( oc->symbol_extras, 0, sizeof (SymbolExtra) * count );
+  }
+
+  // ObjectCodeFormatInfo contains computed addresses based on offset to
+  // image, if the address of image changes, we need to invalidate
+  // the ObjectCodeFormatInfo and recompute it.
+  if (oc->image != oldImage) {
+#if defined(OBJFORMAT_MACHO)
+    ocInit_MachO( oc );
+#endif
+#if defined(OBJFORMAT_ELF)
+    ocInit_ELF( oc );
+#endif
   }
 
   oc->first_symbol_extra = first;
