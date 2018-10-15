@@ -279,16 +279,16 @@ integer_gmp_mpn_gcd(mp_limb_t r[],
 
 /* wraps mpz_gcdext()
  *
- * Set g to the greatest common divisor of x and y, and in addition
- * set s and t to coefficients satisfying x*s + y*t = g.
+ * Set g={g0,gn} to the greatest common divisor of x={x0,xn} and
+ * y={y0,yn}, and in addition set s={s0,sn} to coefficient
+ * satisfying x*s + y*t = g.
  *
- * The {gp,gn} array is zero-padded (as otherwise 'gn' can't be
- * reconstructed).
+ * The g0 array is zero-padded (so that gn is fixed).
  *
- * g must have space for exactly gn=min(xn,yn) limbs.
- * s must have space for at least yn limbs.
+ * g0 must have space for exactly gn=min(xn,yn) limbs.
+ * s0 must have space for at least yn limbs.
  *
- * return value: signed 'sn' of {sp,sn} where |sn| >= 1
+ * return value: signed 'sn' of s={s0,sn} where |sn| >= 1
  */
 mp_size_t
 integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
