@@ -10,19 +10,9 @@ Roles2
 SkipMany
 T12550
 T3017
-T7627
 ghci025
-holes
-holes3
 tc231
-tcfail099
-tcfail156
-tcfail179
-valid_substitutions
 T8958
-T2414
-T12083a
-TypeAppData
 -- Fails on CI but not locally
 scc001
 ghcpkg05
