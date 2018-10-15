@@ -692,12 +692,24 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
          liftIO $ GHCi.seqHValue hsc_env a
          go (pred max_depth) my_ty old_ty a
--- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE.  So we
--- treat them like indirections; if the payload is TSO or BLOCKING_QUEUE, we'll end up
--- showing '_' which is what we want.
+-- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE. If
+-- the indirection is a TSO or BLOCKING_QUEUE, we return the BLACKHOLE itself as
+-- the suspension so that entering it in GHCi will enter the BLACKHOLE instead
+-- of entering the TSO or BLOCKING_QUEUE (which leads to runtime panic).
       BlackholeClosure{indirectee=ind} -> do
          traceTR (text "Following a BLACKHOLE")
-         go max_depth my_ty old_ty ind
+         ind_clos <- trIO (GHCi.getClosure hsc_env ind)
+         let return_bh_value = return (Suspension BLACKHOLE my_ty a Nothing)
+         case ind_clos of
+           -- TSO and BLOCKING_QUEUE cases
+           BlockingQueueClosure{} -> return_bh_value
+           OtherClosure info _ _
+             | tipe info == TSO -> return_bh_value
+           UnsupportedClosure info
+             | tipe info == TSO -> return_bh_value
+           -- Otherwise follow the indirectee
+           -- (NOTE: This code will break if we support TSO in ghc-heap one day)
+           _ -> go max_depth my_ty old_ty ind
 -- We always follow indirections
       IndClosure{indirectee=ind} -> do
          traceTR (text "Following an indirection" )
