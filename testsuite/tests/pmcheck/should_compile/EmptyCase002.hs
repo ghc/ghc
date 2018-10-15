@@ -5,6 +5,8 @@
 -- Check some newtypes, in combination with GADTs and TypeFamilies
 module EmptyCase002 where
 
+import Data.Kind (Type)
+
 newtype T = MkT H
 newtype G = MkG T
 newtype H = MkH G
@@ -17,15 +19,15 @@ data A
 
 data B = B1 | B2
 
-data C :: * -> * where
+data C :: Type -> Type where
   C1 :: C Int
   C2 :: C Bool
 
-data D :: * -> * -> * where
+data D :: Type -> Type -> Type where
   D1 :: D Int  Bool
   D2 :: D Bool Char
 
-type family E (a :: *) :: * where
+type family E (a :: Type) :: Type where
   E Int  = Bool
   E Bool = Char
 

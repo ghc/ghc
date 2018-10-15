@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds, UndecidableInstances, UndecidableSuperClasses #-}
 module Ctx where
 
-import Data.Kind ( Constraint )
+import Data.Kind ( Type, Constraint )
 
-type family Indirect :: * -> Constraint
+type family Indirect :: Type -> Constraint
 type instance Indirect = Show
 
 class Indirect a => Cls a where

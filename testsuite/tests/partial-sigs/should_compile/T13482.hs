@@ -5,10 +5,12 @@
 
 module T12382 where
 
+import Data.Kind (Type)
+
 minimal1_noksig :: forall m. ( _ ) => Int -> Bool
 minimal1_noksig _ = (mempty :: m) == (mempty :: m)
 
-minimal1 :: forall (m :: *). _ => Bool
+minimal1 :: forall (m :: Type). _ => Bool
 minimal1 = (mempty :: m) == (mempty :: m)
 
 minimal2 :: forall m. (Eq m, _) => Bool

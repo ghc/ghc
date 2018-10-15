@@ -2,7 +2,9 @@
 
 module ContextStack2 where
 
-type family TF a :: *
+import Data.Kind (Type)
+
+type family TF a :: Type
 type instance TF (a,b) = (TF a, TF b)
 
 -- Succeeds with new approach to fuvs

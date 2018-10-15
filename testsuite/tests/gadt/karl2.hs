@@ -5,11 +5,13 @@ module Expr0 where
 -- See Trac #301
 -- This one *does* use GADTs (Fct)
 
-data Expr :: * -> * where
+import Data.Kind (Type)
+
+data Expr :: Type -> Type where
   Const :: Show a => a -> Expr a
   Apply :: Fct a b -> Expr a -> Expr b
 
-data Fct :: * -> * -> * where
+data Fct :: Type -> Type -> Type where
   Succ :: Fct Int Int
   EqZero :: Fct Int Bool
   Add :: Fct Int (Int -> Int)

@@ -4,7 +4,9 @@
 -- Check interaction between Newtypes and GADTs
 module EmptyCase006 where
 
-data GA :: * -> * where
+import Data.Kind (Type)
+
+data GA :: Type -> Type where
   MkGA1 :: GA Int
   MkGA2 :: GA a -> GA [a]
   MkGA3 :: GA (a,a)

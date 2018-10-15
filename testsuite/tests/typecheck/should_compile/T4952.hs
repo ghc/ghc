@@ -8,6 +8,7 @@
 module Storage.Hashed.Monad () where
 
 import Control.Applicative (Applicative(..))
+import Data.Kind (Type)
 
 class Monad m => TreeRO m where
     withDirectory :: (MonadError e m) => Int -> m a -> m a
@@ -19,7 +20,7 @@ instance (Monad m, MonadError e m) => TreeRO (M m) where
       _ <- expandTo dir
       undefined
 
-data M (m :: * -> *) a
+data M (m :: Type -> Type) a
 
 instance Functor (M m) where
     fmap = undefined

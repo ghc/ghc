@@ -31,6 +31,7 @@ import Control.Monad.Trans (MonadTrans(..))
 import Data.Foldable (toList)
 import Data.Maybe (maybe)
 import Data.Sequence (Seq, viewl)
+import Data.Kind (Type)
 
 par, pseq :: a -> b -> b
 par = error "urk"
@@ -359,7 +360,7 @@ type SinkFunctor a x = EitherFunctor a (TryYield x)
 
 -- | A 'Sink' can be used to yield values from any nested `Trampoline` computation whose functor provably descends from
 -- the functor /a/. It's the write-only end of a 'Pipe' communication channel.
-data Sink (m :: * -> *) a x =
+data Sink (m :: Type -> Type) a x =
    Sink
    {
    -- | Function 'put' tries to put a value into the given `Sink`. The intervening 'Trampoline' computations suspend up
@@ -373,7 +374,7 @@ data Sink (m :: * -> *) a x =
 
 -- | A 'Source' can be used to read values into any nested `Trampoline` computation whose functor provably descends from
 -- the functor /a/. It's the read-only end of a 'Pipe' communication channel.
-newtype Source (m :: * -> *) a x =
+newtype Source (m :: Type -> Type) a x =
    Source
    {
    -- | Function 'get' tries to get a value from the given 'Source' argument. The intervening 'Trampoline' computations

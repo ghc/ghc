@@ -5,6 +5,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 module T8165 where
 
+import Data.Kind (Type)
+
 -----------------------------------------------------------
 
 class C a where
@@ -30,8 +32,8 @@ newtype E = MkE Int
 -----------------------------------------------------------
 
 class C2 a b where
-  type F b c a           :: *
-  type G b (d :: * -> *) :: * -> *
+  type F b c a :: Type
+  type G b (d :: Type -> Type) :: Type -> Type
 
 instance C2 a y => C2 a (Either x y) where
   type F (Either x y) c a = F y c a

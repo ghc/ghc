@@ -5,6 +5,8 @@
 
 module Vta1 where
 
+import Data.Kind (Type)
+
 quad :: a -> b -> c -> d -> (a, b, c, d)
 quad = (,,,)
 
@@ -58,9 +60,9 @@ pairnum = pair 3
 e = (pair 3 :: forall a. Num a => forall b. b -> (a, b)) @Int @Bool True
 h = pairnum @Int @Bool True
 
-data First (a :: * -> *) = F
+data First (a :: Type -> Type) = F
 data Proxy (a :: k) = P -- This expands to P (kind variable) (type variable)
-data Three (a :: * -> k -> *) = T
+data Three (a :: Type -> k -> Type) = T
 
 foo :: Proxy a -> Int
 foo _ = 0
@@ -88,7 +90,7 @@ n = MkN show
 
 boo = unMkN n @Bool
 
-boo2 :: forall (a :: * -> *) . Proxy a -> Bool
+boo2 :: forall (a :: Type -> Type) . Proxy a -> Bool
 boo2 _ = False
 
 base = boo2 P

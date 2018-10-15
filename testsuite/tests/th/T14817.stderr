@@ -1,7 +1,7 @@
-T14817.hs:(5,3)-(6,31): Splicing declarations
-    [d| data family Foo :: *
+T14817.hs:(7,3)-(8,34): Splicing declarations
+    [d| data family Foo :: Type
         
-        data instance Foo :: * |]
+        data instance Foo :: Type |]
   ======>
-    data family Foo :: GHC.Types.Type
-    data instance Foo :: GHC.Types.Type
+    data family Foo :: Type
+    data instance Foo :: Type

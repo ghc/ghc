@@ -2,7 +2,9 @@
 
 module T8966 where
 
-data NQ :: [k] -> * where
+import Data.Kind (Type)
+
+data NQ :: [k] -> Type where
    D :: NQ '[a]
 
 pattern Q = D

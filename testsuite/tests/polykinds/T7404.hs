@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeFamilies, PolyKinds, ScopedTypeVariables #-}
 module T7404 where
 
-type family Foo (x :: *) (y :: x)
+import Data.Kind (Type)
+
+type family Foo (x :: Type) (y :: x)

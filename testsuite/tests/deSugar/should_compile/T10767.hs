@@ -16,9 +16,10 @@ T10767.hs:43:1: Warning:
 -}
 
 import Data.Proxy
+import Data.Kind (Type)
 
 class SpecList a where
-    type List a :: *
+    type List a :: Type
 
     slCase      :: List a -> b -> (a -> List a -> b) -> b
 

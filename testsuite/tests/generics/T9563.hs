@@ -5,9 +5,10 @@
 
 module T9563 where
 
+import Data.Kind (Type)
 import GHC.Generics
 
-data family F typ :: * -> *
+data family F typ :: Type -> Type
 data A
 data instance F A a = AData a
   deriving (Generic, Generic1)

@@ -3,7 +3,7 @@
 module Foo( shared, foo, bar) where
 -- module Foo where
 
-import GHC.Exts
+import Data.Kind
 
 {-
 foo :: [Int] -> [Int]
@@ -16,7 +16,7 @@ foo = let f = map negate
 
 -}
 
-type family Domain (f :: * -> *) a :: Constraint
+type family Domain (f :: Type -> Type) a :: Constraint
 
 type instance Domain [] a = ()
 

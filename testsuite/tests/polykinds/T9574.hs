@@ -1,18 +1,20 @@
 {-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, ScopedTypeVariables, GADTs, RankNTypes #-}
 module T9574 where
 
-data KProxy (t :: *) = KProxy
+import Data.Kind (Type)
+
+data KProxy (t :: Type) = KProxy
 data Proxy p
 
 class Funct f where
-    type Codomain f :: *
+    type Codomain f :: Type
 
 instance Funct ('KProxy :: KProxy o) where
-    type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+    type Codomain 'KProxy = NatTr (Proxy :: o -> Type)
 
-data NatTr (c :: o -> *) where
-    M :: (forall (a :: o). Proxy a) -> NatTr (c :: o -> *)
+data NatTr (c :: o -> Type) where
+    M :: (forall (a :: o). Proxy a) -> NatTr (c :: o -> Type)
 
-p :: forall (c :: o -> *). NatTr c
+p :: forall o (c :: o -> Type). NatTr c
 p = M t where
     M t = undefined :: Codomain ('KProxy :: KProxy o)

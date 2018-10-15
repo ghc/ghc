@@ -5,11 +5,13 @@
 -- Newtypes, PolyKinds, DataKinds, GADTs, DataFamilies
 module EmptyCase010 where
 
-newtype Baz (f :: k -> *) (a :: k) = Baz (f a)
+import Data.Kind (Type)
+
+newtype Baz (f :: k -> Type) (a :: k) = Baz (f a)
 
 data T = T1 | T2 T | T3 T T | T4 () -- only promoted
 
-data GC :: T -> * where
+data GC :: T -> Type where
   MkGC1 :: GC 'T1
   MkGC2 :: T -> GC (T4 '())
 
@@ -25,7 +27,7 @@ f22 = \case
 f23 :: Baz GC 'T1 -> ()
 f23 = \case
 
-data GD :: (* -> *) -> * where
+data GD :: (Type -> Type) -> Type where
   MkGD1 :: GD Maybe
   MkGD2 :: GD []
   MkGD3 :: GD f
@@ -42,7 +44,7 @@ f25 x = case x of {}
 f26 :: Baz GD f -> ()
 f26 = \case
 
-data family DC a :: * -> *
+data family DC a :: Type -> Type
 
 data instance DC () Int -- Empty type
 

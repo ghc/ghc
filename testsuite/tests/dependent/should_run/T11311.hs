@@ -3,6 +3,6 @@ module T11311 where
 import Data.Kind
 
 foo :: ()
-foo = (id :: * -> *) undefined `seq` ()
+foo = (id :: Type -> Type) undefined `seq` ()
 
 main = print foo

@@ -9,13 +9,14 @@
 -- with a compiler built with -DDEBUG
 
 module T11562 where
-import qualified GHC.Types as C (Constraint)
 
-class Category (cat :: k -> k -> *) where
+import Data.Kind
+
+class Category (cat :: k -> k -> Type) where
   id :: cat a a
   (.) :: cat b c -> cat a b -> cat a c
 
-data Dict :: C.Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 newtype C2D a b = Sub (a => Dict b)

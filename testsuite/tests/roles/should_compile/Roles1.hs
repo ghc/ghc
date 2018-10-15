@@ -2,10 +2,12 @@
 
 module Roles1 where
 
+import Data.Kind (Type)
+
 data T1 a = K1 a
 data T2 a = K2 a
 data T3 (a :: k) = K3
-data T4 (a :: * -> *) b = K4 (a b)
+data T4 (a :: Type -> Type) b = K4 (a b)
 
 data T5 a = K5 a
 data T6 a = K6

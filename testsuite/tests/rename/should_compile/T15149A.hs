@@ -1,4 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 module T15149A where
 
-data family An c :: *
+import Data.Kind (Type)
+
+data family An c :: Type

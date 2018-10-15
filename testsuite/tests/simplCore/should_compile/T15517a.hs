@@ -9,16 +9,17 @@
 {-# LANGUAGE TypeOperators           #-}
 module T15517a () where
 
+import Data.Kind (Type)
 import Data.Proxy
 
-newtype Rep (ki :: kon -> *) (phi :: Nat -> *) (code :: [[Atom kon]])
+newtype Rep (ki :: kon -> Type) (phi :: Nat -> Type) (code :: [[Atom kon]])
   = Rep (NS (PoA ki phi) code)
 
-data NA  :: (kon -> *) -> (Nat -> *) -> Atom kon -> * where
+data NA  :: (kon -> Type) -> (Nat -> Type) -> Atom kon -> Type where
   NA_I :: (IsNat k) => phi k -> NA ki phi (I k)
   NA_K ::              ki  k -> NA ki phi (K k)
 
-data NP :: (k -> *) -> [k] -> * where
+data NP :: (k -> Type) -> [k] -> Type where
   NP0  :: NP p '[]
   (:*) :: p x -> NP p xs -> NP p (x : xs)
 
@@ -32,33 +33,33 @@ instance IsNat n => IsNat (S n) where
 proxyUnsuc :: Proxy (S n) -> Proxy n
 proxyUnsuc _ = Proxy
 
-type PoA (ki :: kon -> *) (phi :: Nat -> *) = NP (NA ki phi)
+type PoA (ki :: kon -> Type) (phi :: Nat -> Type) = NP (NA ki phi)
 
 data Atom kon
   = K kon
   | I Nat
 
 data Nat = S Nat | Z
-data SNat :: Nat -> * where
+data SNat :: Nat -> Type where
   SZ ::           SNat Z
   SS :: SNat n -> SNat (S n)
 
 data Kon = KInt
-data Singl (kon :: Kon) :: * where
+data Singl (kon :: Kon) :: Type where
   SInt :: Int -> Singl KInt
 
 type family Lkup (n :: Nat) (ks :: [k]) :: k where
   Lkup Z     (k : ks) = k
   Lkup (S n) (k : ks) = Lkup n ks
 
-data El :: [*] -> Nat -> * where
+data El :: [Type] -> Nat -> Type where
   El :: IsNat ix => Lkup ix fam -> El fam ix
 
-data NS :: (k -> *) -> [k] -> * where
+data NS :: (k -> Type) -> [k] -> Type where
   There :: NS p xs -> NS p (x : xs)
   Here  :: p x     -> NS p (x : xs)
 
-class Family (ki :: kon -> *) (fam :: [*]) (codes :: [[[Atom kon]]])
+class Family (ki :: kon -> Type) (fam :: [Type]) (codes :: [[[Atom kon]]])
       | fam -> ki codes , ki codes -> fam where
     sfrom' :: SNat ix -> El fam ix -> Rep ki (El fam) (Lkup ix codes)
 

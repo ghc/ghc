@@ -3,8 +3,10 @@
 
 module T7280 where
 
-type family Mutable (v :: * -> *) :: * -> * -> *
-class MVector (v :: * -> * -> *) a
+import Data.Kind (Type)
+
+type family Mutable (v :: Type -> Type) :: Type -> Type -> Type
+class MVector (v :: Type -> Type -> Type) a
 class MVector (Mutable v) a => Vector v a where
    copy :: Monad m => Mutable v s a -> v a -> m ()
 

@@ -5,13 +5,13 @@ module Main where
 import Prelude hiding (lookup)
 import Data.Char (ord)
 import qualified Data.Map as Map
-
+import Data.Kind (Type)
 
 -- Generic maps as ATs
 -- -------------------
 
 class GMapKey k where
-  data GMap k :: * -> *
+  data GMap k :: Type -> Type
   empty       :: GMap k v
   lookup      :: k -> GMap k v -> Maybe v
   insert      :: k -> v -> GMap k v -> GMap k v

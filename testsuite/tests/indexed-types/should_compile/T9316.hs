@@ -14,12 +14,12 @@ module SingletonsBug where
 
 import Control.Applicative
 import Data.Traversable (for)
-import GHC.Exts( Constraint )
+import Data.Kind (Type, Constraint)
 
 -----------------------------------
 -- From 'constraints' library
 -- import Data.Constraint (Dict(..))
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 -----------------------------------
@@ -33,7 +33,7 @@ class SingI (a :: k) where
 
 data family Sing (a :: k)
 
-data KProxy (a :: *) = KProxy
+data KProxy (a :: Type) = KProxy
 
 data SomeSing (kproxy :: KProxy k) where
   SomeSing :: Sing (a :: k) -> SomeSing ('KProxy :: KProxy k)
@@ -42,7 +42,7 @@ data SomeSing (kproxy :: KProxy k) where
 class (kparam ~ 'KProxy) => SingKind (kparam :: KProxy k) where
   -- | Get a base type from a proxy for the promoted kind. For example,
   -- @DemoteRep ('KProxy :: KProxy Bool)@ will be the type @Bool@.
-  type DemoteRep kparam :: *
+  type DemoteRep kparam :: Type
 
   -- | Convert a singleton to its unrefined version.
   fromSing :: Sing (a :: k) -> DemoteRep kparam
@@ -71,7 +71,7 @@ instance SingKind ('KProxy :: KProxy SubscriptionChannel) where
 instance SingI BookingsChannel where
   sing = SBookingsChannel
 
-type family T (c :: SubscriptionChannel) :: *
+type family T (c :: SubscriptionChannel) :: Type
 type instance T 'BookingsChannel = Bool
 
 witnessC :: Sing channel -> Dict (Show (T channel), SingI channel)

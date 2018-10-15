@@ -4,6 +4,8 @@
 -- Check interaction between Newtypes and DataFamilies
 module EmptyCase008 where
 
+import Data.Kind (Type)
+
 data family DA a
 
 newtype Foo3 a = Foo3 (DA a)
@@ -25,7 +27,7 @@ f13 :: Foo3 () -> ()
 f13 = \case
 
 -- ----------------
-data family DB a :: * -> *
+data family DB a :: Type -> Type
 
 data instance DB Int a where
   MkDB1 :: DB Int ()

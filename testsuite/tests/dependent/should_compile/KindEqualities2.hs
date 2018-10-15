@@ -8,7 +8,7 @@ import GHC.Exts ( Any )
 
 data Kind = Star | Arr Kind Kind
 
-data Ty :: Kind -> * where
+data Ty :: Kind -> Type where
   TInt :: Ty Star
   TBool :: Ty Star
   TMaybe :: Ty (Arr Star Star)
@@ -22,7 +22,7 @@ data TyRep (k :: Kind) (t :: Ty k) where
   TyApp :: TyRep (Arr k1 k2) a -> TyRep k1 b -> TyRep k2 (TApp a b)
 
 type family IK (k :: Kind)
-type instance IK Star = *
+type instance IK Star = Type
 type instance IK (Arr k1 k2) = IK k1 -> IK k2
 
 $(return [])  -- necessary because the following instances depend on the

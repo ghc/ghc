@@ -3,5 +3,7 @@
 
 module T7903 where
 
-instance Eq (((->) a :: * -> *) b)
+import Data.Kind (Type)
+
+instance Eq (((->) a :: Type -> Type) b)
 instance (Ord b) => Ord (((->) a) b)

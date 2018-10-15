@@ -4,9 +4,11 @@
 
 module PolyKinds01 where
 
+import Data.Kind (Type)
+
 data Nat = Ze | Su Nat
 
-data Vec :: * -> Nat -> * where
+data Vec :: Type -> Nat -> Type where
   VNil  :: Vec a Ze
   VCons :: a -> Vec a n -> Vec a (Su n)
 

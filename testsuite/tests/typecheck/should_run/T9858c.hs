@@ -2,10 +2,10 @@
 module Main(main) where
 
 import Data.Typeable
-import GHC.Exts
+import Data.Kind
 
 test1 :: Bool
-test1 = typeRep (Proxy :: Proxy (() :: *)) ==
+test1 = typeRep (Proxy :: Proxy (() :: Type)) ==
         typeRep (Proxy :: Proxy (() :: Constraint))
 
 test2 :: Bool

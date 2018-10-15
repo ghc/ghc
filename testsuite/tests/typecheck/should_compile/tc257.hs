@@ -1,16 +1,16 @@
 {-# LANGUAGE KindSignatures, ConstraintKinds, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
 module Ctx where
 
-import Data.Kind ( Constraint )
+import Data.Kind ( Type, Constraint )
 
-data Proxy (ctxt :: * -> Constraint) = Proxy
+data Proxy (ctxt :: Type -> Constraint) = Proxy
 
 -- At one time, this one worked:
 nonmeth :: ctxt Int => Proxy ctxt -> a
 nonmeth prox = nonmeth prox
 
 
-class Foo (ctxt :: * -> Constraint) a where
+class Foo (ctxt :: Type -> Constraint) a where
     meth :: ctxt a => Proxy ctxt -> a
 
 instance ctxt Int => Foo ctxt Int where

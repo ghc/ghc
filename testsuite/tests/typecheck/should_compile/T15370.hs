@@ -13,7 +13,7 @@ data S (a :: Either x y)
 mkRefl :: n :~: j
 mkRefl = Refl
 
-right :: forall (r :: Either x y).
+right :: forall x y (r :: Either x y).
          S r -> ()
 right no =
   case mkRefl @x @y of

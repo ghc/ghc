@@ -13,6 +13,8 @@ reimplemented in Haskell for our purposes. -}
              RankNTypes, TypeFamilies, FlexibleInstances, IncoherentInstances #-}
 module TypeMachinery where
 
+import Data.Kind (Type)
+
 -- The natural numbers:
 --  o first the phantom types
 
@@ -20,7 +22,7 @@ data Z; data S n
 
 -- o the using the above the singleton type Nat'
 
-data Nat' :: * -> * where
+data Nat' :: Type -> Type where
   Z :: Nat' Z
   S :: Nat' n -> Nat' (S n)
 
@@ -28,7 +30,7 @@ deriving instance Show (Nat' a)
 
 -- Type-level addition
 
-type family Plus m n :: *
+type family Plus m n :: Type
 type instance Plus Z n = n
 type instance Plus (S m) n = S (Plus m n)
 
@@ -48,7 +50,7 @@ sameNat' _ _ = False
 -- A data type for existentially hiding
 -- (e.g.) Nat' values
 
-data Hidden :: (* -> *) -> * where
+data Hidden :: (Type -> Type) -> Type where
   Hide :: Show (a n) => a n -> Hidden a
 
 deriving instance Show (Hidden t)
@@ -93,7 +95,7 @@ instance Integral (Hidden Nat') where
 -- McBride's Fin data type. By counting backwards from the
 -- result index, it only admits a fixed number of inhabitants.
 
-data Fin :: * -> * where
+data Fin :: Type -> Type where
     Stop :: Fin (S Z)
     Retreat :: Fin s -> Fin (S s)
 

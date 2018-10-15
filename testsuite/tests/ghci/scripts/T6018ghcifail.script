@@ -2,10 +2,10 @@
 :set -XDataKinds
 :set -XUndecidableInstances
 :set -XPolyKinds
+import Data.Kind (Type)
 
 
-
-type family F a b c = (result :: *) | result -> a b c
+type family F a b c = (result :: Type) | result -> a b c
 type instance F Int  Char Bool = Bool
 type instance F Char Bool Int  = Int
 type instance F Bool Int  Char = Int

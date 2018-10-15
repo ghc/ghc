@@ -8,6 +8,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 module T14172a where
 
+import Data.Kind
 import Data.Coerce
 import Data.Functor.Compose
 import Data.Functor.Identity
@@ -45,10 +46,10 @@ withIso ai k = case ai (Exchange id Identity) of
 {-# INLINE withIso #-}
 
 class Wrapped s where
-  type Unwrapped s :: *
+  type Unwrapped s :: Type
   _Wrapped' :: Iso' s (Unwrapped s)
 
-class Wrapped s => Rewrapped (s :: *) (t :: *)
+class Wrapped s => Rewrapped (s :: Type) (t :: Type)
 
 class    (Rewrapped s t, Rewrapped t s) => Rewrapping s t
 instance (Rewrapped s t, Rewrapped t s) => Rewrapping s t

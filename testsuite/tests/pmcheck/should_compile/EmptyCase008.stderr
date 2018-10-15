@@ -1,18 +1,19 @@
-EmptyCase008.hs:15:7: warning: [-Wincomplete-patterns (in -Wextra)]
+
+EmptyCase008.hs:17:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
             (Foo3 (MkDA1 _))
             (Foo3 MkDA2)
 
-EmptyCase008.hs:19:7: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase008.hs:21:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative: Patterns not matched: _ :: Foo3 a
 
-EmptyCase008.hs:38:7: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase008.hs:40:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative: Patterns not matched: (Foo4 MkDB1)
 
-EmptyCase008.hs:46:7: warning: [-Wincomplete-patterns (in -Wextra)]
+EmptyCase008.hs:48:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative: Patterns not matched: _ :: Foo4 a b

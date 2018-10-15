@@ -1,7 +1,9 @@
 {-# LANGUAGE TypeFamilies #-}
 module GhciKinds where
 
-type family F a :: *
+import Data.Kind (Type)
+
+type family F a :: Type
 type instance F [a] = a -> F a
 type instance F Int = Bool
 

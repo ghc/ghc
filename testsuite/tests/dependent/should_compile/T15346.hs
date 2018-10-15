@@ -24,7 +24,7 @@ class SDecide k where
 instance SDecide () where
   test = undefined
 
-test1 :: forall (a :: k). SDecide (Rep k) => Proxy a
+test1 :: forall k (a :: k). SDecide (Rep k) => Proxy a
 test1 = seq (test @_ @(PFrom a)) Proxy
 
 test2 :: forall (a :: ()). Proxy a

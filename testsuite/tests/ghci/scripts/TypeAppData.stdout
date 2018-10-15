@@ -7,7 +7,6 @@ P6 :: forall {k} {a :: k}. P1 a -> P6
 P7 :: forall {k} {a :: k}. P1 a
 P8 :: forall {k} {a :: k}. P1 a
 P9 :: forall {k} {a :: k}. P1 a
-P10 :: forall {k} {a :: k}. P1 a
 P11 :: forall {k} {a :: k}. P1 a -> P5
 P12 :: forall {k} {a :: k}. P1 a -> P5
 P13 :: forall {k} {a :: k}. P1 a -> P5

@@ -4,14 +4,14 @@
 
 module PolyInstances where
 
-import GHC.Exts
+import Data.Kind
 import Data.Proxy
 
 class C (a :: k)
 
 instance (C a, C b) => C (a b)
 
-data Dict :: Constraint -> *
+data Dict :: Constraint -> Type
 
 instance C Dict
 

@@ -2,7 +2,9 @@
 
 module GADT13 where
 
-data family HiThere a :: *
+import Data.Kind (Type)
+
+data family HiThere a :: Type
 
 data instance HiThere () where
     HiThere :: HiThere ()

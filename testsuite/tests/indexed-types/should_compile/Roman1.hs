@@ -6,9 +6,10 @@
 module Roman where
 
 import Control.Monad.ST
+import Data.Kind (Type)
 
-type family Mut (v :: * -> *) :: * -> * -> *
-type family State (m :: * -> *)
+type family Mut (v :: Type -> Type) :: Type -> Type -> Type
+type family State (m :: Type -> Type)
 type instance State (ST s) = s
 
 unsafeFreeze :: Mut v (State (ST s)) a -> ST s (v a)
@@ -22,10 +23,10 @@ new p = runST (do
 ---------------------------------------------
 -- Here's a simpler version that also failed
 
-type family FMut :: * -> *      -- No args
-                                -- Same thing happens with one arg
+type family FMut :: Type -> Type      -- No args
+                                      -- Same thing happens with one arg
 
-type family   FState (m :: *)
+type family   FState (m :: Type)
 type instance FState Char = Int
 
 funsafeFreeze :: FMut (FState Char) -> ()

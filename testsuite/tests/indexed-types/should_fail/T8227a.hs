@@ -1,7 +1,9 @@
 {-# LANGUAGE TypeFamilies #-}
 module T8227a where
 
-type family V a :: *
+import Data.Kind (Type)
+
+type family V a :: Type
 
 type instance V Double    = Double
 type instance V (a -> b)   = V b

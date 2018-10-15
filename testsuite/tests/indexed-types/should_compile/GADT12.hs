@@ -6,10 +6,12 @@
 
 module ShouldCompile where
 
+import qualified Data.Kind as K (Type)
+
 data Typed
 data Untyped
 
-type family TU a b :: *
+type family TU a b :: K.Type
 type instance TU Typed b = b
 type instance TU Untyped b = ()
 
@@ -20,7 +22,7 @@ data Type a where
     TypeString  :: Type String
     TypeList    :: Type t -> Type [t]
 
-data Expr :: * -> * -> * {- tu a -} where
+data Expr :: K.Type -> K.Type -> K.Type {- tu a -} where
     Const :: Type a -> a -> Expr tu (TU tu a)
     Var2  :: a -> TU tu (Type a) -> Expr tu (TU tu a)
 

@@ -8,19 +8,21 @@
 
 module T2715 where
 
+import Data.Kind (Type)
+
 data Interval v where
    Intv :: (Ord v, Enum v) => (v,v) -> Interval v
 
-type family Domain (d :: * -> *) :: * -> *
+type family Domain (d :: Type -> Type) :: Type -> Type
 type instance Domain Interval = Interval 
 
-type family Value (d :: * -> *) :: *
+type family Value (d :: Type -> Type) :: Type
 
 class IDomain d where
    empty   :: (Ord (Value d), Enum (Value d)) => Domain d (Value d)
 
 class (IDomain d1) -- (IDomain d1, IDomain d2, Value d1 ~ Value d2) 
-   => IIDomain (d1 :: * -> *) (d2 :: * -> * ) where
+   => IIDomain (d1 :: Type -> Type) (d2 :: Type -> Type ) where
    equals  :: Domain d1 (Value d1) -> Domain d2 (Value d2) -> Bool
 
 

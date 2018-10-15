@@ -7,6 +7,8 @@
 
 module T5862 where
 
+import Data.Kind (Type)
+
 data Nat = Zero | Succ Nat
 
 data SNat a where
@@ -24,4 +26,4 @@ data SMaybe a where
 type family Sing (a :: k)
 type instance Sing (a :: Nat) = SNat a
 type instance Sing (a :: Bool) = SBool a
-type instance Sing (a :: Maybe *) = SMaybe a -- want to say Maybe k
+type instance Sing (a :: Maybe Type) = SMaybe a -- want to say Maybe k

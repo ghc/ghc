@@ -4,7 +4,9 @@
 
 module Main where
 
-type family F a :: *
+import Data.Kind (Type)
+
+type family F a :: Type
 type instance F Int = (Int, ())
 
 class C a

@@ -1,22 +1,24 @@
 {-# LANGUAGE GADTs, DataKinds, KindSignatures, PolyKinds, FlexibleContexts, RankNTypes, ScopedTypeVariables #-}
 module T9725 where
 
+import Data.Kind (Type)
+
 data En = M Bool
 class Kn (l :: En)
 
 instance Kn (M b)
 
-data Fac :: En -> * where
+data Fac :: En -> Type where
   Mo :: Kn (M b) => Fac (M b)
 
-data Fm :: * -> * where
+data Fm :: Type -> Type where
   HiF :: Kn (ent b) => Fm (Fac (ent b)) -> Fm (O ent)
   MoF :: Kn (M b) => Fm (Fac (M b))
 
-data O :: (k -> En) -> * where
+data O :: (k -> En) -> Type where
   Hi :: Fac (ent k) -> O ent
 
-data Co :: (* -> *) -> * -> * where
+data Co :: (Type -> Type) -> Type -> Type where
   Ab :: (t -> f t) -> Co f t
 
 -- Restricted kind signature:

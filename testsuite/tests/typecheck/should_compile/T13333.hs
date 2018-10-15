@@ -14,7 +14,7 @@ import GHC.Exts (Constraint)
 data T (phantom :: k) = T
 
 data D (p :: k -> Constraint) (x :: j) where
-  D :: forall (p :: k -> Constraint) (x :: k). p x => D p x
+  D :: forall k (p :: k -> Constraint) (x :: k). p x => D p x
 
 class Possibly p x where
   possibly :: proxy1 p -> proxy2 x -> Maybe (D p x)

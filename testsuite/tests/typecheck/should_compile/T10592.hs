@@ -4,6 +4,7 @@
 
 module T10592 where
 
+import Data.Kind (Type)
 import Prelude (Bool(True,False),Integer,Ordering)
 import qualified Prelude
 
@@ -11,7 +12,7 @@ import qualified Prelude
 -- class hierarchy
 
 class Boolean (Logic a) => Eq a where
-    type Logic a :: *
+    type Logic a :: Type
     (==) :: a -> a -> Logic a
 
     (/=) :: a -> a -> Logic a

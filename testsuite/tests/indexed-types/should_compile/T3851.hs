@@ -2,7 +2,9 @@
 
 module T3851 where
 
-type family TF a :: * -> *
+import Data.Kind (Type)
+
+type family TF a :: Type -> Type
 type instance TF () = App (Equ ())
 
 data Equ ix ix' where Refl :: Equ ix ix
@@ -17,7 +19,7 @@ ar :: App (Equ ()) () -> ()
 ar (App Refl) = ()
 
 ------------------
-data family DF a :: * -> *
+data family DF a :: Type -> Type
 data instance DF () a = D (App (Equ ()) a)
 
 bar_df :: DF () () -> ()

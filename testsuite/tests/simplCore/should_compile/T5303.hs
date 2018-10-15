@@ -3,22 +3,23 @@ module T5303( showContextSeries ) where
 
 import Control.Monad.State.Strict( StateT )  
 import Control.Monad.Trans ( lift )
+import Data.Kind (Type)
 
-data Tree (m :: * -> *) = Tree {}
+data Tree (m :: Type -> Type) = Tree {}
 
-data FL (a :: * -> * -> *) x z where
+data FL (a :: Type -> Type -> Type) x z where
     (:>:) :: a x y -> FL a y z -> FL a x z
     NilFL :: FL a x x
 
-class (Functor m, Monad m) => ApplyMonad m (state :: (* -> *) -> *)
+class (Functor m, Monad m) => ApplyMonad m (state :: (Type -> Type) -> Type)
 
-class Apply (p :: * -> * -> *) where
-    type ApplyState p :: (* -> *) -> *
+class Apply (p :: Type -> Type -> Type) where
+    type ApplyState p :: (Type -> Type) -> Type
     apply :: ApplyMonad m (ApplyState p) => p x y -> m ()
 
 class (Functor m, Monad m, ApplyMonad (ApplyMonadOver m state) state)
-      => ApplyMonadTrans m (state :: (* -> *) -> *) where
-  type ApplyMonadOver m state :: * -> *
+      => ApplyMonadTrans m (state :: (Type -> Type) -> Type) where
+  type ApplyMonadOver m state :: Type -> Type
   runApplyMonad :: (ApplyMonadOver m state) x -> state m -> m (x, state m)
 
 instance (Functor m, Monad m) => ApplyMonadTrans m Tree where

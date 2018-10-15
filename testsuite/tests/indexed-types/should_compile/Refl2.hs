@@ -2,7 +2,9 @@
 
 module Refl2 where
 
-type family T (a :: * -> *) :: * -> *
+import Data.Kind (Type)
+
+type family T (a :: Type -> Type) :: Type -> Type
 
 data U a x = U (T a x)
 

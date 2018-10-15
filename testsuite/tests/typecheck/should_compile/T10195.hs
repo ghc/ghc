@@ -5,10 +5,10 @@
 
 module T10195 where
 
-import GHC.Exts
+import Data.Kind
 
 data Foo m zp r'q = Foo zp
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 type family BarFamily a b :: Bool
