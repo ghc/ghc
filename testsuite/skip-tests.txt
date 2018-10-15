@@ -27,11 +27,6 @@ T13244
 
 ### Simplifier
 T3591
-### PrepareRHS variable
-cholewo-eval
-
-### Core Prep
-ds046
 
 ### Polymorphism See #91
 
