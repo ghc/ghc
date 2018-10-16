@@ -81,7 +81,8 @@ if args.only:
     config.only = args.only
     config.run_only_some_tests = True
 
-with open("../skip-tests.txt", 'r') as f:
+from os.path import dirname, abspath
+with open(os.path.join(dirname(dirname(abspath(__file__))), "skip-tests.txt"), 'r') as f:
     config.skipTests = set(f.read().splitlines())
 
 if args.way:
