@@ -1168,9 +1168,8 @@ The rules for map work like this.
 -- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost
 -- Coercions for Haskell", section 6.5:
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
--- TODO: MattP disabled for now as the MkCoercible wrapper makes things go
--- funny
--- {-# RULES "map/coerce" [1] map coerce = coerce #-}
+
+{-# RULES "map/coerce" [1] map coerce = coerce #-}
 
 
 ----------------------------------------------
