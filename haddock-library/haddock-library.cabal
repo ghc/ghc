@@ -6,8 +6,8 @@ description:          Haddock is a documentation-generation tool for Haskell
                       libraries. These modules expose some functionality of it
                       without pulling in the GHC dependency. Please note that the
                       API is likely to change so specify upper bounds in your
-                      project if you can't release often. For interacting with Haddock
-                      itself, see the ‘haddock’ package.
+                      project. For interacting with Haddock
+                      itself, see the [haddock package](https://hackage.haskell.org/package/haddock).
 license:              BSD3
 license-files:        LICENSE
 maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
