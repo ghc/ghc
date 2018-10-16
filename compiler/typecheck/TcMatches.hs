@@ -220,12 +220,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
 
        ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
        ; let (usages,matches') = unzip umatches
-       ; tcEmitBindingUsage $
-           case usages of -- Interestingly the empty cases must be
-                          -- special-cased: @zeroUE@ is not the identity of
-                          -- @supUE@.
-             [] -> zeroUE
-             _  -> foldr1 supUE usages
+       ; tcEmitBindingUsage $ supUEs usages
        ; pat_tys  <- mapM (mapM readExpType) pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts = L l matches'
@@ -271,10 +266,11 @@ tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (Located (body GhcRn)) -> ExpRhoType
 -- but we don't need to do that any more
 
 tcGRHSs ctxt (GRHSs _ grhss (L l binds)) res_ty
-  = do  { (binds', grhss')
+  = do  { (binds', ugrhss)
             <- tcLocalBinds binds $
-               mapM (wrapLocM (tcGRHS ctxt res_ty)) grhss
-
+               mapM (tcCollectingUsage . wrapLocM (tcGRHS ctxt res_ty)) grhss
+        ; let (usages, grhss') = unzip ugrhss
+        ; tcEmitBindingUsage $ supUEs usages
         ; return (GRHSs noExt grhss' (L l binds')) }
 tcGRHSs _ (XGRHSs _) _ = panic "tcGRHSs"
 
