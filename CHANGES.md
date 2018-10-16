@@ -1,13 +1,17 @@
-## TBD / GHC-8.5+
+## Changes in version 2.21.0
 
  * Overhaul handling of data declarations in XHTML and LaTeX. Adds support for
    documenting individual arguments of constructors/patterns (#709)
 
+ * Actually list all fixities for `--hoogle` (#871)
+
+ * Fix broken instance source links (#869)
+
+ * Avoiding line breaks due to ling line in the output of `--hoogle` (#868)
+
+ * Capture docs on type family instances (#867)
+
 ## Changes in version 2.20.0
-
-TODO
-
-## Changes in version 2.19.1
 
  * Show where instances are defined (#748)
 

@@ -8,7 +8,7 @@ module Bug722
 class Foo a
 (!@#) :: Foo a => a -> a -> a
 infixl 4 !@#
-type family &* :: * -> * -> *
+type family (&*) :: * -> * -> *
 infixr 3 &*
 data a :-& b
 (:^&) :: a -> b -> (:-&) a b

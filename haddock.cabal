@@ -1,6 +1,6 @@
 cabal-version:        2.0
 name:                 haddock
-version:              2.20.0
+version:              2.21.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -23,17 +23,17 @@ description:
   without any documentation annotations, Haddock can generate useful documentation
   from your source code.
   .
-  <<https://cdn.rawgit.com/haskell/haddock/master/doc/cheatsheet/haddocks.svg>>
+  <<https://cdn.rawgit.com/haskell/haddock/ghc-8.6/doc/cheatsheet/haddocks.svg>>
 license:              BSD3
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
-maintainer:           Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==8.4.*
+tested-with:          GHC==8.6.*
 
 extra-source-files:
   CHANGES.md
@@ -142,7 +142,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.20.0
+    build-depends:  haddock-api == 2.21.0
 
 test-suite html-test
   type:             exitcode-stdio-1.0

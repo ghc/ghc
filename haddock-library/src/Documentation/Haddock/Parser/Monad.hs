@@ -17,6 +17,7 @@ import           Data.String                 ( IsString(..) )
 import           Data.Bits                   ( Bits(..) )
 import           Data.Char                   ( ord )
 import           Data.List                   ( foldl' )
+import           Control.Applicative as App
 
 import           Documentation.Haddock.Types ( Version )
 
@@ -52,7 +53,7 @@ peekChar' = Parsec.lookAhead Parsec.anyChar
 
 -- | Parses the given string. Returns the parsed string.
 string :: Text -> Parser Text
-string t = Parsec.string (T.unpack t) *> pure t
+string t = Parsec.string (T.unpack t) *> App.pure t
 
 -- | Scan the input text, accumulating characters as long as the scanning
 -- function returns true.

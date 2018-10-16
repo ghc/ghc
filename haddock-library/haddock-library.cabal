@@ -1,16 +1,16 @@
 cabal-version:        2.0
 name:                 haddock-library
-version:              1.6.0
+version:              1.6.1
 synopsis:             Library exposing some functionality of Haddock.
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries. These modules expose some functionality of it
                       without pulling in the GHC dependency. Please note that the
                       API is likely to change so specify upper bounds in your
-                      project if you can't release often. For interacting with Haddock
-                      itself, see the ‘haddock’ package.
+                      project. For interacting with Haddock
+                      itself, see the [haddock package](https://hackage.haskell.org/package/haddock).
 license:              BSD3
 license-files:        LICENSE
-maintainer:           Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+maintainer:           Alec Theriault <alec.theriault@gmail.com>, Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
@@ -71,7 +71,7 @@ test-suite spec
       Documentation.Haddock.Utf8Spec
 
   build-depends:
-      base         >= 4.5     && < 4.12
+      base         >= 4.5     && < 4.13
     , base-compat  >= 0.9.3   && < 0.11
     , bytestring   >= 0.9.2.1 && < 0.11
     , containers   >= 0.4.2.1 && < 0.7
@@ -91,8 +91,9 @@ test-suite fixtures
   main-is:          Fixtures.hs
   ghc-options:      -Wall -O0
   hs-source-dirs:   fixtures
+  buildable:        False
   build-depends:
-      base         >= 4.5     && < 4.12
+      base         >= 4.5     && < 4.13
     , base-compat  >= 0.9.3   && < 0.11
     , directory             ^>= 1.3.0.2
     , filepath              ^>= 1.4.1.2
