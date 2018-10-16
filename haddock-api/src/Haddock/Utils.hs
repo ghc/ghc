@@ -33,6 +33,7 @@ module Haddock.Utils (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
+  writeUtf8File,
 
   -- * HTML cross reference mapping
   html_xrefs_ref, html_xrefs_ref',
@@ -75,7 +76,7 @@ import Data.List ( isSuffixOf )
 import Data.Maybe ( mapMaybe )
 import System.Environment ( getProgName )
 import System.Exit
-import System.IO ( hPutStr, stderr )
+import System.IO ( hPutStr, hSetEncoding, IOMode(..), stderr, utf8, withFile )
 import System.IO.Unsafe ( unsafePerformIO )
 import qualified System.FilePath.Posix as HtmlPath
 import Distribution.Verbosity
@@ -395,6 +396,15 @@ isAlphaChar c    = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 isDigitChar c    = c >= '0' && c <= '9'
 isAlphaNumChar c = isAlphaChar c || isDigitChar c
 
+-- | Utility to write output to UTF-8 encoded files.
+--
+-- The problem with 'writeFile' is that it picks up its 'TextEncoding' from
+-- 'getLocaleEncoding', and on some platforms (like Windows) this default
+-- encoding isn't enough for the characters we want to write.
+writeUtf8File :: FilePath -> String -> IO ()
+writeUtf8File filepath contents = withFile filepath WriteMode $ \h -> do
+    hSetEncoding h utf8
+    hPutStr h contents
 
 -----------------------------------------------------------------------------
 -- * HTML cross references

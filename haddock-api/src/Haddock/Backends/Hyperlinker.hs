@@ -6,6 +6,7 @@ module Haddock.Backends.Hyperlinker
 
 
 import Haddock.Types
+import Haddock.Utils (writeUtf8File)
 import Haddock.Backends.Hyperlinker.Renderer
 import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Utils
@@ -44,7 +45,7 @@ ppHyperlinkedModuleSource :: FilePath -> Bool -> SrcMap -> Interface
                           -> IO ()
 ppHyperlinkedModuleSource srcdir pretty srcs iface =
     case ifaceTokenizedSrc iface of
-        Just tokens -> writeFile path . html . render' $ tokens
+        Just tokens -> writeUtf8File path . html . render' $ tokens
         Nothing -> return ()
   where
     render' = render (Just srcCssFile) (Just highlightScript) srcs

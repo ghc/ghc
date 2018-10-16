@@ -283,7 +283,7 @@ ppHtmlContents dflags odir doctitle _maybe_package
             ppModuleTree pkg qual tree
           ]
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
+  writeUtf8File (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
 
 
 ppPrologue :: Maybe Package -> Qualification -> String -> Maybe (MDoc GHC.RdrName) -> Html
@@ -425,9 +425,9 @@ ppHtmlIndex odir doctitle _maybe_package themes
     mapM_ (do_sub_index index) initialChars
     -- Let's add a single large index as well for those who don't know exactly what they're looking for:
     let mergedhtml = indexPage False Nothing index
-    writeFile (joinPath [odir, subIndexHtmlFile merged_name]) (renderToString debug mergedhtml)
+    writeUtf8File (joinPath [odir, subIndexHtmlFile merged_name]) (renderToString debug mergedhtml)
 
-  writeFile (joinPath [odir, indexHtmlFile]) (renderToString debug html)
+  writeUtf8File (joinPath [odir, indexHtmlFile]) (renderToString debug html)
 
   where
     indexPage showLetters ch items =
@@ -468,7 +468,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
     do_sub_index this_ix c
       = unless (null index_part) $
-          writeFile (joinPath [odir, subIndexHtmlFile [c]]) (renderToString debug html)
+          writeUtf8File (joinPath [odir, subIndexHtmlFile [c]]) (renderToString debug html)
       where
         html = indexPage True (Just c) index_part
         index_part = [(n,stuff) | (n,stuff) <- this_ix, toUpper (head n) == c]
@@ -562,7 +562,7 @@ ppHtmlModule odir doctitle themes
           ]
 
   createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
+  writeUtf8File (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
 
 signatureDocURL :: String
 signatureDocURL = "https://wiki.haskell.org/Module_signature"

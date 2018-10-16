@@ -135,7 +135,7 @@ ppLaTeXTop doctitle packageStr odir prologue maybe_style ifaces = do
 
       filename = odir </> (fromMaybe "haddock" packageStr <.> "tex")
 
-  writeFile filename (show tex)
+  writeUtf8File filename (show tex)
 
 
 ppLaTeXModule :: String -> FilePath -> Interface -> IO ()
@@ -168,7 +168,7 @@ ppLaTeXModule _title odir iface = do
 
       body = processExports exports
   --
-  writeFile (odir </> moduleLaTeXFile mdl) (fullRender PageMode 80 1 txtPrinter "" tex)
+  writeUtf8File (odir </> moduleLaTeXFile mdl) (fullRender PageMode 80 1 txtPrinter "" tex)
 
 -- | Prints out an entry in a module export list.
 exportListItem :: ExportItem DocNameI -> LaTeX
