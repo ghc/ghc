@@ -1901,10 +1901,12 @@ type :: { LHsType GhcPs }
         | btype '->' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOmega $3)
                                               [mu AnnRarrow $2] }
 
-        | btype '⊸' ctype             {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
-                                              [mu AnnRarrow $2] }
-        | btype '->@{' '(' mult ')' ctype  {% ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
-                                              [mu AnnRarrow $2] }
+        | btype '⊸' ctype             {% hintLinear (getLoc $1) >>
+                                         ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
+                                             [mu AnnRarrow $2] }
+        | btype '->@{' '(' mult ')' ctype  {% hintLinear (getLoc $1) >>
+                                              ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
+                                                  [mu AnnRarrow $2] }
 
 mult :: { LHsType GhcPs }
         : btype                  { $1 }
@@ -1921,15 +1923,18 @@ typedoc :: { LHsType GhcPs }
                                                  HsFunTy noExt (L (comb2 $1 $2) (HsDocTy noExt $1 $2))
                                                          HsOmega $4)
                                                 [mu AnnRarrow $3] }
-        | btype '⊸'     ctypedoc        {% ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
+        | btype '⊸'     ctypedoc        {% hintLinear (getLoc $1) >>
+                                           ams (sLL $1 $> $ HsFunTy noExt $1 HsOne $3)
                                                 [mu AnnRarrow $2] }
-        | btype docprev '⊸' ctypedoc    {% ams (sLL $1 $> $
+        | btype docprev '⊸' ctypedoc    {% hintLinear (getLoc $1) >>
+                                           ams (sLL $1 $> $
                                                  HsFunTy noExt (L (comb2 $1 $2) (HsDocTy noExt $1 $2))
                                                          HsOne
                                                          $4)
                                                 [mu AnnRarrow $3] }
-        | btype '->@{' '(' mult ')' ctypedoc  {% ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
-                                              [mu AnnRarrow $2] }
+        | btype '->@{' '(' mult ')' ctypedoc  {% hintLinear (getLoc $1) >>
+                                                 ams (sLL $1 $> $ HsFunTy noExt $1 (HsRigTy $4) $6)
+                                                     [mu AnnRarrow $2] }
 
 -- See Note [Parsing ~]
 btype :: { LHsType GhcPs }
@@ -3691,6 +3696,13 @@ fileSrcSpan = do
   l <- getSrcLoc;
   let loc = mkSrcLoc (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
+
+-- Hint about linear types
+hintLinear :: SrcSpan -> P ()
+hintLinear span = do
+  linearEnabled <- liftM ((LangExt.LinearTypes `extopt`) . options) getPState
+  unless linearEnabled $ parseErrorSDoc span $
+    text "Enable LinearTypes to allow linear functions"
 
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
