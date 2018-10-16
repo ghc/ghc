@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE UnicodeSyntax #-}
 module Linear13 where
 

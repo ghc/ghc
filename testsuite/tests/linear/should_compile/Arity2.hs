@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 module Arity2 where
 {-

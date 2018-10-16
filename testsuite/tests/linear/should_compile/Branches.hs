@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 module GuardTup where
 
 data Q = Q ()

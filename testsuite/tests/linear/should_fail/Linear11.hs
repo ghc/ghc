@@ -1,5 +1,6 @@
-{-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE UnicodeSyntax #-}
 module Linear11 where
 
 data Unrestricted a where Unrestricted :: a -> Unrestricted a

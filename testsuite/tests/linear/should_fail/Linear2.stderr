@@ -1,15 +1,15 @@
 
-Linear2.hs:8:15: error:
+Linear2.hs:9:15: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In an equation for ‘incorrectApp1’: incorrectApp1 x = dup (x, 0)
 
-Linear2.hs:11:17: error:
+Linear2.hs:12:17: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In an equation for ‘incorrectApp2’: incorrectApp2 f x = f x
 
-Linear2.hs:14:15: error:
+Linear2.hs:15:15: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In an equation for ‘incorrectIf’:

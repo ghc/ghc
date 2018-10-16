@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 -- !! Data constructors with strict fields
 -- This test should use -funbox-strict-fields
 

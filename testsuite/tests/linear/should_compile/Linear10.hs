@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE GADTs #-}
 module Linear10 where

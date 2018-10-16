@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables,
              MagicHash, BangPatterns, DataKinds, RankNTypes #-}

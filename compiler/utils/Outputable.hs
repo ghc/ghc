@@ -621,7 +621,7 @@ quotes d =
              _other              -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
-arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
+arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine  = docToSDoc $ Pretty.text ""

@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE LambdaCase, GADTs #-}
 {-# LANGUAGE RebindableSyntax #-}

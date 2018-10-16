@@ -51,7 +51,7 @@ data GMult a
   deriving (Data)
 
 -- | The 'Multable' class describes the requirements that a type needs to be a
--- good citizen as an argument of 'Gmult'
+-- good citizen as an argument of 'GMult'
 class Outputable a => Multable a where
   -- | A way to relect multiplicities into @a@
   fromMult :: GMult a -> a

@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 module Pr110 where
 
 data Bloop = Bloop Bool

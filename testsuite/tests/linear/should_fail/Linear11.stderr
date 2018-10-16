@@ -1,11 +1,11 @@
 
-Linear11.hs:8:23: error:
+Linear11.hs:9:23: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In an equation for ‘incorrectUnrestricted’:
           incorrectUnrestricted a = Unrestricted a
 
-Linear11.hs:13:43: error:
+Linear11.hs:14:43: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In the pattern: NotUnrestricted a

@@ -6,6 +6,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UnicodeSyntax #-}
+{-# LANGUAGE LinearTypes #-}
 module Foo where
 
 data Either a b = Left a | Right b
