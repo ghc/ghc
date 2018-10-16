@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 module DollarDefault where
 
 class C p where

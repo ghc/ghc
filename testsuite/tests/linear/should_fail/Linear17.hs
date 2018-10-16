@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 {-# LANGUAGE UnicodeSyntax #-}
 {-# LANGUAGE RebindableSyntax #-}
 module Linear17 where

@@ -1,5 +1,5 @@
 
-Linear7.hs:6:16: error:
+Linear7.hs:7:16: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In an equation for ‘incorrectLCase’:

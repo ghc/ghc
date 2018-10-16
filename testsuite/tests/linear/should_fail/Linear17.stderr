@@ -1,8 +1,8 @@
 
-Linear17.hs:12:8: error:
+Linear17.hs:13:8: error:
     Variable not in scope: error :: [GHC.Types.Char] -> a
 
-Linear17.hs:18:3: error:
+Linear17.hs:19:3: error:
     • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘0’
     • In a stmt of a 'do' block: x <- ()
       In the expression:
@@ -18,7 +18,7 @@ Linear17.hs:18:3: error:
                  () <- y
                  ....
 
-Linear17.hs:26:6: error:
+Linear17.hs:27:6: error:
     • Couldn't match expected weight ‘1’ of variable ‘z’ with actual weight ‘0’
     • In the pattern: (y, z)
       In a stmt of a 'do' block: (y, z) <- ((), x)
@@ -28,7 +28,7 @@ Linear17.hs:26:6: error:
            () <- y
            ()
 
-Linear17.hs:31:3: error:
+Linear17.hs:32:3: error:
     • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
         arising from an application
     • In a stmt of a 'do' block: x <- ()
