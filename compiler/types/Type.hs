@@ -110,9 +110,10 @@ module Type (
 
         -- ** Predicates on types
         isTyVarTy, isFunTy, isDictTy, isPredTy, isCoercionTy,
-        isCoercionTy_maybe, isCoercionType, isForAllTy,
+        isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
         isPiTy, isTauTy, isFamFreeTy,
+        isCoVarType, isEvVarType,
 
         isValidJoinPointType,
 
@@ -1694,6 +1695,36 @@ caseBinder (Anon t)  _ d = d t
 
 Predicates on PredType
 
+Note [Types for coercions, predicates, and evidence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We treat differently:
+
+  (a) Predicate types
+        Test: isPredTy
+        Binders: DictIds
+        Kind: Constraint
+        Examples: (Eq a), and (a ~ b)
+
+  (b) Coercion types are primitive, unboxed equalities
+        Test: isCoVarTy
+        Binders: CoVars (can appear in coercions)
+        Kind: TYPE (TupleRep [])
+        Examples: (t1 ~# t2) or (t1 ~R# t2)
+
+  (c) Evidence types is the type of evidence manipulated by
+      the type constraint solver.
+        Test: isEvVarType
+        Binders: EvVars
+        Kind: Constraint or TYPE (TupleRep [])
+        Examples: all coercion types and predicate types
+
+Coercion types and predicate types are mutually exclusive,
+but evidence types are a superset of both.
+
+When treated as a user type, predicates are invisible and are
+implicitly instantiated; but coercion types, and non-pred evidence
+types, are just regular old types.
+
 Note [isPredTy complications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 You would think that we could define
@@ -1714,6 +1745,19 @@ But there are a number of complications:
   print it as such. But that means that isPredTy must return True for
   (C a => C [a]).  Admittedly that type is illegal in Haskell, but we
   want to print it nicely in error messages.
+
+Note [Evidence for quantified constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The superclass mechanism in TcCanonical.makeSuperClasses risks
+taking a quantified constraint like
+   (forall a. C a => a ~ b)
+and generate superclass evidence
+   (forall a. C a => a ~# b)
+
+This is a funny thing: neither isPredTy nor isCoVarType are true
+of it.  So we are careful not to generate it in the first place:
+see Note [Equality superclasses in quantified constraints]
+in TcCanonical.
 -}
 
 -- | Split a type constructor application into its type constructor and
@@ -1766,30 +1810,45 @@ tcReturnsConstraintKind (FunTy    _ ty) = tcReturnsConstraintKind ty
 tcReturnsConstraintKind (TyConApp tc _) = isConstraintKindCon tc
 tcReturnsConstraintKind _               = False
 
+isEvVarType :: Type -> Bool
+-- True of (a) predicates, of kind Constraint, such as (Eq a), and (a ~ b)
+--         (b) coercion types, such as (t1 ~# t2) or (t1 ~R# t2)
+-- See Note [Types for coercions, predicates, and evidence]
+-- See Note [Evidence for quantified constraints]
+isEvVarType ty = isCoVarType ty || isPredTy ty
+
+-- | Does this type classify a core (unlifted) Coercion?
+-- At either role nominal or representational
+--    (t1 ~# t2) or (t1 ~R# t2)
+-- See Note [Types for coercions, predicates, and evidence]
+isCoVarType :: Type -> Bool
+isCoVarType ty
+  | Just (tc,tys) <- splitTyConApp_maybe ty
+  , (tc `hasKey` eqPrimTyConKey) || (tc `hasKey` eqReprPrimTyConKey)
+  , tys `lengthIs` 4
+  = True
+isCoVarType _ = False
+
 -- | Is the type suitable to classify a given/wanted in the typechecker?
 isPredTy :: Type -> Bool
 -- See Note [isPredTy complications]
+-- NB: /not/ true of (t1 ~# t2) or (t1 ~R# t2)
+--     See Note [Types for coercions, predicates, and evidence]
 isPredTy ty = go ty []
   where
     go :: Type -> [KindOrType] -> Bool
+    -- Since we are looking at the kind,
+    -- no need to look through type synonyms
     go (AppTy ty1 ty2)   args       = go ty1 (ty2 : args)
     go (TyVarTy tv)      args       = go_k (tyVarKind tv) args
     go (TyConApp tc tys) args       = ASSERT( null args )  -- TyConApp invariant
-                                      go_tc tc tys
+                                      go_k (tyConKind tc) tys
     go (FunTy arg res) []
       | isPredTy arg                = isPredTy res   -- (Eq a => C a)
       | otherwise                   = False          -- (Int -> Bool)
     go (ForAllTy _ ty) []           = go ty []
     go (CastTy _ co) args           = go_k (pSnd (coercionKind co)) args
     go _ _ = False
-
-    go_tc :: TyCon -> [KindOrType] -> Bool
-    go_tc tc args
-      | tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-                  = args `lengthIs` 4  -- ~# and ~R# sadly have result kind #
-                                       -- not Constraint; but we still want
-                                       -- isPredTy to reply True.
-      | otherwise = go_k (tyConKind tc) args
 
     go_k :: Kind -> [KindOrType] -> Bool
     -- True <=> ('k' applied to 'kts') = Constraint

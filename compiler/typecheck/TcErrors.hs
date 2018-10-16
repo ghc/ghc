@@ -1186,8 +1186,8 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
-        || isCoercionType hole_ty -- Don't print the kind of unlifted
-                                  -- equalities (#15039)
+        || isCoVarType hole_ty -- Don't print the kind of unlifted
+                               -- equalities (#15039)
       = pprType hole_ty
       | otherwise
       = pprType hole_ty <+> dcolon <+> pprKind hole_kind

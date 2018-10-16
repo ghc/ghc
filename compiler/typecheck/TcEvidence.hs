@@ -20,7 +20,7 @@ module TcEvidence (
 
   -- EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
-  evId, evCoercion, evCast, evDFunApp,  evSelector,
+  evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
 
   evTermCoercion, evTermCoercion_maybe,
@@ -56,6 +56,7 @@ import PprCore ()   -- Instance OutputableBndr TyVar
 import TcType
 import Type
 import TyCon
+import DataCon( DataCon, dataConWrapId )
 import Class( Class )
 import PrelNames
 import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
@@ -551,6 +552,9 @@ evCast et tc | isReflCo tc = EvExpr et
 -- Dictionary instance application
 evDFunApp :: DFunId -> [Type] -> [EvExpr] -> EvTerm
 evDFunApp df tys ets = EvExpr $ Var df `mkTyApps` tys `mkApps` ets
+
+evDataConApp :: DataCon -> [Type] -> [EvExpr] -> EvTerm
+evDataConApp dc tys ets = evDFunApp (dataConWrapId dc) tys ets
 
 -- Selector id plus the types at which it
 -- should be instantiated, used for HasField

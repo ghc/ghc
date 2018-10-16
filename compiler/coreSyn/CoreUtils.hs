@@ -266,7 +266,7 @@ mkCast e co
   = e
 
 mkCast (Coercion e_co) co
-  | isCoercionType (pSnd (coercionKind co))
+  | isCoVarType (pSnd (coercionKind co))
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce

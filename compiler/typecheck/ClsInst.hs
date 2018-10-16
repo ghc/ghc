@@ -512,14 +512,14 @@ matchHeteroEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~~ t2)
 matchHeteroEquality args
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) args
+                    , cir_mk_ev     = evDataConApp heqDataCon args
                     , cir_what      = BuiltinInstance })
 
 matchHomoEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~ t2)
 matchHomoEquality args@[k,t1,t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId eqDataCon) args
+                    , cir_mk_ev     = evDataConApp eqDataCon args
                     , cir_what      = BuiltinInstance })
 matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 
@@ -527,8 +527,7 @@ matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 matchCoercible :: [Type] -> TcM ClsInstResult
 matchCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId coercibleDataCon)
-                                                args
+                    , cir_mk_ev     = evDataConApp coercibleDataCon args
                     , cir_what      = BuiltinInstance })
   where
     args' = [k, k, t1, t2]

@@ -243,7 +243,7 @@ simple_opt_expr env expr
          -- Note [Getting the map/coerce RULE to work]
       | isDeadBinder b
       , [(DEFAULT, _, rhs)] <- as
-      , isCoercionType (varType b)
+      , isCoVarType (varType b)
       , (Var fun, _args) <- collectArgs e
       , fun `hasKey` coercibleSCSelIdKey
          -- without this last check, we get #11230

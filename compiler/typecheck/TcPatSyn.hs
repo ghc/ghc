@@ -41,6 +41,8 @@ import TcBinds
 import BasicTypes
 import TcSimplify
 import TcUnify
+import Type( PredTree(..), EqRel(..), classifyPredType )
+import TysWiredIn
 import TcType
 import TcEvidence
 import BuildTyCl
@@ -52,6 +54,7 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
+import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition )
 
@@ -157,8 +160,9 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        ; prov_dicts <- mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
-             prov_theta = map evVarPred filtered_prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
+             (prov_theta, prov_evs)
+                 = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
 
        -- Report bad universal type variables
        -- See Note [Type variables whose kind is captured]
@@ -181,11 +185,37 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                           (mkTyVarBinders Inferred univ_tvs
                             , req_theta,  ev_binds, req_dicts)
                           (mkTyVarBinders Inferred ex_tvs
-                            , mkTyVarTys ex_tvs, prov_theta
-                            , map (EvExpr . evId) filtered_prov_dicts)
+                            , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
 tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
+
+mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
+-- See Note [Equality evidence in pattern synonyms]
+mkProvEvidence ev_id
+  | EqPred r ty1 ty2 <- classifyPredType pred
+  , let k1 = typeKind ty1
+        k2 = typeKind ty2
+        is_homo = k1 `tcEqType` k2
+        homo_tys   = [k1, ty1, ty2]
+        hetero_tys = [k1, k2, ty1, ty2]
+  = case r of
+      ReprEq | is_homo
+             -> Just ( mkClassPred coercibleClass    homo_tys
+                     , evDataConApp coercibleDataCon homo_tys eq_con_args )
+             | otherwise -> Nothing
+      NomEq  | is_homo
+             -> Just ( mkClassPred eqClass    homo_tys
+                     , evDataConApp eqDataCon homo_tys eq_con_args )
+             | otherwise
+             -> Just ( mkClassPred heqClass    hetero_tys
+                     , evDataConApp heqDataCon hetero_tys eq_con_args )
+
+  | otherwise
+  = Just (pred, EvExpr (evId ev_id))
+  where
+    pred = evVarPred ev_id
+    eq_con_args = [evId ev_id]
 
 badUnivTvErr :: [TyVar] -> TyVar -> TcM ()
 -- See Note [Type variables whose kind is captured]
@@ -238,6 +268,30 @@ Similarly consider
 
 The pattern (Bam x y) binds two (Ord a) dictionaries, but we only
 need one.  Agian mkMimimalWithSCs removes the redundant one.
+
+Note [Equality evidence in pattern synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data X a where
+     MkX :: Eq a => [a] -> X (Maybe a)
+  pattern P x = MkG x
+
+Then there is a danger that GHC will infer
+  P :: forall a.  () =>
+       forall b. (a ~# Maybe b, Eq b) => [b] -> X a
+
+The 'builder' for P, which is called in user-code, will then
+have type
+  $bP :: forall a b. (a ~# Maybe b, Eq b) => [b] -> X a
+
+and that is bad because (a ~# Maybe b) is not a predicate type
+(see Note [Types for coercions, predicates, and evidence] in Type)
+and is not implicitly instantiated.
+
+So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
+marginally less efficient, if the builder/martcher are not inlined.
+
+See also Note [Lift equality constaints when quantifying] in TcType
 
 Note [Type variables whose kind is captured]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

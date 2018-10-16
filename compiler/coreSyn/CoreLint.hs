@@ -1214,7 +1214,7 @@ lintCoBndr cv thing_inside
   = do { subst <- getTCvSubst
        ; let (subst', cv') = substCoVarBndr subst cv
        ; lintKind (varType cv')
-       ; lintL (isCoercionType (varType cv'))
+       ; lintL (isCoVarType (varType cv'))
                (text "CoVar with non-coercion type:" <+> pprTyVar cv)
        ; updateTCvSubst subst' (thing_inside cv') }
 
@@ -1260,7 +1260,7 @@ lintIdBndr top_lvl bind_site id linterF
 
        -- Check that the Id does not have type (t1 ~# t2) or (t1 ~R# t2);
        -- if so, it should be a CoVar, and checked by lintCoVarBndr
-       ; lintL (not (isCoercionType ty))
+       ; lintL (not (isCoVarType ty))
                (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr ty)
 
        ; let id' = setIdType id ty
