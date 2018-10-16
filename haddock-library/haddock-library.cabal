@@ -1,6 +1,6 @@
 cabal-version:        2.0
 name:                 haddock-library
-version:              1.6.1
+version:              1.7.0
 synopsis:             Library exposing some functionality of Haddock.
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries. These modules expose some functionality of it
@@ -35,14 +35,14 @@ library
     Documentation.Haddock.Doc
     Documentation.Haddock.Markup
     Documentation.Haddock.Parser
-    Documentation.Haddock.Parser.Monad
     Documentation.Haddock.Types
     Documentation.Haddock.Utf8
 
   other-modules:
     Documentation.Haddock.Parser.Util
+    Documentation.Haddock.Parser.Monad
 
-  ghc-options: -funbox-strict-fields -Wall -fwarn-tabs -O2
+  ghc-options: -funbox-strict-fields -Wall -fwarn-tabs
   if impl(ghc >= 8.0)
     ghc-options: -Wcompat -Wnoncanonical-monad-instances -Wnoncanonical-monadfail-instances
 
