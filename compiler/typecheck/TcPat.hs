@@ -376,7 +376,8 @@ tc_pat _ (WildPat _) pat_ty thing_inside
 
 
 tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
-  = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
+  = checkLinearity $
+    do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name (pat_ty `weightedSet` bndr_id) $
                          tc_lpat pat (pat_ty `weightedSet`(mkCheckExpType $ idType bndr_id))
                                  penv thing_inside
@@ -389,6 +390,13 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType (weightedThing pat_ty)
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
+    where
+      checkLinearity tc_as =
+        if subweight Omega (weightedWeight pat_ty) then
+          tc_as
+        else do
+          addErrTc $ text "@-patterns are only allowed at multiplicity ω"
+          tc_as
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
   = do  {
