@@ -2937,7 +2937,7 @@ ignoredPrags = Map.fromList (map ignored pragmas)
                      impls = ["hugs", "nhc98", "jhc", "yhc", "catch", "derive"]
                      options_pragmas = map ("options_" ++) impls
                      -- CFILES is a hugs-only thing.
-                     pragmas = options_pragmas ++ ["cfiles", "contract"]
+                     pragmas = options_pragmas ++ ["cfiles", "contract", "hlint"]
 
 oneWordPrags = Map.fromList [
      ("rules", rulePrag),
