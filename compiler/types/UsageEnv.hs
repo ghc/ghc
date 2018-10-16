@@ -65,8 +65,7 @@ supUEs :: [UsageEnv] -> UsageEnv
 supUEs [] = zeroUE -- TODO: arnaud: this is incorrect, it should be the bottom
                    -- usage env, but I haven't defined it yet. Then we could use
                    -- a foldr and wouldn't need to special-case the empty list
-                   -- as currently. This hack/error is duplicated somewhere else
-                   -- too.
+                   -- as currently.
 supUEs l = foldr1 supUE l
 
 -- TODO: arnaud: both delete function: unify argument order with existing similar functions.
