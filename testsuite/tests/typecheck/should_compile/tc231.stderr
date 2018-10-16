@@ -1,6 +1,4 @@
 TYPE SIGNATURES
-  Node :: forall s a chain. s -> a -> chain -> Q s a chain
-  Z :: forall a. a -> Z a
   foo ::
     forall s b chain.
     Zork s (Z [Char]) b =>
@@ -15,6 +13,9 @@ COERCION AXIOMS
   axiom N:Zork ::
     Zork s a b = forall chain. Q s a chain -> ST s ()
       -- Defined at tc231.hs:25:1
+DATA CONSTRUCTORS
+  Z :: forall a. a -> Z a
+  Node :: forall s a chain. s -> a -> chain -> Q s a chain
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

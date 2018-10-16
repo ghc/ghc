@@ -1,7 +1,5 @@
 TYPE SIGNATURES
   foo :: forall a. (a ~ Bool) => (a, Bool)
-TYPE CONSTRUCTORS
-COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

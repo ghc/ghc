@@ -1,9 +1,9 @@
 TYPE SIGNATURES
-  ADT.Foo :: forall x y z. x -> y -> z -> Foo x y z
   bar :: Int -> Foo Bool () Int
 TYPE CONSTRUCTORS
   Foo :: * -> * -> * -> *
-COERCION AXIOMS
+DATA CONSTRUCTORS
+  Foo :: forall x y z. x -> y -> z -> Foo x y z
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

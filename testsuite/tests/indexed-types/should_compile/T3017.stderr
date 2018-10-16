@@ -1,5 +1,4 @@
 TYPE SIGNATURES
-  Foo.L :: forall a. [a] -> ListColl a
   empty :: forall c. Coll c => c
   emptyL :: forall a. ListColl a
   insert :: forall c. Coll c => Elem c -> c -> c
@@ -11,7 +10,9 @@ TYPE CONSTRUCTORS
 COERCION AXIOMS
   axiom Foo.D:R:ElemListColl ::
     Elem (ListColl a) = a -- Defined at T3017.hs:13:9
-INSTANCES
+DATA CONSTRUCTORS
+  L :: forall a. [a] -> ListColl a
+CLASS INSTANCES
   instance Coll (ListColl a) -- Defined at T3017.hs:12:11
 FAMILY INSTANCES
   type Elem (ListColl a)
