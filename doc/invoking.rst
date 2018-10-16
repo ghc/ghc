@@ -27,8 +27,8 @@ considered a bug in the new versions. If you ever get failed parsing
 message, please report it.
 
 You must also specify an option for the output format. Currently only
-the :option:`--html` option for HTML and the :option:`--hoogle` option for
-outputting Hoogle data are functional.
+the :option:`--html` option for HTML, the :option:`--hoogle` option for
+outputting Hoogle data, and the :option:`--latex` option are functional.
 
 The packaging tool
 `Cabal <http://www.haskell.org/ghc/docs/latest/html/Cabal/index.html>`__
@@ -124,6 +124,12 @@ The following options are available:
         Some JavaScript utilities used to implement some of the dynamic
         features like collapsible sections.
 
+.. option:: --mathjax
+
+    Specify a custom URL for a mathjax-compatible JS script. By default,
+    this is set to `MathJax
+    <https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML>`_.
+
 .. option:: --latex
 
     Generate documentation in LaTeX format. Several files will be
@@ -159,6 +165,35 @@ The following options are available:
 
     Generate an index file for the
     `Hoogle <http://hackage.haskell.org/package/hoogle>`_ search engine.
+    One text file will be generated into the current directory (or the
+    specified directory if the :option:`-o` is given). Note that
+    the :option:`--package-name` is required.
+
+    Since the output is intended to be parsed by Hoogle, some conventions
+    need to be upheld:
+
+      * Every entity should span exactly one line. ::
+
+            newtype ReaderT r (m :: * -> *) a :: * -> (* -> *) -> * -> *
+          
+        The one exception to this rule is classes. The body of a class
+        is split up with one class member per line, an opening brace on
+        the line of the header, and a closing brace on a new line after
+        the class. ::
+
+            class Foo a where {
+                foo :: a -> a -> Baz a;
+                type family Baz a;
+                type Baz a = [(a, a)];
+            }
+      
+      * Entites that are exported only indirectly (for instance data
+        constructors visible via a ``ReaderT(..)`` export) have their names
+        wrapped in square brackets. ::
+
+            [ReaderT] :: (r -> m a) -> ReaderT r m a
+            [runReaderT] :: ReaderT r m a -> r -> m a
+
 
 .. option:: --hyperlinked-source
 
@@ -341,6 +376,14 @@ The following options are available:
 
     The title should be a plain string (no markup please!).
 
+.. option:: --package-name=<name>
+
+    Specify the name of the package being documented.
+
+.. option:: --package-version=<version>
+
+    Specify the version of the package being documented.
+
 .. option:: -q <mode>
             --qual=<mode>
 
@@ -368,6 +411,19 @@ The following options are available:
 
     -  relative: x, B.y, C.z
 
+.. option:: --since-qual=<mode>
+
+    Specify how ``@since`` annotations are qualified.
+
+    mode should be one of
+
+    -  ``always`` (default): always qualify ``@since`` annotations with
+       a package name and version
+
+    -  ``only-external``: only qualify ``@since`` annotations with a
+       package name and version when they do not come from the current
+       package
+
 .. option:: -?
             --help
 
@@ -377,6 +433,21 @@ The following options are available:
             --version
 
     Output version information and exit.
+
+.. option:: --ghc-version
+
+    Output the version of GHC which Haddock expects to find at :option:-B
+    and exit.
+
+.. option:: --print-ghc-path
+
+    Output the path to the GHC (which Haddock computes based on :option:-B)
+    and exit.
+
+.. option:: --print-ghc-libdir
+
+    Output the path to the GHC ``lib`` directory (which Haddock computes
+    based on :option:-B) and exit.
 
 .. option:: -v
             --verbose
@@ -415,6 +486,16 @@ The following options are available:
     Causes Haddock to behave as if module module has the ``hide``
     attribute. (:ref:`module-attrs`).
 
+.. option:: --show <module>
+
+    Causes Haddock to behave as if module module does not have the ``hide``
+    attribute. (:ref:`module-attrs`).
+
+.. option:: --show-all
+
+    Causes Haddock to behave as if no modules have the ``hide`` attribute.
+    (:ref:`module-attrs`).
+
 .. option:: --show-extensions <module>
 
     Causes Haddock to behave as if module module has the
@@ -430,10 +511,21 @@ The following options are available:
 
     Turn off all warnings.
 
+.. option:: --interface-version
+
+    Prints out the version of the binary Haddock interface files that
+    this version of Haddock generates.
+
 .. option:: --compatible-interface-versions
 
     Prints out space-separated versions of binary Haddock interface
-    files that this version is compatible with.
+    files that this version of Haddock is compatible with.
+
+.. option:: --bypass-interface-version-check
+
+    **DANGEROUS** Causes Haddock to ignore the interface verions of
+    binary Haddock interface files. This can make Haddock crash during
+    deserialization of interface files.
 
 .. option:: --no-tmp-comp-dir
 
