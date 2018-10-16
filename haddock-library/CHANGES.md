@@ -1,3 +1,11 @@
+## Changes in version 1.7.0
+
+ * Make `Documentation.Haddock.Parser.Monad` an internal module
+
+## Changes in version 1.6.1
+
+ * Replace `attoparsec` with `parsec` (#799)
+
 ## Changes in version 1.6.0
 
  * `MetaDoc` stores package name for since annotations

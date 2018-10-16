@@ -776,14 +776,14 @@ Special Characters
 ~~~~~~~~~~~~~~~~~~
 
 The following characters have special meanings in documentation
-comments: ``\\``, ``/``, ``'``, ``\```, ``"``, ``@``, ``<``, ``$``. To insert a
+comments: ``\``, ``/``, ``'``, `````, ``"``, ``@``, ``<``, ``$``, ``#``. To insert a
 literal occurrence of one of these special characters, precede it with a
-backslash (``\\``).
+backslash (``\``).
 
 Additionally, the character ``>`` has a special meaning at the beginning
 of a line, and the following characters have special meanings at the
 beginning of a paragraph: ``*``, ``-``. These characters can also be
-escaped using ``\\``.
+escaped using ``\``.
 
 Furthermore, the character sequence ``>>>`` has a special meaning at the
 beginning of a line. To escape it, just prefix the characters in the
