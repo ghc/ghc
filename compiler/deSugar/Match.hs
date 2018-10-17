@@ -471,7 +471,7 @@ tidy1 _ (LitPat _ lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 tidy1 _ (NPat ty (L _ lit) mb_neg eq)
-  = return (idDsWrapper, tidyNPat tidyLitPat lit mb_neg eq ty)
+  = return (idDsWrapper, tidyNPat lit mb_neg eq ty)
 
 -- Everything else goes through unchanged...
 

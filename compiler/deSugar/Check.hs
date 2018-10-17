@@ -24,7 +24,6 @@ import GhcPrelude
 
 import TmOracle
 import Unify( tcMatchTy )
-import BasicTypes
 import DynFlags
 import HsSyn
 import TcHsSyn
@@ -45,7 +44,7 @@ import HscTypes (CompleteMatch(..))
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
-import TcType        (isStringTy, isIntTy, isWordTy)
+import TcType        (isStringTy)
 import Bag
 import ErrUtils
 import Var           (EvVar)
@@ -833,14 +832,21 @@ translatePat fam_insts pat = case pat of
                       , pm_con_dicts   = dicts
                       , pm_con_args    = args }]
 
-  NPat ty (L _ ol) mb_neg _eq -> translateNPat fam_insts ol mb_neg ty
+  -- See Note [Translate Overloaded Literal for Exhaustiveness Checking]
+  NPat _ (L _ olit) mb_neg _
+    | OverLit (OverLitTc False ty) (HsIsString src s) _ <- olit
+    , isStringTy ty ->
+        foldr (mkListPatVec charTy) [nilPattern charTy] <$>
+          translatePatVec fam_insts
+            (map (LitPat noExt . HsChar src) (unpackFS s))
+    | otherwise -> return [PmLit { pm_lit_lit = PmOLit (isJust mb_neg) olit }]
 
+  -- See Note [Translate Overloaded Literal for Exhaustiveness Checking]
   LitPat _ lit
-      -- If it is a string then convert it to a list of characters
     | HsString src s <- lit ->
         foldr (mkListPatVec charTy) [nilPattern charTy] <$>
           translatePatVec fam_insts
-                            (map (LitPat noExt  . HsChar src) (unpackFS s))
+            (map (LitPat noExt . HsChar src) (unpackFS s))
     | otherwise -> return [mkLitPattern lit]
 
   TuplePat tys ps boxity -> do
@@ -859,29 +865,90 @@ translatePat fam_insts pat = case pat of
   SplicePat {} -> panic "Check.translatePat: SplicePat"
   XPat      {} -> panic "Check.translatePat: XPat"
 
--- | Translate an overloaded literal (see `tidyNPat' in deSugar/MatchLit.hs)
-translateNPat :: FamInstEnvs
-              -> HsOverLit GhcTc -> Maybe (SyntaxExpr GhcTc) -> Type
-              -> DsM PatVec
-translateNPat fam_insts (OverLit (OverLitTc False ty) val _ ) mb_neg outer_ty
-  | not type_change, isStringTy ty, HsIsString src s <- val, Nothing <- mb_neg
-  = translatePat fam_insts (LitPat noExt (HsString src s))
-  | not type_change, isIntTy    ty, HsIntegral i <- val
-  = translatePat fam_insts
-                 (LitPat noExt $ case mb_neg of
-                             Nothing -> HsInt noExt i
-                             Just _  -> HsInt noExt (negateIntegralLit i))
-  | not type_change, isWordTy   ty, HsIntegral i <- val
-  = translatePat fam_insts
-                 (LitPat noExt $ case mb_neg of
-                             Nothing -> HsWordPrim (il_text i) (il_value i)
-                             Just _  -> let ni = negateIntegralLit i in
-                                        HsWordPrim (il_text ni) (il_value ni))
-  where
-    type_change = not (outer_ty `eqType` ty)
+{- Note [Translate Overloaded Literal for Exhaustiveness Checking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The translation of @NPat@ in exhaustiveness checker is a bit different
+from translation in pattern matcher.
 
-translateNPat _ ol mb_neg _
-  = return [PmLit { pm_lit_lit = PmOLit (isJust mb_neg) ol }]
+  * In pattern matcher (see `tidyNPat' in deSugar/MatchLit.hs), we
+    translate integral literals to HsIntPrim or HsWordPrim and translate
+    overloaded strings to HsString.
+
+  * In exhaustiveness checker, in `genCaseTmCs1/genCaseTmCs2`, we use
+    `lhsExprToPmExpr` to generate uncovered set. In `hsExprToPmExpr`,
+    however we generate `PmOLit` for HsOverLit, rather than refine
+    `HsOverLit` inside `NPat` to HsIntPrim/HsWordPrim. If we do
+    the same thing in `translatePat` as in `tidyNPat`, the exhaustiveness
+    checker will fail to match the literals patterns correctly. See
+    Trac #14546.
+
+  In Note [Undecidable Equality for Overloaded Literals], we say: "treat
+  overloaded literals that look different as different", but previously we
+  didn't do such things.
+
+  Now, we translate the literal value to match and the literal patterns
+  consistently:
+
+  * For integral literals, we parse both the integral literal value and
+    the patterns as OverLit HsIntegral. For example:
+
+      case 0::Int of
+          0 -> putStrLn "A"
+          1 -> putStrLn "B"
+          _ -> putStrLn "C"
+
+    When checking the exhaustiveness of pattern matching, we translate the 0
+    in value position as PmOLit, but translate the 0 and 1 in pattern position
+    as PmSLit. The inconsistency leads to the failure of eqPmLit to detect the
+    equality and report warning of "Pattern match is redundant" on pattern 0,
+    as reported in Trac #14546. In this patch we remove the specialization of
+    OverLit patterns, and keep the overloaded number literal in pattern as it
+    is to maintain the consistency. We know nothing about the `fromInteger`
+    method (see Note [Undecidable Equality for Overloaded Literals]). Now we
+    can capture the exhaustiveness of pattern 0 and the redundancy of pattern
+    1 and _.
+
+  * For string literals, we parse the string literals as HsString. When
+    OverloadedStrings is enabled, it further be turned as HsOverLit HsIsString.
+    For example:
+
+      case "foo" of
+          "foo" -> putStrLn "A"
+          "bar" -> putStrLn "B"
+          "baz" -> putStrLn "C"
+
+    Previously, the overloaded string values are translated to PmOLit and the
+    non-overloaded string values are translated to PmSLit. However the string
+    patterns, both overloaded and non-overloaded, are translated to list of
+    characters. The inconsistency leads to wrong warnings about redundant and
+    non-exhaustive pattern matching warnings, as reported in Trac #14546.
+
+    In order to catch the redundant pattern in following case:
+
+      case "foo" of
+          ('f':_) -> putStrLn "A"
+          "bar" -> putStrLn "B"
+
+    in this patch, we translate non-overloaded string literals, both in value
+    position and pattern position, as list of characters. For overloaded string
+    literals, we only translate it to list of characters only when it's type
+    is stringTy, since we know nothing about the toString methods. But we know
+    that if two overloaded strings are syntax equal, then they are equal. Then
+    if it's type is not stringTy, we just translate it to PmOLit. We can still
+    capture the exhaustiveness of pattern "foo" and the redundancy of pattern
+    "bar" and "baz" in the following code:
+
+      {-# LANGUAGE OverloadedStrings #-}
+      main = do
+        case "foo" of
+            "foo" -> putStrLn "A"
+            "bar" -> putStrLn "B"
+            "baz" -> putStrLn "C"
+
+  We must ensure that doing the same translation to literal values and patterns
+  in `translatePat` and `hsExprToPmExpr`. The previous inconsistent work led to
+  Trac #14546.
+-}
 
 -- | Translate a list of patterns (Note: each pattern is translated
 -- to a pattern vector but we do not concatenate the results).
@@ -1097,7 +1164,7 @@ below is the *right thing to do*:
 The case with literals is a bit different. a literal @l@ should be translated
 to @x (True <- x == from l)@. Since we want to have better warnings for
 overloaded literals as it is a very common feature, we treat them differently.
-They are mainly covered in Note [Undecidable Equality on Overloaded Literals]
+They are mainly covered in Note [Undecidable Equality for Overloaded Literals]
 in PmExpr.
 
 4. N+K Patterns & Pattern Synonyms

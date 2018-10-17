@@ -382,6 +382,9 @@ These flags dump various phases of GHC's C-\\- pipeline.
     ``.cmm`` compilation this also dumps the result of
     file parsing.
 
+    Cmm dumps don't include unreachable blocks since we print
+    blocks in reverse post order.
+
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-\\- output
     :type: dynamic
@@ -757,6 +760,17 @@ Checking for consistency
 
     Compile with alignment checks for all info table dereferences. This can be
     useful when finding pointer tagging issues.
+
+.. ghc-flag:: -fproc-alignment
+    :shortdesc: Align functions at given boundry.
+    :type: dynamic
+
+    Align functions to multiples of the given value. Only valid values are powers
+    of two.
+
+    ``-fproc-alignment=64`` can be used to limit alignment impact on performance
+    as each function will start at a cache line.
+    However forcing larger alignments in general reduces performance.
 
 .. ghc-flag:: -fcatch-bottoms
     :shortdesc: Insert ``error`` expressions after bottoming expressions; useful

@@ -69,7 +69,7 @@ import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
                   , liftIO, traceTc )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
-import TcEvidence ( TcCoercion, CoercionHole
+import TcEvidence ( TcCoercion, CoercionHole, EvTerm(..)
                   , EvExpr, EvBind, mkGivenEvBind )
 import TcRnTypes  ( CtEvidence(..) )
 import Var        ( EvVar )
@@ -173,7 +173,7 @@ newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 newGiven :: CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
 newGiven loc pty evtm = do
    new_ev <- newEvVar pty
-   setEvBind $ mkGivenEvBind new_ev evtm
+   setEvBind $ mkGivenEvBind new_ev (EvExpr evtm)
    return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
 
 -- | Create a fresh evidence variable.

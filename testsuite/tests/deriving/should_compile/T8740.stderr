@@ -1,0 +1,18 @@
+
+T8740.hs:17:1: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘Reified’ with ‘Abstract’
+      Inaccessible code in
+        a pattern with constructor:
+          ElectRefAsTypeOf :: forall a.
+                              Int -> Elect Abstract a -> Elect Abstract a,
+        in a case alternative
+    • In the pattern: ElectRefAsTypeOf {}
+      In a case alternative: ElectRefAsTypeOf {} -> GT
+      In the expression:
+        case b of
+          ElectRefAsTypeOf {} -> GT
+          ElectHandle b1 -> (a1 `compare` b1)
+          _ -> LT
+      When typechecking the code for ‘compare’
+        in a derived instance for ‘Ord (Elect p a)’:
+        To see the code I am typechecking, use -ddump-deriv

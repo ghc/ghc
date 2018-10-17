@@ -15,7 +15,10 @@ module BinIface (
         getSymtabName,
         getDictFastString,
         CheckHiWay(..),
-        TraceBinIFaceReading(..)
+        TraceBinIFaceReading(..),
+        getWithUserData,
+        putWithUserData
+
     ) where
 
 #include "HsVersions.h"
@@ -134,7 +137,14 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     wantedGot "Way" way_descr check_way
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
+    getWithUserData ncu bh
 
+
+-- | This performs a get action after reading the dictionary and symbol
+-- table. It is necessary to run this before trying to deserialise any
+-- Names or FastStrings.
+getWithUserData :: Binary a => NameCacheUpdater -> BinHandle -> IO a
+getWithUserData ncu bh = do
     -- Read the dictionary
     -- The next word in the file is a pointer to where the dictionary is
     -- (probably at the end of the file)
@@ -179,6 +189,17 @@ writeBinIface dflags hi_path mod_iface = do
     let way_descr = getWayDescr dflags
     put_  bh way_descr
 
+
+    putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+    -- And send the result to the file
+    writeBinMem bh hi_path
+
+-- | Put a piece of data with an initialised `UserData` field. This
+-- is necessary if you want to serialise Names or FastStrings.
+-- It also writes a symbol table and the dictionary.
+-- This segment should be read using `getWithUserData`.
+putWithUserData :: Binary a => (SDoc -> IO ()) -> BinHandle -> a -> IO ()
+putWithUserData log_action bh payload = do
     -- Remember where the dictionary pointer will go
     dict_p_p <- tellBin bh
     -- Placeholder for ptr to dictionary
@@ -187,7 +208,6 @@ writeBinIface dflags hi_path mod_iface = do
     -- Remember where the symbol table pointer will go
     symtab_p_p <- tellBin bh
     put_ bh symtab_p_p
-
     -- Make some intial state
     symtab_next <- newFastMutInt
     writeFastMutInt symtab_next 0
@@ -206,7 +226,7 @@ writeBinIface dflags hi_path mod_iface = do
     bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
                                                   (putName bin_dict bin_symtab)
                                                   (putFastString bin_dict)
-    put_ bh mod_iface
+    put_ bh payload
 
     -- Write the symtab pointer at the front of the file
     symtab_p <- tellBin bh        -- This is where the symtab will start
@@ -217,7 +237,7 @@ writeBinIface dflags hi_path mod_iface = do
     symtab_next <- readFastMutInt symtab_next
     symtab_map  <- readIORef symtab_map
     putSymbolTable bh symtab_next symtab_map
-    debugTraceMsg dflags 3 (text "writeBinIface:" <+> int symtab_next
+    log_action (text "writeBinIface:" <+> int symtab_next
                                 <+> text "Names")
 
     -- NB. write the dictionary after the symbol table, because
@@ -232,11 +252,10 @@ writeBinIface dflags hi_path mod_iface = do
     dict_next <- readFastMutInt dict_next_ref
     dict_map  <- readIORef dict_map_ref
     putDictionary bh dict_next dict_map
-    debugTraceMsg dflags 3 (text "writeBinIface:" <+> int dict_next
+    log_action (text "writeBinIface:" <+> int dict_next
                                 <+> text "dict entries")
 
-    -- And send the result to the file
-    writeBinMem bh hi_path
+
 
 -- | Initial ram buffer to allocate for writing interface files
 initBinMemSize :: Int

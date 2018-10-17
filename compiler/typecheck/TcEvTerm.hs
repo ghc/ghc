@@ -23,9 +23,10 @@ import SrcLoc
 -- Used with Opt_DeferTypeErrors
 -- See Note [Deferring coercion errors to runtime]
 -- in TcSimplify
-evDelayedError :: Type -> FastString -> EvExpr
+evDelayedError :: Type -> FastString -> EvTerm
 evDelayedError ty msg
-  = Var errorId `mkTyApps` [getRuntimeRep ty, ty] `mkApps` [litMsg]
+  = EvExpr $
+    Var errorId `mkTyApps` [getRuntimeRep ty, ty] `mkApps` [litMsg]
   where
     errorId = tYPE_ERROR_ID
     litMsg  = Lit (MachStr (fastStringToByteString msg))

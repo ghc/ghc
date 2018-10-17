@@ -44,11 +44,13 @@ test('T7710', normal, compile, [''])
 
 test('AutoDeriveTypeable', normal, compile, [''])
 
+test('T8128', normal, compile, [''])
 test('T8138', reqlib('primitive'), compile, ['-O2'])
 test('T8165', normal, compile, [''])
 test('T8631', normal, compile, [''])
 test('T8758', [], multimod_compile, ['T8758a', '-v0'])
 test('T8678', normal, compile, [''])
+test('T8740', normal, compile, [''])
 test('T8865', normal, compile, [''])
 test('T8893', normal, compile, [''])
 test('T8950', normal, compile, [''])

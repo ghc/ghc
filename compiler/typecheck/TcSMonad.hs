@@ -16,9 +16,12 @@ module TcSMonad (
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, setEvBindsTcS, checkConstraintsTcS,
+    nestTcS, nestImplicTcS, setEvBindsTcS,
+    checkConstraintsTcS, checkTvConstraintsTcS,
 
     runTcPluginTcS, addUsedGRE, addUsedGREs,
+
+    QCInst(..),
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -33,8 +36,8 @@ module TcSMonad (
     newWanted, newWantedEvVar, newWantedNC, newWantedEvVarNC, newDerivedNC,
     newBoundEvVarId,
     unifyTyVar, unflattenFmv, reportUnifications,
-    setEvBind, setWantedEq, setEqIfWanted,
-    setWantedEvTerm, setWantedEvBind, setEvBindIfWanted,
+    setEvBind, setWantedEq,
+    setWantedEvTerm, setEvBindIfWanted,
     newEvVar, newGivenEvVar, newGivenEvVars,
     emitNewDeriveds, emitNewDerivedEq,
     checkReductionDepth,
@@ -53,10 +56,10 @@ module TcSMonad (
     getInertEqs, getInertCans, getInertGivens,
     getInertInsols,
     getTcSInerts, setTcSInerts,
-    matchableGivens, prohibitedSuperClassSolve,
+    matchableGivens, prohibitedSuperClassSolve, mightMatchLater,
     getUnsolvedInerts,
     removeInertCts, getPendingScDicts,
-    addInertCan, addInertEq, insertFunEq,
+    addInertCan, insertFunEq, addInertForAll,
     emitWorkNC, emitWork,
     isImprovable,
 
@@ -137,6 +140,7 @@ import Kind
 import TcType
 import DynFlags
 import Type
+import TyCoRep( coHoleCoVar )
 import Coercion
 import Unify
 
@@ -168,7 +172,7 @@ import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
 import Data.IORef
-import Data.List ( foldl', partition )
+import Data.List ( foldl', partition, mapAccumL )
 
 #if defined(DEBUG)
 import Digraph
@@ -438,17 +442,22 @@ instance Outputable InertSet where
          where
            dicts = bagToList (dictsToBag solved_dicts)
 
+emptyInertCans :: InertCans
+emptyInertCans
+  = IC { inert_count    = 0
+       , inert_eqs      = emptyDVarEnv
+       , inert_dicts    = emptyDicts
+       , inert_safehask = emptyDicts
+       , inert_funeqs   = emptyFunEqs
+       , inert_insts    = []
+       , inert_irreds   = emptyCts }
+
 emptyInert :: InertSet
 emptyInert
-  = IS { inert_cans = IC { inert_count    = 0
-                         , inert_eqs      = emptyDVarEnv
-                         , inert_dicts    = emptyDicts
-                         , inert_safehask = emptyDicts
-                         , inert_funeqs   = emptyFunEqs
-                         , inert_irreds   = emptyCts }
-       , inert_flat_cache    = emptyExactFunEqs
-       , inert_fsks          = []
-       , inert_solved_dicts  = emptyDictMap }
+  = IS { inert_cans         = emptyInertCans
+       , inert_fsks         = []
+       , inert_flat_cache   = emptyExactFunEqs
+       , inert_solved_dicts = emptyDictMap }
 
 
 {- Note [Solved dictionaries]
@@ -479,6 +488,12 @@ Other notes about solved dictionaries
   so it may get out of date.
 
 * THe inert_solved_dicts are all Wanteds, never givens
+
+* We only cache dictionaries from top-level instances, not from
+  local quantified constraints.  Reason: if we cached the latter
+  we'd need to purge the cache when bringing new quantified
+  constraints into scope, because quantified constraints "shadow"
+  top-level instances.
 
 Note [Do not add superclasses of solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -638,6 +653,8 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- Dictionaries only
               -- All fully rewritten (modulo flavour constraints)
               --     wrt inert_eqs
+
+       , inert_insts :: [QCInst]
 
        , inert_safehask :: DictMap Ct
               -- Failed dictionary resolution due to Safe Haskell overlapping
@@ -995,6 +1012,7 @@ instance Outputable InertCans where
   ppr (IC { inert_eqs = eqs
           , inert_funeqs = funeqs, inert_dicts = dicts
           , inert_safehask = safehask, inert_irreds = irreds
+          , inert_insts = insts
           , inert_count = count })
     = braces $ vcat
       [ ppUnless (isEmptyDVarEnv eqs) $
@@ -1008,6 +1026,8 @@ instance Outputable InertCans where
         text "Safe Haskell unsafe overlap =" <+> pprCts (dictsToBag safehask)
       , ppUnless (isEmptyCts irreds) $
         text "Irreds =" <+> pprCts irreds
+      , ppUnless (null insts) $
+        text "Given instances =" <+> vcat (map ppr insts)
       , text "Unsolved goals =" <+> int count
       ]
 
@@ -1457,6 +1477,45 @@ equalities arising from injectivity.
 
 {- *********************************************************************
 *                                                                      *
+                   Inert instances: inert_insts
+*                                                                      *
+********************************************************************* -}
+
+addInertForAll :: QCInst -> TcS ()
+-- Add a local Given instance, typically arising from a type signature
+addInertForAll qci
+  = updInertCans $ \ics ->
+    ics { inert_insts = qci : inert_insts ics }
+
+{- Note [Local instances and incoherence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f :: forall b c. (Eq b, forall a. Eq a => Eq (c a))
+                 => c b -> Bool
+   f x = x==x
+
+We get [W] Eq (c b), and we must use the local instance to solve it.
+
+BUT that wanted also unifies with the top-level Eq [a] instance,
+and Eq (Maybe a) etc.  We want the local instance to "win", otherwise
+we can't solve the wanted at all.  So we mark it as Incohherent.
+According to Note [Rules for instance lookup] in InstEnv, that'll
+make it win even if there are other instances that unify.
+
+Moreover this is not a hack!  The evidence for this local instance
+will be constructed by GHC at a call site... from the very instances
+that unify with it here.  It is not like an incoherent user-written
+instance which might have utterly different behaviour.
+
+Consdider  f :: Eq a => blah.  If we have [W] Eq a, we certainly
+get it from the Eq a context, without worrying that there are
+lots of top-level instances that unify with [W] Eq a!  We'll use
+those instances to build evidence to pass to f. That's just the
+nullary case of what's happening here.
+-}
+
+{- *********************************************************************
+*                                                                      *
                   Adding an inert
 *                                                                      *
 ************************************************************************
@@ -1495,42 +1554,36 @@ So in kickOutRewritable we look at all the tyvars of the
 CFunEqCan, including the fsk.
 -}
 
-addInertEq :: Ct -> TcS ()
--- This is a key function, because of the kick-out stuff
+addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
 -- Precondition: item /is/ canonical
 -- See Note [Adding an equality to the InertCans]
-addInertEq ct
-  = do { traceTcS "addInertEq {" $
-         text "Adding new inert equality:" <+> ppr ct
-
-       ; ics <- getInertCans
-
-       ; ct@(CTyEqCan { cc_tyvar = tv, cc_ev = ev, cc_eq_rel = eq_rel })
-             <- maybeEmitShadow ics ct
-
-       ; (_, ics1) <- kickOutRewritable (ctEvFlavour ev, eq_rel) tv ics
-
-       ; let ics2 = ics1 { inert_eqs   = addTyEq (inert_eqs ics1) tv ct
-                         , inert_count = bumpUnsolvedCount ev (inert_count ics1) }
-       ; setInertCans ics2
-
-       ; traceTcS "addInertEq }" $ empty }
-
---------------
-addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
 addInertCan ct
   = do { traceTcS "insertInertCan {" $
-         text "Trying to insert new non-eq inert item:" <+> ppr ct
+         text "Trying to insert new inert item:" <+> ppr ct
 
        ; ics <- getInertCans
-       ; ct <- maybeEmitShadow ics ct
+       ; ct  <- maybeEmitShadow ics ct
+       ; ics <- maybeKickOut ics ct
        ; setInertCans (add_item ics ct)
 
        ; traceTcS "addInertCan }" $ empty }
 
+maybeKickOut :: InertCans -> Ct -> TcS InertCans
+-- For a CTyEqCan, kick out any inert that can be rewritten by the CTyEqCan
+maybeKickOut ics ct
+  | CTyEqCan { cc_tyvar = tv, cc_ev = ev, cc_eq_rel = eq_rel } <- ct
+  = do { (_, ics') <- kickOutRewritable (ctEvFlavour ev, eq_rel) tv ics
+       ; return ics' }
+  | otherwise
+  = return ics
+
 add_item :: InertCans -> Ct -> InertCans
 add_item ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
   = ics { inert_funeqs = insertFunEq (inert_funeqs ics) tc tys item }
+
+add_item ics item@(CTyEqCan { cc_tyvar = tv, cc_ev = ev })
+  = ics { inert_eqs   = addTyEq (inert_eqs ics) tv item
+        , inert_count = bumpUnsolvedCount ev (inert_count ics) }
 
 add_item ics@(IC { inert_irreds = irreds, inert_count = count })
          item@(CIrredCan { cc_ev = ev, cc_insol = insoluble })
@@ -1545,8 +1598,7 @@ add_item ics item@(CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys })
 
 add_item _ item
   = pprPanic "upd_inert set: can't happen! Inserting " $
-    ppr item   -- CTyEqCan is dealt with by addInertEq
-               -- Can't be CNonCanonical, CHoleCan,
+    ppr item   -- Can't be CNonCanonical, CHoleCan,
                -- because they only land in inert_irreds
 
 bumpUnsolvedCount :: CtEvidence -> Int -> Int
@@ -1580,12 +1632,14 @@ kick_out_rewritable :: CtFlavourRole  -- Flavour/role of the equality that
                     -> InertCans
                     -> (WorkList, InertCans)
 -- See Note [kickOutRewritable]
-kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
-                                        , inert_dicts    = dictmap
-                                        , inert_safehask = safehask
-                                        , inert_funeqs   = funeqmap
-                                        , inert_irreds   = irreds
-                                        , inert_count    = n })
+kick_out_rewritable new_fr new_tv
+                    ics@(IC { inert_eqs      = tv_eqs
+                            , inert_dicts    = dictmap
+                            , inert_safehask = safehask
+                            , inert_funeqs   = funeqmap
+                            , inert_irreds   = irreds
+                            , inert_insts    = old_insts
+                            , inert_count    = n })
   | not (new_fr `eqMayRewriteFR` new_fr)
   = (emptyWorkList, ics)
         -- If new_fr can't rewrite itself, it can't rewrite
@@ -1601,6 +1655,7 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
                        , inert_safehask = safehask   -- ??
                        , inert_funeqs   = feqs_in
                        , inert_irreds   = irs_in
+                       , inert_insts    = insts_in
                        , inert_count    = n - workListWantedCount kicked_out }
 
     kicked_out :: WorkList
@@ -1613,7 +1668,8 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
     kicked_out = foldrBag extendWorkListCt
                           (emptyWorkList { wl_eqs    = tv_eqs_out
                                          , wl_funeqs = feqs_out })
-                          (dicts_out `andCts` irs_out)
+                          ((dicts_out `andCts` irs_out)
+                            `extendCtsList` insts_out)
 
     (tv_eqs_out, tv_eqs_in) = foldDVarEnv kick_out_eqs ([], emptyDVarEnv) tv_eqs
     (feqs_out,   feqs_in)   = partitionFunEqs  kick_out_ct funeqmap
@@ -1623,6 +1679,22 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
       -- Kick out even insolubles: See Note [Rewrite insolubles]
       -- Of course we must kick out irreducibles like (c a), in case
       -- we can rewrite 'c' to something more useful
+
+    -- Kick-out for inert instances
+    -- See Note [Quantified constraints] in TcCanonical
+    insts_out :: [Ct]
+    insts_in  :: [QCInst]
+    (insts_out, insts_in)
+       | fr_may_rewrite (Given, NomEq)  -- All the insts are Givens
+       = partitionWith kick_out_qci old_insts
+       | otherwise
+       = ([], old_insts)
+    kick_out_qci qci
+      | let ev = qci_ev qci
+      , fr_can_rewrite_ty NomEq (ctEvPred (qci_ev qci))
+      = Left (mkNonCanonical ev)
+      | otherwise
+      = Right qci
 
     (_, new_role) = new_fr
 
@@ -1868,13 +1940,16 @@ getPendingScDicts :: TcS [Ct]
 -- Set the flag to False in the inert set, and return that Ct
 getPendingScDicts = updRetInertCans get_sc_dicts
   where
-    get_sc_dicts ic@(IC { inert_dicts = dicts })
-      = (sc_pend_dicts, ic')
+    get_sc_dicts ic@(IC { inert_dicts = dicts, inert_insts = insts })
+      = (sc_pend_insts ++ sc_pend_dicts, ic')
       where
-        ic' = ic { inert_dicts = foldr add dicts sc_pend_dicts }
+        ic' = ic { inert_dicts = foldr add dicts sc_pend_dicts
+                 , inert_insts = insts' }
 
         sc_pend_dicts :: [Ct]
         sc_pend_dicts = foldDicts get_pending dicts []
+
+        (sc_pend_insts, insts') = mapAccumL get_pending_inst [] insts
 
     get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc = True
                                        -- but flipping the flag
@@ -1886,6 +1961,13 @@ getPendingScDicts = updRetInertCans get_sc_dicts
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
         = addDict dicts cls tys ct
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
+
+    get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
+    get_pending_inst cts qci
+       | Just qci' <- isPendingScInst qci
+       = (CQuantCan qci' : cts, qci')
+       | otherwise
+       = (cts, qci)
 
 getUnsolvedInerts :: TcS ( Bag Implication
                          , Cts     -- Tyvar eqs: a ~ ty
@@ -1995,7 +2077,7 @@ getNoGivenEqs tclvl skol_tvs
 -- Given might overlap with an instance. See Note [Instance and Given overlap]
 -- in TcInteract.
 matchableGivens :: CtLoc -> PredType -> InertSet -> Cts
-matchableGivens loc_w pred (IS { inert_cans = inert_cans })
+matchableGivens loc_w pred_w (IS { inert_cans = inert_cans })
   = filterBag matchable_given all_relevant_givens
   where
     -- just look in class constraints and irreds. matchableGivens does get called
@@ -2004,7 +2086,7 @@ matchableGivens loc_w pred (IS { inert_cans = inert_cans })
     -- non-canonical -- that is, irreducible -- equalities.
     all_relevant_givens :: Cts
     all_relevant_givens
-      | Just (clas, _) <- getClassPredTys_maybe pred
+      | Just (clas, _) <- getClassPredTys_maybe pred_w
       = findDictsByClass (inert_dicts inert_cans) clas
         `unionBags` inert_irreds inert_cans
       | otherwise
@@ -2012,16 +2094,17 @@ matchableGivens loc_w pred (IS { inert_cans = inert_cans })
 
     matchable_given :: Ct -> Bool
     matchable_given ct
-      | CtGiven { ctev_loc = loc_g } <- ctev
-      , Just _ <- tcUnifyTys bind_meta_tv [ctEvPred ctev] [pred]
-      , not (prohibitedSuperClassSolve loc_g loc_w)
-      = True
+      | CtGiven { ctev_loc = loc_g, ctev_pred = pred_g } <- ctEvidence ct
+      = mightMatchLater pred_g loc_g pred_w loc_w
 
       | otherwise
       = False
-      where
-        ctev = cc_ev ct
 
+mightMatchLater :: TcPredType -> CtLoc -> TcPredType -> CtLoc -> Bool
+mightMatchLater given_pred given_loc wanted_pred wanted_loc
+  =  not (prohibitedSuperClassSolve given_loc wanted_loc)
+  && isJust (tcUnifyTys bind_meta_tv [given_pred] [wanted_pred])
+  where
     bind_meta_tv :: TcTyVar -> BindFlag
     -- Any meta tyvar may be unified later, so we treat it as
     -- bindable when unifying with givens. That ensures that we
@@ -2134,6 +2217,7 @@ removeInertCt is ct =
     CTyEqCan  { cc_tyvar = x,  cc_rhs    = ty } ->
       is { inert_eqs    = delTyEq (inert_eqs is) x ty }
 
+    CQuantCan {}     -> panic "removeInertCt: CQuantCan"
     CIrredCan {}     -> panic "removeInertCt: CIrredEvCan"
     CNonCanonical {} -> panic "removeInertCt: CNonCanonical"
     CHoleCan {}      -> panic "removeInertCt: CHoleCan"
@@ -2662,9 +2746,10 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
                    , tcs_count         = count
                    } ->
     do { inerts <- TcM.readTcRef old_inert_var
-       ; let nest_inert = emptyInert { inert_cans         = inert_cans inerts
-                                     , inert_solved_dicts = inert_solved_dicts inerts }
-                          -- See Note [Do not inherit the flat cache]
+       ; let nest_inert = emptyInert
+                            { inert_cans = inert_cans inerts
+                            , inert_solved_dicts = inert_solved_dicts inerts }
+                              -- See Note [Do not inherit the flat cache]
        ; new_inert_var <- TcM.newTcRef nest_inert
        ; new_wl_var    <- TcM.newTcRef emptyWorkList
        ; let nest_env = TcSEnv { tcs_ev_binds      = ref
@@ -2724,28 +2809,30 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
-checkConstraintsTcS :: SkolemInfo
-                    -> [TcTyVar]        -- Skolems
-                    -> TcS result
-                    -> TcS result
--- Just like TcUnify.checkTvConstraints, but in the TcS monnad,
--- using the work-list to gather the constraints
-checkConstraintsTcS skol_info skol_tvs (TcS thing_inside)
+checkTvConstraintsTcS :: SkolemInfo
+                      -> [TcTyVar]        -- Skolems
+                      -> TcS (result, Cts)
+                      -> TcS result
+-- Just like TcUnify.checkTvConstraints, but
+--   - In the TcS monnad
+--   - The thing-inside should not put things in the work-list
+--     Instead, it returns the Wanted constraints it needs
+--   - No 'givens', and no TcEvBinds; this is type-level constraints only
+checkTvConstraintsTcS skol_info skol_tvs (TcS thing_inside)
   = TcS $ \ tcs_env ->
-    do { new_wl_var <- TcM.newTcRef emptyWorkList
-       ; let new_tcs_env = tcs_env { tcs_worklist = new_wl_var }
+    do { let wl_panic  = pprPanic "TcSMonad.buildImplication" $
+                         ppr skol_info $$ ppr skol_tvs
+                         -- This panic checks that the thing-inside
+                         -- does not emit any work-list constraints
+             new_tcs_env = tcs_env { tcs_worklist = wl_panic }
 
-       ; (res, new_tclvl) <- TcM.pushTcLevelM $
-                             thing_inside new_tcs_env
+       ; ((res, wanteds), new_tclvl) <- TcM.pushTcLevelM $
+                                        thing_inside new_tcs_env
 
-       ; wl@WL { wl_eqs = eqs } <- TcM.readTcRef new_wl_var
-       ; ASSERT2( null (wl_funeqs wl) && null (wl_rest wl) &&
-                  null (wl_implics wl), ppr wl )
-         unless (null eqs) $
+       ; unless (null wanteds) $
          do { tcl_env <- TcM.getLclEnv
             ; ev_binds_var <- TcM.newNoTcEvBinds
-            ; let wc  = WC { wc_simple = listToCts eqs
-                           , wc_impl   = emptyBag }
+            ; let wc = emptyWC { wc_simple = wanteds }
                   imp = newImplication { ic_tclvl  = new_tclvl
                                        , ic_skols  = skol_tvs
                                        , ic_wanted = wc
@@ -2758,6 +2845,47 @@ checkConstraintsTcS skol_info skol_tvs (TcS thing_inside)
                           (extendWorkListImplic (unitBag imp)) }
 
       ; return res }
+
+checkConstraintsTcS :: SkolemInfo
+                    -> [TcTyVar]        -- Skolems
+                    -> [EvVar]          -- Givens
+                    -> TcS (result, Cts)
+                    -> TcS (result, TcEvBinds)
+-- Just like checkConstraintsTcS, but
+--   - In the TcS monnad
+--   - The thing-inside should not put things in the work-list
+--     Instead, it returns the Wanted constraints it needs
+--   - I did not bother to put in the fast-path for
+--     empty-skols/empty-givens, or for empty-wanteds, because
+--     this function is used only for "quantified constraints" in
+--     with both tests are pretty much guaranteed to fail
+checkConstraintsTcS skol_info skol_tvs given (TcS thing_inside)
+  = TcS $ \ tcs_env ->
+    do { let wl_panic  = pprPanic "TcSMonad.buildImplication" $
+                         ppr skol_info $$ ppr skol_tvs
+                         -- This panic checks that the thing-inside
+                         -- does not emit any work-list constraints
+             new_tcs_env = tcs_env { tcs_worklist = wl_panic }
+
+       ; ((res, wanteds), new_tclvl) <- TcM.pushTcLevelM $
+                                        thing_inside new_tcs_env
+
+       ; tcl_env <- TcM.getLclEnv
+       ; ev_binds_var <- TcM.newTcEvBinds
+       ; let wc = emptyWC { wc_simple = wanteds }
+             imp = newImplication { ic_tclvl  = new_tclvl
+                                  , ic_skols  = skol_tvs
+                                  , ic_given  = given
+                                  , ic_wanted = wc
+                                  , ic_binds  = ev_binds_var
+                                  , ic_env    = tcl_env
+                                  , ic_info   = skol_info }
+
+           -- Add the implication to the work-list
+       ; TcM.updTcRef (tcs_worklist tcs_env)
+                      (extendWorkListImplic (unitBag imp))
+
+       ; return (res, TcEvBinds ev_binds_var) }
 
 {-
 Note [Propagate the solved dictionaries]
@@ -3076,7 +3204,7 @@ dischargeFunEq (CtGiven { ctev_evar = old_evar, ctev_loc = loc }) fsk co xi
 
 dischargeFunEq ev@(CtWanted { ctev_dest = dest }) fmv co xi
   = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
-    do { setWantedEvTerm dest (EvExpr (evCoercion co))
+    do { setWantedEvTerm dest (evCoercion co)
        ; unflattenFmv fmv xi
        ; n_kicked <- kickOutAfterUnification fmv
        ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ pprKicked n_kicked) }
@@ -3173,28 +3301,25 @@ setWantedEq (HoleDest hole) co
        ; wrapTcS $ TcM.fillCoercionHole hole co }
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq" (ppr ev)
 
--- | Equalities only
-setEqIfWanted :: CtEvidence -> Coercion -> TcS ()
-setEqIfWanted (CtWanted { ctev_dest = dest }) co = setWantedEq dest co
-setEqIfWanted _ _ = return ()
-
--- | Good for equalities and non-equalities
+-- | Good for both equalities and non-equalities
 setWantedEvTerm :: TcEvDest -> EvTerm -> TcS ()
 setWantedEvTerm (HoleDest hole) tm
-  = do { let co = evTermCoercion tm
-       ; useVars (coVarsOfCo co)
+  | Just co <- evTermCoercion_maybe tm
+  = do { useVars (coVarsOfCo co)
        ; wrapTcS $ TcM.fillCoercionHole hole co }
-setWantedEvTerm (EvVarDest ev) tm = setWantedEvBind ev tm
+  | otherwise
+  = do { let co_var = coHoleCoVar hole
+       ; setEvBind (mkWantedEvBind co_var tm)
+       ; wrapTcS $ TcM.fillCoercionHole hole (mkTcCoVarCo co_var) }
 
-setWantedEvBind :: EvVar -> EvTerm -> TcS ()
-setWantedEvBind ev_id tm = setEvBind (mkWantedEvBind ev_id tm)
+setWantedEvTerm (EvVarDest ev_id) tm
+  = setEvBind (mkWantedEvBind ev_id tm)
 
-setEvBindIfWanted :: CtEvidence -> EvExpr -> TcS ()
+setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev tm
   = case ev of
-      CtWanted { ctev_dest = dest }
-        -> setWantedEvTerm dest (EvExpr tm)
-      _ -> return ()
+      CtWanted { ctev_dest = dest } -> setWantedEvTerm dest tm
+      _                             -> return ()
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds
@@ -3205,7 +3330,7 @@ newNoTcEvBinds = wrapTcS TcM.newNoTcEvBinds
 newEvVar :: TcPredType -> TcS EvVar
 newEvVar pred = wrapTcS (TcM.newEvVar pred)
 
-newGivenEvVar :: CtLoc -> (TcPredType, EvExpr) -> TcS CtEvidence
+newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
@@ -3216,13 +3341,13 @@ newGivenEvVar loc (pred, rhs)
 
 -- | Make a new 'Id' of the given type, bound (in the monad's EvBinds) to the
 -- given term
-newBoundEvVarId :: TcPredType -> EvExpr -> TcS EvVar
+newBoundEvVarId :: TcPredType -> EvTerm -> TcS EvVar
 newBoundEvVarId pred rhs
   = do { new_ev <- newEvVar pred
        ; setEvBind (mkGivenEvBind new_ev rhs)
        ; return new_ev }
 
-newGivenEvVars :: CtLoc -> [(TcPredType, EvExpr)] -> TcS [CtEvidence]
+newGivenEvVars :: CtLoc -> [(TcPredType, EvTerm)] -> TcS [CtEvidence]
 newGivenEvVars loc pts = mapM (newGivenEvVar loc) pts
 
 emitNewWantedEq :: CtLoc -> Role -> TcType -> TcType -> TcS Coercion
