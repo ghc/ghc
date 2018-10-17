@@ -361,9 +361,8 @@ noDeferredBindings ctxt = ctxt { cec_defer_type_errors  = TypeError
                                , cec_expr_holes         = HoleError
                                , cec_out_of_scope_holes = HoleError }
 
-{-
-Note [Suppressing error messages]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Suppressing error messages]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The cec_suppress flag says "don't report any errors".  Instead, just create
 evidence bindings (as usual).  It's used when more important errors have occurred.
 
@@ -373,6 +372,19 @@ Specifically (see reportWanteds)
   * If there are any insolubles (eg Int~Bool), here or in a nested implication,
     then suppress errors from the simple constraints here.  Sometimes the
     simple-constraint errors are a knock-on effect of the insolubles.
+
+This suppression behaviour is controlled by the Bool flag in
+ReportErrorSpec, as used in reportWanteds.
+
+But we need to take care: flags can turn errors into warnings, and we
+don't want those warnings to suppress subsequent errors (including
+suppressing the essential addTcEvBind for them: Trac #15152). So in
+tryReporter we use askNoErrs to see if any error messages were
+/actually/ produced; if not, we don't switch on suppression.
+
+A consequence is that warnings never suppress warnings, so turning an
+error into a warning may allow subsequent warnings to appear that were
+previously suppressed.   (e.g. partial-sigs/should_fail/T14584)
 -}
 
 reportImplic :: ReportErrCtxt -> Implication -> TcM ()
@@ -530,9 +542,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- (see TcRnTypes.insolubleWantedCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("Out of scope", is_out_of_scope, out_of_scope_killer, mkHoleReporter tidy_cts)
+    report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
               , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
-              , ("custom_error", is_user_type_error, True, mkUserTypeErrorReporter)
+              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
 
               , given_eq_spec
               , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
@@ -552,15 +564,6 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
-
-    out_of_scope_killer :: Bool
-    out_of_scope_killer
-      = case cec_out_of_scope_holes ctxt of
-          HoleError -> True  -- Makes scope errors suppress type errors
-          _         -> False -- But if the scope-errors are warnings or deferred,
-                             -- do not suppress type errors; else you get an exit
-                             -- code of "success" even though there is
-                             -- a type error!
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_hole, is_dict,
@@ -785,6 +788,10 @@ reportGroup mk_err ctxt cts =
                ; reportWarning (Reason Opt_WarnMissingMonadFailInstances) err }
 
         (_, cts') -> do { err <- mk_err ctxt cts'
+                        ; traceTc "About to maybeReportErr" $
+                          vcat [ text "Constraint:"             <+> ppr cts'
+                               , text "cec_suppress ="          <+> ppr (cec_suppress ctxt)
+                               , text "cec_defer_type_errors =" <+> ppr (cec_defer_type_errors ctxt) ]
                         ; maybeReportError ctxt err
                             -- But see Note [Always warn with -fdefer-type-errors]
                         ; traceTc "reportGroup" (ppr cts')
@@ -904,12 +911,16 @@ tryReporters ctxt reporters cts
 
 tryReporter :: ReportErrCtxt -> ReporterSpec -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 tryReporter ctxt (str, keep_me,  suppress_after, reporter) cts
-  | null yeses = return (ctxt, cts)
-  | otherwise  = do { traceTc "tryReporter{ " (text str <+> ppr yeses)
-                    ; reporter ctxt yeses
-                    ; let ctxt' = ctxt { cec_suppress = suppress_after || cec_suppress ctxt }
-                    ; traceTc "tryReporter end }" (text str <+> ppr (cec_suppress ctxt) <+> ppr suppress_after)
-                    ; return (ctxt', nos) }
+  | null yeses
+  = return (ctxt, cts)
+  | otherwise
+  = do { traceTc "tryReporter{ " (text str <+> ppr yeses)
+       ; (_, no_errs) <- askNoErrs (reporter ctxt yeses)
+       ; let suppress_now = not no_errs && suppress_after
+                            -- See Note [Suppressing error messages]
+             ctxt' = ctxt { cec_suppress = suppress_now || cec_suppress ctxt }
+       ; traceTc "tryReporter end }" (text str <+> ppr (cec_suppress ctxt) <+> ppr suppress_after)
+       ; return (ctxt', nos) }
   where
     (yeses, nos) = partition (\ct -> keep_me ct (classifyPredType (ctPred ct))) cts
 
@@ -966,9 +977,8 @@ getUserGivensFromImplics :: [Implication] -> [UserGiven]
 getUserGivensFromImplics implics
   = reverse (filterOut (null . ic_given) implics)
 
-{-
-Note [Always warn with -fdefer-type-errors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Always warn with -fdefer-type-errors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When -fdefer-type-errors is on we warn about *all* type errors, even
 if cec_suppress is on.  This can lead to a lot more warnings than you
 would get errors without -fdefer-type-errors, but if we suppress any of
@@ -1161,8 +1171,12 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
                           , tyvars_msg, type_hole_hint ]
 
     pp_hole_type_with_kind
-      | isLiftedTypeKind hole_kind = pprType hole_ty
-      | otherwise                  = pprType hole_ty <+> dcolon <+> pprKind hole_kind
+      | isLiftedTypeKind hole_kind
+        || isCoercionType hole_ty -- Don't print the kind of unlifted
+                                  -- equalities (#15039)
+      = pprType hole_ty
+      | otherwise
+      = pprType hole_ty <+> dcolon <+> pprKind hole_kind
 
     tyvars_msg = ppUnless (null tyvars) $
                  text "Where:" <+> (vcat (map loc_msg other_tvs)

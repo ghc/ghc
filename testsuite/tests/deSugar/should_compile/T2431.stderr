@@ -11,11 +11,9 @@ T2431.$WRefl [InlPrag=INLINE[2]] :: forall a. a :~: a
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a) ->
-                 T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))}]
+         Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)}]
 T2431.$WRefl
-  = \ (@ a) ->
-      T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))
+  = \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)
 
 -- RHS size: {terms: 4, types: 8, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a

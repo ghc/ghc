@@ -776,6 +776,22 @@
       SymI_HasProto(stg_MUT_VAR_CLEAN_info)                             \
       SymI_HasProto(stg_MUT_VAR_DIRTY_info)                             \
       SymI_HasProto(stg_WEAK_info)                                      \
+      SymI_HasProto(stg_SRT_1_info)                                     \
+      SymI_HasProto(stg_SRT_2_info)                                     \
+      SymI_HasProto(stg_SRT_3_info)                                     \
+      SymI_HasProto(stg_SRT_4_info)                                     \
+      SymI_HasProto(stg_SRT_5_info)                                     \
+      SymI_HasProto(stg_SRT_6_info)                                     \
+      SymI_HasProto(stg_SRT_7_info)                                     \
+      SymI_HasProto(stg_SRT_8_info)                                     \
+      SymI_HasProto(stg_SRT_9_info)                                     \
+      SymI_HasProto(stg_SRT_10_info)                                    \
+      SymI_HasProto(stg_SRT_11_info)                                    \
+      SymI_HasProto(stg_SRT_12_info)                                    \
+      SymI_HasProto(stg_SRT_13_info)                                    \
+      SymI_HasProto(stg_SRT_14_info)                                    \
+      SymI_HasProto(stg_SRT_15_info)                                    \
+      SymI_HasProto(stg_SRT_16_info)                                    \
       SymI_HasProto(stg_ap_v_info)                                      \
       SymI_HasProto(stg_ap_f_info)                                      \
       SymI_HasProto(stg_ap_d_info)                                      \

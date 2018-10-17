@@ -3,7 +3,7 @@ pattern Foo :: () => (b ~ a) => a :~~: b
 pattern Bar
   :: forall k2 k1 (a :: k1) (b :: k2).
      () =>
-     (k2 ~ k1, (b :: k2) ~~ (a :: k1)) =>
+     (k2 ~ k1, b ~~ a) =>
      a :~~: b
   	-- Defined at <interactive>:11:1
 pattern Bam :: () => Ord a => a -> a -> (S a, S a)

@@ -1908,7 +1908,7 @@ resetStaticObjectForRetainerProfiling( StgClosure *static_objects )
             break;
         case FUN_STATIC:
             maybeInitRetainerSet(p);
-            p = (StgClosure*)*FUN_STATIC_LINK(p);
+            p = (StgClosure*)*STATIC_LINK(p);
             break;
         case CONSTR:
         case CONSTR_1_0:

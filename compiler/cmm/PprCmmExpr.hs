@@ -198,7 +198,7 @@ pprLit lit = sdocWithDynFlags $ \dflags ->
     CmmVec lits        -> char '<' <> commafy (map pprLit lits) <> char '>'
     CmmLabel clbl      -> ppr clbl
     CmmLabelOff clbl i -> ppr clbl <> ppr_offset i
-    CmmLabelDiffOff clbl1 clbl2 i -> ppr clbl1 <> char '-'
+    CmmLabelDiffOff clbl1 clbl2 i _ -> ppr clbl1 <> char '-'
                                   <> ppr clbl2 <> ppr_offset i
     CmmBlock id        -> ppr id
     CmmHighStackMark -> text "<highSp>"

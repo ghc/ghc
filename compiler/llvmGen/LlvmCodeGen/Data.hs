@@ -148,12 +148,14 @@ genStaticLit (CmmLabelOff label off) = do
     let offset = LMStaticLit $ LMIntLit (toInteger off) (llvmWord dflags)
     return $ LMAdd var offset
 
-genStaticLit (CmmLabelDiffOff l1 l2 off) = do
+genStaticLit (CmmLabelDiffOff l1 l2 off w) = do
     dflags <- getDynFlags
     var1 <- genStaticLit (CmmLabel l1)
     var2 <- genStaticLit (CmmLabel l2)
-    let var = LMSub var1 var2
-        offset = LMStaticLit $ LMIntLit (toInteger off) (llvmWord dflags)
+    let var
+          | w == wordWidth dflags = LMSub var1 var2
+          | otherwise = LMTrunc (LMSub var1 var2) (widthToLlvmInt w)
+        offset = LMStaticLit $ LMIntLit (toInteger off) (LMInt $ widthInBits w)
     return $ LMAdd var offset
 
 genStaticLit (CmmBlock b) = genStaticLit $ CmmLabel $ infoTblLbl b

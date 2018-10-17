@@ -449,7 +449,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1164944688, 5)]),
+           (wordsize(64), 1106015512, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -464,9 +464,8 @@ test('T5631',
         # 2017-02-17:     1517484488 (amd64/Linux) Type-indexed Typeable
         # 2017-03-03:     1065147968 (amd64/Linux) Share Typeable KindReps
         # 2017-03-31:     1037482512 (amd64/Linux) Fix memory leak in simplifier
-	    # 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in
-	    #                            TypeEqOrigin should be fixed by #14037
-        # 2018-05-05:     1164944688 (amd64/Linux) Simplify callSiteInline a little
+	# 2017-07-27:     1106015512 (Mac) Regresssion from tracking visibility in TypeEqOrigin
+	#                                  should be fixed by #14037
        only_ways(['normal'])
       ],
      compile,
@@ -749,7 +748,7 @@ test('T9020',
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 562206104, 10)])
+           (wordsize(64), 391876936, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -764,6 +763,7 @@ test('T9020',
            # 2017-03-31:  493596312 Fix memory leak in simplifier
            # 2017-04-28:  423163832  Remove exponential behaviour in simplifier
            # 2018-04-09:  562206104 Inexplicable, collateral of #14737
+           # 2018-05-14:  391876936 Improved simplCast performance #15019
       ],
       compile,[''])
 
@@ -1042,7 +1042,7 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 150743648, 5),
+          [(wordsize(64), 139100464, 5),
           # initial:      125831400
           # 2017-01-18:   133380960  Allow top-level string literals in Core
           # 2017-02-17:   153611448  Type-indexed Typeable
@@ -1051,8 +1051,8 @@ test('T12425',
           # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
           # 2017-05-23:   134780272  Addition of llvm-targets in dynflags (D3352)
           # 2018-04-15:   141952368  Collateral of #14737
-          # 2018-04-30:   130646336  improved simplCast performance #15019
           # 2018-04-26:   150743648  Do not unpack class dictionaries with INLINABLE
+          # 2018-05-14:   139100464  improved simplCast performance #15019
           ]),
      ],
      compile,
@@ -1236,6 +1236,8 @@ test('T14697',
           # initial:    635573784
           # 2018-02-23: 337290376 Cache the fingerprint of sOpt_P
           ]),
+       # This generates too large of a command-line for poor Windows
+       when(opsys('mingw32'), expect_broken(15072)),
        pre_cmd('./genT14697'),
        extra_files(['genT14697']),
        extra_hc_opts('$(cat T14697-flags)'), # 10k -optP arguments
@@ -1270,11 +1272,10 @@ test ('T9630',
       [ compiler_stats_num_field('max_bytes_used', # Note [residency]
           [(platform('x86_64-unknown-mingw32'),   39867088, 15),
           # 2017-12-24:                     34171816 (x64/Windows)
-          (wordsize(64), 42664296, 15)
+          (wordsize(64), 35324712, 15)
           # initial:    56955240
           # 2017-06-07: 41568168     Stop the specialiser generating loopy code
           # 2018-02-25: 35324712     It's not entirely clear
-          # 2018-05-05: 42664296     Don't inline nested function bindings as aggressively
           ]),
       extra_clean(['T9630a.hi', 'T9630a.o'])
       ],

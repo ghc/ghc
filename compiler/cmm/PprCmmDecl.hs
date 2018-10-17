@@ -115,18 +115,15 @@ pprTop (CmmData section ds) =
 pprInfoTable :: CmmInfoTable -> SDoc
 pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
-                           , cit_srt = _srt })
-  = vcat [ text "label:" <+> ppr lbl
-         , text "rep:" <> ppr rep
+                           , cit_srt = srt })
+  = vcat [ text "label: " <> ppr lbl
+         , text "rep: " <> ppr rep
          , case prof_info of
              NoProfilingInfo -> empty
-             ProfilingInfo ct cd -> vcat [ text "type:" <+> pprWord8String ct
-                                         , text "desc: " <> pprWord8String cd ] ]
-
-instance Outputable C_SRT where
-  ppr NoC_SRT = text "_no_srt_"
-  ppr (C_SRT label off bitmap)
-      = parens (ppr label <> comma <> ppr off <> comma <> ppr bitmap)
+             ProfilingInfo ct cd ->
+               vcat [ text "type: " <> pprWord8String ct
+                    , text "desc: " <> pprWord8String cd ]
+         , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where
   ppr NoHint     = empty

@@ -149,8 +149,9 @@ runFinalizerBatch (I# n) arr =
                   0# -> (# s, () #)
                   _  -> let !m' = m -# 1# in
                         case indexArray# arr m' of { (# io #) ->
-                        case io s of          { s' ->
-                        unIO (go m') s'
+                        case catch# (\p -> (# io p, () #))
+                                    (\_ s'' -> (# s'', () #)) s of          {
+                         (# s', _ #) -> unIO (go m') s'
                         }}
    in
         go n

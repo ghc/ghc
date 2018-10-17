@@ -536,14 +536,14 @@ loop:
       switch (info->type) {
 
       case THUNK_STATIC:
-          if (info->srt_bitmap != 0) {
+          if (info->srt != 0) {
               evacuate_static_object(THUNK_STATIC_LINK((StgClosure *)q), q);
           }
           return;
 
       case FUN_STATIC:
-          if (info->srt_bitmap != 0) {
-              evacuate_static_object(FUN_STATIC_LINK((StgClosure *)q), q);
+          if (info->srt != 0 || info->layout.payload.ptrs != 0) {
+              evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
           }
           return;
 

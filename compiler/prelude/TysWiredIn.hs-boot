@@ -12,6 +12,8 @@ listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
 mkBoxedTupleTy :: [Type] -> Type
 
+coercibleTyCon, heqTyCon :: TyCon
+
 liftedTypeKind :: Kind
 constraintKind :: Kind
 

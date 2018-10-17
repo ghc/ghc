@@ -6,7 +6,7 @@ module IfaceEnv (
         newGlobalBinder, newInteractiveBinder,
         externaliseName,
         lookupIfaceTop,
-        lookupOrig, lookupOrigNameCache, extendNameCache,
+        lookupOrig, lookupOrigIO, lookupOrigNameCache, extendNameCache,
         newIfaceName, newIfaceNames,
         extendIfaceIdEnv, extendIfaceTyVarEnv,
         tcIfaceLclId, tcIfaceTyVar, lookupIfaceVar,
@@ -16,7 +16,7 @@ module IfaceEnv (
         ifaceExportNames,
 
         -- Name-cache stuff
-        allocateGlobalBinder, updNameCache,
+        allocateGlobalBinder, updNameCacheTc,
         mkNameCacheUpdater, NameCacheUpdater(..),
    ) where
 
@@ -61,8 +61,7 @@ newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- moment when we know its Module and SrcLoc in their full glory
 
 newGlobalBinder mod occ loc
-  = do { mod `seq` occ `seq` return ()    -- See notes with lookupOrig
-       ; name <- updNameCache $ \name_cache ->
+  = do { name <- updNameCacheTc mod occ $ \name_cache ->
                  allocateGlobalBinder name_cache mod occ loc
        ; traceIf (text "newGlobalBinder" <+>
                   (vcat [ ppr mod <+> ppr occ <+> ppr loc, ppr name]))
@@ -73,7 +72,7 @@ newInteractiveBinder :: HscEnv -> OccName -> SrcSpan -> IO Name
 -- from the interactive context
 newInteractiveBinder hsc_env occ loc
  = do { let mod = icInteractiveModule (hsc_IC hsc_env)
-       ; updNameCacheIO hsc_env $ \name_cache ->
+       ; updNameCacheIO hsc_env mod occ $ \name_cache ->
          allocateGlobalBinder name_cache mod occ loc }
 
 allocateGlobalBinder
@@ -130,11 +129,30 @@ newtype NameCacheUpdater
 
 mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
 mkNameCacheUpdater = do { hsc_env <- getTopEnv
-                        ; return (NCU (updNameCacheIO hsc_env)) }
+                        ; return (NCU (updNameCache hsc_env)) }
 
-updNameCache :: (NameCache -> (NameCache, c)) -> TcRnIf a b c
-updNameCache upd_fn = do { hsc_env <- getTopEnv
-                         ; liftIO $ updNameCacheIO hsc_env upd_fn }
+updNameCacheTc :: Module -> OccName -> (NameCache -> (NameCache, c))
+               -> TcRnIf a b c
+updNameCacheTc mod occ upd_fn = do {
+    hsc_env <- getTopEnv
+  ; liftIO $ updNameCacheIO hsc_env mod occ upd_fn }
+
+
+updNameCacheIO ::  HscEnv -> Module -> OccName
+               -> (NameCache -> (NameCache, c))
+               -> IO c
+updNameCacheIO hsc_env mod occ upd_fn = do {
+
+    -- First ensure that mod and occ are evaluated
+    -- If not, chaos can ensue:
+    --      we read the name-cache
+    --      then pull on mod (say)
+    --      which does some stuff that modifies the name cache
+    -- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
+
+    mod `seq` occ `seq` return ()
+  ; updNameCache hsc_env upd_fn }
+
 
 {-
 ************************************************************************
@@ -149,26 +167,31 @@ updNameCache upd_fn = do { hsc_env <- getTopEnv
 -- and 'Module' is simply that of the 'ModIface' you are typechecking.
 lookupOrig :: Module -> OccName -> TcRnIf a b Name
 lookupOrig mod occ
-  = do  {       -- First ensure that mod and occ are evaluated
-                -- If not, chaos can ensue:
-                --      we read the name-cache
-                --      then pull on mod (say)
-                --      which does some stuff that modifies the name cache
-                -- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
-          mod `seq` occ `seq` return ()
-        ; traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
+  = do  { traceIf (text "lookup_orig" <+> ppr mod <+> ppr occ)
 
-        ; updNameCache $ \name_cache ->
-          case lookupOrigNameCache (nsNames name_cache) mod occ of {
-              Just name -> (name_cache, name);
-              Nothing   ->
-              case takeUniqFromSupply (nsUniqs name_cache) of {
-              (uniq, us) ->
-                  let
-                    name      = mkExternalName uniq mod occ noSrcSpan
-                    new_cache = extendNameCache (nsNames name_cache) mod occ name
-                  in (name_cache{ nsUniqs = us, nsNames = new_cache }, name)
-    }}}
+        ; updNameCacheTc mod occ $ lookupNameCache mod occ }
+
+lookupOrigIO :: HscEnv -> Module -> OccName -> IO Name
+lookupOrigIO hsc_env mod occ
+  = updNameCacheIO hsc_env mod occ $ lookupNameCache mod occ
+
+lookupNameCache :: Module -> OccName -> NameCache -> (NameCache, Name)
+-- Lookup up the (Module,OccName) in the NameCache
+-- If you find it, return it; if not, allocate a fresh original name and extend
+-- the NameCache.
+-- Reason: this may the first occurrence of (say) Foo.bar we have encountered.
+-- If we need to explore its value we will load Foo.hi; but meanwhile all we
+-- need is a Name for it.
+lookupNameCache mod occ name_cache =
+  case lookupOrigNameCache (nsNames name_cache) mod occ of {
+    Just name -> (name_cache, name);
+    Nothing   ->
+        case takeUniqFromSupply (nsUniqs name_cache) of {
+          (uniq, us) ->
+              let
+                name      = mkExternalName uniq mod occ noSrcSpan
+                new_cache = extendNameCache (nsNames name_cache) mod occ name
+              in (name_cache{ nsUniqs = us, nsNames = new_cache }, name) }}
 
 externaliseName :: Module -> Name -> TcRnIf m n Name
 -- Take an Internal Name and make it an External one,
@@ -178,7 +201,7 @@ externaliseName mod name
              loc = nameSrcSpan name
              uniq = nameUnique name
        ; occ `seq` return ()  -- c.f. seq in newGlobalBinder
-       ; updNameCache $ \ ns ->
+       ; updNameCacheTc mod occ $ \ ns ->
          let name' = mkExternalName uniq mod occ loc
              ns'   = ns { nsNames = extendNameCache (nsNames ns) mod occ name' }
          in (ns', name') }

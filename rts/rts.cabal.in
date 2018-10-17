@@ -20,6 +20,8 @@ flag mingwex
   default: @CabalMingwex@
 flag libdw
   default: @CabalHaveLibdw@
+flag libnuma
+  default: @CabalHaveLibNuma@
 flag 64bit
   default: @Cabal64bit@
 flag leading-underscore
@@ -88,6 +90,8 @@ library
     if flag(libdw)
        -- for backtraces
        extra-libraries: elf dw
+    if flag(libnuma)
+       extra-libraries: numa
     if !flag(smp)
        cpp-options: -DNOSMP
 
@@ -246,6 +250,9 @@ library
          "-Wl,-u,_hs_atomicwrite8"
          "-Wl,-u,_hs_atomicwrite16"
          "-Wl,-u,_hs_atomicwrite32"
+         -- This symbol is useful in gdb, but not referred to anywhere,
+         -- so we need to force it to be included in the binary.
+         "-Wl,-u,_findPtr"
     else
       ld-options:
          "-Wl,-u,base_GHCziTopHandler_runIO_closure"
@@ -316,6 +323,9 @@ library
          "-Wl,-u,hs_atomicwrite8"
          "-Wl,-u,hs_atomicwrite16"
          "-Wl,-u,hs_atomicwrite32"
+         -- This symbol is useful in gdb, but not referred to anywhere,
+         -- so we need to force it to be included in the binary.
+         "-Wl,-u,findPtr"
 
     if os(osx)
       ld-options: "-Wl,-search_paths_first"
