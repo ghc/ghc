@@ -15,7 +15,7 @@ module TcIface (
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
-        tcIfaceVectInfo, tcIfaceAnnotations, tcIfaceCompleteSigs,
+        tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (Trac #7683)
         tcIfaceGlobal
  ) where
@@ -55,7 +55,6 @@ import PrelNames
 import TysWiredIn
 import Literal
 import Var
-import VarEnv
 import VarSet
 import Name
 import NameEnv
@@ -174,9 +173,6 @@ typecheckIface iface
         ; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; anns      <- tcIfaceAnnotations (mi_anns iface)
 
-                -- Vectorisation information
-        ; vect_info <- tcIfaceVectInfo (mi_semantic_module iface) type_env (mi_vect_info iface)
-
                 -- Exports
         ; exports <- ifaceExportNames (mi_exports iface)
 
@@ -194,7 +190,6 @@ typecheckIface iface
                               , md_fam_insts = fam_insts
                               , md_rules     = rules
                               , md_anns      = anns
-                              , md_vect_info = vect_info
                               , md_exports   = exports
                               , md_complete_sigs = complete_sigs
                               }
@@ -394,7 +389,6 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         anns      <- tcIfaceAnnotations (mi_anns iface)
-        vect_info <- tcIfaceVectInfo (mi_semantic_module iface) type_env (mi_vect_info iface)
         exports   <- ifaceExportNames (mi_exports iface)
         complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
         return $ ModDetails { md_types     = type_env
@@ -402,7 +396,6 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
                             , md_fam_insts = fam_insts
                             , md_rules     = rules
                             , md_anns      = anns
-                            , md_vect_info = vect_info
                             , md_exports   = exports
                             , md_complete_sigs = complete_sigs
                             }
@@ -435,7 +428,6 @@ typecheckIfaceForInstantiate nsubst iface =
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
     rules     <- tcIfaceRules ignore_prags (mi_rules iface)
     anns      <- tcIfaceAnnotations (mi_anns iface)
-    vect_info <- tcIfaceVectInfo (mi_semantic_module iface) type_env (mi_vect_info iface)
     exports   <- ifaceExportNames (mi_exports iface)
     complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
     return $ ModDetails { md_types     = type_env
@@ -443,7 +435,6 @@ typecheckIfaceForInstantiate nsubst iface =
                         , md_fam_insts = fam_insts
                         , md_rules     = rules
                         , md_anns      = anns
-                        , md_vect_info = vect_info
                         , md_exports   = exports
                         , md_complete_sigs = complete_sigs
                         }
@@ -1128,134 +1119,6 @@ tcIfaceCompleteSigs = mapM tcIfaceCompleteSig
 
 tcIfaceCompleteSig :: IfaceCompleteMatch -> IfL CompleteMatch
 tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
-
-{-
-************************************************************************
-*                                                                      *
-                Vectorisation information
-*                                                                      *
-************************************************************************
--}
-
--- We need access to the type environment as we need to look up information about type constructors
--- (i.e., their data constructors and whether they are class type constructors).  If a vectorised
--- type constructor or class is defined in the same module as where it is vectorised, we cannot
--- look that information up from the type constructor that we obtained via a 'forkM'ed
--- 'tcIfaceTyCon' without recursively loading the interface that we are already type checking again
--- and again and again...
---
-tcIfaceVectInfo :: Module -> TypeEnv -> IfaceVectInfo -> IfL VectInfo
-tcIfaceVectInfo mod typeEnv (IfaceVectInfo
-                             { ifaceVectInfoVar            = vars
-                             , ifaceVectInfoTyCon          = tycons
-                             , ifaceVectInfoTyConReuse     = tyconsReuse
-                             , ifaceVectInfoParallelVars   = parallelVars
-                             , ifaceVectInfoParallelTyCons = parallelTyCons
-                             })
-  = do { let parallelTyConsSet = mkNameSet parallelTyCons
-       ; vVars         <- mapM vectVarMapping                  vars
-       ; let varsSet = mkVarSet (map fst vVars)
-       ; tyConRes1     <- mapM (vectTyConVectMapping varsSet)  tycons
-       ; tyConRes2     <- mapM (vectTyConReuseMapping varsSet) tyconsReuse
-       ; vParallelVars <- mapM vectVar                         parallelVars
-       ; let (vTyCons, vDataCons, vScSels) = unzip3 (tyConRes1 ++ tyConRes2)
-       ; return $ VectInfo
-                  { vectInfoVar            = mkDVarEnv vVars `extendDVarEnvList` concat vScSels
-                  , vectInfoTyCon          = mkNameEnv vTyCons
-                  , vectInfoDataCon        = mkNameEnv (concat vDataCons)
-                  , vectInfoParallelVars   = mkDVarSet vParallelVars
-                  , vectInfoParallelTyCons = parallelTyConsSet
-                  }
-       }
-  where
-    vectVarMapping name
-      = do { vName <- lookupIfaceTop (mkLocalisedOccName mod mkVectOcc name)
-           ; var   <- forkM (text "vect var"  <+> ppr name)  $
-                        tcIfaceExtId name
-           ; vVar  <- forkM (text "vect vVar [mod =" <+>
-                             ppr mod <> text "; nameModule =" <+>
-                             ppr (nameModule name) <> text "]" <+> ppr vName) $
-                       tcIfaceExtId vName
-           ; return (var, (var, vVar))
-           }
-      -- where
-      --   lookupLocalOrExternalId name
-      --     = do { let mb_id = lookupTypeEnv typeEnv name
-      --          ; case mb_id of
-      --                -- id is local
-      --              Just (AnId id) -> return id
-      --                -- name is not an Id => internal inconsistency
-      --              Just _         -> notAnIdErr
-      --                -- Id is external
-      --              Nothing        -> tcIfaceExtId name
-      --          }
-      --
-      --   notAnIdErr = pprPanic "TcIface.tcIfaceVectInfo: not an id" (ppr name)
-
-    vectVar name
-      = forkM (text "vect scalar var"  <+> ppr name)  $
-          tcIfaceExtId name
-
-    vectTyConVectMapping vars name
-      = do { vName  <- lookupIfaceTop (mkLocalisedOccName mod mkVectTyConOcc name)
-           ; vectTyConMapping vars name vName
-           }
-
-    vectTyConReuseMapping vars name
-      = vectTyConMapping vars name name
-
-    vectTyConMapping vars name vName
-      = do { tycon  <- lookupLocalOrExternalTyCon name
-           ; vTycon <- forkM (text "vTycon of" <+> ppr vName) $
-                         lookupLocalOrExternalTyCon vName
-
-               -- Map the data constructors of the original type constructor to those of the
-               -- vectorised type constructor /unless/ the type constructor was vectorised
-               -- abstractly; if it was vectorised abstractly, the workers of its data constructors
-               -- do not appear in the set of vectorised variables.
-               --
-               -- NB: This is lazy!  We don't pull at the type constructors before we actually use
-               --     the data constructor mapping.
-           ; let isAbstract | isClassTyCon tycon = False
-                            | datacon:_ <- tyConDataCons tycon
-                                                 = not $ dataConWrapId datacon `elemVarSet` vars
-                            | otherwise          = True
-                 vDataCons  | isAbstract = []
-                            | otherwise  = [ (dataConName datacon, (datacon, vDatacon))
-                                           | (datacon, vDatacon) <- zip (tyConDataCons tycon)
-                                                                        (tyConDataCons vTycon)
-                                           ]
-
-                   -- Map the (implicit) superclass and methods selectors as they don't occur in
-                   -- the var map.
-                 vScSels    | Just cls  <- tyConClass_maybe tycon
-                            , Just vCls <- tyConClass_maybe vTycon
-                            = [ (sel, (sel, vSel))
-                              | (sel, vSel) <- zip (classAllSelIds cls) (classAllSelIds vCls)
-                              ]
-                            | otherwise
-                            = []
-
-           ; return ( (name, (tycon, vTycon))          -- (T, T_v)
-                    , vDataCons                        -- list of (Ci, Ci_v)
-                    , vScSels                          -- list of (seli, seli_v)
-                    )
-           }
-      where
-          -- we need a fully defined version of the type constructor to be able to extract
-          -- its data constructors etc.
-        lookupLocalOrExternalTyCon name
-          = do { let mb_tycon = lookupTypeEnv typeEnv name
-               ; case mb_tycon of
-                     -- tycon is local
-                   Just (ATyCon tycon) -> return tycon
-                     -- name is not a tycon => internal inconsistency
-                   Just _              -> notATyConErr
-                     -- tycon is external
-                   Nothing             -> tcIfaceTyConByName name
-               }
-
-        notATyConErr = pprPanic "TcIface.tcIfaceVectInfo: not a tycon" (ppr name)
 
 {-
 ************************************************************************

@@ -14,7 +14,7 @@ module CoreMonad (
     pprPassDetails,
 
     -- * Plugins
-    PluginPass, bindsOnlyPass,
+    CorePluginPass, bindsOnlyPass,
 
     -- * Counting
     SimplCount, doSimplTick, doFreeSimplTick, simplCountN,
@@ -108,7 +108,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   = CoreDoSimplify      -- The core-to-core simplifier.
         Int                    -- Max iterations
         SimplMode
-  | CoreDoPluginPass String PluginPass
+  | CoreDoPluginPass String CorePluginPass
   | CoreDoFloatInwards
   | CoreDoFloatOutwards FloatOutSwitches
   | CoreLiberateCase
@@ -123,7 +123,6 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck CompilerPhase String   -- Check for non-application of rules
                                            -- matching this string
-  | CoreDoVectorisation
   | CoreDoNothing                -- Useful when building up
   | CoreDoPasses [CoreToDo]      -- lists of these things
 
@@ -149,7 +148,6 @@ instance Outputable CoreToDo where
   ppr CoreDoSpecialising       = text "Specialise"
   ppr CoreDoSpecConstr         = text "SpecConstr"
   ppr CoreCSE                  = text "Common sub-expression"
-  ppr CoreDoVectorisation      = text "Vectorisation"
   ppr CoreDesugar              = text "Desugar (before optimization)"
   ppr CoreDesugarOpt           = text "Desugar (after optimization)"
   ppr CoreTidy                 = text "Tidy Core"
@@ -239,7 +237,7 @@ runMaybe Nothing  _ = CoreDoNothing
 -}
 
 -- | A description of the plugin pass itself
-type PluginPass = ModGuts -> CoreM ModGuts
+type CorePluginPass = ModGuts -> CoreM ModGuts
 
 bindsOnlyPass :: (CoreProgram -> CoreM CoreProgram) -> ModGuts -> CoreM ModGuts
 bindsOnlyPass pass guts

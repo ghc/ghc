@@ -74,3 +74,21 @@ test('T14335',
      compile_fail,
      ['-package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin \
        -fexternal-interpreter -package simple-plugin ' + config.plugin_way_flags])
+
+test('plugin-recomp-pure',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     run_command, ['$MAKE -s --no-print-directory plugin-recomp-pure'])
+
+test('plugin-recomp-impure',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     run_command, ['$MAKE -s --no-print-directory plugin-recomp-impure'])
+
+test('plugin-recomp-flags',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
+      ],
+     run_command, ['$MAKE -s --no-print-directory plugin-recomp-flags'])

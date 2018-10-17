@@ -50,9 +50,6 @@ module HsDecls (
   RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
   flattenRuleDecls, pprFullRuleName,
-  -- ** @VECTORISE@ declarations
-  VectDecl(..), LVectDecl,VectTypePR(..),VectTypeTc(..),VectClassPR(..),
-  lvectDeclName, lvectInstDecl,
   -- ** @default@ declarations
   DefaultDecl(..), LDefaultDecl,
   -- ** Template haskell declaration splice
@@ -87,7 +84,7 @@ module HsDecls (
 -- friends:
 import GhcPrelude
 
-import {-# SOURCE #-}   HsExpr( LHsExpr, HsExpr, HsSplice, pprExpr,
+import {-# SOURCE #-}   HsExpr( HsExpr, HsSplice, pprExpr,
                                 pprSpliceDecl )
         -- Because Expr imports Decls via HsBracket
 
@@ -95,7 +92,6 @@ import HsBinds
 import HsTypes
 import HsDoc
 import TyCon
-import Name
 import BasicTypes
 import Coercion
 import ForeignCall
@@ -103,7 +99,6 @@ import HsExtension
 import NameSet
 
 -- others:
-import InstEnv
 import Class
 import Outputable
 import Util
@@ -141,7 +136,6 @@ data HsDecl p
   | WarningD   (XWarningD p)   (WarnDecls p)     -- ^ Warning declaration
   | AnnD       (XAnnD p)       (AnnDecl p)       -- ^ Annotation declaration
   | RuleD      (XRuleD p)      (RuleDecls p)     -- ^ Rule declaration
-  | VectD      (XVectD p)      (VectDecl p)      -- ^ Vectorise declaration
   | SpliceD    (XSpliceD p)    (SpliceDecl p)    -- ^ Splice declaration
                                                  -- (Includes quasi-quotes)
   | DocD       (XDocD p)       (DocDecl)  -- ^ Documentation comment declaration
@@ -158,7 +152,6 @@ type instance XForD       (GhcPass _) = NoExt
 type instance XWarningD   (GhcPass _) = NoExt
 type instance XAnnD       (GhcPass _) = NoExt
 type instance XRuleD      (GhcPass _) = NoExt
-type instance XVectD      (GhcPass _) = NoExt
 type instance XSpliceD    (GhcPass _) = NoExt
 type instance XDocD       (GhcPass _) = NoExt
 type instance XRoleAnnotD (GhcPass _) = NoExt
@@ -204,7 +197,6 @@ data HsGroup p
         hs_warnds :: [LWarnDecls p],
         hs_annds  :: [LAnnDecl p],
         hs_ruleds :: [LRuleDecls p],
-        hs_vects  :: [LVectDecl p],
 
         hs_docs   :: [LDocDecl]
     }
@@ -225,7 +217,7 @@ emptyGroup = HsGroup { hs_ext = noExt,
                        hs_tyclds = [],
                        hs_derivds = [],
                        hs_fixds = [], hs_defds = [], hs_annds = [],
-                       hs_fords = [], hs_warnds = [], hs_ruleds = [], hs_vects = [],
+                       hs_fords = [], hs_warnds = [], hs_ruleds = [],
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_splcds = [],
                        hs_docs = [] }
@@ -244,8 +236,7 @@ appendGroups
         hs_fords  = fords1,
         hs_warnds = warnds1,
         hs_ruleds = rulds1,
-        hs_vects = vects1,
-  hs_docs   = docs1 }
+        hs_docs   = docs1 }
     HsGroup {
         hs_valds  = val_groups2,
         hs_splcds = spliceds2,
@@ -257,7 +248,6 @@ appendGroups
         hs_fords  = fords2,
         hs_warnds = warnds2,
         hs_ruleds = rulds2,
-        hs_vects  = vects2,
         hs_docs   = docs2 }
   =
     HsGroup {
@@ -272,7 +262,6 @@ appendGroups
         hs_fords  = fords1 ++ fords2,
         hs_warnds = warnds1 ++ warnds2,
         hs_ruleds = rulds1 ++ rulds2,
-        hs_vects  = vects1 ++ vects2,
         hs_docs   = docs1  ++ docs2 }
 appendGroups _ _ = panic "appendGroups"
 
@@ -285,7 +274,6 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsDecl p) where
     ppr (ForD _ fd)               = ppr fd
     ppr (SigD _ sd)               = ppr sd
     ppr (RuleD _ rd)              = ppr rd
-    ppr (VectD _ vect)            = ppr vect
     ppr (WarningD _ wd)           = ppr wd
     ppr (AnnD _ ad)               = ppr ad
     ppr (SpliceD _ dd)            = ppr dd
@@ -302,13 +290,11 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsGroup p) where
                    hs_annds  = ann_decls,
                    hs_fords  = foreign_decls,
                    hs_defds  = default_decls,
-                   hs_ruleds = rule_decls,
-                   hs_vects  = vect_decls })
+                   hs_ruleds = rule_decls })
         = vcat_mb empty
             [ppr_ds fix_decls, ppr_ds default_decls,
              ppr_ds deprec_decls, ppr_ds ann_decls,
              ppr_ds rule_decls,
-             ppr_ds vect_decls,
              if isEmptyValBinds val_decls
                 then Nothing
                 else Just (ppr val_decls),
@@ -2111,137 +2097,6 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (RuleBndr p) where
    ppr (RuleBndr _ name) = ppr name
    ppr (RuleBndrSig _ name ty) = parens (ppr name <> dcolon <> ppr ty)
    ppr (XRuleBndr x) = ppr x
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Vectorisation declarations}
-*                                                                      *
-************************************************************************
-
-A vectorisation pragma, one of
-
-  {-# VECTORISE f = closure1 g (scalar_map g) #-}
-  {-# VECTORISE SCALAR f #-}
-  {-# NOVECTORISE f #-}
-
-  {-# VECTORISE type T = ty #-}
-  {-# VECTORISE SCALAR type T #-}
--}
-
--- | Located Vectorise Declaration
-type LVectDecl pass = Located (VectDecl pass)
-
--- | Vectorise Declaration
-data VectDecl pass
-  = HsVect
-      (XHsVect pass)
-      SourceText   -- Note [Pragma source text] in BasicTypes
-      (Located (IdP pass))
-      (LHsExpr pass)
-        -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --           'ApiAnnotation.AnnEqual','ApiAnnotation.AnnClose'
-
-        -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsNoVect
-      (XHsNoVect pass)
-      SourceText   -- Note [Pragma source text] in BasicTypes
-      (Located (IdP pass))
-        -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --                                    'ApiAnnotation.AnnClose'
-
-        -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsVectType
-      (XHsVectType pass)
-      Bool                      -- 'TRUE' => SCALAR declaration
-  | HsVectClass               -- pre type-checking
-      (XHsVectClass pass)
-  | HsVectInst                -- pre type-checking (always SCALAR)
-                              -- !!!FIXME: should be superfluous now
-      (XHsVectInst pass)
-  | XVectDecl (XXVectDecl pass)
-
--- Used for XHsVectType for parser and renamer phases
-data VectTypePR pass
-  = VectTypePR
-      SourceText                   -- Note [Pragma source text] in BasicTypes
-      (Located (IdP pass))
-      (Maybe (Located (IdP pass))) -- 'Nothing' => no right-hand side
-
--- Used for XHsVectType
-data VectTypeTc
-  = VectTypeTc
-      TyCon
-      (Maybe TyCon)                -- 'Nothing' => no right-hand side
-  deriving Data
-
--- Used for XHsVectClass for parser and renamer phases
-data VectClassPR pass
-  = VectClassPR
-      SourceText                   -- Note [Pragma source text] in BasicTypes
-      (Located (IdP pass))
-
-type instance XHsVect        (GhcPass _) = NoExt
-type instance XHsNoVect      (GhcPass _) = NoExt
-
-type instance XHsVectType  GhcPs = VectTypePR GhcPs
-type instance XHsVectType  GhcRn = VectTypePR GhcRn
-type instance XHsVectType  GhcTc = VectTypeTc
-
-type instance XHsVectClass GhcPs = VectClassPR GhcPs
-type instance XHsVectClass GhcRn = VectClassPR GhcRn
-type instance XHsVectClass GhcTc = Class
-
-type instance XHsVectInst  GhcPs = (LHsSigType GhcPs)
-type instance XHsVectInst  GhcRn = (LHsSigType GhcRn)
-type instance XHsVectInst  GhcTc = ClsInst
-
-type instance XXVectDecl     (GhcPass _) = NoExt
-
-
-lvectDeclName :: LVectDecl GhcTc -> Name
-lvectDeclName (L _ (HsVect _ _       (L _ name) _))     = getName name
-lvectDeclName (L _ (HsNoVect _ _     (L _ name)))       = getName name
-lvectDeclName (L _ (HsVectType (VectTypeTc tycon _) _)) = getName tycon
-lvectDeclName (L _ (HsVectClass cls))                   = getName cls
-lvectDeclName (L _ (HsVectInst {}))
-  = panic "HsDecls.lvectDeclName: HsVectInst"
-lvectDeclName (L _ (XVectDecl {}))
-  = panic "HsDecls.lvectDeclName: XVectDecl"
-
-lvectInstDecl :: LVectDecl pass -> Bool
-lvectInstDecl (L _ (HsVectInst {}))  = True
-lvectInstDecl _                      = False
-
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (VectDecl p) where
-  ppr (HsVect _ _ v rhs)
-    = sep [text "{-# VECTORISE" <+> ppr v,
-           nest 4 $
-             pprExpr (unLoc rhs) <+> text "#-}" ]
-  ppr (HsNoVect _ _ v)
-    = sep [text "{-# NOVECTORISE" <+> ppr v <+> text "#-}" ]
-  ppr (HsVectType x False)
-    = sep [text "{-# VECTORISE type" <+> ppr x <+> text "#-}" ]
-  ppr (HsVectType x True)
-    = sep [text "{-# VECTORISE SCALAR type" <+> ppr x <+> text "#-}" ]
-  ppr (HsVectClass c)
-    = sep [text "{-# VECTORISE class" <+> ppr c <+> text "#-}" ]
-  ppr (HsVectInst i)
-    = sep [text "{-# VECTORISE SCALAR instance" <+> ppr i <+> text "#-}" ]
-  ppr (XVectDecl x) = ppr x
-
-instance (p ~ GhcPass pass, OutputableBndrId p)
-        => Outputable (VectTypePR p) where
-  ppr (VectTypePR _ n Nothing) = ppr n
-  ppr (VectTypePR _ n (Just t)) = sep [ppr n, text "=", ppr t]
-
-instance Outputable VectTypeTc where
-  ppr (VectTypeTc n Nothing) = ppr n
-  ppr (VectTypeTc n (Just t)) = sep [ppr n, text "=", ppr t]
-
-instance (p ~ GhcPass pass, OutputableBndrId p)
-        => Outputable (VectClassPR p) where
-  ppr (VectClassPR _ n ) = ppr n
 
 {-
 ************************************************************************

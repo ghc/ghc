@@ -2,7 +2,7 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[TcMovectle]{Typechecking a whole module}
+\section[TcRnDriver]{Typechecking a whole module}
 
 https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 -}
@@ -436,13 +436,12 @@ tcRnSrcDecls explicit_mod_hdr decls
                          tcg_ev_binds  = cur_ev_binds,
                          tcg_imp_specs = imp_specs,
                          tcg_rules     = rules,
-                         tcg_vects     = vects,
                          tcg_fords     = fords } = tcg_env
             ; all_ev_binds = cur_ev_binds `unionBags` new_ev_binds } ;
 
-      ; (bind_env, ev_binds', binds', fords', imp_specs', rules', vects')
+      ; (bind_env, ev_binds', binds', fords', imp_specs', rules')
             <- {-# SCC "zonkTopDecls" #-}
-               zonkTopDecls all_ev_binds binds rules vects
+               zonkTopDecls all_ev_binds binds rules
                             imp_specs fords ;
       ; traceTc "Tc11" empty
 
@@ -451,7 +450,6 @@ tcRnSrcDecls explicit_mod_hdr decls
                                    tcg_ev_binds = ev_binds',
                                    tcg_imp_specs = imp_specs',
                                    tcg_rules    = rules',
-                                   tcg_vects    = vects',
                                    tcg_fords    = fords' } } ;
 
       ; setGlobalTypeEnv tcg_env' final_type_env
@@ -576,7 +574,6 @@ tcRnHsBootDecls hsc_src decls
                             , hs_fords  = for_decls
                             , hs_defds  = def_decls
                             , hs_ruleds = rule_decls
-                            , hs_vects  = vect_decls
                             , hs_annds  = _
                             , hs_valds
                                  = XValBindsLR (NValBinds val_binds val_sigs) })
@@ -594,7 +591,6 @@ tcRnHsBootDecls hsc_src decls
         ; mapM_ (badBootDecl hsc_src "foreign") for_decls
         ; mapM_ (badBootDecl hsc_src "default") def_decls
         ; mapM_ (badBootDecl hsc_src "rule")    rule_decls
-        ; mapM_ (badBootDecl hsc_src "vect")    vect_decls
 
                 -- Typecheck type/class/instance decls
         ; traceTc "Tc2 (boot)" empty
@@ -1325,7 +1321,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                          hs_defds  = default_decls,
                          hs_annds  = annotation_decls,
                          hs_ruleds = rule_decls,
-                         hs_vects  = vect_decls,
                          hs_valds  = hs_val_binds@(XValBindsLR
                                               (NValBinds val_binds val_sigs)) })
  = do {         -- Type-check the type and class decls, and all imported decls
@@ -1388,9 +1383,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                 -- Rules
         rules <- tcRules rule_decls ;
 
-                -- Vectorisation declarations
-        vects <- tcVectDecls vect_decls ;
-
                 -- Wrap up
         traceTc "Tc7a" empty ;
         let { all_binds = inst_binds     `unionBags`
@@ -1409,7 +1401,6 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                                  , tcg_sigs    = tcg_sigs tcg_env `unionNameSet` sig_names
                                  , tcg_rules   = tcg_rules tcg_env
                                                       ++ flattenRuleDecls rules
-                                 , tcg_vects   = tcg_vects tcg_env ++ vects
                                  , tcg_anns    = tcg_anns tcg_env ++ annotations
                                  , tcg_ann_env = extendAnnEnvList (tcg_ann_env tcg_env) annotations
                                  , tcg_fords   = tcg_fords tcg_env ++ foe_decls ++ fi_decls
@@ -2608,14 +2599,12 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                         tcg_insts     = insts,
                         tcg_fam_insts = fam_insts,
                         tcg_rules     = rules,
-                        tcg_vects     = vects,
                         tcg_imports   = imports })
   = vcat [ ppr_types type_env
          , ppr_tycons fam_insts type_env
          , ppr_insts insts
          , ppr_fam_insts fam_insts
          , vcat (map ppr rules)
-         , vcat (map ppr vects)
          , text "Dependent modules:" <+>
                 pprUFM (imp_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>

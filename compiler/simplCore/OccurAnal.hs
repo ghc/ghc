@@ -62,9 +62,9 @@ Here's the externally-callable interface:
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
                 -> (Activation -> Bool) -- Active rules
-                -> [CoreRule] -> [CoreVect] -> VarSet
+                -> [CoreRule]
                 -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_unf active_rule imp_rules vects vectVars binds
+occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -86,12 +86,8 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules vects vectVars binds
           -- we can easily create an infinite loop (Trac #9583 is an example)
 
     initial_uds = addManyOccsSet emptyDetails
-                            (rulesFreeVars imp_rules `unionVarSet`
-                             vectsFreeVars vects `unionVarSet`
-                             vectVars)
-    -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
-    -- we only get them *until* the vectoriser runs. Afterwards, these dependencies are
-    -- reflected in 'vectors' — see Note [Vectorisation declarations and occurrences].)
+                            (rulesFreeVars imp_rules)
+    -- The RULES declarations keep things alive!
 
     -- Note [Preventing loops due to imported functions rules]
     imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv

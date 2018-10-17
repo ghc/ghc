@@ -44,9 +44,9 @@ test('T3016', when(fast(), skip), compile, [''])
 test('T1647', normal, compile, ['-fdicts-strict -dcore-lint'])
 
 test('T3234',
-     only_ways(['optasm']),
-     compile,
-     ['-ddump-simpl-stats -dsuppress-uniques'])
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T3234'])
 
 test('T3717', only_ways(['optasm']),
               compile,
@@ -315,3 +315,4 @@ test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
 test('T15005', normal, compile, ['-O'])
 # we omit profiling because it affects the optimiser and makes the test fail
 test('T15056', [extra_files(['T15056a.hs']), omit_ways(['profasm'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])
+test('T15186', normal, multimod_compile, ['T15186', '-v0'])

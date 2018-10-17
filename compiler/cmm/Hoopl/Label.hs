@@ -21,6 +21,8 @@ import Outputable
 import Hoopl.Collections
 
 import Unique (Uniquable(..))
+import TrieMap
+
 
 -----------------------------------------------------------------------------
 --              Label
@@ -119,6 +121,14 @@ instance Outputable LabelSet where
 
 instance Outputable a => Outputable (LabelMap a) where
   ppr = ppr . mapToList
+
+instance TrieMap LabelMap where
+  type Key LabelMap = Label
+  emptyTM = mapEmpty
+  lookupTM k m = mapLookup k m
+  alterTM k f m = mapAlter f k m
+  foldTM k m z = mapFoldr k z m
+  mapTM f m = mapMap f m
 
 -----------------------------------------------------------------------------
 -- FactBase

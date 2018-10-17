@@ -5,7 +5,6 @@ import Data.Maybe (isJust): True
 add a b = a+b: False
 data Foo = Foo String: False
 deriving instance Show Foo: False
-{-# NOVECTORISE foo #-}: False
 {-# WARNING Foo "Just a warning" #-}: False
 {-# ANN foo (Just "Hello") #-}: False
 {-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}: False
@@ -34,7 +33,6 @@ import Data.Maybe (isJust): False
 add a b = a+b: True
 data Foo = Foo String: True
 deriving instance Show Foo: True
-{-# NOVECTORISE foo #-}: True
 {-# WARNING Foo "Just a warning" #-}: True
 {-# ANN foo (Just "Hello") #-}: True
 {-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}: True
@@ -63,7 +61,6 @@ import Data.Maybe (isJust): False
 add a b = a+b: False
 data Foo = Foo String: False
 deriving instance Show Foo: False
-{-# NOVECTORISE foo #-}: False
 {-# WARNING Foo "Just a warning" #-}: False
 {-# ANN foo (Just "Hello") #-}: False
 {-# RULES "map/map" forall f g xs. map f (map g xs) = map (f.g) xs #-}: False
@@ -84,3 +81,4 @@ x <- foo y: True
 a <-: False
 2 +: False
 @#: False
+

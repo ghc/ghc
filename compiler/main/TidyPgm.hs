@@ -61,7 +61,6 @@ import Maybes
 import UniqSupply
 import ErrUtils (Severity(..))
 import Outputable
-import UniqDFM
 import SrcLoc
 import qualified ErrUtils as Err
 
@@ -71,7 +70,7 @@ import Data.List        ( sortBy )
 import Data.IORef       ( atomicModifyIORef' )
 
 {-
-Constructing the TypeEnv, Instances, Rules, VectInfo from which the
+Constructing the TypeEnv, Instances, Rules from which the
 ModIface is constructed, and which goes on to subsequent modules in
 --make mode.
 
@@ -165,7 +164,6 @@ mkBootModDetailsTc hsc_env
                              , md_rules     = []
                              , md_anns      = []
                              , md_exports   = exports
-                             , md_vect_info = noVectInfo
                              , md_complete_sigs = []
                              })
         }
@@ -246,9 +244,8 @@ First we figure out which Ids are "external" Ids.  An
 unit.  These are
   a) the user exported ones
   b) the ones bound to static forms
-  c) ones mentioned in the unfoldings, workers,
-     rules of externally-visible ones ,
-     or vectorised versions of externally-visible ones
+  c) ones mentioned in the unfoldings, workers, or
+     rules of externally-visible ones
 
 While figuring out which Ids are external, we pick a "tidy" OccName
 for each one.  That is, we make its OccName distinct from the other
@@ -324,7 +321,6 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_binds     = binds
                               , mg_patsyns   = patsyns
                               , mg_rules     = imp_rules
-                              , mg_vect_info = vect_info
                               , mg_anns      = anns
                               , mg_complete_sigs = complete_sigs
                               , mg_deps      = deps
@@ -351,7 +347,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
 
         ; (unfold_env, tidy_occ_env)
               <- chooseExternalIds hsc_env mod omit_prags expose_all
-                                   binds implicit_binds imp_rules (vectInfoVar vect_info)
+                                   binds implicit_binds imp_rules
         ; let { (trimmed_binds, trimmed_rules)
                     = findExternalRules omit_prags binds imp_rules unfold_env }
 
@@ -372,8 +368,6 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                 -- You might worry that the tidy_env contains IdInfo-rich stuff
                 -- and indeed it does, but if omit_prags is on, ext_rules is
                 -- empty
-
-              ; tidy_vect_info = tidyVectInfo tidy_env vect_info
 
                 -- Tidy the Ids inside each PatSyn, very similarly to DFunIds
                 -- and then override the PatSyns in the type_env with the new tidy ones
@@ -444,7 +438,6 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                    ModDetails { md_types     = tidy_type_env,
                                 md_rules     = tidy_rules,
                                 md_insts     = tidy_cls_insts,
-                                md_vect_info = tidy_vect_info,
                                 md_fam_insts = fam_insts,
                                 md_exports   = exports,
                                 md_anns      = anns,      -- are already tidy
@@ -492,38 +485,6 @@ trimThing other_thing
 extendTypeEnvWithPatSyns :: [PatSyn] -> TypeEnv -> TypeEnv
 extendTypeEnvWithPatSyns tidy_patsyns type_env
   = extendTypeEnvList type_env [AConLike (PatSynCon ps) | ps <- tidy_patsyns ]
-
-tidyVectInfo :: TidyEnv -> VectInfo -> VectInfo
-tidyVectInfo (_, var_env) info@(VectInfo { vectInfoVar          = vars
-                                         , vectInfoParallelVars = parallelVars
-                                         })
-  = info { vectInfoVar          = tidy_vars
-         , vectInfoParallelVars = tidy_parallelVars
-         }
-  where
-      -- we only export mappings whose domain and co-domain is exported (otherwise, the iface is
-      -- inconsistent)
-    tidy_vars = mkDVarEnv [ (tidy_var, (tidy_var, tidy_var_v))
-                          | (var, var_v) <- eltsUDFM vars
-                          , let tidy_var   = lookup_var var
-                                tidy_var_v = lookup_var var_v
-                          , isExternalId tidy_var   && isExportedId tidy_var
-                          , isExternalId tidy_var_v && isExportedId tidy_var_v
-                          , isDataConWorkId var || not (isImplicitId var)
-                          ]
-
-    tidy_parallelVars = mkDVarSet
-                          [ tidy_var
-                          | var <- dVarSetElems parallelVars
-                          , let tidy_var = lookup_var var
-                          , isExternalId tidy_var && isExportedId tidy_var
-                          ]
-
-    lookup_var var = lookupWithDefaultVarEnv var_env var var
-
-    -- We need to make sure that all names getting into the iface version of 'VectInfo' are
-    -- external; otherwise, 'MkIface' will bomb out.
-    isExternalId = isExternalName . idName
 
 {-
 Note [Don't attempt to trim data types]
@@ -641,11 +602,10 @@ chooseExternalIds :: HscEnv
                   -> [CoreBind]
                   -> [CoreBind]
                   -> [CoreRule]
-                  -> DVarEnv (Var, Var)
                   -> IO (UnfoldEnv, TidyOccEnv)
                   -- Step 1 from the notes above
 
-chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_rules vect_vars
+chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_rules
   = do { (unfold_env1,occ_env1) <- search init_work_list emptyVarEnv init_occ_env
        ; let internal_ids = filter (not . (`elemVarEnv` unfold_env1)) binders
        ; tidy_internal internal_ids unfold_env1 occ_env1 }
@@ -665,13 +625,10 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
 
   -- An Id should be external if either (a) it is exported,
   -- (b) it appears in the RHS of a local rule for an imported Id, or
-  -- (c) it is the vectorised version of an imported Id.
   -- See Note [Which rules to expose]
   is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars
-                 || id `elemVarSet` vect_var_vs
 
   rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
-  vect_var_vs    = mkVarSet [var_v | (var, var_v) <- eltsUDFM vect_vars, isGlobalId var]
 
   binders          = map fst $ flattenBinds binds
   implicit_binders = bindersOfBinds implicit_binds
@@ -721,9 +678,6 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
                 | omit_prags = ([], False)
                 | otherwise  = addExternal expose_all refined_id
 
-                -- add vectorised version if any exists
-          new_ids' = new_ids ++ maybeToList (fmap snd $ lookupDVarEnv vect_vars idocc)
-
                 -- 'idocc' is an *occurrence*, but we need to see the
                 -- unfolding in the *definition*; so look up in binder_set
           refined_id = case lookupVarSet binder_set idocc of
@@ -734,7 +688,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
           referrer' | isExportedId refined_id = refined_id
                     | otherwise               = referrer
       --
-      search (zip new_ids' (repeat referrer') ++ rest) unfold_env' occ_env'
+      search (zip new_ids (repeat referrer') ++ rest) unfold_env' occ_env'
 
   tidy_internal :: [Id] -> UnfoldEnv -> TidyOccEnv
                 -> IO (UnfoldEnv, TidyOccEnv)

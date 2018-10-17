@@ -16,14 +16,15 @@ import qualified Language.Haskell.TH as TH
 
 plugin :: Plugin
 plugin = defaultPlugin {
-    installCoreToDos = install
+    installCoreToDos = install,
+    pluginRecompile  = purePlugin
   }
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install options todos = do
     putMsgS $ "Simple Plugin Passes Queried"
     putMsgS $ "Got options: " ++ unwords options
-    
+
     -- Create some actual passes to continue the test.
     return $ CoreDoPluginPass "Main pass" mainPass
              : todos
@@ -36,7 +37,7 @@ findNameBind target (NonRec b e) = findNameBndr target b
 findNameBind target (Rec bes) = mconcat (map (findNameBndr target . fst) bes)
 
 findNameBndr :: String -> CoreBndr -> First Name
-findNameBndr target b 
+findNameBndr target b
   = if getOccString (varName b) == target
     then First (Just (varName b))
     else First Nothing

@@ -45,8 +45,9 @@ import Data.IORef (IORef, atomicModifyIORef', mkWeakIORef, newIORef, readIORef,
 import GHC.Base
 import GHC.Clock (getMonotonicTimeNSec)
 import GHC.Conc.Signal (runHandlers)
+import GHC.Enum (maxBound)
 import GHC.Num (Num(..))
-import GHC.Real (fromIntegral)
+import GHC.Real (quot, fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
@@ -208,6 +209,18 @@ wakeManager mgr = sendWakeup (emControl mgr)
 ------------------------------------------------------------------------
 -- Registering interest in timeout events
 
+expirationTime :: Int -> IO Q.Prio
+expirationTime us = do
+    now <- getMonotonicTimeNSec
+    let expTime
+          -- Currently we treat overflows by clamping to maxBound. If humanity
+          -- still exists in 2500 CE we will ned to be a bit more careful here.
+          -- See #15158.
+          | (maxBound - now) `quot` 1000 < fromIntegral us  = maxBound
+          | otherwise                                       = now + ns
+          where ns = 1000 * fromIntegral us
+    return expTime
+
 -- | Register a timeout in the given number of microseconds.  The
 -- returned 'TimeoutKey' can be used to later unregister or update the
 -- timeout.  The timeout is automatically unregistered after the given
@@ -217,8 +230,7 @@ registerTimeout mgr us cb = do
   !key <- newUnique (emUniqueSource mgr)
   if us <= 0 then cb
     else do
-      now <- getMonotonicTimeNSec
-      let expTime = fromIntegral us * 1000 + now
+      expTime <- expirationTime us
 
       -- "unsafeInsertNew" is safe - the key must not exist in the PSQ. It
       -- doesn't because we just generated it from a unique supply.
@@ -234,9 +246,7 @@ unregisterTimeout mgr (TK key) = do
 -- microseconds.
 updateTimeout :: TimerManager -> TimeoutKey -> Int -> IO ()
 updateTimeout mgr (TK key) us = do
-  now <- getMonotonicTimeNSec
-  let expTime = fromIntegral us * 1000 + now
-
+  expTime <- expirationTime us
   editTimeouts mgr (Q.adjust (const expTime) key)
 
 editTimeouts :: TimerManager -> TimeoutEdit -> IO ()

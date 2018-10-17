@@ -44,7 +44,7 @@ module HscTypes (
         lookupHpt, eltsHpt, filterHpt, allHpt, mapHpt, delFromHpt,
         addToHpt, addListToHpt, lookupHptDirectly, listToHpt,
         hptCompleteSigs,
-        hptInstances, hptRules, hptVectInfo, pprHPT,
+        hptInstances, hptRules, pprHPT,
 
         -- * State relating to known packages
         ExternalPackageState(..), EpsStats(..), addEpsInStats,
@@ -123,10 +123,6 @@ module HscTypes (
         -- * Breakpoints
         ModBreaks (..), emptyModBreaks,
 
-        -- * Vectorisation information
-        VectInfo(..), IfaceVectInfo(..), noVectInfo, plusVectInfo,
-        noIfaceVectInfo, isNoIfaceVectInfo,
-
         -- * Safe Haskell information
         IfaceTrustInfo, getSafeMode, setSafeMode, noIfaceTrustInfo,
         trustInfoToNum, numToTrustInfo, IsSafeImport,
@@ -161,11 +157,9 @@ import Avail
 import Module
 import InstEnv          ( InstEnv, ClsInst, identicalClsInstHead )
 import FamInstEnv
-import CoreSyn          ( CoreProgram, RuleBase, CoreRule, CoreVect )
+import CoreSyn          ( CoreProgram, RuleBase, CoreRule )
 import Name
 import NameEnv
-import NameSet
-import VarEnv
 import VarSet
 import Var
 import Id
@@ -665,13 +659,6 @@ hptInstances hsc_env want_this_module
                 return (md_insts details, md_fam_insts details)
     in (concat insts, concat famInsts)
 
--- | Get the combined VectInfo of all modules in the home package table. In
--- contrast to instances and rules, we don't care whether the modules are
--- "below" us in the dependency sense. The VectInfo of those modules not "below"
--- us does not affect the compilation of the current module.
-hptVectInfo :: HscEnv -> VectInfo
-hptVectInfo = concatVectInfo . hptAllThings ((: []) . md_vect_info . hm_details)
-
 -- | Get rules from modules "below" this one (in the dependency sense)
 hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
 hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
@@ -861,6 +848,7 @@ data ModIface
                                               -- excluding optimisation flags
         mi_opt_hash   :: !Fingerprint,        -- ^ Hash of optimisation flags
         mi_hpc_hash   :: !Fingerprint,        -- ^ Hash of hpc flags
+        mi_plugin_hash :: !Fingerprint,       -- ^ Hash of plugins
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
         mi_finsts     :: !WhetherHasFamInst,
@@ -933,9 +921,7 @@ data ModIface
         mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
         mi_rules       :: [IfaceRule],     -- ^ Sorted rules
         mi_orphan_hash :: !Fingerprint,    -- ^ Hash for orphan rules, class and family
-                                           -- instances, and vectorise pragmas combined
-
-        mi_vect_info :: !IfaceVectInfo,    -- ^ Vectorisation information
+                                           -- instances combined
 
                 -- Cached environments for easy lookup
                 -- These are computed (lazily) from other fields
@@ -1023,6 +1009,7 @@ instance Binary ModIface where
                  mi_flag_hash = flag_hash,
                  mi_opt_hash  = opt_hash,
                  mi_hpc_hash  = hpc_hash,
+                 mi_plugin_hash = plugin_hash,
                  mi_orphan    = orphan,
                  mi_finsts    = hasFamInsts,
                  mi_deps      = deps,
@@ -1038,7 +1025,6 @@ instance Binary ModIface where
                  mi_fam_insts = fam_insts,
                  mi_rules     = rules,
                  mi_orphan_hash = orphan_hash,
-                 mi_vect_info = vect_info,
                  mi_hpc       = hpc_info,
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
@@ -1051,6 +1037,7 @@ instance Binary ModIface where
         put_ bh flag_hash
         put_ bh opt_hash
         put_ bh hpc_hash
+        put_ bh plugin_hash
         put_ bh orphan
         put_ bh hasFamInsts
         lazyPut bh deps
@@ -1066,7 +1053,6 @@ instance Binary ModIface where
         put_ bh fam_insts
         lazyPut bh rules
         put_ bh orphan_hash
-        put_ bh vect_info
         put_ bh hpc_info
         put_ bh trust
         put_ bh trust_pkg
@@ -1081,6 +1067,7 @@ instance Binary ModIface where
         flag_hash   <- get bh
         opt_hash    <- get bh
         hpc_hash    <- get bh
+        plugin_hash <- get bh
         orphan      <- get bh
         hasFamInsts <- get bh
         deps        <- lazyGet bh
@@ -1096,7 +1083,6 @@ instance Binary ModIface where
         fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
         rules       <- {-# SCC "bin_rules" #-} lazyGet bh
         orphan_hash <- get bh
-        vect_info   <- get bh
         hpc_info    <- get bh
         trust       <- get bh
         trust_pkg   <- get bh
@@ -1110,6 +1096,7 @@ instance Binary ModIface where
                  mi_flag_hash   = flag_hash,
                  mi_opt_hash    = opt_hash,
                  mi_hpc_hash    = hpc_hash,
+                 mi_plugin_hash = plugin_hash,
                  mi_orphan      = orphan,
                  mi_finsts      = hasFamInsts,
                  mi_deps        = deps,
@@ -1126,7 +1113,6 @@ instance Binary ModIface where
                  mi_fam_insts   = fam_insts,
                  mi_rules       = rules,
                  mi_orphan_hash = orphan_hash,
-                 mi_vect_info   = vect_info,
                  mi_hpc         = hpc_info,
                  mi_trust       = trust,
                  mi_trust_pkg   = trust_pkg,
@@ -1149,6 +1135,7 @@ emptyModIface mod
                mi_flag_hash   = fingerprint0,
                mi_opt_hash    = fingerprint0,
                mi_hpc_hash    = fingerprint0,
+               mi_plugin_hash = fingerprint0,
                mi_orphan      = False,
                mi_finsts      = False,
                mi_hsc_src     = HsSrcFile,
@@ -1166,7 +1153,6 @@ emptyModIface mod
                mi_decls       = [],
                mi_globals     = Nothing,
                mi_orphan_hash = fingerprint0,
-               mi_vect_info   = noIfaceVectInfo,
                mi_warn_fn     = emptyIfaceWarnCache,
                mi_fix_fn      = emptyIfaceFixCache,
                mi_hash_fn     = emptyIfaceHashCache,
@@ -1205,7 +1191,6 @@ data ModDetails
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
                                         -- they only annotate things also declared in this module
-        md_vect_info :: !VectInfo,       -- ^ Module vectorisation information
         md_complete_sigs :: [CompleteMatch]
           -- ^ Complete match pragmas for this module
      }
@@ -1219,7 +1204,6 @@ emptyModDetails
                  md_rules     = [],
                  md_fam_insts = [],
                  md_anns      = [],
-                 md_vect_info = noVectInfo,
                  md_complete_sigs = [] }
 
 -- | Records the modules directly imported by a module for extracting e.g.
@@ -1286,9 +1270,6 @@ data ModGuts
         mg_complete_sigs :: [CompleteMatch], -- ^ Complete Matches
         mg_hpc_info  :: !HpcInfo,        -- ^ Coverage tick boxes in the module
         mg_modBreaks :: !(Maybe ModBreaks), -- ^ Breakpoints for the module
-        mg_vect_decls:: ![CoreVect],     -- ^ Vectorisation declarations in this module
-                                         --   (produced by desugarer & consumed by vectoriser)
-        mg_vect_info :: !VectInfo,       -- ^ Pool of vectorised declarations in the module
 
                         -- The next two fields are unusual, because they give instance
                         -- environments for *all* modules in the home package, including
@@ -2317,7 +2298,6 @@ lookupFixity env n = case lookupNameEnv env n of
 -- * A transformation rule in a module other than the one defining
 --   the function in the head of the rule
 --
--- * A vectorisation pragma
 type WhetherHasOrphans   = Bool
 
 -- | Does this module define family instances?
@@ -2511,7 +2491,6 @@ type PackageTypeEnv          = TypeEnv
 type PackageRuleBase         = RuleBase
 type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
-type PackageVectInfo         = VectInfo
 type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatchMap = CompleteMatchMap
 
@@ -2572,8 +2551,6 @@ data ExternalPackageState
         eps_fam_inst_env :: !PackageFamInstEnv,-- ^ The total 'FamInstEnv' accumulated
                                                -- from all the external-package modules
         eps_rule_base    :: !PackageRuleBase,  -- ^ The total 'RuleEnv' accumulated
-                                               -- from all the external-package modules
-        eps_vect_info    :: !PackageVectInfo,  -- ^ The total 'VectInfo' accumulated
                                                -- from all the external-package modules
         eps_ann_env      :: !PackageAnnEnv,    -- ^ The total 'AnnEnv' accumulated
                                                -- from all the external-package modules
@@ -2873,119 +2850,6 @@ emptyHpcInfo = NoHpcInfo
 isHpcUsed :: HpcInfo -> AnyHpcUsage
 isHpcUsed (HpcInfo {})                   = True
 isHpcUsed (NoHpcInfo { hpcUsed = used }) = used
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Vectorisation Support}
-*                                                                      *
-************************************************************************
-
-The following information is generated and consumed by the vectorisation
-subsystem.  It communicates the vectorisation status of declarations from one
-module to another.
-
-Why do we need both f and f_v in the ModGuts/ModDetails/EPS version VectInfo
-below?  We need to know `f' when converting to IfaceVectInfo.  However, during
-vectorisation, we need to know `f_v', whose `Var' we cannot lookup based
-on just the OccName easily in a Core pass.
--}
-
--- |Vectorisation information for 'ModGuts', 'ModDetails' and 'ExternalPackageState'; see also
--- documentation at 'Vectorise.Env.GlobalEnv'.
---
--- NB: The following tables may also include 'Var's, 'TyCon's and 'DataCon's from imported modules,
---     which have been subsequently vectorised in the current module.
---
-data VectInfo
-  = VectInfo
-    { vectInfoVar            :: DVarEnv (Var    , Var  )    -- ^ @(f, f_v)@ keyed on @f@
-    , vectInfoTyCon          :: NameEnv (TyCon  , TyCon)    -- ^ @(T, T_v)@ keyed on @T@
-    , vectInfoDataCon        :: NameEnv (DataCon, DataCon)  -- ^ @(C, C_v)@ keyed on @C@
-    , vectInfoParallelVars   :: DVarSet                     -- ^ set of parallel variables
-    , vectInfoParallelTyCons :: NameSet                     -- ^ set of parallel type constructors
-    }
-
--- |Vectorisation information for 'ModIface'; i.e, the vectorisation information propagated
--- across module boundaries.
---
--- NB: The field 'ifaceVectInfoVar' explicitly contains the workers of data constructors as well as
---     class selectors — i.e., their mappings are /not/ implicitly generated from the data types.
---     Moreover, whether the worker of a data constructor is in 'ifaceVectInfoVar' determines
---     whether that data constructor was vectorised (or is part of an abstractly vectorised type
---     constructor).
---
-data IfaceVectInfo
-  = IfaceVectInfo
-    { ifaceVectInfoVar            :: [Name]  -- ^ All variables in here have a vectorised variant
-    , ifaceVectInfoTyCon          :: [Name]  -- ^ All 'TyCon's in here have a vectorised variant;
-                                             -- the name of the vectorised variant and those of its
-                                             -- data constructors are determined by
-                                             -- 'OccName.mkVectTyConOcc' and
-                                             -- 'OccName.mkVectDataConOcc'; the names of the
-                                             -- isomorphisms are determined by 'OccName.mkVectIsoOcc'
-    , ifaceVectInfoTyConReuse     :: [Name]  -- ^ The vectorised form of all the 'TyCon's in here
-                                             -- coincides with the unconverted form; the name of the
-                                             -- isomorphisms is determined by 'OccName.mkVectIsoOcc'
-    , ifaceVectInfoParallelVars   :: [Name]  -- iface version of 'vectInfoParallelVar'
-    , ifaceVectInfoParallelTyCons :: [Name]  -- iface version of 'vectInfoParallelTyCon'
-    }
-
-noVectInfo :: VectInfo
-noVectInfo
-  = VectInfo emptyDVarEnv emptyNameEnv emptyNameEnv emptyDVarSet emptyNameSet
-
-plusVectInfo :: VectInfo -> VectInfo -> VectInfo
-plusVectInfo vi1 vi2 =
-  VectInfo (vectInfoVar            vi1 `plusDVarEnv`   vectInfoVar            vi2)
-           (vectInfoTyCon          vi1 `plusNameEnv`   vectInfoTyCon          vi2)
-           (vectInfoDataCon        vi1 `plusNameEnv`   vectInfoDataCon        vi2)
-           (vectInfoParallelVars   vi1 `unionDVarSet`  vectInfoParallelVars   vi2)
-           (vectInfoParallelTyCons vi1 `unionNameSet` vectInfoParallelTyCons vi2)
-
-concatVectInfo :: [VectInfo] -> VectInfo
-concatVectInfo = foldr plusVectInfo noVectInfo
-
-noIfaceVectInfo :: IfaceVectInfo
-noIfaceVectInfo = IfaceVectInfo [] [] [] [] []
-
-isNoIfaceVectInfo :: IfaceVectInfo -> Bool
-isNoIfaceVectInfo (IfaceVectInfo l1 l2 l3 l4 l5)
-  = null l1 && null l2 && null l3 && null l4 && null l5
-
-instance Outputable VectInfo where
-  ppr info = vcat
-             [ text "variables       :" <+> ppr (vectInfoVar            info)
-             , text "tycons          :" <+> ppr (vectInfoTyCon          info)
-             , text "datacons        :" <+> ppr (vectInfoDataCon        info)
-             , text "parallel vars   :" <+> ppr (vectInfoParallelVars   info)
-             , text "parallel tycons :" <+> ppr (vectInfoParallelTyCons info)
-             ]
-
-instance Outputable IfaceVectInfo where
-  ppr info = vcat
-             [ text "variables       :" <+> ppr (ifaceVectInfoVar            info)
-             , text "tycons          :" <+> ppr (ifaceVectInfoTyCon          info)
-             , text "tycons reuse    :" <+> ppr (ifaceVectInfoTyConReuse     info)
-             , text "parallel vars   :" <+> ppr (ifaceVectInfoParallelVars   info)
-             , text "parallel tycons :" <+> ppr (ifaceVectInfoParallelTyCons info)
-             ]
-
-
-instance Binary IfaceVectInfo where
-    put_ bh (IfaceVectInfo a1 a2 a3 a4 a5) = do
-        put_ bh a1
-        put_ bh a2
-        put_ bh a3
-        put_ bh a4
-        put_ bh a5
-    get bh = do
-        a1 <- get bh
-        a2 <- get bh
-        a3 <- get bh
-        a4 <- get bh
-        a5 <- get bh
-        return (IfaceVectInfo a1 a2 a3 a4 a5)
 
 {-
 ************************************************************************

@@ -562,10 +562,6 @@ addTickHsExpr (ExplicitList ty wit es) =
                    addTickWit (Just fln)
                      = do fln' <- addTickSyntaxExpr hpcSrcSpan fln
                           return (Just fln')
-addTickHsExpr (ExplicitPArr ty es) =
-        liftM2 ExplicitPArr
-                (return ty)
-                (mapM (addTickLHsExpr) es)
 
 addTickHsExpr (HsStatic fvs e) = HsStatic fvs <$> addTickLHsExpr e
 
@@ -602,10 +598,6 @@ addTickHsExpr (HsTickPragma _ _ _ _ (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) False False pos $
                 addTickHsExpr e0
     return $ unLoc e2
-addTickHsExpr (PArrSeq ty arith_seq) =
-        liftM2 PArrSeq
-                (return ty)
-                (addTickArithSeqInfo arith_seq)
 addTickHsExpr (HsSCC x src nm e) =
         liftM3 (HsSCC x)
                 (return src)

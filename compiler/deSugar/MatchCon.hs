@@ -31,7 +31,6 @@ import Id
 import NameEnv
 import FieldLabel ( flSelector )
 import SrcLoc
-import DynFlags
 import Outputable
 import Control.Monad(liftM)
 import Data.List (groupBy)
@@ -95,8 +94,7 @@ matchConFamily :: [Id]
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
 matchConFamily (var:vars) ty groups
-  = do dflags <- getDynFlags
-       let weight = idWeight var
+  = do let weight = idWeight var
            -- Each variable in the argument list correspond to one column in the
            -- pattern matching equations. It has the same type as all the
            -- pattern, and, more importantly for this function, its multiplicity
@@ -106,7 +104,7 @@ matchConFamily (var:vars) ty groups
            --
            -- TODO: arnaud: check correctness of the comment
        alts <- mapM (fmap toRealAlt . matchOneConLike vars ty weight) groups
-       return (mkCoAlgCaseMatchResult dflags var ty alts)
+       return (mkCoAlgCaseMatchResult var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }

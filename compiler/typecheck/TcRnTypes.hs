@@ -46,7 +46,7 @@ module TcRnTypes(
         pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
 
         -- Desugaring types
-        DsM, DsLclEnv(..), DsGblEnv(..), PArrBuiltin(..),
+        DsM, DsLclEnv(..), DsGblEnv(..),
         DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
         mkCompleteMatchMap, extendCompleteMatchMap,
 
@@ -364,25 +364,6 @@ a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
 -}
 
--- If '-XParallelArrays' is given, the desugarer populates this table with the corresponding
--- variables found in 'Data.Array.Parallel'.
---
-data PArrBuiltin
-        = PArrBuiltin
-        { lengthPVar         :: Var     -- ^ lengthP
-        , replicatePVar      :: Var     -- ^ replicateP
-        , singletonPVar      :: Var     -- ^ singletonP
-        , mapPVar            :: Var     -- ^ mapP
-        , filterPVar         :: Var     -- ^ filterP
-        , zipPVar            :: Var     -- ^ zipP
-        , crossMapPVar       :: Var     -- ^ crossMapP
-        , indexPVar          :: Var     -- ^ (!:)
-        , emptyPVar          :: Var     -- ^ emptyP
-        , appPVar            :: Var     -- ^ (+:+)
-        , enumFromToPVar     :: Var     -- ^ enumFromToP
-        , enumFromThenToPVar :: Var     -- ^ enumFromThenToP
-        }
-
 data DsGblEnv
         = DsGblEnv
         { ds_mod          :: Module             -- For SCC profiling
@@ -391,11 +372,6 @@ data DsGblEnv
         , ds_msgs    :: IORef Messages          -- Warning messages
         , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                                 -- possibly-imported things
-        , ds_dph_env :: GlobalRdrEnv            -- exported entities of 'Data.Array.Parallel.Prim'
-                                                -- iff '-fvectorise' flag was given as well as
-                                                -- exported entities of 'Data.Array.Parallel' iff
-                                                -- '-XParallelArrays' was given; otherwise, empty
-        , ds_parr_bi :: PArrBuiltin             -- desugarer names for '-XParallelArrays'
         , ds_complete_matches :: CompleteMatchMap
            -- Additional complete pattern matches
         , ds_cc_st   :: IORef CostCentreState
@@ -680,7 +656,6 @@ data TcGblEnv
         tcg_fam_insts :: [FamInst],          -- ...Family instances
         tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
         tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
-        tcg_vects     :: [LVectDecl GhcTc],   -- ...Vectorisation declarations
         tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
 
         tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
@@ -3389,7 +3364,6 @@ data CtOrigin
   | NegateOrigin                        -- Occurrence of syntactic negation
 
   | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
-  | PArrSeqOrigin  (ArithSeqInfo GhcRn) -- [:x..y:] and [:x,y..z:]
   | SectionOrigin
   | TupleOrigin                        -- (..,..)
   | ExprSigOrigin       -- e :: ty
@@ -3529,12 +3503,10 @@ exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e
 exprCtOrigin (HsDo {})           = DoOrigin
 exprCtOrigin (ExplicitList {})   = Shouldn'tHappenOrigin "list"
-exprCtOrigin (ExplicitPArr {})   = Shouldn'tHappenOrigin "parallel array"
 exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
 exprCtOrigin (RecordUpd {})      = Shouldn'tHappenOrigin "record update"
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
-exprCtOrigin (PArrSeq {})      = Shouldn'tHappenOrigin "parallel array sequence"
 exprCtOrigin (HsSCC _ _ _ e)     = lexprCtOrigin e
 exprCtOrigin (HsCoreAnn _ _ _ e) = lexprCtOrigin e
 exprCtOrigin (HsBracket {})      = Shouldn'tHappenOrigin "TH bracket"
@@ -3681,7 +3653,6 @@ pprCtO ViewPatOrigin         = text "a view pattern"
 pprCtO IfOrigin              = text "an if expression"
 pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
-pprCtO (PArrSeqOrigin seq)   = hsep [text "the parallel array sequence", quotes (ppr seq)]
 pprCtO SectionOrigin         = text "an operator section"
 pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"

@@ -20,9 +20,7 @@ module MkId (
         mkPrimOpId, mkFCallId,
 
         wrapNewTypeBody, unwrapNewTypeBody,
-        wrapFamInstBody, unwrapFamInstScrut,
-        wrapTypeUnbranchedFamInstBody, unwrapTypeUnbranchedFamInstScrut,
-
+        wrapFamInstBody,
         DataConBoxer(..), mkDataConRep, mkDataConRepSimple, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
@@ -55,7 +53,6 @@ import CoreUtils        ( exprType, mkCast )
 import CoreUnfold
 import Literal
 import TyCon
-import CoAxiom
 import Class
 import NameSet
 import Name
@@ -1107,35 +1104,6 @@ wrapFamInstBody tycon args body
   = mkCast body (mkSymCo (mkUnbranchedAxInstCo Representational co_con args []))
   | otherwise
   = body
-
--- Same as `wrapFamInstBody`, but for type family instances, which are
--- represented by a `CoAxiom`, and not a `TyCon`
-wrapTypeFamInstBody :: HasCallStack => CoAxiom br -> Int -> [Type] -> [Coercion]
-                    -> CoreExpr -> CoreExpr
-wrapTypeFamInstBody axiom ind args cos body
-  = mkCast body (mkSymCo (mkAxInstCo Representational axiom ind args cos))
-
-wrapTypeUnbranchedFamInstBody :: CoAxiom Unbranched -> [Type] -> [Coercion]
-                              -> CoreExpr -> CoreExpr
-wrapTypeUnbranchedFamInstBody axiom
-  = wrapTypeFamInstBody axiom 0
-
-unwrapFamInstScrut :: HasCallStack => TyCon -> [Type] -> CoreExpr -> CoreExpr
-unwrapFamInstScrut tycon args scrut
-  | Just co_con <- tyConFamilyCoercion_maybe tycon
-  = mkCast scrut (mkUnbranchedAxInstCo Representational co_con args []) -- data instances only
-  | otherwise
-  = scrut
-
-unwrapTypeFamInstScrut :: HasCallStack => CoAxiom br -> Int -> [Type] -> [Coercion]
-                       -> CoreExpr -> CoreExpr
-unwrapTypeFamInstScrut axiom ind args cos scrut
-  = mkCast scrut (mkAxInstCo Representational axiom ind args cos)
-
-unwrapTypeUnbranchedFamInstScrut :: CoAxiom Unbranched -> [Type] -> [Coercion]
-                                 -> CoreExpr -> CoreExpr
-unwrapTypeUnbranchedFamInstScrut axiom
-  = unwrapTypeFamInstScrut axiom 0
 
 {-
 ************************************************************************

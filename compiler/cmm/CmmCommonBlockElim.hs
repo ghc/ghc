@@ -1,4 +1,5 @@
-{-# LANGUAGE GADTs, BangPatterns #-}
+{-# LANGUAGE GADTs, BangPatterns, ScopedTypeVariables #-}
+
 module CmmCommonBlockElim
   ( elimCommonBlocks
   )
@@ -24,9 +25,8 @@ import qualified Data.List as List
 import Data.Word
 import qualified Data.Map as M
 import Outputable
-import UniqFM
-import UniqDFM
 import qualified TrieMap as TM
+import UniqFM
 import Unique
 import Control.Arrow (first, second)
 import Data.List (foldl')
@@ -64,9 +64,11 @@ elimCommonBlocks :: CmmGraph -> CmmGraph
 elimCommonBlocks g = replaceLabels env $ copyTicks env g
   where
      env = iterate mapEmpty blocks_with_key
-     -- The order of blocks doesn't matter here, but revPostorder also drops any
-     -- unreachable blocks, which is useful.
-     groups = groupByInt hash_block (revPostorder g)
+     -- The order of blocks doesn't matter here. While we could use
+     -- revPostorder which drops unreachable blocks this is done in
+     -- ContFlowOpt already which runs before this pass. So we use
+     -- toBlockList since it is faster.
+     groups = groupByInt hash_block (toBlockList g) :: [[CmmBlock]]
      blocks_with_key = [ [ (successors b, [b]) | b <- bs] | bs <- groups]
 
 -- Invariant: The blocks in the list are pairwise distinct
@@ -94,6 +96,8 @@ iterate subst blocks
     subst' = subst `mapUnion` new_substs
     updated_blocks = map (map (first (map (lookupBid subst')))) merged_blocks
 
+-- Combine two lists of blocks.
+-- While they are internally distinct they can still share common blocks.
 mergeBlocks :: Subst -> DistinctBlocks -> DistinctBlocks -> (Subst, DistinctBlocks)
 mergeBlocks subst existing new = go new
   where
@@ -298,17 +302,21 @@ copyTicks env g
              foldr blockCons code (map CmmTick ticks)
 
 -- Group by [Label]
-groupByLabel :: [(Key, a)] -> [(Key, [a])]
-groupByLabel = go (TM.emptyTM :: TM.ListMap UniqDFM a)
-  where
-    go !m [] = TM.foldTM (:) m []
-    go !m ((k,v) : entries) = go (TM.alterTM k' adjust m) entries
-      where k' = map getUnique k
-            adjust Nothing       = Just (k,[v])
-            adjust (Just (_,vs)) = Just (k,v:vs)
-
+-- See Note [Compressed TrieMap] in coreSyn/TrieMap about the usage of GenMap.
+groupByLabel :: [(Key, DistinctBlocks)] -> [(Key, [DistinctBlocks])]
+groupByLabel =
+  go (TM.emptyTM :: TM.ListMap (TM.GenMap LabelMap) (Key, [DistinctBlocks]))
+    where
+      go !m [] = TM.foldTM (:) m []
+      go !m ((k,v) : entries) = go (TM.alterTM k adjust m) entries
+        where --k' = map (getKey . getUnique) k
+              adjust Nothing       = Just (k,[v])
+              adjust (Just (_,vs)) = Just (k,v:vs)
 
 groupByInt :: (a -> Int) -> [a] -> [[a]]
 groupByInt f xs = nonDetEltsUFM $ List.foldl' go emptyUFM xs
-  -- See Note [Unique Determinism and code generation]
-  where go m x = alterUFM (Just . maybe [x] (x:)) m (f x)
+   -- See Note [Unique Determinism and code generation]
+  where
+    go m x = alterUFM addEntry m (f x)
+      where
+        addEntry xs = Just $! maybe [x] (x:) xs

@@ -466,14 +466,6 @@ tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
         ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
 }
 
-tc_pat penv (PArrPat _ pats) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedPArrTy penv (weightedThing pat_ty)
-        ; (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
-                                     pats penv thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
-        ; return (mkHsWrapPat coi (PArrPat elt_ty pats') pat_ty, res)
-        }
-
 tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
   = do  { let arity = length pats
               tc = tupleTyCon boxity arity

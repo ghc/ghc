@@ -462,18 +462,6 @@ data HsExpr p
                                    -- For OverloadedLists, the fromListN witness
                 [LHsExpr p]
 
-  -- | Syntactic parallel array: [:e1, ..., en:]
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
-  --              'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnComma',
-  --              'ApiAnnotation.AnnVbar'
-  --              'ApiAnnotation.AnnClose' @':]'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | ExplicitPArr
-                (XExplicitPArr p) -- type of elements of the parallel array
-                [LHsExpr p]
-
   -- | Record construction
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
@@ -523,24 +511,6 @@ data HsExpr p
                 (Maybe (SyntaxExpr p))
                                   -- For OverloadedLists, the fromList witness
                 (ArithSeqInfo p)
-
-  -- | Arithmetic sequence for parallel array
-  --
-  -- > [:e1..e2:] or [:e1, e2..e3:]
-  --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
-  --              'ApiAnnotation.AnnComma','ApiAnnotation.AnnDotdot',
-  --              'ApiAnnotation.AnnVbar',
-  --              'ApiAnnotation.AnnClose' @':]'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | PArrSeq
-                (XPArrSeq p)
-                (ArithSeqInfo p)
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# SCC'@,
-  --             'ApiAnnotation.AnnVal' or 'ApiAnnotation.AnnValStr',
-  --              'ApiAnnotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsSCC       (XSCC p)
@@ -783,10 +753,6 @@ type instance XExplicitList  GhcPs = NoExt
 type instance XExplicitList  GhcRn = NoExt
 type instance XExplicitList  GhcTc = Type
 
-type instance XExplicitPArr  GhcPs = NoExt
-type instance XExplicitPArr  GhcRn = NoExt
-type instance XExplicitPArr  GhcTc = Type
-
 type instance XRecordCon     GhcPs = NoExt
 type instance XRecordCon     GhcRn = NoExt
 type instance XRecordCon     GhcTc = RecordConTc
@@ -802,10 +768,6 @@ type instance XExprWithTySig GhcTc = (LHsSigWcType GhcRn)
 type instance XArithSeq      GhcPs = NoExt
 type instance XArithSeq      GhcRn = NoExt
 type instance XArithSeq      GhcTc = PostTcExpr
-
-type instance XPArrSeq       GhcPs = NoExt
-type instance XPArrSeq       GhcRn = NoExt
-type instance XPArrSeq       GhcTc = PostTcExpr
 
 type instance XSCC           (GhcPass _) = NoExt
 type instance XCoreAnn       (GhcPass _) = NoExt
@@ -1118,9 +1080,6 @@ ppr_expr (HsDo _ do_or_list_comp (L _ stmts)) = pprDo do_or_list_comp stmts
 ppr_expr (ExplicitList _ _ exprs)
   = brackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (ExplicitPArr _ exprs)
-  = paBrackets (pprDeeperList fsep (punctuate comma (map ppr_lexpr exprs)))
-
 ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
   = hang (ppr con_id) 2 (ppr rbinds)
 
@@ -1132,7 +1091,6 @@ ppr_expr (ExprWithTySig sig expr)
          4 (ppr sig)
 
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
-ppr_expr (PArrSeq  _ info)   = paBrackets (ppr info)
 
 ppr_expr (EWildPat _)     = char '_'
 ppr_expr (ELazyPat _ e)   = char '~' <> ppr e
@@ -1286,11 +1244,9 @@ hsExprNeedsParens p = go
       | isListCompExpr sc             = False
       | otherwise                     = p > topPrec
     go (ExplicitList{})               = False
-    go (ExplicitPArr{})               = False
     go (RecordUpd{})                  = False
     go (ExprWithTySig{})              = p > topPrec
     go (ArithSeq{})                   = False
-    go (PArrSeq{})                    = False
     go (EWildPat{})                   = False
     go (ELazyPat{})                   = False
     go (EAsPat{})                     = False
@@ -1906,14 +1862,14 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 
 -- For details on above see note [Api annotations] in ApiAnnotation
 data StmtLR idL idR body -- body should always be (LHs**** idR)
-  = LastStmt  -- Always the last Stmt in ListComp, MonadComp, PArrComp,
+  = LastStmt  -- Always the last Stmt in ListComp, MonadComp,
               -- and (after the renamer) DoExpr, MDoExpr
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
           (XLastStmt idL idR body)
           body
           Bool               -- True <=> return was stripped by ApplicativeDo
           (SyntaxExpr idR)   -- The return operator, used only for
-                             -- MonadComp For ListComp, PArrComp, we
+                             -- MonadComp For ListComp we
                              -- use the baked-in 'return' For DoExpr,
                              -- MDoExpr, we don't apply a 'return' at
                              -- all See Note [Monad Comprehensions] |
@@ -2390,7 +2346,6 @@ pprDo GhciStmtCtxt  stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo ArrowExpr     stmts = text "do"  <+> ppr_do_stmts stmts
 pprDo MDoExpr       stmts = text "mdo" <+> ppr_do_stmts stmts
 pprDo ListComp      stmts = brackets    $ pprComp stmts
-pprDo PArrComp      stmts = paBrackets  $ pprComp stmts
 pprDo MonadComp     stmts = brackets    $ pprComp stmts
 pprDo _             _     = panic "pprDo" -- PatGuard, ParStmtCxt
 
@@ -2794,7 +2749,6 @@ isPatSynCtxt ctxt =
 data HsStmtContext id
   = ListComp
   | MonadComp
-  | PArrComp                         -- ^Parallel array comprehension
 
   | DoExpr                           -- ^do { ... }
   | MDoExpr                          -- ^mdo { ... }  ie recursive do-expression
@@ -2810,7 +2764,6 @@ deriving instance (Data id) => Data (HsStmtContext id)
 isListCompExpr :: HsStmtContext id -> Bool
 -- Uses syntax [ e | quals ]
 isListCompExpr ListComp          = True
-isListCompExpr PArrComp          = True
 isListCompExpr MonadComp         = True
 isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
 isListCompExpr (TransStmtCtxt c) = isListCompExpr c
@@ -2825,7 +2778,7 @@ isMonadFailStmtContext MDoExpr              = True
 isMonadFailStmtContext GhciStmtCtxt         = True
 isMonadFailStmtContext (ParStmtCtxt ctxt)   = isMonadFailStmtContext ctxt
 isMonadFailStmtContext (TransStmtCtxt ctxt) = isMonadFailStmtContext ctxt
-isMonadFailStmtContext _ = False -- ListComp, PArrComp, PatGuard, ArrowExpr
+isMonadFailStmtContext _ = False -- ListComp, PatGuard, ArrowExpr
 
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})   = text "="
@@ -2880,7 +2833,6 @@ pprAStmtContext ctxt = article <+> pprStmtContext ctxt
     pp_a  = text "a"
     article = case ctxt of
                   MDoExpr       -> pp_an
-                  PArrComp      -> pp_an
                   GhciStmtCtxt  -> pp_an
                   _             -> pp_a
 
@@ -2892,7 +2844,6 @@ pprStmtContext MDoExpr         = text "'mdo' block"
 pprStmtContext ArrowExpr       = text "'do' block in an arrow command"
 pprStmtContext ListComp        = text "list comprehension"
 pprStmtContext MonadComp       = text "monad comprehension"
-pprStmtContext PArrComp        = text "array comprehension"
 pprStmtContext (PatGuard ctxt) = text "pattern guard for" $$ pprMatchContext ctxt
 
 -- Drop the inner contexts when reporting errors, else we get
@@ -2934,7 +2885,6 @@ matchContextErrString (StmtCtxt ArrowExpr)         = text "'do' block"
 matchContextErrString (StmtCtxt MDoExpr)           = text "'mdo' block"
 matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
 matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
-matchContextErrString (StmtCtxt PArrComp)          = text "array comprehension"
 
 pprMatchInCtxt :: (OutputableBndrId (GhcPass idR),
                    -- TODO:AZ these constraints do not make sense

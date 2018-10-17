@@ -455,7 +455,6 @@
    []
    []
    []
-   []
    [])
   [({ DumpRenamedAst.hs:4:8-21 }
     (ImportDecl

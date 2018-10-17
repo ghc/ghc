@@ -394,7 +394,6 @@ data DumpFlag
    | Opt_D_dump_splices
    | Opt_D_th_dec_file
    | Opt_D_dump_BCOs
-   | Opt_D_dump_vect
    | Opt_D_dump_ticked
    | Opt_D_dump_rtti
    | Opt_D_source_stats
@@ -470,8 +469,6 @@ data GeneralFlag
    | Opt_UnboxSmallStrictFields
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
-   | Opt_Vectorise
-   | Opt_VectorisationAvoidance
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
@@ -667,8 +664,6 @@ optimisationFlags = EnumSet.fromList
    , Opt_UnboxSmallStrictFields
    , Opt_DictsCheap
    , Opt_EnableRewriteRules
-   , Opt_Vectorise
-   , Opt_VectorisationAvoidance
    , Opt_RegsGraph
    , Opt_RegsIterative
    , Opt_PedanticBottoms
@@ -3207,8 +3202,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_hi)
   , make_ord_flag defGhcFlag "ddump-minimal-imports"
         (NoArg (setGeneralFlag Opt_D_dump_minimal_imports))
-  , make_ord_flag defGhcFlag "ddump-vect"
-        (setDumpFlag Opt_D_dump_vect)
   , make_ord_flag defGhcFlag "ddump-hpc"
         (setDumpFlag Opt_D_dump_ticked) -- back compat
   , make_ord_flag defGhcFlag "ddump-ticked"
@@ -3334,7 +3327,6 @@ dynamic_flags_deps = [
         ------ Optimisation flags ------------------------------------------
   , make_dep_flag defGhcFlag "Onot"   (noArgM $ setOptLevel 0 )
                                                             "Use -O0 instead"
-  , make_ord_flag defGhcFlag "Odph"   (noArgM setDPHOpt)
   , make_ord_flag defGhcFlag "O"      (optIntSuffixM (\mb_n ->
                                                 setOptLevel (mb_n `orElse` 1)))
                 -- If the number is missing, use 1
@@ -3968,8 +3960,6 @@ fFlagsDeps = [
   flagSpec "write-interface"                  Opt_WriteInterface,
   flagSpec "unbox-small-strict-fields"        Opt_UnboxSmallStrictFields,
   flagSpec "unbox-strict-fields"              Opt_UnboxStrictFields,
-  flagSpec "vectorisation-avoidance"          Opt_VectorisationAvoidance,
-  flagSpec "vectorise"                        Opt_Vectorise,
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
@@ -4037,10 +4027,6 @@ fLangFlagsDeps = [
     (deprecatedForExtension "ImplicitParams"),
   depFlagSpec' "scoped-type-variables"          LangExt.ScopedTypeVariables
     (deprecatedForExtension "ScopedTypeVariables"),
-  depFlagSpec' "parr"                           LangExt.ParallelArrays
-    (deprecatedForExtension "ParallelArrays"),
-  depFlagSpec' "PArr"                           LangExt.ParallelArrays
-    (deprecatedForExtension "ParallelArrays"),
   depFlagSpec' "allow-overlapping-instances"    LangExt.OverlappingInstances
     (deprecatedForExtension "OverlappingInstances"),
   depFlagSpec' "allow-undecidable-instances"    LangExt.UndecidableInstances
@@ -4381,11 +4367,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_DmdTxDictSel)
     , ([0,1,2], Opt_LlvmTBAA)
-    , ([0,1,2], Opt_VectorisationAvoidance)
-                -- This one is important for a tiresome reason:
-                -- we want to make sure that the bindings for data
-                -- constructors are eta-expanded.  This is probably
-                -- a good thing anyway, but it seems fragile.
 
     , ([0],     Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
@@ -5129,17 +5110,6 @@ checkOptLevel n dflags
      = Left "-O conflicts with --interactive; -O ignored."
    | otherwise
      = Right dflags
-
--- -Odph is equivalent to
---
---    -O2                               optimise as much as possible
---    -fmax-simplifier-iterations20     this is necessary sometimes
---    -fsimplifier-phases=3             we use an additional simplifier phase for fusion
---
-setDPHOpt :: DynFlags -> DynP DynFlags
-setDPHOpt dflags = setOptLevel 2 (dflags { maxSimplIterations  = 20
-                                         , simplPhases         = 3
-                                         })
 
 setMainIs :: String -> DynP ()
 setMainIs arg

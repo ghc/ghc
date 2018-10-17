@@ -1,18 +1,30 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE CPP #-}
 module Plugins (
     FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction,
-    Plugin(..), CommandLineOption, LoadedPlugin(..),
+    Plugin(..), CommandLineOption, LoadedPlugin(..), lpModuleName,
     defaultPlugin, withPlugins, withPlugins_
+    , PluginRecompile(..)
+    , purePlugin, impurePlugin, flagRecompile
     ) where
 
 import GhcPrelude
 
 import CoreMonad ( CoreToDo, CoreM )
-import TcRnTypes ( TcPlugin)
+import qualified TcRnTypes (TcPlugin)
 import DynFlags
 import GhcMonad
 import DriverPhases
-import Module ( ModuleName )
+import Module ( ModuleName, Module(moduleName))
+import Fingerprint
+import Data.List
+import Outputable (Outputable(..), text, (<+>))
+
+#if __GLASGOW_HASKELL__ < 840
+--Qualified import so we can define a Semigroup instance
+-- but it doesn't clash with Outputable.<>
+import qualified Data.Semigroup
+#endif
 
 import Control.Monad
 
@@ -28,25 +40,62 @@ type CommandLineOption = String
 -- Nonetheless, this API is preliminary and highly likely to change in
 -- the future.
 data Plugin = Plugin {
-    installCoreToDos :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
+    installCoreToDos :: CorePlugin
     -- ^ Modify the Core pipeline that will be used for compilation.
     -- This is called as the Core pipeline is built for every module
     -- being compiled, and plugins get the opportunity to modify the
     -- pipeline in a nondeterministic order.
-  , tcPlugin :: [CommandLineOption] -> Maybe TcPlugin
+  , tcPlugin :: TcPlugin
     -- ^ An optional typechecker plugin, which may modify the
     -- behaviour of the constraint solver.
+  , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
+    -- ^ Specify how the plugin should affect recompilation.
   }
 
 -- | A plugin with its arguments. The result of loading the plugin.
 data LoadedPlugin = LoadedPlugin {
     lpPlugin :: Plugin
     -- ^ the actual callable plugin
-  , lpModuleName :: ModuleName
-    -- ^ the qualified name of the module containing the plugin
+  , lpModule :: Module
+    -- ^ The module the plugin is defined in
   , lpArguments :: [CommandLineOption]
     -- ^ command line arguments for the plugin
   }
+
+lpModuleName :: LoadedPlugin -> ModuleName
+lpModuleName = moduleName . lpModule
+
+
+data PluginRecompile = ForceRecompile | NoForceRecompile | MaybeRecompile Fingerprint
+
+instance Outputable PluginRecompile where
+  ppr ForceRecompile = text "ForceRecompile"
+  ppr NoForceRecompile = text "NoForceRecompile"
+  ppr (MaybeRecompile fp) = text "MaybeRecompile" <+> ppr fp
+
+instance Semigroup PluginRecompile where
+  ForceRecompile <> _ = ForceRecompile
+  NoForceRecompile <> r = r
+  MaybeRecompile fp <> NoForceRecompile   = MaybeRecompile fp
+  MaybeRecompile fp <> MaybeRecompile fp' = MaybeRecompile (fingerprintFingerprints [fp, fp'])
+  MaybeRecompile _fp <> ForceRecompile     = ForceRecompile
+
+instance Monoid PluginRecompile where
+  mempty = NoForceRecompile
+#if __GLASGOW_HASKELL__ < 840
+  mappend = (Data.Semigroup.<>)
+#endif
+
+type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
+type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin
+
+purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
+purePlugin _args = return NoForceRecompile
+
+impurePlugin _args = return ForceRecompile
+
+flagRecompile =
+  return . MaybeRecompile . fingerprintFingerprints . map fingerprintString . sort
 
 -- | Default plugin: does nothing at all! For compatibility reasons
 -- you should base all your plugin definitions on this default value.
@@ -54,6 +103,7 @@ defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos = const return
       , tcPlugin         = const Nothing
+      , pluginRecompile  = impurePlugin
     }
 
 type PluginOperation m a = Plugin -> [CommandLineOption] -> a -> m a

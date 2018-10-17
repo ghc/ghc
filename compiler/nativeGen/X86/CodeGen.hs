@@ -2857,11 +2857,16 @@ genSwitch dflags expr targets
                     JMP_TBL op ids (Section ReadOnlyData lbl) lbl
                  ]
         return code
-  where (offset, ids) = switchTargetsToTable targets
+  where
+    (offset, blockIds) = switchTargetsToTable targets
+    ids = map (fmap DestBlockId) blockIds
 
 generateJumpTableForInstr :: DynFlags -> Instr -> Maybe (NatCmmDecl (Alignment, CmmStatics) Instr)
 generateJumpTableForInstr dflags (JMP_TBL _ ids section lbl)
-    = Just (createJumpTable dflags ids section lbl)
+    = let getBlockId (DestBlockId id) = id
+          getBlockId _ = panic "Non-Label target in Jump Table"
+          blockIds = map (fmap getBlockId) ids
+      in Just (createJumpTable dflags blockIds section lbl)
 generateJumpTableForInstr _ _ = Nothing
 
 createJumpTable :: DynFlags -> [Maybe BlockId] -> Section -> CLabel

@@ -78,8 +78,6 @@ module Module
         baseUnitId,
         rtsUnitId,
         thUnitId,
-        dphSeqUnitId,
-        dphParUnitId,
         mainUnitId,
         thisGhcUnitId,
         isHoleModule,
@@ -1067,8 +1065,7 @@ parseModSubst = Parse.between (Parse.char '[') (Parse.char ']')
 
 integerUnitId, primUnitId,
   baseUnitId, rtsUnitId,
-  thUnitId, dphSeqUnitId, dphParUnitId,
-  mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
+  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 primUnitId        = fsToUnitId (fsLit "ghc-prim")
 integerUnitId     = fsToUnitId (fsLit n)
   where
@@ -1078,8 +1075,6 @@ integerUnitId     = fsToUnitId (fsLit n)
 baseUnitId        = fsToUnitId (fsLit "base")
 rtsUnitId         = fsToUnitId (fsLit "rts")
 thUnitId          = fsToUnitId (fsLit "template-haskell")
-dphSeqUnitId      = fsToUnitId (fsLit "dph-seq")
-dphParUnitId      = fsToUnitId (fsLit "dph-par")
 thisGhcUnitId     = fsToUnitId (fsLit "ghc")
 interactiveUnitId = fsToUnitId (fsLit "interactive")
 
@@ -1127,9 +1122,7 @@ wiredInUnitIds = [ primUnitId,
                        baseUnitId,
                        rtsUnitId,
                        thUnitId,
-                       thisGhcUnitId,
-                       dphSeqUnitId,
-                       dphParUnitId ]
+                       thisGhcUnitId ]
 
 {-
 ************************************************************************

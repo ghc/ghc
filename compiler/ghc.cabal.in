@@ -160,7 +160,6 @@ Library
         typecheck
         types
         utils
-        vectorise
 
     -- we use an explicit Prelude
     Default-Extensions:
@@ -536,35 +535,6 @@ Library
         UniqMap
         UniqSet
         Util
-        Vectorise.Builtins.Base
-        Vectorise.Builtins.Initialise
-        Vectorise.Builtins
-        Vectorise.Monad.Base
-        Vectorise.Monad.Naming
-        Vectorise.Monad.Local
-        Vectorise.Monad.Global
-        Vectorise.Monad.InstEnv
-        Vectorise.Monad
-        Vectorise.Utils.Base
-        Vectorise.Utils.Closure
-        Vectorise.Utils.Hoisting
-        Vectorise.Utils.PADict
-        Vectorise.Utils.Poly
-        Vectorise.Utils
-        Vectorise.Generic.Description
-        Vectorise.Generic.PAMethods
-        Vectorise.Generic.PADict
-        Vectorise.Generic.PData
-        Vectorise.Type.Env
-        Vectorise.Type.Type
-        Vectorise.Type.TyConDecl
-        Vectorise.Type.Classify
-        Vectorise.Convert
-        Vectorise.Vect
-        Vectorise.Var
-        Vectorise.Env
-        Vectorise.Exp
-        Vectorise
         Hoopl.Block
         Hoopl.Collections
         Hoopl.Dataflow

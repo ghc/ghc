@@ -24,7 +24,7 @@ module Outputable (
         text, ftext, ptext, ztext,
         int, intWithCommas, integer, word, float, double, rational, doublePrec,
         parens, cparen, brackets, braces, quotes, quote,
-        doubleQuotes, angleBrackets, paBrackets,
+        doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
@@ -592,7 +592,7 @@ doublePrec :: Int -> Double -> SDoc
 doublePrec p n = text (showFFloat (Just p) n "")
 
 parens, braces, brackets, quotes, quote,
-        paBrackets, doubleQuotes, angleBrackets :: SDoc -> SDoc
+        doubleQuotes, angleBrackets :: SDoc -> SDoc
 
 parens d        = SDoc $ Pretty.parens . runSDoc d
 braces d        = SDoc $ Pretty.braces . runSDoc d
@@ -600,7 +600,6 @@ brackets d      = SDoc $ Pretty.brackets . runSDoc d
 quote d         = SDoc $ Pretty.quote . runSDoc d
 doubleQuotes d  = SDoc $ Pretty.doubleQuotes . runSDoc d
 angleBrackets d = char '<' <> d <> char '>'
-paBrackets d    = text "[:" <> d <> text ":]"
 
 cparen :: Bool -> SDoc -> SDoc
 cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d

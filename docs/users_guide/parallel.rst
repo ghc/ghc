@@ -156,13 +156,3 @@ from the ``Control.Parallel.Strategies`` module in the `parallel
 package <http://hackage.haskell.org/package/parallel>`__. This module
 builds functionality around ``par``, expressing more elaborate patterns
 of parallel computation, such as parallel ``map``.
-
-.. _dph:
-
-Data Parallel Haskell
----------------------
-
-GHC includes experimental support for Data Parallel Haskell (DPH). This
-code is highly unstable and is only provided as a technology preview.
-More information can be found on the corresponding
-`DPH wiki page <http://www.haskell.org/haskellwiki/GHC/Data_Parallel_Haskell>`__.

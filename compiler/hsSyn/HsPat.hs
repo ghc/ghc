@@ -166,12 +166,7 @@ data Pat p
     --            'ApiAnnotation.AnnClose' @'#)'@
 
     -- For details on above see note [Api annotations] in ApiAnnotation
-  | PArrPat     (XPArrPat p)   -- After typechecking,  the type of the elements
-                [LPat p]       -- Syntactic parallel array
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
-    --                                    'ApiAnnotation.AnnClose' @':]'@
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
         ------------ Constructor patterns ---------------
   | ConPatIn    (Located (IdP p))
                 (HsConPatDetails p)
@@ -308,10 +303,6 @@ type instance XTuplePat GhcTc = [Type]
 type instance XSumPat GhcPs = NoExt
 type instance XSumPat GhcRn = NoExt
 type instance XSumPat GhcTc = [Type]
-
-type instance XPArrPat GhcPs = NoExt
-type instance XPArrPat GhcRn = NoExt
-type instance XPArrPat GhcTc = Type
 
 type instance XViewPat GhcPs = NoExt
 type instance XViewPat GhcRn = NoExt
@@ -535,7 +526,6 @@ pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
                                                  else pprPat pat
 pprPat (SigPat ty pat)          = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
-pprPat (PArrPat _ pats)         = paBrackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)     = tupleParens (boxityTupleSort bx)
                                               (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
@@ -694,7 +684,6 @@ isIrrefutableHsPat pat
     go1 (SumPat {})         = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
     go1 (ListPat {})        = False
-    go1 (PArrPat {})        = False     -- ?
 
     go1 (ConPatIn {})       = False     -- Conservative
     go1 (ConPatOut{ pat_con = L _ (RealDataCon con), pat_args = details })
@@ -758,7 +747,6 @@ patNeedsParens p = go
     go (TuplePat {})          = False
     go (SumPat {})            = False
     go (ListPat {})           = False
-    go (PArrPat {})           = False
     go (LitPat _ l)           = hsLitNeedsParens p l
     go (NPat _ (L _ ol) _ _)  = hsOverLitNeedsParens p ol
     go (XPat {})              = True -- conservative default
@@ -800,7 +788,6 @@ collectEvVarsPat pat =
     ListPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     TuplePat _ ps _  -> unionManyBags $ map collectEvVarsLPat ps
     SumPat _ p _ _   -> collectEvVarsLPat p
-    PArrPat _ ps     -> unionManyBags $ map collectEvVarsLPat ps
     ConPatOut {pat_dicts = dicts, pat_args  = args}
                      -> unionBags (listToBag dicts)
                                    $ unionManyBags

@@ -520,13 +520,6 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsPArrTy            (XPArrTy pass)
-                        (LHsType pass)  -- Elem. type of parallel array: [:t:]
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
-      --         'ApiAnnotation.AnnClose' @':]'@
-
-      -- For details on above see note [Api annotations] in ApiAnnotation
-
   | HsTupleTy           (XTupleTy pass)
                         HsTupleSort
                         [LHsType pass]  -- Element types (length gives arity)
@@ -676,7 +669,6 @@ type instance XAppsTy          (GhcPass _) = NoExt
 type instance XAppTy           (GhcPass _) = NoExt
 type instance XFunTy           (GhcPass _) = NoExt
 type instance XListTy          (GhcPass _) = NoExt
-type instance XPArrTy          (GhcPass _) = NoExt
 type instance XTupleTy         (GhcPass _) = NoExt
 type instance XSumTy           (GhcPass _) = NoExt
 type instance XOpTy            (GhcPass _) = NoExt
@@ -1488,7 +1480,6 @@ ppr_mono_ty (HsSumTy _ tys)
 ppr_mono_ty (HsKindSig _ ty kind)
   = parens (ppr_mono_lty ty <+> dcolon <+> ppr kind)
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
-ppr_mono_ty (HsPArrTy _ ty)       = paBrackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
 ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
 ppr_mono_ty (HsExplicitListTy _ Promoted tys)
@@ -1575,7 +1566,6 @@ hsTypeNeedsParens p = go
     go (HsSumTy{})           = False
     go (HsKindSig{})         = False
     go (HsListTy{})          = False
-    go (HsPArrTy{})          = False
     go (HsIParamTy{})        = p > topPrec
     go (HsSpliceTy{})        = False
     go (HsExplicitListTy{})  = False

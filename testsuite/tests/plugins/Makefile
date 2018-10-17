@@ -50,5 +50,30 @@ T11244:
 .PHONY: T12567a
 T12567a:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make T12567a.hs -package-db simple-plugin/pkg.T12567a/local.package.conf -hide-all-plugin-packages -plugin-package simple-plugin 1>&2
-	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make T12567a.hs -package-db simple-plugin/pkg.T12567a/local.package.conf -hide-all-plugin-packages -plugin-package simple-plugin 2>&1 | grep "T12567a.hs, T12567a.o" 1>&2
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make T12567a.hs -package-db simple-plugin/pkg.T12567a/local.package.conf -hide-all-plugin-packages -plugin-package simple-plugin 1>&2
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make T12567b.hs -package-db simple-plugin/pkg.T12567a/local.package.conf -hide-all-plugin-packages -plugin-package simple-plugin 1>&2
+
+.PHONY: T14335
+T14335:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -fexternal-interpreter --make -v0 plugins01.hs -package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -hide-all-plugin-packages -plugin-package simple-plugin
+	./plugins01
+
+# Shouldn't recompile the module
+.PHONY: plugin-recomp-pure
+plugin-recomp-pure:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
+
+# Should recompile the module
+.PHONY: plugin-recomp-impure
+plugin-recomp-impure:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin ImpurePlugin
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin ImpurePlugin
+
+# Should not recompile the module the first time but should the second time
+.PHONY: plugin-recomp-flags
+plugin-recomp-flags:
+	"$(TEST_HC)" $(TEST_HC_OPTS)  $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:0
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:0
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:1
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:1

@@ -911,15 +911,6 @@ packageFlagErr :: DynFlags
                -> PackageFlag
                -> [(PackageConfig, UnusablePackageReason)]
                -> IO a
-
--- for missing DPH package we emit a more helpful error message, because
--- this may be the result of using -fdph-par or -fdph-seq.
-packageFlagErr dflags (ExposePackage _ (PackageArg pkg) _) []
-  | is_dph_package pkg
-  = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ dph_err))
-  where dph_err = text "the " <> text pkg <> text " package is not installed."
-                  $$ text "To install it: \"cabal install dph\"."
-        is_dph_package pkg = "dph" `isPrefixOf` pkg
 packageFlagErr dflags flag reasons
   = packageFlagErr' dflags (pprFlag flag) reasons
 

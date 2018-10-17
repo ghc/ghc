@@ -67,11 +67,6 @@ module OccName (
         mkSuperDictSelOcc, mkSuperDictAuxOcc,
         mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
         mkInstTyCoOcc, mkEqPredCoOcc,
-        mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
-        mkPDataTyConOcc,  mkPDataDataConOcc,
-        mkPDatasTyConOcc, mkPDatasDataConOcc,
-        mkPReprTyConOcc,
-        mkPADFunOcc,
         mkRecFldSelOcc,
         mkTyConRepOcc,
 
@@ -655,38 +650,12 @@ mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
 mkGenR   = mk_simple_deriv tcName "Rep_"
 mkGen1R  = mk_simple_deriv tcName "Rep1_"
 
--- Vectorisation
-mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
- mkPADFunOcc,      mkPReprTyConOcc,
- mkPDataTyConOcc,  mkPDataDataConOcc,
- mkPDatasTyConOcc, mkPDatasDataConOcc
-  :: Maybe String -> OccName -> OccName
-mkVectOcc          = mk_simple_deriv_with varName  "$v"
-mkVectTyConOcc     = mk_simple_deriv_with tcName   "V:"
-mkVectDataConOcc   = mk_simple_deriv_with dataName "VD:"
-mkVectIsoOcc       = mk_simple_deriv_with varName  "$vi"
-mkPADFunOcc        = mk_simple_deriv_with varName  "$pa"
-mkPReprTyConOcc    = mk_simple_deriv_with tcName   "VR:"
-mkPDataTyConOcc    = mk_simple_deriv_with tcName   "VP:"
-mkPDatasTyConOcc   = mk_simple_deriv_with tcName   "VPs:"
-mkPDataDataConOcc  = mk_simple_deriv_with dataName "VPD:"
-mkPDatasDataConOcc = mk_simple_deriv_with dataName "VPDs:"
-
 -- Overloaded record field selectors
 mkRecFldSelOcc :: String -> OccName
 mkRecFldSelOcc s = mk_deriv varName "$sel" [fsLit s]
 
 mk_simple_deriv :: NameSpace -> FastString -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px [occNameFS occ]
-
-mk_simple_deriv_with :: NameSpace     -- ^ the namespace
-                     -> FastString    -- ^ an identifying prefix
-                     -> Maybe String  -- ^ another optional prefix
-                     -> OccName       -- ^ the 'OccName' to derive from
-                     -> OccName
-mk_simple_deriv_with sp px Nothing     occ = mk_deriv sp px [occNameFS occ]
-mk_simple_deriv_with sp px (Just with) occ =
-    mk_deriv sp px [fsLit with, fsLit "_", occNameFS occ]
 
 -- Data constructor workers are made by setting the name space
 -- of the data constructor OccName (which should be a DataName)

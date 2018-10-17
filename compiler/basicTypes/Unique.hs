@@ -49,7 +49,7 @@ module Unique (
         mkPrimOpIdUnique,
         mkPreludeMiscIdUnique, mkPreludeDataConUnique,
         mkPreludeTyConUnique, mkPreludeClassUnique,
-        mkPArrDataConUnique, mkCoVarUnique,
+        mkCoVarUnique,
 
         mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
         mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
@@ -369,7 +369,6 @@ mkPreludeTyConUnique   :: Int -> Unique
 mkPreludeDataConUnique :: Arity -> Unique
 mkPrimOpIdUnique       :: Int -> Unique
 mkPreludeMiscIdUnique  :: Int -> Unique
-mkPArrDataConUnique    :: Int -> Unique
 mkCoVarUnique          :: Int -> Unique
 
 mkAlphaTyVarUnique   i = mkUnique '1' i
@@ -410,9 +409,6 @@ dataConWrapperUnique u = stepUnique u 3
 --------------------------------------------------
 mkPrimOpIdUnique op         = mkUnique '9' op
 mkPreludeMiscIdUnique  i    = mkUnique '0' i
-
--- No numbers left anymore, so I pick something different for the character tag
-mkPArrDataConUnique a           = mkUnique ':' (2*a)
 
 -- The "tyvar uniques" print specially nicely: a, b, c, etc.
 -- See pprUnique for details

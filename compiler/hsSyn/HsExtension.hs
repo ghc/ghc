@@ -216,7 +216,6 @@ type family XForD        x
 type family XWarningD    x
 type family XAnnD        x
 type family XRuleD       x
-type family XVectD       x
 type family XSpliceD     x
 type family XDocD        x
 type family XRoleAnnotD  x
@@ -233,7 +232,6 @@ type ForallXHsDecl (c :: * -> Constraint) (x :: *) =
        , c (XWarningD    x)
        , c (XAnnD        x)
        , c (XRuleD       x)
-       , c (XVectD       x)
        , c (XSpliceD     x)
        , c (XDocD        x)
        , c (XRoleAnnotD  x)
@@ -442,25 +440,6 @@ type ForallXRuleBndr (c :: * -> Constraint) (x :: *) =
        )
 
 -- -------------------------------------
--- RuleBndr type families
-type family XHsVect          x
-type family XHsNoVect        x
-type family XHsVectType      x
-type family XHsVectClass     x
-type family XHsVectInst      x
-type family XXVectDecl       x
-
-type ForallXVectDecl (c :: * -> Constraint) (x :: *) =
-       ( c (XHsVect          x)
-       , c (XHsNoVect        x)
-       , c (XHsVectType      x)
-       , c (XHsVectClass     x)
-       , c (XHsVectInst      x)
-       , c (XXVectDecl       x)
-       , c (XXVectDecl       x)
-       )
-
--- -------------------------------------
 -- WarnDecls type families
 type family XWarnings        x
 type family XXWarnDecls      x
@@ -528,12 +507,10 @@ type family XMultiIf        x
 type family XLet            x
 type family XDo             x
 type family XExplicitList   x
-type family XExplicitPArr   x
 type family XRecordCon      x
 type family XRecordUpd      x
 type family XExprWithTySig  x
 type family XArithSeq       x
-type family XPArrSeq        x
 type family XSCC            x
 type family XCoreAnn        x
 type family XBracket        x
@@ -580,12 +557,10 @@ type ForallXExpr (c :: * -> Constraint) (x :: *) =
        , c (XLet            x)
        , c (XDo             x)
        , c (XExplicitList   x)
-       , c (XExplicitPArr   x)
        , c (XRecordCon      x)
        , c (XRecordUpd      x)
        , c (XExprWithTySig  x)
        , c (XArithSeq       x)
-       , c (XPArrSeq        x)
        , c (XSCC            x)
        , c (XCoreAnn        x)
        , c (XBracket        x)
@@ -856,7 +831,6 @@ type family XBangPat   x
 type family XListPat   x
 type family XTuplePat  x
 type family XSumPat    x
-type family XPArrPat   x
 type family XConPat    x
 type family XViewPat   x
 type family XSplicePat x
@@ -878,7 +852,6 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
        , c (XListPat   x)
        , c (XTuplePat  x)
        , c (XSumPat    x)
-       , c (XPArrPat   x)
        , c (XViewPat   x)
        , c (XSplicePat x)
        , c (XLitPat    x)
@@ -929,7 +902,6 @@ type family XAppsTy          x
 type family XAppTy           x
 type family XFunTy           x
 type family XListTy          x
-type family XPArrTy          x
 type family XTupleTy         x
 type family XSumTy           x
 type family XOpTy            x
@@ -957,7 +929,6 @@ type ForallXType (c :: * -> Constraint) (x :: *) =
        , c (XAppTy           x)
        , c (XFunTy           x)
        , c (XListTy          x)
-       , c (XPArrTy          x)
        , c (XTupleTy         x)
        , c (XSumTy           x)
        , c (XOpTy            x)
@@ -1129,16 +1100,6 @@ type OutputableX p = -- See Note [OutputableX]
 
   , Outputable (XAppTypeE p)
   , Outputable (XAppTypeE GhcRn)
-
-  , Outputable (XHsVectType p)
-  , Outputable (XHsVectType GhcRn)
-
-  , Outputable (XHsVectClass p)
-  , Outputable (XHsVectClass GhcRn)
-
-  , Outputable (XHsVectInst p)
-  , Outputable (XHsVectInst GhcRn)
-
   )
 -- TODO: Should OutputableX be included in OutputableBndrId?
 
