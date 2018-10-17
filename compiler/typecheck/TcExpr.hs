@@ -868,7 +868,18 @@ following.
 tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
-          (record_expr', record_rho) <- tcInferRho record_expr
+          (record_expr', record_rho) <- tcScalingUsage Omega $ tcInferRho record_expr
+            -- Record update drops some of the content of the record (namely the
+            -- content of the field being updated). As a consequence, it
+            -- requires an unrestricted record.
+            --
+            -- Consider the following example:
+            --
+            -- data R a = R { self :: a }
+            -- bad :: a ⊸ ()
+            -- bad x = let r = R x in r { self = () }
+            --
+            -- This should definitely *not* typecheck.
 
         -- STEP -1  See Note [Disambiguating record fields]
         -- After this we know that rbinds is unambiguous
