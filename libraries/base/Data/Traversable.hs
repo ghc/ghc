@@ -61,7 +61,7 @@ import Data.Functor
 import Data.Functor.Identity ( Identity(..) )
 import Data.Functor.Utils ( StateL(..), StateR(..) )
 import Data.Monoid ( Dual(..), Sum(..), Product(..),
-                     First(..), Last(..), Alt(..) )
+                     First(..), Last(..), Alt(..), Ap(..) )
 import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
@@ -293,6 +293,10 @@ instance Traversable Last where
 -- | @since 4.12.0.0
 instance (Traversable f) => Traversable (Alt f) where
     traverse f (Alt x) = Alt <$> traverse f x
+
+-- | @since 4.12.0.0
+instance (Traversable f) => Traversable (Ap f) where
+    traverse f (Ap x) = Ap <$> traverse f x
 
 -- | @since 4.9.0.0
 instance Traversable ZipList where

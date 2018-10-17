@@ -8,5 +8,5 @@
       instance Num Double -- Defined in ‘GHC.Float’
       instance Num Float -- Defined in ‘GHC.Float’
       ...plus two others
-      ...plus five instances involving out-of-scope types
+      ...plus six instances involving out-of-scope types
       (use -fprint-potential-instances to see them all)

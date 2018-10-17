@@ -15,7 +15,7 @@ TYPE CONSTRUCTORS
   data family Sing (a :: k)
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
-    Sing = DataFamilyInstanceLHS.R:SingMyKind_
+    Sing _ = DataFamilyInstanceLHS.R:SingMyKind_
       -- Defined at DataFamilyInstanceLHS.hs:8:15
 FAMILY INSTANCES
   data instance Sing

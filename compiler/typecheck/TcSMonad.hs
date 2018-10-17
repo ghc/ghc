@@ -83,7 +83,7 @@ module TcSMonad (
 
     -- The flattening cache
     lookupFlatCache, extendFlatCache, newFlattenSkolem,            -- Flatten skolems
-    dischargeFmv, pprKicked,
+    dischargeFunEq, pprKicked,
 
     -- Inert CFunEqCans
     updInertFunEqs, findFunEq,
@@ -3044,12 +3044,14 @@ demoteUnfilledFmv fmv
                       ; TcM.writeMetaTyVar fmv tv_ty } }
 
 -----------------------------
-dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFmv ev fmv co ty)
---     [W] ev :: F tys ~ fmv
---         co :: F tys ~ xi
--- Precondition: fmv is not filled, and fmv `notElem` xi
---               ev is Wanted or Derived
+dischargeFunEq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
+-- (dischargeFunEqCan ev tv co ty)
+--     Preconditions
+--       - ev :: F tys ~ tv   is a CFunEqCan
+--       - tv is a FlatMetaTv of FlatSkolTv
+--       - co :: F tys ~ xi
+--       - fmv/fsk `notElem` xi
+--       - fmv not filled (for Wanteds)
 --
 -- Then for [W] or [WD], we actually fill in the fmv:
 --      set fmv := xi,
@@ -3057,23 +3059,31 @@ dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
 --      kick out any inert things that are now rewritable
 --
 -- For [D], we instead emit an equality that must ultimately hold
---      emit  xi ~ fmv
+--      [D] xi ~ fmv
 --      Does not evaluate 'co' if 'ev' is Derived
 --
+-- For [G], emit this equality
+--     [G] (sym ev; co) :: fsk ~ xi
+
 -- See TcFlatten Note [The flattening story],
 -- especially "Ownership of fsk/fmv"
-dischargeFmv ev@(CtWanted { ctev_dest = dest }) fmv co xi
+dischargeFunEq (CtGiven { ctev_evar = old_evar, ctev_loc = loc }) fsk co xi
+  = do { new_ev <- newGivenEvVar loc ( new_pred, evCoercion new_co  )
+       ; emitWorkNC [new_ev] }
+  where
+    new_pred = mkPrimEqPred (mkTyVarTy fsk) xi
+    new_co   = mkTcSymCo (mkTcCoVarCo old_evar) `mkTcTransCo` co
+
+dischargeFunEq ev@(CtWanted { ctev_dest = dest }) fmv co xi
   = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
     do { setWantedEvTerm dest (EvExpr (evCoercion co))
        ; unflattenFmv fmv xi
        ; n_kicked <- kickOutAfterUnification fmv
        ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ pprKicked n_kicked) }
 
-dischargeFmv (CtDerived { ctev_loc = loc }) fmv _co xi
+dischargeFunEq (CtDerived { ctev_loc = loc }) fmv _co xi
   = emitNewDerivedEq loc Nominal xi (mkTyVarTy fmv)
               -- FunEqs are always at Nominal role
-
-dischargeFmv ev _ _ _ = pprPanic "dischargeFmv" (ppr ev)
 
 pprKicked :: Int -> SDoc
 pprKicked 0 = empty

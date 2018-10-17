@@ -1433,20 +1433,9 @@ reactFunEq :: CtEvidence -> TcTyVar    -- From this  :: F args1 ~ fsk1
            -> CtEvidence -> TcTyVar    -- Solve this :: F args2 ~ fsk2
            -> TcS ()
 reactFunEq from_this fsk1 solve_this fsk2
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- solve_this
-  = do { let fsk_eq_co = mkTcSymCo (mkTcCoVarCo evar) `mkTcTransCo`
-                         ctEvCoercion from_this
-                         -- :: fsk2 ~ fsk1
-             fsk_eq_pred = mkTcEqPredLikeEv solve_this
-                             (mkTyVarTy fsk2) (mkTyVarTy fsk1)
-
-       ; new_ev <- newGivenEvVar loc (fsk_eq_pred, evCoercion fsk_eq_co)
-       ; emitWorkNC [new_ev] }
-
-  | otherwise  -- Wanted
-  = do { traceTcS "reactFunEq (Wanted/Derived)"
+  = do { traceTcS "reactFunEq"
             (vcat [ppr from_this, ppr fsk1, ppr solve_this, ppr fsk2])
-       ; dischargeFmv solve_this fsk2 (ctEvCoercion from_this) (mkTyVarTy fsk1)
+       ; dischargeFunEq solve_this fsk2 (ctEvCoercion from_this) (mkTyVarTy fsk1)
        ; traceTcS "reactFunEq done" (ppr from_this $$ ppr fsk1 $$
                                      ppr solve_this $$ ppr fsk2) }
 
@@ -1893,40 +1882,25 @@ reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
                   -> TcS (StopOrContinue Ct)
 -- We have found an applicable top-level axiom: use it to reduce
 -- Precondition: fsk is not free in rhs_ty
---               old_ev is not Derived
 reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
-  | isDerived old_ev
-  = do { emitNewDerivedEq loc Nominal (mkTyVarTy fsk) rhs_ty
-       ; stopWith old_ev "Fun/Top (derived)" }
-
-  | Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
+  | not (isDerived old_ev)  -- Precondition of shortCutReduction
+  , Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
   , isTypeFamilyTyCon tc
   , tc_args `lengthIs` tyConArity tc    -- Short-cut
   = -- RHS is another type-family application
     -- Try shortcut; see Note [Top-level reductions for type functions]
-    shortCutReduction old_ev fsk ax_co tc tc_args
+    do { shortCutReduction old_ev fsk ax_co tc tc_args
+       ; stopWith old_ev "Fun/Top (shortcut)" }
 
-  | isGiven old_ev  -- Not shortcut
-  = do { let final_co = mkTcSymCo (ctEvCoercion old_ev) `mkTcTransCo` ax_co
-              -- final_co :: fsk ~ rhs_ty
-       ; new_ev <- newGivenEvVar deeper_loc (mkPrimEqPred (mkTyVarTy fsk) rhs_ty,
-                                             evCoercion final_co)
-       ; emitWorkNC [new_ev] -- Non-cannonical; that will mean we flatten rhs_ty
-       ; stopWith old_ev "Fun/Top (given)" }
-
-  | otherwise   -- So old_ev is Wanted (cannot be Derived)
+  | otherwise
   = ASSERT2( not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
            , ppr old_ev $$ ppr rhs_ty )
            -- Guaranteed by Note [FunEq occurs-check principle]
-    do { dischargeFmv old_ev fsk ax_co rhs_ty
+    do { dischargeFunEq old_ev fsk ax_co rhs_ty
        ; traceTcS "doTopReactFunEq" $
          vcat [ text "old_ev:" <+> ppr old_ev
               , nest 2 (text ":=") <+> ppr ax_co ]
-       ; stopWith old_ev "Fun/Top (wanted)" }
-
-  where
-    loc = ctEvLoc old_ev
-    deeper_loc = bumpCtLocDepth loc
+       ; stopWith old_ev "Fun/Top" }
 
 improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcTyVar -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
@@ -2021,7 +1995,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
 
 
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
-                  -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
+                  -> TyCon -> [TcType] -> TcS ()
 -- See Note [Top-level reductions for type functions]
 -- Previously, we flattened the tc_args here, but there's no need to do so.
 -- And, if we did, this function would have all the complication of
@@ -2046,8 +2020,7 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
 
        ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc
                                 , cc_tyargs = tc_args, cc_fsk = fsk }
-       ; updWorkListTcS (extendWorkListFunEq new_ct)
-       ; stopWith old_ev "Fun/Top (shortcut)" }
+       ; updWorkListTcS (extendWorkListFunEq new_ct) }
   where
     deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
 

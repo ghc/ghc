@@ -10,6 +10,7 @@ other dynamic, non-language, flag settings:
   -fignore-optim-changes
   -fignore-hpc-changes
   -fno-ghci-history
+  -fghci-leak-check
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
@@ -29,6 +30,7 @@ other dynamic, non-language, flag settings:
   -fignore-optim-changes
   -fignore-hpc-changes
   -fno-ghci-history
+  -fghci-leak-check
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
@@ -47,6 +49,7 @@ other dynamic, non-language, flag settings:
   -fignore-optim-changes
   -fignore-hpc-changes
   -fno-ghci-history
+  -fghci-leak-check
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:
@@ -67,6 +70,7 @@ other dynamic, non-language, flag settings:
   -fignore-optim-changes
   -fignore-hpc-changes
   -fno-ghci-history
+  -fghci-leak-check
   -fimplicit-import-qualified
   -fshow-warning-groups
 warning settings:

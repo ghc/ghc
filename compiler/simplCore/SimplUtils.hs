@@ -477,23 +477,25 @@ contArgs cont
 
 
 -------------------
-mkArgInfo :: Id
+mkArgInfo :: SimplEnv
+          -> Id
           -> [CoreRule] -- Rules for function
           -> Int        -- Number of value args
           -> SimplCont  -- Context of the call
           -> ArgInfo
 
-mkArgInfo fun rules n_val_args call_cont
+mkArgInfo env fun rules n_val_args call_cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
-            , ai_rules = fun_rules, ai_encl = False
+            , ai_rules = fun_rules
+            , ai_encl = False
             , ai_strs = vanilla_stricts
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
             , ai_rules = fun_rules
-            , ai_encl = interestingArgContext rules call_cont
-            , ai_strs  = add_type_str fun_ty arg_stricts
+            , ai_encl  = interestingArgContext rules call_cont
+            , ai_strs  = arg_stricts
             , ai_discs = arg_discounts }
   where
     fun_ty = idType fun
@@ -511,7 +513,11 @@ mkArgInfo fun rules n_val_args call_cont
     vanilla_stricts  = repeat False
 
     arg_stricts
-      = case splitStrictSig (idStrictness fun) of
+      | not (sm_inline (seMode env))
+      = vanilla_stricts -- See Note [Do not expose strictness if sm_inline=False]
+      | otherwise
+      = add_type_str fun_ty $
+        case splitStrictSig (idStrictness fun) of
           (demands, result_info)
                 | not (demands `lengthExceeds` n_val_args)
                 ->      -- Enough args, use the strictness given.
@@ -533,26 +539,25 @@ mkArgInfo fun rules n_val_args call_cont
     add_type_str :: Type -> [Bool] -> [Bool]
     -- If the function arg types are strict, record that in the 'strictness bits'
     -- No need to instantiate because unboxed types (which dominate the strict
-    -- types) can't instantiate type variables.
-    -- add_type_str is done repeatedly (for each call); might be better
-    -- once-for-all in the function
+    --   types) can't instantiate type variables.
+    -- add_type_str is done repeatedly (for each call);
+    --   might be better once-for-all in the function
     -- But beware primops/datacons with no strictness
 
-    add_type_str
-      = go
-      where
-        go _ [] = []
-        go fun_ty strs            -- Look through foralls
-            | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty       -- Includes coercions
-            = go fun_ty' strs
-        go fun_ty (str:strs)      -- Add strict-type info
-            | Just (Weighted _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
-            = (str || Just False == isLiftedType_maybe arg_ty) : go fun_ty' strs
-               -- If the type is levity-polymorphic, we can't know whether it's
-               -- strict. isLiftedType_maybe will return Just False only when
-               -- we're sure the type is unlifted.
-        go _ strs
-            = strs
+    add_type_str _ [] = []
+    add_type_str fun_ty all_strs@(str:strs)
+      | Just (Weighted _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      = (str || Just False == isLiftedType_maybe arg_ty)
+        : add_type_str fun_ty' strs
+          -- If the type is levity-polymorphic, we can't know whether it's
+          -- strict. isLiftedType_maybe will return Just False only when
+          -- we're sure the type is unlifted.
+
+      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
+      = add_type_str fun_ty' all_strs     -- Look through foralls
+
+      | otherwise
+      = all_strs
 
 {- Note [Unsaturated functions]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -562,6 +567,28 @@ Consider (test eyeball/inline4)
 where f has arity 2.  Then we do not want to inline 'x', because
 it'll just be floated out again.  Even if f has lots of discounts
 on its first argument -- it must be saturated for these to kick in
+
+Note [Do not expose strictness if sm_inline=False]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Trac #15163 showed a case in which we had
+
+  {-# INLINE [1] zip #-}
+  zip = undefined
+
+  {-# RULES "foo" forall as bs. stream (zip as bs) = ..blah... #-}
+
+If we expose zip's bottoming nature when simplifing the LHS of the
+RULE we get
+  {-# RULES "foo" forall as bs.
+                   stream (case zip of {}) = ..blah... #-}
+discarding the arguments to zip.  Usually this is fine, but on the
+LHS of a rule it's not, because 'as' and 'bs' are now not bound on
+the LHS.
+
+This is a pretty pathalogical example, so I'm not losing sleep over
+it, but the simplest solution was to check sm_inline; if it is False,
+which it is on the LHS of a rule (see updModeForRules), then don't
+make use of the strictness info for the function.
 -}
 
 
@@ -812,9 +839,9 @@ updModeForStableUnfoldings inline_rule_act current_mode
 updModeForRules :: SimplMode -> SimplMode
 -- See Note [Simplifying rules]
 updModeForRules current_mode
-  = current_mode { sm_phase  = InitialPhase
-                 , sm_inline = False
-                 , sm_rules  = False
+  = current_mode { sm_phase      = InitialPhase
+                 , sm_inline     = False  -- See Note [Do not expose strictness if sm_inline=False]
+                 , sm_rules      = False
                  , sm_eta_expand = False }
 
 {- Note [Simplifying rules]

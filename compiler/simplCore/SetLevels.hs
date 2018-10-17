@@ -1649,7 +1649,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) Alias rhs_ty
+      = mkSysLocalOrCoVar (mkFastString "lvl") uniq Alias rhs_ty
         -- The let-bind is made alias-like, because it allows float out to
         -- preserve type even when floating out of a branch.
 

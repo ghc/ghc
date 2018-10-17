@@ -1,0 +1,15 @@
+
+T14179.hs:7:15: error:
+    Conflicting family instance declarations:
+      Foo1 a -- Defined at T14179.hs:7:15
+      Foo1 a -- Defined at T14179.hs:8:15
+
+T14179.hs:11:15: error:
+    Conflicting family instance declarations:
+      Foo2 a -- Defined at T14179.hs:11:15
+      Foo2 a -- Defined at T14179.hs:12:15
+
+T14179.hs:15:15: error:
+    Conflicting family instance declarations:
+      Foo3 [a] -- Defined at T14179.hs:15:15
+      Foo3 [a] -- Defined at T14179.hs:18:15

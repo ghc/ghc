@@ -235,7 +235,7 @@ subexpression elimination pass.
     :shortdesc: Dump simplifier stats
     :type: dynamic
 
-    Dump statistics about how many of each kind of transformation too
+    Dump statistics about how many of each kind of transformation took
     place. If you add ``-dppr-debug`` you get more detailed information.
 
 .. ghc-flag:: -dverbose-core2core

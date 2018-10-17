@@ -172,18 +172,22 @@ Defined here to avoid module loops. CoAxiom is loaded very early on.
 pprCoAxiom :: CoAxiom br -> SDoc
 pprCoAxiom ax@(CoAxiom { co_ax_branches = branches })
   = hang (text "axiom" <+> ppr ax <+> dcolon)
-       2 (vcat (map (ppr_co_ax_branch (const pprType) ax) $ fromBranches branches))
+       2 (vcat (map (ppr_co_ax_branch (\_ ty -> equals <+> pprType ty) ax) $
+                    fromBranches branches))
 
 pprCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 pprCoAxBranch = ppr_co_ax_branch pprRhs
   where
     pprRhs fam_tc rhs
-      | Just (tycon, _) <- splitTyConApp_maybe rhs
-      , isDataFamilyTyCon fam_tc
-      = pprDataCons tycon
+      | isDataFamilyTyCon fam_tc
+      = empty -- Don't bother printing anything for the RHS of a data family
+              -- instance...
 
       | otherwise
-      = ppr rhs
+      = equals <+> ppr rhs
+              -- ...but for a type family instance, do print out the RHS, since
+              -- it might be needed to disambiguate between duplicate instances
+              -- (#14179)
 
 pprCoAxBranchHdr :: CoAxiom br -> BranchIndex -> SDoc
 pprCoAxBranchHdr ax index = pprCoAxBranch ax (coAxiomNthBranch ax index)
@@ -197,8 +201,8 @@ ppr_co_ax_branch ppr_rhs
                           , cab_rhs = rhs
                           , cab_loc = loc })
   = foldr1 (flip hangNotEmpty 2)
-        [ pprUserForAll (mkTyVarBinders Inferred (tvs ++ cvs))
-        , pprTypeApp fam_tc lhs <+> equals <+> ppr_rhs fam_tc rhs
+        [ pprUserForAll (mkTyVarBinders Inferred (ee_tvs ++ cvs))
+        , pprTypeApp fam_tc ee_lhs <+> ppr_rhs fam_tc rhs
         , text "-- Defined" <+> pprLoc loc ]
   where
         pprLoc loc
@@ -208,6 +212,21 @@ ppr_co_ax_branch ppr_rhs
           | otherwise
           = text "in" <+>
               quotes (ppr (nameModule name))
+
+        (ee_tvs, ee_lhs)
+          | Just (tycon, tc_args) <- splitTyConApp_maybe rhs
+          , isDataFamilyTyCon fam_tc
+          = -- Eta-expand LHS types, because sometimes data family instances
+            -- are eta-reduced.
+            -- See Note [Eta reduction for data family axioms] in TcInstDecls.
+            let tc_tvs           = tyConTyVars tycon
+                etad_tvs         = dropList tc_args tc_tvs
+                etad_tys         = mkTyVarTys etad_tvs
+                eta_expanded_tvs = tvs `chkAppend` etad_tvs
+                eta_expanded_lhs = lhs `chkAppend` etad_tys
+            in (eta_expanded_tvs, eta_expanded_lhs)
+          | otherwise
+          = (tvs, lhs)
 
 {-
 %************************************************************************
@@ -371,12 +390,12 @@ splitForAllCo_maybe _                     = Nothing
 -------------------------------------------------------
 -- and some coercion kind stuff
 
-coVarTypes :: CoVar -> Pair Type
+coVarTypes :: HasDebugCallStack => CoVar -> Pair Type
 coVarTypes cv
   | (_, _, ty1, ty2, _) <- coVarKindsTypesRole cv
   = Pair ty1 ty2
 
-coVarKindsTypesRole :: CoVar -> (Kind,Kind,Type,Type,Role)
+coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind,Kind,Type,Type,Role)
 coVarKindsTypesRole cv
  | Just (tc, [k1,k2,ty1,ty2]) <- splitTyConApp_maybe (varType cv)
  = let role
@@ -431,10 +450,12 @@ mkRuntimeRepCo co
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
                            -- (up to silliness with Constraint)
 
-isReflCoVar_maybe :: CoVar -> Maybe Coercion
+isReflCoVar_maybe :: Var -> Maybe Coercion
 -- If cv :: t~t then isReflCoVar_maybe cv = Just (Refl t)
+-- Works on all kinds of Vars, not just CoVars
 isReflCoVar_maybe cv
-  | Pair ty1 ty2 <- coVarTypes cv
+  | isCoVar cv
+  , Pair ty1 ty2 <- coVarTypes cv
   , ty1 `eqType` ty2
   = Just (Refl (coVarRole cv) ty1)
   | otherwise

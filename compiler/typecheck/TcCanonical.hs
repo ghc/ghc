@@ -1485,19 +1485,15 @@ canCFunEqCan ev fn tys fsk
                       ; return (ev', fsk) }
               else do { (ev', new_co, new_fsk)
                           <- newFlattenSkolem flav (ctEvLoc ev) fn tys'
-                      ; case flav of
-                          Given -> return () -- nothing more to do.
-                                             -- NB: new_co is stored within ev',
-                                             -- and will be put in the flat_cache below
-                          _     -> do { let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
-                                               -- sym lhs_co :: F tys ~ F tys'
-                                               -- new_co     :: F tys' ~ new_fsk
-                                               -- co         :: F tys ~ (new_fsk |> kind_co)
-                                            co = mkTcSymCo lhs_co `mkTcTransCo`
-                                                 (new_co `mkTcCoherenceRightCo` kind_co)
+                      ; let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
+                               -- sym lhs_co :: F tys ~ F tys'
+                               -- new_co     :: F tys' ~ new_fsk
+                               -- co         :: F tys ~ (new_fsk |> kind_co)
+                            co = mkTcSymCo lhs_co `mkTcTransCo`
+                                 (new_co `mkTcCoherenceRightCo` kind_co)
 
-                                      ; traceTcS "Discharging fmv due to hetero flattening" empty
-                                      ; dischargeFmv ev fsk co xi }
+                      ; traceTcS "Discharging fmv/fsk due to hetero flattening" (ppr ev)
+                      ; dischargeFunEq ev fsk co xi
                       ; return (ev', new_fsk) }
 
        ; extendFlatCache fn tys' (ctEvCoercion ev', mkTyVarTy fsk', ctEvFlavour ev')
@@ -1590,16 +1586,12 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
   | CtGiven { ctev_evar = evar } <- ev
     -- unswapped: tm :: (lhs :: ki1) ~ (rhs :: ki2)
     -- swapped  : tm :: (rhs :: ki2) ~ (lhs :: ki1)
-  = do { kind_ev_id <- newBoundEvVarId kind_pty
-                                       (evCoercion $ mkTcKindCo $ mkTcCoVarCo evar)
-           -- kind_ev_id :: (ki1 :: *) ~ (ki2 :: *)   (whether swapped or not)
-       ; let kind_ev = CtGiven { ctev_pred = kind_pty
-                               , ctev_evar = kind_ev_id
-                               , ctev_loc  = kind_loc }
+  = do { let kind_co = mkTcKindCo (mkTcCoVarCo evar)
+       ; kind_ev <- newGivenEvVar kind_loc (kind_pty, evCoercion kind_co)
+       ; let  -- kind_ev :: (ki1 :: *) ~ (ki2 :: *)   (whether swapped or not)
               -- co1     :: kind(tv1) ~N ki1
               -- homo_co :: ki2 ~N kind(tv1)
-             homo_co = mkTcSymCo (mkCoVarCo kind_ev_id) `mkTcTransCo` mkTcSymCo co1
-
+             homo_co = mkTcSymCo (ctEvCoercion kind_ev) `mkTcTransCo` mkTcSymCo co1
              rhs'    = mkCastTy xi2 homo_co     -- :: kind(tv1)
              ps_rhs' = mkCastTy ps_xi2 homo_co  -- :: kind(tv1)
              rhs_co  = mkReflCo role xi2 `mkTcCoherenceLeftCo` homo_co
@@ -1610,7 +1602,7 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
                -- lhs_co :: (tv1 :: kind(tv1)) ~ (tv1 |> co1 :: ki1)
 
        ; traceTcS "Hetero equality gives rise to given kind equality"
-           (ppr kind_ev_id <+> dcolon <+> ppr kind_pty)
+           (ppr kind_ev <+> dcolon <+> ppr kind_pty)
        ; emitWorkNC [kind_ev]
        ; type_ev <- rewriteEqEvidence ev NotSwapped lhs' rhs' lhs_co rhs_co
        ; canEqTyVarHomo type_ev eq_rel NotSwapped tv1 ps_tv1 rhs' ps_rhs' }

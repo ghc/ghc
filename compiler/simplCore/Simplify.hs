@@ -1747,7 +1747,7 @@ completeCall env var cont
   | otherwise
   -- Don't inline; instead rebuild the call
   = do { rule_base <- getSimplRules
-       ; let info = mkArgInfo var (getRules rule_base var)
+       ; let info = mkArgInfo env var (getRules rule_base var)
                               n_val_args call_cont
        ; rebuildCall env info cont }
 

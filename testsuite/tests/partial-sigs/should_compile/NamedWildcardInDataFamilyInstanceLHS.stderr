@@ -14,7 +14,7 @@ TYPE CONSTRUCTORS
   data family Sing (a :: k)
 COERCION AXIOMS
   axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
-    Sing = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
+    Sing _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a
       -- Defined at NamedWildcardInDataFamilyInstanceLHS.hs:8:15
 FAMILY INSTANCES
   data instance Sing

@@ -40,6 +40,7 @@ import Foreign.C
 import Foreign.Marshal.Array
 import Foreign.Ptr
 #include <windows.h>
+#include <stdint.h>
 #else
 import Foreign.C
 import Foreign.Marshal.Alloc
@@ -169,7 +170,7 @@ getExecutablePath = go 2048  -- plenty, PATH_MAX is 512 under Win32
 getFinalPath :: FilePath -> IO FilePath
 getFinalPath path = withCWString path $ \s ->
   bracket (createFile s) c_closeHandle $ \h -> do
-    let invalid = h == wordPtrToPtr (#const INVALID_HANDLE_VALUE)
+    let invalid = h == wordPtrToPtr (#const (intptr_t)INVALID_HANDLE_VALUE)
     if invalid then pure path else go h bufSize
 
   where go h sz = allocaArray (fromIntegral sz) $ \outPath -> do

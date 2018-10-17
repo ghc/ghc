@@ -1,5 +1,5 @@
 
-T9371.hs:14:10:
+T9371.hs:14:10: error:
     Conflicting family instance declarations:
-      D = D1 (Either x ()) -- Defined at T9371.hs:14:10
-      D (x, y) = D2 (x, y) -- Defined at T9371.hs:18:10
+      D x -- Defined at T9371.hs:14:10
+      D (x, y) -- Defined at T9371.hs:18:10

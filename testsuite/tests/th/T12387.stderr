@@ -1,0 +1,4 @@
+
+T12387.hs:8:3: error:
+    • Class ‘Eq’ does not have a method ‘compare’
+    • In the instance declaration for ‘Eq Foo’
