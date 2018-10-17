@@ -463,15 +463,16 @@ getCAFs (CmmProc top_info topLbl _ g)
 -- | Get the list of blocks that correspond to the entry points for
 -- FUN_STATIC closures.  These are the blocks for which if we have an
 -- SRT we can merge it with the static closure. [FUN]
-getStaticFuns :: CmmDecl -> [(BlockId, CLabel)]
-getStaticFuns (CmmData _ _) = []
-getStaticFuns (CmmProc top_info _ _ g)
-  | Just info <- mapLookup (g_entry g) (info_tbls top_info)
+getStaticFuns :: [CmmDecl] -> [(BlockId, CLabel)]
+getStaticFuns decls =
+  [ (g_entry g, lbl)
+  | CmmProc top_info _ _ g <- decls
+  , Just info <- [mapLookup (g_entry g) (info_tbls top_info)]
+  , Just (id, _) <- [cit_clo info]
   , let rep = cit_rep info
-  , Just (id, _) <- cit_clo info
+  , isStaticRep rep && isFunRep rep
   , let lbl = mkLocalClosureLabel (idName id) (idCafInfo id)
-  , isStaticRep rep && isFunRep rep = [(g_entry g, lbl)]
-  | otherwise = []
+  ]
 
 
 -- | Put the labelled blocks that we will be annotating with SRTs into
@@ -527,7 +528,7 @@ doSRTs
   -> [(CAFEnv, [CmmDecl])]
   -> IO (ModuleSRTInfo, [CmmDecl])
 
-doSRTs dflags topSRT tops = do
+doSRTs dflags moduleSRTInfo tops = do
   us <- mkSplitUniqSupply 'u'
 
   -- Ignore the original grouping of decls, and combine all the
@@ -535,7 +536,7 @@ doSRTs dflags topSRT tops = do
   let (cafEnvs, declss) = unzip tops
       cafEnv = mapUnions cafEnvs
       decls = concat declss
-      staticFuns = mapFromList (concatMap getStaticFuns decls)
+      staticFuns = mapFromList (getStaticFuns decls)
 
   -- Put the decls in dependency order. Why? So that we can implement
   -- [Shortcut] and [Filter].  If we need to refer to an SRT that has
@@ -547,9 +548,14 @@ doSRTs dflags topSRT tops = do
 
   -- On each strongly-connected group of decls, construct the SRT
   -- closures and the SRT fields for info tables.
-  let ((result, _srtMap), topSRT') =
+  let result ::
+        [ ( [CmmDecl]              -- generated SRTs
+          , [(Label, CLabel)]      -- SRT fields for info tables
+          , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
+          ) ]
+      ((result, _srtMap), moduleSRTInfo') =
         initUs_ us $
-        flip runStateT topSRT $
+        flip runStateT moduleSRTInfo $
         flip runStateT Map.empty $
         mapM (doSCC dflags staticFuns) sccs
 
@@ -561,7 +567,7 @@ doSRTs dflags topSRT tops = do
     funSRTMap = mapFromList (concat funSRTs)
     decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap) decls
 
-  return (topSRT', concat declss ++ decls')
+  return (moduleSRTInfo', concat declss ++ decls')
 
 
 -- | Build the SRT for a strongly-connected component of blocks

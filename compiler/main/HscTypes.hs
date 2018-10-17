@@ -1244,7 +1244,8 @@ data ImportedModsVal
         imv_span :: SrcSpan,             -- ^ the source span of the whole import
         imv_is_safe :: IsSafeImport,     -- ^ whether this is a safe import
         imv_is_hiding :: Bool,           -- ^ whether this is an "hiding" import
-        imv_all_exports :: GlobalRdrEnv, -- ^ all the things the module could provide
+        imv_all_exports :: !GlobalRdrEnv, -- ^ all the things the module could provide
+          -- NB. BangPattern here: otherwise this leaks. (#15111)
         imv_qualified :: Bool            -- ^ whether this is a qualified import
         }
 

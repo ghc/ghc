@@ -621,7 +621,10 @@ forAllEscapeErr env ty tau_kind
                  , text "of kind:" <+> ppr_tidy env tau_kind ]) )
 
 ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
-ubxArgTyErr env ty = (env, sep [text "Illegal unboxed tuple type as function argument:", ppr_tidy env ty])
+ubxArgTyErr env ty
+  = ( env, vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
+                      , ppr_tidy env ty ]
+                , text "Perhaps you intended to use UnboxedTuples" ] )
 
 {-
 Note [Liberal type synonyms]

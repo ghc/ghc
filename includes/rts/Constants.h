@@ -127,6 +127,19 @@
 #  endif
 #endif
 
+/* -----------------------------------------------------------------------------
+   StgRun related labels shared between StgCRun.c and StgStartup.cmm.
+   -------------------------------------------------------------------------- */
+
+#if defined(LEADING_UNDERSCORE)
+#define STG_RUN "_StgRun"
+#define STG_RUN_JMP _StgRunJmp
+#define STG_RETURN "_StgReturn"
+#else
+#define STG_RUN "StgRun"
+#define STG_RUN_JMP StgRunJmp
+#define STG_RETURN "StgReturn"
+#endif
 
 /* -----------------------------------------------------------------------------
    How much Haskell stack space to reserve for the saving of registers

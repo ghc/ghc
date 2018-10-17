@@ -384,8 +384,9 @@ test('T7954',
                       [(wordsize(32), 920045264, 10),
               # some date:  1380051408    (64-bit Windows machine)
               # 2014-04-04:  920045264    (64-bit Windows machine)
-                       (wordsize(64), 1680051336, 10)]),
+                       (wordsize(64), 1280051632, 10)]),
               # 2014-02-10: 1680051336 (x86_64/Linux), call arity analysis
+              # 2018-05-03: 1280051632 (x86_64/Linux), refactor numericEnumFrom
       only_ways(['normal'])
       ],
      compile_and_run,
