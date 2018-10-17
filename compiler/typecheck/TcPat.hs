@@ -433,12 +433,12 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
 tc_pat penv (SigPat sig_ty pat ) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
-                -- Using tcExtendTyVarEnv2 is appropriate here (not scopeTyVars2)
+                -- Using tcExtendNameTyVarEnv is appropriate here (not scopeTyVars2)
                 -- because we're not really bringing fresh tyvars into scope.
                 -- We're *naming* existing tyvars. Note that it is OK for a tyvar
                 -- from an outer scope to mention one of these tyvars in its kind.
-        ; (pat', res) <- tcExtendTyVarEnv2 wcs      $
-                         tcExtendTyVarEnv2 tv_binds $
+        ; (pat', res) <- tcExtendNameTyVarEnv wcs      $
+                         tcExtendNameTyVarEnv tv_binds $
                          tc_lpat pat (pat_ty `weightedSet` mkCheckExpType inner_ty) penv thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
         ; return (mkHsWrapPat wrap (SigPat inner_ty pat') pat_ty, res) }

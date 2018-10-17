@@ -74,8 +74,6 @@ module GHC.Conc
         , orElse
         , throwSTM
         , catchSTM
-        , alwaysSucceeds
-        , always
         , TVar(..)
         , newTVar
         , newTVarIO

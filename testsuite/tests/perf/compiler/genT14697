@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 SIZE=100
 ROOT=T14697
 # Generates 100 empty modules and T14697 that imports them all

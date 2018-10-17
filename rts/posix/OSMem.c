@@ -36,6 +36,10 @@
 #if defined(HAVE_NUMAIF_H)
 #include <numaif.h>
 #endif
+#if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
 
 #include <errno.h>
 
@@ -501,6 +505,13 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
             "Provided heap start address %p is lower than minimum address %p",
             (void*)startAddress, (void*)minimumAddress);
     }
+
+#if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)
+    struct rlimit limit;
+    if (!getrlimit(RLIMIT_AS, &limit) && *len > limit.rlim_cur) {
+        *len = limit.rlim_cur;
+    }
+#endif
 
     attempt = 0;
     while (1) {

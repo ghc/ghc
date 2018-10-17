@@ -1638,7 +1638,7 @@ tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
        ; let skol_info = SigSkol ExprSigCtxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
        ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
-                              tcExtendTyVarEnv2 (map (fmap unrestricted) tv_prs) $ -- TODO: arnaud: type variables, should be Zero
+                              tcExtendNameTyVarEnv (map (fmap unrestricted) tv_prs) $ -- TODO: arnaud: type variables, should be Zero
                               tcPolyExprNC expr tau
 
        ; let poly_wrap = mkWpTyLams   skol_tvs
@@ -1651,8 +1651,8 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
                 do { sig_inst <- tcInstSig sig
-                   ; expr' <- tcExtendTyVarEnv2 (map (fmap unrestricted) $ sig_inst_skols sig_inst) $ -- TODO: arnaud: (also line below) type variables, should be Zero
-                              tcExtendTyVarEnv2 (map (fmap unrestricted) $ sig_inst_wcs   sig_inst) $
+                   ; expr' <- tcExtendNameTyVarEnv (map (fmap unrestricted) $ sig_inst_skols sig_inst) $ -- TODO: arnaud: (also line below) type variables, should be Zero
+                              tcExtendNameTyVarEnv (map (fmap unrestricted) $ sig_inst_wcs   sig_inst) $
                               tcPolyExprNC expr (sig_inst_tau sig_inst)
                    ; return (expr', sig_inst) }
        -- See Note [Partial expression signatures]

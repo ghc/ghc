@@ -485,23 +485,14 @@ INFO_TABLE(stg_TVAR_DIRTY, 2, 1, TVAR, "TVAR", "TVAR")
 INFO_TABLE(stg_TVAR_WATCH_QUEUE, 3, 0, MUT_PRIM, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
 { foreign "C" barf("TVAR_WATCH_QUEUE object entered!") never returns; }
 
-INFO_TABLE(stg_ATOMIC_INVARIANT, 2, 1, MUT_PRIM, "ATOMIC_INVARIANT", "ATOMIC_INVARIANT")
-{ foreign "C" barf("ATOMIC_INVARIANT object entered!") never returns; }
-
-INFO_TABLE(stg_INVARIANT_CHECK_QUEUE, 3, 0, MUT_PRIM, "INVARIANT_CHECK_QUEUE", "INVARIANT_CHECK_QUEUE")
-{ foreign "C" barf("INVARIANT_CHECK_QUEUE object entered!") never returns; }
-
 INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
 { foreign "C" barf("TREC_CHUNK object entered!") never returns; }
 
-INFO_TABLE(stg_TREC_HEADER, 3, 1, MUT_PRIM, "TREC_HEADER", "TREC_HEADER")
+INFO_TABLE(stg_TREC_HEADER, 2, 1, MUT_PRIM, "TREC_HEADER", "TREC_HEADER")
 { foreign "C" barf("TREC_HEADER object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
 { foreign "C" barf("END_STM_WATCH_QUEUE object entered!") never returns; }
-
-INFO_TABLE_CONSTR(stg_END_INVARIANT_CHECK_QUEUE,0,0,0,CONSTR_NOCAF,"END_INVARIANT_CHECK_QUEUE","END_INVARIANT_CHECK_QUEUE")
-{ foreign "C" barf("END_INVARIANT_CHECK_QUEUE object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
 { foreign "C" barf("END_STM_CHUNK_LIST object entered!") never returns; }
@@ -510,8 +501,6 @@ INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF,"NO_TREC","NO_TREC")
 { foreign "C" barf("NO_TREC object entered!") never returns; }
 
 CLOSURE(stg_END_STM_WATCH_QUEUE_closure,stg_END_STM_WATCH_QUEUE);
-
-CLOSURE(stg_END_INVARIANT_CHECK_QUEUE_closure,stg_END_INVARIANT_CHECK_QUEUE);
 
 CLOSURE(stg_END_STM_CHUNK_LIST_closure,stg_END_STM_CHUNK_LIST);
 

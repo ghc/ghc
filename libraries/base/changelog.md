@@ -3,6 +3,17 @@
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 
+  * The STM invariant-checking mechanism (`always` and `alwaysSucceeds`), which
+    was deprecated in GHC 8.4, has been removed (as proposed in
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst>).
+    This is a bit earlier than proposed in the deprecation pragma included in
+    GHC 8.4, but due to community feedback we decided to move ahead with the
+    early removal.
+
+    Existing users are encouraged to encapsulate their STM operations in safe
+    abstractions which can perform the invariant checking without help from the
+    runtime system.
+
   * Add a new module `GHC.ResponseFile` (previously defined in the `haddock`
     package). (#13896)
 

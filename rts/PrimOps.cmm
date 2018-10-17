@@ -1057,11 +1057,10 @@ INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 // Atomically frame ------------------------------------------------------------
 
 // This must match StgAtomicallyFrame in Closures.h
-#define ATOMICALLY_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,code,next,result)  \
+#define ATOMICALLY_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,code,result)  \
     w_ info_ptr,                                                        \
     PROF_HDR_FIELDS(w_,p1,p2)                                           \
     p_ code,                                                            \
-    p_ next,                                                            \
     p_ result
 
 
@@ -1070,67 +1069,36 @@ INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
                ATOMICALLY_FRAME_FIELDS(W_,P_,
                                        info_ptr, p1, p2,
                                        code,
-                                       next_invariant,
                                        frame_result))
     return (P_ result) // value returned to the frame
 {
     W_ valid;
-    gcptr trec, outer, next_invariant, q;
+    gcptr trec, outer, q;
 
     trec   = StgTSO_trec(CurrentTSO);
     outer  = StgTRecHeader_enclosing_trec(trec);
 
-    if (outer == NO_TREC) {
-        /* First time back at the atomically frame -- pick up invariants */
-        ("ptr" next_invariant) =
-            ccall stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr");
-        frame_result = result;
+    /* Back at the atomically frame */
+    frame_result = result;
 
+    /* try to commit */
+    (valid) = ccall stmCommitTransaction(MyCapability() "ptr", trec "ptr");
+    if (valid != 0) {
+        /* Transaction was valid: commit succeeded */
+        StgTSO_trec(CurrentTSO) = NO_TREC;
+        return (frame_result);
     } else {
-        /* Second/subsequent time back at the atomically frame -- abort the
-         * tx that's checking the invariant and move on to the next one */
-        StgTSO_trec(CurrentTSO) = outer;
-        StgInvariantCheckQueue_my_execution(next_invariant) = trec;
-        ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-        /* Don't free trec -- it's linked from q and will be stashed in the
-         * invariant if we eventually commit. */
-        next_invariant =
-           StgInvariantCheckQueue_next_queue_entry(next_invariant);
-        trec = outer;
-    }
-
-    if (next_invariant != END_INVARIANT_CHECK_QUEUE) {
-        /* We can't commit yet: another invariant to check */
-        ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr", trec "ptr");
+        /* Transaction was not valid: try again */
+        ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr",
+                                                 NO_TREC "ptr");
         StgTSO_trec(CurrentTSO) = trec;
-        q = StgInvariantCheckQueue_invariant(next_invariant);
+
         jump stg_ap_v_fast
+            // push the StgAtomicallyFrame again: the code generator is
+            // clever enough to only assign the fields that have changed.
             (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
-                                     code,next_invariant,frame_result))
-            (StgAtomicInvariant_code(q));
-
-    } else {
-
-        /* We've got no more invariants to check, try to commit */
-        (valid) = ccall stmCommitTransaction(MyCapability() "ptr", trec "ptr");
-        if (valid != 0) {
-            /* Transaction was valid: commit succeeded */
-            StgTSO_trec(CurrentTSO) = NO_TREC;
-            return (frame_result);
-        } else {
-            /* Transaction was not valid: try again */
-            ("ptr" trec) = ccall stmStartTransaction(MyCapability() "ptr",
-                                                     NO_TREC "ptr");
-            StgTSO_trec(CurrentTSO) = trec;
-            next_invariant = END_INVARIANT_CHECK_QUEUE;
-
-            jump stg_ap_v_fast
-                // push the StgAtomicallyFrame again: the code generator is
-                // clever enough to only assign the fields that have changed.
-                (ATOMICALLY_FRAME_FIELDS(,,info_ptr,p1,p2,
-                                         code,next_invariant,frame_result))
-                (code);
-        }
+                                     code,frame_result))
+            (code);
     }
 }
 
@@ -1140,7 +1108,6 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
                ATOMICALLY_FRAME_FIELDS(W_,P_,
                                        info_ptr, p1, p2,
                                        code,
-                                       next_invariant,
                                        frame_result))
     return (/* no return values */)
 {
@@ -1152,7 +1119,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
         /* Previous attempt is still valid: no point trying again yet */
         jump stg_block_noregs
             (ATOMICALLY_FRAME_FIELDS(,,info_ptr, p1, p2,
-                                     code,next_invariant,frame_result))
+                                     code,frame_result))
             ();
     } else {
         /* Previous attempt is no longer valid: try again */
@@ -1162,7 +1129,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
         // change the frame header to stg_atomically_frame_info
         jump stg_ap_v_fast
             (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, p1, p2,
-                                     code,next_invariant,frame_result))
+                                     code,frame_result))
             (code);
     }
 }
@@ -1213,7 +1180,7 @@ stg_atomicallyzh (P_ stm)
 {
     P_ old_trec;
     P_ new_trec;
-    P_ code, next_invariant, frame_result;
+    P_ code, frame_result;
 
     // stmStartTransaction may allocate
     MAYBE_GC_P(stg_atomicallyzh, stm);
@@ -1228,7 +1195,6 @@ stg_atomicallyzh (P_ stm)
     }
 
     code = stm;
-    next_invariant = END_INVARIANT_CHECK_QUEUE;
     frame_result = NO_TREC;
 
     /* Start the memory transcation */
@@ -1237,7 +1203,7 @@ stg_atomicallyzh (P_ stm)
 
     jump stg_ap_v_fast
         (ATOMICALLY_FRAME_FIELDS(,,stg_atomically_frame_info, CCCS, 0,
-                                 code,next_invariant,frame_result))
+                                 code,frame_result))
         (stm);
 }
 
@@ -1340,16 +1306,6 @@ retry_pop_stack:
 
     // We've reached the ATOMICALLY_FRAME: attempt to wait
     ASSERT(frame_type == ATOMICALLY_FRAME);
-    if (outer != NO_TREC) {
-        // We called retry while checking invariants, so abort the current
-        // invariant check (merging its TVar accesses into the parents read
-        // set so we'll wait on them)
-        ccall stmAbortTransaction(MyCapability() "ptr", trec "ptr");
-        ccall stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr");
-        trec = outer;
-        StgTSO_trec(CurrentTSO) = trec;
-        outer  = StgTRecHeader_enclosing_trec(trec);
-    }
     ASSERT(outer == NO_TREC);
 
     (r) = ccall stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr");
@@ -1368,20 +1324,6 @@ retry_pop_stack:
         jump stg_ap_v_fast [R1];
     }
 }
-
-stg_checkzh (P_ closure /* STM a */)
-{
-    W_ trec;
-
-    MAYBE_GC_P (stg_checkzh, closure);
-
-    trec = StgTSO_trec(CurrentTSO);
-    ccall stmAddInvariantToCheck(MyCapability() "ptr",
-                                 trec "ptr",
-                                 closure "ptr");
-    return ();
-}
-
 
 stg_newTVarzh (P_ init)
 {

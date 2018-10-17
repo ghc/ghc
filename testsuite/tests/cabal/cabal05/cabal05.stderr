@@ -1,3 +1,7 @@
+the following packages have broken abi-depends fields:
+    p
+    q
+    r
 
 T.hs:3:1: error:
     Ambiguous module name ‘Conflict’:

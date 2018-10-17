@@ -540,11 +540,11 @@ pprStatics dflags (CmmStaticLit (CmmInt i W64) : rest)
         q = i `shiftR` 32
 pprStatics dflags (CmmStaticLit (CmmInt _ w) : _)
   | w /= wordWidth dflags
-  = panic "pprStatics: cannot emit a non-word-sized static literal"
+  = pprPanic "pprStatics: cannot emit a non-word-sized static literal" (ppr w)
 pprStatics dflags (CmmStaticLit lit : rest)
   = pprLit1 lit : pprStatics dflags rest
 pprStatics _ (other : _)
-  = pprPanic "pprWord" (pprStatic other)
+  = pprPanic "pprStatics: other" (pprStatic other)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of

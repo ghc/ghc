@@ -524,7 +524,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '->@{'           { L _ (ITlolly2) }
  '@'            { L _ ITat }
  '~'            { L _ ITtilde }
- '~#'           { L _ ITtildehsh }
  '=>'           { L _ (ITdarrow _) }
  '-'            { L _ ITminus }
  '!'            { L _ ITbang }
@@ -3142,8 +3141,6 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
-        | '(' '~#' ')'          {% ams (sLL $1 $> $ getRdrName eqPrimTyCon)
-                                        [mop $1,mj AnnTildehsh $2,mcp $3] }
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists

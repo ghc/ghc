@@ -1578,10 +1578,6 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                     mutlist_TVAR_WATCH_QUEUE++;
                 else if (((StgClosure*)p)->header.info == &stg_TREC_HEADER_info)
                     mutlist_TREC_HEADER++;
-                else if (((StgClosure*)p)->header.info == &stg_ATOMIC_INVARIANT_info)
-                    mutlist_ATOMIC_INVARIANT++;
-                else if (((StgClosure*)p)->header.info == &stg_INVARIANT_CHECK_QUEUE_info)
-                    mutlist_INVARIANT_CHECK_QUEUE++;
                 else
                     mutlist_OTHERS++;
                 break;

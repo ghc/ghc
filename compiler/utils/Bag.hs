@@ -328,6 +328,7 @@ mapAccumBagLM f s (ListBag xs)    = do { (s', xs') <- mapAccumLM f s xs
 
 listToBag :: [a] -> Bag a
 listToBag [] = EmptyBag
+listToBag [x] = UnitBag x
 listToBag vs = ListBag vs
 
 bagToList :: Bag a -> [a]

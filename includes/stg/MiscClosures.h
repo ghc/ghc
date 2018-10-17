@@ -143,12 +143,9 @@ RTS_ENTRY(stg_raise);
 RTS_ENTRY(stg_raise_ret);
 RTS_ENTRY(stg_atomically);
 RTS_ENTRY(stg_TVAR_WATCH_QUEUE);
-RTS_ENTRY(stg_INVARIANT_CHECK_QUEUE);
-RTS_ENTRY(stg_ATOMIC_INVARIANT);
 RTS_ENTRY(stg_TREC_CHUNK);
 RTS_ENTRY(stg_TREC_HEADER);
 RTS_ENTRY(stg_END_STM_WATCH_QUEUE);
-RTS_ENTRY(stg_END_INVARIANT_CHECK_QUEUE);
 RTS_ENTRY(stg_END_STM_CHUNK_LIST);
 RTS_ENTRY(stg_NO_TREC);
 RTS_ENTRY(stg_COMPACT_NFDATA_CLEAN);
@@ -179,7 +176,6 @@ RTS_CLOSURE(stg_dummy_ret_closure);
 RTS_CLOSURE(stg_forceIO_closure);
 
 RTS_CLOSURE(stg_END_STM_WATCH_QUEUE_closure);
-RTS_CLOSURE(stg_END_INVARIANT_CHECK_QUEUE_closure);
 RTS_CLOSURE(stg_END_STM_CHUNK_LIST_closure);
 RTS_CLOSURE(stg_NO_TREC_closure);
 
@@ -471,7 +467,6 @@ RTS_FUN_DECL(stg_newTVarzh);
 RTS_FUN_DECL(stg_readTVarzh);
 RTS_FUN_DECL(stg_readTVarIOzh);
 RTS_FUN_DECL(stg_writeTVarzh);
-RTS_FUN_DECL(stg_checkzh);
 
 RTS_FUN_DECL(stg_unpackClosurezh);
 RTS_FUN_DECL(stg_getApStackValzh);

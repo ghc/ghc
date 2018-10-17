@@ -21,7 +21,7 @@ Defer01.hs:25:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match has inaccessible right hand side
     In an equation for ‘c’: c (C2 x) = ...
 
-Defer01.hs:25:4: warning: [-Wdeferred-type-errors (in -Wdefault)]
+Defer01.hs:25:4: warning: [-Winaccessible-code (in -Wdefault)]
     • Couldn't match type ‘Int’ with ‘Bool’
       Inaccessible code in
         a pattern with constructor: C2 :: Bool -> C Bool,

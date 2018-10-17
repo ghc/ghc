@@ -6,3 +6,4 @@ T11648b.hs:7:1: error:
     Inferred kinds of user-written variables:
       k :: k0
       a :: Proxy k
+    Inferred result kind: *

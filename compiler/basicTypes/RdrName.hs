@@ -112,7 +112,7 @@ import Data.List( sortBy, foldl', nub )
 --           'ApiAnnotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
 --           'ApiAnnotation.AnnClose' @')'@ or @']'@ or @':]'@,,
 --           'ApiAnnotation.AnnBackquote' @'`'@,
---           'ApiAnnotation.AnnVal','ApiAnnotation.AnnTildehsh',
+--           'ApiAnnotation.AnnVal'
 --           'ApiAnnotation.AnnTilde',
 
 -- For details on above see note [Api annotations] in ApiAnnotation

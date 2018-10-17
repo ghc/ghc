@@ -1539,7 +1539,7 @@ tcWildCardBindersX new_wc maybe_skol_info wc_names thing_inside
   where
     scope_tvs
       | Just info <- maybe_skol_info = scopeTyVars2 info
-      | otherwise                    = tcExtendTyVarEnv2
+      | otherwise                    = tcExtendNameTyVarEnv
 
 -- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
 -- user-supplied kind signature (CUSK), generalise the result.
@@ -1594,7 +1594,7 @@ kcLHsQTyVars name flav cusk
           -- fully settled down by this point, and so this check will get
           -- a false positive.
        ; when (not_associated && not (null meta_tvs)) $
-         report_non_cusk_tvs (qkvs ++ tc_tvs)
+         report_non_cusk_tvs (qkvs ++ tc_tvs) res_kind
 
           -- If any of the scoped_kvs aren't actually mentioned in a binder's
           -- kind (or the return kind), then we're in the CUSK case from
@@ -1666,7 +1666,7 @@ kcLHsQTyVars name flav cusk
        | otherwise
        = mkAnonTyConBinder tv
 
-    report_non_cusk_tvs all_tvs
+    report_non_cusk_tvs all_tvs res_kind
       = do { all_tvs <- mapM zonkTyCoVarKind all_tvs
            ; let (_, tidy_tvs)         = tidyOpenTyCoVars emptyTidyEnv all_tvs
                  (meta_tvs, other_tvs) = partition isMetaTyVar tidy_tvs
@@ -1677,8 +1677,14 @@ kcLHsQTyVars name flav cusk
                           isOrAre meta_tvs <+> text "undetermined:")
                        2 (vcat (map pp_tv meta_tvs))
                   , text "Perhaps add a kind signature."
-                  , hang (text "Inferred kinds of user-written variables:")
-                       2 (vcat (map pp_tv other_tvs)) ] }
+                  , ppUnless (null other_tvs) $
+                    hang (text "Inferred kinds of user-written variables:")
+                       2 (vcat (map pp_tv other_tvs))
+                    -- It's possible that the result kind contains
+                    -- underdetermined, forall-bound variables which weren't
+                    -- reported earier (see #13777).
+                  , hang (text "Inferred result kind:")
+                       2 (ppr res_kind) ] }
       where
         pp_tv tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 kcLHsQTyVars _ _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
@@ -1939,7 +1945,7 @@ scopeTyVars2 :: SkolemInfo -> [(Name, Weighted TcTyVar)] -> TcM a -> TcM a
 scopeTyVars2 skol_info prs thing_inside
   = fmap snd $ -- discard the TcEvBinds, which will always be empty
     checkConstraints skol_info (map (weightedThing . snd) prs) [{- no EvVars -}] $
-    tcExtendTyVarEnv2 prs $
+    tcExtendNameTyVarEnv prs $
     thing_inside
 
 ------------------
@@ -2096,7 +2102,7 @@ kcTyClTyVars :: Name -> TcM a -> TcM a
 kcTyClTyVars tycon_name thing_inside
   -- See Note [Use SigTvs in kind-checking pass] in TcTyClsDecls
   = do { tycon <- kcLookupTcTyCon tycon_name
-       ; tcExtendTyVarEnv2 (fmap unrestricted <$> tcTyConScopedTyVars tycon) $ thing_inside }
+       ; tcExtendNameTyVarEnv (fmap unrestricted <$> tcTyConScopedTyVars tycon) $ thing_inside }
 
 tcTyClTyVars :: Name
              -> ([TyConBinder] -> Kind -> TcM a) -> TcM a

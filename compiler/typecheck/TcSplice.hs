@@ -113,6 +113,7 @@ import DynFlags
 import Panic
 import Lexeme
 import qualified EnumSet
+import Plugins
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -736,10 +737,13 @@ runMeta' show_code ppr_hs run_and_convert expr
         -- in type-correct programs.
         ; failIfErrsM
 
-        -- Desugar
-        ; ds_expr <- initDsTc (dsLExpr expr)
-        -- Compile and link it; might fail if linking fails
+        -- run plugins
         ; hsc_env <- getTopEnv
+        ; expr' <- withPlugins (hsc_dflags hsc_env) spliceRunAction expr
+
+        -- Desugar
+        ; ds_expr <- initDsTc (dsLExpr expr')
+        -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
         ; traceTc "About to run (desugared)" (ppr ds_expr)
         ; either_hval <- tryM $ liftIO $

@@ -40,6 +40,7 @@ import Util
 import Outputable
 import FastString
 import DataCon
+import PatSyn
 import HscTypes (CompleteMatch(..))
 
 import DsMonad
@@ -1315,13 +1316,69 @@ allCompleteMatches cl tys = do
   let final_groups = fam ++ from_pragma
   return final_groups
     where
-      -- Check that all the pattern types in a `COMPLETE`
-      -- pragma subsume the type we're matching. See #14135.
+      -- Check that all the pattern synonym return types in a `COMPLETE`
+      -- pragma subsume the type we're matching.
+      -- See Note [Filtering out non-matching COMPLETE sets]
       isValidCompleteMatch :: Type -> [ConLike] -> Bool
-      isValidCompleteMatch ty =
-        isJust . mapM (flip tcMatchTy ty . resTy . conLikeFullSig)
+      isValidCompleteMatch ty = all go
         where
-          resTy (_, _, _, _, _, _, res_ty) = res_ty
+          go (RealDataCon {}) = True
+          go (PatSynCon psc)  = isJust $ flip tcMatchTy ty $ patSynResTy
+                                       $ patSynSig psc
+
+          patSynResTy (_, _, _, _, _, res_ty) = res_ty
+
+{-
+Note [Filtering out non-matching COMPLETE sets]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, conlikes in a COMPLETE set are simply grouped by the
+type constructor heading the return type. This is nice and simple, but it does
+mean that there are scenarios when a COMPLETE set might be incompatible with
+the type of a scrutinee. For instance, consider (from #14135):
+
+  data Foo a = Foo1 a | Foo2 a
+
+  pattern MyFoo2 :: Int -> Foo Int
+  pattern MyFoo2 i = Foo2 i
+
+  {-# COMPLETE Foo1, MyFoo2 #-}
+
+  f :: Foo a -> a
+  f (Foo1 x) = x
+
+`f` has an incomplete pattern-match, so when choosing which constructors to
+report as unmatched in a warning, GHC must choose between the original set of
+data constructors {Foo1, Foo2} and the COMPLETE set {Foo1, MyFoo2}. But observe
+that GHC shouldn't even consider the COMPLETE set as a possibility: the return
+type of MyFoo2, Foo Int, does not match the type of the scrutinee, Foo a, since
+there's no substitution `s` such that s(Foo Int) = Foo a.
+
+To ensure that GHC doesn't pick this COMPLETE set, it checks each pattern
+synonym constructor's return type matches the type of the scrutinee, and if one
+doesn't, then we remove the whole COMPLETE set from consideration.
+
+One might wonder why GHC only checks /pattern synonym/ constructors, and not
+/data/ constructors as well. The reason is because that the type of a
+GADT constructor very well may not match the type of a scrutinee, and that's
+OK. Consider this example (from #14059):
+
+  data SBool (z :: Bool) where
+    SFalse :: SBool False
+    STrue  :: SBool True
+
+  pattern STooGoodToBeTrue :: forall (z :: Bool). ()
+                           => z ~ True
+                           => SBool z
+  pattern STooGoodToBeTrue = STrue
+  {-# COMPLETE SFalse, STooGoodToBeTrue #-}
+
+  wobble :: SBool z -> Bool
+  wobble STooGoodToBeTrue = True
+
+In the incomplete pattern match for `wobble`, we /do/ want to warn that SFalse
+should be matched against, even though its type, SBool False, does not match
+the scrutinee type, SBool z.
+-}
 
 -- -----------------------------------------------------------------------
 -- * Types and constraints

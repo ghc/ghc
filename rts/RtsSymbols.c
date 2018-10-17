@@ -558,7 +558,6 @@
       SymI_HasProto(stg_catchzh)                                        \
       SymI_HasProto(stg_catchRetryzh)                                   \
       SymI_HasProto(stg_catchSTMzh)                                     \
-      SymI_HasProto(stg_checkzh)                                        \
       SymI_HasProto(stg_clearCCSzh)                                     \
       SymI_HasProto(stg_compactAddWithSharingzh)                        \
       SymI_HasProto(stg_compactAddzh)                                   \
