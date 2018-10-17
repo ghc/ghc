@@ -1566,6 +1566,8 @@ app_ok primop_ok fun args
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
+             || (n_val_args == 0 &&
+                 isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args
   where
