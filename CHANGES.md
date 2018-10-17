@@ -1,4 +1,4 @@
-## TBA
+## Changes in version 2.22.0
 
  * Make `--package-version` optional for `--hoogle` (#899)
 
