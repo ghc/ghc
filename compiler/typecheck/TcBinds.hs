@@ -1358,6 +1358,10 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
+               tcScalingUsage Omega $
+                  -- toplevel and let-bindings are, at the moment, always
+                  -- unrestricted. The value being bound must, accordingly, be
+                  -- unrestricted. Hence them being scaled above.
                tcMatchesFun (L nm_loc name) matches exp_ty
 
         ; mono_id <- newLetBndr no_gen name Alias rhs_ty
