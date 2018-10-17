@@ -180,7 +180,7 @@ data HsWrapper
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
   | WpFun HsWrapper HsWrapper (Weighted TcType) SDoc
-       -- (WpFun wrap1 wrap2 (w t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
+       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
