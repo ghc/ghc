@@ -179,8 +179,8 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper HsWrapper (Weighted TcType) SDoc
-       -- (WpFun w wrap1 wrap2 t1)[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
+  | WpFun HsWrapper HsWrapper (Weighted TcType) SDoc
+       -- (WpFun wrap1 wrap2 (w t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
@@ -212,7 +212,7 @@ data HsWrapper
 instance Data.Data HsWrapper where
   gfoldl _ z WpHole             = z WpHole
   gfoldl k z (WpCompose a1 a2)  = z WpCompose `k` a1 `k` a2
-  gfoldl k z (WpFun w a1 a2 a3 _) = z wpFunEmpty `k` w `k` a1 `k` a2 `k` a3
+  gfoldl k z (WpFun a1 a2 a3 _) = z wpFunEmpty `k` a1 `k` a2 `k` a3
   gfoldl k z (WpCast a1)        = z WpCast `k` a1
   gfoldl k z (WpEvLam a1)       = z WpEvLam `k` a1
   gfoldl k z (WpEvApp a1)       = z WpEvApp `k` a1
@@ -223,7 +223,7 @@ instance Data.Data HsWrapper where
   gunfold k z c = case Data.constrIndex c of
                     1 -> z WpHole
                     2 -> k (k (z WpCompose))
-                    3 -> k (k (k (k (z wpFunEmpty))))
+                    3 -> k (k (k (z wpFunEmpty)))
                     4 -> k (z WpCast)
                     5 -> k (z WpEvLam)
                     6 -> k (z WpEvApp)
@@ -233,7 +233,7 @@ instance Data.Data HsWrapper where
 
   toConstr WpHole          = wpHole_constr
   toConstr (WpCompose _ _) = wpCompose_constr
-  toConstr (WpFun _ _ _ _ _) = wpFun_constr
+  toConstr (WpFun _ _ _ _) = wpFun_constr
   toConstr (WpCast _)      = wpCast_constr
   toConstr (WpEvLam _)     = wpEvLam_constr
   toConstr (WpEvApp _)     = wpEvApp_constr
@@ -265,16 +265,18 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> HsWrapper -> Weighted TcType -> HsWrapper
-wpFunEmpty w_c c1 c2 t1 = WpFun w_c c1 c2 t1 empty
+wpFunEmpty :: HsWrapper -> HsWrapper -> Weighted TcType -> HsWrapper
+wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
 WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-mkWpFun :: HsWrapper -- the multiplicities on the arrows of the wrappee and wrapper respectively
-        -> HsWrapper -> HsWrapper
+multRefl :: Rig -> TcCoercion
+multRefl w = mkReflCo Representational (fromMult w)
+
+mkWpFun :: HsWrapper -> HsWrapper
         -> (Weighted TcType)    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
@@ -283,13 +285,11 @@ mkWpFun :: HsWrapper -- the multiplicities on the arrows of the wrappee and wrap
 -- When the multiplicities are not the same, always make a proper wrapper.  We
 -- don't currently need to actually record the source multiplicity: it is just
 -- here to prevent making a coercion between two incoercible function arrow
--- arnaud: TODO: add an assertion that w1 is a subweight of w2
-mkWpFun WpHole WpHole       WpHole       _  _  _ = WpHole
-mkWpFun w_co co1          co2         t1 _  d  = WpFun w_co co1 co2 t1 d
---mkWpFun w  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational w (mkTcRepReflCo t1) co2)
---mkWpFun w  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) (mkTcRepReflCo t2))
---mkWpFun w  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) co2)
---mkWpFun w_co  co1          co2          t1 _  d = WpFun w_co co1 co2 t1 d
+mkWpFun WpHole       WpHole       _  _  _ = WpHole
+mkWpFun WpHole       (WpCast co2) (Weighted w t1) _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Weighted w _)  t2 _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Weighted w _)  _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) co2)
+mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 
 mkWpCastR :: TcCoercionR -> HsWrapper
@@ -850,7 +850,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun w f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
+    help it (WpFun f1 f2 (Weighted w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]

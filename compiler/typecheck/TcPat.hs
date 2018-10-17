@@ -420,7 +420,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
 
         ; let Weighted w h_overall_pat_ty = overall_pat_ty
         ; overall_pat_ty <- readExpType h_overall_pat_ty
-        ; let expr_wrap2' = mkWpFun idHsWrapper expr_wrap2 idHsWrapper -- TODO: arnaud: maybe one of the two `weight` ought to be the pattern's weight?
+        ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
                                     (Weighted w overall_pat_ty) inf_res_ty doc
                -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
                --                (overall_pat_ty -> inf_res_ty)

@@ -432,7 +432,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
                     -- a real-world failure and DollarDefault for a small
                     -- example
                    Just w -> w
-             wrap1 = mkWpFun idHsWrapper idHsWrapper wrap_res arg2_sigma res_ty doc
+             wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
 
@@ -1396,7 +1396,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
            ; let w = weightedWeight arg_ty
-           ; return ( mkWpFun idHsWrapper idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
+           ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
                     , HsValArg arg' : args'
                     , inner_res_ty ) }
       where
@@ -1555,7 +1555,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
 
            ; return ( result
                     , match_wrapper <.>
-                      mkWpFun idHsWrapper (arg_wrapper2 <.> arg_wrapper1) res_wrapper
+                      mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
                               (Weighted op_mult arg_ty) res_ty doc ) }
       where
         herald = text "This rebindable syntax expects a function with"
