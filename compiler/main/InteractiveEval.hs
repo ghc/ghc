@@ -30,6 +30,8 @@ module InteractiveEval (
         exprType,
         typeKind,
         parseName,
+        getDocs,
+        GetDocsFailure(..),
         showModule,
         moduleIsBootOrNotObjectLinkable,
         parseExpr, compileParsedExpr,
@@ -91,6 +93,8 @@ import Data.Dynamic
 import Data.Either
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
+import Data.Map (Map)
+import qualified Data.Map as Map
 import StringBuffer (stringToStringBuffer)
 import Control.Monad
 import GHC.Exts
@@ -820,6 +824,70 @@ parseThing parser dflags stmt = do
       loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
   Lexer.unP parser (Lexer.mkPState dflags buf loc)
+
+getDocs :: GhcMonad m
+        => Name
+        -> m (Either GetDocsFailure (Maybe HsDocString, Map Int HsDocString))
+           -- TODO: What about docs for constructors etc.?
+getDocs name =
+  withSession $ \hsc_env -> do
+     case nameModule_maybe name of
+       Nothing -> pure (Left (NameHasNoModule name))
+       Just mod -> do
+         if isInteractiveModule mod
+           then pure (Left InteractiveName)
+           else do
+             ModIface { mi_doc_hdr = mb_doc_hdr
+                      , mi_decl_docs = DeclDocMap dmap
+                      , mi_arg_docs = ArgDocMap amap
+                      } <- liftIO $ hscGetModuleInterface hsc_env mod
+             if isNothing mb_doc_hdr && Map.null dmap && Map.null amap
+               then pure (Left (NoDocsInIface mod compiled))
+               else pure (Right ( Map.lookup name dmap
+                                , Map.findWithDefault Map.empty name amap))
+  where
+    compiled =
+      -- TODO: Find a more direct indicator.
+      case nameSrcLoc name of
+        RealSrcLoc {} -> False
+        UnhelpfulLoc {} -> True
+
+-- | Failure modes for 'getDocs'.
+
+-- TODO: Find a way to differentiate between modules loaded without '-haddock'
+-- and modules that contain no docs.
+data GetDocsFailure
+
+    -- | 'nameModule_maybe' returned 'Nothing'.
+  = NameHasNoModule Name
+
+    -- | This is probably because the module was loaded without @-haddock@,
+    -- but it's also possible that the entire module contains no documentation.
+  | NoDocsInIface
+      Module
+      Bool -- ^ 'True': The module was compiled.
+           -- 'False': The module was :loaded.
+
+    -- | The 'Name' was defined interactively.
+  | InteractiveName
+
+instance Outputable GetDocsFailure where
+  ppr (NameHasNoModule name) =
+    quotes (ppr name) <+> text "has no module where we could look for docs."
+  ppr (NoDocsInIface mod compiled) = vcat
+    [ text "Can't find any documentation for" <+> ppr mod <> char '.'
+    , text "This is probably because the module was"
+        <+> text (if compiled then "compiled" else "loaded")
+        <+> text "without '-haddock',"
+    , text "but it's also possible that the module contains no documentation."
+    , text ""
+    , if compiled
+        then text "Try re-compiling with '-haddock'."
+        else text "Try running ':set -haddock' and :load the file again."
+        -- TODO: Figure out why :reload doesn't load the docs and maybe fix it.
+    ]
+  ppr InteractiveName =
+    text "Docs are unavailable for interactive declarations."
 
 -- -----------------------------------------------------------------------------
 -- Getting the type of an expression

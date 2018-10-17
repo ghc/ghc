@@ -2374,6 +2374,14 @@ commonly used commands.
     see the number of each breakpoint). The ``*`` form deletes all the
     breakpoints.
 
+.. ghci-cmd:: :doc; ⟨name⟩
+
+    (Experimental: This command will likely change significantly in GHC 8.8.)
+
+    Displays the documentation for the given name. Currently the command is
+    restricted to displaying the documentation directly on the declaration
+    in question, ignoring documentation for arguments, constructors etc.
+
 .. ghci-cmd:: :edit; ⟨file⟩
 
     Opens an editor to edit the file ⟨file⟩, or the most recently loaded

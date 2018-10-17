@@ -185,9 +185,13 @@ pprNode node = pp_node <+> pp_debug
     pp_node :: SDoc
     pp_node = sdocWithDynFlags $ \dflags -> case node of
       -- label:
-      CmmEntry id tscope -> ppr id <> colon <+>
+      CmmEntry id tscope -> lbl <> colon <+>
          (sdocWithDynFlags $ \dflags ->
            ppUnless (gopt Opt_SuppressTicks dflags) (text "//" <+> ppr tscope))
+          where
+            lbl = if gopt Opt_SuppressUniques dflags
+                then text "_lbl_"
+                else ppr id
 
       -- // text
       CmmComment s -> text "//" <+> ftext s

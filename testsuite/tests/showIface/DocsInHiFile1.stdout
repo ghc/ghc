@@ -1,0 +1,36 @@
+module header:
+  Just " `elem`, 'print',
+`Unknown',
+'<>', ':=:', 'Bool'
+"
+declaration docs:
+  D':
+    " Another datatype...
+
+ ...with two docstrings."
+  P:
+    " A class"
+  p:
+    " A class method"
+  D:
+    " A datatype."
+  D0:
+    " A constructor for 'D'. '"
+  D1:
+    " Another constructor"
+  elem:
+    " '()', 'elem'."
+  $fShowD:
+    " 'Show' instance"
+arg docs:
+  p:
+    0:
+      " An argument"
+  add:
+    0:
+      " First summand for 'add'"
+    1:
+      " Second summand"
+    2:
+      " Sum"
+

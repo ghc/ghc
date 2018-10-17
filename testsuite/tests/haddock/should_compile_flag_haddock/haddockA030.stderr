@@ -2,6 +2,9 @@
 ==================== Parser ====================
 module ShouldCompile where
 data A
-  =  comment for A  A |  comment for B  B |  comment for C   C | D
+  = " comment for A " A |
+    " comment for B " B |
+    " comment for C  " C |
+    D
 
 

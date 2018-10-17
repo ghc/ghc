@@ -118,6 +118,12 @@ Compiler
   :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
   need this, you don't need it.
 
+GHCi
+~~~~
+
+- Added an experimental :ghci-cmd:`:doc` command that displays the
+  documentation for a declaration.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

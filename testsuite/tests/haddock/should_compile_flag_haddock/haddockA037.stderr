@@ -4,4 +4,6 @@ module UnamedConstructorFields where
 data A = A
 data B = B
 data C = C
-data Foo = MkFoo A  'A' has a comment B C  'C' has a comment
+data Foo = MkFoo A " 'A' has a comment" B C " 'C' has a comment"
+
+

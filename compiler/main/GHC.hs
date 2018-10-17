@@ -132,6 +132,9 @@ module GHC (
         ForeignHValue,
         compileExprRemote, compileParsedExprRemote,
 
+        -- ** Docs
+        getDocs, GetDocsFailure(..),
+
         -- ** Other
         runTcInteractive,   -- Desired by some clients (Trac #8878)
         isStmt, hasImport, isImport, isDecl,
