@@ -1,0 +1,236 @@
+
+refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [Integer] -> Integer
+    • In the expression: _
+      In an equation for ‘f’: f = _
+    • Relevant bindings include
+        f :: [Integer] -> Integer (bound at refinement_hole_fits.hs:4:1)
+      Valid hole fits include
+        f :: [Integer] -> Integer (bound at refinement_hole_fits.hs:4:1)
+        g :: [Integer] -> Integer (bound at refinement_hole_fits.hs:7:1)
+        head :: forall a. [a] -> a
+          with head @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+        last :: forall a. [a] -> a
+          with last @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+        maximum :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Ord a => t a -> a
+          with maximum @[] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        minimum :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Ord a => t a -> a
+          with minimum @[] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        product :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Num a => t a -> a
+          with product @[] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        sum :: forall (t :: * -> *).
+               Foldable t =>
+               forall a. Num a => t a -> a
+          with sum @[] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+      Valid refinement hole fits include
+        foldl1 (_ :: Integer -> Integer -> Integer)
+          where foldl1 :: forall (t :: * -> *).
+                          Foldable t =>
+                          forall a. (a -> a -> a) -> t a -> a
+          with foldl1 @[] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        foldr1 (_ :: Integer -> Integer -> Integer)
+          where foldr1 :: forall (t :: * -> *).
+                          Foldable t =>
+                          forall a. (a -> a -> a) -> t a -> a
+          with foldr1 @[] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        foldl (_ :: Integer -> Integer -> Integer) (_ :: Integer)
+          where foldl :: forall (t :: * -> *).
+                         Foldable t =>
+                         forall b a. (b -> a -> b) -> b -> t a -> b
+          with foldl @[] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        foldr (_ :: Integer -> Integer -> Integer) (_ :: Integer)
+          where foldr :: forall (t :: * -> *).
+                         Foldable t =>
+                         forall a b. (a -> b -> b) -> b -> t a -> b
+          with foldr @[] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        const (_ :: Integer)
+          where const :: forall a b. a -> b -> a
+          with const @Integer @[Integer]
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        ($) (_ :: [Integer] -> Integer)
+          where ($) :: forall a b. (a -> b) -> a -> b
+          with ($) @'GHC.Types.LiftedRep @[Integer] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        fail (_ :: String)
+          where fail :: forall (m :: * -> *).
+                        Monad m =>
+                        forall a. String -> m a
+          with fail @((->) [Integer]) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        return (_ :: Integer)
+          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          with return @((->) [Integer]) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        pure (_ :: Integer)
+          where pure :: forall (f :: * -> *).
+                        Applicative f =>
+                        forall a. a -> f a
+          with pure @((->) [Integer]) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        ($!) (_ :: [Integer] -> Integer)
+          where ($!) :: forall a b. (a -> b) -> a -> b
+          with ($!) @'GHC.Types.LiftedRep @[Integer] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        id (_ :: [Integer] -> Integer)
+          where id :: forall a. a -> a
+          with id @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        head (_ :: [[Integer] -> Integer])
+          where head :: forall a. [a] -> a
+          with head @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+        last (_ :: [[Integer] -> Integer])
+          where last :: forall a. [a] -> a
+          with last @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+        asTypeOf (_ :: [Integer] -> Integer) (_ :: [Integer] -> Integer)
+          where asTypeOf :: forall a. a -> a -> a
+          with asTypeOf @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        (!!) (_ :: [[Integer] -> Integer]) (_ :: Int)
+          where (!!) :: forall a. [a] -> Int -> a
+          with (!!) @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+
+refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: Integer -> [Integer] -> Integer
+    • In the expression: _
+      In the expression: _ 0
+      In an equation for ‘g’: g = _ 0
+    • Relevant bindings include
+        g :: [Integer] -> Integer (bound at refinement_hole_fits.hs:7:1)
+      Valid hole fits include
+        const :: forall a b. a -> b -> a
+          with const @Integer @[Integer]
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          with return @((->) [Integer]) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        pure :: forall (f :: * -> *). Applicative f => forall a. a -> f a
+          with pure @((->) [Integer]) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+      Valid refinement hole fits include
+        foldl (_ :: Integer -> Integer -> Integer)
+          where foldl :: forall (t :: * -> *).
+                         Foldable t =>
+                         forall b a. (b -> a -> b) -> b -> t a -> b
+          with foldl @[] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        foldr (_ :: Integer -> Integer -> Integer)
+          where foldr :: forall (t :: * -> *).
+                         Foldable t =>
+                         forall a b. (a -> b -> b) -> b -> t a -> b
+          with foldr @[] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Foldable’))
+        curry (_ :: (Integer, [Integer]) -> Integer)
+          where curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
+          with curry @Integer @[Integer] @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘Data.Tuple’))
+        flip (_ :: [Integer] -> Integer -> Integer)
+          where flip :: forall a b c. (a -> b -> c) -> b -> a -> c
+          with flip @[Integer] @Integer @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        const (_ :: [Integer] -> Integer)
+          where const :: forall a b. a -> b -> a
+          with const @([Integer] -> Integer) @Integer
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        ($) (_ :: Integer -> [Integer] -> Integer)
+          where ($) :: forall a b. (a -> b) -> a -> b
+          with ($) @'GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        fail (_ :: String)
+          where fail :: forall (m :: * -> *).
+                        Monad m =>
+                        forall a. String -> m a
+          with fail @((->) Integer) @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        return (_ :: [Integer] -> Integer)
+          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          with return @((->) Integer) @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        pure (_ :: [Integer] -> Integer)
+          where pure :: forall (f :: * -> *).
+                        Applicative f =>
+                        forall a. a -> f a
+          with pure @((->) Integer) @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        ($!) (_ :: Integer -> [Integer] -> Integer)
+          where ($!) :: forall a b. (a -> b) -> a -> b
+          with ($!) @'GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        id (_ :: Integer -> [Integer] -> Integer)
+          where id :: forall a. a -> a
+          with id @(Integer -> [Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        head (_ :: [Integer -> [Integer] -> Integer])
+          where head :: forall a. [a] -> a
+          with head @(Integer -> [Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+        last (_ :: [Integer -> [Integer] -> Integer])
+          where last :: forall a. [a] -> a
+          with last @(Integer -> [Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))
+        asTypeOf (_ :: Integer -> [Integer] -> Integer)
+                 (_ :: Integer -> [Integer] -> Integer)
+          where asTypeOf :: forall a. a -> a -> a
+          with asTypeOf @(Integer -> [Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.Base’))
+        (!!) (_ :: [Integer -> [Integer] -> Integer]) (_ :: Int)
+          where (!!) :: forall a. [a] -> Int -> a
+          with (!!) @(Integer -> [Integer] -> Integer)
+          (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
+           (and originally defined in ‘GHC.List’))

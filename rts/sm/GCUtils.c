@@ -341,24 +341,3 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
 
     return ws->todo_free;
 }
-
-/* -----------------------------------------------------------------------------
- * Debugging
- * -------------------------------------------------------------------------- */
-
-#if defined(DEBUG)
-void
-printMutableList(bdescr *bd)
-{
-    StgPtr p;
-
-    debugBelch("mutable list %p: ", bd);
-
-    for (; bd != NULL; bd = bd->link) {
-        for (p = bd->start; p < bd->free; p++) {
-            debugBelch("%p (%s), ", (void *)*p, info_type((StgClosure *)*p));
-        }
-    }
-    debugBelch("\n");
-}
-#endif /* DEBUG */

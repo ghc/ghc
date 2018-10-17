@@ -1,0 +1,6 @@
+T13838.exe: T13838.hs:6:1: error:
+    • Couldn't match expected type ‘IO t0’ with actual type ‘() -> ()’
+    • Probable cause: ‘main’ is applied to too few arguments
+      In the expression: main
+      When checking the type of the IO action ‘main’
+(deferred type error)

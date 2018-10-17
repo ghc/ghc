@@ -42,7 +42,6 @@ readHexFingerprint s = Fingerprint w1 w2
        [(w1,"")] = readHex s1
        [(w2,"")] = readHex (take 16 s2)
 
--- this can move to GHC.Fingerprint in GHC 8.6
 fingerprintByteString :: BS.ByteString -> Fingerprint
 fingerprintByteString bs = unsafeDupablePerformIO $
   BS.unsafeUseAsCStringLen bs $ \(ptr, len) -> fingerprintData (castPtr ptr) len

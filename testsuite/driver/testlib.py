@@ -874,7 +874,7 @@ def do_test(name, way, func, args, files):
             if_verbose(1, '** pre_cmd was "{0}". Running trace'.format(override_options(opts.pre_cmd)))
             runCmd('cd "{0}" && strace {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
                            stderr = subprocess.STDOUT,
-                           print_output = true)
+                           print_output = True)
 
     result = func(*[name,way] + args)
 

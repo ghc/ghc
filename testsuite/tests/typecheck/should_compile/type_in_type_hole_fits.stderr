@@ -1,0 +1,78 @@
+
+type_in_type_hole_fits.hs:79:11: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole:
+        _a :: [Integer] -> Sorted (O ('NLogN 2 0)) (O N) 'True Integer
+      Or perhaps ‘_a’ is mis-spelled, or not in scope
+    • In the expression: _a
+      In the expression: _a [3, 1, 2]
+      In an equation for ‘mySortA’: mySortA = _a [3, 1, 2]
+    • Relevant bindings include
+        mySortA :: Sorted (O (N ^. 2)) (O N) 'True Integer
+          (bound at type_in_type_hole_fits.hs:79:1)
+      Valid hole fits include
+        mergeSort :: forall a (n :: AsympPoly) (m :: AsympPoly) (s :: Bool).
+                     (Ord a, n >=. O (N *. LogN), m >=. O N, IsStable s) =>
+                     [a] -> Sorted n m s a
+          with mergeSort @Integer @(O ('NLogN 2 0)) @(O N) @'True
+          (defined at type_in_type_hole_fits.hs:61:1)
+        insertionSort :: forall a (n :: AsympPoly) (m :: AsympPoly) (s :: Bool).
+                         (Ord a, n >=. O (N ^. 2), m >=. O One, IsStable s) =>
+                         [a] -> Sorted n m s a
+          with insertionSort @Integer @(O ('NLogN 2 0)) @(O N) @'True
+          (defined at type_in_type_hole_fits.hs:65:1)
+        Sorted :: forall (cpu :: AsympPoly) (mem :: AsympPoly) (stable :: Bool) a.
+                  [a] -> Sorted cpu mem stable a
+          with Sorted @(O ('NLogN 2 0)) @(O N) @'True @Integer
+          (defined at type_in_type_hole_fits.hs:54:18)
+
+type_in_type_hole_fits.hs:82:11: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole:
+        _b :: [Integer] -> Sorted (O ('NLogN 1 1)) (O N) 'False Integer
+      Or perhaps ‘_b’ is mis-spelled, or not in scope
+    • In the expression: _b
+      In the expression: _b [3, 1, 2]
+      In an equation for ‘mySortB’: mySortB = _b [3, 1, 2]
+    • Relevant bindings include
+        mySortB :: Sorted (O (N *. LogN)) (O N) 'False Integer
+          (bound at type_in_type_hole_fits.hs:82:1)
+      Valid hole fits include
+        quickSort :: forall a (n :: AsympPoly) (m :: AsympPoly).
+                     (Ord a, n >=. O (N *. LogN), m >=. O N) =>
+                     [a] -> Sorted n m 'False a
+          with quickSort @Integer @(O ('NLogN 1 1)) @(O N)
+          (defined at type_in_type_hole_fits.hs:71:1)
+        heapSort :: forall a (n :: AsympPoly) (m :: AsympPoly).
+                    (Ord a, n >=. O (N *. LogN), m >=. O One) =>
+                    [a] -> Sorted n m 'False a
+          with heapSort @Integer @(O ('NLogN 1 1)) @(O N)
+          (defined at type_in_type_hole_fits.hs:74:1)
+        mergeSort :: forall a (n :: AsympPoly) (m :: AsympPoly) (s :: Bool).
+                     (Ord a, n >=. O (N *. LogN), m >=. O N, IsStable s) =>
+                     [a] -> Sorted n m s a
+          with mergeSort @Integer @(O ('NLogN 1 1)) @(O N) @'False
+          (defined at type_in_type_hole_fits.hs:61:1)
+        Sorted :: forall (cpu :: AsympPoly) (mem :: AsympPoly) (stable :: Bool) a.
+                  [a] -> Sorted cpu mem stable a
+          with Sorted @(O ('NLogN 1 1)) @(O N) @'False @Integer
+          (defined at type_in_type_hole_fits.hs:54:18)
+
+type_in_type_hole_fits.hs:85:11: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole:
+        _c :: [Integer] -> Sorted (O ('NLogN 1 1)) (O One) 'False Integer
+      Or perhaps ‘_c’ is mis-spelled, or not in scope
+    • In the expression: _c
+      In the expression: _c [3, 1, 2]
+      In an equation for ‘mySortC’: mySortC = _c [3, 1, 2]
+    • Relevant bindings include
+        mySortC :: Sorted (O (N *. LogN)) (O One) 'False Integer
+          (bound at type_in_type_hole_fits.hs:85:1)
+      Valid hole fits include
+        heapSort :: forall a (n :: AsympPoly) (m :: AsympPoly).
+                    (Ord a, n >=. O (N *. LogN), m >=. O One) =>
+                    [a] -> Sorted n m 'False a
+          with heapSort @Integer @(O ('NLogN 1 1)) @(O One)
+          (defined at type_in_type_hole_fits.hs:74:1)
+        Sorted :: forall (cpu :: AsympPoly) (mem :: AsympPoly) (stable :: Bool) a.
+                  [a] -> Sorted cpu mem stable a
+          with Sorted @(O ('NLogN 1 1)) @(O One) @'False @Integer
+          (defined at type_in_type_hole_fits.hs:54:18)

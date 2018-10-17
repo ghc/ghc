@@ -1,0 +1,11 @@
+
+valid_hole_fits_interactions.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: SBool 'True
+    • In the expression: _
+      In an equation for ‘f’: f = _
+    • Relevant bindings include
+        f :: SBool 'True (bound at valid_hole_fits_interactions.hs:15:1)
+      Valid hole fits include
+        f :: SBool 'True (bound at valid_hole_fits_interactions.hs:15:1)
+        STrue :: SBool 'True
+          (defined at valid_hole_fits_interactions.hs:12:3)

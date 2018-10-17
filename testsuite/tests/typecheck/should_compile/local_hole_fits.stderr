@@ -1,0 +1,28 @@
+
+local_hole_fits.hs:4:15: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 head :: forall a. [a] -> a
+               at local_hole_fits.hs:3:1-16
+    • In the expression: _
+      In an equation for ‘head’: head (x : xs) = _
+    • Relevant bindings include
+        xs :: [a] (bound at local_hole_fits.hs:4:9)
+        x :: a (bound at local_hole_fits.hs:4:7)
+        head :: [a] -> a (bound at local_hole_fits.hs:4:1)
+      Valid hole fits include x :: a (bound at local_hole_fits.hs:4:7)
+
+local_hole_fits.hs:8:11: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 mshow :: forall a. Show a => a -> a
+               at local_hole_fits.hs:7:1-25
+    • In the expression: _
+      In an equation for ‘mshow’: mshow a = _
+    • Relevant bindings include
+        a :: a (bound at local_hole_fits.hs:8:7)
+        mshow :: a -> a (bound at local_hole_fits.hs:8:1)
+      Constraints include Show a (from local_hole_fits.hs:7:1-25)
+      Valid hole fits include a :: a (bound at local_hole_fits.hs:8:7)

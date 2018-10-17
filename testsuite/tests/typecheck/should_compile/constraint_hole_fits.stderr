@@ -1,0 +1,65 @@
+
+constraint_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: [a] -> a
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 g :: forall a. Ord a => [a] -> a
+               at constraint_hole_fits.hs:3:1-22
+    • In the expression: _
+      In an equation for ‘g’: g = _
+    • Relevant bindings include
+        g :: [a] -> a (bound at constraint_hole_fits.hs:4:1)
+      Constraints include Ord a (from constraint_hole_fits.hs:3:1-22)
+      Valid hole fits include
+        g :: [a] -> a
+        head :: forall a. [a] -> a
+        last :: forall a. [a] -> a
+        maximum :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Ord a => t a -> a
+        minimum :: forall (t :: * -> *).
+                   Foldable t =>
+                   forall a. Ord a => t a -> a
+      Valid refinement hole fits include
+        foldl1 (_ :: a -> a -> a)
+          where foldl1 :: forall (t :: * -> *).
+                          Foldable t =>
+                          forall a. (a -> a -> a) -> t a -> a
+        foldr1 (_ :: a -> a -> a)
+          where foldr1 :: forall (t :: * -> *).
+                          Foldable t =>
+                          forall a. (a -> a -> a) -> t a -> a
+        foldl (_ :: a -> a -> a) (_ :: a)
+          where foldl :: forall (t :: * -> *).
+                         Foldable t =>
+                         forall b a. (b -> a -> b) -> b -> t a -> b
+        foldr (_ :: a -> a -> a) (_ :: a)
+          where foldr :: forall (t :: * -> *).
+                         Foldable t =>
+                         forall a b. (a -> b -> b) -> b -> t a -> b
+        const (_ :: a)
+          where const :: forall a b. a -> b -> a
+        ($) (_ :: [a] -> a)
+          where ($) :: forall a b. (a -> b) -> a -> b
+        fail (_ :: String)
+          where fail :: forall (m :: * -> *).
+                        Monad m =>
+                        forall a. String -> m a
+        return (_ :: a)
+          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+        pure (_ :: a)
+          where pure :: forall (f :: * -> *).
+                        Applicative f =>
+                        forall a. a -> f a
+        ($!) (_ :: [a] -> a)
+          where ($!) :: forall a b. (a -> b) -> a -> b
+        id (_ :: [a] -> a)
+          where id :: forall a. a -> a
+        head (_ :: [[a] -> a])
+          where head :: forall a. [a] -> a
+        last (_ :: [[a] -> a])
+          where last :: forall a. [a] -> a
+        asTypeOf (_ :: [a] -> a) (_ :: [a] -> a)
+          where asTypeOf :: forall a. a -> a -> a
+        (!!) (_ :: [[a] -> a]) (_ :: Int)
+          where (!!) :: forall a. [a] -> Int -> a

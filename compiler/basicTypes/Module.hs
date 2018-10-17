@@ -151,13 +151,10 @@ import Util
 import Data.List
 import Data.Ord
 import GHC.PackageDb (BinaryStringRep(..), DbUnitIdModuleRep(..), DbModule(..), DbUnitId(..))
+import Fingerprint
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Unsafe as BS
 import qualified Data.ByteString.Char8 as BS.Char8
-import System.IO.Unsafe
-import Foreign.Ptr (castPtr)
-import GHC.Fingerprint
 import Encoding
 
 import qualified Text.ParserCombinators.ReadP as Parse
@@ -846,11 +843,6 @@ rawHashUnitId sorted_holes =
         [ toStringRep m,                BS.Char8.singleton ' ',
           fastStringToByteString (unitIdFS (moduleUnitId b)), BS.Char8.singleton ':',
           toStringRep (moduleName b),   BS.Char8.singleton '\n']
-
-fingerprintByteString :: BS.ByteString -> Fingerprint
-fingerprintByteString bs = unsafePerformIO
-                         . BS.unsafeUseAsCStringLen bs
-                         $ \(p,l) -> fingerprintData (castPtr p) l
 
 fingerprintUnitId :: BS.ByteString -> Fingerprint -> BS.ByteString
 fingerprintUnitId prefix (Fingerprint a b)

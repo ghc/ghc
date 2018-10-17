@@ -13,7 +13,7 @@
 module SysTools (
         -- * Initialisation
         initSysTools,
-        initLlvmTargets,
+        initLlvmConfig,
 
         -- * Interface to system tools
         module SysTools.Tasks,
@@ -110,16 +110,22 @@ stuff.
 ************************************************************************
 -}
 
-initLlvmTargets :: Maybe String
-                -> IO LlvmTargets
-initLlvmTargets mbMinusB
-  = do top_dir <- findTopDir mbMinusB
-       let llvmTargetsFile = top_dir </> "llvm-targets"
-       llvmTargetsStr <- readFile llvmTargetsFile
-       case maybeReadFuzzy llvmTargetsStr of
-         Just s -> return (fmap mkLlvmTarget <$> s)
-         Nothing -> pgmError ("Can't parse " ++ show llvmTargetsFile)
+initLlvmConfig :: Maybe String
+                -> IO LlvmConfig
+initLlvmConfig mbMinusB
+  = do
+      targets <- readAndParse "llvm-targets" mkLlvmTarget
+      passes <- readAndParse "llvm-passes" id
+      return (targets, passes)
   where
+    readAndParse name builder =
+      do top_dir <- findTopDir mbMinusB
+         let llvmConfigFile = top_dir </> name
+         llvmConfigStr <- readFile llvmConfigFile
+         case maybeReadFuzzy llvmConfigStr of
+           Just s -> return (fmap builder <$> s)
+           Nothing -> pgmError ("Can't parse " ++ show llvmConfigFile)
+
     mkLlvmTarget :: (String, String, String) -> LlvmTarget
     mkLlvmTarget (dl, cpu, attrs) = LlvmTarget dl cpu (words attrs)
 
