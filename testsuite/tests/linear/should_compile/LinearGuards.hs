@@ -1,3 +1,4 @@
+{-# LANGUAGE LinearTypes #-}
 module LinearGuards where
 
 f :: a ->. a
