@@ -1,0 +1,5 @@
+
+T15761.hs:5:1: error:
+    • Expecting one more argument to ‘(Int + Bool) Double’
+      Expected a type, but ‘(Int + Bool) Double’ has kind ‘* -> *’
+    • In the data instance declaration for ‘+’
