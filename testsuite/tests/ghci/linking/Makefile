@@ -137,5 +137,5 @@ T14708:
 
 .PHONY: T15729
 T15729:
-	"$(TEST_HC)" -c T15729.c -o bss.o
+	"$(TEST_HC)" -fPIC -c T15729.c -o bss.o
 	echo "main" | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) bss.o T15729.hs
