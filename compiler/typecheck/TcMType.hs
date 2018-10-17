@@ -515,13 +515,24 @@ tcInstSkolTyVars' overlappable subst tvs
        ; instSkolTyCoVarsX (mkTcSkolTyVar lvl loc overlappable) subst tvs }
 
 mkTcSkolTyVar :: TcLevel -> SrcSpan -> Bool -> TcTyCoVarMaker gbl lcl
-mkTcSkolTyVar lvl loc overlappable old_name kind
+-- Allocates skolems whose level is ONE GREATER THAN the passed-in tc_lvl
+-- See Note [Skolem level allocation]
+mkTcSkolTyVar tc_lvl loc overlappable old_name kind
   = do { uniq <- newUnique
        ; let name = mkInternalName uniq (getOccName old_name) loc
        ; return (mkTcTyVar name kind details) }
   where
-    details = SkolemTv (pushTcLevel lvl) overlappable
-              -- NB: skolems bump the level
+    details = SkolemTv (pushTcLevel tc_lvl) overlappable
+              -- pushTcLevel: see Note [Skolem level allocation]
+
+{- Note [Skolem level allocation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We generally allocate skolems /before/ calling pushLevelAndCaptureConstraints.
+So we want their level to the level of the soon-to-be-created implication,
+which has a level one higher than the current level.  Hence the pushTcLevel.
+It feels like a slight hack.  Applies also to vanillaSkolemTv.
+
+-}
 
 ------------------
 freshenTyVarBndrs :: [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyVar])
@@ -572,9 +583,10 @@ newFskTyVar :: TcType -> TcM TcTyVar
 newFskTyVar fam_ty
   = do { uniq <- newUnique
        ; ref  <- newMutVar Flexi
+       ; tclvl <- getTcLevel
        ; let details = MetaTv { mtv_info  = FlatSkolTv
                               , mtv_ref   = ref
-                              , mtv_tclvl = fmvTcLevel }
+                              , mtv_tclvl = tclvl }
              name = mkMetaTyVarName uniq (fsLit "fsk")
        ; return (mkTcTyVar name (typeKind fam_ty) details) }
 
@@ -627,9 +639,10 @@ newFmvTyVar :: TcType -> TcM TcTyVar
 newFmvTyVar fam_ty
   = do { uniq <- newUnique
        ; ref  <- newMutVar Flexi
+       ; tclvl <- getTcLevel
        ; let details = MetaTv { mtv_info  = FlatMetaTv
                               , mtv_ref   = ref
-                              , mtv_tclvl = fmvTcLevel }
+                              , mtv_tclvl = tclvl }
              name = mkMetaTyVarName uniq (fsLit "s")
        ; return (mkTcTyVar name (typeKind fam_ty) details) }
 
@@ -745,8 +758,7 @@ writeMetaTyVarRef tyvar ref ty
     tv_lvl = tcTyVarLevel tyvar
     ty_lvl = tcTypeLevel ty
 
-    level_check_ok = isFlattenTyVar tyvar
-                  || not (ty_lvl `strictlyDeeperThan` tv_lvl)
+    level_check_ok  = not (ty_lvl `strictlyDeeperThan` tv_lvl)
     level_check_msg = ppr ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
 
     double_upd_msg details = hang (text "Double update of meta tyvar")

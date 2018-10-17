@@ -1,4 +1,4 @@
-
+4607
 test('tcfail001', normal, compile_fail, [''])
 test('tcfail002', normal, compile_fail, [''])
 test('tcfail003', normal, compile_fail, [''])
@@ -467,7 +467,7 @@ test('T14350', normal, compile_fail, [''])
 test('T14390', normal, compile_fail, [''])
 test('MissingExportList03', normal, compile_fail, [''])
 test('T14618', normal, compile_fail, [''])
-test('T14607', normal, compile_fail, [''])
+test('T14607', normal, compile, [''])
 test('T14605', normal, compile_fail, [''])
 test('T14761a', normal, compile_fail, [''])
 test('T14761b', normal, compile_fail, [''])

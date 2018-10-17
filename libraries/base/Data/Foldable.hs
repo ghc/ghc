@@ -436,6 +436,10 @@ instance Foldable First where
 instance Foldable Last where
     foldMap f = foldMap f . getLast
 
+-- | @since 4.12.0.0
+instance (Foldable f) => Foldable (Alt f) where
+    foldMap f = foldMap f . getAlt
+
 -- Instances for GHC.Generics
 -- | @since 4.9.0.0
 instance Foldable U1 where

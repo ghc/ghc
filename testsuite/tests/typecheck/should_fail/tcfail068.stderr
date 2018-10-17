@@ -23,48 +23,48 @@ tcfail068.hs:14:9: error:
           (bound at tcfail068.hs:12:1)
 
 tcfail068.hs:19:9: error:
-    • Couldn't match type ‘s’ with ‘s1’
+    • Couldn't match type ‘s1’ with ‘s’
+      ‘s1’ is a rigid type variable bound by
+        a type expected by the context:
+          forall s1. GHC.ST.ST s1 (IndTree s a)
+        at tcfail068.hs:(18,9)-(21,19)
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itiap :: forall a s.
                    Constructed a =>
                    (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         at tcfail068.hs:16:1-75
-      ‘s1’ is a rigid type variable bound by
-        a type expected by the context:
-          forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:(18,9)-(21,19)
       Expected type: GHC.ST.ST s1 (IndTree s a)
         Actual type: GHC.ST.ST s (IndTree s a)
     • In the first argument of ‘runST’, namely
         ‘(readSTArray arr i
-          >>= \ val -> writeSTArray arr i (f val) >> return arr)’
+            >>= \ val -> writeSTArray arr i (f val) >> return arr)’
       In the expression:
         runST
           (readSTArray arr i
-           >>= \ val -> writeSTArray arr i (f val) >> return arr)
+             >>= \ val -> writeSTArray arr i (f val) >> return arr)
       In an equation for ‘itiap’:
           itiap i f arr
             = runST
                 (readSTArray arr i
-                 >>= \ val -> writeSTArray arr i (f val) >> return arr)
+                   >>= \ val -> writeSTArray arr i (f val) >> return arr)
     • Relevant bindings include
         arr :: IndTree s a (bound at tcfail068.hs:17:11)
         itiap :: (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
           (bound at tcfail068.hs:17:1)
 
 tcfail068.hs:24:36: error:
-    • Couldn't match type ‘s’ with ‘s1’
+    • Couldn't match type ‘s1’ with ‘s’
+      ‘s1’ is a rigid type variable bound by
+        a type expected by the context:
+          forall s1. GHC.ST.ST s1 (IndTree s a)
+        at tcfail068.hs:24:29-46
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itrap :: forall a s.
                    Constructed a =>
                    ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
         at tcfail068.hs:23:1-87
-      ‘s1’ is a rigid type variable bound by
-        a type expected by the context:
-          forall s1. GHC.ST.ST s1 (IndTree s a)
-        at tcfail068.hs:24:29-46
       Expected type: GHC.ST.ST s1 (IndTree s a)
         Actual type: GHC.ST.ST s (IndTree s a)
     • In the first argument of ‘runST’, namely ‘(itrap' i k)’
@@ -91,7 +91,11 @@ tcfail068.hs:24:36: error:
           (bound at tcfail068.hs:24:1)
 
 tcfail068.hs:36:46: error:
-    • Couldn't match type ‘s’ with ‘s1’
+    • Couldn't match type ‘s1’ with ‘s’
+      ‘s1’ is a rigid type variable bound by
+        a type expected by the context:
+          forall s1. GHC.ST.ST s1 (c, IndTree s b)
+        at tcfail068.hs:36:40-63
       ‘s’ is a rigid type variable bound by
         the type signature for:
           itrapstate :: forall b a c s.
@@ -104,10 +108,6 @@ tcfail068.hs:36:46: error:
                         -> IndTree s b
                         -> (c, IndTree s b)
         at tcfail068.hs:(34,1)-(35,62)
-      ‘s1’ is a rigid type variable bound by
-        a type expected by the context:
-          forall s1. GHC.ST.ST s1 (c, IndTree s b)
-        at tcfail068.hs:36:40-63
       Expected type: GHC.ST.ST s1 (c, IndTree s b)
         Actual type: GHC.ST.ST s (c, IndTree s b)
     • In the first argument of ‘runST’, namely ‘(itrapstate' i k s)’

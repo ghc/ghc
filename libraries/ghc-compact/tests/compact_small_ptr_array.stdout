@@ -1,0 +1,1 @@
+fromListN 5 [Just 'a',Just 'a',Just 'a',Just 'a',Just 'a']

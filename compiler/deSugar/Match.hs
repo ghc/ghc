@@ -39,7 +39,6 @@ import MatchCon
 import MatchLit
 import Type
 import Coercion ( eqCoercion )
-import TcType ( toTcTypeBag )
 import TyCon( isNewTyCon )
 import Weight
 import TysWiredIn
@@ -743,7 +742,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
     mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-                 dicts = toTcTypeBag (collectEvVarsPats upats) -- Only TcTyVars
+                 dicts = collectEvVarsPats upats
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
                              addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]

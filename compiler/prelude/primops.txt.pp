@@ -3024,12 +3024,11 @@ primop  NewBCOOp "newBCO#" GenPrimOp
    out_of_line      = True
 
 primop  UnpackClosureOp "unpackClosure#" GenPrimOp
-   a -> (# Addr#, Array# b, ByteArray# #)
-   { {\tt unpackClosure\# closure} copies non-pointers and pointers in the
+   a -> (# Addr#, ByteArray#, Array# b #)
+   { {\tt unpackClosure\# closure} copies the closure and pointers in the
      payload of the given closure into two new arrays, and returns a pointer to
-     the first word of the closure's info table, a pointer array for the
-     pointers in the payload, and a non-pointer array for the non-pointers in
-     the payload. }
+     the first word of the closure's info table, a non-pointer array for the raw
+     bytes of the closure, and a pointer array for the pointers in the payload. }
    with
    out_of_line = True
 

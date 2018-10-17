@@ -188,7 +188,7 @@ threadDelay time
         case delay# time# s of { s' -> (# s', () #)
         }}
 
--- | Switch the value of returned 'TVar' from intial value 'False' to 'True'
+-- | Switch the value of returned 'TVar' from initial value 'False' to 'True'
 -- after a given number of microseconds. The caveats associated with
 -- 'threadDelay' also apply.
 --

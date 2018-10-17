@@ -19,6 +19,8 @@
 
   * `Numeric.showEFloat (Just 0)` now respects the user's requested precision.
     (#15115)
+    
+  * `Data.Monoid.Alt` now has `Foldable` and `Traversable` instances. (#15099)
 
 ## 4.11.1.0 *TBA*
   * Bundled with GHC 8.4.2

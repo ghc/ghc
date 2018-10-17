@@ -9,5 +9,5 @@ COERCION AXIOMS
     F _t = Int
       -- Defined at NamedWildcardInTypeFamilyInstanceLHS.hs:5:3
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.2.1,
+Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

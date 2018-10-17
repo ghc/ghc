@@ -24,6 +24,7 @@ module UnVarGraph
     , unionUnVarGraph, unionUnVarGraphs
     , completeGraph, completeBipartiteGraph
     , neighbors
+    , hasLoopAt
     , delNode
     ) where
 
@@ -120,6 +121,13 @@ neighbors (UnVarGraph g) v = unionUnVarSets $ concatMap go $ bagToList g
   where go (CG s)       = (if v `elemUnVarSet` s then [s] else [])
         go (CBPG s1 s2) = (if v `elemUnVarSet` s1 then [s2] else []) ++
                           (if v `elemUnVarSet` s2 then [s1] else [])
+
+-- hasLoopAt G v <=> v--v ∈ G
+hasLoopAt :: UnVarGraph -> Var -> Bool
+hasLoopAt (UnVarGraph g) v = any go $ bagToList g
+  where go (CG s)       = v `elemUnVarSet` s
+        go (CBPG s1 s2) = v `elemUnVarSet` s1 && v `elemUnVarSet` s2
+
 
 delNode :: UnVarGraph -> Var -> UnVarGraph
 delNode (UnVarGraph g) v = prune $ UnVarGraph $ mapBag go g

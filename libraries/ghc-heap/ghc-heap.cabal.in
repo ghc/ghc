@@ -1,0 +1,38 @@
+cabal-version:  2.1
+name:           ghc-heap
+version:        @ProjectVersionMunged@
+license:        BSD-3-Clause
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+bug-reports:    http://ghc.haskell.org/trac/ghc/newticket
+synopsis:       Functions for walking GHC's heap
+category:       GHC
+description:
+    This package provides functions for walking the GHC heap data structures
+    and retrieving information about those data structures.
+
+build-type:     Simple
+tested-with:    GHC==7.11
+
+source-repository head
+  type:     git
+  location: http://git.haskell.org/ghc.git
+  subdir:   libraries/heapview
+
+library
+  default-language: Haskell2010
+
+  build-depends:    base             >= 4.9.0 && < 5.0
+                  , ghc-prim         > 0.2 && < 0.6
+                  , rts              == 1.0.*
+
+  ghc-options:      -Wall
+  cmm-sources:      cbits/HeapPrim.cmm
+  exposed-modules:  GHC.Exts.Heap
+                    GHC.Exts.Heap.Closures
+                    GHC.Exts.Heap.ClosureTypes
+                    GHC.Exts.Heap.Constants
+                    GHC.Exts.Heap.InfoTable
+                    GHC.Exts.Heap.InfoTable.Types
+                    GHC.Exts.Heap.InfoTableProf
+                    GHC.Exts.Heap.Utils

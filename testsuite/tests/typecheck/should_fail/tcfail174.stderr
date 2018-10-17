@@ -7,10 +7,12 @@ tcfail174.hs:9:5: error:
       In an equation for ‘g’: g = Base id
 
 tcfail174.hs:16:14: error:
-    • Couldn't match type ‘a’ with ‘a1’
-        because type variable ‘a1’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+    • Couldn't match type ‘a1’ with ‘a’
+      ‘a1’ is a rigid type variable bound by
         the type a -> a
+        at tcfail174.hs:16:1-14
+      ‘a’ is a rigid type variable bound by
+        the inferred type of h1 :: Capture a
         at tcfail174.hs:16:1-14
       Expected type: Capture (forall x. x -> a)
         Actual type: Capture (forall a. a -> a)
@@ -23,7 +25,8 @@ tcfail174.hs:16:14: error:
 tcfail174.hs:19:14: error:
     • Couldn't match type ‘a’ with ‘b’
       ‘a’ is a rigid type variable bound by
-        the type a -> a at tcfail174.hs:1:1
+        the type a -> a
+        at tcfail174.hs:1:1
       ‘b’ is a rigid type variable bound by
         the type signature for:
           h2 :: forall b. Capture b

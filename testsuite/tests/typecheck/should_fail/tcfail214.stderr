@@ -1,5 +1,5 @@
 
 tcfail214.hs:9:10: error:
-    • The constraint ‘F a’ is no smaller than the instance head
+    • Illegal nested constraint ‘F a’
       (Use UndecidableInstances to permit this)
     • In the instance declaration for ‘C [a]’

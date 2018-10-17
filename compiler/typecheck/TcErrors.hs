@@ -414,10 +414,9 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
     ctxt1 | NoEvBindsVar{} <- evb    = noDeferredBindings ctxt
-          | termEvidenceAllowed info = ctxt
-          | otherwise                = noDeferredBindings ctxt
+          | otherwise                = ctxt
           -- If we go inside an implication that has no term
-          -- evidence (i.e. unifying under a forall), we can't defer
+          -- evidence (e.g. unifying under a forall), we can't defer
           -- type errors.  You could imagine using the /enclosing/
           -- bindings (in cec_binds), but that may not have enough stuff
           -- in scope for the bindings to be well typed.  So we just

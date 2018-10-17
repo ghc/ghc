@@ -1284,3 +1284,13 @@ test ('T9630',
       ],
       multimod_compile,
       ['T9630', '-v0 -O'])
+
+test ('T15164',
+      [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 1945564312, 10)
+          # initial:      3423873408
+          # 2018-05-22:   1945564312   Fix bottleneck in CallArity
+          ])
+      ],
+      compile,
+      ['-v0 -O'])

@@ -1,14 +1,14 @@
 
 tcfail076.hs:18:82: error:
-    • Couldn't match type ‘res’ with ‘res1’
-      ‘res’ is a rigid type variable bound by
-        a type expected by the context:
-          forall res. (a -> m res) -> m res
-        at tcfail076.hs:18:28-96
+    • Couldn't match type ‘res1’ with ‘res’
       ‘res1’ is a rigid type variable bound by
         a type expected by the context:
           forall res1. (b -> m res1) -> m res1
         at tcfail076.hs:18:64-88
+      ‘res’ is a rigid type variable bound by
+        a type expected by the context:
+          forall res. (a -> m res) -> m res
+        at tcfail076.hs:18:28-96
       Expected type: m res1
         Actual type: m res
     • In the expression: cont a

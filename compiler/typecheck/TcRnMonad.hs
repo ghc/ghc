@@ -1538,8 +1538,8 @@ setTcLevel tclvl thing_inside
 
 isTouchableTcM :: TcTyVar -> TcM Bool
 isTouchableTcM tv
-  = do { env <- getLclEnv
-       ; return (isTouchableMetaTyVar (tcl_tclvl env) tv) }
+  = do { lvl <- getTcLevel
+       ; return (isTouchableMetaTyVar lvl tv) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }

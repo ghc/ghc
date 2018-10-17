@@ -1,44 +1,38 @@
 
 T13784.hs:28:28: error:
-    • Could not deduce: as1 ~ (a1 : Divide a1 as1)
-      from the context: (a : as) ~ (a1 : as1)
-        bound by a pattern with constructor:
-                   :* :: forall a (as :: [*]). a -> Product as -> Product (a : as),
-                 in an equation for ‘divide’
-        at T13784.hs:28:13-19
-      ‘as1’ is a rigid type variable bound by
-        a pattern with constructor:
-          :* :: forall a (as :: [*]). a -> Product as -> Product (a : as),
-        in an equation for ‘divide’
-        at T13784.hs:28:13-19
+    • Couldn't match type ‘as’ with ‘a : Divide a as’
+      ‘as’ is a rigid type variable bound by
+        the instance declaration
+        at T13784.hs:24:10-30
       Expected type: Product (Divide a (a : as))
         Actual type: Product as1
     • In the expression: as
       In the expression: (a, as)
       In an equation for ‘divide’: divide (a :* as) = (a, as)
     • Relevant bindings include
-        as :: Product as1 (bound at T13784.hs:28:18)
-        a :: a1 (bound at T13784.hs:28:13)
+        divide :: Product (a : as) -> (a, Product (Divide a (a : as)))
+          (bound at T13784.hs:28:5)
 
 T13784.hs:32:24: error:
-    • Couldn't match type ‘Product (a1 : as0)’
-                     with ‘(b, Product (Divide b (a1 : as1)))’
+    • Couldn't match type ‘Product (a : as0)’
+                     with ‘(b, Product (Divide b (a : as)))’
       Expected type: (b, Product (Divide b (a : as)))
         Actual type: Product (a1 : as0)
     • In the expression: a :* divide as
       In an equation for ‘divide’: divide (a :* as) = a :* divide as
       In the instance declaration for ‘Divideable b (a : as)’
     • Relevant bindings include
-        as :: Product as1 (bound at T13784.hs:32:18)
-        a :: a1 (bound at T13784.hs:32:13)
         divide :: Product (a : as) -> (b, Product (Divide b (a : as)))
           (bound at T13784.hs:32:5)
 
 T13784.hs:32:29: error:
-    • Couldn't match expected type ‘Product as0’
-                  with actual type ‘(a0, Product (Divide a0 as1))’
+    • Couldn't match type ‘(a0, Product (Divide a0 as))’
+                     with ‘Product as0’
+      Expected type: Product as0
+        Actual type: (a0, Product (Divide a0 as1))
     • In the second argument of ‘(:*)’, namely ‘divide as’
       In the expression: a :* divide as
       In an equation for ‘divide’: divide (a :* as) = a :* divide as
     • Relevant bindings include
-        as :: Product as1 (bound at T13784.hs:32:18)
+        divide :: Product (a : as) -> (b, Product (Divide b (a : as)))
+          (bound at T13784.hs:32:5)

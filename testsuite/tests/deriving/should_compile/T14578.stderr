@@ -108,15 +108,15 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
-GHC.Base.Semigroup [T14578.App f[ssk:2] a[ssk:2]]
+GHC.Base.Semigroup [T14578.App f[ssk:1] a[ssk:1]]
   GHC.Base.sconcat = GHC.Base.$dmsconcat
-                       @(T14578.App f[ssk:2] a[ssk:2])
+                       @(T14578.App f[ssk:1] a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Base.Semigroup [T14578.App f[ssk:2] a[ssk:2]]
+GHC.Base.Semigroup [T14578.App f[ssk:1] a[ssk:1]]
   GHC.Base.stimes = GHC.Base.$dmstimes
-                      @(T14578.App f[ssk:2] a[ssk:2])
+                      @(T14578.App f[ssk:1] a[ssk:1])
 
 
