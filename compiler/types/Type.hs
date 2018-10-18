@@ -2543,7 +2543,7 @@ occCheckExpand vs_to_avoid ty
            ; return (ForAllCo tv' kind_co' body') }
     go_co cxt (FunCo w r co1 co2)       = do { co1' <- go_co cxt co1
                                              ; co2' <- go_co cxt co2
-                                             ; return (mkFunCo r w co1' co2') }
+                                             ; return (mkFunCo w r co1' co2') }
     go_co cxt (CoVarCo c)               = do { c' <- go_var cxt c
                                              ; return (mkCoVarCo c') }
     go_co cxt (HoleCo h)                = do { c' <- go_var cxt (ch_co_var h)

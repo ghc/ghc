@@ -2394,7 +2394,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
              text "tenvFVs" <+> ppr (tyCoVarsOfTypesSet tenv) $$
              text "cenv" <+> ppr cenv $$
              text "cenvFVs" <+> ppr (tyCoVarsOfCosSet cenv) $$
-             text "tys" <+> ppr tys $$
+             text "tys" <+> ppr (toList tys) $$
              text "cos" <+> ppr cos )
     WARN( not tysCosFVsInScope,
              text "in_scope" <+> ppr in_scope $$
