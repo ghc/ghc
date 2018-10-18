@@ -1,0 +1,5 @@
+
+LinearViewPattern.hs:11:4: error:
+    • View patterns are only allowed at multiplicity ω
+    • In the pattern: not -> True
+      In an equation for ‘f’: f (not -> True) = True
