@@ -1773,6 +1773,7 @@ canCFunEqCan :: CtEvidence
 canCFunEqCan ev fn tys fsk
   = do { (tys', cos, kind_co) <- flattenArgsNom ev fn tys
                         -- cos :: tys' ~ tys
+
        ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
                         -- :: F tys' ~ F tys
              new_lhs = mkTyConApp fn tys'
@@ -1780,7 +1781,7 @@ canCFunEqCan ev fn tys fsk
              flav    = ctEvFlavour ev
        ; (ev', fsk')
            <- if isTcReflexiveCo kind_co   -- See Note [canCFunEqCan]
-              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs $$ ppr lhs_co)
+              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs)
                       ; let fsk_ty = mkTyVarTy fsk
                       ; ev' <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty
                                                  lhs_co (mkTcNomReflCo fsk_ty)

@@ -772,6 +772,9 @@ flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion], Tc
 -- and we want to flatten all at nominal role
 -- The kind passed in is the kind of the type family or class, call it T
 -- The last coercion returned has type (typeKind(T xis) ~N typeKind(T tys))
+--
+-- For Derived constraints the returned coercion may be undefined
+-- because flattening may use a Derived equality ([D] a ~ ty)
 flattenArgsNom ev tc tys
   = do { traceTcS "flatten_args {" (vcat (map ppr tys))
        ; (tys', cos, kind_co)
