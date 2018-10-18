@@ -27,6 +27,3 @@ T12921.hs:4:16: error:
         (use -fprint-potential-instances to see them all)
     • In the annotation:
         {-# ANN module "HLint: ignore Reduce duplication" #-}
-
-T12921.hs:7:8: error:
-    Variable not in scope: choice :: [a0] -> Int -> Int

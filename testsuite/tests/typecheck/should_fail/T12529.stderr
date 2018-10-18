@@ -1,6 +1,4 @@
 
-T12529.hs:5:5: error: Variable not in scope: p
-
 T12529.hs:5:5: error:
     • Cannot apply expression of type ‘t1’
       to a visible type argument ‘Int’

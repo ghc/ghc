@@ -1,2 +1,18 @@
 
-mc13.hs:12:37: error: Variable not in scope: f :: [a] -> m a
+mc13.hs:12:16: error:
+    • Ambiguous type variable ‘m0’ arising from a statement in a monad comprehension
+      prevents the constraint ‘(Monad m0)’ from being solved.
+      Relevant bindings include output :: m0 () (bound at mc13.hs:12:1)
+      Probable fix: use a type annotation to specify what ‘m0’ should be.
+      These potential instances exist:
+        instance Monad IO -- Defined in ‘GHC.Base’
+        instance Monad Maybe -- Defined in ‘GHC.Base’
+        instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+        ...plus one other
+        ...plus two instances involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In a stmt of a monad comprehension: then f
+      In the expression: [() | f <- functions, then f]
+      In an equation for ‘output’: output = [() | f <- functions, then f]
+
+mc13.hs:12:37: error: Variable not in scope: f :: [a] -> m0 a
