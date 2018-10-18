@@ -2825,7 +2825,7 @@ ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
             = Coercion $ ctEvCoercion ev
 ctEvExpr ev = evId (ctEvEvId ev)
 
-ctEvCoercion :: CtEvidence -> Coercion
+ctEvCoercion :: HasDebugCallStack => CtEvidence -> Coercion
 ctEvCoercion (CtGiven { ctev_evar = ev_id })
   = mkTcCoVarCo ev_id
 ctEvCoercion (CtWanted { ctev_dest = dest })
