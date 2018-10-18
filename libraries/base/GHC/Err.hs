@@ -27,8 +27,8 @@ import GHC.CString ()
 import GHC.Types (Char, RuntimeRep)
 import GHC.Stack.Types
 import GHC.Prim
-import GHC.Integer ()   -- Make sure Integer is compiled first
-                        -- because GHC depends on it in a wired-in way
+import GHC.Integer ()   -- Make sure Integer and Natural are compiled first
+import GHC.Natural ()   -- because GHC depends on it in a wired-in way
                         -- so the build system doesn't see the dependency
 import {-# SOURCE #-} GHC.Exception
   ( errorCallWithCallStackException

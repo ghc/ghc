@@ -9,7 +9,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module TcBinds ( tcLocalBinds, tcTopBinds, tcRecSelBinds,
+module TcBinds ( tcLocalBinds, tcTopBinds, tcValBinds,
                  tcHsBootSigs, tcPolyCheck,
                  addTypecheckedBinds,
                  chooseInferredQuantifiers,
@@ -304,15 +304,6 @@ tcCompleteSigs sigs =
                                <+> text "resp."
                                <+> quotes (ppr tc'))
   in  mapMaybeM (addLocM doOne) sigs
-
-tcRecSelBinds :: HsValBinds GhcRn -> TcM TcGblEnv
-tcRecSelBinds (XValBindsLR (NValBinds binds sigs))
-  = tcExtendGlobalValEnv [sel_id | L _ (IdSig _ sel_id) <- sigs] $
-    do { (rec_sel_binds, tcg_env) <- discardWarnings $
-                                     tcValBinds TopLevel binds sigs getGblEnv
-       ; let tcg_env' = tcg_env `addTypecheckedBinds` map snd rec_sel_binds
-       ; return tcg_env' }
-tcRecSelBinds (ValBinds {}) = panic "tcRecSelBinds"
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
@@ -649,7 +640,13 @@ recoveryCode binder_names sig_fn
       = mkLocalId name (Regular Omega) forall_a_a
 
 forall_a_a :: TcType
-forall_a_a = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] openAlphaTy
+-- At one point I had (forall r (a :: TYPE r). a), but of course
+-- that type is ill-formed: its mentions 'r' which escapes r's scope.
+-- Another alternative would be (forall (a :: TYPE kappa). a), where
+-- kappa is a unification variable. But I don't think we need that
+-- complication here. I'm going to just use (forall (a::*). a).
+-- See Trac #15276
+forall_a_a = mkSpecForAllTys [alphaTyVar] alphaTy
 
 {- *********************************************************************
 *                                                                      *

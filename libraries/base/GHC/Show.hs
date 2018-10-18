@@ -479,6 +479,13 @@ instance Show Integer where
         | otherwise = integerToString n r
     showList = showList__ (showsPrec 0)
 
+-- | @since 4.8.0.0
+instance Show Natural where
+#if defined(MIN_VERSION_integer_gmp)
+    showsPrec p (NatS# w#) = showsPrec p (W# w#)
+#endif
+    showsPrec p i          = showsPrec p (naturalToInteger i)
+
 -- Divide and conquer implementation of string conversion
 integerToString :: Integer -> String -> String
 integerToString n0 cs0

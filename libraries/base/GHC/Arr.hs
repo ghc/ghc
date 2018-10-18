@@ -240,6 +240,15 @@ instance  Ix Integer  where
     inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
+-- | @since 4.8.0.0
+instance Ix Natural where
+    range (m,n) = [m..n]
+    inRange (m,n) i = m <= i && i <= n
+    unsafeIndex (m,_) i = fromIntegral (i-m)
+    index b i | inRange b i = unsafeIndex b i
+              | otherwise   = indexError b i "Natural"
+
+----------------------------------------------------------------------
 -- | @since 2.01
 instance Ix Bool where -- as derived
     {-# INLINE range #-}

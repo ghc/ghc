@@ -99,7 +99,7 @@ import Data.Semigroup.Internal
 --
 -- > Data.Monoid.First x === Maybe (Data.Semigroup.First x)
 --
--- In additional to being equivalent in the structural sense, the two
+-- In addition to being equivalent in the structural sense, the two
 -- also have 'Monoid' instances that behave the same. This type will
 -- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
 -- Users are advised to use the variant from "Data.Semigroup" and wrap
@@ -138,7 +138,7 @@ instance Monoid (First a) where
 --
 -- > Data.Monoid.Last x === Maybe (Data.Semigroup.Last x)
 --
--- In additional to being equivalent in the structural sense, the two
+-- In addition to being equivalent in the structural sense, the two
 -- also have 'Monoid' instances that behave the same. This type will
 -- be marked deprecated in GHC 8.8, and removed in GHC 8.10.
 -- Users are advised to use the variant from "Data.Semigroup" and wrap

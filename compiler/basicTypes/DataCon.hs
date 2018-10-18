@@ -89,7 +89,7 @@ import TysPrim
 import qualified Data.Data as Data
 import Data.Char
 import Data.Word
-import Data.List( mapAccumL, find )
+import Data.List( find )
 import qualified Data.Set as Set
 
 {-
@@ -1209,7 +1209,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
     , substTys   subst (map weightedThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
   where
     univ_subst = zipTvSubst univ_tvs univ_tys
-    (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst ex_tvs
+    (subst, ex_tvs') = Type.substTyVarBndrs univ_subst ex_tvs
 
 
 -- | The \"full signature\" of the 'DataCon' returns, in order:

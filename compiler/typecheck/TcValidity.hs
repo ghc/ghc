@@ -336,6 +336,7 @@ checkValidType ctxt ty
                  TySynCtxt _    -> rank0
 
                  ExprSigCtxt    -> rank1
+                 KindSigCtxt    -> rank1
                  TypeAppCtxt | impred_flag -> ArbitraryRank
                              | otherwise   -> tyConArgMonoType
                     -- Normally, ImpredicativeTypes is handled in check_arg_type,
@@ -932,6 +933,8 @@ okIPCtxt (DataTyCtxt {})        = True
 okIPCtxt (PatSynCtxt {})        = True
 okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
                                          -- Trac #11466
+
+okIPCtxt (KindSigCtxt {})       = False
 okIPCtxt (ClassSCCtxt {})       = False
 okIPCtxt (InstDeclCtxt {})      = False
 okIPCtxt (SpecInstCtxt {})      = False
@@ -1121,12 +1124,13 @@ tcInstHeadTyNotSynonym ty
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
--- These must be a constructor applied to type variable arguments.
+-- These must be a constructor applied to type variable arguments
+-- or a type-level literal.
 -- But we allow kind instantiations.
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
   = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
-
+  | LitTy _ <- ty = True  -- accept type literals (Trac #13833)
   | otherwise
   = False
   where
@@ -1411,14 +1415,16 @@ checkInstTermination theta head_pred
               bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
                                -- See Note [Invisible arguments and termination]
 
-         ForAllPred tvs theta pred
-           -> do { check (foralld_tvs `extendVarSetList` binderVars tvs) pred
-                 ; checkInstTermination theta pred }
+         ForAllPred tvs theta' head_pred'
+           -> do { check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
+                 ; addErrCtxt (text "In the quantified constraint"
+                              <+> quotes (ppr pred)) $
+                   checkInstTermination theta' head_pred' }
 
    check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what)
+     | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what (ppr head_pred))
      | not (isTyFamFree pred) = addErrTc (nestedMsg what)
-     | pred_size >= head_size = addErrTc (smallerMsg what)
+     | pred_size >= head_size = addErrTc (smallerMsg what (ppr head_pred))
      | otherwise              = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
      where
@@ -1426,18 +1432,19 @@ checkInstTermination theta head_pred
         bad_tvs = filterOut (`elemVarSet` foralld_tvs) (fvType pred)
                   \\ head_fvs
 
-smallerMsg :: SDoc -> SDoc
-smallerMsg what
+smallerMsg :: SDoc -> SDoc -> SDoc
+smallerMsg what inst_head
   = vcat [ hang (text "The" <+> what)
-              2 (text "is no smaller than the instance head")
+              2 (sep [ text "is no smaller than"
+                     , text "the instance head" <+> quotes inst_head ])
          , parens undecidableMsg ]
 
-noMoreMsg :: [TcTyVar] -> SDoc -> SDoc
-noMoreMsg tvs what
+noMoreMsg :: [TcTyVar] -> SDoc -> SDoc -> SDoc
+noMoreMsg tvs what inst_head
   = vcat [ hang (text "Variable" <> plural tvs <+> quotes (pprWithCommas ppr tvs)
                 <+> occurs <+> text "more often")
               2 (sep [ text "in the" <+> what
-                     , text "than in the instance head" ])
+                     , text "than in the instance head" <+> quotes inst_head ])
          , parens undecidableMsg ]
   where
    occurs = if isSingleton tvs then text "occurs"
@@ -1799,12 +1806,13 @@ checkFamInstRhs tc lhsTys famInsts
    fvs      = fvTypes lhsTys
    check (tc, tys)
       | not (all isTyFamFree tys) = Just (nestedMsg what)
-      | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what)
-      | lhs_size <= fam_app_size  = Just (smallerMsg what)
+      | not (null bad_tvs)        = Just (noMoreMsg bad_tvs what inst_head)
+      | lhs_size <= fam_app_size  = Just (smallerMsg what inst_head)
       | otherwise                 = Nothing
       where
         what         = text "type family application"
                        <+> quotes (pprType (TyConApp tc tys))
+        inst_head    = pprType (TyConApp tc lhsTys)
         bad_tvs      = fvTypes tys \\ fvs
         fam_app_size = sizeTyConAppArgs tc tys
 

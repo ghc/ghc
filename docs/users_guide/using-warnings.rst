@@ -109,6 +109,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wmissing-monadfail-instances`
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
+        * :ghc-flag:`-Wimplicit-kind-vars`
 
 .. ghc-flag:: -Wno-compat
     :shortdesc: Disables all warnings enabled by :ghc-flag:`-Wcompat`.
@@ -150,6 +151,9 @@ to abort.
     Makes a specific warning into a fatal error. The warning will be enabled if
     it hasn't been enabled yet.
 
+    ``-Werror=compat`` has the same effect as ``-Werror=...`` for each warning
+    flag in the :ghc-flag:`-Wcompat` option group.
+
 .. ghc-flag:: -Wwarn
     :shortdesc: make warnings non-fatal
     :type: dynamic
@@ -170,6 +174,9 @@ to abort.
 
     Note that it doesn't fully negate the effects of ``-Werror=<wflag>`` - the
     warning will still be enabled.
+
+    ``-Wwarn=compat`` has the same effect as ``-Wwarn=...`` for each warning
+    flag in the :ghc-flag:`-Wcompat` option group.
 
 When a warning is emitted, the specific warning flag which controls
 it is shown.
@@ -767,6 +774,58 @@ of ``-W(no-)*``.
     being compiled).
 
     This warning is off by default.
+
+.. ghc-flag:: -Wimplicit-kind-vars
+    :shortdesc: warn when kind variables are brought into scope implicitly despite
+        the "forall-or-nothing" rule
+    :type: dynamic
+    :reverse: -Wno-implicit-kind-vars
+    :category:
+
+    :since: 8.6
+
+    `GHC proposal #24
+    <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0024-no-kind-vars.rst>`__
+    prescribes to treat kind variables and type variables identically in
+    ``forall``, removing the legacy distinction between them.
+
+    Consider the following examples: ::
+
+        f :: Proxy a -> Proxy b -> ()
+        g :: forall a b. Proxy a -> Proxy b -> ()
+
+    ``f`` does not use an explicit ``forall``, so type variables ``a`` and ``b``
+    are brought into scope implicitly. ``g`` quantifies both ``a`` and ``b``
+    explicitly. Both ``f`` and ``g`` work today and will continue to work in the
+    future because they adhere to the "forall-or-nothing" rule: either all type
+    variables in a function definition are introduced explicitly or implicitly,
+    there is no middle ground.
+
+    A violation of the "forall-or-nothing" rule looks like this: ::
+
+        m :: forall a. Proxy a -> Proxy b -> ()
+
+    ``m`` does not introduce one of the variables, ``b``, and thus is rejected.
+
+    However, consider the following example: ::
+
+        n :: forall a. Proxy (a :: k) -> ()
+
+    While ``n`` uses ``k`` without introducing it and thus violates the rule, it
+    is currently accepted. This is because ``k`` in ``n`` is considered a kind
+    variable, as it occurs in a kind signature. In reality, the line between
+    type variables and kind variables is blurry, as the following example
+    demonstrates: ::
+
+        kindOf :: forall a. Proxy (a :: k) -> Proxy k
+
+    In ``kindOf``, the ``k`` variable is used both in a kind position and a type
+    position. Currently, ``kindOf`` happens to be accepted as well.
+
+    In a future release of GHC, both ``n`` and ``kindOf`` will be rejected per
+    the "forall-or-nothing" rule. This warning, being part of the
+    :ghc-flag:`-Wcompat` option group, allows to detect this before the actual
+    breaking change takes place.
 
 .. ghc-flag:: -Wincomplete-patterns
     :shortdesc: warn when a pattern match could fail

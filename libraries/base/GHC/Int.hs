@@ -1082,6 +1082,36 @@ instance Ix Int64 where
     unsafeIndex (m,_) i = fromIntegral i - fromIntegral m
     inRange (m,n) i     = m <= i && i <= n
 
+-------------------------------------------------------------------------------
+
+{-# RULES
+"fromIntegral/Natural->Int8"
+    fromIntegral = (fromIntegral :: Int -> Int8)    . naturalToInt
+"fromIntegral/Natural->Int16"
+    fromIntegral = (fromIntegral :: Int -> Int16)   . naturalToInt
+"fromIntegral/Natural->Int32"
+    fromIntegral = (fromIntegral :: Int -> Int32)   . naturalToInt
+  #-}
+
+{-# RULES
+"fromIntegral/Int8->Natural"
+    fromIntegral = intToNatural  . (fromIntegral :: Int8  -> Int)
+"fromIntegral/Int16->Natural"
+    fromIntegral = intToNatural  . (fromIntegral :: Int16 -> Int)
+"fromIntegral/Int32->Natural"
+    fromIntegral = intToNatural  . (fromIntegral :: Int32 -> Int)
+  #-}
+
+#if WORD_SIZE_IN_BITS == 64
+-- these RULES are valid for Word==Word64 & Int==Int64
+{-# RULES
+"fromIntegral/Natural->Int64"
+    fromIntegral = (fromIntegral :: Int -> Int64) . naturalToInt
+"fromIntegral/Int64->Natural"
+    fromIntegral = intToNatural . (fromIntegral :: Int64 -> Int)
+  #-}
+#endif
+
 
 {- Note [Order of tests]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

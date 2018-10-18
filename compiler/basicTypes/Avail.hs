@@ -16,6 +16,8 @@ module Avail (
     availName, availNames, availNonFldNames,
     availNamesWithSelectors,
     availFlds,
+    availsNamesWithOccs,
+    availNamesWithOccs,
     stableAvailCmp,
     plusAvail,
     trimAvail,
@@ -175,6 +177,22 @@ availFlds :: AvailInfo -> [FieldLabel]
 availFlds (AvailTC _ _ fs) = fs
 availFlds _                = []
 
+availsNamesWithOccs :: [AvailInfo] -> [(Name, OccName)]
+availsNamesWithOccs = concatMap availNamesWithOccs
+
+-- | 'Name's made available by the availability information, paired with
+-- the 'OccName' used to refer to each one.
+--
+-- When @DuplicateRecordFields@ is in use, the 'Name' may be the
+-- mangled name of a record selector (e.g. @$sel:foo:MkT@) while the
+-- 'OccName' will be the label of the field (e.g. @foo@).
+--
+-- See Note [Representing fields in AvailInfo].
+availNamesWithOccs :: AvailInfo -> [(Name, OccName)]
+availNamesWithOccs (Avail n) = [(n, nameOccName n)]
+availNamesWithOccs (AvailTC _ ns fs)
+  = [ (n, nameOccName n) | n <- ns ] ++
+    [ (flSelector fl, mkVarOccFS (flLabel fl)) | fl <- fs ]
 
 -- -----------------------------------------------------------------------------
 -- Utility

@@ -490,6 +490,7 @@ data GeneralFlag
    | Opt_SolveConstantDicts
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
+   | Opt_NumConstantFolding
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -806,6 +807,7 @@ data WarningFlag =
    | Opt_WarnMissingExportList
    | Opt_WarnInaccessibleCode
    | Opt_WarnStarIsType                   -- Since 8.6
+   | Opt_WarnImplicitKindVars             -- Since 8.6
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -878,7 +880,7 @@ data DynFlags = DynFlags {
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
                                         --   See CoreMonad.FloatOutSwitches
 
-  cmmProcAlignment      :: Maybe Int,   -- ^ Align Cmm functions at this boundry or use default.
+  cmmProcAlignment      :: Maybe Int,   -- ^ Align Cmm functions at this boundary or use default.
 
   historySize           :: Int,         -- ^ Simplification history size
 
@@ -3520,10 +3522,7 @@ dynamic_flags_deps = [
  ++ map (mkFlag turnOff "fno-"      unSetGeneralFlag  ) fFlagsDeps
  ++ map (mkFlag turnOn  "W"         setWarningFlag    ) wWarningFlagsDeps
  ++ map (mkFlag turnOff "Wno-"      unSetWarningFlag  ) wWarningFlagsDeps
- ++ map (mkFlag turnOn  "Werror="   (\flag -> do {
-                                       ; setWarningFlag flag
-                                       ; setFatalWarningFlag flag }))
-                                                        wWarningFlagsDeps
+ ++ map (mkFlag turnOn  "Werror="   setWErrorFlag )     wWarningFlagsDeps
  ++ map (mkFlag turnOn  "Wwarn="     unSetFatalWarningFlag )
                                                         wWarningFlagsDeps
  ++ map (mkFlag turnOn  "Wno-error=" unSetFatalWarningFlag )
@@ -3535,6 +3534,12 @@ dynamic_flags_deps = [
  ++ [ (NotDeprecated, unrecognisedWarning "W"),
       (Deprecated,    unrecognisedWarning "fwarn-"),
       (Deprecated,    unrecognisedWarning "fno-warn-") ]
+ ++ [ make_ord_flag defFlag "Werror=compat"
+        (NoArg (mapM_ setWErrorFlag minusWcompatOpts))
+    , make_ord_flag defFlag "Wno-error=compat"
+        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts))
+    , make_ord_flag defFlag "Wwarn=compat"
+        (NoArg (mapM_ unSetFatalWarningFlag minusWcompatOpts)) ]
  ++ map (mkFlag turnOn  "f"         setExtensionFlag  ) fLangFlagsDeps
  ++ map (mkFlag turnOff "fno-"      unSetExtensionFlag) fLangFlagsDeps
  ++ map (mkFlag turnOn  "X"         setExtensionFlag  ) xFlagsDeps
@@ -3783,6 +3788,7 @@ wWarningFlagsDeps = [
   flagSpec "hi-shadowing"                Opt_WarnHiShadows,
   flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
+  flagSpec "implicit-kind-vars"          Opt_WarnImplicitKindVars,
   flagSpec "incomplete-patterns"         Opt_WarnIncompletePatterns,
   flagSpec "incomplete-record-updates"   Opt_WarnIncompletePatternsRecUpd,
   flagSpec "incomplete-uni-patterns"     Opt_WarnIncompleteUniPatterns,
@@ -3984,6 +3990,7 @@ fFlagsDeps = [
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
   flagSpec "catch-bottoms"                    Opt_CatchBottoms,
   flagSpec "alignment-sanitisation"           Opt_AlignmentSanitisation,
+  flagSpec "num-constant-folding"             Opt_NumConstantFolding,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
@@ -4438,6 +4445,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CprAnal)
     , ([1,2],   Opt_WorkerWrapper)
     , ([1,2],   Opt_SolveConstantDicts)
+    , ([1,2],   Opt_NumConstantFolding)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)
@@ -4591,6 +4599,7 @@ minusWcompatOpts
     = [ Opt_WarnMissingMonadFailInstances
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
+      , Opt_WarnImplicitKindVars
       ]
 
 enableUnusedBinds :: DynP ()
@@ -4796,6 +4805,11 @@ unSetWarningFlag f = upd (\dfs -> wopt_unset dfs f)
 setFatalWarningFlag, unSetFatalWarningFlag :: WarningFlag -> DynP ()
 setFatalWarningFlag   f = upd (\dfs -> wopt_set_fatal dfs f)
 unSetFatalWarningFlag f = upd (\dfs -> wopt_unset_fatal dfs f)
+
+setWErrorFlag :: WarningFlag -> DynP ()
+setWErrorFlag flag =
+  do { setWarningFlag flag
+     ; setFatalWarningFlag flag }
 
 --------------------------
 setExtensionFlag, unSetExtensionFlag :: LangExt.Extension -> DynP ()

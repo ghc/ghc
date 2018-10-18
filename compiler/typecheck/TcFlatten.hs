@@ -14,7 +14,6 @@ import GhcPrelude
 import TcRnTypes
 import TcType
 import Type
-import TcUnify( occCheckExpand )
 import TcEvidence
 import TyCon
 import TyCoRep   -- performs delicate algorithm on types
@@ -1997,7 +1996,7 @@ unflattenWanteds tv_eqs funeqs
                -- to observe the occurs check.  Zonking will eliminate it
                -- altogether in due course
              rhs' <- zonkTcType (mkTyConApp tc xis)
-           ; case occCheckExpand fmv rhs' of
+           ; case occCheckExpand [fmv] rhs' of
                Just rhs''    -- Normal case: fill the tyvar
                  -> do { setReflEvidence ev NomEq rhs''
                        ; unflattenFmv fmv rhs''
@@ -2095,7 +2094,7 @@ tryFill ev tv rhs
               , tv == tv'   -- tv == rhs
               -> return True
 
-            _ | Just rhs'' <- occCheckExpand tv rhs'
+            _ | Just rhs'' <- occCheckExpand [tv] rhs'
               -> do {       -- Fill the tyvar
                       unifyTyVar tv rhs''
                     ; return True }

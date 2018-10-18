@@ -337,6 +337,11 @@ rnImplicitBndrs bind_free_tvs
 
        ; traceRn "rnImplicitBndrs" (vcat [ ppr kvs, ppr tvs, ppr real_tvs ])
 
+       ; whenWOptM Opt_WarnImplicitKindVars $
+         unless (bind_free_tvs || null kvs) $
+         addWarnAt (Reason Opt_WarnImplicitKindVars) (getLoc (head kvs)) $
+         implicit_kind_vars_msg kvs
+
        ; loc <- getSrcSpanM
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) (kvs ++ real_tvs)
 
@@ -346,6 +351,16 @@ rnImplicitBndrs bind_free_tvs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
+  where
+    implicit_kind_vars_msg kvs =
+      vcat [ text "An explicit" <+> quotes (text "forall") <+>
+             text "was used, but the following kind variables" <+>
+             text "are not quantified:" <+>
+             hsep (punctuate comma (map (quotes . ppr) kvs))
+           , text "Despite this fact, GHC will introduce them into scope," <+>
+             text "but it will stop doing so in the future."
+           , text "Suggested fix: add" <+>
+             quotes (text "forall" <+> hsep (map ppr kvs) <> char '.') ]
 
 rnLHsInstType :: SDoc -> LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
 -- Rename the type in an instance.

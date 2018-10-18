@@ -55,6 +55,10 @@ infix  6  :+
 -- has the phase of @z@, but unit magnitude.
 --
 -- The 'Foldable' and 'Traversable' instances traverse the real part first.
+--
+-- Note that `Complex`'s instances inherit the deficiencies from the type
+-- parameter's. For example, @Complex Float@'s 'Ord' instance has similar
+-- problems to `Float`'s.
 data Complex a
   = !a :+ !a    -- ^ forms a complex number from its real and imaginary
                 -- rectangular components.

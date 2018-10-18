@@ -152,15 +152,17 @@ orIfNotFound this or_this = do
   res <- this
   case res of
     NotFound { fr_paths = paths1, fr_mods_hidden = mh1
-             , fr_pkgs_hidden = ph1, fr_suggestions = s1 }
+             , fr_pkgs_hidden = ph1, fr_unusables = u1, fr_suggestions = s1 }
      -> do res2 <- or_this
            case res2 of
              NotFound { fr_paths = paths2, fr_pkg = mb_pkg2, fr_mods_hidden = mh2
-                      , fr_pkgs_hidden = ph2, fr_suggestions = s2 }
+                      , fr_pkgs_hidden = ph2, fr_unusables = u2
+                      , fr_suggestions = s2 }
               -> return (NotFound { fr_paths = paths1 ++ paths2
                                   , fr_pkg = mb_pkg2 -- snd arg is the package search
                                   , fr_mods_hidden = mh1 ++ mh2
                                   , fr_pkgs_hidden = ph1 ++ ph2
+                                  , fr_unusables = u1 ++ u2
                                   , fr_suggestions = s1  ++ s2 })
              _other -> return res2
     _other -> return res
@@ -205,6 +207,7 @@ findLookupResult hsc_env r = case r of
         InstalledNotFound fp _ -> return (NotFound{ fr_paths = fp, fr_pkg = Just (moduleUnitId m)
                                          , fr_pkgs_hidden = []
                                          , fr_mods_hidden = []
+                                         , fr_unusables = []
                                          , fr_suggestions = []})
      LookupMultiple rs ->
        return (FoundMultiple rs)
@@ -212,11 +215,23 @@ findLookupResult hsc_env r = case r of
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
                        , fr_pkgs_hidden = map (moduleUnitId.fst) pkg_hiddens
                        , fr_mods_hidden = map (moduleUnitId.fst) mod_hiddens
+                       , fr_unusables = []
                        , fr_suggestions = [] })
+     LookupUnusable unusable ->
+       let unusables' = map get_unusable unusable
+           get_unusable (m, ModUnusable r) = (moduleUnitId m, r)
+           get_unusable (_, r)             =
+             pprPanic "findLookupResult: unexpected origin" (ppr r)
+       in return (NotFound{ fr_paths = [], fr_pkg = Nothing
+                          , fr_pkgs_hidden = []
+                          , fr_mods_hidden = []
+                          , fr_unusables = unusables'
+                          , fr_suggestions = [] })
      LookupNotFound suggest ->
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
                        , fr_pkgs_hidden = []
                        , fr_mods_hidden = []
+                       , fr_unusables = []
                        , fr_suggestions = suggest })
 
 modLocationCache :: HscEnv -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
@@ -260,6 +275,7 @@ findHomeModule hsc_env mod_name = do
         fr_pkg = Just uid,
         fr_mods_hidden = [],
         fr_pkgs_hidden = [],
+        fr_unusables = [],
         fr_suggestions = []
       }
  where
@@ -570,8 +586,19 @@ findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
 -- Error messages
 
 cannotFindModule :: DynFlags -> ModuleName -> FindResult -> SDoc
-cannotFindModule = cantFindErr (sLit "Could not find module")
-                               (sLit "Ambiguous module name")
+cannotFindModule flags mod res =
+  cantFindErr (sLit cannotFindMsg)
+              (sLit "Ambiguous module name")
+              flags mod res
+  where
+    cannotFindMsg =
+      case res of
+        NotFound { fr_mods_hidden = hidden_mods
+                 , fr_pkgs_hidden = hidden_pkgs
+                 , fr_unusables = unusables }
+          | not (null hidden_mods && null hidden_pkgs && null unusables)
+          -> "Could not load module"
+        _ -> "Could not find module"
 
 cannotFindInterface  :: DynFlags -> ModuleName -> InstalledFindResult -> SDoc
 cannotFindInterface = cantFindInstalledErr (sLit "Failed to load interface for")
@@ -598,6 +625,7 @@ cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
     pprMod (m, o) = text "it is bound as" <+> ppr m <+>
                                 text "by" <+> pprOrigin m o
     pprOrigin _ ModHidden = panic "cantFindErr: bound by mod hidden"
+    pprOrigin _ (ModUnusable _) = panic "cantFindErr: bound by mod unusable"
     pprOrigin m (ModOrigin e res _ f) = sep $ punctuate comma (
       if e == Just True
           then [text "package" <+> ppr (moduleUnitId m)]
@@ -619,19 +647,21 @@ cantFindErr cannot_find _ dflags mod_name find_result
 
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
-                     , fr_suggestions = suggest }
+                     , fr_unusables = unusables, fr_suggestions = suggest }
                 | Just pkg <- mb_pkg, pkg /= thisPackage dflags
                 -> not_found_in_package pkg files
 
                 | not (null suggest)
                 -> pp_suggestions suggest $$ tried_these files
 
-                | null files && null mod_hiddens && null pkg_hiddens
+                | null files && null mod_hiddens &&
+                  null pkg_hiddens && null unusables
                 -> text "It is not a module in the current program, or in any known package."
 
                 | otherwise
                 -> vcat (map pkg_hidden pkg_hiddens) $$
                    vcat (map mod_hidden mod_hiddens) $$
+                   vcat (map unusable unusables) $$
                    tried_these files
 
             _ -> panic "cantFindErr"
@@ -674,15 +704,20 @@ cantFindErr cannot_find _ dflags mod_name find_result
            in text "Perhaps you need to add" <+>
               quotes (ppr (packageName pkg)) <+>
               text "to the build-depends in your .cabal file."
-     | otherwise
-         = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
-           in text "You can run" <+>
-              quotes (text ":set -package " <> ppr (packageName pkg)) <+>
-              text "to expose it." $$
-              text "(Note: this unloads all the modules in the current scope.)"
+     | Just pkg <- lookupPackage dflags pkgid
+         = text "You can run" <+>
+           quotes (text ":set -package " <> ppr (packageName pkg)) <+>
+           text "to expose it." $$
+           text "(Note: this unloads all the modules in the current scope.)"
+     | otherwise = Outputable.empty
 
     mod_hidden pkg =
         text "it is a hidden module in the package" <+> quotes (ppr pkg)
+
+    unusable (pkg, reason)
+      = text "It is a member of the package"
+      <+> quotes (ppr pkg)
+      $$ pprReason (text "which is") reason
 
     pp_suggestions :: [ModuleSuggestion] -> SDoc
     pp_suggestions sugs
@@ -695,6 +730,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
     -- also has a reexport, prefer that one
     pp_sugg (SuggestVisible m mod o) = ppr m <+> provenance o
       where provenance ModHidden = Outputable.empty
+            provenance (ModUnusable _) = Outputable.empty
             provenance (ModOrigin{ fromOrigPackage = e,
                                    fromExposedReexport = res,
                                    fromPackageFlag = f })
@@ -711,6 +747,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
               | otherwise = Outputable.empty
     pp_sugg (SuggestHidden m mod o) = ppr m <+> provenance o
       where provenance ModHidden =  Outputable.empty
+            provenance (ModUnusable _) = Outputable.empty
             provenance (ModOrigin{ fromOrigPackage = e,
                                    fromHiddenReexport = rhs })
               | Just False <- e

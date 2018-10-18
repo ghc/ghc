@@ -28,8 +28,8 @@ T13242a.hs:13:11: error:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         instance Eq Integer
           -- Defined in ‘integer-gmp-1.0.2.0:GHC.Integer.Type’
-        instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Base’
-        ...plus 22 others
+        instance Eq () -- Defined in ‘GHC.Classes’
+        ...plus 21 others
         ...plus six instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: return (x == x)

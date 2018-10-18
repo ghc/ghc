@@ -132,6 +132,11 @@ AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
+  # See #15281
+  if test "$GhcMajVersion" = "8" && test "$GhcMinVersion" = "2" && test "$GhcPatchLevel" = "1"; then
+     AC_MSG_ERROR([GHC 8.2.1 is known to be buggy and cannot bootstrap this GHC release (See Trac 15281); please use GHC 8.2.2 or later.])
+  fi
+
   if test "$GhcMajVersion" = "unknown" || test "$GhcMinVersion" = "unknown"; then
      AC_MSG_ERROR([Cannot determine the version of $WithGhc.  Is it really GHC?])
   fi
@@ -643,7 +648,7 @@ AC_SUBST([LibtoolCmd])
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=5.0
+LlvmVersion=6.0
 AC_SUBST([LlvmVersion])
 sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])

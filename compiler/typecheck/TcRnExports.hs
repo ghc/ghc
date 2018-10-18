@@ -225,7 +225,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     exports_from_item :: ExportAccum -> LIE GhcPs -> RnM ExportAccum
     exports_from_item acc@(ExportAccum ie_avails occs)
-                      (L loc (IEModuleContents _ (L lm mod)))
+                      (L loc ie@(IEModuleContents _ (L lm mod)))
         | let earlier_mods
                 = [ mod
                   | ((L _ (IEModuleContents _ (L _ mod))), _) <- ie_avails ]
@@ -239,9 +239,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                                 || (moduleName this_mod == mod)
                    ; gre_prs     = pickGREsModExp mod (globalRdrEnvElts rdr_env)
                    ; new_exports = map (availFromGRE . fst) gre_prs
-                   ; (names, fls)= classifyGREs (map fst gre_prs)
                    ; all_gres    = foldr (\(gre1,gre2) gres -> gre1 : gre2 : gres) [] gre_prs
-               }
+                   }
 
              ; checkErr exportValid (moduleNotImported mod)
              ; warnIfFlag Opt_WarnDodgyExports
@@ -251,8 +250,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; traceRn "efa" (ppr mod $$ ppr all_gres)
              ; addUsedGREs all_gres
 
-             ; occs' <- check_occs (IEModuleContents noExt (noLoc mod)) occs
-                                                                      names fls
+             ; occs' <- check_occs ie occs new_exports
                       -- This check_occs not only finds conflicts
                       -- between this item and others, but also
                       -- internally within this item.  That is, if
@@ -278,8 +276,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   then return acc    -- Avoid error cascade
                   else do
 
-                    occs' <- check_occs ie occs (availNonFldNames avail)
-                                                (availFlds avail)
+                    occs' <- check_occs ie occs [avail]
 
                     return (ExportAccum ((L loc new_ie, [avail]) : lie_avails) occs')
 
@@ -586,19 +583,19 @@ checkPatSynParent parent NoParent mpat_syn
 
 
 {-===========================================================================-}
-check_occs :: IE GhcPs -> ExportOccMap -> [Name] -> [FieldLabel]
+check_occs :: IE GhcPs -> ExportOccMap -> [AvailInfo]
            -> RnM ExportOccMap
-check_occs ie occs names fls
+check_occs ie occs avails
   -- 'names' and 'fls' are the entities specified by 'ie'
   = foldlM check occs names_with_occs
   where
     -- Each Name specified by 'ie', paired with the OccName used to
     -- refer to it in the GlobalRdrEnv
-    -- (see Note [Parents for record fields] in RdrName).  We check for export
-    -- clashes using the selector Name, but need the field label OccName in
-    -- order to look up the right GRE later.
-    names_with_occs = map (\name -> (name, nameOccName name)) names
-                   ++ map (\fl -> (flSelector fl, mkVarOccFS (flLabel fl))) fls
+    -- (see Note [Representing fields in AvailInfo] in Avail).
+    --
+    -- We check for export clashes using the selector Name, but need
+    -- the field label OccName for presenting error messages.
+    names_with_occs = availsNamesWithOccs avails
 
     check occs (name, occ)
       = case lookupOccEnv occs name_occ of
@@ -610,7 +607,7 @@ check_occs ie occs names fls
             -- by two different module exports. See ticket #4478.
             -> do { warnIfFlag Opt_WarnDuplicateExports
                                (not (dupExport_ok name ie ie'))
-                               (dupExportWarn name_occ ie ie')
+                               (dupExportWarn occ ie ie')
                   ; return occs }
 
             | otherwise    -- Same occ name but different names: an error

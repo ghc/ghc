@@ -19,6 +19,7 @@ import GhcPrelude
 import HsSyn
 import TcBinds
 import TcTyClsDecls
+import TcTyDecls ( addTyConsToGblEnv )
 import TcClassDcl( tcClassDecl2, tcATDefault,
                    HsSigFun, mkHsSigFun,
                    findMethodBind, instantiateMethod )
@@ -419,13 +420,12 @@ addFamInsts :: [FamInst] -> TcM a -> TcM a
 --        (b) the type envt with stuff from data type decls
 addFamInsts fam_insts thing_inside
   = tcExtendLocalFamInstEnv fam_insts $
-    tcExtendGlobalEnv axioms $
-    tcExtendTyConEnv data_rep_tycons  $
+    tcExtendGlobalEnv axioms          $
     do { traceTc "addFamInsts" (pprFamInsts fam_insts)
-       ; tcg_env <- tcAddImplicits data_rep_tycons
-                    -- Does not add its axiom; that comes from
-                    -- adding the 'axioms' above
-       ; setGblEnv tcg_env thing_inside }
+       ; gbl_env <- addTyConsToGblEnv data_rep_tycons
+                    -- Does not add its axiom; that comes
+                    -- from adding the 'axioms' above
+       ; setGblEnv gbl_env thing_inside }
   where
     axioms = map (ACoAxiom . toBranchedAxiom . famInstAxiom) fam_insts
     data_rep_tycons = famInstsRepTyCons fam_insts

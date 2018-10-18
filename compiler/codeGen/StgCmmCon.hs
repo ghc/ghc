@@ -198,7 +198,7 @@ because they don't support cross package data references well.
 buildDynCon' dflags platform binder _ _cc con [arg]
   | maybeIntLikeCon con
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
-  , NonVoid (StgLitArg (MachInt val)) <- arg
+  , NonVoid (StgLitArg (LitNumber LitNumInt val _)) <- arg
   , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
   , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
   = do  { let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_INTLIKE")

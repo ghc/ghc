@@ -1206,7 +1206,7 @@ Type) pairs.
 
 We also benefit because we can piggyback on the liftCoSubstVarBndr function to
 deal with binders. However, I had to modify that function to work with this
-application. Thus, we now have liftCoSubstVarBndrCallback, which takes
+application. Thus, we now have liftCoSubstVarBndrUsing, which takes
 a function used to process the kind of the binder. We don't wish
 to lift the kind, but instead normalise it. So, we pass in a callback function
 that processes the kind of the binder.
@@ -1403,7 +1403,7 @@ normalise_tyvar_bndr tv
   = do { lc1 <- getLC
        ; env <- getEnv
        ; let callback lc ki = runNormM (normalise_type ki) env lc Nominal
-       ; return $ liftCoSubstVarBndrCallback callback lc1 tv }
+       ; return $ liftCoSubstVarBndrUsing callback lc1 tv }
 
 -- | a monad for the normalisation functions, reading 'FamInstEnvs',
 -- a 'LiftingContext', and a 'Role'.

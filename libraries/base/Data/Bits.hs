@@ -190,8 +190,12 @@ class Eq a => Bits a where
     {-| Return the number of bits in the type of the argument.  The actual
         value of the argument is ignored.  The function 'bitSize' is
         undefined for types that do not have a fixed bitsize, like 'Integer'.
+
+        Default implementation based upon 'bitSizeMaybe' provided since
+        4.12.0.0.
         -}
     bitSize           :: a -> Int
+    bitSize b = fromMaybe (error "bitSize is undefined") (bitSizeMaybe b)
 
     {-| Return 'True' if the argument is a signed type.  The actual
         value of the argument is ignored -}
@@ -535,6 +539,74 @@ instance Bits Integer where
    bitSizeMaybe _ = Nothing
    bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Integer)"
    isSigned _ = True
+
+#if defined(MIN_VERSION_integer_gmp)
+-- | @since 4.8.0
+instance Bits Natural where
+   (.&.) = andNatural
+   (.|.) = orNatural
+   xor = xorNatural
+   complement _ = errorWithoutStackTrace
+                    "Bits.complement: Natural complement undefined"
+   shift x i
+     | i >= 0    = shiftLNatural x i
+     | otherwise = shiftRNatural x (negate i)
+   testBit x i   = testBitNatural x i
+   zeroBits      = wordToNaturalBase 0##
+   clearBit x i  = x `xor` (bit i .&. x)
+
+   bit (I# i#) = bitNatural i#
+   popCount x  = popCountNatural x
+
+   rotate x i = shift x i   -- since an Natural never wraps around
+
+   bitSizeMaybe _ = Nothing
+   bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Natural)"
+   isSigned _ = False
+#else
+-- | @since 4.8.0.0
+instance Bits Natural where
+  Natural n .&. Natural m = Natural (n .&. m)
+  {-# INLINE (.&.) #-}
+  Natural n .|. Natural m = Natural (n .|. m)
+  {-# INLINE (.|.) #-}
+  xor (Natural n) (Natural m) = Natural (xor n m)
+  {-# INLINE xor #-}
+  complement _ = errorWithoutStackTrace "Bits.complement: Natural complement undefined"
+  {-# INLINE complement #-}
+  shift (Natural n) = Natural . shift n
+  {-# INLINE shift #-}
+  rotate (Natural n) = Natural . rotate n
+  {-# INLINE rotate #-}
+  bit = Natural . bit
+  {-# INLINE bit #-}
+  setBit (Natural n) = Natural . setBit n
+  {-# INLINE setBit #-}
+  clearBit (Natural n) = Natural . clearBit n
+  {-# INLINE clearBit #-}
+  complementBit (Natural n) = Natural . complementBit n
+  {-# INLINE complementBit #-}
+  testBit (Natural n) = testBit n
+  {-# INLINE testBit #-}
+  bitSizeMaybe _ = Nothing
+  {-# INLINE bitSizeMaybe #-}
+  bitSize = errorWithoutStackTrace "Natural: bitSize"
+  {-# INLINE bitSize #-}
+  isSigned _ = False
+  {-# INLINE isSigned #-}
+  shiftL (Natural n) = Natural . shiftL n
+  {-# INLINE shiftL #-}
+  shiftR (Natural n) = Natural . shiftR n
+  {-# INLINE shiftR #-}
+  rotateL (Natural n) = Natural . rotateL n
+  {-# INLINE rotateL #-}
+  rotateR (Natural n) = Natural . rotateR n
+  {-# INLINE rotateR #-}
+  popCount (Natural n) = popCount n
+  {-# INLINE popCount #-}
+  zeroBits = Natural 0
+
+#endif
 
 -----------------------------------------------------------------------------
 

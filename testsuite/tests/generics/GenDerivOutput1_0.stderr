@@ -43,7 +43,7 @@ Derived type family instances:
                                                                            'GHC.Types.True)
                                                                         (GHC.Generics.S1
                                                                            ('GHC.Generics.MetaSel
-                                                                              ('GHC.Base.Just
+                                                                              ('GHC.Maybe.Just
                                                                                  "element")
                                                                               'GHC.Generics.NoSourceUnpackedness
                                                                               'GHC.Generics.NoSourceStrictness
@@ -51,7 +51,7 @@ Derived type family instances:
                                                                            GHC.Generics.Par1
                                                                          GHC.Generics.:*: GHC.Generics.S1
                                                                                             ('GHC.Generics.MetaSel
-                                                                                               ('GHC.Base.Just
+                                                                                               ('GHC.Maybe.Just
                                                                                                   "rest")
                                                                                                'GHC.Generics.NoSourceUnpackedness
                                                                                                'GHC.Generics.NoSourceStrictness

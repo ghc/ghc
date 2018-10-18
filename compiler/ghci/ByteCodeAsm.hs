@@ -444,17 +444,19 @@ assembleI dflags i = case i of
      -- On Windows, stdcall labels have a suffix indicating the no. of
      -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
     literal (MachLabel fs _ _) = litlabel fs
-    literal (MachWord w)       = int (fromIntegral w)
-    literal (MachInt j)        = int (fromIntegral j)
     literal MachNullAddr       = int 0
     literal (MachFloat r)      = float (fromRational r)
     literal (MachDouble r)     = double (fromRational r)
     literal (MachChar c)       = int (ord c)
-    literal (MachInt64 ii)     = int64 (fromIntegral ii)
-    literal (MachWord64 ii)    = int64 (fromIntegral ii)
     literal (MachStr bs)       = lit [BCONPtrStr bs]
        -- MachStr requires a zero-terminator when emitted
-    literal LitInteger{}       = panic "ByteCodeAsm.literal: LitInteger"
+    literal (LitNumber nt i _) = case nt of
+      LitNumInt     -> int (fromIntegral i)
+      LitNumWord    -> int (fromIntegral i)
+      LitNumInt64   -> int64 (fromIntegral i)
+      LitNumWord64  -> int64 (fromIntegral i)
+      LitNumInteger -> panic "ByteCodeAsm.literal: LitNumInteger"
+      LitNumNatural -> panic "ByteCodeAsm.literal: LitNumNatural"
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]

@@ -972,3 +972,33 @@ byteSwap64 (W64# w#) = W64# (byteSwap64# w#)
 byteSwap64 :: Word64 -> Word64
 byteSwap64 (W64# w#) = W64# (byteSwap# w#)
 #endif
+
+-------------------------------------------------------------------------------
+
+{-# RULES
+"fromIntegral/Natural->Word8"
+    fromIntegral = (fromIntegral :: Word -> Word8)  . naturalToWord
+"fromIntegral/Natural->Word16"
+    fromIntegral = (fromIntegral :: Word -> Word16) . naturalToWord
+"fromIntegral/Natural->Word32"
+    fromIntegral = (fromIntegral :: Word -> Word32) . naturalToWord
+  #-}
+
+{-# RULES
+"fromIntegral/Word8->Natural"
+    fromIntegral = wordToNatural . (fromIntegral :: Word8  -> Word)
+"fromIntegral/Word16->Natural"
+    fromIntegral = wordToNatural . (fromIntegral :: Word16 -> Word)
+"fromIntegral/Word32->Natural"
+    fromIntegral = wordToNatural . (fromIntegral :: Word32 -> Word)
+  #-}
+
+#if WORD_SIZE_IN_BITS == 64
+-- these RULES are valid for Word==Word64
+{-# RULES
+"fromIntegral/Natural->Word64"
+    fromIntegral = (fromIntegral :: Word -> Word64) . naturalToWord
+"fromIntegral/Word64->Natural"
+    fromIntegral = wordToNatural . (fromIntegral :: Word64 -> Word)
+  #-}
+#endif

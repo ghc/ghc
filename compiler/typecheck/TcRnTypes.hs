@@ -1101,6 +1101,10 @@ data PromotionErr
   | FamDataConPE     -- Data constructor for a data family
                      -- See Note [AFamDataCon: not promoting data family constructors]
                      -- in TcEnv.
+  | ConstrainedDataConPE PredType
+                     -- Data constructor with a non-equality context
+                     -- See Note [Don't promote data constructors with
+                     --           non-equality contexts] in TcHsType
   | PatSynPE         -- Pattern synonyms
                      -- See Note [Don't promote pattern synonyms] in TcEnv
 
@@ -1255,14 +1259,16 @@ instance Outputable IdBindingInfo where
     text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
 
 instance Outputable PromotionErr where
-  ppr ClassPE        = text "ClassPE"
-  ppr TyConPE        = text "TyConPE"
-  ppr PatSynPE       = text "PatSynPE"
-  ppr PatSynExPE     = text "PatSynExPE"
-  ppr FamDataConPE   = text "FamDataConPE"
-  ppr RecDataConPE   = text "RecDataConPE"
-  ppr NoDataKindsTC  = text "NoDataKindsTC"
-  ppr NoDataKindsDC  = text "NoDataKindsDC"
+  ppr ClassPE                     = text "ClassPE"
+  ppr TyConPE                     = text "TyConPE"
+  ppr PatSynPE                    = text "PatSynPE"
+  ppr PatSynExPE                  = text "PatSynExPE"
+  ppr FamDataConPE                = text "FamDataConPE"
+  ppr (ConstrainedDataConPE pred) = text "ConstrainedDataConPE"
+                                      <+> parens (ppr pred)
+  ppr RecDataConPE                = text "RecDataConPE"
+  ppr NoDataKindsTC               = text "NoDataKindsTC"
+  ppr NoDataKindsDC               = text "NoDataKindsDC"
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing)    = pprTyThingCategory thing
@@ -1272,14 +1278,15 @@ pprTcTyThingCategory (ATcTyCon {})     = text "Local tycon"
 pprTcTyThingCategory (APromotionErr pe) = pprPECategory pe
 
 pprPECategory :: PromotionErr -> SDoc
-pprPECategory ClassPE        = text "Class"
-pprPECategory TyConPE        = text "Type constructor"
-pprPECategory PatSynPE       = text "Pattern synonym"
-pprPECategory PatSynExPE     = text "Pattern synonym existential"
-pprPECategory FamDataConPE   = text "Data constructor"
-pprPECategory RecDataConPE   = text "Data constructor"
-pprPECategory NoDataKindsTC  = text "Type constructor"
-pprPECategory NoDataKindsDC  = text "Data constructor"
+pprPECategory ClassPE                = text "Class"
+pprPECategory TyConPE                = text "Type constructor"
+pprPECategory PatSynPE               = text "Pattern synonym"
+pprPECategory PatSynExPE             = text "Pattern synonym existential"
+pprPECategory FamDataConPE           = text "Data constructor"
+pprPECategory ConstrainedDataConPE{} = text "Data constructor"
+pprPECategory RecDataConPE           = text "Data constructor"
+pprPECategory NoDataKindsTC          = text "Type constructor"
+pprPECategory NoDataKindsDC          = text "Data constructor"
 
 {-
 ************************************************************************
@@ -1761,7 +1768,7 @@ Example 1:  (c Int), where c :: * -> Constraint.  We can't do anything
 
 Example 2:  a ~ b, where a :: *, b :: k, where k is a kind variable
             We don't want to use this to substitute 'b' for 'a', in case
-            'k' is subequently unifed with (say) *->*, because then
+            'k' is subsequently unifed with (say) *->*, because then
             we'd have ill-kinded types floating about.  Rather we want
             to defer using the equality altogether until 'k' get resolved.
 

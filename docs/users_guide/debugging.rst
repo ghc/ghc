@@ -173,11 +173,12 @@ These flags dump various information from GHC's typechecker and renamer.
     Dump Template Haskell expressions that we splice in, and what
     Haskell code the expression evaluates to.
 
-.. ghc-flag:: -dth-dec-file=⟨file⟩
-    :shortdesc: Show evaluated TH declarations in a .th.hs file
+.. ghc-flag:: -dth-dec-file
+    :shortdesc: Dump evaluated TH declarations into `*.th.hs` files
     :type: dynamic
 
-    Dump expansions of all top-level Template Haskell splices into ⟨file⟩.
+    Dump expansions of all top-level Template Haskell splices into
+    :file:`{module}.th.hs` for each file :file:`{module}.hs`.
 
 .. ghc-flag:: -ddump-types
     :shortdesc: Dump type signatures
@@ -383,7 +384,7 @@ These flags dump various phases of GHC's C-\\- pipeline.
     file parsing.
 
     Cmm dumps don't include unreachable blocks since we print
-    blocks in reverse post order.
+    blocks in reverse post-order.
 
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-\\- output
@@ -762,7 +763,7 @@ Checking for consistency
     useful when finding pointer tagging issues.
 
 .. ghc-flag:: -fproc-alignment
-    :shortdesc: Align functions at given boundry.
+    :shortdesc: Align functions at given boundary.
     :type: dynamic
 
     Align functions to multiples of the given value. Only valid values are powers

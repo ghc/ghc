@@ -149,7 +149,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                                          emptyTCvSubst (catMaybes mbSubsts)
                    unmapped_tvs = filter (\v -> v `notElemTCvSubst` subst
                                              && not (v `isInScope` subst)) tvs
-                   (subst', _)  = mapAccumL substTyVarBndr subst unmapped_tvs
+                   (subst', _)  = substTyVarBndrs subst unmapped_tvs
                    preds'       = map (substPredOrigin subst') preds
                    inst_tys'    = substTys subst' inst_tys
                    tvs'         = tyCoVarsOfTypesWellScoped inst_tys'
@@ -399,7 +399,7 @@ We have some special hacks to support things like
    data T = MkT Int# deriving ( Show )
 
 Specifically, we use TcGenDeriv.box to box the Int# into an Int
-(which we know how to show), and append a '#'. Parenthesis are not required
+(which we know how to show), and append a '#'. Parentheses are not required
 for unboxed values (`MkT -3#` is a valid expression).
 
 Note [Superclasses of derived instance]

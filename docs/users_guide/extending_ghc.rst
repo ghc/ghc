@@ -605,7 +605,7 @@ to segfaults or other runtime misbehaviour.
 Source plugins
 ~~~~~~~~~~~~~~
 
-In additional to core and type checker plugins, you can install plugins that can
+In addition to core and type checker plugins, you can install plugins that can
 access different representations of the source code. The main purpose of these
 plugins is to make it easier to implement development tools.
 

@@ -817,6 +817,9 @@ data FindResult
       , fr_pkgs_hidden :: [UnitId]      -- Module is in these packages,
                                            --   but the *package* is hidden
 
+        -- Modules are in these packages, but it is unusable
+      , fr_unusables   :: [(UnitId, UnusablePackageReason)]
+
       , fr_suggestions :: [ModuleSuggestion] -- Possible mis-spelled modules
       }
 

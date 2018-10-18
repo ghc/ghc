@@ -263,13 +263,9 @@ mkIntegerExpr i = do t <- lookupTyCon integerTyConName
                      return (Lit (mkLitInteger i (mkTyConTy t)))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
---
--- TODO: should we add LitNatural to Core?
-mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Natural
-mkNaturalExpr i = do iExpr <- mkIntegerExpr i
-                     fiExpr <- lookupId naturalFromIntegerName
-                     return (mkCoreApps (Var fiExpr) [iExpr])
-
+mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr
+mkNaturalExpr i = do t <- lookupTyCon naturalTyConName
+                     return (Lit (mkLitNatural i (mkTyConTy t)))
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr

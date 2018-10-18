@@ -1,4 +1,6 @@
 test('T7116', normal, run_command, ['$MAKE -s --no-print-directory T7116'])
+test('T14170', normal, run_command, ['$MAKE -s --no-print-directory T14170'])
+test('T14465', normal, run_command, ['$MAKE -s --no-print-directory T14465'])
 test('T7895', normal, compile, [''])
 test('T7881', normal, compile, [''])
 # For T8542, the hpc way adds extra annotations that prevent

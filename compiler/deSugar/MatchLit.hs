@@ -78,32 +78,32 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 -}
 
 dsLit :: HsLit GhcRn -> DsM CoreExpr
-dsLit (HsStringPrim _ s) = return (Lit (MachStr s))
-dsLit (HsCharPrim   _ c) = return (Lit (MachChar c))
-dsLit (HsIntPrim    _ i) = return (Lit (MachInt i))
-dsLit (HsWordPrim   _ w) = return (Lit (MachWord w))
-dsLit (HsInt64Prim  _ i) = return (Lit (MachInt64 i))
-dsLit (HsWord64Prim _ w) = return (Lit (MachWord64 w))
-dsLit (HsFloatPrim  _ f) = return (Lit (MachFloat (fl_value f)))
-dsLit (HsDoublePrim _ d) = return (Lit (MachDouble (fl_value d)))
-dsLit (HsChar _ c)       = return (mkCharExpr c)
-dsLit (HsString _ str)   = mkStringExprFS str
-dsLit (HsInteger _ i _)  = mkIntegerExpr i
-dsLit (HsInt _ i)        = do dflags <- getDynFlags
-                              return (mkIntExpr dflags (il_value i))
-
-dsLit (HsRat _ (FL _ _ val) ty) = do
-  num   <- mkIntegerExpr (numerator val)
-  denom <- mkIntegerExpr (denominator val)
-  return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
-  where
-    (ratio_data_con, integer_ty)
-        = case tcSplitTyConApp ty of
-                (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
-                                   (head (tyConDataCons tycon), i_ty)
-                x -> pprPanic "dsLit" (ppr x)
-
-dsLit (XLit x)  = pprPanic "dsLit" (ppr x)
+dsLit l = do
+  dflags <- getDynFlags
+  case l of
+    HsStringPrim _ s -> return (Lit (MachStr s))
+    HsCharPrim   _ c -> return (Lit (MachChar c))
+    HsIntPrim    _ i -> return (Lit (mkMachIntWrap dflags i))
+    HsWordPrim   _ w -> return (Lit (mkMachWordWrap dflags w))
+    HsInt64Prim  _ i -> return (Lit (mkMachInt64Wrap dflags i))
+    HsWord64Prim _ w -> return (Lit (mkMachWord64Wrap dflags w))
+    HsFloatPrim  _ f -> return (Lit (MachFloat (fl_value f)))
+    HsDoublePrim _ d -> return (Lit (MachDouble (fl_value d)))
+    HsChar _ c       -> return (mkCharExpr c)
+    HsString _ str   -> mkStringExprFS str
+    HsInteger _ i _  -> mkIntegerExpr i
+    HsInt _ i        -> return (mkIntExpr dflags (il_value i))
+    XLit x           -> pprPanic "dsLit" (ppr x)
+    HsRat _ (FL _ _ val) ty -> do
+      num   <- mkIntegerExpr (numerator val)
+      denom <- mkIntegerExpr (denominator val)
+      return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
+      where
+        (ratio_data_con, integer_ty)
+            = case tcSplitTyConApp ty of
+                    (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+                                       (head (tyConDataCons tycon), i_ty)
+                    x -> pprPanic "dsLit" (ppr x)
 
 dsOverLit :: HsOverLit GhcTc -> DsM CoreExpr
 dsOverLit lit = do { dflags <- getDynFlags
@@ -162,20 +162,30 @@ warnAboutOverflowedLiterals :: DynFlags -> HsOverLit GhcTc -> DsM ()
 warnAboutOverflowedLiterals dflags lit
  | wopt Opt_WarnOverflowedLiterals dflags
  , Just (i, tc) <- getIntegralLit lit
-  = if      tc == intTyConName    then check i tc (Proxy :: Proxy Int)
-    else if tc == int8TyConName   then check i tc (Proxy :: Proxy Int8)
-    else if tc == int16TyConName  then check i tc (Proxy :: Proxy Int16)
-    else if tc == int32TyConName  then check i tc (Proxy :: Proxy Int32)
-    else if tc == int64TyConName  then check i tc (Proxy :: Proxy Int64)
-    else if tc == wordTyConName   then check i tc (Proxy :: Proxy Word)
-    else if tc == word8TyConName  then check i tc (Proxy :: Proxy Word8)
-    else if tc == word16TyConName then check i tc (Proxy :: Proxy Word16)
-    else if tc == word32TyConName then check i tc (Proxy :: Proxy Word32)
-    else if tc == word64TyConName then check i tc (Proxy :: Proxy Word64)
+  = if      tc == intTyConName     then check i tc (Proxy :: Proxy Int)
+    else if tc == int8TyConName    then check i tc (Proxy :: Proxy Int8)
+    else if tc == int16TyConName   then check i tc (Proxy :: Proxy Int16)
+    else if tc == int32TyConName   then check i tc (Proxy :: Proxy Int32)
+    else if tc == int64TyConName   then check i tc (Proxy :: Proxy Int64)
+    else if tc == wordTyConName    then check i tc (Proxy :: Proxy Word)
+    else if tc == word8TyConName   then check i tc (Proxy :: Proxy Word8)
+    else if tc == word16TyConName  then check i tc (Proxy :: Proxy Word16)
+    else if tc == word32TyConName  then check i tc (Proxy :: Proxy Word32)
+    else if tc == word64TyConName  then check i tc (Proxy :: Proxy Word64)
+    else if tc == naturalTyConName then checkPositive i tc
     else return ()
 
   | otherwise = return ()
   where
+    checkPositive :: Integer -> Name -> DsM ()
+    checkPositive i tc
+      = when (i < 0) $ do
+        warnDs (Reason Opt_WarnOverflowedLiterals)
+               (vcat [ text "Literal" <+> integer i
+                       <+> text "is negative but" <+> ppr tc
+                       <+> ptext (sLit "only supports positive numbers")
+                     ])
+
     check :: forall a. (Bounded a, Integral a) => Integer -> Name -> Proxy a -> DsM ()
     check i tc _proxy
       = when (i < minB || i > maxB) $ do
@@ -390,8 +400,8 @@ hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
 -- HsLit does not.
 hsLitKey dflags (HsIntPrim    _ i) = mkMachIntWrap  dflags i
 hsLitKey dflags (HsWordPrim   _ w) = mkMachWordWrap dflags w
-hsLitKey _      (HsInt64Prim  _ i) = mkMachInt64Wrap       i
-hsLitKey _      (HsWord64Prim _ w) = mkMachWord64Wrap      w
+hsLitKey dflags (HsInt64Prim  _ i) = mkMachInt64Wrap  dflags i
+hsLitKey dflags (HsWord64Prim _ w) = mkMachWord64Wrap dflags w
 hsLitKey _      (HsCharPrim   _ c) = mkMachChar            c
 hsLitKey _      (HsFloatPrim  _ f) = mkMachFloat           (fl_value f)
 hsLitKey _      (HsDoublePrim _ d) = mkMachDouble          (fl_value d)

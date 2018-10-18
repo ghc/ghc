@@ -36,16 +36,3 @@
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE   700
 #endif
-
-#if defined(mingw32_HOST_OS)
-/* Without this gcc will warn about %ull and the like since some msvcrt versions
-   do not support them. See
-   https://sourceforge.net/p/mingw-w64/mailman/message/28557333/
-
-   Note that this is implied by _POSIX_C_SOURCE in the msys2 toolchain that we
-   now use. However, we retain this explicit #define to preserve the ability to
-   bootstrap GHC with compilers still using msys (e.g. GHC 7.10.1 and 7.10.2).
-   This can be removed in for GHC 8.4. See #12951.
-  */
-#define __USE_MINGW_ANSI_STDIO 1
-#endif

@@ -893,7 +893,7 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
        ; let quantifiable_candidates
                = pickQuantifiablePreds (mkVarSet qtvs) candidates
-             -- NB: do /not/ run pickQuantifieablePreds over psig_theta,
+             -- NB: do /not/ run pickQuantifiablePreds over psig_theta,
              -- because we always want to quantify over psig_theta, and not
              -- drop any of them; e.g. CallStack constraints.  c.f Trac #14658
 

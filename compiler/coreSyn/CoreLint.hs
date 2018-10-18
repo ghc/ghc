@@ -719,8 +719,7 @@ lintCoreExpr (Cast expr co)
   = do { (expr_ty, ue) <- markAllJoinsBad $ lintCoreExpr expr
        ; co' <- applySubstCo co
        ; (_, k2, from_ty, to_ty, r) <- lintCoercion co'
-       ; lintL (classifiesTypeWithValues k2)
-               (text "Target of cast not # or *:" <+> ppr co)
+       ; checkValueKind k2 (text "target of cast" <+> quotes (ppr co))
        ; lintRole co' Representational r
        ; ensureEqTys from_ty expr_ty (mkCastErr expr co' from_ty expr_ty)
        ; return (to_ty, ue) }
@@ -1400,8 +1399,9 @@ lintInTy ty
   = addLoc (InType ty) $
     do  { ty' <- applySubstTy ty
         ; k  <- lintType ty'
-        -- No need to lint k, because lintType
-        -- guarantees that k is linted
+        ; lintKind k  -- The kind returned by lintType is already
+                      -- a LintedKind but we also want to check that
+                      -- k :: *, which lintKind does
         ; return (ty', k) }
 
 checkTyCon :: TyCon -> LintM ()
@@ -1461,18 +1461,13 @@ lintType t@(ForAllTy (TvBndr tv _vis) ty)
   = do { lintL (isTyVar tv) (text "Covar bound in type:" <+> ppr t)
        ; lintTyBndr tv $ \tv' ->
     do { k <- lintType ty
-       ; lintL (classifiesTypeWithValues k)
-               (text "Non-* and non-# kind in forall:" <+> ppr t)
-       ; if (not (tv' `elemVarSet` tyCoVarsOfType k))
-         then return k
-         else
-    do { -- See Note [Stupid type synonyms]
-         let k' = expandTypeSynonyms k
-       ; lintL (not (tv' `elemVarSet` tyCoVarsOfType k'))
-               (hang (text "Variable escape in forall:")
-                   2 (vcat [ text "type:" <+> ppr t
-                           , text "kind:" <+> ppr k' ]))
-       ; return k' }}}
+       ; checkValueKind k (text "the body of forall:" <+> ppr t)
+       ; case occCheckExpand [tv'] k of  -- See Note [Stupid type synonyms]
+           Just k' -> return k'
+           Nothing -> failWithL (hang (text "Variable escape in forall:")
+                                    2 (vcat [ text "type:" <+> ppr t
+                                            , text "kind:" <+> ppr k ]))
+    }}
 
 lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 
@@ -1493,7 +1488,7 @@ Consider (Trac #14939)
    f :: forall (cls :: * -> Constraint) (b :: Alg cls *). b
 
 Here 'cls' appears free in b's kind, which would usually be illegal
-(becuase in (forall a. ty), ty's kind should not mention 'a'). But
+(because in (forall a. ty), ty's kind should not mention 'a'). But
 #in this case (Alg cls *) = *, so all is well.  Currently we allow
 this, and make Lint expand synonyms where necessary to make it so.
 
@@ -1533,9 +1528,9 @@ lintKind k = do { sk <- lintType k
                                       2 (text "has kind:" <+> ppr sk))) }
 
 -----------------
--- confirms that a type is really *
-lintStar :: SDoc -> OutKind -> LintM ()
-lintStar doc k
+-- Confirms that a type is really *, #, Constraint etc
+checkValueKind :: OutKind -> SDoc -> LintM ()
+checkValueKind k doc
   = lintL (classifiesTypeWithValues k)
           (text "Non-*-like kind when *-like expected:" <+> ppr k $$
            text "when checking" <+> doc)
@@ -1722,8 +1717,8 @@ lintInCo co
 lintStarCoercion :: OutCoercion -> LintM (LintedType, LintedType)
 lintStarCoercion g
   = do { (k1, k2, t1, t2, r) <- lintCoercion g
-       ; lintStar (text "the kind of the left type in" <+> ppr g) k1
-       ; lintStar (text "the kind of the right type in" <+> ppr g) k2
+       ; checkValueKind k1 (text "the kind of the left type in" <+> ppr g)
+       ; checkValueKind k2 (text "the kind of the right type in" <+> ppr g)
        ; lintRole g Nominal r
        ; return (t1, t2) }
 

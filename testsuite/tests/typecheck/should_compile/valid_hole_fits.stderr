@@ -78,7 +78,7 @@ valid_hole_fits.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
         Just :: forall a. a -> Maybe a
           with Just @Integer
           (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Maybe’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @Maybe @Integer
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -98,7 +98,7 @@ valid_hole_fits.hs:30:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 68 instances involving out-of-scope types
+        ...plus 69 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show _
       In an equation for ‘f’: f = show _
@@ -148,7 +148,7 @@ valid_hole_fits.hs:34:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 68 instances involving out-of-scope types
+        ...plus 69 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show (_ (_ :: Bool))
       In an equation for ‘h’: h = show (_ (_ :: Bool))
@@ -172,7 +172,7 @@ valid_hole_fits.hs:34:11: warning: [-Wtyped-holes (in -Wdefault)]
         Just :: forall a. a -> Maybe a
           with Just @Bool
           (imported from ‘Data.Maybe’ at valid_hole_fits.hs:5:1-17
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘GHC.Maybe’))
         id :: forall a. a -> a
           with id @Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40

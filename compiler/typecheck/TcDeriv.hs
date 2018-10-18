@@ -643,8 +643,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mbl_deriv_strat overlap_mode))
                    unmapped_tkvs = filter (\v -> v `notElemTCvSubst` kind_subst
                                         && not (v `elemVarSet` ki_subst_range))
                                           tvs'
-                   (subst, _)    = mapAccumL substTyVarBndr
-                                             kind_subst unmapped_tkvs
+                   (subst, _)    = substTyVarBndrs kind_subst unmapped_tkvs
                    (final_deriv_ctxt, final_deriv_ctxt_tys)
                      = case deriv_ctxt' of
                          InferContext wc -> (InferContext wc, [])
@@ -814,8 +813,7 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
                   unmapped_tkvs   = filter (\v -> v `notElemTCvSubst` kind_subst
                                          && not (v `elemVarSet` ki_subst_range))
                                            tkvs'
-                  (subst, _)      = mapAccumL substTyVarBndr
-                                              kind_subst unmapped_tkvs
+                  (subst, _)      = substTyVarBndrs kind_subst unmapped_tkvs
                   final_tc_args   = substTys subst tc_args'
                   final_cls_tys   = substTys subst cls_tys'
                   final_tkvs      = tyCoVarsOfTypesWellScoped $
@@ -1036,7 +1034,7 @@ the type variable binder for c, since its kind is (k2 -> k2 -> *).
 We used to accomplish this by doing the following:
 
     unmapped_tkvs = filter (`notElemTCvSubst` kind_subst) all_tkvs
-    (subst, _)    = mapAccumL substTyVarBndr kind_subst unmapped_tkvs
+    (subst, _)    = substTyVarBndrs kind_subst unmapped_tkvs
 
 Where all_tkvs contains all kind variables in the class and instance types (in
 this case, all_tkvs = [k1,k2]). But since kind_subst only has one mapping,

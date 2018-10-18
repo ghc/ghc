@@ -6,12 +6,12 @@ NotRelaxedExamples.hs:9:15: error:
 
 NotRelaxedExamples.hs:10:15: error:
     • The type family application ‘F2 [x]’
-        is no smaller than the instance head
+        is no smaller than the instance head ‘F2 [x]’
       (Use UndecidableInstances to permit this)
     • In the type instance declaration for ‘F2’
 
 NotRelaxedExamples.hs:11:15: error:
     • The type family application ‘F3 [Char]’
-        is no smaller than the instance head
+        is no smaller than the instance head ‘F3 Bool’
       (Use UndecidableInstances to permit this)
     • In the type instance declaration for ‘F3’

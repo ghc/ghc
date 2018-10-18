@@ -133,13 +133,13 @@ exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
 coreAltType :: CoreAlt -> Type
 -- ^ Returns the type of the alternatives right hand side
-coreAltType (_,bs,rhs)
-  | any bad_binder bs = expandTypeSynonyms ty
-  | otherwise         = ty    -- Note [Existential variables and silly type synonyms]
+coreAltType alt@(_,bs,rhs)
+  = case occCheckExpand bs rhs_ty of
+      -- Note [Existential variables and silly type synonyms]
+      Just ty -> ty
+      Nothing -> pprPanic "coreAltType" (pprCoreAlt alt $$ ppr rhs_ty)
   where
-    ty           = exprType rhs
-    free_tvs     = tyCoVarsOfType ty
-    bad_binder b = b `elemVarSet` free_tvs
+    rhs_ty = exprType rhs
 
 coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
@@ -2446,12 +2446,13 @@ and 'execute' it rather than allocating it statically.
 -- | This function is called only on *top-level* right-hand sides.
 -- Returns @True@ if the RHS can be allocated statically in the output,
 -- with no thunks involved at all.
-rhsIsStatic :: Platform
-            -> (Name -> Bool)         -- Which names are dynamic
-            -> (Integer -> CoreExpr)  -- Desugaring for integer literals (disgusting)
-                                      -- C.f. Note [Disgusting computation of CafRefs]
-                                      --      in TidyPgm
-            -> CoreExpr -> Bool
+rhsIsStatic
+   :: Platform
+   -> (Name -> Bool)         -- Which names are dynamic
+   -> (LitNumType -> Integer -> Maybe CoreExpr)
+      -- Desugaring for some literals (disgusting)
+      -- C.f. Note [Disgusting computation of CafRefs] in TidyPgm
+   -> CoreExpr -> Bool
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
@@ -2506,7 +2507,7 @@ rhsIsStatic :: Platform
 --
 --    c) don't look through unfolding of f in (f x).
 
-rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
+rhsIsStatic platform is_dynamic_name cvt_literal rhs = is_static False rhs
   where
   is_static :: Bool     -- True <=> in a constructor argument; must be atomic
             -> CoreExpr -> Bool
@@ -2516,7 +2517,9 @@ rhsIsStatic platform is_dynamic_name cvt_integer rhs = is_static False rhs
                                               && is_static in_arg e
   is_static in_arg (Cast e _)             = is_static in_arg e
   is_static _      (Coercion {})          = True   -- Behaves just like a literal
-  is_static in_arg (Lit (LitInteger i _)) = is_static in_arg (cvt_integer i)
+  is_static in_arg (Lit (LitNumber nt i _)) = case cvt_literal nt i of
+    Just e  -> is_static in_arg e
+    Nothing -> True
   is_static _      (Lit (MachLabel {}))   = False
   is_static _      (Lit _)                = True
         -- A MachLabel (foreign import "&foo") in an argument

@@ -45,7 +45,7 @@ import TcRnMonad
 import TcEnv
 import TcEvidence
 import InstEnv
-import TysWiredIn  ( heqDataCon, coercibleDataCon, omegaDataConTy )
+import TysWiredIn  ( heqDataCon, omegaDataConTy )
 import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
@@ -456,7 +456,7 @@ tcInstBinder _ subst (Anon ty)
 
   | isPredTy substed_ty
   = do { let (env, tidy_ty) = tidyOpenType emptyTidyEnv substed_ty
-       ; addErrTcM (env, text "Illegal constraint in a type:" <+> ppr tidy_ty)
+       ; addErrTcM (env, text "Illegal constraint in a kind:" <+> ppr tidy_ty)
 
          -- just invent a new variable so that we can continue
        ; u <- newUnique
@@ -483,8 +483,6 @@ tcInstBinder _ subst (Anon ty)
       | Just (tc, [_, k1, k2]) <- splitTyConApp_maybe ty
       = if | tc `hasKey` eqTyConKey
              -> Just (mkEqBoxTy, Nominal, k1, k2)
-           | tc `hasKey` coercibleTyConKey
-             -> Just (mkCoercibleBoxTy, Representational, k1, k2)
            | otherwise
              -> Nothing
       | otherwise
@@ -507,15 +505,6 @@ mkEqBoxTy co ty1 ty2
        ; let [datacon] = tyConDataCons eq_tc
        ; hetero <- mkHEqBoxTy co ty1 ty2
        ; return $ mkTyConApp (promoteDataCon datacon) [k, ty1, ty2, hetero] }
-  where k = typeKind ty1
-
--- | This takes @a ~R# b@ and returns @Coercible a b@.
-mkCoercibleBoxTy :: TcCoercion -> Type -> Type -> TcM Type
--- monadic just for convenience with mkEqBoxTy
-mkCoercibleBoxTy co ty1 ty2
-  = do { return $
-         mkTyConApp (promoteDataCon coercibleDataCon)
-                    [k, ty1, ty2, mkCoercionTy co] }
   where k = typeKind ty1
 
 {-

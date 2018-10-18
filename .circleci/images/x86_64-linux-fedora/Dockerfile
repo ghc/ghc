@@ -4,6 +4,11 @@ ENV LANG C.UTF-8
 
 RUN dnf -y install coreutils binutils which git make automake autoconf gcc perl python3 texinfo xz lbzip2 patch openssh-clients sudo curl zlib-devel sqlite ncurses-compat-libs gmp-devel ncurses-devel gcc-c++ findutils
 
+# systemd isn't running so remove it from nsswitch.conf
+# Failing to do this will result in testsuite failures due to
+# non-functional user lookup (#15230).
+RUN sed -i -e 's/systemd//g' /etc/nsswitch.conf
+
 # Install GHC and cabal
 RUN cd /tmp && curl https://downloads.haskell.org/~ghc/8.4.2/ghc-8.4.2-x86_64-deb8-linux.tar.xz | tar -Jx
 RUN cd /tmp/ghc-8.4.2 && ./configure --prefix=/opt/ghc/8.4.2

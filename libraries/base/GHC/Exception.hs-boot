@@ -24,17 +24,15 @@ well-behaved, non-bottom values.  The clients use 'raise#'
 to get a visibly-bottom value.
 -}
 
-module GHC.Exception ( SomeException, errorCallException,
-                       errorCallWithCallStackException,
-                       divZeroException, overflowException, ratioZeroDenomException,
-                       underflowException
-    ) where
+module GHC.Exception
+  ( module GHC.Exception.Type
+  , errorCallException
+  , errorCallWithCallStackException
+  ) where
+
+import {-# SOURCE #-} GHC.Exception.Type
 import GHC.Types ( Char )
 import GHC.Stack.Types ( CallStack )
-
-data SomeException
-divZeroException, overflowException, ratioZeroDenomException  :: SomeException
-underflowException :: SomeException
 
 errorCallException :: [Char] -> SomeException
 errorCallWithCallStackException :: [Char] -> CallStack -> SomeException

@@ -710,12 +710,10 @@ tcPatSynMatcher (L loc name) lpat
 
 mkPatSynRecSelBinds :: PatSyn
                     -> [FieldLabel]  -- ^ Visible field labels
-                    -> HsValBinds GhcRn
+                    -> [(Id, LHsBind GhcRn)]
 mkPatSynRecSelBinds ps fields
-  = XValBindsLR (NValBinds selector_binds sigs)
-  where
-    (sigs, selector_binds) = unzip (map mkRecSel fields)
-    mkRecSel fld_lbl = mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl
+  = [ mkOneRecordSelector [PatSynCon ps] (RecSelPatSyn ps) fld_lbl
+    | fld_lbl <- fields ]
 
 isUnidirectional :: HsPatSynDir a -> Bool
 isUnidirectional Unidirectional          = True

@@ -117,12 +117,12 @@ module TyCoRep (
         substCoUnchecked, substCoWithUnchecked,
         substTyWithInScope,
         substTys, substTheta,
-        lookupTyVar, substTyVarBndr,
+        lookupTyVar, substTyVarBndr, substTyVarBndrs,
         substCo, substCos, substCoVar, substCoVars, lookupCoVar,
         substCoVarBndr, cloneTyVarBndr, cloneTyVarBndrs,
         substTyVar, substTyVars,
         substForAllCoBndr,
-        substTyVarBndrCallback, substForAllCoBndrCallback,
+        substTyVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
 
         substRigUnchecked, substVarMult,
@@ -2388,17 +2388,15 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 checkValidSubst :: (HasCallStack,Traversable t) => TCvSubst -> t Type -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 -- TODO (RAE): Change back to ASSERT
-  = WARN( not ({-#SCC "isValidTCvSubst" #-} isValidTCvSubst subst),
+  = WARN( not (isValidTCvSubst subst),
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
-             text "tenvFVs"
-               <+> ppr (tyCoVarsOfTypesSet tenv) $$
+             text "tenvFVs" <+> ppr (tyCoVarsOfTypesSet tenv) $$
              text "cenv" <+> ppr cenv $$
-             text "cenvFVs"
-               <+> ppr (tyCoVarsOfCosSet cenv) $$
-             text "tys" <+> ppr (toList tys) $$
+             text "cenvFVs" <+> ppr (tyCoVarsOfCosSet cenv) $$
+             text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos )
-    WARN( not ({-#SCC "tysCosFVsInScope" #-} tysCosFVsInScope),
+    WARN( not tysCosFVsInScope,
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "cenv" <+> ppr cenv $$
@@ -2598,7 +2596,7 @@ subst_co subst co
 
 substForAllCoBndr :: TCvSubst -> TyVar -> Coercion -> (TCvSubst, TyVar, Coercion)
 substForAllCoBndr subst
-  = substForAllCoBndrCallback False (substCo subst) subst
+  = substForAllCoBndrUsing False (substCo subst) subst
 
 -- | Like 'substForAllCoBndr', but disables sanity checks.
 -- The problems that the sanity checks in substCo catch are described in
@@ -2607,14 +2605,14 @@ substForAllCoBndr subst
 -- substCo and remove this function. Please don't use in new code.
 substForAllCoBndrUnchecked :: TCvSubst -> TyVar -> Coercion -> (TCvSubst, TyVar, Coercion)
 substForAllCoBndrUnchecked subst
-  = substForAllCoBndrCallback False (substCoUnchecked subst) subst
+  = substForAllCoBndrUsing False (substCoUnchecked subst) subst
 
 -- See Note [Sym and ForAllCo]
-substForAllCoBndrCallback :: Bool  -- apply sym to binder?
+substForAllCoBndrUsing :: Bool  -- apply sym to binder?
                           -> (Coercion -> Coercion)  -- transformation to kind co
                           -> TCvSubst -> TyVar -> Coercion
                           -> (TCvSubst, TyVar, Coercion)
-substForAllCoBndrCallback sym sco (TCvSubst in_scope tenv cenv)
+substForAllCoBndrUsing sym sco (TCvSubst in_scope tenv cenv)
                           old_var old_kind_co
   = ( TCvSubst (in_scope `extendInScopeSet` new_var) new_env cenv
     , new_var, new_kind_co )
@@ -2647,7 +2645,10 @@ lookupCoVar :: TCvSubst -> Var  -> Maybe Coercion
 lookupCoVar (TCvSubst _ _ cenv) v = lookupVarEnv cenv v
 
 substTyVarBndr :: HasCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)
-substTyVarBndr = substTyVarBndrCallback substTy
+substTyVarBndr = substTyVarBndrUsing substTy
+
+substTyVarBndrs :: HasCallStack => TCvSubst -> [TyVar] -> (TCvSubst, [TyVar])
+substTyVarBndrs = mapAccumL substTyVarBndr
 
 -- | Like 'substTyVarBndr' but disables sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
@@ -2655,13 +2656,15 @@ substTyVarBndr = substTyVarBndrCallback substTy
 -- The goal of #11371 is to migrate all the calls of substTyUnchecked to
 -- substTy and remove this function. Please don't use in new code.
 substTyVarBndrUnchecked :: TCvSubst -> TyVar -> (TCvSubst, TyVar)
-substTyVarBndrUnchecked = substTyVarBndrCallback substTyUnchecked
+substTyVarBndrUnchecked = substTyVarBndrUsing substTyUnchecked
 
 -- | Substitute a tyvar in a binding position, returning an
 -- extended subst and a new tyvar.
-substTyVarBndrCallback :: (TCvSubst -> Type -> Type)  -- ^ the subst function
-                       -> TCvSubst -> TyVar -> (TCvSubst, TyVar)
-substTyVarBndrCallback subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
+-- Use the supplied function to substitute in the kind
+substTyVarBndrUsing
+  :: (TCvSubst -> Type -> Type)  -- ^ Use this to substitute in the kind
+  -> TCvSubst -> TyVar -> (TCvSubst, TyVar)
+substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
   = ASSERT2( _no_capture, pprTyVar old_var $$ pprTyVar new_var $$ ppr subst )
     ASSERT( isTyVar old_var )
     (TCvSubst (in_scope `extendInScopeSet` new_var) new_env cenv, new_var)

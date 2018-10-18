@@ -79,6 +79,7 @@ Defer01.hs:43:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Num Double -- Defined in ‘GHC.Float’
         instance Num Float -- Defined in ‘GHC.Float’
         ...plus two others
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘myOp’, namely ‘23’
       In the expression: myOp 23

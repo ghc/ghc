@@ -208,7 +208,7 @@ putWithUserData log_action bh payload = do
     -- Remember where the symbol table pointer will go
     symtab_p_p <- tellBin bh
     put_ bh symtab_p_p
-    -- Make some intial state
+    -- Make some initial state
     symtab_next <- newFastMutInt
     writeFastMutInt symtab_next 0
     symtab_map <- newIORef emptyUFM

@@ -32,6 +32,7 @@
 module Unsafe.Coerce (unsafeCoerce) where
 
 import GHC.Integer () -- for build ordering
+import GHC.Natural () -- for build ordering
 import GHC.Prim (unsafeCoerce#)
 
 local_id :: a -> a

@@ -1,12 +1,14 @@
 
 tcfail157.hs:27:10: error:
     • Variable ‘b’ occurs more often
-        in the constraint ‘E m a b’ than in the instance head
+        in the constraint ‘E m a b’
+        than in the instance head ‘Foo m (a -> ())’
       (Use UndecidableInstances to permit this)
     • In the instance declaration for ‘Foo m (a -> ())’
 
 tcfail157.hs:27:10: error:
     • Variable ‘b’ occurs more often
-        in the constraint ‘Foo m b’ than in the instance head
+        in the constraint ‘Foo m b’
+        than in the instance head ‘Foo m (a -> ())’
       (Use UndecidableInstances to permit this)
     • In the instance declaration for ‘Foo m (a -> ())’

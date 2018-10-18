@@ -20,12 +20,16 @@
 
 module GHC.Real where
 
+#include "MachDeps.h"
+
 import GHC.Base
 import GHC.Num
 import GHC.List
 import GHC.Enum
 import GHC.Show
-import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException, ratioZeroDenomException )
+import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException
+                                   , underflowException
+                                   , ratioZeroDenomException )
 
 #if defined(OPTIMISE_INTEGER_GCD_LCM)
 # if defined(MIN_VERSION_integer_gmp)
@@ -61,11 +65,20 @@ ratioZeroDenominatorError = raise# ratioZeroDenomException
 overflowError :: a
 overflowError = raise# overflowException
 
+{-# NOINLINE underflowError #-}
+underflowError :: a
+underflowError = raise# underflowException
+
+
 --------------------------------------------------------------
 -- The Ratio and Rational types
 --------------------------------------------------------------
 
 -- | Rational numbers, with numerator and denominator of some 'Integral' type.
+--
+-- Note that `Ratio`'s instances inherit the deficiencies from the type
+-- parameter's. For example, @Ratio Natural@'s 'Num' instance has similar
+-- problems to `Numeric.Natural.Natural`'s.
 data  Ratio a = !a :% !a  deriving Eq -- ^ @since 2.01
 
 -- | Arbitrary-precision rational numbers, represented as a ratio of
@@ -122,6 +135,19 @@ class  (Num a, Ord a) => Real a  where
     toRational          ::  a -> Rational
 
 -- | Integral numbers, supporting integer division.
+--
+-- The Haskell Report defines no laws for 'Integral'. However, 'Integral'
+-- instances are customarily expected to define a Euclidean domain and have the
+-- following properties for the 'div'/'mod' and 'quot'/'rem' pairs, given
+-- suitable Euclidean functions @f@ and @g@:
+--
+-- * @x@ = @y * quot x y + rem x y@ with @rem x y@ = @fromInteger 0@ or
+-- @g (rem x y)@ < @g y@
+-- * @x@ = @y * div x y + mod x y@ with @mod x y@ = @fromInteger 0@ or
+-- @f (mod x y)@ < @f y@
+--
+-- An example of a suitable Euclidean function, for `Integer`'s instance, is
+-- 'abs'.
 class  (Real a, Enum a) => Integral a  where
     -- | integer division truncated toward zero
     quot                :: a -> a -> a
@@ -155,6 +181,16 @@ class  (Real a, Enum a) => Integral a  where
                            where qr@(q,r) = quotRem n d
 
 -- | Fractional numbers, supporting real division.
+--
+-- The Haskell Report defines no laws for 'Fractional'. However, '(+)' and
+-- '(*)' are customarily expected to define a division ring and have the
+-- following properties:
+--
+-- [__'recip' gives the multiplicative inverse__]:
+-- @x * recip x@ = @recip x * x@ = @fromInteger 1@
+--
+-- Note that it /isn't/ customarily expected that a type instance of
+-- 'Fractional' implement a field. However, all instances in 'base' do.
 class  (Num a) => Fractional a  where
     {-# MINIMAL fromRational, (recip | (/)) #-}
 
@@ -376,6 +412,18 @@ instance Integral Word where
 instance  Real Integer  where
     toRational x        =  x :% 1
 
+#if defined(MIN_VERSION_integer_gmp)
+-- | @since 4.8.0.0
+instance Real Natural where
+    toRational (NatS# w)  = toRational (W# w)
+    toRational (NatJ# bn) = toRational (Jp# bn)
+#else
+-- | @since 4.8.0.0
+instance Real Natural where
+  toRational (Natural a) = toRational a
+  {-# INLINE toRational #-}
+#endif
+
 -- Note [Integer division constant folding]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
@@ -417,6 +465,39 @@ instance  Integral Integer where
     _ `quotRem` 0 = divZeroError
     n `quotRem` d = case n `quotRemInteger` d of
                       (# q, r #) -> (q, r)
+
+#if defined(MIN_VERSION_integer_gmp)
+-- | @since 4.8.0.0
+instance Integral Natural where
+    toInteger = naturalToInteger
+
+    divMod = quotRemNatural
+    div    = quotNatural
+    mod    = remNatural
+
+    quotRem = quotRemNatural
+    quot    = quotNatural
+    rem     = remNatural
+#else
+-- | @since 4.8.0.0
+instance Integral Natural where
+  quot (Natural a) (Natural b) = Natural (quot a b)
+  {-# INLINE quot #-}
+  rem (Natural a) (Natural b) = Natural (rem a b)
+  {-# INLINE rem #-}
+  div (Natural a) (Natural b) = Natural (div a b)
+  {-# INLINE div #-}
+  mod (Natural a) (Natural b) = Natural (mod a b)
+  {-# INLINE mod #-}
+  divMod (Natural a) (Natural b) = (Natural q, Natural r)
+    where (q,r) = divMod a b
+  {-# INLINE divMod #-}
+  quotRem (Natural a) (Natural b) = (Natural q, Natural r)
+    where (q,r) = quotRem a b
+  {-# INLINE quotRem #-}
+  toInteger (Natural a) = a
+  {-# INLINE toInteger #-}
+#endif
 
 --------------------------------------------------------------
 -- Instances for @Ratio@
@@ -505,6 +586,17 @@ fromIntegral = fromInteger . toInteger
 "fromIntegral/Word->Int"  fromIntegral = \(W# x#) -> I# (word2Int# x#)
 "fromIntegral/Word->Word" fromIntegral = id :: Word -> Word
     #-}
+
+{-# RULES
+"fromIntegral/Natural->Natural"  fromIntegral = id :: Natural -> Natural
+"fromIntegral/Natural->Integer"  fromIntegral = toInteger :: Natural->Integer
+"fromIntegral/Natural->Word"     fromIntegral = naturalToWord
+  #-}
+
+{-# RULES
+"fromIntegral/Word->Natural"     fromIntegral = wordToNatural
+"fromIntegral/Int->Natural"     fromIntegral = intToNatural
+  #-}
 
 -- | general coercion to fractional types
 realToFrac :: (Real a, Fractional b) => a -> b
@@ -698,6 +790,8 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 "gcd/Int->Int->Int"             gcd = gcdInt'
 "gcd/Integer->Integer->Integer" gcd = gcdInteger
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
+"gcd/Natural->Natural->Natural" gcd = gcdNatural
+"lcm/Natural->Natural->Natural" lcm = lcmNatural
  #-}
 
 gcdInt' :: Int -> Int -> Int

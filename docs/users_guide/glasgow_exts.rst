@@ -8546,12 +8546,24 @@ constructors are prefixed by a tick ``'``): ::
     'L :: k1 -> Sum k1 k2
     'R :: k2 -> Sum k1 k2
 
-.. note::
-    Data family instances cannot be promoted at the moment: GHC’s type theory
-    just isn’t up to the task of promoting data families, which requires full
-    dependent types.
+Virtually all data constructors, even those with rich kinds, can be promoted.
+There are only a couple of exceptions to this rule:
 
-    See also :ghc-ticket:`15245`.
+-  Data family instance constructors cannot be promoted at the moment. GHC's
+   type theory just isn’t up to the task of promoting data families, which
+   requires full dependent types.
+
+-  Data constructors with contexts that contain non-equality constraints cannot
+   be promoted. For example: ::
+
+     data Foo :: Type -> Type where
+       MkFoo1 :: a ~ Int         => Foo a    -- promotable
+       MkFoo2 :: a ~~ Int        => Foo a    -- promotable
+       MkFoo3 :: Show a          => Foo a    -- not promotable
+
+   ``MkFoo1`` and ``MkFoo2`` can be promoted, since their contexts
+   only involve equality-oriented constraints. However, ``MkFoo3``'s context
+   contains a non-equality constraint ``Show a``, and thus cannot be promoted.
 
 .. _promotion-syntax:
 
@@ -8893,14 +8905,8 @@ example, consider ::
   data Proxy a           -- Proxy :: forall k. k -> Type
   data X (a :: Proxy k)
 
-According to the rules above ``X`` has a CUSK. Yet, what is the kind of ``k``?
-It is impossible to know. This code is thus rejected as masquerading as having
-a CUSK, but not really. If you wish ``k`` to be polykinded, it is straightforward
-to specify this: ::
-
-  data X (a :: Proxy (k1 :: k2))
-
-The above definition is indeed fully fixed, with no masquerade.
+According to the rules above ``X`` has a CUSK. Yet, the kind of ``k`` is undetermined.
+It is thus quantified over, giving ``X`` the kind ``forall k1 (k :: k1). Proxy k -> Type``.
 
 Kind inference in closed type families
 --------------------------------------
@@ -12681,9 +12687,9 @@ non-trivial program, you may be interested in combining this with the
 :ghc-flag:`-ddump-to-file` flag (see :ref:`dumping-output`. For each file using
 Template Haskell, this will show the output in a ``.dump-splices`` file.
 
-The flag :ghc-flag:`-dth-dec-file=⟨file⟩` shows the expansions of all top-level
+The flag :ghc-flag:`-dth-dec-file` dumps the expansions of all top-level
 TH declaration splices, both typed and untyped, in the file :file:`M.th.hs`
-where M is the name of the module being compiled. Note that other types of
+for each module `M` being compiled. Note that other types of
 splices (expressions, types, and patterns) are not shown. Application
 developers can check this into their repository so that they can grep for
 identifiers that were defined in Template Haskell. This is similar to using
@@ -12702,7 +12708,7 @@ Below is a sample output of :ghc-flag:`-ddump-splices` ::
       foo :: Int -> Int
       foo x = (x + 1)
 
-Below is the output of the same sample using :ghc-flag:`-dth-dec-file=⟨file⟩` ::
+Below is the output of the same sample using :ghc-flag:`-dth-dec-file` ::
 
     -- TH_pragma.hs:(6,4)-(8,26): Splicing declarations
     foo :: Int -> Int

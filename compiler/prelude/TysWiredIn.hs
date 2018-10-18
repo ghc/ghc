@@ -280,11 +280,11 @@ nilDataConName    = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "[]") ni
 consDataConName   = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit ":") consDataConKey consDataCon
 
 maybeTyConName, nothingDataConName, justDataConName :: Name
-maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Maybe")
+maybeTyConName     = mkWiredInTyConName   UserSyntax gHC_MAYBE (fsLit "Maybe")
                                           maybeTyConKey maybeTyCon
-nothingDataConName = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "Nothing")
+nothingDataConName = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Nothing")
                                           nothingDataConKey nothingDataCon
-justDataConName    = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "Just")
+justDataConName    = mkWiredInDataConName UserSyntax gHC_MAYBE (fsLit "Just")
                                           justDataConKey justDataCon
 
 wordTyConName, wordDataConName, word8TyConName, word8DataConName :: Name

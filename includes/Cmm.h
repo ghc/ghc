@@ -211,7 +211,7 @@
         if (predicate) {                        \
             /*null*/;                           \
         } else {                                \
-            foreign "C" _assertFail(NULL, __LINE__) never returns; \
+            foreign "C" _assertFail(__FILE__, __LINE__) never returns; \
         }
 #else
 #define ASSERT(p) /* nothing */

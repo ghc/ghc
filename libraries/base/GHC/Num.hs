@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -16,10 +16,17 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Num (module GHC.Num, module GHC.Integer) where
+
+module GHC.Num (module GHC.Num, module GHC.Integer, module GHC.Natural) where
+
+#include "MachDeps.h"
 
 import GHC.Base
 import GHC.Integer
+import GHC.Natural
+#if !defined(MIN_VERSION_integer_gmp)
+import {-# SOURCE #-} GHC.Exception.Type (underflowException)
+#endif
 
 infixl 7  *
 infixl 6  +, -
@@ -28,6 +35,23 @@ default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
 
 -- | Basic numeric class.
+--
+-- The Haskell Report defines no laws for 'Num'. However, '(+)' and '(*)' are
+-- customarily expected to define a ring and have the following properties:
+--
+-- [__Associativity of (+)__]: @(x + y) + z@ = @x + (y + z)@
+-- [__Commutativity of (+)__]: @x + y@ = @y + x@
+-- [__@fromInteger 0@ is the additive identity__]: @x + fromInteger 0@ = @x@
+-- [__'negate' gives the additive inverse__]: @x + negate x@ = @fromInteger 0@
+-- [__Associativity of (*)__]: @(x * y) * z@ = @x * (y * z)@
+-- [__@fromInteger 1@ is the multiplicative identity__]:
+-- @x * fromInteger 1@ = @x@ and @fromInteger 1 * x@ = @x@
+-- [__Distributivity of (*) with respect to (+)__]:
+-- @a * (b + c)@ = @(a * b) + (a * c)@ and @(b + c) * a@ = @(b * a) + (c * a)@
+--
+-- Note that it /isn't/ customarily expected that a type instance of both 'Num'
+-- and 'Ord' implement an ordered ring. Indeed, in 'base' only 'Integer' and
+-- 'Rational' do.
 class  Num a  where
     {-# MINIMAL (+), (*), abs, signum, fromInteger, (negate | (-)) #-}
 
@@ -100,3 +124,41 @@ instance  Num Integer  where
 
     abs = absInteger
     signum = signumInteger
+
+#if defined(MIN_VERSION_integer_gmp)
+-- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an
+-- additive inverse. It is a semiring though.
+--
+-- @since 4.8.0.0
+instance  Num Natural  where
+    (+) = plusNatural
+    (-) = minusNatural
+    (*) = timesNatural
+    negate      = negateNatural
+    fromInteger = naturalFromInteger
+
+    abs = id
+    signum = signumNatural
+
+#else
+-- | Note that `Natural`'s 'Num' instance isn't a ring: no element but 0 has an
+-- additive inverse. It is a semiring though.
+--
+-- @since 4.8.0.0
+instance Num Natural where
+  Natural n + Natural m = Natural (n + m)
+  {-# INLINE (+) #-}
+  Natural n * Natural m = Natural (n * m)
+  {-# INLINE (*) #-}
+  Natural n - Natural m
+      | m > n     = raise# underflowException
+      | otherwise = Natural (n - m)
+  {-# INLINE (-) #-}
+  abs (Natural n) = Natural n
+  {-# INLINE abs #-}
+  signum (Natural n) = Natural (signum n)
+  {-# INLINE signum #-}
+  fromInteger = naturalFromInteger
+  {-# INLINE fromInteger #-}
+
+#endif

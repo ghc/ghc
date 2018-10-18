@@ -10,7 +10,7 @@ TcTyClsDecls: Typecheck type and class declarations
 {-# LANGUAGE TypeFamilies #-}
 
 module TcTyClsDecls (
-        tcTyAndClassDecls, tcAddImplicits,
+        tcTyAndClassDecls,
 
         -- Functions used by TcInstDcls to check
         -- data/type family instance declarations
@@ -70,6 +70,7 @@ import SrcLoc
 import ListSetOps
 import DynFlags
 import Unique
+import ConLike( ConLike(..) )
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -171,7 +172,7 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Do it before Step 3 (adding implicit things) because the latter
            -- expects well-formed TyCons
        ; traceTc "Starting validity check" (ppr tyclss)
-       ; tyclss <- mapM checkValidTyCl tyclss
+       ; tyclss <- concatMapM checkValidTyCl tyclss
        ; traceTc "Done validity check" (ppr tyclss)
        ; mapM_ (recoverM (return ()) . checkValidRoleAnnots role_annots) tyclss
            -- See Note [Check role annotations in a second pass]
@@ -181,14 +182,12 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
            -- Step 3: Add the implicit things;
            -- we want them in the environment because
            -- they may be mentioned in interface files
-       ; tcExtendTyConEnv tyclss $
-    do { gbl_env <- tcAddImplicits tyclss
-       ; setGblEnv gbl_env $
-    do {
-            -- Step 4: check instance declarations
-       ; (gbl_env, inst_info, datafam_deriv_info) <- tcInstDecls1 instds
+       ; gbl_env <- addTyConsToGblEnv tyclss
 
-       ; return (gbl_env, inst_info, datafam_deriv_info) } } }
+           -- Step 4: check instance declarations
+       ; setGblEnv gbl_env $
+         tcInstDecls1 instds }
+
 tcTyClGroup (XTyClGroup _) = panic "tcTyClGroup"
 
 tcTyClDecls :: [LTyClDecl GhcRn] -> RoleAnnotEnv -> TcM [TyCon]
@@ -426,7 +425,7 @@ We do the following steps:
         error if B is used in any of the kinds needed to initialse
         B's kind (e.g. (a :: Type)) here
 
-      - Extend the type env with these intial kinds (monomorphic for
+      - Extend the type env with these initial kinds (monomorphic for
         decls that lack a CUSK)
             B :-> TcTyCon <initial kind>
         (thereby overriding the B :-> TyConPE binding)
@@ -2153,8 +2152,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
                   tcMatchTy res_tmpl res_ty
   = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tmpl_tvs dc_tvs subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
-        (arg_subst, substed_ex_tvs)
-          = mapAccumL substTyVarBndr kind_subst raw_ex_tvs
+        (arg_subst, substed_ex_tvs) = substTyVarBndrs kind_subst raw_ex_tvs
 
         -- After rejigging the existential tyvars, the resulting substitution
         -- gives us exactly what we need to rejig the user-written tyvars,
@@ -2455,7 +2453,11 @@ Validity checking is done once the mutually-recursive knot has been
 tied, so we can look at things freely.
 -}
 
-checkValidTyCl :: TyCon -> TcM TyCon
+checkValidTyCl :: TyCon -> TcM [TyCon]
+-- The returned list is either a singleton (if valid)
+-- or a list of "fake tycons" (if not); the fake tycons
+-- include any implicits, like promoted data constructors
+-- See Note [Recover from validity error]
 checkValidTyCl tc
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
@@ -2463,15 +2465,19 @@ checkValidTyCl tc
              (do { traceTc "Starting validity for tycon" (ppr tc)
                  ; checkValidTyCon tc
                  ; traceTc "Done validity for tycon" (ppr tc)
-                 ; return tc })
+                 ; return [tc] })
   where
     recovery_code -- See Note [Recover from validity error]
       = do { traceTc "Aborted validity for tycon" (ppr tc)
-           ; return fake_tc }
-    fake_tc | not (isClassTyCon tc)
-            = makeRecoveryTyCon tc
-            | otherwise
-            = tc
+           ; return (concatMap mk_fake_tc $
+                     ATyCon tc : implicitTyConThings tc) }
+
+    mk_fake_tc (ATyCon tc)
+      | isClassTyCon tc = [tc]   -- Ugh! Note [Recover from validity error]
+      | otherwise       = [makeRecoveryTyCon tc]
+    mk_fake_tc (AConLike (RealDataCon dc))
+                        = [makeRecoveryTyCon (promoteDataCon dc)]
+    mk_fake_tc _        = []
 
 {- Note [Recover from validity error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2485,14 +2491,29 @@ want to go on checking validity of subsequent type declarations.
 So we replace T with an abstract TyCon which will do no harm.
 See indexed-types/should_fail/BadSock and Trac #10896
 
-Painfully, though, we *don't* want to do this for classes.
-Consider tcfail041:
-   class (?x::Int) => C a where ...
-   instance C Int
-The class is invalid because of the superclass constraint.  But
-we still want it to look like a /class/, else the instance bleats
-that the instance is mal-formed because it hasn't got a class in
-the head.
+Some notes:
+
+* We must make fakes for promoted DataCons too. Consider (Trac #15215)
+      data T a = MkT ...
+      data S a = ...T...MkT....
+  If there is an error in the definition of 'T' we add a "fake type
+  constructor" to the type environment, so that we can continue to
+  typecheck 'S'.  But we /were not/ adding a fake anything for 'MkT'
+  and so there was an internal error when we met 'MkT' in the body of
+  'S'.
+
+* Painfully, we *don't* want to do this for classes.
+  Consider tcfail041:
+     class (?x::Int) => C a where ...
+     instance C Int
+  The class is invalid because of the superclass constraint.  But
+  we still want it to look like a /class/, else the instance bleats
+  that the instance is mal-formed because it hasn't got a class in
+  the head.
+
+  This is really bogus; now we have in scope a Class that is invalid
+  in some way, with unknown downstream consequences.  A better
+  alterantive might be to make a fake class TyCon.  A job for another day.
 -}
 
 -------------------------

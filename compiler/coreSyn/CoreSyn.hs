@@ -759,7 +759,7 @@ transformation universally. This transformation would do:
 but that is ill-typed, as `x` is type `a`, not `Bool`.
 
 
-This is also justifies why we do not consider the `e` in `e |> co` to be in
+This also justifies why we do not consider the `e` in `e |> co` to be in
 tail position: A cast changes the type, but the type must be the same. But
 operationally, casts are vacuous, so this is a bit unfortunate! See #14610 for
 ideas how to fix this.

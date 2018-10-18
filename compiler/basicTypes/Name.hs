@@ -115,6 +115,7 @@ data Name = Name {
 -- (and real!) space leaks, due to the fact that we don't look at
 -- the SrcLoc in a Name all that often.
 
+-- See Note [About the NameSorts]
 data NameSort
   = External Module
 
@@ -151,7 +152,7 @@ instance NFData NameSort where
 data BuiltInSyntax = BuiltInSyntax | UserSyntax
 
 {-
-Notes about the NameSorts:
+Note [About the NameSorts]
 
 1.  Initially, top-level Ids (including locally-defined ones) get External names,
     and all other local Ids get Internal names

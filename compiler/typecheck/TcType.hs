@@ -607,6 +607,7 @@ data UserTypeCtxt
 
   | InfSigCtxt Name     -- Inferred type for function
   | ExprSigCtxt         -- Expression type signature
+  | KindSigCtxt         -- Kind signature
   | TypeAppCtxt         -- Visible type application
   | ConArgCtxt Name     -- Data constructor argument
   | TySynCtxt Name      -- RHS of a type synonym decl
@@ -657,6 +658,7 @@ pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (pp
 pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
 pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
+pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
 pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
 pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
 pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)

@@ -125,6 +125,11 @@ Language
 
   This is now an error unless :extension:`PolyKinds` is enabled.
 
+- Type literals now could be used in type class instances without the extension
+  :extension:`FlexibleInstances`.
+
+  See :ghc-ticket:`13833`.
+
 Compiler
 ~~~~~~~~
 
@@ -146,6 +151,12 @@ Compiler
   enabled independently by the flag
   :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
   need this, you don't need it.
+
+- :ghc-flag:`-Wcompat` now includes :ghc-flag:`-Wimplicit-kind-vars` to
+  provide early detection of breakage that will be caused by implementation of
+  `GHC proposal #24
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0024-no-kind-vars.rst>`__
+  in a future release.
 
 Plugins
 ~~~~~~~

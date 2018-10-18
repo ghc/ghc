@@ -117,7 +117,8 @@ module GHC.Base
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
                                 -- to avoid lots of people having to
-        module GHC.Err          -- import it explicitly
+        module GHC.Err,         -- import it explicitly
+        module GHC.Maybe
   )
         where
 
@@ -127,10 +128,12 @@ import GHC.CString
 import GHC.Magic
 import GHC.Prim
 import GHC.Err
+import GHC.Maybe
 import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
 
-import GHC.Tuple ()     -- Note [Depend on GHC.Tuple]
-import GHC.Integer ()   -- Note [Depend on GHC.Integer]
+import GHC.Tuple ()              -- Note [Depend on GHC.Tuple]
+import GHC.Integer ()            -- Note [Depend on GHC.Integer]
+import GHC.Natural ()            -- Note [Depend on GHC.Natural]
 
 -- for 'class Semigroup'
 import {-# SOURCE #-} GHC.Real (Integral)
@@ -182,6 +185,10 @@ Similarly, tuple syntax (or ()) creates an implicit dependency on
 GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
 GHC.Integer] --- to explain this to the build system.  We make GHC.Base
 depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
+
+Note [Depend on GHC.Natural]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Similar to GHC.Integer.
 -}
 
 #if 0
@@ -201,21 +208,6 @@ otherwise = True
 build = errorWithoutStackTrace "urk"
 foldr = errorWithoutStackTrace "urk"
 #endif
-
--- | The 'Maybe' type encapsulates an optional value.  A value of type
--- @'Maybe' a@ either contains a value of type @a@ (represented as @'Just' a@),
--- or it is empty (represented as 'Nothing').  Using 'Maybe' is a good way to
--- deal with errors or exceptional cases without resorting to drastic
--- measures such as 'error'.
---
--- The 'Maybe' type is also a monad.  It is a simple kind of error
--- monad, where all errors are represented by 'Nothing'.  A richer
--- error monad can be built using the 'Data.Either.Either' type.
---
-data  Maybe a  =  Nothing | Just a
-  deriving ( Eq  -- ^ @since 2.01
-           , Ord -- ^ @since 2.01
-           )
 
 infixr 6 <>
 

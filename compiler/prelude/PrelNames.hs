@@ -358,7 +358,9 @@ basicKnownKeyNames
 
         -- Natural
         naturalTyConName,
-        naturalFromIntegerName,
+        naturalFromIntegerName, naturalToIntegerName,
+        plusNaturalName, minusNaturalName, timesNaturalName, mkNaturalName,
+        wordToNaturalName,
 
         -- Float/Double
         rationalToFloatName,
@@ -435,7 +437,7 @@ basicKnownKeyNames
         , eqTyConName
 
     ] ++ case cIntegerLibraryType of
-           IntegerGMP    -> [integerSDataConName]
+           IntegerGMP    -> [integerSDataConName,naturalSDataConName]
            IntegerSimple -> []
 
 genericTyConNames :: [Name]
@@ -473,8 +475,8 @@ pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
-    gHC_SHOW, gHC_READ, gHC_NUM, gHC_INTEGER_TYPE, gHC_NATURAL, gHC_LIST,
-    gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
+    gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE, gHC_INTEGER_TYPE, gHC_NATURAL,
+    gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -497,6 +499,7 @@ gHC_GHCI        = mkBaseModule (fsLit "GHC.GHCi")
 gHC_SHOW        = mkBaseModule (fsLit "GHC.Show")
 gHC_READ        = mkBaseModule (fsLit "GHC.Read")
 gHC_NUM         = mkBaseModule (fsLit "GHC.Num")
+gHC_MAYBE       = mkBaseModule (fsLit "GHC.Maybe")
 gHC_INTEGER_TYPE= mkIntegerModule (fsLit "GHC.Integer.Type")
 gHC_NATURAL     = mkBaseModule (fsLit "GHC.Natural")
 gHC_LIST        = mkBaseModule (fsLit "GHC.List")
@@ -1121,7 +1124,7 @@ integerTyConName, mkIntegerName, integerSDataConName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName, bitIntegerName :: Name
 integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
-integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit n)                   integerSDataConKey
+integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit n)                    integerSDataConKey
   where n = case cIntegerLibraryType of
             IntegerGMP    -> "S#"
             IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
@@ -1169,11 +1172,24 @@ shiftRIntegerName     = varQual gHC_INTEGER_TYPE (fsLit "shiftRInteger")     shi
 bitIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "bitInteger")        bitIntegerIdKey
 
 -- GHC.Natural types
-naturalTyConName :: Name
+naturalTyConName, naturalSDataConName :: Name
 naturalTyConName     = tcQual gHC_NATURAL (fsLit "Natural") naturalTyConKey
+naturalSDataConName  = dcQual gHC_NATURAL (fsLit n)         naturalSDataConKey
+  where n = case cIntegerLibraryType of
+            IntegerGMP    -> "NatS#"
+            IntegerSimple -> panic "naturalSDataConName evaluated for integer-simple"
 
 naturalFromIntegerName :: Name
 naturalFromIntegerName = varQual gHC_NATURAL (fsLit "naturalFromInteger") naturalFromIntegerIdKey
+
+naturalToIntegerName, plusNaturalName, minusNaturalName, timesNaturalName,
+   mkNaturalName, wordToNaturalName :: Name
+naturalToIntegerName  = varQual gHC_NATURAL (fsLit "naturalToInteger")  naturalToIntegerIdKey
+plusNaturalName       = varQual gHC_NATURAL (fsLit "plusNatural")       plusNaturalIdKey
+minusNaturalName      = varQual gHC_NATURAL (fsLit "minusNatural")      minusNaturalIdKey
+timesNaturalName      = varQual gHC_NATURAL (fsLit "timesNatural")      timesNaturalIdKey
+mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNaturalIdKey
+wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
 
 -- GHC.Real types and classes
 rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
@@ -2399,8 +2415,17 @@ makeStaticKey :: Unique
 makeStaticKey = mkPreludeMiscIdUnique 561
 
 -- Natural
-naturalFromIntegerIdKey :: Unique
+naturalFromIntegerIdKey, naturalToIntegerIdKey, plusNaturalIdKey,
+   minusNaturalIdKey, timesNaturalIdKey, mkNaturalIdKey,
+   naturalSDataConKey, wordToNaturalIdKey :: Unique
 naturalFromIntegerIdKey = mkPreludeMiscIdUnique 562
+naturalToIntegerIdKey   = mkPreludeMiscIdUnique 563
+plusNaturalIdKey        = mkPreludeMiscIdUnique 564
+minusNaturalIdKey       = mkPreludeMiscIdUnique 565
+timesNaturalIdKey       = mkPreludeMiscIdUnique 566
+mkNaturalIdKey          = mkPreludeMiscIdUnique 567
+naturalSDataConKey      = mkPreludeMiscIdUnique 568
+wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 
 {-
 ************************************************************************

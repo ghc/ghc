@@ -476,7 +476,7 @@ splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
       Refl -> IsCon con kinds
 
 -- | Use a 'TypeRep' as 'Typeable' evidence.
-withTypeable :: forall (a :: k) (r :: TYPE rep). ()
+withTypeable :: forall k (a :: k) rep (r :: TYPE rep). ()
              => TypeRep a -> (Typeable a => r) -> r
 withTypeable rep k = unsafeCoerce k' rep
   where k' :: Gift a r
@@ -631,7 +631,7 @@ unkindedTypeRep :: SomeKindedTypeRep k -> SomeTypeRep
 unkindedTypeRep (SomeKindedTypeRep x) = SomeTypeRep x
 
 data SomeKindedTypeRep k where
-    SomeKindedTypeRep :: forall (a :: k). TypeRep a
+    SomeKindedTypeRep :: forall k (a :: k). TypeRep a
                       -> SomeKindedTypeRep k
 
 kApp :: SomeKindedTypeRep (k -> k')
@@ -640,7 +640,7 @@ kApp :: SomeKindedTypeRep (k -> k')
 kApp (SomeKindedTypeRep f) (SomeKindedTypeRep a) =
     SomeKindedTypeRep (mkTrApp f a)
 
-kindedTypeRep :: forall (a :: k). Typeable a => SomeKindedTypeRep k
+kindedTypeRep :: forall k (a :: k). Typeable a => SomeKindedTypeRep k
 kindedTypeRep = SomeKindedTypeRep (typeRep @a)
 
 buildList :: forall k. Typeable k
@@ -980,7 +980,8 @@ tcNat :: TyCon
 tcNat = typeRepTyCon (typeRep @Nat)
 
 -- | An internal function, to make representations for type literals.
-typeLitTypeRep :: forall (a :: k). (Typeable k) => String -> TyCon -> TypeRep a
+typeLitTypeRep :: forall k (a :: k). (Typeable k) =>
+                  String -> TyCon -> TypeRep a
 typeLitTypeRep nm kind_tycon = mkTrCon (mkTypeLitTyCon nm kind_tycon) []
 
 -- | For compiler use.

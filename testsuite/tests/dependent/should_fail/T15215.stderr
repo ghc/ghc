@@ -1,0 +1,12 @@
+
+T15215.hs:9:3: error:
+    • Non type-variable argument in the constraint: Show (Maybe a)
+      (Use FlexibleContexts to permit this)
+    • In the definition of data constructor ‘MkA’
+      In the data type declaration for ‘A’
+
+T15215.hs:12:14: error:
+    • Illegal constraint in a kind: Show (Maybe a0)
+    • In the first argument of ‘SA’, namely ‘MkA’
+      In the type ‘SA MkA’
+      In the definition of data constructor ‘SMkA’

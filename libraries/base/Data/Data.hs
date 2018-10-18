@@ -126,7 +126,6 @@ import Data.Version( Version(..) )
 import GHC.Base hiding (Any, IntRep, FloatRep)
 import GHC.List
 import GHC.Num
-import GHC.Natural
 import GHC.Read
 import GHC.Show
 import Text.Read( reads )

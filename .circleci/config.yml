@@ -1,3 +1,6 @@
+# Questions about this file?
+# See https://ghc.haskell.org/trac/ghc/wiki/ContinuousIntegration/Usage.
+
 version: 2
 aliases:
   - &defaults
@@ -188,8 +191,8 @@ jobs:
       - run:
           name: Install LLVM
           command: |
-            curl http://releases.llvm.org/5.0.0/clang+llvm-5.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
-            echo "export PATH=`pwd`/../clang+llvm-5.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
+            curl http://releases.llvm.org/6.0.0/clang+llvm-6.0.0-x86_64-linux-gnu-debian8.tar.xz | tar -xJC ..
+            echo "export PATH=`pwd`/../clang+llvm-6.0.0-x86_64-linux-gnu-debian8/bin:\$PATH" >> $BASH_ENV
       - run:
           name: Verify that llc works
           command: llc
@@ -241,7 +244,7 @@ jobs:
   "validate-x86_64-fedora":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux-fedora:0.0.3
+      - image: ghcci/x86_64-linux-fedora:0.0.4
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-fedora
