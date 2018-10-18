@@ -15,6 +15,7 @@ data MaybeDefault v where
     SetTo :: forall v . ( Eq v, Show v ) => !v -> MaybeDefault v
     SetTo4 :: forall v a. (( Eq v, Show v ) => v -> MaybeDefault v
                                             -> a -> MaybeDefault [a])
+    TestParens :: (forall v . (Eq v) -> MaybeDefault v)
 
 [t| Map.Map T.Text $tc |]
 

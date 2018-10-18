@@ -2163,8 +2163,9 @@ gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
         : con_list '::' sigtypedoc
-                {% ams (sLL $1 $> (mkGadtDecl (unLoc $1) $3))
-                       [mu AnnDcolon $2] }
+                {% let (gadt,anns) = mkGadtDecl (unLoc $1) $3
+                   in ams (sLL $1 $> gadt)
+                       (mu AnnDcolon $2:anns) }
 
 {- Note [Difference in parsing GADT and data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

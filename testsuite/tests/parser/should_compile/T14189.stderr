@@ -39,7 +39,8 @@
             (NoExt)
             ({ T14189.hs:6:15-16 }
              {Name: T14189.MT})
-            (False)
+            ({ <no location info> }
+             (False))
             []
             (Nothing)
             (PrefixCon
@@ -57,7 +58,8 @@
             (NoExt)
             ({ T14189.hs:6:24-25 }
              {Name: T14189.NT})
-            (False)
+            ({ <no location info> }
+             (False))
             []
             (Nothing)
             (PrefixCon
@@ -68,7 +70,8 @@
             (NoExt)
             ({ T14189.hs:6:29 }
              {Name: T14189.F})
-            (False)
+            ({ <no location info> }
+             (False))
             []
             (Nothing)
             (RecCon

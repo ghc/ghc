@@ -2007,7 +2007,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                   all_fvs) }}
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
-                            , con_forall  = explicit_forall
+                            , con_forall  = L _ explicit_forall
                             , con_qvars   = qtvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args

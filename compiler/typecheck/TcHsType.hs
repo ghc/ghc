@@ -514,7 +514,7 @@ metavariable.
 In types, however, we're not so lucky, because *we cannot re-generalize*!
 There is no lambda. So, we must be careful only to instantiate at the last
 possible moment, when we're sure we're never going to want the lost polymorphism
-again. This is done in calls to tcInstBinders.
+again. This is done in calls to tcInstTyBinders.
 
 To implement this behavior, we use bidirectional type checking, where we
 explicitly think about whether we know the kind of the type we're checking
@@ -973,7 +973,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
       | isInvisibleBinder ki_binder
         -- It's invisible. Instantiate.
       = do { traceTc "tcInferApps (invis)" (ppr ki_binder $$ ppr subst)
-           ; (subst', arg') <- tcInstBinder mb_kind_info subst ki_binder
+           ; (subst', arg') <- tcInstTyBinder mb_kind_info subst ki_binder
            ; go n (arg' : acc_args) subst' (mkNakedAppTy fun arg')
                 ki_binders inner_ki all_args }
 
@@ -1094,7 +1094,7 @@ instantiateTyN mb_kind_env n bndrs inner_ki
   = return ([], ki)
 
   | otherwise
-  = do { (subst, inst_args) <- tcInstBinders empty_subst mb_kind_env inst_bndrs
+  = do { (subst, inst_args) <- tcInstTyBinders empty_subst mb_kind_env inst_bndrs
        ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
              ki'        = substTy subst rebuilt_ki
        ; traceTc "instantiateTyN" (vcat [ ppr ki
