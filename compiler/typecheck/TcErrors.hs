@@ -543,7 +543,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- report1: ones that should *not* be suppresed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
-    -- (see TcRnTypes.insolubleWantedCt) is caught here, otherwise
+    -- (see TcRnTypes.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
     report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)

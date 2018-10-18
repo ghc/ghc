@@ -89,7 +89,7 @@ module TcRnTypes(
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
-        tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt,
+        tyCoVarsOfWCList, insolubleCt, insolubleEqCt,
         isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
@@ -2387,7 +2387,7 @@ addInsols wc cts
 insolublesOnly :: WantedConstraints -> WantedConstraints
 -- Keep only the definitely-insoluble constraints
 insolublesOnly (WC { wc_simple = simples, wc_impl = implics })
-  = WC { wc_simple = filterBag insolubleWantedCt simples
+  = WC { wc_simple = filterBag insolubleCt simples
        , wc_impl   = mapBag implic_insols_only implics }
   where
     implic_insols_only implic
@@ -2407,16 +2407,16 @@ insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
 insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples })
-  =  anyBag insolubleWantedCt simples
+  =  anyBag insolubleCt simples
   || anyBag insolubleImplic implics
 
-insolubleWantedCt :: Ct -> Bool
+insolubleCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
-insolubleWantedCt ct
-  | isGivenCt ct     = False              -- See Note [Given insolubles]
-  | isHoleCt ct      = isOutOfScopeCt ct  -- See Note [Insoluble holes]
-  | insolubleEqCt ct = True
-  | otherwise        = False
+insolubleCt ct
+  | not (insolubleEqCt ct) = False
+  | isHoleCt ct            = isOutOfScopeCt ct  -- See Note [Insoluble holes]
+  | arisesFromGivens ct    = False              -- See Note [Given insolubles]
+  | otherwise              = True
 
 insolubleEqCt :: Ct -> Bool
 -- Returns True of /equality/ constraints
@@ -2469,6 +2469,12 @@ We do /not/ want to set the implication status to IC_Insoluble,
 because that'll suppress reports of [W] C b (f b).  But we
 may not report the insoluble [G] f b ~# b either (see Note [Given errors]
 in TcErrors), so we may fail to report anything at all!  Yikes.
+
+The same applies to Derived constraints that /arise from/ Givens.
+E.g.   f :: (C Int [a]) => blah
+where a fundep means we get
+       [D] Int ~ [a]
+By the same reasoning we must not suppress other errors (Trac #15767)
 
 Bottom line: insolubleWC (called in TcSimplify.setImplicationStatus)
              should ignore givens even if they are insoluble.
