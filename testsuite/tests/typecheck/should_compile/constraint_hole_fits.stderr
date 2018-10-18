@@ -14,43 +14,35 @@ constraint_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
         g :: [a] -> a
         head :: forall a. [a] -> a
         last :: forall a. [a] -> a
-        maximum :: forall (t :: * -> *).
-                   Foldable t =>
-                   forall a. Ord a => t a -> a
-        minimum :: forall (t :: * -> *).
-                   Foldable t =>
-                   forall a. Ord a => t a -> a
+        maximum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
+        minimum :: forall (t :: * -> *) a. (Foldable t, Ord a) => t a -> a
       Valid refinement hole fits include
         foldl1 (_ :: a -> a -> a)
-          where foldl1 :: forall (t :: * -> *).
+          where foldl1 :: forall (t :: * -> *) a.
                           Foldable t =>
-                          forall a. (a -> a -> a) -> t a -> a
+                          (a -> a -> a) -> t a -> a
         foldr1 (_ :: a -> a -> a)
-          where foldr1 :: forall (t :: * -> *).
+          where foldr1 :: forall (t :: * -> *) a.
                           Foldable t =>
-                          forall a. (a -> a -> a) -> t a -> a
+                          (a -> a -> a) -> t a -> a
         foldl (_ :: a -> a -> a) (_ :: a)
-          where foldl :: forall (t :: * -> *).
+          where foldl :: forall (t :: * -> *) b a.
                          Foldable t =>
-                         forall b a. (b -> a -> b) -> b -> t a -> b
+                         (b -> a -> b) -> b -> t a -> b
         foldr (_ :: a -> a -> a) (_ :: a)
-          where foldr :: forall (t :: * -> *).
+          where foldr :: forall (t :: * -> *) a b.
                          Foldable t =>
-                         forall a b. (a -> b -> b) -> b -> t a -> b
+                         (a -> b -> b) -> b -> t a -> b
         const (_ :: a)
           where const :: forall a b. a -> b -> a
         ($) (_ :: [a] -> a)
           where ($) :: forall a b. (a -> b) -> a -> b
         fail (_ :: String)
-          where fail :: forall (m :: * -> *).
-                        Monad m =>
-                        forall a. String -> m a
+          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: a)
-          where return :: forall (m :: * -> *). Monad m => forall a. a -> m a
+          where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: a)
-          where pure :: forall (f :: * -> *).
-                        Applicative f =>
-                        forall a. a -> f a
+          where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
         ($!) (_ :: [a] -> a)
           where ($!) :: forall a b. (a -> b) -> a -> b
         id (_ :: [a] -> a)

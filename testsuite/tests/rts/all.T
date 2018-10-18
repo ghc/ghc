@@ -198,6 +198,8 @@ test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']),
 # this one just needs to run on linux, as darwin/mingw32 are covered
 # by the _a test already.
 test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']),
+                      when(arch('powerpc64') or arch('powerpc64le'),
+                          expect_broken(11259)),
 		      when(opsys('darwin') or opsys('mingw32'), skip)],
      run_command, ['$MAKE -s --no-print-directory T5435_v_asm_b'])
 test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
@@ -386,9 +388,11 @@ test('T12497', [ unless(opsys('mingw32'), skip)
 
 # This test sometimes produces out of sequence samples in the profasm way, but
 # not reliably, so we just skip it. See ticket #15065.
+# Test is being skipped on darwin due to it's flakiness.
 test('T12903', [ when(opsys('mingw32'), skip)
-	       , omit_ways(['ghci', 'profasm'])
-	       ], compile_and_run, [''])
+               , when(opsys('darwin'), skip)
+	           , omit_ways(['ghci', 'profasm'])]
+	       , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
 test('T13894', normal, compile_and_run, [''])

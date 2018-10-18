@@ -80,7 +80,7 @@ datatype like
 
 gives rise to the AvailInfo
 
-  AvailTC T [T, MkT] [FieldLabel "foo" False foo],
+  AvailTC T [T, MkT] [FieldLabel "foo" False foo]
 
 whereas if -XDuplicateRecordFields is enabled it gives
 
@@ -98,8 +98,9 @@ multiple distinct fields with the same label. For example,
 
 gives rise to
 
-  AvailTC F [F, MkFInt, MkFBool]
-    [FieldLabel "foo" True $sel:foo:MkFInt, FieldLabel "foo" True $sel:foo:MkFBool].
+  AvailTC F [ F, MkFInt, MkFBool ]
+            [ FieldLabel "foo" True $sel:foo:MkFInt
+            , FieldLabel "foo" True $sel:foo:MkFBool ]
 
 Moreover, note that the flIsOverloaded flag need not be the same for
 all the elements of the list.  In the example above, this occurs if
@@ -107,8 +108,9 @@ the two data instances are defined in different modules, one with
 `-XDuplicateRecordFields` enabled and one with it disabled.  Thus it
 is possible to have
 
-  AvailTC F [F, MkFInt, MkFBool]
-    [FieldLabel "foo" True $sel:foo:MkFInt, FieldLabel "foo" False foo].
+  AvailTC F [ F, MkFInt, MkFBool ]
+            [ FieldLabel "foo" True $sel:foo:MkFInt
+            , FieldLabel "foo" False foo ]
 
 If the two data instances are defined in different modules, both
 without `-XDuplicateRecordFields`, it will be impossible to export

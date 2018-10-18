@@ -312,21 +312,24 @@ else:
     watcher = Watcher(len(parallelTests))
 
     # Now run all the tests
-    for oneTest in parallelTests:
-        if stopping():
-            break
-        oneTest(watcher)
+    try:
+        for oneTest in parallelTests:
+            if stopping():
+                break
+            oneTest(watcher)
 
-    # wait for parallel tests to finish
-    if not stopping():
-        watcher.wait()
+        # wait for parallel tests to finish
+        if not stopping():
+            watcher.wait()
 
-    # Run the following tests purely sequential
-    config.use_threads = False
-    for oneTest in aloneTests:
-        if stopping():
-            break
-        oneTest(watcher)
+        # Run the following tests purely sequential
+        config.use_threads = False
+        for oneTest in aloneTests:
+            if stopping():
+                break
+            oneTest(watcher)
+    except KeyboardInterrupt:
+        pass
 
     # flush everything before we continue
     sys.stdout.flush()

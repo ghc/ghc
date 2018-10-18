@@ -2342,8 +2342,9 @@ matchClassInst :: DynFlags -> InertSet
                -> CtLoc -> TcS LookupInstResult
 matchClassInst dflags inerts clas tys loc
 -- First check whether there is an in-scope Given that could
--- match this constraint.  In that case, do not use top-level
--- instances.  See Note [Instance and Given overlap]
+-- match this constraint.  In that case, do not use any instance
+-- whether top level, or local quantified constraints.
+-- ee Note [Instance and Given overlap]
   | not (xopt LangExt.IncoherentInstances dflags)
   , not (naturallyCoherentClass clas)
   , let matchable_givens = matchableGivens loc pred inerts
@@ -2357,7 +2358,7 @@ matchClassInst dflags inerts clas tys loc
   = do { traceTcS "matchClassInst" $ text "pred =" <+> ppr pred <+> char '{'
        ; local_res <- matchLocalInst pred loc
        ; case local_res of
-           OneInst {} ->
+           OneInst {} ->  -- See Note [Local instances and incoherence]
                 do { traceTcS "} matchClassInst local match" $ ppr local_res
                    ; return local_res }
 
@@ -2399,6 +2400,7 @@ naturallyCoherentClass cls
     || cls `hasKey` heqTyConKey
     || cls `hasKey` eqTyConKey
     || cls `hasKey` coercibleTyConKey
+
 
 {- Note [Instance and Given overlap]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2526,9 +2528,37 @@ Exammples: T5853, T10432, T5315, T9222, T2627b, T3028b
 
 PS: the term "naturally coherent" doesn't really seem helpful.
 Perhaps "invertible" or something?  I left it for now though.
+
+Note [Local instances and incoherence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f :: forall b c. (Eq b, forall a. Eq a => Eq (c a))
+                 => c b -> Bool
+   f x = x==x
+
+We get [W] Eq (c b), and we must use the local instance to solve it.
+
+BUT that wanted also unifies with the top-level Eq [a] instance,
+and Eq (Maybe a) etc.  We want the local instance to "win", otherwise
+we can't solve the wanted at all.  So we mark it as Incohherent.
+According to Note [Rules for instance lookup] in InstEnv, that'll
+make it win even if there are other instances that unify.
+
+Moreover this is not a hack!  The evidence for this local instance
+will be constructed by GHC at a call site... from the very instances
+that unify with it here.  It is not like an incoherent user-written
+instance which might have utterly different behaviour.
+
+Consdider  f :: Eq a => blah.  If we have [W] Eq a, we certainly
+get it from the Eq a context, without worrying that there are
+lots of top-level instances that unify with [W] Eq a!  We'll use
+those instances to build evidence to pass to f. That's just the
+nullary case of what's happening here.
 -}
 
 matchLocalInst :: TcPredType -> CtLoc -> TcS LookupInstResult
+-- Try any Given quantified constraints, which are
+-- effectively just local instance declarations.
 matchLocalInst pred loc
   = do { ics <- getInertCans
        ; case match_local_inst (inert_insts ics) of

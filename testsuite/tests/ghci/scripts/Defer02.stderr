@@ -59,7 +59,7 @@ Defer01.hs:34:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
 Defer01.hs:39:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
     • In the first argument of ‘not’, namely ‘(K a)’
-      In the expression: (not (K a))
+      In the first argument of ‘seq’, namely ‘(not (K a))’
       In the expression: seq (not (K a)) ()
     • Relevant bindings include
         a :: a (bound at Defer01.hs:39:3)
@@ -152,7 +152,7 @@ Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 *** Exception: Defer01.hs:39:17: error:
     • Couldn't match expected type ‘Bool’ with actual type ‘T a’
     • In the first argument of ‘not’, namely ‘(K a)’
-      In the expression: (not (K a))
+      In the first argument of ‘seq’, namely ‘(not (K a))’
       In the expression: seq (not (K a)) ()
     • Relevant bindings include
         a :: a (bound at Defer01.hs:39:3)

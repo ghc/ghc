@@ -156,7 +156,7 @@ kind ``TYPE 'IntRep`` and ``Double#`` has kind ``TYPE 'DoubleRep``. These
 kinds say that the runtime representation of an ``Int#`` is a machine integer,
 and the runtime representation of a ``Double#`` is a machine double-precision
 floating point. In contrast, the kind ``*`` is actually just a synonym
-for ``TYPE 'PtrRepLifted``. More details of the ``TYPE`` mechanisms appear in
+for ``TYPE 'LiftedRep``. More details of the ``TYPE`` mechanisms appear in
 the `section on runtime representation polymorphism <#runtime-rep>`__.
 
 Given that ``Int#``'s kind is not ``*``, it then it follows that
@@ -4720,7 +4720,7 @@ which really behave differently for the newtype and its representation.
         {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
         import Lib
-        
+
         newtype Int' = Int' Int
                      deriving (AClass)
 
@@ -9130,6 +9130,24 @@ In this redefinition, we give an explicit kind for ``(:~~:)``, deferring the cho
 of ``k2`` until after the first argument (``a``) has been given. With this declaration
 for ``(:~~:)``, the instance for ``HTestEquality`` is accepted.
 
+Another difference between higher-rank kinds and types can be found in their
+treatment of inferred and user-specified type variables. Consider the following
+program: ::
+
+  newtype Foo (f :: forall k. k -> Type) = MkFoo (f Int)
+  data Proxy a = Proxy
+
+  foo :: Foo Proxy
+  foo = MkFoo Proxy
+
+The kind of ``Foo``'s parameter is ``forall k. k -> Type``, but the kind of
+``Proxy`` is ``forall {k}. k -> Type``, where ``{k}`` denotes that the kind
+variable ``k`` is to be inferred, not specified by the user. (See
+:ref:`visible-type-application` for more discussion on the inferred-specified
+distinction). GHC does not consider ``forall k. k -> Type`` and
+``forall {k}. k -> Type`` to be equal at the kind level, and thus rejects
+``Foo Proxy`` as ill-kinded.
+
 Constraints in kinds
 --------------------
 
@@ -9389,7 +9407,7 @@ stub out functions that return unboxed types.
 Printing levity-polymorphic types
 ---------------------------------
 
-.. ghc-flag:: -fprint-explicit-runtime-rep
+.. ghc-flag:: -fprint-explicit-runtime-reps
     :shortdesc: Print ``RuntimeRep`` variables in types which are
         runtime-representation polymorphic.
     :type: dynamic
@@ -9729,9 +9747,9 @@ Introducing quantified constraints offers two main benefits:
    instance (Eq a, forall b. Eq b => Eq (f b)) => Eq (Rose f a) where
      (Rose x1 rs1) == (Rose x2 rs2) = x1 == x2 && rs1 == rs2
 
-  This extension allows to write constraints of the form ``forall b. Eq b => Eq (f b)``,
-  which is needed to solve the ``Eq (f (Rose f x))`` constraint arising from the
-  second usage of the ``(==)`` method.
+  This extension allows us to write constraints of the form ``forall b. Eq b =>
+  Eq (f b)``, which is needed to solve the ``Eq (f (Rose f x))`` constraint
+  arising from the second usage of the ``(==)`` method.
 
 - Secondly, quantified constraints allow for more concise and precise specifications. As an example, consider the MTL type class for monad transformers::
 
@@ -9739,7 +9757,7 @@ Introducing quantified constraints offers two main benefits:
      lift :: Monad m => m a -> (t m) a
 
   The developer knows that a monad transformer takes a monad ``m`` into a new monad ``t m``.
-  But this is property is not formally specified in the above declaration.
+  But this property is not formally specified in the above declaration.
   This omission becomes an issue when defining monad transformer composition::
 
     newtype (t1 * t2) m a = C { runC :: t1 (t2 m) a }
@@ -9758,31 +9776,37 @@ Introducing quantified constraints offers two main benefits:
     class (forall m. Monad m => Monad (t m)) => Trans t where
       lift :: Monad m => m a -> (t m) a
 
-THe idea is very old; see Seciton 7 of `Derivable type classes <https://www.microsoft.com/en-us/research/publication/derivable-type-classes/>`_.
+This idea is very old; see Seciton 7 of `Derivable type classes <https://www.microsoft.com/en-us/research/publication/derivable-type-classes/>`_.
 
 Syntax changes
 ----------------
 
 `Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this ::
 
- context ::= class
-         |   ( class1, ..., classn )
+.. code-block:: none
 
- class ::= qtycls tyvar
-        |  qtycls (tyvar atype1 ... atypen)
+    context ::= class
+            |   ( class1, ..., classn )
+
+    class ::= qtycls tyvar
+            |  qtycls (tyvar atype1 ... atypen)
 
 We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration ::
 
- class ::= ...
-       | context => qtycls inst
-       | context => tyvar inst
+.. code-block:: none
+
+    class ::= ...
+          | context => qtycls inst
+          | context => tyvar inst
 
 The definition of ``inst`` is unchanged from the Haskell Report (roughly, just a type).
 That is the only syntactic change to the language.
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with ``ExplicitForAll`` and ``MultiParameterTypeClasses`` the syntax becomes ::
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes ::
+
+.. code-block:: none
 
     class ::= ...
            | [forall tyavrs .] context => qtycls inst1 ... instn
@@ -9804,7 +9828,7 @@ Notes:
    instance (forall xx. c (Free c xx)) => Monad (Free c) where
        Free f >>= g = f g
 
-  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the `=>` may be headed by a type *variable* (`c` in this case), rather than a class.  It should not be one of the forall'd variables, though.
+  See `Iceland Jack's summary <https://ghc.haskell.org/trac/ghc/ticket/14733#comment:6>`_.  The key point is that the bit to the right of the ``=>`` may be headed by a type *variable* (``c`` in this case), rather than a class.  It should not be one of the forall'd variables, though.
 
   (NB: this goes beyond what is described in `the paper <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_, but does not seem to introduce any new technical difficulties.)
 
@@ -9883,13 +9907,13 @@ There are several possible approaches for handling these overlapping local axiom
   instances), so it is a much more pervasive change, with substantial consequences
   for the type inference engine.
 
-GHC adoptst **Reject if in doubt** for now.  We can see how painful it
+GHC adopts **Reject if in doubt** for now.  We can see how painful it
 is in practice, and try something more ambitious if necessary.
 
 Instance lookup
 -------------------
 
-In the light of the overlap decision, instance lookup works like this, when
+In the light of the overlap decision, instance lookup works like this when
 trying to solve a class constraint ``C t``
 
 1. First see if there is a given un-quantified constraint ``C t``.  If so, use it to solve the constraint.
@@ -9901,22 +9925,9 @@ trying to solve a class constraint ``C t``
 Termination
 ---------------
 
-GHC uses the `Paterson Conditions <http://downloads.haskell.org/~ghc/master/users-guide/glasgow_exts.html#instance-termination-rules>`_ to ensure that instance resolution terminates:
-
-The Paterson Conditions are these: for each class constraint ``(C t1 ... tn)``
-in the context
-
-1. No type variable has more occurrences in the constraint than in
-   the head
-
-2. The constraint has fewer constructors and variables (taken
-   together and counting repetitions) than the head
-
-3. The constraint mentions no type functions. A type function
-   application can in principle expand to a type of arbitrary size,
-   and so are rejected out of hand
-
-How are those rules modified for quantified constraints? In two ways.
+GHC uses the :ref:`Paterson Conditions <instance-termination>` to ensure
+that instance resolution terminates. How are those rules modified for quantified
+constraints? In two ways.
 
 - Each quantified constraint, taken by itself, must satisfy the termination rules for an instance declaration.
 
@@ -11533,7 +11544,7 @@ for typed holes:
                 with maxBound @Bool
               minBound :: forall a. Bounded a => a
                 with minBound @Bool
- 
+
 .. _typed-hole-valid-hole-fits:
 
 Valid Hole Fits
@@ -11579,7 +11590,7 @@ configurable by a few flags.
     By default, the hole fits show the type of the hole fit.
     This can be turned off by the reverse of this flag.
 
-     
+
 
 .. ghc-flag:: -fshow-type-app-of-hole-fits
     :shortdesc: Toggles whether to show the type application of the valid
@@ -11625,7 +11636,7 @@ configurable by a few flags.
     hole fit, i.e. where it was bound or defined, and what module
     it was originally defined in if it was imported. This can be toggled
     off using the reverse of this flag.
-           
+
 
 .. ghc-flag:: -funclutter-valid-hole-fits
     :shortdesc: Unclutter the list of valid hole fits by not showing
@@ -11715,7 +11726,7 @@ it will additionally offer up a list of refinement hole fits, in this case: ::
 
 Which shows that the hole could be replaced with e.g. ``foldl1 _``. While not
 fixing the hole, this can help users understand what options they have.
- 
+
 .. ghc-flag:: -frefinement-level-hole-fits=⟨n⟩
     :shortdesc: *default: off.* Sets the level of refinement of the
          refinement hole fits, where level ``n`` means that hole fits
@@ -11776,9 +11787,9 @@ fixing the hole, this can help users understand what options they have.
     for the hole ``_ :: [a] -> a``. If this flag is toggled off, the output
     will display only ``foldl1 _``, which can be used as a direct replacement
     for the hole, without requiring ``-XScopedTypeVariables``.
-   
-          
-    
+
+
+
 
 Sorting Valid Hole Fits
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -563,7 +563,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                 -- inl_inline: see Note [Wrapper NoUserInline]
                 -- inl_rule:   RuleMatchInfo is (and must be) unaffected
 
-            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule wrap_rhs arity
+            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule dflags wrap_rhs arity
                               `setInlinePragma` wrap_prag
                               `setIdOccInfo`    noOccInfo
                                 -- Zap any loop-breaker-ness, to avoid bleating from Lint

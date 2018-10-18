@@ -1578,12 +1578,10 @@ setImplicationStatus :: Implication -> TcS (Maybe Implication)
 --    * Trim the ic_wanted field to remove Derived constraints
 -- Precondition: the ic_status field is not already IC_Solved
 -- Return Nothing if we can discard the implication altogether
-setImplicationStatus implic@(Implic { ic_status    = status
-                                    , ic_info      = info
-                                    , ic_skols     = skols
-                                    , ic_telescope = m_telescope
-                                    , ic_wanted    = wc
-                                    , ic_given     = givens })
+setImplicationStatus implic@(Implic { ic_status     = status
+                                    , ic_info       = info
+                                    , ic_wanted     = wc
+                                    , ic_given      = givens })
  | ASSERT2( not (isSolvedStatus status ), ppr info )
    -- Precondition: we only set the status if it is not already solved
    not (isSolvedWC pruned_wc)
@@ -1606,20 +1604,20 @@ setImplicationStatus implic@(Implic { ic_status    = status
               -- See Note [Tracking redundant constraints]
  = do { traceTcS "setImplicationStatus(all-solved) {" (ppr implic)
 
-      ; implic <- neededEvVars implic
-      ; skols <- mapM TcS.zonkTcTyCoVarBndr skols
+      ; implic@(Implic { ic_need_inner = need_inner
+                       , ic_need_outer = need_outer }) <- neededEvVars implic
+
+      ; bad_telescope <- checkBadTelescope implic
 
       ; let dead_givens | warnRedundantGivens info
-                        = filterOut (`elemVarSet` ic_need_inner implic) givens
+                        = filterOut (`elemVarSet` need_inner) givens
                         | otherwise = []   -- None to report
-
-            bad_telescope = check_telescope skols
 
             discard_entire_implication  -- Can we discard the entire implication?
               =  null dead_givens           -- No warning from this implication
               && not bad_telescope
               && isEmptyBag pruned_implics  -- No live children
-              && isEmptyVarSet (ic_need_outer implic) -- No needed vars to pass up to parent
+              && isEmptyVarSet need_outer   -- No needed vars to pass up to parent
 
             final_status
               | bad_telescope = IC_BadTelescope
@@ -1653,18 +1651,28 @@ setImplicationStatus implic@(Implic { ic_status    = status
      | otherwise
      = True        -- Otherwise, keep it
 
-   -- See Note [Keeping scoped variables in order: Explicit] in TcHsType
-   check_telescope sks = isJust m_telescope && go emptyVarSet (reverse sks)
-     where
-       go :: TyVarSet   -- skolems that appear *later* than the current ones
-          -> [TcTyVar]  -- ordered skolems, in reverse order
-          -> Bool       -- True <=> there is an out-of-order skolem
-       go _ [] = False
-       go later_skols (one_skol : earlier_skols)
-         | tyCoVarsOfType (tyVarKind one_skol) `intersectsVarSet` later_skols
-         = True
-         | otherwise
-         = go (later_skols `extendVarSet` one_skol) earlier_skols
+checkBadTelescope :: Implication -> TcS Bool
+-- True <=> the skolems form a bad telescope
+-- See Note [Keeping scoped variables in order: Explicit] in TcHsType
+checkBadTelescope (Implic { ic_telescope  = m_telescope
+                          , ic_skols      = skols })
+  | isJust m_telescope
+  = do{ skols <- mapM TcS.zonkTcTyCoVarBndr skols
+      ; return (go emptyVarSet (reverse skols))}
+
+  | otherwise
+  = return False
+
+  where
+    go :: TyVarSet   -- skolems that appear *later* than the current ones
+       -> [TcTyVar]  -- ordered skolems, in reverse order
+       -> Bool       -- True <=> there is an out-of-order skolem
+    go _ [] = False
+    go later_skols (one_skol : earlier_skols)
+      | tyCoVarsOfType (tyVarKind one_skol) `intersectsVarSet` later_skols
+      = True
+      | otherwise
+      = go (later_skols `extendVarSet` one_skol) earlier_skols
 
 warnRedundantGivens :: SkolemInfo -> Bool
 warnRedundantGivens (SigSkol ctxt _ _)

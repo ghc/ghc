@@ -40,8 +40,7 @@ test('T3429', [ extra_run_opts('+RTS -C0.001 -RTS'),
      compile_and_run, [''])
 
 # without -O, goes into an infinite loop
-# GHCi does not detect the infinite loop.  We should really fix this.
-test('T4030', omit_ways('ghci'), compile_and_run, ['-O'])
+test('T4030', normal, compile_and_run, ['-O'])
 
 # each of these runs for about a second
 test('throwto001', [reqlib('random'), extra_run_opts('1000 2000')],
@@ -119,10 +118,7 @@ setTestOpts(when(fast(), skip))
 
 test('conc001', normal, compile_and_run, [''])
 test('conc002', normal, compile_and_run, [''])
-
-# Omit GHCi way - it blows up to 0.5G.  Something to do with the threaded RTS?
-test('conc004', omit_ways(['ghci']), compile_and_run, [''])
-
+test('conc004', normal, compile_and_run, [''])
 test('conc007', extra_run_opts('+RTS -H128M -RTS'), compile_and_run, [''])
 test('conc008', normal, compile_and_run, [''])
 test('conc009', exit_code(1), compile_and_run, [''])

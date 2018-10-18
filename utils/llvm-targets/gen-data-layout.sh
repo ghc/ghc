@@ -39,6 +39,9 @@ TARGETS=(
     "i386-apple-darwin" "x86_64-apple-darwin"
     # iOS
     "armv7-apple-ios arm64-apple-ios" "i386-apple-ios x86_64-apple-ios"
+
+    # FreeBSD ARM
+    "aarch64-unknown-freebsd" "armv6-unknown-freebsd-gnueabihf" "armv7-unknown-freebsd-gnueabihf"
 )
 
 # given the call to clang -c11 that clang --target -v generates,

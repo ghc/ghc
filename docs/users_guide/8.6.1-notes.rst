@@ -126,6 +126,37 @@ Compiler
   :ghc-flag:`-fexternal-dynamic-refs`. If you don't know why you might
   need this, you don't need it.
 
+Plugins
+~~~~~~~
+
+- GHC's plugin mechanism now offers plugin authors control over their plugin's
+  effect on recompilation checking. Specifically the ``Plugin`` record name has
+  a new field ::
+
+    data Plugin = Plugin {
+        pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
+      , {- ... -}
+      }
+
+    data PluginRecompile = ForceRecompile | NoForceRecompile | MaybeRecompile Fingerprint
+
+  Plugin based on ``defaultPlugin`` will have their previous recompilation
+  behavior (``ForceRecompile``) preserved. However, plugins that are "pure" are
+  encouraged to override this to either ``NoForceRecompile`` or ``MaybeRecompile``.
+  See :ref:`plugin_recompilation` for details.
+
+- GHC now provides a class of new plugins: source plugins. These plugins can
+  inspect and modify a variety of intermediate representations used by the
+  compiler's frontend. These include:
+
+    * The ability to modify the parser output
+    * The ability to inspect the renamer output
+    * The ability to modify the typechecked AST
+    * The ability to modify Template Haskell splices
+    * The ability to modify interface files as they are loaded
+
+  See :ref:`source-plugins` for details.
+
 GHCi
 ~~~~
 

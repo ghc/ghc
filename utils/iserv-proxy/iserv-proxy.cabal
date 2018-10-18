@@ -1,5 +1,5 @@
-Name: iserv-bin
-Version: 0.0
+Name: iserv-proxy
+Version: 8.5
 Copyright: XXX
 License: BSD3
 -- XXX License-File: LICENSE
@@ -61,72 +61,10 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.10
 
-Flag library
-    Description:   Build iserv library
-    Default:       False
-
-Flag proxy
-    Description:   Build iserv-proxy
-    Default:       False
-
-Library
-    If flag(library)
-       Buildable: True
-    Else
-       Buildable: False
-    Default-Language: Haskell2010
-    Hs-Source-Dirs: src
-    Exposed-Modules: Lib
-                   , Remote.Message
-                   , Remote.Slave
-                   , GHCi.Utils
-    Build-Depends: base       >= 4   && < 5,
-                   binary     >= 0.7 && < 0.9,
-                   bytestring >= 0.10 && < 0.11,
-                   containers >= 0.5 && < 0.6,
-                   deepseq    >= 1.4 && < 1.5,
-                   ghci       == 8.5,
-                   network    >= 2.6 && < 2.7,
-                   directory  >= 1.3 && < 1.4,
-                   filepath   >= 1.4 && < 1.5
-   if os(windows)
-       Cpp-Options: -DWINDOWS
-   else
-       Build-Depends: unix   >= 2.7 && < 2.9
-
-Executable iserv
-    Default-Language: Haskell2010
-    ghc-options: -no-hs-main
-    Main-Is: Main.hs
-    C-Sources: cbits/iservmain.c
-    Hs-Source-Dirs: src
-    include-dirs: .
-    If flag(library)
-       Other-Modules: GHCi.Utils
-    Else
-       Other-Modules: GHCi.Utils
-                    , Lib
-    Build-Depends: array      >= 0.5 && < 0.6,
-                   base       >= 4   && < 5,
-                   binary     >= 0.7 && < 0.9,
-                   bytestring >= 0.10 && < 0.11,
-                   containers >= 0.5 && < 0.6,
-                   deepseq    >= 1.4 && < 1.5,
-                   ghci       == 8.5
-
-    if os(windows)
-        Cpp-Options: -DWINDOWS
-    else
-        Build-Depends: unix   >= 2.7 && < 2.9
-
 Executable iserv-proxy
-   If flag(proxy)
-      Buildable: True
-   Else
-      Buildable: False
    Default-Language: Haskell2010
-   Main-Is: Remote.hs
-   Hs-Source-Dirs: proxy-src
+   Main-Is: Main.hs
+   Hs-Source-Dirs: src
    Build-Depends: array      >= 0.5 && < 0.6,
                   base       >= 4   && < 5,
                   binary     >= 0.7 && < 0.9,
@@ -137,4 +75,4 @@ Executable iserv-proxy
                   directory  >= 1.3 && < 1.4,
                   network    >= 2.6,
                   filepath   >= 1.4 && < 1.5,
-                  iserv-bin
+                  libiserv   == 8.5

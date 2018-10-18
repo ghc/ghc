@@ -14,6 +14,7 @@ else:
     opts = ''
 test('num009', [ when(fast(), skip)
                , when(platform('i386-apple-darwin'), expect_broken(2370))
+               , when(platform('powerpc64le-unknown-linux'), expect_broken(13634))
                , when(opsys('mingw32'), omit_ways(['ghci'])) ],
                # We get different results at 1e20 on x86/Windows, so there is
                # a special output file for that.  I (SDM) don't think these are

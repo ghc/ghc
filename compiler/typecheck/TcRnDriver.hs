@@ -42,6 +42,7 @@ module TcRnDriver (
         badReexportedBootThing,
         checkBootDeclM,
         missingBootThing,
+        getRenamedStuff, RenamedStuff
     ) where
 
 import GhcPrelude
@@ -60,7 +61,7 @@ import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
-import Plugins ( tcPlugin, LoadedPlugin(..))
+import Plugins
 import DynFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
@@ -149,12 +150,12 @@ import Control.Monad
 
 -- | Top level entry point for typechecker and renamer
 tcRnModule :: HscEnv
-           -> HscSource
+           -> ModSummary
            -> Bool              -- True <=> save renamed syntax
            -> HsParsedModule
            -> IO (Messages, Maybe TcGblEnv)
 
-tcRnModule hsc_env hsc_src save_rn_syntax
+tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module=L loc this_module}
  | RealSrcSpan real_loc <- loc
  = withTiming (pure dflags)
@@ -163,12 +164,13 @@ tcRnModule hsc_env hsc_src save_rn_syntax
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
           withTcPlugins hsc_env $
 
-          tcRnModuleTcRnM hsc_env hsc_src parsedModule pair
+          tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
   | otherwise
   = return ((emptyBag, unitBag err_msg), Nothing)
 
   where
+    hsc_src = ms_hsc_src mod_sum
     dflags = hsc_dflags hsc_env
     err_msg = mkPlainErrMsg (hsc_dflags hsc_env) loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
@@ -187,13 +189,13 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 
 
 tcRnModuleTcRnM :: HscEnv
-                -> HscSource
+                -> ModSummary
                 -> HsParsedModule
                 -> (Module, SrcSpan)
                 -> TcRn TcGblEnv
 -- Factored out separately from tcRnModule so that a Core plugin can
 -- call the type checker directly
-tcRnModuleTcRnM hsc_env hsc_src
+tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
                       (L loc (HsModule maybe_mod export_ies
@@ -203,8 +205,8 @@ tcRnModuleTcRnM hsc_env hsc_src
                 })
                 (this_mod, prel_imp_loc)
  = setSrcSpan loc $
-   do { let { explicit_mod_hdr = isJust maybe_mod } ;
-
+   do { let { explicit_mod_hdr = isJust maybe_mod
+            ; hsc_src = ms_hsc_src mod_sum };
                 -- Load the hi-boot interface for this module, if any
                 -- We do this now so that the boot_names can be passed
                 -- to tcTyAndClassDecls, because the boot_names are
@@ -288,6 +290,9 @@ tcRnModuleTcRnM hsc_env hsc_src
 
                 -- add extra source files to tcg_dependent_files
         addDependentFiles src_files ;
+
+        runRenamerPlugin mod_sum hsc_env tcg_env ;
+        tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env ;
 
                 -- Dump output and return
         tcDump tcg_env ;
@@ -2057,21 +2062,73 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                     tcGhciStmts [no_it_b] ,
                     tcGhciStmts [no_it_c] ]
 
-
-        -- Ensure that type errors don't get deferred when type checking the
-        -- naked expression. Deferring type errors here is unhelpful because the
-        -- expression gets evaluated right away anyway. It also would potentially
-        -- emit two redundant type-error warnings, one from each plan.
         ; generate_it <- goptM Opt_NoIt
+
+        -- We disable `-fdefer-type-errors` in GHCi for naked expressions.
+        -- See Note [Deferred type errors in GHCi]
+
+        -- NB: The flag `-fdefer-type-errors` implies `-fdefer-type-holes`
+        -- and `-fdefer-out-of-scope-variables`. However the flag
+        -- `-fno-defer-type-errors` doesn't imply `-fdefer-type-holes` and
+        -- `-fno-defer-out-of-scope-variables`. Thus the later two flags
+        -- also need to be unset here.
         ; plan <- unsetGOptM Opt_DeferTypeErrors $
                   unsetGOptM Opt_DeferTypedHoles $
+                  unsetGOptM Opt_DeferOutOfScopeVariables $
                     runPlans $ if generate_it
                                  then no_it_plans
                                  else it_plans
 
-
         ; fix_env <- getFixityEnv
         ; return (plan, fix_env) }
+
+{- Note [Deferred type errors in GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHCi, we ensure that type errors don't get deferred when type checking the
+naked expressions. Deferring type errors here is unhelpful because the
+expression gets evaluated right away anyway. It also would potentially emit
+two redundant type-error warnings, one from each plan.
+
+Trac #14963 reveals another bug that when deferred type errors is enabled
+in GHCi, any reference of imported/loaded variables (directly or indirectly)
+in interactively issued naked expressions will cause ghc panic. See more
+detailed dicussion in Trac #14963.
+
+The interactively issued declarations, statements, as well as the modules
+loaded into GHCi, are not affected. That means, for declaration, you could
+have
+
+    Prelude> :set -fdefer-type-errors
+    Prelude> x :: IO (); x = putStrLn True
+    <interactive>:14:26: warning: [-Wdeferred-type-errors]
+        ? Couldn't match type ‘Bool’ with ‘[Char]’
+          Expected type: String
+            Actual type: Bool
+        ? In the first argument of ‘putStrLn’, namely ‘True’
+          In the expression: putStrLn True
+          In an equation for ‘x’: x = putStrLn True
+
+But for naked expressions, you will have
+
+    Prelude> :set -fdefer-type-errors
+    Prelude> putStrLn True
+    <interactive>:2:10: error:
+        ? Couldn't match type ‘Bool’ with ‘[Char]’
+          Expected type: String
+            Actual type: Bool
+        ? In the first argument of ‘putStrLn’, namely ‘True’
+          In the expression: putStrLn True
+          In an equation for ‘it’: it = putStrLn True
+
+    Prelude> let x = putStrLn True
+    <interactive>:2:18: warning: [-Wdeferred-type-errors]
+        ? Couldn't match type ‘Bool’ with ‘[Char]’
+          Expected type: String
+            Actual type: Bool
+        ? In the first argument of ‘putStrLn’, namely ‘True’
+          In the expression: putStrLn True
+          In an equation for ‘x’: x = putStrLn True
+-}
 
 tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
@@ -2113,7 +2170,7 @@ tcUserStmt rdr_stmt@(L loc _)
 
 {-
 Note [GHCi Plans]
-
+~~~~~~~~~~~~~~~~~
 When a user types an expression in the repl we try to print it in three different
 ways. Also, depending on whether -fno-it is set, we bind a variable called `it`
 which can be used to refer to the result of the expression subsequently in the repl.
@@ -2698,3 +2755,39 @@ withTcPlugins hsc_env m =
 getTcPlugins :: DynFlags -> [TcPlugin]
 getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
   where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
+
+runRenamerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM ()
+runRenamerPlugin mod_sum hsc_env gbl_env = do
+    let dflags = hsc_dflags hsc_env
+    case getRenamedStuff gbl_env of
+      Just rn ->
+        withPlugins_ dflags
+                     (\p opts -> (fromMaybe (\_ _ _ -> return ())
+                                            (renamedResultAction p)) opts mod_sum)
+                     rn
+      Nothing -> return ()
+
+-- XXX: should this really be a Maybe X?  Check under which circumstances this
+-- can become a Nothing and decide whether this should instead throw an
+-- exception/signal an error.
+type RenamedStuff =
+        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
+                Maybe LHsDocString))
+
+-- | Extract the renamed information from TcGblEnv.
+getRenamedStuff :: TcGblEnv -> RenamedStuff
+getRenamedStuff tc_result
+  = fmap (\decls -> ( decls, tcg_rn_imports tc_result
+                    , tcg_rn_exports tc_result, tcg_doc_hdr tc_result ) )
+         (tcg_rn_decls tc_result)
+
+runTypecheckerPlugin :: ModSummary -> HscEnv -> TcGblEnv -> TcM TcGblEnv
+runTypecheckerPlugin sum hsc_env gbl_env = do
+    let dflags = hsc_dflags hsc_env
+        unsafeText = "Use of plugins makes the module unsafe"
+        pluginUnsafe = unitBag ( mkPlainWarnMsg dflags noSrcSpan
+                                   (Outputable.text unsafeText) )
+        mark_unsafe = recordUnsafeInfer pluginUnsafe
+    withPlugins dflags
+      (\p opts env -> mark_unsafe >> typeCheckResultAction p opts sum env)
+      gbl_env

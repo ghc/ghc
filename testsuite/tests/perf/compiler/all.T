@@ -942,7 +942,7 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64),  924299320, 5),
+        [(wordsize(64),  973149832, 5),
          # 2015-08-04    999826288     initial value
          # 2016-04-14   1066246248     Final demand analyzer run
          # 2016-06-18    984268712     shuffling around of Data.Functor.Identity
@@ -954,6 +954,7 @@ test('T9233',
          # 2017-02-07    884436192     Another improvement to SetLevels
          # 2017-02-17    974530192     Type-indexed Typeable
          # 2017-03-21    924299320     It's unclear
+         # 2018-06-09    973149832     It's unclear
 
          (wordsize(32),  460112888, 5)
          # 2016-04-06    515672240     (x86/Linux) initial value
@@ -1094,7 +1095,7 @@ test('T12545',
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 118665640, 5),
+          [(wordsize(64), 125020728, 5),
           # 2017-01-05   90595208  initial
           # 2017-01-19   95269000  Allow top-level string literals in Core
           # 2017-02-05   88806416  Probably OccAnal fixes
@@ -1102,6 +1103,7 @@ test('T13035',
           # 2017-02-25   98390488  Early inline patch
           # 2017-03-21   93249744  It's unclear
           # 2017-07-19   118665640 Generate Typeable bindings for data instances
+          # 2018-06-10   125020728 It's unclear
           ]),
      ],
      compile,

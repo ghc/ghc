@@ -67,7 +67,7 @@
  * -------------------------------------------------------------------------- */
 
 #if !defined(THREADED_RTS)
-// Blocked/sleeping thrads
+// Blocked/sleeping threads
 StgTSO *blocked_queue_hd = NULL;
 StgTSO *blocked_queue_tl = NULL;
 StgTSO *sleeping_queue = NULL;    // perhaps replace with a hash table?

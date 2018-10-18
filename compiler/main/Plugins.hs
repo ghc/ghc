@@ -59,13 +59,13 @@ data Plugin = Plugin {
     -- ^ Modify the module when it is parsed. This is called by
     -- HscMain when the parsing is successful.
   , renamedResultAction :: Maybe ([CommandLineOption] -> ModSummary
-                                    -> RenamedSource -> Hsc ())
+                                    -> RenamedSource -> TcM ())
     -- ^ Installs a read-only pass that receives the renamed syntax tree as an
     -- argument when type checking is successful.
   , typeCheckResultAction :: [CommandLineOption] -> ModSummary -> TcGblEnv
-                               -> Hsc TcGblEnv
-    -- ^ Modify the module when it is type checked. This is called by
-    -- HscMain when the type checking is successful.
+                               -> TcM TcGblEnv
+    -- ^ Modify the module when it is type checked. This is called add the
+    -- very end of typechecking.
   , spliceRunAction :: [CommandLineOption] -> LHsExpr GhcTc
                          -> TcM (LHsExpr GhcTc)
     -- ^ Modify the TH splice or quasiqoute before it is run.

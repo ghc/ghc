@@ -626,8 +626,10 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_forall = isJust mb_forall
                , con_ex_tvs = mb_forall `orElse` []
                , con_mb_cxt = mb_cxt
-               , con_args   = args
+               , con_args   = args'
                , con_doc    = Nothing }
+  where
+    args' = nudgeHsSrcBangs args
 
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs     -- Always a HsForAllTy
@@ -638,7 +640,7 @@ mkGadtDecl names ty
                 , con_forall = isLHsForAllTy ty
                 , con_qvars  = mkHsQTvs tvs
                 , con_mb_cxt = mcxt
-                , con_args   = args
+                , con_args   = args'
                 , con_res_ty = res_ty
                 , con_doc    = Nothing }
   where
@@ -651,12 +653,35 @@ mkGadtDecl names ty
     split_rho tau                  = (Nothing, tau)
 
     (args, res_ty) = split_tau tau
+    args' = nudgeHsSrcBangs args
 
     -- See Note [GADT abstract syntax] in HsDecls
     split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) _w res_ty))
                                    = (RecCon (L loc rf), res_ty)
     split_tau (L _ (HsParTy _ ty)) = split_tau ty
     split_tau tau                  = (PrefixCon [], tau)
+
+nudgeHsSrcBangs :: HsConDeclDetails GhcPs -> HsConDeclDetails GhcPs
+-- ^ This function ensures that fields with strictness or packedness
+-- annotations put these annotations on an outer 'HsBangTy'.
+--
+-- The problem is that in the parser, strictness and packedness annotations
+-- bind more tightly that docstrings. However, the expectation downstream of
+-- the parser (by functions such as 'getBangType' and 'getBangStrictness')
+-- is that docstrings bind more tightly so that 'HsBangTy' may end up as the
+-- top-level type.
+--
+-- See #15206
+nudgeHsSrcBangs details
+  = case details of
+      PrefixCon as -> PrefixCon (map go as)
+      RecCon r -> RecCon r
+      InfixCon a1 a2 -> InfixCon (go a1) (go a2)
+  where
+    go (L l (HsDocTy _ (L _ (HsBangTy _ s lty)) lds)) =
+      L l (HsBangTy noExt s (addCLoc lty lds (HsDocTy noExt lty lds)))
+    go lty = lty
+
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

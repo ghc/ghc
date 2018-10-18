@@ -535,7 +535,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     // SRT only
     case THUNK_STATIC:
-        ASSERT(get_itbl(c)->srt_bitmap != 0);
+        ASSERT(get_itbl(c)->srt != 0);
     case THUNK_0_1:
     case THUNK_0_2:
     thunk_srt_only:

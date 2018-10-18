@@ -2051,10 +2051,11 @@ collectArgs expr
     go e         as = (e, as)
 
 -- | Attempt to remove the last N arguments of a function call.
--- Strip off any ticks encountered along the way and any ticks
+-- Strip off any ticks or coercions encountered along the way and any
 -- at the end.
 stripNArgs :: Word -> Expr a -> Maybe (Expr a)
 stripNArgs !n (Tick _ e) = stripNArgs n e
+stripNArgs n (Cast f _) = stripNArgs n f
 stripNArgs 0 e = Just e
 stripNArgs n (App f _) = stripNArgs (n - 1) f
 stripNArgs _ _ = Nothing

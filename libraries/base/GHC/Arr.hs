@@ -508,6 +508,10 @@ listArray (l,u) es = runST (ST $ \s1# ->
 (!) :: Ix i => Array i e -> i -> e
 (!) arr@(Array l u n _) i = unsafeAt arr $ safeIndex (l,u) n i
 
+{-# INLINE (!#) #-}
+(!#) :: Ix i => Array i e -> i -> (# e #)
+(!#) arr@(Array l u n _) i = unsafeAt# arr $ safeIndex (l,u) n i
+
 {-# INLINE safeRangeSize #-}
 safeRangeSize :: Ix i => (i, i) -> Int
 safeRangeSize (l,u) = let r = rangeSize (l, u)
@@ -551,6 +555,15 @@ unsafeAt :: Array i e -> Int -> e
 unsafeAt (Array _ _ _ arr#) (I# i#) =
     case indexArray# arr# i# of (# e #) -> e
 
+-- | Look up an element in an array without forcing it
+unsafeAt# :: Array i e -> Int -> (# e #)
+unsafeAt# (Array _ _ _ arr#) (I# i#) = indexArray# arr# i#
+
+-- | A convenient version of unsafeAt#
+unsafeAtA :: Applicative f
+          => Array i e -> Int -> f e
+unsafeAtA ary i = case unsafeAt# ary i of (# e #) -> pure e
+
 -- | The bounds with which an array was constructed.
 {-# INLINE bounds #-}
 bounds :: Array i e -> (i,i)
@@ -570,7 +583,7 @@ indices (Array l u _ _) = range (l,u)
 {-# INLINE elems #-}
 elems :: Array i e -> [e]
 elems arr@(Array _ _ n _) =
-    [unsafeAt arr i | i <- [0 .. n - 1]]
+    [e | i <- [0 .. n - 1], e <- unsafeAtA arr i]
 
 -- | A right fold over the elements
 {-# INLINABLE foldrElems #-}
@@ -578,7 +591,8 @@ foldrElems :: (a -> b -> b) -> b -> Array i a -> b
 foldrElems f b0 = \ arr@(Array _ _ n _) ->
   let
     go i | i == n    = b0
-         | otherwise = f (unsafeAt arr i) (go (i+1))
+         | (# e #) <- unsafeAt# arr i
+         = f e (go (i+1))
   in go 0
 
 -- | A left fold over the elements
@@ -587,7 +601,8 @@ foldlElems :: (b -> a -> b) -> b -> Array i a -> b
 foldlElems f b0 = \ arr@(Array _ _ n _) ->
   let
     go i | i == (-1) = b0
-         | otherwise = f (go (i-1)) (unsafeAt arr i)
+         | (# e #) <- unsafeAt# arr i
+         = f (go (i-1)) e
   in go (n-1)
 
 -- | A strict right fold over the elements
@@ -596,7 +611,8 @@ foldrElems' :: (a -> b -> b) -> b -> Array i a -> b
 foldrElems' f b0 = \ arr@(Array _ _ n _) ->
   let
     go i a | i == (-1) = a
-           | otherwise = go (i-1) (f (unsafeAt arr i) $! a)
+           | (# e #) <- unsafeAt# arr i
+           = go (i-1) (f e $! a)
   in go (n-1) b0
 
 -- | A strict left fold over the elements
@@ -605,7 +621,8 @@ foldlElems' :: (b -> a -> b) -> b -> Array i a -> b
 foldlElems' f b0 = \ arr@(Array _ _ n _) ->
   let
     go i a | i == n    = a
-           | otherwise = go (i+1) (a `seq` f a (unsafeAt arr i))
+           | (# e #) <- unsafeAt# arr i
+           = go (i+1) (a `seq` f a e)
   in go 0 b0
 
 -- | A left fold over the elements with no starting value
@@ -614,7 +631,8 @@ foldl1Elems :: (a -> a -> a) -> Array i a -> a
 foldl1Elems f = \ arr@(Array _ _ n _) ->
   let
     go i | i == 0    = unsafeAt arr 0
-         | otherwise = f (go (i-1)) (unsafeAt arr i)
+         | (# e #) <- unsafeAt# arr i
+         = f (go (i-1)) e
   in
     if n == 0 then errorWithoutStackTrace "foldl1: empty Array" else go (n-1)
 
@@ -624,7 +642,8 @@ foldr1Elems :: (a -> a -> a) -> Array i a -> a
 foldr1Elems f = \ arr@(Array _ _ n _) ->
   let
     go i | i == n-1  = unsafeAt arr i
-         | otherwise = f (unsafeAt arr i) (go (i + 1))
+         | (# e #) <- unsafeAt# arr i
+         = f e (go (i + 1))
   in
     if n == 0 then errorWithoutStackTrace "foldr1: empty Array" else go 0
 
@@ -632,7 +651,7 @@ foldr1Elems f = \ arr@(Array _ _ n _) ->
 {-# INLINE assocs #-}
 assocs :: Ix i => Array i e -> [(i, e)]
 assocs arr@(Array l u _ _) =
-    [(i, arr ! i) | i <- range (l,u)]
+    [(i, e) | i <- range (l,u), let !(# e #) = arr !# i]
 
 -- | The 'accumArray' function deals with repeated indices in the association
 -- list using an /accumulating function/ which combines the values of
@@ -740,7 +759,8 @@ amap f arr@(Array l u n@(I# n#) _) = runST (ST $ \s1# ->
         (# s2#, marr# #) ->
           let go i s#
                 | i == n    = done l u n marr# s#
-                | otherwise = fill marr# (i, f (unsafeAt arr i)) (go (i+1)) s#
+                | (# e #) <- unsafeAt# arr i
+                = fill marr# (i, f e) (go (i+1)) s#
           in go 0 s2# )
 
 {- Note [amap]

@@ -254,8 +254,8 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
         -- unconditional jump to a block that can be shortcut.
         | Nothing <- callContinuation_maybe last
         = let oldSuccs = successors last
-              newSuccs = successors swapcond_last
-          in ( mapInsert bid (blockJoinTail head swapcond_last) blocks
+              newSuccs = successors rewrite_last
+          in ( mapInsert bid (blockJoinTail head rewrite_last) blocks
              , shortcut_map
              , if oldSuccs == newSuccs
                then backEdges
@@ -283,8 +283,13 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
                    Just b | Just dest <- canShortcut b -> dest
                    _otherwise -> l
 
-          -- See Note [Invert Cmm conditionals]
-          swapcond_last
+          rewrite_last
+            -- Sometimes we can get rid of the conditional completely.
+            | CmmCondBranch _cond t f _l <- shortcut_last
+            , t == f
+            = CmmBranch t
+
+            -- See Note [Invert Cmm conditionals]
             | CmmCondBranch cond t f l <- shortcut_last
             , hasOnePredecessor t -- inverting will make t a fallthrough
             , likelyTrue l || (numPreds f > 1)

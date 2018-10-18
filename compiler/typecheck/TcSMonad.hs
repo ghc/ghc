@@ -1483,35 +1483,35 @@ equalities arising from injectivity.
 
 addInertForAll :: QCInst -> TcS ()
 -- Add a local Given instance, typically arising from a type signature
-addInertForAll qci
+addInertForAll new_qci
   = updInertCans $ \ics ->
-    ics { inert_insts = qci : inert_insts ics }
+    ics { inert_insts = add_qci (inert_insts ics) }
+  where
+    add_qci :: [QCInst] -> [QCInst]
+    -- See Note [Do not add duplicate quantified instances]
+    add_qci qcis | any same_qci qcis = qcis
+                 | otherwise         = new_qci : qcis
 
-{- Note [Local instances and incoherence]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   f :: forall b c. (Eq b, forall a. Eq a => Eq (c a))
-                 => c b -> Bool
-   f x = x==x
+    same_qci old_qci = tcEqType (ctEvPred (qci_ev old_qci))
+                                (ctEvPred (qci_ev new_qci))
 
-We get [W] Eq (c b), and we must use the local instance to solve it.
+{- Note [Do not add duplicate quantified instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (Trac #15244):
 
-BUT that wanted also unifies with the top-level Eq [a] instance,
-and Eq (Maybe a) etc.  We want the local instance to "win", otherwise
-we can't solve the wanted at all.  So we mark it as Incohherent.
-According to Note [Rules for instance lookup] in InstEnv, that'll
-make it win even if there are other instances that unify.
+  f :: (C g, D g) => ....
+  class S g => C g where ...
+  class S g => D g where ...
+  class (forall a. Eq a => Eq (g a)) => S g where ...
 
-Moreover this is not a hack!  The evidence for this local instance
-will be constructed by GHC at a call site... from the very instances
-that unify with it here.  It is not like an incoherent user-written
-instance which might have utterly different behaviour.
+Then in f's RHS there are two identical quantified constraints
+available, one via the superclasses of C and one via the superclasses
+of D.  The two are identical, and it seems wrong to reject the program
+because of that. But without doing duplicate-elimination we will have
+two matching QCInsts when we try to solve constraints arising from f's
+RHS.
 
-Consdider  f :: Eq a => blah.  If we have [W] Eq a, we certainly
-get it from the Eq a context, without worrying that there are
-lots of top-level instances that unify with [W] Eq a!  We'll use
-those instances to build evidence to pass to f. That's just the
-nullary case of what's happening here.
+The simplest thing is simply to eliminate duplicattes, which we do here.
 -}
 
 {- *********************************************************************

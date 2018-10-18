@@ -651,6 +651,14 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $3="$$3 -D_HPUX_SOURCE"
         $5="$$5 -D_HPUX_SOURCE"
         ;;
+
+    arm*freebsd*)
+        # On arm/freebsd, tell gcc to generate Arm
+        # instructions (ie not Thumb).
+        $2="$$2 -marm"
+        $3="$$3 -Wl,-z,noexecstack"
+        $4="$$4 -z noexecstack"
+        ;;
     arm*linux*)
         # On arm/linux and arm/android, tell gcc to generate Arm
         # instructions (ie not Thumb).
@@ -659,6 +667,10 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -z noexecstack"
         ;;
 
+    aarch64*freebsd*)
+        $3="$$3 -Wl,-z,noexecstack"
+        $4="$$4 -z noexecstack"
+        ;;
     aarch64*linux*)
         $3="$$3 -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
@@ -1902,6 +1914,10 @@ case "$1" in
 # converts the canonicalized target into someting llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
   case "$2-$3" in
+    *-freebsd*-gnueabihf)
+      llvm_target_vendor="unknown"
+      llvm_target_os="freebsd-gnueabihf"
+      ;;
     hardfloat-*eabi)
       llvm_target_vendor="unknown"
       llvm_target_os="$3""hf"

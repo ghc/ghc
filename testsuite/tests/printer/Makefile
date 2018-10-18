@@ -229,3 +229,11 @@ T14289c:
 .PHONY: T14306
 T14306:
 	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" T14306.hs
+
+.PHONY: T14343
+T14343:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" T14343.hs
+
+.PHONY: T14343b
+T14343b:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" T14343b.hs

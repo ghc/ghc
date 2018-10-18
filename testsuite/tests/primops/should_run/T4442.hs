@@ -8,6 +8,9 @@ import GHC.Stable(
   StablePtr(..), castStablePtrToPtr, castPtrToStablePtr, newStablePtr)
 import GHC.Exts
 import Data.Char(ord)
+#if WORD_SIZE_IN_BITS < 64
+import GHC.Int (Int64(..))
+#endif
 
 assertEqual :: (Show a, Eq a) => a -> a -> IO ()
 assertEqual a b

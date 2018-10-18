@@ -252,7 +252,7 @@ ghcPrimExports
  = map (avail . idName) ghcPrimIds ++
    map (avail . idName . primOpId) allThePrimOps ++
    [ AvailTC n [n] []
-   | tc <- funTyCon : primTyCons, let n = tyConName tc  ]
+   | tc <- funTyCon : exposedPrimTyCons, let n = tyConName tc  ]
 
 {-
 ************************************************************************

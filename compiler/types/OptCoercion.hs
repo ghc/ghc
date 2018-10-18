@@ -83,11 +83,15 @@ an ambient substitution, which is why a LiftingContext stores a TCvSubst.
 
 -}
 
-optCoercion :: TCvSubst -> Coercion -> NormalCo
+optCoercion :: DynFlags -> TCvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
-optCoercion env co
-  | hasNoOptCoercion unsafeGlobalDynFlags = substCo env co
+optCoercion dflags env co
+  | hasNoOptCoercion dflags = substCo env co
+  | otherwise               = optCoercion' env co
+
+optCoercion' :: TCvSubst -> Coercion -> NormalCo
+optCoercion' env co
   | debugIsOn
   = let out_co = opt_co1 lc False co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
@@ -350,7 +354,7 @@ opt_co4 env sym rep r (CoherenceCo co1 co2)
 
   | TransCo col1' cor1' <- co1'
   = if sym then opt_trans in_scope col1'
-                  (optCoercion (zapTCvSubst (lcTCvSubst env))
+                  (optCoercion' (zapTCvSubst (lcTCvSubst env))
                                (mkCoherenceRightCo cor1' co2'))
            else opt_trans in_scope (mkCoherenceCo col1' co2') cor1'
 
@@ -430,7 +434,7 @@ opt_univ env sym prov role oty1 oty2
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
   = let roles    = tyConRolesX role tc1
-        arg_cos  = zipWith3 (mkUnivCo prov) roles tys1 tys2
+        arg_cos  = zipWith3 (mkUnivCo prov') roles tys1 tys2
         arg_cos' = zipWith (opt_co4 env sym False) roles arg_cos
     in
     mkTyConAppCo role tc1 arg_cos'
@@ -442,13 +446,13 @@ opt_univ env sym prov role oty1 oty2
       -- NB: prov isn't interesting here either
   = let k1   = tyVarKind tv1
         k2   = tyVarKind tv2
-        eta  = mkUnivCo prov Nominal k1 k2
+        eta  = mkUnivCo prov' Nominal k1 k2
           -- eta gets opt'ed soon, but not yet.
         ty2' = substTyWith [tv2] [TyVarTy tv1 `mkCastTy` eta] ty2
 
         (env', tv1', eta') = optForAllCoBndr env sym tv1 eta
     in
-    mkForAllCo tv1' eta' (opt_univ env' sym prov role ty1 ty2')
+    mkForAllCo tv1' eta' (opt_univ env' sym prov' role ty1 ty2')
 
   | otherwise
   = let ty1 = substTyUnchecked (lcSubstLeft  env) oty1

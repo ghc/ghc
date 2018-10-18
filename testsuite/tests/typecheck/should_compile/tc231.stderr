@@ -5,8 +5,7 @@ TYPE SIGNATURES
     forall s b chain.
     Zork s (Z [Char]) b =>
     Q s (Z [Char]) chain -> ST s ()
-  huh ::
-    forall s a b. Zork s a b => forall chain. Q s a chain -> ST s ()
+  huh :: forall s a b chain. Zork s a b => Q s a chain -> ST s ()
   s :: forall t t1. Q t (Z [Char]) t1 -> Q t (Z [Char]) t1
 TYPE CONSTRUCTORS
   data Q s a chain = Node s a chain
@@ -20,4 +19,4 @@ COERCION AXIOMS
       -- Defined at tc231.hs:25:1
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
-                     integer-gmp-1.0.2.0]
+                     integer-simple-0.1.1.1]

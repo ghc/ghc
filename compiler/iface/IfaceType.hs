@@ -346,8 +346,23 @@ isIfaceLiftedTypeKind _ = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
+--
+-- Here we split nested IfaceSigmaTy properly.
+--
+-- @
+-- forall t. T t => forall m a b. M m => (a -> m b) -> t a -> m (t b)
+-- @
+--
+-- If you called @splitIfaceSigmaTy@ on this type:
+--
+-- @
+-- ([t, m, a, b], [T t, M m], (a -> m b) -> t a -> m (t b))
+-- @
 splitIfaceSigmaTy ty
-  = (bndrs, theta, tau)
+  = case (bndrs, theta) of
+      ([], []) -> (bndrs, theta, tau)
+      _        -> let (bndrs', theta', tau') = splitIfaceSigmaTy tau
+                   in (bndrs ++ bndrs', theta ++ theta', tau')
   where
     (bndrs, rho)   = split_foralls ty
     (theta, tau)   = split_rho rho
@@ -627,6 +642,8 @@ pprIfaceType       = pprPrecIfaceType topPrec
 pprParendIfaceType = pprPrecIfaceType appPrec
 
 pprPrecIfaceType :: PprPrec -> IfaceType -> SDoc
+-- We still need `eliminateRuntimeRep`, since the `pprPrecIfaceType` maybe
+-- called from other places, besides `:type` and `:info`.
 pprPrecIfaceType prec ty =
   eliminateRuntimeRep (\ty -> eliminateMultiplicity (ppr_ty prec) ty) ty
 
@@ -977,9 +994,11 @@ data ShowForAllFlag = ShowForAllMust | ShowForAllWhen
 
 pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceSigmaType show_forall ty
-  = ppr_iface_forall_part show_forall tvs theta (ppr tau)
+  = eliminateRuntimeRep ppr_fn ty
   where
-    (tvs, theta, tau) = splitIfaceSigmaTy ty
+    ppr_fn iface_ty =
+      let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
+       in ppr_iface_forall_part show_forall tvs theta (ppr tau)
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
@@ -1027,6 +1046,15 @@ criteria are met:
 
 -------------------
 
+-- | Prefix a space if the given 'IfaceType' is a promoted 'TyCon'.
+pprSpaceIfPromotedTyCon :: IfaceType -> SDoc -> SDoc
+pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
+  = case ifaceTyConIsPromoted (ifaceTyConInfo tyCon) of
+      IsPromoted -> (space <>)
+      _ -> id
+pprSpaceIfPromotedTyCon _
+  = id
+
 -- See equivalent function in TyCoRep.hs
 pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print
@@ -1035,8 +1063,8 @@ pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 pprIfaceTyList ctxt_prec ty1 ty2
   = case gather ty2 of
       (arg_tys, Nothing)
-        -> char '\'' <> brackets (fsep (punctuate comma
-                        (map (ppr_ty topPrec) (ty1:arg_tys))))
+        -> char '\'' <> brackets (pprSpaceIfPromotedTyCon ty1 (fsep
+                        (punctuate comma (map (ppr_ty topPrec) (ty1:arg_tys)))))
       (arg_tys, Just tl)
         -> maybeParen ctxt_prec funPrec $ hang (ppr_ty funPrec ty1)
            2 (fsep [ colon <+> ppr_ty funPrec ty | ty <- arg_tys ++ [tl]])
@@ -1230,8 +1258,11 @@ pprTuple ctxt_prec ConstraintTuple IsNotPromoted ITC_Nil
 pprTuple _ sort IsPromoted args
   = let tys = tcArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
+        spaceIfPromoted = case args' of
+          arg0:_ -> pprSpaceIfPromotedTyCon arg0
+          _ -> id
     in pprPromotionQuoteI IsPromoted <>
-       tupleParens sort (pprWithCommas pprIfaceType args')
+       tupleParens sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
 
 pprTuple _ sort promoted args
   =   -- drop the RuntimeRep vars.

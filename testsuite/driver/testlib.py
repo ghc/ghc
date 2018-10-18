@@ -872,9 +872,6 @@ def do_test(name, way, func, args, files):
         if exit_code != 0:
             framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
             if_verbose(1, '** pre_cmd was "{0}". Running trace'.format(override_options(opts.pre_cmd)))
-            runCmd('cd "{0}" && strace {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
-                           stderr = subprocess.STDOUT,
-                           print_output = True)
 
     result = func(*[name,way] + args)
 
@@ -1443,7 +1440,7 @@ def stdout_ok(name, way):
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
-    with open(in_testdir(name, 'run.stdout')) as f:
+    with open(in_testdir(name, 'run.stdout'), encoding='utf8') as f:
         str = f.read().strip()
         if str:
             print("Stdout (", name, "):")
@@ -1459,7 +1456,7 @@ def stderr_ok(name, way):
                           whitespace_normaliser=normalise_whitespace)
 
 def dump_stderr( name ):
-    with open(in_testdir(name, 'run.stderr')) as f:
+    with open(in_testdir(name, 'run.stderr'), encoding='utf8') as f:
         str = f.read().strip()
         if str:
             print("Stderr (", name, "):")
