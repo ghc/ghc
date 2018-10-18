@@ -1,11 +1,13 @@
 
 tcfail198.hs:6:36: error:
     • Couldn't match expected type ‘a1’ with actual type ‘a’
-        because type variable ‘a1’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a1’ is a rigid type variable bound by
         an expression type signature:
           forall a1. a1
         at tcfail198.hs:6:41
+      ‘a’ is a rigid type variable bound by
+        the inferred type of f3 :: [a] -> [a]
+        at tcfail198.hs:6:1-44
     • In the expression: x :: a
       In the second argument of ‘(++)’, namely ‘[x :: a]’
       In the expression: xs ++ [x :: a]

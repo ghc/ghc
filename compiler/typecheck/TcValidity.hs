@@ -621,7 +621,10 @@ forAllEscapeErr env ty tau_kind
                  , text "of kind:" <+> ppr_tidy env tau_kind ]) )
 
 ubxArgTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
-ubxArgTyErr env ty = (env, sep [text "Illegal unboxed tuple type as function argument:", ppr_tidy env ty])
+ubxArgTyErr env ty
+  = ( env, vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
+                      , ppr_tidy env ty ]
+                , text "Perhaps you intended to use UnboxedTuples" ] )
 
 {-
 Note [Liberal type synonyms]
@@ -1402,8 +1405,10 @@ checkInstTermination tys theta
 
    check2 pred pred_size
      | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what)
+     | not (isTyFamFree pred) = addErrTc (nestedMsg what)
      | pred_size >= head_size = addErrTc (smallerMsg what)
      | otherwise              = return ()
+     -- isTyFamFree: see Note [Type families in instance contexts]
      where
         what    = text "constraint" <+> quotes (ppr pred)
         bad_tvs = fvType pred \\ head_fvs
@@ -1429,7 +1434,18 @@ undecidableMsg, constraintKindsMsg :: SDoc
 undecidableMsg     = text "Use UndecidableInstances to permit this"
 constraintKindsMsg = text "Use ConstraintKinds to permit this"
 
-{-
+{- Note [Type families in instance contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Are these OK?
+  type family F a
+  instance F a    => C (Maybe [a]) where ...
+  intance C (F a) => C [[[a]]]     where ...
+
+No: the type family in the instance head might blow up to an
+arbitrarily large type, depending on how 'a' is instantiated.
+So we require UndecidableInstances if we have a type family
+in the instance head.  Trac #15172.
+
 Note [Associated type instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow this:
@@ -1574,6 +1590,8 @@ checkConsistentFamInst
 checkConsistentFamInst Nothing _ _ _ = return ()
 checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pats
   = do { -- Check that the associated type indeed comes from this class
+         -- See [Mismatched class methods and associated type families]
+         -- in TcInstDecls.
          checkTc (Just clas == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 

@@ -6,7 +6,7 @@
 Loading interface files
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module LoadIface (
         -- Importing one thing
@@ -25,6 +25,7 @@ module LoadIface (
         loadDecls,      -- Should move to TcIface and be renamed
         initExternalPackageState,
         moduleFreeHolesPrecise,
+        needWiredInHomeIface, loadWiredInHomeIface,
 
         pprModIfaceSimple,
         ifaceStats, pprModIface, showIface
@@ -443,6 +444,8 @@ loadInterface doc_str mod from
         in
         initIfaceLcl (mi_semantic_module iface) loc_doc (mi_boot iface) $ do
 
+        dontLeakTheHPT $ do
+
         --      Load the new ModIface into the External Package State
         -- Even home-package interfaces loaded by loadInterface
         --      (which only happens in OneShot mode; in Batch/Interactive
@@ -513,6 +516,54 @@ loadInterface doc_str mod from
 
         ; return (Succeeded final_iface)
     }}}}
+
+
+
+-- Note [HPT space leak] (#15111)
+--
+-- In IfL, we defer some work until it is demanded using forkM, such
+-- as building TyThings from IfaceDecls. These thunks are stored in
+-- the ExternalPackageState, and they might never be poked.  If we're
+-- not careful, these thunks will capture the state of the loaded
+-- program when we read an interface file, and retain all that data
+-- for ever.
+--
+-- Therefore, when loading a package interface file , we use a "clean"
+-- version of the HscEnv with all the data about the currently loaded
+-- program stripped out. Most of the fields can be panics because
+-- we'll never read them, but hsc_HPT needs to be empty because this
+-- interface will cause other interfaces to be loaded recursively, and
+-- when looking up those interfaces we use the HPT in loadInterface.
+-- We know that none of the interfaces below here can refer to
+-- home-package modules however, so it's safe for the HPT to be empty.
+--
+dontLeakTheHPT :: IfL a -> IfL a
+dontLeakTheHPT thing_inside = do
+  let
+    cleanTopEnv HscEnv{..} =
+       let
+         -- wrinkle: when we're typechecking in --backpack mode, the
+         -- instantiation of a signature might reside in the HPT, so
+         -- this case breaks the assumption that EPS interfaces only
+         -- refer to other EPS interfaces. We can detect when we're in
+         -- typechecking-only mode by using hscTarget==HscNothing, and
+         -- in that case we don't empty the HPT.  (admittedly this is
+         -- a bit of a hack, better suggestions welcome). A number of
+         -- tests in testsuite/tests/backpack break without this
+         -- tweak.
+         !hpt | hscTarget hsc_dflags == HscNothing = hsc_HPT
+              | otherwise = emptyHomePackageTable
+       in
+       HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
+              ,  hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
+              ,  hsc_IC           = panic "cleanTopEnv: hsc_IC"
+              ,  hsc_HPT          = hpt
+              , .. }
+
+  updTopEnv cleanTopEnv $ do
+  !_ <- getTopEnv        -- force the updTopEnv
+  thing_inside
+
 
 -- | Returns @True@ if a 'ModIface' comes from an external package.
 -- In this case, we should NOT load it into the EPS; the entities

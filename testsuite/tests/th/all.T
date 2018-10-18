@@ -360,6 +360,7 @@ test('T11629', normal, compile, ['-v0'])
 test('T8761', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12130', [], multimod_compile,
      ['T12130', '-v0 ' + config.ghc_th_way_flags])
+test('T12387', normal, compile_fail, ['-v0'])
 test('T12403', omit_ways(['ghci']),
               compile_and_run, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12407', omit_ways(['ghci']), compile, ['-v0'])
@@ -406,7 +407,9 @@ test('T14869', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
 test('T14888', normal, compile,
     ['-v0 -ddump-splices -dsuppress-uniques ' + config.ghc_th_way_flags])
-test('T14298', normal, compile_and_run, ['-v0'])
+# There is a phasing issue in the ghci way which prevents us from being
+# able to compile and link the foreign file while compiling the haskell module.
+test('T14298', expect_broken_for(15161, ['ghci']), compile_and_run, ['-v0'])
 test('T14875', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14885a', normal, compile, [''])
 test('T14885b', normal, compile, [''])

@@ -8,11 +8,13 @@ tc141.hs:11:12: error:
 
 tc141.hs:11:31: error:
     • Couldn't match expected type ‘a2’ with actual type ‘a’
-        because type variable ‘a2’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a2’ is a rigid type variable bound by
         an expression type signature:
           forall a2. a2
         at tc141.hs:11:34
+      ‘a’ is a rigid type variable bound by
+        the inferred type of f :: (a, a) -> (a1, a)
+        at tc141.hs:11:1-37
     • In the expression: q :: a
       In the expression: (q :: a, p)
       In the expression: let (p :: a, q :: a) = x in (q :: a, p)
@@ -36,11 +38,13 @@ tc141.hs:13:13: error:
 
 tc141.hs:15:18: error:
     • Couldn't match expected type ‘a2’ with actual type ‘p’
-        because type variable ‘a2’ would escape its scope
-      This (rigid, skolem) type variable is bound by
+      ‘a2’ is a rigid type variable bound by
         the type signature for:
           v :: forall a2. a2
         at tc141.hs:14:14-19
+      ‘p’ is a rigid type variable bound by
+        the inferred type of g :: a -> p -> a1
+        at tc141.hs:(13,1)-(16,13)
     • In the expression: b
       In an equation for ‘v’: v = b
       In the expression:

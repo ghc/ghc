@@ -13,7 +13,8 @@ module TcUnify (
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
   tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubWeight,
   tcSubTypeDS_NC_O, tcSubTypeET,
-  checkConstraints, buildImplicationFor,
+  checkConstraints, checkTvConstraints,
+  buildImplicationFor,
 
   -- Various unifications
   unifyType, unifyTheta, unifyKind,
@@ -1163,29 +1164,45 @@ checkConstraints :: SkolemInfo
                  -> TcM (TcEvBinds, result)
 
 checkConstraints skol_info skol_tvs given thing_inside
-  = do { (implics, ev_binds, result)
-            <- buildImplication skol_info skol_tvs given thing_inside
-       ; emitImplications implics
-       ; return (ev_binds, result) }
-
-buildImplication :: SkolemInfo
-                 -> [TcTyVar]           -- Skolems
-                 -> [EvVar]             -- Given
-                 -> TcM result
-                 -> TcM (Bag Implication, TcEvBinds, result)
-buildImplication skol_info skol_tvs given thing_inside
   = do { implication_needed <- implicationNeeded skol_tvs given
 
        ; if implication_needed
          then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
                  ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
-                 ; return (implics, ev_binds, result) }
+                 ; traceTc "checkConstraints" (ppr tclvl $$ ppr skol_tvs)
+                 ; emitImplications implics
+                 ; return (ev_binds, result) }
 
          else -- Fast path.  We check every function argument with
               -- tcPolyExpr, which uses tcSkolemise and hence checkConstraints.
               -- So this fast path is well-exercised
               do { res <- thing_inside
-                 ; return (emptyBag, emptyTcEvBinds, res) } }
+                 ; return (emptyTcEvBinds, res) } }
+
+checkTvConstraints :: SkolemInfo
+                   -> Maybe SDoc  -- User-written telescope, if present
+                   -> TcM ([TcTyVar], result)
+                   -> TcM ([TcTyVar], result)
+
+checkTvConstraints skol_info m_telescope thing_inside
+  = do { (tclvl, wanted, (skol_tvs, result))
+             <- pushLevelAndCaptureConstraints thing_inside
+
+       ; if isEmptyWC wanted
+         then return ()
+         else do { tc_lcl_env <- getLclEnv
+                 ; ev_binds   <- newNoTcEvBinds
+                 ; emitImplication $
+                   newImplication { ic_tclvl     = tclvl
+                                  , ic_skols     = skol_tvs
+                                  , ic_no_eqs    = True
+                                  , ic_telescope = m_telescope
+                                  , ic_wanted    = wanted
+                                  , ic_binds     = ev_binds
+                                  , ic_info      = skol_info
+                                  , ic_env       = tc_lcl_env } }
+       ; return (skol_tvs, result) }
+
 
 implicationNeeded :: [TcTyVar] -> [EvVar] -> TcM Bool
 -- With the solver producing unlifted equalities, we need
@@ -1625,72 +1642,113 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
 
 swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
 swapOverTyVars tv1 tv2
-  | isFmvTyVar tv1 = False  -- See Note [Fmv Orientation Invariant]
-  | isFmvTyVar tv2 = True
+  -- Level comparison: see Note [TyVar/TyVar orientation]
+  | lvl1 `strictlyDeeperThan` lvl2 = False
+  | lvl2 `strictlyDeeperThan` lvl1 = True
 
-  | Just lvl1 <- metaTyVarTcLevel_maybe tv1
-      -- If tv1 is touchable, swap only if tv2 is also
-      -- touchable and it's strictly better to update the latter
-      -- But see Note [Avoid unnecessary swaps]
-  = case metaTyVarTcLevel_maybe tv2 of
-      Nothing   -> False
-      Just lvl2 | lvl2 `strictlyDeeperThan` lvl1 -> True
-                | lvl1 `strictlyDeeperThan` lvl2 -> False
-                | otherwise                      -> nicer_to_update_tv2
+  -- Priority: see Note [TyVar/TyVar orientation]
+  | pri1 > pri2 = False
+  | pri2 > pri1 = True
 
-  -- So tv1 is not a meta tyvar
-  -- If only one is a meta tyvar, put it on the left
-  -- This is not because it'll be solved; but because
-  -- the floating step looks for meta tyvars on the left
-  | isMetaTyVar tv2 = True
-
-  -- So neither is a meta tyvar (including FlatMetaTv)
-
-  -- If only one is a flatten skolem, put it on the left
-  -- See Note [Eliminate flat-skols]
-  | not (isFlattenTyVar tv1), isFlattenTyVar tv2 = True
+  -- Names: see Note [TyVar/TyVar orientation]
+  | isSystemName tv2_name, not (isSystemName tv1_name) = True
 
   | otherwise = False
 
   where
+    lvl1 = tcTyVarLevel tv1
+    lvl2 = tcTyVarLevel tv2
+    pri1 = lhsPriority tv1
+    pri2 = lhsPriority tv2
     tv1_name = Var.varName tv1
     tv2_name = Var.varName tv2
 
-    nicer_to_update_tv2
-      | isSigTyVar tv1, not (isSigTyVar tv2)               = True
-      | isSystemName tv2_name, not (isSystemName tv1_name) = True
---      | nameUnique tv1_name `ltUnique` nameUnique tv2_name = True
---      -- See Note [Eliminate younger unification variables]
---      (which also explains why it's commented out)
-      | otherwise = False
+
+lhsPriority :: TcTyVar -> Int
+-- Higher => more important to be on the LHS
+-- See Note [TyVar/TyVar orientation]
+lhsPriority tv
+  = ASSERT2( isTyVar tv, ppr tv)
+    case tcTyVarDetails tv of
+      RuntimeUnk  -> 0
+      SkolemTv {} -> 0
+      MetaTv { mtv_info = info } -> case info of
+                                     FlatSkolTv -> 1
+                                     SigTv      -> 2
+                                     TauTv      -> 3
+                                     FlatMetaTv -> 4
+{- Note [TyVar/TyVar orientation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given (a ~ b), should we orient the CTyEqCan as (a~b) or (b~a)?
+This is a surprisingly tricky question!
+
+First note: only swap if you have to!
+   See Note [Avoid unnecessary swaps]
+
+So we look for a positive reason to swap, using a three-step test:
+
+* Level comparison. If 'a' has deeper level than 'b',
+  put 'a' on the left.  See Note [Deeper level on the left]
+
+* Priority.  If the levels are the same, look at what kind of
+  type variable it is, using 'lhsPriority'
+
+  - FlatMetaTv: Always put on the left.
+    See Note [Fmv Orientation Invariant]
+    NB: FlatMetaTvs always have the current level, never an
+        outer one.  So nothing can be deeper than a FlatMetaTv
 
 
--- @trySpontaneousSolve wi@ solves equalities where one side is a
--- touchable unification variable.
--- Returns True <=> spontaneous solve happened
-canSolveByUnification :: TcLevel -> TcTyVar -> TcType -> Bool
-canSolveByUnification tclvl tv xi
-  | isTouchableMetaTyVar tclvl tv
-  = case metaTyVarInfo tv of
-      SigTv -> is_tyvar xi
-      _     -> True
+  - SigTv/TauTv:  if we have  sig_tv ~ tau_tv, put tau_tv
+                  on the left because there are fewer
+                  restrictions on updating TauTvs
 
-  | otherwise    -- Untouchable
-  = False
-  where
-    is_tyvar xi
-      = case tcGetTyVar_maybe xi of
-          Nothing -> False
-          Just tv -> case tcTyVarDetails tv of
-                       MetaTv { mtv_info = info }
-                                   -> case info of
-                                        SigTv -> True
-                                        _     -> False
-                       SkolemTv {} -> True
-                       RuntimeUnk  -> True
+  - SigTv/TauTv:  put on the left eitehr
+     a) Because it's touchable and can be unified, or
+     b) Even if it's not touchable, TcSimplify.floatEqualities
+        looks for meta tyvars on the left
 
-{- Note [Fmv Orientation Invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  - FlatSkolTv: Put on the left in preference to a SkolemTv
+                See Note [Eliminate flat-skols]
+
+* Names. If the level and priority comparisons are all
+  equal, try to eliminate a TyVars with a System Name in
+  favour of ones with a Name derived from a user type signature
+
+* Age.  At one point in the past we tried to break any remaining
+  ties by eliminating the younger type variable, based on their
+  Uniques.  See Note [Eliminate younger unification variables]
+  (which also explains why we don't do this any more)
+
+Note [Deeper level on the left]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The most important thing is that we want to put tyvars with
+the deepest level on the left.  The reason to do so differs for
+Wanteds and Givens, but either way, deepest wins!  Simple.
+
+* Wanteds.  Putting the deepest variable on the left maximise the
+  chances that it's a touchable meta-tyvar which can be solved.
+
+* Givens. Suppose we have something like
+     forall a[2]. b[1] ~ a[2] => beta[1] ~ a[2]
+
+  If we orient the Given a[2] on the left, we'll rewrite the Wanted to
+  (beta[1] ~ b[1]), and that can float out of the implication.
+  Otherwise it can't.  By putting the deepest variable on the left
+  we maximise our changes of elminating skolem capture.
+
+  See also TcSMonad Note [Let-bound skolems] for another reason
+  to orient with the deepest skolem on the left.
+
+  IMPORTANT NOTE: this test does a level-number comparison on
+  skolems, so it's important that skolems have (accurate) level
+  numbers.
+
+See Trac #15009 for an further analysis of why "deepest on the left"
+is a good plan.
+
+Note [Fmv Orientation Invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    * We always orient a constraint
         fmv ~ alpha
      with fmv on the left, even if alpha is
@@ -1723,11 +1781,29 @@ T10226, T10009.)
           [WD] F fmv ~ fmv, [WD] fmv ~ a
     And now we are stuck.
 
-So instead the Fmv Orientation Invariant puts te fmv on the
+So instead the Fmv Orientation Invariant puts the fmv on the
 left, giving
       [WD] fmv ~ alpha, [WD] F alpha ~ fmv, [WD] alpha ~ a
 
     Now we get alpha:=a, and everything works out
+
+Note [Eliminate flat-skols]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have  [G] Num (F [a])
+then we flatten to
+     [G] Num fsk
+     [G] F [a] ~ fsk
+where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
+      type instance F [a] = a
+then we'll reduce the second constraint to
+     [G] a ~ fsk
+and then replace all uses of 'a' with fsk.  That's bad because
+in error messages intead of saying 'a' we'll say (F [a]).  In all
+places, including those where the programmer wrote 'a' in the first
+place.  Very confusing!  See Trac #7862.
+
+Solution: re-orient a~fsk to fsk~a, so that we preferentially eliminate
+the fsk.
 
 Note [Avoid unnecessary swaps]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1759,10 +1835,34 @@ But, to my surprise, it didn't seem to make any significant difference
 to the compiler's performance, so I didn't take it any further.  Still
 it seemed to too nice to discard altogether, so I'm leaving these
 notes.  SLPJ Jan 18.
+-}
 
+-- @trySpontaneousSolve wi@ solves equalities where one side is a
+-- touchable unification variable.
+-- Returns True <=> spontaneous solve happened
+canSolveByUnification :: TcLevel -> TcTyVar -> TcType -> Bool
+canSolveByUnification tclvl tv xi
+  | isTouchableMetaTyVar tclvl tv
+  = case metaTyVarInfo tv of
+      SigTv -> is_tyvar xi
+      _     -> True
 
-Note [Prevent unification with type families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  | otherwise    -- Untouchable
+  = False
+  where
+    is_tyvar xi
+      = case tcGetTyVar_maybe xi of
+          Nothing -> False
+          Just tv -> case tcTyVarDetails tv of
+                       MetaTv { mtv_info = info }
+                                   -> case info of
+                                        SigTv -> True
+                                        _     -> False
+                       SkolemTv {} -> True
+                       RuntimeUnk  -> True
+
+{- Note [Prevent unification with type families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We prevent unification with type families because of an uneasy compromise.
 It's perfectly sound to unify with type families, and it even improves the
 error messages in the testsuite. It also modestly improves performance, at
@@ -1889,7 +1989,7 @@ lookupTcTyVar tyvar
 Note [Unifying untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We treat an untouchable type variable as if it was a skolem.  That
-ensures it won't unify with anything.  It's a slight had, because
+ensures it won't unify with anything.  It's a slight hack, because
 we return a made-up TcTyVarDetails, but I think it works smoothly.
 -}
 

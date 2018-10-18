@@ -82,7 +82,7 @@ module Outputable (
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
         pprTrace, pprTraceDebug, pprTraceIt, warnPprTrace, pprSTrace,
-        pprTraceException,
+        pprTraceException, pprTraceM,
         trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen, callStackDoc,
     ) where
@@ -1182,6 +1182,9 @@ pprTrace str doc x
    | hasNoDebugOutput unsafeGlobalDynFlags = x
    | otherwise                             =
       pprDebugAndThen unsafeGlobalDynFlags trace (text str) doc x
+
+pprTraceM :: Applicative f => String -> SDoc -> f ()
+pprTraceM str doc = pprTrace str doc (pure ())
 
 -- | @pprTraceIt desc x@ is equivalent to @pprTrace desc (ppr x) x@
 pprTraceIt :: Outputable a => String -> a -> a

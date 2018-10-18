@@ -1906,7 +1906,7 @@ data TCvSubst
   = TCvSubst InScopeSet -- The in-scope type and kind variables
              TvSubstEnv -- Substitutes both type and kind variables
              CvSubstEnv -- Substitutes coercion variables
-        -- See Note [Apply Once]
+        -- See Note [Substitutions apply only once]
         -- and Note [Extending the TvSubstEnv]
         -- and Note [Substituting types and coercions]
         -- and Note [The substitution invariant]
@@ -1914,21 +1914,51 @@ data TCvSubst
 -- | A substitution of 'Type's for 'TyVar's
 --                 and 'Kind's for 'KindVar's
 type TvSubstEnv = TyVarEnv Type
-        -- A TvSubstEnv is used both inside a TCvSubst (with the apply-once
-        -- invariant discussed in Note [Apply Once]), and also independently
-        -- in the middle of matching, and unification (see Types.Unify)
-        -- So you have to look at the context to know if it's idempotent or
-        -- apply-once or whatever
+  -- NB: A TvSubstEnv is used
+  --   both inside a TCvSubst (with the apply-once invariant
+  --        discussed in Note [Substitutions apply only once],
+  --   and  also independently in the middle of matching,
+  --        and unification (see Types.Unify).
+  -- So you have to look at the context to know if it's idempotent or
+  -- apply-once or whatever
 
 -- | A substitution of 'Coercion's for 'CoVar's
 type CvSubstEnv = CoVarEnv Coercion
 
-{-
-Note [Apply Once]
-~~~~~~~~~~~~~~~~~
+{- Note [The substitution invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When calling (substTy subst ty) it should be the case that
+the in-scope set in the substitution is a superset of both:
+
+  (SIa) The free vars of the range of the substitution
+  (SIb) The free vars of ty minus the domain of the substitution
+
+The same rules apply to other substitutions (notably CoreSubst.Subst)
+
+* Reason for (SIa). Consider
+      substTy [a :-> Maybe b] (forall b. b->a)
+  we must rename the forall b, to get
+      forall b2. b2 -> Maybe b
+  Making 'b' part of the in-scope set forces this renaming to
+  take place.
+
+* Reason for (SIb). Consider
+     substTy [a :-> Maybe b] (forall b. (a,b,x))
+  Then if we use the in-scope set {b}, satisfying (SIa), there is
+  a danger we will rename the forall'd variable to 'x' by mistake,
+  getting this:
+      forall x. (List b, x, x)
+  Breaking (SIb) caused the bug from #11371.
+
+Note: if the free vars of the range of the substitution are freshly created,
+then the problems of (SIa) can't happen, and so it would be sound to
+ignore (SIa).
+
+Note [Substitutions apply only once]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We use TCvSubsts to instantiate things, and we might instantiate
         forall a b. ty
-\with the types
+with the types
         [a, b], or [b, a].
 So the substitution might go [a->b, b->a].  A similar situation arises in Core
 when we find a beta redex like
@@ -1936,9 +1966,9 @@ when we find a beta redex like
 Then we also end up with a substitution that permutes type variables. Other
 variations happen to; for example [a -> (a, b)].
 
-        ****************************************************
-        *** So a TCvSubst must be applied precisely once ***
-        ****************************************************
+        ********************************************************
+        *** So a substitution must be applied precisely once ***
+        ********************************************************
 
 A TCvSubst is not idempotent, but, unlike the non-idempotent substitution
 we use during unifications, it must not be repeatedly applied.
@@ -1981,25 +2011,6 @@ Note that the TvSubstEnv should *never* map a CoVar (built with the Id
 constructor) and the CvSubstEnv should *never* map a TyVar. Furthermore,
 the range of the TvSubstEnv should *never* include a type headed with
 CoercionTy.
-
-Note [The substitution invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When calling (substTy subst ty) it should be the case that
-the in-scope set in the substitution is a superset of both:
-
-  * The free vars of the range of the substitution
-  * The free vars of ty minus the domain of the substitution
-
-If we want to substitute [a -> ty1, b -> ty2] I used to
-think it was enough to generate an in-scope set that includes
-fv(ty1,ty2).  But that's not enough; we really should also take the
-free vars of the type we are substituting into!  Example:
-     (forall b. (a,b,x)) [a -> List b]
-Then if we use the in-scope set {b}, there is a danger we will rename
-the forall'd variable to 'x' by mistake, getting this:
-     (forall x. (List b, x, x))
-
-Breaking this invariant caused the bug from #11371.
 -}
 
 emptyTvSubstEnv :: TvSubstEnv

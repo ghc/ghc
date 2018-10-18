@@ -27,7 +27,6 @@ import SrcLoc
 import GHCi.BreakArray
 import GHCi.RemoteTypes
 import GHCi.FFI
-import GHCi.InfoTable
 import Control.DeepSeq
 
 import Foreign
@@ -36,6 +35,7 @@ import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import GHC.Exts.Heap
 import GHC.Stack.CCS
 
 -- -----------------------------------------------------------------------------

@@ -357,6 +357,7 @@ static int totalArgumentSize(char *typeString)
                     sz += 2;
                     break;
                 }
+                /* fall through */
                 // everything else is one word.
             default:
                 sz += 1;

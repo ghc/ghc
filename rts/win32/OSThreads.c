@@ -578,7 +578,7 @@ void setThreadNode (uint32_t node)
 {
     if (osNumaAvailable())
     {
-        StgWord mask = 0;
+        uint64_t mask = 0;
         if (!GetNumaNodeProcessorMask(node, &mask) && !SetThreadAffinityMask(GetCurrentThread(), mask))
         {
             sysErrorBelch(

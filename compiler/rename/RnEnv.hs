@@ -651,8 +651,10 @@ lookupSubBndrOcc warn_if_deprec the_parent doc rdr_name = do
     NameNotFound -> return (Left (unknownSubordinateErr doc rdr_name))
     FoundName _p n -> return (Right n)
     FoundFL fl  ->  return (Right (flSelector fl))
-    IncorrectParent {} -> return $ Left (unknownSubordinateErr doc rdr_name)
-
+    IncorrectParent {}
+         -- See [Mismatched class methods and associated type families]
+         -- in TcInstDecls.
+      -> return $ Left (unknownSubordinateErr doc rdr_name)
 
 {-
 Note [Family instance binders]

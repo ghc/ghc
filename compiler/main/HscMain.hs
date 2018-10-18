@@ -363,7 +363,7 @@ hscParse' mod_summary
                 srcs0 = nub $ filter (not . (tmpDir dflags `isPrefixOf`))
                             $ filter (not . (== n_hspp))
                             $ map FilePath.normalise
-                            $ filter (not . (isPrefixOf "<"))
+                            $ filter (not . isPrefixOf "<")
                             $ map unpackFS
                             $ srcfiles pst
                 srcs1 = case ml_hs_file (ms_location mod_summary) of
@@ -918,7 +918,7 @@ hscCheckSafeImports tcg_env = do
 -- | Validate that safe imported modules are actually safe.  For modules in the
 -- HomePackage (the package the module we are compiling in resides) this just
 -- involves checking its trust type is 'Safe' or 'Trustworthy'. For modules
--- that reside in another package we also must check that the external pacakge
+-- that reside in another package we also must check that the external package
 -- is trusted. See the Note [Safe Haskell Trust Check] above for more
 -- information.
 --
@@ -1397,15 +1397,13 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        us <- mkSplitUniqSupply 'S'
-        let initTopSRT = initUs_ us emptySRT
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose "Parsed Cmm" (ppr cmm)
-        (_, cmmgroup) <- cmmPipeline hsc_env initTopSRT cmm
-        rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
             cmm_mod = mkModule (thisPackage dflags) mod_name
+        (_, cmmgroup) <- cmmPipeline hsc_env (emptySRT cmm_mod) cmm
+        rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
         return ()
@@ -1456,21 +1454,17 @@ doCodeGen hsc_env this_mod data_tycons
         osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline us cmmgroup = do
-                let (topSRT', us') = initUs us emptySRT
-                (topSRT, cmmgroup) <- cmmPipeline hsc_env topSRT' cmmgroup
-                let srt | isEmptySRT topSRT = []
-                        | otherwise         = srtToData topSRT
-                return (us', srt ++ cmmgroup)
+                (_topSRT, cmmgroup) <-
+                  cmmPipeline hsc_env (emptySRT this_mod) cmmgroup
+                return (us, cmmgroup)
 
           in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
                 return ()
 
       | otherwise
         = {-# SCC "cmmPipeline" #-}
-          let initTopSRT = initUs_ us emptySRT
-              run_pipeline = cmmPipeline hsc_env
-          in do topSRT <- Stream.mapAccumL run_pipeline initTopSRT ppr_stream1
-                Stream.yield (srtToData topSRT)
+          let run_pipeline = cmmPipeline hsc_env
+          in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
 
     let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm

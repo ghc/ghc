@@ -59,7 +59,7 @@ litToImm lit
         CmmLabel l              -> ImmCLbl l
         CmmLabelOff l off       -> ImmIndex l off
 
-        CmmLabelDiffOff l1 l2 off
+        CmmLabelDiffOff l1 l2 off _
          -> ImmConstantSum
                 (ImmConstantDiff (ImmCLbl l1) (ImmCLbl l2))
                 (ImmInt off)

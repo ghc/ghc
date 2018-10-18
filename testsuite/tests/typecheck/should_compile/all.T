@@ -499,6 +499,7 @@ test('T11401', normal, compile, [''])
 test('T11699', normal, compile, [''])
 test('T11512', normal, compile, [''])
 test('T11754', normal, compile, [''])
+test('T11766', normal, compile, [''])
 test('T11811', normal, compile, [''])
 test('T11793', normal, compile, [''])
 test('T11348', normal, compile, [''])
@@ -597,7 +598,7 @@ test('T14590', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutio
 # output we expect (T13032.stderr).
 test('T13032', omit_ways(['hpc', 'profasm']), compile, [''])
 test('T14273', normal, compile, ['-fdefer-type-errors -fno-max-valid-substitutions'])
-test('T14732', normal, compile, [''])
+test('T14732', expect_broken_for(15163, ['profasm']), compile, [''])
 test('T14774', [], run_command, ['$MAKE -s --no-print-directory T14774'])
 test('T14763', normal, compile, [''])
 test('T14811', normal, compile, [''])
@@ -605,5 +606,12 @@ test('T14934', [extra_files(['T14934.hs', 'T14934a.hs'])], run_command,
                ['$MAKE -s --no-print-directory T14934'])
 test('T13643', normal, compile, [''])
 test('SplitWD', normal, compile, [''])
-test('T14441', normal, compile, [''])
+# we omit profasm because it fails with:
+# T14441.hs:1:1: fatal:
+#     Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('T14441', omit_ways(['profasm']), compile, [''])
 test('T15050', [expect_broken(15050)], compile, [''])

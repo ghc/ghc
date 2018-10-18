@@ -114,6 +114,7 @@ module DynFlags (
         setUnitId,
         interpretPackageEnv,
         canonicalizeHomeModule,
+        canonicalizeModuleIfHome,
 
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
@@ -533,6 +534,7 @@ data GeneralFlag
    | Opt_IgnoreDotGhci
    | Opt_GhciSandbox
    | Opt_GhciHistory
+   | Opt_GhciLeakCheck
    | Opt_LocalGhciHistory
    | Opt_NoIt
    | Opt_HelpfulErrors
@@ -3892,6 +3894,7 @@ fFlagsDeps = [
   flagSpec "fun-to-thunk"                     Opt_FunToThunk,
   flagSpec "gen-manifest"                     Opt_GenManifest,
   flagSpec "ghci-history"                     Opt_GhciHistory,
+  flagSpec "ghci-leak-check"                  Opt_GhciLeakCheck,
   flagGhciSpec "local-ghci-history"           Opt_LocalGhciHistory,
   flagGhciSpec "no-it"                        Opt_NoIt,
   flagSpec "ghci-sandbox"                     Opt_GhciSandbox,
@@ -4861,6 +4864,12 @@ canonicalizeHomeModule dflags mod_name =
     case lookup mod_name (thisUnitIdInsts dflags) of
         Nothing  -> mkModule (thisPackage dflags) mod_name
         Just mod -> mod
+
+canonicalizeModuleIfHome :: DynFlags -> Module -> Module
+canonicalizeModuleIfHome dflags mod
+    = if thisPackage dflags == moduleUnitId mod
+                      then canonicalizeHomeModule dflags (moduleName mod)
+                      else mod
 
 
 -- -----------------------------------------------------------------------------

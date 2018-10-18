@@ -216,10 +216,19 @@ class  (Real a, Fractional a) => RealFrac a  where
 -- These 'numeric' enumerations come straight from the Report
 
 numericEnumFrom         :: (Fractional a) => a -> [a]
-numericEnumFrom n       =  n `seq` (n : numericEnumFrom (n + 1))
+numericEnumFrom n       = go 0
+  where
+    -- See Note [Numeric Stability of Enumerating Floating Numbers]
+    go !k = let !n' = n + k
+             in n' : go (k + 1)
 
 numericEnumFromThen     :: (Fractional a) => a -> a -> [a]
-numericEnumFromThen n m = n `seq` m `seq` (n : numericEnumFromThen m (m+m-n))
+numericEnumFromThen n m = go 0
+  where
+    step = m - n
+    -- See Note [Numeric Stability of Enumerating Floating Numbers]
+    go !k = let !n' = n + k * step
+             in n' : go (k + 1)
 
 numericEnumFromTo       :: (Ord a, Fractional a) => a -> a -> [a]
 numericEnumFromTo n m   = takeWhile (<= m + 1/2) (numericEnumFrom n)
@@ -231,6 +240,49 @@ numericEnumFromThenTo e1 e2 e3
                                  mid = (e2 - e1) / 2
                                  predicate | e2 >= e1  = (<= e3 + mid)
                                            | otherwise = (>= e3 + mid)
+
+{- Note [Numeric Stability of Enumerating Floating Numbers]
+-----------------------------------------------------------
+When enumerate floating numbers, we could add the increment to the last number
+at every run (as what we did previously):
+
+    numericEnumFrom n =  n `seq` (n : numericEnumFrom (n + 1))
+
+This approach is concise and really fast, only needs an addition operation.
+However when a floating number is large enough, for `n`, `n` and `n+1` will
+have the same binary representation. For example (all number has type
+`Double`):
+
+    9007199254740990                 is: 0x433ffffffffffffe
+    9007199254740990 + 1             is: 0x433fffffffffffff
+    (9007199254740990 + 1) + 1       is: 0x4340000000000000
+    ((9007199254740990 + 1) + 1) + 1 is: 0x4340000000000000
+
+When we evaluate ([9007199254740990..9007199254740991] :: Double), we would
+never reach the condition in `numericEnumFromTo`
+
+    9007199254740990 + 1 + 1 + ... > 9007199254740991 + 1/2
+
+We would fall into infinite loop (as reported in Trac #15081).
+
+To remedy the situation, we record the number of `1` that needed to be added
+to the start number, rather than increasing `1` at every time. This approach
+can improvement the numeric stability greatly at the cost of a multiplication.
+
+Furthermore, we use the type of the enumerated number, `Fractional a => a`,
+as the type of multiplier. In rare situations, the multiplier could be very
+large and will lead to the enumeration to infinite loop, too, which should
+be very rare. Consider the following example:
+
+    [1..9007199254740994]
+
+We could fix that by using an Integer as multiplier but we don't do that.
+The benchmark on T7954.hs shows that this approach leads to significant
+degeneration on performance (33% increase allocation and 300% increase on
+elapsed time).
+
+See Trac #15081 and Phab:D4650 for the related discussion about this problem.
+-}
 
 --------------------------------------------------------------
 -- Instances for Int

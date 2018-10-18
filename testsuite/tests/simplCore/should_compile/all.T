@@ -158,7 +158,16 @@ test('T7702',
      compile,
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])
 
-test('T7944', normal, compile, ['-O2'])
+# we omit profasm because it doesn't bring much to the table but
+# introduces its share of complexity, as the test as it is fails with
+# profasm:
+# T7944.hs:7:1: fatal:
+#     Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('T7944', omit_ways(['profasm']), compile, ['-O2'])
 test('T7995',
      # RULE doesn't seem to fire unless optimizations are turned on.
      # This seems reasonable, so I've required it for the test. -- EZY 20130720
@@ -279,7 +288,8 @@ test('T14779b',
 test('T13708', normal, compile, [''])
 
 # thunk should inline here, so check whether or not it appears in the Core
-test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
+# (we skip profasm because it might not inline there)
+test('T14137', [ check_errmsg(r'thunk'), omit_ways(['profasm']) ], compile, ['-dsuppress-uniques -ddump-simpl'])
 # bar and foo should CSEd here, so check for that in the Core
 test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])
 
@@ -303,4 +313,5 @@ test('T14978',
      ['$MAKE -s --no-print-directory T14978'])
 test('T15002', [ req_profiling ], compile, ['-O -fprof-auto -prof'])
 test('T15005', normal, compile, ['-O'])
-test('T15056', [extra_files(['T15056a.hs'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])
+# we omit profiling because it affects the optimiser and makes the test fail
+test('T15056', [extra_files(['T15056a.hs']), omit_ways(['profasm'])], multimod_compile, ['T15056', '-O -v0 -ddump-rule-firings'])

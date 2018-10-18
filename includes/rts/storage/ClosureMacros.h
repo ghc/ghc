@@ -109,7 +109,7 @@ INLINE_HEADER const StgConInfoTable *get_con_itbl(const StgClosure *c)
 
 INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 {
-    return get_itbl(con)->srt_bitmap;
+    return get_itbl(con)->srt;
 }
 
 /* -----------------------------------------------------------------------------
@@ -172,7 +172,6 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
    -------------------------------------------------------------------------- */
 
 /* These are hard-coded. */
-#define FUN_STATIC_LINK(p)   (&(p)->payload[0])
 #define THUNK_STATIC_LINK(p) (&(p)->payload[1])
 #define IND_STATIC_LINK(p)   (&(p)->payload[1])
 
@@ -182,8 +181,6 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
     switch (info->type) {
     case THUNK_STATIC:
         return THUNK_STATIC_LINK(p);
-    case FUN_STATIC:
-        return FUN_STATIC_LINK(p);
     case IND_STATIC:
         return IND_STATIC_LINK(p);
     default:

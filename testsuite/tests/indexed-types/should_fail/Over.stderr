@@ -1,8 +1,8 @@
 
 OverB.hs:7:15: error:
     Conflicting family instance declarations:
-      C [Int] [a] = CListList2 -- Defined at OverB.hs:7:15
-      C [a] [Int] = C9ListList -- Defined at OverC.hs:7:15
+      C [Int] [a] -- Defined at OverB.hs:7:15
+      C [a] [Int] -- Defined at OverC.hs:7:15
 
 OverB.hs:9:15: error:
     Conflicting family instance declarations:

@@ -19,17 +19,17 @@ T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
           (bound at T9834.hs:23:3)
 
 T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘a’ with ‘a1’
+    • Couldn't match type ‘a1’ with ‘a’
+      ‘a1’ is a rigid type variable bound by
+        a type expected by the context:
+          forall (q :: * -> *). Applicative q => Nat (Comp p q) (Comp p q)
+        at T9834.hs:23:10-19
       ‘a’ is a rigid type variable bound by
         the type signature for:
           afix :: forall a.
                   (forall (q :: * -> *). Applicative q => Comp p q a -> Comp p q a)
                   -> p a
         at T9834.hs:22:11-74
-      ‘a1’ is a rigid type variable bound by
-        a type expected by the context:
-          forall (q :: * -> *). Applicative q => Nat (Comp p q) (Comp p q)
-        at T9834.hs:23:10-19
       Expected type: Comp p q a1 -> Comp p q a1
         Actual type: Comp p q a -> Comp p q a
     • In the expression: wrapIdComp

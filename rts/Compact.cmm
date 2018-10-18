@@ -189,24 +189,26 @@ eval:
         SMALL_MUT_ARR_PTRS_FROZEN0,
         SMALL_MUT_ARR_PTRS_FROZEN: {
 
-        W_ i, size, ptrs;
-        size = SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_size(p));
-        ptrs = StgMutArrPtrs_ptrs(p);
-        ALLOCATE(compact, BYTES_TO_WDS(size), p, to, tag);
+        (should) = ccall shouldCompact(compact "ptr", p "ptr");
+        if (should == SHOULDCOMPACT_IN_CNF) { P_[pp] = p; return(); }
+
+        CHECK_HASH();
+
+        W_ i, ptrs;
+        ptrs = StgSmallMutArrPtrs_ptrs(p);
+        ALLOCATE(compact, BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + ptrs, p, to, tag);
         P_[pp] = tag | to;
         SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
-        StgMutArrPtrs_ptrs(to) = ptrs;
-        StgMutArrPtrs_size(to) = StgMutArrPtrs_size(p);
-        prim %memcpy(to, p, size, 1);
+        StgSmallMutArrPtrs_ptrs(to) = ptrs;
         i = 0;
-      loop0:
+      loop1:
         if (i < ptrs) ( likely: True ) {
             W_ q;
             q = to + SIZEOF_StgSmallMutArrPtrs + WDS(i);
             call stg_compactAddWorkerzh(
                 compact, P_[p + SIZEOF_StgSmallMutArrPtrs + WDS(i)], q);
             i = i + 1;
-            goto loop0;
+            goto loop1;
         }
         return();
     }
@@ -238,16 +240,16 @@ eval:
         // First, copy the non-pointers
         if (nptrs > 0) {
             i = ptrs;
-        loop1:
+        loop2:
             StgClosure_payload(to,i) = StgClosure_payload(p,i);
             i = i + 1;
-            if (i < ptrs + nptrs) ( likely: True ) goto loop1;
+            if (i < ptrs + nptrs) ( likely: True ) goto loop2;
         }
 
         // Next, recursively compact and copy the pointers
         if (ptrs == 0) { return(); }
         i = 0;
-      loop2:
+      loop3:
         W_ q;
         q = to + SIZEOF_StgHeader + OFFSET_StgClosure_payload + WDS(i);
         // Tail-call the last one.  This means we don't build up a deep
@@ -257,7 +259,7 @@ eval:
         }
         call stg_compactAddWorkerzh(compact, StgClosure_payload(p,i), q);
         i = i + 1;
-        goto loop2;
+        goto loop3;
     }
 
     // these might be static closures that we can avoid copying into

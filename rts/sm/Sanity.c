@@ -677,7 +677,7 @@ checkStaticObjects ( StgClosure* static_objects )
       break;
 
     case FUN_STATIC:
-      p = *FUN_STATIC_LINK((StgClosure *)p);
+      p = *STATIC_LINK(info,(StgClosure *)p);
       break;
 
     case CONSTR:

@@ -15,10 +15,10 @@ TYPE CONSTRUCTORS
   data family Sing (a :: k)
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
-    Sing = DataFamilyInstanceLHS.R:SingMyKind_
+    Sing _ = DataFamilyInstanceLHS.R:SingMyKind_
       -- Defined at DataFamilyInstanceLHS.hs:8:15
 FAMILY INSTANCES
   data instance Sing
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.2.1,
+Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

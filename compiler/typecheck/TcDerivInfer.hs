@@ -747,8 +747,8 @@ simplifyDeriv pred tvs thetas
 Note [Overlap and deriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider some overlapping instances:
-  data Show a => Show [a] where ..
-  data Show [Char] where ...
+  instance Show a => Show [a] where ..
+  instance Show [Char] where ...
 
 Now a data type with deriving:
   data T a = MkT [a] deriving( Show )

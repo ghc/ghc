@@ -145,6 +145,7 @@ _darcs/
 /libraries/ghc-boot-th/GNUmakefile
 /libraries/ghc-boot-th/ghc-boot-th.cabal
 /libraries/ghc-boot-th/ghc.mk
+/libraries/ghc-heap/ghc-heap.cabal
 /libraries/ghci/GNUmakefile
 /libraries/ghci/ghci.cabal
 /libraries/ghci/ghc.mk

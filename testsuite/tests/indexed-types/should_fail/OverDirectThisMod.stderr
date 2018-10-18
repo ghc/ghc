@@ -1,8 +1,8 @@
 
 OverDirectThisModB.hs:7:15: error:
     Conflicting family instance declarations:
-      C [Int] [a] = CListList2 -- Defined at OverDirectThisModB.hs:7:15
-      C [a] [Int] = C9ListList -- Defined at OverDirectThisModC.hs:10:15
+      C [Int] [a] -- Defined at OverDirectThisModB.hs:7:15
+      C [a] [Int] -- Defined at OverDirectThisModC.hs:10:15
 
 OverDirectThisModB.hs:9:15: error:
     Conflicting family instance declarations:

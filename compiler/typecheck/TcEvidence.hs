@@ -16,7 +16,7 @@ module TcEvidence (
   lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
   isEmptyEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  sccEvBinds, evBindVar,
+  sccEvBinds, evBindVar, isNoEvBindsVar,
 
   -- EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
@@ -394,10 +394,9 @@ data EvBindsVar
       -- See Note [Tracking redundant constraints] in TcSimplify
     }
 
-  | NoEvBindsVar {  -- used when we're solving only for equalities,
-                    -- which don't have bindings
+  | NoEvBindsVar {  -- See Note [No evidence bindings]
 
-        -- see above for comments
+      -- See above for comments on ebv_uniq, evb_tcvs
       ebv_uniq :: Unique,
       ebv_tcvs :: IORef CoVarSet
     }
@@ -407,6 +406,25 @@ instance Data.Data TcEvBinds where
   toConstr _   = abstractConstr "TcEvBinds"
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = Data.mkNoRepType "TcEvBinds"
+
+{- Note [No evidence bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Class constraints etc give rise to /term/ bindings for evidence, and
+we have nowhere to put term bindings in /types/.  So in some places we
+use NoEvBindsVar (see newNoTcEvBinds) to signal that no term-level
+evidence bindings are allowed.  Notebly ():
+
+  - Places in types where we are solving kind constraints (all of which
+    are equalities); see solveEqualities, solveLocalEqualities,
+    checkTvConstraints
+
+  - When unifying forall-types
+-}
+
+isNoEvBindsVar :: EvBindsVar -> Bool
+isNoEvBindsVar (NoEvBindsVar {}) = True
+isNoEvBindsVar (EvBindsVar {})   = False
 
 -----------------
 newtype EvBindMap

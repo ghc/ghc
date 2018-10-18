@@ -253,8 +253,8 @@ cmmRegOff reg byte_off = CmmRegOff reg byte_off
 cmmOffsetLit :: CmmLit -> Int -> CmmLit
 cmmOffsetLit (CmmLabel l)      byte_off = cmmLabelOff l byte_off
 cmmOffsetLit (CmmLabelOff l m) byte_off = cmmLabelOff l (m+byte_off)
-cmmOffsetLit (CmmLabelDiffOff l1 l2 m) byte_off
-                                        = CmmLabelDiffOff l1 l2 (m+byte_off)
+cmmOffsetLit (CmmLabelDiffOff l1 l2 m w) byte_off
+                                        = CmmLabelDiffOff l1 l2 (m+byte_off) w
 cmmOffsetLit (CmmInt m rep)    byte_off = CmmInt (m + fromIntegral byte_off) rep
 cmmOffsetLit _                 byte_off = pprPanic "cmmOffsetLit" (ppr byte_off)
 

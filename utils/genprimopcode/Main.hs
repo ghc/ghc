@@ -263,7 +263,7 @@ gen_hs_source (Info defaults entries) =
 
     ++ "default ()"  -- If we don't say this then the default type include Integer
                      -- so that runs off and loads modules that are not part of
-                     -- pacakge ghc-prim at all.  And that in turn somehow ends up
+                     -- package ghc-prim at all.  And that in turn somehow ends up
                      -- with Declaration for $fEqMaybe:
                      --       attempting to use module ‘GHC.Classes’
                      --       (libraries/ghc-prim/./GHC/Classes.hs) which is not loaded

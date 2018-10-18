@@ -1006,7 +1006,7 @@ collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = L _ ps })) acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
-collectMethodBinders :: LHsBindsLR GhcPs idR -> [Located RdrName]
+collectMethodBinders :: LHsBindsLR idL idR -> [Located (IdP idL)]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
 collectMethodBinders binds = foldrBag (get . unLoc) [] binds
   where

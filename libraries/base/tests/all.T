@@ -1,7 +1,21 @@
+import string
+import re
 
+#--------------------------------------
+# Python normalization functions
+#--------------------------------------
+
+def normalise_quotes (str):
+  str = re.sub(r'"',r'', str, flags=re.MULTILINE)
+  return str
+
+#--------------------------------------
+# Test functions
+#--------------------------------------
 test('readFloat', exit_code(1), compile_and_run, [''])
 test('enumDouble', normal, compile_and_run, [''])
 test('enumRatio', normal, compile_and_run, [''])
+test('enumNumeric', normal, compile_and_run, [''])
 test('tempfiles', normal, compile_and_run, [''])
 test('fixed', normal, compile_and_run, [''])
 test('quotOverflow', normal, compile_and_run, [''])
@@ -121,7 +135,9 @@ test('T2528', normal, compile_and_run, [''])
 # Seems to be a known problem, e.g.
 #     http://mingw-users.1079350.n2.nabble.com/Bug-re-Unicode-on-the-console-td3121717.html
 # May 2014: seems to work on msys2
-test('T4006', normal, compile_and_run, [''])
+# May 2018: The behavior of printf seems very implementation dependent.
+#     so let's normalise the output.
+test('T4006', normalise_fun(normalise_quotes), compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
 test('T5962', normal, compile_and_run, [''])
@@ -187,7 +203,8 @@ test('T9681', normal, compile_fail, [''])
 #   make an educated guess how long it needs to be guaranteed to reach the C
 #   call."
 test('T8089',
-     [exit_code(99), run_timeout_multiplier(0.01)],
+     [exit_code(99), run_timeout_multiplier(0.01),
+      expect_broken_for(15158, ['ghci', 'threaded1', 'threaded2', 'profthreaded'])],
      compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
@@ -224,3 +241,4 @@ test('T3474',
 test('T14425', normal, compile_and_run, [''])
 test('T10412', normal, compile_and_run, [''])
 test('T13896', normal, compile_and_run, [''])
+test('T13167', normal, compile_and_run, [''])

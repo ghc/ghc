@@ -28,7 +28,7 @@ import Data.Either
 import Data.Function ( fix )
 import Data.Maybe
 import Data.Monoid ( Dual(..), Sum(..), Product(..)
-                   , First(..), Last(..), Alt(..) )
+                   , First(..), Last(..), Alt(..), Ap(..) )
 import GHC.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
 import GHC.Generics
 import GHC.List ( head, tail )
@@ -125,6 +125,10 @@ instance MonadFix Last where
 -- | @since 4.8.0.0
 instance MonadFix f => MonadFix (Alt f) where
     mfix f   = Alt (mfix (getAlt . f))
+
+-- | @since 4.12.0.0
+instance MonadFix f => MonadFix (Ap f) where
+    mfix f   = Ap (mfix (getAp . f))
 
 -- Instances for GHC.Generics
 -- | @since 4.9.0.0

@@ -1,14 +1,14 @@
 
 T14066d.hs:11:35: error:
-    • Couldn't match type ‘b’ with ‘b1’
-      ‘b’ is a rigid type variable bound by
-        the type signature for:
-          f :: forall b. b -> (Proxy Maybe, ())
-        at T14066d.hs:10:1-37
+    • Couldn't match type ‘b1’ with ‘b’
       ‘b1’ is a rigid type variable bound by
         a type expected by the context:
           forall c b1 (a :: c). (Proxy a, Proxy c, b1)
         at T14066d.hs:11:33-35
+      ‘b’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall b. b -> (Proxy Maybe, ())
+        at T14066d.hs:10:1-37
       Expected type: (Proxy a, Proxy c, b1)
         Actual type: (Proxy a, Proxy c, b)
     • In the first argument of ‘g’, namely ‘y’

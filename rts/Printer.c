@@ -624,10 +624,14 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
     }
 }
 
+static void printStack( StgStack *stack )
+{
+    printStackChunk( stack->sp, stack->stack + stack->stack_size );
+}
+
 void printTSO( StgTSO *tso )
 {
-    printStackChunk( tso->stackobj->sp,
-                     tso->stackobj->stack+tso->stackobj->stack_size);
+    printStack( tso->stackobj );
 }
 
 /* --------------------------------------------------------------------------

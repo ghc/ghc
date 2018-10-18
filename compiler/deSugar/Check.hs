@@ -44,7 +44,7 @@ import HscTypes (CompleteMatch(..))
 
 import DsMonad
 import TcSimplify    (tcCheckSatisfiability)
-import TcType        (toTcType, isStringTy, isIntTy, isWordTy)
+import TcType        (isStringTy, isIntTy, isWordTy)
 import Bag
 import ErrUtils
 import Var           (EvVar)
@@ -625,12 +625,12 @@ inhabitationCandidates fam_insts ty
       Just (tc, _)
         | tc `elem` trivially_inhabited -> case dcs of
             []    -> return (Left src_ty)
-            (_:_) -> do var <- liftD $ mkPmId (toTcType core_ty)
+            (_:_) -> do var <- liftD $ mkPmId core_ty
                         let va = build_tm (PmVar var) dcs
                         return $ Right [(va, mkIdEq var, emptyBag)]
 
         | pmIsClosedType core_ty -> liftD $ do
-            var  <- mkPmId (toTcType core_ty) -- it would be wrong to unify x
+            var  <- mkPmId core_ty -- it would be wrong to unify x
             alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
             return $ Right [(build_tm va dcs, eq, cs) | (va, eq, cs) <- alts]
       -- For other types conservatively assume that they are inhabited.
@@ -1332,7 +1332,7 @@ allCompleteMatches cl tys = do
 -- * Types and constraints
 
 newEvVar :: Name -> Type -> EvVar
-newEvVar name ty = mkLocalId name (Regular Omega) (toTcType ty)
+newEvVar name ty = mkLocalId name (Regular Omega) ty
 
 nameType :: String -> Type -> DsM EvVar
 nameType name ty = do

@@ -124,31 +124,6 @@ typedef struct {
   StgWord bitmap[];
 } StgLargeBitmap;
 
-/* -----------------------------------------------------------------------------
-   SRTs  (Static Reference Tables)
-
-   These tables are used to keep track of the static objects referred
-   to by the code for a closure or stack frame, so that we can follow
-   static data references from code and thus accurately
-   garbage-collect CAFs.
-   -------------------------------------------------------------------------- */
-
-/* An SRT is just an array of closure pointers: */
-typedef StgClosure* StgSRT[];
-
-/*
- * Each info table refers to some subset of the closure pointers in an
- * SRT.  It does this using a pair of an StgSRT pointer and a
- * half-word bitmap.  If the half-word bitmap isn't large enough, then
- * we fall back to a large SRT, including an unbounded bitmap.  If the
- * half-word bitmap is set to all ones (0xffff), then the StgSRT
- * pointer instead points to an StgLargeSRT:
- */
-typedef struct StgLargeSRT_ {
-    StgSRT *srt;
-    StgLargeBitmap l;
-} StgLargeSRT;
-
 /* ----------------------------------------------------------------------------
    Info Tables
    ------------------------------------------------------------------------- */
@@ -178,6 +153,24 @@ typedef union {
 } StgClosureInfo;
 
 
+#if defined(x86_64_TARGET_ARCH) && defined(TABLES_NEXT_TO_CODE)
+// On x86_64 we can fit a pointer offset in half a word, so put the SRT offset
+// in the info->srt field directly.
+//
+// See the section "Referring to an SRT from the info table" in
+// Note [SRTs] in CmmBuildInfoTables.hs
+#define USE_INLINE_SRT_FIELD
+#endif
+
+#if defined(USE_INLINE_SRT_FIELD)
+// offset to the SRT / closure, or zero if there's no SRT
+typedef StgHalfInt StgSRTField;
+#else
+// non-zero if there is an SRT, the offset is in the optional srt field.
+typedef StgHalfWord StgSRTField;
+#endif
+
+
 /*
  * The "standard" part of an info table.  Every info table has this bit.
  */
@@ -194,11 +187,14 @@ typedef struct StgInfoTable_ {
     StgClosureInfo  layout;     /* closure layout info (one word) */
 
     StgHalfWord     type;       /* closure type */
-    StgHalfWord     srt_bitmap;
+    StgSRTField     srt;
        /* In a CONSTR:
             - the constructor tag
           In a FUN/THUNK
-            - a bitmap of SRT entries
+            - if USE_INLINE_SRT_FIELD
+              - offset to the SRT (or zero if no SRT)
+            - otherwise
+              - non-zero if there is an SRT, offset is in srt_offset
        */
 
 #if defined(TABLES_NEXT_TO_CODE)
@@ -217,7 +213,7 @@ typedef struct StgInfoTable_ {
       and bitmap fields may be left out (they are at the end, so omitting
       them doesn't affect the layout).
 
-   -  If srt_bitmap (in the std info table part) is zero, then the srt
+   -  If has_srt (in the std info table part) is zero, then the srt
       field needn't be set.  This only applies if the slow_apply and
       bitmap fields have also been omitted.
    -------------------------------------------------------------------------- */
@@ -239,7 +235,9 @@ typedef struct StgFunInfoExtraRev_ {
         StgWord bitmap;
         OFFSET_FIELD(bitmap_offset);    /* arg ptr/nonptr bitmap */
     } b;
-    OFFSET_FIELD(srt_offset);   /* pointer to the SRT table */
+#if !defined(USE_INLINE_SRT_FIELD)
+    OFFSET_FIELD(srt_offset);   /* pointer to the SRT closure */
+#endif
     StgHalfWord    fun_type;    /* function type */
     StgHalfWord    arity;       /* function arity */
 } StgFunInfoExtraRev;
@@ -247,7 +245,7 @@ typedef struct StgFunInfoExtraRev_ {
 typedef struct StgFunInfoExtraFwd_ {
     StgHalfWord    fun_type;    /* function type */
     StgHalfWord    arity;       /* function arity */
-    StgSRT         *srt;        /* pointer to the SRT table */
+    StgClosure    *srt;         /* pointer to the SRT closure */
     union { /* union for compat. with TABLES_NEXT_TO_CODE version */
         StgWord        bitmap;  /* arg ptr/nonptr bitmap */
     } b;
@@ -273,16 +271,18 @@ extern const StgWord stg_arg_bitmaps[];
 
 /*
  * When info tables are laid out backwards, we can omit the SRT
- * pointer iff srt_bitmap is zero.
+ * pointer iff has_srt is zero.
  */
 
 typedef struct {
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD(srt_offset);   /* offset to the SRT table */
+#if !defined(USE_INLINE_SRT_FIELD)
+    OFFSET_FIELD(srt_offset);   /* offset to the SRT closure */
+#endif
     StgInfoTable i;
 #else
     StgInfoTable i;
-    StgSRT      *srt;   /* pointer to the SRT table */
+    StgClosure  *srt;           /* pointer to the SRT closure */
 #endif
 } StgRetInfoTable;
 
@@ -292,20 +292,18 @@ typedef struct {
 
 /*
  * When info tables are laid out backwards, we can omit the SRT
- * pointer iff srt_bitmap is zero.
+ * pointer iff has_srt is zero.
  */
 
 typedef struct StgThunkInfoTable_ {
-#if !defined(TABLES_NEXT_TO_CODE)
-    StgInfoTable i;
-#endif
 #if defined(TABLES_NEXT_TO_CODE)
-    OFFSET_FIELD(srt_offset);   /* offset to the SRT table */
+#if !defined(USE_INLINE_SRT_FIELD)
+    OFFSET_FIELD(srt_offset);   /* offset to the SRT closure */
+#endif
+    StgInfoTable i;
 #else
-    StgSRT         *srt;        /* pointer to the SRT table */
-#endif
-#if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
+    StgClosure  *srt;           /* pointer to the SRT closure */
 #endif
 } StgThunkInfoTable;
 
@@ -340,8 +338,14 @@ typedef struct StgConInfoTable_ {
  * info must be a Stg[Ret|Thunk]InfoTable* (an info table that has a SRT)
  */
 #if defined(TABLES_NEXT_TO_CODE)
-#define GET_SRT(info) ((StgSRT*) (((StgWord) ((info)+1)) + (info)->srt_offset))
+#if defined(x86_64_TARGET_ARCH)
+#define GET_SRT(info) \
+  ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
 #else
+#define GET_SRT(info) \
+  ((StgClosure*) (((StgWord) ((info)+1)) + (info)->srt_offset))
+#endif
+#else // !TABLES_NEXT_TO_CODE
 #define GET_SRT(info) ((info)->srt)
 #endif
 
@@ -361,7 +365,13 @@ typedef struct StgConInfoTable_ {
  * info must be a StgFunInfoTable*
  */
 #if defined(TABLES_NEXT_TO_CODE)
-#define GET_FUN_SRT(info) ((StgSRT*) (((StgWord) ((info)+1)) + (info)->f.srt_offset))
+#if defined(x86_64_TARGET_ARCH)
+#define GET_FUN_SRT(info) \
+  ((StgClosure*) (((StgWord) ((info)+1)) + (info)->i.srt))
+#else
+#define GET_FUN_SRT(info) \
+  ((StgClosure*) (((StgWord) ((info)+1)) + (info)->f.srt_offset))
+#endif
 #else
 #define GET_FUN_SRT(info) ((info)->f.srt)
 #endif

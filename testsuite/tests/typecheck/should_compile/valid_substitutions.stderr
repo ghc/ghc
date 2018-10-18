@@ -104,7 +104,7 @@ valid_substitutions.hs:30:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 67 instances involving out-of-scope types
+        ...plus 68 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show _
       In an equation for ‘f’: f = show _
@@ -153,7 +153,7 @@ valid_substitutions.hs:34:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 67 instances involving out-of-scope types
+        ...plus 68 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: show (_ (_ :: Bool))
       In an equation for ‘h’: h = show (_ (_ :: Bool))

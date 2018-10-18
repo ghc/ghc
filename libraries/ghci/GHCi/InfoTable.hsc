@@ -9,70 +9,19 @@
 -- We use the RTS data structures directly via hsc2hs.
 --
 module GHCi.InfoTable
-  ( peekItbl, StgInfoTable(..)
-  , conInfoPtr
+  (
 #ifdef GHCI
-  , mkConInfoTable
+    mkConInfoTable
 #endif
   ) where
 
-#if !defined(TABLES_NEXT_TO_CODE)
-import Data.Maybe (fromJust)
-#endif
+#ifdef GHCI
 import Foreign
-import Foreign.C -- needed for 2nd stage
-import GHC.Ptr -- needed for 2nd stage
-import GHC.Exts -- needed for 2nd stage
-import System.IO.Unsafe -- needed for 2nd stage
-
-type ItblCodes = Either [Word8] [Word32]
-
--- Ultra-minimalist version specially for constructors
-#if SIZEOF_VOID_P == 8
-type HalfWord = Word32
-#elif SIZEOF_VOID_P == 4
-type HalfWord = Word16
-#else
-#error Unknown SIZEOF_VOID_P
+import Foreign.C
+import GHC.Ptr
+import GHC.Exts
+import GHC.Exts.Heap
 #endif
-
-type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
-
-data StgInfoTable = StgInfoTable {
-   entry  :: Maybe EntryFunPtr, -- Just <=> not ghciTablesNextToCode
-   ptrs   :: HalfWord,
-   nptrs  :: HalfWord,
-   tipe   :: HalfWord,
-   srtlen :: HalfWord,
-   code   :: Maybe ItblCodes -- Just <=> ghciTablesNextToCode
-  }
-
-peekItbl :: Ptr StgInfoTable -> IO StgInfoTable
-peekItbl a0 = do
-#if defined(TABLES_NEXT_TO_CODE)
-  let entry' = Nothing
-#else
-  entry' <- Just <$> (#peek StgInfoTable, entry) a0
-#endif
-  ptrs' <- (#peek StgInfoTable, layout.payload.ptrs) a0
-  nptrs' <- (#peek StgInfoTable, layout.payload.nptrs) a0
-  tipe' <- (#peek StgInfoTable, type) a0
-  srtlen' <- (#peek StgInfoTable, srt_bitmap) a0
-  return StgInfoTable
-    { entry  = entry'
-    , ptrs   = ptrs'
-    , nptrs  = nptrs'
-    , tipe   = tipe'
-    , srtlen = srtlen'
-    , code   = Nothing
-    }
-
--- | Convert a pointer to an StgConInfo into an info pointer that can be
--- used in the header of a closure.
-conInfoPtr :: Ptr () -> Ptr ()
-conInfoPtr ptr
- | ghciTablesNextToCode = ptr `plusPtr` (#size StgConInfoTable)
- | otherwise            = ptr
 
 ghciTablesNextToCode :: Bool
 #ifdef TABLES_NEXT_TO_CODE
@@ -82,6 +31,9 @@ ghciTablesNextToCode = False
 #endif
 
 #ifdef GHCI /* To end */
+-- NOTE: Must return a pointer acceptable for use in the header of a closure.
+-- If tables_next_to_code is enabled, then it must point the the 'code' field.
+-- Otherwise, it should point to the start of the StgInfoTable.
 mkConInfoTable
    :: Int     -- ptr words
    -> Int     -- non-ptr words
@@ -103,7 +55,7 @@ mkConInfoTable ptr_words nonptr_words tag ptrtag con_desc =
                          else Just entry_addr,
                  ptrs  = fromIntegral ptr_words,
                  nptrs = fromIntegral nonptr_words,
-                 tipe  = fromIntegral cONSTR,
+                 tipe  = CONSTR,
                  srtlen = fromIntegral tag,
                  code  = if ghciTablesNextToCode
                          then Just code'
@@ -369,11 +321,16 @@ pokeConItbl
   :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
   -> IO ()
 pokeConItbl wr_ptr ex_ptr itbl = do
-  let _con_desc = conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB)
 #if defined(TABLES_NEXT_TO_CODE)
-  (#poke StgConInfoTable, con_desc) wr_ptr _con_desc
+  -- Write the offset to the con_desc from the end of the standard InfoTable
+  -- at the first byte.
+  let con_desc_offset = conDesc itbl `minusPtr` (ex_ptr `plusPtr` conInfoTableSizeB)
+  (#poke StgConInfoTable, con_desc) wr_ptr con_desc_offset
 #else
-  (#poke StgConInfoTable, con_desc) wr_ptr (conDesc itbl)
+  -- Write the con_desc address after the end of the info table.
+  -- Use itblSize because CPP will not pick up PROFILING when calculating
+  -- the offset.
+  pokeByteOff wr_ptr itblSize (conDesc itbl)
 #endif
   pokeItbl (wr_ptr `plusPtr` (#offset StgConInfoTable, i)) (infoTable itbl)
 
@@ -385,28 +342,14 @@ sizeOfEntryCode
        Left  xs -> sizeOf (head xs) * length xs
        Right xs -> sizeOf (head xs) * length xs
 
-pokeItbl :: Ptr StgInfoTable -> StgInfoTable -> IO ()
-pokeItbl a0 itbl = do
-#if !defined(TABLES_NEXT_TO_CODE)
-  (#poke StgInfoTable, entry) a0 (fromJust (entry itbl))
-#endif
-  (#poke StgInfoTable, layout.payload.ptrs) a0 (ptrs itbl)
-  (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs itbl)
-  (#poke StgInfoTable, type) a0 (tipe itbl)
-  (#poke StgInfoTable, srt_bitmap) a0 (srtlen itbl)
-#if defined(TABLES_NEXT_TO_CODE)
-  let code_offset = (a0 `plusPtr` (#offset StgInfoTable, code))
-  case code itbl of
-    Nothing -> return ()
-    Just (Left xs) -> pokeArray code_offset xs
-    Just (Right xs) -> pokeArray code_offset xs
-#endif
-
+-- Note: Must return proper pointer for use in a closure
 newExecConItbl :: StgInfoTable -> [Word8] -> IO (FunPtr ())
 newExecConItbl obj con_desc
    = alloca $ \pcode -> do
         let lcon_desc = length con_desc + 1{- null terminator -}
-            sz = fromIntegral ((#size StgConInfoTable) + sizeOfEntryCode)
+            -- SCARY
+            -- This size represents the number of bytes in an StgConInfoTable.
+            sz = fromIntegral (conInfoTableSizeB + sizeOfEntryCode)
                -- Note: we need to allocate the conDesc string next to the info
                -- table, because on a 64-bit platform we reference this string
                -- with a 32-bit offset relative to the info table, so if we
@@ -418,7 +361,11 @@ newExecConItbl obj con_desc
         pokeConItbl wr_ptr ex_ptr cinfo
         pokeArray0 0 (castPtr wr_ptr `plusPtr` fromIntegral sz) con_desc
         _flushExec sz ex_ptr -- Cache flush (if needed)
+#if defined(TABLES_NEXT_TO_CODE)
+        return (castPtrToFunPtr (ex_ptr `plusPtr` conInfoTableSizeB))
+#else
         return (castPtrToFunPtr ex_ptr)
+#endif
 
 foreign import ccall unsafe "allocateExec"
   _allocateExec :: CUInt -> Ptr (Ptr a) -> IO (Ptr a)
@@ -432,26 +379,6 @@ foreign import ccall unsafe "flushExec"
 wORD_SIZE :: Int
 wORD_SIZE = (#const SIZEOF_HSINT)
 
-fixedInfoTableSizeB :: Int
-fixedInfoTableSizeB = 2 * wORD_SIZE
-
-profInfoTableSizeB :: Int
-profInfoTableSizeB = (#size StgProfInfo)
-
-stdInfoTableSizeB :: Int
-stdInfoTableSizeB
-  = (if ghciTablesNextToCode then 0 else wORD_SIZE)
-  + (if rtsIsProfiled then profInfoTableSizeB else 0)
-  + fixedInfoTableSizeB
-
 conInfoTableSizeB :: Int
-conInfoTableSizeB = stdInfoTableSizeB + wORD_SIZE
-
-foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
-
-rtsIsProfiled :: Bool
-rtsIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
-
-cONSTR :: Int   -- Defined in ClosureTypes.h
-cONSTR = (#const CONSTR)
+conInfoTableSizeB = wORD_SIZE + itblSize
 #endif /* GHCI */

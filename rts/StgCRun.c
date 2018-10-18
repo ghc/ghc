@@ -59,8 +59,8 @@
 #include "StgRun.h"
 #include "Capability.h"
 
-#if defined(DEBUG)
 #include "RtsUtils.h"
+#if defined(DEBUG)
 #include "Printer.h"
 #endif
 
@@ -89,14 +89,6 @@ StgFunPtr StgReturn(void)
 }
 
 #else /* !USE_MINIINTERPRETER */
-
-#if defined(LEADING_UNDERSCORE)
-#define STG_RUN "_StgRun"
-#define STG_RETURN "_StgReturn"
-#else
-#define STG_RUN "StgRun"
-#define STG_RETURN "StgReturn"
-#endif
 
 #if defined(mingw32_HOST_OS)
 /*
@@ -257,6 +249,121 @@ StgRunIsImplementedInAssembler(void)
 #define STG_HIDDEN ".hidden "
 #endif
 
+/*
+Note [Unwinding foreign exports on x86-64]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For foreign exports, that is Haskell functions exported as C functions when
+we unwind we have to unwind from Haskell code into C code. The current story
+is as follows:
+
+  * The Haskell stack always has stg_stop_thread_info frame at the bottom
+  * We annotate stg_stop_thread_info to unwind the instruction pointer to a
+    label inside StgRun called StgRunJmp. It's the last instruction before the
+    code jumps into Haskell.
+  * StgRun - which is implemented in assembler is annotated with some manual
+    unwinding information. It unwinds all the registers that it has saved
+    on the stack. This is important as rsp and rbp are often required for
+    getting to the next frame and the rest of the saved registers are useful
+    when inspecting locals in gdb.
+
+
+ Example x86-64 stack for an FFI call
+ from C into a Haskell function:
+
+
+      HASKELL HEAP
+      "ADDRESS SPACE"
+
+  +--------------------+ <------ rbp
+  |                    |
+  |                    |
+  |                    |
+  |                    |
+  |  Haskell           |
+  |  evaluation stack  |
+  |                    |
+  |                    |
+  |--------------------|
+  |stg_catch_frame_info|
+  |--------------------|
+  |  stg_forceIO_info  |
+  |--------------------|
+  |stg_stop_thread_info| -------
+  +--------------------+       |
+           ...                 |
+   (other heap objects)        |
+           ...                 |
+                               |
+                               |
+                               |
+     C STACK "ADDRESS SPACE"   |
+                               v
+  +-----------------------------+ <------ rsp
+  |                             |
+  | RESERVED_C_STACK_BYTES ~16k |
+  |                             |
+  |-----------------------------|
+  |             rbx             ||
+  |-----------------------------| \
+  |             rbp             | |
+  |-----------------------------|  \
+  |             r12             |  |
+  |-----------------------------|   \
+  |             r13             |   | STG_RUN_STACK_FRAME_SIZE
+  |-----------------------------|  /
+  |             r14             |  |
+  |-----------------------------| /
+  |             r15             | |
+  |-----------------------------|/
+  |  rip saved by call StgRun   |
+  |        in schedule()        |
+  +-----------------------------+
+                ...
+      schedule() stack frame
+
+
+ Lower addresses on the top
+
+One little snag in this approach is that the annotations accepted by the
+assembler are surprisingly unexpressive. I had to resort to a .cfi_escape
+and hand-assemble a DWARF expression. What made it worse was that big numbers
+are LEB128 encoded, which makes them variable byte length, with length depending
+on the magnitude.
+
+Here's an example stack generated this way:
+
+  Thread 1 "m" hit Breakpoint 1, Fib_zdfstableZZC0ZZCmainZZCFibZZCfib1_info () at Fib.hs:9
+  9       fib a = return (a + 1)
+  #0  Fib_zdfstableZZC0ZZCmainZZCFibZZCfib1_info () at Fib.hs:9
+  #1  stg_catch_frame_info () at rts/Exception.cmm:372
+  #2  stg_forceIO_info () at rts/StgStartup.cmm:178
+  #3  stg_stop_thread_info () at rts/StgStartup.cmm:42
+  #4  0x00000000007048ab in StgRunIsImplementedInAssembler () at rts/StgCRun.c:255
+  #5  0x00000000006fcf42 in schedule (initialCapability=initialCapability@entry=0x8adac0 <MainCapability>, task=task@entry=0x8cf2a0) at rts/Schedule.c:451
+  #6  0x00000000006fe18e in scheduleWaitThread (tso=0x4200006388, ret=<optimized out>, pcap=0x7fffffffdac0) at rts/Schedule.c:2533
+  #7  0x000000000040a21e in hs_fib ()
+  #8  0x000000000040a083 in main (argc=1, argv=0x7fffffffdc48) at m.cpp:15
+
+(This is from patched gdb. See Note [Info Offset].)
+
+The previous approach was to encode the unwinding information for select
+registers in stg_stop_thread_info with Cmm annotations. The unfortunate thing
+about that approach was that it required introduction of an artificial MachSp
+register that wasn't meaningful outside unwinding. I discovered that to get
+stack unwinding working under -threaded runtime I also needed to unwind rbp
+which would require adding MachRbp. If we wanted to see saved locals in gdb,
+we'd have to add more. The core of the problem is that Cmm is architecture
+independent, while unwinding isn't.
+
+Note [Unwinding foreign imports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For unwinding foreign imports, that is C functions exposed as Haskell functions
+no special handling is required. The C function unwinds according to the rip
+saved on the stack by the call instruction. Then we perform regular Haskell
+stack unwinding.
+*/
+
+
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
@@ -297,6 +404,43 @@ StgRunIsImplementedInAssembler(void)
         "movq %%xmm14,128(%%rax)\n\t"
         "movq %%xmm15,136(%%rax)\n\t"
 #endif
+
+        /*
+         * Let the unwinder know where we saved the registers
+         * See Note [Unwinding foreign exports on x86-64].
+         */
+        ".cfi_def_cfa rsp, 0\n\t"
+        ".cfi_offset rbx, %c2\n\t"
+        ".cfi_offset rbp, %c3\n\t"
+        ".cfi_offset r12, %c4\n\t"
+        ".cfi_offset r13, %c5\n\t"
+        ".cfi_offset r14, %c6\n\t"
+        ".cfi_offset r15, %c7\n\t"
+        ".cfi_offset rip, %c8\n\t"
+        ".cfi_escape " // DW_CFA_val_expression is not expressible otherwise
+          "0x16, " // DW_CFA_val_expression
+          "0x07, " // register num 7 - rsp
+          "0x04, " // block length
+          "0x77, " // DW_OP_breg7 - signed LEB128 offset from rsp
+#define RSP_DELTA (RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE + 8)
+          "%c9" // signed LEB128 encoded delta - byte 1
+#if (RSP_DELTA >> 7) > 0
+          ", %c10" // signed LEB128 encoded delta - byte 2
+#endif
+
+#if (RSP_DELTA >> 14) > 0
+          ", %c11" // signed LEB128 encoded delta - byte 3
+#endif
+
+#if (RSP_DELTA >> 21) > 0
+          ", %c12" // signed LEB128 encoded delta - byte 4
+#endif
+
+#if (RSP_DELTA >> 28) > 0
+#error "RSP_DELTA too big"
+#endif
+          "\n\t"
+
         /*
          * Set BaseReg
          */
@@ -313,6 +457,17 @@ StgRunIsImplementedInAssembler(void)
 #else
         "movq %%rdi,%%rax\n\t"
 #endif
+
+        STG_GLOBAL xstr(STG_RUN_JMP) "\n"
+#if !defined(mingw32_HOST_OS)
+        STG_HIDDEN xstr(STG_RUN_JMP) "\n"
+#endif
+#if HAVE_SUBSECTIONS_VIA_SYMBOLS
+        // If we have deadstripping enabled and a label is detected as unused
+        // the code gets nop'd out.
+        ".no_dead_strip " xstr(STG_RUN_JMP) "\n"
+#endif
+        xstr(STG_RUN_JMP) ":\n\t"
         "jmp *%%rax\n\t"
 
         ".globl " STG_RETURN "\n"
@@ -349,7 +504,32 @@ StgRunIsImplementedInAssembler(void)
 
         :
         : "i"(RESERVED_C_STACK_BYTES),
-          "i"(STG_RUN_STACK_FRAME_SIZE /* stack frame size */)
+          "i"(STG_RUN_STACK_FRAME_SIZE /* stack frame size */),
+          "i"(RESERVED_C_STACK_BYTES /* rbx relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 8 /* rbp relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 16 /* r12 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 24 /* r13 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 32 /* r14 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + 40 /* r15 relative to cfa (rsp) */),
+          "i"(RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE
+            /* rip relative to cfa */),
+          "i"((RSP_DELTA & 127) | (128 * ((RSP_DELTA >> 7) > 0)))
+            /* signed LEB128-encoded delta from rsp - byte 1 */
+#if (RSP_DELTA >> 7) > 0
+          , "i"(((RSP_DELTA >> 7) & 127) | (128 * ((RSP_DELTA >> 14) > 0)))
+            /* signed LEB128-encoded delta from rsp - byte 2 */
+#endif
+
+#if (RSP_DELTA >> 14) > 0
+          , "i"(((RSP_DELTA >> 14) & 127) | (128 * ((RSP_DELTA >> 21) > 0)))
+            /* signed LEB128-encoded delta from rsp - byte 3 */
+#endif
+
+#if (RSP_DELTA >> 21) > 0
+          , "i"(((RSP_DELTA >> 21) & 127) | (128 * ((RSP_DELTA >> 28) > 0)))
+            /* signed LEB128-encoded delta from rsp - byte 4 */
+#endif
+#undef RSP_DELTA
         );
         /*
          * See Note [Stack Alignment on X86]

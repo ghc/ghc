@@ -11,7 +11,7 @@ T10971b.hs:4:11: error:
         instance Foldable Maybe -- Defined in ‘Data.Foldable’
         instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
         ...plus one other
-        ...plus 26 instances involving out-of-scope types
+        ...plus 28 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: length x
       In the expression: \ x -> length x
@@ -29,7 +29,7 @@ T10971b.hs:5:13: error:
         instance Traversable Maybe -- Defined in ‘Data.Traversable’
         instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
         ...plus one other
-        ...plus 26 instances involving out-of-scope types
+        ...plus 28 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: fmapDefault f x
       In the expression: \ f x -> fmapDefault f x
@@ -47,7 +47,7 @@ T10971b.hs:6:14: error:
         instance Traversable Maybe -- Defined in ‘Data.Traversable’
         instance Traversable ((,) a) -- Defined in ‘Data.Traversable’
         ...plus one other
-        ...plus 26 instances involving out-of-scope types
+        ...plus 28 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: fmapDefault f x
       In the expression: (fmapDefault f x, length x)
@@ -65,7 +65,7 @@ T10971b.hs:6:31: error:
         instance Foldable Maybe -- Defined in ‘Data.Foldable’
         instance Foldable ((,) a) -- Defined in ‘Data.Foldable’
         ...plus one other
-        ...plus 26 instances involving out-of-scope types
+        ...plus 28 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: length x
       In the expression: (fmapDefault f x, length x)

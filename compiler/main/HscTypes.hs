@@ -106,7 +106,7 @@ module HscTypes (
         -- * Information on imports and exports
         WhetherHasOrphans, IsBootInterface, Usage(..),
         Dependencies(..), noDependencies,
-        updNameCacheIO,
+        updNameCache,
         IfaceExport,
 
         -- * Warnings
@@ -1244,7 +1244,8 @@ data ImportedModsVal
         imv_span :: SrcSpan,             -- ^ the source span of the whole import
         imv_is_safe :: IsSafeImport,     -- ^ whether this is a safe import
         imv_is_hiding :: Bool,           -- ^ whether this is an "hiding" import
-        imv_all_exports :: GlobalRdrEnv, -- ^ all the things the module could provide
+        imv_all_exports :: !GlobalRdrEnv, -- ^ all the things the module could provide
+          -- NB. BangPattern here: otherwise this leaks. (#15111)
         imv_qualified :: Bool            -- ^ whether this is a qualified import
         }
 
@@ -2612,10 +2613,10 @@ interface file); so we give it 'noSrcLoc' then.  Later, when we find
 its binding site, we fix it up.
 -}
 
-updNameCacheIO :: HscEnv
-               -> (NameCache -> (NameCache, c))  -- The updating function
-               -> IO c
-updNameCacheIO hsc_env upd_fn
+updNameCache :: HscEnv
+             -> (NameCache -> (NameCache, c))  -- The updating function
+             -> IO c
+updNameCache hsc_env upd_fn
   = atomicModifyIORef' (hsc_NC hsc_env) upd_fn
 
 mkSOName :: Platform -> FilePath -> FilePath

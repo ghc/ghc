@@ -10,7 +10,7 @@ Functions for working with the typechecker environment (setters, getters...).
 
 module TcRnMonad(
   -- * Initalisation
-  initTc, initTcWithGbl, initTcInteractive, initTcForLookup, initTcRnIf,
+  initTc, initTcWithGbl, initTcInteractive, initTcRnIf,
 
   -- * Simple accessors
   discardResult,
@@ -179,7 +179,6 @@ import CostCentreState
 
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Exception
 import Data.IORef
 import Control.Monad
 import Data.Set ( Set )
@@ -251,9 +250,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
                 tcg_mod            = mod,
                 tcg_semantic_mod   =
-                    if thisPackage dflags == moduleUnitId mod
-                        then canonicalizeHomeModule dflags (moduleName mod)
-                        else mod,
+                    canonicalizeModuleIfHome dflags mod,
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
@@ -379,15 +376,6 @@ initTcInteractive hsc_env thing_inside
            thing_inside
   where
     interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
-
-initTcForLookup :: HscEnv -> TcM a -> IO a
--- The thing_inside is just going to look up something
--- in the environment, so we don't need much setup
-initTcForLookup hsc_env thing_inside
-  = do { (msgs, m) <- initTcInteractive hsc_env thing_inside
-       ; case m of
-             Nothing -> throwIO $ mkSrcErr $ snd msgs
-             Just x -> return x }
 
 {- Note [Default types]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1550,8 +1538,8 @@ setTcLevel tclvl thing_inside
 
 isTouchableTcM :: TcTyVar -> TcM Bool
 isTouchableTcM tv
-  = do { env <- getLclEnv
-       ; return (isTouchableMetaTyVar (tcl_tclvl env) tv) }
+  = do { lvl <- getTcLevel
+       ; return (isTouchableMetaTyVar lvl tv) }
 
 getLclTypeEnv :: TcM TcTypeEnv
 getLclTypeEnv = do { env <- getLclEnv; return (tcl_env env) }

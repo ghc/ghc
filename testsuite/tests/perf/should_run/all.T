@@ -384,8 +384,9 @@ test('T7954',
                       [(wordsize(32), 920045264, 10),
               # some date:  1380051408    (64-bit Windows machine)
               # 2014-04-04:  920045264    (64-bit Windows machine)
-                       (wordsize(64), 1680051336, 10)]),
+                       (wordsize(64), 1280051632, 10)]),
               # 2014-02-10: 1680051336 (x86_64/Linux), call arity analysis
+              # 2018-05-03: 1280051632 (x86_64/Linux), refactor numericEnumFrom
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -562,12 +563,14 @@ test('T13623',
 
 test('T14052',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 2346183840, 10) ])],
+                      [ (wordsize(64), 2346183840, 15) ])],
      ghci_script,
      ['T14052.script'])
 
 test('T14936',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(64), 51792, 5) ])],
+                      [(platform('x86_64-unknown-mingw32'),   47536, 10),
+                       # 2018-05-04     47536 unknown
+                       (wordsize(64), 51792, 5) ])],
      compile_and_run,
      ['-O2'])
