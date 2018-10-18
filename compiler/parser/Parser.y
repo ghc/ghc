@@ -1927,6 +1927,7 @@ typedoc :: { LHsType GhcPs }
                                          >> ams (sLL $1 $> $
                                                  HsFunTy noExt (L (comb2 $1 $2)
                                                             (HsDocTy noExt $2 $1))
+                                                            HsOmega
                                                          $4)
                                                 [mu AnnRarrow $3] }
 
