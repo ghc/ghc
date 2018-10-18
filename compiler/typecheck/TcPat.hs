@@ -399,7 +399,12 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
           addErrTc $ text "@-patterns are only allowed at multiplicity ω"
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
-  = do  {
+  = do  { checkLinearity
+          -- It should be possible to have view patterns at linear (or otherwise
+          -- non-ω) multiplicity. But it is not clear at the moment what
+          -- restriction need to be put in place, if any, for linear view
+          -- patterns to desugar to type-correct Core.
+
          -- Expr must have type `forall a1...aN. OPT' -> B`
          -- where overall_pat_ty is an instance of OPT'.
         ; (expr',expr'_inferred) <- tcInferSigma expr
@@ -427,6 +432,10 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
               expr_wrap = expr_wrap2' <.> expr_wrap1
               doc = text "When checking the view pattern function:" <+> (ppr expr)
         ; return (ViewPat overall_pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
+    where
+      checkLinearity =
+        when (not $ subweight Omega (weightedWeight overall_pat_ty)) $
+          addErrTc $ text "View patterns are only allowed at multiplicity ω"
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
