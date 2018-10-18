@@ -382,6 +382,11 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
+       ; tcSubWeight Omega (weightedWeight arg2_sigma)
+         -- When ($) becomes multiplicity-polymorphic, then the above check will
+         -- need to go. But in the meantime, it would produce ill-typed
+         -- desugared code to accept linear functions to the left of a ($).
+
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
          -- where arg2_sigma maybe polymorphic; that's the point
@@ -425,16 +430,6 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
              -- matchActualFunTys? funTyWeight seems a bit icky.
              --
              -- We need to zonk here as well, see Dollar2 for an example
-             --
-             -- TODO: Remove this fromMaybe as it is only
-             -- hiding errors.
-             w = case funTyWeight_maybe arg1_ty_read of
-                   Nothing -> Omega
-                    -- pprPanic "dollarRule" (ppr arg1_ty_read $$ ppr arg1' $$ ppr arg2)
-                    -- See Data.ByteString.Builder.Internal for
-                    -- a real-world failure and DollarDefault for a small
-                    -- example
-                   Just w -> w
              wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
