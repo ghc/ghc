@@ -609,7 +609,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd Nothing
                                       (MG { mg_alts = noLoc alts
-                                          , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty Omega
+                                          , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
                                           , mg_origin = FromSource
                                           }) -- MattP: TODO Check this multiplicity
                                      -- FromSource is not strictly right, but we
@@ -941,7 +941,7 @@ dsDo stmts
            ; let fun = L noSrcSpan $ HsLam noExt $
                    MG { mg_alts = noLoc [mkSimpleMatch LambdaExpr pats
                                                        body']
-                      , mg_ext = MatchGroupTc (map unrestricted arg_tys) body_ty Omega
+                      , mg_ext = MatchGroupTc (map unrestricted arg_tys) body_ty
                       , mg_origin = Generated }
                       -- TODO: MattP: Check this multiplicity
 
@@ -975,7 +975,7 @@ dsDo stmts
                            (MG { mg_alts = noLoc [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
-                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty Omega
+                               , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
                                -- TODO: MattP: check this multiplicity
                                , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats

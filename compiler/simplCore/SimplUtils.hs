@@ -123,7 +123,7 @@ data SimplCont
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont
-      , sc_weight :: Rig } -- TODO: arnaud: not needed, I think, because the hole is in the function, not the argument.
+      , sc_weight :: Rig }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -416,7 +416,7 @@ contHoleType (StrictArg  { sc_fun = ai, sc_weight = _w })      = funArgTy (ai_ty
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
                          , sc_weight = w })
-  = mkFunTy w (perhapsSubstTy dup se (exprType e)) -- TODO: arnaud: It's probably not _always_ Omega here.
+  = mkFunTy w (perhapsSubstTy dup se (exprType e))
                   (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
@@ -2152,7 +2152,7 @@ mkCase2 dflags scrut bndr alts_ty alts
       _               -> True
   , gopt Opt_CaseFolding dflags
   , Just (scrut', tx_con, mk_orig) <- caseRules dflags scrut
-  = do { bndr' <- newId (fsLit "lwild") Omega (exprType scrut') -- arnaud
+  = do { bndr' <- newId (fsLit "lwild") Omega (exprType scrut')
 
        ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
                   -- mapMaybeM: discard unreachable alternatives

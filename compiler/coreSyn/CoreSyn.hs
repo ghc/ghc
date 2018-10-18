@@ -275,7 +275,6 @@ data Expr b
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
   | Case  (Expr b) b Type [Alt b]       -- See #case_invariants#
-   -- TODO: arnaud: remember to explain how the variable carries the multiplicity scaling-factor
   | Cast  (Expr b) Coercion
   | Tick  (Tickish Id) (Expr b)
   | Type  Type

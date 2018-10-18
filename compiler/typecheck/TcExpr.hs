@@ -557,7 +557,7 @@ tcExpr (ExplicitList _ witness exprs) res_ty
       Just fln -> do { ((exprs', elt_ty), fln')
                          <- tcSyntaxOp ListOrigin fln
                                        [synKnownType intTy, SynList] res_ty $
-                            \ [elt_ty] _ -> -- TODO: arnaud: enforce that all the multiplicities are Omega (even if it was not imposed by the type-class definition, `fromListN` will use the list notation twice anyway: once to compute the length of the list and once as the list itself)
+                            \ [elt_ty] _ ->
                             do { exprs' <-
                                     mapM (tcScalingUsage Omega . tc_elt elt_ty) exprs
                                ; return (exprs', elt_ty) }
@@ -588,7 +588,9 @@ tcExpr (HsCase x scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          let weight = Omega -- TODO: arnaud: add support for weight annotation on case. In the meantime, suppose it's always Omega.
+          let weight = Omega
+            -- There is not yet syntax or inference mechanism for case
+            -- expressions to be anything else than unrestricted.
         ; (scrut', scrut_ty) <- tcScalingUsage weight $ tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
@@ -612,7 +614,7 @@ tcExpr (HsIf x Nothing pred b1 b2) res_ty    -- Ordinary 'if'
 tcExpr (HsIf x (Just fun) pred b1 b2) res_ty
   = do { ((pred', b1', b2'), fun')
            <- tcSyntaxOp IfOrigin fun [SynAny, SynAny, SynAny] res_ty $
-              \ [pred_ty, b1_ty, b2_ty] _ -> -- TODO: arnaud: overloaded ifThenElse must be unrestricted.
+              \ [pred_ty, b1_ty, b2_ty] _ ->
               do { pred' <- tcPolyExpr pred pred_ty
                  ; b1'   <- tcPolyExpr b1   b1_ty
                  ; b2'   <- tcPolyExpr b2   b2_ty
@@ -710,7 +712,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                Just con_id -> do {
                   res_wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "RecordCon")
                                           (Just expr) actual_res_ty res_ty
-                ; rbinds' <- tcRecordBinds con_like (map weightedThing arg_tys) rbinds -- TODO: arnaud: with this `weightedThing`, I'm guessing that record syntax for construction/update is broken
+                ; rbinds' <- tcRecordBinds con_like (map weightedThing arg_tys) rbinds
                 ; return $
                   mkHsWrap res_wrap $
                   RecordCon { rcon_ext = RecordConTc
@@ -1133,7 +1135,7 @@ arithSeqEltType Nothing res_ty
 arithSeqEltType (Just fl) res_ty
   = do { (elt_ty, fl')
            <- tcSyntaxOp ListOrigin fl [SynList] res_ty $
-              \ [elt_ty] _ -> return elt_ty -- TODO:arnaud: ensure that the multiplicity is Omega?
+              \ [elt_ty] _ -> return elt_ty
        ; return (idHsWrapper, elt_ty, Just fl') }
 
 {-
@@ -1592,7 +1594,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
               if subweight arg_mult mult then
                 return (arg_mult, mult, [])
               else
-                addErrTc (text "Incorrect multiplicity in rebindable syntax") >> -- TODO: arnaud: helpful error message required here
+                addErrTc (text "Incorrect multiplicity in rebindable syntax") >>
                 return (mult, mult, [])
 
     go rho_ty (SynType the_ty)
@@ -1705,7 +1707,7 @@ tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
        ; let skol_info = SigSkol ExprSigCtxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
        ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
-                              tcExtendNameTyVarEnv (map (fmap unrestricted) tv_prs) $ -- TODO: arnaud: type variables, should be Zero
+                              tcExtendNameTyVarEnv (map (fmap unrestricted) tv_prs) $
                               tcPolyExprNC expr tau
 
        ; let poly_wrap = mkWpTyLams   skol_tvs
@@ -1718,7 +1720,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
     do { (tclvl, wanted, (expr', sig_inst))
              <- pushLevelAndCaptureConstraints  $
                 do { sig_inst <- tcInstSig sig
-                   ; expr' <- tcExtendNameTyVarEnv (map (fmap unrestricted) $ sig_inst_skols sig_inst) $ -- TODO: arnaud: (also line below) type variables, should be Zero
+                   ; expr' <- tcExtendNameTyVarEnv (map (fmap unrestricted) $ sig_inst_skols sig_inst) $
                               tcExtendNameTyVarEnv (map (fmap unrestricted) $ sig_inst_wcs   sig_inst) $
                               tcPolyExprNC expr (sig_inst_tau sig_inst)
                    ; return (expr', sig_inst) }
@@ -1852,9 +1854,6 @@ tc_infer_id lbl id_name
              ATcId { tct_id = id }
                -> do { check_naughty id        -- Note [Local record selectors]
                      ; checkThLocalId id
-                     -- TODO: arnaud: I'm not sure being here guarantees that
-                     -- the variable is actually in the local context. Maybe
-                     -- it's not sufficient either. Harden if not the case.
                      ; tcEmitBindingUsage $ unitUE id_name One
                      ; return_id id }
 

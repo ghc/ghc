@@ -968,7 +968,6 @@ checkSubUE var ue1 ue2 =
   <+> text "doesn't have the same usage environment as its right-hand side"
   $$ text "Recorded (var's) environment:" <+> ppr ue2
   $$ text "Computed (rhs's) environment:" <+> ppr ue1
-  -- TODO: arnaud: more informative error message
 
 {-
 Note [No alternatives lint check]
@@ -1093,7 +1092,7 @@ lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
   = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
        ; lintAltBinders rhs_ue scrut scrut_ty con_ty'  bndrs }
   | otherwise
-  = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE -- TODO: arnaud: there was a TODO there, presumably MattP wasn't happy with how this line handles multiplicities. I don't know yet what this function does.
+  = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE
        ; rhs_ue' <- checkCaseLinearity rhs_ue scrut var_w bndr
        ; lintAltBinders rhs_ue' scrut scrut_ty con_ty' bndrs }
 

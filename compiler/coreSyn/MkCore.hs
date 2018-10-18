@@ -520,7 +520,7 @@ mkTupleCase uniqs vars body scrut_var scrut
 
     one_tuple_case chunk_vars (us, vs, body)
       = let (uniq, us') = takeUniqFromSupply us
-            scrut_var = mkSysLocal (fsLit "ds") uniq Omega -- TODO: arnaud: I'll soon need to parametrise this by a multiplicity, rather than using Omega
+            scrut_var = mkSysLocal (fsLit "ds") uniq Omega
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us', scrut_var:vs, body')
@@ -889,7 +889,6 @@ aBSENT_ERROR_ID
    absent_ty = mkSpecForAllTys [alphaTyVar] (mkFunTy Omega addrPrimTy alphaTy)
    -- Not runtime-rep polymorphic. aBSENT_ERROR_ID is only used for
    -- lifted-type things; see Note [Absent errors] in WwLib
-   -- arnaud: check this Omega
    arity_info = vanillaIdInfo `setArityInfo` 1
    -- NB: no bottoming strictness info, unlike other error-ids.
    -- See Note [aBSENT_ERROR_ID]

@@ -56,7 +56,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
                                  , liftedRepDataConTyCon, omegaDataConTyCon )
-import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy, isMultiplicityTy ) 
+import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy, isMultiplicityTy )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
@@ -1376,7 +1376,7 @@ ppr_co _         (IfaceGReflCo r ty IfaceMRefl)
 ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
   = ppr_special_co ctxt_prec
     (text "GRefl" <+> ppr r <+> pprParendIfaceType ty) [co]
-ppr_co ctxt_prec (IfaceFunCo r _ co1 co2) -- TODO: arnaud: print multiplicity somehow
+ppr_co ctxt_prec (IfaceFunCo r _ co1 co2)
   = maybeParen ctxt_prec funPrec $
     sep (ppr_co funPrec co1 : ppr_fun_tail co2)
   where

@@ -199,7 +199,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
   where
     ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ idType matcher_id
     ([pat_ty1, cont_sigma, _], _)      = tcSplitFunTys tau
-    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (weightedThing cont_sigma) -- TODO: arnaud: this function is all wrong, I need to think about pattern synonyms
+    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (weightedThing cont_sigma)
     (arg_tys1, _) = (tcSplitFunTys cont_tau)
     twiddle = char '~'
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)

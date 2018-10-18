@@ -198,7 +198,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkFunTys (map unrestricted more_arg_tys) res_ty -- TODO: arnaud: check but I believe these are arrows with unknown weight, therefore it's correct to default to Omega
+           ; let unif_fun_ty = mkFunTys (map unrestricted more_arg_tys) res_ty
            ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
@@ -322,7 +322,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     defer n fun_ty
       = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
            ; res_ty  <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkFunTys (map unrestricted arg_tys) res_ty -- TODO: arnaud: check but I believe these are arrows of unknown weight so it's correct to default to Omega
+           ; let unif_fun_ty = mkFunTys (map unrestricted arg_tys) res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
            ; return (mkWpCastN co, map unrestricted arg_tys, res_ty) }
 

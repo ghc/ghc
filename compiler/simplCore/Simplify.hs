@@ -884,8 +884,6 @@ simplExprF1 env (App fun arg) cont
                                 , sc_hole_ty = hole'
                                 , sc_cont    = cont } }
       _       ->
-        -- MattP: TODO: This could be quite expensive.
-        -- TODO: arnaud: but not needed, will remove.
         let fun_ty = exprType fun
             (Weighted w _, _) = splitFunTy fun_ty
         in
@@ -2593,7 +2591,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
   | Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") Omega ty2 -- TODO: arnaud: yet another place where it's not obvious to choose the multiplicity
+  = do { case_bndr2 <- newId (fsLit "nt") Omega ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co) Nothing
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -2996,7 +2994,7 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
-mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
+mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_weight = w })
         -- See Note [Duplicating StrictArg]
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   = do { (floats1, cont') <- mkDupableCont env cont
@@ -3007,7 +3005,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
                             , sc_cci = cci
                             , sc_cont = cont'
                             , sc_dup = OkToDup
-                            , sc_weight = Omega } ) } -- TODO: Arnaud: is this Omega correct? if so explain why.
+                            , sc_weight = w } ) }
 
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
@@ -3544,4 +3542,3 @@ simplRules env mb_new_id rules mb_cont
                           , ru_fn    = fn_name'
                           , ru_args  = args'
                           , ru_rhs   = rhs' }) }
-

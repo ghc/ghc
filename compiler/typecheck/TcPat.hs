@@ -412,7 +412,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
-        ; (expr_wrap1, [Weighted weight inf_arg_ty], inf_res_ty) -- TODO: arnaud: probably need to compare this weight with the pattern's weight.
+        ; (expr_wrap1, [Weighted weight inf_arg_ty], inf_res_ty)
             <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr'_inferred
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
@@ -468,7 +468,7 @@ tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
         ; ((pats', res, elt_ty), e')
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
                                           SynList $
-                 \ [elt_ty] _ -> -- TODO: arnaud: we know the weight of the pattern, we ought, I suppose, to verify that it can be applied to the view thus. View patterns should be properly understood, though, maybe they don't interact well with linear types at all, in which case we should disallow them. In particular, I'm thinking of the fact that the view is not necessarily well-factored (though this just creates more branches, so it's alright), what happens with default clauses, too (in this case, if there are like a `Just x` pattern in one branch and a "view -> ..." pattern on another?) The default pattern question may be more general too.
+                 \ [elt_ty] _ ->
                  do { (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
                                                  pats penv thing_inside
                     ; return (pats', res, elt_ty) }
@@ -552,11 +552,14 @@ tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
 tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
-  = do  { let orig = LiteralOrigin over_lit
+  = do  { checkLinearity
+          -- It may be possible to refine linear pattern so that they work in
+          -- linear environments. But it is not clear how useful this is.
+        ; let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType (weightedThing pat_ty), SynAny]
                           (mkCheckExpType boolTy) $
-               \ [neg_lit_ty] _ -> -- TODO: arnaud: when desugaring a literal pattern in to an equality, we need, somewhat, to contribute the usage of the variable `x` (first argument of the equality) to the typing environment and check that all is consistent, to be designed. Alternatively: assume that literal pattern do not work for linear patterns.
+               \ [neg_lit_ty] _ ->
                let new_over_lit lit_ty = newOverloadedLit over_lit
                                            (mkCheckExpType lit_ty)
                in case mb_neg of
@@ -573,6 +576,11 @@ tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
         ; res <- thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
         ; return (NPat pat_ty (L l lit') mb_neg' eq', res) }
+    where
+      checkLinearity =
+        when (not $ subweight Omega (weightedWeight pat_ty)) $
+          addErrTc $ text "Literal patterns are only allowed at multiplicity ω"
+
 
 {-
 Note [NPlusK patterns]
@@ -604,16 +612,17 @@ AST is used for the subtraction operation.
 
 -- See Note [NPlusK patterns]
 tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted thing_inside
-  = do  { pat_ty <- expTypeToType (weightedThing pat_ty_weighted)
+  = do  { checkLinearity
+        ; pat_ty <- expTypeToType (weightedThing pat_ty_weighted)
         ; let orig = LiteralOrigin lit
         ; (lit1', ge')
             <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
                                   (mkCheckExpType boolTy) $
-               \ [lit1_ty] _ -> -- TODO: arnaud: checking linearity finely, for NPlusK patterns, looks devilishly hard. See also the corresponding comment for literal patterns. Maybe just refuse non-unrestricted patterns.
+               \ [lit1_ty] _ ->
                newOverloadedLit lit (mkCheckExpType lit1_ty)
         ; ((lit2', minus_wrap, bndr_id), minus')
             <- tcSyntaxOpGen orig minus [synKnownType pat_ty, SynRho] SynAny $
-               \ [lit2_ty, var_ty] _ -> -- TODO: arnaud: see above: either handle correctly or reject non linear.
+               \ [lit2_ty, var_ty] _ ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
                   ; (wrap, bndr_id) <- setSrcSpan nm_loc $
                                      tcPatBndr penv name (pat_ty_weighted `weightedSet` mkCheckExpType var_ty)
@@ -635,6 +644,11 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
               pat' = NPlusKPat pat_ty (L nm_loc bndr_id) (L loc lit1') lit2'
                                ge' minus''
         ; return (pat', res) }
+    where
+      checkLinearity =
+        when (not $ subweight Omega (weightedWeight pat_ty_weighted)) $
+          addErrTc $ text "N+K patterns are only allowed at multiplicity ω"
+
 
 -- HsSpliced is an annotation produced by 'RnSplice.rnSplicePat'.
 -- Here we get rid of it and add the finalizers to the global environment.

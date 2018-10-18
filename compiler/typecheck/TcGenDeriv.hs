@@ -1880,7 +1880,7 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
 
     sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
              mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
-             mkFunTy Omega (mkParentType tycon) intPrimTy -- TODO: arnaud: I don't know what this is. So it's probably wrong.
+             mkFunTy Omega (mkParentType tycon) intPrimTy
 
     lots_of_constructors = tyConFamilySize tycon > 8
                         -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
@@ -1904,7 +1904,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
   where
     sig_ty = mkLHsSigWcType $ L loc $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
-             intTy `mkFunTyOm` mkParentType tycon -- TODO: arnaud: I don't know what this is. So it's probably wrong.
+             intTy `mkFunTyOm` mkParentType tycon
 
     rdr_name = tag2con_RDR dflags tycon
 

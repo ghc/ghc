@@ -2721,7 +2721,6 @@ wrapTypeWithImplication ty impl = wrapType ty mentioned_skols givens
 
 wrapType :: Type -> [TyVar] -> [PredType] -> Type
 wrapType ty skols givens = mkSpecForAllTys skols $ mkFunTys (map unrestricted givens) ty
-  -- arnaud: Check this but seems like they are pred types
 
 
 {-

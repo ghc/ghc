@@ -195,7 +195,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name (Regular Omega) join_id_ty id_info) } -- TODO: arnaud: I'm guessing this is used to create join points, in which case, the is really not the right multiplicity.
+       ; return (mkLocalVar details name Alias join_id_ty id_info) }
 
 
 {-

@@ -614,7 +614,6 @@ substIdType subst@(Subst _ _ tv_env cv_env) id
         (setIdType id
           (substTy subst old_ty))
           (substRig subst old_w)
-        -- TODO: arnaud: ^ this is the problem
 
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type

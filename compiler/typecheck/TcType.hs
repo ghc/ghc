@@ -400,9 +400,6 @@ mkCheckExpType = Check
 *                                                                      *
 ********************************************************************* -}
 
--- TODO: arnaud: in the comment below, when the syntax for multiplicities is
--- fixed, arrange for one of the multiplicities to be known for the sake of the
--- example.
 -- | What to expect for an argument to a rebindable-syntax operator.
 -- Quite like 'Type', but allows for holes to be filled in by tcSyntaxOp.
 -- The callback called from tcSyntaxOp gets a list of types; the meaning

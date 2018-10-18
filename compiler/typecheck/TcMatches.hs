@@ -224,7 +224,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; pat_tys  <- mapM (mapM readExpType) pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts = L l matches'
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty Omega -- MattP: This information should be collected from above
+                    , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
 tcMatches _ _ _ (XMatchGroup {}) = panic "tcMatches"
 
@@ -520,7 +520,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              -- typically something like [(Int,Bool,Int)]
              -- We don't know what tuple_ty is yet, so we use a variable
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalIdOrCoVar n_bndr_name (Regular Omega) (n_app (idType bndr_id)) -- TODO: arnaud: Omega probably not correct
+             mk_n_bndr n_bndr_name bndr_id = mkLocalIdOrCoVar n_bndr_name (Regular Omega) (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -701,7 +701,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
        --------------- Bulding the bindersMap ----------------
        ; let mk_n_bndr :: Name -> TcId -> TcId
-             mk_n_bndr n_bndr_name bndr_id = mkLocalIdOrCoVar n_bndr_name (Regular Omega) (n_app (idType bndr_id)) -- TODO: arnaud: Omega here, probably not correct
+             mk_n_bndr n_bndr_name bndr_id = mkLocalIdOrCoVar n_bndr_name (Regular Omega) (n_app (idType bndr_id))
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
@@ -773,7 +773,7 @@ tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
            <- tcSyntaxOp MCompOrigin bind_op
                          [ synKnownType (m_ty `mkAppTy` tuple_ty)
                          , SynFun SynAnyMult (synKnownType tuple_ty) SynRho ] res_ty $
-              \ [inner_res_ty] _ -> -- TODO: arnaud: we need to do something with the linearity of `(>>=)` in the parallel-comprehension case. I don't understand yet how `(>>=)` is used in this syntax.
+              \ [inner_res_ty] _ ->
               do { stuff <- loop m_ty (mkCheckExpType inner_res_ty)
                                  tup_tys bndr_stmts_s
                  ; return (stuff, inner_res_ty) }
@@ -827,10 +827,9 @@ tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
 
 tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
-                --       (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
+                --       (>>=) :: rhs_ty ->_rhs_weight (pat_ty ->_pat_weight new_res_ty) ->_fun_weight res_ty
                 -- This level of generality is needed for using do-notation
                 -- in full generality; see Trac #1537
-                -- TODO: arnaud: modify example above to include multiplicities
 
           ((rhs', pat_weight, pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
@@ -854,7 +853,7 @@ tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
             Just join_op ->
               second Just <$>
               (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
-               \ [rhs_ty] [rhs_weight] -> tcScalingUsage rhs_weight $ tc_app_stmts (mkCheckExpType rhs_ty)) -- TODO: arnaud: probably not quite correct, check ApplicativeDo with linearity
+               \ [rhs_ty] [rhs_weight] -> tcScalingUsage rhs_weight $ tc_app_stmts (mkCheckExpType rhs_ty))
 
         ; return (ApplicativeStmt body_ty pairs' mb_join', thing) }
 
@@ -875,7 +874,8 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith (\n t -> mkLocalId n (Regular Omega) t) tup_names tup_elt_tys -- Omega because it's a recursive definition
+        ; let tup_ids = zipWith (\n t -> mkLocalId n (Regular Omega) t) tup_names tup_elt_tys
+                -- Omega because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 
         ; tcExtendIdEnv (map unrestricted tup_ids) $ do
@@ -902,7 +902,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                           [ synKnownType mfix_res_ty
                           , SynFun SynAnyMult (synKnownType tup_ty) SynRho ]
                           res_ty $
-               \ [new_res_ty] _ -> -- TODO: arnaud: recursive should probably interact with linearity. Have to figure out how.
+               \ [new_res_ty] _ ->
                do { thing <- thing_inside (mkCheckExpType new_res_ty)
                   ; return (thing, new_res_ty) }
 

@@ -544,7 +544,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkSpecForAllTys tyvars (mkFunTys (map unrestricted arg_tys) res_ty) -- TODO: arnaud: linear types for primops?
+        mkSpecForAllTys tyvars (mkFunTys (map unrestricted arg_tys) res_ty)
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
@@ -612,7 +612,7 @@ commutableOp :: PrimOp -> Bool
 
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
 dyadic_fun_ty  ty = mkFunTys [unrestricted ty, unrestricted ty] ty
-monadic_fun_ty ty = mkFunTy Omega ty ty -- TODO: arnaud: understand
+monadic_fun_ty ty = mkFunTy Omega ty ty
 compare_fun_ty ty = mkFunTys [unrestricted ty, unrestricted ty] intPrimTy
 
 -- Output stuff:

@@ -558,7 +558,7 @@ case bodies, containing the following fields:
 
 dsCmd ids local_vars stack_ty res_ty
       (HsCmdCase _ exp (MG { mg_alts = L l matches
-                           , mg_ext = MatchGroupTc arg_tys _ _
+                           , mg_ext = MatchGroupTc arg_tys _
                            , mg_origin = origin }))
       env_ids = do
     stack_id <- newSysLocalDs Omega stack_ty -- TODO: arnaud: handle arrows correctly
@@ -606,7 +606,7 @@ dsCmd ids local_vars stack_ty res_ty
 
     core_body <- dsExpr (HsCase noExt exp
                          (MG { mg_alts = L l matches'
-                             , mg_ext = MatchGroupTc arg_tys sum_ty Omega
+                             , mg_ext = MatchGroupTc arg_tys sum_ty
                              , mg_origin = origin }))
                              --TODO: MattP check this multiplicity is correct
         -- Note that we replace the HsCase result type by sum_ty,
