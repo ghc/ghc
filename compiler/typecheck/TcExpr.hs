@@ -362,7 +362,10 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; let arg2_exp_ty = res_ty
        ; arg1' <- tcArg op arg1 (unrestricted arg1_ty) 1
        ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
-                  tc_poly_expr_nc arg2 arg2_exp_ty
+                  tcScalingUsage Omega $ tc_poly_expr_nc arg2 arg2_exp_ty
+                  -- It is not necessary, but for the sake of least surprise,
+                  -- seq is unrestricted in its second argument. It can (and,
+                  -- probably, should) be refined later.
        ; arg2_ty <- readExpType arg2_exp_ty
        ; op_id <- tcLookupId op_name
        ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
@@ -1988,8 +1991,16 @@ tcSeq loc fun_name args res_ty
               -> return (term_arg1, term_arg2, res_ty)
             _ -> too_many_args "seq" args
 
-        ; arg1' <- tcMonoExpr arg1 (mkCheckExpType arg1_ty)
-        ; arg2' <- tcMonoExpr arg2 arg2_exp_ty
+        ; arg1' <- tcScalingUsage Omega $ tcMonoExpr arg1 (mkCheckExpType arg1_ty)
+          -- seq must be unrestricted in its first argument because:
+          --
+          -- - It doesn't consume the fields of data types
+          -- - It doesn't apply functions, hence doesn't consume them
+        ; arg2' <- tcScalingUsage Omega $ tcMonoExpr arg2 arg2_exp_ty
+          -- It is not necessary, but for the sake of least surprise, seq is
+          -- unrestricted in its second argument. It can (and, probably, should)
+          -- be refined later.
+
         ; res_ty <- readExpType res_ty  -- by now, it's surely filled in
         ; let fun'    = L loc (mkHsWrap ty_args (HsVar noExt (L loc fun)))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
