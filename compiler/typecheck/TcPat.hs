@@ -874,6 +874,9 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
+        ; when (not $ subweight Omega pat_weight) $
+            addErrTc $ text "Pattern synonyms are only allowed at multiplicity ω"
+
         ; wrap <- tcSubTypePat penv (weightedThing pat_ty) ty'
         ; traceTc "tcPatSynPat" (ppr pat_syn $$
                                  ppr pat_ty $$
