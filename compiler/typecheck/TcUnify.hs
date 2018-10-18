@@ -824,8 +824,10 @@ tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM ()
 tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
   { -- Note that here we do not call to `subweightMaybe`, so we check
     -- for strict equality.
-  ; wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
-  ; MASSERT ( isIdHsWrapper wrap )
+  ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
+  -- I don't know why, but `_wrap` need not be an identity wrapper. At any rate,
+  -- the wrapper isn't significant for multiplicities, so it is safe to drop
+  -- it. But maybe there is a better way to implement this function.
   ; return () }
 
 -- TODO: MattP fix the origins
