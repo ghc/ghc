@@ -2134,19 +2134,34 @@ repInst :: Core (Maybe TH.Overlap) ->
 repInst (MkC o) (MkC cxt) (MkC ty) (MkC ds) = rep2 instanceWithOverlapDName
                                                               [o, cxt, ty, ds]
 
-repDerivStrategy :: Maybe (Located DerivStrategy)
-                 -> DsM (Core (Maybe TH.DerivStrategy))
+repDerivStrategy :: Maybe (LDerivStrategy GhcRn)
+                 -> DsM (Core (Maybe TH.DerivStrategyQ))
 repDerivStrategy mds =
   case mds of
     Nothing -> nothing
     Just (L _ ds) ->
       case ds of
-        StockStrategy    -> just =<< dataCon stockStrategyDataConName
-        AnyclassStrategy -> just =<< dataCon anyclassStrategyDataConName
-        NewtypeStrategy  -> just =<< dataCon newtypeStrategyDataConName
+        StockStrategy    -> just =<< repStockStrategy
+        AnyclassStrategy -> just =<< repAnyclassStrategy
+        NewtypeStrategy  -> just =<< repNewtypeStrategy
+        ViaStrategy ty   -> do ty' <- repLTy (hsSigType ty)
+                               via_strat <- repViaStrategy ty'
+                               just via_strat
   where
-  nothing = coreNothing derivStrategyTyConName
-  just    = coreJust    derivStrategyTyConName
+  nothing = coreNothing derivStrategyQTyConName
+  just    = coreJust    derivStrategyQTyConName
+
+repStockStrategy :: DsM (Core TH.DerivStrategyQ)
+repStockStrategy = rep2 stockStrategyName []
+
+repAnyclassStrategy :: DsM (Core TH.DerivStrategyQ)
+repAnyclassStrategy = rep2 anyclassStrategyName []
+
+repNewtypeStrategy :: DsM (Core TH.DerivStrategyQ)
+repNewtypeStrategy = rep2 newtypeStrategyName []
+
+repViaStrategy :: Core TH.TypeQ -> DsM (Core TH.DerivStrategyQ)
+repViaStrategy (MkC t) = rep2 viaStrategyName [t]
 
 repOverlap :: Maybe OverlapMode -> DsM (Core (Maybe TH.Overlap))
 repOverlap mb =
@@ -2170,7 +2185,7 @@ repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndrQ]
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
   = rep2 classDName [cxt, cls, tvs, fds, ds]
 
-repDeriv :: Core (Maybe TH.DerivStrategy)
+repDeriv :: Core (Maybe TH.DerivStrategyQ)
          -> Core TH.CxtQ -> Core TH.TypeQ
          -> DsM (Core TH.DecQ)
 repDeriv (MkC ds) (MkC cxt) (MkC ty)

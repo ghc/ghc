@@ -5,6 +5,7 @@
 
 {-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
@@ -40,7 +41,7 @@ module CoreSyn (
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders,
-        collectArgs, collectArgsTicks, flattenBinds,
+        collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
 
         exprToType, exprToCoercion_maybe,
         applyTypeToArg,
@@ -2048,6 +2049,15 @@ collectArgs expr
   where
     go (App f a) as = go f (a:as)
     go e         as = (e, as)
+
+-- | Attempt to remove the last N arguments of a function call.
+-- Strip off any ticks encountered along the way and any ticks
+-- at the end.
+stripNArgs :: Word -> Expr a -> Maybe (Expr a)
+stripNArgs !n (Tick _ e) = stripNArgs n e
+stripNArgs 0 e = Just e
+stripNArgs n (App f _) = stripNArgs (n - 1) f
+stripNArgs _ _ = Nothing
 
 -- | Like @collectArgs@, but also collects looks through floatable
 -- ticks if it means that we can find more arguments.

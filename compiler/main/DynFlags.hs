@@ -4113,6 +4113,7 @@ xFlagsDeps = [
   flagSpec "DeriveLift"                       LangExt.DeriveLift,
   flagSpec "DeriveTraversable"                LangExt.DeriveTraversable,
   flagSpec "DerivingStrategies"               LangExt.DerivingStrategies,
+  flagSpec "DerivingVia"                      LangExt.DerivingVia,
   flagSpec "DisambiguateRecordFields"         LangExt.DisambiguateRecordFields,
   flagSpec "DoAndIfThenElse"                  LangExt.DoAndIfThenElse,
   flagSpec "BlockArguments"                   LangExt.BlockArguments,
@@ -4321,6 +4322,8 @@ impliedXFlags
     , (LangExt.TypeFamilyDependencies,    turnOn, LangExt.TypeFamilies)
 
     , (LangExt.RebindableSyntax, turnOff, LangExt.ImplicitPrelude)      -- NB: turn off!
+
+    , (LangExt.DerivingVia, turnOn, LangExt.DerivingStrategies)
 
     , (LangExt.GADTs,            turnOn, LangExt.GADTSyntax)
     , (LangExt.GADTs,            turnOn, LangExt.MonoLocalBinds)

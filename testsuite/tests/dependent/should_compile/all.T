@@ -17,7 +17,7 @@ test('T9632', normal, compile, [''])
 # discussed in #11330.
 test('dynamic-paper',
      expect_broken_for(11330, ['profasm']),
-     compile, [''])
+     compile_fail, [''])
 test('T11311', normal, compile, [''])
 test('T11405', normal, compile, [''])
 test('T11241', normal, compile, [''])

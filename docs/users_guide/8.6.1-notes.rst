@@ -28,6 +28,14 @@ Full details
 
 Language
 ~~~~~~~~
+- A new :extension:`DerivingVia` language extension has been added which allows
+  the use of the ``via`` deriving strategy. For instance: ::
+
+    newtype T = MkT Int
+      deriving Monoid via (Sum Int)
+
+  See :ref:`deriving-via` for more information.
+
 - GHC now permits the use of a wildcard type as the context of a standalone
   ``deriving`` declaration with the use of the
   :extension:`PartialTypeSignatures` language extension. For instance, this

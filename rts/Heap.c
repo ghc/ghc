@@ -181,8 +181,8 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
 
         case MUT_ARR_PTRS_CLEAN:
         case MUT_ARR_PTRS_DIRTY:
-        case MUT_ARR_PTRS_FROZEN:
-        case MUT_ARR_PTRS_FROZEN0:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
             for (i = 0; i < ((StgMutArrPtrs *)closure)->ptrs; ++i) {
                 ptrs[nptrs++] = ((StgMutArrPtrs *)closure)->payload[i];
             }
@@ -208,7 +208,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
     StgMutArrPtrs *arr =
         (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), nptrs, 0);
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_info, cap->r.rCCCS);
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, cap->r.rCCCS);
     arr->ptrs = nptrs;
     arr->size = size;
 

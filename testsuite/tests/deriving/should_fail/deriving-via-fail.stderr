@@ -1,0 +1,16 @@
+
+deriving-via-fail.hs:9:34: error:
+    Type variable ‘b’ is bound in the ‘via’ type ‘(Identity b)’
+    but is not mentioned in the derived class ‘Show’, which is illegal
+
+deriving-via-fail.hs:12:12: error:
+    Type variable ‘fooo’ is bound in the ‘via’ type ‘fooo’
+    but is not mentioned in the derived class ‘Category’, which is illegal
+
+deriving-via-fail.hs:15:20: error:
+    Type variable ‘a’ is bound in the ‘via’ type ‘(forall a. a)’
+    but is not mentioned in the derived class ‘Eq’, which is illegal
+
+deriving-via-fail.hs:19:12: error:
+    Type variable ‘b’ is bound in the ‘via’ type ‘(Identity b)’
+    but is not mentioned in the derived instance ‘Show (Foo4 a)’, which is illegal

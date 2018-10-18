@@ -278,14 +278,7 @@ evacuate_large(StgPtr p)
   }
 
   // remove from large_object list
-  if (bd->u.back) {
-    bd->u.back->link = bd->link;
-  } else { // first object in the list
-    gen->large_objects = bd->link;
-  }
-  if (bd->link) {
-    bd->link->u.back = bd->u.back;
-  }
+  dbl_link_remove(bd, &gen->large_objects);
 
   /* link it on to the evacuated large object list of the destination gen
    */
@@ -414,14 +407,7 @@ evacuate_compact (StgPtr p)
     }
 
     // remove from compact_objects list
-    if (bd->u.back) {
-        bd->u.back->link = bd->link;
-    } else { // first object in the list
-        gen->compact_objects = bd->link;
-    }
-    if (bd->link) {
-        bd->link->u.back = bd->u.back;
-    }
+    dbl_link_remove(bd, &gen->compact_objects);
 
     /* link it on to the evacuated compact object list of the destination gen
      */
@@ -825,16 +811,16 @@ loop:
 
   case MUT_ARR_PTRS_CLEAN:
   case MUT_ARR_PTRS_DIRTY:
-  case MUT_ARR_PTRS_FROZEN:
-  case MUT_ARR_PTRS_FROZEN0:
+  case MUT_ARR_PTRS_FROZEN_CLEAN:
+  case MUT_ARR_PTRS_FROZEN_DIRTY:
       // just copy the block
       copy(p,info,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),gen_no);
       return;
 
   case SMALL_MUT_ARR_PTRS_CLEAN:
   case SMALL_MUT_ARR_PTRS_DIRTY:
-  case SMALL_MUT_ARR_PTRS_FROZEN:
-  case SMALL_MUT_ARR_PTRS_FROZEN0:
+  case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+  case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
       // just copy the block
       copy(p,info,q,small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)q),gen_no);
       return;

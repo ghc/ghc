@@ -646,18 +646,16 @@ scavenge_block (bdescr *bd)
         break;
     }
 
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
         // follow everything
     {
         p = scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
 
-        // If we're going to put this object on the mutable list, then
-        // set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
-            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
+            ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
         }
         break;
     }
@@ -689,8 +687,8 @@ scavenge_block (bdescr *bd)
         break;
     }
 
-    case SMALL_MUT_ARR_PTRS_FROZEN:
-    case SMALL_MUT_ARR_PTRS_FROZEN0:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
         // follow everything
     {
         StgPtr next;
@@ -700,12 +698,10 @@ scavenge_block (bdescr *bd)
             evacuate((StgClosure **)p);
         }
 
-        // If we're going to put this object on the mutable list, then
-        // set its info ptr to SMALL_MUT_ARR_PTRS_FROZEN0 to indicate that.
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN0_info;
+            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_info;
+            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
         }
         break;
     }
@@ -1042,20 +1038,18 @@ scavenge_mark_stack(void)
             break;
         }
 
-        case MUT_ARR_PTRS_FROZEN:
-        case MUT_ARR_PTRS_FROZEN0:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
             // follow everything
         {
             StgPtr q = p;
 
             scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
-            // If we're going to put this object on the mutable list, then
-            // set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
             } else {
-                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
+                ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
             }
             break;
         }
@@ -1089,8 +1083,8 @@ scavenge_mark_stack(void)
             break;
         }
 
-        case SMALL_MUT_ARR_PTRS_FROZEN:
-        case SMALL_MUT_ARR_PTRS_FROZEN0:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
             // follow everything
         {
             StgPtr next, q = p;
@@ -1100,12 +1094,10 @@ scavenge_mark_stack(void)
                 evacuate((StgClosure **)p);
             }
 
-            // If we're going to put this object on the mutable list, then
-            // set its info ptr to SMALL_MUT_ARR_PTRS_FROZEN0 to indicate that.
             if (gct->failed_to_evac) {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN0_info;
+                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
             } else {
-                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_info;
+                ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
             }
             break;
         }
@@ -1366,18 +1358,16 @@ scavenge_one(StgPtr p)
         break;
     }
 
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
     {
         // follow everything
         scavenge_mut_arr_ptrs((StgMutArrPtrs *)p);
 
-        // If we're going to put this object on the mutable list, then
-        // set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
         if (gct->failed_to_evac) {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
+            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
-            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
+            ((StgClosure *)p)->header.info = &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info;
         }
         break;
     }
@@ -1411,8 +1401,8 @@ scavenge_one(StgPtr p)
         break;
     }
 
-    case SMALL_MUT_ARR_PTRS_FROZEN:
-    case SMALL_MUT_ARR_PTRS_FROZEN0:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
     {
         // follow everything
         StgPtr next, q=p;
@@ -1422,12 +1412,10 @@ scavenge_one(StgPtr p)
             evacuate((StgClosure **)p);
         }
 
-        // If we're going to put this object on the mutable list, then
-        // set its info ptr to SMALL_MUT_ARR_PTRS_FROZEN0 to indicate that.
         if (gct->failed_to_evac) {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN0_info;
+            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info;
         } else {
-            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_info;
+            ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info;
         }
         break;
     }
@@ -1562,8 +1550,8 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
                 mutlist_MUTVARS++; break;
             case MUT_ARR_PTRS_CLEAN:
             case MUT_ARR_PTRS_DIRTY:
-            case MUT_ARR_PTRS_FROZEN:
-            case MUT_ARR_PTRS_FROZEN0:
+            case MUT_ARR_PTRS_FROZEN_CLEAN:
+            case MUT_ARR_PTRS_FROZEN_DIRTY:
                 mutlist_MUTARRS++; break;
             case MVAR_CLEAN:
                 barf("MVAR_CLEAN on mutable list");
@@ -1595,6 +1583,7 @@ scavenge_mutable_list(bdescr *bd, generation *gen)
             //
             switch (get_itbl((StgClosure *)p)->type) {
             case MUT_ARR_PTRS_CLEAN:
+            case SMALL_MUT_ARR_PTRS_CLEAN:
                 recordMutableGen_GC((StgClosure *)p,gen_no);
                 continue;
             case MUT_ARR_PTRS_DIRTY:

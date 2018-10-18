@@ -28,7 +28,9 @@ import Name             ( mkSystemVarName, isExternalName, getOccFS )
 import Coercion hiding  ( substCo, substCoVar )
 import OptCoercion      ( optCoercion )
 import FamInstEnv       ( topNormaliseType_maybe )
-import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness, dataConRepArgTys )
+import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
+                        , dataConRepArgTys, isUnboxedTupleCon
+                        , StrictnessMark (..) )
 import CoreMonad        ( Tick(..), SimplMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
@@ -52,6 +54,8 @@ import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
 import Weight
+
+import PrimOp          ( PrimOp (SeqOp) )
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -2661,11 +2665,8 @@ simplAlt env scrut' _ case_bndr' cont' (LitAlt lit, bndrs, rhs)
         ; return (LitAlt lit, [], rhs') }
 
 simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
-  = do  {       -- Deal with the pattern-bound variables
-                -- Mark the ones that are in ! positions in the
-                -- data constructor as certainly-evaluated.
-                -- NB: simplLamBinders preserves this eval info
-        ; let vs_with_evals = add_evals (dataConRepStrictness con)
+  = do  { -- See Note [Adding evaluatedness info to pattern-bound variables]
+          let vs_with_evals = addEvals scrut' con vs
         ; (env', vs') <- simplLamBndrs env vs_with_evals
 
                 -- Bind the case-binder to (con args)
@@ -2676,37 +2677,75 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
         ; env'' <- addAltUnfoldings env' scrut' case_bndr' con_app
         ; rhs' <- simplExprC env'' rhs cont'
         ; return (DataAlt con, vs', rhs') }
-  where
-        -- add_evals records the evaluated-ness of the bound variables of
-        -- a case pattern.  This is *important*.  Consider
-        --      data T = T !Int !Int
-        --
-        --      case x of { T a b -> T (a+1) b }
-        --
-        -- We really must record that b is already evaluated so that we don't
-        -- go and re-evaluate it when constructing the result.
-        -- See Note [Data-con worker strictness] in MkId.hs
-    add_evals the_strs
-        = go vs the_strs
-        where
-          go [] [] = []
-          go (v:vs') strs | isTyVar v = v : go vs' strs
-          go (v:vs') (str:strs) = zap str v : go vs' strs
-          go _ _ = pprPanic "cat_evals"
-                    (ppr con $$
-                     ppr vs  $$
-                     ppr_with_length the_strs $$
-                     ppr_with_length (dataConRepArgTys con) $$
-                     ppr_with_length (dataConRepStrictness con))
-            where
-              ppr_with_length list
-                = ppr list <+> parens (text "length =" <+> ppr (length list))
-                                    -- NB: If this panic triggers, note that
-                                    -- NoStrictnessMark doesn't print!
 
-          zap str v = setCaseBndrEvald str $ -- Add eval'dness info
-                      zapIdOccInfo v         -- And kill occ info;
-                                             -- see Note [Case alternative occ info]
+{- Note [Adding evaluatedness info to pattern-bound variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+addEvals records the evaluated-ness of the bound variables of
+a case pattern.  This is *important*.  Consider
+
+     data T = T !Int !Int
+
+     case x of { T a b -> T (a+1) b }
+
+We really must record that b is already evaluated so that we don't
+go and re-evaluate it when constructing the result.
+See Note [Data-con worker strictness] in MkId.hs
+
+NB: simplLamBinders preserves this eval info
+
+In addition to handling data constructor fields with !s, addEvals
+also records the fact that the result of seq# is always in WHNF.
+See Note [seq# magic] in PrelRules.  Example (Trac #15226):
+
+  case seq# v s of
+    (# s', v' #) -> E
+
+we want the compiler to be aware that v' is in WHNF in E.
+
+Open problem: we don't record that v itself is in WHNF (and we can't
+do it here).  The right thing is to do some kind of binder-swap;
+see Trac #15226 for discussion.
+-}
+
+addEvals :: Maybe OutExpr -> DataCon -> [Id] -> [Id]
+-- See Note [Adding evaluatedness info to pattern-bound variables]
+addEvals scrut con vs
+  -- Deal with seq# applications
+  | Just scr <- scrut
+  , isUnboxedTupleCon con
+  , [s,x] <- vs
+    -- Use stripNArgs rather than collectArgsTicks to avoid building
+    -- a list of arguments only to throw it away immediately.
+  , Just (Var f) <- stripNArgs 4 scr
+  , Just SeqOp <- isPrimOpId_maybe f
+  , let x' = zapIdOccInfoAndSetEvald MarkedStrict x
+  = [s, x']
+
+  -- Deal with banged datacon fields
+addEvals _scrut con vs = go vs the_strs
+    where
+      the_strs = dataConRepStrictness con
+
+      go [] [] = []
+      go (v:vs') strs | isTyVar v = v : go vs' strs
+      go (v:vs') (str:strs) = zapIdOccInfoAndSetEvald str v : go vs' strs
+      go _ _ = pprPanic "Simplify.addEvals"
+                (ppr con $$
+                 ppr vs  $$
+                 ppr_with_length (map strdisp the_strs) $$
+                 ppr_with_length (dataConRepArgTys con) $$
+                 ppr_with_length (dataConRepStrictness con))
+        where
+          ppr_with_length list
+            = ppr list <+> parens (text "length =" <+> ppr (length list))
+          strdisp MarkedStrict = "MarkedStrict"
+          strdisp NotMarkedStrict = "NotMarkedStrict"
+
+zapIdOccInfoAndSetEvald :: StrictnessMark -> Id -> Id
+zapIdOccInfoAndSetEvald str v =
+  setCaseBndrEvald str $ -- Add eval'dness info
+  zapIdOccInfo v         -- And kill occ info;
+                         -- see Note [Case alternative occ info]
 
 addAltUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> OutExpr -> SimplM SimplEnv
 addAltUnfoldings env scrut case_bndr con_app

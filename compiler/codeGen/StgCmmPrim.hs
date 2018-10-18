@@ -194,7 +194,7 @@ shouldInlinePrimOp _ CopyMutableArrayArrayOp
 
 shouldInlinePrimOp dflags CloneArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
-      Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
+      Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
 
 shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
@@ -202,7 +202,7 @@ shouldInlinePrimOp dflags CloneMutableArrayOp [src, src_off, (CmmLit (CmmInt n w
 
 shouldInlinePrimOp dflags FreezeArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
-      Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_infoLabel res src src_off (fromInteger n)
+      Just $ \ [res] -> emitCloneArray mkMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
 
 shouldInlinePrimOp dflags ThawArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
@@ -227,7 +227,7 @@ shouldInlinePrimOp _ CopySmallMutableArrayOp
 
 shouldInlinePrimOp dflags CloneSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
-      Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
+      Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
 
 shouldInlinePrimOp dflags CloneSmallMutableArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
@@ -235,7 +235,7 @@ shouldInlinePrimOp dflags CloneSmallMutableArrayOp [src, src_off, (CmmLit (CmmIn
 
 shouldInlinePrimOp dflags FreezeSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
-      Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_infoLabel res src src_off (fromInteger n)
+      Just $ \ [res] -> emitCloneSmallArray mkSMAP_FROZEN_CLEAN_infoLabel res src src_off (fromInteger n)
 
 shouldInlinePrimOp dflags ThawSmallArrayOp [src, src_off, (CmmLit (CmmInt n w))]
   | wordsToBytes dflags (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags) =
@@ -383,20 +383,20 @@ emitPrimOp dflags [res] DataToTagOp [arg]
 
 --  #define unsafeFreezzeArrayzh(r,a)
 --      {
---        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN0_info);
+--        SET_INFO((StgClosure *)a,&stg_MUT_ARR_PTRS_FROZEN_DIRTY_info);
 --        r = a;
 --      }
 emitPrimOp _      [res] UnsafeFreezeArrayOp [arg]
    = emit $ catAGraphs
-   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN0_infoLabel)),
+   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 emitPrimOp _      [res] UnsafeFreezeArrayArrayOp [arg]
    = emit $ catAGraphs
-   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN0_infoLabel)),
+   [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_DIRTY_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 emitPrimOp _      [res] UnsafeFreezeSmallArrayOp [arg]
    = emit $ catAGraphs
-   [ setInfo arg (CmmLit (CmmLabel mkSMAP_FROZEN0_infoLabel)),
+   [ setInfo arg (CmmLit (CmmLabel mkSMAP_FROZEN_DIRTY_infoLabel)),
      mkAssign (CmmLocal res) arg ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)       r=(a)

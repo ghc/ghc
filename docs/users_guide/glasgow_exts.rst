@@ -4102,7 +4102,7 @@ causes the generated code to be ill-typed.
 
 As a general rule, if a data type has a derived ``Functor`` instance and its
 last type parameter occurs on the right-hand side of the data declaration, then
-either it must (1) occur bare (e.g., ``newtype Id a = a``), or (2) occur as the
+either it must (1) occur bare (e.g., ``newtype Id a = Id a``), or (2) occur as the
 last argument of a type constructor (as in ``Right`` above).
 
 There are two exceptions to this rule:
@@ -4613,6 +4613,9 @@ It is particularly galling that, since the constructor doesn't appear at
 run-time, this instance declaration defines a dictionary which is
 *wholly equivalent* to the ``Int`` dictionary, only slower!
 
+:extension:`DerivingVia` (see :ref:`deriving-via`) is a generalization of
+this idea.
+
 .. _generalized-newtype-deriving:
 
 Generalising the deriving clause
@@ -4940,6 +4943,11 @@ isn't sophisticated enough to determine this, so you'll need to enable
 you do go down this route, make sure you can convince yourself that all of
 the type family instances you're deriving will eventually terminate if used!
 
+Note that :extension:`DerivingVia` (see :ref:`deriving-via`) uses essentially
+the same specification to derive instances of associated type families as well
+(except that it uses the ``via`` type instead of the underlying ``rep-type``
+of a newtype).
+
 .. _derive-any-class:
 
 Deriving any other class
@@ -5143,10 +5151,12 @@ Currently, the deriving strategies are:
 - ``stock``: Have GHC implement a "standard" instance for a data type,
   if possible (e.g., ``Eq``, ``Ord``, ``Generic``, ``Data``, ``Functor``, etc.)
 
-- ``anyclass``: Use :extension:`DeriveAnyClass`
+- ``anyclass``: Use :extension:`DeriveAnyClass` (see :ref:`derive-any-class`)
 
 - ``newtype``: Use :extension:`GeneralizedNewtypeDeriving`
+               (see :ref:`newtype-deriving`)
 
+- ``via``: Use :extension:`DerivingVia` (see :ref:`deriving-via`)
 
 .. _default-deriving-strategy:
 
@@ -5180,6 +5190,118 @@ In that case, GHC chooses the strategy as follows:
    user is warned about the ambiguity. The warning can be avoided by explicitly
    stating the desired deriving strategy.
 
+.. _deriving-via:
+
+Deriving via
+------------
+
+.. extension:: DerivingVia
+    :shortdesc: Enable deriving instances ``via`` types of the same runtime
+        representation.
+        Implies :extension:`DerivingStrategies`.
+
+    :implies: :extension:`DerivingStrategies`
+
+    :since: 8.6.1
+
+This allows ``deriving`` a class instance for a type by specifying
+another type of equal runtime representation (such that there exists a
+``Coercible`` instance between the two: see :ref:`coercible`) that is
+already an instance of the that class.
+
+:extension:`DerivingVia` is indicated by the use of the ``via``
+deriving strategy. ``via`` requires specifying another type (the ``via`` type)
+to ``coerce`` through. For example, this code: ::
+
+    {-# LANGUAGE DerivingVia #-}
+
+    import Numeric
+
+    newtype Hex a = Hex a
+
+    instance (Integral a, Show a) => Show (Hex a) where
+      show (Hex a) = "0x" ++ showHex a ""
+
+    newtype Unicode = U Int
+      deriving Show
+        via (Hex Int)
+
+    -- >>> euroSign
+    -- 0x20ac
+    euroSign :: Unicode
+    euroSign = U 0x20ac
+
+Generates the following instance ::
+
+    instance Show Unicode where
+      show :: Unicode -> String
+      show = Data.Coerce.coerce
+        @(Hex Int -> String)
+        @(Unicode -> String)
+        show
+
+This extension generalizes :extension:`GeneralizedNewtypeDeriving`. To
+derive ``Num Unicode`` with GND (``deriving newtype Num``) it must
+reuse the ``Num Int`` instance. With ``DerivingVia``, we can explicitly
+specify the representation type ``Int``: ::
+
+    newtype Unicode = U Int
+      deriving Num
+        via Int
+
+      deriving Show
+        via (Hex Int)
+
+    euroSign :: Unicode
+    euroSign = 0x20ac
+
+Code duplication is common in instance declarations. A familiar
+pattern is lifting operations over an ``Applicative`` functor.
+Instead of having catch-all instances for ``f a`` which overlap
+with all other such instances, like so: ::
+
+    instance (Applicative f, Semigroup a) => Semigroup (f a) ..
+    instance (Applicative f, Monoid    a) => Monoid    (f a) ..
+
+We can instead create a newtype ``App``
+(where ``App f a`` and ``f a`` are represented the same in memory)
+and use :extension:`DerivingVia` to explicitly enable uses of this
+pattern: ::
+
+    {-# LANGUAGE DerivingVia, DeriveFunctor, GeneralizedNewtypeDeriving #-}
+
+    import Control.Applicative
+
+    newtype App f a = App (f a) deriving newtype (Functor, Applicative)
+
+    instance (Applicative f, Semigroup a) => Semigroup (App f a) where
+      (<>) = liftA2 (<>)
+
+    instance (Applicative f, Monoid a) => Monoid (App f a) where
+      mempty = pure mempty
+
+    data Pair a = MkPair a a
+      deriving stock
+        Functor
+
+      deriving (Semigroup, Monoid)
+        via (App Pair a)
+
+    instance Applicative Pair where
+      pure a = MkPair a a
+
+      MkPair f g <*> MkPair a b = MkPair (f a) (g b)
+
+Note that the ``via`` type does not have to be a ``newtype``.
+The only restriction is that it is coercible with the
+original data type. This means there can be arbitrary nesting of newtypes,
+as in the following example: ::
+
+    newtype Kleisli m a b = (a -> m b)
+      deriving (Semigroup, Monoid)
+        via (a -> App m b)
+
+Here we make use of the ``Monoid ((->) a)`` instance.
 
 .. _pattern-synonyms:
 
@@ -9116,7 +9238,7 @@ variables. These variables may depend on each other, even in the same
 the body of the ``forall``. Here are some examples::
 
   data Proxy k (a :: k) = MkProxy   -- just to use below
-  
+
   f :: forall k a. Proxy k a        -- This is just fine. We see that (a :: k).
   f = undefined
 
@@ -15694,7 +15816,7 @@ Roles
    single: roles
 
 Using :extension:`GeneralizedNewtypeDeriving`
-(:ref:`generalized-newtype-deriving`), a programmer can take existing
+(:ref:`newtype-deriving`), a programmer can take existing
 instances of classes and "lift" these into instances of that class for a
 newtype. However, this is not always safe. For example, consider the
 following:

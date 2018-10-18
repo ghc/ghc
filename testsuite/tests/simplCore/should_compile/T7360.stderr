@@ -57,10 +57,10 @@ fun2 :: forall a. [a] -> ((), Int)
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@ a) (x [Occ=Once!] :: [a]) ->
                  (T7360.fun5,
-                  case x of wild {
+                  case x of wild [Occ=Once] {
                     [] -> T7360.fun4;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
+                      case GHC.List.$wlenAcc @ a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
                       GHC.Types.I# ww2
                       }
                   })}]

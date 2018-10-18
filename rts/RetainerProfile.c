@@ -465,8 +465,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         // StgMutArrPtr.ptrs, no SRT
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
         init_ptrs(&se.info, ((StgMutArrPtrs *)c)->ptrs,
                   (StgPtr)(((StgMutArrPtrs *)c)->payload));
         *first_child = find_ptrs(&se.info);
@@ -477,8 +477,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
         // StgMutArrPtr.ptrs, no SRT
     case SMALL_MUT_ARR_PTRS_CLEAN:
     case SMALL_MUT_ARR_PTRS_DIRTY:
-    case SMALL_MUT_ARR_PTRS_FROZEN:
-    case SMALL_MUT_ARR_PTRS_FROZEN0:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
         init_ptrs(&se.info, ((StgSmallMutArrPtrs *)c)->ptrs,
                   (StgPtr)(((StgSmallMutArrPtrs *)c)->payload));
         *first_child = find_ptrs(&se.info);
@@ -809,8 +809,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             // StgMutArrPtr.ptrs, no SRT
         case MUT_ARR_PTRS_CLEAN:
         case MUT_ARR_PTRS_DIRTY:
-        case MUT_ARR_PTRS_FROZEN:
-        case MUT_ARR_PTRS_FROZEN0:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
             *c = find_ptrs(&se->info);
             if (*c == NULL) {
                 popOff();
@@ -1031,10 +1031,10 @@ isRetainer( StgClosure *c )
         // STM
     case TREC_CHUNK:
         // immutable arrays
-    case MUT_ARR_PTRS_FROZEN:
-    case MUT_ARR_PTRS_FROZEN0:
-    case SMALL_MUT_ARR_PTRS_FROZEN:
-    case SMALL_MUT_ARR_PTRS_FROZEN0:
+    case MUT_ARR_PTRS_FROZEN_CLEAN:
+    case MUT_ARR_PTRS_FROZEN_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
         return false;
 
         //

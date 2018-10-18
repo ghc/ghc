@@ -105,7 +105,9 @@ g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
                  (w1 [Occ=Once] :: Bool)
                  (w2 [Occ=Once!] :: Int) ->
                  case w2 of { GHC.Types.I# ww1 [Occ=Once] ->
-                 case T13143.$wg w w1 ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+                 case T13143.$wg w w1 ww1 of ww2 [Occ=Once] { __DEFAULT ->
+                 GHC.Types.I# ww2
+                 }
                  }}]
 g = \ (w :: Bool) (w1 :: Bool) (w2 :: Int) ->
       case w2 of { GHC.Types.I# ww1 ->

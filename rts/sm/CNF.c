@@ -722,14 +722,14 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
             p += arr_words_sizeW((StgArrBytes*)p);
             break;
 
-        case MUT_ARR_PTRS_FROZEN:
-        case MUT_ARR_PTRS_FROZEN0:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
             verify_mut_arr_ptrs(str, (StgMutArrPtrs*)p);
             p += mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
             break;
 
-        case SMALL_MUT_ARR_PTRS_FROZEN:
-        case SMALL_MUT_ARR_PTRS_FROZEN0:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
         {
             uint32_t i;
             StgSmallMutArrPtrs *arr = (StgSmallMutArrPtrs*)p;
@@ -969,14 +969,14 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             p += arr_words_sizeW((StgArrBytes*)p);
             break;
 
-        case MUT_ARR_PTRS_FROZEN:
-        case MUT_ARR_PTRS_FROZEN0:
+        case MUT_ARR_PTRS_FROZEN_CLEAN:
+        case MUT_ARR_PTRS_FROZEN_DIRTY:
             fixup_mut_arr_ptrs(fixup_table, count, (StgMutArrPtrs*)p);
             p += mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
             break;
 
-        case SMALL_MUT_ARR_PTRS_FROZEN:
-        case SMALL_MUT_ARR_PTRS_FROZEN0:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
         {
             uint32_t i;
             StgSmallMutArrPtrs *arr = (StgSmallMutArrPtrs*)p;
