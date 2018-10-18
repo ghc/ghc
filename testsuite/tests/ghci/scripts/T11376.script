@@ -3,7 +3,7 @@ let { bar :: Show a => a -> b -> a; bar = error "urk" }
 :type bar @Int
 :set -fprint-explicit-foralls
 :type bar @Int
-:set -fprint-explicit-kinds -XTypeApplications -XTypeInType
+:set -fprint-explicit-kinds -XTypeApplications -XPolyKinds
 data Prox a = Prox
 let { prox :: Prox a; prox = Prox }
 :t prox

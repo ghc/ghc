@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, ExplicitForAll, MagicHash, UnboxedTuples,
+{-# LANGUAGE DataKinds, PolyKinds, ExplicitForAll, MagicHash, UnboxedTuples,
              TypeFamilies, GADTs #-}
 
 module Main where

@@ -333,6 +333,7 @@ srcSpanFirstCharacter (RealSrcSpan span) = RealSrcSpan $ mkRealSrcSpan loc1 loc2
   where
     loc1@(SrcLoc f l c) = realSrcSpanStart span
     loc2 = SrcLoc f l (c+1)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -511,8 +512,8 @@ pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
 data GenLocated l e = L l e
   deriving (Eq, Ord, Data, Functor, Foldable, Traversable)
 
-type Located e = GenLocated SrcSpan e
-type RealLocated e = GenLocated RealSrcSpan e
+type Located = GenLocated SrcSpan
+type RealLocated = GenLocated RealSrcSpan
 
 unLoc :: GenLocated l e -> e
 unLoc (L _ e) = e

@@ -8,6 +8,7 @@
 
 module TH_RichKinds2 where
 
+import qualified Data.Kind as K
 import Data.Char
 import Data.List
 import Language.Haskell.TH
@@ -32,7 +33,7 @@ $( let fixKs :: String -> String -- need to remove TH renaming index from k vari
              if length index == 0 then s else
              prefix ++ "0" ++ (fixKs rest)
    in
-   do decls <- [d| data SMaybe :: (k -> *) -> (Maybe k) -> * where
+   do decls <- [d| data SMaybe :: (k -> K.Type) -> (Maybe k) -> K.Type where
                      SNothing :: SMaybe s 'Nothing
                      SJust :: s a -> SMaybe s ('Just a)
 
@@ -42,7 +43,7 @@ $( let fixKs :: String -> String -- need to remove TH renaming index from k vari
       reportWarning (fixKs (pprint decls))
       return decls )
 
-data SBool :: Bool -> * where
+data SBool :: Bool -> K.Type where
   SFalse :: SBool 'False
   STrue :: SBool 'True
 

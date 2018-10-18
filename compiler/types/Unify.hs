@@ -889,7 +889,7 @@ unify_ty env ty1 (TyVarTy tv2) kco
 unify_ty env ty1 ty2 _kco
   | Just (tc1, tys1) <- mb_tc_app1
   , Just (tc2, tys2) <- mb_tc_app2
-  , tc1 == tc2 || (tcIsStarKind ty1 && tcIsStarKind ty2)
+  , tc1 == tc2 || (tcIsLiftedTypeKind ty1 && tcIsLiftedTypeKind ty2)
   = if isInjectiveTyCon tc1 Nominal
     then unify_tys env tys1 tys2
     else do { let inj | isTypeFamilyTyCon tc1

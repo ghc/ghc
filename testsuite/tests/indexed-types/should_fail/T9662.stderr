@@ -1,11 +1,11 @@
 
-T9662.hs:47:8: error:
+T9662.hs:49:8: error:
     • Couldn't match type ‘k’ with ‘Int’
       ‘k’ is a rigid type variable bound by
         the type signature for:
           test :: forall sh k m n.
                   Shape (((sh :. k) :. m) :. n) -> Shape (((sh :. m) :. n) :. k)
-        at T9662.hs:44:1-50
+        at T9662.hs:46:1-50
       Expected type: Exp (((sh :. m) :. n) :. k)
                      -> Exp (((sh :. m) :. n) :. k)
         Actual type: Exp
@@ -32,4 +32,4 @@ T9662.hs:47:8: error:
     • Relevant bindings include
         test :: Shape (((sh :. k) :. m) :. n)
                 -> Shape (((sh :. m) :. n) :. k)
-          (bound at T9662.hs:45:1)
+          (bound at T9662.hs:47:1)

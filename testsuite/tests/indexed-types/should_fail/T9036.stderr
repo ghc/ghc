@@ -1,5 +1,5 @@
 
-T9036.hs:17:17: error:
+T9036.hs:18:17: error:
     • Couldn't match type ‘Curried t0 [t0]’ with ‘Curried t [t]’
       Expected type: Maybe (GetMonad t after) -> Curried t [t]
         Actual type: Maybe (GetMonad t0 after) -> Curried t0 [t0]

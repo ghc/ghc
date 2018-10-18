@@ -1,11 +1,11 @@
-{-# language PolyKinds, KindSignatures, GADTs, TypeFamilies, RankNTypes, TypeInType,
+{-# language DataKinds, PolyKinds, GADTs, TypeFamilies, RankNTypes,
              TypeOperators, ConstraintKinds #-}
 
 module T12369 where
 
 import Data.Kind
 
-data family Fix :: (k -> *) -> k
+data family Fix :: (k -> Type) -> k
 newtype instance Fix f = In { out :: f (Fix f) }
 
 type FREE k = (k -> Constraint) -> (k -> k)

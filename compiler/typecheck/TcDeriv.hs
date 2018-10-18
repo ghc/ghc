@@ -969,11 +969,11 @@ generated instance of:
 
     instance (k ~ *) => Functor (T k) where
 
-But this does not typecheck as the result of a -XTypeInType design decision:
-kind equalities are not allowed to be bound in types, only terms. But in
-essence, the two instance declarations are entirely equivalent, since even
-though (T k) matches any kind k, the only possibly value for k is *, since
-anything else is ill-typed. As a result, we can just as comfortably use (T *).
+But this does not typecheck by design: kind equalities are not allowed to be
+bound in types, only terms. But in essence, the two instance declarations are
+entirely equivalent, since even though (T k) matches any kind k, the only
+possibly value for k is *, since anything else is ill-typed. As a result, we can
+just as comfortably use (T *).
 
 Another way of thinking about is: deriving clauses often infer constraints.
 For example:
@@ -1065,8 +1065,8 @@ mentions other type variables:
   data family Fam (f :: * -> *) (a :: *)
   newtype instance Fam f (Const a f) = Fam (f a) deriving Functor
 
-With -XTypeInType, it is also possible to define kind synonyms, and they can
-mention other types in a datatype declaration. For example,
+It is also possible to define kind synonyms, and they can mention other types in
+a datatype declaration. For example,
 
   type Const a b = a
   newtype T f (a :: Const * f) = T (f a) deriving Functor

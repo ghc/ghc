@@ -34,7 +34,6 @@ module HsTypes (
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
-        HsAppType(..),LHsAppType,
 
         LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
@@ -63,9 +62,9 @@ module HsTypes (
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTy, splitLHsQualTy, splitLHsSigmaTy,
-        splitHsFunType, splitHsAppsTy,
-        splitHsAppTys, getAppsTyHead_maybe, hsTyGetAppHead_maybe,
-        mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppsTy,
+        splitHsFunType,
+        splitHsAppTys, hsTyGetAppHead_maybe,
+        mkHsOpTy, mkHsAppTy, mkHsAppTys,
         ignoreParens, hsSigType, hsSigWcType,
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
@@ -493,11 +492,6 @@ data HsType pass
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsAppsTy            (XAppsTy pass)
-                        [LHsAppType pass] -- Used only before renaming,
-                                          -- Note [HsAppsTy]
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
-
   | HsAppTy             (XAppTy pass)
                         (LHsType pass)
                         (LHsType pass)
@@ -572,6 +566,11 @@ data HsType pass
       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
+
+  | HsStarTy            (XStarTy pass)
+                        Bool             -- Is this the Unicode variant?
+                                         -- Note [HsStarTy]
+      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
   | HsKindSig           (XKindSig pass)
                         (LHsType pass)  -- (ty :: kind)
@@ -665,7 +664,6 @@ instance Outputable NewHsTypeX where
 type instance XForAllTy        (GhcPass _) = NoExt
 type instance XQualTy          (GhcPass _) = NoExt
 type instance XTyVar           (GhcPass _) = NoExt
-type instance XAppsTy          (GhcPass _) = NoExt
 type instance XAppTy           (GhcPass _) = NoExt
 type instance XFunTy           (GhcPass _) = NoExt
 type instance XListTy          (GhcPass _) = NoExt
@@ -675,6 +673,7 @@ type instance XOpTy            (GhcPass _) = NoExt
 type instance XParTy           (GhcPass _) = NoExt
 type instance XIParamTy        (GhcPass _) = NoExt
 type instance XEqTy            (GhcPass _) = NoExt
+type instance XStarTy          (GhcPass _) = NoExt
 type instance XKindSig         (GhcPass _) = NoExt
 
 type instance XSpliceTy        GhcPs = NoExt
@@ -743,27 +742,6 @@ newtype HsWildCardInfo        -- See Note [The wildcard story for types]
       -- A anonymous wild card ('_'). A fresh Name is generated for
       -- each individual anonymous wildcard during renaming
 
--- | Located Haskell Application Type
-type LHsAppType pass = Located (HsAppType pass)
-      -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSimpleQuote'
-
--- | Haskell Application Type
-data HsAppType pass
-  = HsAppInfix (XAppInfix pass)
-               (Located (IdP pass)) -- either a symbol or an id in backticks
-  | HsAppPrefix (XAppPrefix pass)
-                (LHsType pass)      -- anything else, including things like (+)
-  | XAppType
-      (XXAppType pass)
-
-type instance XAppInfix   (GhcPass _) = NoExt
-type instance XAppPrefix  (GhcPass _) = NoExt
-type instance XXAppType   (GhcPass _) = NoExt
-
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (HsAppType p) where
-  ppr = ppr_app_ty
-
 {-
 Note [HsForAllTy tyvar binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -819,16 +797,18 @@ HsTyVar: A name in a type or kind.
   The 'Promoted' field in an HsTyVar captures whether the type was promoted in
   the source code by prefixing an apostrophe.
 
-Note [HsAppsTy]
+Note [HsStarTy]
 ~~~~~~~~~~~~~~~
-How to parse
+When the StarIsType extension is enabled, we want to treat '*' and its Unicode
+variant identically to 'Data.Kind.Type'. Unfortunately, doing so in the parser
+would mean that when we pretty-print it back, we don't know whether the user
+wrote '*' or 'Type', and lose the parse/ppr roundtrip property.
 
-  Foo * Int
+As a workaround, we parse '*' as HsStarTy (if it stands for 'Data.Kind.Type')
+and then desugar it to 'Data.Kind.Type' in the typechecker (see tc_hs_type).
+When '*' is a regular type operator (StarIsType is disabled), HsStarTy is not
+involved.
 
-? Is it `(*) Foo Int` or `Foo GHC.Types.* Int`? There's no way to know until renaming.
-So we just take type expressions like this and put each component in a list, so be
-sorted out in the renamer. The sorting out is done by RnTypes.mkHsOpTyRn. This means
-that the parser should never produce HsAppTy or HsOpTy.
 
 Note [Promoted lists and tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1076,12 +1056,6 @@ mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
 mkHsAppTys = foldl mkHsAppTy
 
-mkHsAppsTy :: [LHsAppType GhcPs] -> HsType GhcPs
--- In the common case of a singleton non-operator,
--- avoid the clutter of wrapping in a HsAppsTy
-mkHsAppsTy [L _ (HsAppPrefix _ (L _ ty))] = ty
-mkHsAppsTy app_tys                        = HsAppsTy NoExt app_tys
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1117,38 +1091,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
 
 splitHsFunType other = ([], other)
 
---------------------------------
--- | Retrieves the head of an HsAppsTy, if this can be done unambiguously,
--- without consulting fixities.
-getAppsTyHead_maybe :: [LHsAppType (GhcPass p)]
-                    -> Maybe ( LHsType (GhcPass p)
-                             , [LHsType (GhcPass p)], LexicalFixity)
-getAppsTyHead_maybe tys = case splitHsAppsTy tys of
-  ([app1:apps], []) ->  -- no symbols, some normal types
-    Just (mkHsAppTys app1 apps, [], Prefix)
-  ([app1l:appsl, app1r:appsr], [L loc op]) ->  -- one operator
-    Just ( L loc (HsTyVar noExt NotPromoted (L loc op))
-         , [mkHsAppTys app1l appsl, mkHsAppTys app1r appsr], Infix)
-  _ -> -- can't figure it out
-    Nothing
-
--- | Splits a [HsAppType pass] (the payload of an HsAppsTy) into regions of
--- prefix types (normal types) and infix operators.
--- If @splitHsAppsTy tys = (non_syms, syms)@, then @tys@ starts with the first
--- element of @non_syms@ followed by the first element of @syms@ followed by
--- the next element of @non_syms@, etc. It is guaranteed that the non_syms list
--- has one more element than the syms list.
-splitHsAppsTy :: [LHsAppType pass] -> ([[LHsType pass]], [Located (IdP pass)])
-splitHsAppsTy = go [] [] []
-  where
-    go acc acc_non acc_sym [] = (reverse (reverse acc : acc_non), reverse acc_sym)
-    go acc acc_non acc_sym (L _ (HsAppPrefix _ ty) : rest)
-      = go (ty : acc) acc_non acc_sym rest
-    go acc acc_non acc_sym (L _ (HsAppInfix _ op) : rest)
-      = go [] (reverse acc : acc_non) (op : acc_sym) rest
-    go _ _ _ (L _ (XAppType _):_) = panic "splitHsAppsTy"
-
--- Retrieve the name of the "head" of a nested type application
+-- retrieve the name of the "head" of a nested type application
 -- somewhat like splitHsAppTys, but a little more thorough
 -- used to examine the result of a GADT-like datacon, so it doesn't handle
 -- *all* cases (like lists, tuples, (~), etc.)
@@ -1157,9 +1100,6 @@ hsTyGetAppHead_maybe :: LHsType (GhcPass p)
 hsTyGetAppHead_maybe = go []
   where
     go tys (L _ (HsTyVar _ _ ln))          = Just (ln, tys)
-    go tys (L _ (HsAppsTy _ apps))
-      | Just (head, args, _) <- getAppsTyHead_maybe apps
-                                           = go (args ++ tys) head
     go tys (L _ (HsAppTy _ l r))           = go (r : tys) l
     go tys (L _ (HsOpTy _ l (L loc n) r))  = Just (L loc n, l : r : tys)
     go tys (L _ (HsParTy _ t))             = go tys t
@@ -1168,7 +1108,6 @@ hsTyGetAppHead_maybe = go []
 
 splitHsAppTys :: LHsType GhcRn -> [LHsType GhcRn]
               -> (LHsType GhcRn, [LHsType GhcRn])
-  -- no need to worry about HsAppsTy here
 splitHsAppTys (L _ (HsAppTy _ f a)) as = splitHsAppTys f (a:as)
 splitHsAppTys (L _ (HsParTy _ f))   as = splitHsAppTys f as
 splitHsAppTys f                     as = (f,as)
@@ -1493,8 +1432,7 @@ ppr_mono_ty (HsWildCardTy {})   = char '_'
 ppr_mono_ty (HsEqTy _ ty1 ty2)
   = ppr_mono_lty ty1 <+> char '~' <+> ppr_mono_lty ty2
 
-ppr_mono_ty (HsAppsTy _ tys)
-  = hsep (map (ppr_app_ty . unLoc) tys)
+ppr_mono_ty (HsStarTy _ isUni)  = char (if isUni then '★' else '*')
 
 ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
@@ -1533,19 +1471,6 @@ ppr_fun_ty ty1 weight ty2
     sep [p1, arr <+> p2]
 
 --------------------------
-ppr_app_ty :: (OutputableBndrId (GhcPass p)) => HsAppType (GhcPass p) -> SDoc
-ppr_app_ty (HsAppInfix _ (L _ n)) = pprInfixOcc n
-ppr_app_ty (HsAppPrefix _ (L _ (HsTyVar _ NotPromoted (L _ n))))
-  = pprPrefixOcc n
-ppr_app_ty (HsAppPrefix _ (L _ (HsTyVar _ Promoted  (L _ n))))
-  = space <> quote (pprPrefixOcc n) -- We need a space before the ' above, so
-                                    -- the parser does not attach it to the
-                                    -- previous symbol
-ppr_app_ty (HsAppPrefix _ ty) = ppr_mono_lty ty
-
-ppr_app_ty (XAppType ty)      = ppr ty
-
---------------------------
 ppr_tylit :: HsTyLit -> SDoc
 ppr_tylit (HsNumTy _ i) = integer i
 ppr_tylit (HsStrTy _ s) = text (show s)
@@ -1573,7 +1498,7 @@ hsTypeNeedsParens p = go
     go (HsTyLit{})           = False
     go (HsWildCardTy{})      = False
     go (HsEqTy{})            = p >= opPrec
-    go (HsAppsTy _ args)     = p >= appPrec && not (null args)
+    go (HsStarTy{})          = False
     go (HsAppTy{})           = p >= appPrec
     go (HsOpTy{})            = p >= opPrec
     go (HsParTy{})           = False

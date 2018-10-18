@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds, UnicodeSyntax #-}
 
 import Data.Typeable
 import GHC.Types

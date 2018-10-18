@@ -822,6 +822,11 @@ tc_hs_type mode rn_ty@(HsEqTy _ ty1 ty2) exp_kind
        ; let ty' = mkNakedTyConApp eq_tc [kind1, ty1', ty2'']
        ; checkExpectedKind rn_ty ty' constraintKind exp_kind }
 
+tc_hs_type _ rn_ty@(HsStarTy _ _) exp_kind
+  -- Desugaring 'HsStarTy' to 'Data.Kind.Type' here means that we don't have to
+  -- handle it in 'coreView' and 'tcView'.
+  = checkExpectedKind rn_ty liftedTypeKind liftedTypeKind exp_kind
+
 --------- Literals
 tc_hs_type _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
   = do { checkWiredInTyCon typeNatKindCon
@@ -845,10 +850,6 @@ tc_hs_type _ (HsWildCardTy wc) exp_kind
          -- Take care here! Even though the coercion is Refl,
          -- we still need it to establish Note [The tcType invariant]
        }
-
--- disposed of by renamer
-tc_hs_type _ ty@(HsAppsTy {}) _
-  = pprPanic "tc_hs_tyep HsAppsTy" (ppr ty)
 
 tcWildCardOcc :: HsWildCardInfo -> Kind -> TcM TcType
 tcWildCardOcc wc_info exp_kind
@@ -1159,9 +1160,6 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                                 ; tc <- get_loopy_tc name tc_tc
                                 ; handle_tyfams tc tc_tc }
                              -- mkNakedTyConApp: see Note [Type-checking inside the knot]
-                 -- NB: we really should check if we're at the kind level
-                 -- and if the tycon is promotable if -XNoTypeInType is set.
-                 -- But this is a terribly large amount of work! Not worth it.
 
            AGlobal (ATyCon tc)
              -> do { check_tc tc
@@ -1171,13 +1169,9 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
              -> do { data_kinds <- xoptM LangExt.DataKinds
                    ; unless (data_kinds || specialPromotedDc dc) $
                        promotionErr name NoDataKindsDC
-                   ; type_in_type <- xoptM LangExt.TypeInType
-                   ; unless ( type_in_type ||
-                              ( isTypeLevel (mode_level mode) &&
-                                isLegacyPromotableDataCon dc ) ||
-                              ( isKindLevel (mode_level mode) &&
-                                specialPromotedDc dc ) ) $
-                       promotionErr name NoTypeInTypeDC
+                   ; when (isFamInstTyCon (dataConTyCon dc)) $
+                       -- see Trac #15245
+                       promotionErr name FamDataConPE
                    ; let tc = promoteDataCon dc
                    ; return (mkNakedTyConApp tc [], tyConKind tc) }
 
@@ -1186,16 +1180,11 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
            _  -> wrongThingErr "type" thing name }
   where
     check_tc :: TyCon -> TcM ()
-    check_tc tc = do { type_in_type <- xoptM LangExt.TypeInType
-                     ; data_kinds   <- xoptM LangExt.DataKinds
+    check_tc tc = do { data_kinds   <- xoptM LangExt.DataKinds
                      ; unless (isTypeLevel (mode_level mode) ||
                                data_kinds ||
                                isKindTyCon tc) $
-                       promotionErr name NoDataKindsTC
-                     ; unless (isTypeLevel (mode_level mode) ||
-                               type_in_type ||
-                               isLegacyPromotableTyCon tc) $
-                       promotionErr name NoTypeInTypeTC }
+                       promotionErr name NoDataKindsTC }
 
     -- if we are type-checking a type family tycon, we must instantiate
     -- any invisible arguments right away. Otherwise, we get #11246
@@ -1607,15 +1596,9 @@ kcLHsQTyVars name flav cusk
                                            , hsq_dependent = dep_names }
                       , hsq_explicit = hs_tvs }) thing_inside
   | cusk
-  = do { typeintype <- xoptM LangExt.TypeInType
-       ; let m_kind
-               | typeintype = Nothing
-               | otherwise  = Just liftedTypeKind
-                 -- without -XTypeInType, default all kind variables to have kind *
-
-       ; (scoped_kvs, (tc_tvs, (res_kind, stuff)))
+  = do { (scoped_kvs, (tc_tvs, (res_kind, stuff)))
            <- solveEqualities $
-              tcImplicitTKBndrsX newSkolemTyVar m_kind skol_info kv_ns $
+              tcImplicitTKBndrsX newSkolemTyVar skol_info kv_ns $
               kcLHsTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
            -- Now, because we're in a CUSK, quantify over the mentioned
@@ -1672,17 +1655,10 @@ kcLHsQTyVars name flav cusk
        ; return (tycon, stuff) }
 
   | otherwise
-  = do { typeintype <- xoptM LangExt.TypeInType
-
-             -- if -XNoTypeInType and we know all the implicits are kind vars,
-             -- just give the kind *. This prevents test
-             -- dependent/should_fail/KindLevelsB from compiling, as it should
-       ; let default_kind
-               | typeintype = Nothing
-               | otherwise  = Just liftedTypeKind
-           -- Why newSigTyVar?  See Note [Kind generalisation and sigTvs]
-       ; (scoped_kvs, (tc_tvs, (res_kind, stuff)))
-           <- kcImplicitTKBndrs kv_ns default_kind $
+  = do { (scoped_kvs, (tc_tvs, (res_kind, stuff)))
+           -- Why kcImplicitTKBndrs which uses newSigTyVar?
+           -- See Note [Kind generalisation and sigTvs]
+           <- kcImplicitTKBndrs kv_ns $
               kcLHsTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
@@ -1792,17 +1768,16 @@ tcImplicitTKBndrs :: SkolemInfo
                   -> [Name]
                   -> TcM a
                   -> TcM ([TcTyVar], a)
-tcImplicitTKBndrs = tcImplicitTKBndrsX newSkolemTyVar Nothing
+tcImplicitTKBndrs = tcImplicitTKBndrsX newSkolemTyVar
 
 -- | Like 'tcImplicitTKBndrs', but uses 'newSigTyVar' to create tyvars
 tcImplicitTKBndrsSig :: SkolemInfo
                      -> [Name]
                      -> TcM a
                      -> TcM ([TcTyVar], a)
-tcImplicitTKBndrsSig = tcImplicitTKBndrsX newSigTyVar Nothing
+tcImplicitTKBndrsSig = tcImplicitTKBndrsX newSigTyVar
 
 tcImplicitTKBndrsX :: (Name -> Kind -> TcM TcTyVar) -- new_tv function
-                   -> Maybe Kind           -- Just k <=> assign all names this kind
                    -> SkolemInfo
                    -> [Name]
                    -> TcM a
@@ -1816,7 +1791,7 @@ tcImplicitTKBndrsX :: (Name -> Kind -> TcM TcTyVar) -- new_tv function
 --
 -- * Returned TcTyVars have zonked kinds
 --   See Note [Keeping scoped variables in order: Implicit]
-tcImplicitTKBndrsX new_tv m_kind skol_info tv_names thing_inside
+tcImplicitTKBndrsX new_tv skol_info tv_names thing_inside
   | null tv_names -- Short cut for the common case where there
                   -- are no implicit type variables to bind
   = do { result <- solveLocalEqualities thing_inside
@@ -1826,7 +1801,7 @@ tcImplicitTKBndrsX new_tv m_kind skol_info tv_names thing_inside
   = do { (skol_tvs, result)
            <- solveLocalEqualities $
               checkTvConstraints skol_info Nothing $
-              do { tv_pairs <- mapM (tcHsTyVarName new_tv m_kind) tv_names
+              do { tv_pairs <- mapM (tcHsTyVarName new_tv Nothing) tv_names
                  ; let must_scope_tvs = [ unrestricted tv | (tv, False) <- tv_pairs ]
                  ; result <- tcExtendTyVarEnv must_scope_tvs $
                              thing_inside
@@ -1844,13 +1819,11 @@ tcImplicitTKBndrsX new_tv m_kind skol_info tv_names thing_inside
 -- kind checking. Uses SigTvs, as per Note [Use SigTvs in kind-checking pass]
 -- in TcTyClsDecls.
 kcImplicitTKBndrs :: [Name]     -- of the vars
-                  -> Maybe Kind -- Just k <=> use k as the kind for all vars
-                                -- Nothing <=> use a meta-tyvar
                   -> TcM a
                   -> TcM ([TcTyVar], a)  -- returns the tyvars created
                                          -- these are *not* dependency ordered
-kcImplicitTKBndrs var_ns m_kind thing_inside
-  = do { tkvs_pairs <- mapM (tcHsTyVarName newSigTyVar m_kind) var_ns
+kcImplicitTKBndrs var_ns thing_inside
+  = do { tkvs_pairs <- mapM (tcHsTyVarName newSigTyVar Nothing) var_ns
        ; let must_scope_tkvs = [ unrestricted tkv | (tkv, False) <- tkvs_pairs ]
        ; result <- tcExtendTyVarEnv must_scope_tkvs $
                    thing_inside
@@ -2775,8 +2748,6 @@ promotionErr name err
                FamDataConPE   -> text "it comes from a data family instance"
                NoDataKindsTC  -> text "perhaps you intended to use DataKinds"
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
-               NoTypeInTypeTC -> text "perhaps you intended to use TypeInType"
-               NoTypeInTypeDC -> text "perhaps you intended to use TypeInType"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
                PatSynExPE     -> sep [ text "the existential variables of a pattern synonym"
                                      , text "signature do not scope over the pattern" ]
@@ -2827,19 +2798,16 @@ reportFloatingKvs tycon_name flav all_tvs bad_tvs
        ; bad_tvs <- mapM zonkTcTyVarToTyVar bad_tvs
        ; let (tidy_env, tidy_all_tvs) = tidyOpenTyCoVars emptyTidyEnv all_tvs
              tidy_bad_tvs             = map (tidyTyVarOcc tidy_env) bad_tvs
-       ; typeintype <- xoptM LangExt.TypeInType
-       ; mapM_ (report typeintype tidy_all_tvs) tidy_bad_tvs }
+       ; mapM_ (report tidy_all_tvs) tidy_bad_tvs }
   where
-    report typeintype tidy_all_tvs tidy_bad_tv
+    report tidy_all_tvs tidy_bad_tv
       = addErr $
         vcat [ text "Kind variable" <+> quotes (ppr tidy_bad_tv) <+>
                text "is implicitly bound in" <+> ppr flav
              , quotes (ppr tycon_name) <> comma <+>
                text "but does not appear as the kind of any"
              , text "of its type variables. Perhaps you meant"
-             , text "to bind it" <+> ppWhen (not typeintype)
-                                            (text "(with TypeInType)") <+>
-                                 text "explicitly somewhere?"
+             , text "to bind it explicitly somewhere?"
              , ppWhen (not (null tidy_all_tvs)) $
                  hang (text "Type variables with inferred kinds:")
                  2 (ppr_tv_bndrs tidy_all_tvs) ]

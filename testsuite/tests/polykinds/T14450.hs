@@ -1,4 +1,6 @@
-{-# Language KindSignatures, TypeOperators, PolyKinds, TypeOperators, ConstraintKinds, TypeFamilies, DataKinds, TypeInType, GADTs, AllowAmbiguousTypes, InstanceSigs #-}
+{-# Language KindSignatures, TypeOperators, PolyKinds, TypeOperators,
+             ConstraintKinds, TypeFamilies, DataKinds, GADTs,
+             AllowAmbiguousTypes, InstanceSigs #-}
 
 module T14450 where
 

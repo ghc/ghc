@@ -1,4 +1,4 @@
-{-# LANGUAGE ExplicitForAll, TypeInType, GADTSyntax,
+{-# LANGUAGE ExplicitForAll, PolyKinds, GADTSyntax,
              ExistentialQuantification #-}
 
 module T12911 where

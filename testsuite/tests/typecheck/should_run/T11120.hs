@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, MagicHash, DataKinds #-}
+{-# LANGUAGE MagicHash, DataKinds #-}
 -- See also TypeOf.hs
 
 import GHC.Prim

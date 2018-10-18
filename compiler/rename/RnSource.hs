@@ -1509,9 +1509,7 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
           -- See Note [Complete user-supplied kind signatures] in HsDecls
-       ; typeintype <- xoptM LangExt.TypeInType
-       ; let cusk = hsTvbAllKinded tyvars' &&
-                    (not typeintype || no_rhs_kvs)
+       ; let cusk = hsTvbAllKinded tyvars' && no_rhs_kvs
              rn_info = DataDeclRn { tcdDataCusk = cusk
                                   , tcdFVs      = fvs }
        ; traceRn "rndata" (ppr tycon <+> ppr cusk <+> ppr no_rhs_kvs)

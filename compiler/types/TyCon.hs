@@ -2033,18 +2033,14 @@ isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
 -- -XDataKinds.
 kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
-  ( mkUniqSet [ liftedTypeKindTyConKey, starKindTyConKey, unicodeStarKindTyConKey
-              , constraintKindTyConKey, tYPETyConKey ]
+  ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
 
 isLiftedTypeKindTyConName :: Name -> Bool
-isLiftedTypeKindTyConName
-  = (`hasKey` liftedTypeKindTyConKey) <||>
-    (`hasKey` starKindTyConKey) <||>
-    (`hasKey` unicodeStarKindTyConKey)
+isLiftedTypeKindTyConName = (`hasKey` liftedTypeKindTyConKey)
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is

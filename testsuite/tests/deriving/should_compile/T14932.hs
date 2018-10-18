@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeOperators #-}
 module T14932 where
 
-import GHC.Exts
+import Data.Kind (Constraint, Type)
 
 class Zero a where
  zero :: a
@@ -16,7 +16,7 @@ type family All c xs :: Constraint where
  All c '[] = ()
  All c (x : xs) = (c x, All c xs)
 
-type family Code (a :: *) :: [[*]]
+type family Code (a :: Type) :: [[Type]]
 type instance Code B1 = '[ '[ ] ]
 
 data B1 = B1

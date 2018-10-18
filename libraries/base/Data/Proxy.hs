@@ -59,7 +59,7 @@ data Proxy t = Proxy deriving ( Bounded -- ^ @since 4.7.0.0
 
 -- | A concrete, promotable proxy type, for use at the kind level
 -- There are no instances for this because it is intended at the kind level only
-data KProxy (t :: *) = KProxy
+data KProxy (t :: Type) = KProxy
 
 -- It's common to use (undefined :: Proxy t) and (Proxy :: Proxy t)
 -- interchangeably, so all of these instances are hand-written to be

@@ -13,8 +13,7 @@ module Kind (
         isConstraintKindCon,
 
         classifiesTypeWithValues,
-        isStarKind, isStarKindSynonymTyCon,
-        tcIsStarKind,
+        tcIsLiftedTypeKind,
         isKindLevPoly
        ) where
 
@@ -39,7 +38,7 @@ import Util
 *                                                                      *
 ************************************************************************
 
-Note [Kind Constraint and kind *]
+Note [Kind Constraint and kind Type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The kind Constraint is the kind of classes and other type constraints.
 The special thing about types of kind Constraint is that
@@ -50,16 +49,16 @@ The special thing about types of kind Constraint is that
    to f.
 
 However, once type inference is over, there is *no* distinction between
-Constraint and *.  Indeed we can have coercions between the two. Consider
+Constraint and Type. Indeed we can have coercions between the two. Consider
    class C a where
      op :: a -> a
 For this single-method class we may generate a newtype, which in turn
 generates an axiom witnessing
     C a ~ (a -> a)
-so on the left we have Constraint, and on the right we have *.
+so on the left we have Constraint, and on the right we have Type.
 See Trac #7451.
 
-Bottom line: although '*' and 'Constraint' are distinct TyCons, with
+Bottom line: although 'Type' and 'Constraint' are distinct TyCons, with
 distinct uniques, they are treated as equal at all times except
 during type inference.
 -}
@@ -97,8 +96,8 @@ returnsConstraintKind = returnsTyCon constraintKindTyConKey
 -- E.g.  True of   TYPE k, TYPE (F Int)
 --       False of  TYPE 'LiftedRep
 isKindLevPoly :: Kind -> Bool
-isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
-                      -- the isStarKind check is necessary b/c of Constraint
+isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
+                    -- the isLiftedTypeKind check is necessary b/c of Constraint
                   go k
   where
     go ty | Just ty' <- coreView ty = go ty'
@@ -134,21 +133,9 @@ classifiesTypeWithValues = isTYPE (const True)
 -- | Is this kind equivalent to @*@?
 --
 -- This considers 'Constraint' to be distinct from @*@. For a version that
--- treats them as the same type, see 'isStarKind'.
-tcIsStarKind :: Kind -> Bool
-tcIsStarKind = tcIsTYPE is_lifted
+-- treats them as the same type, see 'isLiftedTypeKind'.
+tcIsLiftedTypeKind :: Kind -> Bool
+tcIsLiftedTypeKind = tcIsTYPE is_lifted
   where
     is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
     is_lifted _                        = False
-
--- | Is this kind equivalent to @*@?
---
--- This considers 'Constraint' to be the same as @*@. For a version that
--- treats them as different types, see 'tcIsStarKind'.
-isStarKind :: Kind -> Bool
-isStarKind = isLiftedTypeKind
-                              -- See Note [Kind Constraint and kind *]
-
--- | Is the tycon @Constraint@?
-isStarKindSynonymTyCon :: TyCon -> Bool
-isStarKindSynonymTyCon tc = tc `hasKey` constraintKindTyConKey

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 
 module T11724 where
 

@@ -2,7 +2,7 @@
 
 module T14246 where
 
-import Data.Kind -- necessary for *
+import Data.Kind
 
 data Nat = Z | S Nat
 
@@ -16,8 +16,8 @@ data L
 
 type family KLN (n :: k) :: Nat where
     KLN (f :: v -> k) = S (KLN (forall t. f t))
-    KLN (f :: *) = Z
+    KLN (f :: Type) = Z
 
-type family Reveal (n :: k) (l :: Vect (KLN n) L) :: * where
+type family Reveal (n :: k) (l :: Vect (KLN n) L) :: Type where
     Reveal (f :: v -> k) (Cons (Label (t :: v)) l) = Reveal (f t) l
-    Reveal (a :: *) Nil = a
+    Reveal (a :: Type) Nil = a

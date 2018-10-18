@@ -138,4 +138,5 @@ data Extension
    | EmptyDataDeriving
    | NumericUnderscores
    | QuantifiedConstraints
+   | StarIsType
    deriving (Eq, Enum, Show, Generic)

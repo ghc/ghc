@@ -11,11 +11,11 @@
 module T13674 where
 
 import Data.Proxy
-import GHC.Exts (Constraint)
+import Data.Kind (Constraint, Type)
 import GHC.TypeLits
 import Unsafe.Coerce (unsafeCoerce)
 
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 infixr 9 :-

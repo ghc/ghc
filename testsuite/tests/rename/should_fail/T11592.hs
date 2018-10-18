@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 
 module Bug11592 where
 

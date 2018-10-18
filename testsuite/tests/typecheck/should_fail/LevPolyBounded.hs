@@ -1,6 +1,6 @@
 -- inspired by comment:25 on #12708
 
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 
 module LevPolyBounded where
 

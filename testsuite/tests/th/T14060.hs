@@ -2,7 +2,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 module Main where
 
 import Data.Kind

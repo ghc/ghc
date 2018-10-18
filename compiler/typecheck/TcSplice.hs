@@ -1721,8 +1721,8 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
 ------------------------------
 reifyType :: TyCoRep.Type -> TcM TH.Type
 -- Monadic only because of failure
-reifyType ty                | tcIsStarKind ty = return TH.StarT
-  -- Make sure to use tcIsStarKind here, since we don't want to confuse it
+reifyType ty                | tcIsLiftedTypeKind ty = return TH.StarT
+  -- Make sure to use tcIsLiftedTypeKind here, since we don't want to confuse it
   -- with Constraint (#14869).
 reifyType ty@(ForAllTy {})  = reify_for_all ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }

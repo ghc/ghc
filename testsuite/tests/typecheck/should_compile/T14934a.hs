@@ -4,9 +4,10 @@
 {-# LANGUAGE TypeOperators #-}
 module T14934a where
 
+import Data.Kind (Type)
 import GHC.TypeLits
 
-data Foo :: Nat -> * where
+data Foo :: Nat -> Type where
   MkFoo0 :: Foo 0
   MkFoo1 :: Foo 1
 

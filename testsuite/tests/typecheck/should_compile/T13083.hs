@@ -8,11 +8,12 @@
 
 module T13083 where
 
+import Data.Kind
 import GHC.Generics (Par1(..),(:*:)(..))
 import GHC.Exts (coerce)
 
 -- Representation as free vector space
-type family V (a :: *) :: * -> *
+type family V (a :: Type) :: Type -> Type
 
 type instance V R = Par1
 type instance V (a,b) = V a :*: V b
@@ -59,7 +60,7 @@ foo = coerce
 --                                with that of ‘Par1’
 --         arising from a use of ‘coerce’
 
--- Note that Par1 has the wrong kind (* -> *) for V Par1
+-- Note that Par1 has the wrong kind (Type -> Type) for V Par1
 
 -- Same error:
 --

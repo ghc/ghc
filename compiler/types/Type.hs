@@ -352,7 +352,7 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
                -- partially-applied type constructor; indeed, usually will!
 
 coreView (TyConApp tc [])       -- At the Core level, Constraint = Type
-  | isStarKindSynonymTyCon tc
+  | isConstraintKindCon tc
   = Just liftedTypeKind
 
 coreView _ = Nothing
@@ -2360,13 +2360,14 @@ nonDetCmpTypesX _   []        _         = LT
 nonDetCmpTypesX _   _         []        = GT
 
 -------------
--- | Compare two 'TyCon's. NB: This should /never/ see the "star synonyms",
--- as recognized by Kind.isStarKindSynonymTyCon. See Note
--- [Kind Constraint and kind *] in Kind.
+-- | Compare two 'TyCon's. NB: This should /never/ see 'Constraint' (as
+-- recognized by Kind.isConstraintKindCon) which is considered a synonym for
+-- 'Type' in Core.
+-- See Note [Kind Constraint and kind Type] in Kind.
 -- See Note [nonDetCmpType nondeterminism]
 nonDetCmpTc :: TyCon -> TyCon -> Ordering
 nonDetCmpTc tc1 tc2
-  = ASSERT( not (isStarKindSynonymTyCon tc1) && not (isStarKindSynonymTyCon tc2) )
+  = ASSERT( not (isConstraintKindCon tc1) && not (isConstraintKindCon tc2) )
     u1 `nonDetCmpUnique` u2
   where
     u1  = tyConUnique tc1

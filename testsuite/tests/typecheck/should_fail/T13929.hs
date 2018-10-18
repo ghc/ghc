@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveGeneric #-}

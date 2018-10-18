@@ -848,6 +848,7 @@ tcIsTYPE _ _ = False
 
 -- | This version considers Constraint to be the same as *. Returns True
 -- if the argument is equivalent to Type/Constraint and False otherwise.
+-- See Note [Kind Constraint and kind Type]
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind = isTYPE is_lifted
   where

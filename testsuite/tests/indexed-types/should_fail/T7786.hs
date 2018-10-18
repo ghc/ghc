@@ -4,7 +4,9 @@
              FlexibleContexts, ScopedTypeVariables #-}
 module T7786 where
 
+import Data.Kind (Type)
 import GHC.TypeLits(Symbol,Nat)
+
 data family Sing (a :: k)
 
 data Inventory a = Empty | More (Inventory a) a
@@ -33,7 +35,7 @@ under Root' post = post
 under (Symic'' ks k) post = under ks post `Symic''` k
 under (Numic'' ks k) post = under ks post `Numic''` k
 
-data Database :: Inventory [KeySegment] -> * where
+data Database :: Inventory [KeySegment] -> Type where
   Clean :: Database Empty
   Record :: (k `KeyNotIn` i) => Database i -> Sing k -> () -> Database (More i k)
   Sub :: ((sub `UnderDisjoint` k) i) => Database i -> Sing k -> Database sub -> Database ((sub `BuriedUnder` k) i)

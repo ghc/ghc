@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, DataKinds, TypeInType #-}
+{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds #-}
 
 import GHC.Exts
 import Prelude (Bool(True,False),Integer,Ordering,undefined)

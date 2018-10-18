@@ -3,8 +3,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Numerals
-where
+module Numerals where
+
+import Data.Kind
 
 data Z          -- empty data type
 data S a        -- empty data type
@@ -19,7 +20,7 @@ two   = Succ one
 three = Succ two
 -- etc...we really would like some nicer syntax here
 
-type family (:+:) n m :: *
+type family (:+:) n m :: Type
 type instance Z     :+: m = m
 type instance (S n) :+: m = S (n :+: m)
 

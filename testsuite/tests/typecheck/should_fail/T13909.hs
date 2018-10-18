@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 module T13909 where
 
 import Data.Kind

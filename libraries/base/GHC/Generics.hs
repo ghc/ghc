@@ -15,7 +15,6 @@
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE Trustworthy                #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE TypeInType                 #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -850,7 +849,7 @@ deriving instance Monoid p => Monoid (Par1 p)
 
 -- | Recursive calls of kind @* -> *@ (or kind @k -> *@, when @PolyKinds@
 -- is enabled)
-newtype Rec1 (f :: k -> *) (p :: k) = Rec1 { unRec1 :: f p }
+newtype Rec1 (f :: k -> Type) (p :: k) = Rec1 { unRec1 :: f p }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -880,7 +879,7 @@ deriving instance Semigroup (f p) => Semigroup (Rec1 f p)
 deriving instance Monoid (f p) => Monoid (Rec1 f p)
 
 -- | Constants, additional parameters and recursion of kind @*@
-newtype K1 (i :: *) c (p :: k) = K1 { unK1 :: c }
+newtype K1 (i :: Type) c (p :: k) = K1 { unK1 :: c }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -921,7 +920,8 @@ deriving instance Semigroup (f p) => Semigroup (M1 i c f p)
 deriving instance Monoid (f p) => Monoid (M1 i c f p)
 
 -- | Meta-information (constructor names, etc.)
-newtype M1 (i :: *) (c :: Meta) (f :: k -> *) (p :: k) = M1 { unM1 :: f p }
+newtype M1 (i :: Type) (c :: Meta) (f :: k -> Type) (p :: k) =
+    M1 { unM1 :: f p }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -933,7 +933,7 @@ newtype M1 (i :: *) (c :: Meta) (f :: k -> *) (p :: k) = M1 { unM1 :: f p }
 
 -- | Sums: encode choice between constructors
 infixr 5 :+:
-data (:+:) (f :: k -> *) (g :: k -> *) (p :: k) = L1 (f p) | R1 (g p)
+data (:+:) (f :: k -> Type) (g :: k -> Type) (p :: k) = L1 (f p) | R1 (g p)
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -945,7 +945,7 @@ data (:+:) (f :: k -> *) (g :: k -> *) (p :: k) = L1 (f p) | R1 (g p)
 
 -- | Products: encode multiple arguments to constructors
 infixr 6 :*:
-data (:*:) (f :: k -> *) (g :: k -> *) (p :: k) = f p :*: g p
+data (:*:) (f :: k -> Type) (g :: k -> Type) (p :: k) = f p :*: g p
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
            , Read     -- ^ @since 4.7.0.0
@@ -986,7 +986,7 @@ instance (Monoid (f p), Monoid (g p)) => Monoid ((f :*: g) p) where
 
 -- | Composition of functors
 infixr 7 :.:
-newtype (:.:) (f :: k2 -> *) (g :: k1 -> k2) (p :: k1) =
+newtype (:.:) (f :: k2 -> Type) (g :: k1 -> k2) (p :: k1) =
     Comp1 { unComp1 :: f (g p) }
   deriving ( Eq       -- ^ @since 4.7.0.0
            , Ord      -- ^ @since 4.7.0.0
@@ -1018,7 +1018,7 @@ deriving instance Monoid (f (g p)) => Monoid ((f :.: g) p)
 -- | Constants of unlifted kinds
 --
 -- @since 4.9.0.0
-data family URec (a :: *) (p :: k)
+data family URec (a :: Type) (p :: k)
 
 -- | Used for marking occurrences of 'Addr#'
 --
@@ -1118,10 +1118,10 @@ type UInt    = URec Int
 -- @since 4.9.0.0
 type UWord   = URec Word
 
--- | Tag for K1: recursion (of kind @*@)
+-- | Tag for K1: recursion (of kind @Type@)
 data R
 
--- | Type synonym for encoding recursion (of kind @*@)
+-- | Type synonym for encoding recursion (of kind @Type@)
 type Rec0  = K1 R
 
 -- | Tag for M1: datatype
@@ -1143,17 +1143,17 @@ type S1 = M1 S
 -- | Class for datatypes that represent datatypes
 class Datatype d where
   -- | The name of the datatype (unqualified)
-  datatypeName :: t d (f :: k -> *) (a :: k) -> [Char]
+  datatypeName :: t d (f :: k -> Type) (a :: k) -> [Char]
   -- | The fully-qualified name of the module where the type is declared
-  moduleName   :: t d (f :: k -> *) (a :: k) -> [Char]
+  moduleName   :: t d (f :: k -> Type) (a :: k) -> [Char]
   -- | The package name of the module where the type is declared
   --
   -- @since 4.9.0.0
-  packageName :: t d (f :: k -> *) (a :: k) -> [Char]
+  packageName :: t d (f :: k -> Type) (a :: k) -> [Char]
   -- | Marks if the datatype is actually a newtype
   --
   -- @since 4.7.0.0
-  isNewtype    :: t d (f :: k -> *) (a :: k) -> Bool
+  isNewtype    :: t d (f :: k -> Type) (a :: k) -> Bool
   isNewtype _ = False
 
 -- | @since 4.9.0.0
@@ -1167,14 +1167,14 @@ instance (KnownSymbol n, KnownSymbol m, KnownSymbol p, SingI nt)
 -- | Class for datatypes that represent data constructors
 class Constructor c where
   -- | The name of the constructor
-  conName :: t c (f :: k -> *) (a :: k) -> [Char]
+  conName :: t c (f :: k -> Type) (a :: k) -> [Char]
 
   -- | The fixity of the constructor
-  conFixity :: t c (f :: k -> *) (a :: k) -> Fixity
+  conFixity :: t c (f :: k -> Type) (a :: k) -> Fixity
   conFixity _ = Prefix
 
   -- | Marks if this constructor is a record
-  conIsRecord :: t c (f :: k -> *) (a :: k) -> Bool
+  conIsRecord :: t c (f :: k -> Type) (a :: k) -> Bool
   conIsRecord _ = False
 
 -- | @since 4.9.0.0
@@ -1306,19 +1306,19 @@ data DecidedStrictness = DecidedLazy
 -- | Class for datatypes that represent records
 class Selector s where
   -- | The name of the selector
-  selName :: t s (f :: k -> *) (a :: k) -> [Char]
+  selName :: t s (f :: k -> Type) (a :: k) -> [Char]
   -- | The selector's unpackedness annotation (if any)
   --
   -- @since 4.9.0.0
-  selSourceUnpackedness :: t s (f :: k -> *) (a :: k) -> SourceUnpackedness
+  selSourceUnpackedness :: t s (f :: k -> Type) (a :: k) -> SourceUnpackedness
   -- | The selector's strictness annotation (if any)
   --
   -- @since 4.9.0.0
-  selSourceStrictness :: t s (f :: k -> *) (a :: k) -> SourceStrictness
+  selSourceStrictness :: t s (f :: k -> Type) (a :: k) -> SourceStrictness
   -- | The strictness that the compiler inferred for the selector
   --
   -- @since 4.9.0.0
-  selDecidedStrictness :: t s (f :: k -> *) (a :: k) -> DecidedStrictness
+  selDecidedStrictness :: t s (f :: k -> Type) (a :: k) -> DecidedStrictness
 
 -- | @since 4.9.0.0
 instance (SingI mn, SingI su, SingI ss, SingI ds)
@@ -1339,7 +1339,7 @@ instance (SingI mn, SingI su, SingI ss, SingI ds)
 -- @
 class Generic a where
   -- | Generic representation type
-  type Rep a :: * -> *
+  type Rep a :: Type -> Type
   -- | Convert from the datatype to its representation
   from  :: a -> (Rep a) x
   -- | Convert from the representation to the datatype
@@ -1356,9 +1356,9 @@ class Generic a where
 -- 'from1' . 'to1' ≡ 'id'
 -- 'to1' . 'from1' ≡ 'id'
 -- @
-class Generic1 (f :: k -> *) where
+class Generic1 (f :: k -> Type) where
   -- | Generic representation type
-  type Rep1 f :: k -> *
+  type Rep1 f :: k -> Type
   -- | Convert from the datatype to its representation
   from1  :: f a -> (Rep1 f) a
   -- | Convert from the representation to the datatype
@@ -1490,7 +1490,7 @@ class SingI (a :: k) where
 class SingKind k where
   -- | Get a base type from a proxy for the promoted kind. For example,
   -- @DemoteRep Bool@ will be the type @Bool@.
-  type DemoteRep k :: *
+  type DemoteRep k :: Type
 
   -- | Convert a singleton to its unrefined version.
   fromSing :: Sing (a :: k) -> DemoteRep k

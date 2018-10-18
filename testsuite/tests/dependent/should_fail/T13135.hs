@@ -8,11 +8,11 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 
 
-module T12135 where
+
+module T13135 where
 
 
 import Data.Kind (Type)

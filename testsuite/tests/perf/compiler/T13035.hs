@@ -1,6 +1,9 @@
-{-# LANGUAGE PolyKinds, DataKinds, TypeOperators, TypeFamilies, GADTs, PartialTypeSignatures #-}
+{-# LANGUAGE PolyKinds, DataKinds, TypeOperators, TypeFamilies,
+             GADTs, PartialTypeSignatures #-}
 
 module T13035 where
+
+import Data.Kind
 
 newtype MyAttr a b = MyAttr { _unMyAttr :: MyFun (a b) }
 type MyRec a b = Rec (MyAttr a) b
@@ -26,9 +29,9 @@ type (a :: j1 -> j2) $ (b :: j1) = a b
 infixr 0 $
 infixr 9 =:
 
-data FConst (a :: *) (b :: Fields)
-data FApply (a :: * -> * -> *) b c (d :: Fields)
-data FMap (a :: * -> *) b (d :: Fields)
+data FConst (a :: Type) (b :: Fields)
+data FApply (a :: Type -> Type -> Type) b c (d :: Fields)
+data FMap (a :: Type -> Type) b (d :: Fields)
 
 type instance MyFun (FConst a b) = a
 type instance MyFun (FApply b c d a) = b (MyFun (c a)) (MyFun (d a))
@@ -63,7 +66,7 @@ data Fields = Name
             | UnsaturatedFat
             | ServingSize
 
-data Rec :: (u -> *) -> [u] -> * where
+data Rec :: (u -> Type) -> [u] -> Type where
   RNil :: Rec f '[]
   (:&) :: !(f r) -> !(Rec f rs) -> Rec f (r ': rs)
 

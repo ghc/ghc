@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, RankNTypes, TypeOperators, TypeInType,
+{-# LANGUAGE TemplateHaskell, RankNTypes, TypeOperators, DataKinds, PolyKinds,
              GADTs #-}
 
 module T8031 where
@@ -6,7 +6,7 @@ module T8031 where
 import Data.Proxy
 import Data.Kind
 
-data SList :: [k] -> * where
+data SList :: [k] -> Type where
   SCons :: Proxy h -> Proxy t -> SList (h ': t)
 
 $( [d| foo :: forall (a :: k). Proxy a

@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, TypeInType, UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies, DataKinds, PolyKinds, UndecidableInstances #-}
 
 module T14066c where
 

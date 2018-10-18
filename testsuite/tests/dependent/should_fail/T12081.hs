@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds, PolyKinds #-}
 
 module T12081 where
 

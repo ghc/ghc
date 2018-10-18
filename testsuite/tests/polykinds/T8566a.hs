@@ -6,13 +6,15 @@
 {-# LANGUAGE TypeOperators              #-}
 module T8566a where
 
+import Data.Kind (Type)
+
 data Field = forall k. APP k [Field]
 
-data InField (u :: Field) :: * where
+data InField (u :: Field) :: Type where
   A :: AppVars t (ExpandField args) -> InField (APP t args)
 
-type family ExpandField (args :: [Field]) :: [*]
-type family AppVars (t :: k) (vs :: [*]) :: *
+type family ExpandField (args :: [Field]) :: [Type]
+type family AppVars (t :: k) (vs :: [Type]) :: Type
 
 -- This function fails to compile, because we discard
 -- 'given' kind equalities.  See comment 7 in Trac #8566

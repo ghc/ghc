@@ -1,4 +1,4 @@
-{-# Language PolyKinds, TypeInType, UndecidableInstances #-}
+{-# Language PolyKinds, UndecidableInstances #-}
 module T13603 where
 
 import GHC.Exts (TYPE, RuntimeRep)

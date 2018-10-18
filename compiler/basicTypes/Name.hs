@@ -79,7 +79,6 @@ module Name (
 import GhcPrelude
 
 import {-# SOURCE #-} TyCoRep( TyThing )
-import {-# SOURCE #-} PrelNames( starKindTyConKey, unicodeStarKindTyConKey )
 
 import OccName
 import Module
@@ -687,24 +686,6 @@ pprInfixName :: (Outputable a, NamedThing a) => a -> SDoc
 pprInfixName  n = pprInfixVar (isSymOcc (getOccName n)) (ppr n)
 
 pprPrefixName :: NamedThing a => a -> SDoc
-pprPrefixName thing
- | name `hasKey` starKindTyConKey || name `hasKey` unicodeStarKindTyConKey
- = ppr name   -- See Note [Special treatment for kind *]
- | otherwise
- = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
+pprPrefixName thing = pprPrefixVar (isSymOcc (nameOccName name)) (ppr name)
  where
    name = getName thing
-
-{-
-Note [Special treatment for kind *]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Do not put parens around the kind '*'.  Even though it looks like
-an operator, it is really a special case.
-
-This pprPrefixName stuff is really only used when printing HsSyn,
-which has to be polymorphic in the name type, and hence has to go via
-the overloaded function pprPrefixOcc.  It's easier where we know the
-type being pretty printed; eg the pretty-printing code in TyCoRep.
-
-See Trac #7645, which led to this.
--}

@@ -784,11 +784,10 @@ variables and its return type are annotated.
  - An open type family always has a CUSK -- unannotated type variables (and
 return type) default to *.
 
- - Additionally, if -XTypeInType is on, then a data definition with a top-level
-   :: must explicitly bind all kind variables to the right of the ::.
-   See test dependent/should_compile/KindLevels, which requires this case.
-   (Naturally, any kind variable mentioned before the :: should not be bound
-   after it.)
+ - A data definition with a top-level :: must explicitly bind all kind variables
+to the right of the ::. See test dependent/should_compile/KindLevels, which
+requires this case. (Naturally, any kind variable mentioned before the :: should
+not be bound after it.)
 -}
 
 

@@ -1,2 +1,2 @@
 
-T15209.hs:6:8: error: Not in scope: type constructor or class ‘~#’
+T15209.hs:6:10: error: Not in scope: type constructor or class ‘~#’

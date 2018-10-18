@@ -4,9 +4,10 @@
 
 module T13784 where
 
+import Data.Kind (Type)
 import Data.Monoid ((<>))
 
-data Product :: [*] -> * where
+data Product :: [Type] -> Type where
     (:*) :: a -> Product as -> Product (a : as)
     Unit :: Product '[]
 infixr 5 :*
@@ -18,7 +19,7 @@ instance (Show a, Show (Product as)) => Show (Product (a : as)) where
     show (a :* as) = show a <> " :* " <> show as
 
 class Divideable a as where
-    type Divide a as :: [*]
+    type Divide a as :: [Type]
     divide :: Product as -> (a, Product (Divide a as))
 
 instance Divideable a (a : as) where

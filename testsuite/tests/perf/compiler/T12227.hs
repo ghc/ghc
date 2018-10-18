@@ -13,25 +13,26 @@ module Crash where
 
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality (type (==))
+import Data.Kind
 import GHC.Exts
 import GHC.Generics
 
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 infixr 0 -->
 
-type family (args :: [*]) --> (ret :: *) :: *
+type family (args :: [Type]) --> (ret :: Type) :: Type
   where
     '[]           --> ret = ret
     (arg ': args) --> ret = arg -> (args --> ret)
 
-type family AllArguments (func :: *) :: [*]
+type family AllArguments (func :: Type) :: [Type]
   where
     AllArguments (arg -> func) = arg ': AllArguments func
     AllArguments ret           = '[]
 
-type family FinalReturn (func :: *) :: *
+type family FinalReturn (func :: Type) :: Type
   where
     FinalReturn (arg -> func) = FinalReturn func
     FinalReturn ret           = ret
@@ -39,11 +40,11 @@ type family FinalReturn (func :: *) :: *
 type IsFullFunction f
   = (AllArguments f --> FinalReturn f) ~ f
 
-type family SConstructor (struct :: *) :: *
+type family SConstructor (struct :: Type) :: Type
   where
     SConstructor struct = GPrependFields (Rep struct ()) '[] --> struct
 
-type family GPrependFields (gstruct :: *) (tail :: [*]) :: [*]
+type family GPrependFields (gstruct :: Type) (tail :: [Type]) :: [Type]
   where
     GPrependFields (M1  i t f p) tail = GPrependFields (f p) tail
     GPrependFields (K1    i c p) tail = c ': tail
@@ -60,7 +61,7 @@ instance AppendFields fields1 fields2 fields r
          => AppendFields (f ': fields1) fields2 (f ': fields) r
 
 class Generic struct
-      => GoodConstructor (struct :: *)
+      => GoodConstructor (struct :: Type)
   where
     goodConstructor :: Proxy struct
                     -> Dict ( IsFullFunction (SConstructor struct)
@@ -79,7 +80,7 @@ instance ( Generic struct
                           (Proxy :: Proxy struct)
     {-# INLINE goodConstructor #-}
 
-class GoodConstructorEq (isEqual :: Bool) (ctor :: *) (struct :: *)
+class GoodConstructorEq (isEqual :: Bool) (ctor :: Type) (struct :: Type)
   where
     goodConstructorEq :: Proxy isEqual
                       -> Proxy ctor

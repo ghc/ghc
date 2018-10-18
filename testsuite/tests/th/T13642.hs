@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, TypeInType, TemplateHaskell, RankNTypes #-}
+{-# LANGUAGE GADTs, PolyKinds, TemplateHaskell, RankNTypes #-}
 module T13642 where
 
 import Data.Kind (Type)

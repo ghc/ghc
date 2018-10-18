@@ -963,7 +963,7 @@ the trees to reflect the fixities of the underlying operators:
 This is done by the renamer (see @mkOppAppRn@, @mkConOppPatRn@, and
 @mkHsOpTyRn@ in RnTypes), which expects that the input will be completely
 right-biased for types and left-biased for everything else. So we left-bias the
-trees of @UInfixP@ and @UInfixE@ and use HsAppsTy for UInfixT.
+trees of @UInfixP@ and @UInfixE@ and right-bias the trees of @UInfixT@.
 
 Sample input:
 
@@ -1331,10 +1331,8 @@ cvtTypeKind ty_str ty
                    }
 
            UInfixT t1 s t2
-             -> do { t1' <- cvtType t1
-                   ; t2' <- cvtType t2
-                   ; s'  <- tconName s
-                   ; return $ cvtOpAppT t1' s' t2'
+             -> do { t2' <- cvtType t2
+                   ; cvtOpAppT t1 s t2'
                    } -- Note [Converting UInfix]
 
            ParensT t
@@ -1445,23 +1443,20 @@ cvtTyLit :: TH.TyLit -> HsTyLit
 cvtTyLit (TH.NumTyLit i) = HsNumTy NoSourceText i
 cvtTyLit (TH.StrTyLit s) = HsStrTy NoSourceText (fsLit s)
 
-{- | @cvtOpAppT x op y@ takes converted arguments and flattens any HsAppsTy
-   structure in them.
--}
-cvtOpAppT :: LHsType GhcPs -> RdrName -> LHsType GhcPs -> LHsType GhcPs
-cvtOpAppT t1@(L loc1 _) op t2@(L loc2 _)
-  = L (combineSrcSpans loc1 loc2) $
-    HsAppsTy noExt (t1' ++ [noLoc $ HsAppInfix noExt (noLoc op)] ++ t2')
-  where
-    t1' | L _ (HsAppsTy _ t1s) <- t1
-        = t1s
-        | otherwise
-        = [noLoc $ HsAppPrefix noExt t1]
+{- | @cvtOpAppT x op y@ converts @op@ and @y@ and produces the operator
+application @x `op` y@. The produced tree of infix types will be right-biased,
+provided @y@ is.
 
-    t2' | L _ (HsAppsTy _ t2s) <- t2
-        = t2s
-        | otherwise
-        = [noLoc $ HsAppPrefix noExt t2]
+See the @cvtOpApp@ documentation for how this function works.
+-}
+cvtOpAppT :: TH.Type -> TH.Name -> LHsType GhcPs -> CvtM (LHsType GhcPs)
+cvtOpAppT (UInfixT x op2 y) op1 z
+  = do { l <- cvtOpAppT y op1 z
+       ; cvtOpAppT x op2 l }
+cvtOpAppT x op y
+  = do { op' <- tconNameL op
+       ; x' <- cvtType x
+       ; returnL (mkHsOpTy x' op' y) }
 
 cvtKind :: TH.Kind -> CvtM (LHsKind GhcPs)
 cvtKind = cvtTypeKind "kind"

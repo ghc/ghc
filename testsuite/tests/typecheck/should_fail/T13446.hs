@@ -11,10 +11,10 @@
 module T13446 where
 
 import Data.Coerce (Coercible)
-import GHC.Exts (Constraint)
+import Data.Kind (Type, Constraint)
 import GHC.TypeLits (Symbol)
 
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: a => Dict a
 
 infixr 9 :-

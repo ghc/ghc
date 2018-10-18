@@ -1,5 +1,5 @@
-
 module Foo where
 
-data Foo (a :: *) = Foo a
+import Data.Kind (Type)
 
+data Foo (a :: Type) = Foo a

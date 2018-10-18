@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, ExplicitForAll #-}
+{-# LANGUAGE PolyKinds, ExplicitForAll #-}
 
 module BadTelescope3 where
 

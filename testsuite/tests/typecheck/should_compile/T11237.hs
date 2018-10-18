@@ -1,6 +1,6 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds, KindSignatures #-}
 {-# LANGUAGE GADTs #-}
-module TypeInTypeBug where
+module T11237 where
 
 import qualified Data.Kind
 

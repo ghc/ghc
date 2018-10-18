@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, TypeFamilies #-}
+{-# LANGUAGE PolyKinds, TypeFamilies #-}
 
 module Bug where
 

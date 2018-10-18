@@ -1,4 +1,4 @@
-:set -XTypeInType
+:set -XPolyKinds
 import GHC.Exts
 
 putStrLn "-fno-print-explicit-runtime-reps"

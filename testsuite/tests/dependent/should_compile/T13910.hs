@@ -7,7 +7,8 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE TypeOperators #-}
 module T13910 where
 
@@ -17,7 +18,7 @@ import Data.Type.Equality
 data family Sing (a :: k)
 
 class SingKind k where
-  type Demote k = (r :: *) | r -> k
+  type Demote k = (r :: Type) | r -> k
   fromSing :: Sing (a :: k) -> Demote k
   toSing   :: Demote k -> SomeSing k
 
@@ -33,8 +34,8 @@ withSomeSing x f =
   case toSing x of
     SomeSing x' -> f x'
 
-data TyFun :: * -> * -> *
-type a ~> b = TyFun a b -> *
+data TyFun :: Type -> Type -> Type
+type a ~> b = TyFun a b -> Type
 infixr 0 ~>
 
 type family Apply (f :: k1 ~> k2) (x :: k1) :: k2

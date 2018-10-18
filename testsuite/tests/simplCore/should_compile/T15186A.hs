@@ -32,7 +32,7 @@ data BinomialTree (h::Height) (f :: k -> Type) :: Ctx k -> Type where
             -> !(BinomialTree ('Succ h) f x)
             -> BinomialTree h f x
 
-newtype Assignment (f :: k -> *) (ctx :: Ctx k)
+newtype Assignment (f :: k -> Type) (ctx :: Ctx k)
   = Assignment (BinomialTree 'Zero f ctx)
 
 data AssignView f ctx where

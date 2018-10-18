@@ -34,8 +34,7 @@ module RdrName (
         -- ** Destruction
         rdrNameOcc, rdrNameSpace, demoteRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
-        isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName, isStar,
-        isUniStar,
+        isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
@@ -63,7 +62,10 @@ module RdrName (
         pprNameProvenance,
         Parent(..),
         ImportSpec(..), ImpDeclSpec(..), ImpItemSpec(..),
-        importSpecLoc, importSpecModule, isExplicitItem, bestImport
+        importSpecLoc, importSpecModule, isExplicitItem, bestImport,
+
+        -- * Utils for StarIsType
+        starInfo
   ) where
 
 #include "HsVersions.h"
@@ -261,10 +263,6 @@ isExact _         = False
 isExact_maybe :: RdrName -> Maybe Name
 isExact_maybe (Exact n) = Just n
 isExact_maybe _         = Nothing
-
-isStar, isUniStar :: RdrName -> Bool
-isStar     = (fsLit "*" ==) . occNameFS . rdrNameOcc
-isUniStar = (fsLit "★" ==) . occNameFS . rdrNameOcc
 
 {-
 ************************************************************************
@@ -1277,3 +1275,87 @@ instance Outputable ImportSpec where
 pprLoc :: SrcSpan -> SDoc
 pprLoc (RealSrcSpan s)    = text "at" <+> ppr s
 pprLoc (UnhelpfulSpan {}) = empty
+
+-- | Display info about the treatment of '*' under NoStarIsType.
+--
+-- With StarIsType, three properties of '*' hold:
+--
+--   (a) it is not an infix operator
+--   (b) it is always in scope
+--   (c) it is a synonym for Data.Kind.Type
+--
+-- However, the user might not know that he's working on a module with
+-- NoStarIsType and write code that still assumes (a), (b), and (c), which
+-- actually do not hold in that module.
+--
+-- Violation of (a) shows up in the parser. For instance, in the following
+-- examples, we have '*' not applied to enough arguments:
+--
+--   data A :: *
+--   data F :: * -> *
+--
+-- Violation of (b) or (c) show up in the renamer and the typechecker
+-- respectively. For instance:
+--
+--   type K = Either * Bool
+--
+-- This will parse differently depending on whether StarIsType is enabled,
+-- but it will parse nonetheless. With NoStarIsType it is parsed as a type
+-- operator, thus we have ((*) Either Bool). Now there are two cases to
+-- consider:
+--
+--   1. There is no definition of (*) in scope. In this case the renamer will
+--      fail to look it up. This is a violation of assumption (b).
+--
+--   2. There is a definition of the (*) type operator in scope (for example
+--      coming from GHC.TypeNats). In this case the user will get a kind
+--      mismatch error. This is a violation of assumption (c).
+--
+-- Since NoStarIsType is implied by a fairly common extension TypeOperators,
+-- the user might be working on a module with NoStarIsType unbeknownst to him.
+-- Even if the user switched off StarIsType manually, he might have forgotten
+-- about it and use '*' as 'Data.Kind.Type' out of habit.
+--
+-- Thus it is very important to give a hint whenever an assumption about '*' is
+-- violated. Unfortunately, it is somewhat difficult to deal with (c), so we
+-- limit ourselves to (a) and (b).
+--
+-- 'starInfo' generates an appropriate hint to the user depending on the
+-- extensions enabled in the module and the name that triggered the error.
+-- That is, if we have NoStarIsType and the error is related to '*' or its
+-- Unicode variant, the resulting SDoc will contain a helpful suggestion.
+-- Otherwise it is empty.
+--
+starInfo :: (Bool, Bool) -> RdrName -> SDoc
+starInfo (type_operators, star_is_type) rdr_name =
+  -- One might ask: if can use sdocWithDynFlags here, why bother to take
+  -- (type_operators, star_is_type) as input? Why not refactor?
+  --
+  -- The reason is that sdocWithDynFlags would provide DynFlags that are active
+  -- in the module that tries to load the problematic definition, not
+  -- in the module that is being loaded.
+  --
+  -- So if we have 'data T :: *' in a module with NoStarIsType, then the hint
+  -- must be displayed even if we load this definition from a module (or GHCi)
+  -- with StarIsType enabled!
+  --
+  if isUnqualStar && not star_is_type
+     then text "With NoStarIsType" <>
+          (if type_operators
+              then text " (implied by TypeOperators), "
+              else text ", ") <>
+          quotes (ppr rdr_name) <>
+          text " is treated as a regular type operator. "
+        $$
+          text "Did you mean to use " <> quotes (text "Type") <>
+          text " from Data.Kind instead?"
+      else empty
+  where
+    -- Does rdr_name look like the user might have meant the '*' kind by it?
+    -- We focus on unqualified stars specifically, because qualified stars are
+    -- treated as type operators even under StarIsType.
+    isUnqualStar
+      | Unqual occName <- rdr_name
+      = let fs = occNameFS occName
+        in fs == fsLit "*" || fs == fsLit "★"
+      | otherwise = False

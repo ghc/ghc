@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds #-}
 module T11732b where
 
 data P1   (a :: k) = MkP1 deriving Functor

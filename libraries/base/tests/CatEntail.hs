@@ -2,11 +2,11 @@
 {-# LANGUAGE TypeOperators, KindSignatures #-}
 module CatEntail where
 import Prelude hiding (id, (.))
-import GHC.Exts (Constraint)
+import Data.Kind
 import Control.Category
 
 -- One dictionary to rule them all.
-data Dict :: Constraint -> * where
+data Dict :: Constraint -> Type where
   Dict :: ctx => Dict ctx
 
 -- Entailment.

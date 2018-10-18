@@ -2,9 +2,11 @@
 
 module ClassOperator where
 
+import Data.Kind
+
 -- | Class with fixity, including associated types
 class a ><> b where
-  type a <>< b :: *
+  type a <>< b :: Type
   data a ><< b
   (>><), (<<>) :: a -> b -> ()
 

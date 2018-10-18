@@ -277,11 +277,9 @@
                   {Name: k})))
                (HsOmega)
                ({ DumpRenamedAst.hs:12:30 }
-                (HsTyVar
+                (HsStarTy
                  (NoExt)
-                 (NotPromoted)
-                 ({ DumpRenamedAst.hs:12:30 }
-                  {Name: GHC.Types.*})))))))))
+                 (False)))))))))
          (Nothing))))]
      []
      [({ DumpRenamedAst.hs:(15,1)-(16,45) }
@@ -317,11 +315,9 @@
                    {Name: k})))
                 (HsOmega)
                 ({ DumpRenamedAst.hs:15:33 }
-                 (HsTyVar
+                 (HsStarTy
                   (NoExt)
-                  (NotPromoted)
-                  ({ DumpRenamedAst.hs:15:33 }
-                   {Name: GHC.Types.*})))))))]
+                  (False)))))))]
            (Prefix)
            (HsDataDefn
             (NoExt)
@@ -347,18 +343,12 @@
                       {Name: k})))
                    (HsOmega)
                    ({ DumpRenamedAst.hs:15:45 }
-                    (HsTyVar
+                    (HsStarTy
                      (NoExt)
-                     (NotPromoted)
-                     ({ DumpRenamedAst.hs:15:45 }
-                      {Name: GHC.Types.*})))))))
-               (HsOmega)
                ({ DumpRenamedAst.hs:15:51 }
-                (HsTyVar
+                (HsStarTy
                  (NoExt)
-                 (NotPromoted)
-                 ({ DumpRenamedAst.hs:15:51 }
-                  {Name: GHC.Types.*}))))))
+                 (False))))))
             [({ DumpRenamedAst.hs:16:3-45 }
               (ConDeclGADT
                (NoExt)

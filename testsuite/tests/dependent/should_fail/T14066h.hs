@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeInType, MonoLocalBinds #-}
+{-# LANGUAGE ScopedTypeVariables, PolyKinds, MonoLocalBinds #-}
 
 module T14066h where
 

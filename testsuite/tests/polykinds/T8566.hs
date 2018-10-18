@@ -10,10 +10,12 @@
 
 module T8566 where
 
-data U (s :: *) = forall v. AA v [U s]
+import Data.Kind (Type)
+
+data U (s :: Type) = forall v. AA v [U s]
 -- AA :: forall (s:*) (v:*). v -> [U s] -> U s
 
-data I (u :: U *) (r :: [*]) :: * where
+data I (u :: U Type) (r :: [Type]) :: Type where
    A :: I (AA t as) r                  -- Existential k
 
 -- A :: forall (u:U *) (r:[*])                  Universal
@@ -22,7 +24,7 @@ data I (u :: U *) (r :: [*]) :: * where
 --             I u r
 
 -- fs unused, but needs to be present for the bug
-class C (u :: U *) (r :: [*]) (fs :: [*]) where
+class C (u :: U Type) (r :: [Type]) (fs :: [Type]) where
    c :: I u r -> I u r
 
 -- c :: forall (u :: U *) (r :: [*]) (fs :: [*]). C u r fs => I u r -> I u r

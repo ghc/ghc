@@ -1751,14 +1751,11 @@ eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Kind constructors
 liftedTypeKindTyConKey, tYPETyConKey,
-  constraintKindTyConKey,
-  starKindTyConKey, unicodeStarKindTyConKey, runtimeRepTyConKey,
+  constraintKindTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 tYPETyConKey                            = mkPreludeTyConUnique 88
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
-starKindTyConKey                        = mkPreludeTyConUnique 93
-unicodeStarKindTyConKey                 = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
 vecElemTyConKey                         = mkPreludeTyConUnique 97
@@ -2482,5 +2479,5 @@ The following names should be considered by GHCi to be in scope always.
 pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
-    [ starKindTyConKey, liftedTypeKindTyConKey, tYPETyConKey
+    [ liftedTypeKindTyConKey, tYPETyConKey
     , runtimeRepTyConKey, liftedRepDataConKey ]

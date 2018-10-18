@@ -1,4 +1,4 @@
-:set -fprint-explicit-foralls -XKindSignatures -XExplicitNamespaces
+:set -fprint-explicit-foralls -XKindSignatures -XExplicitNamespaces -XUnicodeSyntax
 import Data.Kind (type Type)
 
 

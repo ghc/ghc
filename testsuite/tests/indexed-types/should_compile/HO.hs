@@ -3,9 +3,10 @@
 module HO where
 
 import Data.IORef
+import Data.Kind
 
-type family SMRef    (m::(* -> *)) :: * -> *
-type family SMMonad  (r::(* -> *)) :: * -> *
+type family SMRef    (m::(Type -> Type)) :: Type -> Type
+type family SMMonad  (r::(Type -> Type)) :: Type -> Type
 
 type instance SMRef   IO        = IORef
 type instance SMMonad IORef     = IO

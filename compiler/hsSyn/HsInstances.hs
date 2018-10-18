@@ -392,11 +392,6 @@ deriving instance Data thing => Data (HsWeighted GhcPs thing)
 deriving instance Data thing => Data (HsWeighted GhcRn thing)
 deriving instance Data thing => Data (HsWeighted GhcTc thing)
 
--- deriving instance (DataIdLR p p) => Data (HsAppType p)
-deriving instance Data (HsAppType GhcPs)
-deriving instance Data (HsAppType GhcRn)
-deriving instance Data (HsAppType GhcTc)
-
 -- deriving instance (DataIdLR p p) => Data (ConDeclField p)
 deriving instance Data (ConDeclField GhcPs)
 deriving instance Data (ConDeclField GhcRn)

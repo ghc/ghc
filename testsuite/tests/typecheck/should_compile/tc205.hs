@@ -4,7 +4,9 @@
 
 module ShouldCompile where
 
+import Data.Kind
+
 infix 1 `DArrowX`       -- (->) has precedence 0
 
-data DArrowX :: * -> * -> * where
+data DArrowX :: Type -> Type -> Type where
   First   :: a `DArrowX`  a' -> (a,b) `DArrowX` (a',b)

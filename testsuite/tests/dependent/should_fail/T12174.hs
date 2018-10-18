@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeInType #-}
 module T12174 where
 
 data V a

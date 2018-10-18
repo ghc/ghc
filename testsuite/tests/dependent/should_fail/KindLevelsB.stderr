@@ -1,5 +1,0 @@
-
-KindLevelsB.hs:7:13: error:
-    • Expected kind ‘A’, but ‘a’ has kind ‘*’
-    • In the first argument of ‘B’, namely ‘a’
-      In the kind ‘B a -> *’

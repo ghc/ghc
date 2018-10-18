@@ -1114,7 +1114,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   | tc `ifaceTyConHasKey` tYPETyConKey
   , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
   , rep `ifaceTyConHasKey` liftedRepDataConKey
-  = kindStar
+  = kindType
 
   | otherwise
   = getPprDebug $ \dbg ->
@@ -1224,10 +1224,8 @@ ppr_iface_tc_app pp _ tc [ty]
   | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
 
 ppr_iface_tc_app pp ctxt_prec tc tys
-  |  tc `ifaceTyConHasKey` starKindTyConKey
-  || tc `ifaceTyConHasKey` liftedTypeKindTyConKey
-  || tc `ifaceTyConHasKey` unicodeStarKindTyConKey
-  = kindStar   -- Handle unicode; do not wrap * in parens
+  | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
+  = kindType
 
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)

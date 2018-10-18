@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, PolyKinds, TypeInType, GADTs, UndecidableSuperClasses #-}
+{-# LANGUAGE RankNTypes, PolyKinds, GADTs, UndecidableSuperClasses #-}
 
 module T11520 where
 

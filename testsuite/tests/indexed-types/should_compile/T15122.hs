@@ -7,7 +7,7 @@ import Data.Kind
 import Data.Proxy
 
 data IsStar (a :: k) where
-  IsStar :: IsStar (a :: *)
+  IsStar :: IsStar (a :: Type)
 
 type family F (a :: k) :: k
 

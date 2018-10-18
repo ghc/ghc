@@ -20,6 +20,7 @@
 module T12734 where
 
 import Prelude
+import Data.Kind
 import Control.Applicative
 import Control.Monad.Fix
 import Control.Monad.Trans.Identity
@@ -30,14 +31,14 @@ import Control.Monad.IO.Class
 data A
 data B
 data Net
-data Type
+data Ty
 
 data Layer4 t l
 data TermStore
 
 -- Helpers: Stack
 
-data Stack layers (t :: * -> *) where
+data Stack layers (t :: Type -> Type) where
     SLayer :: t l -> Stack ls t -> Stack (l ': ls) t
     SNull  :: Stack '[] t
 
@@ -57,28 +58,35 @@ type TermStack t layers = Stack layers (Layer4 (Expr t layers))
 class Monad m => Constructor m t
 
 instance ( Monad m, expr ~ Expr t layers, Constructor m (TermStack t layers)
-         ) => Constructor m (Layer4 expr Type)
+         ) => Constructor m (Layer4 expr Ty)
 
 
--- HERE IS A FUNNY BEHAVIOR: the commented line raises context reduction stack overflow
-test_gr :: ( Constructor m (TermStack t layers), Inferable A layers m, Inferable B t m
-            , bind ~ Expr t layers
---        ) => m (Expr t layers)
-          ) => m bind
+-- HERE IS A FUNNY BEHAVIOR: the commented line raises context reduction stack
+-- overflow
+test_gr ::
+    ( Constructor m (TermStack t layers), Inferable A layers m, Inferable B t m
+      , bind ~ Expr t layers
+--  ) => m (Expr t layers)
+    ) => m bind
 test_gr = undefined
 
 
 -- Explicit information about a type which could be inferred
 
-class Monad m => Inferable (cls :: *) (t :: k) m | cls m -> t
+class Monad m => Inferable (cls :: Type) (t :: k) m | cls m -> t
 
-newtype KnownTypex (cls :: *) (t :: k) (m :: * -> *) (a :: *) = KnownTypex (IdentityT m a) deriving (Show, Functor, Monad, MonadIO, MonadFix, MonadTrans, Applicative, Alternative)
+newtype KnownTyx (cls :: Type) (t :: k) (m :: Type -> Type) (a :: Type) =
+    KnownTyx (IdentityT m a)
+  deriving (Show, Functor, Monad, MonadIO, MonadFix, MonadTrans,
+            Applicative, Alternative)
 
-instance {-# OVERLAPPABLE #-} (t ~ t', Monad m)                              => Inferable cls t (KnownTypex cls t' m)
-instance {-# OVERLAPPABLE #-} (Inferable cls t n, MonadTrans m, Monad (m n)) => Inferable cls t (m n)
+instance {-# OVERLAPPABLE #-} (t ~ t', Monad m) =>
+  Inferable cls t (KnownTyx cls t' m)
+instance {-# OVERLAPPABLE #-} (Inferable cls t n, MonadTrans m, Monad (m n)) =>
+  Inferable cls t (m n)
 
 
-runInferenceTx :: forall cls t m a. KnownTypex cls t m a -> m a
+runInferenceTx :: forall cls t m a. KnownTyx cls t m a -> m a
 runInferenceTx = undefined
 
 
@@ -86,7 +94,7 @@ runInferenceTx = undefined
 -- running it
 
 test_ghc_err :: (MonadIO m, MonadFix m)
-        => m (Expr Net '[Type])
+        => m (Expr Net '[Ty])
 test_ghc_err = runInferenceTx @B  @Net
-             $ runInferenceTx @A @'[Type]
+             $ runInferenceTx @A @'[Ty]
              $ (test_gr)

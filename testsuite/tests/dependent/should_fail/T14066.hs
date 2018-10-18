@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeInType #-}
-{-# LANGUAGE KindSignatures #-}
+
+
 
 module T14066 where
 

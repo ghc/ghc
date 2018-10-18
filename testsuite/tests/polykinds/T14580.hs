@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, DataKinds, TypeInType, TypeOperators #-}
+{-# LANGUAGE PolyKinds, DataKinds, TypeOperators #-}
 module T14580 where
 import Data.Kind
 

@@ -1,4 +1,6 @@
-{-# Language PatternSynonyms, ViewPatterns, GADTs, ConstraintKinds, RankNTypes, KindSignatures, PolyKinds, ScopedTypeVariables, DataKinds, TypeInType, TypeOperators, TypeApplications, TypeFamilies, TypeFamilyDependencies #-}
+{-# Language PatternSynonyms, ViewPatterns, GADTs, ConstraintKinds, RankNTypes,
+             PolyKinds, ScopedTypeVariables, DataKinds, TypeOperators,
+             TypeApplications, TypeFamilies, TypeFamilyDependencies #-}
 
 module T14507 where
 

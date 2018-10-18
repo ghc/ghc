@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 module Bug where
 
 import Data.Kind

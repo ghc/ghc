@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, GADTs, DataKinds, TypeOperators #-}
+{-# LANGUAGE KindSignatures, GADTs, DataKinds #-}
 module Foo where
 
 data Foo1 :: [*] -> * where

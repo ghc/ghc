@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, TypeFamilies, GADTs, ConstraintKinds #-}
+{-# LANGUAGE DataKinds, PolyKinds, TypeFamilies, GADTs, ConstraintKinds #-}
 
 module T12919 where
 

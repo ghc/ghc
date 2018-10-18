@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, PolyKinds, TypeInType #-}
+{-# LANGUAGE RankNTypes, PolyKinds #-}
 -- NB: -fprint-explicit-runtime-reps enabled in all.T
 
 module TypeSkolEscape where

@@ -778,7 +778,7 @@ kcConDecl (ConDeclGADT { con_names = names
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
     discardResult $
-    kcImplicitTKBndrs implicit_tkv_nms Nothing $
+    kcImplicitTKBndrs implicit_tkv_nms $
     kcExplicitTKBndrs explicit_tkv_nms $
     do { _ <- tcHsMbContext cxt
        ; mapM_ (tcHsOpenType . getBangType . hsThing) (hsConDeclArgTys args)
@@ -1023,7 +1023,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info, fdLName = tc_lname@(L _ tc_na
   -- Data families might have a variable return kind.
   -- See See Note [Arity of data families] in FamInstEnv.
   ; (extra_binders, final_res_kind) <- tcDataKindSig binders res_kind
-  ; checkTc (tcIsStarKind final_res_kind
+  ; checkTc (tcIsLiftedTypeKind final_res_kind
              || isJust (tcGetCastedTyVar_maybe final_res_kind))
             (badKindSig False res_kind)
 
@@ -1175,7 +1175,7 @@ tcDataDefn roles_info
        ; let hsc_src = tcg_src tcg_env
        ; (extra_bndrs, final_res_kind) <- tcDataKindSig tycon_binders res_kind
        ; unless (mk_permissive_kind hsc_src cons) $
-         checkTc (tcIsStarKind final_res_kind) (badKindSig True res_kind)
+         checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
 
        ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
              roles        = roles_info tc_name
@@ -1567,7 +1567,7 @@ kcFamTyPats :: TcTyCon
             -> TcM ()
 kcFamTyPats tc_fam_tc tv_names arg_pats kind_checker
   = discardResult $
-    kcImplicitTKBndrs tv_names Nothing $
+    kcImplicitTKBndrs tv_names $
     do { let loc     = nameSrcSpan name
              lhs_fun = L loc (HsTyVar noExt NotPromoted (L loc name))
                -- lhs_fun is for error messages only
@@ -2677,32 +2677,6 @@ checkValidDataCon dflags existential_ok tc con
         ; checkTc (existential_ok || isVanillaDataCon con)
                   (badExistential con)
 
-        ; typeintype <- xoptM LangExt.TypeInType
-        ; let (_, _, eq_specs, _, _, _) = dataConFullSig con
-                -- dataConEqSpec retrieves both the real GADT equalities
-                -- plus any user-written GADT-like equalities. But we don't
-                -- want anything user-written. If we don't exclude user-written
-                -- ones, test case polykinds/T13391a fails.
-
-              invisible_gadt_eq_specs = filter is_invisible_eq_spec eq_specs
-              univ_tvs = dataConUnivTyVars con
-              tc_bndrs = tyConBinders tc
-
-              vis_map :: VarEnv ArgFlag
-              vis_map = zipVarEnv univ_tvs (map tyConBinderArgFlag tc_bndrs)
-
-                -- See Note [Wrong visibility for GADTs] for why we have to build the map
-                -- above instead of just looking at the datacon tyvar binder
-              is_invisible_eq_spec eq_spec
-                = isInvisibleArgFlag arg_flag
-                where
-                  eq_tv    = eqSpecTyVar eq_spec
-                  arg_flag = expectJust "checkValidDataCon" $
-                             lookupVarEnv vis_map eq_tv
-
-        ; checkTc (typeintype || null invisible_gadt_eq_specs)
-                  (badGADT con invisible_gadt_eq_specs)
-
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
@@ -3510,15 +3484,6 @@ badExistential con
                 text "has existential type variables, a context, or a specialised result type")
        2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
                , parens $ text "Enable ExistentialQuantification or GADTs to allow this" ])
-
-badGADT :: DataCon -> [EqSpec] -> SDoc
-badGADT con eq_specs
-  = hang (text "Data constructor" <+> quotes (ppr con) <+>
-               text "constrains the choice of kind parameter" <> plural eq_specs <> colon)
-       2 (vcat (map ppr_eq_spec eq_specs)) $$
-    text "Use TypeInType to allow this"
-  where
-    ppr_eq_spec eq_spec = ppr (eqSpecTyVar eq_spec) <+> char '~' <+> ppr (eqSpecType eq_spec)
 
 badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name

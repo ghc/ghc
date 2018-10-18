@@ -4,13 +4,14 @@
 module T9747 where
 import Data.List (intercalate)
 import Data.Proxy
-import GHC.Exts (Constraint)
+import Data.Kind (Type, Constraint)
 
-data HList :: [*] -> * where
+data HList :: [Type] -> Type where
   Nil :: HList '[]
   Cons :: a -> HList as -> HList (a ': as)
 
-type family HListAll (c :: * -> Constraint) (ts :: [*]) :: Constraint where
+type family HListAll (c :: Type -> Constraint)
+                     (ts :: [Type]) :: Constraint where
   HListAll c '[] = ()
   HListAll c (t ': ts) = (c t, HListAll c ts)
 
@@ -27,7 +28,7 @@ test = showHList (Cons (2::Int)
                  (Cons (3.1 :: Float)
                  (Cons 'c' Nil)))
 
-type family ConFun (t :: *) :: * -> Constraint
+type family ConFun (t :: Type) :: Type -> Constraint
 data Tag
 type instance ConFun Tag = Group
 

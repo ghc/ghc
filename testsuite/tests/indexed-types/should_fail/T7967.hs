@@ -1,21 +1,23 @@
 {-# LANGUAGE TypeFamilies, DataKinds, TypeOperators, GADTs #-}
 module T7967 where
 
+import Data.Kind (Type)
+
 data Nat = Zero | Succ Nat
 
-data SNat :: Nat -> * where
+data SNat :: Nat -> Type where
   SZero :: SNat Zero
   SSucc :: SNat n -> SNat (Succ n)
 
-data HList :: [*] -> * where
+data HList :: [Type] -> Type where
   HNil :: HList '[]
   HCons :: h -> HList t -> HList (h ': t)
 
-data Index :: Nat -> [*] -> * where
+data Index :: Nat -> [Type] -> Type where
   IZero :: Index Zero (h ': t)
   ISucc :: Index n l -> Index (Succ n) (h ': l)
 
-type family Lookup (n :: Nat) (l :: [*]) :: *
+type family Lookup (n :: Nat) (l :: [Type]) :: Type
 type instance Lookup Zero (h ': t) = h
 type instance Lookup (Succ n) (h ': t) = Lookup n t
 

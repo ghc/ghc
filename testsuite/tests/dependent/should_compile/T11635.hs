@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, KindSignatures, ExplicitForAll, RankNTypes #-}
+{-# LANGUAGE PolyKinds, KindSignatures, ExplicitForAll, RankNTypes #-}
 
 module T11635 where
 

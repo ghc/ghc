@@ -204,7 +204,7 @@ and it not straightforward to implement, because by the time we see
 the problem, simplifyInfer has already skolemised 's'.)
 
 This stuff can only happen in the presence of view patterns, with
-TypeInType, so it's a bit of a corner case.
+PolyKinds, so it's a bit of a corner case.
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

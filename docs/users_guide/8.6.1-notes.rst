@@ -28,6 +28,19 @@ Full details
 
 Language
 ~~~~~~~~
+
+- Use of quantified type variables in constraints is now allowed via the
+  :extension:`QuantifiedConstraints` language extension. This long-awaited feature
+  enables users to encode significantly more precision in their types. For instance,
+  the common ``MonadTrans`` typeclass could now make the expectation that an
+  applied transformer is must be a ``Monad`` ::
+
+      class (forall a. Monad m => Monad (t m)) => MonadTrans t where {- ... -}
+
+  Additionally, quantification can enable terminating instance resolution
+  where this previously was not possible. See :ref:`quantified-constraints` for
+  details.
+
 - A new :extension:`DerivingVia` language extension has been added which allows
   the use of the ``via`` deriving strategy. For instance: ::
 
@@ -35,6 +48,11 @@ Language
       deriving Monoid via (Sum Int)
 
   See :ref:`deriving-via` for more information.
+
+- A new :extension:`StarIsType` language extension has been added which controls
+  whether ``*`` is parsed as ``Data.Kind.Type`` or a regular type operator.
+  :extension:`StarIsType` is enabled by default and disabled by
+  :extension:`TypeOperators`.
 
 - GHC now permits the use of a wildcard type as the context of a standalone
   ``deriving`` declaration with the use of the
@@ -85,24 +103,27 @@ Language
   See :ref:`Numeric underscores <numeric-underscores>`
   for the full details.
 
-- GHC is now more diligent about catching illegal uses of kind polymorphism.
-  For instance, this used to be accepted without :extension:`PolyKinds`: ::
+- CUSKs now require all kind variables to be explicitly quantified. This was
+  already the case with :extension:`TypeInType`, but now :extension:`PolyKinds`
+  also exhibits this behavior. This means that the following example is no
+  longer considered to have a CUSK::
 
-    class C a where
-      c :: Proxy (x :: a)
+   data T1 :: k -> Type       -- No CUSK: `k` is not explicitly quantified
 
-  Despite the fact that ``a`` is used as a kind variable in the type signature
-  for ``c``. This is now an error unless :extension:`PolyKinds` is explicitly
-  enabled.
+- Functionality of :extension:`TypeInType` has been subsumed by
+  :extension:`PolyKinds`, and it is now merely a shorthand for
+  :extension:`PolyKinds`, :extension:`DataKinds`, and :extension:`NoStarIsType`.
+  The users are advised to avoid :extension:`TypeInType` due to its misleading
+  name: the ``Type :: Type`` axiom holds regardless of whether it is enabled.
 
-  Moreover, GHC 8.4 would accept the following without the use of
-  :extension:`TypeInType` (or even :extension:`PolyKinds`!): ::
+- GHC has become more diligent about catching illegal uses of kind polymorphism.
+  For instance, GHC 8.4 would accept the following without the use of
+  :extension:`PolyKinds`::
 
     f :: forall k (a :: k). Proxy a
     f = Proxy
 
-  Despite the fact that ``k`` is used as both a type and kind variable. This is
-  now an error unless :extension:`TypeInType` is explicitly enabled.
+  This is now an error unless :extension:`PolyKinds` is enabled.
 
 Compiler
 ~~~~~~~~
