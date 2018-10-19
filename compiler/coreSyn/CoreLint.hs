@@ -950,7 +950,7 @@ checkLinearity body_ue lam_var =
   case varWeightednessMaybe lam_var of
     Just (Regular mult) -> do
       ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
-      return $ deleteUE lam_var body_ue
+      return $ deleteUE body_ue lam_var
     Just Alias -> return body_ue -- aliases do not generate multiplicity constraints
     Nothing   -> return body_ue -- A type variable
   where
@@ -1101,7 +1101,7 @@ checkCaseLinearity :: UsageEnv -> Var ->  Rig -> Var -> LintM UsageEnv
 checkCaseLinearity ue scrut var_w bndr = do
   ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
-  return $ deleteUE bndr ue
+  return $ deleteUE ue bndr
   where
     lhs = bndr_usage + (scrut_usage * var_w)
     rhs = scrut_w * var_w
@@ -1256,7 +1256,7 @@ lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
     rhs_ue <- lintAltExpr rhs alt_ty ;
 --    ; pprTrace "lintCoreAlt" (ppr weights $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
     ; rhs_ue' <- addLoc (CasePat alt) (lintAltBinders rhs_ue scrut scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
-    return $ deleteUE scrut rhs_ue'
+    return $ deleteUE rhs_ue' scrut
     } }
 
   | otherwise   -- Scrut-ty is wrong shape

@@ -618,7 +618,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
                      text "of variable" <+> quotes (ppr x) <+>
                      text "with actual weight" <+> quotes (ppr actual_w)
           -- In case of error, recover by pretending that the weight usage was correct
-      return $ deleteUE x uenv
+      return $ deleteUE uenv x
 
 
 

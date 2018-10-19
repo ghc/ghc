@@ -60,30 +60,31 @@ supUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
   plusNameEnv_CD sup e1 Zero e2 Zero
 
 supUEs :: [UsageEnv] -> UsageEnv
-supUEs [] = zeroUE -- TODO: arnaud: this is incorrect, it should be the bottom
-                   -- usage env, but I haven't defined it yet. Then we could use
-                   -- a foldr and wouldn't need to special-case the empty list
-                   -- as currently.
+supUEs [] = zeroUE -- This is incorrect, it should be the bottom usage env, but
+                   -- it isn't defined yet. Then we could use a foldr and
+                   -- wouldn't need to special-case the empty list as
+                   -- currently. As a consequence empty cases do not have the
+                   -- right typing rule. This should be easier to solve after
+                   -- inference is implemented.
 supUEs l = foldr1 supUE l
 
--- TODO: arnaud: both delete function: unify argument order with existing similar functions.
 -- | @deleteUEAsserting w x env@ deletes the binding to @x@ in @env@ under one
 -- condition: if @x@ is bound to @w'@ in @env@, then @w'@ must be a subweight of
 -- @w@, if @x@ is not bound in @env@ then 'Zero' must be a subweight of @W@. If
 -- the condition is not met, then @Nothing@ is returned.
-deleteUEAsserting :: Rig -> Name -> UsageEnv -> Maybe UsageEnv
-deleteUEAsserting w x (UsageEnv e) | Just w' <- lookupNameEnv e x = do
+deleteUEAsserting :: UsageEnv -> Rig -> Name -> Maybe UsageEnv
+deleteUEAsserting (UsageEnv e) w x | Just w' <- lookupNameEnv e x = do
   guard (subweight w' w)
   return $ UsageEnv (delFromNameEnv e x)
-deleteUEAsserting w _x (UsageEnv e) = do
+deleteUEAsserting (UsageEnv e) w _x = do
   guard (subweight Zero w)
   return $ UsageEnv e
 
-deleteUE :: NamedThing n => n -> UsageEnv -> UsageEnv
-deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e (getName x)
+deleteUE :: NamedThing n => UsageEnv -> n -> UsageEnv
+deleteUE (UsageEnv e) x = UsageEnv $ delFromNameEnv e (getName x)
 
-deleteListUE :: NamedThing n => [n] -> UsageEnv -> UsageEnv
-deleteListUE xs e = foldl' (flip deleteUE) e xs
+deleteListUE :: NamedThing n => UsageEnv -> [n] -> UsageEnv
+deleteListUE e xs = foldl' deleteUE e xs
 
 
 -- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
