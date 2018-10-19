@@ -961,7 +961,7 @@ dsDo stmts
                         , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt (Omega, bind_ty) (mkBigLHsPatTupId later_pats) -- TODO: arnaud: I'm not sure what is being desugared here.
+        new_bind_stmt = L loc $ BindStmt (Omega, bind_ty) (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
 
