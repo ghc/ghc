@@ -67,6 +67,7 @@ module HscMain
     , hscDecls, hscParseDeclsWithLocation, hscDeclsWithLocation, hscParsedDecls
     , hscTcExpr, TcRnExprMode(..), hscImport, hscKcType
     , hscParseExpr
+    , hscParseType
     , hscCompileCoreExpr
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
@@ -113,6 +114,7 @@ import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
 import TcRnMonad
+import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
 import NameCache        ( initNameCache )
 import LoadIface        ( ifaceStats, initExternalPackageState )
 import PrelInfo
@@ -1761,7 +1763,7 @@ hscKcType
 hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env normalise ty
+    ioMsgMaybe $ tcRnType hsc_env DefaultFlexi normalise ty
 
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do

@@ -107,6 +107,11 @@ Compiler
   only convenient workaround was to enable `-fobject-code` for all
   modules.
 
+GHCi
+~~~~
+
+- Added a command `:instances` to show the class instances available for a type.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
