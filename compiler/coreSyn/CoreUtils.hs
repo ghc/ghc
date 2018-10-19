@@ -1554,15 +1554,15 @@ app_ok primop_ok fun args
               -- Often there is a literal divisor, and this
               -- can get rid of a thunk in an inner loop
 
-        | SeqOp <- op    -- See Note [seq# and expr_ok]
+        | SeqOp <- op       -- See Note [Evaluating primops and expr_ok]
         -> all (expr_ok primop_ok) args
 
-        | DataToTagOp <- op
-        -> False -- all (expr_ok primop_ok) args
+        | DataToTagOp <- op -- See Note [Evaluating primops and expr_ok]
+        -> all (expr_ok primop_ok) args
 
         | otherwise
         -> primop_ok op  -- Check the primop itself
-        && and (zipWith arg_ok arg_tys args)  -- Check the arguments
+        && and (zipWith primop_arg_ok arg_tys args)  -- Check the arguments
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
@@ -1573,9 +1573,9 @@ app_ok primop_ok fun args
   where
     (arg_tys, _) = splitPiTys (idType fun)
 
-    arg_ok :: TyBinder -> CoreExpr -> Bool
-    arg_ok (Named _) _ = True   -- A type argument
-    arg_ok (Anon ty) arg        -- A term argument
+    primop_arg_ok :: TyBinder -> CoreExpr -> Bool
+    primop_arg_ok (Named _) _ = True   -- A type argument
+    primop_arg_ok (Anon ty) arg        -- A term argument
        | isUnliftedType ty = expr_ok primop_ok arg
        | otherwise         = True  -- See Note [Primops with lifted arguments]
 
@@ -1701,26 +1701,28 @@ and do not perform evaluation.
 
 Bottom line:
   * in exprOkForSpeculation we simply ignore all lifted arguments.
-  * except see Note [seq# and expr_ok] for an exception
+  * except see Note [Evaluating primops and expr_ok] for an exception
 
 
-Note [seq# and expr_ok]
-~~~~~~~~~~~~~~~~~~~~~~~
+Note [Evaluating primops and expr_ok]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Recall that
    seq# :: forall a s . a -> State# s -> (# State# s, a #)
-must always evaluate its first argument.  So it's really a
-counter-example to Note [Primops with lifted arguments]. In
-the case of seq# we must check the argument to seq#.  Remember
-item (d) of the specification of exprOkForSpeculation:
+and
+  dataToTag# :: forall a . a -> Int#
+must always evaluate their first argument.  So they're really counter-examples
+to Note [Primops with lifted arguments]. In the case of seq# and dataToTag# we
+must check the arguments. Remember item (d) of the specification of
+exprOkForSpeculation:
 
   -- Precisely, it returns @True@ iff:
   --  a) The expression guarantees to terminate,
          ...
   --  d) without throwing a Haskell exception
 
-The lack of this special case caused Trac #5129 to go bad again.
-See comment:24 and following
-
+The lack of this special case caused Trac #5129 to go bad again. See comment:24
+and following. We started treating dataToTag# the same way in #15696, see
+comment:60 and following.
 
 ************************************************************************
 *                                                                      *

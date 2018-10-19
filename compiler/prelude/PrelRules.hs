@@ -1097,7 +1097,7 @@ Implementing seq#.  The compiler has magic for SeqOp in
 - StgCmmExpr.cgExpr, and cgCase: special case for seq#
 
 - CoreUtils.exprOkForSpeculation;
-  see Note [seq# and expr_ok] in CoreUtils
+  see Note [Evaluating primops and expr_ok] in CoreUtils
 
 - Simplify.addEvals records evaluated-ness for the result; see
   Note [Adding evaluatedness info to pattern-bound variables]
