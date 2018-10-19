@@ -18,7 +18,7 @@ aliases:
     # ideally we would simply set THREADS here instead of re-detecting it every
     # time we need it below. Unfortunately, there is no way to set an environment
     # variable with the result of a shell script.
-    SKIP_PERF_TESTS: YES
+    SKIP_PERF_TESTS: NO
     VERBOSE: 2
   - &boot
     run:
@@ -32,6 +32,12 @@ aliases:
         include mk/flavours/\$(BuildFlavour).mk
         endif
         EOF
+  - &set_git_identity
+      run:
+        name: Set Git Identity
+        command: |
+          git config user.email "ghc-circleci@haskell.org"
+          git config user.name "GHC CircleCI"
   - &configure_unix
     run:
       name: Configure
@@ -59,15 +65,44 @@ aliases:
       command: |
         cabal update
         hadrian/build.sh -j`mk/detect-cpu-count.sh`
+
+
+  - &test_push
+    run:
+      name: Test Push
+      command: |
+        # Add git.haskell.org as a known host.
+        echo "|1|F3mPVCE55+KfApNIMYQ3Dv39sGE=|1bRkvJEJhAN2R0LE/lAjFCEJGl0= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBUZS9jGBkE5UzpSo6irnIgcQcfzvbuIOsFc8+N61FwtZncRntbaKPuUimOFPgeaUZLl6Iajz6IIs7aduU0/v+I=" >> ~/.ssh/known_hosts
+        echo "|1|2VUMjYSRVpT2qJPA0rA9ap9xILY=|5OThkI4ED9V0J+Es7D5FOD55Klk= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+3TLluLAO4lkW60W+N2DFkS+WoRFGqLwHzgd1ifxG9TIm31wChPY3E/hgMnJmgGqWCF4UDUemmyCycEaL7FtKfzjTAclg9EfpQnozyE3T5hIo2WL7SN5O8ttG/bYGuDnn14jLnWwJyN4oz/znWFiDG9e2Oc9YFNlQ+PK8ae5xR4gqBB7EOoj9J1EiPqG2OXRr5Mei3TLsRDU6fnz/e4oFJpKWWeN6M63oePv0qoaGjxcrATZUWsuWrxVMmYo9kP1xRuFJbAUw2m4uVP+793SW1zxySi1HBMtJG+gCDdZZSwYbkV1hassLWBHv1qPttncfX8Zek3Z3VolaTmfWJTo9" >> ~/.ssh/known_hosts
+
+        # Make fake note.
+        git notes --ref notes_test add -m "Test01" HEAD
+
+        # Push the git notes.
+        git push git@git.haskell.org:ghc refs/notes/notes_test
+
+
+
+
   - &test
     run:
       name: Test
       command: |
         mkdir -p test-results
-        make test THREADS=`mk/detect-cpu-count.sh` SKIP_PERF_TESTS=YES JUNIT_FILE=../../test-results/junit.xml
+        make test                  TEST="T8766"                              THREADS=`mk/detect-cpu-count.sh` SKIP_PERF_TESTS=$SKIP_PERF_TESTS TEST_ENV=$TEST_ENV JUNIT_FILE=../../test-results/junit.xml
   - &store_test_results
     store_test_results:
       path: test-results
+  - &push_perf_note
+    run:
+      name: Push Performance Git Notes
+      command: |
+        # Add git.haskell.org as a known host.
+        echo "|1|F3mPVCE55+KfApNIMYQ3Dv39sGE=|1bRkvJEJhAN2R0LE/lAjFCEJGl0= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBUZS9jGBkE5UzpSo6irnIgcQcfzvbuIOsFc8+N61FwtZncRntbaKPuUimOFPgeaUZLl6Iajz6IIs7aduU0/v+I=" >> ~/.ssh/known_hosts
+        echo "|1|2VUMjYSRVpT2qJPA0rA9ap9xILY=|5OThkI4ED9V0J+Es7D5FOD55Klk= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+3TLluLAO4lkW60W+N2DFkS+WoRFGqLwHzgd1ifxG9TIm31wChPY3E/hgMnJmgGqWCF4UDUemmyCycEaL7FtKfzjTAclg9EfpQnozyE3T5hIo2WL7SN5O8ttG/bYGuDnn14jLnWwJyN4oz/znWFiDG9e2Oc9YFNlQ+PK8ae5xR4gqBB7EOoj9J1EiPqG2OXRr5Mei3TLsRDU6fnz/e4oFJpKWWeN6M63oePv0qoaGjxcrATZUWsuWrxVMmYo9kP1xRuFJbAUw2m4uVP+793SW1zxySi1HBMtJG+gCDdZZSwYbkV1hassLWBHv1qPttncfX8Zek3Z3VolaTmfWJTo9" >> ~/.ssh/known_hosts
+
+        # Push the git notes.
+        git push git@git.haskell.org:ghc refs/notes/perf
   - &slowtest
     run:
       name: Full Test
@@ -102,17 +137,28 @@ jobs:
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux
+      TEST_ENV: x86_64-linux
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
       - *configure_unix
-      - *make
-      - *bindist
-      - *storeartifacts
-      - *test
-      - *store_test_results
+      #
+      #
+      #
+      #
+      - *test_push
+      #
+      #
+      #
+      #- *make
+      #- *bindist
+      #- *storeartifacts
+      #- *test
+      #- *store_test_results
+      #- *push_perf_note
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
@@ -122,8 +168,10 @@ jobs:
       TARGET: FreeBSD
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-freebsd
+      TEST_ENV: x86_64-freebsd
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -133,6 +181,7 @@ jobs:
       - *storeartifacts
       - *test
       - *store_test_results
+      - *push_perf_note
 
   "validate-x86_64-darwin":
     macos:
@@ -145,8 +194,10 @@ jobs:
       ac_cv_func_clock_gettime: "no"
       GHC_COLLECTOR_FLAVOR: x86_64-darwin
       <<: *buildenv
+      TEST_ENV: x86_64-darwin
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -156,6 +207,7 @@ jobs:
       - *storeartifacts
       - *test
       - *store_test_results
+      - *push_perf_note
 
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
@@ -165,6 +217,7 @@ jobs:
       <<: *buildenv
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -177,8 +230,10 @@ jobs:
       - image: ghcci/x86_64-linux:0.0.4
     environment:
       <<: *buildenv
+      TEST_ENV: x86_64-linux-unreg
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -186,6 +241,7 @@ jobs:
       - *make
       - *test
       - *store_test_results
+      - *push_perf_note
 
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
@@ -194,6 +250,7 @@ jobs:
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
+      TEST_ENV: x86_64-linux-llvm
     steps:
       - run:
           name: Install LLVM
@@ -204,12 +261,14 @@ jobs:
           name: Verify that llc works
           command: llc
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
       - *configure_unix
       - *make
       - *test
+      - *push_perf_note
 
   # Nightly build with -DDEBUG using devel2 flavour
   "validate-x86_64-linux-debug":
@@ -219,8 +278,11 @@ jobs:
     environment:
       BUILD_FLAVOUR: devel2
       <<: *buildenv
+      TEST_ENV: x86_64-linux-debug
+      SKIP_PERF_TESTS: YES
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -228,6 +290,7 @@ jobs:
       - *make
       - *test
       - *store_test_results
+      - *push_perf_note
 
   "validate-i386-linux":
     resource_class: xlarge
@@ -236,8 +299,10 @@ jobs:
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: i386-linux
+      TEST_ENV: i386-linux
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -247,6 +312,7 @@ jobs:
       - *storeartifacts
       - *test
       - *store_test_results
+      - *push_perf_note
 
   "validate-x86_64-fedora":
     resource_class: xlarge
@@ -255,8 +321,10 @@ jobs:
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-fedora
+      TEST_ENV: x86_64-fedora
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
@@ -266,6 +334,7 @@ jobs:
       - *storeartifacts
       - *test
       - *store_test_results
+      - *push_perf_note
 
   "slow-validate-x86_64-linux":
     resource_class: xlarge
@@ -273,15 +342,18 @@ jobs:
       - image: ghcci/x86_64-linux:0.0.4
     environment:
       <<: *buildenv
+      TEST_ENV: slow-x86_64-linux
       GHC_COLLECTOR_FLAVOR: x86_64-linux
     steps:
       - checkout
+      - *set_git_identity
       - *prepare
       - *submodules
       - *boot
       - *configure_unix
       - *make
       - *slowtest
+      - *push_perf_note
 
 workflows:
   version: 2
@@ -291,28 +363,28 @@ workflows:
         *trigger_on_tags
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
-    - validate-x86_64-darwin:
-        *trigger_on_tags
-    - validate-x86_64-linux-llvm
-    - validate-i386-linux:
-        *trigger_on_tags
-    - validate-hadrian-x86_64-linux
-    - validate-x86_64-fedora:
-        *trigger_on_tags
-
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-    - validate-x86_64-linux-unreg
-    - validate-x86_64-linux-llvm
-    - validate-x86_64-linux-debug
-    - slow-validate-x86_64-linux
+#    - validate-x86_64-darwin:
+#        *trigger_on_tags
+#    - validate-x86_64-linux-llvm
+#    - validate-i386-linux:
+#        *trigger_on_tags
+#    - validate-hadrian-x86_64-linux
+#    - validate-x86_64-fedora:
+#        *trigger_on_tags
+#
+#  nightly:
+#    triggers:
+#      - schedule:
+#          cron: "0 0 * * *"
+#          filters:
+#            branches:
+#              only:
+#                - master
+#    jobs:
+#    - validate-x86_64-linux-unreg
+#    - validate-x86_64-linux-llvm
+#    - validate-x86_64-linux-debug
+#    - slow-validate-x86_64-linux
 
 notify:
   webhooks:

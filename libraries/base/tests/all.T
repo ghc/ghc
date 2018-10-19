@@ -176,12 +176,7 @@ test('topHandler04',
 
 
 test('T8766',
-        [ stats_num_field('bytes allocated',
-                          [ (wordsize(64), 16828144, 5)
-	# with GHC-7.6.3: 83937384 (but faster execution than the next line)
-	# before:         58771216 (without call-arity-analysis)
-	# expected value: 16828144 (2014-01-14)
-                          , (wordsize(32), 8433644, 5) ])
+        [ collect_stats('bytes allocated',5)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -208,9 +203,7 @@ test('T8089',
 test('T8684', expect_broken(8684), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
-        [ stats_num_field('bytes allocated',
-                          [ (wordsize(64), 51840, 20)
-                          , (wordsize(32), 47348, 20) ])
+        [ collect_stats('bytes allocated')
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -223,10 +216,7 @@ test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', req_smp, compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
 test('T13191',
-        [ stats_num_field('bytes allocated',
-                          [ (wordsize(64), 185943272, 5) ])
-        # with GHC-8.1 before liftA2 change: 325065128
-        # GHC-8.1 with custom liftA2:        185943272
+        [ collect_stats('bytes allocated', 5)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -234,7 +224,7 @@ test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
-     [stats_num_field('max_bytes_used', [ (wordsize(64), 44504, 5) ]),
+     [collect_stats('max_bytes_used',5),
       only_ways(['normal'])],
      compile_and_run, ['-O'])
 test('T14425', normal, compile_and_run, [''])
