@@ -219,6 +219,8 @@ module GHC (
         Kind,
         PredType,
         ThetaType, pprForAll, pprThetaArrowTy,
+        parseType,
+        getInstancesForType,
 
         -- ** Entities
         TyThing(..),
