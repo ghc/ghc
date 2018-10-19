@@ -67,6 +67,11 @@ Compiler
   `copyByteArray#` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
 
+GHCi
+~~~~
+
+- Added a command `:instances` to show the class instances available for a type.
+
 Runtime system
 ~~~~~~~~~~~~~~
 

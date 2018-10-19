@@ -21,7 +21,7 @@ module InstEnv (
         emptyInstEnv, extendInstEnv,
         deleteFromInstEnv, deleteDFunFromInstEnv,
         identicalClsInstHead,
-        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts,
+        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts, instEnvClasses,
         memberInstEnv,
         instIsVisible,
         classInstances, instanceBindFun,
@@ -426,6 +426,9 @@ emptyInstEnv = emptyUDFM
 instEnvElts :: InstEnv -> [ClsInst]
 instEnvElts ie = [elt | ClsIE elts <- eltsUDFM ie, elt <- elts]
   -- See Note [InstEnv determinism]
+
+instEnvClasses :: InstEnv -> [Class]
+instEnvClasses ie = [is_cls e | ClsIE (e : _) <- eltsUDFM ie]
 
 -- | Test if an instance is visible, by checking that its origin module
 -- is in 'VisibleOrphanModules'.
