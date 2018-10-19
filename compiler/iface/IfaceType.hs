@@ -983,7 +983,8 @@ eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
 
 eliminateMultiplicity :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateMultiplicity f ty = sdocWithDynFlags $ \dflags ->
-    -- TODO: MattP make my own flag
+    -- For the time being, printing multiplicities piggybacks on the
+    -- print-explicit-runtime-reps flag. But will eventually get its own flag.
     if gopt Opt_PrintExplicitRuntimeReps dflags
       then f ty
       else getPprStyle $ \sty -> f (defaultMultiplicityVars sty ty)

@@ -99,10 +99,6 @@ otherwise, make one up.
 
 selectSimpleMatchVarL :: Rig -> LPat GhcTc -> DsM Id
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
--- TODO: MattP: This function is used in a few places where is might be
--- necessary to take into account multiplicity but it wasn't on the
--- critical path to fix for now.
-
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,

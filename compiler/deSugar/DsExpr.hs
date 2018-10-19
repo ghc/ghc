@@ -216,7 +216,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
                              eqn_rhs = cantFailMatchResult body }
-       ; var    <- selectMatchVar Omega upat -- TODO: MattP
+       ; var    <- selectMatchVar Omega upat
        ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
        ; return (bindNonRec var rhs result) }
 
@@ -611,7 +611,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                                       (MG { mg_alts = noLoc alts
                                           , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
                                           , mg_origin = FromSource
-                                          }) -- MattP: TODO Check this multiplicity
+                                          })
                                      -- FromSource is not strictly right, but we
                                      -- want incomplete pattern-match warnings
 
@@ -669,8 +669,6 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                                       | (tv, ty) <- univ_tvs `zip` out_inst_tys
                                       , not (tv `elemVarEnv` wrap_subst) ]
                         <.> mkWpTyApps [omegaDataConTy]
-                  -- TODO: This looks very dodgy MattP, need to treat this
-                  -- uniformly like ex_tvs probably?
 
                  rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
 
@@ -943,7 +941,6 @@ dsDo stmts
                                                        body']
                       , mg_ext = MatchGroupTc (map unrestricted arg_tys) body_ty
                       , mg_origin = Generated }
-                      -- TODO: MattP: Check this multiplicity
 
            ; fun' <- dsLExpr fun
            ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
@@ -976,7 +973,6 @@ dsDo stmts
                                                     LambdaExpr
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
-                               -- TODO: MattP: check this multiplicity
                                , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty

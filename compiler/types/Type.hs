@@ -412,8 +412,7 @@ expandTypeSynonyms ty
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
     go subst (FunTy weight arg res)
-      -- TODO: MattP recurse into weight here
-      = mkFunTy weight (go subst arg) (go subst res)
+      = mkFunTy (toMult $ go subst (fromMult weight)) (go subst arg) (go subst res)
     go subst (ForAllTy (TvBndr tv vis) t)
       = let (subst', tv') = substTyVarBndrUsing go subst tv in
         ForAllTy (TvBndr tv' vis) (go subst' t)
@@ -2689,8 +2688,7 @@ tyConsOfType ty
      go (LitTy {})                  = emptyUniqSet
      go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
      go (AppTy a b)                 = go a `unionUniqSets` go b
-     -- MattP: TODO get tycons from weight once it is just a type
-     go (FunTy w a b)               = go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
+     go (FunTy w a b)               = go (fromMult w) `unionUniqSets` go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
      go (ForAllTy (TvBndr tv _) ty) = go ty `unionUniqSets` go (tyVarKind tv)
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co

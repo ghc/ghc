@@ -645,15 +645,6 @@ mkTyConAppCo r tc cos
 
   | otherwise = TyConAppCo r tc cos
 
--- TODO: MattP this is very suspect. There can probably be more complicated
--- coercions here. However, there is another function rigToCo which is
--- probably the inverse which is also extremely simple minded like this.
-coercionToRig :: Coercion -> Rig
-coercionToRig co
-  | Just (ty, _) <- isReflCo_maybe co
-  = toMult ty
-  | otherwise = pprPanic "coercionToRig" (ppr co)
-
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
 -- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@.
 mkFunCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion

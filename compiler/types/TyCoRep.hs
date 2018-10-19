@@ -873,7 +873,6 @@ isLinearType :: Type -> Bool
 -- ^ Returns @True@ of an 'Type' if the 'Type' has any linear function arrows
 -- in its type. We use this function to check whether it is safe to eta
 -- reduce an Id.
--- TODO: MattP perhaps this should look through casts a well. Probably not.
 isLinearType ty = case ty of
                       FunTy One _ _ -> True
                       FunTy _ _ res -> isLinearType res

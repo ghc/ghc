@@ -275,7 +275,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
          let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idWeight var) pat_ty' -- MattP: I am fairly sure this is right now -- or at least -- not very wrong
+        ; var' <- newUniqueId var (idWeight var) pat_ty'
         ; match_result <- match (var':vars) ty $
                           map (decomposeFirstPat getViewPat) eqns
          -- compile the view expressions

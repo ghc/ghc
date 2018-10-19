@@ -165,10 +165,8 @@ mkWeighted :: GMult t -> a -> GWeighted t a
 mkWeighted = Weighted
 
 instance (Multable t, Outputable a) => Outputable (GWeighted t a) where
-   ppr (Weighted _cnt t) = -- ppr cnt <> ppr t
-                          ppr t
-
--- MattP: For now we don't print the weight by default as it creeps into
+   ppr (Weighted _cnt t) = ppr t
+     -- Do not print the multiplicity here because it tends to be too verbose
 
 weightedSet :: GWeighted t a -> b -> GWeighted t b
 weightedSet x b = fmap (\_->b) x
