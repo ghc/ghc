@@ -8,8 +8,13 @@ Warnings and sanity-checking
    single: warnings
 
 GHC has a number of options that select which types of non-fatal error
-messages, otherwise known as warnings, can be generated during
-compilation. By default, you get a standard set of warnings which are
+messages, otherwise known as warnings, can be generated during compilation.
+Some options control individual warnings and others control collections
+of warnings.
+To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
+To reverse``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
+
+By default, you get a standard set of warnings which are
 generally likely to indicate bugs in your program. These are:
 
 .. hlist::
@@ -146,7 +151,9 @@ to abort.
     :category:
 
     Makes any warning into a fatal error. Useful so that you don't miss
-    warnings when doing batch compilation.
+    warnings when doing batch compilation. To reverse ``-Werror`` and stop
+    treating any warnings as errors use ``-Wwarn``, or use ``-Wwarn=<wflag>``
+    to stop treating specific warnings as errors.
 
 .. ghc-flag:: -Werror=⟨wflag⟩
     :shortdesc: make a specific warning fatal
@@ -158,7 +165,7 @@ to abort.
     :implies: ``-W<wflag>``
 
     Makes a specific warning into a fatal error. The warning will be enabled if
-    it hasn't been enabled yet.
+    it hasn't been enabled yet. Can be reversed with ``-Wwarn=<wflag>``.
 
     ``-Werror=compat`` has the same effect as ``-Werror=...`` for each warning
     flag in the :ghc-flag:`-Wcompat` option group.
