@@ -309,7 +309,6 @@ dsPrimCall fn_id co fcall = do
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
-      -- TODO: arnaud: not clue whether the above unrestricted is correct
 
     ccall_uniq <- newUnique
     dflags <- getDynFlags

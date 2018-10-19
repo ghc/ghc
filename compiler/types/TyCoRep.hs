@@ -307,9 +307,6 @@ data Type
 
   | FunTy Rig Type Type     -- ^ t1 ->_p t2   Very common, so an important special case
 
-    -- TODO: arnaud: also PI
-    -- TODO: arnaud: ignored by Core. Nonetheless, maybe should update the Formalism
-
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
   | CastTy
@@ -781,9 +778,6 @@ mkFunTyOm = mkFunTy Omega
 -- | Make nested arrow types
 mkFunTys :: [Weighted Type] -> Type -> Type
 mkFunTys tys ty = foldr (\(Weighted w t) -> mkFunTy w t) ty tys
--- FIXME: arnaud: see at use-site how to best refine this. Probably the list argument should be of pairs `(Rig,Type)`.
--- MattP: The unweighted one should be the default. there are lots of "bad"
--- calls to this which map unrestricted over the argument first.
 
 mkFunTysOm :: [Type] -> Type -> Type
 mkFunTysOm tys ty = mkFunTys (map unrestricted tys) ty
@@ -3029,7 +3023,7 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
     user_bndrs = dataConUserTyVarBinders dc
     forAllDoc  = pprUserForAll user_bndrs
     thetaDoc   = pprThetaArrowTy theta
-    argsDoc    = hsep (fmap pprParendType (map weightedThing arg_tys)) -- TODO: arnaud: do I have to do something in order to print arrows correctly for linear constructor?
+    argsDoc    = hsep (fmap pprParendType (map weightedThing arg_tys))
 
 
 pprTypeApp :: TyCon -> [Type] -> SDoc

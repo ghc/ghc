@@ -1010,7 +1010,8 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
              , BindMe <- tvBindFlag env cv
              -> do { checkRnEnv env (tyCoVarsOfCo co2)
                    ; let (_, co_l, co_r) = decomposeFunCo Nominal kco
-                     -- TODO: arnaud: because the coercion is nominal, I believe we can safely ignore the multiplicity coercion.
+                     -- Because the coercion is nominal, it should be safe to
+                     -- ignore the multiplicity coercion.
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1
