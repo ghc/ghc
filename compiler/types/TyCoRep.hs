@@ -86,6 +86,7 @@ module TyCoRep (
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList, tyCoVarsOfProv,
+        almostDevoidCoVarOfCo,
         closeOverKinds,
         injectiveVarsOfBinder, injectiveVarsOfType,
 
@@ -1666,8 +1667,8 @@ tyCoVarsOfCos cos = ty_co_vars_of_cos cos emptyVarSet emptyVarSet
 
 ty_co_vars_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_co (Refl ty)            is acc = ty_co_vars_of_type ty is acc
-ty_co_vars_of_co (GRefl _ ty mrefl)   is acc = ty_co_vars_of_type ty is $
-                                               ty_co_vars_of_mco mrefl is acc
+ty_co_vars_of_co (GRefl _ ty mco)     is acc = ty_co_vars_of_type ty is $
+                                               ty_co_vars_of_mco mco is acc
 ty_co_vars_of_co (TyConAppCo _ _ cos) is acc = ty_co_vars_of_cos cos is acc
 ty_co_vars_of_co (AppCo co arg)       is acc = ty_co_vars_of_co co is $
                                                ty_co_vars_of_co arg is acc
@@ -1888,6 +1889,97 @@ coVarsOfCo co = getCoVarSet (tyCoFVsOfCo co)
 
 coVarsOfCos :: [Coercion] -> CoVarSet
 coVarsOfCos cos = getCoVarSet (tyCoFVsOfCos cos)
+
+----- Whether a covar is /Almost Devoid/ in a type or coercion ----
+
+-- | Given a covar and a coercion, returns True if covar is almost devoid in
+-- the coercion. That is, covar can only appear in Refl and GRefl.
+-- See last wrinkle in Note [Unused coercion variable in ForAllCo] in Coercion
+almostDevoidCoVarOfCo :: CoVar -> Coercion -> Bool
+almostDevoidCoVarOfCo cv co =
+  almost_devoid_co_var_of_co co cv
+
+almost_devoid_co_var_of_co :: Coercion -> CoVar -> Bool
+almost_devoid_co_var_of_co (Refl {}) _ = True   -- covar is allowed in Refl and
+almost_devoid_co_var_of_co (GRefl {}) _ = True  -- GRefl, so we don't look into
+                                                -- the coercions
+almost_devoid_co_var_of_co (TyConAppCo _ _ cos) cv
+  = almost_devoid_co_var_of_cos cos cv
+almost_devoid_co_var_of_co (AppCo co arg) cv
+  = almost_devoid_co_var_of_co co cv
+  && almost_devoid_co_var_of_co arg cv
+almost_devoid_co_var_of_co (ForAllCo v kind_co co) cv
+  = almost_devoid_co_var_of_co kind_co cv
+  && (v == cv || almost_devoid_co_var_of_co co cv)
+almost_devoid_co_var_of_co (FunCo _ co1 co2) cv
+  = almost_devoid_co_var_of_co co1 cv
+  && almost_devoid_co_var_of_co co2 cv
+almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
+almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
+almost_devoid_co_var_of_co (AxiomInstCo _ _ cos) cv
+  = almost_devoid_co_var_of_cos cos cv
+almost_devoid_co_var_of_co (UnivCo p _ t1 t2) cv
+  = almost_devoid_co_var_of_prov p cv
+  && almost_devoid_co_var_of_type t1 cv
+  && almost_devoid_co_var_of_type t2 cv
+almost_devoid_co_var_of_co (SymCo co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_co (TransCo co1 co2) cv
+  = almost_devoid_co_var_of_co co1 cv
+  && almost_devoid_co_var_of_co co2 cv
+almost_devoid_co_var_of_co (NthCo _ _ co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_co (LRCo _ co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_co (InstCo co arg) cv
+  = almost_devoid_co_var_of_co co cv
+  && almost_devoid_co_var_of_co arg cv
+almost_devoid_co_var_of_co (KindCo co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_co (SubCo co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_co (AxiomRuleCo _ cs) cv
+  = almost_devoid_co_var_of_cos cs cv
+
+almost_devoid_co_var_of_cos :: [Coercion] -> CoVar -> Bool
+almost_devoid_co_var_of_cos [] _ = True
+almost_devoid_co_var_of_cos (co:cos) cv
+  = almost_devoid_co_var_of_co co cv
+  && almost_devoid_co_var_of_cos cos cv
+
+almost_devoid_co_var_of_prov :: UnivCoProvenance -> CoVar -> Bool
+almost_devoid_co_var_of_prov (PhantomProv co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
+  = almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
+almost_devoid_co_var_of_prov (PluginProv _) _ = True
+
+almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
+almost_devoid_co_var_of_type (TyVarTy _) _ = True
+almost_devoid_co_var_of_type (TyConApp _ tys) cv
+  = almost_devoid_co_var_of_types tys cv
+almost_devoid_co_var_of_type (LitTy {}) _ = True
+almost_devoid_co_var_of_type (AppTy fun arg) cv
+  = almost_devoid_co_var_of_type fun cv
+  && almost_devoid_co_var_of_type arg cv
+almost_devoid_co_var_of_type (FunTy arg res) cv
+  = almost_devoid_co_var_of_type arg cv
+  && almost_devoid_co_var_of_type res cv
+almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
+  = almost_devoid_co_var_of_type (varType v) cv
+  && (v == cv || almost_devoid_co_var_of_type ty cv)
+almost_devoid_co_var_of_type (CastTy ty co) cv
+  = almost_devoid_co_var_of_type ty cv
+  && almost_devoid_co_var_of_co co cv
+almost_devoid_co_var_of_type (CoercionTy co) cv
+  = almost_devoid_co_var_of_co co cv
+
+almost_devoid_co_var_of_types :: [Type] -> CoVar -> Bool
+almost_devoid_co_var_of_types [] _ = True
+almost_devoid_co_var_of_types (ty:tys) cv
+  = almost_devoid_co_var_of_type ty cv
+  && almost_devoid_co_var_of_types tys cv
 
 ------------- Closing over kinds -----------------
 

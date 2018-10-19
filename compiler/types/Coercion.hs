@@ -717,6 +717,10 @@ We chose (2) for two reasons:
 * even if cv occurs in body_co, it is possible that cv does not occur in the kind
   of body_co. Therefore the check in coercionKind is inevitable.
 
+The last wrinkle is that cv can only appear in Refl and GRefl for the consistency
+of the type system. Thus the almostDevoidCoVarOfCo test.
+See Section 5.8.5.2 of Richard's thesis for more details.
+This check can cause liftCoSubst to fail.
 -}
 
 
@@ -724,26 +728,28 @@ We chose (2) for two reasons:
 -- The kind of the tycovar should be the left-hand kind of the kind coercion.
 -- See Note [Unused coercion variable in ForAllCo]
 mkForAllCo :: TyCoVar -> CoercionN -> Coercion -> Coercion
-mkForAllCo tv kind_co co
-  | ASSERT( varType tv `eqType` (pFst $ coercionKind kind_co)) True
+mkForAllCo v kind_co co
+  | ASSERT( varType v `eqType` (pFst $ coercionKind kind_co)) True
+  , ASSERT( isTyVar v || almostDevoidCoVarOfCo v co) True
   , Just (ty, r) <- isReflCo_maybe co
   , isGReflCo kind_co
-  = mkReflCo r (mkTyCoInvForAllTy tv ty)
+  = mkReflCo r (mkTyCoInvForAllTy v ty)
   | otherwise
-  = ForAllCo tv kind_co co
+  = ForAllCo v kind_co co
 
 -- | Like 'mkForAllCo', but the inner coercion shouldn't be an obvious
 -- reflexive coercion. For example, it is guaranteed in 'mkForAllCos'.
 -- The kind of the tycovar should be the left-hand kind of the kind coercion.
 mkForAllCo_NoRefl :: TyCoVar -> CoercionN -> Coercion -> Coercion
-mkForAllCo_NoRefl tv kind_co co
-  | ASSERT( varType tv `eqType` (pFst $ coercionKind kind_co)) True
+mkForAllCo_NoRefl v kind_co co
+  | ASSERT( varType v `eqType` (pFst $ coercionKind kind_co)) True
+  , ASSERT( isTyVar v || almostDevoidCoVarOfCo v co) True
   , ASSERT( not (isReflCo co)) True
-  , isCoVar tv
-  , not (tv `elemVarSet` tyCoVarsOfCo co)
+  , isCoVar v
+  , not (v `elemVarSet` tyCoVarsOfCo co)
   = FunCo (coercionRole co) kind_co co
   | otherwise
-  = ForAllCo tv kind_co co
+  = ForAllCo v kind_co co
 
 -- | Make nested ForAllCos
 mkForAllCos :: [(TyCoVar, CoercionN)] -> Coercion -> Coercion
@@ -759,20 +765,20 @@ mkForAllCos bndrs co
 -- | Make a Coercion quantified over a type/coercion variable;
 -- the variable has the same type in both sides of the coercion
 mkHomoForAllCos :: [TyCoVar] -> Coercion -> Coercion
-mkHomoForAllCos tvs co
+mkHomoForAllCos vs co
   | Just (ty, r) <- isReflCo_maybe co
-  = mkReflCo r (mkTyCoInvForAllTys tvs ty)
+  = mkReflCo r (mkTyCoInvForAllTys vs ty)
   | otherwise
-  = mkHomoForAllCos_NoRefl tvs co
+  = mkHomoForAllCos_NoRefl vs co
 
 -- | Like 'mkHomoForAllCos', but the inner coercion shouldn't be an obvious
 -- reflexive coercion. For example, it is guaranteed in 'mkHomoForAllCos'.
 mkHomoForAllCos_NoRefl :: [TyCoVar] -> Coercion -> Coercion
-mkHomoForAllCos_NoRefl tvs orig_co
+mkHomoForAllCos_NoRefl vs orig_co
   = ASSERT( not (isReflCo orig_co))
-    foldr go orig_co tvs
+    foldr go orig_co vs
   where
-    go tv co = mkForAllCo_NoRefl tv (mkNomReflCo (varType tv)) co
+    go v co = mkForAllCo_NoRefl v (mkNomReflCo (varType v)) co
 
 mkCoVarCo :: CoVar -> Coercion
 -- cv :: s ~# t
@@ -1827,9 +1833,18 @@ ty_co_subst lc role ty
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
     go r (FunTy ty1 ty2)   = mkFunCo r (go r ty1) (go r ty2)
-    go r (ForAllTy (Bndr v _) ty)
-                           = let (lc', v', h) = liftCoSubstVarBndr lc v in
-                             mkForAllCo v' h $! ty_co_subst lc' r ty
+    go r t@(ForAllTy (Bndr v _) ty)
+       = let (lc', v', h) = liftCoSubstVarBndr lc v
+             body_co = ty_co_subst lc' r ty in
+         if isTyVar v' || almostDevoidCoVarOfCo v' body_co
+           -- Lifting a ForAllTy over a coercion variable could fail as ForAllCo
+           -- imposes an extra restriction on where a covar can appear. See last
+           -- wrinkle in Note [Unused coercion variable in ForAllCo].
+           -- We specifically check for this and panic because we know that
+           -- there's a hole in the type system here, and we'd rather panic than
+           -- fall into it.
+         then mkForAllCo v' h body_co
+         else pprPanic "ty_co_subst: covar is not almost devoid" (ppr t)
     go r ty@(LitTy {})     = ASSERT( r == Nominal )
                              mkNomReflCo ty
     go r (CastTy ty co)    = castCoercionKindI (go r ty) (substLeftCo lc co)
@@ -1871,7 +1886,7 @@ callback:
   FamInstEnv, therefore the input arg 'fun' returns a pair with polymophic type
   in snd.
   However in 'liftCoSubstVarBndr', we don't need the snd, so we use unit and
-  ignore the fourth componenet of the return value.
+  ignore the fourth component of the return value.
 
 liftCoSubstTyVarBndrUsing:
   Given

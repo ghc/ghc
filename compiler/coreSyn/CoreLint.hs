@@ -1728,7 +1728,9 @@ lintCoercion (ForAllCo tv1 kind_co co)
 lintCoercion (ForAllCo cv1 kind_co co)
   -- forall over coercions
   = ASSERT( isCoVar cv1 )
-    do { (_, k2) <- lintStarCoercion kind_co
+    do { lintL (almostDevoidCoVarOfCo cv1 co)
+               (text "Covar can only appear in Refl and GRefl: " <+> ppr co)
+       ; (_, k2) <- lintStarCoercion kind_co
        ; let cv2 = setVarType cv1 k2
        ; addInScopeVar cv1 $
     do {
