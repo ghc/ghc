@@ -14,8 +14,6 @@ import TyCoRep ( Rig, Weighted )
 import Control.Monad
 import Data.Maybe
 
--- TODO: arnaud: try and make this non-recursive with the rest
-
 --
 -- * Usage environments
 --
@@ -116,38 +114,3 @@ subweightUE (UsageEnv lhs) (UsageEnv rhs) =
   where
     pairs =
       plusUFM_CD (,) lhs Zero rhs Zero
-
-data IsSubweight = Smaller -- Definitely a subweight
-                 | Larger  -- Definitely not a subweight
-                 | Unknown -- Could be a subweight, need to ask the typechecker
-                 deriving (Show, Eq, Ord)
-
-isUnknown :: IsSubweight -> Bool
-isUnknown Unknown = True
-isUnknown _ = False
-
-instance Outputable IsSubweight where
-  ppr = text . show
-
-
--- TODO: arnaud: this should move to Weight.
-
--- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
--- value of weight @w2@ is expected. This is a partial order.
-subweightMaybe :: GMult t -> GMult t -> IsSubweight
-subweightMaybe r1 r2 = go r1 r2
-  where
-    go _     Omega = Smaller
-    go Zero  Zero  = Smaller
-    go _     Zero  = Larger
-    go Zero  One   = Larger
-    -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
-    -- used zero times cannot be used one time.
-    -- Zero = {0}
-    -- One  = {1}
-    -- Omega = {0...}
-    go One   One   = Smaller
-    -- The 1 <= p rule
-    go One   _     = Smaller
---    go (RigThing t) (RigThing t') = Unknown
-    go _     _     = Unknown

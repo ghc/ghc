@@ -91,7 +91,6 @@ import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolem
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
 import Weight
-import {-# SOURCE #-} UsageEnv
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique

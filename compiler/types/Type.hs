@@ -224,7 +224,6 @@ import BasicTypes
 import Kind
 import TyCoRep
 import Weight
-import {-# SOURCE #-} UsageEnv
 
 -- friends:
 import Var
