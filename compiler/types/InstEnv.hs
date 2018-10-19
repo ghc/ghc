@@ -21,7 +21,7 @@ module InstEnv (
         emptyInstEnv, extendInstEnv,
         deleteFromInstEnv, deleteDFunFromInstEnv,
         identicalClsInstHead,
-        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts,
+        extendInstEnvList, lookupUniqueInstEnv, lookupInstEnv, instEnvElts, instEnvClss,
         memberInstEnv,
         instIsVisible,
         classInstances, instanceBindFun,
@@ -427,6 +427,9 @@ instEnvElts :: InstEnv -> [ClsInst]
 instEnvElts ie = [elt | ClsIE elts <- eltsUDFM ie, elt <- elts]
   -- See Note [InstEnv determinism]
 
+instEnvClss :: InstEnv -> [Class]
+instEnvClss ie = [is_cls e | ClsIE (e : _) <- eltsUDFM ie]
+
 -- | Test if an instance is visible, by checking that its origin module
 -- is in 'VisibleOrphanModules'.
 -- See Note [Instance lookup and orphan instances]
@@ -482,6 +485,14 @@ deleteDFunFromInstEnv inst_env dfun
     (_, _, cls, _) = tcSplitDFunTy (idType dfun)
     adjust (ClsIE items) = ClsIE (filterOut same_dfun items)
     same_dfun (ClsInst { is_dfun = dfun' }) = dfun == dfun'
+
+lookupDFunInInstEnv :: InstEnv -> DFunId -> [ClsInst]
+lookupDFunInInstEnv inst_env dfun
+  = [i |  i <- filter same_dfun items]
+  where
+  Just (ClsIE items) = lookupUDFM inst_env dfun
+  same_dfun (ClsInst { is_dfun = dfun' }) = dfun == dfun'
+
 
 identicalClsInstHead :: ClsInst -> ClsInst -> Bool
 -- ^ True when when the instance heads are the same
