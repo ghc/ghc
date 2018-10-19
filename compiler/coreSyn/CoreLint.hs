@@ -857,7 +857,6 @@ lintCoreExpr (Type ty)
 lintCoreExpr (Coercion co)
   = do { (k1, k2, ty1, ty2, role) <- lintInCo co
        ; return ((mkHeteroCoercionType role k1 k2 ty1 ty2), emptyUE) }
-       -- MattP: Coercions only mention types, so empty UE
 
 ----------------------
 lintVarOcc :: Var -> Int -- Number of arguments (type or value) being passed
@@ -1061,7 +1060,7 @@ lintCoreArg (fun_ty, ue) (Type arg_ty)
                   <+> ppr arg_ty)
        ; arg_ty' <- applySubstTy arg_ty
        ; res <- lintTyApp fun_ty arg_ty'
-       ; return (res, ue) } -- MattP: Type arguments can't mention value arguments
+       ; return (res, ue) }
 
 lintCoreArg (fun_ty, fun_ue) arg
   = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
@@ -1617,7 +1616,7 @@ lintCoreRule _ _ (BuiltinRule {})
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
-    do { (lhs_ty, _) <- lintCoreArgs (fun_ty, emptyUE) args -- MattP: Check this
+    do { (lhs_ty, _) <- lintCoreArgs (fun_ty, emptyUE) args
        ; (rhs_ty, _) <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
@@ -1812,9 +1811,7 @@ lintCoercion co@(FunCo r w co1 co2)
        ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
        ; lintRole co1 r r1
        ; lintRole co2 r r2
-       -- TODO: MattP, this check needs to be reenabled. The problem lies
-       -- somewhere in 30e7ecb805c2eb2d53b6cf02308a382e492cc64c
-       --; lintRole w Nominal r3
+       ; lintRole w Nominal r3
        ; return (k, k', mkFunTy (toMult s3) s1 s2, mkFunTy (toMult t3) t1 t2, r) }
 
 lintCoercion (CoVarCo cv)

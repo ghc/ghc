@@ -71,6 +71,7 @@ import Name
 import VarSet
 import Var
 import Type
+import Weight (Multable(..))
 import TyCoRep
 import TyCon
 import CoAxiom
@@ -354,9 +355,7 @@ orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderKind bndr)
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (FunTy w arg res)    = unitNameSet funTyConName    -- NB!  See Trac #8535
-                                     -- `unionNameSet` orphNamesOfType w --
-                                     -- TODO: MattP this needs to be
-                                     -- uncommented when Rig is just a type
+                                       `unionNameSet` orphNamesOfType (fromMult w)
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
