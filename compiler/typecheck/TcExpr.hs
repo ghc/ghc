@@ -426,8 +426,6 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
              -- The second multiplicity is not used.
-             -- MattP: Perhaps this wrapper should be computed in
-             -- matchActualFunTys? funTyWeight seems a bit icky.
              --
              -- We need to zonk here as well, see Dollar2 for an example
              wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
@@ -514,12 +512,6 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
       ; let w_tvb = mkTyVarBinder Inferred multiplicityTyVar
             w_ty  = mkTyVarTy multiplicityTyVar
        ; let actual_res_ty
-                 -- MattP: I changed this to linear 17/04/18. It is
-                 -- computing the type of the tuple section which is like
-                 -- a partially applied tuple constructor and hence should
-                 -- be linear. I don't see how the comment about case is
-                 -- relevant.
-                 -- MattP: I made this polymorphic on 26-06-2018
                  =  mkForAllTys [w_tvb] $
                     mkFunTys [ mkWeighted (RigThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
@@ -530,10 +522,6 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
 
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
-
-       --TODO: MattP: Check whether we should use a wrapper here or do it
-       --in dsExpr
---       ; let wrap' = wrap <.> mkWpTyLams [w_ty]
 
        ; return $ mkHsWrap wrap (ExplicitTuple x tup_args1 boxity) }
 

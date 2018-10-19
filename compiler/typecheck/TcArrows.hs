@@ -262,10 +262,6 @@ tc_cmd env
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
                                     , mg_ext = MatchGroupTc arg_tys res_ty
                                     , mg_origin = origin })
-                                    -- MattP: Check Omega here - not sure
-                                    -- what this was used for yet but
-                                    -- I think it's probably fine to be
-                                    -- Omega.
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats

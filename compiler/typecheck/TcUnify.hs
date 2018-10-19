@@ -822,7 +822,6 @@ tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
   -- it. But maybe there is a better way to implement this function.
   ; return () }
 
--- TODO: MattP fix the origins
 -- As an approximation to checking w1 * w2 <= w we check that w1 <= w and
 -- w2 <= w. As together they imply that w1 * w2 <= w.
 -- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
@@ -835,8 +834,6 @@ tcSubWeight actual_w w
     do_one weight =
       case weight of
         RigAdd m1 m2 -> do
-          -- MattP: We probably need to instantiate these
-          -- variables m1 and m2 to be Omega right here.
           tcSubWeight Omega w
         RigMul m1 m2 -> do
           tcSubWeight m1 w

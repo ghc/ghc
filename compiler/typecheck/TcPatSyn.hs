@@ -751,7 +751,6 @@ tcPatSynMatcher (L loc name) lpat
              mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty
                     , mg_origin = Generated }
-                    -- MattP: Probably wrong
 
        ; let bind = FunBind{ fun_ext = emptyNameSet
                            , fun_id = L loc matcher_id
