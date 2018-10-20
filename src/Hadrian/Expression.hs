@@ -19,7 +19,6 @@ module Hadrian.Expression (
 import Control.Monad.Extra
 import Control.Monad.Trans
 import Control.Monad.Trans.Reader
-import Data.Semigroup (Semigroup, (<>))
 import Development.Shake
 import Development.Shake.Classes
 
@@ -71,7 +70,7 @@ class ToPredicate p c b where
 infixr 3 ?
 
 -- | Apply a predicate to an expression.
-(?) :: (Monoid a, Semigroup a, ToPredicate p c b) => p -> Expr c b a -> Expr c b a
+(?) :: (Monoid a, ToPredicate p c b) => p -> Expr c b a -> Expr c b a
 p ? e = do
     bool <- toPredicate p
     if bool then e else mempty
