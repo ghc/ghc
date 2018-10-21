@@ -1,3 +1,7 @@
+## Changes in TBA
+
+ * NewOcean is the new default theme (#721, #782)
+
 ## Changes in version 2.22.0
 
  * Make `--package-version` optional for `--hoogle` (#899)
@@ -20,8 +24,6 @@
  * Capture docs on type family instances (#867)
 
 ## Changes in version 2.20.0
-
- * NewOcean is the new default theme (#721, #782)
 
  * Show where instances are defined (#748)
 
