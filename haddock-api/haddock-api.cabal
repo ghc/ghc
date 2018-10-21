@@ -34,6 +34,11 @@ data-files:
   html/Ocean.std-theme/ocean.css
   html/Ocean.std-theme/plus.gif
   html/Ocean.std-theme/synopsis.png
+  html/NewOcean.std-theme/hslogo-16.png
+  html/NewOcean.std-theme/minus.gif
+  html/NewOcean.std-theme/new-ocean.css
+  html/NewOcean.std-theme/plus.gif
+  html/NewOcean.std-theme/synopsis.png
   latex/haddock.sty
 
 library
