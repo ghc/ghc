@@ -49,3 +49,8 @@ ifeq "$(WINDOWS)" "YES"
 else
 	grep '{-# LINE 1 \"T12504/path/to/$@\.hsc\" #-}' T12504/path/to/$@.hs
 endif
+
+.PHONY: T15758
+T15758:
+	'$(HSC2HS)' $@.hsc @T15758.response
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c $@.a.hs
