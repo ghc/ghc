@@ -358,10 +358,7 @@ test('T15426',
     ['-O2'])
 
 test('T15578',
-    [stats_num_field('bytes allocated',
-                    [ (wordsize(64), 800041456, 5) ]),
-                    # 2018-09-07     800041456   Improvements from #15578
-                    # initial      42400041456
+    [collect_stats('bytes allocated', 5),
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])

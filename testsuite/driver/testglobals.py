@@ -31,6 +31,9 @@ class TestConfig:
         self.accept_platform = False
         self.accept_os = False
 
+        # File in which to save the performance metrics.
+        self.metrics_file = ''
+
         # File in which to save the summary
         self.summary_file = ''
 

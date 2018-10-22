@@ -65,44 +65,21 @@ aliases:
       command: |
         cabal update
         hadrian/build.sh -j`mk/detect-cpu-count.sh`
-
-
-  - &test_push
-    run:
-      name: Test Push
-      command: |
-        # Add git.haskell.org as a known host.
-        echo "|1|F3mPVCE55+KfApNIMYQ3Dv39sGE=|1bRkvJEJhAN2R0LE/lAjFCEJGl0= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBUZS9jGBkE5UzpSo6irnIgcQcfzvbuIOsFc8+N61FwtZncRntbaKPuUimOFPgeaUZLl6Iajz6IIs7aduU0/v+I=" >> ~/.ssh/known_hosts
-        echo "|1|2VUMjYSRVpT2qJPA0rA9ap9xILY=|5OThkI4ED9V0J+Es7D5FOD55Klk= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+3TLluLAO4lkW60W+N2DFkS+WoRFGqLwHzgd1ifxG9TIm31wChPY3E/hgMnJmgGqWCF4UDUemmyCycEaL7FtKfzjTAclg9EfpQnozyE3T5hIo2WL7SN5O8ttG/bYGuDnn14jLnWwJyN4oz/znWFiDG9e2Oc9YFNlQ+PK8ae5xR4gqBB7EOoj9J1EiPqG2OXRr5Mei3TLsRDU6fnz/e4oFJpKWWeN6M63oePv0qoaGjxcrATZUWsuWrxVMmYo9kP1xRuFJbAUw2m4uVP+793SW1zxySi1HBMtJG+gCDdZZSwYbkV1hassLWBHv1qPttncfX8Zek3Z3VolaTmfWJTo9" >> ~/.ssh/known_hosts
-
-        # Make fake note.
-        git notes --ref notes_test add -m "Test01" HEAD
-
-        # Push the git notes.
-        git push git@git.haskell.org:ghc refs/notes/notes_test
-
-
-
-
   - &test
     run:
       name: Test
       command: |
         mkdir -p test-results
-        make test                  TEST="T8766"                              THREADS=`mk/detect-cpu-count.sh` SKIP_PERF_TESTS=$SKIP_PERF_TESTS TEST_ENV=$TEST_ENV JUNIT_FILE=../../test-results/junit.xml
+        METRICS_FILE=$(mktemp)
+        echo "export METRICS_FILE=$METRICS_FILE" >> $BASH_ENV
+        make test THREADS=`mk/detect-cpu-count.sh` SKIP_PERF_TESTS=$SKIP_PERF_TESTS TEST_ENV=$TEST_ENV JUNIT_FILE=../../test-results/junit.xml METRICS_FILE=$METRICS_FILE
   - &store_test_results
     store_test_results:
       path: test-results
   - &push_perf_note
     run:
       name: Push Performance Git Notes
-      command: |
-        # Add git.haskell.org as a known host.
-        echo "|1|F3mPVCE55+KfApNIMYQ3Dv39sGE=|1bRkvJEJhAN2R0LE/lAjFCEJGl0= ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBUZS9jGBkE5UzpSo6irnIgcQcfzvbuIOsFc8+N61FwtZncRntbaKPuUimOFPgeaUZLl6Iajz6IIs7aduU0/v+I=" >> ~/.ssh/known_hosts
-        echo "|1|2VUMjYSRVpT2qJPA0rA9ap9xILY=|5OThkI4ED9V0J+Es7D5FOD55Klk= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+3TLluLAO4lkW60W+N2DFkS+WoRFGqLwHzgd1ifxG9TIm31wChPY3E/hgMnJmgGqWCF4UDUemmyCycEaL7FtKfzjTAclg9EfpQnozyE3T5hIo2WL7SN5O8ttG/bYGuDnn14jLnWwJyN4oz/znWFiDG9e2Oc9YFNlQ+PK8ae5xR4gqBB7EOoj9J1EiPqG2OXRr5Mei3TLsRDU6fnz/e4oFJpKWWeN6M63oePv0qoaGjxcrATZUWsuWrxVMmYo9kP1xRuFJbAUw2m4uVP+793SW1zxySi1HBMtJG+gCDdZZSwYbkV1hassLWBHv1qPttncfX8Zek3Z3VolaTmfWJTo9" >> ~/.ssh/known_hosts
-
-        # Push the git notes.
-        git push git@git.haskell.org:ghc refs/notes/perf
+      command: .circleci/push-test-metrics.sh
   - &slowtest
     run:
       name: Full Test
@@ -145,20 +122,12 @@ jobs:
       - *submodules
       - *boot
       - *configure_unix
-      #
-      #
-      #
-      #
-      - *test_push
-      #
-      #
-      #
-      #- *make
-      #- *bindist
-      #- *storeartifacts
-      #- *test
-      #- *store_test_results
-      #- *push_perf_note
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
+      - *store_test_results
+      - *push_perf_note
 
   "validate-x86_64-freebsd":
     resource_class: xlarge
@@ -363,11 +332,11 @@ workflows:
         *trigger_on_tags
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
-#    - validate-x86_64-darwin:
-#        *trigger_on_tags
-#    - validate-x86_64-linux-llvm
-#    - validate-i386-linux:
-#        *trigger_on_tags
+    - validate-x86_64-darwin:
+        *trigger_on_tags
+    - validate-x86_64-linux-llvm
+    - validate-i386-linux:
+        *trigger_on_tags
 #    - validate-hadrian-x86_64-linux
 #    - validate-x86_64-fedora:
 #        *trigger_on_tags

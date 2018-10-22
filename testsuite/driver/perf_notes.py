@@ -170,21 +170,25 @@ def allow_changes_string(changes):
 
     return '\n\n'.join(msgs)
 
+# Formats a list of metrics into a string. Used e.g. to save metrics to a file or git note.
+def format_perf_stat(stats):
+    # If a single stat, convert to a singleton list.
+    if not isinstance(stats, list):
+        stats = [stats]
+
+    return "\n".join(["\t".join([str(stat_val) for stat_val in stat]) for stat in stats])
+
 # Appends a list of metrics to the git note of the given commit.
 # Tries up to max_tries times to write to git notes should it fail for some reason.
 # Each retry will wait 1 second.
 # Returns True if the note was successfully appended.
 def append_perf_stat(stats, commit='HEAD', namespace='perf', max_tries=5):
-    # If a single stat, convert to a singleton list.
-    if not isinstance(stats, list):
-        stats = [stats]
-
     # Append to git note
     print('Appending ' + str(len(stats)) + ' stats to git notes.')
-    stats_str = "\n".join(["\t".join([str(stat_val) for stat_val in stat]) for stat in stats])
+    stats_str = format_perf_stat(stats)
     def try_append():
             try:
-                return subprocess.check_output(['git', 'notes', '--ref=perf', 'append', commit, '-m', stats_str])
+                return subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'append', commit, '-m', stats_str])
             except subprocess.CalledProcessError:
                 return b'Git - fatal'
 
