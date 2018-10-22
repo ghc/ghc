@@ -34,6 +34,7 @@ module HscTypes (
         ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
         SourceModified(..), isTemplateHaskellOrQQNonBoot,
+        moduleRetainsAllBindings,
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
@@ -3148,3 +3149,32 @@ Also see Note [Typechecking Complete Matches] in TcBinds for a more detailed
 explanation for how GHC ensures that all the conlikes in a COMPLETE set are
 consistent.
 -}
+
+-- | Does this module retain *all* top-level bindings for a module,
+-- rather than just the exported bindings, in the TypeEnv and compiled
+-- code (if any)?  In interpreted mode we do this, so that GHCi can
+-- call functions inside a module.  In HscNothing mode we also do it,
+-- so that Haddock can get access to the GlobalRdrEnv for a module
+-- after typechecking it.
+-- However, doing this may consume a lot of memory, so we support a
+-- retention mode where we only keep bindings for modules that were
+-- in the hsc_targets field of HscEnv.
+moduleRetainsAllBindings :: HscEnv -> Module -> Bool
+moduleRetainsAllBindings hsc_env mod
+  = let dflags = hsc_dflags hsc_env
+        target = hscTarget dflags in
+    case bindingsRetentionMode dflags of
+      Full -> targetRetainsAllBindings target
+      Minimal ->
+          targetRetainsAllBindings target &&
+          (isInteractiveModule mod || moduleNameIsInHscTargets)
+  where
+    thisModSummary = mgLookupModule (hsc_mod_graph hsc_env) mod
+    moduleNameIsInHscTargets = any isThisModule (hsc_targets hsc_env)
+      where
+        isThisModule (Target tid _ _) = case tid of
+          TargetModule name -> name == moduleName mod
+          TargetFile fp _ ->
+              case thisModSummary of
+                Just summary -> Just fp == (ml_hs_file . ms_location) summary
+                Nothing -> False
