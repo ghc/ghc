@@ -73,7 +73,7 @@ import TcSimplify
 import TcType
 import TcHsSyn( zonkSigType )
 import Weight
-import Inst   ( tcInstBinders, tcInstBinder )
+import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyBinder(..), Type(TyVarTy) )  -- Used in tcDataKindSig
 import Type
 import Coercion
