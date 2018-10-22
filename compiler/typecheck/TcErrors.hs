@@ -2067,8 +2067,6 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
 
                   | otherwise       = text "kind" <+> quotes (ppr exp)
 
-      _ -> empty
-
     num_args_msg = case level of
       KindLevel
         | not (isMetaTyVarTy exp) && not (isMetaTyVarTy act)

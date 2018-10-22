@@ -1740,9 +1740,10 @@ flatten_exact_fam_app_fully tc tys
                        ; when (eq_rel == NomEq) $
                          liftTcS $
                          extendFlatCache tc tys ( co, xi, flavour )
-                       ; let xi' = xi `mkCastTy` kind_co
-                             co' = update_co $ mkSymCo co
-                                                `mkTcCoherenceLeftCo` kind_co
+                       ; let role = eqRelRole eq_rel
+                             xi' = xi `mkCastTy` kind_co
+                             co' = update_co $
+                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
                        ; return $ Right (xi', co') }
                TyFamAppStuck a -> pure (Left a) }
 
@@ -1770,8 +1771,8 @@ flatten_exact_fam_app_fully tc tys
                                     `mkTransCo` mkSymCo final_co
                              role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
-                             co' = update_co $ mkSymCo co
-                                                `mkTcCoherenceLeftCo` kind_co
+                             co' = update_co $
+                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
                        ; return $ Right (xi', co') }
                TyFamAppStuck a -> pure (Left a) }
 
