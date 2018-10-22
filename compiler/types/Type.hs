@@ -260,7 +260,6 @@ import Digraph
 import Unique ( nonDetCmpUnique )
 
 import Maybes           ( orElse )
-import Data.Bool ()
 import Data.Maybe       ( isJust, mapMaybe )
 import Control.Monad    ( guard )
 
@@ -1565,11 +1564,19 @@ partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
 partitionInvisibleTypes tc tys =
   partitionByList (map isInvisibleArgFlag $ tyConArgFlags tc tys) tys
 
--- | Given a tycon and a list of things (which correspond to arguments),
--- partitions the things into
---      Inferred or Specified ones and
---      Required ones
--- The callback function is necessary for this scenario:
+-- | Given a list of things paired with their visibilities, partition the
+-- things into (invisible things, visible things).
+partitionInvisibles :: [(a, ArgFlag)] -> ([a], [a])
+partitionInvisibles = partitionWith pick_invis
+  where
+    pick_invis :: (a, ArgFlag) -> Either a a
+    pick_invis (thing, vis) | isInvisibleArgFlag vis = Left thing
+                            | otherwise              = Right thing
+
+-- | Given a 'TyCon' and a list of argument types, determine each argument's
+-- visibility ('Inferred', 'Specified', or 'Required').
+--
+-- Wrinkle: consider the following scenario:
 --
 -- > T :: forall k. k -> k
 -- > tyConArgFlags T [forall m. m -> m -> m, S, R, Q]
