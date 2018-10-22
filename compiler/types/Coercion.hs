@@ -717,10 +717,23 @@ We chose (2) for two reasons:
 * even if cv occurs in body_co, it is possible that cv does not occur in the kind
   of body_co. Therefore the check in coercionKind is inevitable.
 
-The last wrinkle is that cv can only appear in Refl and GRefl for the consistency
-of the type system. Thus the almostDevoidCoVarOfCo test.
-See Section 5.8.5.2 of Richard's thesis for more details.
-This check can cause liftCoSubst to fail.
+The last wrinkle is that there are restrictions around the use of the cv in the
+coercion, as described in Section 5.8.5.2 of Richard's thesis. The idea is that
+we cannot prove that the type system is consistent with unrestricted use of this
+cv; the consistency proof uses an untyped rewrite relation that works over types
+with all coercions and casts removed. So, we can allow the cv to appear only in
+positions that are erased. As an approximation of this (and keeping close to the
+published theory), we currently allow the cv only within the type in a Refl node
+and under a GRefl node (including in the Coercion stored in a GRefl). It's
+possible other places are OK, too, but this is a safe approximation.
+
+Sadly, with heterogeneous equality, this restriction might be able to be violated;
+Richard's thesis is unable to prove that it isn't. Specifically, the liftCoSubst
+function might create an invalid coercion. Because a violation of the
+restriction might lead to a program that "goes wrong", it is checked all the time,
+even in a production compiler and without -dcore-list. We *have* proved that the
+problem does not occur with homogeneous equality, so this check can be dropped
+once ~# is made to be homogeneous.
 -}
 
 
