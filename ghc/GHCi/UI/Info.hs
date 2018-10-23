@@ -2,6 +2,7 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 -- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
@@ -331,17 +332,17 @@ processAllTypeCheckedModule tcm = do
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
-    getTypeLPat (L spn pat) =
+    getTypeLPat (dL->(spn , pat)) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
         getMaybeId (VarPat _ (L _ vid)) = Just vid
         getMaybeId _                    = Nothing
 
     -- | Get ALL source spans in the source.
-    listifyAllSpans :: Typeable a => TypecheckedSource -> [Located a]
+    listifyAllSpans :: (HasSrcSpan a , Typeable a) => TypecheckedSource -> [a]
     listifyAllSpans = everythingAllSpans (++) [] ([] `mkQ` (\x -> [x | p x]))
       where
-        p (L spn _) = isGoodSrcSpan spn
+        p (dL->(spn , _)) = isGoodSrcSpan spn
 
     -- | Variant of @syb@'s @everything@ (which summarises all nodes
     -- in top-down, left-to-right order) with a stop-condition on 'NameSet's

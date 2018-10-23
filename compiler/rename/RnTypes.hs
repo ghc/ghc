@@ -6,6 +6,7 @@
 
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module RnTypes (
         -- Type related stuff
@@ -1313,7 +1314,7 @@ mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
 mkConOpPatRn :: Located Name -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
-mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
+mkConOpPatRn op2 fix2 p1@(dL->(loc , ConPatIn op1 (InfixCon p11 p12))) p2
   = do  { fix1 <- lookupFixityRn (unLoc op1)
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
@@ -1324,7 +1325,8 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
 
           else if associate_right then do
                 { new_p <- mkConOpPatRn op2 fix2 p12 p2
-                ; return (ConPatIn op1 (InfixCon p11 (L loc new_p))) } -- XXX loc right?
+                ; return (ConPatIn op1 (InfixCon p11 (cL loc new_p))) }
+                -- XXX loc right?
           else return (ConPatIn op2 (InfixCon p1 p2)) }
 
 mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
@@ -1344,7 +1346,8 @@ checkPrecMatch :: Name -> MatchGroup GhcRn body -> RnM ()
 checkPrecMatch op (MG { mg_alts = L _ ms })
   = mapM_ check ms
   where
-    check (L _ (Match { m_pats = L l1 p1 : L l2 p2 :_ }))
+    check :: Located (Match GhcRn body) -> TcRn ()
+    check (L _ (Match { m_pats = (dL->(l1 , p1)) : (dL->(l2 , p2)) :_ }))
       = setSrcSpan (combineSrcSpans l1 l2) $
         do checkPrec op p1 False
            checkPrec op p2 True

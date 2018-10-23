@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
-
+{-# LANGUAGE ViewPatterns #-}
 module TcErrors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
        warnDefaulting,
@@ -2482,7 +2482,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         mb_patsyn_prov :: Maybe SDoc
         mb_patsyn_prov
           | not lead_with_ambig
-          , ProvCtxtOrigin PSB{ psb_def = L _ pat } <- orig
+          , ProvCtxtOrigin PSB{ psb_def = (dL->(_ , pat)) } <- orig
           = Just (vcat [ text "In other words, a successful match on the pattern"
                        , nest 2 $ ppr pat
                        , text "does not provide the constraint" <+> pprParendType pred ])

@@ -270,10 +270,11 @@ boundValues mod group =
   in vals ++ tys ++ fors
   where found = foundOfLName mod
 
-startOfLocated :: Located a -> RealSrcLoc
+startOfLocated :: HasSrcSpan a => a -> RealSrcLoc
 startOfLocated lHs = case getLoc lHs of
                      RealSrcSpan l -> realSrcSpanStart l
                      UnhelpfulSpan _ -> panic "startOfLocated UnhelpfulSpan"
+
 
 foundOfLName :: ModuleName -> Located Name -> FoundThing
 foundOfLName mod id = FoundThing mod (getOccString $ unLoc id) (startOfLocated id)

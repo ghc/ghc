@@ -9,6 +9,7 @@ TcPat: Typechecking patterns
 {-# LANGUAGE CPP, RankNTypes, TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcPat ( tcLetPat, newLetBndr, LetBndrSpec(..)
              , tcPat, tcPat_O, tcPats
@@ -300,11 +301,11 @@ tc_lpat :: LPat GhcRn
         -> PatEnv
         -> TcM a
         -> TcM (LPat GhcTcId, a)
-tc_lpat (L span pat) pat_ty penv thing_inside
+tc_lpat (dL->(span , pat)) pat_ty penv thing_inside
   = setSrcSpan span $
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat penv pat pat_ty)
                                           thing_inside
-        ; return (L span pat', res) }
+        ; return (cL span pat', res) }
 
 tc_lpats :: PatEnv
          -> [LPat GhcRn] -> [ExpSigmaType]

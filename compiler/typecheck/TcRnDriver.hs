@@ -2026,7 +2026,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
 
               -- [it <- e]
               bind_stmt = L loc $ BindStmt noExt
-                                       (L loc (VarPat noExt (L loc fresh_it)))
+                                       (cL loc (VarPat noExt (cL loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr

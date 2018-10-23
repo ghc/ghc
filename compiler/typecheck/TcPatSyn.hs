@@ -8,6 +8,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind
                 , tcPatSynBuilderOcc, nonBidirectionalErr
@@ -737,9 +738,9 @@ tcPatSynMatcher (L loc name) lpat
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
              body = mkLHsWrap (mkWpLet req_ev_binds) $
-                    L (getLoc lpat) $
+                    cL (getLoc lpat) $
                     HsCase noExt (nlHsVar scrutinee) $
-                    MG{ mg_alts = L (getLoc lpat) cases
+                    MG{ mg_alts = cL (getLoc lpat) cases
                       , mg_ext = MatchGroupTc [pat_ty] res_ty
                       , mg_origin = Generated
                       }
@@ -873,8 +874,9 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
           where
-            builder_args  = [L loc (VarPat noExt (L loc n)) | L loc n <- args]
-            builder_match = mkMatch (mkPrefixFunRhs (L loc name))
+            builder_args  = [cL loc (VarPat noExt (cL loc n))
+                            | (dL->(loc , n)) <- args]
+            builder_match = mkMatch (mkPrefixFunRhs (cL loc name))
                                     builder_args body
                                     (noLoc (EmptyLocalBinds noExt))
 
@@ -944,7 +946,7 @@ tcPatToExpr name args pat = go pat
            ; return (RecordCon noExt con exprFields) }
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
-    go (L loc p) = L loc <$> go1 p
+    go (dL->(loc , p)) = cL loc <$> go1 p
 
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
     go1 (ConPatIn con info)
@@ -992,7 +994,8 @@ tcPatToExpr name args pat = go pat
     go1 p@(AsPat {})                         = notInvertible p
     go1 p@(ViewPat {})                       = notInvertible p
     go1 p@(NPlusKPat {})                     = notInvertible p
-    go1 p@(XPat {})                          = notInvertible p
+    go1 p@(NewPat {})                        = notInvertible p
+    --TODO: ShNajd: Not sure about above
     go1 p@(SplicePat _ (HsTypedSplice {}))   = notInvertible p
     go1 p@(SplicePat _ (HsUntypedSplice {})) = notInvertible p
     go1 p@(SplicePat _ (HsQuasiQuote {}))    = notInvertible p

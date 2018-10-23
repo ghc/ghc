@@ -508,7 +508,8 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     tc_sub_group rec_tc binds =
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
-recursivePatSynErr :: OutputableBndrId name => LHsBinds name -> TcM a
+recursivePatSynErr :: OutputableBndrId (GhcPass p) =>
+                      LHsBinds (GhcPass p) -> TcM a
 recursivePatSynErr binds
   = failWithTc $
     hang (text "Recursive pattern synonym definition with following bindings:")

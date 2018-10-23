@@ -13,9 +13,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-
+{-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE FlexibleInstances #-}
 module HsPat (
         Pat(..), InPat, OutPat, LPat,
         ListPatTc(..),
@@ -70,7 +70,7 @@ import Data.Data hiding (TyCon,Fixity)
 type InPat p  = LPat p        -- No 'Out' constructors
 type OutPat p = LPat p        -- No 'In' constructors
 
-type LPat p = Located (Pat p)
+type LPat p = Pat p
 
 -- | Pattern
 --
@@ -269,8 +269,8 @@ data Pat p
     -- ^ Coercion Pattern
 
   -- | Trees that Grow extension point for new constructors
-  | XPat
-      (XXPat p)
+  | NewPat
+      (XNewPat p)
 
 -- ---------------------------------------------------------------------
 
@@ -324,7 +324,32 @@ type instance XSigPat GhcRn = (LHsSigWcType GhcRn)
 type instance XSigPat GhcTc = Type
 
 type instance XCoPat  (GhcPass _) = NoExt
-type instance XXPat   (GhcPass _) = NoExt
+type instance XNewPat (GhcPass p) = (SrcSpan , Pat (GhcPass p))
+
+{-
+************************************************************************
+*                                                                      *
+*              HasSrcSpan Instance
+*                                                                      *
+************************************************************************
+-}
+
+type instance SrcSpanLess (Pat (GhcPass p)) = Pat (GhcPass p)
+instance HasSrcSpan (Pat (GhcPass p)) where
+  -- NB: The following choses the behaviour of the outer location
+  --     wrapper replacing the inner ones.
+  composeSrcSpan (sp , p) =  if sp == noSrcSpan
+                             then p
+                             else NewPat (sp , stripSrcSpanPat p)
+
+  -- NB: The following only returns the top-level location, if any.
+  decomposeSrcSpan (NewPat (sp , p)) = (sp , stripSrcSpanPat p)
+  decomposeSrcSpan p                 = (noSrcSpan , p)
+
+stripSrcSpanPat :: Pat (GhcPass p) -> Pat (GhcPass p)
+stripSrcSpanPat (NewPat (_ , p)) = stripSrcSpanPat p
+stripSrcSpanPat p                = p
+
 
 -- ---------------------------------------------------------------------
 
@@ -489,7 +514,7 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
 
 pprParendLPat :: (OutputableBndrId (GhcPass p))
               => PprPrec -> LPat (GhcPass p) -> SDoc
-pprParendLPat p (L _ pat) = pprParendPat p pat
+pprParendLPat p (dL->(_ , pat)) = pprParendPat p pat
 
 pprParendPat :: (OutputableBndrId (GhcPass p))
              => PprPrec -> Pat (GhcPass p) -> SDoc
@@ -542,7 +567,7 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                          , ppr binds])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
-pprPat (XPat x)               = ppr x
+pprPat (NewPat (_ , p))         = ppr p
 
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId (GhcPass p))
@@ -581,14 +606,15 @@ instance (Outputable p, Outputable arg)
 ************************************************************************
 -}
 
-mkPrefixConPat :: DataCon -> [OutPat p] -> [Type] -> OutPat p
+mkPrefixConPat :: DataCon -> [OutPat (GhcPass p)] -> [Type] ->
+                  OutPat (GhcPass p)
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
   = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc), pat_tvs = [], pat_dicts = [],
                         pat_binds = emptyTcEvBinds, pat_args = PrefixCon pats,
                         pat_arg_tys = tys, pat_wrap = idHsWrapper }
 
-mkNilPat :: Type -> OutPat p
+mkNilPat :: Type -> OutPat (GhcPass p)
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
 mkCharLitPat :: SourceText -> Char -> OutPat (GhcPass p)
@@ -627,12 +653,12 @@ patterns are treated specially, of course.
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
 
-isBangedLPat :: LPat p -> Bool
-isBangedLPat (L _ (ParPat _ p)) = isBangedLPat p
-isBangedLPat (L _ (BangPat {})) = True
-isBangedLPat _                  = False
+isBangedLPat :: LPat (GhcPass p) -> Bool
+isBangedLPat (dL->(_ , ParPat _ p)) = isBangedLPat p
+isBangedLPat (dL->(_ , BangPat {})) = True
+isBangedLPat _                      = False
 
-looksLazyPatBind :: HsBind p -> Bool
+looksLazyPatBind :: HsBind (GhcPass p) -> Bool
 -- Returns True of anything *except*
 --     a StrictHsBind (as above) or
 --     a VarPat
@@ -645,15 +671,15 @@ looksLazyPatBind (AbsBinds { abs_binds = binds })
 looksLazyPatBind _
   = False
 
-looksLazyLPat :: LPat p -> Bool
-looksLazyLPat (L _ (ParPat _ p))           = looksLazyLPat p
-looksLazyLPat (L _ (AsPat _ _ p))          = looksLazyLPat p
-looksLazyLPat (L _ (BangPat {}))           = False
-looksLazyLPat (L _ (VarPat {}))            = False
-looksLazyLPat (L _ (WildPat {}))           = False
-looksLazyLPat _                            = True
+looksLazyLPat :: LPat (GhcPass p) -> Bool
+looksLazyLPat (dL->(_ , ParPat _ p))  = looksLazyLPat p
+looksLazyLPat (dL->(_ , AsPat _ _ p)) = looksLazyLPat p
+looksLazyLPat (dL->(_ , BangPat {}))  = False
+looksLazyLPat (dL->(_ , VarPat {}))   = False
+looksLazyLPat (dL->(_ , WildPat {}))  = False
+looksLazyLPat _                        = True
 
-isIrrefutableHsPat :: (OutputableBndrId p) => LPat p -> Bool
+isIrrefutableHsPat :: (OutputableBndrId (GhcPass p)) => LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -669,7 +695,7 @@ isIrrefutableHsPat :: (OutputableBndrId p) => LPat p -> Bool
 isIrrefutableHsPat pat
   = go pat
   where
-    go (L _ pat) = go1 pat
+    go (dL->(_ , pat)) = go1 pat
 
     go1 (WildPat {})        = True
     go1 (VarPat {})         = True
@@ -702,7 +728,7 @@ isIrrefutableHsPat pat
     -- since we cannot know until the splice is evaluated.
     go1 (SplicePat {})      = False
 
-    go1 (XPat {})           = False
+    go1 (NewPat {})         = False
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -728,7 +754,7 @@ is the only thing that could possibly be matched!
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
-patNeedsParens :: PprPrec -> Pat p -> Bool
+patNeedsParens :: PprPrec -> Pat (GhcPass p) -> Bool
 patNeedsParens p = go
   where
     go (NPlusKPat {})         = p > opPrec
@@ -749,7 +775,7 @@ patNeedsParens p = go
     go (ListPat {})           = False
     go (LitPat _ l)           = hsLitNeedsParens p l
     go (NPat _ (L _ ol) _ _)  = hsOverLitNeedsParens p ol
-    go (XPat {})              = True -- conservative default
+    go (NewPat {})            = True -- conservative default
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
@@ -763,8 +789,8 @@ conPatNeedsParens p = go
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
 parenthesizePat :: PprPrec -> LPat (GhcPass p) -> LPat (GhcPass p)
-parenthesizePat p lpat@(L loc pat)
-  | patNeedsParens p pat = L loc (ParPat NoExt lpat)
+parenthesizePat p lpat@(dL->(loc , pat))
+  | patNeedsParens p pat = cL loc (ParPat NoExt lpat)
   | otherwise            = lpat
 
 {-
@@ -776,7 +802,7 @@ collectEvVarsPats :: [Pat GhcTc] -> Bag EvVar
 collectEvVarsPats = unionManyBags . map collectEvVarsPat
 
 collectEvVarsLPat :: LPat GhcTc -> Bag EvVar
-collectEvVarsLPat (L _ pat) = collectEvVarsPat pat
+collectEvVarsLPat (dL->(_ , pat)) = collectEvVarsPat pat
 
 collectEvVarsPat :: Pat GhcTc -> Bag EvVar
 collectEvVarsPat pat =

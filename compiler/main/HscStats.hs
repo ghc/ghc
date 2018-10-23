@@ -5,6 +5,7 @@
 --
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns     #-}
 
 module HscStats ( ppSourceStats ) where
 
@@ -102,7 +103,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
         = sum5 (map inst_info inst_decls)
 
-    count_bind (PatBind { pat_lhs = L _ (VarPat{}) }) = (1,0,0)
+    count_bind (PatBind { pat_lhs = dL->(_ , VarPat{}) }) = (1,0,0)
     count_bind (PatBind {})                           = (0,1,0)
     count_bind (FunBind {})                           = (0,1,0)
     count_bind (PatSynBind {})                        = (0,0,1)
@@ -181,4 +182,3 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
     sum7 = foldr add7 (0,0,0,0,0,0,0)
 
     add7 (x1,x2,x3,x4,x5,x6,x7) (y1,y2,y3,y4,y5,y6,y7) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6,x7+y7)
-
