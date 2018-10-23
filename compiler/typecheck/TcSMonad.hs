@@ -3340,12 +3340,12 @@ setEvBind ev_bind
 
 -- | Mark variables as used filling a coercion hole
 useVars :: CoVarSet -> TcS ()
-useVars vars
+useVars co_vars
   = do { ev_binds_var <- getTcEvBindsVar
        ; let ref = ebv_tcvs ev_binds_var
        ; wrapTcS $
          do { tcvs <- TcM.readTcRef ref
-            ; let tcvs' = tcvs `unionVarSet` vars
+            ; let tcvs' = tcvs `unionVarSet` co_vars
             ; TcM.writeTcRef ref tcvs' } }
 
 -- | Equalities only

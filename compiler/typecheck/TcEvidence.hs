@@ -399,19 +399,16 @@ data EvBindsVar
       -- Some Given, some Wanted
 
       ebv_tcvs :: IORef CoVarSet
-      -- The free coercion vars of the (rhss of) the coercion bindings
-      -- All of these are Wanted
-      --
-      -- Coercions don't actually have bindings
-      -- because we plug them in-place (via a mutable
-      -- variable); but we keep their free variables
-      -- so that we can report unused given constraints
+      -- The free Given coercion vars needed by Wanted coercions that
+      -- are solved by filling in their HoleDest in-place. Since they
+      -- don't appear in ebv_binds, we keep track of their free
+      -- variables so that we can report unused given constraints
       -- See Note [Tracking redundant constraints] in TcSimplify
     }
 
   | CoEvBindsVar {  -- See Note [Coercion evidence only]
 
-      -- See above for comments on ebv_uniq, evb_tcvs
+      -- See above for comments on ebv_uniq, ebv_tcvs
       ebv_uniq :: Unique,
       ebv_tcvs :: IORef CoVarSet
     }
@@ -834,6 +831,8 @@ evTermCoercion tm = case evTermCoercion_maybe tm of
 ********************************************************************* -}
 
 findNeededEvVars :: EvBindMap -> VarSet -> VarSet
+-- Find all the Given evidence needed by seeds,
+-- looking transitively through binds
 findNeededEvVars ev_binds seeds
   = transCloVarSet also_needs seeds
   where
