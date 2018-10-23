@@ -165,8 +165,7 @@ outOfScope dflags x =
   where
     warnAndMonospace a = do
       tell ["Warning: '" ++ showPpr dflags a ++ "' is out of scope.\n" ++
-            "    If you qualify the identifier, haddock can try to link it\n" ++
-            "    it anyway."]
+            "    If you qualify the identifier, haddock can try to link it anyway."]
       pure (monospaced a)
     monospaced a = DocMonospaced (DocString (showPpr dflags a))
 
