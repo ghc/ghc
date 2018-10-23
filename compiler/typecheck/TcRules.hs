@@ -141,8 +141,8 @@ generateRuleConstraints hs_bndrs lhs rhs
               -- the RULE.  c.f. Trac #10072
 
        ; let (id_bndrs, tv_bndrs) = partition isId vars
-       ; tcExtendTyVarEnv tv_bndrs $
-         tcExtendIdEnv    id_bndrs $
+       ; tcExtendTyVarEnv (map unrestricted tv_bndrs) $
+         tcExtendIdEnv    (map unrestricted id_bndrs) $
     do { -- See Note [Solve order for RULES]
          ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
        ; (rhs',            rhs_wanted) <- captureConstraints $
