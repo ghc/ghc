@@ -2412,9 +2412,12 @@ insolubleWC (WC { wc_impl = implics, wc_simple = simples })
 
 insolubleCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
+-- Namely: a) an equality constraint
+--         b) that is insoluble
+--         c) and does not arise from a Given
 insolubleCt ct
-  | not (insolubleEqCt ct) = False
   | isHoleCt ct            = isOutOfScopeCt ct  -- See Note [Insoluble holes]
+  | not (insolubleEqCt ct) = False
   | arisesFromGivens ct    = False              -- See Note [Given insolubles]
   | otherwise              = True
 
