@@ -437,6 +437,7 @@ Library
         WorkWrap
         WwLib
         FamInst
+        ClsInst
         Inst
         TcAnnotations
         TcArrows

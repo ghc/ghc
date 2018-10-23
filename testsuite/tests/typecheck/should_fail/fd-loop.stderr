@@ -4,9 +4,3 @@ fd-loop.hs:12:10: error:
         in the constraint ‘C a b’ than in the instance head ‘Eq (T a)’
       (Use UndecidableInstances to permit this)
     • In the instance declaration for ‘Eq (T a)’
-
-fd-loop.hs:12:10: error:
-    • Variable ‘b’ occurs more often
-        in the constraint ‘Eq b’ than in the instance head ‘Eq (T a)’
-      (Use UndecidableInstances to permit this)
-    • In the instance declaration for ‘Eq (T a)’

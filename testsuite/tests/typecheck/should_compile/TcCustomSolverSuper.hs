@@ -13,11 +13,17 @@ using the solver (see `tcSuperClasses` in `TcInstDecls`).
 However, some classes need to be excepted from this behavior,
 as they have custom solving rules, and this test checks that
 we got this right.
+
+PS: this test used to have Typeable in the context too, but
+    that's a redundant constraint, so I removed it
+
+PPS: the whole structre of tcSuperClasses has changed,
+     so I'm no longer sure what is being tested here
 -}
 
 
-class (Typeable x, KnownNat x)    => C x
-class (Typeable x, KnownSymbol x) => D x
+class (KnownNat x)    => C x
+class (KnownSymbol x) => D x
 
 instance C 2
 instance D "2"

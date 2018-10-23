@@ -20,6 +20,7 @@ module TcSMonad (
     checkConstraintsTcS, checkTvConstraintsTcS,
 
     runTcPluginTcS, addUsedGRE, addUsedGREs,
+    matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
 
@@ -97,7 +98,7 @@ module TcSMonad (
     -- MetaTyVars
     newFlexiTcSTy, instFlexi, instFlexiX,
     cloneMetaTyVar, demoteUnfilledFmv,
-    tcInstType, tcInstSkolTyVarsX,
+    tcInstSkolTyVarsX,
 
     TcLevel,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
@@ -107,7 +108,7 @@ module TcSMonad (
     zonkTcTyCoVarBndr,
 
     -- References
-    newTcRef, readTcRef, updTcRef,
+    newTcRef, readTcRef, writeTcRef, updTcRef,
 
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
@@ -133,9 +134,11 @@ import FamInstEnv
 
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
+import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
-       ( checkWellStaged, topIdLvl, tcGetDefaultTys, tcLookupClass, tcLookupId )
+       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
 import PrelNames( heqTyConKey, eqTyConKey )
+import ClsInst( InstanceWhat(..) )
 import Kind
 import TcType
 import DynFlags
@@ -363,13 +366,13 @@ selectNextWorkItem :: TcS (Maybe Ct)
 -- See Note [Prioritise equalities]
 selectNextWorkItem
   = do { wl_var <- getTcSWorkListRef
-       ; wl <- wrapTcS (TcM.readTcRef wl_var)
+       ; wl <- readTcRef wl_var
        ; case selectWorkItem wl of {
            Nothing -> return Nothing ;
            Just (ct, new_wl) ->
     do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
          -- This is done by TcInteract.chooseInstance
-       ; wrapTcS (TcM.writeTcRef wl_var new_wl)
+       ; writeTcRef wl_var new_wl
        ; return (Just ct) } } }
 
 -- Pretty printing
@@ -2927,21 +2930,21 @@ getTcSWorkListRef :: TcS (IORef WorkList)
 getTcSWorkListRef = TcS (return . tcs_worklist)
 
 getTcSInerts :: TcS InertSet
-getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef)
+getTcSInerts = getTcSInertsRef >>= readTcRef
 
 setTcSInerts :: InertSet -> TcS ()
-setTcSInerts ics = do { r <- getTcSInertsRef; wrapTcS (TcM.writeTcRef r ics) }
+setTcSInerts ics = do { r <- getTcSInertsRef; writeTcRef r ics }
 
 getWorkListImplics :: TcS (Bag Implication)
 getWorkListImplics
   = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- wrapTcS (TcM.readTcRef wl_var)
+       ; wl_curr <- readTcRef wl_var
        ; return (wl_implics wl_curr) }
 
 updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
 updWorkListTcS f
   = do { wl_var <- getTcSWorkListRef
-       ; wrapTcS (TcM.updTcRef wl_var f)}
+       ; updTcRef wl_var f }
 
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs
@@ -2960,6 +2963,9 @@ newTcRef x = wrapTcS (TcM.newTcRef x)
 
 readTcRef :: TcRef a -> TcS a
 readTcRef ref = wrapTcS (TcM.readTcRef ref)
+
+writeTcRef :: TcRef a -> a -> TcS ()
+writeTcRef ref val = wrapTcS (TcM.writeTcRef ref val)
 
 updTcRef :: TcRef a -> (a->a) -> TcS ()
 updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
@@ -3043,14 +3049,24 @@ addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-checkWellStagedDFun :: PredType -> DFunId -> CtLoc -> TcS ()
-checkWellStagedDFun pred dfun_id loc
+checkWellStagedDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
+-- Check that we do not try to use an instance before it is available.  E.g.
+--    instance Eq T where ...
+--    f x = $( ... (\(p::T) -> p == p)... )
+-- Here we can't use the equality function from the instance in the splice
+
+checkWellStagedDFun loc what pred
+  | TopLevInstance { iw_dfun_id = dfun_id } <- what
+  , let bind_lvl = TcM.topIdLvl dfun_id
+  , bind_lvl > impLevel
   = wrapTcS $ TcM.setCtLocM loc $
     do { use_stage <- TcM.getStage
        ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
+
+  | otherwise
+  = return ()    -- Fast path for common case
   where
     pp_thing = text "instance for" <+> quotes (ppr pred)
-    bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
@@ -3059,7 +3075,7 @@ isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
 isFilledMetaTyVar_maybe tv
  = case tcTyVarDetails tv of
      MetaTv { mtv_ref = ref }
-        -> do { cts <- wrapTcS (TcM.readTcRef ref)
+        -> do { cts <- readTcRef ref
               ; case cts of
                   Indirect ty -> return (Just ty)
                   Flexi       -> return Nothing }
@@ -3268,12 +3284,12 @@ instFlexiHelper subst tv
        ; TcM.traceTc "instFlexi" (ppr ty')
        ; return (extendTvSubst subst tv ty') }
 
-tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
-                   -- ^ How to instantiate the type variables
-           -> Id   -- ^ Type to instantiate
-           -> TcS ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
-                -- (type vars, preds (incl equalities), rho)
-tcInstType inst_tyvars id = wrapTcS (TcM.tcInstType inst_tyvars id)
+matchGlobalInst :: DynFlags
+                -> Bool      -- True <=> caller is the short-cut solver
+                             -- See Note [Shortcut solving: overlap]
+                -> Class -> [Type] -> TcS TcM.ClsInstResult
+matchGlobalInst dflags short_cut cls tys
+  = wrapTcS (TcM.matchGlobalInst dflags short_cut cls tys)
 
 tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
 tcInstSkolTyVarsX subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX subst tvs

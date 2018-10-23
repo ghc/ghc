@@ -27,6 +27,7 @@ import Maybes
 -- friends:
 import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
+import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
 import PrelNames
@@ -40,15 +41,15 @@ import TyCon
 -- others:
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
-import TcEnv       ( tcGetInstEnvs, tcInitTidyEnv, tcInitOpenTidyEnv )
+import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
-import InstEnv     ( InstMatch, lookupInstEnv )
 import FamInstEnv  ( isDominatedBy, injectiveBranches,
                      InjectivityCheckResult(..) )
 import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
+import Id          ( idType, idName )
 import Var         ( TyVarBndr(..), mkTyVar )
 import ErrUtils
 import DynFlags
@@ -680,9 +681,9 @@ applying the instance decl would show up two uses of ?x.  Trac #8912.
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 -- Assumes argument is fully zonked
 checkValidTheta ctxt theta
-  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
-       ; addErrCtxtM (checkThetaCtxt ctxt theta) $
-         check_valid_theta env ctxt theta }
+  = addErrCtxtM (checkThetaCtxt ctxt theta) $
+    do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
+       ; check_valid_theta env ctxt theta }
 
 -------------------------
 check_valid_theta :: TidyEnv -> UserTypeCtxt -> [PredType] -> TcM ()
@@ -748,32 +749,47 @@ check_pred_help under_syn env dflags ctxt pred
 
   | otherwise  -- A bit like classifyPredType, but not the same
                -- E.g. we treat (~) like (~#); and we look inside tuples
-  = case splitTyConApp_maybe pred of
-      Just (tc, tys)
-        | isTupleTyCon tc
-        -> check_tuple_pred under_syn env dflags ctxt pred tys
+  = case classifyPredType pred of
+      ClassPred cls tys
+        | isCTupleClass cls   -> check_tuple_pred under_syn env dflags ctxt pred tys
+        | otherwise           -> check_class_pred env dflags ctxt pred cls tys
 
-        | tc `hasKey` heqTyConKey ||
-          tc `hasKey` eqTyConKey ||
-          tc `hasKey` eqPrimTyConKey
-          -- NB: this equality check must come first,
-          --  because (~) is a class,too.
-        -> check_eq_pred env dflags pred tc tys
+      EqPred NomEq _ _  -> -- a ~# b
+                           check_eq_pred env dflags pred
 
-        | Just cls <- tyConClass_maybe tc
-          -- Includes Coercible
-        -> check_class_pred env dflags ctxt pred cls tys
+      EqPred ReprEq _ _ -> -- Ugh!  When inferring types we may get
+                           -- f :: (a ~R# b) => blha
+                           -- And we want to treat that like (Coercible a b)
+                           -- We should probably check argument shapes, but we
+                           -- didn't do so before, so I'm leaving it for now
+                           return ()
 
-      _ -> check_irred_pred under_syn env dflags ctxt pred
+      ForAllPred _ theta head -> check_quant_pred env dflags pred theta head
+      IrredPred {}            -> check_irred_pred under_syn env dflags ctxt pred
 
-check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TyCon -> [TcType] -> TcM ()
-check_eq_pred env dflags pred tc tys
+check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
+check_eq_pred env dflags pred
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
-    do { checkTc (tys `lengthIs` tyConArity tc) (tyConArityErr tc tys)
-       ; checkTcM (xopt LangExt.TypeFamilies dflags
-                   || xopt LangExt.GADTs dflags)
-                  (eqPredTyErr env pred) }
+    checkTcM (xopt LangExt.TypeFamilies dflags
+              || xopt LangExt.GADTs dflags)
+             (eqPredTyErr env pred)
+
+check_quant_pred :: TidyEnv -> DynFlags -> PredType
+                 -> ThetaType -> PredType -> TcM ()
+check_quant_pred env dflags pred theta head_pred
+  = addErrCtxt (text "In the quantified constraint"
+                <+> quotes (ppr pred)) $
+    do { checkTcM head_ok (badQuantHeadErr env pred)
+
+       ; unless (xopt LangExt.UndecidableInstances dflags) $
+         checkInstTermination theta head_pred
+    }
+  where
+    head_ok = case classifyPredType head_pred of
+                 ClassPred {} -> True
+                 IrredPred {} -> hasTyVarHead head_pred
+                 _            -> False
 
 check_tuple_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
 check_tuple_pred under_syn env dflags ctxt pred ts
@@ -833,16 +849,21 @@ This will cause the constraint simplifier to loop because every time we canonica
 solved to add+canonicalise another (Foo a) constraint.  -}
 
 -------------------------
-check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
+check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
+                 -> PredType -> Class -> [TcType] -> TcM ()
 check_class_pred env dflags ctxt pred cls tys
+  |  cls `hasKey` heqTyConKey   -- (~) and (~~) are classified as classes,
+  || cls `hasKey` eqTyConKey    -- but here we want to treat them as equalities
+  = pprTrace "check_class" (ppr cls) $
+    check_eq_pred env dflags pred
+
   | isIPClass cls
   = do { check_arity
        ; checkTcM (okIPCtxt ctxt) (badIPPred env pred) }
 
-  | otherwise
+  | otherwise     -- Includes Coercible
   = do { check_arity
-       ; warn_simp <- woptM Opt_WarnSimplifiableClassConstraints
-       ; when warn_simp check_simplifiable_class_constraint
+       ; checkSimplifiableClassConstraint env dflags ctxt cls tys
        ; checkTcM arg_tys_ok (predTyVarErr env pred) }
   where
     check_arity = checkTc (tys `lengthIs` classArity cls)
@@ -858,26 +879,47 @@ check_class_pred env dflags ctxt pred cls tys
                                 -- in checkInstTermination
         _            -> checkValidClsArgs flexible_contexts cls tys
 
-    -- See Note [Simplifiable given constraints]
-    check_simplifiable_class_constraint
-       | xopt LangExt.MonoLocalBinds dflags
-       = return ()
-       | DataTyCtxt {} <- ctxt   -- Don't do this check for the "stupid theta"
-       = return ()               -- of a data type declaration
-       | otherwise
-       = do { envs <- tcGetInstEnvs
-            ; case lookupInstEnv False envs cls tys of
-                 ([m], [], _) -> addWarnTc (Reason Opt_WarnSimplifiableClassConstraints)
-                                           (simplifiable_constraint_warn m)
-                 _ -> return () }
+checkSimplifiableClassConstraint :: TidyEnv -> DynFlags -> UserTypeCtxt
+                                 -> Class -> [TcType] -> TcM ()
+-- See Note [Simplifiable given constraints]
+checkSimplifiableClassConstraint env dflags ctxt cls tys
+  | not (wopt Opt_WarnSimplifiableClassConstraints dflags)
+  = return ()
+  | xopt LangExt.MonoLocalBinds dflags
+  = return ()
 
-    simplifiable_constraint_warn :: InstMatch -> SDoc
-    simplifiable_constraint_warn (match, _)
-     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred)))
-                 2 (text "matches an instance declaration")
-            , ppr match
+  | DataTyCtxt {} <- ctxt   -- Don't do this check for the "stupid theta"
+  = return ()               -- of a data type declaration
+
+  | cls `hasKey` coercibleTyConKey
+  = return ()   -- Oddly, we treat (Coercible t1 t2) as unconditionally OK
+                -- matchGlobalInst will reply "yes" because we can reduce
+                -- (Coercible a b) to (a ~R# b)
+
+  | otherwise
+  = do { result <- matchGlobalInst dflags False cls tys
+       ; case result of
+           OneInst { cir_what = what }
+              -> addWarnTc (Reason Opt_WarnSimplifiableClassConstraints)
+                                   (simplifiable_constraint_warn what)
+           _          -> return () }
+  where
+    pred = mkClassPred cls tys
+
+    simplifiable_constraint_warn :: InstanceWhat -> SDoc
+    simplifiable_constraint_warn what
+     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred))
+                    <+> text "matches")
+                 2 (ppr_what what)
             , hang (text "This makes type inference for inner bindings fragile;")
                  2 (text "either use MonoLocalBinds, or simplify it using the instance") ]
+
+    ppr_what BuiltinInstance = text "a built-in instance"
+    ppr_what LocalInstance   = text "a locally-quantified instance"
+    ppr_what (TopLevInstance { iw_dfun_id = dfun })
+      = hang (text "instance" <+> pprSigmaType (idType dfun))
+           2 (text "--" <+> pprDefinedAt (idName dfun))
+
 
 {- Note [Simplifiable given constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -973,7 +1015,12 @@ checkThetaCtxt ctxt theta env
            , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
-eqPredTyErr, predTupleErr, predIrredErr, predSuperClassErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+eqPredTyErr, predTupleErr, predIrredErr,
+   predSuperClassErr, badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+badQuantHeadErr env pred
+  = ( env
+    , hang (text "Quantified predicate must have a class or type variable head:")
+         2 (ppr_tidy env pred) )
 eqPredTyErr  env pred
   = ( env
     , text "Illegal equational constraint" <+> ppr_tidy env pred $$
@@ -1329,7 +1376,9 @@ checkValidInstance ctxt hs_type ty
   | otherwise
   = do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
         ; traceTc "checkValidInstance {" (ppr ty)
-        ; checkValidTheta ctxt theta
+
+        ; env0 <- tcInitTidyEnv
+        ; check_valid_theta env0 ctxt theta
 
         -- The Termination and Coverate Conditions
         -- Check that instance inference will terminate (if we care)
@@ -1415,16 +1464,15 @@ checkInstTermination theta head_pred
               bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
                                -- See Note [Invisible arguments and termination]
 
-         ForAllPred tvs theta' head_pred'
-           -> do { check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
-                 ; addErrCtxt (text "In the quantified constraint"
-                              <+> quotes (ppr pred)) $
-                   checkInstTermination theta' head_pred' }
+         ForAllPred tvs _ head_pred'
+           -> check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
+              -- Termination of the quantified predicate itself is checked
+              -- when the predicates are individually checked for validity
 
    check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what (ppr head_pred))
-     | not (isTyFamFree pred) = addErrTc (nestedMsg what)
-     | pred_size >= head_size = addErrTc (smallerMsg what (ppr head_pred))
+     | not (null bad_tvs)     = failWithTc (noMoreMsg bad_tvs what (ppr head_pred))
+     | not (isTyFamFree pred) = failWithTc (nestedMsg what)
+     | pred_size >= head_size = failWithTc (smallerMsg what (ppr head_pred))
      | otherwise              = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
      where
