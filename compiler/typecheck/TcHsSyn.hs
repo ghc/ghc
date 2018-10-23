@@ -980,11 +980,10 @@ zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; (env2, c2') <- zonkCoFn env1 c2
                                     ; return (env2, WpCompose c1' c2') }
-zonkCoFn env (WpFun w c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
-                                       ; (env2, c2') <- zonkCoFn env1 c2
-                                       ; (env3, w') <- zonkCoFn env2 w
-                                       ; t1'         <- zonkWeightedTcTypeToType env2 t1
-                                       ; return (env2, WpFun w' c1' c2' t1' d) }
+zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
+                                     ; (env2, c2') <- zonkCoFn env1 c2
+                                     ; t1'         <- zonkWeightedTcTypeToType env2 t1
+                                     ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
                               ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev

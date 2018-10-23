@@ -1122,16 +1122,15 @@ dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; return (w1 . w2) }
  -- See comments on WpFun in TcEvidence for an explanation of what
  -- the specification of this clause is
-dsHsWrapper (WpFun c_w c1 c2 (Weighted w t1) doc)
+dsHsWrapper (WpFun c1 c2 (Weighted w t1) doc)
                               = do { x <- newSysLocalDsNoLP w t1
-                                   ; w_w  <- dsHsWrapper c_w
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
                                          arg     = w1 (Var x)
                                    ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
                                    ; if ok
-                                     then return (\e -> w_w (Lam x (w2 (app e arg))))
+                                     then return (\e -> (Lam x (w2 (app e arg))))
                                      else return id }  -- this return is irrelevant
 dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
                                 return $ \e -> mkCastDs e co

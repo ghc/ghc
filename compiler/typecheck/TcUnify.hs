@@ -160,7 +160,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
         do { (result, wrap_res) <- go ((Weighted weight $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
-                    , mkWpFun idHsWrapper idHsWrapper wrap_res (Weighted weight arg_ty) res_ty doc ) }
+                    , mkWpFun idHsWrapper wrap_res (Weighted weight arg_ty) res_ty doc ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -287,7 +287,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args (FunTy w arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
         do { (wrap_res, tys, ty_r) <- go (n-1) (Weighted w arg_ty : acc_args) res_ty
-           ; return ( mkWpFun idHsWrapper idHsWrapper wrap_res (Weighted w arg_ty) ty_r doc
+           ; return ( mkWpFun idHsWrapper wrap_res (Weighted w arg_ty) ty_r doc
                     , Weighted w arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
@@ -760,13 +760,10 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        -- TODO: MattP this should be on the same code path as tcSubWeight
-        do { -- Note that here we do not call to `subweightMaybe`, so we check
-             -- for strict equality.
-           ; w_wrap <- tc_sub_weight_ds eq_orig inst_orig ctxt act_weight exp_weight
+        do { tcEqWeight eq_orig inst_orig ctxt act_weight exp_weight
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
-           ; return (mkWpFun w_wrap arg_wrap res_wrap (Weighted exp_weight exp_arg) exp_res doc) }
+           ; return (mkWpFun arg_wrap res_wrap (Weighted exp_weight exp_arg) exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
@@ -814,9 +811,15 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-tc_sub_weight_ds :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM HsWrapper
-tc_sub_weight_ds eq_orig inst_orig ctxt w_actual w_expected =
-  tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
+tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM ()
+tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
+  { -- Note that here we do not call to `subweightMaybe`, so we check
+    -- for strict equality.
+  ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
+  -- I don't know why, but `_wrap` need not be an identity wrapper. At any rate,
+  -- the wrapper isn't significant for multiplicities, so it is safe to drop
+  -- it. But maybe there is a better way to implement this function.
+  ; return () }
 
 -- TODO: MattP fix the origins
 -- As an approximation to checking w1 * w2 <= w we check that w1 <= w and
@@ -840,7 +843,7 @@ tcSubWeight actual_w w
         _ -> do_one_action weight w
 
     do_one_action a_w c_w
-       = void (tc_sub_weight_ds AppOrigin AppOrigin TypeAppCtxt a_w c_w)
+       = tcEqWeight AppOrigin AppOrigin TypeAppCtxt a_w c_w
 
 
 

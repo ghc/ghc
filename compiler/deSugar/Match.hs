@@ -1046,8 +1046,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpFun w_w w1 w2 _ _) (WpFun w_w'  w1' w2' _ _) =
-      wrap w_w w_w' && wrap w1 w1' && wrap w2 w2'
+    wrap (WpFun w1 w2 _ _) (WpFun w1' w2' _ _) =
+      wrap w1 w1' && wrap w2 w2'
     wrap (WpCast co)       (WpCast co')        = co `eqCoercion` co'
     wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
     wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'

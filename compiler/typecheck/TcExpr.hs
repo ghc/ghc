@@ -362,7 +362,10 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; let arg2_exp_ty = res_ty
        ; arg1' <- tcArg op arg1 (unrestricted arg1_ty) 1
        ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
-                  tc_poly_expr_nc arg2 arg2_exp_ty
+                  tcScalingUsage Omega $ tc_poly_expr_nc arg2 arg2_exp_ty
+                  -- It is not necessary, but for the sake of least surprise,
+                  -- seq is unrestricted in its second argument. It can (and,
+                  -- probably, should) be refined later.
        ; arg2_ty <- readExpType arg2_exp_ty
        ; op_id <- tcLookupId op_name
        ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
@@ -378,6 +381,11 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
              orig1 = lexprCtOrigin arg1
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
+
+       ; tcSubWeight Omega (weightedWeight arg2_sigma)
+         -- When ($) becomes multiplicity-polymorphic, then the above check will
+         -- need to go. But in the meantime, it would produce ill-typed
+         -- desugared code to accept linear functions to the left of a ($).
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
@@ -422,17 +430,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
              -- matchActualFunTys? funTyWeight seems a bit icky.
              --
              -- We need to zonk here as well, see Dollar2 for an example
-             --
-             -- TODO: Remove this fromMaybe as it is only
-             -- hiding errors.
-             w = case funTyWeight_maybe arg1_ty_read of
-                   Nothing -> Omega
-                    -- pprPanic "dollarRule" (ppr arg1_ty_read $$ ppr arg1' $$ ppr arg2)
-                    -- See Data.ByteString.Builder.Internal for
-                    -- a real-world failure and DollarDefault for a small
-                    -- example
-                   Just w -> w
-             wrap1 = mkWpFun idHsWrapper idHsWrapper wrap_res arg2_sigma res_ty doc
+             wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
 
@@ -859,7 +857,18 @@ following.
 tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
   = ASSERT( notNull rbnds )
     do  { -- STEP -2: typecheck the record_expr, the record to be updated
-          (record_expr', record_rho) <- tcInferRho record_expr
+          (record_expr', record_rho) <- tcScalingUsage Omega $ tcInferRho record_expr
+            -- Record update drops some of the content of the record (namely the
+            -- content of the field being updated). As a consequence, it
+            -- requires an unrestricted record.
+            --
+            -- Consider the following example:
+            --
+            -- data R a = R { self :: a }
+            -- bad :: a ⊸ ()
+            -- bad x = let r = R x in r { self = () }
+            --
+            -- This should definitely *not* typecheck.
 
         -- STEP -1  See Note [Disambiguating record fields]
         -- After this we know that rbinds is unambiguous
@@ -1410,7 +1419,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
            ; let w = weightedWeight arg_ty
-           ; return ( mkWpFun idHsWrapper idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
+           ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
                     , HsValArg arg' : args'
                     , inner_res_ty ) }
       where
@@ -1569,7 +1578,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
 
            ; return ( result
                     , match_wrapper <.>
-                      mkWpFun idHsWrapper (arg_wrapper2 <.> arg_wrapper1) res_wrapper
+                      mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
                               (Weighted op_mult arg_ty) res_ty doc ) }
       where
         herald = text "This rebindable syntax expects a function with"

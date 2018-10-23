@@ -53,6 +53,7 @@ import Util
 import Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
+import Control.Monad ( when )
 import ListSetOps ( getNth )
 import Data.Functor.Compose ( Compose(..) )
 
@@ -344,7 +345,8 @@ tc_pat penv (BangPat x pat) pat_ty thing_inside
         ; return (BangPat x pat', res) }
 
 tc_pat penv (LazyPat x pat) pat_ty thing_inside
-  = do  { (pat', (res, pat_ct))
+  = do  { checkLinearity
+        ; (pat', (res, pat_ct))
                 <- tc_lpat pat pat_ty (makeLazy penv) $
                    captureConstraints thing_inside
                 -- Ignore refined penv', revert to penv
@@ -358,26 +360,27 @@ tc_pat penv (LazyPat x pat) pat_ty thing_inside
         ; _ <- unifyType Nothing (typeKind pat_ty) liftedTypeKind
 
         ; return (LazyPat x pat', res) }
+    where
+      checkLinearity =
+        when (not $ subweight Omega (weightedWeight pat_ty)) $
+          addErrTc $ text "Lazy patterns are only allowed at multiplicity ω"
 
 tc_pat _ (WildPat _) pat_ty thing_inside
-  = checkLinearity $
-    do  { res <- thing_inside
+  = do  { checkLinearity
+        ; res <- thing_inside
         ; pat_ty <- expTypeToType (weightedThing pat_ty)
         ; return (WildPat pat_ty, res) }
     where
-      checkLinearity tc_wildcard =
-        if subweight Zero (weightedWeight pat_ty) then
-          tc_wildcard
-        else do
+      checkLinearity =
+        when (not $ subweight Zero (weightedWeight pat_ty)) $
           addErrTc $ text "Wildcard patterns of weight " <+>
                      quotes (ppr $ weightedWeight pat_ty) <+>
                      text "are not allowed"
-          tc_wildcard
 
 
 tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
-  = checkLinearity $
-    do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
+  = do  { checkLinearity
+        ; (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name (pat_ty `weightedSet` bndr_id) $
                          tc_lpat pat (pat_ty `weightedSet`(mkCheckExpType $ idType bndr_id))
                                  penv thing_inside
@@ -391,15 +394,17 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
     where
-      checkLinearity tc_as =
-        if subweight Omega (weightedWeight pat_ty) then
-          tc_as
-        else do
+      checkLinearity =
+        when (not $ subweight Omega (weightedWeight pat_ty)) $
           addErrTc $ text "@-patterns are only allowed at multiplicity ω"
-          tc_as
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
-  = do  {
+  = do  { checkLinearity
+          -- It should be possible to have view patterns at linear (or otherwise
+          -- non-ω) multiplicity. But it is not clear at the moment what
+          -- restriction need to be put in place, if any, for linear view
+          -- patterns to desugar to type-correct Core.
+
          -- Expr must have type `forall a1...aN. OPT' -> B`
          -- where overall_pat_ty is an instance of OPT'.
         ; (expr',expr'_inferred) <- tcInferSigma expr
@@ -420,13 +425,17 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
 
         ; let Weighted w h_overall_pat_ty = overall_pat_ty
         ; overall_pat_ty <- readExpType h_overall_pat_ty
-        ; let expr_wrap2' = mkWpFun idHsWrapper expr_wrap2 idHsWrapper -- TODO: arnaud: maybe one of the two `weight` ought to be the pattern's weight?
+        ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
                                     (Weighted w overall_pat_ty) inf_res_ty doc
                -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
                --                (overall_pat_ty -> inf_res_ty)
               expr_wrap = expr_wrap2' <.> expr_wrap1
               doc = text "When checking the view pattern function:" <+> (ppr expr)
         ; return (ViewPat overall_pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
+    where
+      checkLinearity =
+        when (not $ subweight Omega (weightedWeight overall_pat_ty)) $
+          addErrTc $ text "View patterns are only allowed at multiplicity ω"
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
@@ -856,6 +865,9 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               arg_tys_weighted = map (scaleWeighted pat_weight) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
+
+        ; when (not $ subweight Omega pat_weight) $
+            addErrTc $ text "Pattern synonyms are only allowed at multiplicity ω"
 
         ; wrap <- tcSubTypePat penv (weightedThing pat_ty) ty'
         ; traceTc "tcPatSynPat" (ppr pat_syn $$

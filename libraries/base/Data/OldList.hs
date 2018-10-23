@@ -920,7 +920,7 @@ sort :: (Ord a) => [a] -> [a]
 --
 -- >>> sortBy (\(a,_) (b,_) -> compare a b) [(2, "world"), (4, "!"), (1, "Hello")]
 -- [(1,"Hello"),(2,"world"),(4,"!")]
-sortBy :: forall a . (a -> a -> Ordering) -> [a] -> [a]
+sortBy :: (a -> a -> Ordering) -> [a] -> [a]
 
 #if defined(USE_REPORT_PRELUDE)
 sort = sortBy compare
