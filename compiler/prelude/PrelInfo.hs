@@ -70,7 +70,7 @@ import Class
 import TyCon
 import UniqFM
 import Util
-import {-# SOURCE #-} TcTypeNats ( typeNatTyCons )
+import TcTypeNats ( typeNatTyCons )
 
 import Control.Applicative ((<|>))
 import Data.List        ( intercalate )
