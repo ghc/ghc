@@ -96,7 +96,7 @@ tcPatSynDecl psb@(PSB { psb_id = L _ name, psb_args = details }) mb_sig
        where
          -- The matcher_id is used only by the desugarer, so actually
          -- and error-thunk would probably do just as well here.
-         matcher_id = mkLocalId matcher_name $
+         matcher_id = mkLocalId matcher_name Alias $  -- todo Krzysztof is Alias right?
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
 tcPatSynDecl (XPatSynBind {}) _ = panic "tcPatSynDecl"

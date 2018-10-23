@@ -1787,7 +1787,7 @@ kcImplicitTKBndrs :: [Name]     -- of the vars
                                          -- these are *not* dependency ordered
 kcImplicitTKBndrs var_ns thing_inside
   = do { tkvs <- mapM newFlexiKindedSigTyVar var_ns
-       ; result <- tcExtendTyVarEnv tkvs thing_inside
+       ; result <- tcExtendTyVarEnv (map unrestricted tkvs) thing_inside
        ; return (tkvs, result) }
 
 
@@ -1825,8 +1825,7 @@ tcImplicitTKBndrsX new_tv skol_info tv_names thing_inside
            <- solveLocalEqualities $
               checkTvConstraints skol_info Nothing $
               do { tkvs <- mapM new_tv tv_names
-                   -- probably must_scope_tvs -> map unrestricted tkvs
-                 ; result <- tcExtendTyVarEnv tkvs thing_inside
+                 ; result <- tcExtendTyVarEnv (map unrestricted tkvs) thing_inside
                  ; return (tkvs, result) }
 
        ; skol_tvs <- mapM zonkTcTyCoVarBndr skol_tvs
