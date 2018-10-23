@@ -109,3 +109,17 @@ callstack002
 
 # Other tests which timeout on CI, but not locally
 concprog001
+
+# Unknown, to be checked
+dynamic-paper
+
+# Hole suggestions
+T14273
+T14343
+T14343b
+holes
+holes2
+holes3
+type_in_type_hole_fits
+valid_hole_fits
+valid_hole_fits_interactions
