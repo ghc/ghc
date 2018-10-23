@@ -180,7 +180,10 @@ mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExt e1 e2)
 
 mkHsAppType :: (XAppTypeE (GhcPass id) ~ LHsWcType GhcRn)
             => LHsExpr (GhcPass id) -> LHsWcType GhcRn -> LHsExpr (GhcPass id)
-mkHsAppType e t = addCLoc e (hswc_body t) (HsAppType t e)
+mkHsAppType e t = addCLoc e t_body (HsAppType paren_wct e)
+  where
+    t_body    = hswc_body t
+    paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
 
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl mkHsAppType
@@ -496,12 +499,23 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: (XFunTy p ~ NoExt) => LHsType p -> HsRig p -> LHsType p -> LHsType p
+-- TODO Krzysztof this was originally (XFunTy p ~ NoExt) =>,
+-- it's not clear to me why it had to be changed
+nlHsFunTy :: (p ~ GhcPass q) => LHsType p -> HsRig p -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExt NotPromoted (noLoc x))
-nlHsFunTy a weight b = noLoc (HsFunTy noExt a weight b)
+
+nlHsFunTy a weight b = noLoc (HsFunTy noExt (parenthesizeHsType funPrec a)
+                                     weight
+                                     (parenthesize_fun_tail b))
+  where
+    parenthesize_fun_tail (L loc (HsFunTy ext ty1 weight ty2))
+      = L loc (HsFunTy ext (parenthesizeHsType funPrec ty1)
+                           weight
+                           (parenthesize_fun_tail ty2))
+    parenthesize_fun_tail lty = lty
 nlHsParTy t   = noLoc (HsParTy noExt t)
 
 nlHsTyConApp :: IdP (GhcPass p) -> [LHsType (GhcPass p)] -> LHsType (GhcPass p)
@@ -703,7 +717,7 @@ The derived Eq instance for Glurp (without any kind signatures) would be:
   instance Eq a => Eq (Glurp a) where
     (==) = coerce @(Wat 'Proxy -> Wat 'Proxy -> Bool)
                   @(Glurp a    -> Glurp a    -> Bool)
-                  (==)
+                  (==) :: Glurp a -> Glurp a -> Bool
 
 (Where the visible type applications use types produced by typeToLHsType.)
 

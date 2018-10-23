@@ -1474,7 +1474,7 @@ lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 lintType (CastTy ty co)
   = do { k1 <- lintType ty
        ; (k1', k2) <- lintStarCoercion co
-       ; ensureEqTys k1 k1' (mkCastErr ty co k1' k1)
+       ; ensureEqTys k1 k1' (mkCastTyErr ty co k1' k1)
        ; return k2 }
 
 lintType (CoercionTy co)
@@ -2611,14 +2611,32 @@ mkArityMsg binder
          ]
            where (StrictSig dmd_ty) = idStrictness binder
 -}
-mkCastErr :: Outputable casted => casted -> Coercion -> Type -> Type -> MsgDoc
-mkCastErr expr co from_ty expr_ty
-  = vcat [text "From-type of Cast differs from type of enclosed expression",
-          text "From-type:" <+> ppr from_ty,
-          text "Type of enclosed expr:" <+> ppr expr_ty,
-          text "Actual enclosed expr:" <+> ppr expr,
+mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
+mkCastErr expr = mk_cast_err "expression" "type" (ppr expr)
+
+mkCastTyErr :: Type -> Coercion -> Kind -> Kind -> MsgDoc
+mkCastTyErr ty = mk_cast_err "type" "kind" (ppr ty)
+
+mk_cast_err :: String -- ^ What sort of casted thing this is
+                      --   (\"expression\" or \"type\").
+            -> String -- ^ What sort of coercion is being used
+                      --   (\"type\" or \"kind\").
+            -> SDoc   -- ^ The thing being casted.
+            -> Coercion -> Type -> Type -> MsgDoc
+mk_cast_err thing_str co_str pp_thing co from_ty thing_ty
+  = vcat [from_msg <+> text "of Cast differs from" <+> co_msg
+            <+> text "of" <+> enclosed_msg,
+          from_msg <> colon <+> ppr from_ty,
+          text (capitalise co_str) <+> text "of" <+> enclosed_msg <> colon
+            <+> ppr thing_ty,
+          text "Actual" <+> enclosed_msg <> colon <+> pp_thing,
           text "Coercion used in cast:" <+> ppr co
          ]
+  where
+    co_msg, from_msg, enclosed_msg :: SDoc
+    co_msg       = text co_str
+    from_msg     = text "From-" <> co_msg
+    enclosed_msg = text "enclosed" <+> text thing_str
 
 mkBadUnivCoMsg :: LeftOrRight -> Coercion -> SDoc
 mkBadUnivCoMsg lr co

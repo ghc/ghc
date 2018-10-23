@@ -517,8 +517,13 @@ stripInvisArgs dflags tys
     where
       suppress_invis c
         = case c of
+            ITC_Nil        -> ITC_Nil
             ITC_Invis _ ts -> suppress_invis ts
-            _ -> c
+            ITC_Vis   t ts -> ITC_Vis t $ suppress_invis ts
+              -- Keep recursing through the remainder of the arguments, as it's
+              -- possible that there are remaining invisible ones.
+              -- See the "In type declarations" section of Note [TyVarBndrs,
+              -- TyVarBinders, TyConBinders, and visibility] in TyCoRep.
 
 tcArgsIfaceTypes :: IfaceTcArgs -> [IfaceType]
 tcArgsIfaceTypes ITC_Nil = []
@@ -913,11 +918,15 @@ pprParendIfaceTcArgs = ppr_tc_args appPrec
 
 ppr_tc_args :: PprPrec -> IfaceTcArgs -> SDoc
 ppr_tc_args ctx_prec args
- = let pprTys t ts = ppr_ty ctx_prec t <+> ppr_tc_args ctx_prec ts
+ = let ppr_rest    = ppr_tc_args ctx_prec
+       pprTys t ts = ppr_ty ctx_prec t <+> ppr_rest ts
    in case args of
         ITC_Nil        -> empty
         ITC_Vis   t ts -> pprTys t ts
-        ITC_Invis t ts -> pprTys t ts
+        ITC_Invis t ts -> sdocWithDynFlags $ \dflags ->
+                          if gopt Opt_PrintExplicitKinds dflags
+                             then pprTys t ts
+                             else ppr_rest ts
 
 -------------------
 pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc

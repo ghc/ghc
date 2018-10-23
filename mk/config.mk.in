@@ -875,8 +875,6 @@ else
 HSCOLOUR_SRCS = YES
 endif
 
-# Build and install DPH?
-BUILD_DPH = NO
 # Build and install the "extra" packages (see ./packages)?
 BUILD_EXTRA_PKGS = NO
 

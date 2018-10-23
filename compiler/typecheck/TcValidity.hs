@@ -854,7 +854,7 @@ check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
 check_class_pred env dflags ctxt pred cls tys
   |  cls `hasKey` heqTyConKey   -- (~) and (~~) are classified as classes,
   || cls `hasKey` eqTyConKey    -- but here we want to treat them as equalities
-  = pprTrace "check_class" (ppr cls) $
+  = -- pprTrace "check_class" (ppr cls) $
     check_eq_pred env dflags pred
 
   | isIPClass cls

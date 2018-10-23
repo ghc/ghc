@@ -1465,8 +1465,8 @@ ppr_tylit (HsStrTy _ s) = text (show s)
 hsTypeNeedsParens :: PprPrec -> HsType pass -> Bool
 hsTypeNeedsParens p = go
   where
-    go (HsForAllTy{})        = False
-    go (HsQualTy{})          = False
+    go (HsForAllTy{})        = p >= funPrec
+    go (HsQualTy{})          = p >= funPrec
     go (HsBangTy{})          = p > topPrec
     go (HsRecTy{})           = False
     go (HsTyVar{})           = False
