@@ -1435,7 +1435,8 @@ flatten_app_tys fun_ty arg_tys
        ; flatten_app_ty_args fun_xi fun_co arg_tys }
 
 -- Given a flattened function (with the coercion produced by flattening) and
--- a bunch of unflattened arguments, flatten the arguments and apply
+-- a bunch of unflattened arguments, flatten the arguments and apply.
+-- The coercion argument's role matches the role stored in the FlatM monad.
 --
 -- The bang patterns used here were observed to improve performance. If you
 -- wish to remove them, be sure to check for regeressions in allocations.

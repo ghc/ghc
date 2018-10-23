@@ -71,7 +71,7 @@ function get_cpu_and_attr() {
     done
 }
 
-# first marker to discrimiate the first line being outputted.
+# first marker to discriminate the first line being outputted.
 FST=1
 # a dummy file to use for the clang invocation.
 FILE=_____dummy.c

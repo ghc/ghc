@@ -1611,19 +1611,25 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
       | canSolveByUnification cur_lvl tv1 ty2
       , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (typeKind ty2') (tyVarKind tv1)
+           ; traceTc "uUnfilledVar2 ok" $
+             vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
+                  , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
+                  , ppr (isTcReflCo co_k), ppr co_k ]
+
            ; if isTcReflCo co_k  -- only proceed if the kinds matched.
 
              then do { writeMetaTyVar tv1 ty2'
                      ; return (mkTcNomReflCo ty2') }
-             else defer } -- this cannot be solved now.
-                          -- See Note [Equalities with incompatible kinds]
-                          -- in TcCanonical
+
+             else defer } -- This cannot be solved now.  See TcCanonical
+                          -- Note [Equalities with incompatible kinds]
 
       | otherwise
-      = defer
+      = do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occured in type family parameter
+            ; defer }
 
     ty1 = mkTyVarTy tv1
     kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
@@ -1812,7 +1818,7 @@ Note [Eliminate younger unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a choice of unifying
      alpha := beta   or   beta := alpha
-we try, if possible, to elimiate the "younger" one, as determined
+we try, if possible, to eliminate the "younger" one, as determined
 by `ltUnique`.  Reason: the younger one is less likely to appear free in
 an existing inert constraint, and hence we are less likely to be forced
 into kicking out and rewriting inert constraints.

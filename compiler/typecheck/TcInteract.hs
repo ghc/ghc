@@ -2883,8 +2883,8 @@ mk_typeable_pred :: Class -> Type -> PredType
 mk_typeable_pred clas ty = mkClassPred clas [ typeKind ty, ty ]
 
   -- Typeable is implied by KnownNat/KnownSymbol. In the case of a type literal
-  -- we generate a sub-goal for the appropriate class. See #10348 for what
-  -- happens when we fail to do this.
+  -- we generate a sub-goal for the appropriate class.
+  -- See Note [Typeable for Nat and Symbol]
 doTyLit :: Name -> Type -> TcS LookupInstResult
 doTyLit kc t = do { kc_clas <- tcLookupClass kc
                   ; let kc_pred    = mkClassPred kc_clas [ t ]
@@ -2931,6 +2931,27 @@ a TypeRep for them.  For qualified but not polymorphic types, like
    at the current state of affairs this would be an odd exception as
    no other class works with impredicative types.
    For now we leave it off, until we have a better story for impredicativity.
+
+
+Note [Typeable for Nat and Symbol]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have special Typeable instances for Nat and Symbol.  Roughly we
+have this instance, implemented here by doTyLit:
+      instance KnownNat n => Typeable (n :: Nat) where
+         typeRep = tyepNatTypeRep @n
+where
+   Data.Typeable.Internals.typeNatTypeRep :: KnownNat a => TypeRep a
+
+Ultimately typeNatTypeRep uses 'natSing' from KnownNat to get a
+runtime value 'n'; it turns it into a string with 'show' and uses
+that to whiz up a TypeRep TyCon for 'n', with mkTypeLitTyCon.
+See #10348.
+
+Because of this rule it's inadvisable (see #15322) to have a constraint
+    f :: (Typeable (n :: Nat)) => blah
+in a function signature; it gives rise to overlap problems just as
+if you'd written
+    f :: Eq [a] => blah
 -}
 
 {- ********************************************************************

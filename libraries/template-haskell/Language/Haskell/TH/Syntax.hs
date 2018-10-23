@@ -473,7 +473,7 @@ addForeignFile = addForeignSource
 -- Note that for non-C languages (for example C++) @extern "C"@ directives
 -- must be used to get symbols that we can access from Haskell.
 --
--- To get better errors, it is reccomended to use #line pragmas when
+-- To get better errors, it is recommended to use #line pragmas when
 -- emitting C files, e.g.
 --
 -- > {-# LANGUAGE CPP #-}

@@ -267,8 +267,8 @@ pprStatsConflict stats
         $$ text "\n")
 
 
--- | For every vreg, dump it's how many conflicts it has and its lifetime
---      good for making a scatter plot.
+-- | For every vreg, dump how many conflicts it has, and its lifetime.
+--      Good for making a scatter plot.
 pprStatsLifeConflict
         :: [RegAllocStats statics instr]
         -> Color.Graph VirtualReg RegClass RealReg -- ^ global register conflict graph
@@ -279,10 +279,10 @@ pprStatsLifeConflict stats graph
                 $ foldl' plusSpillCostInfo zeroSpillCostInfo
                 $ [ raSpillCosts s | s@RegAllocStatsStart{} <- stats ]
 
-        scatter = map   (\r ->  let lifetime    = case lookupUFM lifeMap r of
-                                                        Just (_, l)     -> l
-                                                        Nothing         -> 0
-                                    Just node   = Color.lookupNode graph r
+        scatter = map   (\r ->  let lifetime  = case lookupUFM lifeMap r of
+                                                      Just (_, l) -> l
+                                                      Nothing     -> 0
+                                    Just node = Color.lookupNode graph r
                                 in parens $ hcat $ punctuate (text ", ")
                                         [ doubleQuotes $ ppr $ Color.nodeId node
                                         , ppr $ sizeUniqSet (Color.nodeConflicts node)

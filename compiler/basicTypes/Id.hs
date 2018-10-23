@@ -238,7 +238,7 @@ lazySetIdInfo = Var.lazySetIdInfo
 
 setIdInfo :: Id -> IdInfo -> Id
 setIdInfo id info = info `seq` (lazySetIdInfo id info)
-        -- Try to avoid spack leaks by seq'ing
+        -- Try to avoid space leaks by seq'ing
 
 modifyIdInfo :: HasDebugCallStack => (IdInfo -> IdInfo) -> Id -> Id
 modifyIdInfo fn id = setIdInfo id (fn (idInfo id))

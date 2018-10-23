@@ -39,10 +39,6 @@ module TcMType (
   tauifyExpType, inferResultToType,
 
   --------------------------------
-  -- Creating fresh type variables for pm checking
-  genInstSkolTyVarsX,
-
-  --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
   newWanted, newWanteds, cloneWanted, cloneWC,
@@ -781,14 +777,6 @@ See Note [TcLevel assignment] in TcType.
 % Generating fresh variables for pattern match check
 -}
 
--- UNINSTANTIATED VERSION OF tcInstSkolTyCoVars
-genInstSkolTyVarsX :: SrcSpan -> TCvSubst -> [TyVar]
-                   -> TcRnIf gbl lcl (TCvSubst, [TcTyVar])
--- Precondition: tyvars should be scoping-ordered
--- see Note [Kind substitution when instantiating]
--- Get the location from the monad; this is a complete freshening operation
-genInstSkolTyVarsX loc subst tvs
-  = instSkolTyCoVarsX (mkTcSkolTyVar topTcLevel loc False) subst tvs
 
 {-
 ************************************************************************

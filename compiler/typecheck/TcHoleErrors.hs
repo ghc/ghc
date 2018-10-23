@@ -356,6 +356,15 @@ the only non-hole constraint that mentions any free type variables mentioned in
 the hole constraint for `_a`, namely `a_a1pd[tau:2]` , and similarly for the
 hole `_b` we only require that the `$dShow_a1pe` constraint is solved.
 
+Note [Leaking errors]
+~~~~~~~~~~~~~~~~~~~
+
+When considering candidates, GHC believes that we're checking for validity in
+actual source. However, As evidenced by #15321, #15007 and #15202, this can
+cause bewildering error messages. The solution here is simple: if a candidate
+would cause the type checker to error, it is not a valid hole fit, and thus it
+is discarded.
+
 -}
 
 
@@ -510,11 +519,11 @@ getLocalBindings tidy_orig ct
 
 -- See Note [Valid hole fits include ...]
 findValidHoleFits :: TidyEnv        --The tidy_env for zonking
-                           -> [Implication]  --Enclosing implications for givens
-                           -> [Ct] -- The  unsolved simple constraints in the
-                                   -- implication for the hole.
-                           -> Ct   -- The hole constraint itself
-                           -> TcM (TidyEnv, SDoc)
+                  -> [Implication]  --Enclosing implications for givens
+                  -> [Ct] -- The  unsolved simple constraints in the
+                          -- implication for the hole.
+                  -> Ct   -- The hole constraint itself
+                  -> TcM (TidyEnv, SDoc)
 findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
   do { rdr_env <- getGlobalRdrEnv
      ; lclBinds <- getLocalBindings tidy_env ct
@@ -819,6 +828,8 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
         go subs _ _ _ [] = return (False, reverse subs)
         go subs _ (Just 0) _ _ = return (True, reverse subs)
         go subs seen maxleft ty (el:elts) =
+          -- See Note [Leaking errors]
+          tryTcDiscardingErrs discard_it $
           do { traceTc "lookingUp" $ ppr el
              ; maybeThing <- lookup el
              ; case maybeThing of
