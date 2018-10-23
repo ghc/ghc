@@ -58,7 +58,7 @@ module TcSMonad (
     getTcSInerts, setTcSInerts,
     matchableGivens, prohibitedSuperClassSolve, mightMatchLater,
     getUnsolvedInerts,
-    removeInertCts, getPendingScDicts,
+    removeInertCts, getPendingGivenScs,
     addInertCan, insertFunEq, addInertForAll,
     emitWorkNC, emitWork,
     isImprovable,
@@ -367,7 +367,8 @@ selectNextWorkItem
        ; case selectWorkItem wl of {
            Nothing -> return Nothing ;
            Just (ct, new_wl) ->
-    do { checkReductionDepth (ctLoc ct) (ctPred ct)
+    do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
+         -- This is done by TcInteract.chooseInstance
        ; wrapTcS (TcM.writeTcRef wl_var new_wl)
        ; return (Just ct) } } }
 
@@ -1935,27 +1936,36 @@ getInertGivens
                      $ concat (dVarEnvElts (inert_eqs inerts))
        ; return (filter isGivenCt all_cts) }
 
-getPendingScDicts :: TcS [Ct]
--- Find all inert Given dictionaries whose cc_pend_sc flag is True
--- Set the flag to False in the inert set, and return that Ct
-getPendingScDicts = updRetInertCans get_sc_dicts
+getPendingGivenScs :: TcS [Ct]
+-- Find all inert Given dictionaries, or quantified constraints,
+--     whose cc_pend_sc flag is True
+--     and that belong to the current level
+-- Set their cc_pend_sc flag to False in the inert set, and return that Ct
+getPendingGivenScs = do { lvl <- getTcLevel
+                        ; updRetInertCans (get_sc_pending lvl) }
+
+get_sc_pending :: TcLevel -> InertCans -> ([Ct], InertCans)
+get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
+  = ASSERT2( all isGivenCt sc_pending, ppr sc_pending )
+       -- When getPendingScDics is called,
+       -- there are never any Wanteds in the inert set
+    (sc_pending, ic { inert_dicts = dicts', inert_insts = insts' })
   where
-    get_sc_dicts ic@(IC { inert_dicts = dicts, inert_insts = insts })
-      = (sc_pend_insts ++ sc_pend_dicts, ic')
-      where
-        ic' = ic { inert_dicts = foldr add dicts sc_pend_dicts
-                 , inert_insts = insts' }
+    sc_pending = sc_pend_insts ++ sc_pend_dicts
 
-        sc_pend_dicts :: [Ct]
-        sc_pend_dicts = foldDicts get_pending dicts []
+    sc_pend_dicts = foldDicts get_pending dicts []
+    dicts' = foldr add dicts sc_pend_dicts
 
-        (sc_pend_insts, insts') = mapAccumL get_pending_inst [] insts
+    (sc_pend_insts, insts') = mapAccumL get_pending_inst [] insts
 
     get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc = True
                                        -- but flipping the flag
     get_pending dict dicts
-        | Just dict' <- isPendingScDict dict = dict' : dicts
-        | otherwise                          = dicts
+        | Just dict' <- isPendingScDict dict
+        , belongs_to_this_level (ctEvidence dict)
+        = dict' : dicts
+        | otherwise
+        = dicts
 
     add :: Ct -> DictMap Ct -> DictMap Ct
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
@@ -1963,11 +1973,16 @@ getPendingScDicts = updRetInertCans get_sc_dicts
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
-    get_pending_inst cts qci
+    get_pending_inst cts qci@(QCI { qci_ev = ev })
        | Just qci' <- isPendingScInst qci
+       , belongs_to_this_level ev
        = (CQuantCan qci' : cts, qci')
        | otherwise
        = (cts, qci)
+
+    belongs_to_this_level ev = ctLocLevel (ctEvLoc ev) == this_lvl
+    -- We only want Givens from this level; see (3a) in
+    -- Note [The superclass story] in TcCanonical
 
 getUnsolvedInerts :: TcS ( Bag Implication
                          , Cts     -- Tyvar eqs: a ~ ty

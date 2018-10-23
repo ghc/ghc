@@ -810,7 +810,7 @@ addTickIPBind (IPBind x nm e) =
         liftM2 (IPBind x)
                 (return nm)
                 (addTickLHsExpr e)
-addTickIPBind (XCIPBind x) = return (XCIPBind x)
+addTickIPBind (XIPBind x) = return (XIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)

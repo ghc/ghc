@@ -70,6 +70,7 @@ import Data.Functor.Identity (Identity(Identity))
 import Data.Proxy (Proxy(Proxy))
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Monoid (mappend)
+import Data.Ord (Down(Down))
 
 import GHC.Read (expectP, list, paren)
 
@@ -643,6 +644,24 @@ instance Read1 Proxy where
 
   liftReadListPrec = liftReadListPrecDefault
   liftReadList     = liftReadListDefault
+
+-- | @since 4.12.0.0
+instance Eq1 Down where
+    liftEq eq (Down x) (Down y) = eq x y
+
+-- | @since 4.12.0.0
+instance Ord1 Down where
+    liftCompare comp (Down x) (Down y) = comp x y
+
+-- | @since 4.12.0.0
+instance Read1 Down where
+    liftReadsPrec rp _ = readsData $
+         readsUnaryWith rp "Down" Down
+
+-- | @since 4.12.0.0
+instance Show1 Down where
+    liftShowsPrec sp _ d (Down x) = showsUnaryWith sp "Down" d x
+
 
 -- Building blocks
 

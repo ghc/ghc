@@ -494,7 +494,7 @@ addForeignSource lang src = do
   runIO $ writeFile path src
   addForeignFilePath lang path
 
--- | Same as 'addForeignSource', but expects to recieve a path pointing to the
+-- | Same as 'addForeignSource', but expects to receive a path pointing to the
 -- foreign file instead of a 'String' of its contents. Consider using this in
 -- conjunction with 'addTempFile'.
 --

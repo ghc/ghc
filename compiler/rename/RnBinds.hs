@@ -226,7 +226,7 @@ rnIPBind :: IPBind GhcPs -> RnM (IPBind GhcRn, FreeVars)
 rnIPBind (IPBind _ ~(Left n) expr) = do
     (expr',fvExpr) <- rnLExpr expr
     return (IPBind noExt (Left n) expr', fvExpr)
-rnIPBind (XCIPBind _) = panic "rnIPBind"
+rnIPBind (XIPBind _) = panic "rnIPBind"
 
 {-
 ************************************************************************

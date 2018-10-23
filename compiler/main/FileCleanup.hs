@@ -3,7 +3,7 @@ module FileCleanup
   ( TempFileLifetime(..)
   , cleanTempDirs, cleanTempFiles, cleanCurrentModuleTempFiles
   , addFilesToClean, changeTempFilesLifetime
-  , newTempName, newTempLibName
+  , newTempName, newTempLibName, newTempDir
   , withSystemTempDirectory, withTempDirectory
   ) where
 
@@ -130,6 +130,21 @@ newTempName dflags lifetime extn
            if b then findTempName prefix
                 else do -- clean it up later
                         addFilesToClean dflags lifetime [filename]
+                        return filename
+
+newTempDir :: DynFlags -> IO FilePath
+newTempDir dflags
+  = do d <- getTempDir dflags
+       findTempDir (d </> "ghc_")
+  where
+    findTempDir :: FilePath -> IO FilePath
+    findTempDir prefix
+      = do n <- newTempSuffix dflags
+           let filename = prefix ++ show n
+           b <- doesDirectoryExist filename
+           if b then findTempDir prefix
+                else do createDirectory filename
+                        -- see mkTempDir below; this is wrong: -> consIORef (dirsToClean dflags) filename
                         return filename
 
 newTempLibName :: DynFlags -> TempFileLifetime -> Suffix

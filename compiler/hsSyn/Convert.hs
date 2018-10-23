@@ -18,6 +18,7 @@ import GhcPrelude
 
 import HsSyn as Hs
 import qualified Class
+import PrelNames
 import RdrName
 import qualified Name
 import Module
@@ -28,7 +29,6 @@ import SrcLoc
 import Type
 import qualified Coercion ( Role(..) )
 import TysWiredIn
-import TysPrim (eqPrimTyCon)
 import BasicTypes as Hs
 import ForeignCall
 import Unique
@@ -1378,10 +1378,11 @@ cvtTypeKind ty_str ty
                               (noLoc (getRdrName constraintKindTyCon)))
 
            EqualityT
-             | [x',y'] <- tys' -> returnL (HsEqTy noExt x' y')
+             | [x',y'] <- tys' ->
+                   returnL (HsOpTy noExt x' (noLoc eqTyCon_RDR) y')
              | otherwise ->
                    mk_apps (HsTyVar noExt NotPromoted
-                            (noLoc (getRdrName eqPrimTyCon))) tys'
+                            (noLoc eqTyCon_RDR)) tys'
 
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }

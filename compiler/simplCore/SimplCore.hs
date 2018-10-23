@@ -723,6 +723,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                   ; return (getTopFloatBinds floats, rules1) } ;
 
                 -- Stop if nothing happened; don't dump output
+                -- See Note [Which transformations are innocuous] in CoreMonad
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks

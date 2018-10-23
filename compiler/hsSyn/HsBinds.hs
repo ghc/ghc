@@ -859,12 +859,12 @@ type LIPBind id = Located (IPBind id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data IPBind id
   = IPBind
-        (XIPBind id)
+        (XCIPBind id)
         (Either (Located HsIPName) (IdP id))
         (LHsExpr id)
-  | XCIPBind (XXIPBind id)
+  | XIPBind (XXIPBind id)
 
-type instance XIPBind     (GhcPass p) = NoExt
+type instance XCIPBind    (GhcPass p) = NoExt
 type instance XXIPBind    (GhcPass p) = NoExt
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
@@ -878,7 +878,7 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IPBind p) where
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
                    Right     id  -> pprBndr LetBind id
-  ppr (XCIPBind x) = ppr x
+  ppr (XIPBind x) = ppr x
 
 {-
 ************************************************************************

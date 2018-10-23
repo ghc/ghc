@@ -29,6 +29,7 @@ import Data.Function ( fix )
 import Data.Maybe
 import Data.Monoid ( Dual(..), Sum(..), Product(..)
                    , First(..), Last(..), Alt(..), Ap(..) )
+import Data.Ord ( Down(..) )
 import GHC.Base ( Monad, NonEmpty(..), errorWithoutStackTrace, (.) )
 import GHC.Generics
 import GHC.List ( head, tail )
@@ -149,3 +150,10 @@ instance (MonadFix f, MonadFix g) => MonadFix (f :*: g) where
       where
         fstP (a :*: _) = a
         sndP (_ :*: b) = b
+
+-- Instances for Data.Ord
+
+-- | @since 4.12.0.0
+instance MonadFix Down where
+    mfix f = Down (fix (getDown . f))
+      where getDown (Down x) = x

@@ -42,7 +42,7 @@ T14884.hs:4:7: error:
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show Integer -- Defined in ‘GHC.Show’
         ...plus 23 others
-        ...plus 66 instances involving out-of-scope types
+        ...plus 67 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the first argument of ‘_’, namely ‘print’
       In the expression: _ print "abc"

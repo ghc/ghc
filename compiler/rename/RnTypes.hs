@@ -644,12 +644,6 @@ rnHsTyKi env t@(HsIParamTy _ n ty)
        ; (ty', fvs) <- rnLHsTyKi env ty
        ; return (HsIParamTy noExt n ty', fvs) }
 
-rnHsTyKi env t@(HsEqTy _ ty1 ty2)
-  = do { checkPolyKinds env t
-       ; (ty1', fvs1) <- rnLHsTyKi env ty1
-       ; (ty2', fvs2) <- rnLHsTyKi env ty2
-       ; return (HsEqTy noExt ty1' ty2', fvs1 `plusFV` fvs2) }
-
 rnHsTyKi _ (HsStarTy _ isUni)
   = return (HsStarTy noExt isUni, emptyFVs)
 
@@ -1088,7 +1082,6 @@ collectAnonWildCards lty = go lty
       HsOpTy _ ty1 _ ty2             -> go ty1 `mappend` go ty2
       HsParTy _ ty                   -> go ty
       HsIParamTy _ _ ty              -> go ty
-      HsEqTy _ ty1 ty2               -> go ty1 `mappend` go ty2
       HsKindSig _ ty kind            -> go ty `mappend` go kind
       HsDocTy _ ty _                 -> go ty
       HsBangTy _ _ ty                -> go ty
@@ -1772,8 +1765,6 @@ extract_lty t_or_k (L _ ty) acc
                                        extract_lty t_or_k ty2 =<<
                                        extract_rig t_or_k w acc
       HsIParamTy _ _ ty           -> extract_lty t_or_k ty acc
-      HsEqTy _ ty1 ty2            -> extract_lty t_or_k ty1 =<<
-                                     extract_lty t_or_k ty2 acc
       HsOpTy _ ty1 tv ty2         -> extract_tv t_or_k tv =<<
                                      extract_lty t_or_k ty1 =<<
                                      extract_lty t_or_k ty2 acc

@@ -126,7 +126,7 @@ Note [magicIds]
 ~~~~~~~~~~~~~~~
 The magicIds
 
-  * Are exported from GHC.Maic
+  * Are exported from GHC.Magic
 
   * Can be defined in Haskell (and are, in ghc-prim:GHC/Magic.hs).
     This definition at least generates Haddock documentation for them.
@@ -1244,7 +1244,7 @@ proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHash
 lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
+noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1492,9 +1492,8 @@ a little bit of magic to optimize away 'noinline' after we are done
 running the simplifier.
 
 'noinline' needs to be wired-in because it gets inserted automatically
-when we serialize an expression to the interface format, and we DON'T
-want use its fingerprints.
-
+when we serialize an expression to the interface format. See
+Note [Inlining and hs-boot files] in ToIface
 
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

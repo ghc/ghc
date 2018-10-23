@@ -731,6 +731,7 @@ module GHC.Generics  (
 -- We use some base types
 import Data.Either ( Either (..) )
 import Data.Maybe  ( Maybe(..), fromMaybe )
+import Data.Ord    ( Down(..) )
 import GHC.Integer ( Integer, integerToInt )
 import GHC.Prim    ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Ptr     ( Ptr )
@@ -1435,6 +1436,9 @@ deriving instance Generic ((,,,,,) a b c d e f)
 -- | @since 4.6.0.0
 deriving instance Generic ((,,,,,,) a b c d e f g)
 
+-- | @since 4.12.0.0
+deriving instance Generic (Down a)
+
 
 -- | @since 4.6.0.0
 deriving instance Generic1 []
@@ -1468,6 +1472,9 @@ deriving instance Generic1 ((,,,,,) a b c d e)
 
 -- | @since 4.6.0.0
 deriving instance Generic1 ((,,,,,,) a b c d e f)
+
+-- | @since 4.12.0.0
+deriving instance Generic1 Down
 
 --------------------------------------------------------------------------------
 -- Copied from the singletons package

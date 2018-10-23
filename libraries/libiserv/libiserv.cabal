@@ -1,5 +1,5 @@
 Name: libiserv
-Version: 8.5
+Version: 8.7.1
 Copyright: XXX
 License: BSD3
 License-File: LICENSE
@@ -23,9 +23,9 @@ Library
     Build-Depends: base       >= 4   && < 5,
                    binary     >= 0.7 && < 0.9,
                    bytestring >= 0.10 && < 0.11,
-                   containers >= 0.5 && < 0.6,
+                   containers >= 0.5 && < 0.7,
                    deepseq    >= 1.4 && < 1.5,
-                   ghci       == 8.5.*
+                   ghci       == 8.7.*
     if flag(network)
        Exposed-Modules: Remote.Message
                       , Remote.Slave

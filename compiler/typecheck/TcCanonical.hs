@@ -290,6 +290,15 @@ So here's the plan:
    This may succeed in generating (a finite number of) extra Givens,
    and extra Deriveds. Both may help the proof.
 
+3a An important wrinkle: only expand Givens from the current level.
+   Two reasons:
+      - We only want to expand it once, and that is best done at
+        the level it is bound, rather than repeatedly at the leaves
+        of the implication tree
+      - We may be inside a type where we can't create term-level
+        evidence anyway, so we can't superclass-expand, say,
+        (a ~ b) to get (a ~# b).  This happened in Trac #15290.
+
 4. Go round to (2) again.  This loop (2,3,4) is implemented
    in TcSimplify.simpl_loop.
 

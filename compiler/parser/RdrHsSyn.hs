@@ -649,7 +649,7 @@ mkGadtDecl names ty
                  , con_args   = args'
                  , con_res_ty = res_ty
                  , con_doc    = Nothing }
-    , anns1 ++ anns2 ++ anns3)
+    , anns1 ++ anns2)
   where
     (ty'@(L l _),anns1) = peel_parens ty []
     (tvs, rho) = splitLHsForAllTy ty'
@@ -660,14 +660,13 @@ mkGadtDecl names ty
     split_rho (L l (HsParTy _ ty)) ann = split_rho ty (ann++mkParensApiAnn l)
     split_rho tau                  ann = (Nothing, tau, ann)
 
-    (args, res_ty, anns3) = split_tau tau []
+    (args, res_ty) = split_tau tau
     args' = nudgeHsSrcBangs args
 
     -- See Note [GADT abstract syntax] in HsDecls
-    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) _w res_ty)) ann
-                                       = (RecCon (L loc rf), res_ty, ann)
-    split_tau (L l (HsParTy _ ty)) ann = split_tau ty (ann++mkParensApiAnn l)
-    split_tau tau                  ann = (PrefixCon [], tau, ann)
+    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) _w res_ty))
+                                   = (RecCon (L loc rf), res_ty)
+    split_tau tau                  = (PrefixCon [], tau)
 
     peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
                                                        (ann++mkParensApiAnn l)

@@ -505,6 +505,10 @@ deriving instance Foldable UInt
 -- | @since 4.9.0.0
 deriving instance Foldable UWord
 
+-- Instances for Data.Ord
+-- | @since 4.12.0.0
+deriving instance Foldable Down
+
 -- | Monadic fold over the elements of a structure,
 -- associating to the right, i.e. from right to left.
 foldrM :: (Foldable t, Monad m) => (a -> b -> m b) -> b -> t a -> m b

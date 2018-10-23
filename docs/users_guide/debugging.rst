@@ -376,12 +376,14 @@ C-\\- representation
 These flags dump various phases of GHC's C-\\- pipeline.
 
 .. ghc-flag:: -ddump-cmm-verbose
-    :shortdesc: Show output from each C-\\- pipeline pass
+    :shortdesc: Show output from main C-\\- pipeline passes
     :type: dynamic
 
-    Dump output from all C-\\- pipeline stages. In case of
+    Dump output from main C-\\- pipeline stages. In case of
     ``.cmm`` compilation this also dumps the result of
-    file parsing.
+    file parsing. Not included are passes run by
+    the chosen backend. Currently only the NCG backends runs
+    additional passes ( :ghc-flag:`-ddump-opt-cmm` ).
 
     Cmm dumps don't include unreachable blocks since we print
     blocks in reverse post-order.

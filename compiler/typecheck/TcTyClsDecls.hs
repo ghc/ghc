@@ -1619,7 +1619,8 @@ tcFamTyPats fam_tc mb_clsinfo
 
        ; (fam_used_tvs, (typats, (more_typats, res_kind)))
             <- solveEqualities $  -- See Note [Constraints in patterns]
-               tcImplicitTKBndrs FamInstSkol tv_names $
+               tcImplicitQTKBndrs FamInstSkol tv_names $
+                  -- See Note [Kind-checking tyvar binders for associated types]
                do { let loc = nameSrcSpan fam_name
                         lhs_fun = L loc (HsTyVar noExt NotPromoted
                                                                (L loc fam_name))

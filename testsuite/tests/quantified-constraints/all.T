@@ -10,3 +10,6 @@ test('T14961', normal, compile, [''])
 test('T9123a', normal, compile, [''])
 test('T15244', normal, compile, [''])
 test('T15231', normal, compile_fail, [''])
+
+test('T15290', normal, compile, [''])
+test('T15290a', normal, compile_fail, [''])

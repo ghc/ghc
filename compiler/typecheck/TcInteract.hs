@@ -564,7 +564,7 @@ solveOneFromTheOther ev_i ev_w
        ; return (same_level_strategy binds) }
 
   | otherwise   -- Both are Given, levels differ
-  = return (different_level_strategy)
+  = return different_level_strategy
   where
      pred  = ctEvPred ev_i
      loc_i = ctEvLoc ev_i
@@ -574,12 +574,12 @@ solveOneFromTheOther ev_i ev_w
      ev_id_i = ctEvEvId ev_i
      ev_id_w = ctEvEvId ev_w
 
-     different_level_strategy
+     different_level_strategy  -- Both Given
        | isIPPred pred, lvl_w > lvl_i = KeepWork
        | lvl_w < lvl_i                = KeepWork
        | otherwise                    = KeepInert
 
-     same_level_strategy binds        -- Both Given
+     same_level_strategy binds -- Both Given
        | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
        = case ctLocOrigin loc_w of
             GivenOrigin (InstSC s_w) | s_w < s_i -> KeepWork
@@ -1013,8 +1013,7 @@ IncoherentInstances is `1`. If we were to do the optimization, the output of
 Note [Shortcut try_solve_from_instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The workhorse of the short-cut solver is
-    try_solve_from_instance :: CtLoc
-                            -> (EvBindMap, DictMap CtEvidence)
+    try_solve_from_instance :: (EvBindMap, DictMap CtEvidence)
                             -> CtEvidence       -- Solve this
                             -> MaybeT TcS (EvBindMap, DictMap CtEvidence)
 Note that:
@@ -1104,7 +1103,7 @@ shortCutSolver dflags ev_w ev_i
                      getTcEvBindsMap ev_binds_var
        ; solved_dicts <- getSolvedDicts
 
-       ; mb_stuff <- runMaybeT $ try_solve_from_instance loc_w
+       ; mb_stuff <- runMaybeT $ try_solve_from_instance
                                    (ev_binds, solved_dicts) ev_w
 
        ; case mb_stuff of
@@ -1123,12 +1122,13 @@ shortCutSolver dflags ev_w ev_i
     loc_w = ctEvLoc ev_w
 
     try_solve_from_instance   -- See Note [Shortcut try_solve_from_instance]
-      :: CtLoc -> (EvBindMap, DictMap CtEvidence) -> CtEvidence
+      :: (EvBindMap, DictMap CtEvidence) -> CtEvidence
       -> MaybeT TcS (EvBindMap, DictMap CtEvidence)
-    try_solve_from_instance loc (ev_binds, solved_dicts) ev
+    try_solve_from_instance (ev_binds, solved_dicts) ev
       | let pred = ctEvPred ev
+            loc  = ctEvLoc  ev
       , ClassPred cls tys <- classifyPredType pred
-      = do { inst_res <- lift $ matchGlobalInst dflags True cls tys loc_w
+      = do { inst_res <- lift $ matchGlobalInst dflags True cls tys loc
            ; case inst_res of
                OneInst { lir_new_theta = preds
                        , lir_mk_ev = mk_ev
@@ -1142,9 +1142,9 @@ shortCutSolver dflags ev_w ev_i
                              -- up in a loop while solving recursive dictionaries.
 
                        ; lift $ traceTcS "shortCutSolver: found instance" (ppr preds)
-                       ; lift $ checkReductionDepth loc' pred
+                       ; lift $ checkReductionDepth loc pred
 
-                       ; evc_vs <- mapM (new_wanted_cached solved_dicts') preds
+                       ; evc_vs <- mapM (new_wanted_cached loc' solved_dicts') preds
                                   -- Emit work for subgoals but use our local cache
                                   -- so we can solve recursive dictionaries.
 
@@ -1152,7 +1152,7 @@ shortCutSolver dflags ev_w ev_i
                              ev_binds' = extendEvBinds ev_binds $
                                          mkWantedEvBind (ctEvEvId ev) ev_tm
 
-                       ; foldlM (try_solve_from_instance loc')
+                       ; foldlM try_solve_from_instance
                                 (ev_binds', solved_dicts')
                                 (freshGoals evc_vs) }
 
@@ -1163,12 +1163,12 @@ shortCutSolver dflags ev_w ev_i
     -- Use a local cache of solved dicts while emitting EvVars for new work
     -- We bail out of the entire computation if we need to emit an EvVar for
     -- a subgoal that isn't a ClassPred.
-    new_wanted_cached :: DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
-    new_wanted_cached cache pty
+    new_wanted_cached :: CtLoc -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
+    new_wanted_cached loc cache pty
       | ClassPred cls tys <- classifyPredType pty
       = lift $ case findDict cache loc_w cls tys of
           Just ctev -> return $ Cached (ctEvExpr ctev)
-          Nothing -> Fresh <$> newWantedNC loc_w pty
+          Nothing   -> Fresh <$> newWantedNC loc pty
       | otherwise = mzero
 
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
@@ -1841,7 +1841,7 @@ doTopReactOther work_item
   = do { -- Try local quantified constraints
          res <- matchLocalInst pred (ctEvLoc ev)
        ; case res of
-           OneInst {} -> chooseInstance ev pred res
+           OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }
   where
     ev = ctEvidence work_item
@@ -2236,7 +2236,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
                OneInst { lir_safe_over = s }
                   -> do { unless s $ insertSafeOverlapFailureTcS work_item
                         ; when (isWanted ev) $ addSolvedDict ev cls xis
-                        ; chooseInstance ev dict_pred lkup_res }
+                        ; chooseInstance work_item lkup_res }
                _  ->  -- NoInstance or NotSure
                      do { when (isImprovable ev) $
                           try_fundep_improvement
@@ -2265,9 +2265,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
 doTopReactDict _ w = pprPanic "doTopReactDict" (ppr w)
 
 
-chooseInstance :: CtEvidence -> TcPredType -> LookupInstResult
-               -> TcS (StopOrContinue Ct)
-chooseInstance ev pred
+chooseInstance :: Ct -> LookupInstResult -> TcS (StopOrContinue Ct)
+chooseInstance work_item
                (OneInst { lir_new_theta = theta
                         , lir_mk_ev     = mk_ev })
   = do { traceTcS "doTopReact/found instance for" $ ppr ev
@@ -2275,9 +2274,11 @@ chooseInstance ev pred
        ; if isDerived ev then finish_derived theta
                          else finish_wanted  theta mk_ev }
   where
+     ev         = ctEvidence work_item
+     pred       = ctEvPred ev
      loc        = ctEvLoc ev
-     deeper_loc = zap_origin (bumpCtLocDepth loc)
      origin     = ctLocOrigin loc
+     deeper_loc = zap_origin (bumpCtLocDepth loc)
 
      zap_origin loc  -- After applying an instance we can set ScOrigin to
                      -- infinity, so that prohibitedSuperClassSolve never fires
@@ -2290,10 +2291,15 @@ chooseInstance ev pred
                    -> ([EvExpr] -> EvTerm) -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
      finish_wanted theta mk_ev
-        = do { evc_vars <- mapM (newWanted deeper_loc) theta
+        = do { evb <- getTcEvBindsVar
+             ; if isNoEvBindsVar evb
+               then -- See Note [Instances in no-evidence implications]
+                    continueWith work_item
+               else
+          do { evc_vars <- mapM (newWanted deeper_loc) theta
              ; setEvBindIfWanted ev (mk_ev (map getEvExpr evc_vars))
              ; emitWorkNC (freshGoals evc_vars)
-             ; stopWith ev "Dict/Top (solved wanted)" }
+             ; stopWith ev "Dict/Top (solved wanted)" } }
 
      finish_derived theta  -- Use type-class instances for Deriveds, in the hope
        =                   -- of generating some improvements
@@ -2303,8 +2309,28 @@ chooseInstance ev pred
             ; traceTcS "finish_derived" (ppr (ctl_depth deeper_loc))
             ; stopWith ev "Dict/Top (solved derived)" }
 
-chooseInstance ev _ lookup_res
-  = pprPanic "chooseInstance" (ppr ev $$ ppr lookup_res)
+chooseInstance work_item lookup_res
+  = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
+
+{- Note [Instances in no-evidence implications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Trac #15290 we had
+  [G] forall p q. Coercible p q => Coercible (m p) (m q))
+  [W] forall <no-ev> a. m (Int, IntStateT m a)
+                          ~R#
+                        m (Int, StateT Int m a)
+
+The Given is an ordinary quantified constraint; the Wanted is an implication
+equality that arises from
+  [W] (forall a. t1) ~R# (forall a. t2)
+
+But because the (t1 ~R# t2) is solved "inside a type" (under that forall a)
+we can't generate any term evidence.  So we can't actually use that
+lovely quantified constraint.  Alas!
+
+This test arranges to ignore the instance-based solution under these
+(rare) circumstances.   It's sad, but I  really don't see what else we can do.
+-}
 
 {- *******************************************************************
 *                                                                    *

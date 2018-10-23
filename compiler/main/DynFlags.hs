@@ -557,6 +557,13 @@ data GeneralFlag
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
+   -- copy all libs into a single folder prior to linking binaries
+   -- this should elivate the excessive command line limit restrictions
+   -- on windows, by only requiring a single -L argument instead of
+   -- one for each dependency.  At the time of this writing, gcc
+   -- forwards all -L flags to the collect2 command without using a
+   -- response file and as such breaking apart.
+   | Opt_SingleLibFolder
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -765,7 +772,6 @@ data WarningFlag =
    | Opt_WarnUnusedForalls
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
-   | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
    | Opt_WarnMissingMonadFailInstances -- since 8.0
    | Opt_WarnSemigroup -- since 8.0
    | Opt_WarnDodgyExports
@@ -2820,6 +2826,8 @@ dynamic_flags_deps = [
 #endif
   , make_ord_flag defGhcFlag "relative-dynlib-paths"
       (NoArg (setGeneralFlag Opt_RelativeDynlibPaths))
+  , make_ord_flag defGhcFlag "copy-libs-when-linking"
+      (NoArg (setGeneralFlag Opt_SingleLibFolder))
   , make_ord_flag defGhcFlag "pie"            (NoArg (setGeneralFlag Opt_PICExecutable))
   , make_ord_flag defGhcFlag "no-pie"         (NoArg (unSetGeneralFlag Opt_PICExecutable))
 
@@ -3765,8 +3773,6 @@ wWarningFlagsDeps = [
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "alternative-layout-rule-transitional"
                                       Opt_WarnAlternativeLayoutRuleTransitional,
-  depFlagSpec "amp"                      Opt_WarnAMP
-    "it has no effect",
   depFlagSpec "auto-orphans"             Opt_WarnAutoOrphans
     "it has no effect",
   flagSpec "cpp-undef"                   Opt_WarnCPPUndef,

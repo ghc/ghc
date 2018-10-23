@@ -71,7 +71,7 @@ module TcRnTypes(
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
-        isPendingScDict, superClassesMightHelp,
+        isPendingScDict, superClassesMightHelp, getPendingWantedScs,
         isCDictCan_Maybe, isCFunEqCan_maybe,
         isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
@@ -2219,15 +2219,30 @@ setPendingScDict ct@(CDictCan { cc_pend_sc = False })
                     = ct { cc_pend_sc = True }
 setPendingScDict ct = ct
 
-superClassesMightHelp :: Ct -> Bool
+superClassesMightHelp :: WantedConstraints -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
 -- expose more equalities or functional dependencies) might help to
 -- solve this constraint.  See Note [When superclasses help]
-superClassesMightHelp ct
-  = isWantedCt ct && not (is_ip ct)
+superClassesMightHelp (WC { wc_simple = simples, wc_impl = implics })
+  = anyBag might_help_ct simples || anyBag might_help_implic implics
   where
+    might_help_implic ic
+       | IC_Unsolved <- ic_status ic = superClassesMightHelp (ic_wanted ic)
+       | otherwise                   = False
+
+    might_help_ct ct = isWantedCt ct && not (is_ip ct)
+
     is_ip (CDictCan { cc_class = cls }) = isIPClass cls
     is_ip _                             = False
+
+getPendingWantedScs :: Cts -> ([Ct], Cts)
+getPendingWantedScs simples
+  = mapAccumBagL get [] simples
+  where
+    get acc ct | Just ct' <- isPendingScDict ct
+               = (ct':acc, ct')
+               | otherwise
+               = (acc,     ct)
 
 {- Note [When superclasses help]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2238,6 +2253,11 @@ for which expansion of superclasses (e.g. from given constraints)
 might actually help. The function superClassesMightHelp tells if
 doing this superclass expansion might help solve this constraint.
 Note that
+
+  * We look inside implications; maybe it'll help to expand the Givens
+    at level 2 to help solve an unsolved Wanted buried inside an
+    implication.  E.g.
+        forall a. Ord a => forall b. [W] Eq a
 
   * Superclasses help only for Wanted constraints.  Derived constraints
     are not really "unsolved" and we certainly don't want them to

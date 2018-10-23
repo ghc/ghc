@@ -62,6 +62,9 @@ makeGot(ObjectCode * oc) {
                     symTab->symbols[i].got_addr
                             = (uint8_t *)oc->info->got_start
                               + (slot++ * sizeof(void*));
+        if(mprotect(mem, oc->info->got_size, PROT_READ) != 0) {
+            sysErrorBelch("unable to protect memory");
+        }
     }
     return EXIT_SUCCESS;
 }

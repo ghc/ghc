@@ -1744,6 +1744,16 @@ linkBinary' staticLink dflags o_files dep_packages = do
               in ["-L" ++ l] ++ ["-Xlinker", "-rpath", "-Xlinker", libpath]
          | otherwise = ["-L" ++ l]
 
+    pkg_lib_path_opts <-
+      if gopt Opt_SingleLibFolder dflags
+      then do
+        libs <- getLibs dflags dep_packages
+        tmpDir <- newTempDir dflags
+        sequence_ [ copyFile lib (tmpDir </> basename)
+                  | (lib, basename) <- libs]
+        return [ "-L" ++ tmpDir ]
+      else pure pkg_lib_path_opts
+
     let
       dead_strip
         | gopt Opt_WholeArchiveHsLibs dflags = []
