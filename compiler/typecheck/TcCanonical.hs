@@ -895,11 +895,13 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel
 
 -- See Note [Canonicalising type applications] about why we require flat types
 can_eq_nc' True _rdr_env _envs ev eq_rel (AppTy t1 s1) _ ty2 _
-  | Just (t2, s2) <- tcSplitAppTy_maybe ty2
-  = can_eq_app ev eq_rel t1 s1 t2 s2
+  | NomEq <- eq_rel
+  , Just (t2, s2) <- tcSplitAppTy_maybe ty2
+  = can_eq_app ev t1 s1 t2 s2
 can_eq_nc' True _rdr_env _envs ev eq_rel ty1 _ (AppTy t2 s2) _
-  | Just (t1, s1) <- tcSplitAppTy_maybe ty1
-  = can_eq_app ev eq_rel t1 s1 t2 s2
+  | NomEq <- eq_rel
+  , Just (t1, s1) <- tcSplitAppTy_maybe ty1
+  = can_eq_app ev t1 s1 t2 s2
 
 -- No similarity in type structure detected. Flatten and try again.
 can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
@@ -909,9 +911,22 @@ can_eq_nc' False rdr_env envs ev eq_rel _ ps_ty1 _ ps_ty2
        ; can_eq_nc' True rdr_env envs new_ev eq_rel xi1 xi1 xi2 xi2 }
 
 -- We've flattened and the types don't match. Give up.
-can_eq_nc' True _rdr_env _envs ev _eq_rel _ ps_ty1 _ ps_ty2
+can_eq_nc' True _rdr_env _envs ev eq_rel _ ps_ty1 _ ps_ty2
   = do { traceTcS "can_eq_nc' catch-all case" (ppr ps_ty1 $$ ppr ps_ty2)
-       ; canEqHardFailure ev ps_ty1 ps_ty2 }
+       ; case eq_rel of -- See Note [Unsolved equalities]
+            ReprEq -> continueWith (mkIrredCt ev)
+            NomEq  -> continueWith (mkInsolubleCt ev) }
+          -- No need to call canEqFailure/canEqHardFailure because they
+          -- flatten, and the types involved here are already flat
+
+{- Note [Unsolved equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have an unsolved equality like
+  (a b ~R# Int)
+that is not necessarily insoluble!  Maybe 'a' will turn out to be a newtype.
+So we want to make it a potentially-soluble Irred not an insoluble one.
+Missing this point is what caused Trac #15431
+-}
 
 ---------------------------------
 can_eq_nc_forall :: CtEvidence -> EqRel
@@ -1222,8 +1237,8 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
 ---------
 -- ^ Decompose a type application.
 -- All input types must be flat. See Note [Canonicalising type applications]
-can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
-           -> EqRel            -- r
+-- Nominal equality only!
+can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
            -> Xi -> Xi         -- s1 t1
            -> Xi -> Xi         -- s2 t2
            -> TcS (StopOrContinue Ct)
@@ -1231,13 +1246,7 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~r s2 t2
 -- AppTys only decompose for nominal equality, so this case just leads
 -- to an irreducible constraint; see typecheck/should_compile/T10494
 -- See Note [Decomposing equality], note {4}
-can_eq_app ev ReprEq _ _ _ _
-  = do { traceTcS "failing to decompose representational AppTy equality" (ppr ev)
-       ; continueWith (mkIrredCt ev) }
-          -- no need to call canEqFailure, because that flattens, and the
-          -- types involved here are already flat
-
-can_eq_app ev NomEq s1 t1 s2 t2
+can_eq_app ev s1 t1 s2 t2
   | CtDerived { ctev_loc = loc } <- ev
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
        ; stopWith ev "Decomposed [D] AppTy" }

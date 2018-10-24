@@ -106,7 +106,7 @@ instance ExceptionMonad (IOEnv a) where
 
 instance ContainsDynFlags env => HasDynFlags (IOEnv env) where
     getDynFlags = do env <- getEnv
-                     return $ extractDynFlags env
+                     return $! extractDynFlags env
 
 instance ContainsModule env => HasModule (IOEnv env) where
     getModule = do env <- getEnv

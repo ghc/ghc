@@ -150,6 +150,11 @@ data Integer  = S#                !Int#
               | Jn# {-# UNPACK #-} !BigNat
                 -- ^ iff value in @]-inf, minBound::'Int'[@ range
 
+-- NOTE: the above representation is baked into the GHCi debugger in
+-- compiler/ghci/RtClosureInspect.hs. If you change it here, fixes
+-- will be required over there too. Tests for this are in
+-- testsuite/tests/ghci.debugger.
+
 -- TODO: experiment with different constructor-ordering
 
 instance Eq Integer where

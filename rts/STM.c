@@ -332,24 +332,29 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
     // queues: it's up to the thread itself to remove it from the wait queues
     // if it decides to do so when it is scheduled.
 
-    // Unblocking a TSO from BlockedOnSTM is done under the TSO lock,
-    // to avoid multiple CPUs unblocking the same TSO, and also to
-    // synchronise with throwTo(). The first time the TSO is unblocked
-    // we mark this fact by setting block_info.closure == STM_AWOKEN.
-    // This way we can avoid sending further wakeup messages in the
-    // future.
-    lockTSO(tso);
-    if (tso->why_blocked == BlockedOnSTM &&
-        tso->block_info.closure == &stg_STM_AWOKEN_closure) {
-      TRACE("unpark_tso already woken up tso=%p", tso);
-    } else if (tso -> why_blocked == BlockedOnSTM) {
-      TRACE("unpark_tso on tso=%p", tso);
-      tso->block_info.closure = &stg_STM_AWOKEN_closure;
-      tryWakeupThread(cap,tso);
-    } else {
-      TRACE("spurious unpark_tso on tso=%p", tso);
+    // Only the capability that owns this TSO may unblock it. We can
+    // call tryWakeupThread() which will either unblock it directly if
+    // it belongs to this cap, or send a message to the owning cap
+    // otherwise.
+
+    // But we don't really want to send multiple messages if we write
+    // to the same TVar multiple times, and the owning cap hasn't yet
+    // woken up the thread and removed it from the TVar's watch list.
+    // So, we use the tso->block_info as a flag to indicate whether
+    // we've already done tryWakeupThread() for this thread.
+
+    // Safety Note: we hold the TVar lock at this point, so we know
+    // that this thread is definitely still blocked, since the first
+    // thing a thread will do when it runs is remove itself from the
+    // TVar watch queues, and to do that it would need to lock the
+    // TVar.
+
+    if (tso->block_info.closure != &stg_STM_AWOKEN_closure) {
+        // safe to do a non-atomic test-and-set here, because it's
+        // fine if we do multiple tryWakeupThread()s.
+        tso->block_info.closure = &stg_STM_AWOKEN_closure;
+        tryWakeupThread(cap,tso);
     }
-    unlockTSO(tso);
 }
 
 static void unpark_waiters_on(Capability *cap, StgTVar *s) {

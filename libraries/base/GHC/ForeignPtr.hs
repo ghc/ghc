@@ -321,7 +321,7 @@ addForeignPtrConcFinalizer_ _ _ =
 
 insertHaskellFinalizer :: IORef Finalizers -> IO () -> IO Bool
 insertHaskellFinalizer r f = do
-  !wasEmpty <- atomicModifyIORef r $ \finalizers -> case finalizers of
+  !wasEmpty <- atomicModifyIORefP r $ \finalizers -> case finalizers of
       NoFinalizers -> (HaskellFinalizers [f], True)
       HaskellFinalizers fs -> (HaskellFinalizers (f:fs), False)
       _ -> noMixingError
@@ -352,8 +352,8 @@ ensureCFinalizerWeak ref@(IORef (STRef r#)) value = do
       NoFinalizers -> IO $ \s ->
           case mkWeakNoFinalizer# r# (unsafeCoerce# value) s of { (# s1, w #) ->
              -- See Note [MallocPtr finalizers] (#10904)
-          case atomicModifyMutVar# r# (update w) s1 of
-              { (# s2, (weak, needKill ) #) ->
+          case atomicModifyMutVar2# r# (update w) s1 of
+              { (# s2, _, (_, (weak, needKill )) #) ->
           if needKill
             then case finalizeWeak# w s2 of { (# s3, _, _ #) ->
               (# s3, weak #) }
@@ -370,7 +370,8 @@ noMixingError = errorWithoutStackTrace $
 
 foreignPtrFinalizer :: IORef Finalizers -> IO ()
 foreignPtrFinalizer r = do
-  fs <- atomicModifyIORef r $ \fs -> (NoFinalizers, fs) -- atomic, see #7170
+  fs <- atomicSwapIORef r NoFinalizers
+             -- atomic, see #7170
   case fs of
     NoFinalizers -> return ()
     CFinalizers w -> IO $ \s -> case finalizeWeak# w s of

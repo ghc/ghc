@@ -583,7 +583,7 @@ tempCounter = unsafePerformIO $ newIORef 0
 rand_string :: IO String
 rand_string = do
   r1 <- c_getpid
-  r2 <- atomicModifyIORef tempCounter (\n -> (n+1, n))
+  (r2, _) <- atomicModifyIORef'_ tempCounter (+1)
   return $ show r1 ++ "-" ++ show r2
 
 data OpenNewFileResult

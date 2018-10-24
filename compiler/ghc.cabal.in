@@ -45,6 +45,11 @@ Flag terminfo
     Default: True
     Manual: True
 
+Flag integer-gmp
+    Description: Use integer-gmp
+    Manual: True
+    Default: False
+
 Library
     Default-Language: Haskell2010
     Exposed: False
@@ -83,6 +88,11 @@ Library
     if flag(ghci)
         CPP-Options: -DGHCI
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
+
+    -- gmp internals are used by the GHCi debugger if available
+    if flag(integer-gmp)
+        CPP-Options: -DINTEGER_GMP
+        build-depends: integer-gmp >= 1.0.2
 
     Other-Extensions:
         BangPatterns

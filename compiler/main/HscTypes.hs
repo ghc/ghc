@@ -2620,11 +2620,11 @@ interface file); so we give it 'noSrcLoc' then.  Later, when we find
 its binding site, we fix it up.
 -}
 
-updNameCache :: HscEnv
+updNameCache :: IORef NameCache
              -> (NameCache -> (NameCache, c))  -- The updating function
              -> IO c
-updNameCache hsc_env upd_fn
-  = atomicModifyIORef' (hsc_NC hsc_env) upd_fn
+updNameCache ncRef upd_fn
+  = atomicModifyIORef' ncRef upd_fn
 
 mkSOName :: Platform -> FilePath -> FilePath
 mkSOName platform root

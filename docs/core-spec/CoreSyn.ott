@@ -275,6 +275,7 @@ ind, I {{ tex i }} :: 'Ind_' ::= {{ com Indices, numbers }}
   | 0                           :: M :: zero
   | 1                           :: M :: one
   | 2                           :: M :: two
+  | 3                           :: M :: three
 
 terms :: 'Terms_' ::= {{ com List of terms }}
   | </ ei // i />      ::   :: List
@@ -388,6 +389,7 @@ terminals :: 'terminals_' ::=
   | validDcRoles ::   :: validDcRoles     {{ tex \textsf{validDcRoles} }}
   | -->          ::   :: steps            {{ tex \longrightarrow }}
   | coercionKind ::   :: coercionKind     {{ tex \textsf{coercionKind} }}
+  | coercionRole ::   :: coercionRole     {{ tex \textsf{coercionRole} }}
   | take         ::   :: take             {{ tex \textsf{take}\! }}
   | coaxrProves  ::   :: coaxrProves      {{ tex \textsf{coaxrProves} }}
   | Just         ::   :: Just             {{ tex \textsf{Just} }}
@@ -465,6 +467,7 @@ formula :: 'formula_' ::=
   | no other case matches              ::   :: no_other_case
     {{ tex \text{no other case matches} }}
   | t = coercionKind g                 ::   :: coercionKind
+  | R = coercionRole g                 ::   :: coercionRole
   | Just ( t1 , t2 ) = coaxrProves mu </ si // i /> </ ( s'j , s''j ) // j />
                                        ::   :: coaxrProves
   | mu1 = mu2                          ::   :: mu_rewrite

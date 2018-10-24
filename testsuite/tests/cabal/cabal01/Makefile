@@ -21,7 +21,7 @@ $(eval $(call canonicalise,PREFIX))
 
 cabal01:
 	$(MAKE) -s --no-print-directory clean
-	'$(TEST_HC)' --make -o setup Setup.lhs -v0
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -o setup Setup.lhs -v0
 
 	'$(GHC_PKG)' init local.db
 # We don't make use of -rtsopts in this test, and if it's enabled then

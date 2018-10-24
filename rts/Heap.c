@@ -162,9 +162,14 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
 
         case AP_STACK:
             ptrs[nptrs++] = ((StgAP_STACK *)closure)->fun;
-            for (i = 0; i < ((StgAP_STACK *)closure)->size; ++i) {
-                ptrs[nptrs++] = ((StgAP_STACK *)closure)->payload[i];
-            }
+            /*
+              The payload is a stack, which consists of a mixture of pointers
+              and non-pointers.  We can't simply pretend it's all pointers,
+              because that will cause crashes in the GC later.  We could
+              traverse the stack and extract pointers and non-pointers, but that
+              would be complicated, so let's just ignore the payload for now.
+              See #15375.
+            */
             break;
 
         case BCO:

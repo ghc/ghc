@@ -669,7 +669,8 @@
       SymI_HasProto(stg_newMutVarzh)                                    \
       SymI_HasProto(stg_newTVarzh)                                      \
       SymI_HasProto(stg_noDuplicatezh)                                  \
-      SymI_HasProto(stg_atomicModifyMutVarzh)                           \
+      SymI_HasProto(stg_atomicModifyMutVar2zh)                          \
+      SymI_HasProto(stg_atomicModifyMutVarzuzh)                         \
       SymI_HasProto(stg_casMutVarzh)                                    \
       SymI_HasProto(stg_newPinnedByteArrayzh)                           \
       SymI_HasProto(stg_newAlignedPinnedByteArrayzh)                    \

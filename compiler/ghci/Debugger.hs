@@ -44,8 +44,6 @@ import Data.List
 import Data.Maybe
 import Data.IORef
 
-import GHC.Exts
-
 -------------------------------------
 -- | The :print & friends commands
 -------------------------------------
@@ -120,11 +118,10 @@ bindSuspensions t = do
           availNames   = map ((prefix++) . show) [(1::Int)..] \\ alreadyUsedNames
       availNames_var  <- liftIO $ newIORef availNames
       (t', stuff)     <- liftIO $ foldTerm (nameSuspensionsAndGetInfos hsc_env availNames_var) t
-      let (names, tys, hvals) = unzip3 stuff
+      let (names, tys, fhvs) = unzip3 stuff
       let ids = [ mkVanillaGlobal name ty
                 | (name,ty) <- zip names tys]
           new_ic = extendInteractiveContextWithIds ictxt ids
-      fhvs <- liftIO $ mapM (mkFinalizedHValue hsc_env <=< mkRemoteRef) hvals
       liftIO $ extendLinkEnv (zip names fhvs)
       setSession hsc_env {hsc_IC = new_ic }
       return t'
@@ -132,7 +129,7 @@ bindSuspensions t = do
 
 --    Processing suspensions. Give names and recopilate info
         nameSuspensionsAndGetInfos :: HscEnv -> IORef [String]
-                                   -> TermFold (IO (Term, [(Name,Type,HValue)]))
+                                   -> TermFold (IO (Term, [(Name,Type,ForeignHValue)]))
         nameSuspensionsAndGetInfos hsc_env freeNames = TermFold
                       {
                         fSuspension = doSuspension hsc_env freeNames
@@ -163,7 +160,7 @@ showTerm term = do
        then cPprTerm (liftM2 (++) (\_y->[cPprShowable]) cPprTermBase) term
        else cPprTerm cPprTermBase term
  where
-  cPprShowable prec t@Term{ty=ty, val=val} =
+  cPprShowable prec t@Term{ty=ty, val=fhv} =
     if not (isFullyEvaluatedTerm t)
      then return Nothing
      else do
@@ -176,13 +173,14 @@ showTerm term = do
                       -- does this still do what it is intended to do
                       -- with the changed error handling and logging?
            let noop_log _ _ _ _ _ _ = return ()
-               expr = "show " ++ showPpr dflags bname
+               expr = "Prelude.return (Prelude.show " ++
+                         showPpr dflags bname ++
+                      ") :: Prelude.IO Prelude.String"
            _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
-           fhv <- liftIO $ mkFinalizedHValue hsc_env =<< mkRemoteRef val
            txt_ <- withExtendedLinkEnv [(bname, fhv)]
-                                       (GHC.compileExpr expr)
+                                       (GHC.compileExprRemote expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
-           let txt = unsafeCoerce# txt_ :: [a]
+           txt <- liftIO $ evalString hsc_env txt_
            if not (null txt) then
              return $ Just $ cparen (prec >= myprec && needsParens txt)
                                     (text txt)

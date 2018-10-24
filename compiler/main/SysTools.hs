@@ -110,17 +110,16 @@ stuff.
 ************************************************************************
 -}
 
-initLlvmConfig :: Maybe String
-                -> IO LlvmConfig
-initLlvmConfig mbMinusB
+initLlvmConfig :: String
+               -> IO LlvmConfig
+initLlvmConfig top_dir
   = do
       targets <- readAndParse "llvm-targets" mkLlvmTarget
       passes <- readAndParse "llvm-passes" id
       return (targets, passes)
   where
     readAndParse name builder =
-      do top_dir <- findTopDir mbMinusB
-         let llvmConfigFile = top_dir </> name
+      do let llvmConfigFile = top_dir </> name
          llvmConfigStr <- readFile llvmConfigFile
          case maybeReadFuzzy llvmConfigStr of
            Just s -> return (fmap builder <$> s)
@@ -130,14 +129,13 @@ initLlvmConfig mbMinusB
     mkLlvmTarget (dl, cpu, attrs) = LlvmTarget dl cpu (words attrs)
 
 
-initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
+initSysTools :: String          -- TopDir path
              -> IO Settings     -- Set all the mutable variables above, holding
                                 --      (a) the system programs
                                 --      (b) the package-config file
                                 --      (c) the GHC usage message
-initSysTools mbMinusB
-  = do top_dir <- findTopDir mbMinusB
-             -- see Note [topdir: How GHC finds its files]
+initSysTools top_dir
+  = do       -- see Note [topdir: How GHC finds its files]
              -- NB: top_dir is assumed to be in standard Unix
              -- format, '/' separated
        mtool_dir <- findToolDir top_dir
@@ -548,9 +546,12 @@ linkDynLib dflags0 o_files dep_packages
             -------------------------------------------------------------------
 
             let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
+                unregisterised = platformUnregisterised (targetPlatform dflags)
             let bsymbolicFlag = -- we need symbolic linking to resolve
-                                -- non-PIC intra-package-relocations
-                                ["-Wl,-Bsymbolic"]
+                                -- non-PIC intra-package-relocations for
+                                -- performance (where symbolic linking works)
+                                -- See Note [-Bsymbolic assumptions by GHC]
+                                ["-Wl,-Bsymbolic" | not unregisterised]
 
             runLink dflags (
                     map Option verbFlags
@@ -607,3 +608,27 @@ getFrameworkOpts dflags platform
     -- reverse because they're added in reverse order from the cmd line:
     framework_opts = concat [ ["-framework", fw]
                             | fw <- reverse frameworks ]
+
+{-
+Note [-Bsymbolic assumptions by GHC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GHC has a few assumptions about interaction of relocations in NCG and linker:
+
+1. -Bsymbolic resolves internal references when the shared library is linked,
+   which is important for performance.
+2. When there is a reference to data in a shared library from the main program,
+   the runtime linker relocates the data object into the main program using an
+   R_*_COPY relocation.
+3. If we used -Bsymbolic, then this results in multiple copies of the data
+   object, because some references have already been resolved to point to the
+   original instance. This is bad!
+
+We work around [3.] for native compiled code by avoiding the generation of
+R_*_COPY relocations.
+
+Unregisterised compiler can't evade R_*_COPY relocations easily thus we disable
+-Bsymbolic linking there.
+
+See related Trac tickets: #4210, #15338
+-}

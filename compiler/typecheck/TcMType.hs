@@ -41,7 +41,7 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
-  newWanted, newWanteds, cloneWanted, cloneWC,
+  newWanted, newWanteds, cloneWanted, cloneSimple, cloneWC,
   emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
@@ -191,14 +191,15 @@ cloneWanted ct
   where
     ev = ctEvidence ct
 
+cloneSimple :: Ct -> TcM Ct
+cloneSimple = fmap mkNonCanonical . cloneWanted
+
 cloneWC :: WantedConstraints -> TcM WantedConstraints
 cloneWC wc@(WC { wc_simple = simples, wc_impl = implics })
-  = do { simples' <- mapBagM clone_one simples
+  = do { simples' <- mapBagM cloneSimple simples
        ; implics' <- mapBagM clone_implic implics
        ; return (wc { wc_simple = simples', wc_impl = implics' }) }
   where
-    clone_one ct = do { ev <- cloneWanted ct; return (mkNonCanonical ev) }
-
     clone_implic implic@(Implic { ic_wanted = inner_wanted })
       = do { inner_wanted' <- cloneWC inner_wanted
            ; return (implic { ic_wanted = inner_wanted' }) }

@@ -7,7 +7,7 @@ SETUP=../Setup -v0
 T12733: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cp p/P.hs.in1 p/P.hs
 	cd p && $(SETUP) clean
 	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d

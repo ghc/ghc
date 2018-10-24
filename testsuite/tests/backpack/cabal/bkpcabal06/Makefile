@@ -12,7 +12,7 @@ CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --gh
 bkpcabal06: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	$(CONFIGURE)
 	cp impl/P.hs.in1 impl/P.hs
 	$(SETUP) build

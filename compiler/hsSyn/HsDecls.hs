@@ -676,7 +676,7 @@ countTyClDecls decls
    isNewTy _                                                      = False
 
 -- | Does this declaration have a complete, user-supplied kind signature?
--- See Note [Complete user-supplied kind signatures]
+-- See Note [CUSKs: complete user-supplied kind signatures]
 hsDeclHasCusk :: TyClDecl GhcRn -> Bool
 hsDeclHasCusk (FamDecl { tcdFam = fam_decl }) = famDeclHasCusk Nothing fam_decl
 hsDeclHasCusk (SynDecl { tcdTyVars = tyvars, tcdRhs = rhs })
@@ -757,7 +757,7 @@ pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
          , hsep (map (ppr.unLoc) varsr)]
       | otherwise = hsep [ pprPrefixOcc (unLoc thing)
                   , hsep (map (ppr.unLoc) (varl:varsr))]
-    pp_tyvars [] = ppr thing
+    pp_tyvars [] = pprPrefixOcc (unLoc thing)
 pp_vanilla_decl_head _ (XLHsQTyVars x) _ _ = ppr x
 
 pprTyClDeclFlavour :: TyClDecl (GhcPass p) -> SDoc
@@ -774,34 +774,83 @@ pprTyClDeclFlavour (DataDecl { tcdDataDefn = XHsDataDefn x })
 pprTyClDeclFlavour (XTyClDecl x) = ppr x
 
 
-{- Note [Complete user-supplied kind signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [CUSKs: complete user-supplied kind signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We kind-check declarations differently if they have a complete, user-supplied
 kind signature (CUSK). This is because we can safely generalise a CUSKed
 declaration before checking all of the others, supporting polymorphic recursion.
 See ghc.haskell.org/trac/ghc/wiki/GhcKinds/KindInference#Proposednewstrategy
 and #9200 for lots of discussion of how we got here.
 
-A declaration has a CUSK if we can know its complete kind without doing any
-inference, at all. Here are the rules:
+PRINCIPLE:
+  a type declaration has a CUSK iff we could produce a separate kind signature
+  for it, just like a type signature for a function,
+  looking only at the header of the declaration.
 
- - A class or datatype is said to have a CUSK if and only if all of its type
-variables are annotated. Its result kind is, by construction, Constraint or *
-respectively.
+Examples:
+  * data T1 (a :: *->*) (b :: *) = ....
+    -- Has CUSK; equivalant to   T1 :: (*->*) -> * -> *
 
- - A type synonym has a CUSK if and only if all of its type variables and its
-RHS are annotated with kinds.
+ * data T2 a b = ...
+   -- No CUSK; we do not want to guess T2 :: * -> * -> *
+   -- becuase the full decl might be   data T a b = MkT (a b)
 
- - A closed type family is said to have a CUSK if and only if all of its type
-variables and its return type are annotated.
+  * data T3 (a :: k -> *) (b :: *) = ...
+    -- CUSK; equivalent to   T3 :: (k -> *) -> * -> *
+    -- We lexically generalise over k to get
+    --    T3 :: forall k. (k -> *) -> * -> *
+    -- The generalisation is here is purely lexical, just like
+    --    f3 :: a -> a
+    -- means
+    --    f3 :: forall a. a -> a
 
- - An open type family always has a CUSK -- unannotated type variables (and
-return type) default to *.
+  * data T4 (a :: j k) = ...
+     -- CUSK; equivalent to   T4 :: j k -> *
+     -- which we lexically generalise to  T4 :: forall j k. j k -> *
+     -- and then, if PolyKinds is on, we further generalise to
+     --   T4 :: forall kk (j :: kk -> *) (k :: kk). j k -> *
+     -- Again this is exactly like what happens as the term level
+     -- when you write
+     --    f4 :: forall a b. a b -> Int
 
- - A data definition with a top-level :: must explicitly bind all kind variables
-to the right of the ::. See test dependent/should_compile/KindLevels, which
-requires this case. (Naturally, any kind variable mentioned before the :: should
-not be bound after it.)
+NOTE THAT
+  * A CUSK does /not/ mean that everything about the kind signature is
+    fully specified by the user.  Look at T4 and f4: we had do do kind
+    inference to figure out the kind-quantification.  But in both cases
+    (T4 and f4) that inference is done looking /only/ at the header of T4
+    (or signature for f4), not at the definition thereof.
+
+  * The CUSK completely fixes the kind of the type constructor, forever.
+
+  * The precise rules, for each declaration form, for whethher a declaration
+    has a CUSK are given in the user manual section "Complete user-supplied
+    kind signatures and polymorphic recursion".  BUt they simply implement
+    PRINCIPLE above.
+
+  * Open type families are interesting:
+      type family T5 a b :: *
+    There simply /is/ no accompanying declaration, so that info is all
+    we'll ever get.  So we it has a CUSK by definition, and we default
+    any un-fixed kind variables to *.
+
+  * Associated types are a bit tricker:
+      class C6 a where
+         type family T6 a b :: *
+         op :: a Int -> Int
+    Here C6 does not have a CUSK (in fact we ultimately discover that
+    a :: * -> *).  And hence neither does T6, the associated family,
+    because we can't fix its kind until we have settled C6.  Another
+    way to say it: unlike a top-level, we /may/ discover more about
+    a's kind from C6's definition.
+
+  * A data definition with a top-level :: must explicitly bind all
+    kind variables to the right of the ::. See test
+    dependent/should_compile/KindLevels, which requires this
+    case. (Naturally, any kind variable mentioned before the :: should
+    not be bound after it.)
+
+    This last point is much more debatable than the others; see
+    Trac #15142 comment:22
 -}
 
 
@@ -1025,6 +1074,7 @@ data FamilyInfo pass
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
 -- | Does this family declaration have a complete, user-supplied kind signature?
+-- See Note [CUSKs: complete user-supplied kind signatures]
 famDeclHasCusk :: Maybe Bool
                    -- ^ if associated, does the enclosing class have a CUSK?
                -> FamilyDecl pass -> Bool
@@ -2334,7 +2384,7 @@ type instance XXRoleAnnotDecl (GhcPass _) = NoExt
 instance (p ~ GhcPass pass, OutputableBndr (IdP p))
        => Outputable (RoleAnnotDecl p) where
   ppr (RoleAnnotDecl _ ltycon roles)
-    = text "type role" <+> ppr ltycon <+>
+    = text "type role" <+> pprPrefixOcc (unLoc ltycon) <+>
       hsep (map (pp_role . unLoc) roles)
     where
       pp_role Nothing  = underscore

@@ -1676,7 +1676,7 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
 
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the first MutableByteArray# to the specified region in the second MutableByteArray#.
+  {Copy a range of the first MutableByteArray\# to the specified region in the second MutableByteArray\#.
    Both arrays must fully contain the specified ranges, but this is not checked. The regions are
    allowed to overlap, although this is only possible when the same array is provided
    as both the source and the destination.}
@@ -1687,10 +1687,10 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
 
 primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
   ByteArray# -> Int# -> Addr# -> Int# -> State# s -> State# s
-  {Copy a range of the ByteArray# to the memory range starting at the Addr#.
-   The ByteArray# and the memory region at Addr# must fully contain the
-   specified ranges, but this is not checked. The Addr# must not point into the
-   ByteArray# (e.g. if the ByteArray# were pinned), but this is not checked
+  {Copy a range of the ByteArray\# to the memory range starting at the Addr\#.
+   The ByteArray\# and the memory region at Addr\# must fully contain the
+   specified ranges, but this is not checked. The Addr\# must not point into the
+   ByteArray\# (e.g. if the ByteArray\# were pinned), but this is not checked
    either.}
   with
   has_side_effects = True
@@ -1699,10 +1699,10 @@ primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
 
 primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
   MutableByteArray# s -> Int# -> Addr# -> Int# -> State# s -> State# s
-  {Copy a range of the MutableByteArray# to the memory range starting at the
-   Addr#. The MutableByteArray# and the memory region at Addr# must fully
-   contain the specified ranges, but this is not checked. The Addr# must not
-   point into the MutableByteArray# (e.g. if the MutableByteArray# were
+  {Copy a range of the MutableByteArray\# to the memory range starting at the
+   Addr\#. The MutableByteArray\# and the memory region at Addr\# must fully
+   contain the specified ranges, but this is not checked. The Addr\# must not
+   point into the MutableByteArray\# (e.g. if the MutableByteArray\# were
    pinned), but this is not checked either.}
   with
   has_side_effects = True
@@ -1711,10 +1711,10 @@ primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
 
 primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
   Addr# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a memory range starting at the Addr# to the specified range in the
-   MutableByteArray#. The memory region at Addr# and the ByteArray# must fully
-   contain the specified ranges, but this is not checked. The Addr# must not
-   point into the MutableByteArray# (e.g. if the MutableByteArray# were pinned),
+  {Copy a memory range starting at the Addr\# to the specified range in the
+   MutableByteArray\#. The memory region at Addr\# and the ByteArray\# must fully
+   contain the specified ranges, but this is not checked. The Addr\# must not
+   point into the MutableByteArray\# (e.g. if the MutableByteArray\# were pinned),
    but this is not checked either.}
   with
   has_side_effects = True
@@ -1894,7 +1894,7 @@ primop  WriteArrayArrayOp_MutableArrayArray "writeMutableArrayArrayArray#" GenPr
 
 primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
   ArrayArray# -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
-  {Copy a range of the ArrayArray# to the specified region in the MutableArrayArray#.
+  {Copy a range of the ArrayArray\# to the specified region in the MutableArrayArray\#.
    Both arrays must fully contain the specified ranges, but this is not checked.
    The two arrays must not be the same array in different states, but this is not checked either.}
   with
@@ -2224,25 +2224,37 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Int#
 
--- Note [Why not an unboxed tuple in atomicModifyMutVar#?]
+-- Note [Why not an unboxed tuple in atomicModifyMutVar2#?]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- Looking at the type of atomicModifyMutVar#, one might wonder why
+-- Looking at the type of atomicModifyMutVar2#, one might wonder why
 -- it doesn't return an unboxed tuple. e.g.,
 --
---   MutVar# s a -> (a -> (# a, b #)) -> State# s -> (# State# s, b #)
+--   MutVar# s a -> (a -> (# a, b #)) -> State# s -> (# State# s, a, (# a, b #) #)
 --
--- The reason is that atomicModifyMutVar# relies on laziness for its atomicity.
--- Given a MutVar# containing x, atomicModifyMutVar# merely replaces the
+-- The reason is that atomicModifyMutVar2# relies on laziness for its atomicity.
+-- Given a MutVar# containing x, atomicModifyMutVar2# merely replaces
 -- its contents with a thunk of the form (fst (f x)). This can be done using an
 -- atomic compare-and-swap as it is merely replacing a pointer.
 
-primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
-   MutVar# s a -> (a -> b) -> State# s -> (# State# s, c #)
-   { Modify the contents of a {\tt MutVar\#}. Note that this isn't strictly
-     speaking the correct type for this function, it should really be
-     {\tt MutVar# s a -> (a -> (a,b)) -> State# s -> (# State# s, b #)}, however
-     we don't know about pairs here. }
+primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
+   MutVar# s a -> (a -> c) -> State# s -> (# State# s, a, c #)
+   { Modify the contents of a {\tt MutVar\#}, returning the previous
+     contents and the result of applying the given function to the
+     previous contents. Note that this isn't strictly
+     speaking the correct type for this function; it should really be
+     {\tt MutVar\# s a -> (a -> (a,b)) -> State\# s -> (\# State\# s, a, (a, b) \#)},
+     but we don't know about pairs here. }
+   with
+   out_of_line = True
+   has_side_effects = True
+   can_fail         = True
+
+primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
+   MutVar# s a -> (a -> a) -> State# s -> (# State# s, a, a #)
+   { Modify the contents of a {\tt MutVar\#}, returning the previous
+     contents and the result of applying the given function to the
+     previous contents. }
    with
    out_of_line = True
    has_side_effects = True
@@ -2774,13 +2786,13 @@ primop  CompactResizeOp "compactResize#" GenPrimOp
 
 primop  CompactContainsOp "compactContains#" GenPrimOp
    Compact# -> a -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { Returns 1# if the object is contained in the compact, 0# otherwise. }
+   { Returns 1\# if the object is contained in the compact, 0\# otherwise. }
    with
    out_of_line      = True
 
 primop  CompactContainsAnyOp "compactContainsAny#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { Returns 1# if the object is in any compact at all, 0# otherwise. }
+   { Returns 1\# if the object is in any compact at all, 0\# otherwise. }
    with
    out_of_line      = True
 

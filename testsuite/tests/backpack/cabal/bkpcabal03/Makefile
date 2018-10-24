@@ -8,7 +8,7 @@ CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --gh
 bkpcabal03: clean
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init tmp.d
-	'$(TEST_HC)' -v0 --make Setup
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cp bkpcabal03.cabal.in1 bkpcabal03.cabal
 	# typecheck asig1
 	(cd asig1; $(CONFIGURE) --cid "asig1" asig1)

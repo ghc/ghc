@@ -30,7 +30,7 @@ T7786.hs:97:31: error:
       from the context: xxx ~ 'Empty
         bound by a pattern with constructor: Nil :: forall a. Sing 'Empty,
                  in a pattern binding in
-                      'do' block
+                      a 'do' block
         at T7786.hs:96:22-24
     • In the second argument of ‘($)’, namely ‘Sub db k sub’
       In a stmt of a 'do' block: return $ Sub db k sub

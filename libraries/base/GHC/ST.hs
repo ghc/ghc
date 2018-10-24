@@ -18,7 +18,7 @@
 
 module GHC.ST (
         ST(..), STret(..), STRep,
-        fixST, runST,
+        runST,
 
         -- * Unsafe functions
         liftST, unsafeInterleaveST, unsafeDupableInterleaveST
@@ -92,8 +92,7 @@ instance Monoid a => Monoid (ST s a) where
 
 data STret s a = STret (State# s) a
 
--- liftST is useful when we want a lifted result from an ST computation.  See
--- fixST below.
+-- liftST is useful when we want a lifted result from an ST computation.
 liftST :: ST s a -> State# s -> STret s a
 liftST (ST m) = \s -> case m s of (# s', r #) -> STret s' r
 
@@ -125,16 +124,6 @@ unsafeDupableInterleaveST (ST m) = ST ( \ s ->
     in
     (# s, r #)
   )
-
--- | Allow the result of a state transformer computation to be used (lazily)
--- inside the computation.
--- Note that if @f@ is strict, @'fixST' f = _|_@.
-fixST :: (a -> ST s a) -> ST s a
-fixST k = ST $ \ s ->
-    let ans       = liftST (k r) s
-        STret _ r = ans
-    in
-    case ans of STret s' x -> (# s', x #)
 
 -- | @since 2.01
 instance  Show (ST s a)  where
