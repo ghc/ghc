@@ -499,9 +499,7 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
--- TODO Krzysztof this was originally (XFunTy p ~ NoExt) =>,
--- it's not clear to me why it had to be changed
-nlHsFunTy :: (p ~ GhcPass q) => LHsType p -> HsRig p -> LHsType p -> LHsType p
+nlHsFunTy :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => LHsType p -> HsRig p -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))

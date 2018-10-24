@@ -1491,7 +1491,7 @@ hsTypeNeedsParens p = go
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is
 -- true, and if so, surrounds @ty@ with an 'HsParTy'. Otherwise, it simply
 -- returns @ty@.
-parenthesizeHsType :: PprPrec -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+parenthesizeHsType :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => PprPrec -> LHsType p -> LHsType p
 parenthesizeHsType p lty@(L loc ty)
   | hsTypeNeedsParens p ty = L loc (HsParTy NoExt lty)
   | otherwise              = lty
