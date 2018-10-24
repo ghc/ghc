@@ -70,8 +70,8 @@ import TcValidity
 import TcUnify
 import TcIface
 import TcSimplify
+import TcHsSyn
 import TcType
-import TcHsSyn( zonkSigType )
 import Weight
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyBinder(..), Type(TyVarTy) )  -- Used in tcDataKindSig
@@ -85,7 +85,6 @@ import ConLike
 import DataCon
 import Class
 import Name
-import NameEnv
 import NameSet
 import VarEnv
 import TysWiredIn
@@ -117,13 +116,6 @@ to do this on un-desugared types. Luckily, desugared types are close enough
 to HsTypes to make the error messages sane.
 
 During type-checking, we perform as little validity checking as possible.
-This is because some type-checking is done in a mutually-recursive knot, and
-if we look too closely at the tycons, we'll loop. This is why we always must
-use mkNakedTyConApp and mkNakedAppTys, etc., which never look at a tycon.
-The mkNamed... functions don't uphold Type invariants, but zonkTcTypeToType
-will repair this for us. Note that zonkTcType *is* safe within a knot, and
-can be done repeatedly with no ill effect: it just squeezes out metavariables.
-
 Generally, after type-checking, you will want to do validity checking, say
 with TcValidity.checkValidType.
 
@@ -142,19 +134,11 @@ but not all:
 - Similarly, also a GHC extension, we look through synonyms before complaining
   about the form of a class or instance declaration
 
-- Ambiguity checks involve functional dependencies, and it's easier to wait
-  until knots have been resolved before poking into them
+- Ambiguity checks involve functional dependencies
 
 Also, in a mutually recursive group of types, we can't look at the TyCon until we've
 finished building the loop.  So to keep things simple, we postpone most validity
 checking until step (3).
-
-Knot tying
-~~~~~~~~~~
-During step (1) we might fault in a TyCon defined in another module, and it might
-(via a loop) refer back to a TyCon defined in this module. So when we tie a big
-knot around type declarations with ARecThing, so that the fault-in code can get
-the TyCon being defined.
 
 %************************************************************************
 %*                                                                      *
@@ -205,8 +189,7 @@ kcHsSigType skol_info names (HsIB { hsib_body = hs_ty
 kcHsSigType  _ _ (XHsImplicitBndrs _) = panic "kcHsSigType"
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
--- Does not do validity checking; this must be done outside
--- the recursive class declaration "knot"
+-- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
     tc_hs_sig_type_and_gen skol_info sig_ty liftedTypeKind
@@ -227,7 +210,7 @@ tcHsSigType ctxt sig_ty
           -- Generalise here: see Note [Kind generalisation]
        ; do_kind_gen <- decideKindGeneralisationPlan sig_ty
        ; ty <- if do_kind_gen
-               then tc_hs_sig_type_and_gen skol_info sig_ty kind
+               then tc_hs_sig_type_and_gen skol_info sig_ty kind >>= zonkTcType
                else tc_hs_sig_type         skol_info sig_ty kind
 
        ; checkValidType ctxt ty
@@ -241,7 +224,7 @@ tc_hs_sig_type_and_gen :: SkolemInfo -> LHsSigType GhcRn -> Kind -> TcM Type
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
--- No validity checking, but it does zonk en route to generalization
+-- No validity checking or zonking
 tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext
                                               = HsIBRn { hsib_vars = sig_vars }
                                        , hsib_body = hs_ty }) kind
@@ -252,11 +235,9 @@ tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext
          --    kind variables floating about, immediately prior to
          --    kind generalisation
 
-         -- We use the "InKnot" zonker, because this is called
-         -- on class method sigs in the knot
-       ; ty1 <- zonkPromoteTypeInKnot $ mkSpecForAllTys tkvs ty
+       ; ty1 <- zonkPromoteType $ mkSpecForAllTys tkvs ty
        ; kvs <- kindGeneralize ty1
-       ; zonkSigType (mkInvForAllTys kvs ty1) }
+       ; return (mkInvForAllTys kvs ty1) }
 
 tc_hs_sig_type_and_gen _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
 
@@ -283,6 +264,7 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
 -- E.g.    class C (a::*) (b::k->k)
 --         data T a b = ... deriving( C Int )
 --    returns ([k], C, [k, Int], [k->k])
+-- Return values are fully zonked
 tcHsDeriv hs_ty
   = do { cls_kind <- newMetaKindVar
                     -- always safe to kind-generalize, because there
@@ -290,7 +272,8 @@ tcHsDeriv hs_ty
        ; ty <- checkNoErrs $
                  -- avoid redundant error report with "illegal deriving", below
                tc_hs_sig_type_and_gen (SigTypeSkol DerivClauseCtxt) hs_ty cls_kind
-       ; cls_kind <- zonkTcType cls_kind
+       ; cls_kind <- zonkTcTypeToType emptyZonkEnv cls_kind
+       ; ty <- zonkTcTypeToType emptyZonkEnv ty
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
@@ -333,6 +316,7 @@ tcDerivStrategy user_ctxt mds thing_inside
       cls_kind <- newMetaKindVar
       ty' <- checkNoErrs $
              tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty cls_kind
+      ty' <- zonkTcTypeToType emptyZonkEnv ty'
       let (via_tvs, via_pred) = splitForAllTys ty'
       tcExtendTyVarEnv (map unrestricted via_tvs) $ do   -- TODO: is this correct?
         (thing_tvs, thing) <- thing_inside
@@ -350,6 +334,7 @@ tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
 tcHsClsInstType user_ctxt hs_inst_ty
   = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
     do { inst_ty <- tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
+       ; inst_ty <- zonkTcTypeToType emptyZonkEnv inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
 ----------------------------------------------
@@ -942,7 +927,7 @@ bigConstraintTuple arity
 tcInferApps :: TcTyMode
             -> Maybe (VarEnv Kind)  -- ^ Possibly, kind info (see above)
             -> LHsType GhcRn        -- ^ Function (for printing only)
-            -> TcType               -- ^ Function (could be knot-tied)
+            -> TcType               -- ^ Function
             -> TcKind               -- ^ Function kind (zonked)
             -> [LHsType GhcRn]      -- ^ Args
             -> TcM (TcType, [TcType], TcKind) -- ^ (f args, args, result kind)
@@ -965,7 +950,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
     go :: Int             -- the # of the next argument
        -> [TcType]        -- already type-checked args, in reverse order
        -> TCvSubst        -- instantiating substitution
-       -> TcType          -- function applied to some args, could be knot-tied
+       -> TcType          -- function applied to some args
        -> [TyBinder]      -- binders in function kind (both vis. and invis.)
        -> TcKind          -- function kind body (not a Pi-type)
        -> [LHsType GhcRn] -- un-type-checked args
@@ -997,8 +982,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
                             -- nakedSubstTy: see Note [The well-kinded type invariant]
            ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                      tc_lhs_type mode arg exp_kind
-           ; traceTc "tcInferApps (vis 1)" (vcat [ ppr exp_kind
-                                                 , ppr (typeKind arg') ])
+           ; traceTc "tcInferApps (vis 1)" (ppr exp_kind)
            ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
            ; go (n+1) (arg' : acc_args) subst'
                 (mkNakedAppTy fun arg') -- See Note [The well-kinded type invariant]
@@ -1026,7 +1010,6 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
         zapped_subst                   = zapTCvSubst subst
         hs_ty = mkHsAppTys orig_hs_ty (take (n-1) orig_hs_args)
 
-
 -- | Applies a type to a list of arguments.
 -- Always consumes all the arguments, using 'matchExpectedFunKind' as
 -- necessary. If you wish to apply a type to a list of HsTypes, this is
@@ -1034,14 +1017,14 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
 -- Used for type-checking types only.
 tcTyApps :: TcTyMode
          -> LHsType GhcRn        -- ^ Function (for printing only)
-         -> TcType               -- ^ Function (could be knot-tied)
+         -> TcType               -- ^ Function
          -> TcKind               -- ^ Function kind (zonked)
          -> [LHsType GhcRn]      -- ^ Args
          -> TcM (TcType, TcKind) -- ^ (f args, result kind)   result kind is zonked
 -- Precondition: see precondition for tcInferApps
 tcTyApps mode orig_hs_ty fun_ty fun_ki args
   = do { (ty', _args, ki') <- tcInferApps mode Nothing orig_hs_ty fun_ty fun_ki args
-       ; return (ty' `mkNakedCastTy` mkRepReflCo ki', ki') }
+       ; return (ty' `mkNakedCastTy` mkNomReflCo ki', ki') }
           -- The mkNakedCastTy is for (IT3) of Note [The tcType invariant]
 
 --------------------------
@@ -1049,7 +1032,7 @@ tcTyApps mode orig_hs_ty fun_ty fun_ki args
 -- Obeys Note [The tcType invariant]
 checkExpectedKind :: HasDebugCallStack
                   => HsType GhcRn   -- type we're checking (for printing)
-                  -> TcType         -- type we're checking (might be knot-tied)
+                  -> TcType         -- type we're checking
                   -> TcKind         -- the known kind of that type
                   -> TcKind         -- the expected kind
                   -> TcM TcType
@@ -1180,13 +1163,11 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                                     (isTypeLevel (mode_level mode))
                                     (promotionErr name TyConPE)
                                 ; check_tc tc_tc
-                                ; tc <- get_loopy_tc name tc_tc
-                                ; handle_tyfams tc tc_tc }
-                             -- mkNakedTyConApp: see Note [Type-checking inside the knot]
+                                ; handle_tyfams tc_tc }
 
            AGlobal (ATyCon tc)
              -> do { check_tc tc
-                   ; handle_tyfams tc tc }
+                   ; handle_tyfams tc }
 
            AGlobal (AConLike (RealDataCon dc))
              -> do { data_kinds <- xoptM LangExt.DataKinds
@@ -1201,7 +1182,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                                     ConstrainedDataConPE pred
                        Nothing   -> pure ()
                    ; let tc = promoteDataCon dc
-                   ; return (mkNakedTyConApp tc [], tyConKind tc) }
+                   ; return (mkTyConApp tc [], tyConKind tc) }
 
            APromotionErr err -> promotionErr name err
 
@@ -1216,50 +1197,34 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- if we are type-checking a type family tycon, we must instantiate
     -- any invisible arguments right away. Otherwise, we get #11246
-    handle_tyfams :: TyCon     -- the tycon to instantiate (might be loopy)
-                  -> TcTyCon   -- a non-loopy version of the tycon
+    handle_tyfams :: TyCon     -- the tycon to instantiate
                   -> TcM (TcType, TcKind)
-    handle_tyfams tc tc_tc
-      | mightBeUnsaturatedTyCon tc_tc || mode_unsat mode
+    handle_tyfams tc
+      | mightBeUnsaturatedTyCon tc || mode_unsat mode
                                          -- This is where mode_unsat is used
-      = do { tc_kind <- zonkTcType (tyConKind tc_tc)   -- (IT6) of Note [The tcType invariant]
-           ; traceTc "tcTyVar2a" (ppr tc_tc $$ ppr tc_kind)
-           ; return (mkNakedTyConApp tc [] `mkNakedCastTy` mkRepReflCo tc_kind, tc_kind) }
+      = do { tc_kind <- zonkTcType (tyConKind tc)   -- (IT6) of Note [The tcType invariant]
+           ; traceTc "tcTyVar2a" (ppr tc $$ ppr tc_kind)
+           ; return (mkTyConApp tc [] `mkNakedCastTy` mkNomReflCo tc_kind, tc_kind) }
               -- the mkNakedCastTy ensures (IT5) of Note [The tcType invariant]
 
       | otherwise
-      = do { tc_kind <- zonkTcType (tyConKind tc_tc)
+      = do { tc_kind <- zonkTcType (tyConKind tc)
            ; let (tc_kind_bndrs, tc_inner_ki) = splitPiTysInvisible tc_kind
-           ; (tc_args, kind) <- instantiateTyN Nothing (length (tyConBinders tc_tc))
+           ; (tc_args, kind) <- instantiateTyN Nothing (length (tyConBinders tc))
                                                tc_kind_bndrs tc_inner_ki
-           ; let is_saturated = tc_args `lengthAtLeast` tyConArity tc_tc
+           ; let is_saturated = tc_args `lengthAtLeast` tyConArity tc
                  tc_ty
-                   | is_saturated = mkNakedTyConApp tc tc_args `mkNakedCastTy` mkRepReflCo kind
+                   | is_saturated = mkTyConApp tc tc_args `mkNakedCastTy` mkNomReflCo kind
                       -- mkNakedCastTy is for (IT5) of Note [The tcType invariant]
-                   | otherwise    = mkNakedTyConApp tc tc_args
+                   | otherwise    = mkTyConApp tc tc_args
                       -- if the tycon isn't yet saturated, then we don't want mkNakedCastTy,
                       -- because that means we'll have an unsaturated type family
                       -- We don't need it anyway, because we can be sure that the
                       -- type family kind will accept further arguments (because it is
                       -- not yet saturated)
-           -- tc and tc_ty must not be traced here, because that would
-           -- force the evaluation of a potentially knot-tied variable (tc),
-           -- and the typechecker would hang, as per #11708
-           ; traceTc "tcTyVar2b" (vcat [ ppr tc_tc <+> dcolon <+> ppr tc_kind
+           ; traceTc "tcTyVar2b" (vcat [ ppr tc <+> dcolon <+> ppr tc_kind
                                        , ppr kind ])
            ; return (tc_ty, kind) }
-
-    get_loopy_tc :: Name -> TyCon -> TcM TyCon
-    -- Return the knot-tied global TyCon if there is one
-    -- Otherwise the local TcTyCon; we must be doing kind checking
-    -- but we still want to return a TyCon of some sort to use in
-    -- error messages
-    get_loopy_tc name tc_tc
-      = do { env <- getGblEnv
-           ; case lookupNameEnv (tcg_type_env env) name of
-                Just (ATyCon tc) -> return tc
-                _                -> do { traceTc "lk1 (loopy)" (ppr name)
-                                       ; return tc_tc } }
 
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
@@ -1274,34 +1239,6 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                 | otherwise = True
 
 {-
-Note [Type-checking inside the knot]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we are checking the argument types of a data constructor.  We
-must zonk the types before making the DataCon, because once built we
-can't change it.  So we must traverse the type.
-
-BUT the parent TyCon is knot-tied, so we can't look at it yet.
-
-So we must be careful not to use "smart constructors" for types that
-look at the TyCon or Class involved.
-
-  * Hence the use of mkNakedXXX functions. These do *not* enforce
-    the invariants (for example that we use (FunTy s t) rather
-    than (TyConApp (->) [s,t])).
-
-  * The zonking functions establish invariants (even zonkTcType, a change from
-    previous behaviour). So we must never inspect the result of a
-    zonk that might mention a knot-tied TyCon. This is generally OK
-    because we zonk *kinds* while kind-checking types. And the TyCons
-    in kinds shouldn't be knot-tied, because they come from a previous
-    mutually recursive group.
-
-  * TcHsSyn.zonkTcTypeToType also can safely check/establish
-    invariants.
-
-This is horribly delicate.  I hate it.  A good example of how
-delicate it is can be seen in Trac #7903.
-
 Note [GADT kind self-reference]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2696,7 +2633,8 @@ zonkPromoteMapper = TyCoMapper { tcm_smart    = True
                                , tcm_tyvar    = const zonkPromoteTcTyVar
                                , tcm_covar    = const covar
                                , tcm_hole     = const hole
-                               , tcm_tybinder = const tybinder }
+                               , tcm_tybinder = const tybinder
+                               , tcm_tycon    = return }
   where
     covar cv
       = mkCoVarCo <$> zonkPromoteTyCoVarKind cv
@@ -2751,11 +2689,6 @@ zonkPromoteTyCoVarBndr tv
 
 zonkPromoteCoercion :: Coercion -> TcM Coercion
 zonkPromoteCoercion = mapCoercion zonkPromoteMapper ()
-
-zonkPromoteTypeInKnot :: TcType -> TcM TcType
-zonkPromoteTypeInKnot = mapType (zonkPromoteMapper { tcm_smart = False }) ()
-  -- NB: Just changing smart to False will still use the smart zonker (not suitable
-  -- for in-the-knot) for kinds. But that's OK, because kinds aren't knot-tied.
 
 {-
 ************************************************************************

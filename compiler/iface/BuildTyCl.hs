@@ -8,7 +8,7 @@
 module BuildTyCl (
         buildDataCon,
         buildPatSyn,
-        TcMethInfo, buildClass,
+        TcMethInfo, MethInfo, buildClass,
         mkNewTyConRhs,
         newImplicitBinder, newTyConRepName
     ) where
@@ -105,10 +105,11 @@ buildDataCon :: FamInstEnvs
            -> [TyVar]                  -- Existentials
            -> [TyVarBinder]            -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
-           -> ThetaType                -- Does not include the "stupid theta"
+           -> KnotTied ThetaType       -- Does not include the "stupid theta"
                                        -- or the GADT equalities
-           -> [Weighted Type] -> Type  -- Argument and result types
-           -> TyCon                    -- Rep tycon
+           -> [KnotTied (Weighted Type)] -- Arguments
+           -> KnotTied Type            -- Result types
+           -> KnotTied TyCon           -- Rep tycon
            -> NameEnv ConTag           -- Maps the Name of each DataCon to its
                                        -- ConTag
            -> TcRnIf m n DataCon
@@ -214,7 +215,8 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
 
 
 ------------------------------------------------------
-type TcMethInfo     -- A temporary intermediate, to communicate
+type TcMethInfo = MethInfo  -- this variant needs zonking
+type MethInfo       -- A temporary intermediate, to communicate
                     -- between tcClassSigs and buildClass.
   = ( Name   -- Name of the class op
     , Type   -- Type of the class op
@@ -238,7 +240,7 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [FunDep TyVar]               -- Functional dependencies
            -- Super classes, associated types, method info, minimal complete def.
            -- This is Nothing if the class is abstract.
-           -> Maybe (ThetaType, [ClassATItem], [TcMethInfo], ClassMinimalDef)
+           -> Maybe (KnotTied ThetaType, [ClassATItem], [KnotTied MethInfo], ClassMinimalDef)
            -> TcRnIf m n Class
 
 buildClass tycon_name binders roles fds Nothing
