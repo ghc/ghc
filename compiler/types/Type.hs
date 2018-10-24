@@ -63,7 +63,8 @@ module Type (
         stripCoercionTy, splitCoercionType_maybe,
 
         splitPiTysInvisible, filterOutInvisibleTypes, filterOutInferredTypes,
-        partitionInvisibleTypes, partitionInvisibles, tyConArgFlags,
+        partitionInvisibleTypes, partitionInvisibles,
+        tyConArgFlags, appTyArgFlags,
         synTyConResKind,
 
         modifyJoinResTy, setJoinResTy,
@@ -1573,8 +1574,9 @@ partitionInvisibles = partitionWith pick_invis
     pick_invis (thing, vis) | isInvisibleArgFlag vis = Left thing
                             | otherwise              = Right thing
 
--- | Given a 'TyCon' and a list of argument types, determine each argument's
--- visibility ('Inferred', 'Specified', or 'Required').
+-- | Given a 'TyCon' and a list of argument types to which the 'TyCon' is
+-- applied, determine each argument's visibility
+-- ('Inferred', 'Specified', or 'Required').
 --
 -- Wrinkle: consider the following scenario:
 --
@@ -1588,7 +1590,26 @@ partitionInvisibles = partitionWith pick_invis
 -- Thus, the first argument is invisible, @S@ is visible, @R@ is invisible again,
 -- and @Q@ is visible.
 tyConArgFlags :: TyCon -> [Type] -> [ArgFlag]
-tyConArgFlags tc = go emptyTCvSubst (tyConKind tc)
+tyConArgFlags tc = fun_kind_arg_flags (tyConKind tc)
+
+-- | Given a 'Type' and a list of argument types to which the 'Type' is
+-- applied, determine each argument's visibility
+-- ('Inferred', 'Specified', or 'Required').
+--
+-- Most of the time, the arguments will be 'Required', but not always. Consider
+-- @f :: forall a. a -> Type@. In @f Type Bool@, the first argument (@Type@) is
+-- 'Specified' and the second argument (@Bool@) is 'Required'. It is precisely
+-- this sort of higher-rank situation in which 'appTyArgFlags' comes in handy,
+-- since @f Type Bool@ would be represented in Core using 'AppTy's.
+-- (See also Trac #15792).
+appTyArgFlags :: Type -> [Type] -> [ArgFlag]
+appTyArgFlags ty = fun_kind_arg_flags (typeKind ty)
+
+-- | Given a function kind and a list of argument types (where each argument's
+-- kind aligns with the corresponding position in the argument kind), determine
+-- each argument's visibility ('Inferred', 'Specified', or 'Required').
+fun_kind_arg_flags :: Kind -> [Type] -> [ArgFlag]
+fun_kind_arg_flags = go emptyTCvSubst
   where
     go _ _ [] = []
     go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)

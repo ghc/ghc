@@ -441,3 +441,4 @@ test('TH_recover_warns', normal, compile, ['-v0 -ddump-splices -dsuppress-unique
 test('T15738', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15783', normal, multimod_compile,
     ['T15783A', '-v0 ' + config.ghc_th_way_flags])
+test('T15792', normal, compile, ['-v0 -dsuppress-uniques'])

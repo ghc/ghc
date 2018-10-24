@@ -1743,7 +1743,23 @@ reifyType ty@(ForAllTy {})  = reify_for_all ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
 reifyType (TyConApp tc tys) = reify_tc_app tc tys   -- Do not expand type synonyms here
-reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `TH.AppT` r2) }
+reifyType ty@(AppTy {})     = do
+  let (ty_head, ty_args) = splitAppTys ty
+  ty_head' <- reifyType ty_head
+  ty_args' <- reifyTypes (filter_out_invisible_args ty_head ty_args)
+  pure $ mkThAppTs ty_head' ty_args'
+  where
+    -- Make sure to filter out any invisible arguments. For instance, if you
+    -- reify the following:
+    --
+    --   newtype T (f :: forall a. a -> Type) = MkT (f Bool)
+    --
+    -- Then you should receive back `f Bool`, not `f Type Bool`, since the
+    -- `Type` argument is invisible (#15792).
+    filter_out_invisible_args :: Type -> [Type] -> [Type]
+    filter_out_invisible_args ty_head ty_args =
+      filterByList (map isVisibleArgFlag $ appTyArgFlags ty_head ty_args)
+                   ty_args
 reifyType ty@(FunTy t1 t2)
   | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
