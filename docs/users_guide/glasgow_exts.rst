@@ -4453,7 +4453,7 @@ Deriving ``Data`` instances
 
 .. extension:: DeriveDataTypeable
     :shortdesc: Enable deriving for the Data class.
-       Implied by :extension:`AutoDeriveTypeable`.
+       Implied by (deprecated) :extension:`AutoDeriveTypeable`.
 
     :since: 6.8.1
 

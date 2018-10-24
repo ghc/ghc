@@ -158,7 +158,9 @@ These flags dump various information from GHC's typechecker and renamer.
     :shortdesc: Dump typechecker output
     :type: dynamic
 
-    Dump typechecker output
+    Dump typechecker output. Note that this hides a great deal of detail by
+    default; you might consider using this with
+    :ghc-flag:`-fprint-typechecker-elaboration`.
 
 .. ghc-flag:: -ddump-tc-ast
     :shortdesc: Dump typechecker output as a syntax tree
@@ -213,7 +215,8 @@ subexpression elimination pass.
     Print a one-line summary of the size of the Core program at the end
     of the optimisation pipeline.
 
-.. ghc-flag:: -ddump-ds -ddump-ds-preopt
+.. ghc-flag:: -ddump-ds
+              -ddump-ds-preopt
     :shortdesc: Dump desugarer output.
     :type: dynamic
 

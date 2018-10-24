@@ -1,6 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE AutoDeriveTypeable #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module T7710 where

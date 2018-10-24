@@ -4115,7 +4115,10 @@ xFlagsDeps = [
   flagSpec "AlternativeLayoutRuleTransitional"
                                               LangExt.AlternativeLayoutRuleTransitional,
   flagSpec "Arrows"                           LangExt.Arrows,
-  flagSpec "AutoDeriveTypeable"               LangExt.AutoDeriveTypeable,
+  depFlagSpecCond "AutoDeriveTypeable"        LangExt.AutoDeriveTypeable
+    id
+         ("Typeable instances are created automatically " ++
+                     "for all types since GHC 8.2."),
   flagSpec "BangPatterns"                     LangExt.BangPatterns,
   flagSpec "BinaryLiterals"                   LangExt.BinaryLiterals,
   flagSpec "CApiFFI"                          LangExt.CApiFFI,

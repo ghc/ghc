@@ -35,7 +35,7 @@ module TyCoRep (
         UnivCoProvenance(..),
         CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
-        MCoercion(..), MCoercionR,
+        MCoercion(..), MCoercionR, MCoercionN,
 
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
@@ -928,8 +928,8 @@ data Coercion
   --    -   _ stands for a parameter that is not a Role or Coercion.
 
   -- These ones mirror the shape of types
-  = -- Refl :: "e" -> _ -> e
-    Refl Role Type  -- See Note [Refl invariant]
+  = -- Refl :: _ -> N
+    Refl Type  -- See Note [Refl invariant]
           -- Invariant: applications of (Refl T) to a bunch of identity coercions
           --            always show up as Refl.
           -- For example  (Refl T) (Refl a) (Refl b) shows up as (Refl (T a b)).
@@ -940,7 +940,13 @@ data Coercion
           -- ConAppCo coercions (like all coercions other than Refl)
           -- are NEVER the identity.
 
-          -- Use (Refl Representational _), not (SubCo (Refl Nominal _))
+          -- Use (GRefl Representational ty MRefl), not (SubCo (Refl ty))
+
+  -- GRefl :: "e" -> _ -> Maybe N -> e
+  -- See Note [Generalized reflexive coercion]
+  | GRefl Role Type MCoercionN  -- See Note [Refl invariant]
+          -- Use (Refl ty), not (GRefl Nominal ty MRefl)
+          -- Use (GRefl Representational _ _), not (SubCo (GRefl Nominal _ _))
 
   -- These ones simply lift the correspondingly-named
   -- Type constructors into Coercions
@@ -1000,11 +1006,6 @@ data Coercion
     -- :: e -> N -> e
     -- See Note [InstCo roles]
 
-  -- Coherence applies a coercion to the left-hand type of another coercion
-  -- See Note [Coherence]
-  | CoherenceCo Coercion KindCoercion
-     -- :: e -> N -> e
-
   -- Extract a kind coercion from a (heterogeneous) type coercion
   -- NB: all kind coercions are Nominal
   | KindCo Coercion
@@ -1029,7 +1030,13 @@ data MCoercion
     -- A trivial Reflexivity coercion
   | MCo Coercion
     -- Other coercions
+  deriving Data.Data
 type MCoercionR = MCoercion
+type MCoercionN = MCoercion
+
+instance Outputable MCoercion where
+  ppr MRefl    = text "MRefl"
+  ppr (MCo co) = text "MCo" <+> ppr co
 
 {-
 Note [Refl invariant]
@@ -1037,7 +1044,7 @@ Note [Refl invariant]
 Invariant 1:
 
 Coercions have the following invariant
-     Refl is always lifted as far as possible.
+     Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
 
 You might think that a consequencs is:
      Every identity coercions has Refl at the root
@@ -1047,6 +1054,42 @@ But that's not quite true because of coercion variables.  Consider
      Left h    where h :: Maybe Int ~ Maybe Int
 etc.  So the consequence is only true of coercions that
 have no coercion variables.
+
+Note [Generalized reflexive coercion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+GRefl is a generalized reflexive coercion (see Trac #15192). It wraps a kind
+coercion, which might be reflexive (MRefl) or any coercion (MCo co). The typing
+rules for GRefl:
+
+  ty : k1
+  ------------------------------------
+  GRefl r ty MRefl: ty ~r ty
+
+  ty : k1       co :: k1 ~ k2
+  ------------------------------------
+  GRefl r ty (MCo co) : ty ~r ty |> co
+
+Consider we have
+
+   g1 :: s ~r t
+   s  :: k1
+   g2 :: k1 ~ k2
+
+and we want to construct a coercions co which has type
+
+   (s |> g2) ~r t
+
+We can define
+
+   co = Sym (GRefl r s g2) ; g1
+
+It is easy to see that
+
+   Refl == GRefl Nominal ty MRefl :: ty ~n ty
+
+A nominal reflexive coercion is quite common, so we keep the special form Refl to
+save allocation.
 
 Note [Coercion axioms applied to coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1138,19 +1181,6 @@ This all really would work storing just a Name in the ForAllCo. But we can't
 add Names to, e.g., VarSets, and there generally is just an impedance mismatch
 in a bunch of places. So we use tv1. When we need tv2, we can use
 setTyVarKind.
-
-Note [Coherence]
-~~~~~~~~~~~~~~~~
-The Coherence typing rule is thus:
-
-  g1 : s ~ t    s : k1    g2 : k1 ~ k2
-  ------------------------------------
-  CoherenceCo g1 g2 : (s |> g2) ~ t
-
-While this looks (and is) unsymmetric, a combination of other coercion
-combinators can make the symmetric version.
-
-For role information, see Note [Roles and kind coercions].
 
 Note [Predicate coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1674,10 +1704,17 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
 
+tyCoFVsOfMCo :: MCoercion -> FV
+tyCoFVsOfMCo MRefl    = emptyFV
+tyCoFVsOfMCo (MCo co) = tyCoFVsOfCo co
+
 tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion
 -- See Note [Free variables of types]
-tyCoFVsOfCo (Refl _ ty)         fv_cand in_scope acc = tyCoFVsOfType ty fv_cand in_scope acc
+tyCoFVsOfCo (Refl ty) fv_cand in_scope acc
+  = tyCoFVsOfType ty fv_cand in_scope acc
+tyCoFVsOfCo (GRefl _ ty mco) fv_cand in_scope acc
+  = (tyCoFVsOfType ty `unionFV` tyCoFVsOfMCo mco) fv_cand in_scope acc
 tyCoFVsOfCo (TyConAppCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
 tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
@@ -1699,7 +1736,6 @@ tyCoFVsOfCo (TransCo co1 co2)   fv_cand in_scope acc = (tyCoFVsOfCo co1 `unionFV
 tyCoFVsOfCo (NthCo _ _ co)      fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (LRCo _ co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (InstCo co arg)     fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
-tyCoFVsOfCo (CoherenceCo c1 c2) fv_cand in_scope acc = (tyCoFVsOfCo c1 `unionFV` tyCoFVsOfCo c2) fv_cand in_scope acc
 tyCoFVsOfCo (KindCo co)         fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (SubCo co)          fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfCo (AxiomRuleCo _ cs)  fv_cand in_scope acc = tyCoFVsOfCos cs fv_cand in_scope acc
@@ -1750,9 +1786,14 @@ coVarsOfRig _ = emptyVarSet
 coVarsOfTypes :: [Type] -> TyCoVarSet
 coVarsOfTypes tys = mapUnionVarSet coVarsOfType tys
 
+coVarsOfMCo :: MCoercion -> CoVarSet
+coVarsOfMCo MRefl    = emptyVarSet
+coVarsOfMCo (MCo co) = coVarsOfCo co
+
 coVarsOfCo :: Coercion -> CoVarSet
 -- Extract *coercion* variables only.  Tiresome to repeat the code, but easy.
-coVarsOfCo (Refl _ ty)         = coVarsOfType ty
+coVarsOfCo (Refl ty)             = coVarsOfType ty
+coVarsOfCo (GRefl _ ty co)       = coVarsOfType ty `unionVarSet` coVarsOfMCo co
 coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
 coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (ForAllCo tv kind_co co)
@@ -1768,7 +1809,6 @@ coVarsOfCo (TransCo co1 co2)    = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (NthCo _ _ co)       = coVarsOfCo co
 coVarsOfCo (LRCo _ co)          = coVarsOfCo co
 coVarsOfCo (InstCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
-coVarsOfCo (CoherenceCo c1 c2)  = coVarsOfCos [c1, c2]
 coVarsOfCo (KindCo co)          = coVarsOfCo co
 coVarsOfCo (SubCo co)           = coVarsOfCo co
 coVarsOfCo (AxiomRuleCo _ cs)   = coVarsOfCos cs
@@ -1868,10 +1908,15 @@ noFreeVarsOfVarMult :: VarMult -> Bool
 noFreeVarsOfVarMult (Regular w) = noFreeVarsOfRig w
 noFreeVarsOfVarMult Alias = True
 
+noFreeVarsOfMCo :: MCoercion -> Bool
+noFreeVarsOfMCo MRefl    = True
+noFreeVarsOfMCo (MCo co) = noFreeVarsOfCo co
+
 -- | Returns True if this coercion has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo (Refl _ ty)            = noFreeVarsOfType ty
+noFreeVarsOfCo (Refl ty)              = noFreeVarsOfType ty
+noFreeVarsOfCo (GRefl _ ty co)        = noFreeVarsOfType ty && noFreeVarsOfMCo co
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
 noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
@@ -1889,7 +1934,6 @@ noFreeVarsOfCo (TransCo co1 co2)      = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
 noFreeVarsOfCo (NthCo _ _ co)         = noFreeVarsOfCo co
 noFreeVarsOfCo (LRCo _ co)            = noFreeVarsOfCo co
 noFreeVarsOfCo (InstCo co1 co2)       = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
-noFreeVarsOfCo (CoherenceCo co1 co2)  = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
 noFreeVarsOfCo (KindCo co)            = noFreeVarsOfCo co
 noFreeVarsOfCo (SubCo co)             = noFreeVarsOfCo co
 noFreeVarsOfCo (AxiomRuleCo _ cs)     = all noFreeVarsOfCo cs
@@ -2569,8 +2613,13 @@ subst_co subst co
     go_ty :: Type -> Type
     go_ty = subst_ty subst
 
+    go_mco :: MCoercion -> MCoercion
+    go_mco MRefl    = MRefl
+    go_mco (MCo co) = MCo (go co)
+
     go :: Coercion -> Coercion
-    go (Refl r ty)           = mkReflCo r $! go_ty ty
+    go (Refl ty)             = mkNomReflCo $! (go_ty ty)
+    go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
     go (TyConAppCo r tc args)= let args' = map go args
                                in  args' `seqList` mkTyConAppCo r tc args'
     go (AppCo co arg)        = (mkAppCo $! go co) $! go arg
@@ -2587,7 +2636,6 @@ subst_co subst co
     go (NthCo r d co)        = mkNthCo r d $! (go co)
     go (LRCo lr co)          = mkLRCo lr $! (go co)
     go (InstCo co arg)       = (mkInstCo $! (go co)) $! go arg
-    go (CoherenceCo co1 co2) = (mkCoherenceCo $! (go co1)) $! (go co2)
     go (KindCo co)           = mkKindCo $! (go co)
     go (SubCo co)            = mkSubCo $! (go co)
     go (AxiomRuleCo c cs)    = let cs1 = map go cs
@@ -3177,7 +3225,11 @@ tidyCo :: TidyEnv -> Coercion -> Coercion
 tidyCo env@(_, subst) co
   = go co
   where
-    go (Refl r ty)           = Refl r (tidyType env ty)
+    go_mco MRefl    = MRefl
+    go_mco (MCo co) = MCo (go co)
+
+    go (Refl ty)             = Refl (tidyType env ty)
+    go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = let args = map go cos
                                in args `seqList` TyConAppCo r tc args
     go (AppCo co1 co2)       = (AppCo $! go co1) $! go co2
@@ -3199,7 +3251,6 @@ tidyCo env@(_, subst) co
     go (NthCo r d co)        = NthCo r d $! go co
     go (LRCo lr co)          = LRCo lr $! go co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
-    go (CoherenceCo co1 co2) = (CoherenceCo $! go co1) $! go co2
     go (KindCo co)           = KindCo $! go co
     go (SubCo co)            = SubCo $! go co
     go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
@@ -3244,7 +3295,9 @@ typeSize (CastTy ty co)             = typeSize ty + coercionSize co
 typeSize (CoercionTy co)            = coercionSize co
 
 coercionSize :: Coercion -> Int
-coercionSize (Refl _ ty)         = typeSize ty
+coercionSize (Refl ty)             = typeSize ty
+coercionSize (GRefl _ ty MRefl)    = typeSize ty
+coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
@@ -3259,7 +3312,6 @@ coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (NthCo _ _ co)      = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
-coercionSize (CoherenceCo c1 c2) = 1 + coercionSize c1 + coercionSize c2
 coercionSize (KindCo co)         = 1 + coercionSize co
 coercionSize (SubCo co)          = 1 + coercionSize co
 coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)

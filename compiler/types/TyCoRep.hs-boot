@@ -13,10 +13,13 @@ data UnivCoProvenance
 data TCvSubst
 data TyLit
 data TyBinder
+data MCoercion
 
 type PredType = Type
 type Kind = Type
 type ThetaType = [PredType]
+type CoercionN = Coercion
+type MCoercionN = MCoercion
 
 pprKind :: Kind -> SDoc
 pprType :: Type -> SDoc

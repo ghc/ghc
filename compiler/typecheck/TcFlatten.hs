@@ -1117,6 +1117,17 @@ as desired. (Why do we want Star? Because we started with something of kind Star
 
 Whew.
 
+Note [flatten_exact_fam_app_fully performance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The refactor of GRefl seems to cause performance trouble for T9872x: the allocation of flatten_exact_fam_app_fully_performance increased. See note [Generalized reflexive coercion] in TyCoRep for more information about GRefl and Trac #15192 for the current state.
+
+The explicit pattern match in homogenise_result helps with T9872a, b, c.
+
+Still, it increases the expected allocation of T9872d by ~2%.
+
+TODO: a step-by-step replay of the refactor to analyze the performance.
+
 -}
 
 {-# INLINE flatten_args_tc #-}
@@ -1210,12 +1221,12 @@ flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
           --
           --   let kind_co = mkTcSymCo $ mkReflCo Nominal (tyBinderType binder)
           --       casted_xi = xi `mkCastTy` kind_co
-          --       casted_co = co `mkTcCoherenceLeftCo` kind_co
+          --       casted_co = xi |> kind_co ~r xi ; co
           --
           -- but this isn't necessary:
           --   mkTcSymCo (Refl a b) = Refl a b,
           --   mkCastTy x (Refl _ _) = x
-          --   mkTcCoherenceLeftCo x (Refl _ _) = x
+          --   mkTcGReflLeftCo _ ty (Refl _ _) `mkTransCo` co = co
           --
           -- Also, no need to check isAnonTyBinder or isNamedTyBinder, since
           -- we've already established that they're all anonymous.
@@ -1231,7 +1242,7 @@ flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
     finish (xis, cos, binders) = (xis, cos, kind_co)
       where
         final_kind = mkPiTys binders orig_inner_ki
-        kind_co    = mkReflCo Nominal final_kind
+        kind_co    = mkNomReflCo final_kind
 
 {-# INLINE flatten_args_slow #-}
 -- | Slow path, compared to flatten_args_fast, because this one must track
@@ -1285,7 +1296,7 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
            ; let kind_co = mkTcSymCo $
                    liftCoSubst Nominal lc (tyBinderType binder)
                  !casted_xi = xi `mkCastTy` kind_co
-                 casted_co = co `mkTcCoherenceLeftCo` kind_co
+                 casted_co =  mkTcCoherenceLeftCo role xi kind_co co
 
              -- now, extend the lifting context with the new binding
                  !new_lc | Just tv <- tyBinderVar_maybe binder
@@ -1316,13 +1327,13 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
                <- go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_tys
            -- cos_out :: xis_out ~ casted_tys
            -- we need to return cos :: xis_out ~ tys
-           --
-           -- zipWith has the map first because it will fuse.
-           ; let cos = zipWith (flip mkTcCoherenceRightCo)
-                               (map mkTcSymCo arg_cos)
-                               cos_out
+           ; let cos = zipWith3 mkTcGReflRightCo
+                                roles
+                                casted_tys
+                                (map mkTcSymCo arg_cos)
+                 cos' = zipWith mkTransCo cos_out cos
 
-           ; return (xis_out, cos, res_co_out `mkTcTransCo` res_co) }
+           ; return (xis_out, cos', res_co_out `mkTcTransCo` res_co) }
 
     go _ _ _ _ _ _ _ = pprPanic
         "flatten_args wandered into deeper water than usual" (vcat [])
@@ -1411,7 +1422,8 @@ flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
        ; (g', _)   <- flatten_co g
 
-       ; return (mkCastTy xi g', castCoercionKind co g' g) }
+       ; role <- getRole
+       ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
 
 flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 
@@ -1474,7 +1486,8 @@ flatten_app_ty_args fun_xi fun_co arg_tys
                       arg_co = mkAppCos fun_co arg_cos
                 ; return (arg_xi, arg_co, kind_co) }
 
-       ; return (homogenise_result xi co kind_co) }
+       ; role <- getRole
+       ; return (homogenise_result xi co role kind_co) }
 
 flatten_ty_con_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_ty_con_app tc tys
@@ -1482,18 +1495,21 @@ flatten_ty_con_app tc tys
        ; (xis, cos, kind_co) <- flatten_args_tc tc (tyConRolesX role tc) tys
        ; let tyconapp_xi = mkTyConApp tc xis
              tyconapp_co = mkTyConAppCo role tc cos
-       ; return (homogenise_result tyconapp_xi tyconapp_co kind_co) }
+       ; return (homogenise_result tyconapp_xi tyconapp_co role kind_co) }
 
 -- Make the result of flattening homogeneous (Note [Flattening] (F2))
 homogenise_result :: Xi              -- a flattened type
-                  -> Coercion        -- :: xi ~ original ty
+                  -> Coercion        -- :: xi ~r original ty
+                  -> Role            -- r
                   -> CoercionN       -- kind_co :: typeKind(xi) ~N typeKind(ty)
                   -> (Xi, Coercion)  -- (xi |> kind_co, (xi |> kind_co)
-                                     --   ~ original ty)
-homogenise_result xi co kind_co
-  = let xi' = xi `mkCastTy` kind_co
-        co' = co `mkTcCoherenceLeftCo` kind_co
-    in  (xi', co')
+                                     --   ~r original ty)
+homogenise_result xi co r kind_co
+  -- the explicit pattern match here improves the performance of T9872a, b, c by
+  -- ~2%
+  | isGReflCo kind_co = (xi `mkCastTy` kind_co, co)
+  | otherwise         = (xi `mkCastTy` kind_co
+                        , (mkSymCo $ GRefl r xi (MCo kind_co)) `mkTransCo` co)
 {-# INLINE homogenise_result #-}
 
 -- Flatten a vector (list of arguments).
@@ -1591,6 +1607,7 @@ flatten_fam_app tc tys  -- Can be over-saturated
          ; flatten_app_ty_args xi1 co1 tys_rest } } }
 
 -- the [TcType] exactly saturate the TyCon
+-- See note [flatten_exact_fam_app_fully performance]
 flatten_exact_fam_app_fully :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_exact_fam_app_fully tc tys
   -- See Note [Reduce type family applications eagerly]
@@ -1628,10 +1645,10 @@ flatten_exact_fam_app_fully tc tys
                                   -- flatten it
                                   -- fsk_co :: fsk_xi ~ fsk
                            ; let xi  = fsk_xi `mkCastTy` kind_co
-                                 co' = (fsk_co `mkTcCoherenceLeftCo` kind_co)
-                                        `mkTransCo`
-                                        maybeSubCo eq_rel (mkSymCo co)
-                                        `mkTransCo` ret_co
+                                 co' = mkTcCoherenceLeftCo role fsk_xi kind_co fsk_co
+                                       `mkTransCo`
+                                       maybeSubCo eq_rel (mkSymCo co)
+                                       `mkTransCo` ret_co
                            ; return (xi, co')
                            }
                                             -- :: fsk_xi ~ F xis
@@ -1661,12 +1678,12 @@ flatten_exact_fam_app_fully tc tys
                                  ; traceFlat "flatten/flat-cache miss" $
                                      (ppr tc <+> ppr xis $$ ppr fsk $$ ppr ev)
 
-                                 -- NB: fsk's kind is already flattend because
+                                 -- NB: fsk's kind is already flattened because
                                  --     the xis are flattened
-                                 ; let xi = mkTyVarTy fsk `mkCastTy` kind_co
-                                       co' = (maybeSubCo eq_rel (mkSymCo co)
-                                               `mkTcCoherenceLeftCo` kind_co)
-                                              `mkTransCo` ret_co
+                                 ; let fsk_ty = mkTyVarTy fsk
+                                       xi = fsk_ty `mkCastTy` kind_co
+                                       co' = mkTcCoherenceLeftCo role fsk_ty kind_co (maybeSubCo eq_rel (mkSymCo co))
+                                             `mkTransCo` ret_co
                                  ; return (xi, co')
                                  }
                            }
@@ -1710,9 +1727,10 @@ flatten_exact_fam_app_fully tc tys
                        ; when (eq_rel == NomEq) $
                          liftTcS $
                          extendFlatCache tc tys ( co, xi, flavour )
-                       ; let xi' = xi `mkCastTy` kind_co
-                             co' = update_co $ mkSymCo co
-                                                `mkTcCoherenceLeftCo` kind_co
+                       ; let role = eqRelRole eq_rel
+                             xi' = xi `mkCastTy` kind_co
+                             co' = update_co $
+                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
                        ; return $ Just (xi', co') }
                Nothing -> pure Nothing }
 
@@ -1738,9 +1756,10 @@ flatten_exact_fam_app_fully tc tys
                        ; eq_rel <- getEqRel
                        ; let co  = maybeSubCo eq_rel norm_co
                                     `mkTransCo` mkSymCo final_co
+                             role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
-                             co' = update_co $ mkSymCo co
-                                                `mkTcCoherenceLeftCo` kind_co
+                             co' = update_co $
+                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
                        ; return $ Just (xi', co') }
                Nothing -> pure Nothing }
 

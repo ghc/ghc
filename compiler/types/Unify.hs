@@ -1320,7 +1320,7 @@ data MatchEnv = ME { me_tmpls :: TyVarSet
                    , me_env   :: RnEnv2 }
 
 -- | 'liftCoMatch' is sort of inverse to 'liftCoSubst'.  In particular, if
---   @liftCoMatch vars ty co == Just s@, then @listCoSubst s ty == co@,
+--   @liftCoMatch vars ty co == Just s@, then @liftCoSubst s ty == co@,
 --   where @==@ there means that the result of 'liftCoSubst' has the same
 --   type as the original co; but may be different under the hood.
 --   That is, it matches a type against a coercion of the same
@@ -1393,9 +1393,6 @@ ty_co_match menv subst ty co lkco rkco
     ty_co_match menv subst ty' co (substed_co_l `mkTransCo` lkco)
                                   (substed_co_r `mkTransCo` rkco)
 
-  | CoherenceCo co1 co2 <- co
-  = ty_co_match menv subst ty co1 (lkco `mkTransCo` mkSymCo co2) rkco
-
   | SymCo co' <- co
   = swapLiftCoEnv <$> ty_co_match menv (swapLiftCoEnv subst) ty co' rkco lkco
 
@@ -1410,7 +1407,7 @@ ty_co_match menv subst (TyVarTy tv1) co lkco rkco
   = if any (inRnEnvR rn_env) (tyCoVarsOfCoList co)
     then Nothing      -- occurs check failed
     else Just $ extendVarEnv subst tv1' $
-                castCoercionKind co (mkSymCo lkco) (mkSymCo rkco)
+                castCoercionKindI co (mkSymCo lkco) (mkSymCo rkco)
 
   | otherwise
   = Nothing
@@ -1459,6 +1456,21 @@ ty_co_match menv subst (ForAllTy (TvBndr tv1 _) ty1)
 ty_co_match _ subst (CoercionTy {}) _ _ _
   = Just subst -- don't inspect coercions
 
+ty_co_match menv subst ty (GRefl r t (MCo co)) lkco rkco
+  =  ty_co_match menv subst ty (GRefl r t MRefl) lkco (rkco `mkTransCo` mkSymCo co)
+
+ty_co_match menv subst ty co1 lkco rkco
+  | Just (CastTy t co, r) <- isReflCo_maybe co1
+  -- In @pushRefl@, pushing reflexive coercion inside CastTy will give us
+  -- t |> co ~ t ; <t> ; t ~ t |> co
+  -- But transitive coercions are not helpful. Therefore we deal
+  -- with it here: we do recursion on the smaller reflexive coercion,
+  -- while propagating the correct kind coercions.
+  = let kco' = mkSymCo co
+    in ty_co_match menv subst ty (mkReflCo r t) (lkco `mkTransCo` kco')
+                                                (rkco `mkTransCo` kco')
+
+
 ty_co_match menv subst ty co lkco rkco
   | Just co' <- pushRefl co = ty_co_match menv subst ty co' lkco rkco
   | otherwise               = Nothing
@@ -1503,17 +1515,18 @@ ty_co_match_args menv subst (ty:tys) (arg:args) (lkco:lkcos) (rkco:rkcos)
 ty_co_match_args _    _     _        _          _ _ = Nothing
 
 pushRefl :: Coercion -> Maybe Coercion
-pushRefl (Refl Nominal (AppTy ty1 ty2))
-  = Just (AppCo (Refl Nominal ty1) (mkNomReflCo ty2))
-pushRefl (Refl r (FunTy w ty1 ty2))
-  | Just rep1 <- getRuntimeRep_maybe ty1
-  , Just rep2 <- getRuntimeRep_maybe ty2
-  = Just (TyConAppCo r funTyCon [ rigToCo w, mkReflCo r rep1, mkReflCo r rep2
-                                , mkReflCo r ty1,  mkReflCo r ty2 ])
-pushRefl (Refl r (TyConApp tc tys))
-  = Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
-pushRefl (Refl r (ForAllTy (TvBndr tv _) ty))
-  = Just (mkHomoForAllCos_NoRefl [tv] (Refl r ty))
+pushRefl co =
+  case (isReflCo_maybe co) of
+    Just (AppTy ty1 ty2, Nominal)
+      -> Just (AppCo (mkReflCo Nominal ty1) (mkNomReflCo ty2))
+    Just (FunTy w ty1 ty2, r)
+      | Just rep1 <- getRuntimeRep_maybe ty1
+      , Just rep2 <- getRuntimeRep_maybe ty2
+      ->  Just (TyConAppCo r funTyCon [ rigToCo w, mkReflCo r rep1, mkReflCo r rep2
+                                       , mkReflCo r ty1,  mkReflCo r ty2 ])
+    Just (TyConApp tc tys, r)
+      -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
+    Just (ForAllTy (TvBndr tv _) ty, r)
+      -> Just (mkHomoForAllCos_NoRefl [tv] (mkReflCo r ty))
     -- NB: NoRefl variant. Otherwise, we get a loop!
-pushRefl (Refl r (CastTy ty co))  = Just (castCoercionKind (Refl r ty) co co)
-pushRefl _                        = Nothing
+    _ -> Nothing

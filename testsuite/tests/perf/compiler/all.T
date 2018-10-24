@@ -891,7 +891,7 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 572537984, 5),
+          [(wordsize(64), 578498120, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
@@ -906,6 +906,7 @@ test('T9872d',
           # 2017-03-03    462817352   Share Typeable KindReps
           # 2018-03-25    526485920   Flattener patch does more work (#12919)
           # 2018-04-11    572537984   simplCast improvement collateral (#11735)
+          # 2018-07-04    578498120   introduce GRefl (#15192)
 
            (wordsize(32), 232954000, 5)
           # some date     328810212

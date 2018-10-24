@@ -642,8 +642,14 @@ rnIfaceLetBndr (IfLetBndr fs ty info jpi)
 rnIfaceLamBndr :: Rename IfaceLamBndr
 rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot
 
+rnIfaceMCo :: Rename IfaceMCoercion
+rnIfaceMCo IfaceMRefl    = pure IfaceMRefl
+rnIfaceMCo (IfaceMCo co) = IfaceMCo <$> rnIfaceCo co
+
 rnIfaceCo :: Rename IfaceCoercion
-rnIfaceCo (IfaceReflCo role ty) = IfaceReflCo role <$> rnIfaceType ty
+rnIfaceCo (IfaceReflCo ty) = IfaceReflCo <$> rnIfaceType ty
+rnIfaceCo (IfaceGReflCo role ty mco)
+  = IfaceGReflCo role <$> rnIfaceType ty <*> rnIfaceMCo mco
 rnIfaceCo (IfaceFunCo role w co1 co2)
     = IfaceFunCo role w <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos)
@@ -671,7 +677,6 @@ rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomRuleCo ax cos)
     = IfaceAxiomRuleCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c) = IfaceKindCo <$> rnIfaceCo c
-rnIfaceCo (IfaceCoherenceCo c1 c2) = IfaceCoherenceCo <$> rnIfaceCo c1 <*> rnIfaceCo c2
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)
