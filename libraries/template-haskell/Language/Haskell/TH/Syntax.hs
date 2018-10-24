@@ -1620,7 +1620,12 @@ data Exp
   | RecConE Name [FieldExp]            -- ^ @{ T { x = y, z = w } }@
   | RecUpdE Exp [FieldExp]             -- ^ @{ (f x) { z = w } }@
   | StaticE Exp                        -- ^ @{ static e }@
-  | UnboundVarE Name                   -- ^ @{ _x }@ (hole)
+  | UnboundVarE Name                   -- ^ @{ _x }@
+                                       --
+                                       -- This is used for holes or unresolved
+                                       -- identifiers in AST quotes. Note that
+                                       -- it could either have a variable name
+                                       -- or constructor name.
   | LabelE String                      -- ^ @{ #x }@ ( Overloaded label )
   deriving( Show, Eq, Ord, Data, Generic )
 

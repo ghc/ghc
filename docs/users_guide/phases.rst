@@ -678,7 +678,7 @@ for example).
 
 .. ghc-flag:: -package ⟨name⟩
     :shortdesc: Expose package ⟨pkg⟩
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category: linking
 
     If you are using a Haskell "package" (see :ref:`packages`), don't

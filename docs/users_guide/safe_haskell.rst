@@ -582,7 +582,7 @@ trust property of packages:
 .. ghc-flag:: -trust ⟨pkg⟩
     :shortdesc: Expose package ⟨pkg⟩ and set it to be trusted. See
         :ref:`safe-haskell`.
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category: packages
 
     Exposes package ⟨pkg⟩ if it was hidden and considers it a
@@ -591,7 +591,7 @@ trust property of packages:
 .. ghc-flag:: -distrust ⟨pkg⟩
     :shortdesc: Expose package ⟨pkg⟩ and set it to be distrusted. See
         :ref:`safe-haskell`.
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category: packages
 
     Exposes package ⟨pkg⟩ if it was hidden and considers it
@@ -599,7 +599,7 @@ trust property of packages:
 
 .. ghc-flag:: -distrust-all-packages
     :shortdesc: Distrust all packages by default. See :ref:`safe-haskell`.
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category: packages
 
     Considers all packages distrusted unless they are

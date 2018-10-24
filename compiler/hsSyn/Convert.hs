@@ -914,7 +914,11 @@ cvtl e = wrapL (cvt e)
                                            flds
                               ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap (HsStatic noExt) $ cvtl e
-    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar noExt (noLoc s') }
+    cvt (UnboundVarE s)  = do -- Use of 'vcName' here instead of 'vName' is
+                              -- important, because UnboundVarE may contain
+                              -- constructor names - see #14627.
+                              { s' <- vcName s
+                              ; return $ HsVar noExt (noLoc s') }
     cvt (LabelE s)       = do { return $ HsOverLabel noExt Nothing (fsLit s) }
 
 {- Note [Dropping constructors]

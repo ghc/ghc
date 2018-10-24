@@ -3,7 +3,7 @@
 module Plugins (
       FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction
     , Plugin(..), CommandLineOption, LoadedPlugin(..), lpModuleName
-    , defaultPlugin, withPlugins, withPlugins_
+    , defaultPlugin, keepRenamedSource, withPlugins, withPlugins_
     , PluginRecompile(..)
     , purePlugin, impurePlugin, flagRecompile
     ) where
@@ -12,14 +12,13 @@ import GhcPrelude
 
 import {-# SOURCE #-} CoreMonad ( CoreToDo, CoreM )
 import qualified TcRnTypes
-import TcRnTypes ( TcGblEnv, IfM, TcM )
+import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports )
 import HsSyn
 import DynFlags
 import HscTypes
 import GhcMonad
 import DriverPhases
 import Module ( ModuleName, Module(moduleName))
-import Avail
 import Fingerprint
 import Data.List
 import Outputable (Outputable(..), text, (<+>))
@@ -58,10 +57,10 @@ data Plugin = Plugin {
                             -> Hsc HsParsedModule
     -- ^ Modify the module when it is parsed. This is called by
     -- HscMain when the parsing is successful.
-  , renamedResultAction :: Maybe ([CommandLineOption] -> ModSummary
-                                    -> RenamedSource -> TcM ())
-    -- ^ Installs a read-only pass that receives the renamed syntax tree as an
-    -- argument when type checking is successful.
+  , renamedResultAction :: [CommandLineOption] -> TcGblEnv
+                                -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
+    -- ^ Modify each group after it is renamed. This is called after each
+    -- `HsGroup` has been renamed.
   , typeCheckResultAction :: [CommandLineOption] -> ModSummary -> TcGblEnv
                                -> TcM TcGblEnv
     -- ^ Modify the module when it is type checked. This is called add the
@@ -82,8 +81,7 @@ data Plugin = Plugin {
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The `Plugin` datatype have been extended by fields that allow access to the
 -- different inner representations that are generated during the compilation
--- process. These fields are `parsedResultAction`, `needsRenamedSyntax` (for
--- controlling when renamed representation is kept during typechecking),
+-- process. These fields are `parsedResultAction`, `renamedResultAction`,
 -- `typeCheckResultAction`, `spliceRunAction` and `interfaceLoadAction`.
 --
 -- The main purpose of these plugins is to help tool developers. They allow
@@ -149,18 +147,31 @@ defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
       , pluginRecompile  = impurePlugin
-      , renamedResultAction   = Nothing
+      , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return
       , typeCheckResultAction = \_ _ -> return
       , spliceRunAction       = \_ -> return
       , interfaceLoadAction   = \_ -> return
     }
 
+
+-- | A renamer plugin which mades the renamed source available in
+-- a typechecker plugin.
+keepRenamedSource :: [CommandLineOption] -> TcGblEnv
+                  -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
+keepRenamedSource _ gbl_env group =
+  return (gbl_env { tcg_rn_decls = update (tcg_rn_decls gbl_env)
+                  , tcg_rn_exports = update_exports (tcg_rn_exports gbl_env) }, group)
+  where
+    update_exports Nothing = Just []
+    update_exports m = m
+
+    update Nothing = Just emptyRnGroup
+    update m       = m
+
+
 type PluginOperation m a = Plugin -> [CommandLineOption] -> a -> m a
 type ConstPluginOperation m a = Plugin -> [CommandLineOption] -> a -> m ()
-
-type RenamedSource = ( HsGroup GhcRn, [LImportDecl GhcRn]
-                     , Maybe [(LIE GhcRn, Avails)], Maybe LHsDocString )
 
 -- | Perform an operation by using all of the plugins in turn.
 withPlugins :: Monad m => DynFlags -> PluginOperation m a -> a -> m a

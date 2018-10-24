@@ -113,8 +113,8 @@ t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
   | n                       ::   :: TyVarTy       {{ com \ctor{TyVarTy}: Variable }}
   | t1 t2                   ::   :: AppTy         {{ com \ctor{AppTy}: Application }}
   | T </ ti // i />         ::   :: TyConApp      {{ com \ctor{TyConApp}: Application of type constructor }}
-  | t1 -> t2                ::   :: FunTy         {{ com \ctor{ForAllTy (Anon ...) ...}: Function }}
-  | forall n . t            ::   :: ForAllTy      {{ com \ctor{ForAllTy (Named ...) ...}: Type and coercion polymorphism }}
+  | t1 -> t2                ::   :: FunTy         {{ com \ctor{FunTy}: Function }}
+  | forall n . t            ::   :: ForAllTy      {{ com \ctor{ForAllTy}: Type and coercion polymorphism }}
   | lit                     ::   :: LitTy         {{ com \ctor{LitTy}: Type-level literal }}
   | t |> g                  ::   :: CastTy        {{ com \ctor{CastTy}: Kind cast }}
   | g                       ::   :: CoercionTy    {{ com \ctor{CoercionTy}: Coercion used in type }}

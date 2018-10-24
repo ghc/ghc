@@ -5435,6 +5435,37 @@ pattern synonym: ::
       pattern StrictJust a <- Just !a where
         StrictJust !a = Just a
 
+Constructing an explicitly bidirectional pattern synonym also:
+
+- can create different data constructors from the underlying data type,
+  not just the one appearing in the pattern match;
+  
+- can call any functions or conditional logic, especially validation,
+  of course providing it constructs a result of the right type;
+  
+- can use guards on the lhs of the ``=``;
+
+- can have multiple equations.
+
+For example: ::
+
+      data PosNeg = Pos Int | Neg Int
+      pattern Smarter{ nonneg } <- Pos nonneg  where
+        Smarter x = if x >= 0 then (Pos x) else (Neg x)
+
+Or using guards: ::
+
+      pattern Smarter{ nonneg } <- Pos nonneg  where
+        Smarter x | x >= 0    = (Pos x)
+                  | otherwise = (Neg x)
+
+There is an extensive Haskell folk art of `smart constructors 
+<https://wiki.haskell.org/Smart_constructor>`_,
+essentially functions that wrap validation around a constructor,
+and avoid exposing its representation.
+The downside is that the underlying constructor can't be used as a matcher.
+Pattern synonyms can be used as genuinely smart constructors, for both validation and matching.
+
 The table below summarises where each kind of pattern synonym can be used.
 
 +---------------+----------------+---------------+---------------------------+
@@ -5508,7 +5539,7 @@ the syntax for bidirectional pattern synonyms is: ::
 and the syntax for explicitly bidirectional pattern synonyms is: ::
 
       pattern pat_lhs <- pat where
-        pat_lhs = expr
+        pat_lhs = expr                      -- lhs restricted, see below
 
 We can define either prefix, infix or record pattern synonyms by modifying
 the form of `pat_lhs`. The syntax for these is as follows:
@@ -5522,6 +5553,9 @@ Infix   ``arg1 `Name` arg2``
 Record  ``Name{arg1,arg2,...,argn}``
 ======= ============================
 
+The `pat_lhs` for explicitly bidirectional construction cannot use Record syntax.
+(Because the rhs *expr* might be constructing different data constructors.)
+It can use guards with multiple equations.
 
 Pattern synonym declarations can only occur in the top level of a
 module. In particular, they are not allowed as local definitions.
@@ -11560,6 +11594,21 @@ configurable by a few flags.
     ``(_ :: Int -> [Int])``, ``mempty`` is a hole fit with
     ``mempty @(Int -> [Int])``. This can be toggled off with
     the reverse of this flag.
+
+.. ghc-flag:: -fshow-docs-of-hole-fits
+    :shortdesc: Toggles whether to show the documentation of the valid
+       hole fits in the output.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-docs-of-hole-fits
+
+    :default: off
+
+    It can sometime be the case that the name and type of a valid hole
+    fit is not enough to realize what the fit stands for. This flag
+    adds the documentation of the fit to the message, if the 
+    documentation is available (and the module from which the function
+    comes was compiled with the ``-haddock`` flag).
 
 .. ghc-flag:: -fshow-type-app-vars-of-hole-fits
     :shortdesc: Toggles whether to show what type each quantified
