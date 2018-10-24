@@ -1161,7 +1161,7 @@ parseNestedPragma input@(AI _ buf) = do
   setExts (.&. complement (xbit InNestedCommentBit))
   postInput@(AI _ postBuf) <- getInput
   setInput origInput
-  case unLoc lt of
+  case unRealSrcSpan lt of
     ITcomment_line_prag -> do
       let bytes = byteDiff buf postBuf
           diff  = lexemeToString buf bytes
