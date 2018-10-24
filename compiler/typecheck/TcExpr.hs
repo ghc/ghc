@@ -1998,14 +1998,13 @@ checkThLocalId id
         ; case mb_local_use of
              Just (top_lvl, bind_lvl, use_stage)
                 | thLevel use_stage > bind_lvl
-                , isNotTopLevel top_lvl
-                -> checkCrossStageLifting id use_stage
+                -> checkCrossStageLifting top_lvl id use_stage
              _  -> return ()   -- Not a locally-bound thing, or
                                -- no cross-stage link
     }
 
 --------------------------------------
-checkCrossStageLifting :: Id -> ThStage -> TcM ()
+checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
@@ -2015,7 +2014,12 @@ checkCrossStageLifting :: Id -> ThStage -> TcM ()
 -- This is similar to checkCrossStageLifting in RnSplice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
+checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
+  | isTopLevel top_lvl
+  = when (isExternalName id_name) (keepAlive id_name)
+    -- See Note [Keeping things alive for Template Haskell] in RnSplice
+
+  | otherwise
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [|| h x ||]
         -- We must behave as if the reference to x was
@@ -2040,17 +2044,20 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
-                     newMethodFromName (OccurrenceOf (idName id))
+                     newMethodFromName (OccurrenceOf id_name)
                                        THNames.liftName id_ty
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; let pending_splice = PendingTcSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id))
+        ; let pending_splice = PendingTcSplice id_name
+                                 (nlHsApp (noLoc lift) (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
+  where
+    id_name = idName id
 
-checkCrossStageLifting _ _ = return ()
+checkCrossStageLifting _ _ _ = return ()
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
