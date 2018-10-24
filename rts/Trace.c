@@ -130,6 +130,13 @@ void resetTracing (void)
     }
 }
 
+void flushTrace (void)
+{
+    if (eventlog_enabled) {
+        flushEventLog();
+    }
+}
+
 void tracingAddCapapilities (uint32_t from, uint32_t to)
 {
     if (eventlog_enabled) {

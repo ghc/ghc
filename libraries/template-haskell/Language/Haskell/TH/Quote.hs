@@ -21,6 +21,7 @@ module Language.Haskell.TH.Quote(
     ) where
 
 import Language.Haskell.TH.Syntax
+import Prelude
 
 -- | The 'QuasiQuoter' type, a value @q@ of this type can be used
 -- in the syntax @[q| ... string to parse ...|]@.  In fact, for

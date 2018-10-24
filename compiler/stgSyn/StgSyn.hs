@@ -39,6 +39,7 @@ module StgSyn (
         isDllConApp,
         stgArgType,
         stripStgTicksTop,
+        stgCaseBndrInScope,
 
         pprStgBinding, pprStgTopBindings
     ) where
@@ -155,6 +156,18 @@ stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
          go ts other               = (reverse ts, other)
 
+-- | Given an alt type and whether the program is unarised, return whether the
+-- case binder is in scope.
+--
+-- Case binders of unboxed tuple or unboxed sum type always dead after the
+-- unariser has run. See Note [Post-unarisation invariants].
+stgCaseBndrInScope :: AltType -> Bool {- ^ unarised? -} -> Bool
+stgCaseBndrInScope alt_ty unarised =
+    case alt_ty of
+      AlgAlt _      -> True
+      PrimAlt _     -> True
+      MultiValAlt _ -> not unarised
+      PolyAlt       -> True
 
 {-
 ************************************************************************

@@ -4,13 +4,10 @@
 # (c) Simon Marlow 2002
 #
 
-from __future__ import print_function
-
 import argparse
 import signal
 import sys
 import os
-import string
 import shutil
 import tempfile
 import time
@@ -55,7 +52,6 @@ parser.add_argument("--only", action="append", help="just this test (can be give
 parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
-parser.add_argument("--check-files-written", help="check files aren't written by multiple tests") # NOTE: This doesn't seem to exist?
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
 parser.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")

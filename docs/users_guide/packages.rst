@@ -1056,7 +1056,7 @@ extra indirection).
 
    .. code-block:: sh
 
-       ghc -shared libHSfoo-1.0-ghcGHCVersion.so A.o B.o C.o
+       ghc -shared -dynamic -o libHSfoo-1.0-ghcGHCVersion.so A.o B.o C.o
 
    Using GHC's version number in the shared object name allows different
    library versions compiled by different GHC versions to be installed

@@ -41,10 +41,8 @@ expectedGhcOnlyExtensions = ["RelaxedLayout",
                              "AlternativeLayoutRuleTransitional",
                              "DerivingVia",
                              "EmptyDataDeriving",
-                             "GeneralisedNewtypeDeriving",
                              "LinearTypes",
-                             "StarIsType", -- FIXME: add StarIsType to cabal
-                             "QuantifiedConstraints"]
+                             "GeneralisedNewtypeDeriving"]
 
 expectedCabalOnlyExtensions :: [String]
 expectedCabalOnlyExtensions = ["Generics",

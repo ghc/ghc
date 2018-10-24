@@ -1,0 +1,347 @@
+\message{<Paul Taylor's Proof Trees, 2 August 1996>}
+%% Build proof tree for Natural Deduction, Sequent Calculus, etc.
+%% WITH SHORTENING OF PROOF RULES!
+%% Paul Taylor, begun 10 Oct 1989
+%% *** THIS IS ONLY A PRELIMINARY VERSION AND THINGS MAY CHANGE! ***
+%%
+%% 2 Aug 1996: fixed \mscount and \proofdotnumber
+%%
+%%      \prooftree
+%%              hyp1            produces:
+%%              hyp2
+%%              hyp3            hyp1    hyp2    hyp3
+%%      \justifies              -------------------- rulename
+%%              concl                   concl
+%%      \thickness=0.08em
+%%      \shiftright 2em
+%%      \using
+%%              rulename
+%%      \endprooftree
+%%
+%% where the hypotheses may be similar structures or just formulae.
+%%
+%% To get a vertical string of dots instead of the proof rule, do
+%%
+%%      \prooftree                      which produces:
+%%              [hyp]
+%%      \using                                  [hyp]
+%%              name                              .
+%%      \proofdotseparation=1.2ex                 .name
+%%      \proofdotnumber=4                         .
+%%      \leadsto                                  .
+%%              concl                           concl
+%%      \endprooftree
+%%
+%% Within a prooftree, \[ and \] may be used instead of \prooftree and
+%% \endprooftree; this is not permitted at the outer level because it
+%% conflicts with LaTeX. Also,
+%%      \Justifies
+%% produces a double line. In LaTeX you can use \begin{prooftree} and
+%% \end{prootree} at the outer level (however this will not work for the inner
+%% levels, but in any case why would you want to be so verbose?).
+%%
+%% All of of the keywords except \prooftree and \endprooftree are optional
+%% and may appear in any order. They may also be combined in \newcommand's
+%% eg "\def\Cut{\using\sf cut\thickness.08em\justifies}" with the abbreviation
+%% "\prooftree hyp1 hyp2 \Cut \concl \endprooftree". This is recommended and
+%% some standard abbreviations will be found at the end of this file.
+%%
+%% \thickness specifies the breadth of the rule in any units, although
+%% font-relative units such as "ex" or "em" are preferable.
+%% It may optionally be followed by "=".
+%% \proofrulebreadth=.08em or \setlength\proofrulebreadth{.08em} may also be
+%% used either in place of \thickness or globally; the default is 0.04em.
+%% \proofdotseparation and \proofdotnumber control the size of the
+%% string of dots
+%%
+%% If proof trees and formulae are mixed, some explicit spacing is needed,
+%% but don't put anything to the left of the left-most (or the right of
+%% the right-most) hypothesis, or put it in braces, because this will cause
+%% the indentation to be lost.
+%%
+%% By default the conclusion is centered wrt the left-most and right-most
+%% immediate hypotheses (not their proofs); \shiftright or \shiftleft moves
+%% it relative to this position. (Not sure about this specification or how
+%% it should affect spreading of proof tree.)
+%
+% global assignments to dimensions seem to have the effect of stretching
+% diagrams horizontally.
+%
+%%==========================================================================
+
+\def\introrule{{\cal I}}\def\elimrule{{\cal E}}%%
+\def\andintro{\using{\land}\introrule\justifies}%%
+\def\impelim{\using{\Rightarrow}\elimrule\justifies}%%
+\def\allintro{\using{\forall}\introrule\justifies}%%
+\def\allelim{\using{\forall}\elimrule\justifies}%%
+\def\falseelim{\using{\bot}\elimrule\justifies}%%
+\def\existsintro{\using{\exists}\introrule\justifies}%%
+
+%% #1 is meant to be 1 or 2 for the first or second formula
+\def\andelim#1{\using{\land}#1\elimrule\justifies}%%
+\def\orintro#1{\using{\lor}#1\introrule\justifies}%%
+
+%% #1 is meant to be a label corresponding to the discharged hypothesis/es
+\def\impintro#1{\using{\Rightarrow}\introrule_{#1}\justifies}%%
+\def\orelim#1{\using{\lor}\elimrule_{#1}\justifies}%%
+\def\existselim#1{\using{\exists}\elimrule_{#1}\justifies}
+
+%%==========================================================================
+
+\newdimen\proofrulebreadth \proofrulebreadth=.05em
+\newdimen\proofdotseparation \proofdotseparation=1.25ex
+\newdimen\proofrulebaseline \proofrulebaseline=2ex
+\newcount\proofdotnumber \proofdotnumber=3
+\let\then\relax
+\def\hfi{\hskip0pt plus.0001fil}
+\mathchardef\squigto="3A3B
+%
+% flag where we are
+\newif\ifinsideprooftree\insideprooftreefalse
+\newif\ifonleftofproofrule\onleftofproofrulefalse
+\newif\ifproofdots\proofdotsfalse
+\newif\ifdoubleproof\doubleprooffalse
+\let\wereinproofbit\relax
+%
+% dimensions and boxes of bits
+\newdimen\shortenproofleft
+\newdimen\shortenproofright
+\newdimen\proofbelowshift
+\newbox\proofabove
+\newbox\proofbelow
+\newbox\proofrulename
+%
+% miscellaneous commands for setting values
+\def\shiftproofbelow{\let\next\relax\afterassignment\setshiftproofbelow\dimen0 }
+\def\shiftproofbelowneg{\def\next{\multiply\dimen0 by-1 }%
+\afterassignment\setshiftproofbelow\dimen0 }
+\def\setshiftproofbelow{\next\proofbelowshift=\dimen0 }
+\def\setproofrulebreadth{\proofrulebreadth}
+
+%=============================================================================
+\def\prooftree{% NESTED ZERO (\ifonleftofproofrule)
+%
+% first find out whether we're at the left-hand end of a proof rule
+\ifnum  \lastpenalty=1
+\then   \unpenalty
+\else   \onleftofproofrulefalse
+\fi
+%
+% some space on left (except if we're on left, and no infinity for outermost)
+\ifonleftofproofrule
+\else   \ifinsideprooftree
+        \then   \hskip.5em plus1fil
+        \fi
+\fi
+%
+% begin our proof tree environment
+\bgroup% NESTED ONE (\proofbelow, \proofrulename, \proofabove,
+%               \shortenproofleft, \shortenproofright, \proofrulebreadth)
+\setbox\proofbelow=\hbox{}\setbox\proofrulename=\hbox{}%
+\let\justifies\proofover\let\leadsto\proofoverdots\let\Justifies\proofoverdbl
+\let\using\proofusing\let\[\prooftree
+\ifinsideprooftree\let\]\endprooftree\fi
+\proofdotsfalse\doubleprooffalse
+\let\thickness\setproofrulebreadth
+\let\shiftright\shiftproofbelow \let\shift\shiftproofbelow
+\let\shiftleft\shiftproofbelowneg
+\let\ifwasinsideprooftree\ifinsideprooftree
+\insideprooftreetrue
+%
+% now begin to set the top of the rule (definitions local to it)
+\setbox\proofabove=\hbox\bgroup$\displaystyle % NESTED TWO
+\let\wereinproofbit\prooftree
+%
+% these local variables will be copied out:
+\shortenproofleft=0pt \shortenproofright=0pt \proofbelowshift=0pt
+%
+% flags to enable inner proof tree to detect if on left:
+\onleftofproofruletrue\penalty1
+}
+
+%=============================================================================
+% end whatever box and copy crucial values out of it
+\def\eproofbit{% NESTED TWO
+%
+% various hacks applicable to hypothesis list 
+\ifx    \wereinproofbit\prooftree
+\then   \ifcase \lastpenalty
+        \then   \shortenproofright=0pt  % 0: some other object, no indentation
+        \or     \unpenalty\hfil         % 1: empty hypotheses, just glue
+        \or     \unpenalty\unskip       % 2: just had a tree, remove glue
+        \else   \shortenproofright=0pt  % eh?
+        \fi
+\fi
+%
+% pass out crucial values from scope
+\global\dimen0=\shortenproofleft
+\global\dimen1=\shortenproofright
+\global\dimen2=\proofrulebreadth
+\global\dimen3=\proofbelowshift
+\global\dimen4=\proofdotseparation
+\global\count255=\proofdotnumber
+%
+% end the box
+$\egroup  % NESTED ONE
+%
+% restore the values
+\shortenproofleft=\dimen0
+\shortenproofright=\dimen1
+\proofrulebreadth=\dimen2
+\proofbelowshift=\dimen3
+\proofdotseparation=\dimen4
+\proofdotnumber=\count255
+}
+
+%=============================================================================
+\def\proofover{% NESTED TWO
+\eproofbit % NESTED ONE
+\setbox\proofbelow=\hbox\bgroup % NESTED TWO
+\let\wereinproofbit\proofover
+$\displaystyle
+}%
+%
+%=============================================================================
+\def\proofoverdbl{% NESTED TWO
+\eproofbit % NESTED ONE
+\doubleprooftrue
+\setbox\proofbelow=\hbox\bgroup % NESTED TWO
+\let\wereinproofbit\proofoverdbl
+$\displaystyle
+}%
+%
+%=============================================================================
+\def\proofoverdots{% NESTED TWO
+\eproofbit % NESTED ONE
+\proofdotstrue
+\setbox\proofbelow=\hbox\bgroup % NESTED TWO
+\let\wereinproofbit\proofoverdots
+$\displaystyle
+}%
+%
+%=============================================================================
+\def\proofusing{% NESTED TWO
+\eproofbit % NESTED ONE
+\setbox\proofrulename=\hbox\bgroup % NESTED TWO
+\let\wereinproofbit\proofusing
+\kern0.3em$
+}
+
+%=============================================================================
+\def\endprooftree{% NESTED TWO
+\eproofbit % NESTED ONE
+% \dimen0 =     length of proof rule
+% \dimen1 =     indentation of conclusion wrt rule
+% \dimen2 =     new \shortenproofleft, ie indentation of conclusion
+% \dimen3 =     new \shortenproofright, ie
+%                space on right of conclusion to end of tree
+% \dimen4 =     space on right of conclusion below rule
+  \dimen5 =0pt% spread of hypotheses
+% \dimen6, \dimen7 = height & depth of rule
+%
+% length of rule needed by proof above
+\dimen0=\wd\proofabove \advance\dimen0-\shortenproofleft
+\advance\dimen0-\shortenproofright
+%
+% amount of spare space below
+\dimen1=.5\dimen0 \advance\dimen1-.5\wd\proofbelow
+\dimen4=\dimen1
+\advance\dimen1\proofbelowshift \advance\dimen4-\proofbelowshift
+%
+% conclusion sticks out to left of immediate hypotheses
+\ifdim  \dimen1<0pt
+\then   \advance\shortenproofleft\dimen1
+        \advance\dimen0-\dimen1
+        \dimen1=0pt
+%       now it sticks out to left of tree!
+        \ifdim  \shortenproofleft<0pt
+        \then   \setbox\proofabove=\hbox{%
+                        \kern-\shortenproofleft\unhbox\proofabove}%
+                \shortenproofleft=0pt
+        \fi
+\fi
+%
+% and to the right
+\ifdim  \dimen4<0pt
+\then   \advance\shortenproofright\dimen4
+        \advance\dimen0-\dimen4
+        \dimen4=0pt
+\fi
+%
+% make sure enough space for label
+\ifdim  \shortenproofright<\wd\proofrulename
+\then   \shortenproofright=\wd\proofrulename
+\fi
+%
+% calculate new indentations
+\dimen2=\shortenproofleft \advance\dimen2 by\dimen1
+\dimen3=\shortenproofright\advance\dimen3 by\dimen4
+%
+% make the rule or dots, with name attached
+\ifproofdots
+\then
+        \dimen6=\shortenproofleft \advance\dimen6 .5\dimen0
+        \setbox1=\vbox to\proofdotseparation{\vss\hbox{$\cdot$}\vss}%
+        \setbox0=\hbox{%
+                \advance\dimen6-.5\wd1
+                \kern\dimen6
+                $\vcenter to\proofdotnumber\proofdotseparation
+                        {\leaders\box1\vfill}$%
+                \unhbox\proofrulename}%
+\else   \dimen6=\fontdimen22\the\textfont2 % height of maths axis
+        \dimen7=\dimen6
+        \advance\dimen6by.5\proofrulebreadth
+        \advance\dimen7by-.5\proofrulebreadth
+        \setbox0=\hbox{%
+                \kern\shortenproofleft
+                \ifdoubleproof
+                \then   \hbox to\dimen0{%
+                        $\mathsurround0pt\mathord=\mkern-6mu%
+                        \cleaders\hbox{$\mkern-2mu=\mkern-2mu$}\hfill
+                        \mkern-6mu\mathord=$}%
+                \else   \vrule height\dimen6 depth-\dimen7 width\dimen0
+                \fi
+                \unhbox\proofrulename}%
+        \ht0=\dimen6 \dp0=-\dimen7
+\fi
+%
+% set up to centre outermost tree only
+\let\doll\relax
+\ifwasinsideprooftree
+\then   \let\VBOX\vbox
+\else   \ifmmode\else$\let\doll=$\fi
+        \let\VBOX\vcenter
+\fi
+% this \vbox or \vcenter is the actual output:
+\VBOX   {\baselineskip\proofrulebaseline \lineskip.2ex
+        \expandafter\lineskiplimit\ifproofdots0ex\else-0.6ex\fi
+        \hbox   spread\dimen5   {\hfi\unhbox\proofabove\hfi}%
+        \hbox{\box0}%
+        \hbox   {\kern\dimen2 \box\proofbelow}}\doll%
+%
+% pass new indentations out of scope
+\global\dimen2=\dimen2
+\global\dimen3=\dimen3
+\egroup % NESTED ZERO
+\ifonleftofproofrule
+\then   \shortenproofleft=\dimen2
+\fi
+\shortenproofright=\dimen3
+%
+% some space on right and flag we've just made a tree
+\onleftofproofrulefalse
+\ifinsideprooftree
+\then   \hskip.5em plus 1fil \penalty2
+\fi
+}
+
+%==========================================================================
+% IDEAS
+% 1.    Specification of \shiftright and how to spread trees.
+% 2.    Spacing command \m which causes 1em+1fil spacing, over-riding
+%       exisiting space on sides of trees and not affecting the
+%       detection of being on the left or right.
+% 3.    Hack using \@currenvir to detect LaTeX environment; have to
+%       use \aftergroup to pass \shortenproofleft/right out.
+% 4.    (Pie in the sky) detect how much trees can be "tucked in"
+% 5.    Discharged hypotheses (diagonal lines).

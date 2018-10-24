@@ -41,6 +41,7 @@ import GHC.Lexeme       ( startsVarSym, startsVarId )
 import GHC.ForeignSrcLang.Type
 import Language.Haskell.TH.LanguageExtensions
 import Numeric.Natural
+import Prelude
 
 import qualified Control.Monad.Fail as Fail
 

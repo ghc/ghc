@@ -17,6 +17,4 @@ def checkStgString(needle):
             return "%s not contained in -ddump-simpl\n" % needle
     return normalise_errmsg_fun(norm)
 
-
-
-test('T13588', [ checkStgString('case') ] , compile, ['-ddump-stg'])
+test('T13588', [ checkStgString('case') ] , compile, ['-dverbose-stg2stg'])

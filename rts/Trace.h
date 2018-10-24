@@ -295,6 +295,8 @@ void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency);
 #endif /* PROFILING */
 
+void flushTrace(void);
+
 #else /* !TRACING */
 
 #define traceSchedEvent(cap, tag, tso, other) /* nothing */
@@ -330,6 +332,8 @@ void traceHeapProfSampleCostCentre(StgWord8 profile_id,
 #define traceHeapProfSampleBegin(era) /* nothing */
 #define traceHeapProfSampleCostCentre(profile_id, stack, residency) /* nothing */
 #define traceHeapProfSampleString(profile_id, label, residency) /* nothing */
+
+#define flushTrace() /* nothing */
 
 #endif /* TRACING */
 

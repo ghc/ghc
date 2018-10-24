@@ -37,7 +37,8 @@ module DsUtils (
         mkSelectorBinds,
 
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
-        mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang
+        mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang,
+        isTrueLHsExpr
     ) where
 
 #include "HsVersions.h"
@@ -978,3 +979,32 @@ addBang = go
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
            _             -> L l (BangPat noExt lp)
+
+isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
+
+-- Returns Just {..} if we're sure that the expression is True
+-- I.e.   * 'True' datacon
+--        * 'otherwise' Id
+--        * Trivial wappings of these
+-- The arguments to Just are any HsTicks that we have found,
+-- because we still want to tick then, even it they are always evaluated.
+isTrueLHsExpr (L _ (HsVar _ (L _ v))) |  v `hasKey` otherwiseIdKey
+                                      || v `hasKey` getUnique trueDataConId
+                                              = Just return
+        -- trueDataConId doesn't have the same unique as trueDataCon
+isTrueLHsExpr (L _ (HsConLikeOut _ con))
+  | con `hasKey` getUnique trueDataCon = Just return
+isTrueLHsExpr (L _ (HsTick _ tickish e))
+    | Just ticks <- isTrueLHsExpr e
+    = Just (\x -> do wrapped <- ticks x
+                     return (Tick tickish wrapped))
+   -- This encodes that the result is constant True for Hpc tick purposes;
+   -- which is specifically what isTrueLHsExpr is trying to find out.
+isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
+    | Just ticks <- isTrueLHsExpr e
+    = Just (\x -> do e <- ticks x
+                     this_mod <- getModule
+                     return (Tick (HpcTick this_mod ixT) e))
+
+isTrueLHsExpr (L _ (HsPar _ e))         = isTrueLHsExpr e
+isTrueLHsExpr _                       = Nothing
