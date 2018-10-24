@@ -7,13 +7,10 @@ module Kind (
 
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind,
-        isConstraintKind,
         isTYPEApp,
-        returnsTyCon, returnsConstraintKind,
         isConstraintKindCon,
 
         classifiesTypeWithValues,
-        tcIsLiftedTypeKind,
         isKindLevPoly
        ) where
 
@@ -63,13 +60,8 @@ distinct uniques, they are treated as equal at all times except
 during type inference.
 -}
 
-isConstraintKind :: Kind -> Bool
 isConstraintKindCon :: TyCon -> Bool
-
-isConstraintKindCon   tc = tyConUnique tc == constraintKindTyConKey
-
-isConstraintKind (TyConApp tc _) = isConstraintKindCon tc
-isConstraintKind _               = False
+isConstraintKindCon tc = tyConUnique tc == constraintKindTyConKey
 
 isTYPEApp :: Kind -> Maybe DataCon
 isTYPEApp (TyConApp tc args)
@@ -79,17 +71,6 @@ isTYPEApp (TyConApp tc args)
   , Just dc <- isPromotedDataCon_maybe tc
   = Just dc
 isTYPEApp _ = Nothing
-
--- | Does the given type "end" in the given tycon? For example @k -> [a] -> *@
--- ends in @*@ and @Maybe a -> [a]@ ends in @[]@.
-returnsTyCon :: Unique -> Type -> Bool
-returnsTyCon tc_u (ForAllTy _ ty)  = returnsTyCon tc_u ty
-returnsTyCon tc_u (FunTy  _ _ ty)  = returnsTyCon tc_u ty
-returnsTyCon tc_u (TyConApp tc' _) = tc' `hasKey` tc_u
-returnsTyCon _  _                  = False
-
-returnsConstraintKind :: Kind -> Bool
-returnsConstraintKind = returnsTyCon constraintKindTyConKey
 
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
@@ -129,13 +110,3 @@ isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
 classifiesTypeWithValues = isTYPE (const True)
-
--- | Is this kind equivalent to @*@?
---
--- This considers 'Constraint' to be distinct from @*@. For a version that
--- treats them as the same type, see 'isLiftedTypeKind'.
-tcIsLiftedTypeKind :: Kind -> Bool
-tcIsLiftedTypeKind = tcIsTYPE is_lifted
-  where
-    is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
-    is_lifted _                        = False

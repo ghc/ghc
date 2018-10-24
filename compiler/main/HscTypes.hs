@@ -174,8 +174,7 @@ import CoAxiom
 import ConLike
 import DataCon
 import PatSyn
-import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule
-                        , eqTyConName )
+import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser

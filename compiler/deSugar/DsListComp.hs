@@ -623,7 +623,7 @@ dsMcBindStmt :: LPat GhcTc
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
         ; var      <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: the correct pat_weight is somewhere in the caller, but I'll fix later, when list comprehension have test cases.
-        ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
+        ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                   res1_ty (cantFailMatchResult body)
         ; match_code <- handle_failure pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }

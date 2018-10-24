@@ -30,11 +30,10 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
-import TysWiredIn ( heqTyConName, coercibleTyConName )
+import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
 import Type
 import Coercion
-import Kind
 import CoAxiom
 import Class
 import TyCon
@@ -387,10 +386,10 @@ checkValidMonoType ty
 
 checkTySynRhs :: UserTypeCtxt -> TcType -> TcM ()
 checkTySynRhs ctxt ty
-  | returnsConstraintKind actual_kind
+  | tcReturnsConstraintKind actual_kind
   = do { ck <- xoptM LangExt.ConstraintKinds
        ; if ck
-         then  when (isConstraintKind actual_kind)
+         then  when (tcIsConstraintKind actual_kind)
                     (do { dflags <- getDynFlags
                         ; check_pred_ty emptyTidyEnv dflags ctxt ty })
          else addErrTcM (constraintSynErr emptyTidyEnv actual_kind) }
@@ -1443,7 +1442,8 @@ checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type
                    -> TcM ([TyVar], ThetaType, Class, [Type])
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
-  = failWithTc (text "Instance head is not headed by a class")
+  = failWithTc (hang (text "Instance head is not headed by a class:")
+                   2 ( ppr tau))
 
   | isNothing mb_cls
   = failWithTc (vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)

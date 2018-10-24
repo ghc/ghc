@@ -16,7 +16,7 @@ module TcEvidence (
   lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
   isEmptyEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  evBindVar, isNoEvBindsVar,
+  evBindVar, isCoEvBindsVar,
 
   -- EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
@@ -401,7 +401,7 @@ data EvBindsVar
       -- See Note [Tracking redundant constraints] in TcSimplify
     }
 
-  | NoEvBindsVar {  -- See Note [No evidence bindings]
+  | CoEvBindsVar {  -- See Note [Coercion evidence only]
 
       -- See above for comments on ebv_uniq, evb_tcvs
       ebv_uniq :: Unique,
@@ -414,11 +414,11 @@ instance Data.Data TcEvBinds where
   gunfold _ _  = error "gunfold"
   dataTypeOf _ = Data.mkNoRepType "TcEvBinds"
 
-{- Note [No evidence bindings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Coercion evidence only]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Class constraints etc give rise to /term/ bindings for evidence, and
 we have nowhere to put term bindings in /types/.  So in some places we
-use NoEvBindsVar (see newNoTcEvBinds) to signal that no term-level
+use CoEvBindsVar (see newCoTcEvBinds) to signal that no term-level
 evidence bindings are allowed.  Notebly ():
 
   - Places in types where we are solving kind constraints (all of which
@@ -428,9 +428,9 @@ evidence bindings are allowed.  Notebly ():
   - When unifying forall-types
 -}
 
-isNoEvBindsVar :: EvBindsVar -> Bool
-isNoEvBindsVar (NoEvBindsVar {}) = True
-isNoEvBindsVar (EvBindsVar {})   = False
+isCoEvBindsVar :: EvBindsVar -> Bool
+isCoEvBindsVar (CoEvBindsVar {}) = True
+isCoEvBindsVar (EvBindsVar {})   = False
 
 -----------------
 newtype EvBindMap
@@ -921,8 +921,8 @@ instance Outputable TcEvBinds where
 instance Outputable EvBindsVar where
   ppr (EvBindsVar { ebv_uniq = u })
      = text "EvBindsVar" <> angleBrackets (ppr u)
-  ppr (NoEvBindsVar { ebv_uniq = u })
-     = text "NoEvBindsVar" <> angleBrackets (ppr u)
+  ppr (CoEvBindsVar { ebv_uniq = u })
+     = text "CoEvBindsVar" <> angleBrackets (ppr u)
 
 instance Uniquable EvBindsVar where
   getUnique = ebv_uniq

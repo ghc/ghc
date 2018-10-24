@@ -76,10 +76,9 @@ import TcEvidence       ( emptyTcEvBinds )
 -- compiler/prelude
 import ForeignCall
 import TysPrim          ( eqPrimTyCon )
-import PrelNames        ( eqTyCon_RDR )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
-                          listTyCon_RDR, consDataCon_RDR )
+                          listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
 
 -- compiler/utils
 import Util             ( looksLikePackageName )

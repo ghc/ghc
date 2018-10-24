@@ -1033,13 +1033,14 @@ test('T10547',
 test('T12227',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 812869424, 5),
+          [(wordsize(64), 752214784, 5),
           # 2016-07-11    5650186880 (Windows) before fix for #12227
           # 2016-07-11    1822822016 (Windows) after fix for #12227
           # 2016-12-20    1715827784 after d250d493 (INLINE in Traversable dms)
           #                          (or thereabouts in the commit history)
           # 2017-02-14    1060158624  Early inlining: 35% improvement
           # 2018-01-04    812869424   Drop unused givens (#13032): 23% better
+          # 2018-06-27    752214784   Trac #15421
           ]),
      ],
      compile,
@@ -1090,8 +1091,9 @@ test('T12234',
 test('T12545',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3538652464, 5),
+          [(wordsize(64), 3249613688, 5),
           # 2017-06-08    3538652464  initial
+          # 2018-06-27    3249613688  Trac #15421
           ]),
        extra_clean(['T12545a.hi', 'T12545a.o'])
      ],

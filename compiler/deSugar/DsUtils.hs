@@ -98,11 +98,11 @@ otherwise, make one up.
 -}
 
 selectSimpleMatchVarL :: Rig -> LPat GhcTc -> DsM Id
+-- Postcondition: the returned Id has an Internal Name
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 -- TODO: MattP: This function is used in a few places where is might be
 -- necessary to take into account multiplicity but it wasn't on the
 -- critical path to fix for now.
-
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
@@ -121,9 +121,11 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
 selectMatchVars :: [(Rig, Pat GhcTc)] -> DsM [Id]
+-- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
 selectMatchVar :: Rig -> Pat GhcTc -> DsM Id
+-- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
@@ -138,9 +140,8 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
 selectMatchVar _w (AsPat _ var _) = return (unLoc var)
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
-{-
-Note [Localise pattern binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Localise pattern binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider     module M where
                [Just a] = e
 After renaming it looks like
@@ -176,6 +177,7 @@ In fact, even CoreSubst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
+See also Note [MatchIds] in Match.hs
 
 ************************************************************************
 *                                                                      *
@@ -916,13 +918,38 @@ mkBinaryTickBox ixT ixF e = do
 
 -- *******************************************************************
 
+{- Note [decideBangHood]
+~~~~~~~~~~~~~~~~~~~~~~~~
+With -XStrict we may make /outermost/ patterns more strict.
+E.g.
+       let (Just x) = e in ...
+          ==>
+       let !(Just x) = e in ...
+and
+       f x = e
+          ==>
+       f !x = e
+
+This adjustment is done by decideBangHood,
+
+  * Just before constructing an EqnInfo, in Match
+      (matchWrapper and matchSinglePat)
+
+  * When desugaring a pattern-binding in DsBinds.dsHsBind
+
+Note that it is /not/ done recursively.  See the -XStrict
+spec in the user manual.
+
+Specifically:
+   ~pat    => pat    -- when -XStrict (even if pat = ~pat')
+   !pat    => !pat   -- always
+   pat     => !pat   -- when -XStrict
+   pat     => pat    -- otherwise
+-}
+
+
 -- | Use -XStrict to add a ! or remove a ~
---
--- Examples:
--- ~pat    => pat    -- when -XStrict (even if pat = ~pat')
--- !pat    => !pat   -- always
--- pat     => !pat   -- when -XStrict
--- pat     => pat    -- otherwise
+-- See Note [decideBangHood]
 decideBangHood :: DynFlags
                -> LPat GhcTc  -- ^ Original pattern
                -> LPat GhcTc  -- Pattern with bang if necessary

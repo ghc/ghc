@@ -1,9 +1,4 @@
-class (a ~ b) => (~) (a :: k) (b :: k)
-  	-- Defined in ‘Data.Type.Equality’
-instance [incoherent] forall k (a :: k) (b :: k). (a ~ b) => a ~ b
-  -- Defined in ‘Data.Type.Equality’
-(~) :: k -> k -> Constraint
-class (a ~~ b) => (~) (a :: k) (b :: k)
-  	-- Defined in ‘Data.Type.Equality’
-instance [incoherent] forall k (a :: k) (b :: k). (a ~~ b) => a ~ b
-  -- Defined in ‘Data.Type.Equality’
+class (a ~ b) => (~) (a :: k0) (b :: k0) 	-- Defined in ‘GHC.Types’
+(~) :: k0 -> k0 -> Constraint
+class (a GHC.Prim.~# b) => (~) (a :: k0) (b :: k0)
+  	-- Defined in ‘GHC.Types’

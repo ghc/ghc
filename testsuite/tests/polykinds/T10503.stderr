@@ -2,8 +2,8 @@
 T10503.hs:8:6: error:
     • Could not deduce: k ~ *
       from the context: Proxy 'KProxy ~ Proxy 'KProxy
-        bound by the type signature for:
-                   h :: (Proxy 'KProxy ~ Proxy 'KProxy) => r
+        bound by a type expected by the context:
+                   (Proxy 'KProxy ~ Proxy 'KProxy) => r
         at T10503.hs:8:6-85
       ‘k’ is a rigid type variable bound by
         the type signature for:

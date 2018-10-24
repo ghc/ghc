@@ -70,7 +70,6 @@ import RnTypes
 import TcHsSyn
 import TcSimplify
 import Type
-import Kind
 import NameSet
 import TcMType
 import TcHsType

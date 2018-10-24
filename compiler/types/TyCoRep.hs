@@ -41,7 +41,7 @@ module TyCoRep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkFunTy, mkFunTyOm, mkFunTys, mkFunTysOm, mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
-        isTYPE, tcIsTYPE,
+        isTYPE,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
         sameVis, isLinearType,
@@ -154,8 +154,7 @@ import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
                           , toposortTyVars
-                          , coreView, tcView
-                          , eqType )
+                          , coreView, eqType )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} TysWiredIn ( oneDataConTy, omegaDataConTy )
@@ -838,24 +837,6 @@ isTYPE f (TyConApp tc [arg])
       go ty | Just ty' <- coreView ty = go ty'
       go ty = f ty
 isTYPE _ _ = False
-
--- | If a type is @'TYPE' r@ for some @r@, run the predicate argument on @r@.
--- Otherwise, return 'False'.
---
--- This function distinguishes between 'Constraint' and 'Type' (and will return
--- 'False' for 'Constraint'). For a version which does not distinguish between
--- the two, see 'isTYPE'.
-tcIsTYPE :: (   Type    -- the single argument to TYPE; not a synonym
-             -> Bool )  -- what to return
-         -> Kind -> Bool
-tcIsTYPE f ki | Just ki' <- tcView ki = tcIsTYPE f ki'
-tcIsTYPE f (TyConApp tc [arg])
-  | tc `hasKey` tYPETyConKey
-  = go arg
-    where
-      go ty | Just ty' <- tcView ty = go ty'
-      go ty = f ty
-tcIsTYPE _ _ = False
 
 -- | This version considers Constraint to be the same as *. Returns True
 -- if the argument is equivalent to Type/Constraint and False otherwise.
