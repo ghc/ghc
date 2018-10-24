@@ -10606,14 +10606,35 @@ Here are the details:
   will have its type variables
   ordered as ``m, a, b, c``.
 
+- If the type signature includes any kind annotations (either on variable
+  binders or as annotations on types), any variables used in kind
+  annotations come before any variables never used in kind annotations.
+  This rule is not recursive: if there is an annotation within an annotation,
+  then the variables used therein are on equal footing. Examples::
+
+    f :: Proxy (a :: k) -> Proxy (b :: j) -> ()
+      -- as if f :: forall k j a b. ...
+
+    g :: Proxy (b :: j) -> Proxy (a :: (Proxy :: (k -> Type) -> Type) Proxy) -> ()
+      -- as if g :: forall j k b a. ...
+      -- NB: k is in a kind annotation within a kind annotation
+  
 - If any of the variables depend on other variables (that is, if some
   of the variables are *kind* variables), the variables are reordered
   so that kind variables come before type variables, preserving the
   left-to-right order as much as possible. That is, GHC performs a
-  stable topological sort on the variables.
+  stable topological sort on the variables. Examples::
 
-  For example: if we have ``bar :: Proxy (a :: (j, k)) -> b``, then
-  the variables are ordered ``j``, ``k``, ``a``, ``b``.
+    h :: Proxy (a :: (j, k)) -> Proxy (b :: Proxy a) -> ()
+      -- as if h :: forall j k a b. ...
+
+  In this example, all of ``a``, ``j``, and ``k`` are considered kind
+  variables and will always be placed before ``b``, a lowly type variable.
+  (Note that ``a`` is used in ``b``\'s kind.) Yet, even though ``a`` appears
+  lexically before ``j`` and ``k``, ``j`` and ``k`` are quantified first,
+  because ``a`` depends on ``j`` and ``k``. Note further that ``j`` and ``k``
+  are not reordered with respect to eacho other, even though doing so would
+  not violate dependency conditions.
 
 - Visible type application is available to instantiate only user-specified
   type variables. This means that in ``data Proxy a = Proxy``, the unmentioned
@@ -15846,8 +15867,8 @@ Here are some examples: ::
 The type ``Simple`` has its parameter at role representational, which is
 generally the most common case. ``Simple Age`` would have the same
 representation as ``Simple Int``. The type ``Complex``, on the other
-hand, has its parameter at role nominal, because ``Simple Age`` and
-``Simple Int`` are *not* the same. Lastly, ``Phant Age`` and
+hand, has its parameter at role nominal, because ``Complex Age`` and
+``Complex Int`` are *not* the same. Lastly, ``Phant Age`` and
 ``Phant Bool`` have the same representation, even though ``Age`` and
 ``Bool`` are unrelated.
 

@@ -223,6 +223,37 @@ Note carefully:
 * After type checking is done, we report what types the wildcards
   got unified with.
 
+Note [Ordering of implicit variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since the advent of -XTypeApplications, GHC makes promises about the ordering
+of implicit variable quantification. Specifically, we offer that implicitly
+quantified variables (such as those in const :: a -> b -> a, without a `forall`)
+will occur in left-to-right order of first occurrence. Here are a few examples:
+
+  const :: a -> b -> a       -- forall a b. ...
+  f :: Eq a => b -> a -> a   -- forall a b. ...  contexts are included
+
+  type a <-< b = b -> a
+  g :: a <-< b               -- forall a b. ...  type synonyms matter
+
+  class Functor f where
+    fmap :: (a -> b) -> f a -> f b   -- forall f a b. ...
+    -- The f is quantified by the class, so only a and b are considered in fmap
+
+This simple story is complicated by the possibility of dependency: all variables
+must come after any variables mentioned in their kinds.
+
+  typeRep :: Typeable a => TypeRep (a :: k)   -- forall k a. ...
+
+The k comes first because a depends on k, even though the k appears later than
+the a in the code. Thus, GHC does a *stable topological sort* on the variables.
+By "stable", we mean that any two variables who do not depend on each other
+preserve their existing left-to-right ordering.
+
+Implicitly bound variables are collected by extractHsTysRdrTyVars and friends
+in RnTypes. These functions thus promise to keep left-to-right ordering.
+Look for pointers to this note to see the places where the action happens.
+
 -}
 
 -- | Located Haskell Context
@@ -314,6 +345,8 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
 
 data HsIBRn
   = HsIBRn { hsib_vars :: [Name] -- Implicitly-bound kind & type vars
+                                 -- Order is important; see
+                                 -- Note [Ordering of implicit variables]
            , hsib_closed :: Bool -- Taking the hsib_vars into account,
                                  -- is the payload closed? Used in
                                  -- TcHsType.decideKindGeneralisationPlan

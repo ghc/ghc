@@ -1843,6 +1843,11 @@ predTypeEqRel ty
 --
 -- This is a deterministic sorting operation
 -- (that is, doesn't depend on Uniques).
+--
+-- It is also meant to be stable: that is, variables should not
+-- be reordered unnecessarily. The implementation of this
+-- has been observed to be stable, though it is not proven to
+-- be so. See also Note [Ordering of implicit variables] in HsTypes
 toposortTyVars :: [TyCoVar] -> [TyCoVar]
 toposortTyVars tvs = reverse $
                      [ node_payload node | node <- topologicalSortG $

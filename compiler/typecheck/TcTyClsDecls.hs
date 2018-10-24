@@ -633,7 +633,7 @@ getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs =
        ; tycon <- kcLHsQTyVars name ClassFlavour cusk ktvs $
                   return constraintKind
             -- See Note [Don't process associated types in kcLHsQTyVars]
-       ; inner_tcs <- tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $
+       ; inner_tcs <- tcExtendNameTyVarEnv (map (\(x,y) -> (x, unrestricted y)) $ tcTyConScopedTyVars tycon) $
                       getFamDeclInitialKinds (Just cusk) ats
        ; return (tycon : inner_tcs) }
 

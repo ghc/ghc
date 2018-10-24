@@ -343,6 +343,8 @@ rnImplicitBndrs bind_free_tvs
          implicit_kind_vars_msg kvs
 
        ; loc <- getSrcSpanM
+          -- NB: kinds before tvs, as mandated by
+          -- Note [Ordering of implicit variables] in HsTypes
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) (kvs ++ real_tvs)
 
        ; traceRn "checkMixedVars2" $
@@ -1584,6 +1586,9 @@ of the k in Proxy k being reported as out of scope.
 -}
 
 -- See Note [Kind and type-variable binders]
+-- These lists are guaranteed to preserve left-to-right ordering of
+-- the types the variables were extracted from. See also
+-- Note [Ordering of implicit variables] in HsTypes.
 data FreeKiTyVars = FKTV { fktv_kis    :: [Located RdrName]
                          , fktv_tys    :: [Located RdrName] }
 

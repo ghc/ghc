@@ -542,7 +542,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                       live <- sequence $7
                       let prof = NoProfilingInfo
                           -- drop one for the info pointer
-                          bitmap = mkLiveness dflags (map Just (drop 1 live))
+                          bitmap = mkLiveness dflags (drop 1 live)
                           rep  = mkRTSRep (fromIntegral $5) $ mkStackRep bitmap
                       return (mkCmmRetLabel pkg $3,
                               Just $ CmmInfoTable { cit_lbl = mkCmmRetInfoLabel pkg $3

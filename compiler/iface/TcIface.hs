@@ -671,7 +671,7 @@ tc_iface_decl _ _ (IfaceData {ifName = tc_name,
       = do { ax <- tcIfaceCoAxiom ax_name
            ; let fam_tc  = coAxiomTyCon ax
                  ax_unbr = toUnbranchedAxiom ax
-           ; lhs_tys <- tcIfaceTcArgs arg_tys
+           ; lhs_tys <- tcIfaceAppArgs arg_tys
            ; return (DataFamInstTyCon ax_unbr fam_tc lhs_tys) }
 
 tc_iface_decl _ _ (IfaceSynonym {ifName = tc_name,
@@ -866,7 +866,7 @@ tc_ax_branch prev_branches
       (map (\b -> TvBndr b (NamedTCB Inferred)) tv_bndrs) $ \ tvs ->
          -- The _AT variant is needed here; see Note [CoAxBranch type variables] in CoAxiom
     bindIfaceIds cv_bndrs $ \ cvs -> do
-    { tc_lhs <- tcIfaceTcArgs lhs
+    { tc_lhs <- tcIfaceAppArgs lhs
     ; tc_rhs <- tcIfaceType rhs
     ; let br = CoAxBranch { cab_loc     = noSrcSpan
                           , cab_tvs     = binderVars tvs
@@ -1075,7 +1075,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
         -- to write them out in coreRuleToIfaceRule
     ifTopFreeName :: IfaceExpr -> Maybe Name
     ifTopFreeName (IfaceType (IfaceTyConApp tc _ )) = Just (ifaceTyConName tc)
-    ifTopFreeName (IfaceType (IfaceTupleTy s _ ts)) = Just (tupleTyConName s (length (tcArgsIfaceTypes ts)))
+    ifTopFreeName (IfaceType (IfaceTupleTy s _ ts)) = Just (tupleTyConName s (length (appArgsIfaceTypes ts)))
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
@@ -1133,14 +1133,17 @@ tcIfaceType = go
   where
     go (IfaceTyVar n)         = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
-    go (IfaceAppTy t1 t2)     = AppTy <$> go t1 <*> go t2
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy w t1 t2)     = FunTy <$> tcIfaceRig w <*> go t1 <*> go t2
     go (IfaceDFunTy t1 t2)    = FunTy Omega <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
+    go (IfaceAppTy t ts)
+      = do { t'  <- go t
+           ; ts' <- traverse go (appArgsIfaceTypes ts)
+           ; pure (foldl' AppTy t' ts') }
     go (IfaceTyConApp tc tks)
       = do { tc' <- tcIfaceTyCon tc
-           ; tks' <- mapM go (tcArgsIfaceTypes tks)
+           ; tks' <- mapM go (appArgsIfaceTypes tks)
            ; return (mkTyConApp tc' tks') }
     go (IfaceForAllTy bndr t)
       = bindIfaceForAllBndr bndr $ \ tv' vis ->
@@ -1151,9 +1154,9 @@ tcIfaceType = go
 tcIfaceRig :: IfaceType -> IfL Rig
 tcIfaceRig if_ty = toMult <$> tcIfaceType if_ty
 
-tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceTcArgs -> IfL Type
+tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceAppArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args
- = do { args' <- tcIfaceTcArgs args
+ = do { args' <- tcIfaceAppArgs args
       ; let arity = length args'
       ; base_tc <- tcTupleTyCon True sort arity
       ; case is_promoted of
@@ -1180,8 +1183,8 @@ tcTupleTyCon in_type sort arity
                      | otherwise = arity
                       -- in expressions, we only have term args
 
-tcIfaceTcArgs :: IfaceTcArgs -> IfL [Type]
-tcIfaceTcArgs = mapM tcIfaceType . tcArgsIfaceTypes
+tcIfaceAppArgs :: IfaceAppArgs -> IfL [Type]
+tcIfaceAppArgs = mapM tcIfaceType . appArgsIfaceTypes
 
 -----------------------------------------
 tcIfaceCtxt :: IfaceContext -> IfL ThetaType
