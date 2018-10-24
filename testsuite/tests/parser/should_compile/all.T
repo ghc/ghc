@@ -139,3 +139,4 @@ def only_MG_loc(x):
 test('T15279', normalise_errmsg_fun(only_MG_loc), compile, [''])
 test('T15457', normal, compile, [''])
 test('T15675', normal, compile, [''])
+test('T15781', normal, compile, [''])

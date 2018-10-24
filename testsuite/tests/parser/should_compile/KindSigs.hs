@@ -27,6 +27,9 @@ type Quux = '[ True :: Bool ]
 type Quux' = [ True :: Bool, False :: Bool  ]
 type Quuux b = '( [Int, Bool] :: [Type], b )
 
+-- Kind annotation on the RHS of a type synonym
+type Sarsaparilla = Int :: Type
+
 -- Note that 'true :: Bool :: Type' won't parse - you need some parens
 true :: (Bool :: Type)
 true = True
