@@ -17,17 +17,17 @@
     "Alex Biehl <alexbiehl@gmail.com>"
   ],
   "dependencies": {
-    "fuse.js": "^3.1.0",
-    "preact": "^8.2.5"
+    "fuse.js": "^3.3.0",
+    "preact": "^8.3.1"
   },
   "devDependencies": {
-    "browserify": "^14.4.0",
-    "gulp": "^3.9.1",
-    "gulp-sourcemaps": "^2.6.1",
-    "gulp-uglify": "^3.0.0",
-    "tsify": "^3.0.3",
-    "typescript": "^2.5.2",
-    "vinyl-buffer": "^1.0.0",
-    "vinyl-source-stream": "^1.1.0"
+    "browserify": "^14.5.0",
+    "gulp": "^4.0.0",
+    "gulp-sourcemaps": "^2.6.4",
+    "gulp-uglify": "^3.0.1",
+    "tsify": "^3.0.4",
+    "typescript": "^2.9.2",
+    "vinyl-buffer": "^1.0.1",
+    "vinyl-source-stream": "^2.0.0"
   }
 }
