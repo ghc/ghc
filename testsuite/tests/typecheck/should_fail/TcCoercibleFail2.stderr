@@ -1,5 +1,4 @@
 
 TcCoercibleFail2.hs:5:10: error:
-    Illegal instance declaration for ‘Coercible () ()’
-      Manual instances of this class are not permitted.
-    In the instance declaration for ‘Coercible () ()’
+    • Class ‘Coercible’ does not support user-specified instances
+    • In the instance declaration for ‘Coercible () ()’

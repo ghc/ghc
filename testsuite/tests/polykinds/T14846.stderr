@@ -3,11 +3,11 @@ T14846.hs:38:8: error:
     • Couldn't match type ‘ríki’ with ‘Hom riki’
       ‘ríki’ is a rigid type variable bound by
         the type signature for:
-          i :: forall k5 (cls1 :: k5
-                                  -> Constraint) k6 (xx :: k6) (a :: Struct cls1) (ríki :: Struct
-                                                                                             cls1
+          i :: forall k5 (cls2 :: k5
+                                  -> Constraint) k6 (xx :: k6) (a :: Struct cls2) (ríki :: Struct
+                                                                                             cls2
                                                                                            -> Struct
-                                                                                                cls1
+                                                                                                cls2
                                                                                            -> *).
                StructI xx a =>
                ríki a a
@@ -30,11 +30,18 @@ T14846.hs:38:8: error:
                       ríki a a
       In the instance declaration for ‘Category (Hom riki)’
 
-T14846.hs:39:44: error:
-    • Expected kind ‘Struct cls0 -> Constraint’,
-        but ‘cls’ has kind ‘k4 -> Constraint’
-    • In the second argument of ‘Structured’, namely ‘cls’
-      In the first argument of ‘AStruct’, namely ‘(Structured a cls)’
+T14846.hs:39:31: error:
+    • Couldn't match kind ‘k4’ with ‘Struct cls0’
+      ‘k4’ is a rigid type variable bound by
+        the instance declaration
+        at T14846.hs:37:10-65
+      When matching kinds
+        cls :: k4 -> Constraint
+        cls1 :: Struct cls0 -> Constraint
+      Expected kind ‘Struct cls1’,
+        but ‘Structured a cls’ has kind ‘Struct cls’
+    • In the first argument of ‘AStruct’, namely ‘(Structured a cls)’
       In an expression type signature: AStruct (Structured a cls)
+      In the expression: struct :: AStruct (Structured a cls)
     • Relevant bindings include
         i :: Hom riki a a (bound at T14846.hs:39:3)

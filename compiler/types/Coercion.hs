@@ -274,43 +274,71 @@ decomposeFunCo r co = ASSERT2( all_ok, ppr co )
     Pair s1t1 s2t2 = coercionKind co
     all_ok = isFunTy s1t1 && isFunTy s2t2
 
--- | Decompose a function coercion, either a dependent one or a non-dependent one.
--- This is useful when you are trying to build (ty1 |> co) ty2 ty3 ... tyn, but
--- you are pulling the coercions to the right. For example of why you might want
--- to do so, see Note [Respecting definitional equality] in TyCoRep.
--- This might return *fewer* coercions than there are arguments, if the kind provided
--- doesn't have enough binders.
--- The types passed in are the ty2 ... tyn. If the results are (arg_cos, res_co),
--- then you should build
--- @(ty1 (ty2 |> arg_cos1) (ty3 |> arg_cos2) ... (tym |> arg_com)|> res_co) tym+1 ... tyn@.
-decomposePiCos :: Kind  -- of the function (ty1), used only to tell -> from ∀ from other
-               -> [Type] -> CoercionN -> ([CoercionN], CoercionN)
-decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_args orig_co
+{- Note [Pushing a coercion into a pi-type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have this:
+    (f |> co) t1 .. tn
+Then we want to push the coercion into the arguments, so as to make
+progress. For example of why you might want to do so, see Note
+[Respecting definitional equality] in TyCoRep.
+
+This is done by decomposePiCos.  Specifically, if
+    decomposePiCos co [t1,..,tn] = ([co1,...,cok], cor)
+then
+    (f |> co) t1 .. tn   =   (f (t1 |> co1) ... (tk |> cok)) |> cor) t(k+1) ... tn
+
+Notes:
+
+* k can be smaller than n! That is decomposePiCos can return *fewer*
+  coercions than there are arguments (ie k < n), if the kind provided
+  doesn't have enough binders.
+
+* If there is a type error, we might see
+       (f |> co) t1
+  where co :: (forall a. ty) ~ (ty1 -> ty2)
+  Here 'co' is insoluble, but we don't want to crash in decoposePiCos.
+  So decomposePiCos carefully tests both sides of the coercion to check
+  they are both foralls or both arrows.  Not doing this caused Trac #15343.
+-}
+
+decomposePiCos :: HasDebugCallStack
+               => CoercionN -> Pair Type  -- Coercion and its kind
+               -> [Type]
+               -> ([CoercionN], CoercionN)
+-- See Note [Pushing a coercion into a pi-type]
+decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
+  = go [] (orig_subst,orig_k1) orig_co (orig_subst,orig_k2) orig_args
   where
-    orig_subst = mkEmptyTCvSubst $ mkInScopeSet $ tyCoVarsOfTypes (orig_kind : orig_args)
-                                                  `unionVarSet` tyCoVarsOfCo orig_co
+    orig_subst = mkEmptyTCvSubst $ mkInScopeSet $
+                 tyCoVarsOfTypes orig_args `unionVarSet` tyCoVarsOfCo orig_co
 
-    go :: [CoercionN]   -- accumulator for argument coercions, reversed
-       -> TCvSubst      -- instantiating substitution
-       -> Kind          -- of the function being applied (unsubsted)
-       -> [Type]        -- arguments to that function
-       -> CoercionN     -- coercion originally applied to the function
+    go :: [CoercionN]      -- accumulator for argument coercions, reversed
+       -> (TCvSubst,Kind)  -- Lhs kind of coercion
+       -> CoercionN        -- coercion originally applied to the function
+       -> (TCvSubst,Kind)  -- Rhs kind of coercion
+       -> [Type]           -- Arguments to that function
        -> ([CoercionN], Coercion)
-    go acc_arg_cos subst  ki  (ty:tys) co
-      | Just (kv, inner_ki) <- splitForAllTy_maybe ki
-        -- know       co :: (forall a:s1.t1) ~ (forall b:s2.t2)
-        --      function :: forall a:s1.t1
-        --                  (the function is not passed to decomposePiCos)
-        --            ty :: s2
-        -- need   arg_co :: s2 ~ s1
-        --        res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
-      = let arg_co = mkNthCo Nominal 0 (mkSymCo co)
-            res_co = mkInstCo co (mkGReflLeftCo Nominal ty arg_co)
-            subst' = extendTCvSubst subst kv ty
-        in
-        go (arg_co : acc_arg_cos) subst' inner_ki tys res_co
+    -- Invariant:  co :: subst1(k2) ~ subst2(k2)
 
-      | Just (_arg_ki, res_ki) <- splitFunTy_maybe ki
+    go acc_arg_cos (subst1,k1) co (subst2,k2) (ty:tys)
+      | Just (a, t1) <- splitForAllTy_maybe k1
+      , Just (b, t2) <- splitForAllTy_maybe k2
+        -- know     co :: (forall a:s1.t1) ~ (forall b:s2.t2)
+        --    function :: forall a:s1.t1   (the function is not passed to decomposePiCos)
+        --           a :: s1
+        --           b :: s2
+        --          ty :: s2
+        -- need arg_co :: s2 ~ s1
+        --      res_co :: t1[ty |> arg_co / a] ~ t2[ty / b]
+      = let arg_co  = mkNthCo Nominal 0 (mkSymCo co)
+            res_co  = mkInstCo co (mkGReflLeftCo Nominal ty arg_co)
+            subst1' = extendTCvSubst subst1 a (ty `CastTy` arg_co)
+            subst2' = extendTCvSubst subst2 b ty
+        in
+        go (arg_co : acc_arg_cos) (subst1', t1) res_co (subst2', t2) tys
+
+      | Just (_s1, t1) <- splitFunTy_maybe k1
+      , Just (_s2, t2) <- splitFunTy_maybe k2
         -- know     co :: (s1 -> t1) ~ (s2 -> t2)
         --    function :: s1 -> t1
         --          ty :: s2
@@ -321,19 +349,17 @@ decomposePiCos orig_kind orig_args orig_co = go [] orig_subst orig_kind orig_arg
             -- means we can safely ignore the multiplicity argument.<
             arg_co               = mkSymCo sym_arg_co
         in
-        go (arg_co : acc_arg_cos) subst res_ki tys res_co
+        go (arg_co : acc_arg_cos) (subst1,t1) res_co (subst2,t2) tys
 
-      | let substed_ki = substTy subst ki
-      , isPiTy substed_ki
-        -- This might happen if we have to substitute in order to see that the kind
-        -- is a Π-type.
-      = let subst'     = zapTCvSubst subst
-        in
-        go acc_arg_cos subst' substed_ki (ty:tys) co
+      | not (isEmptyTCvSubst subst1) || not (isEmptyTCvSubst subst2)
+      = go acc_arg_cos (zapTCvSubst subst1, substTy subst1 k1)
+                       co
+                       (zapTCvSubst subst2, substTy subst1 k2)
+                       (ty:tys)
 
       -- tys might not be empty, if the left-hand type of the original coercion
       -- didn't have enough binders
-    go acc_arg_cos _subst _ki _tys co = (reverse acc_arg_cos, co)
+    go acc_arg_cos _ki1 co _ki2 _tys = (reverse acc_arg_cos, co)
 
 -- | Attempts to obtain the type variable underlying a 'Coercion'
 getCoVar_maybe :: Coercion -> Maybe CoVar

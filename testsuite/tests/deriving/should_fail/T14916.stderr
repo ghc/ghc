@@ -1,10 +1,8 @@
 
 T14916.hs:7:24: error:
-    • Illegal instance declaration for ‘A ~ A’
-        Manual instances of this class are not permitted.
+    • Class ‘~’ does not support user-specified instances
     • In the data declaration for ‘A’
 
 T14916.hs:8:24: error:
-    • Illegal instance declaration for ‘Coercible B B’
-        Manual instances of this class are not permitted.
+    • Class ‘Coercible’ does not support user-specified instances
     • In the data declaration for ‘B’

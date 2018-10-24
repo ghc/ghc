@@ -1343,6 +1343,17 @@ uType t_or_k origin orig_ty1 orig_ty2
         -- The arguments to 'go' are always semantically identical
         -- to orig_ty{1,2} except for looking through type synonyms
 
+     -- Unwrap casts before looking for variables. This way, we can easily
+     -- recognize (t |> co) ~ (t |> co), which is nice. Previously, we
+     -- didn't do it this way, and then the unification above was deferred.
+    go (CastTy t1 co1) t2
+      = do { co_tys <- uType t_or_k origin t1 t2
+           ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
+
+    go t1 (CastTy t2 co2)
+      = do { co_tys <- uType t_or_k origin t1 t2
+           ; return (mkCoherenceRightCo Nominal t2 co2 co_tys) }
+
         -- Variables; go for uVar
         -- Note that we pass in *original* (before synonym expansion),
         -- so that type variables tend to get filled in with
@@ -1364,14 +1375,6 @@ uType t_or_k origin orig_ty1 orig_ty2
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
       = return $ mkNomReflCo ty1
-
-    go (CastTy t1 co1) t2
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
-
-    go t1 (CastTy t2 co2)
-      = do { co_tys <- go t1 t2
-           ; return ( mkCoherenceRightCo Nominal t2 co2 co_tys) }
 
         -- See Note [Expanding synonyms during unification]
         --

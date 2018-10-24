@@ -9731,11 +9731,11 @@ We to extend ``class`` (warning: this is a rather confusingly named non-terminal
 .. code-block:: none
 
     class ::= ...
-          | context => qtycls inst
-          | context => tyvar inst
+          | [context =>] qtycls inst
+          | [context =>] tyvar inst
 
 The definition of ``inst`` is unchanged from the Haskell Report (roughly, just a type).
-That is the only syntactic change to the language.
+The ``context =>`` part is optional.  That is the only syntactic change to the language.
 
 Notes:
 
@@ -9744,8 +9744,8 @@ Notes:
 .. code-block:: none
 
     class ::= ...
-           | [forall tyavrs .] context => qtycls inst1 ... instn
-           | [forall tyavrs .] context => tyvar inst1 ... instn
+           | [forall tyavrs .] [context =>] qtycls inst1 ... instn
+           | [forall tyavrs .] [context =>] tyvar inst1 ... instn
 
   Note that an explicit ``forall`` is often absolutely essential. Consider the rose-tree example ::
 

@@ -359,7 +359,10 @@ tcHsTypeApp :: LHsWcType GhcRn -> Kind -> TcM Type
 -- See Note [Recipe for checking a signature] in TcHsType
 tcHsTypeApp wc_ty kind
   | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
-  = do { ty <- tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ _ ->
+  = do { ty <- solveLocalEqualities $
+               -- We are looking at a user-written type, very like a
+               -- signature so we want to solve its equalities right now
+               tcWildCardBindersX newWildTyVar Nothing sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        ; ty <- zonkPromoteType ty
        ; checkValidType TypeAppCtxt ty
@@ -549,8 +552,8 @@ then
 without any zonking needed.  The reason for this is that in
 tcInferApps we see (F ty), and we kind-check 'ty' with an
 expected-kind coming from F.  Then, to make the resulting application
-well kinded --- see Note [Ensure well-kinded types] in TcType --- we
-need the kind-checked 'ty' to have exactly the kind that F expects,
+well kinded --- see Note [The well-kinded type invariant] in TcType ---
+we need the kind-checked 'ty' to have exactly the kind that F expects,
 with no funny zonking nonsense in between.
 
 The tcType invariant also applies to checkExpectedKind: if
@@ -856,7 +859,7 @@ tcWildCardOcc wc_info exp_kind
 
 ---------------------------
 -- | Call 'tc_infer_hs_type' and check its result against an expected kind.
-tc_infer_hs_type_ek :: TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
+tc_infer_hs_type_ek :: HasDebugCallStack => TcTyMode -> HsType GhcRn -> TcKind -> TcM TcType
 tc_infer_hs_type_ek mode hs_ty ek
   = do { (ty, k) <- tc_infer_hs_type mode hs_ty
        ; checkExpectedKind hs_ty ty k ek }
@@ -957,7 +960,10 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
 
       -- no user-written args left. We're done!
     go _ acc_args subst fun ki_binders inner_ki []
-      = return (fun, reverse acc_args, substTy subst $ mkPiTys ki_binders inner_ki)
+      = return ( fun
+               , reverse acc_args
+               , nakedSubstTy subst $ mkPiTys ki_binders inner_ki)
+                 -- nakedSubstTy: see Note [The well-kinded type invariant]
 
       -- The function's kind has a binder. Is it visible or invisible?
     go n acc_args subst fun (ki_binder:ki_binders) inner_ki
@@ -974,11 +980,16 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
       = do { traceTc "tcInferApps (vis)" (vcat [ ppr ki_binder, ppr arg
                                                , ppr (tyBinderType ki_binder)
                                                , ppr subst ])
+           ; let exp_kind = nakedSubstTy subst $ tyBinderType ki_binder
+                            -- nakedSubstTy: see Note [The well-kinded type invariant]
            ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
-                     tc_lhs_type mode arg (substTy subst $ tyBinderType ki_binder)
+                     tc_lhs_type mode arg exp_kind
+           ; traceTc "tcInferApps (vis 1)" (vcat [ ppr exp_kind
+                                                 , ppr arg'
+                                                 , ppr (typeKind arg') ])
            ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
            ; go (n+1) (arg' : acc_args) subst'
-                (mkNakedAppTy fun arg')
+                (mkNakedAppTy fun arg') -- See Note [The well-kinded type invariant]
                 ki_binders inner_ki args }
 
        -- We've run out of known binders in the functions's kind.
@@ -994,7 +1005,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
            ; let new_in_scope = tyCoVarsOfTypes [arg_k, res_k]
                  subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
            ; go n acc_args subst'
-                (fun `mkNakedCastTy` co)
+                (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
                 [mkAnonBinder (unrestricted arg_k)] -- TODO:arnaud: Check this but it seems to be for kinds
                 res_k all_args }
       where
@@ -1023,7 +1034,8 @@ tcTyApps mode orig_hs_ty fun_ty fun_ki args
 --------------------------
 -- Like checkExpectedKindX, but returns only the final type; convenient wrapper
 -- Obeys Note [The tcType invariant]
-checkExpectedKind :: HsType GhcRn   -- type we're checking (for printing)
+checkExpectedKind :: HasDebugCallStack
+                  => HsType GhcRn   -- type we're checking (for printing)
                   -> TcType         -- type we're checking (might be knot-tied)
                   -> TcKind         -- the known kind of that type
                   -> TcKind         -- the expected kind
@@ -1031,7 +1043,8 @@ checkExpectedKind :: HsType GhcRn   -- type we're checking (for printing)
 checkExpectedKind hs_ty ty act exp
   = fstOf3 <$> checkExpectedKindX Nothing (ppr hs_ty) ty act exp
 
-checkExpectedKindX :: Maybe (VarEnv Kind)  -- Possibly, instantiations for kind vars
+checkExpectedKindX :: HasDebugCallStack
+                   => Maybe (VarEnv Kind)  -- Possibly, instantiations for kind vars
                    -> SDoc                 -- HsType whose kind we're checking
                    -> TcType               -- the type whose kind we're checking
                    -> TcKind               -- the known kind of that type, k
@@ -1601,14 +1614,14 @@ kcLHsQTyVars :: Name              -- ^ of the thing being checked
              -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
              -> Bool              -- ^ True <=> the decl being checked has a CUSK
              -> LHsQTyVars GhcRn
-             -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
-             -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
+             -> TcM Kind          -- ^ The result kind
+             -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcLHsQTyVars name flav cusk
   user_tyvars@(HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
                                            , hsq_dependent = dep_names }
                       , hsq_explicit = hs_tvs }) thing_inside
   | cusk
-  = do { (scoped_kvs, (tc_tvs, (res_kind, stuff)))
+  = do { (scoped_kvs, (tc_tvs, res_kind))
            <- solveEqualities                    $
               tcImplicitQTKBndrs skol_info kv_ns $
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
@@ -1655,10 +1668,10 @@ kcLHsQTyVars name flav cusk
               , ppr tc_tvs, ppr (mkTyConKind final_binders res_kind)
               , ppr qkvs, ppr final_binders ]
 
-       ; return (tycon, stuff) }
+       ; return tycon }
 
   | otherwise
-  = do { (scoped_kvs, (tc_tvs, (res_kind, stuff)))
+  = do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why kcImplicitTKBndrs which uses newSigTyVar?
            -- See Note [Kind generalisation and sigTvs]
            <- kcImplicitTKBndrs kv_ns $
@@ -1674,7 +1687,7 @@ kcLHsQTyVars name flav cusk
        ; traceTc "kcLHsQTyVars: not-cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
               , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
-       ; return (tycon, stuff) }
+       ; return tycon }
   where
     open_fam = tcFlavourIsOpen flav
     skol_info = TyConSkol flav name
@@ -2734,6 +2747,7 @@ tcLHsKindSig ctxt hs_kind
 -- See  Note [Recipe for checking a signature] in TcHsType
   = do { kind <- solveLocalEqualities $
                  tc_lhs_kind kindLevelMode hs_kind
+       ; traceTc "tcLHsKindSig" (ppr kind)
        ; kind <- zonkPromoteType kind
          -- This zonk is very important in the case of higher rank kinds
          -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
@@ -2743,6 +2757,7 @@ tcLHsKindSig ctxt hs_kind
          --      else we may fail to substitute properly
 
        ; checkValidType ctxt kind
+       ; traceTc "tcLHsKindSig2" (ppr kind)
        ; return kind }
 
 tc_lhs_kind :: TcTyMode -> LHsKind GhcRn -> TcM Kind
