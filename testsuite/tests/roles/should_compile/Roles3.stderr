@@ -8,6 +8,8 @@ TYPE CONSTRUCTORS
   C2 :: * -> * -> Constraint
   C3 :: * -> * -> Constraint
   C4 :: * -> * -> Constraint
+  type role F3 nominal
+  F3 :: * -> *
   type role F4 nominal
   F4 :: * -> *
   type role Syn1 nominal

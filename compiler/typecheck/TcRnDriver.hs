@@ -2734,8 +2734,7 @@ ppr_tycons debug fam_insts type_env
                     , want_tycon tycon]
              -- Sort by OccName to reduce unnecessary changes
     want_tycon tycon | debug      = True
-                     | otherwise  = not (isImplicitTyCon tycon) &&
-                                    isExternalName (tyConName tycon) &&
+                     | otherwise  = isExternalName (tyConName tycon) &&
                                     not (tycon `elem` fi_tycons)
     ppr_tc tc
        = vcat [ ppWhen show_roles $
