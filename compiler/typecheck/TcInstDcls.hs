@@ -43,7 +43,6 @@ import TcUnify
 import CoreSyn    ( Expr(..), mkApps, mkVarApps, mkLams )
 import MkCore     ( nO_METHOD_BINDING_ERROR_ID )
 import CoreUnfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
-import Kind
 import Type
 import TcEvidence
 import TyCon

@@ -956,7 +956,7 @@ tcCheckHoleFit relevantCts implics hole_ty ty = discardErrs $
        else do { fresh_binds <- newTcEvBinds
                 -- The relevant constraints may contain HoleDests, so we must
                 -- take care to clone them as well (to avoid #15370).
-               ; cloned_relevants <- mapBagM cloneSimple relevantCts
+               ; cloned_relevants <- mapBagM cloneWanted relevantCts
                  -- We wrap the WC in the nested implications, see
                  -- Note [Nested Implications]
                ; let outermost_first = reverse implics
