@@ -891,28 +891,13 @@ Note [Silly type synonym]
 Consider
   type T a = Int
 What are the free tyvars of (T x)?  Empty, of course!
-Here's the example that Ralf Laemmel showed me:
-  foo :: (forall a. C u a -> C u a) -> u
-  mappend :: Monoid u => u -> u -> u
-
-  bar :: Monoid u => u
-  bar = foo (\t -> t `mappend` t)
-We have to generalise at the arg to f, and we don't
-want to capture the constraint (Monad (C u a)) because
-it appears to mention a.  Pretty silly, but it was useful to him.
 
 exactTyCoVarsOfType is used by the type checker to figure out exactly
-which type variables are mentioned in a type.  It's also used in the
-smart-app checking code --- see TcExpr.tcIdApp
+which type variables are mentioned in a type.  It only matters
+occasionally -- see the calls to exactTyCoVarsOfType.
 
-On the other hand, consider a *top-level* definition
-  f = (\x -> x) :: T a -> T a
-If we don't abstract over 'a' it'll get fixed to GHC.Prim.Any, and then
-if we have an application like (f "x") we get a confusing error message
-involving Any.  So the conclusion is this: when generalising
-  - at top level use tyCoVarsOfType
-  - in nested bindings use exactTyCoVarsOfType
-See Trac #1813 for example.
+Historical note: years and years ago this function was used during
+generalisation -- see Trac #1813.  But that code has long since died.
 -}
 
 exactTyCoVarsOfType :: Type -> TyCoVarSet
