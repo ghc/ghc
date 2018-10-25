@@ -1081,10 +1081,7 @@ data TcTyThing
       , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
       }
 
-  | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
-                                -- variable is bound. We only need the Name
-                                -- for error-message purposes; it is the corresponding
-                                -- Name in the domain of the envt
+  | ATyVar  Name TcTyVar   -- See Note [Type variables in the type environment]
 
   | ATcTyCon TyCon   -- Used temporarily, during kind checking, for the
                      -- tycons and clases in this recursive group
@@ -1251,6 +1248,48 @@ variables have ClosedTypeId=True (or imported).  This is an extension
 compared to the JFP paper on OutsideIn, which used "top-level" as a
 proxy for "closed".  (It's not a good proxy anyway -- the MR can make
 a top-level binding with a free type variable.)
+
+Note [Type variables in the type environment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type environment has a binding for each lexically-scoped
+type variable that is in scope.  For example
+
+  f :: forall a. a -> a
+  f x = (x :: a)
+
+  g1 :: [a] -> a
+  g1 (ys :: [b]) = head ys :: b
+
+  g2 :: [Int] -> Int
+  g2 (ys :: [c]) = head ys :: c
+
+* The forall'd variable 'a' in the signature scopes over f's RHS.
+
+* The pattern-bound type variable 'b' in 'g1' scopes over g1's
+  RHS; note that it is bound to a skolem 'a' which is not itself
+  lexically in scope.
+
+* The pattern-bound type variable 'c' in 'g2' is bound to
+  Int; that is, pattern-bound type variables can stand for
+  arbitrary types. (see
+    GHC proposal #128 "Allow ScopedTypeVariables to refer to types"
+    https://github.com/ghc-proposals/ghc-proposals/pull/128,
+  and the paper
+    "Type variables in patterns", Haskell Symposium 2018.
+
+
+This is implemented by the constructor
+   ATyVar Name TcTyVar
+in the type environment.
+
+* The Name is the name of the original, lexically scoped type
+  variable
+
+* The TcTyVar is sometimes a skolem (like in 'f'), and sometimes
+  a unification variable (like in 'g1', 'g2').  We never zonk the
+  type environment so in the latter case it always stays as a
+  unification variable, although that variable may be later
+  unified with a type (such as Int in 'g2').
 -}
 
 instance Outputable IdBindingInfo where
