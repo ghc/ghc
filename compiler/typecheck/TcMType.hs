@@ -41,7 +41,7 @@ module TcMType (
   --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
-  newWanted, newWanteds, cloneWanted, cloneSimple, cloneWC,
+  newWanted, newWanteds, cloneWanted, cloneWC,
   emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
@@ -98,7 +98,6 @@ import TyCoRep
 import TcType
 import Type
 import Weight ( pattern Omega )
-import Kind
 import Coercion
 import Class
 import Var
@@ -185,24 +184,38 @@ newWanted orig t_or_k pty
 newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
 newWanteds orig = mapM (newWanted orig Nothing)
 
-cloneWanted :: Ct -> TcM CtEvidence
-cloneWanted ct
-  = newWanted (ctEvOrigin ev) Nothing (ctEvPred ev)
-  where
-    ev = ctEvidence ct
+----------------------------------------------
+-- Cloning constraints
+----------------------------------------------
 
-cloneSimple :: Ct -> TcM Ct
-cloneSimple = fmap mkNonCanonical . cloneWanted
+cloneWanted :: Ct -> TcM Ct
+cloneWanted ct
+  | ev@(CtWanted { ctev_dest = HoleDest {}, ctev_pred = pty }) <- ctEvidence ct
+  = do { co_hole <- newCoercionHole pty
+       ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
+  | otherwise
+  = return ct
 
 cloneWC :: WantedConstraints -> TcM WantedConstraints
+-- Clone all the evidence bindings in
+--   a) the ic_bind field of any implications
+--   b) the CoercionHoles of any wanted constraints
+-- so that solving the WantedConstraints will not have any visible side
+-- effect, /except/ from causing unifications
 cloneWC wc@(WC { wc_simple = simples, wc_impl = implics })
-  = do { simples' <- mapBagM cloneSimple simples
-       ; implics' <- mapBagM clone_implic implics
+  = do { simples' <- mapBagM cloneWanted simples
+       ; implics' <- mapBagM cloneImplication implics
        ; return (wc { wc_simple = simples', wc_impl = implics' }) }
-  where
-    clone_implic implic@(Implic { ic_wanted = inner_wanted })
-      = do { inner_wanted' <- cloneWC inner_wanted
-           ; return (implic { ic_wanted = inner_wanted' }) }
+
+cloneImplication :: Implication -> TcM Implication
+cloneImplication implic@(Implic { ic_binds = binds, ic_wanted = inner_wanted })
+  = do { binds'        <- cloneEvBindsVar binds
+       ; inner_wanted' <- cloneWC inner_wanted
+       ; return (implic { ic_binds = binds', ic_wanted = inner_wanted' }) }
+
+----------------------------------------------
+-- Emitting constraints
+----------------------------------------------
 
 -- | Emits a new Wanted. Deals with both equalities and non-equalities.
 emitWanted :: CtOrigin -> TcPredType -> TcM EvTerm
@@ -725,9 +738,9 @@ writeMetaTyVarRef tyvar ref ty
        ; zonked_ty      <- zonkTcType ty
        ; let zonked_ty_kind = typeKind zonked_ty  -- need to zonk even before typeKind;
                                                   -- otherwise, we can panic in piResultTy
-             kind_check_ok = isConstraintKind zonked_tv_kind
+             kind_check_ok = tcIsConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
-             -- Hack alert! isConstraintKind: see TcHsType
+             -- Hack alert! tcIsConstraintKind: see TcHsType
              -- Note [Extra-constraint holes in partial type signatures]
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")

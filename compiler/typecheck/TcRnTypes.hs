@@ -387,9 +387,15 @@ instance ContainsModule DsGblEnv where
 data DsLclEnv = DsLclEnv {
         dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
-        dsl_dicts   :: Bag EvVar,        -- Constraints from GADT pattern-matching
-        dsl_tm_cs   :: Bag SimpleEq,
-        dsl_pm_iter :: IORef Int         -- no iterations for pmcheck
+
+        -- See Note [Note [Type and Term Equality Propagation] in Check.hs
+        -- These two fields are augmented as we walk inwards,
+        -- through each patttern match in turn
+        dsl_dicts   :: Bag EvVar,     -- Constraints from GADT pattern-matching
+        dsl_tm_cs   :: Bag SimpleEq,  -- Constraints form term-level pattern matching
+
+        dsl_pm_iter :: IORef Int  -- Number of iterations for pmcheck so far
+                                  -- We fail if this gets too big
      }
 
 -- Inside [| |] brackets, the desugarer looks

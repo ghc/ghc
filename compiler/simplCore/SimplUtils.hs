@@ -2177,7 +2177,12 @@ mkCase2 dflags scrut bndr alts_ty alts
   , gopt Opt_CaseFolding dflags
   , Just (scrut', tx_con, mk_orig) <- caseRules dflags scrut
   = do { bndr' <- newId (fsLit "lwild") Omega (exprType scrut') -- arnaud
-       ; alts' <- mapM  (tx_alt tx_con mk_orig bndr') alts
+
+       ; alts' <- mapMaybeM (tx_alt tx_con mk_orig bndr') alts
+                  -- mapMaybeM: discard unreachable alternatives
+                  -- See Note [Unreachable caseRules alternatives]
+                  -- in PrelRules
+
        ; mkCase3 dflags scrut' bndr' alts_ty $
          add_default (re_sort alts')
        }
@@ -2201,19 +2206,14 @@ mkCase2 dflags scrut bndr alts_ty alts
     -- to construct an expression equivalent to the original one, for use
     -- in the DEFAULT case
 
+    tx_alt :: (AltCon -> Maybe AltCon) -> (Id -> CoreExpr) -> Id
+           -> CoreAlt -> SimplM (Maybe CoreAlt)
     tx_alt tx_con mk_orig new_bndr (con, bs, rhs)
-      | DataAlt dc <- con', not (isNullaryRepDataCon dc)
-      = -- For non-nullary data cons we must invent some fake binders
-        -- See Note [caseRules for dataToTag] in PrelRules
-        do { us <- getUniquesM
-           ; let (ex_tvs, arg_ids) = dataConRepInstPat us Omega dc -- arnaud todo
-                                         (tyConAppArgs (idType new_bndr))
-           ; return (con', ex_tvs ++ arg_ids, rhs') }
-      | otherwise
-      = return (con', [], rhs')
+      = case tx_con con of
+          Nothing   -> return Nothing
+          Just con' -> do { bs' <- mk_new_bndrs new_bndr con'
+                          ; return (Just (con', bs', rhs')) }
       where
-        con' = tx_con con
-
         rhs' | isDeadBinder bndr = rhs
              | otherwise         = bindNonRec bndr orig_val rhs
 
@@ -2222,6 +2222,16 @@ mkCase2 dflags scrut bndr alts_ty alts
                       LitAlt l   -> Lit l
                       DataAlt dc -> mkConApp2 dc (tyConAppArgs (idType bndr)) bs
 
+    mk_new_bndrs new_bndr (DataAlt dc)
+      | not (isNullaryRepDataCon dc)
+      = -- For non-nullary data cons we must invent some fake binders
+        -- See Note [caseRules for dataToTag] in PrelRules
+        do { us <- getUniquesM
+             -- TODO Krzysztof is Omega right?
+           ; let (ex_tvs, arg_ids) = dataConRepInstPat us Omega dc
+                                        (tyConAppArgs (idType new_bndr))
+           ; return (ex_tvs ++ arg_ids) }
+    mk_new_bndrs _ _ = return []
 
     re_sort :: [CoreAlt] -> [CoreAlt]  -- Re-sort the alternatives to
     re_sort alts = sortBy cmpAlt alts  -- preserve the #case_invariants#

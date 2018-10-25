@@ -1,4 +1,4 @@
 
 T5513.hs:4:19: error:
-    • Instance head is not headed by a class
+    • Instance head is not headed by a class: lowercase_name a
     • In the stand-alone deriving instance for ‘lowercase_name a’

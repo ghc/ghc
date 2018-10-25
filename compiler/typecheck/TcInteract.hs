@@ -1083,7 +1083,7 @@ shortCutSolver dflags ev_w ev_i
  && gopt Opt_SolveConstantDicts dflags
  -- Enabled by the -fsolve-constant-dicts flag
   = do { ev_binds_var <- getTcEvBindsVar
-       ; ev_binds <- ASSERT2( not (isNoEvBindsVar ev_binds_var ), ppr ev_w )
+       ; ev_binds <- ASSERT2( not (isCoEvBindsVar ev_binds_var ), ppr ev_w )
                      getTcEvBindsMap ev_binds_var
        ; solved_dicts <- getSolvedDicts
 
@@ -1609,7 +1609,8 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
        ; stopWith ev "Solved from inert" }
 
   | ReprEq <- eq_rel   -- See Note [Do not unify representational equalities]
-  = continueWith workItem
+  = do { traceTcS "Not unifying representational equality" (ppr workItem)
+       ; continueWith workItem }
 
   | isGiven ev         -- See Note [Touchables and givens]
   = continueWith workItem
@@ -2268,7 +2269,7 @@ chooseInstance work_item
       -- Precondition: evidence term matches the predicate workItem
      finish_wanted loc theta mk_ev
         = do { evb <- getTcEvBindsVar
-             ; if isNoEvBindsVar evb
+             ; if isCoEvBindsVar evb
                then -- See Note [Instances in no-evidence implications]
                     continueWith work_item
                else

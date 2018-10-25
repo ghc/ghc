@@ -3,7 +3,7 @@ T9222.hs:14:3: error:
     • Couldn't match type ‘c0’ with ‘c’
         ‘c0’ is untouchable
           inside the constraints: a ~ '(b0, c0)
-          bound by the type of the constructor ‘Want’:
+          bound by a type expected by the context:
                      (a ~ '(b0, c0)) => Proxy b0
           at T9222.hs:14:3-43
       ‘c’ is a rigid type variable bound by
