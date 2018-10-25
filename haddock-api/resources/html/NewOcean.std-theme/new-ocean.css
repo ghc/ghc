@@ -86,13 +86,17 @@ body.js-enabled .hide-when-js-enabled {
   #synopsis {
     display: block;
     position: fixed;
+    float: left;
     top: 5em;
+    bottom: 1em;
+    right: 0;
     max-width: 65vw;
+    overflow-y: scroll;
     /* Ensure that synopsis covers everything (including MathJAX markup) */
     z-index: 1;
   }
 
-  #synopsis, #table-of-contents {
+  #table-of-contents {
     left: 2em;
   }
 
@@ -114,7 +118,6 @@ body.js-enabled .hide-when-js-enabled {
     padding: 0;
     position: relative;
     margin: 0;
-    border-bottom: 1px dashed #5E5184;
     width: 100%;
   }
 }
@@ -554,7 +557,7 @@ div#style-menu-holder {
 
 #synopsis summary {
   display: block;
-  float: left;
+  float: right;
   width: 29px;
   color: rgba(255,255,255,0);
   height: 110px;
@@ -565,7 +568,7 @@ div#style-menu-holder {
 }
 
 #synopsis details[open] > summary {
-  background: url(synopsis.png) no-repeat -64px -8px;
+  background: url(synopsis.png) no-repeat -75px -8px;
 }
 
 #synopsis ul {
@@ -581,7 +584,7 @@ div#style-menu-holder {
 
 #synopsis ul,
 #synopsis ul li.src {
-  background-color: #f7f7f7;
+  background-color: rgb(250,247,224);
   white-space: nowrap;
   list-style: none;
   margin-left: 0;
