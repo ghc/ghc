@@ -29,11 +29,11 @@ data-files:
   html/Classic.theme/minus.gif
   html/Classic.theme/plus.gif
   html/Classic.theme/xhaddock.css
-  html/Ocean.std-theme/hslogo-16.png
-  html/Ocean.std-theme/minus.gif
-  html/Ocean.std-theme/ocean.css
-  html/Ocean.std-theme/plus.gif
-  html/Ocean.std-theme/synopsis.png
+  html/Ocean.theme/hslogo-16.png
+  html/Ocean.theme/minus.gif
+  html/Ocean.theme/ocean.css
+  html/Ocean.theme/plus.gif
+  html/Ocean.theme/synopsis.png
   html/NewOcean.std-theme/hslogo-16.png
   html/NewOcean.std-theme/minus.gif
   html/NewOcean.std-theme/new-ocean.css
