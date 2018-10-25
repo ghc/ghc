@@ -191,14 +191,12 @@ class   Instruction instr where
 
         -- Subtract an amount from the C stack pointer
         mkStackAllocInstr
-                :: Platform  -- TODO: remove (needed by x86/x86_64
-                             -- because they share an Instr type)
+                :: Platform
                 -> Int
-                -> instr
+                -> [instr]
 
         -- Add an amount to the C stack pointer
         mkStackDeallocInstr
-                :: Platform  -- TODO: remove (needed by x86/x86_64
-                             -- because they share an Instr type)
+                :: Platform
                 -> Int
-                -> instr
+                -> [instr]

@@ -564,9 +564,9 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
 #endif
 }
 
-stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
+stg_atomicModifyMutVar2zh ( gcptr mv, gcptr f )
 {
-    W_ z, x, y, r, h;
+    W_ z, x, y, h;
 
     /* If x is the current contents of the MutVar#, then
        We want to make the new contents point to
@@ -575,13 +575,12 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
 
        and the return value is
 
-         (sel_1 (f x))
+         (# x, (f x) #)
 
         obviously we can share (f x).
 
          z = [stg_ap_2 f x]  (max (HS + 2) MIN_UPD_SIZE)
          y = [stg_sel_0 z]   (max (HS + 1) MIN_UPD_SIZE)
-         r = [stg_sel_1 z]   (max (HS + 1) MIN_UPD_SIZE)
     */
 
 #if defined(MIN_UPD_SIZE) && MIN_UPD_SIZE > 1
@@ -600,7 +599,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
 #define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),0)
 #endif
 
-#define SIZE (THUNK_2_SIZE + THUNK_1_SIZE + THUNK_1_SIZE)
+#define SIZE (THUNK_2_SIZE + THUNK_1_SIZE)
 
     HP_CHK_GEN_TICKY(SIZE);
 
@@ -618,13 +617,6 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
     LDV_RECORD_CREATE(y);
     StgThunk_payload(y,0) = z;
 
-    TICK_ALLOC_THUNK_1();
-    CCCS_ALLOC(THUNK_1_SIZE);
-    r = y - THUNK_1_SIZE;
-    SET_HDR(r, stg_sel_1_upd_info, CCCS);
-    LDV_RECORD_CREATE(r);
-    StgThunk_payload(r,0) = z;
-
   retry:
     x = StgMutVar_var(mv);
     StgThunk_payload(z,1) = x;
@@ -639,8 +631,61 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
         ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
     }
 
-    return (r);
+    return (x,z);
 }
+
+stg_atomicModifyMutVarzuzh ( gcptr mv, gcptr f )
+{
+    W_ z, x, h;
+
+    /* If x is the current contents of the MutVar#, then
+       We want to make the new contents point to
+
+         (f x)
+
+       and the return value is
+
+         (# x, (f x) #)
+
+        obviously we can share (f x).
+
+         z = [stg_ap_2 f x]  (max (HS + 2) MIN_UPD_SIZE)
+    */
+
+#if defined(MIN_UPD_SIZE) && MIN_UPD_SIZE > 2
+#define THUNK_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
+#define TICK_ALLOC_THUNK() TICK_ALLOC_UP_THK(WDS(2),WDS(MIN_UPD_SIZE-2))
+#else
+#define THUNK_SIZE (SIZEOF_StgThunkHeader + WDS(2))
+#define TICK_ALLOC_THUNK() TICK_ALLOC_UP_THK(WDS(2),0)
+#endif
+
+    HP_CHK_GEN_TICKY(THUNK_SIZE);
+
+    TICK_ALLOC_THUNK();
+    CCCS_ALLOC(THUNK_SIZE);
+    z = Hp - THUNK_SIZE + WDS(1);
+    SET_HDR(z, stg_ap_2_upd_info, CCCS);
+    LDV_RECORD_CREATE(z);
+    StgThunk_payload(z,0) = f;
+
+  retry:
+    x = StgMutVar_var(mv);
+    StgThunk_payload(z,1) = x;
+#if defined(THREADED_RTS)
+    (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, z);
+    if (h != x) { goto retry; }
+#else
+    StgMutVar_var(mv) = z;
+#endif
+
+    if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+        ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+    }
+
+    return (x,z);
+}
+
 
 /* -----------------------------------------------------------------------------
    Weak Pointer Primitives

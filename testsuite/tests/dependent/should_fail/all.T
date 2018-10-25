@@ -32,3 +32,6 @@ test('T14845_fail2', normal, compile_fail, [''])
 test('InferDependency', normal, compile_fail, [''])
 test('T15245', normal, compile_fail, [''])
 test('T15215', normal, compile_fail, [''])
+test('T15308', normal, compile_fail, ['-fno-print-explicit-kinds'])
+test('T15343', normal, compile_fail, [''])
+

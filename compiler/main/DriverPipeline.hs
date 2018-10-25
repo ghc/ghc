@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation #-}
+{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns #-}
 {-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -263,7 +263,7 @@ compileOne' m_tc_result mHscMessage
        -- imports a _stub.h file that we created here.
        current_dir = takeDirectory basename
        old_paths   = includePaths dflags1
-       prevailing_dflags = hsc_dflags hsc_env0
+       !prevailing_dflags = hsc_dflags hsc_env0
        dflags =
           dflags1 { includePaths = addQuoteInclude old_paths [current_dir]
                   , log_action = log_action prevailing_dflags }
@@ -1743,6 +1743,16 @@ linkBinary' staticLink dflags o_files dep_packages = do
                             else l
               in ["-L" ++ l] ++ ["-Xlinker", "-rpath", "-Xlinker", libpath]
          | otherwise = ["-L" ++ l]
+
+    pkg_lib_path_opts <-
+      if gopt Opt_SingleLibFolder dflags
+      then do
+        libs <- getLibs dflags dep_packages
+        tmpDir <- newTempDir dflags
+        sequence_ [ copyFile lib (tmpDir </> basename)
+                  | (lib, basename) <- libs]
+        return [ "-L" ++ tmpDir ]
+      else pure pkg_lib_path_opts
 
     let
       dead_strip

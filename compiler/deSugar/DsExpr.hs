@@ -99,7 +99,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
     ds_ip_bind (L _ (IPBind _ ~(Right n) e)) body
       = do e' <- dsLExpr e
            return (Let (NonRec n e') body)
-    ds_ip_bind (L _ (XCIPBind _)) _ = panic "dsIPBinds"
+    ds_ip_bind (L _ (XIPBind _)) _ = panic "dsIPBinds"
 dsIPBinds (XHsIPBinds _) _ = panic "dsIPBinds"
 
 -------------------------

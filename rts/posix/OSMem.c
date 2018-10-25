@@ -441,6 +441,8 @@ osTryReserveHeapMemory (W_ len, void *hint)
     void *base, *top;
     void *start, *end;
 
+    ASSERT((len & ~MBLOCK_MASK) == len);
+
     /* We try to allocate len + MBLOCK_SIZE,
        because we need memory which is MBLOCK_SIZE aligned,
        and then we discard what we don't need */
@@ -517,6 +519,8 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
 
     attempt = 0;
     while (1) {
+        *len &= ~MBLOCK_MASK;
+
         if (*len < MBLOCK_SIZE) {
             // Give up if the system won't even give us 16 blocks worth of heap
             barf("osReserveHeapMemory: Failed to allocate heap storage");

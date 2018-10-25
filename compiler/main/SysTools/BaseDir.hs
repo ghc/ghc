@@ -201,7 +201,7 @@ foreign import WINDOWS_CCONV unsafe "dynamic"
   makeGetFinalPathNameByHandle :: FunPtr GetFinalPath -> GetFinalPath
 #elif defined(darwin_HOST_OS) || defined(linux_HOST_OS)
 -- on unix, this is a bit more confusing.
--- The layout right now is somehting like
+-- The layout right now is something like
 --
 --   /bin/ghc-X.Y.Z <- wrapper script (1)
 --   /bin/ghc       <- symlink to wrapper script (2)

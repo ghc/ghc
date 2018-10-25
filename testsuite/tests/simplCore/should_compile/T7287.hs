@@ -7,7 +7,7 @@ import GHC.Prim
   "int2Word#/word2Int#" forall x. int2Word# (word2Int# x) = x
   #-}
 
-{- We get a legitmiate
+{- We get a legitimate
 
    T7287.hs:7:3: warning:
        Rule int2Word#/word2Int# may never fire because

@@ -392,7 +392,7 @@ See also:
 -}
 
 type TyConBinder = TyVarBndr TyVar TyConBndrVis
-                   -- See also Note [TyBinder] in TyCoRep
+                   -- See also Note [TyBinders] in TyCoRep
 
 data TyConBndrVis
   = NamedTCB ArgFlag
@@ -1421,7 +1421,7 @@ So we compromise, and move their Kind calculation to the call site.
 -}
 
 -- | Given the name of the function type constructor and it's kind, create the
--- corresponding 'TyCon'. It is recomended to use 'TyCoRep.funTyCon' if you want
+-- corresponding 'TyCon'. It is recommended to use 'TyCoRep.funTyCon' if you want
 -- this functionality
 mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
 mkFunTyCon name binders rep_nm

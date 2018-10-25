@@ -614,12 +614,13 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mbl_deriv_strat overlap_mode))
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let mb_deriv_strat = fmap unLoc mbl_deriv_strat
+             ctxt           = TcType.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_deriv_strat, ppr deriv_ty]
        ; (mb_deriv_strat', tvs', (deriv_ctxt', cls, inst_tys'))
-           <- tcDerivStrategy TcType.InstDeclCtxt mb_deriv_strat $ do
+           <- tcDerivStrategy ctxt mb_deriv_strat $ do
                 (tvs, deriv_ctxt, cls, inst_tys)
-                  <- tcStandaloneDerivInstType deriv_ty
+                  <- tcStandaloneDerivInstType ctxt deriv_ty
                 pure (tvs, (deriv_ctxt, cls, inst_tys))
        ; checkTc (not (null inst_tys')) derivingNullaryErr
        ; let inst_ty' = last inst_tys'
@@ -710,9 +711,9 @@ deriveStandalone (L _ (XDerivDecl _)) = panic "deriveStandalone"
 -- Note that this will never return @'InferContext' 'Nothing'@, as that can
 -- only happen with @deriving@ clauses.
 tcStandaloneDerivInstType
-  :: LHsSigWcType GhcRn
+  :: UserTypeCtxt -> LHsSigWcType GhcRn
   -> TcM ([TyVar], DerivContext, Class, [Type])
-tcStandaloneDerivInstType
+tcStandaloneDerivInstType ctxt
     (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = HsIBRn
                                                         { hsib_vars   = vars
                                                         , hsib_closed = closed }
@@ -721,7 +722,7 @@ tcStandaloneDerivInstType
   , L _ [wc_pred] <- theta
   , L _ (HsWildCardTy (AnonWildCard (L wc_span _))) <- ignoreParens wc_pred
   = do (deriv_tvs, _deriv_theta, deriv_cls, deriv_inst_tys)
-         <- tc_hs_cls_inst_ty $
+         <- tcHsClsInstType ctxt $
             HsIB { hsib_ext = HsIBRn { hsib_vars = vars
                                      , hsib_closed = closed }
                  , hsib_body
@@ -732,13 +733,12 @@ tcStandaloneDerivInstType
        pure (deriv_tvs, InferContext (Just wc_span), deriv_cls, deriv_inst_tys)
   | otherwise
   = do (deriv_tvs, deriv_theta, deriv_cls, deriv_inst_tys)
-         <- tc_hs_cls_inst_ty deriv_ty
+         <- tcHsClsInstType ctxt deriv_ty
        pure (deriv_tvs, SupplyContext deriv_theta, deriv_cls, deriv_inst_tys)
-  where
-    tc_hs_cls_inst_ty = tcHsClsInstType TcType.InstDeclCtxt
-tcStandaloneDerivInstType (HsWC _ (XHsImplicitBndrs _))
+
+tcStandaloneDerivInstType _ (HsWC _ (XHsImplicitBndrs _))
   = panic "tcStandaloneDerivInstType"
-tcStandaloneDerivInstType (XHsWildCardBndrs _)
+tcStandaloneDerivInstType _ (XHsWildCardBndrs _)
   = panic "tcStandaloneDerivInstType"
 
 warnUselessTypeable :: TcM ()

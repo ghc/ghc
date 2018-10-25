@@ -18,6 +18,7 @@ import GhcPrelude
 
 import HsSyn as Hs
 import qualified Class
+import PrelNames
 import RdrName
 import qualified Name
 import Module
@@ -28,7 +29,6 @@ import SrcLoc
 import Type
 import qualified Coercion ( Role(..) )
 import TysWiredIn
-import TysPrim (eqPrimTyCon)
 import BasicTypes as Hs
 import ForeignCall
 import Unique
@@ -819,7 +819,8 @@ cvtl e = wrapL (cvt e)
     cvt (AppTypeE e t) = do { e' <- cvtl e
                             ; t' <- cvtType t
                             ; tp <- wrap_apps t'
-                            ; return $ HsAppType (mkHsWildCardBndrs tp) e' }
+                            ; let tp' = parenthesizeHsType appPrec tp
+                            ; return $ HsAppType (mkHsWildCardBndrs tp') e' }
     cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
@@ -913,7 +914,11 @@ cvtl e = wrapL (cvt e)
                                            flds
                               ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap (HsStatic noExt) $ cvtl e
-    cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar noExt (noLoc s') }
+    cvt (UnboundVarE s)  = do -- Use of 'vcName' here instead of 'vName' is
+                              -- important, because UnboundVarE may contain
+                              -- constructor names - see #14627.
+                              { s' <- vcName s
+                              ; return $ HsVar noExt (noLoc s') }
     cvt (LabelE s)       = do { return $ HsOverLabel noExt Nothing (fsLit s) }
 
 {- Note [Dropping constructors]
@@ -1284,7 +1289,9 @@ cvtTypeKind ty_str ty
                  x'' <- case x' of
                           L _ HsFunTy{}    -> returnL (HsParTy noExt x')
                           L _ HsForAllTy{} -> returnL (HsParTy noExt x')
-                                                                       -- #14646
+                                                               -- #14646
+                          L _ HsQualTy{}   -> returnL (HsParTy noExt x')
+                                                               -- #15324
                           _                -> return x'
                  returnL (HsFunTy noExt x'' HsOmega y')
              | otherwise ->
@@ -1378,10 +1385,11 @@ cvtTypeKind ty_str ty
                               (noLoc (getRdrName constraintKindTyCon)))
 
            EqualityT
-             | [x',y'] <- tys' -> returnL (HsEqTy noExt x' y')
+             | [x',y'] <- tys' ->
+                   returnL (HsOpTy noExt x' (noLoc eqTyCon_RDR) y')
              | otherwise ->
                    mk_apps (HsTyVar noExt NotPromoted
-                            (noLoc (getRdrName eqPrimTyCon))) tys'
+                            (noLoc eqTyCon_RDR)) tys'
 
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }

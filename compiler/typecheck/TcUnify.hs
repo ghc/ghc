@@ -17,7 +17,7 @@ module TcUnify (
   buildImplicationFor,
 
   -- Various unifications
-  unifyType, unifyTheta, unifyKind,
+  unifyType, unifyKind,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
 
@@ -560,7 +560,7 @@ tcSubTypeET _ _ (Infer inf_res) ty_expected
   = ASSERT2( not (ir_inst inf_res), ppr inf_res $$ ppr ty_expected )
       -- An (Infer inf_res) ExpSigmaType passed into tcSubTypeET never
       -- has the ir_inst field set.  Reason: in patterns (which is what
-      -- tcSubTypeET is used for) do not agressively instantiate
+      -- tcSubTypeET is used for) do not aggressively instantiate
     do { co <- fill_infer_result ty_expected inf_res
                -- Since ir_inst is false, we can skip fillInferResult
                -- and go straight to fill_infer_result
@@ -752,7 +752,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     --    go ty_a (TyVarTy alpha)
     -- which, in the impredicative case unified  alpha := ty_a
     -- where th_a is a polytype.  Not only is this probably bogus (we
-    -- simply do not have decent story for imprdicative types), but it
+    -- simply do not have decent story for impredicative types), but it
     -- caused Trac #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
@@ -946,7 +946,7 @@ has the ir_inst flag.
     f :: forall {a}. a -> forall b. Num b => b -> b -> b
   This is surely confusing for users.
 
-  And worse, the monomorphism restriction won't properly. The MR is
+  And worse, the monomorphism restriction won't work properly. The MR is
   dealt with in simplifyInfer, and simplifyInfer has no way of
   instantiating. This could perhaps be worked around, but it may be
   hard to know even when instantiation should happen.
@@ -1010,7 +1010,7 @@ promoteTcType dest_lvl ty
                                           , uo_thing    = Nothing
                                           , uo_visible  = False }
            ; ki_co <- uType KindLevel kind_orig (typeKind ty) res_kind
-           ; let co = mkTcNomReflCo ty `mkTcCoherenceRightCo` ki_co
+           ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
 
 {- Note [Promoting a type]
@@ -1063,7 +1063,7 @@ to
         (forall a. a->a) -> alpha[l+1]
 and emit the constraint
         [W] alpha[l+1] ~ Int
-Now the poromoted type can fill the ref cell, while the emitted
+Now the promoted type can fill the ref cell, while the emitted
 equality can float or not, according to the usual rules.
 
 But that's not quite right!  We are exposing the arrow! We could
@@ -1076,7 +1076,7 @@ Here we abstract over the '->' inside the forall, in case that
 is subject to an equality constraint from a GADT match.
 
 Note that we kept the outer (->) because that's part of
-the polymorphic "shape".  And becauuse of impredicativity,
+the polymorphic "shape".  And because of impredicativity,
 GADT matches can't give equalities that affect polymorphic
 shape.
 
@@ -1180,17 +1180,16 @@ checkTvConstraints skol_info m_telescope thing_inside
 
        ; if isEmptyWC wanted
          then return ()
-         else do { tc_lcl_env <- getLclEnv
-                 ; ev_binds   <- newNoTcEvBinds
+         else do { ev_binds <- newNoTcEvBinds
+                 ; implic   <- newImplication
                  ; emitImplication $
-                   newImplication { ic_tclvl     = tclvl
-                                  , ic_skols     = skol_tvs
-                                  , ic_no_eqs    = True
-                                  , ic_telescope = m_telescope
-                                  , ic_wanted    = wanted
-                                  , ic_binds     = ev_binds
-                                  , ic_info      = skol_info
-                                  , ic_env       = tc_lcl_env } }
+                   implic { ic_tclvl     = tclvl
+                          , ic_skols     = skol_tvs
+                          , ic_no_eqs    = True
+                          , ic_telescope = m_telescope
+                          , ic_wanted    = wanted
+                          , ic_binds     = ev_binds
+                          , ic_info      = skol_info } }
        ; return (skol_tvs, result) }
 
 
@@ -1235,16 +1234,15 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
       -- into scope as a skolem in an implication. This is OK, though,
       -- because SigTvs will always remain tyvars, even after unification.
     do { ev_binds_var <- newTcEvBinds
-       ; env <- getLclEnv
-       ; let implic = newImplication { ic_tclvl  = tclvl
-                                     , ic_skols  = skol_tvs
-                                     , ic_given  = given
-                                     , ic_wanted = wanted
-                                     , ic_binds  = ev_binds_var
-                                     , ic_env    = env
-                                     , ic_info   = skol_info }
+       ; implic <- newImplication
+       ; let implic' = implic { ic_tclvl  = tclvl
+                              , ic_skols  = skol_tvs
+                              , ic_given  = given
+                              , ic_wanted = wanted
+                              , ic_binds  = ev_binds_var
+                              , ic_info   = skol_info }
 
-       ; return (unitBag implic, TcEvBinds ev_binds_var) }
+       ; return (unitBag implic', TcEvBinds ev_binds_var) }
 
 {-
 ************************************************************************
@@ -1276,18 +1274,6 @@ unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
                               , uo_visible = True } -- also always from a visible context
 
 ---------------
-unifyPred :: PredType -> PredType -> TcM TcCoercionN
--- Actual and expected types
-unifyPred = unifyType Nothing
-
----------------
-unifyTheta :: TcThetaType -> TcThetaType -> TcM [TcCoercionN]
--- Actual and expected types
-unifyTheta theta1 theta2
-  = do  { checkTc (equalLength theta1 theta2)
-                  (vcat [text "Contexts differ in length",
-                         nest 2 $ parens $ text "Use RelaxedPolyRec to allow this"])
-        ; zipWithM unifyPred theta1 theta2 }
 
 {-
 %************************************************************************
@@ -1304,7 +1290,7 @@ uType, uType_defer
   -> CtOrigin
   -> TcType    -- ty1 is the *actual* type
   -> TcType    -- ty2 is the *expected* type
-  -> TcM Coercion
+  -> TcM CoercionN
 
 --------------
 -- It is always safe to defer unification to the main constraint solver
@@ -1339,9 +1325,20 @@ uType t_or_k origin orig_ty1 orig_ty2
             else traceTc "u_tys yields coercion:" (ppr co)
        ; return co }
   where
-    go :: TcType -> TcType -> TcM Coercion
+    go :: TcType -> TcType -> TcM CoercionN
         -- The arguments to 'go' are always semantically identical
         -- to orig_ty{1,2} except for looking through type synonyms
+
+     -- Unwrap casts before looking for variables. This way, we can easily
+     -- recognize (t |> co) ~ (t |> co), which is nice. Previously, we
+     -- didn't do it this way, and then the unification above was deferred.
+    go (CastTy t1 co1) t2
+      = do { co_tys <- uType t_or_k origin t1 t2
+           ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
+
+    go t1 (CastTy t2 co2)
+      = do { co_tys <- uType t_or_k origin t1 t2
+           ; return (mkCoherenceRightCo Nominal t2 co2 co_tys) }
 
         -- Variables; go for uVar
         -- Note that we pass in *original* (before synonym expansion),
@@ -1363,15 +1360,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
       | tc1 == tc2
-      = return $ mkReflCo Nominal ty1
-
-    go (CastTy t1 co1) t2
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceLeftCo co_tys co1) }
-
-    go t1 (CastTy t2 co2)
-      = do { co_tys <- go t1 t2
-           ; return (mkCoherenceRightCo co_tys co2) }
+      = return $ mkNomReflCo ty1
 
         -- See Note [Expanding synonyms during unification]
         --
@@ -1611,19 +1600,25 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
       | canSolveByUnification cur_lvl tv1 ty2
       , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (typeKind ty2') (tyVarKind tv1)
+           ; traceTc "uUnfilledVar2 ok" $
+             vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
+                  , ppr ty2 <+> dcolon <+> ppr (typeKind  ty2)
+                  , ppr (isTcReflCo co_k), ppr co_k ]
+
            ; if isTcReflCo co_k  -- only proceed if the kinds matched.
 
              then do { writeMetaTyVar tv1 ty2'
                      ; return (mkTcNomReflCo ty2') }
-             else defer } -- this cannot be solved now.
-                          -- See Note [Equalities with incompatible kinds]
-                          -- in TcCanonical
+
+             else defer } -- This cannot be solved now.  See TcCanonical
+                          -- Note [Equalities with incompatible kinds]
 
       | otherwise
-      = defer
+      = do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occured in type family parameter
+            ; defer }
 
     ty1 = mkTyVarTy tv1
     kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
@@ -1693,7 +1688,7 @@ So we look for a positive reason to swap, using a three-step test:
                   on the left because there are fewer
                   restrictions on updating TauTvs
 
-  - SigTv/TauTv:  put on the left eitehr
+  - SigTv/TauTv:  put on the left either
      a) Because it's touchable and can be unified, or
      b) Even if it's not touchable, TcSimplify.floatEqualities
         looks for meta tyvars on the left
@@ -1725,7 +1720,7 @@ Wanteds and Givens, but either way, deepest wins!  Simple.
   If we orient the Given a[2] on the left, we'll rewrite the Wanted to
   (beta[1] ~ b[1]), and that can float out of the implication.
   Otherwise it can't.  By putting the deepest variable on the left
-  we maximise our changes of elminating skolem capture.
+  we maximise our changes of eliminating skolem capture.
 
   See also TcSMonad Note [Let-bound skolems] for another reason
   to orient with the deepest skolem on the left.
@@ -1788,7 +1783,7 @@ where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
 then we'll reduce the second constraint to
      [G] a ~ fsk
 and then replace all uses of 'a' with fsk.  That's bad because
-in error messages intead of saying 'a' we'll say (F [a]).  In all
+in error messages instead of saying 'a' we'll say (F [a]).  In all
 places, including those where the programmer wrote 'a' in the first
 place.  Very confusing!  See Trac #7862.
 
@@ -1812,7 +1807,7 @@ Note [Eliminate younger unification variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given a choice of unifying
      alpha := beta   or   beta := alpha
-we try, if possible, to elimiate the "younger" one, as determined
+we try, if possible, to eliminate the "younger" one, as determined
 by `ltUnique`.  Reason: the younger one is less likely to appear free in
 an existing inert constraint, and hence we are less likely to be forced
 into kicking out and rewriting inert constraints.
@@ -2028,7 +2023,7 @@ matchExpectedFunKind hs_ty = go
 Suppose we are considering unifying
    (alpha :: *)  ~  Int -> (beta :: alpha -> alpha)
 This may be an error (what is that alpha doing inside beta's kind?),
-but we must not make the mistake of actuallyy unifying or we'll
+but we must not make the mistake of actually unifying or we'll
 build an infinite data structure.  So when looking for occurrences
 of alpha in the rhs, we must look in the kinds of type variables
 that occur there.

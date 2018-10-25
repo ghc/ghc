@@ -1,12 +1,12 @@
 -- Used only by ToIface.hs-boot
 
 module IfaceType( IfaceType, IfaceTyCon, IfaceForAllBndr
-                , IfaceCoercion, IfaceTyLit, IfaceTcArgs ) where
+                , IfaceCoercion, IfaceTyLit, IfaceAppArgs ) where
 
 import Var (TyVarBndr, ArgFlag)
 import FastString (FastString)
 
-data IfaceTcArgs
+data IfaceAppArgs
 type IfLclName = FastString
 type IfaceKind = IfaceType
 

@@ -1,0 +1,42 @@
+
+T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘n’ with ‘j’
+      ‘n’ is a rigid type variable bound by
+        the type signature for:
+          mkRefl :: forall k (n :: k) (j :: k). n :~: j
+        at T15370.hs:13:1-17
+      ‘j’ is a rigid type variable bound by
+        the type signature for:
+          mkRefl :: forall k (n :: k) (j :: k). n :~: j
+        at T15370.hs:13:1-17
+      Expected type: n :~: j
+        Actual type: n :~: n
+    • In the expression: Refl
+      In an equation for ‘mkRefl’: mkRefl = Refl
+    • Relevant bindings include
+        mkRefl :: n :~: j (bound at T15370.hs:14:1)
+
+T15370.hs:20:13: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Couldn't match type ‘S r’ with ‘()’
+      Expected type: ()
+        Actual type: S r
+    • In the expression: no + _
+      In a case alternative: Refl -> no + _
+      In the expression: case mkRefl @x @y of { Refl -> no + _ }
+    • Relevant bindings include
+        no :: S r (bound at T15370.hs:18:7)
+        right :: S r -> () (bound at T15370.hs:18:1)
+
+T15370.hs:20:18: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: S r
+      Where: ‘r’, ‘y’, ‘x’ are rigid type variables bound by
+               the type signature for:
+                 right :: forall x y (r :: Either x y). S r -> ()
+               at T15370.hs:(16,1)-(17,18)
+    • In the second argument of ‘(+)’, namely ‘_’
+      In the expression: no + _
+      In a case alternative: Refl -> no + _
+    • Relevant bindings include
+        no :: S r (bound at T15370.hs:18:7)
+        right :: S r -> () (bound at T15370.hs:18:1)
+      Constraints include y ~ x (from T15370.hs:20:5-8)

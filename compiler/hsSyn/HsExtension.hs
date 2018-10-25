@@ -156,11 +156,11 @@ type ForallXHsIPBinds (c :: * -> Constraint) (x :: *) =
        )
 
 -- IPBind type families
-type family XIPBind  x
+type family XCIPBind x
 type family XXIPBind x
 
 type ForallXIPBind (c :: * -> Constraint) (x :: *) =
-       ( c (XIPBind  x)
+       ( c (XCIPBind x)
        , c (XXIPBind x)
        )
 
@@ -910,7 +910,6 @@ type family XSumTy           x
 type family XOpTy            x
 type family XParTy           x
 type family XIParamTy        x
-type family XEqTy            x
 type family XStarTy          x
 type family XKindSig         x
 type family XSpliceTy        x
@@ -937,7 +936,6 @@ type ForallXType (c :: * -> Constraint) (x :: *) =
        , c (XOpTy            x)
        , c (XParTy           x)
        , c (XIParamTy        x)
-       , c (XEqTy            x)
        , c (XStarTy          x)
        , c (XKindSig         x)
        , c (XSpliceTy        x)
@@ -975,11 +973,11 @@ type ForallXConDeclField (c :: * -> Constraint) (x :: *) =
 
 -- ---------------------------------------------------------------------
 
-type family XFieldOcc  x
+type family XCFieldOcc x
 type family XXFieldOcc x
 
 type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
-       ( c (XFieldOcc  x)
+       ( c (XCFieldOcc x)
        , c (XXFieldOcc x)
        )
 

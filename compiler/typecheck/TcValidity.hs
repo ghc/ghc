@@ -27,8 +27,10 @@ import Maybes
 -- friends:
 import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
+import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
+import TysWiredIn ( heqTyConName, coercibleTyConName )
 import PrelNames
 import Type
 import Coercion
@@ -40,15 +42,15 @@ import TyCon
 -- others:
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
-import TcEnv       ( tcGetInstEnvs, tcInitTidyEnv, tcInitOpenTidyEnv )
+import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
-import InstEnv     ( InstMatch, lookupInstEnv )
 import FamInstEnv  ( isDominatedBy, injectiveBranches,
                      InjectivityCheckResult(..) )
 import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
+import Id          ( idType, idName )
 import Var         ( TyVarBndr(..), mkTyVar )
 import ErrUtils
 import DynFlags
@@ -57,6 +59,7 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import Module
+import Bag         ( emptyBag )
 import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -410,12 +413,12 @@ expectedKindInCtxt ThBrackCtxt     = AnythingKind
 expectedKindInCtxt GhciCtxt        = AnythingKind
 -- The types in a 'default' decl can have varying kinds
 -- See Note [Extended defaults]" in TcEnv
-expectedKindInCtxt DefaultDeclCtxt = AnythingKind
-expectedKindInCtxt TypeAppCtxt     = AnythingKind
-expectedKindInCtxt (ForSigCtxt _)  = TheKind liftedTypeKind
-expectedKindInCtxt InstDeclCtxt    = TheKind constraintKind
-expectedKindInCtxt SpecInstCtxt    = TheKind constraintKind
-expectedKindInCtxt _               = OpenKind
+expectedKindInCtxt DefaultDeclCtxt     = AnythingKind
+expectedKindInCtxt TypeAppCtxt         = AnythingKind
+expectedKindInCtxt (ForSigCtxt _)      = TheKind liftedTypeKind
+expectedKindInCtxt (InstDeclCtxt {})   = TheKind constraintKind
+expectedKindInCtxt SpecInstCtxt        = TheKind constraintKind
+expectedKindInCtxt _                   = OpenKind
 
 {-
 Note [Higher rank types]
@@ -680,9 +683,9 @@ applying the instance decl would show up two uses of ?x.  Trac #8912.
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
 -- Assumes argument is fully zonked
 checkValidTheta ctxt theta
-  = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
-       ; addErrCtxtM (checkThetaCtxt ctxt theta) $
-         check_valid_theta env ctxt theta }
+  = addErrCtxtM (checkThetaCtxt ctxt theta) $
+    do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
+       ; check_valid_theta env ctxt theta }
 
 -------------------------
 check_valid_theta :: TidyEnv -> UserTypeCtxt -> [PredType] -> TcM ()
@@ -748,32 +751,49 @@ check_pred_help under_syn env dflags ctxt pred
 
   | otherwise  -- A bit like classifyPredType, but not the same
                -- E.g. we treat (~) like (~#); and we look inside tuples
-  = case splitTyConApp_maybe pred of
-      Just (tc, tys)
-        | isTupleTyCon tc
-        -> check_tuple_pred under_syn env dflags ctxt pred tys
+  = case classifyPredType pred of
+      ClassPred cls tys
+        | isCTupleClass cls   -> check_tuple_pred under_syn env dflags ctxt pred tys
+        | otherwise           -> check_class_pred env dflags ctxt pred cls tys
 
-        | tc `hasKey` heqTyConKey ||
-          tc `hasKey` eqTyConKey ||
-          tc `hasKey` eqPrimTyConKey
-          -- NB: this equality check must come first,
-          --  because (~) is a class,too.
-        -> check_eq_pred env dflags pred tc tys
+      EqPred NomEq _ _  -> -- a ~# b
+                           check_eq_pred env dflags pred
 
-        | Just cls <- tyConClass_maybe tc
-          -- Includes Coercible
-        -> check_class_pred env dflags ctxt pred cls tys
+      EqPred ReprEq _ _ -> -- Ugh!  When inferring types we may get
+                           -- f :: (a ~R# b) => blha
+                           -- And we want to treat that like (Coercible a b)
+                           -- We should probably check argument shapes, but we
+                           -- didn't do so before, so I'm leaving it for now
+                           return ()
 
-      _ -> check_irred_pred under_syn env dflags ctxt pred
+      ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
+      IrredPred {}            -> check_irred_pred under_syn env dflags ctxt pred
 
-check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TyCon -> [TcType] -> TcM ()
-check_eq_pred env dflags pred tc tys
+check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
+check_eq_pred env dflags pred
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
-    do { checkTc (tys `lengthIs` tyConArity tc) (tyConArityErr tc tys)
-       ; checkTcM (xopt LangExt.TypeFamilies dflags
-                   || xopt LangExt.GADTs dflags)
-                  (eqPredTyErr env pred) }
+    checkTcM (xopt LangExt.TypeFamilies dflags
+              || xopt LangExt.GADTs dflags)
+             (eqPredTyErr env pred)
+
+check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
+                 -> PredType -> ThetaType -> PredType -> TcM ()
+check_quant_pred env dflags _ctxt pred theta head_pred
+  = addErrCtxt (text "In the quantified constraint" <+> quotes (ppr pred)) $
+    do { -- Check the instance head
+         case classifyPredType head_pred of
+            ClassPred cls tys -> checkValidInstHead SigmaCtxt cls tys
+                                 -- SigmaCtxt tells checkValidInstHead that
+                                 -- this is the head of a quantified constraint
+            IrredPred {}      | hasTyVarHead head_pred
+                              -> return ()
+            _                 -> failWithTcM (badQuantHeadErr env pred)
+
+         -- Check for termination
+       ; unless (xopt LangExt.UndecidableInstances dflags) $
+         checkInstTermination theta head_pred
+    }
 
 check_tuple_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
 check_tuple_pred under_syn env dflags ctxt pred ts
@@ -833,16 +853,21 @@ This will cause the constraint simplifier to loop because every time we canonica
 solved to add+canonicalise another (Foo a) constraint.  -}
 
 -------------------------
-check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> Class -> [TcType] -> TcM ()
+check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
+                 -> PredType -> Class -> [TcType] -> TcM ()
 check_class_pred env dflags ctxt pred cls tys
+  |  cls `hasKey` heqTyConKey   -- (~) and (~~) are classified as classes,
+  || cls `hasKey` eqTyConKey    -- but here we want to treat them as equalities
+  = -- pprTrace "check_class" (ppr cls) $
+    check_eq_pred env dflags pred
+
   | isIPClass cls
   = do { check_arity
        ; checkTcM (okIPCtxt ctxt) (badIPPred env pred) }
 
-  | otherwise
+  | otherwise     -- Includes Coercible
   = do { check_arity
-       ; warn_simp <- woptM Opt_WarnSimplifiableClassConstraints
-       ; when warn_simp check_simplifiable_class_constraint
+       ; checkSimplifiableClassConstraint env dflags ctxt cls tys
        ; checkTcM arg_tys_ok (predTyVarErr env pred) }
   where
     check_arity = checkTc (tys `lengthIs` classArity cls)
@@ -853,31 +878,52 @@ check_class_pred env dflags ctxt pred cls tys
     undecidable_ok    = xopt LangExt.UndecidableInstances dflags
     arg_tys_ok = case ctxt of
         SpecInstCtxt -> True    -- {-# SPECIALISE instance Eq (T Int) #-} is fine
-        InstDeclCtxt -> checkValidClsArgs (flexible_contexts || undecidable_ok) cls tys
+        InstDeclCtxt {} -> checkValidClsArgs (flexible_contexts || undecidable_ok) cls tys
                                 -- Further checks on head and theta
                                 -- in checkInstTermination
-        _            -> checkValidClsArgs flexible_contexts cls tys
+        _               -> checkValidClsArgs flexible_contexts cls tys
 
-    -- See Note [Simplifiable given constraints]
-    check_simplifiable_class_constraint
-       | xopt LangExt.MonoLocalBinds dflags
-       = return ()
-       | DataTyCtxt {} <- ctxt   -- Don't do this check for the "stupid theta"
-       = return ()               -- of a data type declaration
-       | otherwise
-       = do { envs <- tcGetInstEnvs
-            ; case lookupInstEnv False envs cls tys of
-                 ([m], [], _) -> addWarnTc (Reason Opt_WarnSimplifiableClassConstraints)
-                                           (simplifiable_constraint_warn m)
-                 _ -> return () }
+checkSimplifiableClassConstraint :: TidyEnv -> DynFlags -> UserTypeCtxt
+                                 -> Class -> [TcType] -> TcM ()
+-- See Note [Simplifiable given constraints]
+checkSimplifiableClassConstraint env dflags ctxt cls tys
+  | not (wopt Opt_WarnSimplifiableClassConstraints dflags)
+  = return ()
+  | xopt LangExt.MonoLocalBinds dflags
+  = return ()
 
-    simplifiable_constraint_warn :: InstMatch -> SDoc
-    simplifiable_constraint_warn (match, _)
-     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred)))
-                 2 (text "matches an instance declaration")
-            , ppr match
+  | DataTyCtxt {} <- ctxt   -- Don't do this check for the "stupid theta"
+  = return ()               -- of a data type declaration
+
+  | cls `hasKey` coercibleTyConKey
+  = return ()   -- Oddly, we treat (Coercible t1 t2) as unconditionally OK
+                -- matchGlobalInst will reply "yes" because we can reduce
+                -- (Coercible a b) to (a ~R# b)
+
+  | otherwise
+  = do { result <- matchGlobalInst dflags False cls tys
+       ; case result of
+           OneInst { cir_what = what }
+              -> addWarnTc (Reason Opt_WarnSimplifiableClassConstraints)
+                                   (simplifiable_constraint_warn what)
+           _          -> return () }
+  where
+    pred = mkClassPred cls tys
+
+    simplifiable_constraint_warn :: InstanceWhat -> SDoc
+    simplifiable_constraint_warn what
+     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred))
+                    <+> text "matches")
+                 2 (ppr_what what)
             , hang (text "This makes type inference for inner bindings fragile;")
                  2 (text "either use MonoLocalBinds, or simplify it using the instance") ]
+
+    ppr_what BuiltinInstance = text "a built-in instance"
+    ppr_what LocalInstance   = text "a locally-quantified instance"
+    ppr_what (TopLevInstance { iw_dfun_id = dfun })
+      = hang (text "instance" <+> pprSigmaType (idType dfun))
+           2 (text "--" <+> pprDefinedAt (idName dfun))
+
 
 {- Note [Simplifiable given constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -973,7 +1019,12 @@ checkThetaCtxt ctxt theta env
            , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
 
-eqPredTyErr, predTupleErr, predIrredErr, predSuperClassErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+eqPredTyErr, predTupleErr, predIrredErr,
+   predSuperClassErr, badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+badQuantHeadErr env pred
+  = ( env
+    , hang (text "Quantified predicate must have a class or type variable head:")
+         2 (ppr_tidy env pred) )
 eqPredTyErr  env pred
   = ( env
     , text "Illegal equational constraint" <+> ppr_tidy env pred $$
@@ -1063,36 +1114,94 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
-  = do { dflags <- getDynFlags
+  = do { dflags   <- getDynFlags
+       ; this_mod <- getModule
+       ; is_boot  <- tcIsHsBootOrSig
+       ; check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args }
 
-       ; mod <- getModule
-       ; checkTc (getUnique clas `notElem` abstractClassKeys ||
-                  nameModule (getName clas) == mod)
-                 (instTypeErr clas cls_args abstract_class_msg)
+check_valid_inst_head :: DynFlags -> Module -> Bool
+                      -> UserTypeCtxt -> Class -> [Type] -> TcM ()
+-- Wow!  There are a surprising number of ad-hoc special cases here.
+check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
 
-       ; when (clas `hasKey` hasFieldClassNameKey) $
-             checkHasFieldInst clas cls_args
+  -- If not in an hs-boot file, abstract classes cannot have instances
+  | isAbstractClass clas
+  , not is_boot
+  = failWithTc abstract_class_msg
 
-           -- Check language restrictions;
-           -- but not for SPECIALISE instance pragmas or deriving clauses
-       ; let ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
-       ; unless (spec_inst_prag || deriv_clause) $
-         do { checkTc (xopt LangExt.TypeSynonymInstances dflags ||
-                       all tcInstHeadTyNotSynonym ty_args)
-                 (instTypeErr clas cls_args head_type_synonym_msg)
-            ; checkTc (xopt LangExt.FlexibleInstances dflags ||
-                       all tcInstHeadTyAppAllTyVars ty_args)
-                 (instTypeErr clas cls_args head_type_args_tyvars_msg)
-            ; checkTc (xopt LangExt.MultiParamTypeClasses dflags ||
-                       lengthIs ty_args 1 ||  -- Only count type arguments
-                       (xopt LangExt.NullaryTypeClasses dflags &&
-                        null ty_args))
-                 (instTypeErr clas cls_args head_one_type_msg) }
+  -- For Typeable, don't complain about instances for
+  -- standalone deriving; they are no-ops, and we warn about
+  -- it in TcDeriv.deriveStandalone
+  | clas_nm == typeableClassName
+  , hand_written_bindings
+  = failWithTc rejected_class_msg
 
-       ; mapM_ checkValidTypePat ty_args }
+  -- Handwritten instances of KnownNat/KnownSymbol class
+  -- are always forbidden (#12837)
+  | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
+  , hand_written_bindings
+  = failWithTc rejected_class_msg
+
+  -- For the most part we don't allow instances for Coercible;
+  -- but we DO want to allow them in quantified constraints:
+  --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
+  | clas_nm == coercibleTyConName
+  , not quantified_constraint
+  = failWithTc rejected_class_msg
+
+  -- Handwritten instances of other nonminal-equality classes
+  -- is forbidden, except in the defining module to allow
+  --    instance a ~~ b => a ~ b
+  -- which occurs in Data.Type.Equality
+  | clas_nm `elem` [ heqTyConName, eqTyConName]
+  , nameModule clas_nm /= this_mod
+  = failWithTc rejected_class_msg
+
+  -- Check for hand-written Generic instances (disallowed in Safe Haskell)
+  | clas_nm `elem` genericClassNames
+  , hand_written_bindings
+  =  do { failIfTc (safeLanguageOn dflags) gen_inst_err
+        ; when (safeInferOn dflags) (recordUnsafeInfer emptyBag) }
+
+  | clas_nm == hasFieldClassName
+  = checkHasFieldInst clas cls_args
+
+  | isCTupleClass clas
+  = failWithTc tuple_class_msg
+
+  -- Check language restrictions on the args to the class
+  | check_h98_arg_shape
+  , Just msg <- mb_ty_args_msg
+  = failWithTc (instTypeErr clas cls_args msg)
+
+  | otherwise
+  = mapM_ checkValidTypePat ty_args
   where
-    spec_inst_prag = case ctxt of { SpecInstCtxt -> True; _ -> False }
-    deriv_clause   = case ctxt of { DerivClauseCtxt -> True; _ -> False }
+    clas_nm = getName clas
+    ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
+
+    hand_written_bindings
+        = case ctxt of
+            InstDeclCtxt stand_alone -> not stand_alone
+            SpecInstCtxt             -> False
+            DerivClauseCtxt          -> False
+            _                        -> True
+
+    check_h98_arg_shape = case ctxt of
+                            SpecInstCtxt    -> False
+                            DerivClauseCtxt -> False
+                            SigmaCtxt       -> False
+                            _               -> True
+        -- SigmaCtxt: once we are in quantified-constraint land, we
+        -- aren't so picky about enforcing H98-language restrictions
+        -- E.g. we want to allow a head like Coercible (m a) (m b)
+
+
+    -- When we are looking at the head of a quantified constraint,
+    -- check_quant_pred sets ctxt to SigmaCtxt
+    quantified_constraint = case ctxt of
+                              SigmaCtxt -> True
+                              _         -> False
 
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
@@ -1105,12 +1214,35 @@ checkValidInstHead ctxt clas cls_args
                 text "and each type variable appears at most once in the instance head.",
                 text "Use FlexibleInstances if you want to disable this."])
 
-    head_one_type_msg = parens (
-                text "Only one type can be given in an instance head." $$
-                text "Use MultiParamTypeClasses if you want to allow more, or zero.")
+    head_one_type_msg = parens $
+                        text "Only one type can be given in an instance head." $$
+                        text "Use MultiParamTypeClasses if you want to allow more, or zero."
 
-    abstract_class_msg =
-                text "Manual instances of this class are not permitted."
+    rejected_class_msg = text "Class" <+> quotes (ppr clas_nm)
+                         <+> text "does not support user-specified instances"
+    tuple_class_msg    = text "You can't specify an instance for a tuple constraint"
+
+    gen_inst_err = rejected_class_msg $$ nest 2 (text "(in Safe Haskell)")
+
+    abstract_class_msg = text "Cannot define instance for abstract class"
+                         <+> quotes (ppr clas_nm)
+
+    mb_ty_args_msg
+      | not (xopt LangExt.TypeSynonymInstances dflags)
+      , not (all tcInstHeadTyNotSynonym ty_args)
+      = Just head_type_synonym_msg
+
+      | not (xopt LangExt.FlexibleInstances dflags)
+      , not (all tcInstHeadTyAppAllTyVars ty_args)
+      = Just head_type_args_tyvars_msg
+
+      | length ty_args /= 1
+      , not (xopt LangExt.MultiParamTypeClasses dflags)
+      , not (xopt LangExt.NullaryTypeClasses dflags && null ty_args)
+      = Just head_one_type_msg
+
+      | otherwise
+      = Nothing
 
 tcInstHeadTyNotSynonym :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
@@ -1154,12 +1286,6 @@ dropCasts ty                = ty  -- LitTy, TyVarTy, CoercionTy
 
 dropCastsB :: TyVarBinder -> TyVarBinder
 dropCastsB b = b   -- Don't bother in the kind of a forall
-
-abstractClassKeys :: [Unique]
-abstractClassKeys = [ heqTyConKey
-                    , eqTyConKey
-                    , coercibleTyConKey
-                    ] -- See Note [Equality class instances]
 
 instTypeErr :: Class -> [Type] -> SDoc -> SDoc
 instTypeErr cls tys msg
@@ -1327,9 +1453,13 @@ checkValidInstance ctxt hs_type ty
   = failWithTc (text "Arity mis-match in instance head")
 
   | otherwise
-  = do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
+  = do  { setSrcSpan head_loc $
+          checkValidInstHead ctxt clas inst_tys
+
         ; traceTc "checkValidInstance {" (ppr ty)
-        ; checkValidTheta ctxt theta
+
+        ; env0 <- tcInitTidyEnv
+        ; check_valid_theta env0 ctxt theta
 
         -- The Termination and Coverate Conditions
         -- Check that instance inference will terminate (if we care)
@@ -1415,16 +1545,15 @@ checkInstTermination theta head_pred
               bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
                                -- See Note [Invisible arguments and termination]
 
-         ForAllPred tvs theta' head_pred'
-           -> do { check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
-                 ; addErrCtxt (text "In the quantified constraint"
-                              <+> quotes (ppr pred)) $
-                   checkInstTermination theta' head_pred' }
+         ForAllPred tvs _ head_pred'
+           -> check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
+              -- Termination of the quantified predicate itself is checked
+              -- when the predicates are individually checked for validity
 
    check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = addErrTc (noMoreMsg bad_tvs what (ppr head_pred))
-     | not (isTyFamFree pred) = addErrTc (nestedMsg what)
-     | pred_size >= head_size = addErrTc (smallerMsg what (ppr head_pred))
+     | not (null bad_tvs)     = failWithTc (noMoreMsg bad_tvs what (ppr head_pred))
+     | not (isTyFamFree pred) = failWithTc (nestedMsg what)
+     | pred_size >= head_size = failWithTc (smallerMsg what (ppr head_pred))
      | otherwise              = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
      where
@@ -1982,8 +2111,13 @@ fvType (CoercionTy co)       = fvCo co
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
 
+fvMCo :: MCoercion -> [TyCoVar]
+fvMCo MRefl    = []
+fvMCo (MCo co) = fvCo co
+
 fvCo :: Coercion -> [TyCoVar]
-fvCo (Refl _ ty)            = fvType ty
+fvCo (Refl ty)              = fvType ty
+fvCo (GRefl _ ty mco)       = fvType ty ++ fvMCo mco
 fvCo (TyConAppCo _ _ args)  = concatMap fvCo args
 fvCo (AppCo co arg)         = fvCo co ++ fvCo arg
 fvCo (ForAllCo tv h co)     = filter (/= tv) (fvCo co) ++ fvCo h
@@ -1996,7 +2130,6 @@ fvCo (TransCo co1 co2)      = fvCo co1 ++ fvCo co2
 fvCo (NthCo _ _ co)         = fvCo co
 fvCo (LRCo _ co)            = fvCo co
 fvCo (InstCo co arg)        = fvCo co ++ fvCo arg
-fvCo (CoherenceCo co1 co2)  = fvCo co1 ++ fvCo co2
 fvCo (KindCo co)            = fvCo co
 fvCo (SubCo co)             = fvCo co
 fvCo (AxiomRuleCo _ cs)     = concatMap fvCo cs

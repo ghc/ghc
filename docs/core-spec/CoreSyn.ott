@@ -113,8 +113,8 @@ t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
   | n                       ::   :: TyVarTy       {{ com \ctor{TyVarTy}: Variable }}
   | t1 t2                   ::   :: AppTy         {{ com \ctor{AppTy}: Application }}
   | T </ ti // i />         ::   :: TyConApp      {{ com \ctor{TyConApp}: Application of type constructor }}
-  | t1 -> t2                ::   :: FunTy         {{ com \ctor{ForAllTy (Anon ...) ...}: Function }}
-  | forall n . t            ::   :: ForAllTy      {{ com \ctor{ForAllTy (Named ...) ...}: Type and coercion polymorphism }}
+  | t1 -> t2                ::   :: FunTy         {{ com \ctor{FunTy}: Function }}
+  | forall n . t            ::   :: ForAllTy      {{ com \ctor{ForAllTy}: Type and coercion polymorphism }}
   | lit                     ::   :: LitTy         {{ com \ctor{LitTy}: Type-level literal }}
   | t |> g                  ::   :: CastTy        {{ com \ctor{CastTy}: Kind cast }}
   | g                       ::   :: CoercionTy    {{ com \ctor{CoercionTy}: Coercion used in type }}
@@ -275,6 +275,7 @@ ind, I {{ tex i }} :: 'Ind_' ::= {{ com Indices, numbers }}
   | 0                           :: M :: zero
   | 1                           :: M :: one
   | 2                           :: M :: two
+  | 3                           :: M :: three
 
 terms :: 'Terms_' ::= {{ com List of terms }}
   | </ ei // i />      ::   :: List
@@ -388,6 +389,7 @@ terminals :: 'terminals_' ::=
   | validDcRoles ::   :: validDcRoles     {{ tex \textsf{validDcRoles} }}
   | -->          ::   :: steps            {{ tex \longrightarrow }}
   | coercionKind ::   :: coercionKind     {{ tex \textsf{coercionKind} }}
+  | coercionRole ::   :: coercionRole     {{ tex \textsf{coercionRole} }}
   | take         ::   :: take             {{ tex \textsf{take}\! }}
   | coaxrProves  ::   :: coaxrProves      {{ tex \textsf{coaxrProves} }}
   | Just         ::   :: Just             {{ tex \textsf{Just} }}
@@ -465,6 +467,7 @@ formula :: 'formula_' ::=
   | no other case matches              ::   :: no_other_case
     {{ tex \text{no other case matches} }}
   | t = coercionKind g                 ::   :: coercionKind
+  | R = coercionRole g                 ::   :: coercionRole
   | Just ( t1 , t2 ) = coaxrProves mu </ si // i /> </ ( s'j , s''j ) // j />
                                        ::   :: coaxrProves
   | mu1 = mu2                          ::   :: mu_rewrite

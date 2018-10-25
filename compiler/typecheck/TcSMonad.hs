@@ -20,6 +20,7 @@ module TcSMonad (
     checkConstraintsTcS, checkTvConstraintsTcS,
 
     runTcPluginTcS, addUsedGRE, addUsedGREs,
+    matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
 
@@ -58,7 +59,7 @@ module TcSMonad (
     getTcSInerts, setTcSInerts,
     matchableGivens, prohibitedSuperClassSolve, mightMatchLater,
     getUnsolvedInerts,
-    removeInertCts, getPendingScDicts,
+    removeInertCts, getPendingGivenScs,
     addInertCan, insertFunEq, addInertForAll,
     emitWorkNC, emitWork,
     isImprovable,
@@ -97,7 +98,7 @@ module TcSMonad (
     -- MetaTyVars
     newFlexiTcSTy, instFlexi, instFlexiX,
     cloneMetaTyVar, demoteUnfilledFmv,
-    tcInstType, tcInstSkolTyVarsX,
+    tcInstSkolTyVarsX,
 
     TcLevel,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
@@ -107,7 +108,7 @@ module TcSMonad (
     zonkTcTyCoVarBndr,
 
     -- References
-    newTcRef, readTcRef, updTcRef,
+    newTcRef, readTcRef, writeTcRef, updTcRef,
 
     -- Misc
     getDefaultInfo, getDynFlags, getGlobalRdrEnvTcS,
@@ -133,9 +134,11 @@ import FamInstEnv
 
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
+import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
-       ( checkWellStaged, topIdLvl, tcGetDefaultTys, tcLookupClass, tcLookupId )
+       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
 import PrelNames( heqTyConKey, eqTyConKey )
+import ClsInst( InstanceWhat(..) )
 import Kind
 import TcType
 import DynFlags
@@ -363,12 +366,13 @@ selectNextWorkItem :: TcS (Maybe Ct)
 -- See Note [Prioritise equalities]
 selectNextWorkItem
   = do { wl_var <- getTcSWorkListRef
-       ; wl <- wrapTcS (TcM.readTcRef wl_var)
+       ; wl <- readTcRef wl_var
        ; case selectWorkItem wl of {
            Nothing -> return Nothing ;
            Just (ct, new_wl) ->
-    do { checkReductionDepth (ctLoc ct) (ctPred ct)
-       ; wrapTcS (TcM.writeTcRef wl_var new_wl)
+    do { -- checkReductionDepth (ctLoc ct) (ctPred ct)
+         -- This is done by TcInteract.chooseInstance
+       ; writeTcRef wl_var new_wl
        ; return (Just ct) } } }
 
 -- Pretty printing
@@ -1935,27 +1939,36 @@ getInertGivens
                      $ concat (dVarEnvElts (inert_eqs inerts))
        ; return (filter isGivenCt all_cts) }
 
-getPendingScDicts :: TcS [Ct]
--- Find all inert Given dictionaries whose cc_pend_sc flag is True
--- Set the flag to False in the inert set, and return that Ct
-getPendingScDicts = updRetInertCans get_sc_dicts
+getPendingGivenScs :: TcS [Ct]
+-- Find all inert Given dictionaries, or quantified constraints,
+--     whose cc_pend_sc flag is True
+--     and that belong to the current level
+-- Set their cc_pend_sc flag to False in the inert set, and return that Ct
+getPendingGivenScs = do { lvl <- getTcLevel
+                        ; updRetInertCans (get_sc_pending lvl) }
+
+get_sc_pending :: TcLevel -> InertCans -> ([Ct], InertCans)
+get_sc_pending this_lvl ic@(IC { inert_dicts = dicts, inert_insts = insts })
+  = ASSERT2( all isGivenCt sc_pending, ppr sc_pending )
+       -- When getPendingScDics is called,
+       -- there are never any Wanteds in the inert set
+    (sc_pending, ic { inert_dicts = dicts', inert_insts = insts' })
   where
-    get_sc_dicts ic@(IC { inert_dicts = dicts, inert_insts = insts })
-      = (sc_pend_insts ++ sc_pend_dicts, ic')
-      where
-        ic' = ic { inert_dicts = foldr add dicts sc_pend_dicts
-                 , inert_insts = insts' }
+    sc_pending = sc_pend_insts ++ sc_pend_dicts
 
-        sc_pend_dicts :: [Ct]
-        sc_pend_dicts = foldDicts get_pending dicts []
+    sc_pend_dicts = foldDicts get_pending dicts []
+    dicts' = foldr add dicts sc_pend_dicts
 
-        (sc_pend_insts, insts') = mapAccumL get_pending_inst [] insts
+    (sc_pend_insts, insts') = mapAccumL get_pending_inst [] insts
 
     get_pending :: Ct -> [Ct] -> [Ct]  -- Get dicts with cc_pend_sc = True
                                        -- but flipping the flag
     get_pending dict dicts
-        | Just dict' <- isPendingScDict dict = dict' : dicts
-        | otherwise                          = dicts
+        | Just dict' <- isPendingScDict dict
+        , belongs_to_this_level (ctEvidence dict)
+        = dict' : dicts
+        | otherwise
+        = dicts
 
     add :: Ct -> DictMap Ct -> DictMap Ct
     add ct@(CDictCan { cc_class = cls, cc_tyargs = tys }) dicts
@@ -1963,11 +1976,16 @@ getPendingScDicts = updRetInertCans get_sc_dicts
     add ct _ = pprPanic "getPendingScDicts" (ppr ct)
 
     get_pending_inst :: [Ct] -> QCInst -> ([Ct], QCInst)
-    get_pending_inst cts qci
+    get_pending_inst cts qci@(QCI { qci_ev = ev })
        | Just qci' <- isPendingScInst qci
+       , belongs_to_this_level ev
        = (CQuantCan qci' : cts, qci')
        | otherwise
        = (cts, qci)
+
+    belongs_to_this_level ev = ctLocLevel (ctEvLoc ev) == this_lvl
+    -- We only want Givens from this level; see (3a) in
+    -- Note [The superclass story] in TcCanonical
 
 getUnsolvedInerts :: TcS ( Bag Implication
                          , Cts     -- Tyvar eqs: a ~ ty
@@ -2830,19 +2848,18 @@ checkTvConstraintsTcS skol_info skol_tvs (TcS thing_inside)
                                         thing_inside new_tcs_env
 
        ; unless (null wanteds) $
-         do { tcl_env <- TcM.getLclEnv
-            ; ev_binds_var <- TcM.newNoTcEvBinds
+         do { ev_binds_var <- TcM.newNoTcEvBinds
+            ; imp <- newImplication
             ; let wc = emptyWC { wc_simple = wanteds }
-                  imp = newImplication { ic_tclvl  = new_tclvl
-                                       , ic_skols  = skol_tvs
-                                       , ic_wanted = wc
-                                       , ic_binds  = ev_binds_var
-                                       , ic_env    = tcl_env
-                                       , ic_info   = skol_info }
+                  imp' = imp { ic_tclvl  = new_tclvl
+                             , ic_skols  = skol_tvs
+                             , ic_wanted = wc
+                             , ic_binds  = ev_binds_var
+                             , ic_info   = skol_info }
 
            -- Add the implication to the work-list
            ; TcM.updTcRef (tcs_worklist tcs_env)
-                          (extendWorkListImplic (unitBag imp)) }
+                          (extendWorkListImplic (unitBag imp')) }
 
       ; return res }
 
@@ -2870,20 +2887,19 @@ checkConstraintsTcS skol_info skol_tvs given (TcS thing_inside)
        ; ((res, wanteds), new_tclvl) <- TcM.pushTcLevelM $
                                         thing_inside new_tcs_env
 
-       ; tcl_env <- TcM.getLclEnv
        ; ev_binds_var <- TcM.newTcEvBinds
+       ; imp <- newImplication
        ; let wc = emptyWC { wc_simple = wanteds }
-             imp = newImplication { ic_tclvl  = new_tclvl
-                                  , ic_skols  = skol_tvs
-                                  , ic_given  = given
-                                  , ic_wanted = wc
-                                  , ic_binds  = ev_binds_var
-                                  , ic_env    = tcl_env
-                                  , ic_info   = skol_info }
+             imp' = imp { ic_tclvl  = new_tclvl
+                        , ic_skols  = skol_tvs
+                        , ic_given  = given
+                        , ic_wanted = wc
+                        , ic_binds  = ev_binds_var
+                        , ic_info   = skol_info }
 
            -- Add the implication to the work-list
        ; TcM.updTcRef (tcs_worklist tcs_env)
-                      (extendWorkListImplic (unitBag imp))
+                      (extendWorkListImplic (unitBag imp'))
 
        ; return (res, TcEvBinds ev_binds_var) }
 
@@ -2912,21 +2928,21 @@ getTcSWorkListRef :: TcS (IORef WorkList)
 getTcSWorkListRef = TcS (return . tcs_worklist)
 
 getTcSInerts :: TcS InertSet
-getTcSInerts = getTcSInertsRef >>= wrapTcS . (TcM.readTcRef)
+getTcSInerts = getTcSInertsRef >>= readTcRef
 
 setTcSInerts :: InertSet -> TcS ()
-setTcSInerts ics = do { r <- getTcSInertsRef; wrapTcS (TcM.writeTcRef r ics) }
+setTcSInerts ics = do { r <- getTcSInertsRef; writeTcRef r ics }
 
 getWorkListImplics :: TcS (Bag Implication)
 getWorkListImplics
   = do { wl_var <- getTcSWorkListRef
-       ; wl_curr <- wrapTcS (TcM.readTcRef wl_var)
+       ; wl_curr <- readTcRef wl_var
        ; return (wl_implics wl_curr) }
 
 updWorkListTcS :: (WorkList -> WorkList) -> TcS ()
 updWorkListTcS f
   = do { wl_var <- getTcSWorkListRef
-       ; wrapTcS (TcM.updTcRef wl_var f)}
+       ; updTcRef wl_var f }
 
 emitWorkNC :: [CtEvidence] -> TcS ()
 emitWorkNC evs
@@ -2945,6 +2961,9 @@ newTcRef x = wrapTcS (TcM.newTcRef x)
 
 readTcRef :: TcRef a -> TcS a
 readTcRef ref = wrapTcS (TcM.readTcRef ref)
+
+writeTcRef :: TcRef a -> a -> TcS ()
+writeTcRef ref val = wrapTcS (TcM.writeTcRef ref val)
 
 updTcRef :: TcRef a -> (a->a) -> TcS ()
 updTcRef ref upd_fn = wrapTcS (TcM.updTcRef ref upd_fn)
@@ -3028,14 +3047,24 @@ addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-checkWellStagedDFun :: PredType -> DFunId -> CtLoc -> TcS ()
-checkWellStagedDFun pred dfun_id loc
+checkWellStagedDFun :: CtLoc -> InstanceWhat -> PredType -> TcS ()
+-- Check that we do not try to use an instance before it is available.  E.g.
+--    instance Eq T where ...
+--    f x = $( ... (\(p::T) -> p == p)... )
+-- Here we can't use the equality function from the instance in the splice
+
+checkWellStagedDFun loc what pred
+  | TopLevInstance { iw_dfun_id = dfun_id } <- what
+  , let bind_lvl = TcM.topIdLvl dfun_id
+  , bind_lvl > impLevel
   = wrapTcS $ TcM.setCtLocM loc $
     do { use_stage <- TcM.getStage
        ; TcM.checkWellStaged pp_thing bind_lvl (thLevel use_stage) }
+
+  | otherwise
+  = return ()    -- Fast path for common case
   where
     pp_thing = text "instance for" <+> quotes (ppr pred)
-    bind_lvl = TcM.topIdLvl dfun_id
 
 pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
@@ -3044,7 +3073,7 @@ isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
 isFilledMetaTyVar_maybe tv
  = case tcTyVarDetails tv of
      MetaTv { mtv_ref = ref }
-        -> do { cts <- wrapTcS (TcM.readTcRef ref)
+        -> do { cts <- readTcRef ref
               ; case cts of
                   Indirect ty -> return (Just ty)
                   Flexi       -> return Nothing }
@@ -3173,7 +3202,7 @@ demoteUnfilledFmv fmv
 
 -----------------------------
 dischargeFunEq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFunEqCan ev tv co ty)
+-- (dischargeFunEq tv co ty)
 --     Preconditions
 --       - ev :: F tys ~ tv   is a CFunEqCan
 --       - tv is a FlatMetaTv of FlatSkolTv
@@ -3253,12 +3282,12 @@ instFlexiHelper subst tv
        ; TcM.traceTc "instFlexi" (ppr ty')
        ; return (extendTvSubst subst tv ty') }
 
-tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
-                   -- ^ How to instantiate the type variables
-           -> Id   -- ^ Type to instantiate
-           -> TcS ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
-                -- (type vars, preds (incl equalities), rho)
-tcInstType inst_tyvars id = wrapTcS (TcM.tcInstType inst_tyvars id)
+matchGlobalInst :: DynFlags
+                -> Bool      -- True <=> caller is the short-cut solver
+                             -- See Note [Shortcut solving: overlap]
+                -> Class -> [Type] -> TcS TcM.ClsInstResult
+matchGlobalInst dflags short_cut cls tys
+  = wrapTcS (TcM.matchGlobalInst dflags short_cut cls tys)
 
 tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
 tcInstSkolTyVarsX subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX subst tvs

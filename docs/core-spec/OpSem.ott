@@ -34,19 +34,39 @@ e1 e2 --> e1' e2
 ----------------------------- :: Beta
 (\n.e1) e2 --> e1[n |-> e2]
 
-g0 = sym (nth 0 g)
-g1 = nth 1 g
+% g : (t1 -> t2) ~Rep# (t3 -> t4)
+% e2 : t3
+% g0 : t3 ~Rep# t1
+% g1 : t2 ~Rep# t4
+g0 = sym (nth Rep 2 g)
+g1 = nth Rep 3 g
 not e2 is_a_type
 not e2 is_a_coercion
 ----------------------------------------------- :: Push
 ((\n.e1) |> g) e2 --> (\n.e1 |> g1) (e2 |> g0)
 
----------------------------------------- :: TPush
-((\n.e) |> g) t --> (\n.(e |> g n)) t
+% g : (forall (a : k1). t1) ~Rep# (forall (a : k2). t2)
+% t : k2
+% g' : k2 ~# k1
+% t' : k1
+g' = sym (nth Nom 0 g)
+t' = t |> g'
+-------------------------------------------------------- :: TPush
+((\n.e) |> g) t --> ((\n.e) t') |> (g @ (<t>_Nom |> g'))
 
-g0 = nth 1 (nth 0 g)
-g1 = sym (nth 2 (nth 0 g))
-g2 = nth 1 g
+% g : ((t1 ~rho# t2) -> t3) ~Rep# ((t4 ~rho# t5) -> t6)
+% g2 : t3 ~Rep# t6
+% g' : t4 ~rho# t5
+% g0 : t1 ~rho# t4
+% g1 : t5 ~rho# t2
+% recall that (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> Type
+% and that (~#) :: forall k1 k2. k1 -> k2 -> TYPE (TupleRep '[])
+% so pulling out the first visible argument for both is argument 2,
+% and the second visible argument for both is argument 3
+R = coercionRole g'
+g0 = nth R 2 (nth Rep 2 g)
+g1 = sym (nth R 3 (nth Rep 2 g))
+g2 = nth Rep 3 g
 ------------------------------- :: CPush
 ((\n.e) |> g) g' --> (\n.e |> g2) (g0 ; g' ; g1)
 
@@ -80,9 +100,10 @@ no other case matches
 ------------------------------------------------------------ :: MatchDefault
 case e as n return t of </ alti // i /> --> u[n |-> e]
 
-T </ taa // aa /> k'~#k T </ t'aa // aa /> = coercionKind g
+T </ taa // aa /> k'~Rep# k T </ t'aa // aa /> = coercionKind g
+</ Raa // aa /> = tyConRoles T
 forall </ alphaaa_kaa // aa />. forall </ betabb_k'bb // bb />. </ t1cc // cc /> $ -> T </ alphaaa_kaa // aa /> = dataConRepType K
-</ e'cc = ecc |> (t1cc $ </ [alphaaa_kaa |-> nth aa g] // aa /> </ [betabb_k'bb |-> <sbb>_Nom] // bb />) // cc />
+</ e'cc = ecc |> (t1cc $ </ [alphaaa_kaa |-> nth Raa aa g] // aa /> </ [betabb_k'bb |-> <sbb>_Nom] // bb />) // cc />
 --------------------------- :: CasePush
 case (K </ taa // aa /> </ sbb // bb /> </ ecc // cc />) |> g as n return t2 of </ alti // i /> --> \\ case K </ t'aa // aa /> </ sbb // bb /> </ e'cc // cc /> as n return t2 of </ alti // i />
 

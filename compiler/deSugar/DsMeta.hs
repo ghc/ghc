@@ -1123,11 +1123,6 @@ repTy (HsSumTy _ tys)       = do tys1 <- repLTys tys
 repTy (HsOpTy _ ty1 n ty2)  = repLTy ((nlHsTyVar (unLoc n) `nlHsAppTy` ty1)
                                    `nlHsAppTy` ty2)
 repTy (HsParTy _ t)         = repLTy t
-repTy (HsEqTy _ t1 t2) = do
-                         t1' <- repLTy t1
-                         t2' <- repLTy t2
-                         eq  <- repTequality
-                         repTapps eq [t1', t2']
 repTy (HsStarTy _ _) =  repTStar
 repTy (HsKindSig _ t k)     = do
                                 t1 <- repLTy t

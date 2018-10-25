@@ -85,7 +85,6 @@ module HscMain
 import GhcPrelude
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( isJust )
 import DynFlags         (addPluginModuleName)
 import Id
 import GHCi             ( addSptEntry )
@@ -455,14 +454,10 @@ tcRnModule' sum save_rn_syntax mod = do
     hsc_env <- getHscEnv
     dflags   <- getDynFlags
 
-    -- check if plugins need the renamed syntax
-    let plugin_needs_rn = any (isJust . renamedResultAction . lpPlugin)
-                              (plugins dflags)
-
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
                    tcRnModule hsc_env sum
-                     (save_rn_syntax || plugin_needs_rn) mod
+                     save_rn_syntax mod
 
     -- See Note [Safe Haskell Overlapping Instances Implementation]
     -- although this is used for more than just that failure case.

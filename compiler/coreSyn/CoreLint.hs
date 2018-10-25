@@ -669,8 +669,8 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
-  | Just rhs <- maybeUnfoldingTemplate uf
-  , isStableUnfolding uf
+  | isStableUnfolding uf
+  , Just rhs <- maybeUnfoldingTemplate uf
   = do { ty <- fst <$> lintRhs bndr rhs
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
 lintIdUnfolding  _ _ _
@@ -1474,7 +1474,7 @@ lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 lintType (CastTy ty co)
   = do { k1 <- lintType ty
        ; (k1', k2) <- lintStarCoercion co
-       ; ensureEqTys k1 k1' (mkCastErr ty co k1' k1)
+       ; ensureEqTys k1 k1' (mkCastTyErr ty co k1' k1)
        ; return k2 }
 
 lintType (CoercionTy co)
@@ -1728,14 +1728,27 @@ lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, Linted
 --
 -- If   lintCoercion co = (k1, k2, s1, s2, r)
 -- then co :: s1 ~r s2
---      s1 :: k2
+--      s1 :: k1
 --      s2 :: k2
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoercion (Refl r ty)
+lintCoercion (Refl ty)
+  = do { k <- lintType ty
+       ; return (k, k, ty, ty, Nominal) }
+
+lintCoercion (GRefl r ty MRefl)
   = do { k <- lintType ty
        ; return (k, k, ty, ty, r) }
+
+lintCoercion (GRefl r ty (MCo co))
+  = do { k <- lintType ty
+       ; (_, _, k1, k2, r') <- lintCoercion co
+       ; ensureEqTys k k1
+               (hang (text "GRefl coercion kind mis-match:" <+> ppr co)
+                   2 (vcat [ppr ty, ppr k, ppr k1]))
+       ; lintRole co Nominal r'
+       ; return (k1, k2, ty, mkCastTy ty co, r) }
 
 lintCoercion co@(TyConAppCo r tc cos)
   | tc `hasKey` funTyConKey
@@ -1757,7 +1770,7 @@ lintCoercion co@(TyConAppCo r tc cos)
 lintCoercion co@(AppCo co1 co2)
   | TyConAppCo {} <- co1
   = failWithL (text "TyConAppCo to the left of AppCo:" <+> ppr co)
-  | Refl _ (TyConApp {}) <- co1
+  | Just (TyConApp {}, _) <- isReflCo_maybe co1
   = failWithL (text "Refl (TyConApp ...) to the left of AppCo:" <+> ppr co)
   | otherwise
   = do { (k1,  k2,  s1, s2, r1) <- lintCoercion co1
@@ -1998,12 +2011,6 @@ lintCoercion co@(AxiomInstCo con ind cos)
                     (bad_ax (text "check_ki2" <+> vcat [ ppr co, ppr k'', ppr ktv, ppr ktv_kind_r ] ))
            ; return (extendTCvSubst subst_l ktv s',
                      extendTCvSubst subst_r ktv t') }
-
-lintCoercion (CoherenceCo co1 co2)
-  = do { (_, k2, t1, t2, r) <- lintCoercion co1
-       ; let lhsty = mkCastTy t1 co2
-       ; k1' <- lintType lhsty
-       ; return (k1', k2, lhsty, t2, r) }
 
 lintCoercion (KindCo co)
   = do { (k1, k2, _, _, _) <- lintCoercion co
@@ -2611,14 +2618,32 @@ mkArityMsg binder
          ]
            where (StrictSig dmd_ty) = idStrictness binder
 -}
-mkCastErr :: Outputable casted => casted -> Coercion -> Type -> Type -> MsgDoc
-mkCastErr expr co from_ty expr_ty
-  = vcat [text "From-type of Cast differs from type of enclosed expression",
-          text "From-type:" <+> ppr from_ty,
-          text "Type of enclosed expr:" <+> ppr expr_ty,
-          text "Actual enclosed expr:" <+> ppr expr,
+mkCastErr :: CoreExpr -> Coercion -> Type -> Type -> MsgDoc
+mkCastErr expr = mk_cast_err "expression" "type" (ppr expr)
+
+mkCastTyErr :: Type -> Coercion -> Kind -> Kind -> MsgDoc
+mkCastTyErr ty = mk_cast_err "type" "kind" (ppr ty)
+
+mk_cast_err :: String -- ^ What sort of casted thing this is
+                      --   (\"expression\" or \"type\").
+            -> String -- ^ What sort of coercion is being used
+                      --   (\"type\" or \"kind\").
+            -> SDoc   -- ^ The thing being casted.
+            -> Coercion -> Type -> Type -> MsgDoc
+mk_cast_err thing_str co_str pp_thing co from_ty thing_ty
+  = vcat [from_msg <+> text "of Cast differs from" <+> co_msg
+            <+> text "of" <+> enclosed_msg,
+          from_msg <> colon <+> ppr from_ty,
+          text (capitalise co_str) <+> text "of" <+> enclosed_msg <> colon
+            <+> ppr thing_ty,
+          text "Actual" <+> enclosed_msg <> colon <+> pp_thing,
           text "Coercion used in cast:" <+> ppr co
          ]
+  where
+    co_msg, from_msg, enclosed_msg :: SDoc
+    co_msg       = text co_str
+    from_msg     = text "From-" <> co_msg
+    enclosed_msg = text "enclosed" <+> text thing_str
 
 mkBadUnivCoMsg :: LeftOrRight -> Coercion -> SDoc
 mkBadUnivCoMsg lr co

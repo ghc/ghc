@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, RecordWildCards #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -169,10 +170,10 @@ extendLoadedPkgs pkgs =
 
 extendLinkEnv :: [(Name,ForeignHValue)] -> IO ()
 extendLinkEnv new_bindings =
-  modifyPLS_ $ \pls -> do
-    let ce = closure_env pls
-    let new_ce = extendClosureEnv ce new_bindings
-    return pls{ closure_env = new_ce }
+  modifyPLS_ $ \pls@PersistentLinkerState{..} -> do
+    let new_ce = extendClosureEnv closure_env new_bindings
+    return $! pls{ closure_env = new_ce }
+    -- strictness is important for not retaining old copies of the pls
 
 deleteFromLinkEnv :: [Name] -> IO ()
 deleteFromLinkEnv to_remove =
@@ -1095,15 +1096,19 @@ unload_wkr :: HscEnv
 -- Does the core unload business
 -- (the wrapper blocks exceptions and deals with the PLS get and put)
 
-unload_wkr hsc_env keep_linkables pls = do
+unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
+  -- NB. careful strictness here to avoid keeping the old PLS when
+  -- we're unloading some code.  -fghci-leak-check with the tests in
+  -- testsuite/ghci can detect space leaks here.
+
   let (objs_to_keep, bcos_to_keep) = partition isObjectLinkable keep_linkables
 
       discard keep l = not (linkableInSet l keep)
 
       (objs_to_unload, remaining_objs_loaded) =
-         partition (discard objs_to_keep) (objs_loaded pls)
+         partition (discard objs_to_keep) objs_loaded
       (bcos_to_unload, remaining_bcos_loaded) =
-         partition (discard bcos_to_keep) (bcos_loaded pls)
+         partition (discard bcos_to_keep) bcos_loaded
 
   mapM_ unloadObjs objs_to_unload
   mapM_ unloadObjs bcos_to_unload
@@ -1114,7 +1119,7 @@ unload_wkr hsc_env keep_linkables pls = do
                    filter (not . null . linkableObjs) bcos_to_unload))) $
     purgeLookupSymbolCache hsc_env
 
-  let bcos_retained = mkModuleSet $ map linkableModule remaining_bcos_loaded
+  let !bcos_retained = mkModuleSet $ map linkableModule remaining_bcos_loaded
 
       -- Note that we want to remove all *local*
       -- (i.e. non-isExternal) names too (these are the
@@ -1122,13 +1127,13 @@ unload_wkr hsc_env keep_linkables pls = do
       keep_name (n,_) = isExternalName n &&
                         nameModule n `elemModuleSet` bcos_retained
 
-      itbl_env'     = filterNameEnv keep_name (itbl_env pls)
-      closure_env'  = filterNameEnv keep_name (closure_env pls)
+      itbl_env'     = filterNameEnv keep_name itbl_env
+      closure_env'  = filterNameEnv keep_name closure_env
 
-      new_pls = pls { itbl_env = itbl_env',
-                      closure_env = closure_env',
-                      bcos_loaded = remaining_bcos_loaded,
-                      objs_loaded = remaining_objs_loaded }
+      !new_pls = pls { itbl_env = itbl_env',
+                       closure_env = closure_env',
+                       bcos_loaded = remaining_bcos_loaded,
+                       objs_loaded = remaining_objs_loaded }
 
   return new_pls
   where

@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2002-2006
 
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE CPP, RankNTypes, BangPatterns #-}
 
 module IfaceEnv (
         newGlobalBinder, newInteractiveBinder,
@@ -129,7 +129,8 @@ newtype NameCacheUpdater
 
 mkNameCacheUpdater :: TcRnIf a b NameCacheUpdater
 mkNameCacheUpdater = do { hsc_env <- getTopEnv
-                        ; return (NCU (updNameCache hsc_env)) }
+                        ; let !ncRef = hsc_NC hsc_env
+                        ; return (NCU (updNameCache ncRef)) }
 
 updNameCacheTc :: Module -> OccName -> (NameCache -> (NameCache, c))
                -> TcRnIf a b c
@@ -151,7 +152,7 @@ updNameCacheIO hsc_env mod occ upd_fn = do {
     -- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
 
     mod `seq` occ `seq` return ()
-  ; updNameCache hsc_env upd_fn }
+  ; updNameCache (hsc_NC hsc_env) upd_fn }
 
 
 {-

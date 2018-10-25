@@ -151,7 +151,7 @@ def autoreconf():
         # Get the normalized ACLOCAL_PATH for Windows
         # This is necessary since on Windows this will be a Windows
         # path, which autoreconf doesn't know doesn't know how to handle.
-        ac_local = os.environ['ACLOCAL_PATH']
+        ac_local = os.getenv('ACLOCAL_PATH', '')
         ac_local_arg = re.sub(r';', r':', ac_local)
         ac_local_arg = re.sub(r'\\', r'/', ac_local_arg)
         ac_local_arg = re.sub(r'(\w):/', r'/\1/', ac_local_arg)

@@ -299,7 +299,6 @@ generate directory distdir config_args
                  final_ipi = installedPkgInfo {
                                  Installed.installedUnitId = ipid,
                                  Installed.compatPackageKey = display (packageId pd),
-                                 Installed.haddockHTMLs = [],
                                  Installed.includeDirs = concatMap fixupIncludeDir (Installed.includeDirs installedPkgInfo)
                              }
                  content = Installed.showInstalledPackageInfo final_ipi ++ "\n"

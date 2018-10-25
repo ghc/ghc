@@ -643,13 +643,13 @@ mkGadtDecl :: [Located RdrName]
 mkGadtDecl names ty
   = (ConDeclGADT { con_g_ext  = noExt
                  , con_names  = names
-                 , con_forall = L l $ isLHsForAllTy ty
+                 , con_forall = L l $ isLHsForAllTy ty'
                  , con_qvars  = mkHsQTvs tvs
                  , con_mb_cxt = mcxt
                  , con_args   = args'
                  , con_res_ty = res_ty
                  , con_doc    = Nothing }
-    , anns1 ++ anns2 ++ anns3)
+    , anns1 ++ anns2)
   where
     (ty'@(L l _),anns1) = peel_parens ty []
     (tvs, rho) = splitLHsForAllTy ty'
@@ -660,14 +660,13 @@ mkGadtDecl names ty
     split_rho (L l (HsParTy _ ty)) ann = split_rho ty (ann++mkParensApiAnn l)
     split_rho tau                  ann = (Nothing, tau, ann)
 
-    (args, res_ty, anns3) = split_tau tau []
+    (args, res_ty) = split_tau tau
     args' = nudgeHsSrcBangs args
 
     -- See Note [GADT abstract syntax] in HsDecls
-    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) _w res_ty)) ann
-                                       = (RecCon (L loc rf), res_ty, ann)
-    split_tau (L l (HsParTy _ ty)) ann = split_tau ty (ann++mkParensApiAnn l)
-    split_tau tau                  ann = (PrefixCon [], tau, ann)
+    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) _w res_ty))
+                                   = (RecCon (L loc rf), res_ty)
+    split_tau tau                  = (PrefixCon [], tau)
 
     peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
                                                        (ann++mkParensApiAnn l)
@@ -870,6 +869,12 @@ checkTyClHdr is_cls ty
   = goL ty [] [] Prefix
   where
     goL (L l ty) acc ann fix = go l ty acc ann fix
+
+    -- workaround to define '*' despite StarIsType
+    go _ (HsParTy _ (L l (HsStarTy _ isUni))) acc ann fix
+      = do { warnStarBndr l
+           ; let name = mkOccName tcClsName (if isUni then "★" else "*")
+           ; return (L l (Unqual name), acc, fix, ann) }
 
     go l (HsTyVar _ _ (L _ tc)) acc ann fix
       | isRdrTc tc               = return (L l tc, acc, fix, ann)
@@ -1748,11 +1753,19 @@ warnStarIsType span = addWarning Opt_WarnStarIsType span msg
         $$ text "Suggested fix: use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 
+warnStarBndr :: SrcSpan -> P ()
+warnStarBndr span = addWarning Opt_WarnStarBinder span msg
+  where
+    msg =  text "Found binding occurrence of" <+> quotes (text "*")
+           <+> text "yet StarIsType is enabled."
+        $$ text "NB. To use (or export) this operator in"
+           <+> text "modules with StarIsType,"
+        $$ text "    including the definition module, you must qualify it."
+
 failOpFewArgs :: Located RdrName -> P a
 failOpFewArgs (L loc op) =
-  do { type_operators <- extension typeOperatorsEnabled
-     ; star_is_type <- extension starIsTypeEnabled
-     ; let msg = too_few $$ starInfo (type_operators, star_is_type) op
+  do { star_is_type <- extension starIsTypeEnabled
+     ; let msg = too_few $$ starInfo star_is_type op
      ; parseErrorSDoc loc msg }
   where
     too_few = text "Operator applied to too few arguments:" <+> ppr op

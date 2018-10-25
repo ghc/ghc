@@ -2295,6 +2295,9 @@ Core Lint never expects to find an *occurrence* of an Id marked
 as Dead, so we must zap the OccInfo on cb before making the
 binding x = cb.  See Trac #5028.
 
+NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
+doesn't use it. So this is only to satisfy the perhpas-over-picky Lint.
+
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We *used* to suppress the binder-swap in case expressions when

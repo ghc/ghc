@@ -317,10 +317,11 @@ test('T7257',
                         # expected value: 1246287228 (i386/Linux)
                         # 2016-04-06: 989850664 (i386/Linux) no idea what happened
                         # 2017-03-25: 869850704 (x86/Linux, 64-bit machine) probably sizeExpr fix
-                       (wordsize(64), 1414893248, 5)]),
+                       (wordsize(64), 1297293264, 5)]),
                         # 2012-09-21: 1774893760 (amd64/Linux)
                         # 2015-11-03: 1654893248 (amd64/Linux)
                         # 2016-06-22: 1414893248 (amd64/Linux, sizeExpr fix)
+                        # 2018-06-22: 1297293264 (amd64/Linux, atomicModifyMutVar# replacement)
       stats_num_field('peak_megabytes_allocated',
                       [(wordsize(32), 217, 5),
                         # 2012-10-08: 217 (x86/Linux)
@@ -562,7 +563,7 @@ test('T13623',
     ['-O2'])
 
 test('T14052',
-     [stats_num_field('bytes allocated',
+     [compiler_stats_num_field('bytes allocated',
                       [ (wordsize(64), 2346183840, 15) ])],
      ghci_script,
      ['T14052.script'])

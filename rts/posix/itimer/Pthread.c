@@ -84,11 +84,11 @@ static Time itimer_interval = DEFAULT_TICK_INTERVAL;
 
 // Should we be firing ticks?
 // Writers to this must hold the mutex below.
-static volatile HsBool stopped = 0;
+static volatile bool stopped = false;
 
 // should the ticker thread exit?
 // This can be set without holding the mutex.
-static volatile HsBool exited = 1;
+static volatile bool exited = true;
 
 // Signaled when we want to (re)start the timer
 static Condition start_cond;
@@ -109,15 +109,13 @@ static void *itimer_thread_func(void *_handle_tick)
 
     timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
     if (timerfd == -1) {
-        sysErrorBelch("timerfd_create");
-        stg_exit(EXIT_FAILURE);
+        barf("timerfd_create");
     }
     if (!TFD_CLOEXEC) {
-      fcntl(timerfd, F_SETFD, FD_CLOEXEC);
+        fcntl(timerfd, F_SETFD, FD_CLOEXEC);
     }
     if (timerfd_settime(timerfd, 0, &it, NULL)) {
-        sysErrorBelch("timerfd_settime");
-        stg_exit(EXIT_FAILURE);
+        barf("timerfd_settime");
     }
 #endif
 
@@ -125,7 +123,7 @@ static void *itimer_thread_func(void *_handle_tick)
         if (USE_TIMERFD_FOR_ITIMER) {
             if (read(timerfd, &nticks, sizeof(nticks)) != sizeof(nticks)) {
                 if (errno != EINTR) {
-                    sysErrorBelch("Itimer: read(timerfd) failed");
+                    barf("Itimer: read(timerfd) failed");
                 }
             }
         } else {
@@ -158,8 +156,8 @@ void
 initTicker (Time interval, TickProc handle_tick)
 {
     itimer_interval = interval;
-    stopped = 0;
-    exited = 0;
+    stopped = false;
+    exited = false;
 
     initCondition(&start_cond);
     initMutex(&mutex);
@@ -173,8 +171,7 @@ initTicker (Time interval, TickProc handle_tick)
         pthread_setname_np(thread, "ghc_ticker");
 #endif
     } else {
-        sysErrorBelch("Itimer: Failed to spawn thread");
-        stg_exit(EXIT_FAILURE);
+        barf("Itimer: Failed to spawn thread");
     }
 }
 
@@ -201,7 +198,7 @@ void
 exitTicker (bool wait)
 {
     ASSERT(!exited);
-    exited = 1;
+    exited = true;
     // ensure that ticker wakes up if stopped
     startTicker();
 

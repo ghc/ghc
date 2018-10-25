@@ -129,7 +129,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -package ⟨pkg⟩
     :shortdesc: Expose package ⟨pkg⟩
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
 
     This option causes the installed package ⟨pkg⟩ to be exposed. The
@@ -181,7 +181,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -package-id ⟨unit-id⟩
     :shortdesc: Expose package by id ⟨unit-id⟩
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
 
     Exposes a package like :ghc-flag:`-package ⟨pkg⟩`, but the package is named
@@ -209,7 +209,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -hide-package ⟨pkg⟩
     :shortdesc: Hide package ⟨pkg⟩
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
 
     This option does the opposite of :ghc-flag:`-package ⟨pkg⟩`: it causes the
@@ -222,7 +222,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -ignore-package ⟨pkg⟩
     :shortdesc: Ignore package ⟨pkg⟩
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
 
     Causes the compiler to behave as if package ⟨pkg⟩, and any packages
@@ -257,7 +257,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -trust ⟨pkg⟩
     :shortdesc: Expose package ⟨pkg⟩ and set it to be trusted
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
     :noindex:
 
@@ -269,7 +269,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -distrust ⟨pkg⟩
     :shortdesc: Expose package ⟨pkg⟩ and set it to be distrusted
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
     :noindex:
 
@@ -281,7 +281,7 @@ The GHC command line options that control packages are:
 
 .. ghc-flag:: -distrust-all-packages
     :shortdesc: Distrust all packages by default
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category:
     :noindex:
 

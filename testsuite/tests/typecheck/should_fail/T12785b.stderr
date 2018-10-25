@@ -11,7 +11,7 @@ T12785b.hs:29:63: error:
       ‘s’ is a rigid type variable bound by
         a pattern with constructor:
           Hide :: forall a (n :: Peano) (f :: a -> *) (s :: HTree n a).
-                  STree n a f s -> Hidden n f,
+                  STree n f s -> Hidden n f,
         in an equation for ‘nest’
         at T12785b.hs:29:7-12
     • In the second argument of ‘($)’, namely ‘a `SBranchX` tr’
@@ -20,12 +20,8 @@ T12785b.hs:29:63: error:
           nest (Hide a `Branch` (nest . hmap nest -> Hide tr))
             = Hide $ a `SBranchX` tr
     • Relevant bindings include
-        tr :: STree
-                n
-                (HTree ('S n) (HTree ('S ('S n)) a))
-                (STree ('S n) (HTree ('S ('S n)) a) (STree ('S ('S n)) a f))
-                s1
+        tr :: STree n (STree ('S n) (STree ('S ('S n)) f)) s1
           (bound at T12785b.hs:29:49)
-        a :: STree ('S m) a f s (bound at T12785b.hs:29:12)
-        nest :: HTree m (Hidden ('S m) f) -> Hidden m (STree ('S m) a f)
+        a :: STree ('S m) f s (bound at T12785b.hs:29:12)
+        nest :: HTree m (Hidden ('S m) f) -> Hidden m (STree ('S m) f)
           (bound at T12785b.hs:27:1)

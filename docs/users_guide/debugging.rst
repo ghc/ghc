@@ -158,7 +158,9 @@ These flags dump various information from GHC's typechecker and renamer.
     :shortdesc: Dump typechecker output
     :type: dynamic
 
-    Dump typechecker output
+    Dump typechecker output. Note that this hides a great deal of detail by
+    default; you might consider using this with
+    :ghc-flag:`-fprint-typechecker-elaboration`.
 
 .. ghc-flag:: -ddump-tc-ast
     :shortdesc: Dump typechecker output as a syntax tree
@@ -213,7 +215,8 @@ subexpression elimination pass.
     Print a one-line summary of the size of the Core program at the end
     of the optimisation pipeline.
 
-.. ghc-flag:: -ddump-ds -ddump-ds-preopt
+.. ghc-flag:: -ddump-ds
+              -ddump-ds-preopt
     :shortdesc: Dump desugarer output.
     :type: dynamic
 
@@ -376,12 +379,14 @@ C-\\- representation
 These flags dump various phases of GHC's C-\\- pipeline.
 
 .. ghc-flag:: -ddump-cmm-verbose
-    :shortdesc: Show output from each C-\\- pipeline pass
+    :shortdesc: Show output from main C-\\- pipeline passes
     :type: dynamic
 
-    Dump output from all C-\\- pipeline stages. In case of
+    Dump output from main C-\\- pipeline stages. In case of
     ``.cmm`` compilation this also dumps the result of
-    file parsing.
+    file parsing. Not included are passes run by
+    the chosen backend. Currently only the NCG backends runs
+    additional passes ( :ghc-flag:`-ddump-opt-cmm` ).
 
     Cmm dumps don't include unreachable blocks since we print
     blocks in reverse post-order.
@@ -551,6 +556,12 @@ These flags dump various bits of information from other backends.
     :type: dynamic
 
     Dump byte-code objects (BCOs) produced for the GHC's byte-code interpreter.
+
+.. ghc-flag:: -ddump-rtti
+    :shortdesc: Trace runtime type inference
+    :type: dynamic
+
+    Trace runtime type inference done by various interpreter commands.
 
 .. ghc-flag:: -ddump-foreign
     :shortdesc: Dump ``foreign export`` stubs

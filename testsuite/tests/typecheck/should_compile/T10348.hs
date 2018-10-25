@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, GADTs, DataKinds, KindSignatures, StandaloneDeriving, TypeOperators #-}
+{-# LANGUAGE GADTs, DataKinds, KindSignatures, StandaloneDeriving, TypeOperators #-}
 
 module T10348 where
 

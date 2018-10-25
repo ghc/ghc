@@ -680,26 +680,34 @@ simplifyDeriv pred tvs thetas
                     ; pure wanteds }
 
        -- See [STEP DAC BUILD]
-       -- Generate the implication constraints constraints to solve with the
-       -- skolemized variables
-       ; wanteds <- mapM mk_wanteds thetas
+       -- Generate the implication constraints, one for each method, to solve
+       -- with the skolemized variables.  Start "one level down" because
+       -- we are going to wrap the result in an implication with tvs_skols,
+       -- in step [DAC RESIDUAL]
+       ; (wanteds, tc_lvl) <- pushTcLevelM $
+                              mapM mk_wanteds thetas
 
        ; traceTc "simplifyDeriv inputs" $
          vcat [ pprTyVars tvs $$ ppr thetas $$ ppr wanteds, doc ]
 
        -- See [STEP DAC SOLVE]
-       -- Simplify the constraints
-       ; solved_implics <- runTcSDeriveds $ solveWantedsAndDrop
-                                          $ unionsWC wanteds
+       -- Simplify the constraints, starting at the same level at which
+       -- they are generated (c.f. the call to runTcSWithEvBinds in
+       -- simplifyInfer)
+       ; solved_wanteds <- setTcLevel tc_lvl   $
+                           runTcSDeriveds      $
+                           solveWantedsAndDrop $
+                           unionsWC wanteds
+
        -- It's not yet zonked!  Obviously zonk it before peering at it
-       ; solved_implics <- zonkWC solved_implics
+       ; solved_wanteds <- zonkWC solved_wanteds
 
        -- See [STEP DAC HOIST]
        -- Split the resulting constraints into bad and good constraints,
        -- building an @unsolved :: WantedConstraints@ representing all
        -- the constraints we can't just shunt to the predicates.
        -- See Note [Exotic derived instance contexts]
-       ; let residual_simple = approximateWC True solved_implics
+       ; let residual_simple = approximateWC True solved_wanteds
              (bad, good) = partitionBagWith get_good residual_simple
 
              get_good :: Ct -> Either Ct PredType
@@ -731,10 +739,9 @@ simplifyDeriv pred tvs thetas
 
        -- See [STEP DAC RESIDUAL]
        ; min_theta_vars <- mapM newEvVar min_theta
-       ; tc_lvl <- getTcLevel
        ; (leftover_implic, _)
-           <- buildImplicationFor (pushTcLevel tc_lvl) skol_info tvs_skols
-                                  min_theta_vars solved_implics
+           <- buildImplicationFor tc_lvl skol_info tvs_skols
+                                  min_theta_vars solved_wanteds
        -- This call to simplifyTop is purely for error reporting
        -- See Note [Error reporting for deriving clauses]
        -- See also Note [Exotic derived instance contexts], which are caught
@@ -816,24 +823,28 @@ it would
 [STEP DAC BUILD]
 So that's what we do.  We build the constraint (call it C1)
 
-   forall b. Ix b => (Show (Maybe s), Ix cc,
-                      Maybe s -> b -> String
-                          ~ Maybe s -> cc -> String)
+   forall[2] b. Ix b => (Show (Maybe s), Ix cc,
+                        Maybe s -> b -> String
+                            ~ Maybe s -> cc -> String)
 
-Here, the 'b' comes from the quantified type variable in the expected type
-of bar (i.e., 'to_anyclass_skols' in 'ThetaOrigin'). The 'cc' is a unification
-variable that comes from instantiating the quantified type variable 'c' in
-$gdm_bar's type (i.e., 'to_anyclass_metas' in 'ThetaOrigin).
+Here:
+* The level of this forall constraint is forall[2], because we are later
+  going to wrap it in a forall[1] in [STEP DAC RESIDUAL]
 
-The (Ix b) constraint comes from the context of bar's type
-(i.e., 'to_wanted_givens' in 'ThetaOrigin'). The (Show (Maybe s)) and (Ix cc)
-constraints come from the context of $gdm_bar's type
-(i.e., 'to_anyclass_givens' in 'ThetaOrigin').
+* The 'b' comes from the quantified type variable in the expected type
+  of bar (i.e., 'to_anyclass_skols' in 'ThetaOrigin'). The 'cc' is a unification
+  variable that comes from instantiating the quantified type variable 'c' in
+  $gdm_bar's type (i.e., 'to_anyclass_metas' in 'ThetaOrigin).
 
-The equality constraint (Maybe s -> b -> String) ~ (Maybe s -> cc -> String)
-comes from marrying up the instantiated type of $gdm_bar with the specified
-type of bar. Notice that the type variables from the instance, 's' in this
-case, are global to this constraint.
+* The (Ix b) constraint comes from the context of bar's type
+  (i.e., 'to_wanted_givens' in 'ThetaOrigin'). The (Show (Maybe s)) and (Ix cc)
+  constraints come from the context of $gdm_bar's type
+  (i.e., 'to_anyclass_givens' in 'ThetaOrigin').
+
+* The equality constraint (Maybe s -> b -> String) ~ (Maybe s -> cc -> String)
+  comes from marrying up the instantiated type of $gdm_bar with the specified
+  type of bar. Notice that the type variables from the instance, 's' in this
+  case, are global to this constraint.
 
 Note that it is vital that we instantiate the `c` in $gdm_bar's type with a new
 unification variable for each iteration of simplifyDeriv. If we re-use the same
@@ -842,8 +853,8 @@ such as Trac #14933.
 
 Similarly for 'baz', givng the constraint C2
 
-   forall. Eq (Maybe s) => (Ord a, Show a,
-                            Maybe s -> Maybe s -> Bool
+   forall[2]. Eq (Maybe s) => (Ord a, Show a,
+                              Maybe s -> Maybe s -> Bool
                                 ~ Maybe s -> Maybe s -> Bool)
 
 In this case baz has no local quantification, so the implication
@@ -854,9 +865,9 @@ variables.
 We can combine these two implication constraints into a single
 constraint (C1, C2), and simplify, unifying cc:=b, to get:
 
-   forall b. Ix b => Show a
+   forall[2] b. Ix b => Show a
    /\
-   forall. Eq (Maybe s) => (Ord a, Show a)
+   forall[2]. Eq (Maybe s) => (Ord a, Show a)
 
 [STEP DAC HOIST]
 Let's call that (C1', C2').  Now we need to hoist the unsolved
@@ -875,7 +886,7 @@ And that's what GHC uses for CX.
 In this case we have solved all the leftover constraints, but what if
 we don't?  Simple!  We just form the final residual constraint
 
-   forall s. CX => (C1',C2')
+   forall[1] s. CX => (C1',C2')
 
 and simplify that. In simple cases it'll succeed easily, because CX
 literally contains the constraints in C1', C2', but if there is anything

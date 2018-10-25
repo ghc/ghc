@@ -1,4 +1,4 @@
-{-# LANGUAGE AutoDeriveTypeable, PolyKinds, TypeFamilies, StandaloneDeriving #-}
+{-# LANGUAGE PolyKinds, TypeFamilies, StandaloneDeriving #-}
 
 module T9999 where
 

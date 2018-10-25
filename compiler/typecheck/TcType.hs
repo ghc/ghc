@@ -52,7 +52,7 @@ module TcType (
   -- Builders
   mkPhiTy, mkInfSigmaTy, mkSpecSigmaTy, mkSigmaTy,
   mkNakedTyConApp, mkNakedAppTys, mkNakedAppTy,
-  mkNakedCastTy,
+  mkNakedCastTy, nakedSubstTy,
 
   --------------------------------
   -- Splitters
@@ -227,6 +227,7 @@ import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.List  ( mapAccumL )
+import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
 import qualified Data.Semigroup as Semi
@@ -621,7 +622,9 @@ data UserTypeCtxt
                         --      f x :: t = ....
   | ForSigCtxt Name     -- Foreign import or export signature
   | DefaultDeclCtxt     -- Types in a default declaration
-  | InstDeclCtxt        -- An instance declaration
+  | InstDeclCtxt Bool   -- An instance declaration
+                        --    True:  stand-alone deriving
+                        --    False: vanilla instance declaration
   | SpecInstCtxt        -- SPECIALISE instance pragma
   | ThBrackCtxt         -- Template Haskell type brackets [t| ... |]
   | GenSigCtxt          -- Higher-rank or impredicative situations
@@ -667,7 +670,8 @@ pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
 pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
 pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
-pprUserTypeCtxt InstDeclCtxt      = text "an instance declaration"
+pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"
+pprUserTypeCtxt (InstDeclCtxt True)  = text "a stand-alone deriving instance declaration"
 pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
 pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
 pprUserTypeCtxt GhciCtxt          = text "a type in a GHCi command"
@@ -865,7 +869,7 @@ promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 ************************************************************************
 -}
 
--- | Finds outermost type-family applications occuring in a type,
+-- | Finds outermost type-family applications occurring in a type,
 -- after expanding synonyms.  In the list (F, tys) that is returned
 -- we guarantee that tys matches F's arity.  For example, given
 --    type family F a :: * -> *    (arity 1)
@@ -954,7 +958,11 @@ exactTyCoVarsOfType ty
     go_rig (RigMul m1 m2)   = go_rig m1 `unionVarSet` go_rig m2
     go_rig _                = emptyVarSet
 
-    goCo (Refl _ ty)        = go ty
+    goMCo MRefl    = emptyVarSet
+    goMCo (MCo co) = goCo co
+
+    goCo (Refl ty)            = go ty
+    goCo (GRefl _ ty mco)     = go ty `unionVarSet` goMCo mco
     goCo (TyConAppCo _ _ args)= goCos args
     goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (ForAllCo tv k_co co)
@@ -969,7 +977,6 @@ exactTyCoVarsOfType ty
     goCo (NthCo _ _ co)      = goCo co
     goCo (LRCo _ co)         = goCo co
     goCo (InstCo co arg)     = goCo co `unionVarSet` goCo arg
-    goCo (CoherenceCo c1 c2) = goCo c1 `unionVarSet` goCo c2
     goCo (KindCo co)         = goCo co
     goCo (SubCo co)          = goCo co
     goCo (AxiomRuleCo _ c)   = goCos c
@@ -1415,6 +1422,69 @@ getDFunTyLitKey :: TyLit -> OccName
 getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
 getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
 
+{- *********************************************************************
+*                                                                      *
+           Maintaining the well-kinded type invariant
+*                                                                      *
+********************************************************************* -}
+
+{- Note [The well-kinded type invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [The tcType invariant] in TcHsType.
+
+During type inference, we maintain this invariant
+
+   (INV-TK): it is legal to call 'typeKind' on any Type ty,
+             /without/ zonking ty
+
+For example, suppose
+    kappa is a unification variable
+    We have already unified kappa := Type
+      yielding    co :: Refl (Type -> Type)
+    a :: kappa
+then consider the type
+    (a Int)
+If we call typeKind on that, we'll crash, because the (un-zonked)
+kind of 'a' is just kappa, not an arrow kind.  If we zonk first
+we'd be fine, but that is too tiresome, so instead we maintain
+(TK-INV).  So we do not form (a Int); instead we form
+    (a |> co) Int
+and typeKind has no problem with that.
+
+Bottom line: we want to keep that 'co' /even though it is Refl/.
+
+Immediate consequence: during type inference we cannot use the "smart
+contructors" for types, particularly
+   mkAppTy, mkCastTy
+because they all eliminate Refl casts.  Solution: during type
+inference use the mkNakedX type formers, which do no Refl-elimination.
+E.g. mkNakedCastTy uses an actual CastTy, without optimising for
+Refl.  (NB: mkNakedCastTy is only called in two places: in tcInferApps
+and in checkExpectedResultKind.)
+
+Where does this show up in practice: apparently mainly in
+TcHsType.tcInferApps.  Suppose we are kind-checking the type (a Int),
+where (a :: kappa).  Then in tcInferApps we'll run out of binders on
+a's kind, so we'll call matchExpectedFunKind, and unify
+   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
+That evidence is actually Refl, but we must not discard the cast to
+form the result type
+   ((a::kappa) (Int::*))
+because that does not satisfy the invariant, and crashes TypeKind.  This
+caused Trac #14174 and #14520.
+
+Notes:
+
+* The Refls will be removed later, when we zonk the type.
+
+* This /also/ applies to substitution.  We must use nakedSubstTy,
+  not substTy, because the latter uses smart constructors that do
+  Refl-elimination.
+
+* None of this is to do with knot-tying, which is the (quite distinct)
+  motivation for mkNakedTyConApp
+-}
+
 ---------------
 mkNakedTyConApp :: TyCon -> [Type] -> Type
 -- Builds a TyConApp
@@ -1445,33 +1515,21 @@ mkNakedCastTy :: Type -> Coercion -> Type
 -- In fact the calls to mkNakedCastTy ar pretty few and far between.
 mkNakedCastTy ty co = CastTy ty co
 
-{- Note [The well-kinded type invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During type inference, we maintain the invariant that
+nakedSubstTy :: HasCallStack => TCvSubst -> TcType  -> TcType
+nakedSubstTy subst ty
+  | isEmptyTCvSubst subst = ty
+  | otherwise             = runIdentity                   $
+                            checkValidSubst subst [ty] [] $
+                            mapType nakedSubstMapper subst ty
+  -- Interesting idea: use StrictIdentity to avoid space leaks
 
-   INVARIANT: every type is well-kinded /without/ zonking
-
-and in particular that typeKind does not fail (as it can for
-ill-kinded types).
-
-Now suppose we are kind-checking the type (a Int), where (a :: kappa).
-Then in tcInferApps we'll run out of binders on a's kind, so
-we'll call matchExpectedFunKind, and unify
-   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
-That evidence is actually Refl, but we must not discard the cast to
-form the result type
-   ((a::kappa) (Int::*))
-bacause that does not satisfy the invariant, and crashes TypeKind.  This
-caused Trac #14174 and #14520.
-
-Solution: make mkNakedCastTy use an actual CastTy, without optimising
-for Refl. Now everything is well-kinded.  The CastTy will be removed
-later, when we zonk.  Still, it's distressingly delicate.
-
-NB: mkNakedCastTy is only called in two places:
-    in tcInferApps and in checkExpectedResultKind.
-    See Note [The tcType invariant] in TcHsType.
--}
+nakedSubstMapper :: TyCoMapper TCvSubst Identity
+nakedSubstMapper
+  = TyCoMapper { tcm_smart    = False
+               , tcm_tyvar    = \subst tv -> return (substTyVar subst tv)
+               , tcm_covar    = \subst cv -> return (substCoVar subst cv)
+               , tcm_hole     = \_ hole   -> return (HoleCo hole)
+               , tcm_tybinder = \subst tv _ -> return (substTyVarBndr subst tv) }
 
 {-
 ************************************************************************
@@ -2157,6 +2215,19 @@ Notice that
    case for tuples.  Something better would be cool.
 
 See also TcTyDecls.checkClassCycles.
+
+Note [Quantifying over equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Should we quantify over an equality constraint (s ~ t)?  In general, we don't.
+Doing so may simply postpone a type error from the function definition site to
+its call site.  (At worst, imagine (Int ~ Bool)).
+
+However, consider this
+         forall a. (F [a] ~ Int) => blah
+Should we quantify over the (F [a] ~ Int)?  Perhaps yes, because at the call
+site we will know 'a', and perhaps we have instance  F [Bool] = Int.
+So we *do* quantify over a type-family equality where the arguments mention
+the quantified variables.
 
 Note [Inheriting implicit parameters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

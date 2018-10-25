@@ -652,21 +652,22 @@ source code, use the ``typeCheckResultAction`` field. For example, if your
 plugin have to decide if two names are referencing the same definition or it has
 to check the type of a function it is using semantic information. In this case
 you need to access the renamed or type checked version of the syntax tree with
-``typeCheckResultAction``
+``typeCheckResultAction`` or ``renamedResultAction``.
 
 ::
 
     typechecked :: [CommandLineOption] -> ModSummary -> TcGblEnv -> TcM TcGblEnv
+    renamed :: [CommandLineOption] -> TcGblEnv -> HsGroup GhcRn -> TcM (TcGblEnv, HsGroup GhcRn)
 
-By overriding the ``renamedResultAction`` field with a ``Just`` function, you
-can request the compiler to keep the renamed syntax tree and give it to your
-processing function. This is important because some parts of the renamed
+By overriding the ``renamedResultAction`` field we can modify each ``HsGroup``
+after it has been renamed. A source file is seperated into groups depending on
+the location of template haskell splices so the contents of these groups may
+not be intuitive. In order to save the entire renamed AST for inspection
+at the end of typechecking you can set ``renamedResultAction`` to ``keepRenamedSource``
+which is provided by the ``Plugins`` module.
+This is important because some parts of the renamed
 syntax tree (for example, imports) are not found in the typechecked one.
-The ``renamedResultAction`` is set to ``Nothing`` by default.
 
-::
-
-    rename :: Maybe ([CommandLineOption] -> ModSummary -> TcM ())
 
 
 Evaluated code

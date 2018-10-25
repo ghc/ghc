@@ -804,7 +804,7 @@ cmmPrimOpFunctions mop = do
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_Add2 w       -> fsLit $ "llvm.uadd.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
-    MO_AddWordC w   -> fsLit $ "llvm.usub.with.overflow."
+    MO_AddWordC w   -> fsLit $ "llvm.uadd.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
     MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)

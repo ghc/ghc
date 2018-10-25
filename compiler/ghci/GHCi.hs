@@ -21,6 +21,8 @@ module GHCi
   , enableBreakpoint
   , breakpointStatus
   , getBreakpointVar
+  , getClosure
+  , seqHValue
 
   -- * The object-code linker
   , initObjLinker
@@ -77,6 +79,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LB
 import Data.IORef
 import Foreign hiding (void)
+import GHC.Exts.Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Exit
 import Data.Maybe
@@ -349,6 +352,17 @@ getBreakpointVar hsc_env ref ix =
   withForeignRef ref $ \apStack -> do
     mb <- iservCmd hsc_env (GetBreakpointVar apStack ix)
     mapM (mkFinalizedHValue hsc_env) mb
+
+getClosure :: HscEnv -> ForeignHValue -> IO (GenClosure ForeignHValue)
+getClosure hsc_env ref =
+  withForeignRef ref $ \hval -> do
+    mb <- iservCmd hsc_env (GetClosure hval)
+    mapM (mkFinalizedHValue hsc_env) mb
+
+seqHValue :: HscEnv -> ForeignHValue -> IO ()
+seqHValue hsc_env ref =
+  withForeignRef ref $ \hval ->
+    iservCmd hsc_env (Seq hval) >>= fromEvalResult
 
 -- -----------------------------------------------------------------------------
 -- Interface to the object-code linker

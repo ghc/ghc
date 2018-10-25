@@ -50,7 +50,7 @@ module Packages (
 
         collectArchives,
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
-        packageHsLibs,
+        packageHsLibs, getLibs,
 
         -- * Utils
         unwireUnitId,
@@ -1760,6 +1760,14 @@ collectArchives dflags pc =
                         , lib <- libs ]
   where searchPaths = nub . filter notNull . libraryDirsForWay dflags $ pc
         libs        = packageHsLibs dflags pc ++ extraLibraries pc
+
+getLibs :: DynFlags -> [PreloadUnitId] -> IO [(String,String)]
+getLibs dflags pkgs = do
+  ps <- getPreloadPackagesAnd dflags pkgs
+  fmap concat . forM ps $ \p -> do
+    let candidates = [ (l </> f, f) | l <- collectLibraryPaths dflags [p]
+                                    , f <- (\n -> "lib" ++ n ++ ".a") <$> packageHsLibs dflags p ]
+    filterM (doesFileExist . fst) candidates
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)

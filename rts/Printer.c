@@ -13,6 +13,7 @@
 #include "rts/Bytecodes.h"  /* for InstrPtr */
 
 #include "sm/Storage.h"
+#include "sm/GCThread.h"
 #include "Hash.h"
 #include "Printer.h"
 #include "RtsUtils.h"
@@ -825,17 +826,29 @@ findPtr(P_ p, int follow)
   int i = 0;
   searched = 0;
 
+#if 0
+  // We can't search the nursery, because we don't know which blocks contain
+  // valid data, because the bd->free pointers in the nursery are only reset
+  // just before a block is used.
   for (n = 0; n < n_capabilities; n++) {
       bd = nurseries[i].blocks;
       i = findPtrBlocks(p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
   }
+#endif
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;
       i = findPtrBlocks(p,bd,arr,arr_size,i);
       bd = generations[g].large_objects;
       i = findPtrBlocks(p,bd,arr,arr_size,i);
+      if (i >= arr_size) return;
+      for (n = 0; n < n_capabilities; n++) {
+          i = findPtrBlocks(p, gc_threads[n]->gens[g].part_list,
+                            arr, arr_size, i);
+          i = findPtrBlocks(p, gc_threads[n]->gens[g].todo_bd,
+                            arr, arr_size, i);
+      }
       if (i >= arr_size) return;
   }
   if (follow && i == 1) {

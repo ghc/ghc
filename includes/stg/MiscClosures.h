@@ -390,7 +390,8 @@ RTS_FUN_DECL(stg_copySmallMutableArrayzh);
 RTS_FUN_DECL(stg_casSmallArrayzh);
 
 RTS_FUN_DECL(stg_newMutVarzh);
-RTS_FUN_DECL(stg_atomicModifyMutVarzh);
+RTS_FUN_DECL(stg_atomicModifyMutVar2zh);
+RTS_FUN_DECL(stg_atomicModifyMutVarzuzh);
 RTS_FUN_DECL(stg_casMutVarzh);
 
 RTS_FUN_DECL(stg_isEmptyMVarzh);

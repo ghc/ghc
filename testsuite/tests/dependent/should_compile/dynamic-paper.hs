@@ -7,7 +7,7 @@ Stephanie Weirich, Richard Eisenberg, and Dimitrios Vytiniotis, 2016. -}
 {-#  LANGUAGE RankNTypes, PolyKinds, TypeOperators,
              ScopedTypeVariables, GADTs, FlexibleInstances,
              UndecidableInstances, RebindableSyntax,
-             DataKinds, MagicHash, AutoDeriveTypeable #-}
+             DataKinds, MagicHash #-}
 {-# OPTIONS_GHC -Wno-missing-methods -Wno-redundant-constraints #-}
 {-# OPTIONS_GHC -Wno-simplifiable-class-constraints #-}
   -- Because we define a local Typeable class and have

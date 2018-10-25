@@ -444,14 +444,14 @@ data HsRecField' id arg = HsRecField {
 --
 -- See also Note [Disambiguating record fields] in TcExpr.
 
-hsRecFields :: HsRecFields p arg -> [XFieldOcc p]
+hsRecFields :: HsRecFields p arg -> [XCFieldOcc p]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
 
 -- Probably won't typecheck at once, things have changed :/
 hsRecFieldsArgs :: HsRecFields p arg -> [arg]
 hsRecFieldsArgs rbinds = map (hsRecFieldArg . unLoc) (rec_flds rbinds)
 
-hsRecFieldSel :: HsRecField pass arg -> Located (XFieldOcc pass)
+hsRecFieldSel :: HsRecField pass arg -> Located (XCFieldOcc pass)
 hsRecFieldSel = fmap extFieldOcc . hsRecFieldLbl
 
 hsRecFieldId :: HsRecField GhcTc arg -> Located Id

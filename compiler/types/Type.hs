@@ -416,8 +416,13 @@ expandTypeSynonyms ty
     go subst (CastTy ty co)  = mkCastTy (go subst ty) (go_co subst co)
     go subst (CoercionTy co) = mkCoercionTy (go_co subst co)
 
-    go_co subst (Refl r ty)
-      = mkReflCo r (go subst ty)
+    go_mco _     MRefl    = MRefl
+    go_mco subst (MCo co) = MCo (go_co subst co)
+
+    go_co subst (Refl ty)
+      = mkNomReflCo (go subst ty)
+    go_co subst (GRefl r ty mco)
+      = mkGReflCo r (go subst ty) (go_mco subst mco)
        -- NB: coercions are always expanded upon creation
     go_co subst (TyConAppCo r tc args)
       = mkTyConAppCo r tc (map (go_co subst) args)
@@ -444,8 +449,6 @@ expandTypeSynonyms ty
       = mkLRCo lr (go_co subst co)
     go_co subst (InstCo co arg)
       = mkInstCo (go_co subst co) (go_co subst arg)
-    go_co subst (CoherenceCo co1 co2)
-      = mkCoherenceCo (go_co subst co1) (go_co subst co2)
     go_co subst (KindCo co)
       = mkKindCo (go_co subst co)
     go_co subst (SubCo co)
@@ -557,7 +560,11 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
             env co
   = go co
   where
-    go (Refl r ty) = Refl r <$> mapType mapper env ty
+    go_mco MRefl    = return MRefl
+    go_mco (MCo co) = MCo <$> (go co)
+
+    go (Refl ty) = Refl <$> mapType mapper env ty
+    go (GRefl r ty mco) = mkgreflco r <$> mapType mapper env ty <*> (go_mco mco)
     go (TyConAppCo r tc args)
       = mktyconappco r tc <$> mapM go args
     go (AppCo c1 c2) = mkappco <$> go c1 <*> go c2
@@ -581,7 +588,6 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (NthCo r i co)      = mknthco r i <$> go co
     go (LRCo lr co)        = mklrco lr <$> go co
     go (InstCo co arg)     = mkinstco <$> go co <*> go arg
-    go (CoherenceCo c1 c2) = mkcoherenceco <$> go c1 <*> go c2
     go (KindCo co)         = mkkindco <$> go co
     go (SubCo co)          = mksubco <$> go co
 
@@ -591,16 +597,16 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go_prov p@(PluginProv _)    = return p
 
     ( mktyconappco, mkappco, mkaxiominstco, mkunivco
-      , mksymco, mktransco, mknthco, mklrco, mkinstco, mkcoherenceco
-      , mkkindco, mksubco, mkforallco)
+      , mksymco, mktransco, mknthco, mklrco, mkinstco
+      , mkkindco, mksubco, mkforallco, mkgreflco)
       | smart
       = ( mkTyConAppCo, mkAppCo, mkAxiomInstCo, mkUnivCo
-        , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo, mkCoherenceCo
-        , mkKindCo, mkSubCo, mkForAllCo )
+        , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
+        , mkKindCo, mkSubCo, mkForAllCo, mkGReflCo )
       | otherwise
       = ( TyConAppCo, AppCo, AxiomInstCo, UnivCo
-        , SymCo, TransCo, NthCo, LRCo, InstCo, CoherenceCo
-        , KindCo, SubCo, ForAllCo )
+        , SymCo, TransCo, NthCo, LRCo, InstCo
+        , KindCo, SubCo, ForAllCo, GRefl )
 
 {-
 ************************************************************************
@@ -679,7 +685,7 @@ the type checker (e.g. when matching type-function equations).
 mkAppTy :: Type -> Type -> Type
   -- See Note [Respecting definitional equality], invariant (EQ1).
 mkAppTy (CastTy fun_ty co) arg_ty
-  | ([arg_co], res_co) <- decomposePiCos (typeKind fun_ty) [arg_ty] co
+  | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
@@ -701,7 +707,7 @@ mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- in TyCoRep
   = foldl AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
-    (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) arg_tys co
+    (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
@@ -1059,13 +1065,12 @@ piResultTys ty orig_args@(arg:args)
       | ForAllTy (TvBndr tv _) res <- ty
       = go (extendVarEnv tv_env tv arg) res args
 
-      | TyVarTy tv <- ty
-      , Just ty' <- lookupVarEnv tv_env tv
-        -- Deals with piResultTys (forall a. a) [forall b.b, Int]
-      = piResultTys ty' all_args
-
-      | otherwise
-      = pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
+      | otherwise  -- See Note [Care with kind instantiation]
+      = ASSERT2( not (isEmptyVarEnv tv_env)
+               , ppr ty $$ ppr orig_args $$ ppr all_args )
+        go emptyTvSubstEnv
+          (substTy (mkTvSubst in_scope tv_env) ty)
+          all_args
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
@@ -1079,7 +1084,35 @@ applyTysX tvs body_ty arg_tys
     pp_stuff = vcat [ppr tvs, ppr body_ty, ppr arg_tys]
     n_tvs = length tvs
 
-{-
+
+
+{- Note [Care with kind instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  T :: forall k. k
+and we are finding the kind of
+  T (forall b. b -> b) * Int
+Then
+  T (forall b. b->b) :: k[ k :-> forall b. b->b]
+                     :: forall b. b -> b
+So
+  T (forall b. b->b) * :: (b -> b)[ b :-> *]
+                       :: * -> *
+
+In other words wwe must intantiate the forall!
+
+Similarly (Trac #154218)
+   S :: forall k f. k -> f k
+and we are finding the kind of
+   S * (* ->) Int Bool
+We have
+   S * (* ->) :: (k -> f k)[ k :-> *, f :-> (* ->)]
+              :: * -> * -> *
+So again we must instantiate.
+
+The same thing happens in ToIface.toIfaceAppArgsX.
+
+
 ---------------------------------------------------------------------
                                 TyConApp
                                 ~~~~~~~~
@@ -1837,6 +1870,11 @@ predTypeEqRel ty
 --
 -- This is a deterministic sorting operation
 -- (that is, doesn't depend on Uniques).
+--
+-- It is also meant to be stable: that is, variables should not
+-- be reordered unnecessarily. The implementation of this
+-- has been observed to be stable, though it is not proven to
+-- be so. See also Note [Ordering of implicit variables] in HsTypes
 toposortTyVars :: [TyCoVar] -> [TyCoVar]
 toposortTyVars tvs = reverse $
                      [ node_payload node | node <- topologicalSortG $
@@ -2355,7 +2393,8 @@ eqRig _ _ = False
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
 nonDetCmpTypesX _   []        []        = EQ
 nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2
-                                      `thenCmp` nonDetCmpTypesX env tys1 tys2
+                                          `thenCmp`
+                                          nonDetCmpTypesX env tys1 tys2
 nonDetCmpTypesX _   []        _         = LT
 nonDetCmpTypesX _   _         []        = GT
 
@@ -2525,8 +2564,15 @@ occCheckExpand vs_to_avoid ty
            -- See Note [Occurrence checking: look inside kinds]
 
     ------------------
-    go_co cxt (Refl r ty)               = do { ty' <- go cxt ty
-                                             ; return (mkReflCo r ty') }
+    go_mco _   MRefl = return MRefl
+    go_mco ctx (MCo co) = MCo <$> go_co ctx co
+
+    ------------------
+    go_co cxt (Refl ty)                 = do { ty' <- go cxt ty
+                                             ; return (mkNomReflCo ty') }
+    go_co cxt (GRefl r ty mco)          = do { mco' <- go_mco cxt mco
+                                             ; ty' <- go cxt ty
+                                             ; return (mkGReflCo r ty' mco') }
       -- Note: Coercions do not contain type synonyms
     go_co cxt (TyConAppCo r tc args)    = do { args' <- mapM (go_co cxt) args
                                              ; return (mkTyConAppCo r tc args') }
@@ -2566,9 +2612,6 @@ occCheckExpand vs_to_avoid ty
     go_co cxt (InstCo co arg)           = do { co' <- go_co cxt co
                                              ; arg' <- go_co cxt arg
                                              ; return (mkInstCo co' arg') }
-    go_co cxt (CoherenceCo co1 co2)     = do { co1' <- go_co cxt co1
-                                             ; co2' <- go_co cxt co2
-                                             ; return (mkCoherenceCo co1' co2') }
     go_co cxt (KindCo co)               = do { co' <- go_co cxt co
                                              ; return (mkKindCo co') }
     go_co cxt (SubCo co)                = do { co' <- go_co cxt co
@@ -2610,7 +2653,8 @@ tyConsOfType ty
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
-     go_co (Refl _ ty)             = go ty
+     go_co (Refl ty)               = go ty
+     go_co (GRefl _ ty mco)        = go ty `unionUniqSets` go_mco mco
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
      go_co (ForAllCo _ kind_co co) = go_co kind_co `unionUniqSets` go_co co
@@ -2624,10 +2668,12 @@ tyConsOfType ty
      go_co (NthCo _ _ co)          = go_co co
      go_co (LRCo _ co)             = go_co co
      go_co (InstCo co arg)         = go_co co `unionUniqSets` go_co arg
-     go_co (CoherenceCo co1 co2)   = go_co co1 `unionUniqSets` go_co co2
      go_co (KindCo co)             = go_co co
      go_co (SubCo co)              = go_co co
      go_co (AxiomRuleCo _ cs)      = go_cos cs
+
+     go_mco MRefl    = emptyUniqSet
+     go_mco (MCo co) = go_co co
 
      go_prov UnsafeCoerceProv    = emptyUniqSet
      go_prov (PhantomProv co)    = go_co co

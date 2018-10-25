@@ -35,7 +35,9 @@ module TcEvidence (
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSubCo,
   tcDowngradeRole,
-  mkTcAxiomRuleCo, mkTcCoherenceLeftCo, mkTcCoherenceRightCo, mkTcPhantomCo,
+  mkTcAxiomRuleCo, mkTcGReflRightCo, mkTcGReflLeftCo, mkTcPhantomCo,
+  mkTcCoherenceLeftCo,
+  mkTcCoherenceRightCo,
   mkTcKindCo,
   tcCoercionKind, coVarsOfTcCo,
   mkTcCoVarCo,
@@ -116,8 +118,12 @@ mkTcSubCo              :: TcCoercionN -> TcCoercionR
 maybeTcSubCo           :: EqRel -> TcCoercion -> TcCoercion
 tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
 mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
-mkTcCoherenceLeftCo    :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcCoherenceRightCo   :: TcCoercion -> TcCoercionN -> TcCoercion
+mkTcGReflRightCo       :: Role -> TcType -> TcCoercionN -> TcCoercion
+mkTcGReflLeftCo        :: Role -> TcType -> TcCoercionN -> TcCoercion
+mkTcCoherenceLeftCo    :: Role -> TcType -> TcCoercionN
+                       -> TcCoercion -> TcCoercion
+mkTcCoherenceRightCo   :: Role -> TcType -> TcCoercionN
+                       -> TcCoercion -> TcCoercion
 mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
 mkTcKindCo             :: TcCoercion -> TcCoercionN
 mkTcCoVarCo            :: CoVar -> TcCoercion
@@ -149,6 +155,8 @@ mkTcSubCo              = mkSubCo
 maybeTcSubCo           = maybeSubCo
 tcDowngradeRole        = downgradeRole
 mkTcAxiomRuleCo        = mkAxiomRuleCo
+mkTcGReflRightCo       = mkGReflRightCo
+mkTcGReflLeftCo        = mkGReflLeftCo
 mkTcCoherenceLeftCo    = mkCoherenceLeftCo
 mkTcCoherenceRightCo   = mkCoherenceRightCo
 mkTcPhantomCo          = mkPhantomCo

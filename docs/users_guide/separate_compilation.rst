@@ -159,7 +159,7 @@ contents of the search path:
 
 .. ghc-flag:: -i⟨dir⟩[:⟨dir⟩]*
     :shortdesc: add ⟨dir⟩, ⟨dir2⟩, etc. to import path
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category: search-path
 
     .. index::
@@ -170,7 +170,7 @@ contents of the search path:
 
 .. ghc-flag:: -i
     :shortdesc: Empty the import directory list
-    :type: dynamic/ ``:set``
+    :type: dynamic
     :category: search-path
 
     resets the search path back to nothing.

@@ -540,7 +540,7 @@ corresponds closely to the underlying bit-encoding of the number.
 In this notation floating point numbers are written using hexadecimal digits,
 and so the digits are interpreted using base 16, rather then the usual 10.
 This means that digits left of the decimal point correspond to positive
-powers of 16, while the ones to the right correspond to negaitve ones.
+powers of 16, while the ones to the right correspond to negative ones.
 
 You may also write an explicit exponent, which is similar to the exponent
 in decimal notation with the following differences:
@@ -3778,7 +3778,7 @@ GHC extends this mechanism along several axes:
 
 * In Haskell 98, the only derivable classes are ``Eq``,
   ``Ord``, ``Enum``, ``Ix``, ``Bounded``, ``Read``, and ``Show``. `Various
-  langauge extensions <#deriving-extra>`__ extend this list.
+  language extensions <#deriving-extra>`__ extend this list.
 
 * Besides the stock approach to deriving instances by generating all method
   definitions, GHC supports two additional deriving strategies, which can
@@ -4123,7 +4123,7 @@ There are two exceptions to this rule:
 
    That is, :extension:`DeriveFunctor` pattern-matches its way into tuples and maps
    over each type that constitutes the tuple. The generated code is
-   reminiscient of what would be generated from
+   reminiscent of what would be generated from
    ``data Triple a = Triple a Int [a]``, except with extra machinery to handle
    the tuple.
 
@@ -4359,7 +4359,7 @@ There are some other differences regarding what data types can have derived
    polymorphic types that are syntactically equivalent to the last type
    parameter. In particular:
 
-  -  We don't fold over the arguments of ``E1`` or ``E4`` beacause even though
+  -  We don't fold over the arguments of ``E1`` or ``E4`` because even though
      ``(a ~ Int)``, ``Int`` is not syntactically equivalent to ``a``.
 
   -  We don't fold over the argument of ``E3`` because ``a`` is not universally
@@ -4453,7 +4453,7 @@ Deriving ``Data`` instances
 
 .. extension:: DeriveDataTypeable
     :shortdesc: Enable deriving for the Data class.
-       Implied by :extension:`AutoDeriveTypeable`.
+       Implied by (deprecated) :extension:`AutoDeriveTypeable`.
 
     :since: 6.8.1
 
@@ -5435,6 +5435,37 @@ pattern synonym: ::
       pattern StrictJust a <- Just !a where
         StrictJust !a = Just a
 
+Constructing an explicitly bidirectional pattern synonym also:
+
+- can create different data constructors from the underlying data type,
+  not just the one appearing in the pattern match;
+
+- can call any functions or conditional logic, especially validation,
+  of course providing it constructs a result of the right type;
+
+- can use guards on the lhs of the ``=``;
+
+- can have multiple equations.
+
+For example: ::
+
+      data PosNeg = Pos Int | Neg Int
+      pattern Smarter{ nonneg } <- Pos nonneg  where
+        Smarter x = if x >= 0 then (Pos x) else (Neg x)
+
+Or using guards: ::
+
+      pattern Smarter{ nonneg } <- Pos nonneg  where
+        Smarter x | x >= 0    = (Pos x)
+                  | otherwise = (Neg x)
+
+There is an extensive Haskell folk art of `smart constructors
+<https://wiki.haskell.org/Smart_constructor>`_,
+essentially functions that wrap validation around a constructor,
+and avoid exposing its representation.
+The downside is that the underlying constructor can't be used as a matcher.
+Pattern synonyms can be used as genuinely smart constructors, for both validation and matching.
+
 The table below summarises where each kind of pattern synonym can be used.
 
 +---------------+----------------+---------------+---------------------------+
@@ -5508,7 +5539,7 @@ the syntax for bidirectional pattern synonyms is: ::
 and the syntax for explicitly bidirectional pattern synonyms is: ::
 
       pattern pat_lhs <- pat where
-        pat_lhs = expr
+        pat_lhs = expr                      -- lhs restricted, see below
 
 We can define either prefix, infix or record pattern synonyms by modifying
 the form of `pat_lhs`. The syntax for these is as follows:
@@ -5522,6 +5553,9 @@ Infix   ``arg1 `Name` arg2``
 Record  ``Name{arg1,arg2,...,argn}``
 ======= ============================
 
+The `pat_lhs` for explicitly bidirectional construction cannot use Record syntax.
+(Because the rhs *expr* might be constructing different data constructors.)
+It can use guards with multiple equations.
 
 Pattern synonym declarations can only occur in the top level of a
 module. In particular, they are not allowed as local definitions.
@@ -5688,7 +5722,7 @@ Note also the following points
          pattern P x y v <- MkT True x y (v::a)
 
    Here the universal type variable `a` scopes over the definition of `P`,
-   but the existential `b` does not.  (c.f. disussion on Trac #14998.)
+   but the existential `b` does not.  (c.f. discussion on Trac #14998.)
 
 -  For a bidirectional pattern synonym, a use of the pattern synonym as
    an expression has the type
@@ -7950,7 +7984,7 @@ keyword in the family instance: ::
       type Elem [e] = e
       ...
 
-The data or type family instance for an assocated type must follow
+The data or type family instance for an associated type must follow
 the rule that the type indexes corresponding to class parameters must have
 precisely the same as type given in the instance head. For example: ::
 
@@ -8678,8 +8712,7 @@ Kind polymorphism
 .. extension:: TypeInType
     :shortdesc: Deprecated. Enable kind polymorphism and datatype promotion.
 
-    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`,
-              :extension:`NoStarIsType`
+    :implies: :extension:`PolyKinds`, :extension:`DataKinds`, :extension:`KindSignatures`
     :since: 8.0.1
 
     In the past this extension used to enable advanced type-level programming
@@ -9126,13 +9159,12 @@ The kind ``Type``
 -----------------
 
 .. extension:: StarIsType
-    :shortdesc: Desugar ``*`` to ``Data.Kind.Type``.
+    :shortdesc: Treat ``*`` as ``Data.Kind.Type``.
 
     :since: 8.6.1
 
     Treat the unqualified uses of the ``*`` type operator as nullary and desugar
-    to ``Data.Kind.Type``. Disabled by :extension:`TypeOperators` and
-    :extension:`TypeInType`.
+    to ``Data.Kind.Type``.
 
 The kind ``Type`` (imported from ``Data.Kind``) classifies ordinary types. With
 :extension:`StarIsType` (currently enabled by default), ``*`` is desugared to
@@ -9731,11 +9763,11 @@ We to extend ``class`` (warning: this is a rather confusingly named non-terminal
 .. code-block:: none
 
     class ::= ...
-          | context => qtycls inst
-          | context => tyvar inst
+          | [context =>] qtycls inst
+          | [context =>] tyvar inst
 
 The definition of ``inst`` is unchanged from the Haskell Report (roughly, just a type).
-That is the only syntactic change to the language.
+The ``context =>`` part is optional.  That is the only syntactic change to the language.
 
 Notes:
 
@@ -9744,8 +9776,8 @@ Notes:
 .. code-block:: none
 
     class ::= ...
-           | [forall tyavrs .] context => qtycls inst1 ... instn
-           | [forall tyavrs .] context => tyvar inst1 ... instn
+           | [forall tyavrs .] [context =>] qtycls inst1 ... instn
+           | [forall tyavrs .] [context =>] tyvar inst1 ... instn
 
   Note that an explicit ``forall`` is often absolutely essential. Consider the rose-tree example ::
 
@@ -10525,7 +10557,7 @@ assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/Let
 The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies`
 and :extension:`GADTs`. You can switch it off again with
 :extension:`NoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
-less predicatable if you do so. (Read the papers!)
+less predictable if you do so. (Read the papers!)
 
 .. _kind-generalisation:
 
@@ -10606,14 +10638,35 @@ Here are the details:
   will have its type variables
   ordered as ``m, a, b, c``.
 
+- If the type signature includes any kind annotations (either on variable
+  binders or as annotations on types), any variables used in kind
+  annotations come before any variables never used in kind annotations.
+  This rule is not recursive: if there is an annotation within an annotation,
+  then the variables used therein are on equal footing. Examples::
+
+    f :: Proxy (a :: k) -> Proxy (b :: j) -> ()
+      -- as if f :: forall k j a b. ...
+
+    g :: Proxy (b :: j) -> Proxy (a :: (Proxy :: (k -> Type) -> Type) Proxy) -> ()
+      -- as if g :: forall j k b a. ...
+      -- NB: k is in a kind annotation within a kind annotation
+
 - If any of the variables depend on other variables (that is, if some
   of the variables are *kind* variables), the variables are reordered
   so that kind variables come before type variables, preserving the
   left-to-right order as much as possible. That is, GHC performs a
-  stable topological sort on the variables.
+  stable topological sort on the variables. Examples::
 
-  For example: if we have ``bar :: Proxy (a :: (j, k)) -> b``, then
-  the variables are ordered ``j``, ``k``, ``a``, ``b``.
+    h :: Proxy (a :: (j, k)) -> Proxy (b :: Proxy a) -> ()
+      -- as if h :: forall j k a b. ...
+
+  In this example, all of ``a``, ``j``, and ``k`` are considered kind
+  variables and will always be placed before ``b``, a lowly type variable.
+  (Note that ``a`` is used in ``b``\'s kind.) Yet, even though ``a`` appears
+  lexically before ``j`` and ``k``, ``j`` and ``k`` are quantified first,
+  because ``a`` depends on ``j`` and ``k``. Note further that ``j`` and ``k``
+  are not reordered with respect to each other, even though doing so would
+  not violate dependency conditions.
 
 - Visible type application is available to instantiate only user-specified
   type variables. This means that in ``data Proxy a = Proxy``, the unmentioned
@@ -11124,7 +11177,7 @@ the following pairs are equivalent: ::
                     h x y = y
                  in ...
 
-Notice that GHC always adds implicit quantfiers *at the outermost level*
+Notice that GHC always adds implicit quantifiers *at the outermost level*
 of a user-written type; it
 does *not* find the inner-most possible quantification
 point. For example: ::
@@ -11539,6 +11592,21 @@ configurable by a few flags.
     ``(_ :: Int -> [Int])``, ``mempty`` is a hole fit with
     ``mempty @(Int -> [Int])``. This can be toggled off with
     the reverse of this flag.
+
+.. ghc-flag:: -fshow-docs-of-hole-fits
+    :shortdesc: Toggles whether to show the documentation of the valid
+       hole fits in the output.
+    :type: dynamic
+    :category: verbosity
+    :reverse: -fno-show-docs-of-hole-fits
+
+    :default: off
+
+    It can sometime be the case that the name and type of a valid hole
+    fit is not enough to realize what the fit stands for. This flag
+    adds the documentation of the fit to the message, if the
+    documentation is available (and the module from which the function
+    comes was compiled with the ``-haddock`` flag).
 
 .. ghc-flag:: -fshow-type-app-vars-of-hole-fits
     :shortdesc: Toggles whether to show what type each quantified
@@ -14946,7 +15014,7 @@ modules. ``COMPLETE`` pragmas should be thought of as asserting a
 universal truth about a set of patterns and as a result, should not be
 used to silence context specific incomplete match warnings.
 
-When specifing a ``COMPLETE`` pragma, the result types of all patterns must
+When specifying a ``COMPLETE`` pragma, the result types of all patterns must
 be consistent with each other. This is a sanity check as it would be impossible
 to match on all the patterns if the types were inconsistent.
 
@@ -15846,8 +15914,8 @@ Here are some examples: ::
 The type ``Simple`` has its parameter at role representational, which is
 generally the most common case. ``Simple Age`` would have the same
 representation as ``Simple Int``. The type ``Complex``, on the other
-hand, has its parameter at role nominal, because ``Simple Age`` and
-``Simple Int`` are *not* the same. Lastly, ``Phant Age`` and
+hand, has its parameter at role nominal, because ``Complex Age`` and
+``Complex Int`` are *not* the same. Lastly, ``Phant Age`` and
 ``Phant Bool`` have the same representation, even though ``Age`` and
 ``Bool`` are unrelated.
 

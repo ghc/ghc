@@ -150,6 +150,11 @@ data Integer  = S#                !Int#
               | Jn# {-# UNPACK #-} !BigNat
                 -- ^ iff value in @]-inf, minBound::'Int'[@ range
 
+-- NOTE: the above representation is baked into the GHCi debugger in
+-- compiler/ghci/RtClosureInspect.hs. If you change it here, fixes
+-- will be required over there too. Tests for this are in
+-- testsuite/tests/ghci.debugger.
+
 -- TODO: experiment with different constructor-ordering
 
 instance Eq Integer where
@@ -1389,7 +1394,9 @@ gcdExtSBigNat x y = case runS go of (g,s) -> (# g, s #)
   where
     go = do
         g@(MBN# g#) <- newBigNat# gn0#
-        s@(MBN# s#) <- newBigNat# (absI# xn#)
+        -- According to https://gmplib.org/manual/Number-Theoretic-Functions.html#index-mpz_005fgcdext
+        -- abs(s) < abs(y) / (2 g)
+        s@(MBN# s#) <- newBigNat# (absI# yn#)
         I# ssn_# <- liftIO (integer_gmp_gcdext# s# g# x# xn# y# yn#)
         let ssn# = narrowGmpSize# ssn_#
             sn#  = absI# ssn#

@@ -575,7 +575,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
 -- The second argument of type TyVarSet is a set of type variables
 -- that are bound together with extra_env and should not be regarded
 -- as free in the types of extra_env.
-  = do  { traceTc "env2" (ppr extra_env)
+  = do  { traceTc "tc_extend_local_env" (ppr extra_env)
         ; env0 <- getLclEnv
         ; env1 <- tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage

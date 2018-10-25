@@ -993,7 +993,7 @@ When typechecking
 we want to typecheck 'bar' in the knowledge that it should be an IO thing,
 pushing info from the context into the RHS.  To do this, we check the
 rebindable syntax first, and push that information into (tcMonoExprNC rhs).
-Otherwise the error shows up when cheking the rebindable syntax, and
+Otherwise the error shows up when checking the rebindable syntax, and
 the expected/inferred stuff is back to front (see Trac #3613).
 
 Note [typechecking ApplicativeStmt]

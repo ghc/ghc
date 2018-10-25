@@ -27,7 +27,7 @@ prep:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(LOCAL_PKGCONF) -c -package $(PKG)-2.0 B2.hs
 
 prep.%:
-	cd $* && '$(TEST_HC)' -v0 --make -o setup Setup.hs
+	cd $* && '$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -o setup Setup.hs
 	cd $* && ./setup configure $(CABAL_MINIMAL_BUILD) -v0 --with-compiler='$(TEST_HC)' --with-ghc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db ../$(LOCAL_PKGCONF)
 	cd $* && ./setup build -v0
 	cd $* && ./setup register -v0 --inplace

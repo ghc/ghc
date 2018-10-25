@@ -1281,7 +1281,8 @@ ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)
-  = do { fun  <- dsLookupGlobalId tr_fun
+  = -- See Note [Typeable for Nat and Symbol] in TcInteract
+    do { fun  <- dsLookupGlobalId tr_fun
        ; dict <- dsEvTerm ev       -- Of type KnownNat/KnownSym
        ; let proxy = mkTyApps (Var proxyHashId) [ty_kind, ty]
        ; return (mkApps (mkTyApps (Var fun) [ty]) [ dict, proxy ]) }

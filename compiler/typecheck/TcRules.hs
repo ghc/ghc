@@ -65,35 +65,23 @@ tcRuleDecls (HsRules _ src decls)
 tcRuleDecls (XRuleDecls _) = panic "tcRuleDecls"
 
 tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
-tcRule (HsRule (HsRuleRn fv_lhs fv_rhs) name act hs_bndrs lhs rhs)
-  = addErrCtxt (ruleCtxt $ snd $ unLoc name)  $
-    do { traceTc "---- Rule ------" (pprFullRuleName name)
+tcRule (HsRule fvs rname@(L _ (_,name))
+               act hs_bndrs lhs rhs)
+  = addErrCtxt (ruleCtxt name)  $
+    do { traceTc "---- Rule ------" (pprFullRuleName rname)
 
         -- Note [Typechecking rules]
-       ; (vars, bndr_wanted) <- captureConstraints $
-                                tcRuleBndrs hs_bndrs
-              -- bndr_wanted constraints can include wildcard hole
-              -- constraints, which we should not forget about.
-              -- It may mention the skolem type variables bound by
-              -- the RULE.  c.f. Trac #10072
+       ; (stuff, tc_lvl) <- pushTcLevelM $
+                            generateRuleConstraints hs_bndrs lhs rhs
 
-       ; let (id_bndrs, tv_bndrs) = partition isId vars
-       ; (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty)
-            <- tcExtendTyVarEnv (map unrestricted tv_bndrs) $ -- TODO: arnaud: type variables should be Zero
-               tcExtendIdEnv    (map unrestricted id_bndrs) $ -- TODO: arnaud: I don't know what `id_bndrs` are so I don't know if unrestricted is right
-               do { -- See Note [Solve order for RULES]
-                    ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
-                  ; (rhs', rhs_wanted) <- captureConstraints $
-                                          tcMonoExpr rhs (mkCheckExpType rule_ty)
-                  ; return (lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) }
+       ; let ( id_bndrs, lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) = stuff
 
-       ; traceTc "tcRule 1" (vcat [ pprFullRuleName name
+       ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
                                   , ppr lhs_wanted
                                   , ppr rhs_wanted ])
-       ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; (lhs_evs, residual_lhs_wanted) <- simplifyRule (snd $ unLoc name)
-                                              all_lhs_wanted
-                                              rhs_wanted
+
+       ; (lhs_evs, residual_lhs_wanted)
+            <- simplifyRule name tc_lvl lhs_wanted rhs_wanted
 
        -- SimplfyRule Plan, step 4
        -- Now figure out what to quantify over
@@ -114,7 +102,7 @@ tcRule (HsRule (HsRuleRn fv_lhs fv_rhs) name act hs_bndrs lhs rhs)
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
        ; qtkvs <- quantifyTyVars gbls forall_tkvs
-       ; traceTc "tcRule" (vcat [ pprFullRuleName name
+       ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs
                                 , ppr rule_ty
@@ -126,18 +114,43 @@ tcRule (HsRule (HsRuleRn fv_lhs fv_rhs) name act hs_bndrs lhs rhs)
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; let skol_info = RuleSkol (snd (unLoc name))
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor topTcLevel skol_info qtkvs
+       ; let skol_info = RuleSkol name
+       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
                                          lhs_evs residual_lhs_wanted
-       ; (rhs_implic, rhs_binds) <- buildImplicationFor topTcLevel skol_info qtkvs
+       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
-       ; return (HsRule (HsRuleRn fv_lhs fv_rhs)name act
+       ; return (HsRule fvs rname act
                     (map (noLoc . RuleBndr noExt . noLoc) (qtkvs ++ tpl_ids))
                     (mkHsDictLet lhs_binds lhs')
                     (mkHsDictLet rhs_binds rhs')) }
 tcRule (XRuleDecl _) = panic "tcRule"
+
+generateRuleConstraints :: [LRuleBndr GhcRn] -> LHsExpr GhcRn -> LHsExpr GhcRn
+                        -> TcM ( [TcId]
+                               , LHsExpr GhcTc, WantedConstraints
+                               , LHsExpr GhcTc, WantedConstraints
+                               , TcType )
+generateRuleConstraints hs_bndrs lhs rhs
+  = do { (vars, bndr_wanted) <- captureConstraints $
+                                tcRuleBndrs hs_bndrs
+              -- bndr_wanted constraints can include wildcard hole
+              -- constraints, which we should not forget about.
+              -- It may mention the skolem type variables bound by
+              -- the RULE.  c.f. Trac #10072
+
+       ; let (id_bndrs, tv_bndrs) = partition isId vars
+       ; tcExtendTyVarEnv (map unrestricted tv_bndrs) $
+         tcExtendIdEnv    (map unrestricted id_bndrs) $
+    do { -- See Note [Solve order for RULES]
+         ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
+       ; (rhs',            rhs_wanted) <- captureConstraints $
+                                          tcMonoExpr rhs (mkCheckExpType rule_ty)
+       ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
+       ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
+                -- Slightly curious that tv_bndrs is not returned
+
 
 tcRuleBndrs :: [LRuleBndr GhcRn] -> TcM [Var]
 tcRuleBndrs []
@@ -308,6 +321,7 @@ terrible, so we avoid the problem by cloning the constraints.
 -}
 
 simplifyRule :: RuleName
+             -> TcLevel                 -- Level at which to solve the constraints
              -> WantedConstraints       -- Constraints from LHS
              -> WantedConstraints       -- Constraints from RHS
              -> TcM ( [EvVar]               -- Quantify over these LHS vars
@@ -315,7 +329,7 @@ simplifyRule :: RuleName
 -- See Note [The SimplifyRule Plan]
 -- NB: This consumes all simple constraints on the LHS, but not
 -- any LHS implication constraints.
-simplifyRule name lhs_wanted rhs_wanted
+simplifyRule name tc_lvl lhs_wanted rhs_wanted
   = do {
        -- Note [The SimplifyRule Plan] step 1
        -- First solve the LHS and *then* solve the RHS
@@ -323,12 +337,13 @@ simplifyRule name lhs_wanted rhs_wanted
        -- Why clone?  See Note [Simplify cloned constraints]
        ; lhs_clone <- cloneWC lhs_wanted
        ; rhs_clone <- cloneWC rhs_wanted
-       ; runTcSDeriveds $
-             do { _ <- solveWanteds lhs_clone
-                ; _ <- solveWanteds rhs_clone
+       ; setTcLevel tc_lvl $
+         runTcSDeriveds    $
+         do { _ <- solveWanteds lhs_clone
+            ; _ <- solveWanteds rhs_clone
                   -- Why do them separately?
                   -- See Note [Solve order for RULES]
-                ; return () }
+            ; return () }
 
        -- Note [The SimplifyRule Plan] step 2
        ; lhs_wanted <- zonkWC lhs_wanted

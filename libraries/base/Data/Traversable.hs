@@ -62,6 +62,7 @@ import Data.Functor.Identity ( Identity(..) )
 import Data.Functor.Utils ( StateL(..), StateR(..) )
 import Data.Monoid ( Dual(..), Sum(..), Product(..),
                      First(..), Last(..), Alt(..), Ap(..) )
+import Data.Ord ( Down(..) )
 import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
@@ -359,6 +360,10 @@ deriving instance Traversable UInt
 
 -- | @since 4.9.0.0
 deriving instance Traversable UWord
+
+-- Instance for Data.Ord
+-- | @since 4.12.0.0
+deriving instance Traversable Down
 
 -- general functions
 

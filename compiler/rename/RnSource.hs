@@ -1745,7 +1745,7 @@ This should be rejected. Why? Because it would generate the following instance:
     instance Eq Quux where
       (==) = coerce @(Quux         -> Quux         -> Bool)
                     @(Const a Quux -> Const a Quux -> Bool)
-                    (==)
+                    (==) :: Const a Quux -> Const a Quux -> Bool
 
 This instance is ill-formed, as the `a` in `Const a Quux` is unbound. The
 problem is that `a` is never used anywhere in the derived class `Eq`. Since

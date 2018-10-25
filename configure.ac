@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.5], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.7], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -710,6 +710,12 @@ cygwin32|mingw32)
   else
     AC_PATH_PROG([PerlCmd],[perl])
   fi
+  # because of Trac #15051 SplitObjs is useless on Windows.  It regresses
+  # build times to days for a build, and this effect is also there for end users
+  # of GHC.  So unfortunately we have to disable it, even without having
+  # split-sections.  Though the compile time hit for split-sections should be
+  # tiny compared to this so maybe we should enable it for x86_64.
+  SplitObjsBroken=YES
   ;;
 *)
     AC_PATH_PROG([PerlCmd],[perl])
@@ -1263,7 +1269,7 @@ if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
     AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
 fi
 AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
-if test $HaveLibNuma = "YES" ; then
+if test $HaveLibNuma = "1" ; then
   AC_SUBST([CabalHaveLibNuma],[True])
 else
   AC_SUBST([CabalHaveLibNuma],[False])

@@ -33,6 +33,7 @@
 ((Test10278.hs:(8,20)-(10,57),AnnForall), [Test10278.hs:8:20-25]),
 ((Test10278.hs:(8,32)-(10,57),AnnDot), [Test10278.hs:8:43]),
 ((Test10278.hs:(8,32)-(10,57),AnnForall), [Test10278.hs:8:32-37]),
+((Test10278.hs:9:27-50,AnnRarrow), [Test10278.hs:10:31-32]),
 ((Test10278.hs:(9,27)-(10,57),AnnRarrow), [Test10278.hs:10:31-32]),
 ((Test10278.hs:9:38-50,AnnCloseP), [Test10278.hs:9:50]),
 ((Test10278.hs:9:38-50,AnnOpenP), [Test10278.hs:9:38]),

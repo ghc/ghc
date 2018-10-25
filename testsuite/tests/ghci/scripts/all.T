@@ -1,5 +1,12 @@
 # coding=utf8
 
+# Note [Disabling ghci-leak-check]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# The -fno-ghci-leak-check is because this test prints the current GHC settings
+# and the ghci-leak-check is turned off in DEBUG mode. See #15372. So we need to
+# turn it off in non-DEBUG mode, too, so that one stdout works for both modes.
+# After #15372 is fully fixed, these "extra_hc_opts" should be removed.
+
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])
@@ -91,7 +98,9 @@ test('ghci056',
       extra_run_opts('ghci056_c.o')],
      ghci_script, ['ghci056.script'])
 
-test('ghci057', normal, ghci_script, ['ghci057.script'])
+test('ghci057', extra_hc_opts("-fno-ghci-leak-check"), ghci_script, ['ghci057.script'])
+  # See Note [Disabling ghci-leak-check]
+
 test('ghci060', normal, ghci_script, ['ghci060.script'])
 test('ghci061', normal, ghci_script, ['ghci061.script'])
 test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
@@ -190,7 +199,10 @@ test('T9181', normal, ghci_script, ['T9181.script'])
 test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
 test('T9658', normal, ghci_script, ['T9658.script'])
-test('T9293', extra_files(['ghci057.hs']), ghci_script, ['T9293.script'])
+
+test('T9293', [extra_hc_opts('-fno-ghci-leak-check'), extra_files(['ghci057.hs'])], ghci_script, ['T9293.script'])
+  # See Note [Disabling ghci-leak-check]
+
 test('T9762',
  [ unless(have_dynamic(),skip)
  , pre_cmd('$MAKE -s --no-print-directory T9762_prep')
@@ -201,6 +213,7 @@ test('T9878', [], ghci_script, ['T9878.script'])
 test('T9878b', [extra_run_opts('-fobject-code')], ghci_script,
      ['T9878b.script'])
 test('T10018', normal, ghci_script, ['T10018.script'])
+test('T10059', normal, ghci_script, ['T10059.script'])
 test('T10122', normal, ghci_script, ['T10122.script'])
 
 test('T10321', normal, ghci_script, ['T10321.script'])
@@ -268,3 +281,4 @@ test('T14676', extra_files(['../prog002']), ghci_script, ['T14676.script'])
 test('T14796', normal, ghci_script, ['T14796.script'])
 test('T14969', normal, ghci_script, ['T14969.script'])
 test('T15259', normal, ghci_script, ['T15259.script'])
+test('T15341', normal, ghci_script, ['T15341.script'])

@@ -5,7 +5,8 @@
 Functions for working with the typechecker environment (setters, getters...).
 -}
 
-{-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances #-}
+{-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcRnMonad(
@@ -436,7 +437,7 @@ updTopEnv upd = updEnv (\ env@(Env { env_top = top }) ->
                           env { env_top = upd top })
 
 getGblEnv :: TcRnIf gbl lcl gbl
-getGblEnv = do { env <- getEnv; return (env_gbl env) }
+getGblEnv = do { Env{..} <- getEnv; return env_gbl }
 
 updGblEnv :: (gbl -> gbl) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updGblEnv upd = updEnv (\ env@(Env { env_gbl = gbl }) ->
@@ -446,7 +447,7 @@ setGblEnv :: gbl -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setGblEnv gbl_env = updEnv (\ env -> env { env_gbl = gbl_env })
 
 getLclEnv :: TcRnIf gbl lcl lcl
-getLclEnv = do { env <- getEnv; return (env_lcl env) }
+getLclEnv = do { Env{..} <- getEnv; return env_lcl }
 
 updLclEnv :: (lcl -> lcl) -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 updLclEnv upd = updEnv (\ env@(Env { env_lcl = lcl }) ->
@@ -1767,7 +1768,7 @@ initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; dflags <- getDynFlags
-        ; let mod = tcg_semantic_mod tcg_env
+        ; let !mod = tcg_semantic_mod tcg_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
               is_instantiate = unitIdIsDefinite (thisPackage dflags) &&

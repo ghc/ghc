@@ -1,9 +1,12 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module GHC.Exts.Heap.ClosureTypes
     ( ClosureType(..)
     , closureTypeHeaderSize
     ) where
+
+import GHC.Generics
 
 {- ---------------------------------------------
 -- Enum representing closure types
@@ -77,7 +80,7 @@ data ClosureType
     | SMALL_MUT_ARR_PTRS_FROZEN_CLEAN
     | COMPACT_NFDATA
     | N_CLOSURE_TYPES
- deriving (Enum, Eq, Ord, Show)
+ deriving (Enum, Eq, Ord, Show, Generic)
 
 -- | Return the size of the closures header in words
 closureTypeHeaderSize :: ClosureType -> Int
