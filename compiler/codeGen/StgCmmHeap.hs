@@ -519,7 +519,7 @@ heapCheck checkStack checkYield do_gc code
                     [" Trying to allocate more than "++show mBLOCK_SIZE++" bytes.",
                      "",
                      "This is currently not possible due to a limitation of GHC's code generator.",
-                     "See http://hackage.haskell.org/trac/ghc/ticket/4505 for details.",
+                     "See http://ghc.haskell.org/trac/ghc/ticket/4505 for details.",
                      "Suggestion: read data from a file instead of having large static data",
                      "structures in code."]
                  | hpHw > 0  = Just (mkIntExpr dflags (hpHw * (wORD_SIZE dflags)))
