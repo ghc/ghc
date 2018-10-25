@@ -138,6 +138,7 @@ body.js-enabled .hide-when-js-enabled {
       white-space: nowrap;
       height: 40px;
       padding: 4px 1.5em 0px 1.5em;
+      overflow: visible;
 
       display: flex;
       justify-content: space-between;
@@ -336,7 +337,7 @@ ul.links li {
   padding: 0;
 }
 
-ul.links li + li:before {
+ul.links > li + li:before {
   content: '\00B7';
 }
 
@@ -428,7 +429,6 @@ pre + pre {
   font-size: 1.2em;
   text-align: left;
   margin: 0 auto;
-  overflow: hidden;
 }
 
 #package-header .caption {
@@ -480,16 +480,17 @@ div#style-menu-holder {
 }
 
 #style-menu li {
-	display: list-item;
+	display: inline-block;
 	border-style: none;
 	margin: 0;
 	padding: 0;
 	color: #000;
 	list-style-type: none;
+	border-top: 1px solid #919191
 }
 
 #style-menu li + li {
-	border-top: 1px solid #919191;
+	border-left: 1px solid #919191;
 }
 
 #style-menu a {

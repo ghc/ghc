@@ -1,7 +1,9 @@
 // Haddock JavaScript utilities
 
 import {getCookie, setCookie, clearCookie} from "./cookies";
+import preact = require("preact");
 
+const { h, Component } = preact;
 const rspace = /\s\s+/g,
     rtrim = /^\s+|\s+$/g;
 
@@ -47,34 +49,43 @@ function makeClassToggle(valueOn: string, valueOff: string): (elem: Element, boo
 
 const toggleShow = makeClassToggle("show", "hide");
 
-function addMenuItem(html: string) {
-  const menu = document.getElementById("page-menu");
-  if (menu && menu.firstChild) {
-    const btn = menu.firstChild.cloneNode(false) as Element;
-    btn.innerHTML = html;
-    menu.appendChild(btn);
-  }
-}
-
 function styles(): HTMLLinkElement[] {
   const es = Array.prototype.slice.call(document.getElementsByTagName("link"));
   return es.filter((a: HTMLLinkElement) => a.rel.indexOf("style") != -1 && a.title);
 }
 
+class StyleMenuButton extends Component<any, any> {
+
+  render(props: { stys: string[] }) {
+    function action() {
+      styleMenu();
+      return false;
+    };
+
+    return <li><div id='style-menu-holder' onClick={action}>
+      <a href='#'>Style &#9662;</a>
+      <ul id='style-menu' class='hide'>
+        {props.stys.map((sty) => {
+              function action() {
+                setActiveStyleSheet(sty);
+                return false;
+              };
+
+              return <li><a href='#' onClick={action}>{sty}</a></li>;
+        })}
+      </ul>
+    </div></li>;
+  }
+
+}
+
 function addStyleMenu() {
-  const as = styles();
-  let btns = "";
-  as.forEach((a) => {
-    btns += "<li><a href='#' onclick=\"setActiveStyleSheet('"
-      + a.title + "'); return false;\">"
-      + a.title + "</a></li>"
-  });
-  if (as.length > 1) {
-    const h = "<div id='style-menu-holder'>"
-      + "<a href='#' onclick='styleMenu(); return false;'>Style &#9662;</a>"
-      + "<ul id='style-menu' class='hide'>" + btns + "</ul>"
-      + "</div>";
-    addMenuItem(h);
+  const stys = styles().map((s) => s.title);
+  if (stys.length > 1) {
+    const pageMenu = document.querySelector('#page-menu') as HTMLUListElement;
+    const dummy = document.createElement('li');
+    pageMenu.appendChild(dummy);
+    preact.render(<StyleMenuButton stys={stys} title="Style"/>, pageMenu, dummy);
   }
 }
 
@@ -97,7 +108,6 @@ function setActiveStyleSheet(title: string) {
     as[0].disabled = false;
     clearCookie("haddock-style");
   }
-  styleMenu(false);
 }
 
 function resetStyle() {
