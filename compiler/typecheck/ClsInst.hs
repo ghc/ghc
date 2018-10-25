@@ -170,6 +170,27 @@ match_one so dfun_id mb_inst_tys
                                                            , iw_safe_over = so } } }
 
 
+{- Note [Shortcut solving: overlap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  instance {-# OVERLAPPABLE #-} C a where ...
+and we are typechecking
+  f :: C a => a -> a
+  f = e  -- Gives rise to [W] C a
+
+We don't want to solve the wanted constraint with the overlappable
+instance; rather we want to use the supplied (C a)! That was the whole
+point of it being overlappable!  Trac #14434 wwas an example.
+
+Alas even if the instance has no overlap flag, thus
+  instance C a where ...
+there is nothing to stop it being overlapped. GHC provides no way to
+declare an instance as "final" so it can't be overlapped.  But really
+only final instances are OK for short-cut solving.  Sigh. Trac #15135
+was a puzzling example.
+-}
+
+
 {- ********************************************************************
 *                                                                     *
                    Class lookup for CTuples
