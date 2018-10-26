@@ -235,7 +235,7 @@ Display the package name on top of the menu links and center both elements:
  */
 
  body, button {
-   font: 400 17px/1.43 'PT Sans',
+   font: 400 15px/1.4 'PT Sans',
      /* Fallback Font Stack */
      -apple-system,
 	  BlinkMacSystemFont,
@@ -672,7 +672,7 @@ div#style-menu-holder {
   visibility: hidden;
 }
 
-.subs {
+.subs, .top > .doc, .subs > .doc {
   padding-left: 1em;
   border-left: 1px solid gainsboro;
   margin-bottom: 1em;
