@@ -371,9 +371,10 @@ modulePackageInfo :: DynFlags
                   -> [Flag] -- ^ Haddock flags are checked as they may contain
                             -- the package name or version provided by the user
                             -- which we prioritise
-                  -> Module
+                  -> Maybe Module
                   -> (Maybe PackageName, Maybe Data.Version.Version)
-modulePackageInfo dflags flags modu =
+modulePackageInfo _dflags _flags Nothing = (Nothing, Nothing)
+modulePackageInfo dflags flags (Just modu) =
   ( optPackageName flags    <|> fmap packageName pkgDb
   , optPackageVersion flags <|> fmap packageVersion pkgDb
   )
