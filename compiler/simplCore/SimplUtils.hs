@@ -153,7 +153,8 @@ data SimplCont
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
-      , sc_cont :: SimplCont }
+      , sc_cont :: SimplCont
+      , sc_weight :: Rig }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -273,20 +274,20 @@ data ArgInfo
     }
 
 data ArgSpec
-  = ValArg OutExpr                    -- Apply to this (coercion or value); c.f. ApplyToVal
+  = ValArg Rig OutExpr                -- Apply to this (coercion or value); c.f. ApplyToVal
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
 
 instance Outputable ArgSpec where
-  ppr (ValArg e)                 = text "ValArg" <+> ppr e
+  ppr (ValArg w e)               = text "ValArg" <+> ppr w <+> ppr e
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
-                        , ai_type = applyTypeToArg (ai_type ai) arg
-                        , ai_rules = decRules (ai_rules ai) }
+addValArgTo :: ArgInfo -> (Rig, OutExpr) -> ArgInfo
+addValArgTo ai (w, arg) = ai { ai_args = ValArg w arg : ai_args ai
+                          , ai_type = applyTypeToArg (ai_type ai) arg
+                          , ai_rules = decRules (ai_rules ai) }
 
 addTyArgTo :: ArgInfo -> OutType -> ArgInfo
 addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
@@ -303,7 +304,7 @@ addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
 argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg e                 : as) = e       : argInfoAppArgs as
+argInfoAppArgs (ValArg _ e                 : as) = e       : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
 pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
@@ -312,7 +313,7 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest } -- TODO Krzysztof
+      ValArg w e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest, sc_weight = w }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -325,7 +326,7 @@ argInfoExpr fun rev_args
   = go rev_args
   where
     go []                              = Var fun
-    go (ValArg a                 : as) = go as `App` a
+    go (ValArg _ a               : as) = go as `App` a
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
@@ -411,7 +412,7 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg { sc_fun = ai })      = funArgTy (ai_type ai)
+contHoleType (StrictArg  { sc_fun = ai, sc_weight = _w })      = funArgTy (ai_type ai) -- MattP: This looks dodgy as sc_weight is not used.
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
                          , sc_weight = w })
