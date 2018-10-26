@@ -157,7 +157,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
            is_generic  = main_cls `hasKey` genClassKey
            is_generic1 = main_cls `hasKey` gen1ClassKey
            -- is_functor_like: see Note [Inferring the instance context]
-           is_functor_like = typeKind inst_ty `tcEqKind` typeToTypeKind
+           is_functor_like = tcTypeKind inst_ty `tcEqKind` typeToTypeKind
                           || is_generic1
 
            get_gen1_constraints :: Class -> CtOrigin -> TypeOrKind -> Type
@@ -191,7 +191,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
            -- message which points out the kind mismatch.
            -- See Note [Inferring the instance context]
            mk_functor_like_constraints orig t_or_k cls
-              = map $ \ty -> let ki = typeKind ty in
+              = map $ \ty -> let ki = tcTypeKind ty in
                              ( [ mk_cls_pred orig t_or_k cls ty
                                , mkPredOrigin orig KindLevel
                                    (mkPrimEqPred ki typeToTypeKind) ]
@@ -232,7 +232,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
              where
                constrs
                  | main_cls `hasKey` dataClassKey
-                 , all (isLiftedTypeKind . typeKind) rep_tc_args
+                 , all (isLiftedTypeKind . tcTypeKind) rep_tc_args
                  = [ mk_cls_pred deriv_origin t_or_k main_cls ty
                    | (t_or_k, ty) <- zip t_or_ks rep_tc_args]
                  | otherwise

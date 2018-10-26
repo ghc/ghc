@@ -2262,8 +2262,8 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
         -- So we return ( [a,b,z], [x,y]
         --              , [], [x,y,z]
         --              , [a~(x,y),b~z], <arg-subst> )
-  | Just subst <- ASSERT( isLiftedTypeKind (typeKind res_ty) )
-                  ASSERT( isLiftedTypeKind (typeKind res_tmpl) )
+  | Just subst <- ASSERT( isLiftedTypeKind (tcTypeKind res_ty) )
+                  ASSERT( isLiftedTypeKind (tcTypeKind res_tmpl) )
                   tcMatchTy res_tmpl res_ty
   = let (univ_tvs, raw_eqs, kind_subst) = mkGADTVars tmpl_tvs dc_tvs subst
         raw_ex_tvs = dc_tvs `minusList` univ_tvs
@@ -2783,8 +2783,8 @@ checkValidDataCon dflags existential_ok tc con
               orig_res_ty = dataConOrigResTy con
         ; traceTc "checkValidDataCon" (vcat
               [ ppr con, ppr tc, ppr tc_tvs
-              , ppr res_ty_tmpl <+> dcolon <+> ppr (typeKind res_ty_tmpl)
-              , ppr orig_res_ty <+> dcolon <+> ppr (typeKind orig_res_ty)])
+              , ppr res_ty_tmpl <+> dcolon <+> ppr (tcTypeKind res_ty_tmpl)
+              , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
 
 
         ; checkTc (isJust (tcMatchTy res_ty_tmpl

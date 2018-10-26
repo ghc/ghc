@@ -599,7 +599,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
 
-    is_homo_equality _ (EqPred _ ty1 ty2) = typeKind ty1 `tcEqType` typeKind ty2
+    is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
     is_homo_equality _ _                  = False
 
     is_equality _ (EqPred {}) = True
@@ -1171,7 +1171,7 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
   where
     occ       = holeOcc hole
     hole_ty   = ctEvPred (ctEvidence ct)
-    hole_kind = typeKind hole_ty
+    hole_kind = tcTypeKind hole_ty
     tyvars    = tyCoVarsOfTypeList hole_ty
 
     hole_msg = case hole of
@@ -1494,9 +1494,9 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
                          || not (cty1 `pickyEqType` cty2)
                          -> hang (text "When matching" <+> sub_what)
                                2 (vcat [ ppr cty1 <+> dcolon <+>
-                                         ppr (typeKind cty1)
+                                         ppr (tcTypeKind cty1)
                                        , ppr cty2 <+> dcolon <+>
-                                         ppr (typeKind cty2) ])
+                                         ppr (tcTypeKind cty2) ])
                        _ -> text "When matching the kind of" <+> quotes (ppr cty1)
               msg2 = case sub_o of
                        TypeEqOrigin {}
@@ -1744,7 +1744,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
         -- Not an occurs check, because F is a type function.
   where
     Pair _ k1 = tcCoercionKind co1
-    k2        = typeKind ty2
+    k2        = tcTypeKind ty2
 
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
@@ -2501,7 +2501,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                , not (isTypeFamilyTyCon tc)
                = hang (text "GHC can't yet do polykinded")
                     2 (text "Typeable" <+>
-                       parens (ppr ty <+> dcolon <+> ppr (typeKind ty)))
+                       parens (ppr ty <+> dcolon <+> ppr (tcTypeKind ty)))
                | otherwise
                = empty
 

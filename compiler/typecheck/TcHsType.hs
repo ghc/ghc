@@ -479,7 +479,7 @@ missing any patterns.
 Note [The tcType invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 (IT1) If    tc_ty = tc_hs_type hs_ty exp_kind
-      then  typeKind tc_ty = exp_kind
+      then  tcTypeKind tc_ty = exp_kind
 without any zonking needed.  The reason for this is that in
 tcInferApps we see (F ty), and we kind-check 'ty' with an
 expected-kind coming from F.  Then, to make the resulting application
@@ -492,17 +492,17 @@ The tcType invariant also applies to checkExpectedKind:
 (IT2) if
         (tc_ty, _, _) = checkExpectedKind ty act_ki exp_ki
       then
-        typeKind tc_ty = exp_ki
+        tcTypeKind tc_ty = exp_ki
 
 These other invariants are all necessary, too, as these functions
 are used within tc_hs_type:
 
-(IT3) If (ty, ki) <- tc_infer_hs_type ..., then typeKind ty == ki.
+(IT3) If (ty, ki) <- tc_infer_hs_type ..., then tcTypeKind ty == ki.
 
 (IT4) If (ty, ki) <- tc_infer_hs_type ..., then zonk ki == ki.
       (In other words, the result kind of tc_infer_hs_type is zonked.)
 
-(IT5) If (ty, ki) <- tcTyVar ..., then typeKind ty == ki.
+(IT5) If (ty, ki) <- tcTyVar ..., then tcTypeKind ty == ki.
 
 (IT6) If (ty, ki) <- tcTyVar ..., then zonk ki == ki.
       (In other words, the result kind of tcTyVar is zonked.)
@@ -559,7 +559,7 @@ tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
 tc_infer_hs_type _    (XHsType (NHsCoreTy ty))
   = do { ty <- zonkTcType ty  -- (IT3) and (IT4) of Note [The tcType invariant]
-       ; return (ty, typeKind ty) }
+       ; return (ty, tcTypeKind ty) }
 tc_infer_hs_type mode other_ty
   = do { kv <- newMetaKindVar
        ; ty' <- tc_hs_type mode other_ty kv
@@ -863,7 +863,7 @@ tcInferApps :: TcTyMode
             -> TcKind               -- ^ Function kind (zonked)
             -> [LHsType GhcRn]      -- ^ Args
             -> TcM (TcType, [TcType], TcKind) -- ^ (f args, args, result kind)
--- Precondition: typeKind fun_ty = fun_ki
+-- Precondition: tcTypeKind fun_ty = fun_ki
 --    Reason: we will return a type application like (fun_ty arg1 ... argn),
 --            and that type must be well-kinded
 --            See Note [The tcType invariant]
@@ -1088,7 +1088,7 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                           -- want to zonk the kind, leaving the TyVar
                           -- un-zonked  (Trac #14873)
                           do { ty <- zonkTcTyVar tv
-                             ; return (ty, typeKind ty) }
+                             ; return (ty, tcTypeKind ty) }
 
            ATcTyCon tc_tc -> do { -- See Note [GADT kind self-reference]
                                   unless

@@ -129,7 +129,7 @@ module Type (
         Kind,
 
         -- ** Finding the kind of a type
-        typeKind, isTypeLevPoly, resultIsLevPoly,
+        typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
 
         -- ** Common Kind
@@ -2627,30 +2627,64 @@ nonDetCmpTc tc1 tc2
 
 typeKind :: HasDebugCallStack => Type -> Kind
 typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
-typeKind (AppTy fun arg)   = typeKind_apps fun [arg]
 typeKind (LitTy l)         = typeLiteralKind l
 typeKind (FunTy {})        = liftedTypeKind
 typeKind (TyVarTy tyvar)   = tyVarKind tyvar
 typeKind (CastTy _ty co)   = pSnd $ coercionKind co
 typeKind (CoercionTy co)   = coercionType co
+
+typeKind (AppTy fun arg)
+  = go fun [arg]
+  where
+    -- Accumulate the type arugments, so we can call piResultTys,
+    -- rather than a succession of calls to piResultTy (which is
+    -- asymptotically costly as the number of arguments increases)
+    go (AppTy fun arg) args = go fun (arg:args)
+    go fun             args = piResultTys (typeKind fun) args
+
 typeKind ty@(ForAllTy (Bndr tv _) _)
   | isTyVar tv                     -- See Note [Weird typing rule for ForAllTy].
   = case occCheckExpand tvs k of   -- We must make sure tv does not occur in kind
       Just k' -> k'                -- As it is already out of scope!
       Nothing -> pprPanic "typeKind"
                   (ppr ty $$ ppr k $$ ppr tvs $$ ppr body)
+  | otherwise
+  = liftedTypeKind
   where
     (tvs, body) = splitTyVarForAllTys ty
     k           = typeKind body
-typeKind (ForAllTy {})     = liftedTypeKind
 
-typeKind_apps :: HasDebugCallStack => Type -> [Type] -> Kind
--- The sole purpose of the function is to accumulate
--- the type arugments, so we can call piResultTys, rather than
--- a succession of calls to piResultTy (which is asymptotically
--- less efficient as the number of arguments increases)
-typeKind_apps (AppTy fun arg) args = typeKind_apps fun (arg:args)
-typeKind_apps fun             args = piResultTys (typeKind fun) args
+tcTypeKind :: HasDebugCallStack => Type -> Kind
+tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
+tcTypeKind (LitTy l)         = typeLiteralKind l
+tcTypeKind (FunTy arg res)
+  | isPredTy arg = tcTypeKind res
+  | otherwise    = liftedTypeKind
+tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
+tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
+tcTypeKind (CoercionTy co)   = coercionType co
+
+tcTypeKind (AppTy fun arg)
+  = go fun [arg]
+  where
+    -- Accumulate the type arugments, so we can call piResultTys,
+    -- rather than a succession of calls to piResultTy (which is
+    -- asymptotically costly as the number of arguments increases)
+    go (AppTy fun arg) args = go fun (arg:args)
+    go fun             args = piResultTys (tcTypeKind fun) args
+
+tcTypeKind ty@(ForAllTy (Bndr tv _) _)
+  | isTyVar tv                     -- See Note [Weird typing rule for ForAllTy].
+  = case occCheckExpand tvs k of   -- We must make sure tv does not occur in kind
+      Just k' -> k'                -- As it is already out of scope!
+      Nothing -> pprPanic "tcTypeKind"
+                  (ppr ty $$ ppr k $$ ppr tvs $$ ppr body)
+  | otherwise
+  = liftedTypeKind
+  where
+    (tvs, body) = splitTyVarForAllTys ty
+    k           = tcTypeKind body
+
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind

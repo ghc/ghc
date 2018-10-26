@@ -2404,7 +2404,7 @@ tcRnType hsc_env normalise rdr_type
                         ; return ty' }
                 else return ty ;
 
-       ; return (ty', mkInvForAllTys kvs (typeKind ty')) }
+       ; return (ty', mkInvForAllTys kvs (tcTypeKind ty')) }
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~
