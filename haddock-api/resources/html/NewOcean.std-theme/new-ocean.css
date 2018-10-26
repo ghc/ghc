@@ -682,13 +682,13 @@ div#style-menu-holder {
   margin-bottom: 0.6em;
 }
 
-.subs ul {
+.subs.fields ul {
   list-style: none;
   display: table;
   margin: 0;
 }
 
-.subs ul li {
+.subs.fields ul li {
   display: table-row;
 }
 
