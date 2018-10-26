@@ -1,8 +1,8 @@
 
 <interactive>:1:7: error:
     Found type wildcard ‘_’ standing for ‘w0 :: k0’
-    Where: ‘w0’ is an ambiguous type variable
-           ‘k0’ is an ambiguous type variable
+    Where: ‘k0’ is an ambiguous type variable
+           ‘w0’ is an ambiguous type variable
     To use the inferred type, enable PartialTypeSignatures
 
 <interactive>:1:17: error:
@@ -16,8 +16,8 @@
 
 <interactive>:1:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     Found type wildcard ‘_’ standing for ‘w0 :: k0’
-    Where: ‘w0’ is an ambiguous type variable
-           ‘k0’ is an ambiguous type variable
+    Where: ‘k0’ is an ambiguous type variable
+           ‘w0’ is an ambiguous type variable
 
 <interactive>:1:17: warning: [-Wpartial-type-signatures (in -Wdefault)]
     Found type wildcard ‘_’ standing for ‘* -> *’
