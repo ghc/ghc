@@ -81,8 +81,6 @@ body.js-enabled .hide-when-js-enabled {
     position: fixed;
     max-width: 10vw;
     top: 10.2em;
-    bottom: 1em;
-    overflow-y: scroll;
   }
 
   #synopsis {
