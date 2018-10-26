@@ -37,7 +37,6 @@ import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
 import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
---import PrimOp           ( tagToEnumKey ) -- temporalily commented out. See #8326
 import CoreOpt          ( pushCoTyArg, pushCoValArg
                         , joinPointBinding_maybe, joinPointBindings_maybe )
 import Rules            ( mkRuleInfo, lookupRule, getRules )
@@ -56,6 +55,7 @@ import Module          ( moduleName, pprModuleName )
 import Weight
 
 import PrimOp          ( PrimOp (SeqOp) )
+
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -220,6 +220,7 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
 
   where
     dflags = seDynFlags env
+
     -- trace_bind emits a trace for each top-level binding, which
     -- helps to locate the tracing for inlining and rule firing
     trace_bind what thing_inside
@@ -243,6 +244,7 @@ simplLazyBind :: SimplEnv
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
   = ASSERT( isId bndr )
     ASSERT2( not (isJoinId bndr), ppr bndr )
+    -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
     do  { let   rhs_env     = rhs_se `setInScopeFromE` env
                 (tvs, body) = case collectTyAndValBinders rhs of
                                 (tvs, [], body)
@@ -543,7 +545,8 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var = mkLocalIdOrCoVarWithInfo name Alias expr_ty info
+              var  = mkLocalIdOrCoVarWithInfo name Alias expr_ty info
+
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
         ; (arity, is_bot, expr2) <- tryEtaExpandRhs mode var expr1
@@ -666,7 +669,6 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
                             DoneEx final_rhs (isJoinId_maybe new_bndr)) }
                 -- Use the substitution to make quite, quite sure that the
                 -- substitution will happen, since we are going to discard the binding
-
 
         else -- Keep the binding
              -- pprTrace "Binding" (ppr final_bndr <+> ppr new_unfolding) $
@@ -860,7 +862,7 @@ simplExprF1 _ (Type ty) _
     -- and by the other callers of simplExprF
 
 simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-} simplIdF env v cont
-simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (emptyFloats env, Lit lit) cont
+simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
@@ -891,6 +893,7 @@ simplExprF1 env (App fun arg) cont
                  ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_dup = NoDup, sc_cont = cont, sc_weight = w }
 
+
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
     simplLam env zapped_bndrs body cont
@@ -914,12 +917,11 @@ simplExprF1 env expr@(Lam {}) cont
     zap b | isTyVar b = b
           | otherwise = zapLamIdInfo b
 
-simplExprF1 env (Case scrut bndr _rty alts) cont
-  = -- pprTrace "simplExpr:case" (ppr bndr <+> ppr rty <+> ppr (contHoleType cont)) $
-      {-#SCC "simplExprF1-Case" #-}
-      simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
-                                   , sc_alts = alts
-                                   , sc_env = env, sc_cont = cont })
+simplExprF1 env (Case scrut bndr _ alts) cont
+  = {-#SCC "simplExprF1-Case" #-}
+    simplExprF env scrut (Select { sc_dup = NoDup, sc_bndr = bndr
+                                 , sc_alts = alts
+                                 , sc_env = env, sc_cont = cont })
 
 simplExprF1 env (Let (Rec pairs) body) cont
   | Just pairs' <- joinPointBindings_maybe pairs
@@ -1018,7 +1020,7 @@ simplCoercionF :: SimplEnv -> InCoercion -> SimplCont
                -> SimplM (SimplFloats, OutExpr)
 simplCoercionF env co cont
   = do { co' <- simplCoercion env co
-       ; rebuild env (emptyFloats env, Coercion co') cont }
+       ; rebuild env (Coercion co') cont }
 
 simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
 simplCoercion env co
@@ -1101,7 +1103,7 @@ simplTick env tickish expr cont
        ; (floats, expr1) <- simplExprF env expr inc
        ; let expr2    = wrapFloats floats expr1
              tickish' = simplTickish env tickish
-       ; rebuild env (emptyFloats env, mkTick tickish' expr2) outc
+       ; rebuild env (mkTick tickish' expr2) outc
        }
 
 -- Alternative version that wraps outgoing floats with the tick.  This
@@ -1181,27 +1183,21 @@ simplTick env tickish expr cont
 ************************************************************************
 -}
 
-rebuild :: HasCallStack => SimplEnv -> (SimplFloats, OutExpr) -> SimplCont -> SimplM (SimplFloats, OutExpr)
+rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplFloats, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant;
 -- only the in-scope set matters
-rebuild env (floats, expr) cont
+rebuild env expr cont
   = case cont of
-      Stop {}          -> return (floats, expr)
-      TickIt t cont    -> rebuild env (floats, mkTick t expr) cont
-      CastIt co cont   -> rebuild env (floats, mkCast expr co) cont
+      Stop {}          -> return (emptyFloats env, expr)
+      TickIt t cont    -> rebuild env (mkTick t expr) cont
+      CastIt co cont   -> rebuild env (mkCast expr co) cont
                        -- NB: mkCast implements the (Coercion co |> g) optimisation
 
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
-        -> rebuildCase (se `setInScopeFromE` env) (floats, expr) bndr alts cont
+        -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
       StrictArg { sc_fun = fun, sc_cont = cont, sc_weight = w }
-        -> do { (floats', expr') <- rebuildCall env (fun `addValArgTo` (w, expr)) cont
-              ; return
-                ( scaleFloatsBy w floats `addFloats` floats'
-                , expr' )
-                -- TODO: arnaud: this is not quite correct. See the remark I
-                -- left in rebuildCall.
-              }
+        -> rebuildCall env (fun `addValArgTo` (w, expr)) cont
       StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
                  , sc_env = se, sc_cont = cont }
         -> do { (floats1, env') <- simplNonRecX (se `setInScopeFromE` env) b expr
@@ -1211,12 +1207,12 @@ rebuild env (floats, expr) cont
               ; return (floats1 `addFloats` floats2, expr') }
 
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
-        -> rebuild env (floats, App expr (Type ty)) cont
+        -> rebuild env (App expr (Type ty)) cont
 
       ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag, sc_cont = cont}
         -- See Note [Avoid redundant simplification]
         -> do { (_, _, arg') <- simplArg env dup_flag se arg
-              ; rebuild env (floats, App expr arg') cont }
+              ; rebuild env (App expr arg') cont }
 
 {-
 ************************************************************************
@@ -1308,7 +1304,7 @@ simplCast env body co0 cont0
                                     , sc_env  = arg_se'
                                     , sc_dup  = dup'
                                     , sc_cont = tail'
-                                    , sc_weight = w}) } }
+                                    , sc_weight = w }) } }
 
         addCoerce co cont
           | isReflexiveCo co = return cont  -- Having this at the end makes a huge
@@ -1373,7 +1369,7 @@ simplLam env bndrs body cont
   = do  { (env', bndrs') <- simplLamBndrs env bndrs
         ; body' <- simplExpr env' body
         ; new_lam <- mkLam env bndrs' body' cont
-        ; rebuild env' (emptyFloats env', new_lam) cont }
+        ; rebuild env' new_lam cont }
 
 -------------
 simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
@@ -1429,7 +1425,7 @@ simplNonRecE :: SimplEnv
 --       the call to simplLam in simplExprF (Lam ...)
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
-  | ASSERT2( isId bndr && not (isJoinId bndr), ppr bndr ) True
+  | ASSERT( isId bndr && not (isJoinId bndr) ) True
   , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs rhs_se
   = do { tick (PreInlineUnconditionally bndr)
        ; -- pprTrace "preInlineUncond" (ppr bndr <+> ppr rhs) $
@@ -1449,7 +1445,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
        ; (env2, bndr2) <- addBndrRules env1 bndr bndr1 Nothing
        ; (floats1, env3) <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
        ; (floats2, expr') <- simplLam env3 bndrs body cont
-       ; return ((scaleFloatsBy (idWeight bndr) floats1) `addFloats` floats2, expr') }
+       ; return (floats1 `addFloats` floats2, expr') }
 
 ------------------
 simplRecE :: SimplEnv
@@ -1595,8 +1591,8 @@ wrapJoinCont env cont thing_inside
     -- See Note [Join points wih -fno-case-of-case]
   = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
-       ; rebuild (env `setInScopeFromF` floats2) (floats2, expr2) cont
-       }
+       ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
+       ; return (floats2 `addFloats` floats3, expr3) }
 
   | otherwise
     -- Normal case; see Note [Join points and case-of-case]
@@ -1801,8 +1797,6 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
                                  -- again and again!
   = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
     return (emptyFloats env, castBottomExpr res cont_ty)
-    -- We're losing the floats from the arguments here. But it should be ok as
-    -- they are never to be evaluated anyways.
   where
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
@@ -1839,7 +1833,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_cont = cont, sc_weight = w })
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
-  = rebuildCall env (info' `addValArgTo` (w, arg)) cont
+  = rebuildCall env (addValArgTo info' (w, arg)) cont
 
   | str         -- Strict argument
   , sm_case_case (getMode env)
@@ -1856,7 +1850,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
                              (mkLazyArgStop arg_ty cci_lazy)
-        ; rebuildCall env (info' `addValArgTo` (w, arg')) cont }
+        ; rebuildCall env (addValArgTo info' (w, arg')) cont }
   where
     info'  = info { ai_strs = strs, ai_discs = discs }
     arg_ty = funArgTy fun_ty
@@ -1879,12 +1873,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
-  = rebuild env (emptyFloats env, argInfoExpr fun rev_args) cont
--- TODO: arnaud: this is most certainly wrong. The floats that we got in
--- `rebuild` in the StrictArg case may still have to float through cont
--- above. Hence be scaled further. So the floats must be threaded through
--- rebuildCall (which is not obvious how to do), then the emptyfloats above must
--- be replace by the argument floats.
+  = rebuild env (argInfoExpr fun rev_args) cont
 
 {- Note [Trying rewrite rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2087,6 +2076,7 @@ trySeqRules in_env scrut rhs cont
                            -- sc_weight. However, a more precise typing rule,
                            -- for seq, would be to have it be linear. In which
                            -- case, sc_weight should be 1.
+
     -- Lazily evaluated, so we don't do most of this
 
     drop_casts (Cast e _) = drop_casts e
@@ -2372,7 +2362,7 @@ I don't really know how to improve this situation.
 
 rebuildCase, reallyRebuildCase
    :: SimplEnv
-   -> (SimplFloats, OutExpr) -- Scrutinee
+   -> OutExpr          -- Scrutinee
    -> InId             -- Case binder
    -> [InAlt]          -- Alternatives (inceasing order)
    -> SimplCont
@@ -2382,12 +2372,12 @@ rebuildCase, reallyRebuildCase
 --      1. Eliminate the case if there's a known constructor
 --------------------------------------------------
 
-rebuildCase env (floats, scrut) case_bndr alts cont
+rebuildCase env scrut case_bndr alts cont
   | Lit lit <- scrut    -- No need for same treatment as constructors
                         -- because literals are inlined more vigorously
   , not (litIsLifted lit)
   = do  { tick (KnownBranch case_bndr)
-        ; withScaledFloats $ case findAlt (LitAlt lit) alts of
+        ; case findAlt (LitAlt lit) alts of
             Nothing           -> missingAlt env case_bndr alts cont
             Just (_, bs, rhs) -> simple_rhs bs rhs }
 
@@ -2396,18 +2386,12 @@ rebuildCase env (floats, scrut) case_bndr alts cont
         -- as well as when it's an explicit constructor application
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (DataAlt con) alts of
-            Nothing  -> withScaledFloats $ missingAlt env case_bndr alts cont
-            Just (DEFAULT, bs, rhs) -> withScaledFloats $ simple_rhs bs rhs
-            Just (_, bs, rhs)       -> knownCon env (floats, scrut) con ty_args
-                                                other_args case_bndr bs rhs cont
+            Nothing  -> missingAlt env case_bndr alts cont
+            Just (DEFAULT, bs, rhs) -> simple_rhs bs rhs
+            Just (_, bs, rhs)       -> knownCon env scrut con ty_args other_args
+                                                case_bndr bs rhs cont
         }
   where
-    withScaledFloats m =
-      do { (floats2, expr') <- m
-         ; return
-           ((scaleFloatsBy (idWeight case_bndr) floats) `addFloats` floats2
-           , expr')
-         }
     simple_rhs bs rhs = ASSERT( null bs )
                         do { (floats1, env') <- simplNonRecX env case_bndr scrut
                                -- scrut is a constructor application,
@@ -2420,7 +2404,7 @@ rebuildCase env (floats, scrut) case_bndr alts cont
 --      2. Eliminate the case if scrutinee is evaluated
 --------------------------------------------------
 
-rebuildCase env (floats, scrut) case_bndr alts@[(_, bndrs, rhs)] cont
+rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   -- See if we can get rid of the case altogether
   -- See Note [Case elimination]
   -- mkCase made sure that if all the alternatives are equal,
@@ -2435,11 +2419,7 @@ rebuildCase env (floats, scrut) case_bndr alts@[(_, bndrs, rhs)] cont
           -- if the scrutinee converges without having imperative
           -- side effects or raising a Haskell exception
           -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
-   = do { (floats2, expr') <- simplExprF env rhs cont
-        ; return
-          ((scaleFloatsBy (idWeight case_bndr) floats) `addFloats` floats2
-          , expr')
-        }
+   = simplExprF env rhs cont
 
   -- 2b.  Turn the case into a let, if
   --      a) it binds only the case-binder
@@ -2453,10 +2433,7 @@ rebuildCase env (floats, scrut) case_bndr alts@[(_, bndrs, rhs)] cont
   = do { tick (CaseElim case_bndr)
        ; (floats1, env') <- simplNonRecX env case_bndr scrut
        ; (floats2, expr') <- simplExprF env' rhs cont
-       ; return
-         ((scaleFloatsBy (idWeight case_bndr) floats) `addFloats` floats1 `addFloats` floats2
-         , expr')
-       }
+       ; return (floats1 `addFloats` floats2, expr') }
 
   -- 2c. Try the seq rules if
   --     a) it binds only the case binder
@@ -2465,15 +2442,8 @@ rebuildCase env (floats, scrut) case_bndr alts@[(_, bndrs, rhs)] cont
   | is_plain_seq
   = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
-           Just (env', rule_rhs, cont') ->
-             do { (floats2, expr') <- simplExprF env' rule_rhs cont'
-                ; return
-                  ((scaleFloatsBy (idWeight case_bndr) floats) `addFloats` floats2
-                  , expr')
-                }
-           Nothing                      ->
-             reallyRebuildCase env (floats, scrut) case_bndr alts cont
-       }
+           Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
+           Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
   where
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
@@ -2492,26 +2462,17 @@ rebuildCase env scrut case_bndr alts cont
 --      3. Catch-all case
 --------------------------------------------------
 
-reallyRebuildCase env (floats, scrut) case_bndr alts cont
+reallyRebuildCase env scrut case_bndr alts cont
   | not (sm_case_case (getMode env))
   = do { case_expr <- simplAlts env scrut case_bndr alts
                                 (mkBoringStop (contHoleType cont))
-       ; rebuild env (scaleFloatsBy (idWeight case_bndr) floats, case_expr) cont }
+       ; rebuild env case_expr cont }
 
   | otherwise
-  = do { (floats', cont') <- mkDupableCaseCont env alts cont
-       ; case_expr <- simplAlts (env `setInScopeFromF` floats')
-                                scrut
-                                (scaleIdBy case_bndr holeScaling)
-                                (scaleAltsBy holeScaling alts)
-                                cont'
-       ; return
-         (scaleFloatsBy (idWeight case_bndr) floats `addFloats` floats'
-         , case_expr) }
-  where
-    holeScaling = contHoleScaling cont
-    -- This assume that cont and cont' have the same scaling factor. Which they
-    -- should.
+  = do { (floats, cont') <- mkDupableCaseCont env alts cont
+       ; case_expr <- simplAlts (env `setInScopeFromF` floats)
+                                scrut case_bndr alts cont'
+       ; return (floats, case_expr) }
 
 {-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -2855,17 +2816,17 @@ All this should happen in one sweep.
 -}
 
 knownCon :: SimplEnv
-         -> (SimplFloats, OutExpr)              -- The scrutinee
+         -> OutExpr                             -- The scrutinee
          -> DataCon -> [OutType] -> [OutExpr]   -- The scrutinee (in pieces)
          -> InId -> [InBndr] -> InExpr          -- The alternative
          -> SimplCont
          -> SimplM (SimplFloats, OutExpr)
 
-knownCon env (floats, scrut) dc dc_ty_args dc_args bndr bs rhs cont
+knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
   = do  { (floats1, env1)  <- bind_args env bs dc_args
         ; (floats2, env2) <- bind_case_bndr env1
         ; (floats3, expr') <- simplExprF env2 rhs cont
-        ; return (scaleFloatsBy (idWeight bndr) floats `addFloats` floats1 `addFloats` floats2 `addFloats` floats3, expr') }
+        ; return (floats1 `addFloats` floats2 `addFloats` floats3, expr') }
   where
     zap_occ = zapBndrOccInfo (isDeadBinder bndr)    -- bndr is an InId
 
@@ -2873,7 +2834,7 @@ knownCon env (floats, scrut) dc dc_ty_args dc_args bndr bs rhs cont
     bind_args env' [] _  = return (emptyFloats env', env')
 
     bind_args env' (b:bs') (Type ty : args)
-      = ASSERT2( isTyVar b, ppr bs $$ ppr dc_args $$ ppr b )
+      = ASSERT( isTyVar b )
         bind_args (extendTvSubst env' b ty) bs' args
 
     bind_args env' (b:bs') (Coercion co : args)
@@ -3048,6 +3009,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
                             , sc_dup = OkToDup
                             , sc_weight = Omega } ) } -- TODO: Arnaud: is this Omega correct? if so explain why.
 
+
 mkDupableCont env (ApplyToTy { sc_cont = cont
                              , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
   = do  { (floats, cont') <- mkDupableCont env cont
@@ -3161,10 +3123,7 @@ mkDupableAlt dflags case_bndr jfloats (con, bndrs', rhs')
                          | otherwise = v
               join_rhs   = mkLams really_final_bndrs rhs'
 
-        --; pprTrace "newJoin" (ppr (mkLamTypes final_bndrs' rhs_ty')
-          --                    $$ ppr join_rhs
-          --                    $$ ppr (exprType join_rhs)) (return ())
-        ; join_bndr <- newJoinId final_bndrs' rhs_ty' -- arnaud: check this call to newJoinId it used to be Omega
+        ; join_bndr <- newJoinId final_bndrs' rhs_ty'
 
         ; let join_call = mkApps (Var join_bndr) final_args
               alt'      = (con, bndrs', join_call)
@@ -3585,3 +3544,4 @@ simplRules env mb_new_id rules mb_cont
                           , ru_fn    = fn_name'
                           , ru_args  = args'
                           , ru_rhs   = rhs' }) }
+

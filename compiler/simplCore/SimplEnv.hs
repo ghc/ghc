@@ -32,7 +32,7 @@ module SimplEnv (
         SimplFloats(..), emptyFloats, mkRecFloats,
         mkFloatBind, addLetFloats, addJoinFloats, addFloats,
         extendFloats, wrapFloats,
-        doFloatFromRhs, getTopFloatBinds, scaleFloatsBy,
+        doFloatFromRhs, getTopFloatBinds,
 
         -- * LetFloats
         LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
@@ -639,14 +639,6 @@ mapLetFloats (LetFloats fs ff) fun
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
     app (Rec bs)     = Rec (map fun bs)
 
-scaleFloatsBy :: Rig -> SimplFloats -> SimplFloats
-scaleFloatsBy w (SimplFloats lfs jfs in_scope) =
-  SimplFloats lfs' jfs in_scope
-  where
-    lfs' = mapLetFloats lfs (\(bndr, e) -> (scaleIdBy bndr w, e))
-
-
-
 {-
 ************************************************************************
 *                                                                      *
@@ -709,7 +701,7 @@ simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
 
 -------------
-simplBinder :: HasCallStack => SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda and case-bound variables
 -- Clone Id if necessary, substitute type
 -- Return with IdInfo already substituted, but (fragile) occurrence info zapped
@@ -722,14 +714,14 @@ simplBinder env bndr
                         ; seqId id `seq` return (env', id) }
 
 ---------------
-simplNonRecBndr :: HasCallStack => SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder
 simplNonRecBndr env id
   = do  { let (env1, id1) = substIdBndr Nothing env id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplNonRecJoinBndr :: HasCallStack => SimplEnv -> OutType -> InBndr
+simplNonRecJoinBndr :: SimplEnv -> OutType -> InBndr
                     -> SimplM (SimplEnv, OutBndr)
 -- A non-recursive let binder for a join point; context being pushed inward may
 -- change the type
@@ -738,7 +730,7 @@ simplNonRecJoinBndr env res_ty id
         ; seqId id1 `seq` return (env1, id1) }
 
 ---------------
-simplRecBndrs :: HasCallStack => SimplEnv -> [InBndr] -> SimplM SimplEnv
+simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders
 simplRecBndrs env@(SimplEnv {}) ids
   = ASSERT(all (not . isJoinId) ids)
@@ -746,7 +738,7 @@ simplRecBndrs env@(SimplEnv {}) ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
-simplRecJoinBndrs :: HasCallStack => SimplEnv -> OutType -> [InBndr] -> SimplM SimplEnv
+simplRecJoinBndrs :: SimplEnv -> OutType -> [InBndr] -> SimplM SimplEnv
 -- Recursive let binders for join points; context being pushed inward may
 -- change types
 simplRecJoinBndrs env@(SimplEnv {}) res_ty ids
@@ -755,7 +747,7 @@ simplRecJoinBndrs env@(SimplEnv {}) res_ty ids
         ; seqIds ids1 `seq` return env1 }
 
 ---------------
-substIdBndr :: HasCallStack => Maybe OutType -> SimplEnv -> InBndr -> (SimplEnv, OutBndr)
+substIdBndr :: Maybe OutType -> SimplEnv -> InBndr -> (SimplEnv, OutBndr)
 -- Might be a coercion variable
 substIdBndr new_res_ty env bndr
   | isCoVar bndr  = substCoVarBndr env bndr
@@ -763,7 +755,7 @@ substIdBndr new_res_ty env bndr
 
 ---------------
 substNonCoVarIdBndr
-   :: HasCallStack => Maybe OutType -- New result type, if a join binder
+   :: Maybe OutType -- New result type, if a join binder
    -> SimplEnv
    -> InBndr    -- Env and binder to transform
    -> (SimplEnv, OutBndr)
@@ -898,7 +890,7 @@ substCo :: SimplEnv -> Coercion -> Coercion
 substCo env co = Coercion.substCo (getTCvSubst env) co
 
 ------------------
-substIdType :: HasCallStack => SimplEnv -> Id -> Id
+substIdType :: SimplEnv -> Id -> Id
 substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
   | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
     || no_free_vars
