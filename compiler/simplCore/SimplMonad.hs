@@ -16,16 +16,16 @@ module SimplMonad (
         -- Counting
         SimplCount, tick, freeTick, checkedTick,
         getSimplCount, zeroSimplCount, pprSimplCount,
-        plusSimplCount, isZeroSimplCount,
+        plusSimplCount, isZeroSimplCount
     ) where
 
 import GhcPrelude
 
 import Var              ( Var, isTyVar, mkLocalVar, VarMult(..) )
 import Name             ( mkSystemVarName )
-import Id               ( Id, mkSysLocalOrCoVar, idWeight )
+import Id               ( Id, mkSysLocalOrCoVar )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import Type             ( Type, mkLamTypes, Rig(..))
+import Type             ( Type, mkLamTypes, Rig(..) )
 import Weight
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
@@ -126,15 +126,12 @@ thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
 thenSmpl m k
   = SM $ \st_env us0 sc0 -> do
       (m_result, us1, sc1) <- unSM m st_env us0 sc0
-      (r, us2, sc2) <- unSM (k m_result) st_env us1 sc1
-      return (r, us2, sc2)
-
+      unSM (k m_result) st_env us1 sc1
 
 thenSmpl_ m k
   = SM $ \st_env us0 sc0 -> do
       (_, us1, sc1) <- unSM m st_env us0 sc0
-      (r, us2, sc2) <- unSM k st_env us1 sc1
-      return (r, us2, sc2)
+      unSM k st_env us1 sc1
 
 -- TODO: this specializing is not allowed
 -- {-# SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
@@ -198,8 +195,8 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; -- pprTrace "newJoinId" (ppr name $$ ppr join_id_ty) $
-          return (mkLocalVar details name (Regular Omega) join_id_ty id_info) } -- TODO: arnaud: I'm guessing this is used to create join points, in which case, the is really not the right multiplicity.
+       ; return (mkLocalVar details name (Regular Omega) join_id_ty id_info) } -- TODO: arnaud: I'm guessing this is used to create join points, in which case, the is really not the right multiplicity.
+
 
 {-
 ************************************************************************
@@ -214,7 +211,7 @@ getSimplCount = SM (\_st_env us sc -> return (sc, us, sc))
 
 tick :: Tick -> SimplM ()
 tick t = SM (\st_env us sc -> let sc' = doSimplTick (st_flags st_env) t sc
-                              in sc' `seq` return ((),us, sc'))
+                              in sc' `seq` return ((), us, sc'))
 
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
@@ -254,62 +251,3 @@ freeTick :: Tick -> SimplM ()
 freeTick t
    = SM (\_st_env us sc -> let sc' = doFreeSimplTick t sc
                            in sc' `seq` return ((), us, sc'))
-
-{-
-************************************************************************
-*                                                                      *
-Weights
-*                                                                      *
-************************************************************************
--}
-
-{- Note [Scaling lets]
-The simplifier creates let bindings under certain circumstances which
-are then inserted later. These are returned in `SimplFloats`.
-
-However, we have to be somewhat careful here when it comes to linearity
-as if we create a floating binding x in the scrutinee position.
-
-case_w (let x[1] = "Foo" in Qux x) of
-  Qux _ -> "Bar"
-
-then the let will end up outside the `case` if we perform KnownBranch or
-the case of case optimisation.
-
-let x[1] = "Foo"
-in "Bar"
-
-So we get a linearity failure as the one usage of x is eliminated.
-However, because the ambient context is an Omega context, we know that
-we will use the scrutinee Omega times and hence all bindings inside it
-Omega times as well. The failure was that we created a [1] binding
-whilst inside this context and it then escaped without being scaled.
-
-We also have to be careful as if we have a [1] case
-
-case_1 (let x[1] = "Foo" in Qux x) of
-  Qux x -> x
-
-then the binding maintains the correct linearity once it is floated rom
-the case and KnownBranch is performed.
-
-let x[1] = "Foo"
-in x
-
-The difficulty mainly comes from that we only discover this context
-at a later point once we have rebuilt the contituation. So, whilst rebuilding
-a continuation we keep track of how many case-of-case like opportunities
-take place and hence how much we have to scale lets floated from the scrutinee.
-This is achieved by adding a Writer like effect to the SimplM data type.
-It seems to work in practice, at least for T12944 which originally highlighted
-this problem.
-
-Why do we do this scaling afterwards rather than when the binding is
-created? It is possible the binding comes from a point deep inside the
-expression. It wasn't clear to me that we know enough about the context
-at the point we make the binding due to the SimplCont type. It might
-be thread this information through to get it right at definition site.
-For now, I leave warnings and this message to my future self.
--}
-
--- TODO: arnaud move note to a better place (Simplify, maybe?)

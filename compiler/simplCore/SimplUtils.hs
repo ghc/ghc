@@ -19,7 +19,7 @@ module SimplUtils (
         -- The continuation type
         SimplCont(..), DupFlag(..), StaticEnv,
         isSimplified, contIsStop,
-        contIsDupable, contResultType, contHoleType, contHoleScaling,
+        contIsDupable, contResultType, contHoleType,
         contIsTrivial, contArgs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
@@ -153,8 +153,7 @@ data SimplCont
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
-      , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_cont :: SimplCont }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -274,20 +273,20 @@ data ArgInfo
     }
 
 data ArgSpec
-  = ValArg Rig OutExpr                -- Apply to this (coercion or value); c.f. ApplyToVal
+  = ValArg OutExpr                    -- Apply to this (coercion or value); c.f. ApplyToVal
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
 
 instance Outputable ArgSpec where
-  ppr (ValArg w e)               = text "ValArg" <+> ppr w <+> ppr e
+  ppr (ValArg e)                 = text "ValArg" <+> ppr e
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo -> (Rig, OutExpr) -> ArgInfo
-addValArgTo ai (w, arg) = ai { ai_args = ValArg w arg : ai_args ai
-                          , ai_type = applyTypeToArg (ai_type ai) arg
-                          , ai_rules = decRules (ai_rules ai) }
+addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
+addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
+                        , ai_type = applyTypeToArg (ai_type ai) arg
+                        , ai_rules = decRules (ai_rules ai) }
 
 addTyArgTo :: ArgInfo -> OutType -> ArgInfo
 addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
@@ -304,7 +303,7 @@ addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
 argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg _ e                 : as) = e       : argInfoAppArgs as
+argInfoAppArgs (ValArg e                 : as) = e       : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
 pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
@@ -313,22 +312,20 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg w e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified
-                               , sc_cont = rest
-                               , sc_weight = w }
+      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest } -- TODO Krzysztof
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
            -- The env has an empty SubstEnv
 
-argInfoExpr :: HasCallStack => OutId -> [ArgSpec] -> OutExpr
+argInfoExpr :: OutId -> [ArgSpec] -> OutExpr
 -- NB: the [ArgSpec] is reversed so that the first arg
 -- in the list is the last one in the application
 argInfoExpr fun rev_args
   = go rev_args
   where
     go []                              = Var fun
-    go (ValArg _ a               : as) = go as `App` a
+    go (ValArg a                 : as) = go as `App` a
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
@@ -414,7 +411,7 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg  { sc_fun = ai, sc_weight = _w })      = funArgTy (ai_type ai) -- MattP: This looks dodgy as sc_weight is not used.
+contHoleType (StrictArg { sc_fun = ai })      = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
                          , sc_weight = w })
@@ -422,28 +419,6 @@ contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
                   (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
-
-
--- Computes the multiplicity scaling factor at the hole. That is, in (case [] of
--- x ::(p) _ { … }) (respectively for arguments of functions), the scaling
--- factor is p. And in E[G[]], the scaling factor is the product of the scaling
--- factor of E and that of G.
---
--- The scaling factor at the hole of E[] is used to determine how a binder
--- should be scaled if it commutes with E. This appears, in particular, in the
--- case-of-case transformation.
-contHoleScaling :: SimplCont -> Rig
-contHoleScaling (Stop _ _) = One
-contHoleScaling (CastIt _ k) = contHoleScaling k
-contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k }) =
-  (idWeight id) * contHoleScaling k
-contHoleScaling (StrictArg { sc_weight = w, sc_cont = k }) =
-  w * contHoleScaling k
-contHoleScaling (Select { sc_bndr = id, sc_cont = k }) =
-  (idWeight id) * contHoleScaling k
-contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
-contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
-contHoleScaling (TickIt _ k) = contHoleScaling k
 
 -------------------
 countArgs :: SimplCont -> Int
@@ -1421,7 +1396,7 @@ won't inline because 'e' is too big.
 ************************************************************************
 -}
 
-mkLam :: HasCallStack => SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
+mkLam :: SimplEnv -> [OutBndr] -> OutExpr -> SimplCont -> SimplM OutExpr
 -- mkLam tries three things
 --      a) eta reduction, if that gives a trivial expression
 --      b) eta expansion [only if there are some value lambdas]
@@ -1818,7 +1793,7 @@ abstractFloats dflags top_lvl main_tvs floats body
                 -- Here, we must abstract 'x' over 'a'.
          tvs_here = toposortTyVars main_tvs
 
-    mk_poly1 :: HasCallStack => [TyVar] -> Id -> SimplM (Id, CoreExpr)
+    mk_poly1 :: [TyVar] -> Id -> SimplM (Id, CoreExpr)
     mk_poly1 tvs_here var
       = do { uniq <- getUniqueM
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
@@ -1933,7 +1908,7 @@ If we don't notice this, we may end up filtering out *all* the cases
 of the inner case y, which give us nowhere to go!
 -}
 
-prepareAlts :: HasCallStack => OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
 -- The returned alternatives can be empty, none are possible
 prepareAlts scrut case_bndr' alts
   | Just (tc, tys) <- splitTyConApp_maybe (varType case_bndr')
@@ -2269,8 +2244,7 @@ in PrelRules)
 --      Catch-all
 --------------------------------------------------
 mkCase3 _dflags scrut bndr alts_ty alts
-  = -- pprTrace "Rebuilding case" (ppr bndr <+> ppr alts_ty) $
-      return (Case scrut bndr alts_ty alts)
+  = return (Case scrut bndr alts_ty alts)
 
 -- See Note [Exitification] and Note [Do not inline exit join points] in Exitify.hs
 -- This lives here (and not in Id) because occurrence info is only valid on

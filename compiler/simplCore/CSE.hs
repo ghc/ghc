@@ -20,16 +20,16 @@ import Id               ( Id, idType, idInlineActivation, isDeadBinder
                         , isJoinId, isJoinId_maybe )
 import CoreUtils        ( mkAltExpr, eqExpr
                         , exprIsTickedString
-                        , stripTicksE, stripTicksT, mkTicks, exprType )
+                        , stripTicksE, stripTicksT, mkTicks )
 import CoreFVs          ( exprFreeVars )
-import Type             ( tyConAppArgs, eqType )
+import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
 import BasicTypes       ( TopLevelFlag(..), isTopLevel
                         , isAlwaysActive, isAnyInlinePragma,
                           inlinePragmaSpec, noUserInlineSpec )
 import CoreMap
-import Util
+import Util             ( filterOut )
 import Data.List        ( mapAccumL )
 
 {-
@@ -468,9 +468,7 @@ This is done by cse_bind.  I got it wrong the first time (Trac #13367).
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
 tryForCSE env expr
-  | Just e <- lookupCSEnv env expr'' =
-    ASSERT2( exprType e `eqType` exprType expr'', ppr (exprType e) $$ ppr (exprType expr'') $$ ppr e $$ ppr expr'' )
-    mkTicks ticks e
+  | Just e <- lookupCSEnv env expr'' = mkTicks ticks e
   | otherwise                        = expr'
     -- The varToCoreExpr is needed if we have
     --   case e of xco { ...case e of yco { ... } ... }
