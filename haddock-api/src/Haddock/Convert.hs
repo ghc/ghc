@@ -122,6 +122,8 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
     in HsIB { hsib_ext = map tyVarName tkvs
             , hsib_body   = FamEqn { feqn_ext    = noExt
                                    , feqn_tycon  = name
+                                   , feqn_bndrs  = Nothing
+                                       -- this must change eventually
                                    , feqn_pats   = annot_typats
                                    , feqn_fixity = Prefix
                                    , feqn_rhs    = hs_rhs } }
