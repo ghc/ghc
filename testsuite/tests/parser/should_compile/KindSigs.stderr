@@ -37,6 +37,7 @@
              ({ KindSigs.hs:12:3-5 }
               (Unqual
                {OccName: Foo}))
+             (Nothing)
              [({ KindSigs.hs:12:7 }
                (HsTyVar
                 (NoExt)

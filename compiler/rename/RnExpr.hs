@@ -167,10 +167,10 @@ rnExpr (HsApp x fun arg)
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsApp x fun' arg', fvFun `plusFV` fvArg) }
 
-rnExpr (HsAppType arg fun)
+rnExpr (HsAppType x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
-       ; return (HsAppType arg' fun', fvFun `plusFV` fvArg) }
+       ; return (HsAppType x fun' arg', fvFun `plusFV` fvArg) }
 
 rnExpr (OpApp _ e1 op e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
@@ -310,11 +310,11 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
                             , rupd_flds = rbinds' }
                  , fvExpr `plusFV` fvRbinds) }
 
-rnExpr (ExprWithTySig pty expr)
-  = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
+rnExpr (ExprWithTySig _ expr pty)
+  = do  { (pty', fvTy)    <- rnHsSigWcType BindUnlessForall ExprWithTySigCtx pty
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
-        ; return (ExprWithTySig pty' expr', fvExpr `plusFV` fvTy) }
+        ; return (ExprWithTySig noExt expr' pty', fvExpr `plusFV` fvTy) }
 
 rnExpr (HsIf x _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -1820,7 +1820,7 @@ isStrictPattern (L _ pat) =
     AsPat _ _ p     -> isStrictPattern p
     ParPat _ p      -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
-    SigPat _ p      -> isStrictPattern p
+    SigPat _ p _    -> isStrictPattern p
     BangPat{}       -> True
     ListPat{}       -> True
     TuplePat{}      -> True
@@ -1944,7 +1944,7 @@ isReturnApp monad_names (L _ e) = case e of
   _otherwise -> Nothing
  where
   is_var f (L _ (HsPar _ e)) = is_var f e
-  is_var f (L _ (HsAppType _ e)) = is_var f e
+  is_var f (L _ (HsAppType _ e _)) = is_var f e
   is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False

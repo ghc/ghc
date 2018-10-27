@@ -973,7 +973,7 @@ translatePat fam_insts pat = case pat of
         g   = PmGrd [PmVar (unLoc lid)] e
     return (ps ++ [g])
 
-  SigPat _ty p -> translatePat fam_insts (unLoc p)
+  SigPat _ p _ty -> translatePat fam_insts (unLoc p)
 
   -- See Note [Translate CoPats]
   CoPat _ wrapper p ty

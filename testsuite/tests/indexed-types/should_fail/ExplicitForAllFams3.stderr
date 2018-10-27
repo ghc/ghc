@@ -1,0 +1,17 @@
+
+ExplicitForAllFams3.hs:7:28: error: Not in scope: type variable ‘b’
+
+ExplicitForAllFams3.hs:10:33: error:
+    Not in scope: type variable ‘b’
+
+ExplicitForAllFams3.hs:13:33: error:
+    Not in scope: type variable ‘b’
+
+ExplicitForAllFams3.hs:16:36: error:
+    Not in scope: type variable ‘b’
+
+ExplicitForAllFams3.hs:22:34: error:
+    Not in scope: type variable ‘b’
+
+ExplicitForAllFams3.hs:23:34: error:
+    Not in scope: type variable ‘b’

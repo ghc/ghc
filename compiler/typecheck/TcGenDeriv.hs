@@ -1850,13 +1850,12 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
     underlying_inst_tys = changeLast inst_tys rhs_ty
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLoc (HsAppType hs_ty e)
+nlHsAppType e s = noLoc (HsAppType noExt e hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc $ ExprWithTySig hs_ty
-                            $ parenthesizeHsExpr sigPrec e
+nlExprWithTySig e s = noLoc $ ExprWithTySig noExt (parenthesizeHsExpr sigPrec e) hs_ty
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 

@@ -335,7 +335,7 @@ data HsExpr p
 
   | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
-  | HsAppType (XAppTypeE p) (LHsExpr p)  -- ^ Visible type application
+  | HsAppType (XAppTypeE p) (LHsExpr p) (LHsWcType (NoGhcTc p))  -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
@@ -499,10 +499,10 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExprWithTySig
-                (XExprWithTySig p)   -- Retain the signature,
-                                     -- as HsSigType Name, for
-                                     -- round-tripping purposes
+                (XExprWithTySig p)
+
                 (LHsExpr p)
+                (LHsSigWcType (NoGhcTc p))
 
   -- | Arithmetic sequence
   --
@@ -723,9 +723,7 @@ type instance XLam           (GhcPass _) = NoExt
 type instance XLamCase       (GhcPass _) = NoExt
 type instance XApp           (GhcPass _) = NoExt
 
-type instance XAppTypeE      GhcPs = LHsWcType GhcPs
-type instance XAppTypeE      GhcRn = LHsWcType GhcRn
-type instance XAppTypeE      GhcTc = LHsWcType GhcRn
+type instance XAppTypeE      (GhcPass _) = NoExt
 
 type instance XOpApp         GhcPs = NoExt
 type instance XOpApp         GhcRn = Fixity
@@ -766,9 +764,7 @@ type instance XRecordUpd     GhcPs = NoExt
 type instance XRecordUpd     GhcRn = NoExt
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
-type instance XExprWithTySig GhcPs = (LHsSigWcType GhcPs)
-type instance XExprWithTySig GhcRn = (LHsSigWcType GhcRn)
-type instance XExprWithTySig GhcTc = (LHsSigWcType GhcRn)
+type instance XExprWithTySig (GhcPass _) = NoExt
 
 type instance XArithSeq      GhcPs = NoExt
 type instance XArithSeq      GhcRn = NoExt
@@ -1086,7 +1082,7 @@ ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
   = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
-ppr_expr (ExprWithTySig sig expr)
+ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
 
@@ -1163,11 +1159,11 @@ ppr_expr (XExpr x) = ppr x
 
 ppr_apps :: (OutputableBndrId (GhcPass p))
          => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (XAppTypeE (GhcPass p))]
+         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
          -> SDoc
 ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType arg (L _ fun))    args
+ppr_apps (HsAppType _ (L _ fun) arg)    args
   = ppr_apps fun (Right arg : args)
 ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
   where

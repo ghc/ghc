@@ -12,7 +12,7 @@ module RnTypes (
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind,
         rnHsSigType, rnHsWcType,
-        rnHsSigWcType, rnHsSigWcTypeScoped,
+        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsSigWcTypeScoped,
         rnLHsInstType,
         newTyVarNameRn, collectAnonWildCards,
         rnConDeclFields,
@@ -83,13 +83,29 @@ to break several loop.
 *********************************************************
 -}
 
-rnHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
-            -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType doc sig_ty
-  = rn_hs_sig_wc_type False doc sig_ty $ \sig_ty' ->
+data HsSigWcTypeScoping = AlwaysBind
+                          -- ^ Always bind any free tyvars of the given type,
+                          --   regardless of whether we have a forall at the top
+                        | BindUnlessForall
+                          -- ^ Unless there's forall at the top, do the same
+                          --   thing as 'AlwaysBind'
+                        | NeverBind
+                          -- ^ Never bind any free tyvars
+
+rnHsSigWcType :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
+              -> RnM (LHsSigWcType GhcRn, FreeVars)
+rnHsSigWcType scoping doc sig_ty
+  = rn_hs_sig_wc_type scoping doc sig_ty $ \sig_ty' ->
     return (sig_ty', emptyFVs)
 
-rnHsSigWcTypeScoped :: HsDocContext -> LHsSigWcType GhcPs
+rnHsSigWcTypeScoped :: HsSigWcTypeScoping
+                       -- AlwaysBind: for pattern type sigs and rules we /do/ want
+                       --             to bring those type variables into scope, even
+                       --             if there's a forall at the top which usually
+                       --             stops that happening
+                       -- e.g  \ (x :: forall a. a-> b) -> e
+                       -- Here we do bring 'b' into scope
+                    -> HsDocContext -> LHsSigWcType GhcPs
                     -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                     -> RnM (a, FreeVars)
 -- Used for
@@ -97,33 +113,26 @@ rnHsSigWcTypeScoped :: HsDocContext -> LHsSigWcType GhcPs
 --   - Pattern type signatures
 -- Wildcards are allowed
 -- type signatures on binders only allowed with ScopedTypeVariables
-rnHsSigWcTypeScoped ctx sig_ty thing_inside
+rnHsSigWcTypeScoped scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedTypeSigErr sig_ty)
-       ; rn_hs_sig_wc_type True ctx sig_ty thing_inside
+       ; rn_hs_sig_wc_type scoping ctx sig_ty thing_inside
        }
-    -- True: for pattern type sigs and rules we /do/ want
-    --       to bring those type variables into scope, even
-    --       if there's a forall at the top which usually
-    --       stops that happening
-    -- e.g  \ (x :: forall a. a-> b) -> e
-    -- Here we do bring 'b' into scope
 
-rn_hs_sig_wc_type :: Bool   -- True <=> always bind any free tyvars of the
-                            --          type, regardless of whether it has
-                            --          a forall at the top
-                  -> HsDocContext
-                  -> LHsSigWcType GhcPs
+rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> LHsSigWcType GhcPs
                   -> (LHsSigWcType GhcRn -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 -- rn_hs_sig_wc_type is used for source-language type signatures
-rn_hs_sig_wc_type always_bind_free_tvs ctxt
+rn_hs_sig_wc_type scoping ctxt
                   (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
                   thing_inside
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (tv_rdrs, nwc_rdrs') <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
-             bind_free_tvs = always_bind_free_tvs || not (isLHsForAllTy hs_ty)
+             bind_free_tvs = case scoping of
+                               AlwaysBind       -> True
+                               BindUnlessForall -> not (isLHsForAllTy hs_ty)
+                               NeverBind        -> False
        ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }

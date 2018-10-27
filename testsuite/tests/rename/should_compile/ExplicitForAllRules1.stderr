@@ -1,0 +1,4 @@
+
+ExplicitForAllRules1.hs:45:31: warning: [-Wunused-foralls (in -Wextra)]
+    Unused quantified type variable ‘b’
+    in the rule "example7"

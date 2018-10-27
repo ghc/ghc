@@ -78,6 +78,7 @@
              ({ DumpParsedAst.hs:8:3-8 }
               (Unqual
                {OccName: Length}))
+             (Nothing)
              [({ DumpParsedAst.hs:8:10-17 }
                (HsParTy
                 (NoExt)
@@ -140,6 +141,7 @@
              ({ DumpParsedAst.hs:9:3-8 }
               (Unqual
                {OccName: Length}))
+             (Nothing)
              [({ DumpParsedAst.hs:9:10-12 }
                (HsExplicitListTy
                 (NoExt)

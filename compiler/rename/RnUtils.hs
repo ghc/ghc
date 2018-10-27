@@ -244,11 +244,14 @@ warnUnused1 flag fld_env name
   = when (reportable name occ) $
     addUnusedWarning flag
                      occ (nameSrcSpan name)
-                     (text "Defined but not used")
+                     (text $ "Defined but not used" ++ opt_str)
   where
     occ = case lookupNameEnv fld_env name of
               Just (fl, _) -> mkVarOccFS fl
               Nothing      -> nameOccName name
+    opt_str = case flag of
+                Opt_WarnUnusedTypePatterns -> " on the right hand side"
+                _ -> ""
 
 warnUnusedGRE :: GlobalRdrElt -> RnM ()
 warnUnusedGRE gre@(GRE { gre_name = name, gre_lcl = lcl, gre_imp = is })

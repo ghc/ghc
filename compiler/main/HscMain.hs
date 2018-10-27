@@ -909,7 +909,7 @@ hscCheckSafeImports tcg_env = do
               -> return tcg_env'
 
     warns dflags rules = listToBag $ map (warnRules dflags) rules
-    warnRules dflags (L loc (HsRule _ n _ _ _ _)) =
+    warnRules dflags (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg dflags loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"

@@ -257,7 +257,7 @@ ds_expr :: Bool   -- are we directly inside an HsWrap?
                   -- See Wrinkle in Note [Detecting forced eta expansion]
         -> HsExpr GhcTc -> DsM CoreExpr
 ds_expr _ (HsPar _ e)            = dsLExpr e
-ds_expr _ (ExprWithTySig _ e)    = dsLExpr e
+ds_expr _ (ExprWithTySig _ e _)  = dsLExpr e
 ds_expr w (HsVar _ (L _ var))    = dsHsVar w var
 ds_expr _ (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
 ds_expr w (HsConLikeOut _ con)   = dsConLike w con
@@ -302,7 +302,7 @@ ds_expr _ e@(HsApp _ fun arg)
        ; dsWhenNoErrs (dsLExprNoLP arg)
                       (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
-ds_expr _ (HsAppType _ e)
+ds_expr _ (HsAppType _ e _)
     -- ignore type arguments here; they're in the wrappers instead at this point
   = dsLExpr e
 

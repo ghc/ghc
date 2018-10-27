@@ -35,6 +35,10 @@ test('OverIndirectThisMod', [], multimod_compile_fail, ['OverIndirectThisModD', 
 
 test('SkolemOccursLoop', expect_fail, compile_fail, [''])
 
+test('ExplicitForAllFams3', normal, compile_fail, [''])
+test('ExplicitForAllFams4a', normal, compile_fail, [''])
+test('ExplicitForAllFams4b', normal, compile_fail, [''])
+
 test('T2334A', normal, compile_fail, [''])
 test('T1900', normal, compile_fail, [''])
 test('T2157', normal, compile_fail, [''])

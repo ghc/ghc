@@ -1391,14 +1391,17 @@ reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 
 -------------------------------------------
 reifyAxBranch :: TyCon -> CoAxBranch -> TcM TH.TySynEqn
-reifyAxBranch fam_tc (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
+reifyAxBranch fam_tc (CoAxBranch { cab_tvs = tvs
+                                 , cab_lhs = lhs
+                                 , cab_rhs = rhs })
             -- remove kind patterns (#8884)
-  = do { let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
+  = do { tvs' <- reifyTyVarsToMaybe tvs
+       ; let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
        ; lhs' <- reifyTypes lhs_types_only
        ; annot_th_lhs <- zipWith3M annotThType (mkIsPolyTvs fam_tvs)
                                    lhs_types_only lhs'
        ; rhs'  <- reifyType rhs
-       ; return (TH.TySynEqn annot_th_lhs rhs') }
+       ; return (TH.TySynEqn tvs' annot_th_lhs rhs') }
   where
     fam_tvs = tyConVisibleTyVars fam_tc
 
@@ -1612,7 +1615,7 @@ reifyClass cls
 
     reifyDefImpl :: TH.Name -> [TH.Name] -> Type -> TcM TH.Dec
     reifyDefImpl n args ty =
-      TH.TySynInstD n . TH.TySynEqn (map TH.VarT args) <$> reifyType ty
+      TH.TySynInstD n . TH.TySynEqn Nothing (map TH.VarT args) <$> reifyType ty
 
     tfNames :: TH.Dec -> (TH.Name, [TH.Name])
     tfNames (TH.OpenTypeFamilyD (TH.TypeFamilyHead n args _ _))
@@ -1697,13 +1700,14 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
   = case flavor of
       SynFamilyInst ->
                -- remove kind patterns (#8884)
-        do { let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
+        do { th_tvs <- reifyTyVarsToMaybe fam_tvs
+           ; let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
            ; th_lhs <- reifyTypes lhs_types_only
            ; annot_th_lhs <- zipWith3M annotThType is_poly_tvs lhs_types_only
                                                    th_lhs
            ; th_rhs <- reifyType rhs
            ; return (TH.TySynInstD (reifyName fam)
-                                   (TH.TySynEqn annot_th_lhs th_rhs)) }
+                                   (TH.TySynEqn th_tvs annot_th_lhs th_rhs)) }
 
       DataFamilyInst rep_tc ->
         do { let rep_tvs = tyConTyVars rep_tc
@@ -1720,14 +1724,15 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                  eta_expanded_lhs = lhs `chkAppend` etad_tys
                  dataCons         = tyConDataCons rep_tc
                  isGadt           = isGadtSyntaxTyCon rep_tc
+           ; th_tvs <- reifyTyVarsToMaybe fam_tvs
            ; cons <- mapM (reifyDataCon isGadt eta_expanded_tvs) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc eta_expanded_lhs
            ; th_tys <- reifyTypes types_only
            ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
            ; return $
                if isNewTyCon rep_tc
-               then TH.NewtypeInstD [] fam' annot_th_tys Nothing (head cons) []
-               else TH.DataInstD    [] fam' annot_th_tys Nothing       cons  []
+               then TH.NewtypeInstD [] fam' th_tvs annot_th_tys Nothing (head cons) []
+               else TH.DataInstD    [] fam' th_tvs annot_th_tys Nothing       cons  []
            }
   where
     fam_tc = famInstTyCon inst
@@ -1814,6 +1819,10 @@ reifyTyVars tvs = mapM reify_tv tvs
       where
         kind = tyVarKind tv
         name = reifyName tv
+
+reifyTyVarsToMaybe :: [TyVar] -> TcM (Maybe [TH.TyVarBndr])
+reifyTyVarsToMaybe []  = pure Nothing
+reifyTyVarsToMaybe tys = Just <$> reifyTyVars tys
 
 {-
 Note [Kind annotations on TyConApps]

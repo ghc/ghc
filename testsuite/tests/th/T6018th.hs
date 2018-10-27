@@ -20,17 +20,20 @@ $( return
                              [(mkName "a"), (mkName "b"), (mkName "c") ]))
    , TySynInstD
        (mkName "F")
-       (TySynEqn [ ConT (mkName "Int"), ConT (mkName "Char")
+       (TySynEqn Nothing
+                 [ ConT (mkName "Int"), ConT (mkName "Char")
                  , ConT (mkName "Bool")]
                  ( ConT (mkName "Bool")))
    , TySynInstD
        (mkName "F")
-       (TySynEqn [ ConT (mkName "Char"), ConT (mkName "Bool")
+       (TySynEqn Nothing
+                 [ ConT (mkName "Char"), ConT (mkName "Bool")
                  , ConT (mkName "Int")]
                  ( ConT (mkName "Int")))
    , TySynInstD
        (mkName "F")
-       (TySynEqn [ ConT (mkName "Bool"), ConT (mkName "Int")
+       (TySynEqn Nothing
+                 [ ConT (mkName "Bool"), ConT (mkName "Int")
                  , ConT (mkName "Char")]
                  ( ConT (mkName "Char")))
    ] )
@@ -48,7 +51,8 @@ $( return
        (Just $ InjectivityAnn (mkName "r") [mkName "a"]))
    , TySynInstD
        (mkName "J")
-       (TySynEqn [ ConT (mkName "Int"), VarT (mkName "b") ]
+       (TySynEqn Nothing
+                 [ ConT (mkName "Int"), VarT (mkName "b") ]
                  ( ConT (mkName "Int")))
    ] )
 
@@ -66,13 +70,16 @@ $( return
        , KindedTV (mkName "c") StarT ]
        (TyVarSig (PlainTV (mkName "r")))
        (Just $ InjectivityAnn (mkName "r") [(mkName "a"), (mkName "b")]))
-       [ TySynEqn [ ConT (mkName "Int"), ConT (mkName "Char")
+       [ TySynEqn Nothing
+                  [ ConT (mkName "Int"), ConT (mkName "Char")
                   , ConT (mkName "Bool")]
                   ( ConT (mkName "Bool"))
-       , TySynEqn [ ConT (mkName "Int"), ConT (mkName "Char")
+       , TySynEqn Nothing
+                  [ ConT (mkName "Int"), ConT (mkName "Char")
                   , ConT (mkName "Int")]
                   ( ConT (mkName "Bool"))
-       , TySynEqn [ ConT (mkName "Bool"), ConT (mkName "Int")
+       , TySynEqn Nothing
+                  [ ConT (mkName "Bool"), ConT (mkName "Int")
                   , ConT (mkName "Int")]
                   ( ConT (mkName "Int"))
        ]
@@ -103,17 +110,20 @@ $( return
                              [(mkName "a"), (mkName "b") ]))
    , TySynInstD
        (mkName "H")
-       (TySynEqn [ ConT (mkName "Int"), ConT (mkName "Char")
+       (TySynEqn Nothing
+                 [ ConT (mkName "Int"), ConT (mkName "Char")
                  , ConT (mkName "Bool")]
                  ( ConT (mkName "Bool")))
    , TySynInstD
        (mkName "H")
-       (TySynEqn [ ConT (mkName "Int"), ConT (mkName "Int")
+       (TySynEqn Nothing
+                 [ ConT (mkName "Int"), ConT (mkName "Int")
                  , ConT (mkName "Int")]
                  ( ConT (mkName "Bool")))
    , TySynInstD
        (mkName "H")
-       (TySynEqn [ ConT (mkName "Bool"), ConT (mkName "Int")
+       (TySynEqn Nothing
+                 [ ConT (mkName "Bool"), ConT (mkName "Int")
                  , ConT (mkName "Int")]
                  ( ConT (mkName "Int")))
    ] )

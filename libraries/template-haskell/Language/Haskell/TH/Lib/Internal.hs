@@ -469,13 +469,15 @@ pragSpecInstD ty
       ty1    <- ty
       return $ PragmaD $ SpecialiseInstP ty1
 
-pragRuleD :: String -> [RuleBndrQ] -> ExpQ -> ExpQ -> Phases -> DecQ
-pragRuleD n bndrs lhs rhs phases
+pragRuleD :: String -> Maybe [TyVarBndrQ] -> [RuleBndrQ] -> ExpQ -> ExpQ
+          -> Phases -> DecQ
+pragRuleD n ty_bndrs tm_bndrs lhs rhs phases
   = do
-      bndrs1 <- sequence bndrs
+      ty_bndrs1 <- traverse sequence ty_bndrs
+      tm_bndrs1 <- sequence tm_bndrs
       lhs1   <- lhs
       rhs1   <- rhs
-      return $ PragmaD $ RuleP n bndrs1 lhs1 rhs1 phases
+      return $ PragmaD $ RuleP n ty_bndrs1 tm_bndrs1 lhs1 rhs1 phases
 
 pragAnnD :: AnnTarget -> ExpQ -> DecQ
 pragAnnD target expr
@@ -489,27 +491,29 @@ pragLineD line file = return $ PragmaD $ LineP line file
 pragCompleteD :: [Name] -> Maybe Name -> DecQ
 pragCompleteD cls mty = return $ PragmaD $ CompleteP cls mty
 
-dataInstD :: CxtQ -> Name -> [TypeQ] -> Maybe KindQ -> [ConQ]
-          -> [DerivClauseQ] -> DecQ
-dataInstD ctxt tc tys ksig cons derivs =
+dataInstD :: CxtQ -> Name -> (Maybe [TyVarBndrQ]) -> [TypeQ] -> Maybe KindQ
+          -> [ConQ] -> [DerivClauseQ] -> DecQ
+dataInstD ctxt tc mb_bndrs tys ksig cons derivs =
   do
-    ctxt1   <- ctxt
-    tys1    <- sequenceA tys
-    ksig1   <- sequenceA ksig
-    cons1   <- sequenceA cons
-    derivs1 <- sequenceA derivs
-    return (DataInstD ctxt1 tc tys1 ksig1 cons1 derivs1)
+    ctxt1     <- ctxt
+    mb_bndrs1 <- traverse sequence mb_bndrs
+    tys1      <- sequenceA tys
+    ksig1     <- sequenceA ksig
+    cons1     <- sequenceA cons
+    derivs1   <- sequenceA derivs
+    return (DataInstD ctxt1 tc mb_bndrs1 tys1 ksig1 cons1 derivs1)
 
-newtypeInstD :: CxtQ -> Name -> [TypeQ] -> Maybe KindQ -> ConQ
-             -> [DerivClauseQ] -> DecQ
-newtypeInstD ctxt tc tys ksig con derivs =
+newtypeInstD :: CxtQ -> Name -> (Maybe [TyVarBndrQ]) -> [TypeQ] -> Maybe KindQ
+             -> ConQ -> [DerivClauseQ] -> DecQ
+newtypeInstD ctxt tc mb_bndrs tys ksig con derivs =
   do
-    ctxt1   <- ctxt
-    tys1    <- sequenceA tys
-    ksig1   <- sequenceA ksig
-    con1    <- con
-    derivs1 <- sequence derivs
-    return (NewtypeInstD ctxt1 tc tys1 ksig1 con1 derivs1)
+    ctxt1     <- ctxt
+    mb_bndrs1 <- traverse sequence mb_bndrs
+    tys1      <- sequenceA tys
+    ksig1     <- sequenceA ksig
+    con1      <- con
+    derivs1   <- sequence derivs
+    return (NewtypeInstD ctxt1 tc mb_bndrs1 tys1 ksig1 con1 derivs1)
 
 tySynInstD :: Name -> TySynEqnQ -> DecQ
 tySynInstD tc eqn =
@@ -580,12 +584,13 @@ implicitParamBindD n e =
     e' <- e
     return $ ImplicitParamBindD n e'
 
-tySynEqn :: [TypeQ] -> TypeQ -> TySynEqnQ
-tySynEqn lhs rhs =
+tySynEqn :: (Maybe [TyVarBndrQ]) -> [TypeQ] -> TypeQ -> TySynEqnQ
+tySynEqn mb_bndrs lhs rhs =
   do
+    mb_bndrs1 <- traverse sequence mb_bndrs
     lhs1 <- sequence lhs
     rhs1 <- rhs
-    return (TySynEqn lhs1 rhs1)
+    return (TySynEqn mb_bndrs1 lhs1 rhs1)
 
 cxt :: [PredQ] -> CxtQ
 cxt = sequence

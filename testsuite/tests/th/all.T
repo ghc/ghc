@@ -76,6 +76,10 @@ test('TH_reifyMkName', normal, compile, ['-v0'])
 
 test('TH_reifyInstances', normal, compile, ['-v0'])
 
+test('TH_reifyExplicitForAllFams', normal, compile, ['-v0'])
+test('TH_ExplicitForAllRules', normal, multimod_compile_and_run,
+     ['TH_ExplicitForAllRules.hs', '-v0 ' + config.ghc_th_way_flags])
+
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3', [], multimod_compile,

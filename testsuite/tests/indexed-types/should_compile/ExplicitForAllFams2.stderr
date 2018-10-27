@@ -1,0 +1,12 @@
+
+ExplicitForAllFams2.hs:34:10: warning: [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘t’
+
+ExplicitForAllFams2.hs:35:10: warning: [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘a’
+
+ExplicitForAllFams2.hs:38:7: warning: [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘t’
+
+ExplicitForAllFams2.hs:39:6: warning: [-Wunused-type-patterns]
+    Defined but not used on the right hand side: type variable ‘a’

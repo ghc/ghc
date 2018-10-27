@@ -1,5 +1,17 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.15.0.0 *TBA*
+
+  * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
+    and `RuleP` now all have a `Maybe [TyVarBndr]` argument, which contains a
+    list of quantified type variables if an explicit `forall` is present, and
+    `Nothing` otherwise.
+
+    Correspondingly, in `Language.Haskell.TH.Lib.Internal`, `pragRuleD`,
+    `dataInstD`, `newtypeInstD`, and `tySynEqn` now all have a
+    `Maybe [TyVarBndrQ]` argument. Non-API-breaking versions of these
+    functions can be found in `Language.Haskell.TH.Lib`.
+
 ## 2.14.0.0 *TBA*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding

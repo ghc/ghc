@@ -1711,14 +1711,18 @@ data Dec
                (Maybe Kind)
          -- ^ @{ data family T a b c :: * }@
 
-  | DataInstD Cxt Name [Type]
+  | DataInstD Cxt Name
+             (Maybe [TyVarBndr])  -- Quantified type vars
+             [Type]
              (Maybe Kind)         -- Kind signature
              [Con] [DerivClause]  -- ^ @{ data instance Cxt x => T [x]
                                   --       = A x | B (T x)
                                   --       deriving (Z,W)
                                   --       deriving stock Eq }@
 
-  | NewtypeInstD Cxt Name [Type]
+  | NewtypeInstD Cxt Name
+                 (Maybe [TyVarBndr])  -- Quantified type vars
+                 [Type]
                  (Maybe Kind)      -- Kind signature
                  Con [DerivClause] -- ^ @{ newtype instance Cxt x => T [x]
                                    --        = A (B x)
@@ -1837,7 +1841,7 @@ data TypeFamilyHead =
 -- | One equation of a type family instance or closed type family. The
 -- arguments are the left-hand-side type patterns and the right-hand-side
 -- result.
-data TySynEqn = TySynEqn [Type] Type
+data TySynEqn = TySynEqn (Maybe [TyVarBndr]) [Type] Type
   deriving( Show, Eq, Ord, Data, Generic )
 
 data FunDep = FunDep [Name] [Name]
@@ -1857,7 +1861,7 @@ data Safety = Unsafe | Safe | Interruptible
 data Pragma = InlineP         Name Inline RuleMatch Phases
             | SpecialiseP     Name Type (Maybe Inline) Phases
             | SpecialiseInstP Type
-            | RuleP           String [RuleBndr] Exp Exp Phases
+            | RuleP           String (Maybe [TyVarBndr]) [RuleBndr] Exp Exp Phases
             | AnnP            AnnTarget Exp
             | LineP           Int String
             | CompleteP       [Name] (Maybe Name)

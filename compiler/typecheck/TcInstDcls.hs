@@ -589,7 +589,8 @@ tcDataFamInstDecl :: Maybe ClsInstInfo
 tcDataFamInstDecl mb_clsinfo
     (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_ext = tv_names
                                                    , hsib_body =
-      FamEqn { feqn_pats   = pats
+      FamEqn { feqn_bndrs  = mb_bndrs
+             , feqn_pats   = pats
              , feqn_tycon  = fam_tc_name
              , feqn_fixity = fixity
              , feqn_rhs    = HsDataDefn { dd_ND = new_or_data
@@ -608,7 +609,7 @@ tcDataFamInstDecl mb_clsinfo
 
          -- Kind check type patterns
        ; let mb_kind_env = thdOf3 <$> mb_clsinfo
-       ; tcFamTyPats fam_tc mb_clsinfo tv_names pats
+       ; tcFamTyPats fam_tc mb_clsinfo tv_names mb_bndrs pats
                      (kcDataDefn mb_kind_env decl) $
              \tvs pats res_kind ->
     do { stupid_theta <- solveEqualities $ tcHsContext ctxt
@@ -710,7 +711,7 @@ tcDataFamInstDecl mb_clsinfo
       = go pats (tv : etad_tvs)
     go pats etad_tvs = (reverse pats, etad_tvs)
 
-    pp_hs_pats = pprFamInstLHS fam_tc_name pats fixity (unLoc ctxt) m_ksig
+    pp_hs_pats = pprFamInstLHS fam_tc_name mb_bndrs pats fixity (unLoc ctxt) m_ksig
 
 tcDataFamInstDecl _
     (L _ (DataFamInstDecl
@@ -1666,8 +1667,8 @@ mkDefMethBind clas inst_tys sel_id dm_name
        ; return (bind, inline_prags) }
   where
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
-    mk_vta fun ty = noLoc (HsAppType (mkEmptyWildCardBndrs $ nlHsParTy
-                                      $ noLoc $ XHsType $ NHsCoreTy ty) fun)
+    mk_vta fun ty = noLoc (HsAppType noExt fun (mkEmptyWildCardBndrs $ nlHsParTy
+                                                $ noLoc $ XHsType $ NHsCoreTy ty))
        -- NB: use visible type application
        -- See Note [Default methods in instances]
 

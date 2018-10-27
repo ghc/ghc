@@ -63,7 +63,7 @@ module HsTypes (
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
         -- Printing
-        pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
+        pprHsType, pprHsForAll, pprHsForAllExtra, pprHsExplicitForAll,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
@@ -1298,6 +1298,8 @@ instance Outputable HsWildCardInfo where
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
 
+-- | Prints a forall; When passed an empty list, prints @forall.@ only when
+-- @-dppr-debug@
 pprHsForAll :: (OutputableBndrId (GhcPass p))
             => [LHsTyVarBndr (GhcPass p)] -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
@@ -1313,15 +1315,17 @@ pprHsForAllExtra :: (OutputableBndrId (GhcPass p))
                  => Maybe SrcSpan -> [LHsTyVarBndr (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
 pprHsForAllExtra extra qtvs cxt
-  = pprHsForAllTvs qtvs <+> pprHsContextExtra show_extra (unLoc cxt)
+  = pp_forall <+> pprHsContextExtra (isJust extra) (unLoc cxt)
   where
-    show_extra = isJust extra
+    pp_forall | null qtvs = whenPprDebug (forAllLit <> dot)
+              | otherwise = forAllLit <+> interppSP qtvs <> dot
 
-pprHsForAllTvs :: (OutputableBndrId (GhcPass p))
-               => [LHsTyVarBndr (GhcPass p)] -> SDoc
-pprHsForAllTvs qtvs
-  | null qtvs = whenPprDebug (forAllLit <+> dot)
-  | otherwise = forAllLit <+> interppSP qtvs <> dot
+-- | Version of 'pprHsForall' or 'pprHsForallExtra' that will always print
+-- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
+pprHsExplicitForAll :: (OutputableBndrId (GhcPass p))
+               => Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc
+pprHsExplicitForAll (Just qtvs) = forAllLit <+> interppSP qtvs <> dot
+pprHsExplicitForAll Nothing     = empty
 
 pprHsContext :: (OutputableBndrId (GhcPass p)) => HsContext (GhcPass p) -> SDoc
 pprHsContext = maybe empty (<+> darrow) . pprHsContextMaybe
@@ -1390,7 +1394,7 @@ ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
-  = sep [pprHsForAllTvs tvs, ppr_mono_lty ty]
+  = sep [pprHsForAll tvs (noLoc []), ppr_mono_lty ty]
 
 ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
   = sep [pprHsContextAlways ctxt, ppr_mono_lty ty]

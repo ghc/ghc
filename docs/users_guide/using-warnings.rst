@@ -1503,7 +1503,7 @@ of ``-W(no-)*``.
         do { mapM_ popInt xs ; return 10 }
 
 .. ghc-flag:: -Wunused-type-patterns
-    :shortdesc: warn about unused type variables which arise from patterns
+    :shortdesc: warn about unused type variables which arise from patterns in
         in type family and data family instances
     :type: dynamic
     :reverse: -Wno-unused-type-patterns
@@ -1513,22 +1513,30 @@ of ``-W(no-)*``.
        single: unused type patterns, warning
        single: type patterns, unused
 
-    Report all unused type variables which arise from patterns in type family
-    and data family instances. For instance: ::
+    Report all unused implicitly bound type variables which arise from
+    patterns in type family and data family instances. For instance: ::
 
         type instance F x y = []
 
-    would report ``x`` and ``y`` as unused. The warning is suppressed if the
-    type variable name begins with an underscore, like so: ::
+    would report ``x`` and ``y`` as unused on the right hand side. The warning
+    is suppressed if the type variable name begins with an underscore, like
+    so: ::
 
         type instance F _x _y = []
+
+    When :extension:`ExplicitForAll` is enabled, explicitly quantified type
+    variables may also be identified as unused. For instance: ::
+      
+        type instance forall x y. F x y = []
+    
+    would still report ``x`` and ``y`` as unused on the right hand side
 
     Unlike :ghc-flag:`-Wunused-matches`, :ghc-flag:`-Wunused-type-patterns` is
     not implied by :ghc-flag:`-Wall`. The rationale for this decision is that
     unlike term-level pattern names, type names are often chosen expressly for
     documentation purposes, so using underscores in type names can make the
     documentation harder to read.
-
+    
 .. ghc-flag:: -Wunused-foralls
     :shortdesc: warn about type variables in user-written
         ``forall``\\s that are unused
