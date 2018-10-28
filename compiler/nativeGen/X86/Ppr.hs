@@ -115,8 +115,6 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> char '-'
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
-      (if debugLevel dflags > 0
-       then ppr (mkAsmTempEndLabel info_lbl) <> char ':' else empty) $$
       pprSizeDecl info_lbl
 
 -- | Output the ELF .size directive.
@@ -130,20 +128,23 @@ pprSizeDecl lbl
 pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = sdocWithDynFlags $ \dflags ->
-    maybe_infotable $$
+    maybe_infotable dflags $
     pprLabel asmLbl $$
     vcat (map pprInstr instrs) $$
     (if debugLevel dflags > 0
      then ppr (mkAsmTempEndLabel asmLbl) <> char ':' else empty)
   where
     asmLbl = blockLbl blockid
-    maybe_infotable = case mapLookup blockid info_env of
-       Nothing   -> empty
-       Just (Statics info_lbl info) ->
+    maybe_infotable dflags c = case mapLookup blockid info_env of
+       Nothing -> c
+       Just (Statics infoLbl info) ->
            pprAlignForSection Text $$
            infoTableLoc $$
            vcat (map pprData info) $$
-           pprLabel info_lbl
+           pprLabel infoLbl $$
+           c $$
+           (if debugLevel dflags > 0
+            then ppr (mkAsmTempEndLabel infoLbl) <> char ':' else empty)
     -- Make sure the info table has the right .loc for the block
     -- coming right after it. See [Note: Info Offset]
     infoTableLoc = case instrs of
