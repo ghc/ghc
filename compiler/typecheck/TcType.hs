@@ -577,7 +577,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
 
 -------------------------------------
 -- UserTypeCtxt describes the origin of the polymorphic type
--- in the places where we need to an expression has that type
+-- in the places where we need an expression to have that type
 
 data UserTypeCtxt
   = FunSigCtxt      -- Function type signature, when checking the type
@@ -713,7 +713,7 @@ Note [TcLevel and untouchable type variables]
 
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication,
-  and it is a TauTv or SigTv (but /not/ FlatMetaTv or FlatSkolTv
+  and it is a TauTv or SigTv (but /not/ FlatMetaTv or FlatSkolTv)
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -992,7 +992,7 @@ anyRewritableTyVar ignore_cos role pred ty
     go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
-    go_tc ReprEq bvs tc tys = foldr ((&&) . go_arg bvs) False $
+    go_tc ReprEq bvs tc tys = any (go_arg bvs)
                               (tyConRolesRepresentational tc `zip` tys)
 
     go_arg bvs (Nominal,          ty) = go NomEq  bvs ty
@@ -1031,7 +1031,7 @@ out the other (Trac #14363).
 ********************************************************************* -}
 
 data CandidatesQTvs  -- See Note [Dependent type variables]
-                     -- See Note [CandidatesQTvs determinism]
+                     -- See Note [CandidatesQTvs determinism and order]
   = DV { dv_kvs :: DTyCoVarSet  -- "kind" variables (dependent)
        , dv_tvs :: DTyVarSet    -- "type" variables (non-dependent)
          -- A variable may appear in both sets
@@ -1195,8 +1195,7 @@ isFloatedTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
   , not (isFlattenInfo info)
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    tv_tclvl `strictlyDeeperThan` ctxt_tclvl
+  = tv_tclvl `strictlyDeeperThan` ctxt_tclvl
 
   | otherwise = False
 
@@ -1212,10 +1211,9 @@ isTyConableTyVar tv
         -- with a type constructor application; in particular,
         -- not a SigTv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        MetaTv { mtv_info = SigTv } -> False
-        _                           -> True
+  = case tcTyVarDetails tv of
+        MetaTv { mtv_info = SigTv }   -> False
+        _                             -> True
   | otherwise = True
 
 isFmvTyVar tv
@@ -1230,7 +1228,7 @@ isFskTyVar tv
         MetaTv { mtv_info = FlatSkolTv } -> True
         _                                -> False
 
--- | True of both given and wanted flatten-skolems (fak and usk)
+-- | True of both given and wanted flatten-skolems (fmv and fsk)
 isFlattenTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
@@ -1245,16 +1243,14 @@ isSkolemTyVar tv
 
 isOverlappableTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
         SkolemTv _ overlappable -> overlappable
         _                       -> False
   | otherwise = False
 
 isMetaTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
         MetaTv {} -> True
         _         -> False
   | otherwise = False
