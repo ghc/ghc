@@ -425,3 +425,5 @@ test('T15550', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15572', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15481', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_recover_warns', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T15815', normal, multimod_compile,
+    ['T15815B', '-v0 ' + config.ghc_th_way_flags])
