@@ -1437,7 +1437,13 @@ cvtTypeKind ty_str ty
 
            EqualityT
              | [x',y'] <- tys' ->
-                   returnL (HsOpTy noExt x' (noLoc eqTyCon_RDR) y')
+                   let px = parenthesizeHsType opPrec x'
+                       py = parenthesizeHsType opPrec y'
+                   in returnL (HsOpTy noExt px (noLoc eqTyCon_RDR) py)
+               -- The long-term goal is to remove the above case entirely and
+               -- subsume it under the case for InfixT. See #15815, comment:6,
+               -- for more details.
+
              | otherwise ->
                    mk_apps (HsTyVar noExt NotPromoted
                             (noLoc eqTyCon_RDR)) tys'

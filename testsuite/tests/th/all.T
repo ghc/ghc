@@ -446,3 +446,5 @@ test('T15738', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15783', normal, multimod_compile,
     ['T15783A', '-v0 ' + config.ghc_th_way_flags])
 test('T15792', normal, compile, ['-v0 -dsuppress-uniques'])
+test('T15815', normal, multimod_compile,
+    ['T15815B', '-v0 ' + config.ghc_th_way_flags])
