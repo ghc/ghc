@@ -1673,7 +1673,9 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
                                    , text "Type-correct unfilled coercion hole"
                                      <+> ppr hole )
                          ; cv' <- zonkCoVar cv
-                         ; return $ mkHoleCo (hole { ch_co_var = cv' }) } }
+                         ; return $ mkCoVarCo cv' } }
+                             -- This will be an out-of-scope variable, but keeping
+                             -- this as a coercion hole led to #15787
 
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
 zonk_tycomapper = TyCoMapper
