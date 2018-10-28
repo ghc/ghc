@@ -140,7 +140,7 @@ with optimisations turned on, and give basically all binders an INLINE pragma.
 
 So instead:
 
-  * For plugins that were build locally: we store the filepath and hash of the
+  * For plugins that were built locally: we store the filepath and hash of the
     object files of the module with the `plugin` binder, and the object files of
     modules that are dependencies of the plugin module and belong to the same
     `UnitId` as the plugin
@@ -165,59 +165,57 @@ One way to improve this is to either:
 mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
 mkPluginUsage hsc_env pluginModule
   = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
-    -- The plug is from an external package, we just look up the dylib that
-    -- contains the plugin
     LookupFound _ pkg -> do
+    -- The plugin is from an external package:
+    -- search for the library files containing the plugin.
       let searchPaths = collectLibraryPaths dflags [pkg]
-          libs        = packageHsLibs dflags pkg
-          dynlibLocs  = [ searchPath </> mkHsSOName platform lib
-                        | searchPath <- searchPaths
-                        , lib <- libs
-                        ]
-      dynlibs <- filterM doesFileExist dynlibLocs
-      case dynlibs of
-        [] -> pprPanic
-                ("mkPluginUsage: no dylibs, tried:\n" ++ unlines dynlibLocs)
-                (ppr pNm)
-        _  -> mapM hashFile (nub dynlibs)
+          useDyn = WayDyn `elem` ways dflags
+          suffix = if useDyn then soExt platform else "a"
+          libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
+                    | searchPath <- searchPaths
+                    , libLoc     <- packageHsLibs dflags pkg
+                    ]
+          -- we also try to find plugin library files by adding WayDyn way,
+          -- if it isn't already present (see trac #15492)
+          paths =
+            if useDyn
+              then libLocs
+              else
+                let dflags'  = updateWays (addWay' WayDyn dflags)
+                    dlibLocs = [ searchPath </> mkHsSOName platform dlibLoc
+                               | searchPath <- searchPaths
+                               , dlibLoc    <- packageHsLibs dflags' pkg
+                               ]
+                in libLocs ++ dlibLocs
+      files <- filterM doesFileExist paths
+      case files of
+        [] ->
+          pprPanic
+             ( "mkPluginUsage: missing plugin library, tried:\n"
+              ++ unlines paths
+             )
+             (ppr pNm)
+        _  -> mapM hashFile (nub files)
     _ -> do
       foundM <- findPluginModule hsc_env pNm
       case foundM of
-        -- The plugin was built locally, look up the object file containing
-        -- the `plugin` binder, and all object files belong to modules that are
-        -- transitive dependencies of the plugin that belong to the same package
+      -- The plugin was built locally: look up the object file containing
+      -- the `plugin` binder, and all object files belong to modules that are
+      -- transitive dependencies of the plugin that belong to the same package.
         Found ml _ -> do
-          pluginObject <- hashFile  (ml_obj_file ml)
+          pluginObject <- hashFile (ml_obj_file ml)
           depObjects   <- catMaybes <$> mapM lookupObjectFile deps
           return (nub (pluginObject : depObjects))
-        _ -> pprPanic "mkPluginUsage: no object or dylib" (ppr pNm)
+        _ -> pprPanic "mkPluginUsage: no object file found" (ppr pNm)
   where
-    -- plugins are shared libraries, so WayDyn should be part of the dflags in
-    -- order to get the correct filenames and library paths.
-    --
-    -- We can distinguish two scenarios:
-    --
-    -- 1. The dflags do not contain WayDyn, in this case we need to remove
-    --    all other ways and only add WayDyn. Why? Because other ways change
-    --    the library tags, i.e. WayProf adds `_p`, and we would end up looking
-    --    for a profiled plugin which might not be installed. See #15492
-    --
-    -- 2. The dflags do contain WayDyn, in this case we can leave the ways as
-    --    is, because the plugin must be compiled with the same ways as the
-    --    module that is currently being build, e.g., if the module is
-    --    build with WayDyn and WayProf, then the plugin that was used
-    --    would've also had to been build with WayProf (and WayDyn).
-    dflags1  = hsc_dflags hsc_env
-    dflags   = if WayDyn `elem` ways dflags1
-                 then dflags1
-                 else updateWays (addWay' WayDyn (dflags1 {ways = []}))
+    dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
     pNm      = moduleName (mi_module pluginModule)
     pPkg     = moduleUnitId (mi_module pluginModule)
     deps     = map fst (dep_mods (mi_deps pluginModule))
 
-    -- loopup object file for a plugin dependencies from the same package as the
-    -- the plugin
+    -- Lookup object file for a plugin dependency,
+    -- from the same package as the plugin.
     lookupObjectFile nm = do
       foundM <- findImportedModule hsc_env nm Nothing
       case foundM of
