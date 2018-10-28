@@ -1,0 +1,6 @@
+
+T15787.hs:15:43: error:
+    • Expected kind ‘ob’, but ‘k’ has kind ‘*’
+    • In the second argument of ‘Kl_kind’, namely ‘k’
+      In the type ‘Kl_kind (m :: ob -> ob) k’
+      In the definition of data constructor ‘Kl’
