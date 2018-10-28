@@ -13,6 +13,7 @@ Contents:
    license
    intro
    8.6.1-notes
+   8.6.2-notes
    ghci
    runghc
    usage
