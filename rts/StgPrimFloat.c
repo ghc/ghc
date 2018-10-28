@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <float.h>
+#include <limits.h>
 
 #define IEEE_FLOATING_POINT 1
 
@@ -47,6 +48,23 @@
 
 #define __abs(a)                (( (a) >= 0 ) ? (a) : (-(a)))
 
+/** Trac #15271: Some large ratios are converted into double incorrectly.
+  * This occurs when StgInt has 64 bits and C int has 32 bits, where wrapping
+  * occurs and an incorrect signed value is passed into ldexp */
+STATIC_INLINE int
+truncExponent(I_ e)
+{
+#if INT_MAX < STG_INT_MAX
+  if (RTS_UNLIKELY(e > INT_MAX))
+    e = INT_MAX;
+#endif
+#if INT_MIN > STG_INT_MIN
+  if (RTS_UNLIKELY(e < INT_MIN))
+    e = INT_MIN;
+#endif
+  return e;
+}
+
 /* Special version for words */
 StgDouble
 __word_encodeDouble (W_ j, I_ e)
@@ -57,7 +75,7 @@ __word_encodeDouble (W_ j, I_ e)
 
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-    r = ldexp(r, e);
+    r = ldexp(r, truncExponent(e));
 
   return r;
 }
@@ -72,7 +90,7 @@ __int_encodeDouble (I_ j, I_ e)
 
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-    r = ldexp(r, e);
+    r = ldexp(r, truncExponent(e));
 
   /* sign is encoded in the size */
   if (j < 0)
@@ -91,7 +109,7 @@ __int_encodeFloat (I_ j, I_ e)
 
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-    r = ldexp(r, e);
+    r = ldexp(r, truncExponent(e));
 
   /* sign is encoded in the size */
   if (j < 0)
@@ -110,7 +128,7 @@ __word_encodeFloat (W_ j, I_ e)
 
   /* Now raise to the exponent */
   if ( r != 0.0 ) /* Lennart suggests this avoids a bug in MIPS's ldexp */
-    r = ldexp(r, e);
+    r = ldexp(r, truncExponent(e));
 
   return r;
 }
