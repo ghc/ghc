@@ -174,7 +174,7 @@ pprSigCtxt ctxt hs_ty
 
 tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- This one is used when we have a LHsSigWcType, but in
--- a place where wildards aren't allowed. The renamer has
+-- a place where wildcards aren't allowed. The renamer has
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 

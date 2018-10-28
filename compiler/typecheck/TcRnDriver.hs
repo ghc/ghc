@@ -51,6 +51,7 @@ import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )
 import TcHsType
+import TcValidity( checkValidType )
 import TcMatches
 import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
@@ -2396,6 +2397,9 @@ tcRnType hsc_env normalise rdr_type
        ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType ty
+
+       -- Do validity checking on type
+       ; checkValidType GhciCtxt ty
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
