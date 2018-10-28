@@ -1,0 +1,3 @@
+<interactive>:1:1: error:
+    Illegal polymorphic type: forall a. a -> a
+    GHC doesn't yet support impredicative polymorphism
