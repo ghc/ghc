@@ -26,7 +26,7 @@ module LlvmCodeGen.Base (
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, tysToParams, llvmFunSection, padLiveArgs, isSSE,
+        llvmPtrBits, tysToParams, llvmFunSection, padLiveArgs, isFPR,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -47,6 +47,7 @@ import CodeGen.Platform ( activeStgRegs )
 import DynFlags
 import FastString
 import Cmm              hiding ( succ )
+import CmmUtils ( regsOverlap )
 import Outputable as Outp
 import Platform
 import UniqFM
@@ -58,8 +59,7 @@ import ErrUtils
 import qualified Stream
 
 import Control.Monad (ap)
-import Data.List (sort)
-import Data.Maybe (mapMaybe)
+import Data.List (sort, groupBy, head)
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -152,36 +152,91 @@ llvmFunArgs dflags live =
     map (lmGlobalRegArg dflags) (filter isPassed allRegs)
     where platform = targetPlatform dflags
           allRegs = activeStgRegs platform
-          paddedLive = map (\(_,r) -> r) $ padLiveArgs live
+          paddedLive = map (\(_,r) -> r) $ padLiveArgs dflags live
           isLive r = r `elem` alwaysLive || r `elem` paddedLive
-          isPassed r = not (isSSE r) || isLive r
+          isPassed r = not (isFPR r) || isLive r
 
 
-isSSE :: GlobalReg -> Bool
-isSSE (FloatReg _)  = True
-isSSE (DoubleReg _) = True
-isSSE (XmmReg _)    = True
-isSSE (YmmReg _)    = True
-isSSE (ZmmReg _)    = True
-isSSE _             = False
+isFPR :: GlobalReg -> Bool
+isFPR (FloatReg _)  = True
+isFPR (DoubleReg _) = True
+isFPR (XmmReg _)    = True
+isFPR (YmmReg _)    = True
+isFPR (ZmmReg _)    = True
+isFPR _             = False
 
-sseRegNum :: GlobalReg -> Maybe Int
-sseRegNum (FloatReg i)  = Just i
-sseRegNum (DoubleReg i) = Just i
-sseRegNum (XmmReg i)    = Just i
-sseRegNum (YmmReg i)    = Just i
-sseRegNum (ZmmReg i)    = Just i
-sseRegNum _             = Nothing
+sameFPRClass :: GlobalReg -> GlobalReg -> Bool
+sameFPRClass (FloatReg _)  (FloatReg _) = True
+sameFPRClass (DoubleReg _) (DoubleReg _) = True
+sameFPRClass (XmmReg _)    (XmmReg _) = True
+sameFPRClass (YmmReg _)    (YmmReg _) = True
+sameFPRClass (ZmmReg _)    (ZmmReg _) = True
+sameFPRClass _             _          = False
 
--- the bool indicates whether the global reg was added as padding.
--- the returned list is not sorted in any particular order,
--- but does indicate the set of live registers needed, with SSE padding.
-padLiveArgs :: LiveGlobalRegs -> [(Bool, GlobalReg)]
-padLiveArgs live = allRegs
+normalizeFPRNum :: GlobalReg -> GlobalReg
+normalizeFPRNum (FloatReg _)  = FloatReg 1
+normalizeFPRNum (DoubleReg _) = DoubleReg 1
+normalizeFPRNum (XmmReg _)    = XmmReg 1
+normalizeFPRNum (YmmReg _)    = YmmReg 1
+normalizeFPRNum (ZmmReg _)    = ZmmReg 1
+normalizeFPRNum _ = error "normalizeFPRNum expected only FPR regs"
+
+getFPRCtor :: GlobalReg -> Int -> GlobalReg
+getFPRCtor (FloatReg _)  = FloatReg
+getFPRCtor (DoubleReg _) = DoubleReg
+getFPRCtor (XmmReg _)    = XmmReg
+getFPRCtor (YmmReg _)    = YmmReg
+getFPRCtor (ZmmReg _)    = ZmmReg
+getFPRCtor _ = error "getFPRCtor expected only FPR regs"
+
+fprRegNum :: GlobalReg -> Int
+fprRegNum (FloatReg i)  = i
+fprRegNum (DoubleReg i) = i
+fprRegNum (XmmReg i)    = i
+fprRegNum (YmmReg i)    = i
+fprRegNum (ZmmReg i)    = i
+fprRegNum _ = error "fprRegNum expected only FPR regs"
+
+-- | Input: dynflags, and the list of live registers
+--
+-- Output: An augmented list of live registers, where padding was
+-- added to the list of registers to ensure the calling convention is
+-- correctly used by LLVM.
+--
+-- Each global reg in the returned list is tagged with a bool, which
+-- indicates whether the global reg was added as padding, or was an original
+-- live register.
+--
+-- That is, True => padding, False => a real, live global register.
+--
+-- Also, the returned list is not sorted in any particular order.
+--
+padLiveArgs :: DynFlags -> LiveGlobalRegs -> [(Bool, GlobalReg)]
+padLiveArgs dflags live =
+      if platformUnregisterised plat
+        then taggedLive -- not using GHC's register convention for platform.
+        else padding ++ taggedLive
+  where
+    taggedLive = map (\x -> (False, x)) live
+    plat = targetPlatform dflags
+
+    fprLive = filter isFPR live
+    padding = concatMap calcPad $ groupBy sharesClass fprLive
+
+    sharesClass :: GlobalReg -> GlobalReg -> Bool
+    sharesClass a b = sameFPRClass a b || overlappingClass
+      where
+        overlappingClass = regsOverlap dflags (norm a) (norm b)
+        norm = CmmGlobal . normalizeFPRNum
+
+    calcPad :: [GlobalReg] -> [(Bool, GlobalReg)]
+    calcPad rs = getFPRPadding (getFPRCtor $ head rs) rs
+
+getFPRPadding :: (Int -> GlobalReg) -> LiveGlobalRegs -> [(Bool, GlobalReg)]
+getFPRPadding paddingCtor live = padding
     where
-        sseRegNums = sort $ mapMaybe sseRegNum live
-        (_, padding) = foldl assignSlots (1, []) $ sseRegNums
-        allRegs = padding ++ map (\r -> (False, r)) live
+        fprRegNums = sort $ map fprRegNum live
+        (_, padding) = foldl assignSlots (1, []) $ fprRegNums
 
         assignSlots (i, acc) regNum
             | i == regNum = -- don't need padding here
@@ -195,11 +250,7 @@ padLiveArgs live = allRegs
 
         genPad start n =
             take n $ flip map (iterate (+1) start) (\i ->
-                (True, FloatReg i))
-                -- NOTE: Picking float should be fine for the following reasons:
-                -- (1) Float aliases with all the other SSE register types on
-                -- the given platform.
-                -- (2) The argument is not live anyways.
+                (True, paddingCtor i))
 
 
 -- | Llvm standard fun attributes
