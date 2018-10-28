@@ -2821,7 +2821,7 @@ withTcPlugins hsc_env m =
     do s <- runTcPluginM start ev_binds_var
        return (solve s, stop s)
 
-getTcPlugins :: DynFlags -> [TcPlugin]
+getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
 getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
   where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
 
