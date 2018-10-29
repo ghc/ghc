@@ -1,0 +1,3 @@
+:load T15592
+:set -fprint-explicit-foralls
+:kind C
