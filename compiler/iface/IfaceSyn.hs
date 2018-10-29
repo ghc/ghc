@@ -995,7 +995,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
-    tys_w_strs = zip stricts (map snd arg_tys) -- TODO: arnaud: don't drop linearity when printing
+    tys_w_strs = zip stricts (map snd arg_tys)
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     -- If we're pretty-printing a H98-style declaration with existential

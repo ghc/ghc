@@ -524,7 +524,7 @@ splitCon apps
      return (data_con, mk_rest ts, trailing_doc)
    split [ L l (HsTupleTy _ HsBoxedOrConstraintTuple ts) ] []
      = return ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-              , PrefixCon (map hsLinear ts) --arnaud: check
+              , PrefixCon (map hsLinear ts)
               , trailing_doc
               )
    split [ L l _ ] _ = parseErrorSDoc l (text msg <+> ppr ty)

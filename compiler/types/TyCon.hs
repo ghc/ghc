@@ -131,6 +131,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
+                                 , multiplicityTyCon
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
                                  , mkFunKind, mkForAllKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyVars, dataConFieldLabels
@@ -2035,6 +2036,7 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+                                          , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)

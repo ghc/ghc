@@ -309,7 +309,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
          vcat [ ppr implicit_tvs, ppr explicit_univ_tvs, ppr req_theta
               , ppr explicit_ex_tvs, ppr prov_theta, ppr sig_body_ty ]
 
-       ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of -- TODO: arnaud: tcSplitFunTysN should return weighted types
+       ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
                                  Right stuff  -> return stuff
                                  Left missing -> wrongNumberOfParmsErr name decl_arity missing
 
@@ -338,11 +338,11 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; (tclvl, wanted, (lpat', (ex_tvs', prov_dicts, args'))) <-
            ASSERT2( equalLength arg_names arg_tys, ppr name $$ ppr arg_names $$ ppr arg_tys )
            pushLevelAndCaptureConstraints            $
-           tcExtendTyVarEnv (map unrestricted univ_tvs)  $ -- TODO: arnaud: I'm not sure
+           tcExtendTyVarEnv (map unrestricted univ_tvs)  $
            tcExtendKindEnvList [(getName (binderVar ex_tv), unrestricted (APromotionErr PatSynExPE))
                                | ex_tv <- extra_ex] $
                -- See Note [Pattern synonym existentials do not scope]
-           tcPat PatSyn lpat (unrestricted $ mkCheckExpType pat_ty) $ -- TODO: arnaud: when tclSplitFunTysN returns weighted type, should preserve the weight
+           tcPat PatSyn lpat (unrestricted $ mkCheckExpType pat_ty) $
            do { let in_scope    = mkInScopeSet (mkVarSet univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
               ; (subst, ex_tvs') <- mapAccumLM newMetaTyVarX empty_subst ex_tvs
@@ -704,14 +704,14 @@ tcPatSynMatcher (L loc name) lpat
                | is_unlifted = ([nlHsVar voidPrimId], [voidPrimTy])
                | otherwise   = (args,                 arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
-                       mkFunTys (map unrestricted cont_arg_tys) res_ty -- TODO: arnaud: unrestricted probably wrong here
+                       mkFunTys (map unrestricted cont_arg_tys) res_ty
 
-             fail_ty  = mkFunTyOm voidPrimTy res_ty -- TODO: arnaud: unsure about Omega here
+             fail_ty  = mkFunTyOm voidPrimTy res_ty
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") Omega pat_ty -- TODO: arnaud: unsure about Omega here
-       ; cont         <- newSysLocalId (fsLit "cont")  Omega cont_ty -- TODO: arnaud: unsure about Omega here
-       ; fail         <- newSysLocalId (fsLit "fail")  Omega fail_ty -- TODO: arnaud: unsure about Omega here
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") Omega pat_ty
+       ; cont         <- newSysLocalId (fsLit "cont")  Omega cont_ty
+       ; fail         <- newSysLocalId (fsLit "fail")  Omega fail_ty
 
        ; let matcher_tau   = mkFunTys (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
@@ -733,14 +733,14 @@ tcPatSynMatcher (L loc name) lpat
                     L (getLoc lpat) $
                     HsCase noExt (nlHsVar scrutinee) $
                     MG{ mg_alts = L (getLoc lpat) cases
-                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty Omega -- MattP : Probably wrong
+                      , mg_ext = MatchGroupTc [unrestricted pat_ty] res_ty
                       , mg_origin = Generated
                       }
              body' = noLoc $
                      HsLam noExt $
                      MG{ mg_alts = noLoc [mkSimpleMatch LambdaExpr
                                                         args body]
-                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty Omega -- MattP: Probably wrong
+                       , mg_ext = MatchGroupTc (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
                        , mg_origin = Generated
                        }
              match = mkMatch (mkPrefixFunRhs (L loc name)) []
@@ -749,9 +749,8 @@ tcPatSynMatcher (L loc name) lpat
                              (noLoc (EmptyLocalBinds noExt))
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
              mg = MG{ mg_alts = L (getLoc match) [match]
-                    , mg_ext = MatchGroupTc [] res_ty Omega
+                    , mg_ext = MatchGroupTc [] res_ty
                     , mg_origin = Generated }
-                    -- MattP: Probably wrong
 
        ; let bind = FunBind{ fun_ext = emptyNameSet
                            , fun_id = L loc matcher_id
@@ -802,7 +801,7 @@ mkPatSynBuilderId dir (L _ name)
              builder_sigma  = add_void need_dummy_arg $
                               mkForAllTys univ_bndrs $
                               mkForAllTys ex_bndrs $
-                              mkFunTys (map unrestricted theta) $ -- TODO: arnaud: and following line probably wrong
+                              mkFunTys (map unrestricted theta) $
                               mkFunTys (map unrestricted arg_tys) $
                               pat_ty
              builder_id     = mkExportedVanillaId builder_name builder_sigma

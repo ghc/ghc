@@ -1,6 +1,6 @@
 
 Linear1.hs:10:14: error:
-    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+    • Couldn't match type ‘'Omega’ with ‘'One’
         arising from an application
     • In an equation for ‘incorrectDup’: incorrectDup x = (x, x)
 

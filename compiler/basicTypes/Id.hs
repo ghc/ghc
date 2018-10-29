@@ -228,8 +228,7 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (Regular $ idWeight id) (idType id) (idInfo id)
-  -- TODO: arnaud: maybe (probably) we should preserve the kind of multiplicity annotation here ^
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varWeightedness id) (idType id) (idInfo id)
   where
     name = idName id
 
@@ -294,19 +293,18 @@ mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoercionType ty )
     Var.mkLocalVar CoVarId name (Var.Regular Omega) ty vanillaIdInfo
-    -- TODO: arnaud: should coercions be of multiplicity 0?
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> VarMult -> Type -> Id
 mkLocalIdOrCoVar name w ty
-  | isCoercionType ty = mkLocalCoVar name   ty -- TODO: arnaud: is it the right thing to ignore the multiplicity for coercion variables?
+  | isCoercionType ty = mkLocalCoVar name   ty
   | otherwise         = mkLocalId    name w ty
 
 -- | Make a local id, with the IdDetails set to CoVarId if the type indicates
 -- so.
 mkLocalIdOrCoVarWithInfo :: Name -> VarMult -> Type -> IdInfo -> Id
 mkLocalIdOrCoVarWithInfo name w ty info
-  = Var.mkLocalVar details name w ty info -- TODO: arnaud: contrary to the above function, I don't ignore the multiplicity for coercion variables here…
+  = Var.mkLocalVar details name w ty info
   where
     details | isCoercionType ty = CoVarId
             | otherwise         = VanillaId

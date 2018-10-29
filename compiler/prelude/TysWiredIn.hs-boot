@@ -38,6 +38,7 @@ anyTypeOfKind :: Kind -> Type
 unboxedTupleKind :: [Type] -> Type
 mkPromotedListTy :: Type -> [Type] -> Type
 
+multiplicityTyCon :: TyCon
 multiplicityTy :: Type
 oneDataConTy :: Type
 omegaDataConTy :: Type

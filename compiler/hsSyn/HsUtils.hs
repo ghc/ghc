@@ -659,7 +659,7 @@ typeToLHsType ty
   = go ty
   where
     go :: Type -> LHsType GhcPs
-    go ty@(FunTy _ arg _) -- TODO: arnaud: check assumption: if arg is a pred, then we don't care about linearity (it is always Omega)
+    go ty@(FunTy _ arg _)
       | isPredTy arg
       , (theta, tau) <- tcSplitPhiTy ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)

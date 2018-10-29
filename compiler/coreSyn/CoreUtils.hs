@@ -2394,7 +2394,7 @@ tryEtaReduce bndrs body
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let weight = idWeight v
-       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: arnaud: it is probably a bit slow to compute the type every time but it simplifies the implementation tremendously for now
+       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty
        , weight `eqRig` fun_weight -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
          in Just (mkFunCo Representational (rigToCo weight) reflCo co, [])

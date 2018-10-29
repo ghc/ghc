@@ -345,8 +345,8 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         -- need arg_co :: s2 ~ s1
         --      res_co :: t1 ~ t2
       = let (_, sym_arg_co, res_co) = decomposeFunCo Nominal co
-            -- TODO: arnaud: because the coercion must be nominal, I believe it
-            -- means we can safely ignore the multiplicity argument.<
+            -- It should be fine to ignore the multiplicity bit of the coercion
+            -- for a Nominal coercion.
             arg_co               = mkSymCo sym_arg_co
         in
         go (arg_co : acc_arg_cos) (subst1,t1) res_co (subst2,t2) tys
@@ -379,8 +379,6 @@ splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
   where cos = [w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
 
--- TODO: MattP: This is wrong and should be ripped out when I change
--- Rig to Coercion in FunCo.
 rigToCo :: Rig -> Coercion
 rigToCo r = mkNomReflCo (fromMult r)
 
@@ -409,7 +407,7 @@ splitAppCo_maybe _ = Nothing
 
 -- Only used in specialise/Rules
 splitFunCo_maybe :: HasCallStack => Coercion -> Maybe (Coercion, Coercion)
-splitFunCo_maybe (FunCo _ _ arg res) = Just (arg, res) -- TODO: arnaud: the fact that we are ignoring the multiplicity argument may hide a bug, if we recompose this as an unrestricted arrow after
+splitFunCo_maybe (FunCo _ _ arg res) = Just (arg, res)
 splitFunCo_maybe _ = Nothing
 
 splitForAllCo_maybe :: Coercion -> Maybe (TyVar, Coercion, Coercion)
@@ -646,15 +644,6 @@ mkTyConAppCo r tc cos
   -- See Note [Refl invariant]
 
   | otherwise = TyConAppCo r tc cos
-
--- TODO: MattP this is very suspect. There can probably be more complicated
--- coercions here. However, there is another function rigToCo which is
--- probably the inverse which is also extremely simple minded like this.
-coercionToRig :: Coercion -> Rig
-coercionToRig co
-  | Just (ty, _) <- isReflCo_maybe co
-  = toMult ty
-  | otherwise = pprPanic "coercionToRig" (ppr co)
 
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
 -- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@.

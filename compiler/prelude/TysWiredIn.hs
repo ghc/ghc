@@ -403,8 +403,14 @@ multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multipli
                           multiplicityTyConKey multiplicityTyCon
 
 oneDataConName, omegaDataConName :: Name
-oneDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
-omegaDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Omega") omegaDataConKey omegaDataCon
+oneDataConName = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
+omegaDataConName = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "Omega") omegaDataConKey omegaDataCon
+ -- It feels wrong to have One and Omega be BuiltInSyntax. But otherwise,
+ -- `Omega`, in particular, is considered out of scope unless an appropriate
+ -- file is open. The problem with this is that `Omega` appears implicitly in
+ -- types every time there is an `(->)`, hence out-of-scope errors get
+ -- reported. Making them built-in make it so that they are always considered in
+ -- scope.
 
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon

@@ -43,6 +43,7 @@ import CoreSyn
 import Coercion
 import Name
 import Type
+import Weight
 import TyCoRep
 import Var
 import FastString(FastString)
@@ -178,8 +179,7 @@ data CoreMapX a
 
 instance Eq (DeBruijn CoreExpr) where
   D env1 e1 == D env2 e2 = go e1 e2 where
-    go (Var v1) (Var v2) | False -- varWeightMaybe v1 `eqRig` varWeightMaybe v2
-                                 -- TODO: Reinstate this
+    go (Var v1) (Var v2)
       = case (lookupCME env1 v1, lookupCME env2 v2) of
                             (Just b1, Just b2) -> b1 == b2
                             (Nothing, Nothing) -> v1 == v2
@@ -194,9 +194,7 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
-      -- MattP: TODO: Reinstate this
-      -- && (varWeightMaybe b1) == (varWeightMaybe b2) -- MattP: Don't think that the env is necessary
-                                                    --        here without polymorphism
+      && D env1 (varWeightednessMaybe b1) == D env2 (varWeightednessMaybe b2)
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -538,6 +536,19 @@ instance Eq (DeBruijn Type) where
             -> True
         _ -> False
 
+instance (Multable a, Eq (DeBruijn a)) => Eq (DeBruijn (GMult a)) where
+  (D _ Zero) == (D _ Zero) = True
+  (D _ One) == (D _ One) = True
+  (D _ Omega) == (D _ Omega) = True
+  (D env (RigAdd p q)) == (D env' (RigAdd p' q')) = (D env p) == (D env' p') && (D env q) == (D env' q')
+  (D env (RigMul p q)) == (D env' (RigMul p' q')) = (D env p) == (D env' p') && (D env q) == (D env' q')
+  (D env (RigThing a)) == (D env' (RigThing a')) = (D env a) == (D env a')
+  _ == _ = False
+
+instance Eq (DeBruijn VarMult) where
+  (D _ Alias) == (D _ Alias) = True
+  (D env (Regular w)) == (D env' (Regular w')) = (D env w) == (D env' w')
+
 instance {-# OVERLAPPING #-}
          Outputable a => Outputable (TypeMapG a) where
   ppr m = text "TypeMap elts" <+> ppr (foldTM (:) m [])
@@ -749,6 +760,11 @@ instance Eq (DeBruijn a) => Eq (DeBruijn [a]) where
     D env (x:xs) == D env' (x':xs') = D env x  == D env' x' &&
                                       D env xs == D env' xs'
     _            == _               = False
+
+instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
+    D _   Nothing  == D _    Nothing   = True
+    D env (Just x) == D env' (Just x') = D env x  == D env' x'
+    _              == _                = False
 
 --------- Variable binders -------------
 

@@ -757,12 +757,13 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , let con = cons `getNth` (con_tag - fIRST_TAG)
         arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
-  , all isLinear arg_tys -- TODO: arnaud: I deactivated worker/wrapper splits on constructors with non-linear arguments, because they require unboxed tuple with variable multiplicity fields.
+  , all isLinear arg_tys
+  -- Deactivates CPR worker/wrapper splits on constructors with non-linear
+  -- arguments, for the moment, because they require unboxed tuple with variable
+  -- multiplicity fields.
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
 
--- TODO: arnaud: if used after strictness analysis handles fields with
--- non-linear multiplicity, document and move to a more appropriate place.
 isLinear :: Weighted a -> Bool
 isLinear (Weighted w _ ) =
   case w of
@@ -836,17 +837,17 @@ mkWWcpr_help :: (DataCon, [Type], [(Weighted Type,StrictnessMark)], Coercion)
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | [arg1@(arg_ty1, _)] <- arg_tys
   , isUnliftedType (weightedThing arg_ty1)
-        -- Special case when there is a single result of unlifted type
+  , isLinear arg_ty1
+        -- Special case when there is a single result of unlifted, linear, type
         --
         -- Wrapper:     case (..call worker..) of x -> C x
         -- Worker:      case (   ..body..    ) of C x -> x
-    -- TODO: arnaud: this only ought to apply when C has a _linear_ parameter. I need to add a check.
   = do { (work_uniq : arg_uniq : _) <- getUniquesM
        ; let arg       = mk_ww_local arg_uniq arg1
              con_app   = mkConApp2 data_con inst_tys [arg] `mkCast` mkSymCo co
 
        ; return ( True
-                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)] -- arnaud: TODO: I don't understand where the multiplicity for this is coming from. It ought to be 1, as below. I guess.
+                , \ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)]
                 , \ body     -> mkUnpackCase body co One work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused Trac #10658
@@ -867,11 +868,10 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
              ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
-               -- TODO: arnaud: ^ the above line loses the multiplicity information because unboxed tuples don't have multiplicity parameters yet. Needs fixing.
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
-                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)] -- arnaud: TODO: What about constructors with unrestricted arguments, unboxed tuples will have troubles with them, won't they? I probably need a unboxed tuple with mixed multiplicity in Core.
+                , \ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt (tupleDataCon Unboxed (length arg_tys)), args, con_app)]
                 , \ body     -> mkUnpackCase body co One work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 

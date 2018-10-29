@@ -485,9 +485,9 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
-        ; tyfam_insts0  <- scopeTyVars InstSkol (map unrestricted tyvars) $ -- TODO: arnaud: probably incorrect
+        ; tyfam_insts0  <- scopeTyVars InstSkol (map unrestricted tyvars) $
                            mapAndRecoverM (tcTyFamInstDecl mb_info) ats
-        ; datafam_stuff <- scopeTyVars InstSkol (map unrestricted tyvars) $ -- TODO: arnaud: probably incorrect
+        ; datafam_stuff <- scopeTyVars InstSkol (map unrestricted tyvars) $
                            mapAndRecoverM (tcDataFamInstDecl mb_info) adts
         ; let (datafam_insts, m_deriv_infos) = unzip datafam_stuff
               deriv_infos                    = catMaybes m_deriv_infos
@@ -1259,7 +1259,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                 , ib_derived    = is_derived })
       -- tcExtendTyVarEnv (not scopeTyVars) is OK because the TcLevel is pushed
       -- in checkInstConstraints
-  = tcExtendNameTyVarEnv (lexical_tvs `zip` (map unrestricted tyvars)) $ -- TODO: arnaud: check
+  = tcExtendNameTyVarEnv (lexical_tvs `zip` (map unrestricted tyvars)) $
        -- The lexical_tvs scope over the 'where' part
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)
        ; checkMinimalDefinition

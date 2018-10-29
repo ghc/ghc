@@ -715,7 +715,7 @@ tc_hs_type mode ty@(HsFunTy _ ty1 weight ty2) exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode HsOmega ty1 ty2 exp_kind -- TODO: arnaud: propagage weight of the type of operators somehow
+  = tc_fun_type mode HsOmega ty1 ty2 exp_kind
 
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
@@ -1018,7 +1018,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
                  subst'       = zapped_subst `extendTCvInScopeSet` new_in_scope
            ; go n acc_args subst'
                 (fun `mkNakedCastTy` co)  -- See Note [The well-kinded type invariant]
-                [mkAnonBinder (unrestricted arg_k)] -- TODO:arnaud: Check this but it seems to be for kinds
+                [mkAnonBinder (unrestricted arg_k)]
                 res_k all_args }
       where
         substed_inner_ki               = substTy subst inner_ki
@@ -2549,8 +2549,8 @@ tcPatSig in_pat_bind sig res_ty
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
-        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0 -- TODO: arnaud: distributes the weight of the type to the component. Correct for now as the weight of the component is always 1, but should actually be a multiplication, using the join of (multiplicative, writer) monadic structure of Weighted. -- The previous comment may not be accurate as we are seemingly typechecking types. I seem to have assumed we were checking patterns.
-        ; let sig_tvs_weighted = map (\(x, y) -> (x, weightedSet res_ty y)) sig_tvs -- TODO: arnaud: see previous
+        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0
+        ; let sig_tvs_weighted = map (\(x, y) -> (x, weightedSet res_ty y)) sig_tvs
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $

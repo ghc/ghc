@@ -2066,7 +2066,7 @@ tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f))) (unLoc fields) -- TODO: arnaud: the @linear@ here duplicates logic, maybe it's better to make a function such that record field types are returned with their linear multiplicity (grep @linear@ in the code to find the other occurrences of this logic)
+    combined = map (\(L _ f) -> (cd_fld_names f,hsLinear (cd_fld_type f))) (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded

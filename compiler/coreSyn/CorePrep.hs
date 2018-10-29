@@ -932,7 +932,7 @@ cpeApp top_env expr
             (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
                                splitFunTy_maybe fun_ty
         (fs, arg') <- cpeArg top_env ss1 arg (weightedThing arg_ty)
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest -- TODO: arnaud: I'm not sure, but I may have to provide the multiplicity information in this line
+        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
       CpeCast co ->
         let Pair _ty1 ty2 = coercionKind co
         in rebuild_app as (Cast fun' co) ty2 floats ss

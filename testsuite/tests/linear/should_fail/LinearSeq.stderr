@@ -1,5 +1,5 @@
 
 LinearSeq.hs:6:5: error:
-    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+    • Couldn't match type ‘'Omega’ with ‘'One’
         arising from an application
     • In an equation for ‘bad’: bad x = seq x ()

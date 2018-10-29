@@ -1314,7 +1314,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
         scrut_ty   = exprType scrut'
-        case_weight = Omega -- TODO: arnaud: must be the linearity of the match, not recorded in interfaces yet, I think
+        case_weight = Omega
         case_bndr' = mkLocalIdOrCoVar case_bndr_name (Regular case_weight) scrut_ty
         tc_app     = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
@@ -1332,7 +1332,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdOrCoVarWithInfo name (Regular Omega) ty' id_info -- TODO: arnaud: will eventually depend on linearity
+        ; let id = mkLocalIdOrCoVarWithInfo name (Regular Omega) ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1348,7 +1348,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalIdOrCoVar name (Regular Omega) ty' `asJoinId_maybe` tcJoinInfo ji) } -- TODO: arnaud: it probably gets to stay Omega, because it's recursive in something. Do check
+          ; return (mkLocalIdOrCoVar name (Regular Omega) ty' `asJoinId_maybe` tcJoinInfo ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
