@@ -9,7 +9,7 @@ GHC 8.6.2 is a bug-fix release, fixing a few regressions found in 8.6.1.
 Highlights
 ----------
 
-The highlights, since the 8.6.2 release, are:
+The highlights, since the 8.6.1 release, are:
 
 - A long-standing bug exposed in GHC 8.6.1, :ghc-ticket:`15696`, has been fixed.
   This issue resulted in undefined runtime behavior with some uses of the
