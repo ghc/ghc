@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds    #-}
+{-# LANGUAGE DataKinds    #-}
 
 module Bug where
 
