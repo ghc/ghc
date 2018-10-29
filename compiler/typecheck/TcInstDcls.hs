@@ -839,7 +839,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_tys  = MkD ty1 ty2
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
-             con_app_tys  = mkHsWrap (mkWpTyApps (omegaDataConTy : inst_tys))
+             con_app_tys  = mkHsWrap (mkWpTyApps inst_tys)
                                   (HsConLikeOut noExt (RealDataCon dict_constr))
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.

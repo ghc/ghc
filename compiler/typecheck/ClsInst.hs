@@ -182,7 +182,7 @@ matchCTuple clas tys   -- (isCTupleClass clas) holds
             -- The dfun *is* the data constructor!
   where
      data_con = tyConSingleDataCon (classTyCon clas)
-     tuple_ev = evDFunApp (dataConWrapId data_con) (omegaDataConTy : tys)
+     tuple_ev = evDFunApp (dataConWrapId data_con) tys
 
 {- ********************************************************************
 *                                                                     *
@@ -453,7 +453,7 @@ if you'd written
 matchLiftedEquality :: [Type] -> TcM ClsInstResult
 matchLiftedEquality args
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) (omegaDataConTy : args)
+                    , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) args
                     , cir_what      = BuiltinInstance })
 
 -- See also Note [The equality types story] in TysPrim
@@ -461,7 +461,7 @@ matchLiftedCoercible :: [Type] -> TcM ClsInstResult
 matchLiftedCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
                     , cir_mk_ev     = evDFunApp (dataConWrapId coercibleDataCon)
-                                                (omegaDataConTy : args)
+                                                args
                     , cir_what      = BuiltinInstance })
   where
     args' = [k, k, t1, t2]
