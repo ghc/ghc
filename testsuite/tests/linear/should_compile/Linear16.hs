@@ -9,8 +9,10 @@ module Linear16 where
 (>>=) x f = f x
 
 -- Not sure why `fail` and return are needed in my examples
+-- TODO: 'return' shouldn't be neccessary since Trac #15607 was fixed,
+-- revisit after merging with master.
 fail :: a
-fail = error "fail"
+fail = fail
 
 return :: a ⊸ a
 return x = x
