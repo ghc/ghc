@@ -20,6 +20,6 @@ correctApp4 x = f (f x)
     f :: Int ⊸ Int
     f y = y
 
-correctIf :: Bool -> a ⊸ a
+correctIf :: Bool ⊸ a ⊸ a
 correctIf x n =
    if x then n else n
