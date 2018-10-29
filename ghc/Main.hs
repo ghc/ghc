@@ -76,6 +76,8 @@ import Data.List
 import Data.Maybe
 import Prelude
 
+import Prelude  -- TODO Krzysztof needed?
+
 -----------------------------------------------------------------------------
 -- ToDo:
 
