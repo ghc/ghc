@@ -1693,8 +1693,7 @@ hscTcExpr hsc_env0 mode expr = runInteractiveHsc hsc_env0 $ do
   parsed_expr <- hscParseExpr expr
   ioMsgMaybe $ tcRnExpr hsc_env mode parsed_expr
 
--- | Find the kind of a type
--- Currently this does *not* generalise the kinds of the type
+-- | Find the kind of a type, after generalisation
 hscKcType
   :: HscEnv
   -> Bool            -- ^ Normalise the type

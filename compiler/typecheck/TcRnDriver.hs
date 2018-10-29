@@ -2375,7 +2375,7 @@ tcRnType :: HscEnv
          -> IO (Messages, Maybe (Type, Kind))
 tcRnType hsc_env normalise rdr_type
   = runTcInteractive hsc_env $
-    setXOptM LangExt.PolyKinds $   -- See Note [Turn on PolyKinds in tcRnType]
+    setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
                <- rnHsWcType GHCiCtx (mkHsWildCardBndrs rdr_type)
                   -- The type can have wild cards, but no implicit
@@ -2386,13 +2386,16 @@ tcRnType hsc_env normalise rdr_type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; ((ty, _), lie)  <-
+       ; ((ty, kind), lie)  <-
                        captureConstraints $
                        tcWildCardBinders wcs $ \ wcs' ->
                        do { emitWildCardHoleConstraints wcs'
                           ; tcLHsTypeUnsaturated rn_type }
        ; _ <- checkNoErrs (simplifyInteractive lie)
 
+       -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
+       ; kind <- zonkTcType kind
+       ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType ty
 
        -- Do validity checking on type
@@ -2405,7 +2408,7 @@ tcRnType hsc_env normalise rdr_type
                         ; return ty' }
                 else return ty ;
 
-       ; return (ty', typeKind ty') }
+       ; return (ty', mkInvForAllTys kvs (typeKind ty')) }
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -2465,7 +2468,7 @@ considers this example, with -fprint-explicit-foralls enabled:
   modified to include an element that is both Num and Monoid, the defaulting
   would succeed, of course.)
 
-Note [Turn on PolyKinds in tcRnType]
+Note [Kind-generalise in tcRnType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We switch on PolyKinds when kind-checking a user type, so that we will
 kind-generalise the type, even when PolyKinds is not otherwise on.
@@ -2475,6 +2478,16 @@ polymorphism. Of course.  If T isn't kind-polymorphic you won't get
 anything unexpected, but the apparent *loss* of polymorphism, for
 types that you know are polymorphic, is quite surprising.  See Trac
 #7688 for a discussion.
+
+Note that the goal is to generalise the *kind of the type*, not
+the type itself! Example:
+  ghci> data SameKind :: k -> k -> Type
+  ghci> :k SameKind _
+
+We want to get `k -> Type`, not `Any -> Type`, which is what we would
+get without kind-generalisation. Note that `:k SameKind` is OK, as
+GHC will not instantiate SameKind here, and so we see its full kind
+of `forall k. k -> k -> Type`.
 
 ************************************************************************
 *                                                                      *
