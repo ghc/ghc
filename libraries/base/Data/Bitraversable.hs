@@ -56,7 +56,7 @@ import GHC.Generics (K1(..))
 --    'fmap' ('bitraverse' g1 g2) .
 --    'bitraverse' f1 f2
 --     ≡ 'bitraverse' ('Data.Functor.Compose.Compose' . 'fmap' g1 . f1)
---                  ('Data.Functor.Compose.Compose' . 'fmap' g2 . f2)@
+--                    ('Data.Functor.Compose.Compose' . 'fmap' g2 . f2)@
 --
 -- where an /applicative transformation/ is a function
 --
