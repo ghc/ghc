@@ -2799,6 +2799,9 @@ checkNewDataCon con
         ; checkTc (not (isUnliftedType (weightedThing arg_ty1))) $
           text "A newtype cannot have an unlifted argument type"
 
+        ; checkTc (ok_weight (weightedWeight arg_ty1)) $
+          text "A newtype constructor must be linear"
+
         ; check_con (null eq_spec) $
           text "A newtype constructor must have a return type of form T a1 ... an"
                 -- Return type is (T a b c)
@@ -2825,6 +2828,9 @@ checkNewDataCon con
     ok_bang (HsSrcBang _ _ SrcStrict) = False
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
     ok_bang _                         = True
+
+    ok_weight One = True
+    ok_weight _   = False
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
