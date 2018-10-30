@@ -1284,8 +1284,6 @@ mkOc( pathchar *path, char *image, int imageSize,
 #if defined(NEED_SYMBOL_EXTRAS)
    oc->symbol_extras     = NULL;
 #endif
-   oc->bssBegin          = NULL;
-   oc->bssEnd            = NULL;
    oc->imageMapped       = mapped;
 
    oc->misalignment      = misalignment;
@@ -1499,35 +1497,35 @@ HsInt loadOc (ObjectCode* oc)
    }
 
    /* Note [loadOc orderings]
-      The order of `ocAllocateExtras` and `ocGetNames` matters. For MachO
+      The order of `ocAllocateSymbolExtras` and `ocGetNames` matters. For MachO
       and ELF, `ocInit` and `ocGetNames` initialize a bunch of pointers based
-      on the offset to `oc->image`, but `ocAllocateExtras` may relocate
+      on the offset to `oc->image`, but `ocAllocateSymbolExtras` may relocate
       the address of `oc->image` and invalidate those pointers. So we must
-      compute or recompute those pointers after `ocAllocateExtras`.
+      compute or recompute those pointers after `ocAllocateSymbolExtras`.
 
       On Windows, when we have an import library we (for now, as we don't honor
       the lazy loading semantics of the library and instead GHCi is already
       lazy) don't use the library after ocGetNames as it just populates the
-      symbol table.  Allocating space for jump tables in ocAllocateExtras
+      symbol table.  Allocating space for jump tables in ocAllocateSymbolExtras
       would just be a waste then as we'll be stopping further processing of the
       library in the next few steps. If necessary, the actual allocation
-      happens in `ocGetNames_PEi386` and `ocAllocateExtras_PEi386` simply
+      happens in `ocGetNames_PEi386` and `ocAllocateSymbolExtras_PEi386` simply
       set the correct pointers.
       */
 
 #if defined(NEED_SYMBOL_EXTRAS)
 #  if defined(OBJFORMAT_MACHO)
-   r = ocAllocateExtras_MachO ( oc );
+   r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) {
        IF_DEBUG(linker,
-                debugBelch("loadOc: ocAllocateExtras_MachO failed\n"));
+                debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_ELF)
-   r = ocAllocateExtras_ELF ( oc );
+   r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) {
        IF_DEBUG(linker,
-                debugBelch("loadOc: ocAllocateExtras_ELF failed\n"));
+                debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
        return r;
    }
 #  endif
@@ -1548,7 +1546,7 @@ HsInt loadOc (ObjectCode* oc)
    }
 
 #  if defined(OBJFORMAT_PEi386)
-   ocAllocateExtras_PEi386 ( oc );
+   ocAllocateSymbolExtras_PEi386 ( oc );
 #  endif
 #endif
 

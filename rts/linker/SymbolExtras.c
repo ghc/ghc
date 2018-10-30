@@ -31,11 +31,10 @@
 #endif /* RTS_LINKER_USE_MMAP */
 
 /*
-  ocAllocateExtras
+  ocAllocateSymbolExtras
 
   Allocate additional space at the end of the object file image to make room
-  for jump islands (powerpc, x86_64, arm), GOT entries (x86_64) and
-  bss sections.
+  for jump islands (powerpc, x86_64, arm) and GOT entries (x86_64).
 
   PowerPC relative branch instructions have a 24 bit displacement field.
   As PPC code is always 4-byte-aligned, this yields a +-32MB range.
@@ -50,11 +49,12 @@
   filled in by makeSymbolExtra below.
 */
 
-int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
+int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 {
+  size_t n;
   void* oldImage = oc->image;
 
-  if (count > 0 || bssSize > 0) {
+  if (count > 0) {
     if (!RTS_LINKER_USE_MMAP) {
 
       // round up to the nearest 4
@@ -65,15 +65,16 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       oc->image = stgReallocBytes( oc->image,
                                misalignment +
                                aligned + sizeof (SymbolExtra) * count,
-                               "ocAllocateExtras" );
+                               "ocAllocateSymbolExtras" );
       oc->image += misalignment;
 
       oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
     } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
-      /* Keep image, bssExtras and symbol_extras contiguous */
-      size_t n = roundUpToPage(oc->fileSize);
-      bssSize = roundUpToAlign(bssSize, 8);
-      size_t allocated_size = n + bssSize + (sizeof(SymbolExtra) * count);
+      n = roundUpToPage(oc->fileSize);
+
+      /* Keep image and symbol_extras contiguous */
+
+      size_t allocated_size = n + (sizeof(SymbolExtra) * count);
       void *new = mmapForLinker(allocated_size, MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
@@ -82,10 +83,12 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
           }
           oc->image = new;
           oc->imageMapped = true;
-          oc->fileSize = allocated_size;
-          oc->symbol_extras = (SymbolExtra *) (oc->image + n + bssSize);
-          oc->bssBegin = oc->image + n;
-          oc->bssEnd = oc->image + n + bssSize;
+          oc->fileSize = n + (sizeof(SymbolExtra) * count);
+          oc->symbol_extras = (SymbolExtra *) (oc->image + n);
+          if (mprotect(new, allocated_size,
+                       PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+            sysErrorBelch("unable to protect memory");
+          }
       }
       else {
           oc->symbol_extras = NULL;
