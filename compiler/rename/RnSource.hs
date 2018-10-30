@@ -2038,16 +2038,18 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; linearTypes <- xopt LangExt.LinearTypes <$> getDynFlags
 
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
               (args', res_ty')
                   = case args of
                       InfixCon {}  -> pprPanic "rnConDecl" (ppr names)
                       RecCon {}    -> (new_args, new_res_ty)
-                      PrefixCon as | (arg_tys, final_res_ty) <- splitHsFunType new_res_ty
-                                   -> ASSERT( null as )
-                                      -- See Note [GADT abstract syntax] in HsDecls
-                                      (PrefixCon arg_tys, final_res_ty)
+                      PrefixCon as -> let (arg_tys, final_res_ty) = splitHsFunType new_res_ty
+                                          arg_tys' | linearTypes = arg_tys
+                                                   | otherwise   = map (hsLinear . hsThing) arg_tys
+                                      in  ASSERT( null as )
+                                         (PrefixCon arg_tys', final_res_ty)
 
               new_qtvs =  HsQTvs { hsq_ext = HsQTvsRn
                                      { hsq_implicit  = implicit_tkvs
