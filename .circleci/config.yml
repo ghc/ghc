@@ -287,17 +287,7 @@ workflows:
   version: 2
   validate:
     jobs:
-    - validate-x86_64-linux:
-        *trigger_on_tags
-    # FreeBSD disabled: https://github.com/haskell/unix/issues/102
-    # - validate-x86_64-freebsd
-    - validate-x86_64-darwin:
-        *trigger_on_tags
-    - validate-x86_64-linux-llvm
     - validate-i386-linux:
-        *trigger_on_tags
-    - validate-hadrian-x86_64-linux
-    - validate-x86_64-fedora:
         *trigger_on_tags
 
   nightly:
