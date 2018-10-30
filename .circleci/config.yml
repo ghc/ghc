@@ -282,6 +282,7 @@ jobs:
       - *configure_unix
       - *make
       - *slowtest
+      - *store_test_results
 
 workflows:
   version: 2
