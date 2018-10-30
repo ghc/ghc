@@ -32,6 +32,16 @@ The highlights, since the 8.6.1 release, are:
   incorrect results, has been fixed (:ghc-ticket:`15271`)
 
 
+Known issues
+------------
+
+Note that the LLVM code generator (:ghc-flag:`-fllvm`) in GHC 8.8, as well as
+all earlier releases, are affected by :ghc-ticket:`14251`, which can result in
+miscompilation of some programs calling functions with unboxed floating-point
+arguments. While originally scheduled to be fixed for this release, the fix
+ended up being more difficult than anticipated and, given that issue is not a
+strict regression from 8.4, we decided to proceed with the release.
+
 Included libraries
 ------------------
 
