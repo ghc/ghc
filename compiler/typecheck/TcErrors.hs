@@ -148,8 +148,9 @@ reportUnsolved wanted
                                 | warn_out_of_scope      = HoleWarn
                                 | otherwise              = HoleDefer
 
-       ; report_unsolved binds_var type_errors expr_holes
-          type_holes out_of_scope_holes wanted
+       ; report_unsolved type_errors expr_holes
+                         type_holes out_of_scope_holes
+                         binds_var wanted
 
        ; ev_binds <- getTcEvBindsMap binds_var
        ; return (evBindMapBinds ev_binds)}
@@ -164,8 +165,8 @@ reportUnsolved wanted
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
   = do { ev_binds <- newNoTcEvBinds
-       ; report_unsolved ev_binds TypeError
-                         HoleError HoleError HoleError wanted }
+       ; report_unsolved TypeError HoleError HoleError HoleError
+                         ev_binds wanted }
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
 -- run-time). See Note [Safe Haskell Overlapping Instances Implementation] in
@@ -173,22 +174,23 @@ reportAllUnsolved wanted
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
   = do { ev_binds <- newTcEvBinds
-       ; report_unsolved ev_binds (TypeWarn NoReason)
-                         HoleWarn HoleWarn HoleWarn wanted }
+       ; report_unsolved (TypeWarn NoReason) HoleWarn HoleWarn HoleWarn
+                         ev_binds wanted }
 
 -- | Report unsolved goals as errors or warnings.
-report_unsolved :: EvBindsVar        -- cec_binds
-                -> TypeErrorChoice   -- Deferred type errors
+report_unsolved :: TypeErrorChoice   -- Deferred type errors
                 -> HoleChoice        -- Expression holes
                 -> HoleChoice        -- Type holes
                 -> HoleChoice        -- Out of scope holes
+                -> EvBindsVar        -- cec_binds
                 -> WantedConstraints -> TcM ()
-report_unsolved mb_binds_var type_errors expr_holes
-    type_holes out_of_scope_holes wanted
+report_unsolved type_errors expr_holes
+    type_holes out_of_scope_holes binds_var wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
-  = do { traceTc "reportUnsolved warning/error settings:" $
+  = do { traceTc "reportUnsolved {" empty
+       ; traceTc "reportUnsolved warning/error settings:" $
            vcat [ text "type errors:" <+> ppr type_errors
                 , text "expr holes:" <+> ppr expr_holes
                 , text "type holes:" <+> ppr type_holes
@@ -221,10 +223,11 @@ report_unsolved mb_binds_var type_errors expr_holes
                                  -- See Trac #15539 and c.f. setting ic_status
                                  -- in TcSimplify.setImplicationStatus
                             , cec_warn_redundant = warn_redundant
-                            , cec_binds    = mb_binds_var }
+                            , cec_binds    = binds_var }
 
        ; tc_lvl <- getTcLevel
-       ; reportWanteds err_ctxt tc_lvl wanted }
+       ; reportWanteds err_ctxt tc_lvl wanted
+       ; traceTc "reportUnsolved }" empty }
 
 --------------------------------------------
 --      Internal functions

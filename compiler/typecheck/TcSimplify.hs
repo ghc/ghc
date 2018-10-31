@@ -178,9 +178,7 @@ solveEqualities thing_inside
           -- vars to LiftedRep. This is needed to avoid #14991.
        ; traceTc "End solveEqualities }" empty
 
-       ; traceTc "reportAllUnsolved {" empty
        ; reportAllUnsolved final_wc
-       ; traceTc "reportAllUnsolved }" empty
        ; return result }
 
 -- | Simplify top-level constraints, but without reporting any unsolved
@@ -514,9 +512,7 @@ simplifyDefault theta
   = do { traceTc "simplifyDefault" empty
        ; wanteds  <- newWanteds DefaultOrigin theta
        ; unsolved <- runTcSDeriveds (solveWantedsAndDrop (mkSimpleWC wanteds))
-       ; traceTc "reportUnsolved {" empty
        ; reportAllUnsolved unsolved
-       ; traceTc "reportUnsolved }" empty
        ; return () }
 
 ------------------
