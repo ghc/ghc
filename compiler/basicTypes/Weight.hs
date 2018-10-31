@@ -108,6 +108,8 @@ pattern RigThing :: Multable a => a -> GMult a
 pattern RigThing a <- RigThing_ a where
   RigThing a = toMult a
 
+{-# COMPLETE Zero, One, Omega, RigMul, RigAdd, RigThing #-}
+
 -- | Used to defined 'Multable' instances. Requires that the argument cannot be
 -- reified any further. There is probably no good reason to use it outside of a
 -- 'Multable' instance definition.
@@ -119,12 +121,12 @@ instance Num (GMult a) where
   (+) = RigAdd
 
 instance Multable a => Outputable (GMult a) where
-  ppr Zero_ = text "0"
-  ppr One_ = text "1"
-  ppr Omega_ = text "ω"
-  ppr (RigAdd_ m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
-  ppr (RigMul_ m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
-  ppr (RigThing_ t) = ppr t
+  ppr Zero = text "0"
+  ppr One = text "1"
+  ppr Omega = text "ω"
+  ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
+  ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
+  ppr (RigThing t) = ppr t
 
 -- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
 -- and @w2@.
