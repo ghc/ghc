@@ -2049,6 +2049,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                                           arg_tys' | linearTypes = arg_tys
                                                    | otherwise   = map (hsLinear . hsThing) arg_tys
                                       in  ASSERT( null as )
+                                      -- See Note [GADT abstract syntax] in HsDecls
                                          (PrefixCon arg_tys', final_res_ty)
 
               new_qtvs =  HsQTvs { hsq_ext = HsQTvsRn
