@@ -365,7 +365,7 @@ instCallConstraints orig preds
      | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
      , tc `hasKey` heqTyConKey
      = do { co <- unifyType Nothing ty1 ty2
-          ; return (evDFunApp (dataConWrapId heqDataCon) (omegaDataConTy : args) [Coercion co]) }
+          ; return (evDFunApp (dataConWrapId heqDataCon) args [Coercion co]) }
 
      | otherwise
      = emitWanted orig pred

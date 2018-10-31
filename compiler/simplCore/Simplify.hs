@@ -855,8 +855,8 @@ simplExprF env e cont
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
             -> SimplM (SimplFloats, OutExpr)
 
-simplExprF1 _ (Type ty) _
-  = pprPanic "simplExprF: type" (ppr ty)
+simplExprF1 _ (Type ty) cont
+  = pprPanic "simplExprF: type" (ppr ty <+> text"cont: " <+> ppr cont)
     -- simplExprF does only with term-valued expressions
     -- The (Type ty) case is handled separately by simplExpr
     -- and by the other callers of simplExprF
