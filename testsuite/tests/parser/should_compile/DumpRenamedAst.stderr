@@ -370,7 +370,7 @@
                (Nothing)
                (PrefixCon
                 [(HsWeighted
-                  (HsOmega)
+                  (HsOne)
                   ({ DumpRenamedAst.hs:16:10-34 }
                    (HsParTy
                     (NoExt)

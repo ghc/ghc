@@ -9,7 +9,7 @@ T9222.hs:14:3: error:
       ‘c’ is a rigid type variable bound by
         the type of the constructor ‘Want’:
           forall i1 j1 (a :: (i1, j1)) (b :: i1) (c :: j1).
-          ((a ~ '(b, c)) => Proxy b) -> Want a
+          ((a ~ '(b, c)) => Proxy b) ->@[n] Want a
         at T9222.hs:14:3-43
     • In the ambiguity check for ‘Want’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
