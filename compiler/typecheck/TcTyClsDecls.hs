@@ -494,19 +494,23 @@ kcTyClGroup decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-          -- Step 1: Bind kind variables for all decls
-        ; initial_tcs <- getInitialKinds decls
-        ; traceTc "kcTyClGroup: initial kinds" $
-          ppr_tc_kinds initial_tcs
+        ; initial_tcs <- pushTcLevelM_   $  -- We are going to kind-generalise, so
+                                            -- unification variables in here must
+                                            -- be one level in
+                         solveEqualities $
+                         do {  -- Step 1: Bind kind variables for all decls
+                              initial_tcs <- getInitialKinds decls
+                            ; traceTc "kcTyClGroup: initial kinds" $
+                              ppr_tc_kinds initial_tcs
 
-         -- Step 2: Set extended envt, kind-check the decls
-         -- NB: the environment extension overrides the tycon
-         --     promotion-errors bindings
-         --     See Note [Type environment evolution]
+                              -- Step 2: Set extended envt, kind-check the decls
+                              -- NB: the environment extension overrides the tycon
+                              --     promotion-errors bindings
+                              --     See Note [Type environment evolution]
+                            ; tcExtendKindEnvWithTyCons initial_tcs $
+                              mapM_ kcLTyClDecl decls
 
-        ; solveEqualities $
-          tcExtendKindEnvWithTyCons initial_tcs $
-          mapM_ kcLTyClDecl decls
+                            ; return initial_tcs }
 
         -- Step 3: skolemisation
         -- Kind checking done for this group
@@ -783,7 +787,11 @@ getInitialKinds :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- Returns a TcTyCon for each TyCon bound by the decls,
 -- each with its initial kind
 
-getInitialKinds decls = concatMapM (addLocM getInitialKind) decls
+getInitialKinds decls
+  = do { traceTc "getInitialKinds {" empty
+       ; tcs <- concatMapM (addLocM getInitialKind) decls
+       ; traceTc "getInitialKinds done }" empty
+       ; return tcs }
 
 getInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
 -- Allocate a fresh kind variable for each TyCon and Class
@@ -1344,7 +1352,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = (dL->L _ tc_name)
                      -- Zonk the patterns etc into the Type world
                  ; (ze, _) <- zonkTyBndrs tvs
                  ; pats'   <- zonkTcTypesToTypesX ze pats
-                 ; rhs_ty'  <- zonkTcTypeToTypeX ze rhs_ty
+                 ; rhs_ty' <- zonkTcTypeToTypeX ze rhs_ty
                  ; return (pats', rhs_ty') }
 
          -- See Note [Type-checking default assoc decls]
@@ -1685,13 +1693,10 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                     \tvs pats res_kind ->
     do { traceTc "tcTyFamInstEqn {" (ppr eqn_tc_name <+> ppr pats)
        ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
-       ; traceTc "tcTyFamInstEqn 1" (ppr eqn_tc_name <+> ppr pats)
        ; (ze, tvs') <- zonkTyBndrs tvs
-       ; traceTc "tcTyFamInstEqn 2" (ppr eqn_tc_name <+> ppr pats)
        ; pats'      <- zonkTcTypesToTypesX ze pats
-       ; traceTc "tcTyFamInstEqn 3" (ppr eqn_tc_name <+> ppr pats $$ ppr rhs_ty)
        ; rhs_ty'    <- zonkTcTypeToTypeX ze rhs_ty
-       ; traceTc "tcTyFamInstEqn 4 }" (ppr fam_tc <+> pprTyVars tvs')
+       ; traceTc "tcTyFamInstEqn }" (ppr fam_tc <+> pprTyVars tvs')
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }
@@ -2149,7 +2154,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
                       , con_mb_cxt = hs_ctxt
                       , con_args = hs_args })
   = addErrCtxt (dataConCtxtName [name]) $
-    do { -- Get hold of the existential type variables
+    do { -- NB: the tyvars from the declaration header are in scope
+
+         -- Get hold of the existential type variables
          -- e.g. data T a = forall k (b::k) f. MkT a (f b)
          -- Here tmpl_bndrs = {a}
          --      hs_qvars = HsQTvs { hsq_implicit = {k}
@@ -2158,7 +2165,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
        ; (exp_tvs, (ctxt, arg_tys, field_lbls, stricts))
-           <- solveEqualities $
+           <- pushTcLevelM_                                $
+              solveEqualities                              $
               tcExplicitTKBndrs skol_info explicit_tkv_nms $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; btys <- tcConArgs hs_args
@@ -2171,17 +2179,17 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; kvs <- quantifyConDecl (mkVarSet (binderVars tmpl_bndrs))
-                                (mkSpecForAllTys exp_tvs $
-                                 mkFunTys ctxt $
-                                 mkFunTys arg_tys $
-                                 unitTy)
+       ; kvs <- kindGeneralize (mkSpecForAllTys (binderVars tmpl_bndrs) $
+                                mkSpecForAllTys exp_tvs $
+                                mkFunTys ctxt $
+                                mkFunTys arg_tys $
+                                unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
                  -- at hand. But the result would mention only the tmpl_tvs,
                  -- and so it just creates more work to do it right. Really,
-                 -- we're doing this to get the right behavior around removing
-                 -- any vars bound in exp_binders.
+                 -- we're only doing this to find the right kind variables to
+                 -- quantify over, and this type is fine for that purpose.
 
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrs kvs
@@ -2230,12 +2238,13 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
   | HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = implicit_tkv_nms }
            , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
-    do { traceTc "tcConDecl 1" (ppr names)
-       ; let ((dL->L _ name) : _) = names
-             skol_info            = DataConSkol name
+    do { traceTc "tcConDecl 1 gadt" (ppr names)
+       ; let (dl->L _ name : _) = names
+             skol_info          = DataConSkol name
 
        ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
-           <- failIfEmitsConstraints $  -- we won't get another crack, and we don't
+           <- pushTcLevelM_          $  -- We are going to generalise
+              failIfEmitsConstraints $  -- We won't get another crack, and we don't
                                         -- want an error cascade
               tcImplicitTKBndrs skol_info implicit_tkv_nms $
               tcExplicitTKBndrs skol_info explicit_tkv_nms $
@@ -2248,10 +2257,10 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
                  }
        ; let user_tvs = imp_tvs ++ exp_tvs
 
-       ; tkvs <- quantifyConDecl emptyVarSet (mkSpecForAllTys user_tvs $
-                                              mkFunTys ctxt $
-                                              mkFunTys arg_tys $
-                                              res_ty)
+       ; tkvs <- kindGeneralize (mkSpecForAllTys user_tvs $
+                                 mkFunTys ctxt $
+                                 mkFunTys arg_tys $
+                                 res_ty)
 
              -- Zonk to Types
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
@@ -2302,15 +2311,6 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
 tcConDecl _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars _) _ _ _ _)
   = panic "tcConDecl"
 tcConDecl _ _ _ _ (XConDecl _) = panic "tcConDecl"
-
--- | Produce the telescope of kind variables that this datacon is
--- implicitly quantified over. Incoming type need not be zonked.
-quantifyConDecl :: TcTyCoVarSet  -- outer tvs, not to be quantified over; zonked
-                -> TcType -> TcM [TcTyVar]
-quantifyConDecl gbl_tvs ty
-  = do { ty <- zonkTcType ty
-       ; fvs <- candidateQTyVarsOfType gbl_tvs ty
-       ; quantifyTyVars gbl_tvs fvs }
 
 tcConIsInfixH98 :: Name
              -> HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn])

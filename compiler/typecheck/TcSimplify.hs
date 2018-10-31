@@ -155,13 +155,13 @@ solveLocalEqualities thing_inside
 
        ; (result, wanted) <- captureConstraints thing_inside
 
-       ; traceTc "solveLocalEqualities: running solver {" (ppr wanted)
-       ; reduced_wanted <- runTcSEqualities (solveWanteds wanted)
-       ; traceTc "solveLocalEqualities: running solver }" (ppr reduced_wanted)
+       ; traceTc "solveLocalEqualities: running solver" (ppr wanted)
+       ; residual_wanted <- runTcSEqualities (solveWanteds wanted)
 
-       ; emitConstraints reduced_wanted
+       ; traceTc "solveLocalEqualities end }" $
+         text "residual_wanted =" <+> ppr residual_wanted
 
-       ; traceTc "solveLocalEqualities end }" empty
+       ; emitConstraints residual_wanted
        ; return result }
 
 -- | Type-check a thing that emits only equality constraints, then
@@ -171,13 +171,16 @@ solveLocalEqualities thing_inside
 solveEqualities :: TcM a -> TcM a
 solveEqualities thing_inside
   = checkNoErrs $  -- See Note [Fail fast on kind errors]
-    do { (result, wanted) <- captureConstraints thing_inside
-       ; traceTc "solveEqualities {" $ text "wanted = " <+> ppr wanted
+    do { traceTc "solveEqualities {" empty
+
+       ; (result, wanted) <- captureConstraints thing_inside
+
+       ; traceTc "solveEqualities: running solver" $ text "wanted = " <+> ppr wanted
        ; final_wc <- runTcSEqualities $ simpl_top wanted
           -- NB: Use simpl_top here so that we potentially default RuntimeRep
           -- vars to LiftedRep. This is needed to avoid #14991.
-       ; traceTc "End solveEqualities }" empty
 
+       ; traceTc "End solveEqualities }" empty
        ; reportAllUnsolved final_wc
        ; return result }
 

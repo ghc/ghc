@@ -189,13 +189,14 @@ kcHsSigType skol_info names (HsIB { hsib_body = hs_ty
     discardResult $
     tcImplicitTKBndrs skol_info sig_vars $
     tc_lhs_type typeLevelMode hs_ty liftedTypeKind
+
 kcHsSigType  _ _ (XHsImplicitBndrs _) = panic "kcHsSigType"
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    tc_hs_sig_type_and_gen skol_info sig_ty liftedTypeKind
+    tc_hs_sig_type_and_gen skol_info sig_ty (TheKind liftedTypeKind)
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -203,15 +204,10 @@ tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 tcHsSigType ctxt sig_ty
   = addSigCtxt ctxt (hsSigType sig_ty) $
     do { traceTc "tcHsSigType {" (ppr sig_ty)
-       ; kind <- case expectedKindInCtxt ctxt of
-                    AnythingKind -> newMetaKindVar
-                    TheKind k    -> return k
-                    OpenKind     -> newOpenTypeKind
-              -- The kind is checked by checkValidType, and isn't necessarily
-              -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- tc_hs_sig_type_and_gen skol_info sig_ty kind
+       ; ty <- tc_hs_sig_type_and_gen skol_info sig_ty
+                                      (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
 
        ; checkValidType ctxt ty
@@ -220,17 +216,27 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-tc_hs_sig_type_and_gen :: SkolemInfo -> LHsSigType GhcRn -> Kind -> TcM Type
+tc_hs_sig_type_and_gen :: SkolemInfo -> LHsSigType GhcRn
+                       -> ContextKind -> TcM Type
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking or zonking
-tc_hs_sig_type_and_gen skol_info (HsIB { hsib_ext = sig_vars
-                                       , hsib_body = hs_ty }) kind
-  = do { ((tkvs, ty), wanted) <- captureConstraints $
-                                 tcImplicitTKBndrs skol_info sig_vars $
-                                 tc_lhs_type typeLevelMode hs_ty kind
+tc_hs_sig_type_and_gen skol_info hs_sig_type ctxt_kind
+  | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
+  = do { (_inner_lvl, wanted, (tkvs, ty))
+              <- pushLevelAndCaptureConstraints $
+                 tcImplicitTKBndrs skol_info sig_vars $
+                   -- tcImplicitTKBndrs does a solveLocalEqualities
+                 do { kind <- case ctxt_kind of
+                        TheKind k -> return k
+                        AnyKind   -> newMetaKindVar
+                        OpenKind  -> newOpenTypeKind
+              -- The kind is checked by checkValidType, and isn't necessarily
+              -- of kind * in a Template Haskell quote eg [t| Maybe |]
+
+                    ; tc_lhs_type typeLevelMode hs_ty kind }
          -- Any remaining variables (unsolved in the solveLocalEqualities
          -- in the tcImplicitTKBndrs) should be in the global tyvars,
          -- and therefore won't be quantified over
@@ -251,18 +257,14 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
 --    returns ([k], C, [k, Int], [k->k])
 -- Return values are fully zonked
 tcHsDeriv hs_ty
-  = do { cls_kind <- newMetaKindVar
-                    -- always safe to kind-generalize, because there
-                    -- can be no covars in an outer scope
-       ; ty <- checkNoErrs $
+  = do { ty <- checkNoErrs $
                  -- avoid redundant error report with "illegal deriving", below
-               tc_hs_sig_type_and_gen (SigTypeSkol DerivClauseCtxt) hs_ty cls_kind
-       ; cls_kind <- zonkTcTypeToType cls_kind
+               tc_hs_sig_type_and_gen (SigTypeSkol DerivClauseCtxt) hs_ty AnyKind
        ; ty <- zonkTcTypeToType ty
-       ; let (tvs, pred) = splitForAllTys ty
-       ; let (args, _) = splitFunTys cls_kind
+       ; let (tvs, pred)    = splitForAllTys ty
+             (kind_args, _) = splitFunTys (typeKind pred)
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, (cls, tys, args))
+           Just (cls, tys) -> return (tvs, (cls, tys, kind_args))
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 -- | Typecheck something within the context of a deriving strategy.
@@ -298,9 +300,8 @@ tcDerivStrategy user_ctxt mds thing_inside
     tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
-      cls_kind <- newMetaKindVar
       ty' <- checkNoErrs $
-             tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty cls_kind
+             tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty AnyKind
       ty' <- zonkTcTypeToType ty'
       let (via_tvs, via_pred) = splitForAllTys ty'
       tcExtendTyVarEnv via_tvs $ do
@@ -325,7 +326,8 @@ tcHsClsInstType user_ctxt hs_inst_ty
        to avoid the validity checker from seeing unsolved coercion holes in
        types. Much better just to report the kind error directly. -}
     do { inst_ty <- failIfEmitsConstraints $
-                    tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
+                    tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty
+                                           (TheKind constraintKind)
        ; inst_ty <- zonkTcTypeToType inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
@@ -1509,6 +1511,19 @@ To avoid the double-zonk, we do two things:
     kindGeneralize does not require a zonked type -- it zonks as it
     gathers free variables. So this way effectively sidesteps step 3.
 
+Note [TcLevel for CUSKs]
+~~~~~~~~~~~~~~~~~~~~~~~~
+In getInitialKinds we are at level 1, busy making unification
+variables over which we will subsequently generalise.
+
+But when we find a CUSK we want to jump back to top level (0)
+because that's the right starting point for a completee,
+stand-alone kind signature.
+
+More precisely, we want to make level-1 skolems, because
+the end up as the TyConBinders of the TyCon, and are brought
+into scope when we type-check the body of the type declaration
+(in tcTyClDecl).
 -}
 
 tcWildCardBinders :: [Name]
@@ -1542,7 +1557,8 @@ kcLHsQTyVars name flav cusk
     -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
   = addTyConFlavCtxt name flav $
     do { (scoped_kvs, (tc_tvs, res_kind))
-           <- solveEqualities                    $
+           <- setTcLevel topTcLevel              $  -- See Note [TcLevel for CUSKs]
+              solveEqualities                    $
               tcImplicitQTKBndrs skol_info kv_ns $
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
@@ -1634,7 +1650,7 @@ kcLHsQTyVars name flav cusk
 
        ; return tycon }
 
-  | otherwise
+  | otherwise     -- Not CUSK
   = do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why kcImplicitTKBndrs which uses newTyVarTyVar?
            -- See Note [Kind generalisation and TyVarTvs]
@@ -1913,6 +1929,9 @@ tcExplicitTKBndrs skol_info hs_tvs thing_inside
 --     - pattern synonym signatures
 --     - expression type signatures
 --
+-- Wraps the inner constraints in an implication,
+-- but makes no attempt to solve it
+--
 -- Specifically NOT used for the binders of a data type
 -- or type family decl. So the forall'd variables always /shadow/
 -- anything already in scope, and the complications of
@@ -1998,7 +2017,7 @@ newWildTyVar _name
 -- Use this (not tcExtendTyVarEnv) wherever you expect a Λ or ∀ in Core.
 -- Use tcExtendTyVarEnv otherwise.
 scopeTyVars :: SkolemInfo -> [TcTyVar] -> TcM a -> TcM a
-scopeTyVars skol_info tvs = scopeTyVars2 skol_info [(tyVarName tv, tv) | tv <- tvs]
+scopeTyVars skol_info tvs = scopeTyVars2 skol_info (mkTyVarNamePairs tvs)
 
 -- | Like 'scopeTyVars', but allows you to specify different scoped names
 -- than the Names stored within the tyvars.
@@ -2017,7 +2036,18 @@ kindGeneralize :: TcType -> TcM [KindVar]
 -- Input needn't be zonked.
 -- NB: You must call solveEqualities or solveLocalEqualities before
 -- kind generalization
-kindGeneralize = kindGeneralizeLocal emptyWC
+--
+-- NB: this function is just a specialised version of
+--        kindGeneralizeLocal emptyWC kind_or_type
+--
+kindGeneralize kind_or_type
+  = do { kvs <- zonkTcTypeAndFV kind_or_type
+       ; let dvs = DV { dv_kvs = kvs, dv_tvs = emptyDVarSet }
+
+       ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
+       ; traceTc "kindGeneralize" (vcat [ ppr kind_or_type
+                                        , ppr dvs ])
+       ; quantifyTyVars gbl_tvs dvs }
 
 -- | This variant of 'kindGeneralize' refuses to generalize over any
 -- variables free in the given WantedConstraints. Instead, it promotes
@@ -2871,8 +2901,9 @@ reportFloatingKvs tycon_name flav all_tvs bad_tvs
 -- another chance to solve constraints
 failIfEmitsConstraints :: TcM a -> TcM a
 failIfEmitsConstraints thing_inside
-  = do { (res, lie) <- captureConstraints thing_inside
-       ; checkNoErrs $ reportAllUnsolved lie
+  = checkNoErrs $  -- c.f same checkNoErrs in solveEqualities
+    do { (res, lie) <- captureConstraints thing_inside
+       ; reportAllUnsolved lie
        ; return res
        }
 
