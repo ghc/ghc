@@ -99,8 +99,6 @@ bool ocMprotect_MachO( ObjectCode *oc );
 void
 ocInit_MachO(ObjectCode * oc)
 {
-    ocDeinit_MachO(oc);
-
     oc->info = (struct ObjectCodeFormatInfo*)stgCallocBytes(
                 1, sizeof *oc->info,
                 "ocInit_MachO(ObjectCodeFormatInfo)");
@@ -162,19 +160,16 @@ ocInit_MachO(ObjectCode * oc)
 
 void
 ocDeinit_MachO(ObjectCode * oc) {
-    if (oc->info != NULL) {
-        if(oc->info->n_macho_symbols > 0) {
-            stgFree(oc->info->macho_symbols);
-        }
-#if defined(aarch64_HOST_ARCH)
-        freeGot(oc);
-        for(int i = 0; i < oc->n_sections; i++) {
-            freeStubs(&oc->sections[i]);
-        }
-#endif
-        stgFree(oc->info);
-        oc->info = NULL;
+    if(oc->info->n_macho_symbols > 0) {
+        stgFree(oc->info->macho_symbols);
     }
+#if defined(aarch64_HOST_ARCH)
+    freeGot(oc);
+    for(int i = 0; i < oc->n_sections; i++) {
+        freeStubs(&oc->sections[i]);
+    }
+#endif
+    stgFree(oc->info);
 }
 
 static int

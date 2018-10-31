@@ -169,8 +169,6 @@ get_shndx_table(Elf_Ehdr* ehdr)
 void
 ocInit_ELF(ObjectCode * oc)
 {
-    ocDeinit_ELF(oc);
-
     oc->info = (struct ObjectCodeFormatInfo*)stgCallocBytes(
             1, sizeof *oc->info,
             "ocInit_Elf(ObjectCodeFormatInfo)");
@@ -320,7 +318,6 @@ ocDeinit_ELF(ObjectCode * oc)
         }
 
         stgFree(oc->info);
-        oc->info = NULL;
     }
 }
 
@@ -757,7 +754,7 @@ ocGetNames_ELF ( ObjectCode* oc )
           start = mem;
           mapped_start = mem;
 #else
-          if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
+          if (USE_CONTIGUOUS_MMAP) {
               // already mapped.
               start = oc->image + offset;
               alloc = SECTION_NOMEM;
@@ -1587,6 +1584,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
       case COMPAT_R_X86_64_PC32:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_PC32 relocation, but ALWAYS_PIC.");
+#else
           StgInt64 off = value - P;
           if (off != (Elf64_Sword)off && X86_64_ELF_NONPIC_HACK) {
               StgInt64 pltAddress =
@@ -1603,6 +1603,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           }
           Elf64_Sword payload = off;
           memcpy((void*)P, &payload, sizeof(payload));
+#endif
           break;
       }
 
@@ -1615,6 +1616,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
       case COMPAT_R_X86_64_32:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_32 relocation, but ALWAYS_PIC.");
+#else
           if (value != (Elf64_Word)value && X86_64_ELF_NONPIC_HACK) {
               StgInt64 pltAddress =
                   (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
@@ -1630,11 +1634,15 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           }
           Elf64_Word payload = value;
           memcpy((void*)P, &payload, sizeof(payload));
+#endif
           break;
       }
 
       case COMPAT_R_X86_64_32S:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_32S relocation, but ALWAYS_PIC.");
+#else
           if ((StgInt64)value != (Elf64_Sword)value && X86_64_ELF_NONPIC_HACK) {
               StgInt64 pltAddress =
                   (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
@@ -1650,6 +1658,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           }
           Elf64_Sword payload = value;
           memcpy((void*)P, &payload, sizeof(payload));
+#endif
           break;
       }
       case COMPAT_R_X86_64_REX_GOTPCRELX:
@@ -1671,6 +1680,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #if defined(dragonfly_HOST_OS)
       case COMPAT_R_X86_64_GOTTPOFF:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_GOTTPOFF relocation, but ALWAYS_PIC.");
+#else
         /* determine the offset of S to the current thread's tls
            area
            XXX: Move this to the beginning of function */
@@ -1688,12 +1700,16 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           }
           Elf64_SWord payload = off;
           memcpy((void*)P, &payload, sizeof(payload));
+#endif
           break;
       }
 #endif
 
       case COMPAT_R_X86_64_PLT32:
       {
+#if defined(ALWAYS_PIC)
+          barf("R_X86_64_PLT32 relocation, but ALWAYS_PIC.");
+#else
           StgInt64 off = value - P;
           if (off != (Elf64_Sword)off) {
               StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
@@ -1708,6 +1724,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           }
           Elf64_Sword payload = off;
           memcpy((void*)P, &payload, sizeof(payload));
+#endif
           break;
       }
 #endif
