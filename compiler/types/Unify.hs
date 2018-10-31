@@ -1430,7 +1430,7 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
-ty_co_match menv subst (FunTy w ty1 ty2) co _lkco _rkco
+ty_co_match menv subst (FunTy _w ty1 ty2) co _lkco _rkco
     -- Despite the fact that (->) is polymorphic in five type variables (two
     -- runtime rep, a multiplicity and two types), we shouldn't need to
     -- explicitly unify the runtime reps here; unifying the types themselves

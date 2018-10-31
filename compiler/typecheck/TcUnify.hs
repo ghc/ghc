@@ -63,7 +63,6 @@ import Bag
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
-import UsageEnv
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -833,7 +832,7 @@ tcSubWeight actual_w w
   where
     do_one weight =
       case weight of
-        RigAdd m1 m2 -> do
+        RigAdd _ _ -> do
           tcSubWeight Omega w
         RigMul m1 m2 -> do
           tcSubWeight m1 w

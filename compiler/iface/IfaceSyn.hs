@@ -58,7 +58,6 @@ import Literal
 import ForeignCall
 import Annotations( AnnPayload, AnnTarget )
 import BasicTypes
-import Weight
 import Outputable
 import Module
 import SrcLoc

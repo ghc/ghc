@@ -47,7 +47,7 @@ import TcType
 import Type
 import Weight
 import Coercion
-import TysWiredIn ( typeNatKind, typeSymbolKind, omegaDataConTy )
+import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id
 import MkId(proxyHashId)
 import Name

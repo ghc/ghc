@@ -35,8 +35,6 @@ module Weight
 
 import GhcPrelude
 
-import Binary
-import Control.Monad
 import Data.Data
 import Outputable
 
@@ -93,8 +91,8 @@ pattern RigMul p q <- RigMul_ p q where
   _ `RigMul` Zero = Zero
   One `RigMul` p = p
   p `RigMul` One = p
-  Omega `RigMul` p = Omega
-  p `RigMul` Omega = Omega
+  Omega `RigMul` _ = Omega
+  _ `RigMul` Omega = Omega
   p `RigMul` q = RigMul_ p q
 
 pattern RigAdd :: GMult a -> GMult a -> GMult a
@@ -121,12 +119,12 @@ instance Num (GMult a) where
   (+) = RigAdd
 
 instance Multable a => Outputable (GMult a) where
-  ppr Zero = text "0"
-  ppr One = text "1"
-  ppr Omega = text "ω"
-  ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
-  ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
-  ppr (RigThing t) = ppr t
+  ppr Zero_ = text "0"
+  ppr One_ = text "1"
+  ppr Omega_ = text "ω"
+  ppr (RigAdd_ m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
+  ppr (RigMul_ m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
+  ppr (RigThing_ t) = ppr t
 
 -- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
 -- and @w2@.

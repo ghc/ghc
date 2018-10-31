@@ -1410,7 +1410,7 @@ getDFunTyKey (TyVarTy tv)            = getOccName tv
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
-getDFunTyKey (FunTy w _ _)           = getOccName funTyCon
+getDFunTyKey (FunTy _ _ _)           = getOccName funTyCon
 getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
@@ -1653,7 +1653,7 @@ tcTyConAppTyCon_maybe ty
   | Just ty' <- tcView ty = tcTyConAppTyCon_maybe ty'
 tcTyConAppTyCon_maybe (TyConApp tc _)
   = Just tc
-tcTyConAppTyCon_maybe (FunTy w _ _)
+tcTyConAppTyCon_maybe (FunTy _ _ _)
   = Just funTyCon
 tcTyConAppTyCon_maybe _
   = Nothing

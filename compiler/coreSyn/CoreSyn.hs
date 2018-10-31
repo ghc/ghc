@@ -117,7 +117,6 @@ import Util
 import UniqSet
 import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
-import TysPrim
 
 import Data.Data hiding (TyCon)
 import Data.Int

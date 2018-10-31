@@ -119,7 +119,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.IORef
 import Data.List
-import Data.Maybe
 
 
 {- *********************************************************************

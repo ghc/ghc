@@ -21,7 +21,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
-        Rig(..), HsRig(..), HsWeighted(..),
+        Rig, HsRig(..), HsWeighted(..),
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
@@ -1483,7 +1483,6 @@ ppr_fun_ty ty1 weight ty2
           HsOne -> text "⊸"
           HsOmega -> text "->"
           HsRigTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
-          _ -> panic "ppr_fun_ty: polymorphism is not yet implemented"
     in
     sep [p1, arr <+> p2]
 

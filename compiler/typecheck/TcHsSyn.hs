@@ -1696,7 +1696,7 @@ zonkRig :: ZonkEnv -> Rig -> TcM Rig
 zonkRig env (RigThing t) = RigThing <$> zonkTcTypeToType env t
 zonkRig env (RigAdd m1 m2) = RigAdd <$> zonkRig env m1 <*> zonkRig env m2
 zonkRig env (RigMul m1 m2) = RigMul <$> zonkRig env m1 <*> zonkRig env m2
-zonkRig env r = return r
+zonkRig _env r = return r
 
 
 

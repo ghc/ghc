@@ -8,11 +8,9 @@ import Name
 import NameEnv
 import UniqFM ( nonDetEltsUFM, plusUFM_CD )
 import Outputable
-import Name
 import TyCoRep ( Rig, Weighted )
 
 import Control.Monad
-import Data.Maybe
 
 --
 -- * Usage environments

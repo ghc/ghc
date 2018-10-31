@@ -54,7 +54,6 @@ import DynFlags
 import ListSetOps       ( equivClasses )
 import Maybes
 import Pair
-import Weight
 import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, unionFV )
 

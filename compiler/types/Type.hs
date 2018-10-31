@@ -1128,7 +1128,7 @@ mkTyConApp tycon tys
 -- look through synonyms.
 tyConAppTyConPicky_maybe :: Type -> Maybe TyCon
 tyConAppTyConPicky_maybe (TyConApp tc _) = Just tc
-tyConAppTyConPicky_maybe (FunTy w _ _)   = Just funTyCon
+tyConAppTyConPicky_maybe (FunTy _ _ _)   = Just funTyCon
 tyConAppTyConPicky_maybe _               = Nothing
 
 
@@ -1136,7 +1136,7 @@ tyConAppTyConPicky_maybe _               = Nothing
 tyConAppTyCon_maybe :: Type -> Maybe TyCon
 tyConAppTyCon_maybe ty | Just ty' <- coreView ty = tyConAppTyCon_maybe ty'
 tyConAppTyCon_maybe (TyConApp tc _) = Just tc
-tyConAppTyCon_maybe (FunTy w _ _)   = Just funTyCon
+tyConAppTyCon_maybe (FunTy _ _ _)   = Just funTyCon
 tyConAppTyCon_maybe _               = Nothing
 
 tyConAppTyCon :: Type -> TyCon

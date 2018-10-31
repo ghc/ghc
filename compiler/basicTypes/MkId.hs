@@ -942,7 +942,7 @@ dataConArgUnpack
    ->  ( [(Weighted Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack (Weighted arg_weight arg_ty)
+dataConArgUnpack (Weighted _ arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
