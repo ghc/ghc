@@ -1920,9 +1920,8 @@ zonkTcTyCoVarBndr :: TcTyCoVar -> TcM TcTyCoVar
 -- A tyvar binder is never a unification variable (TauTv),
 -- rather it is always a skolem. It *might* be a TyVarTv.
 -- (Because non-CUSK type declarations use TyVarTvs.)
--- Regardless, it may have a kind
--- that has not yet been zonked, and may include kind
--- unification variables.
+-- Regardless, it may have a kind that has not yet been zonked,
+-- and may include kind unification variables.
 zonkTcTyCoVarBndr tyvar
   | isTyVarTyVar tyvar
      -- We want to preserve the binding location of the original TyVarTv.

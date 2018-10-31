@@ -575,7 +575,7 @@ kcTyClGroup decls
            ; let no_req_fvs = all_fvs `delDVarSetList` tc_tvs
 
              -- Step 3: partition remaining variables into class variables and
-             -- local variables (matters only for associated types)
+             -- local variables (this matters only for associated types)
                  (class_fvs, local_fvs)
                    = partitionDVarSet (`elemDVarSet` all_class_tctvs) no_req_fvs
 
@@ -988,8 +988,8 @@ kcConDecl (ConDeclGADT { con_names = names
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
     discardResult $
-    kcImplicitTKBndrs implicit_tkv_nms $
-    kcExplicitTKBndrs explicit_tkv_nms $
+    kcImplicitTKBndrsSkol implicit_tkv_nms $
+    kcExplicitTKBndrs     explicit_tkv_nms $
     do { _ <- tcHsMbContext cxt
        ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
@@ -1819,7 +1819,7 @@ kcFamTyPats :: TcTyCon
             -> TcM ()
 kcFamTyPats tc_fam_tc imp_vars mb_expl_bndrs arg_pats kind_checker
   = discardResult $
-    kcImplicitTKBndrs imp_vars $
+    kcImplicitTKBndrsSkol imp_vars $
     kcExplicitTKBndrs (fromMaybe [] mb_expl_bndrs) $
     do { let name     = tyConName tc_fam_tc
              loc      = nameSrcSpan name

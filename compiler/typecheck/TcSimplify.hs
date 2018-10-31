@@ -149,9 +149,11 @@ simplifyTop wanteds
 -- constraints we can and re-emitting constraints that we can't. The thing_inside
 -- should generally bump the TcLevel to make sure that this run of the solver
 -- doesn't affect anything lying around.
-solveLocalEqualities :: TcM a -> TcM a
-solveLocalEqualities thing_inside
-  = do { traceTc "solveLocalEqualities {" empty
+solveLocalEqualities :: String -> TcM a -> TcM a
+solveLocalEqualities callsite thing_inside
+  = do { lvl <- TcM.getTcLevel
+       ; traceTc "solveLocalEqualities {" (vcat [ text "Called from" <+> text callsite
+                                                , text "level =" <+> ppr lvl ])
 
        ; (result, wanted) <- captureConstraints thing_inside
 
@@ -171,7 +173,8 @@ solveLocalEqualities thing_inside
 solveEqualities :: TcM a -> TcM a
 solveEqualities thing_inside
   = checkNoErrs $  -- See Note [Fail fast on kind errors]
-    do { traceTc "solveEqualities {" empty
+    do { lvl <- TcM.getTcLevel
+       ; traceTc "solveEqualities {" (text "level =" <+> ppr lvl)
 
        ; (result, wanted) <- captureConstraints thing_inside
 

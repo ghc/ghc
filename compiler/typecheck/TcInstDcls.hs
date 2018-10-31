@@ -475,16 +475,15 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
              <- tcHsClsInstType (InstDeclCtxt False) poly_ty
              -- NB: tcHsClsInstType does checkValidInstance
 
-        ; let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
+        ; tcExtendTyVarEnv tyvars $
+    do  { let mini_env   = mkVarEnv (classTyVars clas `zip` inst_tys)
               mini_subst = mkTvSubst (mkInScopeSet (mkVarSet tyvars)) mini_env
               mb_info    = Just (clas, tyvars, mini_env)
 
         -- Next, process any associated types.
         ; traceTc "tcLocalInstDecl" (ppr poly_ty)
-        ; tyfam_insts0  <- scopeTyVars InstSkol tyvars $
-                           mapAndRecoverM (tcTyFamInstDecl mb_info) ats
-        ; datafam_stuff <- scopeTyVars InstSkol tyvars $
-                           mapAndRecoverM (tcDataFamInstDecl mb_info) adts
+        ; tyfam_insts0  <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
+        ; datafam_stuff <- mapAndRecoverM (tcDataFamInstDecl mb_info) adts
         ; let (datafam_insts, m_deriv_infos) = unzip datafam_stuff
               deriv_infos                    = catMaybes m_deriv_infos
 
@@ -521,7 +520,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         ; failIfTc (is_boot && not no_binds) badBootDeclErr
 
         ; return ( [inst_info], tyfam_insts0 ++ concat tyfam_insts1 ++ datafam_insts
-                 , deriv_infos ) }
+                 , deriv_infos ) } }
 tcClsInstDecl (L _ (XClsInstDecl _)) = panic "tcClsInstDecl"
 
 {-
