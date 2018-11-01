@@ -2871,7 +2871,7 @@ reportFloatingKvs tycon_name flav all_tvs bad_tvs
 failIfEmitsConstraints :: TcM a -> TcM a
 failIfEmitsConstraints thing_inside
   = do { (res, lie) <- captureConstraints thing_inside
-       ; reportAllUnsolved lie
+       ; checkNoErrs $ reportAllUnsolved lie
        ; return res
        }
 

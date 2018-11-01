@@ -5,18 +5,10 @@ T2994.hs:11:10: error:
         but ‘MonadReader Int’ has kind ‘* -> Constraint’
     • In the instance declaration for ‘MonadReader Int’
 
-T2994.hs:11:10: error:
-    • Instance head is not headed by a class: MonadReader Int
-    • In the instance declaration for ‘MonadReader Int’
-
 T2994.hs:13:10: error:
     • Expecting one more argument to ‘MonadReader (Reader' r)’
       Expected a constraint,
         but ‘MonadReader (Reader' r)’ has kind ‘* -> Constraint’
-    • In the instance declaration for ‘MonadReader (Reader' r)’
-
-T2994.hs:13:10: error:
-    • Instance head is not headed by a class: MonadReader (Reader' r)
     • In the instance declaration for ‘MonadReader (Reader' r)’
 
 T2994.hs:13:23: error:
@@ -28,9 +20,4 @@ T2994.hs:13:23: error:
 T2994.hs:15:10: error:
     • Expected kind ‘(* -> *) -> Constraint’,
         but ‘MonadReader r r’ has kind ‘Constraint’
-    • In the instance declaration for ‘MonadReader r r (Reader' r)’
-
-T2994.hs:15:10: error:
-    • Instance head is not headed by a class:
-        MonadReader r r (Reader' r)
     • In the instance declaration for ‘MonadReader r r (Reader' r)’
