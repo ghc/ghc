@@ -41,15 +41,16 @@ T14273.hs:7:32: warning: [-Wtyped-holes (in -Wdefault)]
         True :: Bool
           (imported from ‘Prelude’ at T14273.hs:1:8-40
            (and originally defined in ‘GHC.Types’))
-        EQ :: Ordering
+        LT :: Ordering
           (imported from ‘Prelude’ at T14273.hs:1:8-40
            (and originally defined in ‘GHC.Types’))
-        LT :: Ordering
+        EQ :: Ordering
           (imported from ‘Prelude’ at T14273.hs:1:8-40
            (and originally defined in ‘GHC.Types’))
         GT :: Ordering
           (imported from ‘Prelude’ at T14273.hs:1:8-40
            (and originally defined in ‘GHC.Types’))
+        () :: () (bound at <wired into compiler>)
         pi :: forall a. Floating a => a
           with pi @Double
           (imported from ‘Prelude’ at T14273.hs:1:8-40

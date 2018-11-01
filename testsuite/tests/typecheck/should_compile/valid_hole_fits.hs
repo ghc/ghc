@@ -33,5 +33,9 @@ f = show _
 h :: String
 h = show (_ (_ :: Bool))
 
+-- Built-in Syntax
+myCons :: a -> [a] -> [a]
+myCons = _
+
 main :: IO ()
 main = _ "hello, world"
