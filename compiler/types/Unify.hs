@@ -344,26 +344,6 @@ If we discover that two types unify if and only if a skolem variable is
 substituted, we can't properly unify the types. But, that skolem variable
 may later be instantiated with a unifyable type. So, we return maybeApart
 in these cases.
-
-Note [Lists of different lengths are MaybeApart]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It is unusual to call tcUnifyTys or tcUnifyTysFG with lists of different
-lengths. The place where we know this can happen is from compatibleBranches in
-FamInstEnv, when checking data family instances. Data family instances may be
-eta-reduced; see Note [Eta reduction for data family axioms] in TcInstDcls.
-
-We wish to say that
-
-  D :: * -> * -> *
-  axDF1 :: D Int ~ DFInst1
-  axDF2 :: D Int Bool ~ DFInst2
-
-overlap. If we conclude that lists of different lengths are SurelyApart, then
-it will look like these do *not* overlap, causing disaster. See Trac #9371.
-
-In usages of tcUnifyTys outside of family instances, we always use tcUnifyTys,
-which can't tell the difference between MaybeApart and SurelyApart, so those
-usages won't notice this design choice.
 -}
 
 -- | Simple unification of two types; all type variables are bindable
@@ -1044,7 +1024,8 @@ unify_tys env orig_xs orig_ys
       -- See Note [Kind coercions in Unify]
       = do { unify_ty env x y (mkNomReflCo $ typeKind x)
            ; go xs ys }
-    go _ _ = maybeApart  -- See Note [Lists of different lengths are MaybeApart]
+    go _ _ = surelyApart
+      -- Possibly different saturations of a polykinded tycon (See Trac #15704)
 
 ---------------------------------
 uVar :: UMEnv

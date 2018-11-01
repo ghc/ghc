@@ -551,13 +551,42 @@ find a branch that matches the target, but then we make sure that the target
 is apart from every previous *incompatible* branch. We don't check the
 branches that are compatible with the matching branch, because they are either
 irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
+
+Note [Compatibility of eta-reduced axioms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In newtype instances of data families we eta-reduce the axioms,
+See Note [Eta reduction for data family axioms] in TcInstDcls. This means that
+we sometimes need to test compatibility of two axioms that were eta-reduced to
+different degrees, e.g.:
+
+
+data family D a b c
+newtype instance D a Int c = DInt (Maybe a)
+  -- D a Int ~ Maybe
+  -- lhs = [a, Int]
+newtype instance D Bool Int Char = DIntChar Float
+  -- D Bool Int Char ~ Float
+  -- lhs = [Bool, Int, Char]
+
+These are obviously incompatible. We could detect this by saturating
+(eta-expanding) the shorter LHS with fresh tyvars until the lists are of
+equal length, but instead we can just remove the tail of the longer list, as
+those types will simply unify with the freshly introduced tyvars.
+
+By doing this, in case the LHS are unifiable, the yielded substitution won't
+mention the tyvars that appear in the tail we dropped off, and we might try
+to test equality RHSes of different kinds, but that's fine since this case
+occurs only for data families, where the RHS is a unique tycon and the equality
+fails anyway.
 -}
 
 -- See Note [Compatibility]
 compatibleBranches :: CoAxBranch -> CoAxBranch -> Bool
 compatibleBranches (CoAxBranch { cab_lhs = lhs1, cab_rhs = rhs1 })
                    (CoAxBranch { cab_lhs = lhs2, cab_rhs = rhs2 })
-  = case tcUnifyTysFG (const BindMe) lhs1 lhs2 of
+  = let (commonlhs1, commonlhs2) = zipAndUnzip lhs1 lhs2
+             -- See Note [Compatibility of eta-reduced axioms]
+    in case tcUnifyTysFG (const BindMe) commonlhs1 commonlhs2 of
       SurelyApart -> True
       Unifiable subst
         | Type.substTyAddInScope subst rhs1 `eqType`
