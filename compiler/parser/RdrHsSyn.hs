@@ -1408,23 +1408,36 @@ mergeOps (L l1 (TyElOpd t) : xs)
   = addAnns >> return t'
 mergeOps all_xs = go (0 :: Int) [] id all_xs
   where
-    -- clause (err.1):
-    -- we do not expect to encounter any (NO)UNPACK pragmas
-    go k acc ops_acc (L l (TyElUnpackedness (_, unpkSrc, unpk)):_) =
-      if not (null acc) && (k > 1 || length acc > 1)
-      then failOpUnpackednessCompound (L l unpkSDoc) (ops_acc (mergeAcc acc))
-      else failOpUnpackednessPosition (L l unpkSDoc)
+    -- NB. When modifying clauses in 'go', make sure that the reasoning in
+    -- Note [Non-empty 'acc' in mergeOps clause [end]] is still correct.
+
+    -- clause [unpk]:
+    -- handle (NO)UNPACK pragmas
+    go k acc ops_acc (L l (TyElUnpackedness (anns, unpkSrc, unpk)):xs) =
+      if not (null acc) && null xs
+      then do { let a = ops_acc (mergeAcc acc)
+                    strictMark = HsSrcBang unpkSrc unpk NoSrcStrict
+                    bl = combineSrcSpans l (getLoc a)
+                    bt = HsBangTy noExt strictMark a
+              ; addAnnsAt bl anns
+              ; return (L bl bt) }
+      else parseErrorSDoc l unpkError
       where
         unpkSDoc = case unpkSrc of
           NoSourceText -> ppr unpk
           SourceText str -> text str <> text " #-}"
+        unpkError
+          | not (null xs) = unpkSDoc <+> text "cannot appear inside a type."
+          | null acc && k == 0 = unpkSDoc <+> text "must be applied to a type."
+          | otherwise =
+              -- See Note [Impossible case in mergeOps clause [unpk]]
+              panic "mergeOps.UNPACK: impossible position"
 
-    -- clause (err.2):
+    -- clause [doc]:
     -- we do not expect to encounter any docs
     go _ _ _ (L l (TyElDocPrev _):_) =
       failOpDocPrev l
 
-    -- clause (err.3):
     -- to improve error messages, we do a bit of guesswork to determine if the
     -- user intended a '!' or a '~' as a strictness annotation
     go k acc ops_acc (L l x : xs)
@@ -1441,44 +1454,93 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
         then failOpStrictnessCompound (L l str) (ops_acc (mergeAcc acc))
         else failOpStrictnessPosition (L l str)
 
-    -- clause (a):
+    -- clause [opr]:
     -- when we encounter an operator, we must have accumulated
     -- something for its rhs, and there must be something left
     -- to build its lhs.
     go k acc ops_acc (L l (TyElOpr op):xs) =
-      if null acc || null xs
+      if null acc || null (filter isTyElOpd xs)
         then failOpFewArgs (L l op)
         else do { let a = mergeAcc acc
                 ; go (k + 1) [] (\c -> mkLHsOpTy c (L l op) (ops_acc a)) xs }
+      where
+        isTyElOpd (L _ (TyElOpd _)) = True
+        isTyElOpd _ = False
 
-    -- clause (a.1): interpret 'TyElTilde' as an operator
+    -- clause [opr.1]: interpret 'TyElTilde' as an operator
     go k acc ops_acc (L l TyElTilde:xs) =
       let op = eqTyCon_RDR
       in go k acc ops_acc (L l (TyElOpr op):xs)
 
-    -- clause (a.2): interpret 'TyElBang' as an operator
+    -- clause [opr.2]: interpret 'TyElBang' as an operator
     go k acc ops_acc (L l TyElBang:xs) =
       let op = mkUnqual tcClsName (fsLit "!")
       in go k acc ops_acc (L l (TyElOpr op):xs)
 
-    -- clause (b):
+    -- clause [opd]:
     -- whenever an operand is encountered, it is added to the accumulator
     go k acc ops_acc (L l (TyElOpd a):xs) = go k (L l a:acc) ops_acc xs
 
-    -- clause (c):
-    -- at this point we know that 'acc' is non-empty because
-    -- there are three options when 'acc' can be empty:
-    -- 1. 'mergeOps' was called with an empty list, and this
-    --    should never happen
-    -- 2. 'mergeOps' was called with a list where the head is an
-    --    operator, this is handled by clause (a)
-    -- 3. 'mergeOps' was called with a list where the head is an
-    --    operand, this is handled by clause (b)
+    -- clause [end]:
+    -- See Note [Non-empty 'acc' in mergeOps clause [end]]
     go _ acc ops_acc [] =
       return (ops_acc (mergeAcc acc))
 
     mergeAcc [] = panic "mergeOps.mergeAcc: empty input"
     mergeAcc (x:xs) = mkHsAppTys x xs
+
+
+{- Note [Impossible case in mergeOps clause [unpk]]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This case should never occur. Let us consider all possible
+variations of 'acc', 'xs', and 'k':
+
+  acc          xs        k
+==============================
+  null   |    null       0      -- "must be applied to a type"
+  null   |  not null     0      -- "must be applied to a type"
+not null |    null       0      -- successful parse
+not null |  not null     0      -- "cannot appear inside a type"
+  null   |    null      >0      -- handled in clause [opr]
+  null   |  not null    >0      -- "cannot appear inside a type"
+not null |    null      >0      -- successful parse
+not null |  not null    >0      -- "cannot appear inside a type"
+
+The (null acc && null xs && k>0) case is handled in clause [opr]
+by the following check:
+
+    if ... || null (filter isTyElOpd xs)
+     then failOpFewArgs (L l op)
+
+We know that this check has been performed because k>0, and by
+the time we reach the end of the list (null xs), the only way
+for (null acc) to hold is that there was not a single TyElOpd
+between the operator and the end of the list. But this case is
+caught by the check and reported as 'failOpFewArgs'.
+-}
+
+{- Note [Non-empty 'acc' in mergeOps clause [end]]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In clause [end] we need to know that 'acc' is non-empty to call 'mergeAcc'
+without a check.
+
+Running 'mergeOps' with an empty input list is forbidden, so we do not consider
+this possibility. This means we'll hit at least one other clause before we
+reach clause [end].
+
+* Clauses [unpk] and [doc] do not call 'go' recursively, so we cannot hit
+  clause [end] from there.
+* Clause [opd] makes 'acc' non-empty, so if we hit clause [end] after it, 'acc'
+  will be non-empty.
+* Clause [opr] checks that (filter isTyElOpd xs) is not null - so we are going
+  to hit clause [opd] at least once before we reach clause [end], making 'acc'
+  non-empty.
+* There are no other clauses.
+
+Therefore, it is safe to omit a check for non-emptiness of 'acc' in clause
+[end].
+
+-}
 
 pInfixSide :: [Located TyEl] -> Maybe (LHsType GhcPs, P (), [Located TyEl])
 pInfixSide (L l (TyElOpd t):xs)
@@ -2122,18 +2184,6 @@ failOpStrictnessPosition :: Located SrcStrictness -> P a
 failOpStrictnessPosition (L loc _) = parseErrorSDoc loc msg
   where
     msg = text "Strictness annotation cannot appear in this position."
-
-failOpUnpackednessCompound :: Located SDoc -> LHsType GhcPs -> P a
-failOpUnpackednessCompound (L _ unpkSDoc) (L loc ty) = parseErrorSDoc loc msg
-  where
-    msg = unpkSDoc <+> text "applied to a compound type." $$
-          text "Did you mean to add parentheses?" $$
-          nest 2 (unpkSDoc <+> parens (ppr ty))
-
-failOpUnpackednessPosition :: Located SDoc -> P a
-failOpUnpackednessPosition (L loc unpkSDoc) = parseErrorSDoc loc msg
-  where
-    msg = unpkSDoc <+> text "cannot appear in this position."
 
 -----------------------------------------------------------------------------
 -- Misc utils
