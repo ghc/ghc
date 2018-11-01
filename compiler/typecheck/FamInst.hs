@@ -150,7 +150,7 @@ See #9562.
 -- It is defined here to avoid a dependency from FamInstEnv on the monad
 -- code.
 
-newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcRnIf gbl lcl FamInst
+newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
 -- Freshen the type variables of the FamInst branches
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
   = ASSERT2( tyCoVarsOfTypes lhs `subVarSet` tcv_set, text "lhs" <+> pp_ax )
@@ -162,7 +162,10 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
        ; let lhs'     = substTys subst lhs
              rhs'     = substTy  subst rhs
              tcvs'    = tvs' ++ cvs'
-       ; when (gopt Opt_DoCoreLinting dflags) $
+       ; ifErrsM (return ()) $ -- Don't lint when there are errors, because
+                               -- errors might mean TcTyCons.
+                               -- See Note [Recover from validity error] in TcTyClsDecls
+         when (gopt Opt_DoCoreLinting dflags) $
            -- Check that the types involved in this instance are well formed.
            -- Do /not/ expand type synonyms, for the reasons discussed in
            -- Note [Linting type synonym applications].
