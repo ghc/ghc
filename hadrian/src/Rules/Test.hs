@@ -81,12 +81,8 @@ testRules = do
 needTestsuitePackages :: Action ()
 needTestsuitePackages = do
     targets   <- mapM (needFile Stage1) =<< testsuitePackages
-    libPath   <- stageLibPath Stage1
-    iservPath <- needFile Stage1 iserv
+    needIservBins
     need targets
-    -- | We need to copy iserv bin to lib/bin as this is where testsuite looks
-    -- | for iserv.
-    copyFile iservPath $ libPath -/- "bin/ghc-iserv"
 
 -- | Build the timeout program.
 -- See: https://github.com/ghc/ghc/blob/master/testsuite/timeout/Makefile#L23
@@ -106,6 +102,11 @@ timeoutProgBuilder = do
                     , "exec " ++ python ++ " $0.py \"$@\"" ]
             writeFile' (root -/- timeoutPath) script
             makeExecutable (root -/- timeoutPath)
+
+needIservBins :: Action ()
+needIservBins =
+    need =<< traverse programPath
+      [ Context Stage1 iserv w | w <- [vanilla, profiling] ]
 
 needTestBuilders :: Action ()
 needTestBuilders = do
