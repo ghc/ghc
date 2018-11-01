@@ -903,7 +903,7 @@ pprRoles :: (Role -> Bool) -> SDoc -> [IfaceTyConBinder]
 pprRoles suppress_if tyCon bndrs roles
   = sdocWithDynFlags $ \dflags ->
       let froles = suppressIfaceInvisibles dflags bndrs roles
-      in ppUnless (all suppress_if roles || null froles) $
+      in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
 pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
