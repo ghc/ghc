@@ -29,6 +29,7 @@ Beginning of sample stream
 A single fixed-width event emitted during program start-up describing the samples that follow.
 
  * ``EVENT_HEAP_PROF_BEGIN``
+
    * ``Word8``: Profile ID
    * ``Word64``: Sampling period in nanoseconds
    * ``Word32``: Sample break-down type. One of,
@@ -55,6 +56,7 @@ Cost centre definitions
 A variable-length packet produced once for each cost centre,
 
  * ``EVENT_HEAP_PROF_COST_CENTRE``
+
    * ``Word32``: cost centre number
    * ``String``: label
    * ``String``: module
@@ -74,6 +76,7 @@ We mark the beginning of a new sample with an ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
 event,
 
  * ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
+
    * ``Word64``: sample number
 
 A heap residency census will follow. Since events may only be up to 2^16^ bytes
@@ -88,7 +91,9 @@ Cost-centre break-down
 A variable-length packet encoding a heap profile sample broken down by,
  * cost-centre (``-hc``)
 
+
  * ``EVENT_HEAP_PROF_SAMPLE_COST_CENTRE``
+
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``Word8``: stack depth
@@ -99,11 +104,13 @@ String break-down
 ^^^^^^^^^^^^^^^^^
 
 A variable-length event encoding a heap sample broken down by,
+
  * type description (``-hy``)
  * closure description (``-hd``)
  * module (``-hm``)
 
  * ``EVENT_HEAP_PROF_SAMPLE_STRING``
+
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``String``: type or closure description, or module name
