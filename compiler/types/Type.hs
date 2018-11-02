@@ -1073,12 +1073,18 @@ piResultTys ty orig_args@(arg:args)
       | ForAllTy (TvBndr tv _) res <- ty
       = go (extendVarEnv tv_env tv arg) res args
 
-      | otherwise  -- See Note [Care with kind instantiation]
-      = ASSERT2( not (isEmptyVarEnv tv_env)
-               , ppr ty $$ ppr orig_args $$ ppr all_args )
-        go emptyTvSubstEnv
+      | not (isEmptyVarEnv tv_env)  -- See Note [Care with kind instantiation]
+      = go emptyTvSubstEnv
           (substTy (mkTvSubst in_scope tv_env) ty)
           all_args
+
+      | otherwise
+      = -- We have not run out of arguments, but the function doesn't
+        -- have the right kind to apply to them; so panic.
+        -- Without hte explicit isEmptyVarEnv test, an ill-kinded type
+        -- would give an infniite loop, which is very unhelpful
+        -- c.f. Trac #15473
+        pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys

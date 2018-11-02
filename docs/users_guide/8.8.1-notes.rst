@@ -40,6 +40,13 @@ Template Haskell
 ~~~~~~~~~~~~~~~~
 
 
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+- GHC now exposes a new primop, ``traceBinaryEvent#``. This primop writes
+  eventlog events similar to ``traceBinaryEvent#`` but allows the user to pass
+  the event payload as a binary blob instead of a ``String``.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -47,6 +54,8 @@ Template Haskell
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Support the characters from recent versions of Unicode (up to v. 12) in literals
+    (see :ghc-ticket:`5518`).
 
 Build system
 ~~~~~~~~~~~~

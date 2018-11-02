@@ -915,8 +915,8 @@ Then:
   * During TcHsType.tcTyVar we look in the *local* env, to get the
     fully-known, not knot-tied TcTyCon for T.
 
-  * Then, in TcHsSyn.zonkTcTypeToType (and zonkTcTyCon in particular) we look in
-    the *global* env to get the TyCon.
+  * Then, in TcHsSyn.zonkTcTypeToType (and zonkTcTyCon in particular)
+    we look in the *global* env to get the TyCon.
 
 This fancy footwork (with two bindings for T) is only necessary for the
 TyCons or Classes of this recursive group.  Earlier, finished groups,
@@ -931,19 +931,19 @@ is done by establishing an "initial kind", which is a rather uninformed
 guess at a tycon's kind (by counting arguments, mainly) and then
 using this initial kind for recursive occurrences.
 
-The initial kind is stored in exactly the same way during kind-checking
-as it is during type-checking (Note [Type checking recursive type and class
-declarations]): in the *local* environment, with ATcTyCon. But we still
-must store *something* in the *global* environment. Even though we
-discard the result of kind-checking, we sometimes need to produce error
-messages. These error messages will want to refer to the tycons being
-checked, except that they don't exist yet, and it would be Terribly
-Annoying to get the error messages to refer back to HsSyn. So we
-create a TcTyCon and put it in the global env. This tycon can
-print out its name and knows its kind,
-but any other action taken on it will panic. Note
-that TcTyCons are *not* knot-tied, unlike the rather valid but
-knot-tied ones that occur during type-checking.
+The initial kind is stored in exactly the same way during
+kind-checking as it is during type-checking (Note [Type checking
+recursive type and class declarations]): in the *local* environment,
+with ATcTyCon. But we still must store *something* in the *global*
+environment. Even though we discard the result of kind-checking, we
+sometimes need to produce error messages. These error messages will
+want to refer to the tycons being checked, except that they don't
+exist yet, and it would be Terribly Annoying to get the error messages
+to refer back to HsSyn. So we create a TcTyCon and put it in the
+global env. This tycon can print out its name and knows its kind, but
+any other action taken on it will panic. Note that TcTyCons are *not*
+knot-tied, unlike the rather valid but knot-tied ones that occur
+during type-checking.
 
 Note [Declarations for wired-in things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1484,12 +1484,15 @@ tcTyFamInstEqn fam_tc mb_clsinfo
     tcFamTyPats fam_tc mb_clsinfo tv_names pats
                 (kcTyFamEqnRhs mb_clsinfo hs_ty) $
                     \tvs pats res_kind ->
-    do { rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
-
+    do { traceTc "tcTyFamInstEqn {" (ppr eqn_tc_name <+> ppr pats)
+       ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
+       ; traceTc "tcTyFamInstEqn 1" (ppr eqn_tc_name <+> ppr pats)
        ; (ze, tvs') <- zonkTyBndrsX emptyZonkEnv tvs
+       ; traceTc "tcTyFamInstEqn 2" (ppr eqn_tc_name <+> ppr pats)
        ; pats'      <- zonkTcTypeToTypes ze pats
+       ; traceTc "tcTyFamInstEqn 3" (ppr eqn_tc_name <+> ppr pats $$ ppr rhs_ty)
        ; rhs_ty'    <- zonkTcTypeToType ze rhs_ty
-       ; traceTc "tcTyFamInstEqn" (ppr fam_tc <+> pprTyVars tvs')
+       ; traceTc "tcTyFamInstEqn 4" (ppr fam_tc <+> pprTyVars tvs')
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }

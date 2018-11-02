@@ -3,6 +3,12 @@
 ## 4.12.0.0 *TBA*
   * Bundled with GHC *TBA*
 
+  * Support the characters from recent versions of Unicode (up to v. 12) in
+    literals (#5518).
+
+## 4.12.0.0 *TBA*
+  * Bundled with GHC *TBA*
+
   * The STM invariant-checking mechanism (`always` and `alwaysSucceeds`), which
     was deprecated in GHC 8.4, has been removed (as proposed in
     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0011-deprecate-stm-invariants.rst>).

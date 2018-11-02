@@ -2,7 +2,6 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 
 module T10100 where
 
