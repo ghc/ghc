@@ -1960,7 +1960,7 @@ defaultTyVarTcS the_tv
        ; unifyTyVar the_tv liftedRepTy
        ; return True }
   | isMultiplicityVar the_tv
-  , not (isSigTyVar the_tv)  -- SigTvs should only be unified with a tyvar
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
                              -- never with a type; c.f. TcMType.defaultTyVar
                              -- See Note [Kind generalisation and SigTvs]
   = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
