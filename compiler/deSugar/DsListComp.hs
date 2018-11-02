@@ -286,7 +286,7 @@ deBindComp pat core_list1 quals core_list2 = do
 
        -- no levity polymorphism here, as list comprehensions don't work
        -- with RebindableSyntax. NB: These are *not* monad comps.
-    [h, u1, u2, u3] <- newSysLocalsDs $ map unrestricted [h_ty, u1_ty, u2_ty, u3_ty] -- TODO: arnaud: probably hiding a bug
+    [h, u1, u2, u3] <- newSysLocalsDs $ map unrestricted [h_ty, u1_ty, u2_ty, u3_ty]
 
     -- the "fail" value ...
     let
@@ -377,8 +377,8 @@ dfBindComp c_id n_id (pat, core_list1) quals = do
     let b_ty   = idType n_id
 
     -- create some new local id's
-    b <- newSysLocalDs Omega b_ty -- TODO: arnaud: probably hiding a bug
-    x <- newSysLocalDs Omega x_ty -- TODO: arnaud: probably hiding a bug
+    b <- newSysLocalDs Omega b_ty
+    x <- newSysLocalDs Omega x_ty
 
     -- build rest of the comprehesion
     core_rest <- dfListComp c_id b quals
@@ -408,11 +408,11 @@ mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 --                              (a2:as'2) -> (a1, a2) : zip as'1 as'2)]
 
 mkZipBind elt_tys = do
-    ass  <- mapM (newSysLocalDs Omega)  elt_list_tys -- TODO: arnaud: probably hiding a bug
-    as'  <- mapM (newSysLocalDs Omega)  elt_tys -- TODO: arnaud: probably hiding a bug
-    as's <- mapM (newSysLocalDs Omega)  elt_list_tys -- TODO: arnaud: probably hiding a bug
+    ass  <- mapM (newSysLocalDs Omega)  elt_list_tys
+    as'  <- mapM (newSysLocalDs Omega)  elt_tys
+    as's <- mapM (newSysLocalDs Omega)  elt_list_tys
 
-    zip_fn <- newSysLocalDs Omega zip_fn_ty -- TODO: arnaud: probably hiding a bug
+    zip_fn <- newSysLocalDs Omega zip_fn_ty
 
     let inner_rhs = mkConsExpr elt_tuple_ty
                         (mkBigCoreVarTup as')
@@ -447,13 +447,13 @@ mkUnzipBind :: TransForm -> [Type] -> DsM (Maybe (Id, CoreExpr))
 mkUnzipBind ThenForm _
  = return Nothing    -- No unzipping for ThenForm
 mkUnzipBind _ elt_tys
-  = do { ax  <- newSysLocalDs Omega elt_tuple_ty -- TODO: arnaud: probably hiding a bug
-       ; axs <- newSysLocalDs Omega elt_list_tuple_ty -- TODO: arnaud: probably hiding a bug
-       ; ys  <- newSysLocalDs Omega elt_tuple_list_ty -- TODO: arnaud: probably hiding a bug
-       ; xs  <- mapM (newSysLocalDs Omega) elt_tys -- TODO: arnaud: probably hiding a bug
-       ; xss <- mapM (newSysLocalDs Omega) elt_list_tys -- TODO: arnaud: probably hiding a bug
+  = do { ax  <- newSysLocalDs Omega elt_tuple_ty
+       ; axs <- newSysLocalDs Omega elt_list_tuple_ty
+       ; ys  <- newSysLocalDs Omega elt_tuple_list_ty
+       ; xs  <- mapM (newSysLocalDs Omega) elt_tys
+       ; xss <- mapM (newSysLocalDs Omega) elt_list_tys
 
-       ; unzip_fn <- newSysLocalDs Omega unzip_fn_ty -- TODO: arnaud: probably hiding a bug
+       ; unzip_fn <- newSysLocalDs Omega unzip_fn_ty
 
        ; [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
 
@@ -473,7 +473,7 @@ mkUnzipBind _ elt_tys
     elt_list_tys       = map mkListTy elt_tys
     elt_list_tuple_ty  = mkBigCoreTupTy elt_list_tys
 
-    unzip_fn_ty        = elt_tuple_list_ty `mkFunTyOm` elt_list_tuple_ty -- FIXME: arnaud: almost certainly wrong
+    unzip_fn_ty        = elt_tuple_list_ty `mkFunTyOm` elt_list_tuple_ty
 
     mkConcatExpression (list_element_ty, head, tail) = mkConsExpr list_element_ty head tail
 
@@ -502,7 +502,6 @@ dsMcStmt (LetStmt _ binds) stmts
 
 --   [ .. | a <- m, stmts ]
 dsMcStmt (BindStmt (_w, bind_ty) pat rhs bind_op fail_op) stmts
-  -- TODO: arnaud: we're losing a multiplicity here
   = do { rhs' <- dsLExpr rhs
        ; dsMcBindStmt pat rhs' bind_op fail_op bind_ty stmts }
 
@@ -558,8 +557,8 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        ; let tup_n_ty' = mkBigCoreVarTupTy to_bndrs
 
        ; body        <- dsMcStmts stmts_rest
-       ; n_tup_var'  <- newSysLocalDsNoLP Omega n_tup_ty' -- TODO: arnaud: probably hiding a bug
-       ; tup_n_var'  <- newSysLocalDs Omega tup_n_ty' -- TODO: arnaud: probably hiding a bug
+       ; n_tup_var'  <- newSysLocalDsNoLP Omega n_tup_ty'
+       ; tup_n_var'  <- newSysLocalDs Omega tup_n_ty'
        ; tup_n_expr' <- mkMcUnzipM form fmap_op n_tup_var' from_bndr_tys
        ; us          <- newUniqueSupply
        ; let rhs'  = mkApps usingExpr' usingArgs'
@@ -608,7 +607,7 @@ matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
 --  \x. case x of (a,b,c) -> body
 matchTuple ids body
   = do { us <- newUniqueSupply
-       ; tup_id <- newSysLocalDs Omega (mkBigCoreVarTupTy ids) -- TODO: arnaud: probably hiding a bug
+       ; tup_id <- newSysLocalDs Omega (mkBigCoreVarTupTy ids)
        ; return (Lam tup_id $ mkTupleCase us ids body tup_id (Var tup_id)) }
 
 -- general `rhs' >>= \pat -> stmts` desugaring where `rhs'` is already a
@@ -622,7 +621,7 @@ dsMcBindStmt :: LPat GhcTc
              -> DsM CoreExpr
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
-        ; var      <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: the correct pat_weight is somewhere in the caller, but I'll fix later, when list comprehension have test cases.
+        ; var      <- selectSimpleMatchVarL Omega pat
         ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                   res1_ty (cantFailMatchResult body)
         ; match_code <- handle_failure pat match fail_op
@@ -680,9 +679,9 @@ mkMcUnzipM ThenForm _ ys _
 
 mkMcUnzipM _ fmap_op ys elt_tys
   = do { fmap_op' <- dsExpr fmap_op
-       ; xs       <- mapM (newSysLocalDs Omega) elt_tys -- TODO: arnaud: probably hiding a bug
+       ; xs       <- mapM (newSysLocalDs Omega) elt_tys
        ; let tup_ty = mkBigCoreTupTy elt_tys
-       ; tup_xs   <- newSysLocalDs Omega tup_ty -- TODO: arnaud: probably hiding a bug
+       ; tup_xs   <- newSysLocalDs Omega tup_ty
 
        ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
                            [ Type tup_ty, Type (getNth elt_tys i)

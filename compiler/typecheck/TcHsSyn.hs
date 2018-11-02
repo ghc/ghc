@@ -603,13 +603,13 @@ zonkMatchGroup :: ZonkEnv
             -> MatchGroup GhcTcId (Located (body GhcTcId))
             -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
 zonkMatchGroup env zBody (MG { mg_alts = L l ms
-                             , mg_ext = MatchGroupTc arg_tys res_ty w
+                             , mg_ext = MatchGroupTc arg_tys res_ty
                              , mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
         ; Compose arg_tys' <- zonkTcTypeToTypes env (Compose arg_tys)
         ; res_ty'  <- zonkTcTypeToType env res_ty
         ; return (MG { mg_alts = L l ms'
-                     , mg_ext = MatchGroupTc arg_tys' res_ty' w
+                     , mg_ext = MatchGroupTc arg_tys' res_ty'
                      , mg_origin = origin }) }
 zonkMatchGroup _ _ (XMatchGroup {}) = panic "zonkMatchGroup"
 

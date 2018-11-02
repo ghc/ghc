@@ -2175,6 +2175,6 @@ ty_con_binders_ty_binders' = foldr go ([], False)
     go (TvBndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (TvBndr tv vis) : bndrs, True)
     go (TvBndr tv AnonTCB)        (bndrs, n)
-      = (Anon (mkWeighted Omega (tyVarKind tv))   : bndrs, n) -- MattP check
+      = (Anon (mkWeighted Omega (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

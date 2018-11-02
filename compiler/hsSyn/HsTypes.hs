@@ -1101,10 +1101,10 @@ splitHsFunType (L _ (HsFunTy _ x weight y))
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName -- TODO: arnaud harder but should be done for all arity
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = ((hsUnrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
+                                 = ((hsUnrestricted t1):args, res)
     go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy _ ty))    tys = go ty tys
     go _                     _   = ([], orig_ty)  -- Failure to match

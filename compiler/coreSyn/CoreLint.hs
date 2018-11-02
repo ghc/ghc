@@ -857,7 +857,6 @@ lintCoreExpr (Type ty)
 lintCoreExpr (Coercion co)
   = do { (k1, k2, ty1, ty2, role) <- lintInCo co
        ; return ((mkHeteroCoercionType role k1 k2 ty1 ty2), emptyUE) }
-       -- MattP: Coercions only mention types, so empty UE
 
 ----------------------
 lintVarOcc :: Var -> Int -- Number of arguments (type or value) being passed
@@ -950,7 +949,7 @@ checkLinearity body_ue lam_var =
   case varWeightednessMaybe lam_var of
     Just (Regular mult) -> do
       ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
-      return $ deleteUE lam_var body_ue
+      return $ deleteUE body_ue lam_var
     Just Alias -> return body_ue -- aliases do not generate multiplicity constraints
     Nothing   -> return body_ue -- A type variable
   where
@@ -968,7 +967,6 @@ checkSubUE var ue1 ue2 =
   <+> text "doesn't have the same usage environment as its right-hand side"
   $$ text "Recorded (var's) environment:" <+> ppr ue2
   $$ text "Computed (rhs's) environment:" <+> ppr ue1
-  -- TODO: arnaud: more informative error message
 
 {-
 Note [No alternatives lint check]
@@ -1062,7 +1060,7 @@ lintCoreArg (fun_ty, ue) (Type arg_ty)
                   <+> ppr arg_ty)
        ; arg_ty' <- applySubstTy arg_ty
        ; res <- lintTyApp fun_ty arg_ty'
-       ; return (res, ue) } -- MattP: Type arguments can't mention value arguments
+       ; return (res, ue) }
 
 lintCoreArg (fun_ty, fun_ue) arg
   = do { (arg_ty, arg_ue) <- markAllJoinsBad $ lintCoreExpr arg
@@ -1093,7 +1091,7 @@ lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
   = do { con_ty' <- lintTyApp con_ty (mkTyVarTy bndr)
        ; lintAltBinders rhs_ue scrut scrut_ty con_ty'  bndrs }
   | otherwise
-  = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE -- TODO: arnaud: there was a TODO there, presumably MattP wasn't happy with how this line handles multiplicities. I don't know yet what this function does.
+  = do { (con_ty', _) <- lintValApp (Var bndr) con_ty (idType bndr) emptyUE emptyUE
        ; rhs_ue' <- checkCaseLinearity rhs_ue scrut var_w bndr
        ; lintAltBinders rhs_ue' scrut scrut_ty con_ty' bndrs }
 
@@ -1102,7 +1100,7 @@ checkCaseLinearity :: UsageEnv -> Var ->  Rig -> Var -> LintM UsageEnv
 checkCaseLinearity ue scrut var_w bndr = do
   ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
-  return $ deleteUE bndr ue
+  return $ deleteUE ue bndr
   where
     lhs = bndr_usage + (scrut_usage * var_w)
     rhs = scrut_w * var_w
@@ -1257,7 +1255,7 @@ lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
     rhs_ue <- lintAltExpr rhs alt_ty ;
 --    ; pprTrace "lintCoreAlt" (ppr weights $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
     ; rhs_ue' <- addLoc (CasePat alt) (lintAltBinders rhs_ue scrut scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
-    return $ deleteUE scrut rhs_ue'
+    return $ deleteUE rhs_ue' scrut
     } }
 
   | otherwise   -- Scrut-ty is wrong shape
@@ -1618,7 +1616,7 @@ lintCoreRule _ _ (BuiltinRule {})
 lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
-    do { (lhs_ty, _) <- lintCoreArgs (fun_ty, emptyUE) args -- MattP: Check this
+    do { (lhs_ty, _) <- lintCoreArgs (fun_ty, emptyUE) args
        ; (rhs_ty, _) <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
@@ -1813,9 +1811,7 @@ lintCoercion co@(FunCo r w co1 co2)
        ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
        ; lintRole co1 r r1
        ; lintRole co2 r r2
-       -- TODO: MattP, this check needs to be reenabled. The problem lies
-       -- somewhere in 30e7ecb805c2eb2d53b6cf02308a382e492cc64c
-       --; lintRole w Nominal r3
+       ; lintRole w Nominal r3
        ; return (k, k', mkFunTy (toMult s3) s1 s2, mkFunTy (toMult t3) t1 t2, r) }
 
 lintCoercion (CoVarCo cv)

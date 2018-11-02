@@ -423,7 +423,7 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
     --    data constructor (DataCon namespace)
     --    data worker (Id namespace)
     --    no wrapper (class dictionaries never have a wrapper)
-    [dc_occ, dcww_occ, dcwrap_occ] ++
+    [dc_occ, dcww_occ] ++
     -- associated types
     [occName (ifName at) | IfaceAT at _ <- ats ] ++
     -- superclass selectors
@@ -437,7 +437,6 @@ ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
     co_occs | is_newtype = [mkNewTyCoOcc cls_tc_occ]
             | otherwise  = []
     dcww_occ = mkDataConWorkerOcc dc_occ
-    dcwrap_occ = mkDataConWrapperOcc dc_occ
     dc_occ = mkClassDataConOcc cls_tc_occ
     is_newtype = n_sigs + n_ctxt == 1 -- Sigh (keep this synced with buildClass)
 
@@ -995,7 +994,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
 
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
-    tys_w_strs = zip stricts (map snd arg_tys) -- TODO: arnaud: don't drop linearity when printing
+    tys_w_strs = zip stricts (map snd arg_tys)
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     -- If we're pretty-printing a H98-style declaration with existential

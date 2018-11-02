@@ -1588,14 +1588,6 @@ data MatchGroupTc
   = MatchGroupTc
        { mg_arg_tys :: [Weighted Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
-       , mg_weight  :: Rig     -- Weight of the result
-                               --
-                               -- TODO: arnaud: I'm deeply suspicious of this
-                               -- mg_weight. If only because, really, there is
-                               -- no one multiplicity for the match; rather
-                               -- there is one per column. And this is embodied
-                               -- by the multiplicities in mg_arg_tys. So
-                               -- probably remove on clean up.
        } deriving Data
 
 type instance XMG         GhcPs b = NoExt

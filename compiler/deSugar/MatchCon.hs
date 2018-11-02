@@ -96,13 +96,10 @@ matchConFamily :: [Id]
 matchConFamily (var:vars) ty groups
   = do let weight = idWeight var
            -- Each variable in the argument list correspond to one column in the
-           -- pattern matching equations. It has the same type as all the
-           -- pattern, and, more importantly for this function, its multiplicity
-           -- is the context multiplicity of the pattern. We extract that
-           -- multiplicity, so that 'matchOneconLike' knows the context
-           -- multiplicity, in case it needs to come up with new variables.
-           --
-           -- TODO: arnaud: check correctness of the comment
+           -- pattern matching equations. Its multiplicity is the context
+           -- multiplicity of the pattern. We extract that multiplicity, so that
+           -- 'matchOneconLike' knows the context multiplicity, in case it needs
+           -- to come up with new variables.
        alts <- mapM (fmap toRealAlt . matchOneConLike vars ty weight) groups
        return (mkCoAlgCaseMatchResult var ty alts)
   where
@@ -117,7 +114,7 @@ matchPatSyn :: [Id]
             -> DsM MatchResult
 matchPatSyn (var:vars) ty eqns
   = do
-       let weight = idWeight var -- TODO: arnaud: this should be right. But it pertains to type synonym, so check for correctness later.
+       let weight = idWeight var
        alt <- fmap toSynAlt $ matchOneConLike vars ty weight eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
@@ -159,7 +156,6 @@ matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single construc
                             . wrapBinds (ds  `zip` dicts1)
                             . mkCoreLets ds_bind
                             , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
-                            -- TODO: arnaud: ^ should val_arg_tys be scaled here?
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
         ; let scaled_arg_tys = map (scaleWeighted weight) val_arg_tys

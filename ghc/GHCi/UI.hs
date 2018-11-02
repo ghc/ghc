@@ -1587,7 +1587,7 @@ getGhciStepIO = do
       ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
-      tySig = mkLHsSigWcType (nlHsFunTy ghciM HsOmega ioM) -- TODO:arnaud: check
+      tySig = mkLHsSigWcType (nlHsFunTy ghciM HsOmega ioM)
   return $ noLoc $ ExprWithTySig tySig body
 
 -----------------------------------------------------------------------------

@@ -112,7 +112,7 @@ conLikeInstOrigArgTys :: ConLike -> [Type] -> [Weighted Type]
 conLikeInstOrigArgTys (RealDataCon data_con) tys =
     dataConInstOrigArgTys data_con tys
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
-    map unrestricted $ patSynInstArgTys pat_syn tys -- TODO: arnaud: fix when pattern synonyms are fixed
+    map unrestricted $ patSynInstArgTys pat_syn tys
 
 -- | Existentially quantified type variables
 conLikeExTyVars :: ConLike -> [TyVar]

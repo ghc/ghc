@@ -137,7 +137,7 @@ inferConstraintsDataConArgs inst_ty inst_tys
                      , not (isUnliftedType (irrelevantWeight arg_ty))
                      , let orig = DerivOriginDC data_con arg_n wildcard
                      , preds_and_mbSubst
-                         <- get_arg_constraints orig arg_t_or_k (irrelevantWeight arg_ty) -- arnaud: check
+                         <- get_arg_constraints orig arg_t_or_k (irrelevantWeight arg_ty)
                      ]
                    preds = concat predss
                    -- If the constraints require a subtype to be of kind

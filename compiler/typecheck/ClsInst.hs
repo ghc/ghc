@@ -183,7 +183,7 @@ matchCTuple clas tys   -- (isCTupleClass clas) holds
             -- The dfun *is* the data constructor!
   where
      data_con = tyConSingleDataCon (classTyCon clas)
-     tuple_ev = evDFunApp (dataConWrapId data_con) (omegaDataConTy : tys)
+     tuple_ev = evDFunApp (dataConWrapId data_con) tys
 
 {- ********************************************************************
 *                                                                     *
@@ -455,7 +455,7 @@ matchHeteroEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~~ t2)
 matchHeteroEquality args
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) (omegaDataConTy : args)
+                    , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) args
                     , cir_what      = BuiltinInstance })
 
 matchHomoEquality :: [Type] -> TcM ClsInstResult
@@ -471,7 +471,7 @@ matchCoercible :: [Type] -> TcM ClsInstResult
 matchCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
                     , cir_mk_ev     = evDFunApp (dataConWrapId coercibleDataCon)
-                                                (omegaDataConTy : args)
+                                                args
                     , cir_what      = BuiltinInstance })
   where
     args' = [k, k, t1, t2]

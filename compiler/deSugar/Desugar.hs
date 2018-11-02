@@ -477,7 +477,7 @@ unfold_coerce bndrs lhs rhs = do
                 v'  = mkLocalCoVar
                         (mkDerivedInternalName mkRepEqOcc u (getName v)) ty'
                 box = Var (dataConWrapId coercibleDataCon) `mkTyApps`
-                      [omegaDataConTy, k, t1, t2] `App`
+                      [k, t1, t2] `App`
                       Coercion (mkCoVarCo v')
 
             (bndrs, wrap) <- go vs

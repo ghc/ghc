@@ -278,7 +278,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
          let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
-        ; var' <- newUniqueId var (idWeight var) pat_ty' -- MattP: I am fairly sure this is right now -- or at least -- not very wrong
+        ; var' <- newUniqueId var (idWeight var) pat_ty'
         ; match_result <- match (var':vars) ty $
                           map (decomposeFirstPat getViewPat) eqns
          -- compile the view expressions
@@ -707,7 +707,7 @@ JJQC 30-Nov-1997
 -}
 
 matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
-                             , mg_ext = MatchGroupTc arg_tys rhs_ty weight
+                             , mg_ext = MatchGroupTc arg_tys rhs_ty
                              , mg_origin = origin })
   = do  { dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
@@ -801,7 +801,7 @@ matchSinglePat (Var var) ctx pat ty match_result
   = matchSinglePatVar var ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
-  = do { var           <- selectSimpleMatchVarL Omega pat -- TODO: arnaud: I don't know where it's used. But I'd be surprised it if were not a bug.
+  = do { var           <- selectSimpleMatchVarL Omega pat
        ; match_result' <- matchSinglePatVar var hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 

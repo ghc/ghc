@@ -1059,7 +1059,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated)
-    arg_tys = map weightedThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs) -- TODO: arnaud: probably a bug eventually, see my other comment below
+    arg_tys = map weightedThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -1372,7 +1372,6 @@ mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "$pm"
       name    = mkInternalName unique occname noSrcSpan
   in  return (mkLocalId name (Regular Omega) ty)
-  -- TODO: arnaud: I don't think these interfere with lambda-binders. Strictly speaking, these variables should probably have more precise multiplicity, and I'm introducing a bug though. But I believe that the simple solution of not caring about variables inside pattern-matching expression is good enough for now.
 
 -- | Generate a fresh term variable of a given and return it in two forms:
 -- * A variable pattern

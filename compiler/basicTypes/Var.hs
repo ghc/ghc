@@ -91,7 +91,6 @@ import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolem
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
 import Weight
-import {-# SOURCE #-} UsageEnv
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -642,7 +641,6 @@ mkLocalVar details name w ty info
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
 mkCoVar name ty = mk_id name (Regular Omega) ty (LocalId NotExported) coVarDetails vanillaIdInfo
-  -- TODO: arnaud: maybe coercions should have multiplicity 0? Them being entirely static.
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id

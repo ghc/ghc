@@ -1010,7 +1010,8 @@ unify_ty env (CoercionTy co1) (CoercionTy co2) kco
              , BindMe <- tvBindFlag env cv
              -> do { checkRnEnv env (tyCoVarsOfCo co2)
                    ; let (_, co_l, co_r) = decomposeFunCo Nominal kco
-                     -- TODO: arnaud: because the coercion is nominal, I believe we can safely ignore the multiplicity coercion.
+                     -- Because the coercion is nominal, it should be safe to
+                     -- ignore the multiplicity coercion.
                       -- cv :: t1 ~ t2
                       -- co2 :: s1 ~ s2
                       -- co_l :: t1 ~ s1
@@ -1430,10 +1431,10 @@ ty_co_match menv subst ty1 (AppCo co2 arg2) _lkco _rkco
 ty_co_match menv subst (TyConApp tc1 tys) (TyConAppCo _ tc2 cos) _lkco _rkco
   = ty_co_match_tc menv subst tc1 tys tc2 cos
 ty_co_match menv subst (FunTy w ty1 ty2) co _lkco _rkco
-    -- Despite the fact that (->) is polymorphic in four type variables (two
-    -- runtime rep and two types), we shouldn't need to explicitly unify the
-    -- runtime reps here; unifying the types themselves should be sufficient.
-    -- See Note [Representation of function types].
+    -- Despite the fact that (->) is polymorphic in five type variables (two
+    -- runtime rep, a multiplicity and two types), we shouldn't need to
+    -- explicitly unify the runtime reps here; unifying the types themselves
+    -- should be sufficient.  See Note [Representation of function types].
     -- TODO: MattP deal with Weight here as well
   | Just (tc, [_, _,_,co1,co2]) <- splitTyConAppCo_maybe co
   , tc == funTyCon

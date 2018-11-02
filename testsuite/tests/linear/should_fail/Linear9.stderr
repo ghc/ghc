@@ -11,7 +11,7 @@ Linear9.hs:12:20: error:
       In an equation for ‘incorrectFstVar’: incorrectFstVar (a, b) = a
 
 Linear9.hs:15:20: error:
-    • Couldn't match type ‘'GHC.Types.Omega’ with ‘'GHC.Types.One’
+    • Couldn't match type ‘'Omega’ with ‘'One’
         arising from an application
     • In the pattern: (a, b)
       In an equation for ‘incorrectFirstDup’:

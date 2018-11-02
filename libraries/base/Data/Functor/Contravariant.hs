@@ -272,8 +272,7 @@ instance Num a => Num (Op a b) where
 instance Fractional a => Fractional (Op a b) where
   Op f / Op g = Op $ \a -> f a / g a
   recip (Op f) = Op $ recip . f
-	-- MattP: Same problem as in Control.Arrow, see Op test
-  fromRational = (\x -> Op x) . const . fromRational
+  fromRational = Op . const . fromRational
 
 instance Floating a => Floating (Op a b) where
   pi = Op $ const pi

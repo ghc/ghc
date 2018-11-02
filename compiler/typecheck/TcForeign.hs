@@ -278,7 +278,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) src)
   = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkFunTys (map unrestricted arg_tys) res_ty)) (illegalForeignTyErr Outputable.empty) -- TODO: arnaud: linear types in FFI
+       check (isFFILabelTy (mkFunTys (map unrestricted arg_tys) res_ty)) (illegalForeignTyErr Outputable.empty)
        cconv' <- checkCConv cconv
        return (CImport (L lc cconv') safety mh l src)
 

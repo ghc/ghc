@@ -6,5 +6,5 @@ data Bloop = Bloop Bool
 g :: Bloop ->. Bool
 g (Bloop x) = x
 
-h :: Bool ->. Bool
-h x = x
+h :: Bool ->. Bloop
+h x = Bloop x

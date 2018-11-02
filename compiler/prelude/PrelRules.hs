@@ -538,7 +538,7 @@ litEq is_eq = msum
   where
     do_lit_eq dflags lit expr = do
       guard (not (litIsLifted lit))
-      return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy -- TODO: arnaud: Now this is interesting! I have to make an unrestricted case, here, because otherwise the default value would be ill-typed (however I decide to do linear cases, either there is no default branch, or the default branch must consume the case-variable). Though, because `Int#` has no component, this behaves like a linear case! Does this make it essentially impossible to write linear program with `Int#`? It could be alright, though, as `Int` and others can be defined to have unrestricted inner `Int#`. Or there could be a special rule for Int#.
+      return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
       where

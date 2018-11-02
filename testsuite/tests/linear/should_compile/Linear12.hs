@@ -15,6 +15,7 @@ consume' x (N k) = k x
 
 data W = W (W ⊸ ())
 
+wPlusTwo :: W ⊸ W
 wPlusTwo n = W (\(W k) -> k n)
 
 data Nat = S Nat

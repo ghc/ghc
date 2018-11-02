@@ -1132,8 +1132,7 @@ listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 -- | @since 4.0.0.0
 instance Data a => Data [a] where
   gfoldl _ z []     = z []
-  -- MattP: Workaround
-  gfoldl f z (x:xs) = z (\x y -> (:) x y) `f` x `f` xs
+  gfoldl f z (x:xs) = z (:) `f` x `f` xs
   toConstr []    = nilConstr
   toConstr (_:_) = consConstr
   gunfold k z c = case constrIndex c of

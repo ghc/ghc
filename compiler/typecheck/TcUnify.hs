@@ -198,7 +198,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkFunTys (map unrestricted more_arg_tys) res_ty -- TODO: arnaud: check but I believe these are arrows with unknown weight, therefore it's correct to default to Omega
+           ; let unif_fun_ty = mkFunTys (map unrestricted more_arg_tys) res_ty
            ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
@@ -322,7 +322,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     defer n fun_ty
       = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
            ; res_ty  <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkFunTys (map unrestricted arg_tys) res_ty -- TODO: arnaud: check but I believe these are arrows of unknown weight so it's correct to default to Omega
+           ; let unif_fun_ty = mkFunTys (map unrestricted arg_tys) res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
            ; return (mkWpCastN co, map unrestricted arg_tys, res_ty) }
 
@@ -822,7 +822,6 @@ tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
   -- it. But maybe there is a better way to implement this function.
   ; return () }
 
--- TODO: MattP fix the origins
 -- As an approximation to checking w1 * w2 <= w we check that w1 <= w and
 -- w2 <= w. As together they imply that w1 * w2 <= w.
 -- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
@@ -835,8 +834,6 @@ tcSubWeight actual_w w
     do_one weight =
       case weight of
         RigAdd m1 m2 -> do
-          -- MattP: We probably need to instantiate these
-          -- variables m1 and m2 to be Omega right here.
           tcSubWeight Omega w
         RigMul m1 m2 -> do
           tcSubWeight m1 w

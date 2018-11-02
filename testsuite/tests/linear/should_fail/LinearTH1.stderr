@@ -1,0 +1,4 @@
+
+LinearTH1.hs:4:6: error:
+    Function with non-Omega multiplicity not (yet) handled by Template Haskell
+      1

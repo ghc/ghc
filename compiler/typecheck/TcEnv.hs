@@ -402,7 +402,7 @@ tcLookupLocated = addLocM tcLookup
 tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
 tcLookupLcl_maybe name
   = do { local_env <- getLclTypeEnv
-       ; return (fmap weightedThing $ lookupNameEnv local_env name) } -- NEXTSTEP: arnaud: don't ignore weights
+       ; return (fmap weightedThing $ lookupNameEnv local_env name) }
 
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name = do
@@ -627,7 +627,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
                      text "of variable" <+> quotes (ppr x) <+>
                      text "with actual weight" <+> quotes (ppr actual_w)
           -- In case of error, recover by pretending that the weight usage was correct
-      return $ deleteUE x uenv
+      return $ deleteUE uenv x
 
 
 
@@ -761,7 +761,7 @@ tcInitOpenTidyEnv tvs
 tcAddDataFamConPlaceholders :: [LInstDecl GhcRn] -> TcM a -> TcM a
 -- See Note [AFamDataCon: not promoting data family constructors]
 tcAddDataFamConPlaceholders inst_decls thing_inside
-  = tcExtendKindEnvList [ (con, Weighted Omega (APromotionErr FamDataConPE)) -- TODO: arnaud: unsure. Probably correct: when type is unclear, assume Omega.
+  = tcExtendKindEnvList [ (con, Weighted Omega (APromotionErr FamDataConPE))
                         | lid <- inst_decls, con <- get_cons lid ]
       thing_inside
       -- Note [AFamDataCon: not promoting data family constructors]
@@ -789,7 +789,7 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
 tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
-  = tcExtendKindEnvList [ (name, Weighted Omega (APromotionErr PatSynPE)) -- TODO: arnaud: see just above
+  = tcExtendKindEnvList [ (name, Weighted Omega (APromotionErr PatSynPE))
                         | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
 
