@@ -78,7 +78,6 @@ module   RdrHsSyn (
 
 import GhcPrelude
 import HsSyn            -- Lots of it
-import Class            ( FunDep )
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import DataCon          ( DataCon, dataConTyCon )
 import ConLike          ( ConLike(..) )
@@ -142,7 +141,7 @@ mkInstD (L loc d) = L loc (InstD noExt d)
 
 mkClassDecl :: SrcSpan
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
-            -> Located (a,[Located (FunDep (Located RdrName))])
+            -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
             -> P (LTyClDecl GhcPs)
 

@@ -296,16 +296,40 @@ addNameClashErrRn rdr_name gres
                -- If there are two or more *local* defns, we'll have reported
   = return ()  -- that already, and we don't want an error cascade
   | otherwise
-  = addErr (vcat [text "Ambiguous occurrence" <+> quotes (ppr rdr_name),
-                  text "It could refer to" <+> vcat (msg1 : msgs)])
+  = addErr (vcat [ text "Ambiguous occurrence" <+> quotes (ppr rdr_name)
+                 , text "It could refer to"
+                 , nest 3 (vcat (msg1 : msgs)) ])
   where
     (np1:nps) = gres
-    msg1 = ptext  (sLit "either") <+> mk_ref np1
-    msgs = [text "    or" <+> mk_ref np | np <- nps]
-    mk_ref gre = sep [nom <> comma, pprNameProvenance gre]
-      where nom = case gre_par gre of
-                    FldParent { par_lbl = Just lbl } -> text "the field" <+> quotes (ppr lbl)
-                    _                                -> quotes (ppr (gre_name gre))
+    msg1 =  text "either" <+> ppr_gre np1
+    msgs = [text "    or" <+> ppr_gre np | np <- nps]
+    ppr_gre gre = sep [ pp_gre_name gre <> comma
+                      , pprNameProvenance gre]
+
+    -- When printing the name, take care to qualify it in the same
+    -- way as the provenance reported by pprNameProvenance, namely
+    -- the head of 'gre_imp'.  Otherwise we get confusing reports like
+    --   Ambiguous occurrence ‘null’
+    --   It could refer to either ‘T15487a.null’,
+    --                            imported from ‘Prelude’ at T15487.hs:1:8-13
+    --                     or ...
+    -- See Trac #15487
+    pp_gre_name gre@(GRE { gre_name = name, gre_par = parent
+                         , gre_lcl = lcl, gre_imp = iss })
+      | FldParent { par_lbl = Just lbl } <- parent
+      = text "the field" <+> quotes (ppr lbl)
+      | otherwise
+      = quotes (pp_qual <> dot <> ppr (nameOccName name))
+      where
+        pp_qual | lcl
+                = ppr (nameModule name)
+                | imp : _ <- iss  -- This 'imp' is the one that
+                                  -- pprNameProvenance chooses
+                , ImpDeclSpec { is_as = mod } <- is_decl imp
+                = ppr mod
+                | otherwise
+                = pprPanic "addNameClassErrRn" (ppr gre $$ ppr iss)
+                  -- Invariant: either 'lcl' is True or 'iss' is non-empty
 
 shadowedNameWarn :: OccName -> [SDoc] -> SDoc
 shadowedNameWarn occ shadowed_locs
