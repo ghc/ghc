@@ -26,7 +26,7 @@ module HsTypes (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..), HsQTvsRn(..),
-        HsImplicitBndrs(..), HsIBRn(..),
+        HsImplicitBndrs(..),
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
@@ -338,23 +338,18 @@ isEmptyLHsQTvs _                = False
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
-  = HsIB { hsib_ext  :: XHsIB pass thing
+  = HsIB { hsib_ext  :: XHsIB pass thing -- after renamer: [Name]
+                                         -- Implicitly-bound kind & type vars
+                                         -- Order is important; see
+                                         -- Note [Ordering of implicit variables]
+
          , hsib_body :: thing            -- Main payload (type or list of types)
     }
   | XHsImplicitBndrs (XXHsImplicitBndrs pass thing)
 
-data HsIBRn
-  = HsIBRn { hsib_vars :: [Name] -- Implicitly-bound kind & type vars
-                                 -- Order is important; see
-                                 -- Note [Ordering of implicit variables]
-           , hsib_closed :: Bool -- Taking the hsib_vars into account,
-                                 -- is the payload closed? Used in
-                                 -- TcHsType.decideKindGeneralisationPlan
-    } deriving Data
-
 type instance XHsIB              GhcPs _ = NoExt
-type instance XHsIB              GhcRn _ = HsIBRn
-type instance XHsIB              GhcTc _ = HsIBRn
+type instance XHsIB              GhcRn _ = [Name]
+type instance XHsIB              GhcTc _ = [Name]
 
 type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExt
 
@@ -435,9 +430,7 @@ mkHsWildCardBndrs x = HsWC { hswc_body = x
 -- Add empty binders.  This is a bit suspicious; what if
 -- the wrapped thing had free type variables?
 mkEmptyImplicitBndrs :: thing -> HsImplicitBndrs GhcRn thing
-mkEmptyImplicitBndrs x = HsIB { hsib_ext = HsIBRn
-                                  { hsib_vars   = []
-                                  , hsib_closed = False }
+mkEmptyImplicitBndrs x = HsIB { hsib_ext = []
                               , hsib_body = x }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs GhcRn thing
@@ -962,7 +955,7 @@ hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
 -- because they scope in the same way
 hsWcScopedTvs sig_ty
   | HsWC { hswc_ext = nwcs, hswc_body = sig_ty1 }  <- sig_ty
-  , HsIB { hsib_ext = HsIBRn { hsib_vars = vars}
+  , HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
       L _ (HsForAllTy { hst_bndrs = tvs }) -> vars ++ nwcs ++
@@ -976,7 +969,7 @@ hsWcScopedTvs (XHsWildCardBndrs _) = panic "hsWcScopedTvs"
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
 hsScopedTvs sig_ty
-  | HsIB { hsib_ext = HsIBRn { hsib_vars = vars }
+  | HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty
   , L _ (HsForAllTy { hst_bndrs = tvs }) <- sig_ty2
   = vars ++ map hsLTyVarName tvs
@@ -1166,7 +1159,7 @@ splitLHsQualTy body              = (noLoc [], body)
 splitLHsInstDeclTy :: LHsSigType GhcRn
                    -> ([Name], LHsContext GhcRn, LHsType GhcRn)
 -- Split up an instance decl type, returning the pieces
-splitLHsInstDeclTy (HsIB { hsib_ext = HsIBRn { hsib_vars = itkvs }
+splitLHsInstDeclTy (HsIB { hsib_ext = itkvs
                          , hsib_body = inst_ty })
   | (tvs, cxt, body_ty) <- splitLHsSigmaTy inst_ty
   = (itkvs ++ map hsLTyVarName tvs, cxt, body_ty)

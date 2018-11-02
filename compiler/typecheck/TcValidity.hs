@@ -2095,6 +2095,7 @@ checkValidTelescope tvbs user_tyvars extra
 -}
 
 -- Free variables of a type, retaining repetitions, and expanding synonyms
+-- This ignores coercions, as coercions aren't user-written
 fvType :: Type -> [TyCoVar]
 fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
 fvType (TyVarTy tv)          = [tv]
@@ -2105,41 +2106,11 @@ fvType (FunTy _ arg res)     = fvType arg ++ fvType res
 fvType (ForAllTy (TvBndr tv _) ty)
   = fvType (tyVarKind tv) ++
     filter (/= tv) (fvType ty)
-fvType (CastTy ty co)        = fvType ty ++ fvCo co
-fvType (CoercionTy co)       = fvCo co
+fvType (CastTy ty _)         = fvType ty
+fvType (CoercionTy {})       = []
 
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
-
-fvMCo :: MCoercion -> [TyCoVar]
-fvMCo MRefl    = []
-fvMCo (MCo co) = fvCo co
-
-fvCo :: Coercion -> [TyCoVar]
-fvCo (Refl ty)              = fvType ty
-fvCo (GRefl _ ty mco)       = fvType ty ++ fvMCo mco
-fvCo (TyConAppCo _ _ args)  = concatMap fvCo args
-fvCo (AppCo co arg)         = fvCo co ++ fvCo arg
-fvCo (ForAllCo tv h co)     = filter (/= tv) (fvCo co) ++ fvCo h
-fvCo (FunCo _ co_mult co1 co2) = fvCo co_mult ++ fvCo co1 ++ fvCo co2
-fvCo (CoVarCo v)            = [v]
-fvCo (AxiomInstCo _ _ args) = concatMap fvCo args
-fvCo (UnivCo p _ t1 t2)     = fvProv p ++ fvType t1 ++ fvType t2
-fvCo (SymCo co)             = fvCo co
-fvCo (TransCo co1 co2)      = fvCo co1 ++ fvCo co2
-fvCo (NthCo _ _ co)         = fvCo co
-fvCo (LRCo _ co)            = fvCo co
-fvCo (InstCo co arg)        = fvCo co ++ fvCo arg
-fvCo (KindCo co)            = fvCo co
-fvCo (SubCo co)             = fvCo co
-fvCo (AxiomRuleCo _ cs)     = concatMap fvCo cs
-fvCo (HoleCo h)             = pprPanic "fvCo falls into a hole" (ppr h)
-
-fvProv :: UnivCoProvenance -> [TyCoVar]
-fvProv UnsafeCoerceProv    = []
-fvProv (PhantomProv co)    = fvCo co
-fvProv (ProofIrrelProv co) = fvCo co
-fvProv (PluginProv _)      = []
 
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
@@ -2151,7 +2122,7 @@ sizeType (AppTy fun arg)   = sizeType fun + sizeType arg
 sizeType (FunTy _ arg res) = sizeType arg + sizeType res + 1
 sizeType (ForAllTy _ ty)   = sizeType ty
 sizeType (CastTy ty _)     = sizeType ty
-sizeType (CoercionTy _)    = 1
+sizeType (CoercionTy _)    = 0
 
 sizeTypes :: [Type] -> Int
 sizeTypes = foldr ((+) . sizeType) 0

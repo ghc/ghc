@@ -1403,7 +1403,7 @@ but it works.
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
 kcTyFamInstEqn tc_fam_tc
-    (L loc (HsIB { hsib_ext = HsIBRn { hsib_vars = tv_names }
+    (L loc (HsIB { hsib_ext = tv_names
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_pats   = pats
                                       , feqn_rhs    = hs_ty }}))
@@ -1456,7 +1456,7 @@ tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 tcTyFamInstEqn fam_tc mb_clsinfo
-    (L loc (HsIB { hsib_ext = HsIBRn { hsib_vars = tv_names }
+    (L loc (HsIB { hsib_ext = tv_names
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_pats   = pats
                                       , feqn_rhs    = hs_ty }}))
@@ -1964,7 +1964,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
              skol_info      = DataConSkol name
 
        ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
-           <- solveEqualities $
+           <- failIfEmitsConstraints $  -- we won't get another crack, and we don't
+                                        -- want an error cascade
               tcImplicitTKBndrs skol_info implicit_tkv_nms $
               tcExplicitTKBndrs skol_info explicit_tkv_nms $
               do { ctxt <- tcHsMbContext cxt

@@ -5,11 +5,13 @@ module TcSimplify(
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
-       simplifyTop, simplifyTopImplic, captureTopConstraints,
+       simplifyTop, simplifyTopImplic,
        simplifyInteractive,
        solveEqualities, solveLocalEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
+
+       captureTopConstraints,
 
        simpl_top,
 
@@ -76,6 +78,8 @@ captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- generates plus the constraints produced by static forms inside.
 -- If it fails with an exception, it reports any insolubles
 -- (out of scope variables) before doing so
+-- NB: bring any environments into scope before calling this, so that
+-- the reportUnsolved has access to the most complete GlobalRdrEnv
 captureTopConstraints thing_inside
   = do { static_wc_var <- TcM.newTcRef emptyWC ;
        ; (mb_res, lie) <- TcM.updGblEnv (\env -> env { tcg_static_wc = static_wc_var } ) $
@@ -1027,7 +1031,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
   = do {  -- Promote any tyvars that we cannot generalise
           -- See Note [Promote momomorphic tyvars]
        ; traceTc "decideMonoTyVars: promotion:" (ppr mono_tvs)
-       ; prom <- promoteTyVarSet mono_tvs
+       ; (prom, _) <- promoteTyVarSet mono_tvs
 
        -- Default any kind/levity vars
        ; let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
@@ -1909,10 +1913,11 @@ we'll get more Givens (a unification is like adding a Given) to
 allow the implication to make progress.
 -}
 
-promoteTyVar :: TcTyVar -> TcM Bool
+promoteTyVar :: TcTyVar -> TcM (Bool, TcTyVar)
 -- When we float a constraint out of an implication we must restore
 -- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in TcType
 -- Return True <=> we did some promotion
+-- Also returns either the original tyvar (no promotion) or the new one
 -- See Note [Promoting unification variables]
 promoteTyVar tv
   = do { tclvl <- TcM.getTcLevel
@@ -1920,14 +1925,16 @@ promoteTyVar tv
          then do { cloned_tv <- TcM.cloneMetaTyVar tv
                  ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
                  ; TcM.writeMetaTyVar tv (mkTyVarTy rhs_tv)
-                 ; return True }
-         else return False }
+                 ; return (True, rhs_tv) }
+         else return (False, tv) }
 
 -- Returns whether or not *any* tyvar is defaulted
-promoteTyVarSet :: TcTyVarSet -> TcM Bool
+promoteTyVarSet :: TcTyVarSet -> TcM (Bool, TcTyVarSet)
 promoteTyVarSet tvs
-  = or <$> mapM promoteTyVar (nonDetEltsUniqSet tvs)
-    -- non-determinism is OK because order of promotion doesn't matter
+  = do { (bools, tyvars) <- mapAndUnzipM promoteTyVar (nonDetEltsUniqSet tvs)
+           -- non-determinism is OK because order of promotion doesn't matter
+
+       ; return (or bools, mkVarSet tyvars) }
 
 promoteTyVarTcS :: TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore

@@ -1318,6 +1318,8 @@ a \/\a in the final result but all the occurrences of a will be zonked to ()
 -- variables free in anything (term-level or type-level) in scope. We thus
 -- don't have to worry about clashes with things that are not in scope, because
 -- if they are reachable, then they'll be returned here.
+-- NB: This is closed over kinds, so it can return unification variables mentioned
+-- in the kinds of in-scope tyvars.
 tcGetGlobalTyCoVars :: TcM TcTyVarSet
 tcGetGlobalTyCoVars
   = do { (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv

@@ -1,4 +1,4 @@
-{-# Language DataKinds, PolyKinds, TypeFamilies, TypeOperators #-}
+{-# Language DataKinds, PolyKinds, TypeFamilies, TypeOperators, AllowAmbiguousTypes #-}
 
 module T14520 where
 
