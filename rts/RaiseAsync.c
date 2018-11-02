@@ -449,8 +449,8 @@ check_target:
         }
         // fall to next
     }
+    FALLTHROUGH;
 #endif
-    /* fallthrough */
     case BlockedOnCCall:
         blockedThrowTo(cap,target,msg);
         return THROWTO_BLOCKED;
