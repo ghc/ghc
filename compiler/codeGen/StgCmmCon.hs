@@ -86,8 +86,10 @@ cgTopRhsCon dflags id con args =
 
             mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
             mk_payload (FieldOff arg _) = do
-                CmmLit lit <- getArgAmode arg
-                return lit
+                amode <- getArgAmode arg
+                case amode of
+                  CmmLit lit -> return lit
+                  _          -> panic "StgCmmCon.cgTopRhsCon"
 
             nonptr_wds = tot_wds - ptr_wds
 

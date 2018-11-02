@@ -242,8 +242,9 @@ processOneArg opt_kind rest arg args
                         []               -> missingArgErr dash_arg
                         (L _ arg1:args1) -> Right (f arg1, args1)
 
+        -- See Trac #12625
         Prefix f | notNull rest_no_eq -> Right (f rest_no_eq, args)
-                 | otherwise          -> unknownFlagErr dash_arg
+                 | otherwise          -> missingArgErr  dash_arg
 
         PrefixPred _ f | notNull rest_no_eq -> Right (f rest_no_eq, args)
                        | otherwise          -> unknownFlagErr dash_arg
@@ -281,7 +282,8 @@ arg_ok :: OptKind t -> [Char] -> String -> Bool
 arg_ok (NoArg           _)  rest _   = null rest
 arg_ok (HasArg          _)  _    _   = True
 arg_ok (SepArg          _)  rest _   = null rest
-arg_ok (Prefix          _)  rest _   = notNull rest
+arg_ok (Prefix          _)  _    _   = True -- Missing argument checked for in processOneArg t
+                                            -- to improve error message (Trac #12625)
 arg_ok (PrefixPred p    _)  rest _   = notNull rest && p (dropEq rest)
 arg_ok (OptIntSuffix    _)  _    _   = True
 arg_ok (IntSuffix       _)  _    _   = True

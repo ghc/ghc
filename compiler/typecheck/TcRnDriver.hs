@@ -392,14 +392,14 @@ tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr decls
  = do { -- Do all the declarations
-      ; ((tcg_env, tcl_env), lie) <- captureTopConstraints $
-              do { (tcg_env, tcl_env) <- tc_rn_src_decls decls
+      ; (tcg_env, tcl_env, lie) <- tc_rn_src_decls decls
 
-                   -- Check for the 'main' declaration
-                   -- Must do this inside the captureTopConstraints
-                 ; tcg_env <- setEnvs (tcg_env, tcl_env) $
-                              checkMain explicit_mod_hdr
-                 ; return (tcg_env, tcl_env) }
+        -- Check for the 'main' declaration
+        -- Must do this inside the captureTopConstraints
+      ; (tcg_env, lie_main) <- setEnvs (tcg_env, tcl_env) $
+                               -- always set envs *before* captureTopConstraints
+                               captureTopConstraints $
+                               checkMain explicit_mod_hdr
 
       ; setEnvs (tcg_env, tcl_env) $ do {
 
@@ -413,7 +413,7 @@ tcRnSrcDecls explicit_mod_hdr decls
              --  * the local env exposes the local Ids to simplifyTop,
              --    so that we get better error messages (monomorphism restriction)
       ; new_ev_binds <- {-# SCC "simplifyTop" #-}
-                        simplifyTop lie
+                        simplifyTop (lie `andWC` lie_main)
 
         -- Emit Typeable bindings
       ; tcg_env <- mkTypeableBinds
@@ -471,16 +471,17 @@ run_th_modfinalizers = do
   then getEnvs
   else do
     writeTcRef th_modfinalizers_var []
-    (envs, lie) <- captureTopConstraints $ do
-      sequence_ th_modfinalizers
-      -- Finalizers can add top-level declarations with addTopDecls.
-      tc_rn_src_decls []
-    setEnvs envs $ do
+    (_, lie_th) <- captureTopConstraints $
+                   sequence_ th_modfinalizers
+      -- Finalizers can add top-level declarations with addTopDecls, so
+      -- we have to run tc_rn_src_decls to get them
+    (tcg_env, tcl_env, lie_top_decls) <- tc_rn_src_decls []
+    setEnvs (tcg_env, tcl_env) $ do
       -- Subsequent rounds of finalizers run after any new constraints are
       -- simplified, or some types might not be complete when using reify
       -- (see #12777).
       new_ev_binds <- {-# SCC "simplifyTop2" #-}
-                      simplifyTop lie
+                      simplifyTop (lie_th `andWC` lie_top_decls)
       updGblEnv (\tcg_env ->
         tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env `unionBags` new_ev_binds }
         )
@@ -488,9 +489,10 @@ run_th_modfinalizers = do
         run_th_modfinalizers
 
 tc_rn_src_decls :: [LHsDecl GhcPs]
-                -> TcM (TcGblEnv, TcLclEnv)
+                -> TcM (TcGblEnv, TcLclEnv, WantedConstraints)
 -- Loops around dealing with each top level inter-splice group
 -- in turn, until it's dealt with the entire module
+-- Never emits constraints; calls captureTopConstraints internally
 tc_rn_src_decls ds
  = {-# SCC "tc_rn_src_decls" #-}
    do { (first_group, group_tail) <- findSplice ds
@@ -535,13 +537,17 @@ tc_rn_src_decls ds
                     }
 
       -- Type check all declarations
-      ; (tcg_env, tcl_env) <- setGblEnv tcg_env $
-                              tcTopSrcDecls rn_decls
+      -- NB: set the env **before** captureTopConstraints so that error messages
+      -- get reported w.r.t. the right GlobalRdrEnv. It is for this reason that
+      -- the captureTopConstraints must go here, not in tcRnSrcDecls.
+      ; ((tcg_env, tcl_env), lie1) <- setGblEnv tcg_env $
+                                      captureTopConstraints $
+                                      tcTopSrcDecls rn_decls
 
         -- If there is no splice, we're nearly done
       ; setEnvs (tcg_env, tcl_env) $
         case group_tail of
-          { Nothing -> return (tcg_env, tcl_env)
+          { Nothing -> return (tcg_env, tcl_env, lie1)
 
             -- If there's a splice, we must carry on
           ; Just (SpliceDecl _ (L loc splice) _, rest_ds) ->
@@ -552,8 +558,11 @@ tc_rn_src_decls ds
                                                              splice)
 
                  -- Glue them on the front of the remaining decls and loop
-               ; setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
-                 tc_rn_src_decls (spliced_decls ++ rest_ds)
+               ; (tcg_env, tcl_env, lie2) <-
+                   setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
+                   tc_rn_src_decls (spliced_decls ++ rest_ds)
+
+               ; return (tcg_env, tcl_env, lie1 `andWC` lie2)
                }
           ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
           }
@@ -584,8 +593,9 @@ tcRnHsBootDecls hsc_src decls
               <- rnTopSrcDecls first_group
         -- The empty list is for extra dependencies coming from .hs-boot files
         -- See Note [Extra dependencies from .hs-boot files] in RnSource
-        ; (gbl_env, lie) <- captureTopConstraints $ setGblEnv tcg_env $ do {
-
+        ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
+              -- NB: setGblEnv **before** captureTopConstraints so that
+              -- if the latter reports errors, it knows what's in scope
 
                 -- Check for illegal declarations
         ; case group_tail of
@@ -1007,7 +1017,6 @@ checkBootTyCon is_boot tc1 tc2
   = ASSERT(tc1 == tc2)
     checkRoles roles1 roles2 `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
-
   -- This allows abstract 'data T a' to be implemented using 'type T = ...'
   -- and abstract 'class K a' to be implement using 'type K = ...'
   -- See Note [Synonyms implement abstract data]
@@ -1021,6 +1030,17 @@ checkBootTyCon is_boot tc1 tc2
     -- there is not an obvious way to do this for a constraint synonym.
     -- So for now, let it all through (it won't cause segfaults, anyway).
     -- Tracked at #12704.
+
+  -- This allows abstract 'data T :: Nat' to be implemented using
+  -- 'type T = 42' Since the kinds already match (we have checked this
+  -- upfront) all we need to check is that the implementation 'type T
+  -- = ...' defined an actual literal.  See #15138 for the case this
+  -- handles.
+  | not is_boot
+  , isAbstractTyCon tc1
+  , Just (_,ty2) <- synTyConDefn_maybe tc2
+  , isJust (isLitTy ty2)
+  = Nothing
 
   | Just fam_flav1 <- famTyConFlav_maybe tc1
   , Just fam_flav2 <- famTyConFlav_maybe tc2

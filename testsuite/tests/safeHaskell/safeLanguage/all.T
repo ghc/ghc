@@ -36,6 +36,6 @@ test('SafeLang18', normal, compile, [''])
 # Test building a package, that trust values are set correctly
 # and can be changed correctly
 #test('SafeRecomp01',
-#		clean_cmd('$MAKE -s --no-print-directory cleanSafeRecomp01'),
+#		normal,
 #      run_command, ['$MAKE -s --no-print-directory safeRecomp01'])
 

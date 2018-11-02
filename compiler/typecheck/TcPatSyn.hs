@@ -189,7 +189,7 @@ badUnivTvErr ex_tvs bad_tv
          , nest 2 (ppr_with_kind bad_tv)
          , hang (text "Existentially-bound variables:")
               2 (vcat (map ppr_with_kind ex_tvs))
-         , text "Probable fix: give the pattern synoym a type signature"
+         , text "Probable fix: give the pattern synonym a type signature"
          ]
   where
     ppr_with_kind tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
@@ -551,10 +551,10 @@ a pattern synonym.  What about the /building/ side?
   tcPatSynBuilderBind, by converting the pattern to an expression and
   typechecking it.
 
-  At one point, for ImplicitBidirectional I used SigTvs (instead of
+  At one point, for ImplicitBidirectional I used TyVarTvs (instead of
   TauTvs) in tcCheckPatSynDecl.  But (a) strengthening the check here
   is redundant since tcPatSynBuilderBind does the job, (b) it was
-  still incomplete (SigTvs can unify with each other), and (c) it
+  still incomplete (TyVarTvs can unify with each other), and (c) it
   didn't even work (Trac #13441 was accepted with
   ExplicitBidirectional, but rejected if expressed in
   ImplicitBidirectional form.  Conclusion: trying to be too clever is
@@ -1016,7 +1016,7 @@ tcPatToExpr name args pat = go pat
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a bidirectional pattern synonym we need to produce an /expression/
 that matches the supplied /pattern/, given values for the arguments
-of the pattern synoymy.  For example
+of the pattern synonym.  For example
   pattern F x y = (Just x, [y])
 The 'builder' for F looks like
   $builderF x y = (Just x, [y])

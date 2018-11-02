@@ -7,16 +7,18 @@ fail() {
   exit 1
 }
 
-echo 'BUILD_SPHINX_HTML = NO' > mk/validate.mk
-echo 'BUILD_SPHINX_PDF = NO' >> mk/validate.mk
 hackage_index_state="@1522046735"
+
+if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
+if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
 
 cat > mk/build.mk <<EOF
 V=1
 HADDOCK_DOCS=YES
 LATEX_DOCS=YES
 HSCOLOUR_SRCS=YES
-BUILD_DOCBOOK_HTML=YES
+BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
+BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 EOF
 
@@ -47,6 +49,7 @@ case "$(uname)" in
       sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     fi
     ;;
+
   Darwin)
     if [[ -n ${TARGET:-} ]]; then
       fail "uname=$(uname) not supported for cross-compilation"
@@ -55,6 +58,11 @@ case "$(uname)" in
     # does not work.
     brew upgrade python
     brew install ghc cabal-install ncurses gmp
+
+    pip3 install sphinx
+    # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
+    #brew cask install mactex
+
     cabal update
     cabal install --reinstall alex happy haddock hscolour --index-state=$hackage_index_state
     # put them on the $PATH, don't fail if already installed
@@ -65,3 +73,9 @@ case "$(uname)" in
   *)
     fail "uname=$(uname) not supported"
 esac
+
+echo "================================================="
+echo "Build.mk:"
+echo ""
+cat mk/build.mk
+echo "================================================="

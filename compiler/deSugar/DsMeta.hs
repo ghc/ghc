@@ -124,7 +124,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_annds   = annds
                         , hs_ruleds  = ruleds
                         , hs_docs    = docs })
- = do { let { bndrs  = hsSigTvBinders valds
+ = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
                        ++ hsPatSynSelectors valds
             ; instds = tyclds >>= group_instds } ;
@@ -182,9 +182,9 @@ repTopDs group@(HsGroup { hs_valds   = valds
       = notHandledL loc "Haddock documentation" empty
 repTopDs (XHsGroup _) = panic "repTopDs"
 
-hsSigTvBinders :: HsValBinds GhcRn -> [Name]
+hsScopedTvBinders :: HsValBinds GhcRn -> [Name]
 -- See Note [Scoped type variables in bindings]
-hsSigTvBinders binds
+hsScopedTvBinders binds
   = concatMap get_scoped_tvs sigs
   where
     sigs = case binds of
@@ -206,7 +206,7 @@ get_scoped_tvs (L _ signature)
       -- Both implicit and explicit quantified variables
       -- We need the implicit ones for   f :: forall (a::k). blah
       --    here 'k' scopes too
-      | HsIB { hsib_ext = HsIBRn { hsib_vars = implicit_vars }
+      | HsIB { hsib_ext = implicit_vars
              , hsib_body = hs_ty } <- sig
       , (explicit_vars, _) <- splitLHsForAllTy hs_ty
       = implicit_vars ++ map hsLTyVarName explicit_vars
@@ -224,7 +224,7 @@ Here the 'forall a' brings 'a' into scope over the binding group.
 To achieve this we
 
   a) Gensym a binding for 'a' at the same time as we do one for 'f'
-     collecting the relevant binders with hsSigTvBinders
+     collecting the relevant binders with hsScopedTvBinders
 
   b) When processing the 'forall', don't gensym
 
@@ -546,7 +546,7 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst tc eqn1 }
 
 repTyFamEqn :: TyFamInstEqn GhcRn -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (HsIB { hsib_ext = HsIBRn { hsib_vars = var_names }
+repTyFamEqn (HsIB { hsib_ext = var_names
                   , hsib_body = FamEqn { feqn_pats = tys
                                        , feqn_rhs  = rhs }})
   = do { let hs_tvs = HsQTvs { hsq_ext = HsQTvsRn
@@ -563,7 +563,7 @@ repTyFamEqn (HsIB _ (XFamEqn _)) = panic "repTyFamEqn"
 
 repDataFamInstD :: DataFamInstDecl GhcRn -> DsM (Core TH.DecQ)
 repDataFamInstD (DataFamInstDecl { dfid_eqn =
-                  (HsIB { hsib_ext = HsIBRn { hsib_vars = var_names }
+                  (HsIB { hsib_ext = var_names
                         , hsib_body = FamEqn { feqn_tycon = tc_name
                                              , feqn_pats  = tys
                                              , feqn_rhs   = defn }})})
@@ -653,7 +653,7 @@ repRuleD (L _ (XRuleDecl _)) = panic "repRuleD"
 ruleBndrNames :: LRuleBndr GhcRn -> [Name]
 ruleBndrNames (L _ (RuleBndr _ n))      = [unLoc n]
 ruleBndrNames (L _ (RuleBndrSig _ n sig))
-  | HsWC { hswc_body = HsIB { hsib_ext = HsIBRn { hsib_vars = vars } }} <- sig
+  | HsWC { hswc_body = HsIB { hsib_ext = vars }} <- sig
   = unLoc n : vars
 ruleBndrNames (L _ (RuleBndrSig _ _ (HsWC _ (XHsImplicitBndrs _))))
   = panic "ruleBndrNames"
@@ -1044,7 +1044,7 @@ repContext ctxt = do preds <- repList typeQTyConName repLTy ctxt
                      repCtxt preds
 
 repHsSigType :: LHsSigType GhcRn -> DsM (Core TH.TypeQ)
-repHsSigType (HsIB { hsib_ext = HsIBRn { hsib_vars = implicit_tvs }
+repHsSigType (HsIB { hsib_ext = implicit_tvs
                    , hsib_body = body })
   | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy body
   = addSimpleTyVarBinds implicit_tvs $
@@ -1487,12 +1487,12 @@ repBinds (EmptyLocalBinds _)
 repBinds b@(HsIPBinds {}) = notHandled "Implicit parameters" (ppr b)
 
 repBinds (HsValBinds _ decs)
- = do   { let { bndrs = hsSigTvBinders decs ++ collectHsValBinders decs }
+ = do   { let { bndrs = hsScopedTvBinders decs ++ collectHsValBinders decs }
                 -- No need to worry about detailed scopes within
                 -- the binding group, because we are talking Names
                 -- here, so we can safely treat it as a mutually
                 -- recursive group
-                -- For hsSigTvBinders see Note [Scoped type variables in bindings]
+                -- For hsScopedTvBinders see Note [Scoped type variables in bindings]
         ; ss        <- mkGenSyms bndrs
         ; prs       <- addBinds ss (rep_val_binds decs)
         ; core_list <- coreList decQTyConName

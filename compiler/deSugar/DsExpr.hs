@@ -644,15 +644,21 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
-                 subst = zipTvSubst univ_tvs in_inst_tys
                  arg_tys' = scaleWeighted Omega <$> arg_tys
                    -- Record updates consume the source record with multiplicity
                    -- Omega. Therefore all the fields need to be scaled thus.
+                 user_tvs =
+                   case con of
+                     RealDataCon data_con -> dataConUserTyVars data_con
+                     PatSynCon _          -> univ_tvs ++ ex_tvs
+                       -- The order here is because of the order in `TcPatSyn`.
+                 in_subst  = zipTvSubst univ_tvs in_inst_tys
+                 out_subst = zipTvSubst univ_tvs out_inst_tys
 
                 -- I'm not bothering to clone the ex_tvs
-           ; eqs_vars   <- mapM newPredVarDs (substTheta subst (eqSpecPreds eq_spec))
-           ; theta_vars <- mapM newPredVarDs (substTheta subst prov_theta)
-           ; arg_ids    <- newSysLocalsDs (getCompose $ substTysUnchecked subst (Compose arg_tys'))
+           ; eqs_vars   <- mapM newPredVarDs (substTheta in_subst (eqSpecPreds eq_spec))
+           ; theta_vars <- mapM newPredVarDs (substTheta in_subst prov_theta)
+           ; arg_ids    <- newSysLocalsDs (getCompose $ substTysUnchecked in_subst (Compose arg_tys))
            ; let field_labels = conLikeFieldLabels con
                  val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
                                          field_labels arg_ids
@@ -661,15 +667,18 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExt con)
                         -- Reconstruct with the WrapId so that unpacking happens
-                 -- The order here is because of the order in `TcPatSyn`.
                  wrap = mkWpEvVarApps theta_vars                                <.>
                         dict_req_wrap                                           <.>
-                        mkWpTyApps    (mkTyVarTys ex_tvs)                       <.>
-                        mkWpTyApps    [ ty
-                                      | (tv, ty) <- univ_tvs `zip` out_inst_tys
+                        mkWpTyApps    [ lookupTyVar out_subst tv
+                                          `orElse` mkTyVarTy tv
+                                      | tv <- user_tvs
                                       , not (tv `elemVarEnv` wrap_subst) ]
                         <.> mkWpTyApps [omegaDataConTy]
 
+                          -- Be sure to use user_tvs (which may be ordered
+                          -- differently than `univ_tvs ++ ex_tvs) above.
+                          -- See Note [DataCon user type variable binders]
+                          -- in DataCon.
                  rhs = foldl (\a b -> nlHsApp a b) inst_con val_args
 
                         -- Tediously wrap the application in a cast

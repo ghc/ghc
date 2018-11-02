@@ -27,6 +27,19 @@ T8848:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-rule-firings T8848.hs | grep 'SPEC map2'
         # Should fire twice
 
+T9441a:
+	$(RM) -f T9941a.o T9941a.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-all T9441a.hs | grep 'f1 = f2'
+	    # Grep output should show 'f1 = f2'
+T9441b:
+	$(RM) -f T9941b.o T9941b.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-all T9441b.hs | grep 'Rec {'
+	    # Grep output should show only one recursive Bind 'Rec {'
+T9441c:
+	$(RM) -f T9941c.o T9941c.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-all T9441c.hs | grep 'Rec {'
+	    # Grep output should show only one recursive Bind 'Rec {'
+
 T9509:
 	$(RM) -f T9509*.o T9509*.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9509a.hs

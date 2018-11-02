@@ -8,10 +8,12 @@ import argparse
 import signal
 import sys
 import os
+import io
 import shutil
 import tempfile
 import time
 import re
+import traceback
 
 # We don't actually need subprocess in runtests.py, but:
 # * We do need it in testlibs.py
@@ -21,8 +23,8 @@ import re
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from testutil import *
-from testglobals import *
+from testutil import getStdout, Watcher
+from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
 from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -193,7 +195,7 @@ def format_path(path):
 # On Windows we need to set $PATH to include the paths to all the DLLs
 # in order for the dynamic library tests to work.
 if windows or darwin:
-    pkginfo = str(getStdout([config.ghc_pkg, 'dump']))
+    pkginfo = getStdout([config.ghc_pkg, 'dump'])
     topdir = config.libdir
     if windows:
         mingw = os.path.abspath(os.path.join(topdir, '../mingw/bin'))
@@ -217,7 +219,6 @@ if windows or darwin:
                 # darwin
                 ghc_env['DYLD_LIBRARY_PATH'] = os.pathsep.join([path, ghc_env.get("DYLD_LIBRARY_PATH", "")])
 
-global testopts_local
 testopts_local.x = TestOptions()
 
 # if timeout == -1 then we try to calculate a sensible value
@@ -289,19 +290,18 @@ for name in config.only:
         framework_fail(name, '', 'test not found')
     else:
         # Let user fix .T file errors before reporting on unfound tests.
-        # The reson the test can not be found is likely because of those
+        # The reason the test can not be found is likely because of those
         # .T file errors.
         pass
 
 if config.list_broken:
-    global brokens
     print('')
     print('Broken tests:')
     print(' '.join(map (lambda bdn: '#' + str(bdn[0]) + '(' + bdn[1] + '/' + bdn[2] + ')', brokens)))
     print('')
 
     if t.framework_failures:
-        print('WARNING:', len(framework_failures), 'framework failures!')
+        print('WARNING:', len(t.framework_failures), 'framework failures!')
         print('')
 else:
     # completion watcher

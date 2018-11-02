@@ -5,5 +5,5 @@ T14552.hs:22:9: error:
       Existentially-bound variables:
         k :: *
         w :: k --> *
-      Probable fix: give the pattern synoym a type signature
+      Probable fix: give the pattern synonym a type signature
     • In the declaration for pattern synonym ‘FOO’

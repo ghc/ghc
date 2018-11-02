@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -e
+
+repo=ghcci
+
+if [[ $# != 2 ]]; then
+    echo "Usage: $0 DIR VERSION"
+    echo
+    echo "Update Docker image in DIR, pushing it to the $repo repository as"
+    echo "version VERSION"
+    echo
+    echo "Example: $0 x86_64-linux-fedora 0.0.3"
+    exit 1
+fi
+
+name=$1
+version=$2
+
+versions="$(curl -s https://registry.hub.docker.com/v1/repositories/$repo/$name/tags | jq -r .[].name)"
+if echo "$versions" | grep $version > /dev/null; then
+    echo "Version $version of $name already exists"
+    echo "Previous versions are:"
+    echo "$versions"
+    exit 1
+fi
+
+docker build $name -t $repo/$name:$version
+docker push $repo/$name:$version
+
+repo_name="$repo/$name"
+sed -i -E -e "s%$repo_name"':[0-9]+(\.[0-9]+)*%'"$repo_name:$version%" ../config.yml
+echo "Built, pushed, and bumped $name:$version"

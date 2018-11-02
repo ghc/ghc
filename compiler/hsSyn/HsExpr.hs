@@ -1093,7 +1093,7 @@ ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
 ppr_expr (EWildPat _)     = char '_'
 ppr_expr (ELazyPat _ e)   = char '~' <> ppr e
-ppr_expr (EAsPat _ v e)   = ppr v <> char '@' <> ppr e
+ppr_expr (EAsPat _ (L _ v) e) = pprPrefixOcc v <> char '@' <> ppr e
 ppr_expr (EViewPat _ p e) = ppr p <+> text "->" <+> ppr e
 
 ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)

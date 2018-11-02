@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, ExplicitForAll, PolyKinds #-}
 
-module SigTvKinds3 where
+module TyVarTvKinds3 where
 
 import Data.Kind
 

@@ -175,14 +175,14 @@ def checkDynAsm(actual_file, normaliser):
     actual_str = normaliser(actual_raw)
     actual = actual_str.split()
     if actual == ['initArray1', 'initArray2', 'success']:
-        return 1
+        return True
     elif opsys('darwin') and actual == ['modInitFunc1', 'modInitFunc2', 'success']:
-        return 1
+        return True
     elif opsys('mingw32') and actual == ['ctors1', 'ctors2', 'success']:
-        return 1
+        return True
     else:
         if_verbose(1, 'T5435_dyn_asm failed with %s, see all.T for details' % actual)
-        return 0
+        return False
 
 # T5435_v_asm got split into two tests because depending
 # on the linker, .init_array and .ctors sections are loaded

@@ -116,7 +116,7 @@ colorGraph iterative spinCount colors triv spill graph0
 -- | Scan through the conflict graph separating out trivially colorable and
 --      potentially uncolorable (problem) nodes.
 --
---      Checking whether a node is trivially colorable or not is a resonably expensive operation,
+--      Checking whether a node is trivially colorable or not is a reasonably expensive operation,
 --      so after a triv node is found and removed from the graph it's no good to return to the 'start'
 --      of the graph and recheck a bunch of nodes that will probably still be non-trivially colorable.
 --
@@ -193,7 +193,7 @@ colorScan_spin iterative triv spill graph
 
                 -- we were able to coalesce something
                 --      go back to Simplify and see if this frees up more nodes to be trivially colorable.
-                (graph2, kksCoalesceFound @(_:_))
+                (graph2, kksCoalesceFound@(_:_))
                  -> colorScan_spin iterative triv spill graph2
                         ksTriv ksSpill (reverse kksCoalesceFound ++ kksCoalesce)
 

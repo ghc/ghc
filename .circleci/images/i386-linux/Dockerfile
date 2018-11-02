@@ -5,7 +5,13 @@ ENV LANG C.UTF-8
 RUN echo 'deb http://ppa.launchpad.net/hvr/ghc/ubuntu trusty main' > /etc/apt/sources.list.d/ghc.list
 RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6F88286
 RUN apt-get update -qq
+
+# Core build utilities
 RUN apt-get install -qy git make automake autoconf gcc perl python3 texinfo xz-utils lbzip2 bzip2 patch openssh-client sudo curl zlib1g-dev libtinfo-dev libsqlite3-0 libsqlite3-dev ca-certificates g++ cabal-install-2.2 ghc-8.4.2 happy alex
+
+# Documentation tools
+RUN apt-get install -qy python3-sphinx texlive-xetex texlive-latex-extra
+
 ENV PATH /home/ghc/.cabal/bin:/home/ghc/.local/bin:/opt/cabal/2.2/bin:/opt/ghc/8.4.2/bin:$PATH
 
 # Get i386 GHC bindist for 32 bit CI builds.

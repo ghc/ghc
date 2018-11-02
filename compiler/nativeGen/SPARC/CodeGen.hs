@@ -423,7 +423,10 @@ genCCall target dest_regs args
                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
                 ForeignTarget expr _
-                 -> do  (dyn_c, [dyn_r]) <- arg_to_int_vregs expr
+                 -> do  (dyn_c, dyn_rs) <- arg_to_int_vregs expr
+                        let dyn_r = case dyn_rs of
+                                      [dyn_r'] -> dyn_r'
+                                      _ -> panic "SPARC.CodeGen.genCCall: arg_to_int"
                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 
                 PrimTarget mop
@@ -433,7 +436,10 @@ genCCall target dest_regs args
                                         return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
 
                                 Right mopExpr -> do
-                                        (dyn_c, [dyn_r]) <- arg_to_int_vregs mopExpr
+                                        (dyn_c, dyn_rs) <- arg_to_int_vregs mopExpr
+                                        let dyn_r = case dyn_rs of
+                                                      [dyn_r'] -> dyn_r'
+                                                      _ -> panic "SPARC.CodeGen.genCCall: arg_to_int"
                                         return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 
                         return lblOrMopExpr

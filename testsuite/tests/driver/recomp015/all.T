@@ -2,7 +2,6 @@
 
 test('recomp015',
      [extra_files(['Generate.hs']),
-       clean_cmd('$MAKE -s clean'),
        # See ticket:11022#comment:7
        unless(opsys('linux') or opsys('solaris2') or opsys('openbsd'), skip),
        when(arch('arm'), skip),

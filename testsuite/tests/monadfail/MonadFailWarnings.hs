@@ -1,7 +1,7 @@
 -- Test purpose:
 -- Ensure that MonadFail warnings are issued correctly if the warning flag
 -- is enabled
-
+{-# LANGUAGE NoMonadFailDesugaring #-}
 {-# OPTIONS_GHC -Wmissing-monadfail-instances #-}
 
 module MonadFailWarnings where

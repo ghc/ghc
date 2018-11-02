@@ -1265,11 +1265,11 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
   = return (emptyBag, emptyTcEvBinds)
 
   | otherwise
-  = ASSERT2( all (isSkolemTyVar <||> isSigTyVar) skol_tvs, ppr skol_tvs )
-      -- Why allow SigTvs? Because implicitly declared kind variables in
-      -- non-CUSK type declarations are SigTvs, and we need to bring them
+  = ASSERT2( all (isSkolemTyVar <||> isTyVarTyVar) skol_tvs, ppr skol_tvs )
+      -- Why allow TyVarTvs? Because implicitly declared kind variables in
+      -- non-CUSK type declarations are TyVarTvs, and we need to bring them
       -- into scope as a skolem in an implication. This is OK, though,
-      -- because SigTvs will always remain tyvars, even after unification.
+      -- because TyVarTvs will always remain tyvars, even after unification.
     do { ev_binds_var <- newTcEvBinds
        ; implic <- newImplication
        ; let implic' = implic { ic_tclvl  = tclvl
@@ -1727,7 +1727,7 @@ lhsPriority tv
       SkolemTv {} -> 0
       MetaTv { mtv_info = info } -> case info of
                                      FlatSkolTv -> 1
-                                     SigTv      -> 2
+                                     TyVarTv    -> 2
                                      TauTv      -> 3
                                      FlatMetaTv -> 4
 {- Note [TyVar/TyVar orientation]
@@ -1752,11 +1752,11 @@ So we look for a positive reason to swap, using a three-step test:
         outer one.  So nothing can be deeper than a FlatMetaTv
 
 
-  - SigTv/TauTv:  if we have  sig_tv ~ tau_tv, put tau_tv
-                  on the left because there are fewer
-                  restrictions on updating TauTvs
+  - TyVarTv/TauTv: if we have  tyv_tv ~ tau_tv, put tau_tv
+                   on the left because there are fewer
+                   restrictions on updating TauTvs
 
-  - SigTv/TauTv:  put on the left either
+  - TyVarTv/TauTv:  put on the left either
      a) Because it's touchable and can be unified, or
      b) Even if it's not touchable, TcSimplify.floatEqualities
         looks for meta tyvars on the left
@@ -1897,8 +1897,8 @@ canSolveByUnification :: TcLevel -> TcTyVar -> TcType -> Bool
 canSolveByUnification tclvl tv xi
   | isTouchableMetaTyVar tclvl tv
   = case metaTyVarInfo tv of
-      SigTv -> is_tyvar xi
-      _     -> True
+      TyVarTv -> is_tyvar xi
+      _       -> True
 
   | otherwise    -- Untouchable
   = False
@@ -1909,8 +1909,8 @@ canSolveByUnification tclvl tv xi
           Just tv -> case tcTyVarDetails tv of
                        MetaTv { mtv_info = info }
                                    -> case info of
-                                        SigTv -> True
-                                        _     -> False
+                                        TyVarTv -> True
+                                        _       -> False
                        SkolemTv {} -> True
                        RuntimeUnk  -> True
 
@@ -2260,7 +2260,7 @@ preCheck dflags ty_fam_ok tv ty
 canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
 canUnifyWithPolyType dflags details
   = case details of
-      MetaTv { mtv_info = SigTv }    -> False
-      MetaTv { mtv_info = TauTv }    -> xopt LangExt.ImpredicativeTypes dflags
-      _other                         -> True
+      MetaTv { mtv_info = TyVarTv }    -> False
+      MetaTv { mtv_info = TauTv }      -> xopt LangExt.ImpredicativeTypes dflags
+      _other                           -> True
           -- We can have non-meta tyvars in given constraints

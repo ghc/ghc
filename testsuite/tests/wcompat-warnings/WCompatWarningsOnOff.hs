@@ -1,6 +1,6 @@
 -- Test purpose:
 -- Ensure that -Wno-compat disables a previously set -Wcompat
-
+{-# LANGUAGE NoMonadFailDesugaring #-}
 {-# OPTIONS_GHC -Wcompat #-}
 {-# OPTIONS_GHC -Wno-compat #-}
 

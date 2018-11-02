@@ -2337,6 +2337,34 @@ sym (ForAllCo tv h g)
 ==>
 ForAllCo tv (sym h) (sym g[tv |-> tv |> sym h])
 
+Note [Substituting in a coercion hole]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It seems highly suspicious to be substituting in a coercion that still
+has coercion holes. Yet, this can happen in a situation like this:
+
+  f :: forall k. k :~: Type -> ()
+  f Refl = let x :: forall (a :: k). [a] -> ...
+               x = ...
+
+When we check x's type signature, we require that k ~ Type. We indeed
+know this due to the Refl pattern match, but the eager unifier can't
+make use of givens. So, when we're done looking at x's type, a coercion
+hole will remain. Then, when we're checking x's definition, we skolemise
+x's type (in order to, e.g., bring the scoped type variable `a` into scope).
+This requires performing a substitution for the fresh skolem variables.
+
+This subsitution needs to affect the kind of the coercion hole, too --
+otherwise, the kind will have an out-of-scope variable in it. More problematically
+in practice (we won't actually notice the out-of-scope variable ever), skolems
+in the kind might have too high a level, triggering a failure to uphold the
+invariant that no free variables in a type have a higher level than the
+ambient level in the type checker. In the event of having free variables in the
+hole's kind, I'm pretty sure we'll always have an erroneous program, so we
+don't need to worry what will happen when the hole gets filled in. After all,
+a hole relating a locally-bound type variable will be unable to be solved. This
+is why it's OK not to look through the IORef of a coercion hole during
+substitution.
+
 -}
 
 -- | Type substitution, see 'zipTvSubst'
@@ -2620,18 +2648,16 @@ subst_co subst co
     go (SubCo co)            = mkSubCo $! (go co)
     go (AxiomRuleCo c cs)    = let cs1 = map go cs
                                 in cs1 `seqList` AxiomRuleCo c cs1
-    go (HoleCo h)            = HoleCo h
-      -- NB: this last case is a little suspicious, but we need it. Originally,
-      -- there was a panic here, but it triggered from deeplySkolemise. Because
-      -- we only skolemise tyvars that are manually bound, this operation makes
-      -- sense, even over a coercion with holes.  We don't need to substitute
-      -- in the type of the coHoleCoVar because it wouldn't makes sense to have
-      --    forall a. ....(ty |> {hole_cv::a})....
+    go (HoleCo h)            = HoleCo $! go_hole h
 
     go_prov UnsafeCoerceProv     = UnsafeCoerceProv
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
+
+    -- See Note [Substituting in a coercion hole]
+    go_hole h@(CoercionHole { ch_co_var = cv })
+      = h { ch_co_var = updateVarType go_ty cv }
 
 substForAllCoBndr :: TCvSubst -> TyVar -> Coercion -> (TCvSubst, TyVar, Coercion)
 substForAllCoBndr subst

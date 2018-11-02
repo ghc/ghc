@@ -635,8 +635,8 @@ isSkolemTy :: TcLevel -> Type -> Bool
 isSkolemTy tc_lvl ty
   | Just tv <- getTyVar_maybe ty
   =  isSkolemTyVar tv
-  || (isSigTyVar tv && isTouchableMetaTyVar tc_lvl tv)
-     -- The last case is for touchable SigTvs
+  || (isTyVarTyVar tv && isTouchableMetaTyVar tc_lvl tv)
+     -- The last case is for touchable TyVarTvs
      -- we postpone untouchables to a latter test (too obscure)
 
   | otherwise
@@ -1606,7 +1606,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
-    || isSigTyVar tv1 && not (isTyVarTy ty2)
+    || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
@@ -1669,7 +1669,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
-  -- it started life as a SigTv, else it'd have been unified, given
+  -- it started life as a TyVarTv, else it'd have been unified, given
   -- that there's no occurs-check or forall problem
   | (implic:_) <- cec_encl ctxt
   , Implic { ic_skols = skols } <- implic
@@ -1707,7 +1707,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   -- Nastiest case: attempt to unify an untouchable variable
   -- So tv is a meta tyvar (or started that way before we
   -- generalised it).  So presumably it is an *untouchable*
-  -- meta tyvar or a SigTv, else it'd have been unified
+  -- meta tyvar or a TyVarTv, else it'd have been unified
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_given = given, ic_tclvl = lvl, ic_info = skol_info } <- implic
@@ -1809,7 +1809,8 @@ misMatchOrCND ctxt ct oriented ty1 ty2
     eq_pred = ctEvPred ev
     orig    = ctEvOrigin ev
     givens  = [ given | given <- getUserGivens ctxt, not (ic_no_eqs given)]
-              -- Keep only UserGivens that have some equalities
+              -- Keep only UserGivens that have some equalities.
+              -- See Note [Suppress redundant givens during error reporting]
 
 couldNotDeduce :: [UserGiven] -> (ThetaType, CtOrigin) -> SDoc
 couldNotDeduce givens (wanteds, orig)
@@ -1824,9 +1825,48 @@ pp_givens givens
                  : map (ppr_given (text "or from:")) gs
     where
        ppr_given herald implic@(Implic { ic_given = gs, ic_info = skol_info })
-           = hang (herald <+> pprEvVarTheta gs)
+           = hang (herald <+> pprEvVarTheta (mkMinimalBySCs evVarPred gs))
+             -- See Note [Suppress redundant givens during error reporting]
+             -- for why we use mkMinimalBySCs above.
                 2 (sep [ text "bound by" <+> ppr skol_info
                        , text "at" <+> ppr (tcl_loc (implicLclEnv implic)) ])
+
+{-
+Note [Suppress redundant givens during error reporting]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When GHC is unable to solve a constraint and prints out an error message, it
+will print out what given constraints are in scope to provide some context to
+the programmer. But we shouldn't print out /every/ given, since some of them
+are not terribly helpful to diagnose type errors. Consider this example:
+
+  foo :: Int :~: Int -> a :~: b -> a :~: c
+  foo Refl Refl = Refl
+
+When reporting that GHC can't solve (a ~ c), there are two givens in scope:
+(Int ~ Int) and (a ~ b). But (Int ~ Int) is trivially soluble (i.e.,
+redundant), so it's not terribly useful to report it in an error message.
+To accomplish this, we discard any Implications that do not bind any
+equalities by filtering the `givens` selected in `misMatchOrCND` (based on
+the `ic_no_eqs` field of the Implication).
+
+But this is not enough to avoid all redundant givens! Consider this example,
+from #15361:
+
+  goo :: forall (a :: Type) (b :: Type) (c :: Type).
+         a :~~: b -> a :~~: c
+  goo HRefl = HRefl
+
+Matching on HRefl brings the /single/ given (* ~ *, a ~ b) into scope.
+The (* ~ *) part arises due the kinds of (:~~:) being unified. More
+importantly, (* ~ *) is redundant, so we'd like not to report it. However,
+the Implication (* ~ *, a ~ b) /does/ bind an equality (as reported by its
+ic_no_eqs field), so the test above will keep it wholesale.
+
+To refine this given, we apply mkMinimalBySCs on it to extract just the (a ~ b)
+part. This works because mkMinimalBySCs eliminates reflexive equalities in
+addition to superclasses (see Note [Remove redundant provided dicts]
+in TcPatSyn).
+-}
 
 extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants

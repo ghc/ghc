@@ -3,6 +3,7 @@
 {-# language ConstraintKinds #-}
 {-# language FlexibleInstances #-}
 {-# language FunctionalDependencies #-}
+{-# language UndecidableInstances #-}
 
 import GHC.Exts (Constraint)
 

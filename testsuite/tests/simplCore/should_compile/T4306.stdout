@@ -1,1 +1,1 @@
-  $wupd :: Double# -> Double#
+  $wupd :: GHC.Prim.Double# -> GHC.Prim.Double#

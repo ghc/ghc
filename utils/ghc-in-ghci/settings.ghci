@@ -36,6 +36,12 @@
 :set -DGHC_LOADED_INTO_GHCI
 :set -XNoImplicitPrelude
 
+-- -fobject-code is required because bytecode doesn't support unboxed tuples
+-- https://ghc.haskell.org/trac/ghc/ticket/1257
+:set -odir ./.ghci-objects
+:set -hidir ./.ghci-objects
+:set -fobject-code
+
 -- Setup args so that running "main" will run ghci and set the prompt to
 -- indicate that it is an inner ghci.
 :set args --interactive -ghci-script utils/ghc-in-ghci/inner.ghci

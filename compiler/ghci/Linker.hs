@@ -87,35 +87,45 @@ import Foreign (Ptr)
 The persistent linker state *must* match the actual state of the
 C dynamic linker at all times, so we keep it in a private global variable.
 
-The global IORef used for PersistentLinkerState actually contains another MVar.
-The reason for this is that we want to allow another loaded copy of the GHC
-library to side-effect the PLS and for those changes to be reflected here.
+The global IORef used for PersistentLinkerState actually contains another MVar,
+which in turn contains a Maybe PersistentLinkerState. The MVar serves to ensure
+mutual exclusion between multiple loaded copies of the GHC library. The Maybe
+may be Nothing to indicate that the linker has not yet been initialised.
 
 The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
 -}
 #if STAGE < 2
-GLOBAL_VAR_M(v_PersistentLinkerState, newMVar (panic "Dynamic linker not initialised"), MVar PersistentLinkerState)
-GLOBAL_VAR(v_InitLinkerDone, False, Bool) -- Set True when dynamic linker is initialised
+GLOBAL_VAR_M( v_PersistentLinkerState
+            , newMVar Nothing
+            , MVar (Maybe PersistentLinkerState))
 #else
 SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
                    , getOrSetLibHSghcPersistentLinkerState
                    , "getOrSetLibHSghcPersistentLinkerState"
-                   , newMVar (panic "Dynamic linker not initialised")
-                   , MVar PersistentLinkerState)
--- Set True when dynamic linker is initialised
-SHARED_GLOBAL_VAR( v_InitLinkerDone
-                 , getOrSetLibHSghcInitLinkerDone
-                 , "getOrSetLibHSghcInitLinkerDone"
-                 , False
-                 , Bool)
+                   , newMVar Nothing
+                   , MVar (Maybe PersistentLinkerState))
 #endif
 
+uninitialised :: a
+uninitialised = panic "Dynamic linker not initialised"
+
 modifyPLS_ :: (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
-modifyPLS_ f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ f
+modifyPLS_ f = readIORef v_PersistentLinkerState
+  >>= flip modifyMVar_ (fmap pure . f . fromMaybe uninitialised)
 
 modifyPLS :: (PersistentLinkerState -> IO (PersistentLinkerState, a)) -> IO a
-modifyPLS f = readIORef v_PersistentLinkerState >>= flip modifyMVar f
+modifyPLS f = readIORef v_PersistentLinkerState
+  >>= flip modifyMVar (fmapFst pure . f . fromMaybe uninitialised)
+  where fmapFst f = fmap (\(x, y) -> (f x, y))
+
+readPLS :: IO PersistentLinkerState
+readPLS = readIORef v_PersistentLinkerState
+  >>= fmap (fromMaybe uninitialised) . readMVar
+
+modifyMbPLS_
+  :: (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
+modifyMbPLS_ f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ f
 
 data PersistentLinkerState
    = PersistentLinkerState {
@@ -255,7 +265,7 @@ withExtendedLinkEnv new_env action
 -- | Display the persistent linker state.
 showLinkerState :: DynFlags -> IO ()
 showLinkerState dflags
-  = do pls <- readIORef v_PersistentLinkerState >>= readMVar
+  = do pls <- readPLS
        putLogMsg dflags NoReason SevDump noSrcSpan
           (defaultDumpStyle dflags)
                  (vcat [text "----- Linker state -----",
@@ -290,11 +300,10 @@ showLinkerState dflags
 --
 initDynLinker :: HscEnv -> IO ()
 initDynLinker hsc_env =
-  modifyPLS_ $ \pls0 -> do
-    done <- readIORef v_InitLinkerDone
-    if done then return pls0
-            else do writeIORef v_InitLinkerDone True
-                    reallyInitDynLinker hsc_env
+  modifyMbPLS_ $ \pls -> do
+    case pls of
+      Just  _ -> return pls
+      Nothing -> Just <$> reallyInitDynLinker hsc_env
 
 reallyInitDynLinker :: HscEnv -> IO PersistentLinkerState
 reallyInitDynLinker hsc_env = do
@@ -1338,8 +1347,8 @@ load_dyn hsc_env dll = do
   r <- loadDLL hsc_env dll
   case r of
     Nothing  -> return ()
-    Just err -> throwGhcExceptionIO (CmdLineError ("can't load .so/.DLL for: "
-                                                ++ dll ++ " (" ++ err ++ ")" ))
+    Just err -> cmdLineErrorIO ("can't load .so/.DLL for: "
+                                ++ dll ++ " (" ++ err ++ ")")
 
 loadFrameworks :: HscEnv -> Platform -> PackageConfig -> IO ()
 loadFrameworks hsc_env platform pkg
@@ -1351,8 +1360,8 @@ loadFrameworks hsc_env platform pkg
     load fw = do  r <- loadFramework hsc_env fw_dirs fw
                   case r of
                     Nothing  -> return ()
-                    Just err -> throwGhcExceptionIO (CmdLineError ("can't load framework: "
-                                                        ++ fw ++ " (" ++ err ++ ")" ))
+                    Just err -> cmdLineErrorIO ("can't load framework: "
+                                                ++ fw ++ " (" ++ err ++ ")" )
 
 -- Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume that addDLL in the RTS can find it,

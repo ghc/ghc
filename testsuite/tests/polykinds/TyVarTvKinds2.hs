@@ -1,6 +1,6 @@
 {-# LANGUAGE PolyKinds #-}
 
-module SigTvKinds2 where
+module TyVarTvKinds2 where
 
 data SameKind :: k -> k -> *
 

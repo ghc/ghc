@@ -1592,14 +1592,13 @@ New monadic failure desugaring mechanism
     when desugaring refutable patterns in ``do`` blocks.
 
 The ``-XMonadFailDesugaring`` extension switches the desugaring of
-``do``-blocks to use ``MonadFail.fail`` instead of ``Monad.fail``. This will
-eventually be the default behaviour in a future GHC release, under the
+``do``-blocks to use ``MonadFail.fail`` instead of ``Monad.fail``.
+
+This extension is enabled by default since GHC 8.6.1, under the
 `MonadFail Proposal (MFP)
 <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
-This extension is temporary, and will be deprecated in a future release. It is
-included so that library authors have a hard check for whether their code
-will work with future GHC versions.
+This extension is temporary, and will be deprecated in a future release.
 
 .. _rebindable-syntax:
 
@@ -10430,11 +10429,6 @@ scope, because it is bound by the pattern match.
 The effect is to bring it into scope,
 standing for the existentially-bound type variable.
 
-When a pattern type signature binds a type variable in this way, GHC
-insists that the type variable is bound to a *rigid*, or fully-known,
-type variable. This means that any user-written type signature always
-stands for a completely known type.
-
 It does seem odd that the existentially-bound type variable *must not*
 be already in scope. Contrast that usually name-bindings merely shadow
 (make a 'hole') in a same-named outer variable's scope.
@@ -10558,49 +10552,6 @@ The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies
 and :extension:`GADTs`. You can switch it off again with
 :extension:`NoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
 less predictable if you do so. (Read the papers!)
-
-.. _kind-generalisation:
-
-Kind generalisation
--------------------
-
-Just as :extension:`MonoLocalBinds` places limitations on when the *type* of a
-*term* is generalised (see :ref:`mono-local-binds`), it also limits when the
-*kind* of a *type signature* is generalised. Here is an example involving
-:ref:`type signatures on instance declarations <instance-sigs>`: ::
-
-    data Proxy a = Proxy
-    newtype Tagged s b = Tagged b
-
-    class C b where
-      c :: forall (s :: k). Tagged s b
-
-    instance C (Proxy a) where
-      c :: forall s. Tagged s (Proxy a)
-      c = Tagged Proxy
-
-With :extension:`MonoLocalBinds` enabled, this ``C (Proxy a)`` instance will
-fail to typecheck. The reason is that the type signature for ``c`` captures
-``a``, an outer-scoped type variable, which means the type signature is not
-closed. Therefore, the inferred kind for ``s`` will *not* be generalised, and
-as a result, it will fail to unify with the kind variable ``k`` which is
-specified in the declaration of ``c``. This can be worked around by specifying
-an explicit kind variable for ``s``, e.g., ::
-
-    instance C (Proxy a) where
-      c :: forall (s :: k). Tagged s (Proxy a)
-      c = Tagged Proxy
-
-or, alternatively: ::
-
-    instance C (Proxy a) where
-      c :: forall k (s :: k). Tagged s (Proxy a)
-      c = Tagged Proxy
-
-This declarations are equivalent using Haskell's implicit "add implicit
-foralls" rules (see :ref:`implicit-quantification`). The implicit foralls rules
-are purely syntactic and are quite separate from the kind generalisation
-described here.
 
 .. _visible-type-application:
 

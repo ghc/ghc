@@ -5,11 +5,13 @@ module TcSimplify(
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
-       simplifyTop, simplifyTopImplic, captureTopConstraints,
+       simplifyTop, simplifyTopImplic,
        simplifyInteractive,
        solveEqualities, solveLocalEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
+
+       captureTopConstraints,
 
        simpl_top,
 
@@ -76,6 +78,8 @@ captureTopConstraints :: TcM a -> TcM (a, WantedConstraints)
 -- generates plus the constraints produced by static forms inside.
 -- If it fails with an exception, it reports any insolubles
 -- (out of scope variables) before doing so
+-- NB: bring any environments into scope before calling this, so that
+-- the reportUnsolved has access to the most complete GlobalRdrEnv
 captureTopConstraints thing_inside
   = do { static_wc_var <- TcM.newTcRef emptyWC ;
        ; (mb_res, lie) <- TcM.updGblEnv (\env -> env { tcg_static_wc = static_wc_var } ) $
@@ -928,7 +932,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
   = do { (no_quant, maybe_quant) <- pick infer_mode candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
-       -- not mono. Need to zonk them because they are meta-tyvar SigTvs
+       -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
        ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
                       concatMap (map snd . sig_inst_skols) psigs
 
@@ -1027,7 +1031,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
   = do {  -- Promote any tyvars that we cannot generalise
           -- See Note [Promote momomorphic tyvars]
        ; traceTc "decideMonoTyVars: promotion:" (ppr mono_tvs)
-       ; prom <- promoteTyVarSet mono_tvs
+       ; (prom, _) <- promoteTyVarSet mono_tvs
 
        -- Default any kind/levity vars
        ; let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
@@ -1161,7 +1165,7 @@ However, in the case of a partial type signature, be doing inference
 or
    g :: (Eq _a) => _b -> _b
 In both cases we use plan InferGen, and hence call simplifyInfer.  But
-those 'a' variables are skolems (actually SigTvs), and we should be
+those 'a' variables are skolems (actually TyVarTvs), and we should be
 sure to quantify over them.  This leads to several wrinkles:
 
 * Wrinkle 1.  In the case of a type error
@@ -1909,10 +1913,11 @@ we'll get more Givens (a unification is like adding a Given) to
 allow the implication to make progress.
 -}
 
-promoteTyVar :: TcTyVar -> TcM Bool
+promoteTyVar :: TcTyVar -> TcM (Bool, TcTyVar)
 -- When we float a constraint out of an implication we must restore
 -- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in TcType
 -- Return True <=> we did some promotion
+-- Also returns either the original tyvar (no promotion) or the new one
 -- See Note [Promoting unification variables]
 promoteTyVar tv
   = do { tclvl <- TcM.getTcLevel
@@ -1920,14 +1925,16 @@ promoteTyVar tv
          then do { cloned_tv <- TcM.cloneMetaTyVar tv
                  ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
                  ; TcM.writeMetaTyVar tv (mkTyVarTy rhs_tv)
-                 ; return True }
-         else return False }
+                 ; return (True, rhs_tv) }
+         else return (False, tv) }
 
 -- Returns whether or not *any* tyvar is defaulted
-promoteTyVarSet :: TcTyVarSet -> TcM Bool
+promoteTyVarSet :: TcTyVarSet -> TcM (Bool, TcTyVarSet)
 promoteTyVarSet tvs
-  = or <$> mapM promoteTyVar (nonDetEltsUniqSet tvs)
-    -- non-determinism is OK because order of promotion doesn't matter
+  = do { (bools, tyvars) <- mapAndUnzipM promoteTyVar (nonDetEltsUniqSet tvs)
+           -- non-determinism is OK because order of promotion doesn't matter
+
+       ; return (or bools, mkVarSet tyvars) }
 
 promoteTyVarTcS :: TcTyVar  -> TcS ()
 -- When we float a constraint out of an implication we must restore
@@ -1946,14 +1953,14 @@ promoteTyVarTcS tv
 defaultTyVarTcS :: TcTyVar -> TcS Bool
 defaultTyVarTcS the_tv
   | isRuntimeRepVar the_tv
-  , not (isSigTyVar the_tv)  -- SigTvs should only be unified with a tyvar
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
                              -- never with a type; c.f. TcMType.defaultTyVar
-                             -- See Note [Kind generalisation and SigTvs]
+                             -- See Note [Kind generalisation and TyVarTvs]
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
        ; return True }
   | isMultiplicityVar the_tv
-  , not (isSigTyVar the_tv)  -- SigTvs should only be unified with a tyvar
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
                              -- never with a type; c.f. TcMType.defaultTyVar
                              -- See Note [Kind generalisation and SigTvs]
   = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
@@ -2286,7 +2293,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
 
     float_tv_eq_candidate tv1 ty2  -- See Note [Which equalities to float]
       =  isMetaTyVar tv1
-      && (not (isSigTyVar tv1) || isTyVarTy ty2)
+      && (not (isTyVarTyVar tv1) || isTyVarTy ty2)
 
 
 {- Note [Float equalities from under a skolem binding]
@@ -2320,7 +2327,7 @@ happen.  In particular, float out equalities that are:
 
 * Of form (alpha ~# ty) or (ty ~# alpha), where
    * alpha is a meta-tyvar.
-   * And 'alpha' is not a SigTv with 'ty' being a non-tyvar.  In that
+   * And 'alpha' is not a TyVarTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
 
