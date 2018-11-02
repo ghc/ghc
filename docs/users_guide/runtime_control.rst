@@ -1067,6 +1067,13 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     `ghc-events <http://hackage.haskell.org/package/ghc-events>`__
     package.
 
+.. rts-flag:: -ol ⟨filename⟩
+
+    :default: :file:`<program>.eventlog`
+    :since: 8.8
+
+    Sets the destination for the eventlog produced with the :rts-flag:`-l` flag.
+
 .. rts-flag:: -v [⟨flags⟩]
 
     Log events as text to standard output, instead of to the

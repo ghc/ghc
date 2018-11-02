@@ -89,6 +89,8 @@ Runtime system
   alignment, lower the amount of wasted memory and lower the amount of in use memory.
   See :ghc-ticket:`13617`. Note that committed memory may be slightly higher.
 
+- The output filename used for :ref:`eventlog output <rts-eventlog>` can now be
+  specified with the :rts-flag:`-ol` flag.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
