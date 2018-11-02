@@ -243,40 +243,6 @@ Compiler
   to typecheck in case explicit kind signatures are not provided. See
   :ref:`kind-generalisation` for an example.
 
-- Type synonyms can no longer appear in the class position of an instance.
-  This means something like this is no longer allowed: ::
-
-    type ReadShow a = (Read a, Show a)
-    instance Read Foo
-    instance Show Foo
-    instance ReadShow Foo -- illegal
-
-  See :ghc-ticket:`13267`.
-
-- Validity checking for associated type family instances has tightened
-  somewhat. Before, this would be accepted: ::
-
-    class Foo a where
-      type Bar a
-
-    instance Foo (Either a b) where
-      type Bar (Either c d) = d -> c
-
-  This is now disallowed, as the type variables used in the `Bar` instance do
-  not match those in the instance head. This instance can be fixed by changing
-  it to: ::
-
-    instance Foo (Either a b) where
-      type Bar (Either a b) = b -> a
-
-  See the section on `associated type family instances <assoc-data-inst>` for
-  more information.
-
-- A bug involving the interaction between :ghc-flag:`-XMonoLocalBinds` and
-  :ghc-flag:`-XPolyKinds` has been fixed. This can cause some programs to fail
-  to typecheck in case explicit kind signatures are not provided. See
-  :ref:`kind-generalisation` for an example.
-
 GHCi
 ~~~~
 
@@ -359,8 +325,9 @@ Runtime system
   move long-lived data outside of the heap so that the garbage
   collector does not have to trace it repeatedly.  Compacted data can
   also be serialized, stored, and deserialized again later by the same
-  program.  For more details see the :compact-ref:`GHC.Compact
-  <GHC-Compact.html>` module.
+  program. For more details see the :ghc-compact-ref:`GHC.Compact.` module.
+  Moreover, see the ``compact`` library on `Hackage
+  <https://hackage.haskell.org/package/compact>`_ for a high-level interface.
 
 - There is new support for improving performance on machines with a
   Non-Uniform Memory Architecture (NUMA).  See :rts-flag:`--numa`.
