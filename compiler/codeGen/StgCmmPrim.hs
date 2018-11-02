@@ -875,18 +875,28 @@ type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 callishPrimOpSupported :: DynFlags -> PrimOp -> Either CallishMachOp GenericOp
 callishPrimOpSupported dflags op
   = case op of
-      IntQuotRemOp   | ncg && (x86ish
-                              || ppc) -> Left (MO_S_QuotRem  (wordWidth dflags))
-                     | otherwise      -> Right (genericIntQuotRemOp dflags)
+      IntQuotRemOp   | ncg && (x86ish || ppc) ->
+                         Left (MO_S_QuotRem  (wordWidth dflags))
+                     | otherwise              ->
+                         Right (genericIntQuotRemOp (wordWidth dflags))
 
-      WordQuotRemOp  | ncg && (x86ish
-                              || ppc) -> Left (MO_U_QuotRem  (wordWidth dflags))
-                     | otherwise      -> Right (genericWordQuotRemOp dflags)
+      Int8QuotRemOp  | (ncg && x86ish)
+                        || llvm      -> Left (MO_S_QuotRem W8)
+                     | otherwise     -> Right (genericIntQuotRemOp W8)
+
+      WordQuotRemOp  | ncg && (x86ish || ppc) ->
+                         Left (MO_U_QuotRem  (wordWidth dflags))
+                     | otherwise      ->
+                         Right (genericWordQuotRemOp (wordWidth dflags))
 
       WordQuotRem2Op | (ncg && (x86ish
                                 || ppc))
                           || llvm     -> Left (MO_U_QuotRem2 (wordWidth dflags))
                      | otherwise      -> Right (genericWordQuotRem2Op dflags)
+
+      Word8QuotRemOp | (ncg && x86ish)
+                        || llvm      -> Left (MO_U_QuotRem W8)
+                     | otherwise     -> Right (genericWordQuotRemOp W8)
 
       WordAdd2Op     | (ncg && (x86ish
                                 || ppc))
@@ -943,20 +953,20 @@ callishPrimOpSupported dflags op
           ArchPPC_64 _ -> True
           _            -> False
 
-genericIntQuotRemOp :: DynFlags -> GenericOp
-genericIntQuotRemOp dflags [res_q, res_r] [arg_x, arg_y]
+genericIntQuotRemOp :: Width -> GenericOp
+genericIntQuotRemOp width [res_q, res_r] [arg_x, arg_y]
    = emit $ mkAssign (CmmLocal res_q)
-              (CmmMachOp (MO_S_Quot (wordWidth dflags)) [arg_x, arg_y]) <*>
+              (CmmMachOp (MO_S_Quot width) [arg_x, arg_y]) <*>
             mkAssign (CmmLocal res_r)
-              (CmmMachOp (MO_S_Rem  (wordWidth dflags)) [arg_x, arg_y])
+              (CmmMachOp (MO_S_Rem  width) [arg_x, arg_y])
 genericIntQuotRemOp _ _ _ = panic "genericIntQuotRemOp"
 
-genericWordQuotRemOp :: DynFlags -> GenericOp
-genericWordQuotRemOp dflags [res_q, res_r] [arg_x, arg_y]
+genericWordQuotRemOp :: Width -> GenericOp
+genericWordQuotRemOp width [res_q, res_r] [arg_x, arg_y]
     = emit $ mkAssign (CmmLocal res_q)
-               (CmmMachOp (MO_U_Quot (wordWidth dflags)) [arg_x, arg_y]) <*>
+               (CmmMachOp (MO_U_Quot width) [arg_x, arg_y]) <*>
              mkAssign (CmmLocal res_r)
-               (CmmMachOp (MO_U_Rem  (wordWidth dflags)) [arg_x, arg_y])
+               (CmmMachOp (MO_U_Rem  width) [arg_x, arg_y])
 genericWordQuotRemOp _ _ _ = panic "genericWordQuotRemOp"
 
 genericWordQuotRem2Op :: DynFlags -> GenericOp
@@ -1309,6 +1319,42 @@ translateOp dflags AddrGeOp       = Just (mo_wordUGe dflags)
 translateOp dflags AddrLeOp       = Just (mo_wordULe dflags)
 translateOp dflags AddrGtOp       = Just (mo_wordUGt dflags)
 translateOp dflags AddrLtOp       = Just (mo_wordULt dflags)
+
+-- Int8# signed ops
+
+translateOp dflags Int8Extend     = Just (MO_SS_Conv W8 (wordWidth dflags))
+translateOp dflags Int8Narrow     = Just (MO_SS_Conv (wordWidth dflags) W8)
+translateOp _      Int8NegOp      = Just (MO_S_Neg W8)
+translateOp _      Int8AddOp      = Just (MO_Add W8)
+translateOp _      Int8SubOp      = Just (MO_Sub W8)
+translateOp _      Int8MulOp      = Just (MO_Mul W8)
+translateOp _      Int8QuotOp     = Just (MO_S_Quot W8)
+translateOp _      Int8RemOp      = Just (MO_S_Rem W8)
+
+translateOp _      Int8EqOp       = Just (MO_Eq W8)
+translateOp _      Int8GeOp       = Just (MO_S_Ge W8)
+translateOp _      Int8GtOp       = Just (MO_S_Gt W8)
+translateOp _      Int8LeOp       = Just (MO_S_Le W8)
+translateOp _      Int8LtOp       = Just (MO_S_Lt W8)
+translateOp _      Int8NeOp       = Just (MO_Ne W8)
+
+-- Word8# unsigned ops
+
+translateOp dflags Word8Extend     = Just (MO_UU_Conv W8 (wordWidth dflags))
+translateOp dflags Word8Narrow     = Just (MO_UU_Conv (wordWidth dflags) W8)
+translateOp _      Word8NotOp      = Just (MO_Not W8)
+translateOp _      Word8AddOp      = Just (MO_Add W8)
+translateOp _      Word8SubOp      = Just (MO_Sub W8)
+translateOp _      Word8MulOp      = Just (MO_Mul W8)
+translateOp _      Word8QuotOp     = Just (MO_U_Quot W8)
+translateOp _      Word8RemOp      = Just (MO_U_Rem W8)
+
+translateOp _      Word8EqOp       = Just (MO_Eq W8)
+translateOp _      Word8GeOp       = Just (MO_U_Ge W8)
+translateOp _      Word8GtOp       = Just (MO_U_Gt W8)
+translateOp _      Word8LeOp       = Just (MO_U_Le W8)
+translateOp _      Word8LtOp       = Just (MO_U_Lt W8)
+translateOp _      Word8NeOp       = Just (MO_Ne W8)
 
 -- Char# ops
 
