@@ -74,7 +74,7 @@ import TcHsSyn
 import TcType
 import Weight
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
-import TyCoRep( TyBinder(..), Type(TyVarTy) )  -- Used in tcDataKindSig
+import TyCoRep( TyBinder(..), Type )  -- Used in tcDataKindSig
 import Type
 import Coercion
 import RdrName( lookupLocalRdrOcc )
@@ -650,7 +650,6 @@ tc_weight mode r = case r of
                             t | isOneMultiplicity t -> return One
                             t | isOmegaMultiplicity t -> return Omega
                             t -> return $ RigThing t
-                         _ -> panic "tc_weight: polymorphism"
 
 
 ------------------------------------------

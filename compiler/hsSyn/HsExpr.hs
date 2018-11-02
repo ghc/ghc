@@ -25,7 +25,6 @@ import GhcPrelude
 import HsDecls
 import HsPat
 import HsLit
-import Weight
 import PlaceHolder ( NameOrRdrName )
 import HsExtension
 import HsTypes

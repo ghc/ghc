@@ -2,7 +2,6 @@ module TcExpr where
 import Name
 import HsSyn    ( HsExpr, LHsExpr, SyntaxExpr )
 import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
-import Weight
 import Type ( Rig )
 import TcRnTypes( TcM, CtOrigin )
 import HsExtension ( GhcRn, GhcTcId )

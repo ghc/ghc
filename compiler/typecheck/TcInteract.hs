@@ -25,7 +25,6 @@ import PrelNames ( coercibleTyConKey,
 import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
 import Class
 import TyCon
-import Weight
 import FunDeps
 import FamInst
 import ClsInst( ClsInstResult(..), InstanceWhat(..), safeOverlap )

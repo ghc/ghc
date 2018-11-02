@@ -33,6 +33,7 @@ import VarEnv
 import VarSet
 import Name( Name )
 import Type hiding ( getTvSubstEnv )
+import Weight ( Multable(..) )
 import Coercion hiding ( getCvSubstEnv )
 import TyCon
 import TyCoRep hiding ( getTvSubstEnv, getCvSubstEnv )
@@ -1435,11 +1436,10 @@ ty_co_match menv subst (FunTy w ty1 ty2) co _lkco _rkco
     -- runtime rep, a multiplicity and two types), we shouldn't need to
     -- explicitly unify the runtime reps here; unifying the types themselves
     -- should be sufficient.  See Note [Representation of function types].
-    -- TODO: MattP deal with Weight here as well
-  | Just (tc, [_, _,_,co1,co2]) <- splitTyConAppCo_maybe co
+  | Just (tc, [co_mult, _,_,co1,co2]) <- splitTyConAppCo_maybe co
   , tc == funTyCon
-  = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co1,co2]
-    in ty_co_match_args menv subst [ty1, ty2] [co1, co2] lkcos rkcos
+  = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co_mult,co1,co2]
+    in ty_co_match_args menv subst [fromMult w, ty1, ty2] [co_mult, co1, co2] lkcos rkcos
 
 ty_co_match menv subst (ForAllTy (TvBndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)

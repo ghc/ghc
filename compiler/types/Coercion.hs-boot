@@ -8,7 +8,6 @@ import {-# SOURCE #-} TyCoRep
 import {-# SOURCE #-} TyCon
 
 import BasicTypes ( LeftOrRight )
-import Weight
 import CoAxiom
 import Var
 import Pair

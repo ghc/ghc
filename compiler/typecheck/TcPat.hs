@@ -412,7 +412,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
-        ; (expr_wrap1, [Weighted weight inf_arg_ty], inf_res_ty)
+        ; (expr_wrap1, [Weighted _weight inf_arg_ty], inf_res_ty)
             <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr'_inferred
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 

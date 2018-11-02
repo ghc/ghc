@@ -63,7 +63,6 @@ import Bag
 import FastString
 import FV
 import Module
-import TysPrim
 
 import Control.Monad
 

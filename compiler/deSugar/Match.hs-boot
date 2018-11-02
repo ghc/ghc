@@ -8,7 +8,6 @@ import CoreSyn  ( CoreExpr )
 import HsSyn    ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import Name     ( Name )
 import HsExtension ( GhcTc )
-import Type   ( Rig )
 
 match   :: [Id]
         -> Type

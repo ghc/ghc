@@ -35,8 +35,6 @@ module Weight
 
 import GhcPrelude
 
-import Binary
-import Control.Monad
 import Data.Data
 import Outputable
 
@@ -93,8 +91,8 @@ pattern RigMul p q <- RigMul_ p q where
   _ `RigMul` Zero = Zero
   One `RigMul` p = p
   p `RigMul` One = p
-  Omega `RigMul` p = Omega
-  p `RigMul` Omega = Omega
+  Omega `RigMul` _ = Omega
+  _ `RigMul` Omega = Omega
   p `RigMul` q = RigMul_ p q
 
 pattern RigAdd :: GMult a -> GMult a -> GMult a
@@ -109,6 +107,8 @@ pattern RigAdd p q <- RigAdd_ p q where
 pattern RigThing :: Multable a => a -> GMult a
 pattern RigThing a <- RigThing_ a where
   RigThing a = toMult a
+
+{-# COMPLETE Zero, One, Omega, RigMul, RigAdd, RigThing #-}
 
 -- | Used to defined 'Multable' instances. Requires that the argument cannot be
 -- reified any further. There is probably no good reason to use it outside of a

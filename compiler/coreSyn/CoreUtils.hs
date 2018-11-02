@@ -80,7 +80,6 @@ import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyBinder(..) )
 import Weight
-import UsageEnv
 import Coercion
 import TyCon
 import Unique

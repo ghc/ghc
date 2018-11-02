@@ -2468,7 +2468,7 @@ substRigUnchecked subst r
 
 substVarMult :: TCvSubst -> VarMult -> VarMult
 substVarMult subst (Regular w) = Regular $ substRigUnchecked subst w
-substVarMult subst Alias = Alias
+substVarMult _ Alias = Alias
 
 -- | Substitute within a 'Type' disabling the sanity checks.
 -- The problems that the sanity checks in substTy catch are described in

@@ -142,7 +142,6 @@ import Binary
 import Var
 import Class
 import BasicTypes
-import Weight
 import DynFlags
 import ForeignCall
 import Name

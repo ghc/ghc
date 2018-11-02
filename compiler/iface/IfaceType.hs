@@ -60,7 +60,6 @@ import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy, isMultiplicityTy )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
-import Weight
 import CoAxiom
 import Var
 import PrelNames

@@ -45,7 +45,6 @@ import IfaceEnv
 import HscTypes
 
 import BasicTypes hiding (SuccessFlag(..))
-import Weight
 import TcRnMonad
 
 import Constants
