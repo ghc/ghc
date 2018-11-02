@@ -25,8 +25,7 @@ module TcMType (
   newFmvTyVar, newFskTyVar,
 
   newMultiplicityVar,
-
-  readMetaTyVar, writeMetaTyVar,
+  readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newMetaDetails, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
@@ -65,8 +64,7 @@ module TcMType (
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
   tidyEvVar, tidyCt, tidySkolemInfo,
-  skolemiseRuntimeUnk,
-  zonkTcTyVar, zonkTcTyVars,
+    zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
@@ -1151,21 +1149,12 @@ defaultTyVar default_kind tv
       where
         (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
 
-skolemiseRuntimeUnk :: TcTyVar -> TcM TyVar
-skolemiseRuntimeUnk tv
-  = skolemise_tv tv RuntimeUnk
-
 skolemiseUnboundMetaTyVar :: TcTyVar -> TcM TyVar
-skolemiseUnboundMetaTyVar tv
-  = skolemise_tv tv (SkolemTv (metaTyVarTcLevel tv) False)
-
-skolemise_tv :: TcTyVar -> TcTyVarDetails -> TcM TyVar
 -- We have a Meta tyvar with a ref-cell inside it
--- Skolemise it, so that
---   we are totally out of Meta-tyvar-land
--- We create a skolem TyVar, not a regular TyVar
+-- Skolemise it, so that we are totally out of Meta-tyvar-land
+-- We create a skolem TcTyVar, not a regular TyVar
 --   See Note [Zonking to Skolem]
-skolemise_tv tv details
+skolemiseUnboundMetaTyVar tv
   = ASSERT2( isMetaTyVar tv, ppr tv )
     do  { when debugIsOn (check_empty tv)
         ; span <- getSrcSpanM    -- Get the location from "here"
@@ -1184,6 +1173,7 @@ skolemise_tv tv details
         ; return final_tv }
 
   where
+    details = SkolemTv (metaTyVarTcLevel tv) False
     check_empty tv       -- [Sept 04] Check for non-empty.
       = when debugIsOn $  -- See note [Silly Type Synonym]
         do { cts <- readMetaTyVar tv

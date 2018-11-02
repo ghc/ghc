@@ -4,7 +4,7 @@ T14066d.hs:11:35: error:
       ‘b1’ is a rigid type variable bound by
         a type expected by the context:
           forall c b1 (a :: c). (Proxy a, Proxy c, b1)
-        at T14066d.hs:11:33-35
+        at T14066d.hs:11:35
       ‘b’ is a rigid type variable bound by
         the type signature for:
           f :: forall b. b -> (Proxy Maybe, ())
