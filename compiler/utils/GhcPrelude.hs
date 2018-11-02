@@ -18,3 +18,5 @@ import Prelude as X hiding ((<>))
 import Prelude as X
 import Data.Semigroup as X (Semigroup)
 #endif
+
+import Data.Foldable as X (foldl')

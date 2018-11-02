@@ -563,7 +563,7 @@ extendGlobalRdrEnvRn avails new_fixities
 
         ; rdr_env2 <- foldlM add_gre rdr_env1 new_gres
 
-        ; let fix_env' = foldl extend_fix_env fix_env new_gres
+        ; let fix_env' = foldl' extend_fix_env fix_env new_gres
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
 
         ; traceRn "extendGlobalRdrEnvRn 2" (pprGlobalRdrEnv True rdr_env2)

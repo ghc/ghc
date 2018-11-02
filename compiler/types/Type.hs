@@ -720,13 +720,13 @@ mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- Why do this? See (EQ1) of
                                      -- Note [Respecting definitional equality]
                                      -- in TyCoRep
-  = foldl AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+  = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
     (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
+mkAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)

@@ -762,6 +762,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
           odir       = objectDir dflags
           osuf       = objectSuf dflags
           keep_hc    = gopt Opt_KeepHcFiles dflags
+          keep_hscpp = gopt Opt_KeepHscppFiles dflags
           keep_s     = gopt Opt_KeepSFiles dflags
           keep_bc    = gopt Opt_KeepLlvmFiles dflags
 
@@ -778,6 +779,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
                        As _    | keep_s     -> True
                        LlvmOpt | keep_bc    -> True
                        HCc     | keep_hc    -> True
+                       HsPp _  | keep_hscpp -> True   -- See Trac #10869
                        _other               -> False
 
           suffix = myPhaseInputExt next_phase
@@ -2169,12 +2171,11 @@ joinObjectFiles dflags o_files output_fn = do
                      ++ (if osInfo == OSFreeBSD
                           then [SysTools.Option "-L/usr/lib"]
                           else [])
-                        -- gcc on sparc sets -Wl,--relax implicitly, but
-                        -- -r and --relax are incompatible for ld, so
+                        -- gcc on sparc sets -Wl,--relax implicitly (another
+                        -- use case is when use passes -optl-Wl,--relax)
+                        -- but -r and --relax are incompatible for ld, so
                         -- disable --relax explicitly.
-                     ++ (if platformArch (targetPlatform dflags)
-                                `elem` [ArchSPARC, ArchSPARC64]
-                         && ldIsGnuLd
+                     ++ (if ldIsGnuLd
                             then [SysTools.Option "-Wl,-no-relax"]
                             else [])
                      ++ map SysTools.Option ld_build_id

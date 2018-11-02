@@ -17,7 +17,6 @@ module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
 import GhcPrelude
 
 import HsSyn as Hs
-import qualified Class
 import PrelNames
 import RdrName
 import qualified Name

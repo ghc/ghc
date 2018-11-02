@@ -350,7 +350,7 @@ mkRuleBase rules = extendRuleBaseList emptyRuleBase rules
 
 extendRuleBaseList :: RuleBase -> [CoreRule] -> RuleBase
 extendRuleBaseList rule_base new_guys
-  = foldl extendRuleBase rule_base new_guys
+  = foldl' extendRuleBase rule_base new_guys
 
 unionRuleBase :: RuleBase -> RuleBase -> RuleBase
 unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
@@ -907,7 +907,7 @@ match_alts renv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
   = do  { subst1 <- match renv' subst r1 r2
         ; match_alts renv subst1 alts1 alts2 }
   where
-    renv' = foldl mb renv (vs1 `zip` vs2)
+    renv' = foldl' mb renv (vs1 `zip` vs2)
     mb renv (v1,v2) = rnMatchBndr2 renv subst v1 v2
 
 match_alts _ _ _ _

@@ -179,14 +179,14 @@ addToUDFM_C
 addToUDFM_C f m k v = addToUDFM_Directly_C f m (getUnique k) v
 
 addListToUDFM :: Uniquable key => UniqDFM elt -> [(key,elt)] -> UniqDFM elt
-addListToUDFM = foldl (\m (k, v) -> addToUDFM m k v)
+addListToUDFM = foldl' (\m (k, v) -> addToUDFM m k v)
 
 addListToUDFM_Directly :: UniqDFM elt -> [(Unique,elt)] -> UniqDFM elt
-addListToUDFM_Directly = foldl (\m (k, v) -> addToUDFM_Directly m k v)
+addListToUDFM_Directly = foldl' (\m (k, v) -> addToUDFM_Directly m k v)
 
 addListToUDFM_Directly_C
   :: (elt -> elt -> elt) -> UniqDFM elt -> [(Unique,elt)] -> UniqDFM elt
-addListToUDFM_Directly_C f = foldl (\m (k, v) -> addToUDFM_Directly_C f m k v)
+addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_Directly_C f m k v)
 
 delFromUDFM :: Uniquable key => UniqDFM elt -> key -> UniqDFM elt
 delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
@@ -329,7 +329,7 @@ partitionUDFM p (UDFM m i) =
 
 -- | Delete a list of elements from a UniqDFM
 delListFromUDFM  :: Uniquable key => UniqDFM elt -> [key] -> UniqDFM elt
-delListFromUDFM = foldl delFromUDFM
+delListFromUDFM = foldl' delFromUDFM
 
 -- | This allows for lossy conversion from UniqDFM to UniqFM
 udfmToUfm :: UniqDFM elt -> UniqFM elt
@@ -337,10 +337,10 @@ udfmToUfm (UDFM m _i) =
   listToUFM_Directly [(getUnique k, taggedFst tv) | (k, tv) <- M.toList m]
 
 listToUDFM :: Uniquable key => [(key,elt)] -> UniqDFM elt
-listToUDFM = foldl (\m (k, v) -> addToUDFM m k v) emptyUDFM
+listToUDFM = foldl' (\m (k, v) -> addToUDFM m k v) emptyUDFM
 
 listToUDFM_Directly :: [(Unique, elt)] -> UniqDFM elt
-listToUDFM_Directly = foldl (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
+listToUDFM_Directly = foldl' (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
 
 -- | Apply a function to a particular element
 adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM elt -> key -> UniqDFM elt

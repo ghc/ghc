@@ -1,6 +1,6 @@
 -- Test for trac #314
 
-{-
+{-|
 /*
   This
   uses

@@ -261,7 +261,7 @@ fileInfo fp = go <$> POSIX.getFileStatus fp
                     )
 
 oct2dec :: Int -> Int
-oct2dec = foldl (\a b -> a * 10 + b) 0 . reverse . dec 8
+oct2dec = foldl' (\a b -> a * 10 + b) 0 . reverse . dec 8
   where dec _ 0 = []
         dec b i = let (rest, last) = i `quotRem` b
                   in last:dec b rest

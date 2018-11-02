@@ -38,7 +38,6 @@ import TcRnMonad
 import ForeignCall      ( CCallTarget(..) )
 import Module
 import HscTypes         ( Warnings(..), plusWarns )
-import Class            ( FunDep )
 import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
                         , monadFailClassName, failMName, failMName_preMFP

@@ -643,7 +643,7 @@ niFixTCvSubst tenv
 
     -- See Note [Finding the substitution fixpoint], Step 6
     init_in_scope = mkInScopeSet (fvVarSet range_fvs)
-    subst = foldl add_free_tv
+    subst = foldl' add_free_tv
                   (mkTvSubst init_in_scope tenv)
                   free_tvs
 

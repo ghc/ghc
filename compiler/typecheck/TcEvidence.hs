@@ -357,7 +357,7 @@ collectHsWrapBinders wrap = go wrap []
     go (WpEvLam v)       wraps = add_lam v (gos wraps)
     go (WpTyLam v)       wraps = add_lam v (gos wraps)
     go (WpCompose w1 w2) wraps = go w1 (w2:wraps)
-    go wrap              wraps = ([], foldl (<.>) wrap wraps)
+    go wrap              wraps = ([], foldl' (<.>) wrap wraps)
 
     gos []     = ([], WpHole)
     gos (w:ws) = go w ws

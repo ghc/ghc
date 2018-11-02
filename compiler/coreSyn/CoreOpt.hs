@@ -145,7 +145,7 @@ simpleOptPgm dflags this_mod binds rules
                           (\_ -> False) {- No rules active -}
                           rules binds
 
-    (final_env, binds') = foldl do_one (emptyEnv dflags, []) occ_anald_binds
+    (final_env, binds') = foldl' do_one (emptyEnv dflags, []) occ_anald_binds
     final_subst = soe_subst final_env
 
     rules' = substRulesForImportedIds final_subst rules
@@ -333,7 +333,7 @@ simple_opt_bind env (Rec prs)
     res_bind          = Just (Rec (reverse rev_prs'))
     prs'              = joinPointBindings_maybe prs `orElse` prs
     (env', bndrs')    = subst_opt_bndrs env (map fst prs')
-    (env'', rev_prs') = foldl do_pr (env', []) (prs' `zip` bndrs')
+    (env'', rev_prs') = foldl' do_pr (env', []) (prs' `zip` bndrs')
     do_pr (env, prs) ((b,r), b')
        = (env', case mb_pr of
                   Just pr -> pr : prs

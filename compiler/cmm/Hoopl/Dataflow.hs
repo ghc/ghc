@@ -40,7 +40,6 @@ import Cmm
 import UniqSupply
 
 import Data.Array
-import Data.List
 import Data.Maybe
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet

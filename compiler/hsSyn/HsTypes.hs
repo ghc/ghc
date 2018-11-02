@@ -97,6 +97,7 @@ import FastString
 import Maybes( isJust )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
+import Data.List ( foldl' )
 import Data.Maybe ( fromMaybe )
 
 {-
@@ -1067,7 +1068,7 @@ mkHsAppTy t1 t2
 
 mkHsAppTys :: LHsType (GhcPass p) -> [LHsType (GhcPass p)]
            -> LHsType (GhcPass p)
-mkHsAppTys = foldl mkHsAppTy
+mkHsAppTys = foldl' mkHsAppTy
 
 {-
 ************************************************************************

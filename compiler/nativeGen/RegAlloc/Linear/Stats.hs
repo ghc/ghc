@@ -15,7 +15,6 @@ import Instruction
 import UniqFM
 import Outputable
 
-import Data.List
 import State
 
 -- | Build a map of how many times each reg was alloced, clobbered, loaded etc.

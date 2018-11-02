@@ -24,7 +24,6 @@ import Panic
 import Util
 
 import Control.Monad
-import Data.List
 
 
 -- Note [What is shortcutting]

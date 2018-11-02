@@ -760,4 +760,4 @@ lubArityEnv :: VarEnv Arity -> VarEnv Arity -> VarEnv Arity
 lubArityEnv = plusVarEnv_C min
 
 lubRess :: [CallArityRes] -> CallArityRes
-lubRess = foldl lubRes emptyArityRes
+lubRess = foldl' lubRes emptyArityRes

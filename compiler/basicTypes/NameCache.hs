@@ -117,4 +117,4 @@ initNameCache us names
                 nsNames = initOrigNames names }
 
 initOrigNames :: [Name] -> OrigNameCache
-initOrigNames names = foldl extendOrigNameCache emptyModuleEnv names
+initOrigNames names = foldl' extendOrigNameCache emptyModuleEnv names

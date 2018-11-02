@@ -186,7 +186,7 @@ mkHsAppType e t = addCLoc e t_body (HsAppType paren_wct e)
     paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
 
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
-mkHsAppTypes = foldl mkHsAppType
+mkHsAppTypes = foldl' mkHsAppType
 
 mkHsLam :: [LPat GhcPs] -> LHsExpr GhcPs -> LHsExpr GhcPs
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExt matches))
@@ -213,7 +213,7 @@ nlHsTyApp fun_id tys
 
 nlHsTyApps :: IdP (GhcPass id) -> [Type] -> [LHsExpr (GhcPass id)]
            -> LHsExpr (GhcPass id)
-nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
+nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
 mkLHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
@@ -422,17 +422,17 @@ nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
                            , syn_res_wrap  = res_wrap }) args
   | [] <- arg_wraps   -- in the noSyntaxExpr case
   = ASSERT( isIdHsWrapper res_wrap )
-    foldl nlHsApp (noLoc fun) args
+    foldl' nlHsApp (noLoc fun) args
 
   | otherwise
-  = mkLHsWrap res_wrap (foldl nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
+  = mkLHsWrap res_wrap (foldl' nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
                                                      mkLHsWrap arg_wraps args))
 
 nlHsApps :: IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
-nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
+nlHsApps f xs = foldl' nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: IdP (GhcPass id) -> [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
-nlHsVarApps f xs = noLoc (foldl mk (HsVar noExt (noLoc f))
+nlHsVarApps f xs = noLoc (foldl' mk (HsVar noExt (noLoc f))
                                                (map ((HsVar noExt) . noLoc) xs))
                  where
                    mk f a = HsApp noExt (noLoc f) (noLoc a)
@@ -517,7 +517,7 @@ nlHsFunTy a weight b = noLoc (HsFunTy noExt (parenthesizeHsType funPrec a)
 nlHsParTy t   = noLoc (HsParTy noExt t)
 
 nlHsTyConApp :: IdP (GhcPass p) -> [LHsType (GhcPass p)] -> LHsType (GhcPass p)
-nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
+nlHsTyConApp tycon tys  = foldl' nlHsAppTy (nlHsTyVar tycon) tys
 
 {-
 Tuples.  All these functions are *pre-typechecker* because they lack

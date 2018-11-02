@@ -31,7 +31,6 @@ import DsMonad
 import qualified Language.Haskell.TH as TH
 
 import HsSyn
-import Class
 import PrelNames
 -- To avoid clashes with DsMeta.varName we must make a local alias for
 -- OccName.varName we do this by removing varName from the import of
@@ -1891,7 +1890,7 @@ unC (MkC x) = x
 
 rep2 :: Name -> [ CoreExpr ] -> DsM (Core a)
 rep2 n xs = do { id <- dsLookupGlobalId n
-               ; return (MkC (foldl App (Var id) xs)) }
+               ; return (MkC (foldl' App (Var id) xs)) }
 
 dataCon' :: Name -> [CoreExpr] -> DsM (Core a)
 dataCon' n args = do { id <- dsLookupDataCon n
