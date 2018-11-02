@@ -161,3 +161,10 @@ test('plugin-recomp-change',
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      run_command, ['$MAKE -s --no-print-directory plugin-recomp-change'])
+
+test('plugin-recomp-change-prof',
+     [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
+      pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}'),
+      when(not config.have_profiling,skip)
+      ],
+     run_command, ['$MAKE -s --no-print-directory plugin-recomp-change-prof'])

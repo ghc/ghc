@@ -264,6 +264,8 @@ test('T12192', normal, run_command, ['mkdir foo && (cd foo && {compiler} -v0 ../
 
 test('T10923', [], run_command, ['$MAKE -s --no-print-directory T10923'])
 
+test('T12625', normal, compile_fail, ['-I'])
+
 test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 
 test('T12955', normal, run_command, ['$MAKE -s --no-print-directory T12955'])

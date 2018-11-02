@@ -307,12 +307,14 @@ mkSrcSpan (RealSrcLoc loc1) (RealSrcLoc loc2)
     = RealSrcSpan (mkRealSrcSpan loc1 loc2)
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
--- within both spans. Assumes the "file" part is the same in both inputs
+-- within both spans. Returns UnhelpfulSpan if the files differ.
 combineSrcSpans :: SrcSpan -> SrcSpan -> SrcSpan
 combineSrcSpans (UnhelpfulSpan _) r = r -- this seems more useful
 combineSrcSpans l (UnhelpfulSpan _) = l
 combineSrcSpans (RealSrcSpan span1) (RealSrcSpan span2)
-    = RealSrcSpan (combineRealSrcSpans span1 span2)
+  | srcSpanFile span1 == srcSpanFile span2
+      = RealSrcSpan (combineRealSrcSpans span1 span2)
+  | otherwise = UnhelpfulSpan (fsLit "<combineSrcSpans: files differ>")
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs

@@ -148,7 +148,6 @@ test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T7702',
      [extra_files(['T7702plugin']),
       pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702 TOP={top}'),
-      clean_cmd('$MAKE -s --no-print-directory -C T7702plugin clean.T7702'),
       # we say 18mb peak allocated +/- 70% because other compiler flags have
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
@@ -197,6 +196,9 @@ test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rule-firings'])
 test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniques'])
+test('T9441a', normal, run_command, ['$MAKE -s --no-print-directory T9441a'])
+test('T9441b', normal, run_command, ['$MAKE -s --no-print-directory T9441b'])
+test('T9441c', normal, run_command, ['$MAKE -s --no-print-directory T9441c'])
 test('T9583', only_ways(['optasm']), compile, [''])
 test('T9565', only_ways(['optasm']), compile, [''])
 test('T5821', only_ways(['optasm']), compile, [''])

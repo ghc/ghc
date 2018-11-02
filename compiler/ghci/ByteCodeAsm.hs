@@ -125,9 +125,12 @@ mallocStrings hsc_env ulbcos = do
     return bco { unlinkedBCOLits = lits, unlinkedBCOPtrs = ptrs }
 
   spliceLit (BCONPtrStr _) = do
-    (RemotePtr p : rest) <- get
-    put rest
-    return (BCONPtrWord (fromIntegral p))
+    rptrs <- get
+    case rptrs of
+      (RemotePtr p : rest) -> do
+        put rest
+        return (BCONPtrWord (fromIntegral p))
+      _ -> panic "mallocStrings:spliceLit"
   spliceLit other = return other
 
   splicePtr (BCOPtrBCO bco) = BCOPtrBCO <$> splice bco

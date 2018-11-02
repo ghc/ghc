@@ -558,7 +558,7 @@ kcTyClGroup decls
 
            ; (env, all_binders') <- zonkTyVarBindersX emptyZonkEnv all_binders
            ; tc_res_kind'        <- zonkTcTypeToType env tc_res_kind
-           ; scoped_tvs'         <- zonkSigTyVarPairs scoped_tvs
+           ; scoped_tvs'         <- zonkTyVarTyVarPairs scoped_tvs
 
              -- See Note [Check telescope again during generalisation]
            ; let extra = text "NB: Implicitly declared variables come before others."
@@ -779,7 +779,7 @@ kcConDecl :: ConDecl GhcRn -> TcM ()
 kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
-      -- See Note [Use SigTvs in kind-checking pass]
+      -- See Note [Use TyVarTvs in kind-checking pass]
     kcExplicitTKBndrs ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
        ; mapM_ (tcHsOpenType . getBangType) (map hsThing (hsConDeclArgTys args)) }
@@ -826,8 +826,8 @@ mappings:
 APromotionErr is only used for DataCons, and only used during type checking
 in tcTyClGroup.
 
-Note [Use SigTvs in kind-checking pass]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Use TyVarTvs in kind-checking pass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   data Proxy a where
@@ -837,7 +837,7 @@ Consider
 It seems reasonable that this should be accepted. But something very strange
 is going on here: when we're kind-checking this declaration, we need to unify
 the kind of `a` with k and j -- even though k and j's scopes are local to the type of
-MkProxy{1,2}. The best approach we've come up with is to use SigTvs during
+MkProxy{1,2}. The best approach we've come up with is to use TyVarTvs during
 the kind-checking pass. First off, note that it's OK if the kind-checking pass
 is too permissive: we'll snag the problems in the type-checking pass later.
 (This extra permissiveness might happen with something like
@@ -846,20 +846,20 @@ is too permissive: we'll snag the problems in the type-checking pass later.
   data Bad a where
     MkBad :: forall k1 k2 (a :: k1) (b :: k2). Bad (SameKind a b)
 
-which would be accepted if k1 and k2 were SigTvs. This is correctly rejected
-in the second pass, though. Test case: polykinds/SigTvKinds3)
+which would be accepted if k1 and k2 were TyVarTvs. This is correctly rejected
+in the second pass, though. Test case: polykinds/TyVarTvKinds3)
 Recall that the kind-checking pass exists solely to collect constraints
 on the kinds and to power unification.
 
-To achieve the use of SigTvs, we must be careful to use specialized functions
-that produce SigTvs, not ordinary skolems. This is why we need
+To achieve the use of TyVarTvs, we must be careful to use specialized functions
+that produce TyVarTvs, not ordinary skolems. This is why we need
 kcExplicitTKBndrs and kcImplicitTKBndrs in TcHsType, separate from their
 tc... variants.
 
 The drawback of this approach is sometimes it will accept a definition that
 a (hypothetical) declarative specification would likely reject. As a general
 rule, we don't want to allow polymorphic recursion without a CUSK. Indeed,
-the whole point of CUSKs is to allow polymorphic recursion. Yet, the SigTvs
+the whole point of CUSKs is to allow polymorphic recursion. Yet, the TyVarTvs
 approach allows a limited form of polymorphic recursion *without* a CUSK.
 
 To wit:
@@ -869,7 +869,7 @@ To wit:
 Note that this is polymorphically recursive, with the recursive occurrence
 of T used at a kind other than a's kind. The approach outlined here accepts
 this definition, because this kind is still a kind variable (and so the
-SigTvs unify). Stepping back, I (Richard) have a hard time envisioning a
+TyVarTvs unify). Stepping back, I (Richard) have a hard time envisioning a
 way to describe exactly what declarations will be accepted and which will
 be rejected (without a CUSK). However, the accepted definitions are indeed
 well-kinded and any rejected definitions would be accepted with a CUSK,

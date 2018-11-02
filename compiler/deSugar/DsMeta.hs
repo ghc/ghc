@@ -124,7 +124,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         , hs_annds   = annds
                         , hs_ruleds  = ruleds
                         , hs_docs    = docs })
- = do { let { bndrs  = hsSigTvBinders valds
+ = do { let { bndrs  = hsScopedTvBinders valds
                        ++ hsGroupBinders group
                        ++ hsPatSynSelectors valds
             ; instds = tyclds >>= group_instds } ;
@@ -182,9 +182,9 @@ repTopDs group@(HsGroup { hs_valds   = valds
       = notHandledL loc "Haddock documentation" empty
 repTopDs (XHsGroup _) = panic "repTopDs"
 
-hsSigTvBinders :: HsValBinds GhcRn -> [Name]
+hsScopedTvBinders :: HsValBinds GhcRn -> [Name]
 -- See Note [Scoped type variables in bindings]
-hsSigTvBinders binds
+hsScopedTvBinders binds
   = concatMap get_scoped_tvs sigs
   where
     sigs = case binds of
@@ -224,7 +224,7 @@ Here the 'forall a' brings 'a' into scope over the binding group.
 To achieve this we
 
   a) Gensym a binding for 'a' at the same time as we do one for 'f'
-     collecting the relevant binders with hsSigTvBinders
+     collecting the relevant binders with hsScopedTvBinders
 
   b) When processing the 'forall', don't gensym
 
@@ -1487,12 +1487,12 @@ repBinds (EmptyLocalBinds _)
 repBinds b@(HsIPBinds {}) = notHandled "Implicit parameters" (ppr b)
 
 repBinds (HsValBinds _ decs)
- = do   { let { bndrs = hsSigTvBinders decs ++ collectHsValBinders decs }
+ = do   { let { bndrs = hsScopedTvBinders decs ++ collectHsValBinders decs }
                 -- No need to worry about detailed scopes within
                 -- the binding group, because we are talking Names
                 -- here, so we can safely treat it as a mutually
                 -- recursive group
-                -- For hsSigTvBinders see Note [Scoped type variables in bindings]
+                -- For hsScopedTvBinders see Note [Scoped type variables in bindings]
         ; ss        <- mkGenSyms bndrs
         ; prs       <- addBinds ss (rep_val_binds decs)
         ; core_list <- coreList decQTyConName

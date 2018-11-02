@@ -1995,10 +1995,10 @@ canEqTyVarTyVar, are these
    number) on the left, so there is the best chance of unifying it
         alpha[3] ~ beta[2]
 
- * If both are meta-tyvars and both at the same level, put a SigTv
+ * If both are meta-tyvars and both at the same level, put a TyVarTv
    on the right if possible
         alpha[2] ~ beta[2](sig-tv)
-   That way, when we unify alpha := beta, we don't lose the SigTv flag.
+   That way, when we unify alpha := beta, we don't lose the TyVarTv flag.
 
  * Put a meta-tv with a System Name on the left if possible so it
    gets eliminated (improves error messages)

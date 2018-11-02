@@ -4,6 +4,7 @@ module Main where
 
 import GHC
 import MonadUtils  ( liftIO )
+import Data.Maybe
 import DynFlags    ( defaultFatalMessager, defaultFlushOut )
 import Annotations ( AnnTarget(..), CoreAnnTarget )
 import GHC.Serialized  ( deserializeWithData )
@@ -34,7 +35,7 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     liftIO $ putStrLn "Finding Module"
     mod <- findModule mod_nm Nothing
     liftIO $ putStrLn "Getting Module Info"
-    Just mod_info <- getModuleInfo mod
+    mod_info <- fromJust <$> getModuleInfo mod
 
     liftIO $ putStrLn "Showing Details For Module"
     showTargetAnns (ModuleTarget mod)

@@ -82,6 +82,7 @@ import DynFlags
 import Data.List
 
 import Data.Char        ( ord )
+import Control.Monad.Fail ( MonadFail )
 
 infixl 4 `mkCoreApp`, `mkCoreApps`
 
@@ -602,7 +603,7 @@ mkFoldrExpr elt_ty result_ty c n list = do
            `App` list)
 
 -- | Make a 'build' expression applied to a locally-bound worker function
-mkBuildExpr :: (MonadThings m, MonadUnique m)
+mkBuildExpr :: (MonadFail m, MonadThings m, MonadUnique m)
             => Type                                     -- ^ Type of list elements to be built
             -> ((Id, Type) -> (Id, Type) -> m CoreExpr) -- ^ Function that, given information about the 'Id's
                                                         -- of the binders for the build worker function, returns

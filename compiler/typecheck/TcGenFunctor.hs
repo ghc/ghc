@@ -9,6 +9,7 @@ The deriving code for the Functor, Foldable, and Traversable classes
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 
 module TcGenFunctor (
         FFoldType(..), functorLikeTraverse,
@@ -436,20 +437,24 @@ foldDataConArgs ft con
 mkSimpleLam :: (LHsExpr GhcPs -> State [RdrName] (LHsExpr GhcPs))
             -> State [RdrName] (LHsExpr GhcPs)
 -- (mkSimpleLam fn) returns (\x. fn(x))
-mkSimpleLam lam = do
-    (n:names) <- get
-    put names
-    body <- lam (nlHsVar n)
-    return (mkHsLam [nlVarPat n] body)
+mkSimpleLam lam =
+    get >>= \case
+      n:names -> do
+        put names
+        body <- lam (nlHsVar n)
+        return (mkHsLam [nlVarPat n] body)
+      _ -> panic "mkSimpleLam"
 
 mkSimpleLam2 :: (LHsExpr GhcPs -> LHsExpr GhcPs
              -> State [RdrName] (LHsExpr GhcPs))
              -> State [RdrName] (LHsExpr GhcPs)
-mkSimpleLam2 lam = do
-    (n1:n2:names) <- get
-    put names
-    body <- lam (nlHsVar n1) (nlHsVar n2)
-    return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
+mkSimpleLam2 lam =
+    get >>= \case
+      n1:n2:names -> do
+        put names
+        body <- lam (nlHsVar n1) (nlHsVar n2)
+        return (mkHsLam [nlVarPat n1,nlVarPat n2] body)
+      _ -> panic "mkSimpleLam2"
 
 -- "Con a1 a2 a3 -> fold [x1 a1, x2 a2, x3 a3]"
 --

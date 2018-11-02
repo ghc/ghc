@@ -81,9 +81,9 @@ RUNTEST_OPTS += -e "ghc_compiler_always_flags='$(TEST_HC_OPTS)'"
 RUNTEST_OPTS += -e config.compiler_debugged=$(GhcDebugged)
 
 ifeq "$(GhcWithNativeCodeGen)" "YES"
-RUNTEST_OPTS += -e ghc_with_native_codegen=1
+RUNTEST_OPTS += -e ghc_with_native_codegen=True
 else
-RUNTEST_OPTS += -e ghc_with_native_codegen=0
+RUNTEST_OPTS += -e ghc_with_native_codegen=False
 endif
 
 GHC_PRIM_LIBDIR := $(subst library-dirs: ,,$(shell "$(GHC_PKG)" field ghc-prim library-dirs --simple-output))
@@ -112,15 +112,15 @@ RUNTEST_OPTS += -e config.have_profiling=False
 endif
 
 ifeq "$(filter thr, $(GhcRTSWays))" "thr"
-RUNTEST_OPTS += -e ghc_with_threaded_rts=1
+RUNTEST_OPTS += -e ghc_with_threaded_rts=True
 else
-RUNTEST_OPTS += -e ghc_with_threaded_rts=0
+RUNTEST_OPTS += -e ghc_with_threaded_rts=False
 endif
 
 ifeq "$(filter dyn, $(GhcRTSWays))" "dyn"
-RUNTEST_OPTS += -e ghc_with_dynamic_rts=1
+RUNTEST_OPTS += -e ghc_with_dynamic_rts=True
 else
-RUNTEST_OPTS += -e ghc_with_dynamic_rts=0
+RUNTEST_OPTS += -e ghc_with_dynamic_rts=False
 endif
 
 ifeq "$(GhcWithInterpreter)" "NO"
@@ -166,20 +166,20 @@ CABAL_PLUGIN_BUILD = --enable-library-vanilla --disable-shared
 endif
 
 ifeq "$(GhcWithSMP)" "YES"
-RUNTEST_OPTS += -e ghc_with_smp=1
+RUNTEST_OPTS += -e ghc_with_smp=True
 else
-RUNTEST_OPTS += -e ghc_with_smp=0
+RUNTEST_OPTS += -e ghc_with_smp=False
 endif
 
 ifeq "$(LLC)" ""
-RUNTEST_OPTS += -e ghc_with_llvm=0
+RUNTEST_OPTS += -e ghc_with_llvm=False
 else ifeq "$(TargetARCH_CPP)" "powerpc"
-RUNTEST_OPTS += -e ghc_with_llvm=0
+RUNTEST_OPTS += -e ghc_with_llvm=False
 else ifneq "$(LLC)" "llc"
 # If we have a real detected value for LLVM, then it really ought to work
-RUNTEST_OPTS += -e ghc_with_llvm=1
+RUNTEST_OPTS += -e ghc_with_llvm=True
 else
-RUNTEST_OPTS += -e ghc_with_llvm=0
+RUNTEST_OPTS += -e ghc_with_llvm=False
 endif
 
 ifeq "$(WINDOWS)" "YES"

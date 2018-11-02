@@ -296,7 +296,7 @@ rnValBindsRHS :: HsSigCtxt
 
 rnValBindsRHS ctxt (ValBinds _ mbinds sigs)
   = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
-       ; binds_w_dus <- mapBagM (rnLBind (mkSigTvFn sigs')) mbinds
+       ; binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn sigs')) mbinds
        ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
 
        ; let patsyn_fvs = foldr (unionNameSet . psb_ext) emptyNameSet $
@@ -581,21 +581,21 @@ depAnalBinds binds_w_dus
 
 ---------------------
 -- Bind the top-level forall'd type variables in the sigs.
--- E.g  f :: a -> a
+-- E.g  f :: forall a. a -> a
 --      f = rhs
 --      The 'a' scopes over the rhs
 --
 -- NB: there'll usually be just one (for a function binding)
 --     but if there are many, one may shadow the rest; too bad!
---      e.g  x :: [a] -> [a]
---           y :: [(a,a)] -> a
+--      e.g  x :: forall a. [a] -> [a]
+--           y :: forall a. [(a,a)] -> a
 --           (x,y) = e
 --      In e, 'a' will be in scope, and it'll be the one from 'y'!
 
-mkSigTvFn :: [LSig GhcRn] -> (Name -> [Name])
+mkScopedTvFn :: [LSig GhcRn] -> (Name -> [Name])
 -- Return a lookup function that maps an Id Name to the names
 -- of the type variables that should scope over its body.
-mkSigTvFn sigs = \n -> lookupNameEnv env n `orElse` []
+mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
   where
     env = mkHsSigEnv get_scoped_tvs sigs
 
@@ -663,9 +663,9 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
        -- invariant: no free vars here when it's a FunBind
   = do  { pattern_synonym_ok <- xoptM LangExt.PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
-        ; let sig_tvs = sig_fn name
+        ; let scoped_tvs = sig_fn name
 
-        ; ((pat', details'), fvs1) <- bindSigTyVarsFV sig_tvs $
+        ; ((pat', details'), fvs1) <- bindSigTyVarsFV scoped_tvs $
                                       rnPat PatSyn pat $ \pat' ->
          -- We check the 'RdrName's instead of the 'Name's
          -- so that the binding locations are reported
@@ -700,7 +700,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
-                do { (mg', fvs) <- bindSigTyVarsFV sig_tvs $
+                do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
                                    rnMatchGroup (mkPrefixFunRhs (L l name))
                                                 rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
@@ -867,7 +867,7 @@ rnMethodBinds is_cls_decl cls ktv_names binds sigs
        -- Answer no in Haskell 2010, but yes if you have -XScopedTypeVariables
        ; scoped_tvs  <- xoptM LangExt.ScopedTypeVariables
        ; (binds'', bind_fvs) <- maybe_extend_tyvar_env scoped_tvs $
-              do { binds_w_dus <- mapBagM (rnLBind (mkSigTvFn other_sigs')) binds'
+              do { binds_w_dus <- mapBagM (rnLBind (mkScopedTvFn other_sigs')) binds'
                  ; let bind_fvs = foldrBag (\(_,_,fv1) fv2 -> fv1 `plusFV` fv2)
                                            emptyFVs binds_w_dus
                  ; return (mapBag fstOf3 binds_w_dus, bind_fvs) }

@@ -25,6 +25,7 @@ import Maybes
 import Packages
 import Finder
 
+import Control.Monad (filterM)
 import Data.List
 import Data.IORef
 import Data.Map (Map)
@@ -166,14 +167,19 @@ mkPluginUsage hsc_env pluginModule
   = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
     -- The plug is from an external package, we just look up the dylib that
     -- contains the plugin
-    LookupFound _ pkg ->
+    LookupFound _ pkg -> do
       let searchPaths = collectLibraryPaths dflags [pkg]
           libs        = packageHsLibs dflags pkg
-          dynlibs     = [ searchPath </> mkHsSOName platform lib
+          dynlibLocs  = [ searchPath </> mkHsSOName platform lib
                         | searchPath <- searchPaths
                         , lib <- libs
                         ]
-      in  mapM hashFile (nub dynlibs)
+      dynlibs <- filterM doesFileExist dynlibLocs
+      case dynlibs of
+        [] -> pprPanic
+                ("mkPluginUsage: no dylibs, tried:\n" ++ unlines dynlibLocs)
+                (ppr pNm)
+        _  -> mapM hashFile (nub dynlibs)
     _ -> do
       foundM <- findPluginModule hsc_env pNm
       case foundM of
@@ -186,10 +192,25 @@ mkPluginUsage hsc_env pluginModule
           return (nub (pluginObject : depObjects))
         _ -> pprPanic "mkPluginUsage: no object or dylib" (ppr pNm)
   where
-    -- plugins are shared libraries, so add WayDyn to the dflags in order to get
-    -- the correct filenames and library paths; just in case the object that is
-    -- currently being build is not going to be linked dynamically
-    dflags   = addWay' WayDyn (hsc_dflags hsc_env)
+    -- plugins are shared libraries, so WayDyn should be part of the dflags in
+    -- order to get the correct filenames and library paths.
+    --
+    -- We can distinguish two scenarios:
+    --
+    -- 1. The dflags do not contain WayDyn, in this case we need to remove
+    --    all other ways and only add WayDyn. Why? Because other ways change
+    --    the library tags, i.e. WayProf adds `_p`, and we would end up looking
+    --    for a profiled plugin which might not be installed. See #15492
+    --
+    -- 2. The dflags do contain WayDyn, in this case we can leave the ways as
+    --    is, because the plugin must be compiled with the same ways as the
+    --    module that is currently being build, e.g., if the module is
+    --    build with WayDyn and WayProf, then the plugin that was used
+    --    would've also had to been build with WayProf (and WayDyn).
+    dflags1  = hsc_dflags hsc_env
+    dflags   = if WayDyn `elem` ways dflags1
+                 then dflags1
+                 else updateWays (addWay' WayDyn (dflags1 {ways = []}))
     platform = targetPlatform dflags
     pNm      = moduleName (mi_module pluginModule)
     pPkg     = moduleUnitId (mi_module pluginModule)

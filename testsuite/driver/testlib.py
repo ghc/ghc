@@ -14,11 +14,12 @@ import copy
 import glob
 import sys
 from math import ceil, trunc
+from pathlib import PurePath
 import collections
 import subprocess
 
-from testglobals import *
-from testutil import *
+from testglobals import config, ghc_env, default_testopts, brokens, t
+from testutil import strip_quotes, lndir, link_or_copy_file
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 global pool_sema
@@ -202,7 +203,6 @@ def _expect_broken_for( name, opts, bug, ways ):
     opts.expect_fail_for = ways
 
 def record_broken(name, opts, bug):
-    global brokens
     me = (bug, opts.testdir, name)
     if not me in brokens:
         brokens.append(me)
@@ -453,12 +453,6 @@ def _pre_cmd( name, opts, cmd ):
 
 # ----
 
-def clean_cmd( cmd ):
-    # TODO. Remove all calls to clean_cmd.
-    return lambda _name, _opts: None
-
-# ----
-
 def cmd_prefix( prefix ):
     return lambda name, opts, p=prefix: _cmd_prefix(name, opts, prefix)
 
@@ -618,8 +612,9 @@ def newTestDir(tempdir, dir):
 testdir_suffix = '.run'
 
 def _newTestDir(name, opts, tempdir, dir):
+    testdir = os.path.join('', *(p for p in PurePath(dir).parts if p != '..'))
     opts.srcdir = os.path.join(os.getcwd(), dir)
-    opts.testdir = os.path.join(tempdir, dir, name + testdir_suffix)
+    opts.testdir = os.path.join(tempdir, testdir, name + testdir_suffix)
     opts.compiler_always_flags = config.compiler_always_flags
 
 # -----------------------------------------------------------------------------
@@ -1223,7 +1218,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
         if config.verbose >= 1 and _expect_pass(way):
             print('Compile failed (exit code {0}) errors were:'.format(exit_code))
             actual_stderr_path = in_testdir(name, 'comp.stderr')
-            if_verbose_dump(1, actual_stderr_path)
+            dump_file(actual_stderr_path)
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
@@ -1570,7 +1565,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
     # See Note [Output comparison].
     if whitespace_normaliser(expected_str) == whitespace_normaliser(actual_str):
-        return 1
+        return True
     else:
         if config.verbose >= 1 and _expect_pass(way):
             print('Actual ' + kind + ' output differs from expected:')
@@ -1597,7 +1592,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
-            return 0
+            return False
         elif config.accept and actual_raw:
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
@@ -1611,13 +1606,13 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
                 if_verbose(1, 'Accepting new output.')
 
             write_file(expected_path, actual_raw)
-            return 1
+            return True
         elif config.accept:
             if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
             os.remove(expected_path)
-            return 1
+            return True
         else:
-            return 0
+            return False
 
 # Note [Output comparison]
 #
@@ -1637,7 +1632,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
-    return ' '.join(w for w in str.split())
+    return ' '.join(str.split())
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
 
@@ -1801,13 +1796,12 @@ def if_verbose( n, s ):
     if config.verbose >= n:
         print(s)
 
-def if_verbose_dump( n, f ):
-    if config.verbose >= n:
-        try:
-            with io.open(f) as file:
-                print(file.read())
-        except Exception:
-            print('')
+def dump_file(f):
+    try:
+        with io.open(f) as file:
+            print(file.read())
+    except Exception:
+        print('')
 
 def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=0):
     timeout_prog = strip_quotes(config.timeout_prog)
@@ -1874,7 +1868,7 @@ def gsNotWorking():
     print("GhostScript not available for hp2ps tests")
 
 global gs_working
-gs_working = 0
+gs_working = False
 if config.have_profiling:
   if config.gs != '':
     resultGood = runCmd(genGSCmd(config.confdir + '/good.ps'));
@@ -1883,7 +1877,7 @@ if config.have_profiling:
                                    ' >/dev/null 2>&1')
         if resultBad != 0:
             print("GhostScript available for hp2ps tests")
-            gs_working = 1;
+            gs_working = True
         else:
             gsNotWorking();
     else:

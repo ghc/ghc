@@ -1592,14 +1592,13 @@ New monadic failure desugaring mechanism
     when desugaring refutable patterns in ``do`` blocks.
 
 The ``-XMonadFailDesugaring`` extension switches the desugaring of
-``do``-blocks to use ``MonadFail.fail`` instead of ``Monad.fail``. This will
-eventually be the default behaviour in a future GHC release, under the
+``do``-blocks to use ``MonadFail.fail`` instead of ``Monad.fail``.
+
+This extension is enabled by default since GHC 8.6.1, under the
 `MonadFail Proposal (MFP)
 <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
 
-This extension is temporary, and will be deprecated in a future release. It is
-included so that library authors have a hard check for whether their code
-will work with future GHC versions.
+This extension is temporary, and will be deprecated in a future release.
 
 .. _rebindable-syntax:
 
@@ -10429,11 +10428,6 @@ variable that is not already in scope. Indeed, it *must not* already be in
 scope, because it is bound by the pattern match.
 The effect is to bring it into scope,
 standing for the existentially-bound type variable.
-
-When a pattern type signature binds a type variable in this way, GHC
-insists that the type variable is bound to a *rigid*, or fully-known,
-type variable. This means that any user-written type signature always
-stands for a completely known type.
 
 It does seem odd that the existentially-bound type variable *must not*
 be already in scope. Contrast that usually name-bindings merely shadow

@@ -932,7 +932,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
   = do { (no_quant, maybe_quant) <- pick infer_mode candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
-       -- not mono. Need to zonk them because they are meta-tyvar SigTvs
+       -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
        ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
                       concatMap (map snd . sig_inst_skols) psigs
 
@@ -1165,7 +1165,7 @@ However, in the case of a partial type signature, be doing inference
 or
    g :: (Eq _a) => _b -> _b
 In both cases we use plan InferGen, and hence call simplifyInfer.  But
-those 'a' variables are skolems (actually SigTvs), and we should be
+those 'a' variables are skolems (actually TyVarTvs), and we should be
 sure to quantify over them.  This leads to several wrinkles:
 
 * Wrinkle 1.  In the case of a type error
@@ -1953,9 +1953,9 @@ promoteTyVarTcS tv
 defaultTyVarTcS :: TcTyVar -> TcS Bool
 defaultTyVarTcS the_tv
   | isRuntimeRepVar the_tv
-  , not (isSigTyVar the_tv)  -- SigTvs should only be unified with a tyvar
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
                              -- never with a type; c.f. TcMType.defaultTyVar
-                             -- See Note [Kind generalisation and SigTvs]
+                             -- See Note [Kind generalisation and TyVarTvs]
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
        ; return True }
@@ -2293,7 +2293,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
 
     float_tv_eq_candidate tv1 ty2  -- See Note [Which equalities to float]
       =  isMetaTyVar tv1
-      && (not (isSigTyVar tv1) || isTyVarTy ty2)
+      && (not (isTyVarTyVar tv1) || isTyVarTy ty2)
 
 
 {- Note [Float equalities from under a skolem binding]
@@ -2327,7 +2327,7 @@ happen.  In particular, float out equalities that are:
 
 * Of form (alpha ~# ty) or (ty ~# alpha), where
    * alpha is a meta-tyvar.
-   * And 'alpha' is not a SigTv with 'ty' being a non-tyvar.  In that
+   * And 'alpha' is not a TyVarTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
 

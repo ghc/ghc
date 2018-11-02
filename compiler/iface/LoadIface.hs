@@ -1048,6 +1048,15 @@ ifaceStats eps
                 Printing interfaces
 *                                                                      *
 ************************************************************************
+
+Note [Name qualification with --show-iface]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In order to disambiguate between identifiers from different modules, we qualify
+all names that don't originate in the current module. In order to keep visual
+noise as low as possible, we keep local names unqualified.
+
+For some background on this choice see trac #15269.
 -}
 
 -- | Read binary interface, and print it out
@@ -1058,8 +1067,15 @@ showIface hsc_env filename = do
    iface <- initTcRnIf 's' hsc_env () () $
        readBinIface IgnoreHiWay TraceBinIFaceReading filename
    let dflags = hsc_dflags hsc_env
+       -- See Note [Name qualification with --show-iface]
+       qualifyImportedNames mod _
+           | mod == mi_module iface = NameUnqual
+           | otherwise              = NameNotInScope1
+       print_unqual = QueryQualify qualifyImportedNames
+                                   neverQualifyModules
+                                   neverQualifyPackages
    putLogMsg dflags NoReason SevDump noSrcSpan
-      (defaultDumpStyle dflags) (pprModIface iface)
+      (mkDumpStyle dflags print_unqual) (pprModIface iface)
 
 -- Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.

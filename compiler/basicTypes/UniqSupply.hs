@@ -32,6 +32,7 @@ module UniqSupply (
 import GhcPrelude
 
 import Unique
+import Panic (panic)
 
 import GHC.IO
 
@@ -39,6 +40,7 @@ import MonadUtils
 import Control.Monad
 import Data.Bits
 import Data.Char
+import Control.Monad.Fail
 
 #include "Unique.h"
 
@@ -146,6 +148,10 @@ instance Applicative UniqSM where
                             (# ff, us' #)  -> case x us' of
                               (# xx, us'' #) -> (# ff xx, us'' #)
     (*>) = thenUs_
+
+-- TODO: try to get rid of this instance
+instance MonadFail UniqSM where
+    fail = panic
 
 -- | Run the 'UniqSM' action, returning the final 'UniqSupply'
 initUs :: UniqSupply -> UniqSM a -> (a, UniqSupply)
