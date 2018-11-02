@@ -942,13 +942,13 @@ dataConArgUnpack
    ->  ( [(Weighted Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack (Weighted _ arg_ty)
+dataConArgUnpack (Weighted arg_mult arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = dataConInstArgTys con tc_args
+  , let rep_tys = map (scaleWeighted arg_mult) $ dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyVars con) )  -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
