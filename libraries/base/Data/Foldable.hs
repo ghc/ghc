@@ -172,8 +172,8 @@ class Foldable t where
     --
     -- Also note that if you want an efficient left-fold, you probably want to
     -- use 'foldl'' instead of 'foldl'. The reason for this is that latter does
-    -- not force the "inner" results (e.g. @z `f` x1@ in the above example)
-    -- before applying them to the operator (e.g. to @(`f` x2)@). This results
+    -- not force the "inner" results (e.g. @z \`f\` x1@ in the above example)
+    -- before applying them to the operator (e.g. to @(\`f\` x2)@). This results
     -- in a thunk chain @O(n)@ elements long, which then must be evaluated from
     -- the outside-in.
     --

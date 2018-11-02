@@ -183,7 +183,7 @@ isEOF = hIsEOF stdin
 --
 -- This operation may fail with:
 --
---  * 'isEOFError' if the end of file has been reached.
+--  * 'System.IO.Error.isEOFError' if the end of file has been reached.
 
 hLookAhead :: Handle -> IO Char
 hLookAhead handle =
@@ -208,9 +208,9 @@ hLookAhead handle =
 --
 -- This operation may fail with:
 --
---  * 'isPermissionError' if the handle has already been used for reading
---    or writing and the implementation does not allow the buffering mode
---    to be changed.
+--  * 'System.IO.Error.isPermissionError' if the handle has already been used
+--    for reading or writing and the implementation does not allow the
+--    buffering mode to be changed.
 
 hSetBuffering :: Handle -> BufferMode -> IO ()
 hSetBuffering handle mode =
@@ -251,8 +251,8 @@ hSetBuffering handle mode =
 
 -- | The action 'hSetEncoding' @hdl@ @encoding@ changes the text encoding
 -- for the handle @hdl@ to @encoding@.  The default encoding when a 'Handle' is
--- created is 'localeEncoding', namely the default encoding for the current
--- locale.
+-- created is 'System.IO.localeEncoding', namely the default encoding for the
+-- current locale.
 --
 -- To create a 'Handle' with no encoding at all, use 'openBinaryFile'.  To
 -- stop further encoding or decoding on an existing 'Handle', use
@@ -295,11 +295,11 @@ hGetEncoding hdl =
 --
 -- This operation may fail with:
 --
---  * 'isFullError' if the device is full;
+--  * 'System.IO.Error.isFullError' if the device is full;
 --
---  * 'isPermissionError' if a system resource limit would be exceeded.
---    It is unspecified whether the characters in the buffer are discarded
---    or retained under these circumstances.
+--  * 'System.IO.Error.isPermissionError' if a system resource limit would be
+--    exceeded. It is unspecified whether the characters in the buffer are
+--    discarded or retained under these circumstances.
 
 hFlush :: Handle -> IO ()
 hFlush handle = wantWritableHandle "hFlush" handle flushWriteBuffer
@@ -312,14 +312,14 @@ hFlush handle = wantWritableHandle "hFlush" handle flushWriteBuffer
 --
 -- This operation may fail with:
 --
---  * 'isFullError' if the device is full;
+--  * 'System.IO.Error.isFullError' if the device is full;
 --
---  * 'isPermissionError' if a system resource limit would be exceeded.
---    It is unspecified whether the characters in the buffer are discarded
---    or retained under these circumstances;
+--  * 'System.IO.Error.isPermissionError' if a system resource limit would be
+--    exceeded. It is unspecified whether the characters in the buffer are
+--    discarded or retained under these circumstances;
 --
---  * 'isIllegalOperation' if @hdl@ has buffered read data, and is not
---    seekable.
+--  * 'System.IO.Error.isIllegalOperation' if @hdl@ has buffered read data, and
+--    is not seekable.
 
 hFlushAll :: Handle -> IO ()
 hFlushAll handle = withHandle_ "hFlushAll" handle flushBuffer
@@ -358,7 +358,8 @@ hGetPosn handle = do
 --
 -- This operation may fail with:
 --
---  * 'isPermissionError' if a system resource limit would be exceeded.
+--  * 'System.IO.Error.isPermissionError' if a system resource limit would be
+--    exceeded.
 
 hSetPosn :: HandlePosn -> IO ()
 hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
@@ -391,10 +392,11 @@ hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
 --
 -- This operation may fail with:
 --
---  * 'isIllegalOperationError' if the Handle is not seekable, or does
---     not support the requested seek mode.
+--  * 'System.IO.Error.isIllegalOperationError' if the Handle is not seekable,
+--    or does not support the requested seek mode.
 --
---  * 'isPermissionError' if a system resource limit would be exceeded.
+--  * 'System.IO.Error.isPermissionError' if a system resource limit would be
+--    exceeded.
 
 hSeek :: Handle -> SeekMode -> Integer -> IO ()
 hSeek handle mode offset =
@@ -425,7 +427,7 @@ hSeek handle mode offset =
 --
 -- This operation may fail with:
 --
---  * 'isIllegalOperationError' if the Handle is not seekable.
+--  * 'System.IO.Error.isIllegalOperationError' if the Handle is not seekable.
 --
 hTell :: Handle -> IO Integer
 hTell handle =

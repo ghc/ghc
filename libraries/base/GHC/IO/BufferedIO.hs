@@ -32,8 +32,8 @@ import GHC.IO.Buffer
 -- | The purpose of 'BufferedIO' is to provide a common interface for I/O
 -- devices that can read and write data through a buffer.  Devices that
 -- implement 'BufferedIO' include ordinary files, memory-mapped files,
--- and bytestrings.  The underlying device implementing a 'Handle' must
--- provide 'BufferedIO'.
+-- and bytestrings.  The underlying device implementing a 'System.IO.Handle'
+-- must provide 'BufferedIO'.
 --
 class BufferedIO dev where
   -- | allocate a new buffer.  The size of the buffer is at the

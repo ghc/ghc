@@ -222,7 +222,7 @@ class Semigroup a where
         -- | An associative operation.
         (<>) :: a -> a -> a
 
-        -- | Reduce a non-empty list with @\<\>@
+        -- | Reduce a non-empty list with '<>'
         --
         -- The default definition should be sufficient, but this can be
         -- overridden for efficiency.
@@ -240,7 +240,7 @@ class Semigroup a where
         --
         -- By making this a member of the class, idempotent semigroups
         -- and monoids can upgrade this to execute in /O(1)/ by
-        -- picking @stimes = 'stimesIdempotent'@ or @stimes =
+        -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
         -- 'stimesIdempotentMonoid'@ respectively.
         stimes :: Integral b => b -> a -> a
         stimes = stimesDefault
@@ -255,7 +255,7 @@ class Semigroup a where
 --
 --  * @x '<>' (y '<>' z) = (x '<>' y) '<>' z@ ('Semigroup' law)
 --
---  * @'mconcat' = 'foldr' '(<>)' 'mempty'@
+--  * @'mconcat' = 'foldr' ('<>') 'mempty'@
 --
 -- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
@@ -263,7 +263,7 @@ class Semigroup a where
 -- Some types can be viewed as a monoid in more than one way,
 -- e.g. both addition and multiplication on numbers.
 -- In such cases we often define @newtype@s and make those instances
--- of 'Monoid', e.g. 'Sum' and 'Product'.
+-- of 'Monoid', e.g. 'Data.Semigroup.Sum' and 'Data.Semigroup.Product'.
 --
 -- __NOTE__: 'Semigroup' is a superclass of 'Monoid' since /base-4.11.0.0/.
 class Semigroup a => Monoid a where
@@ -273,7 +273,7 @@ class Semigroup a => Monoid a where
         -- | An associative operation
         --
         -- __NOTE__: This method is redundant and has the default
-        -- implementation @'mappend' = '(<>)'@ since /base-4.11.0.0/.
+        -- implementation @'mappend' = ('<>')@ since /base-4.11.0.0/.
         mappend :: a -> a -> a
         mappend = (<>)
         {-# INLINE mappend #-}
@@ -473,7 +473,7 @@ class  Functor f  where
 --
 --      @('<*>') = 'liftA2' 'id'@
 --
---      @'liftA2' f x y = f '<$>' x '<*>' y@
+--      @'liftA2' f x y = f 'Prelude.<$>' x '<*>' y@
 --
 -- Further, any definition must satisfy the following:
 --
@@ -669,8 +669,8 @@ class Applicative m => Monad m where
     -- failure in a @do@ expression.
     --
     -- As part of the MonadFail proposal (MFP), this function is moved
-    -- to its own class 'MonadFail' (see "Control.Monad.Fail" for more
-    -- details). The definition here will be removed in a future
+    -- to its own class 'Control.Monad.MonadFail' (see "Control.Monad.Fail" for
+    -- more details). The definition here will be removed in a future
     -- release.
     fail        :: String -> m a
     fail s      = errorWithoutStackTrace s
@@ -867,7 +867,7 @@ infixl 3 <|>
 -- If defined, 'some' and 'many' should be the least solutions
 -- of the equations:
 --
--- * @'some' v = (:) '<$>' v '<*>' 'many' v@
+-- * @'some' v = (:) 'Prelude.<$>' v '<*>' 'many' v@
 --
 -- * @'many' v = 'some' v '<|>' 'pure' []@
 class Applicative f => Alternative f where
@@ -1254,8 +1254,8 @@ id x                    =  x
 -- The compiler may rewrite it to @('assertError' line)@.
 
 -- | If the first argument evaluates to 'True', then the result is the
--- second argument.  Otherwise an 'AssertionFailed' exception is raised,
--- containing a 'String' with the source file and line number of the
+-- second argument.  Otherwise an 'Control.Exception.AssertionFailed' exception
+-- is raised, containing a 'String' with the source file and line number of the
 -- call to 'assert'.
 --
 -- Assertions can normally be turned on or off with a compiler flag
@@ -1386,7 +1386,7 @@ unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a
 
 {- |
-Returns the 'tag' of a constructor application; this function is used
+Returns the tag of a constructor application; this function is used
 by the deriving code for Eq, Ord and Enum.
 
 The primitive dataToTag# requires an evaluated constructor application

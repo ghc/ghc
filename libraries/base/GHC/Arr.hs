@@ -453,13 +453,13 @@ array :: Ix i
                         -- of the array.  These bounds are the lowest and
                         -- highest indices in the array, in that order.
                         -- For example, a one-origin vector of length
-                        -- '10' has bounds '(1,10)', and a one-origin '10'
-                        -- by '10' matrix has bounds '((1,1),(10,10))'.
+                        -- @10@ has bounds @(1,10)@, and a one-origin @10@
+                        -- by @10@ matrix has bounds @((1,1),(10,10))@.
         -> [(i, e)]     -- ^ a list of /associations/ of the form
                         -- (/index/, /value/).  Typically, this list will
                         -- be expressed as a comprehension.  An
-                        -- association '(i, x)' defines the value of
-                        -- the array at index 'i' to be 'x'.
+                        -- association @(i, x)@ defines the value of
+                        -- the array at index @i@ to be @x@.
         -> Array i e
 array (l,u) ies
     = let n = safeRangeSize (l,u)

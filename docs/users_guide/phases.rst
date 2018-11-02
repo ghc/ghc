@@ -1004,6 +1004,9 @@ for example).
     change RTS options at run-time, in which case ``-with-rtsopts``
     would be the *only* way to set them.)
 
+    Use the runtime flag :rts-flag:`--info` on the executable program
+    to see the options set with ``-with-rtsopts``.
+
     Note that ``-with-rtsopts`` has no effect when used with
     ``-no-hs-main``; see :ref:`using-own-main` for details.
 

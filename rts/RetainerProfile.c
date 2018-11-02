@@ -897,7 +897,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case IND:
         case INVALID_OBJECT:
         default:
-            barf("Invalid object *c in pop()");
+            barf("Invalid object *c in pop(): %d", get_itbl(se->c)->type);
             return;
         }
     } while (true);

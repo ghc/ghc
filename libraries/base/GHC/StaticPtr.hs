@@ -59,7 +59,7 @@ import GHC.Word            (Word64(..))
 
 #include "MachDeps.h"
 
--- | A reference to a value of type 'a'.
+-- | A reference to a value of type @a@.
 #if WORD_SIZE_IN_BITS < 64
 data StaticPtr a = StaticPtr Word64# Word64# -- The flattened Fingerprint is
                                              -- convenient in the compiler.
@@ -72,7 +72,7 @@ data StaticPtr a = StaticPtr Word# Word#
 deRefStaticPtr :: StaticPtr a -> a
 deRefStaticPtr (StaticPtr _ _ _ v) = v
 
--- | A key for `StaticPtrs` that can be serialized and used with
+-- | A key for 'StaticPtr's that can be serialized and used with
 -- 'unsafeLookupStaticPtr'.
 type StaticKey = Fingerprint
 

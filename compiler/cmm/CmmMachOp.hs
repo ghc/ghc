@@ -531,6 +531,9 @@ data CallishMachOp
   | MO_F64_Asin
   | MO_F64_Acos
   | MO_F64_Atan
+  | MO_F64_Asinh
+  | MO_F64_Acosh
+  | MO_F64_Atanh
   | MO_F64_Log
   | MO_F64_Exp
   | MO_F64_Fabs
@@ -545,6 +548,9 @@ data CallishMachOp
   | MO_F32_Asin
   | MO_F32_Acos
   | MO_F32_Atan
+  | MO_F32_Asinh
+  | MO_F32_Acosh
+  | MO_F32_Atanh
   | MO_F32_Log
   | MO_F32_Exp
   | MO_F32_Fabs

@@ -206,6 +206,11 @@ void traceUserMsg(Capability *cap, char *msg);
 void traceUserMarker(Capability *cap, char *msg);
 
 /*
+ * A binary message or event emitted by the program
+ */
+void traceUserBinaryMsg(Capability *cap, uint8_t *msg, size_t size);
+
+/*
  * An event to record a Haskell thread's label/name
  * Used by GHC.Conc.labelThread
  */

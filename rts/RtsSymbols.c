@@ -910,6 +910,7 @@
       SymI_HasProto(stg_traceCcszh)                                     \
       SymI_HasProto(stg_traceEventzh)                                   \
       SymI_HasProto(stg_traceMarkerzh)                                  \
+      SymI_HasProto(stg_traceBinaryEventzh)                             \
       SymI_HasProto(stg_getThreadAllocationCounterzh)                   \
       SymI_HasProto(stg_setThreadAllocationCounterzh)                   \
       SymI_HasProto(getMonotonicNSec)                                   \

@@ -286,9 +286,9 @@ integer_gmp_mpn_gcd(mp_limb_t r[],
  * reconstructed).
  *
  * g must have space for exactly gn=min(xn,yn) limbs.
- * s must have space for at least xn limbs.
+ * s must have space for at least yn limbs.
  *
- * return value: signed 'sn' of {sp,sn}
+ * return value: signed 'sn' of {sp,sn} where |sn| >= 1
  */
 mp_size_t
 integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
@@ -305,15 +305,25 @@ integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
 
   mpz_gcdext (g, s, NULL, x, y);
 
+  // g must be positive (0 <= gn).
+  // According to the docs for mpz_gcdext(), we have:
+  //       g < min(|y|/2|s|, |x|/2|t|)
+  // -->   g < min(|y|, |x|)
+  // -->   gn <= min(yn, xn)
+  // <->   gn <= gn0
   const mp_size_t gn = g[0]._mp_size;
   assert(0 <= gn && gn <= gn0);
   memset(g0, 0, gn0*sizeof(mp_limb_t));
   memcpy(g0, g[0]._mp_d, gn*sizeof(mp_limb_t));
   mpz_clear (g);
 
+  // According to the docs for mpz_gcdext(), we have:
+  //       |s| < |y| / 2g
+  // -->   |s| < |y|         (note g > 0)
+  // -->   sn <= yn
   const mp_size_t ssn = s[0]._mp_size;
   const mp_size_t sn  = mp_size_abs(ssn);
-  assert(sn <= mp_size_abs(xn));
+  assert(sn <= mp_size_abs(yn));
   memcpy(s0, s[0]._mp_d, sn*sizeof(mp_limb_t));
   mpz_clear (s);
 

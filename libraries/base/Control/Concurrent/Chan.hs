@@ -102,8 +102,8 @@ writeChan (Chan _ writeVar) val = do
 -- guarantees of 'MVar's (e.g. threads blocked in this operation are woken up in
 -- FIFO order).
 --
--- Throws 'BlockedIndefinitelyOnMVar' when the channel is empty and no other
--- thread holds a reference to the channel.
+-- Throws 'Control.Exception.BlockedIndefinitelyOnMVar' when the channel is
+-- empty and no other thread holds a reference to the channel.
 readChan :: Chan a -> IO a
 readChan (Chan readVar _) = do
   modifyMVar readVar $ \read_end -> do

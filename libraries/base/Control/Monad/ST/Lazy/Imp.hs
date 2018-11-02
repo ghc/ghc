@@ -14,7 +14,7 @@
 -- Portability :  non-portable (requires universal quantification for runST)
 --
 -- This module presents an identical interface to "Control.Monad.ST",
--- except that the monad delays evaluation of state operations until
+-- except that the monad delays evaluation of 'ST' operations until
 -- a value depending on them is required.
 --
 -----------------------------------------------------------------------------
@@ -46,10 +46,10 @@ import qualified GHC.ST as GHC.ST
 import GHC.Base
 import qualified Control.Monad.Fail as Fail
 
--- | The lazy state-transformer monad.
--- A computation of type @'ST' s a@ transforms an internal state indexed
--- by @s@, and returns a value of type @a@.
--- The @s@ parameter is either
+-- | The lazy @'ST' monad.
+-- The ST monad allows for destructive updates, but is escapable (unlike IO).
+-- A computation of type @'ST' s a@ returns a value of type @a@, and
+-- execute in "thread" @s@. The @s@ parameter is either
 --
 -- * an uninstantiated type variable (inside invocations of 'runST'), or
 --
@@ -198,13 +198,13 @@ instance Monad (ST s) where
 instance Fail.MonadFail (ST s) where
     fail s = errorWithoutStackTrace s
 
--- | Return the value computed by a state transformer computation.
+-- | Return the value computed by an 'ST' computation.
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
 runST (ST st) = runRW# (\s -> case st (S# s) of (r, _) -> r)
 
--- | Allow the result of a state transformer computation to be used (lazily)
+-- | Allow the result of an 'ST' computation to be used (lazily)
 -- inside the computation.
 -- Note that if @f@ is strict, @'fixST' f = _|_@.
 fixST :: (a -> ST s a) -> ST s a
@@ -243,7 +243,7 @@ lazyToStrictST :: ST s a -> ST.ST s a
 lazyToStrictST (ST m) = GHC.ST.ST $ \s ->
         case (m (S# s)) of (a, S# s') -> (# s', a #)
 
--- | A monad transformer embedding lazy state transformers in the 'IO'
+-- | A monad transformer embedding lazy 'ST' in the 'IO'
 -- monad.  The 'RealWorld' parameter indicates that the internal state
 -- used by the 'ST' computation is a special one supplied by the 'IO'
 -- monad, and thus distinct from those used by invocations of 'runST'.

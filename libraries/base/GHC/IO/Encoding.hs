@@ -57,7 +57,8 @@ import System.IO.Unsafe (unsafePerformIO)
 -- | The Latin1 (ISO8859-1) encoding.  This encoding maps bytes
 -- directly to the first 256 Unicode code points, and is thus not a
 -- complete Unicode encoding.  An attempt to write a character greater than
--- '\255' to a 'Handle' using the 'latin1' encoding will result in an error.
+-- '\255' to a 'System.IO.Handle' using the 'latin1' encoding will result in an
+-- error.
 latin1  :: TextEncoding
 latin1 = Latin1.latin1_checked
 
@@ -122,7 +123,7 @@ getFileSystemEncoding :: IO TextEncoding
 
 -- | The Unicode encoding of the current locale, but where undecodable
 -- bytes are replaced with their closest visual match. Used for
--- the 'CString' marshalling functions in "Foreign.C.String"
+-- the 'Foreign.C.String.CString' marshalling functions in "Foreign.C.String"
 --
 -- @since 4.5.0.0
 getForeignEncoding :: IO TextEncoding
@@ -187,7 +188,7 @@ char8 = Latin1.latin1
 
 -- | Look up the named Unicode encoding.  May fail with
 --
---  * 'isDoesNotExistError' if the encoding is unknown
+--  * 'System.IO.Error.isDoesNotExistError' if the encoding is unknown
 --
 -- The set of known encodings is system-dependent, but includes at least:
 --

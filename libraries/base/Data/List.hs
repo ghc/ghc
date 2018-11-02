@@ -178,8 +178,8 @@ module Data.List
    -- counterpart whose name is suffixed with \`@By@\'.
    --
    -- It is often convenient to use these functions together with
-   -- 'Data.Function.on', for instance @'sortBy' ('compare'
-   -- \`on\` 'fst')@.
+   -- 'Data.Function.on', for instance @'sortBy' ('Prelude.compare'
+   -- ``Data.Function.on`` 'Prelude.fst')@.
 
    -- *** User-supplied equality (replacing an @Eq@ context)
    -- | The predicate is assumed to define an equivalence.

@@ -164,7 +164,7 @@ instance Monad (Either e) where
 --
 -- We create two values of type @'Either' 'String' 'Int'@, one using the
 -- 'Left' constructor and another using the 'Right' constructor. Then
--- we apply \"either\" the 'length' function (if we have a 'String')
+-- we apply \"either\" the 'Prelude.length' function (if we have a 'String')
 -- or the \"times-two\" function (if we have an 'Int'):
 --
 -- >>> let s = Left "foo" :: Either String Int

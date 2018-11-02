@@ -50,13 +50,13 @@ import {-# SOURCE #-} GHC.IO (failIO)
 -- only a single data constructor, and irrefutable patterns (@~pat@).
 --
 -- Instances of 'MonadFail' should satisfy the following law: @fail s@ should
--- be a left zero for '>>=',
+-- be a left zero for 'Control.Monad.>>=',
 --
 -- @
 -- fail s >>= f  =  fail s
 -- @
 --
--- If your 'Monad' is also 'MonadPlus', a popular definition is
+-- If your 'Monad' is also 'Control.Monad.MonadPlus', a popular definition is
 --
 -- @
 -- fail _ = mzero

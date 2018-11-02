@@ -55,7 +55,7 @@ import GHC.Base
 -- >>> maybe False odd Nothing
 -- False
 --
--- Read an integer from a string using 'readMaybe'. If we succeed,
+-- Read an integer from a string using 'Text.Read.readMaybe'. If we succeed,
 -- return twice the integer; that is, apply @(*2)@ to it. If instead
 -- we fail to parse an integer, return @0@ by default:
 --
@@ -65,7 +65,7 @@ import GHC.Base
 -- >>> maybe 0 (*2) (readMaybe "")
 -- 0
 --
--- Apply 'show' to a @Maybe Int@. If we have @Just n@, we want to show
+-- Apply 'Prelude.show' to a @Maybe Int@. If we have @Just n@, we want to show
 -- the underlying 'Int' @n@. But if we have 'Nothing', we return the
 -- empty string instead of (for example) \"Nothing\":
 --
@@ -161,7 +161,7 @@ fromJust (Just x) = x
 -- >>> fromMaybe "" Nothing
 -- ""
 --
--- Read an integer from a string using 'readMaybe'. If we fail to
+-- Read an integer from a string using 'Text.Read.readMaybe'. If we fail to
 -- parse an integer, we want to return @0@ by default:
 --
 -- >>> import Text.Read ( readMaybe )

@@ -901,7 +901,7 @@ error = true;
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
                       OPTION_SAFE;
-                      printRtsInfo();
+                      printRtsInfo(rtsConfig);
                       stg_exit(0);
                   }
 #if defined(THREADED_RTS)

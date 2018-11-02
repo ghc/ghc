@@ -190,7 +190,7 @@ class  (Real a, Enum a) => Integral a  where
 -- @x * recip x@ = @recip x * x@ = @fromInteger 1@
 --
 -- Note that it /isn't/ customarily expected that a type instance of
--- 'Fractional' implement a field. However, all instances in 'base' do.
+-- 'Fractional' implement a field. However, all instances in @base@ do.
 class  (Num a) => Fractional a  where
     {-# MINIMAL fromRational, (recip | (/)) #-}
 

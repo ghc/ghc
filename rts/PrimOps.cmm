@@ -2405,6 +2405,14 @@ stg_traceEventzh ( W_ msg )
     return ();
 }
 
+stg_traceBinaryEventzh ( W_ msg, W_ len )
+{
+#if defined(TRACING) || defined(DEBUG)
+    ccall traceUserBinaryMsg(MyCapability() "ptr", msg "ptr", len);
+#endif
+    return ();
+}
+
 // Same code as stg_traceEventzh above but a different kind of event
 // Before changing this code, read the comments in the impl above
 stg_traceMarkerzh ( W_ msg )

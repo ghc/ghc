@@ -153,8 +153,8 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 -- implementation in GHC.  It uses pinned memory in the garbage
 -- collected heap, so the 'ForeignPtr' does not require a finalizer to
 -- free the memory.  Use of 'mallocForeignPtr' and associated
--- functions is strongly recommended in preference to 'newForeignPtr'
--- with a finalizer.
+-- functions is strongly recommended in preference to
+-- 'Foreign.ForeignPtr.newForeignPtr' with a finalizer.
 --
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
@@ -289,9 +289,10 @@ addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 --
 -- NB. Be very careful with these finalizers.  One common trap is that
 -- if a finalizer references another finalized value, it does not
--- prevent that value from being finalized.  In particular, 'Handle's
--- are finalized objects, so a finalizer should not refer to a 'Handle'
--- (including @stdout@, @stdin@ or @stderr@).
+-- prevent that value from being finalized.  In particular, 'System.IO.Handle's
+-- are finalized objects, so a finalizer should not refer to a
+-- 'System.IO.Handle' (including 'System.IO.stdout', 'System.IO.stdin', or
+-- 'System.IO.stderr').
 --
 addForeignPtrConcFinalizer (ForeignPtr _ c) finalizer =
   addForeignPtrConcFinalizer_ c finalizer

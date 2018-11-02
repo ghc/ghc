@@ -103,11 +103,11 @@ type TextEncoder state = BufferCodec CharBufElem Word8 state
 -- between sequences of bytes and sequences of Unicode characters.
 --
 -- For example, UTF-8 is an encoding of Unicode characters into a sequence
--- of bytes.  The 'TextEncoding' for UTF-8 is 'utf8'.
+-- of bytes.  The 'TextEncoding' for UTF-8 is 'System.IO.utf8'.
 data TextEncoding
   = forall dstate estate . TextEncoding  {
         textEncodingName :: String,
-                   -- ^ a string that can be passed to 'mkTextEncoding' to
+                   -- ^ a string that can be passed to 'System.IO.mkTextEncoding' to
                    -- create an equivalent 'TextEncoding'.
         mkTextDecoder :: IO (TextDecoder dstate),
                    -- ^ Creates a means of decoding bytes into characters: the result must not
