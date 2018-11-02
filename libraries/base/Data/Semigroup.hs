@@ -19,15 +19,52 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- In mathematics, a semigroup is an algebraic structure consisting of a
--- set together with an associative binary operation. A semigroup
--- generalizes a monoid in that there might not exist an identity
--- element. It also (originally) generalized a group (a monoid with all
--- inverses) to a type where every element did not have to have an inverse,
--- thus the name semigroup.
+-- A type @a@ is a 'Semigroup' if it provides an associative function ('<>')
+-- that lets you combine any two values of type @a@ into one. Where being
+-- associative means that the following must always hold:
 --
--- The use of @(\<\>)@ in this module conflicts with an operator with the same
--- name that is being exported by Data.Monoid. However, this package
+-- >>> (a <> b) <> c == a <> (b <> c)
+--
+-- ==== __Examples__
+--
+-- The 'Min' 'Semigroup' instance for 'Int' is defined to always pick the smaller
+-- number:
+-- >>> Min 1 <> Min 2 <> Min 3 <> Min 4 :: Min Int
+-- Min {getMin = 1}
+--
+-- If we need to combine multiple values we can use the 'sconcat' function
+-- to do so. We need to ensure however that we have at least one value to
+-- operate on, since otherwise our result would be undefined. It is for this
+-- reason that 'sconcat' uses "Data.List.NonEmpty.NonEmpty" - a list that
+-- can never be empty:
+--
+-- >>> (1 :| [])
+-- 1 :| []               -- equivalent to [1] but guaranteed to be non-empty
+-- >>> (1 :| [2, 3, 4])
+-- 1 :| [2,3,4]          -- equivalent to [1,2,3,4] but guaranteed to be non-empty
+--
+-- Equipped with this guaranteed to be non-empty data structure, we can combine
+-- values using 'sconcat' and a 'Semigroup' of our choosing. We can try the 'Min'
+-- and 'Max' instances of 'Int' which pick the smallest, or largest number
+-- respectively:
+--
+-- >>> sconcat (1 :| [2, 3, 4]) :: Min Int
+-- Min {getMin = 1}
+-- >>> sconcat (1 :| [2, 3, 4]) :: Max Int
+-- Max {getMax = 4}
+--
+-- String concatenation is another example of a 'Semigroup' instance:
+--
+-- >>> "foo" <> "bar"
+-- "foobar"
+--
+-- A 'Semigroup' is a generalization of a 'Monoid'. Yet unlike the 'Semigroup', the 'Monoid'
+-- requires the presence of a neutral element ('mempty') in addition to the associative
+-- operator. The requirement for a neutral element prevents many types from being a full Monoid,
+-- like "Data.List.NonEmpty.NonEmpty".
+--
+-- Note that the use of @(\<\>)@ in this module conflicts with an operator with the same
+-- name that is being exported by "Data.Monoid". However, this package
 -- re-exports (most of) the contents of Data.Monoid, so to use semigroups
 -- and monoids in the same package just
 --
