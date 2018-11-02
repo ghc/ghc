@@ -9725,7 +9725,7 @@ denotes representational equality between ``t1`` and ``t2`` in the sense
 of Roles (:ref:`roles`). It is exported by :base-ref:`Data.Coerce.`, which also
 contains the documentation. More details and discussion can be found in the
 paper
-`"Safe Coercions" <http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf>`__.
+`"Safe Coercions" <https://www.microsoft.com/en-us/research/uploads/prod/2018/05/coercible-JFP.pdf>`__.
 
 .. _constraint-kind:
 
