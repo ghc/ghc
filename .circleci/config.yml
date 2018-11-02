@@ -53,7 +53,7 @@ aliases:
   - &make
     run:
       name: Build
-      command: "make -j`mk/detect-cpu-count.sh`"
+      command: "make -j`mk/detect-cpu-count.sh` V=0"
   - &build_hadrian
     run:
       name: Build GHC using Hadrian
@@ -76,7 +76,8 @@ aliases:
   - &bindist
     run:
       name: Create bindist
-      command: make binary-dist
+      # Reduce compression effort to 3
+      command: make binary-dist TAR_COMP_OPTS="-2"
       # Building bindist takes ~15 minutes without output, account for
       # that.
       no_output_timeout: "30m"
@@ -96,10 +97,11 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.4
+      - image: ghcci/x86_64-linux:0.0.2
     environment:
       GHC_COLLECTOR_FLAVOR: x86_64-linux
       BUILD_SPHINX_PDF: "NO"
+      BUILD_SPHINX_HTML: "NO"
       <<: *buildenv
     steps:
       - checkout
