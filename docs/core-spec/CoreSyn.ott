@@ -138,8 +138,10 @@ t {{ tex \tau }}, k {{ tex \kappa }}, s {{ tex \sigma }}, phi {{ tex \phi }}
 %% COERCIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coderef{types/TyCoRep.lhs}{Coercion} }}
-  | < t > _ R               ::   :: Refl          {{ com \ctor{Refl}: Reflexivity }}
-    {{ tex {\langle [[t]] \rangle}_{[[R]]} }}
+  | < t >                   ::   :: Refl          {{ com \ctor{Refl}: Nominal Reflexivity }}
+    {{ tex {\langle [[t]] \rangle} }}
+  | < t > R mg              ::   :: GRefl         {{ com \ctor{GRefl}: Generalized Reflexivity }}
+    {{ tex {\langle [[t]] \rangle}^{[[mg]]}_{[[R]]} }}
   | T RA </ gi // i />      ::   :: TyConAppCo    {{ com \ctor{TyConAppCo}: Type constructor application }}
   | g1 g2                   ::   :: AppCo         {{ com \ctor{AppCo}: Application }}
   | forall z : h . g        ::   :: ForAllCo      {{ com \ctor{ForAllCo}: Polymorphism }}
@@ -156,7 +158,6 @@ g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coder
     {{ tex \textsf{nth}^{[[I]]}_{[[R]]}\,[[g]] }}
   | LorR g                  ::   :: LRCo          {{ com \ctor{LRCo}: Left/right projection }}
   | g @ h                   ::   :: InstCo        {{ com \ctor{InstCo}: Instantiation }}
-  | g |> h                  ::   :: CoherenceCo   {{ com \ctor{CoherenceCo}: Coherence }}
   | kind g                  ::   :: KindCo        {{ com \ctor{KindCo}: Kind extraction }}
   | sub g                   ::   :: SubCo         {{ com \ctor{SubCo}: Sub-role --- convert nominal to representational }}
   | ( g )                   :: M :: Parens        {{ com Parentheses }}
@@ -169,6 +170,11 @@ prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{types/
     {{ tex \mathsf{phant} }}
   | ProofIrrelProv     ::   :: ProofIrrelProv    {{ com From proof irrelevance }}
     {{ tex \mathsf{irrel} }}
+
+mg {{ tex m }} :: 'MCoercion_' ::= {{ com A possibly reflexive coercion , \coderef{types/TyCoRep.lhs}{MCoercion} }}
+  | MRefl            ::   :: MRefl                {{ com \ctor{MRefl}: A trivial reflexive coercion }}
+  | MCo g            ::   :: MCo                  {{ com \ctor{MCo}: Other coercions }}
+    {{ tex [[g]] }}
 
 LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{types/TyCoRep.lhs}{LeftOrRight} }}
   | Left             ::   :: CLeft                {{ com \ctor{CLeft}: Left projection }}
@@ -397,6 +403,8 @@ terminals :: 'terminals_' ::=
   | classifiesTypeWithValues :: :: ctwv   {{ tex \textsf{classifiesTypeWithValues} }}
   | 0            ::   :: zero             {{ tex 0 }}
   | +1           ::   :: succ             {{ tex +1 }}
+  | MRefl        ::   :: mrefl            {{ tex \cdot }}
+  | MCo          ::   :: mco
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Formulae  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

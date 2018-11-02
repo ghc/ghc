@@ -1546,7 +1546,7 @@ if test "$RELEASE" = "NO"; then
 fi
 
     AC_MSG_CHECKING([for GHC Git commit id])
-    if test -d .git; then
+    if test -e .git; then
         git_commit_id=`git rev-parse HEAD`
         if test -n "$git_commit_id" 2>&1 >/dev/null; then true; else
             AC_MSG_ERROR([failed to detect revision: check that git is in your path])

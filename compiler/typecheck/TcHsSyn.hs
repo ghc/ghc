@@ -34,8 +34,9 @@ module TcHsSyn (
         zonkTyVarBindersX, zonkTyVarBinderX,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
-        zonkCoToCo, zonkSigType,
-        zonkEvBinds, zonkTcEvBinds
+        zonkCoToCo,
+        zonkEvBinds, zonkTcEvBinds,
+        zonkTcMethInfoToMethInfo
   ) where
 
 #include "HsVersions.h"
@@ -47,11 +48,13 @@ import Id
 import IdInfo
 import TcRnMonad
 import PrelNames
+import BuildTyCl ( TcMethInfo, MethInfo )
 import TcType
 import TcMType
+import TcEnv   ( tcLookupGlobalOnly )
 import TcEvidence
 import TysPrim
-import TyCon   ( isUnboxedTupleTyCon )
+import TyCon
 import TysWiredIn
 import TyCoRep( CoercionHole(..) )
 import Type
@@ -1678,11 +1681,20 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
 zonk_tycomapper = TyCoMapper
   { tcm_smart = True   -- Establish type invariants
-                       -- See Note [Type-checking inside the knot] in TcHsType
   , tcm_tyvar = zonkTyVarOcc
   , tcm_covar = zonkCoVarOcc
   , tcm_hole  = zonkCoHole
-  , tcm_tybinder = \env tv _vis -> zonkTyBndrX env tv }
+  , tcm_tybinder = \env tv _vis -> zonkTyBndrX env tv
+  , tcm_tycon = zonkTcTyConToTyCon }
+
+-- Zonk a TyCon by changing a TcTyCon to a regular TyCon
+zonkTcTyConToTyCon :: TcTyCon -> TcM TyCon
+zonkTcTyConToTyCon tc
+  | isTcTyCon tc = do { thing <- tcLookupGlobalOnly (getName tc)
+                      ; case thing of
+                          ATyCon real_tc -> return real_tc
+                          _              -> pprPanic "zonkTcTyCon" (ppr tc $$ ppr thing) }
+  | otherwise    = return tc -- it's already zonked
 
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
 zonkTcTypeToType :: ZonkEnv -> TcType -> TcM Type
@@ -1706,18 +1718,19 @@ zonkTcTypeToTypes env tys = mapM (zonkTcTypeToType env) tys
 zonkCoToCo :: ZonkEnv -> Coercion -> TcM Coercion
 zonkCoToCo = mapCoercion zonk_tycomapper
 
-zonkSigType :: TcType -> TcM Type
--- Zonk the type obtained from a user type signature
--- We want to turn any quantified (forall'd) variables into TyVars
--- but we may find some free TcTyVars, and we want to leave them
--- completely alone.  They may even have unification variables inside
--- e.g.  f (x::a) = ...(e :: a -> a)....
--- The type sig for 'e' mentions a free 'a' which will be a
--- unification SigTv variable.
-zonkSigType = zonkTcTypeToType (mkEmptyZonkEnv zonk_unbound_tv)
+zonkTcMethInfoToMethInfo :: TcMethInfo -> TcM MethInfo
+zonkTcMethInfoToMethInfo (name, ty, gdm_spec)
+  = do { ty' <- zonkTcTypeToType emptyZonkEnv ty
+       ; gdm_spec' <- zonk_gdm gdm_spec
+       ; return (name, ty', gdm_spec') }
   where
-    zonk_unbound_tv :: UnboundTyVarZonker
-    zonk_unbound_tv tv = return (mkTyVarTy tv)
+    zonk_gdm :: Maybe (DefMethSpec (SrcSpan, TcType))
+             -> TcM (Maybe (DefMethSpec (SrcSpan, Type)))
+    zonk_gdm Nothing = return Nothing
+    zonk_gdm (Just VanillaDM) = return (Just VanillaDM)
+    zonk_gdm (Just (GenericDM (loc, ty)))
+      = do { ty' <- zonkTcTypeToType emptyZonkEnv ty
+           ; return (Just (GenericDM (loc, ty'))) }
 
 zonkTvSkolemising :: UnboundTyVarZonker
 -- This variant is used for the LHS of rules

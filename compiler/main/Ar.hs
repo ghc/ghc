@@ -95,7 +95,8 @@ getBSDArchEntries = do
         st_size <- getPaddedInt <$> getByteString 10
         end     <- getByteString 2
         when (end /= "\x60\x0a") $
-          fail "Invalid archive header end marker"
+          fail ("[BSD Archive] Invalid archive header end marker for name: " ++
+                C.unpack name)
         off1    <- liftM fromIntegral bytesRead :: Get Int
         -- BSD stores extended filenames, by writing #1/<length> into the
         -- name field, the first @length@ bytes then represent the file name
@@ -106,6 +107,10 @@ getBSDArchEntries = do
                         return $ C.unpack $ C.takeWhile (/= ' ') name
         off2    <- liftM fromIntegral bytesRead :: Get Int
         file    <- getByteString (st_size - (off2 - off1))
+        -- data sections are two byte aligned (see Trac #15396)
+        when (odd st_size) $
+          void (getByteString 1)
+
         rest    <- getBSDArchEntries
         return $ (ArchiveEntry name time own grp mode (st_size - (off2 - off1)) file) : rest
 
@@ -128,8 +133,12 @@ getGNUArchEntries extInfo = do
       st_size <- getPaddedInt <$> getByteString 10
       end     <- getByteString 2
       when (end /= "\x60\x0a") $
-        fail "Invalid archive header end marker"
+        fail ("[BSD Archive] Invalid archive header end marker for name: " ++
+              C.unpack name)
       file <- getByteString st_size
+      -- data sections are two byte aligned (see Trac #15396)
+      when (odd st_size) $
+        void (getByteString 1)
       name <- return . C.unpack $
         if C.unpack (C.take 1 name) == "/"
         then case C.takeWhile (/= ' ') name of

@@ -95,8 +95,9 @@ matchGlobalInst dflags short_cut clas tys
   | cls_name == knownSymbolClassName  = matchKnownSymbol     clas tys
   | isCTupleClass clas                = matchCTuple          clas tys
   | cls_name == typeableClassName     = matchTypeable        clas tys
-  | clas `hasKey` heqTyConKey         = matchLiftedEquality       tys
-  | clas `hasKey` coercibleTyConKey   = matchLiftedCoercible      tys
+  | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
+  | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
+  | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
   | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys
   | otherwise                         = matchInstEnv dflags short_cut clas tys
   where
@@ -450,22 +451,31 @@ if you'd written
 ***********************************************************************-}
 
 -- See also Note [The equality types story] in TysPrim
-matchLiftedEquality :: [Type] -> TcM ClsInstResult
-matchLiftedEquality args
+matchHeteroEquality :: [Type] -> TcM ClsInstResult
+-- Solves (t1 ~~ t2)
+matchHeteroEquality args
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
                     , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) args
                     , cir_what      = BuiltinInstance })
 
+matchHomoEquality :: [Type] -> TcM ClsInstResult
+-- Solves (t1 ~ t2)
+matchHomoEquality args@[k,t1,t2]
+  = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
+                    , cir_mk_ev     = evDFunApp (dataConWrapId eqDataCon) args
+                    , cir_what      = BuiltinInstance })
+matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
+
 -- See also Note [The equality types story] in TysPrim
-matchLiftedCoercible :: [Type] -> TcM ClsInstResult
-matchLiftedCoercible args@[k, t1, t2]
+matchCoercible :: [Type] -> TcM ClsInstResult
+matchCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
                     , cir_mk_ev     = evDFunApp (dataConWrapId coercibleDataCon)
                                                 args
                     , cir_what      = BuiltinInstance })
   where
     args' = [k, k, t1, t2]
-matchLiftedCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
+matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
 
 
 {- ********************************************************************

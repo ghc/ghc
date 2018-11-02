@@ -52,7 +52,7 @@ import TyCoRep
 import Type
 import Weight
 import UniqSupply
-import DsGRHSs       (isTrueLHsExpr)
+import DsUtils       (isTrueLHsExpr)
 import Maybes        (expectJust)
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -427,32 +427,28 @@ checkMatches' vars matches
 --   for details.
 checkEmptyCase' :: Id -> PmM PmResult
 checkEmptyCase' var = do
-  tm_css <- map toComplex . bagToList <$> liftD getTmCsDs
-  case tmOracle initialTmState tm_css of
-    Just tm_state -> do
-      ty_css        <- liftD getDictsDs
-      fam_insts     <- liftD dsGetFamInstEnvs
-      mb_candidates <- inhabitationCandidates fam_insts (idType var)
-      case mb_candidates of
-        -- Inhabitation checking failed / the type is trivially inhabited
-        Left ty -> return (uncoveredWithTy ty)
+  (tm_css, ty_css) <- pmInitialTmTyCs
+  fam_insts        <- liftD dsGetFamInstEnvs
+  mb_candidates    <- inhabitationCandidates fam_insts (idType var)
+  case mb_candidates of
+    -- Inhabitation checking failed / the type is trivially inhabited
+    Left ty -> return (uncoveredWithTy ty)
 
-        -- A list of inhabitant candidates is available: Check for each
-        -- one for the satisfiability of the constraints it gives rise to.
-        Right candidates -> do
-          missing_m <- flip concatMapM candidates $ \(va,tm_ct,ty_cs) -> do
-            let all_ty_cs = unionBags ty_cs ty_css
-            sat_ty <- tyOracle all_ty_cs
-            return $ case (sat_ty, tmOracle tm_state (tm_ct:tm_css)) of
-              (True, Just tm_state') -> [(va, all_ty_cs, tm_state')]
-              _non_sat               -> []
-          let mkValVec (va,all_ty_cs,tm_state')
-                = ValVec [va] (MkDelta all_ty_cs tm_state')
-              uncovered = UncoveredPatterns (map mkValVec missing_m)
-          return $ if null missing_m
-            then emptyPmResult
-            else PmResult FromBuiltin [] uncovered []
-    Nothing -> return emptyPmResult
+    -- A list of inhabitant candidates is available: Check for each
+    -- one for the satisfiability of the constraints it gives rise to.
+    Right candidates -> do
+      missing_m <- flip concatMapM candidates $ \(va,tm_ct,ty_cs) -> do
+        mb_sat <- pmIsSatisfiable tm_ct tm_css ty_cs ty_css
+        pure $ case mb_sat of
+                Just (tm_state', all_ty_cs)
+                        -> [(va, all_ty_cs, tm_state')]
+                Nothing -> []
+      let mkValVec (va,all_ty_cs,tm_state')
+            = ValVec [va] (MkDelta all_ty_cs tm_state')
+          uncovered = UncoveredPatterns (map mkValVec missing_m)
+      return $ if null missing_m
+        then emptyPmResult
+        else PmResult FromBuiltin [] uncovered []
 
 -- | Returns 'True' if the argument 'Type' is a fully saturated application of
 -- a closed type constructor.
@@ -543,6 +539,73 @@ pmTopNormaliseType_maybe env typ
         case reduceTyFamApp_maybe env Representational tc ntys of
           Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
           _               -> NS_Done
+
+-- | Determine suitable constraints to use at the beginning of pattern-match
+-- coverage checking by consulting the sets of term and type constraints
+-- currently in scope. If one of these sets of constraints is unsatisfiable,
+-- use an empty set in its place. (See
+-- @Note [Recovering from unsatisfiable pattern-matching constraints]@
+-- for why this is done.)
+pmInitialTmTyCs :: PmM (TmState, Bag EvVar)
+pmInitialTmTyCs = do
+  ty_cs  <- liftD getDictsDs
+  tm_cs  <- map toComplex . bagToList <$> liftD getTmCsDs
+  sat_ty <- tyOracle ty_cs
+  let initTyCs = if sat_ty then ty_cs else emptyBag
+      initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
+  pure (initTmState, initTyCs)
+
+{-
+Note [Recovering from unsatisfiable pattern-matching constraints]
+~~~~~~~~~~~~~~~~
+Consider the following code (see #12957 and #15450):
+
+  f :: Int ~ Bool => ()
+  f = case True of { False -> () }
+
+We want to warn that the pattern-matching in `f` is non-exhaustive. But GHC
+used not to do this; in fact, it would warn that the match was /redundant/!
+This is because the constraint (Int ~ Bool) in `f` is unsatisfiable, and the
+coverage checker deems any matches with unsatifiable constraint sets to be
+unreachable.
+
+We decide to better than this. When beginning coverage checking, we first
+check if the constraints in scope are unsatisfiable, and if so, we start
+afresh with an empty set of constraints. This way, we'll get the warnings
+that we expect.
+-}
+
+-- | Given some term and type constraints, check if they are satisfiable.
+-- (In other words, this is the ⊢_Sat oracle judgment from the GADTs Meet
+-- Their Match paper.)
+--
+-- For the purposes of efficiency, this takes as separate arguments the
+-- ambient term and type constraints (which are known beforehand to be
+-- satisfiable), as well as the new term and type constraints (which may not
+-- be satisfiable). This lets us implement two mini-optimizations:
+--
+-- * If there are no new type constraints, then don't bother initializing
+--   the type oracle, since it's redundant to do so.
+-- * Since the new term constraint is a separate argument, we only need to
+--   execute one iteration of the term oracle (instead of traversing the
+--   entire set of term constraints).
+pmIsSatisfiable
+  :: ComplexEq -- ^ The new term constraint.
+  -> TmState   -- ^ The ambient term constraints (known to be satisfiable).
+  -> Bag EvVar -- ^ The new type constraints.
+  -> Bag EvVar -- ^ The ambient type constraints (known to be satisfiable).
+  -> PmM (Maybe (TmState, Bag EvVar))
+               -- ^ @'Just' (term_cs, ty_cs)@ if the constraints are
+               -- satisfiable, where @term_cs@ and @ty_cs@ are the new sets of
+               -- term and type constraints, respectively. 'Nothing' otherwise.
+pmIsSatisfiable new_term_c amb_term_cs new_ty_cs amb_ty_cs = do
+  let ty_cs = new_ty_cs `unionBags` amb_ty_cs
+  sat_ty <- if isEmptyBag new_ty_cs
+               then pure True
+               else tyOracle ty_cs
+  pure $ case (sat_ty, solveOneEq amb_term_cs new_term_c) of
+           (True, Just term_cs) -> Just (term_cs, ty_cs)
+           _unsat               -> Nothing
 
 {- Note [Type normalisation for EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1545,14 +1608,8 @@ runMany pm (m:ms) = mappend <$> pm m <*> runMany pm ms
 -- delta with all term and type constraints in scope.
 mkInitialUncovered :: [Id] -> PmM Uncovered
 mkInitialUncovered vars = do
-  ty_cs  <- liftD getDictsDs
-  tm_cs  <- map toComplex . bagToList <$> liftD getTmCsDs
-  sat_ty <- tyOracle ty_cs
-  let initTyCs = if sat_ty then ty_cs else emptyBag
-      initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
-      patterns  = map PmVar vars
-    -- If any of the term/type constraints are non
-    -- satisfiable then return with the initialTmState. See #12957
+  (initTmState, initTyCs) <- pmInitialTmTyCs
+  let patterns = map PmVar vars
   return [ValVec patterns (MkDelta initTyCs initTmState)]
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
@@ -1681,12 +1738,12 @@ pmcheckHd (p@(PmCon { pm_con_con = con, pm_con_arg_tys = tys }))
   cons_cs <- mapM (liftD . mkOneConFull x) complete_match
 
   inst_vsa <- flip concatMapM cons_cs $ \(va, tm_ct, ty_cs) -> do
-    let ty_state = ty_cs `unionBags` delta_ty_cs delta -- not actually a state
-    sat_ty <- if isEmptyBag ty_cs then return True
-                                  else tyOracle ty_state
-    return $ case (sat_ty, solveOneEq (delta_tm_cs delta) tm_ct) of
-      (True, Just tm_state) -> [ValVec (va:vva) (MkDelta ty_state tm_state)]
-      _ty_or_tm_failed      -> []
+    mb_sat <- pmIsSatisfiable tm_ct (delta_tm_cs delta)
+                              ty_cs (delta_ty_cs delta)
+    pure $ case mb_sat of
+             Just (tm_state, ty_state)
+                     -> [ValVec (va:vva) (MkDelta ty_state tm_state)]
+             Nothing -> []
 
   set_provenance prov .
     force_if (canDiverge (idName x) (delta_tm_cs delta)) <$>

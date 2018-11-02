@@ -26,6 +26,7 @@ module TyCoRep (
         Type(..),
         TyLit(..),
         KindOrType, Kind,
+        KnotTied,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..),
         Rig, Weighted,
@@ -496,6 +497,11 @@ In sum, in order to uphold (EQ), we need the following three invariants:
 These invariants are all documented above, in the declaration for Type.
 
 -}
+
+-- | A type labeled 'KnotTied' might have knot-tied tycons in it. See
+-- Note [Type checking recursive type and class declarations] in
+-- TcTyClsDecls
+type KnotTied ty = ty
 
 {- **********************************************************************
 *                                                                       *

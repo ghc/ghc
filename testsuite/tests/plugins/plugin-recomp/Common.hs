@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Common where
 
 import GhcPlugins
@@ -13,5 +14,9 @@ install options todos = do
 
 mainPass :: ModGuts -> CoreM ModGuts
 mainPass guts = do
+#if defined(RUN2)
+    putMsgS "Simple Plugin Pass Run 2"
+#else
     putMsgS "Simple Plugin Pass Run"
+#endif
     return guts

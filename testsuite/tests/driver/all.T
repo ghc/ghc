@@ -278,3 +278,5 @@ test('T13604a', [], run_command, ['$MAKE -s --no-print-directory T13604a'])
 test('inline-check', omit_ways(['hpc', 'profasm'])
                    , compile
 		   , ['-dinline-check foo -O -ddebug-output'])
+
+test('T15396', normal, compile_and_run, ['-package ghc'])

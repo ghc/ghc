@@ -1,0 +1,85 @@
+
+% I have enclosed code.sty, which achieves 99% of what you want without
+% the need for a separate preprocessor. At the start of your document
+% you write "\makeatactive". From then on, inline code is written as @\x
+% -> x_1 & y@. The only difference with what you are used to, is that
+% instead of
+% 
+% @
+%   foo :: Int -> Int
+%   foo = \n -> n+1
+% @
+% 
+% you have to write
+% 
+% \begin{code}
+%   foo :: Int -> Int
+%   foo = \n -> n+1
+% \end{code}
+% 
+% and that you cannot use @ in \section{} and \caption{}. For the paper that occured twice, in which case I had to replace @...@ b y \texttt{...}.
+% 
+% 
+% code.sty  --- nice verbatim mode for code
+
+% To get '@' use \verb+@+
+
+\def\icode{%
+    \relax\ifmmode\hbox\else\leavevmode\null\fi
+    \bgroup
+    %\begingroup
+    \@noligs
+    \verbatim@font
+    \verb@eol@error
+    \let\do\@makeother \dospecials
+    \@vobeyspaces
+    \frenchspacing
+    \@icode}
+\def\@icode#1{%
+    \catcode`#1\active
+    \lccode`\~`#1%
+    \lowercase{\let~\icode@egroup}}
+\def\icode@egroup{%
+    %\endgroup}
+    \egroup}
+
+% The \makeatactive command:
+% makes @ active, in such a way that @...@ behaves as \icode@...@:
+{
+\catcode`@=\active
+\gdef\makeatactive{
+     \catcode`@=\active \def@{\icode@}
+     % Since @ becomes active, it has to be taken care of in verbatim-modes:
+     \let\olddospecials\dospecials \def\dospecials{\do\@\olddospecials}}
+}
+% \gdef\makeatother{\g@remfrom@specials{\@}\@makeother\@}
+\gdef\makeatother{\@makeother\@}
+
+\newcommand\codetabwidth{42pt}
+{\catcode`\^^I=\active%
+\gdef\@vobeytab{\catcode`\^^I\active\let^^I\@xobeytab}}
+\def\@xobeytab{\leavevmode\penalty10000\hskip\codetabwidth}
+
+\begingroup \catcode `|=0 \catcode `[= 1
+\catcode`]=2 \catcode `\{=12 \catcode `\}=12
+\catcode`\\=12 |gdef|@xcode#1\end{code}[#1|end[code]]
+|endgroup
+\def\@code{\trivlist \item\relax
+  \if@minipage\else\vskip\parskip\fi
+  \leftskip\@totalleftmargin\rightskip\z@skip
+  \parindent\z@\parfillskip\@flushglue\parskip\z@skip
+  \@@par
+  \@tempswafalse
+  \def\par{%
+    \if@tempswa
+      \leavevmode \null \@@par\penalty\interlinepenalty
+    \else
+      \@tempswatrue
+      \ifhmode\@@par\penalty\interlinepenalty\fi
+    \fi}%
+  \obeylines \verbatim@font \@noligs
+  \let\do\@makeother \dospecials
+  \everypar \expandafter{\the\everypar \unpenalty}%
+}
+\def\code{\@code \frenchspacing\@vobeytab\@vobeyspaces \@xcode}
+\def\endcode{\if@newlist \leavevmode\fi\endtrivlist}

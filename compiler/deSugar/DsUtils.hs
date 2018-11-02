@@ -37,7 +37,8 @@ module DsUtils (
         mkSelectorBinds,
 
         selectSimpleMatchVarL, selectMatchVars, selectMatchVar,
-        mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang
+        mkOptTickBox, mkBinaryTickBox, decideBangHood, addBang,
+        isTrueLHsExpr
     ) where
 
 #include "HsVersions.h"
@@ -98,6 +99,7 @@ otherwise, make one up.
 -}
 
 selectSimpleMatchVarL :: Rig -> LPat GhcTc -> DsM Id
+-- Postcondition: the returned Id has an Internal Name
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 
 -- (selectMatchVars ps tys) chooses variables of type tys
@@ -117,9 +119,11 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
 selectMatchVars :: [(Rig, Pat GhcTc)] -> DsM [Id]
+-- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
 selectMatchVar :: Rig -> Pat GhcTc -> DsM Id
+-- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
@@ -134,9 +138,8 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
 selectMatchVar _w (AsPat _ var _) = return (unLoc var)
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
-{-
-Note [Localise pattern binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Localise pattern binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider     module M where
                [Just a] = e
 After renaming it looks like
@@ -172,6 +175,7 @@ In fact, even CoreSubst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
+See also Note [MatchIds] in Match.hs
 
 ************************************************************************
 *                                                                      *
@@ -912,13 +916,38 @@ mkBinaryTickBox ixT ixF e = do
 
 -- *******************************************************************
 
+{- Note [decideBangHood]
+~~~~~~~~~~~~~~~~~~~~~~~~
+With -XStrict we may make /outermost/ patterns more strict.
+E.g.
+       let (Just x) = e in ...
+          ==>
+       let !(Just x) = e in ...
+and
+       f x = e
+          ==>
+       f !x = e
+
+This adjustment is done by decideBangHood,
+
+  * Just before constructing an EqnInfo, in Match
+      (matchWrapper and matchSinglePat)
+
+  * When desugaring a pattern-binding in DsBinds.dsHsBind
+
+Note that it is /not/ done recursively.  See the -XStrict
+spec in the user manual.
+
+Specifically:
+   ~pat    => pat    -- when -XStrict (even if pat = ~pat')
+   !pat    => !pat   -- always
+   pat     => !pat   -- when -XStrict
+   pat     => pat    -- otherwise
+-}
+
+
 -- | Use -XStrict to add a ! or remove a ~
---
--- Examples:
--- ~pat    => pat    -- when -XStrict (even if pat = ~pat')
--- !pat    => !pat   -- always
--- pat     => !pat   -- when -XStrict
--- pat     => pat    -- otherwise
+-- See Note [decideBangHood]
 decideBangHood :: DynFlags
                -> LPat GhcTc  -- ^ Original pattern
                -> LPat GhcTc  -- Pattern with bang if necessary
@@ -947,3 +976,32 @@ addBang = go
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
            _             -> L l (BangPat noExt lp)
+
+isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
+
+-- Returns Just {..} if we're sure that the expression is True
+-- I.e.   * 'True' datacon
+--        * 'otherwise' Id
+--        * Trivial wappings of these
+-- The arguments to Just are any HsTicks that we have found,
+-- because we still want to tick then, even it they are always evaluated.
+isTrueLHsExpr (L _ (HsVar _ (L _ v))) |  v `hasKey` otherwiseIdKey
+                                      || v `hasKey` getUnique trueDataConId
+                                              = Just return
+        -- trueDataConId doesn't have the same unique as trueDataCon
+isTrueLHsExpr (L _ (HsConLikeOut _ con))
+  | con `hasKey` getUnique trueDataCon = Just return
+isTrueLHsExpr (L _ (HsTick _ tickish e))
+    | Just ticks <- isTrueLHsExpr e
+    = Just (\x -> do wrapped <- ticks x
+                     return (Tick tickish wrapped))
+   -- This encodes that the result is constant True for Hpc tick purposes;
+   -- which is specifically what isTrueLHsExpr is trying to find out.
+isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
+    | Just ticks <- isTrueLHsExpr e
+    = Just (\x -> do e <- ticks x
+                     this_mod <- getModule
+                     return (Tick (HpcTick this_mod ixT) e))
+
+isTrueLHsExpr (L _ (HsPar _ e))         = isTrueLHsExpr e
+isTrueLHsExpr _                       = Nothing

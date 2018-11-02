@@ -10,7 +10,8 @@ The @TyCon@ datatype
 
 module TyCon(
         -- * Main TyCon data types
-        TyCon, AlgTyConRhs(..), visibleDataCons,
+        TyCon,
+        AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
         RuntimeRepInfo(..), TyConFlavour(..),
@@ -814,7 +815,8 @@ data TyCon
         promDcRepInfo :: RuntimeRepInfo  -- ^ See comments with 'RuntimeRepInfo'
     }
 
-  -- | These exist only during a recursive type/class type-checking knot.
+  -- | These exist only during type-checking. See Note [How TcTyCons work]
+  -- in TcTyClsDecls
   | TcTyCon {
         tyConUnique :: Unique,
         tyConName   :: Name,
@@ -1532,10 +1534,11 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
         algTcParent      = parent
     }
 
--- | Makes a tycon suitable for use during type-checking.
--- The only real need for this is for printing error messages during
--- a recursive type/class type-checking knot. It has a kind because
--- TcErrors sometimes calls typeKind.
+-- | Makes a tycon suitable for use during type-checking. It stores
+-- a variety of details about the definition of the TyCon, but no
+-- right-hand side. It lives only during the type-checking of a
+-- mutually-recursive group of tycons; it is then zonked to a proper
+-- TyCon in zonkTcTyCon.
 -- See also Note [Kind checking recursive type and class declarations]
 -- in TcTyClsDecls.
 mkTcTyCon :: Name
@@ -2386,7 +2389,11 @@ instance Uniquable TyCon where
 instance Outputable TyCon where
   -- At the moment a promoted TyCon has the same Name as its
   -- corresponding TyCon, so we add the quote to distinguish it here
-  ppr tc = pprPromotionQuote tc <> ppr (tyConName tc)
+  ppr tc = pprPromotionQuote tc <> ppr (tyConName tc) <> pp_tc
+    where
+      pp_tc = getPprStyle $ \sty -> if ((debugStyle sty || dumpStyle sty) && isTcTyCon tc)
+                                    then text "[tc]"
+                                    else empty
 
 -- | Paints a picture of what a 'TyCon' represents, in broad strokes.
 -- This is used towards more informative error messages.

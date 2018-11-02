@@ -196,7 +196,7 @@
 #define GNUC3_ATTRIBUTE(at)
 #endif
 
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 3
+#if !defined(DEBUG) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))
 #define GNUC_ATTR_HOT __attribute__((hot))
 #else
 #define GNUC_ATTR_HOT /* nothing */

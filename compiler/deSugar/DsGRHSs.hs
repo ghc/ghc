@@ -15,22 +15,22 @@ module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
 import GhcPrelude
 
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
-import {-# SOURCE #-} Match   ( matchSinglePat )
+import {-# SOURCE #-} Match   ( matchSinglePatVar )
 
 import HsSyn
 import MkCore
 import CoreSyn
+import CoreUtils (bindNonRec)
 
+import Check (genCaseTmCs2)
 import DsMonad
 import DsUtils
-import TysWiredIn
-import PrelNames
 import Type   ( Type )
-import Module
 import Name
 import Util
 import SrcLoc
 import Outputable
+import Weight
 
 {-
 @dsGuarded@ is used for pattern bindings.
@@ -118,9 +118,19 @@ matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
         --         body expression in hand
 
 matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
-    match_result <- matchGuards stmts ctx rhs rhs_ty
+    let upat = unLoc pat
+        dicts = collectEvVarsPat upat
+    -- TODO Krzysztof Omega?
+    match_var <- selectMatchVar Omega upat
+    tm_cs <- genCaseTmCs2 (Just bind_rhs) [upat] [match_var]
+    match_result <- addDictsDs dicts $
+                    addTmCsDs tm_cs  $
+                      -- See Note [Type and Term Equality Propagation] in Check
+                    matchGuards stmts ctx rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
-    matchSinglePat core_rhs (StmtCtxt ctx) pat rhs_ty match_result
+    match_result' <- matchSinglePatVar match_var (StmtCtxt ctx) pat rhs_ty
+                                       match_result
+    pure $ adjustMatchResult (bindNonRec match_var core_rhs) match_result'
 
 matchGuards (LastStmt  {} : _) _ _ _ = panic "matchGuards LastStmt"
 matchGuards (ParStmt   {} : _) _ _ _ = panic "matchGuards ParStmt"
@@ -130,35 +140,6 @@ matchGuards (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
 matchGuards (XStmtLR {} : _) _ _ _ =
   panic "matchGuards XStmtLR"
-
-isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
-
--- Returns Just {..} if we're sure that the expression is True
--- I.e.   * 'True' datacon
---        * 'otherwise' Id
---        * Trivial wappings of these
--- The arguments to Just are any HsTicks that we have found,
--- because we still want to tick then, even it they are always evaluated.
-isTrueLHsExpr (L _ (HsVar _ (L _ v))) |  v `hasKey` otherwiseIdKey
-                                      || v `hasKey` getUnique trueDataConId
-                                              = Just return
-        -- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (L _ (HsConLikeOut _ con))
-  | con `hasKey` getUnique trueDataCon = Just return
-isTrueLHsExpr (L _ (HsTick _ tickish e))
-    | Just ticks <- isTrueLHsExpr e
-    = Just (\x -> do wrapped <- ticks x
-                     return (Tick tickish wrapped))
-   -- This encodes that the result is constant True for Hpc tick purposes;
-   -- which is specifically what isTrueLHsExpr is trying to find out.
-isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
-    | Just ticks <- isTrueLHsExpr e
-    = Just (\x -> do e <- ticks x
-                     this_mod <- getModule
-                     return (Tick (HpcTick this_mod ixT) e))
-
-isTrueLHsExpr (L _ (HsPar _ e))         = isTrueLHsExpr e
-isTrueLHsExpr _                       = Nothing
 
 {-
 Should {\em fail} if @e@ returns @D@

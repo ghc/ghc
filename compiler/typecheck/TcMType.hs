@@ -76,7 +76,6 @@ module TcMType (
   zonkTcTyCoVarBndr, zonkTcTyVarBinder,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
-  zonkTcTypeInKnot,
 
   zonkEvVar, zonkWC, zonkSimples,
   zonkId, zonkCoVar,
@@ -309,8 +308,7 @@ unpackCoercionHole_maybe :: CoercionHole -> TcM (Maybe Coercion)
 unpackCoercionHole_maybe (CoercionHole { ch_ref = ref }) = readTcRef ref
 
 -- | Check that a coercion is appropriate for filling a hole. (The hole
--- itself is needed only for printing. NB: This must be /lazy/ in the coercion,
--- as it's used in TcHsSyn in the presence of knots.
+-- itself is needed only for printing.
 -- Always returns the checked coercion, but this return value is necessary
 -- so that the input coercion is forced only when the output is forced.
 checkCoercionHole :: CoVar -> Coercion -> TcM Coercion
@@ -1328,11 +1326,6 @@ tcGetGlobalTyCoVars
        ; writeMutVar gtv_var gbl_tvs'
        ; return gbl_tvs' }
 
--- | Zonk a type without using the smart constructors; the result type
--- is available for inspection within the type-checking knot.
-zonkTcTypeInKnot :: TcType -> TcM TcType
-zonkTcTypeInKnot = mapType (zonkTcTypeMapper { tcm_smart = False }) ()
-
 zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 -- Zonk a type and take its free variables
 -- With kind polymorphism it can be essential to zonk *first*
@@ -1340,20 +1333,17 @@ zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 --    forall k1. forall (a:k2). a
 -- where k2:=k1 is in the substitution.  We don't want
 -- k2 to look free in this type!
--- NB: This might be called from within the knot, so don't use
--- smart constructors. See Note [Type-checking inside the knot] in TcHsType
 zonkTcTypeAndFV ty
-  = tyCoVarsOfTypeDSet <$> zonkTcTypeInKnot ty
+  = tyCoVarsOfTypeDSet <$> zonkTcType ty
 
 -- | Zonk a type and call 'candidateQTyVarsOfType' on it.
--- Works within the knot.
 zonkTcTypeAndSplitDepVars :: TcType -> TcM CandidatesQTvs
 zonkTcTypeAndSplitDepVars ty
-  = candidateQTyVarsOfType <$> zonkTcTypeInKnot ty
+  = candidateQTyVarsOfType <$> zonkTcType ty
 
 zonkTcTypesAndSplitDepVars :: [TcType] -> TcM CandidatesQTvs
 zonkTcTypesAndSplitDepVars tys
-  = candidateQTyVarsOfTypes <$> mapM zonkTcTypeInKnot tys
+  = candidateQTyVarsOfTypes <$> mapM zonkTcType tys
 
 zonkTyCoVar :: TyCoVar -> TcM TcType
 -- Works on TyVars and TcTyVars
@@ -1538,7 +1528,7 @@ zonkId id
 zonkCoVar :: CoVar -> TcM CoVar
 zonkCoVar = zonkId
 
--- | A suitable TyCoMapper for zonking a type inside the knot, and
+-- | A suitable TyCoMapper for zonking a type during type-checking,
 -- before all metavars are filled in.
 zonkTcTypeMapper :: TyCoMapper () TcM
 zonkTcTypeMapper = TyCoMapper
@@ -1546,7 +1536,8 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_tyvar = const zonkTcTyVar
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
   , tcm_hole  = hole
-  , tcm_tybinder = \_env tv _vis -> ((), ) <$> zonkTcTyCoVarBndr tv }
+  , tcm_tybinder = \_env tv _vis -> ((), ) <$> zonkTcTyCoVarBndr tv
+  , tcm_tycon = return }
   where
     hole :: () -> CoercionHole -> TcM Coercion
     hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
@@ -1556,7 +1547,6 @@ zonkTcTypeMapper = TyCoMapper
                              ; checkCoercionHole cv co' }
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
-
 
 -- For unbound, mutable tyvars, zonkType uses the function given to it
 -- For tyvars bound at a for-all, zonkType zonks them to an immutable

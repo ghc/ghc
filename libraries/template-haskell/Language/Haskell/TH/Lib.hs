@@ -151,6 +151,7 @@ import Language.Haskell.TH.Lib.Internal hiding
 import Language.Haskell.TH.Syntax
 
 import Control.Monad (liftM2)
+import Prelude
 
 -- All definitions below represent the "old" API, since their definitions are
 -- different in Language.Haskell.TH.Lib.Internal. Please think carefully before

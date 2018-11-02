@@ -170,12 +170,13 @@ deSugar hsc_env
               pluginModules =
                 map lpModule (plugins (hsc_dflags hsc_env))
         ; deps <- mkDependencies (thisInstalledUnitId (hsc_dflags hsc_env))
-                                 pluginModules tcg_env
+                                 (map mi_module pluginModules) tcg_env
 
         ; used_th <- readIORef tc_splice_used
         ; dep_files <- readIORef dependent_files
         ; safe_mode <- finalSafeMode dflags tcg_env
-        ; usages <- mkUsageInfo hsc_env mod (imp_mods imports) used_names dep_files merged
+        ; usages <- mkUsageInfo hsc_env mod (imp_mods imports) used_names
+                      dep_files merged pluginModules
         -- id_mod /= mod when we are processing an hsig, but hsigs
         -- never desugared and compiled (there's no code!)
         -- Consequently, this should hold for any ModGuts that make

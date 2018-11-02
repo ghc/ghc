@@ -172,15 +172,7 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = do
     lintStgExpr scrut
 
     lf <- getLintFlags
-    let in_scope =
-          case alts_type of
-             AlgAlt _      -> True
-             PrimAlt _     -> True
-             -- Case binders of unboxed tuple or unboxed sum type always dead
-             -- after the unariser has run.
-             -- See Note [Post-unarisation invariants].
-             MultiValAlt _ -> not (lf_unarised lf)
-             PolyAlt       -> True
+    let in_scope = stgCaseBndrInScope alts_type (lf_unarised lf)
 
     addInScopeVars [bndr | in_scope] (mapM_ lintAlt alts)
 

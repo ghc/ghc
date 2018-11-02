@@ -24,7 +24,7 @@ T10267.hs:8:1: error:
     • Relevant bindings include i :: a -> a (bound at T10267.hs:8:1)
       Valid hole fits include
         i :: a -> a (bound at T10267.hs:8:1)
-        j :: forall a. a -> a
+        j :: forall a0. a0 -> a0
           with j @a
           (bound at T10267.hs:8:1)
         k :: forall a. a -> a
@@ -53,10 +53,10 @@ T10267.hs:14:3: error:
     • Relevant bindings include k :: a -> a (bound at T10267.hs:14:3)
       Valid hole fits include
         k :: a -> a (bound at T10267.hs:14:3)
-        j :: forall a. a -> a
+        j :: forall a0. a0 -> a0
           with j @a
           (bound at T10267.hs:8:1)
-        i :: forall a. a -> a
+        i :: forall a0. a0 -> a0
           with i @a
           (bound at T10267.hs:8:1)
         l :: forall a. a -> a

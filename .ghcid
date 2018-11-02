@@ -1,0 +1,7 @@
+--command utils/ghc-in-ghci/run.sh
+--reload compiler
+--reload ghc
+--reload includes
+--restart utils/ghc-in-ghci/run.sh
+--restart utils/ghc-in-ghci/load-main.ghci
+--restart utils/ghc-in-ghci/settings.ghci

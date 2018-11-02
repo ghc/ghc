@@ -207,14 +207,14 @@ We use the notation $[[t1 k1~#k2 t2]]$ to stand for $[[(~#) k1 k2 t1 t2]]$.
 
 Invariants on coercions:
 \begin{itemize}
-\item $[[<t1 t2>_R]]$ is used; never $[[<t1>_R <t2>_Nom]]$.
-\item If $[[<T>_R]]$ is applied to some coercions, at least one of which is not
-reflexive, use $[[T_R </ gi // i />]]$, never $[[<T>_R g1 g2]] \ldots$.
+\item $[[<t1 t2>]]$ is used; never $[[<t1> <t2> ]]$.
+\item If $[[<T>]]$ is applied to some coercions, at least one of which is not
+reflexive, use $[[T_R </ gi // i />]]$, never $[[<T> g1 g2]] \ldots$.
 \item The $[[T]]$ in $[[T_R </gi//i/>]]$ is never a type synonym, though it could
 be a type function.
 \item Every non-reflexive coercion coerces between two distinct types.
 \item The name in a coercion must be a term-level name (\ctor{Id}).
-\item The contents of $[[<t>_R]]$ must not be a coercion. In other words,
+\item The contents of $[[<t>]]$ must not be a coercion. In other words,
 the payload in a \texttt{Refl} must not be built with \texttt{CoercionTy}.
 \end{itemize}
 
@@ -231,6 +231,20 @@ phantom equality includes all types. See \url{http://ghc.haskell.org/trac/ghc/wi
 for more background.
 
 \gram{\ottR}
+
+The \texttt{GRefl} constructor taks an $[[mg]]$. It wraps a kind coercion, which
+might be reflexive or any coercion:
+
+\gram{\ottmg}
+
+A nominal reflexive coercion is quite common, so we keep the special form
+\texttt{Refl}. Invariants on reflexive coercions:
+
+\begin{itemize}
+\item Always use $[[<t>]]$; never $[[<t> Nom MRefl]]$.
+\item All invariants on $[[<t>]]$ hold for $[[<t> R MRefl]]$.
+\item Use $[[<t> Rep MRefl]]$; never $[[sub <t>]]$.
+\end{itemize}
 
 Is it a left projection or a right projection?
 

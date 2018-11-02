@@ -16,6 +16,8 @@ module Language.Haskell.TH.Lib.Map
     , Language.Haskell.TH.Lib.Map.lookup
     ) where
 
+import Prelude
+
 data Map k a  = Bin {-# UNPACK #-} !Size !k a !(Map k a) !(Map k a)
               | Tip
 

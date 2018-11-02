@@ -174,8 +174,7 @@ import CoAxiom
 import ConLike
 import DataCon
 import PatSyn
-import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule
-                        , eqTyConName )
+import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser
@@ -2372,6 +2371,9 @@ data Dependencies
                         -- This is used by 'checkFamInstConsistency'.  This
                         -- does NOT include us, unlike 'imp_finsts'. See Note
                         -- [The type family instance consistency story].
+
+         , dep_plgins :: [ModuleName]
+                        -- ^ All the plugins used while compiling this module.
          }
   deriving( Eq )
         -- Equality used only for old/new comparison in MkIface.addFingerprints
@@ -2382,16 +2384,18 @@ instance Binary Dependencies where
                       put_ bh (dep_pkgs deps)
                       put_ bh (dep_orphs deps)
                       put_ bh (dep_finsts deps)
+                      put_ bh (dep_plgins deps)
 
     get bh = do ms <- get bh
                 ps <- get bh
                 os <- get bh
                 fis <- get bh
+                pl <- get bh
                 return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
-                               dep_finsts = fis })
+                               dep_finsts = fis, dep_plgins = pl })
 
 noDependencies :: Dependencies
-noDependencies = Deps [] [] [] []
+noDependencies = Deps [] [] [] [] []
 
 -- | Records modules for which changes may force recompilation of this module
 -- See wiki: http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoidance

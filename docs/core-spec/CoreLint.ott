@@ -217,7 +217,16 @@ by
 
 G |-ty t : k
 ---------------------- :: Refl
-G |-co <t>_R : t k~R k t
+G |-co <t> : t k~Nom k t
+
+G |-ty t : k
+---------------------- :: GReflMRefl
+G |-co <t> R MRefl : t k~R k t
+
+G |-ty t : k1
+G |-co g : k1 *~Nom * k2
+---------------------- :: GReflMCo
+G |-co <t> R MCo g : t k1~R k2 (t |> g)
 
 G |-co g1 : s1 k1~R k'1 t1
 G |-co g2 : s2 k2~R k'2 t2
@@ -337,11 +346,6 @@ G |-ty s2 : k
 G |-ty t2 : k'
 ------------------------------------------------------ :: AxiomInstCo
 G |-co C ind </ gi // i /> : s2 k~R0 k' t2
-
-G |-co g : t1 k1~R k2 t2
-G |-ty t1 |> h : k1'
----------------------------------- :: CoherenceCo
-G |-co g |> h : t1 |> h k1'~R k2 t2
 
 G |-co g : t1 k1~R k2 t2
 -------------------------- :: KindCo

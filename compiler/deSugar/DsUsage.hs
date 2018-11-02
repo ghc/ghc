@@ -22,12 +22,16 @@ import UniqSet
 import UniqFM
 import Fingerprint
 import Maybes
+import Packages
+import Finder
 
 import Data.List
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import System.Directory
+import System.FilePath
 
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -60,13 +64,11 @@ mkDependencies iuid pluginModules
                   })
  = do
       -- Template Haskell used?
-      let (mns, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
-          plugin_dep_mods = map (,False) mns
+      let (dep_plgins, ms) = unzip [ (moduleName mn, mn) | mn <- pluginModules ]
           plugin_dep_pkgs = filter (/= iuid) (map (toInstalledUnitId . moduleUnitId) ms)
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
                                              (moduleName mod))
-                      ++ plugin_dep_mods
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
@@ -92,6 +94,7 @@ mkDependencies iuid pluginModules
       return Deps { dep_mods   = dep_mods,
                     dep_pkgs   = dep_pkgs',
                     dep_orphs  = dep_orphs,
+                    dep_plgins = dep_plgins,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering
@@ -99,11 +102,14 @@ mkDependencies iuid pluginModules
 mkUsedNames :: TcGblEnv -> NameSet
 mkUsedNames TcGblEnv{ tcg_dus = dus } = allUses dus
 
-mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath] -> [(Module, Fingerprint)] -> IO [Usage]
+mkUsageInfo :: HscEnv -> Module -> ImportedMods -> NameSet -> [FilePath]
+            -> [(Module, Fingerprint)] -> [ModIface] -> IO [Usage]
 mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
+  pluginModules
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
+    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
     let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
                                        dir_imp_mods used_names
         usages = mod_usages ++ [ UsageFile { usg_file_path = f
@@ -114,10 +120,99 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
                                       usg_mod_hash = hash
                                     }
                                | (mod, hash) <- merged ]
+                            ++ concat plugin_usages
     usages `seqList` return usages
     -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
     -- the entire collection of Ifaces.
+
+{- Note [Plugin dependencies]
+Modules for which plugins were used in the compilation process, should be
+recompiled whenever one of those plugins changes. But how do we know if a
+plugin changed from the previous time a module was compiled?
+
+We could try storing the fingerprints of the interface files of plugins in
+the interface file of the module. And see if there are changes between
+compilation runs. However, this is pretty much a non-option because interface
+fingerprints of plugin modules are fairly stable, unless you compile plugins
+with optimisations turned on, and give basically all binders an INLINE pragma.
+
+So instead:
+
+  * For plugins that were build locally: we store the filepath and hash of the
+    object files of the module with the `plugin` binder, and the object files of
+    modules that are dependencies of the plugin module and belong to the same
+    `UnitId` as the plugin
+  * For plugins in an external package: we store the filepath and hash of
+    the dynamic library containing the plugin module.
+
+During recompilation we then compare the hashes of those files again to see
+if anything has changed.
+
+One issue with this approach is that object files are currently (GHC 8.6.1)
+not created fully deterministicly, which could sometimes induce accidental
+recompilation of a module for which plugins were used in the compile process.
+
+One way to improve this is to either:
+
+  * Have deterministic object file creation
+  * Create and store implementation hashes, which would be based on the Core
+    of the module and the implementation hashes of its dependencies, and then
+    compare implementation hashes for recompilation. Creation of implementation
+    hashes is however potentially expensive.
+-}
+mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
+mkPluginUsage hsc_env pluginModule
+  = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
+    -- The plug is from an external package, we just look up the dylib that
+    -- contains the plugin
+    LookupFound _ pkg ->
+      let searchPaths = collectLibraryPaths dflags [pkg]
+          libs        = packageHsLibs dflags pkg
+          dynlibs     = [ searchPath </> mkHsSOName platform lib
+                        | searchPath <- searchPaths
+                        , lib <- libs
+                        ]
+      in  mapM hashFile (nub dynlibs)
+    _ -> do
+      foundM <- findPluginModule hsc_env pNm
+      case foundM of
+        -- The plugin was built locally, look up the object file containing
+        -- the `plugin` binder, and all object files belong to modules that are
+        -- transitive dependencies of the plugin that belong to the same package
+        Found ml _ -> do
+          pluginObject <- hashFile  (ml_obj_file ml)
+          depObjects   <- catMaybes <$> mapM lookupObjectFile deps
+          return (nub (pluginObject : depObjects))
+        _ -> pprPanic "mkPluginUsage: no object or dylib" (ppr pNm)
+  where
+    -- plugins are shared libraries, so add WayDyn to the dflags in order to get
+    -- the correct filenames and library paths; just in case the object that is
+    -- currently being build is not going to be linked dynamically
+    dflags   = addWay' WayDyn (hsc_dflags hsc_env)
+    platform = targetPlatform dflags
+    pNm      = moduleName (mi_module pluginModule)
+    pPkg     = moduleUnitId (mi_module pluginModule)
+    deps     = map fst (dep_mods (mi_deps pluginModule))
+
+    -- loopup object file for a plugin dependencies from the same package as the
+    -- the plugin
+    lookupObjectFile nm = do
+      foundM <- findImportedModule hsc_env nm Nothing
+      case foundM of
+        Found ml m
+          | moduleUnitId m == pPkg -> Just <$> hashFile (ml_obj_file ml)
+          | otherwise              -> return Nothing
+        _ -> pprPanic "mkPluginUsage: no object for dependency"
+                      (ppr pNm <+> ppr nm)
+
+    hashFile f = do
+      fExist <- doesFileExist f
+      if fExist
+         then do
+            h <- getFileHash f
+            return (UsageFile f h)
+         else pprPanic "mkPluginUsage: file not found" (ppr pNm <+> text f)
 
 mk_mod_usage_info :: PackageIfaceTable
               -> HscEnv

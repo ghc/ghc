@@ -193,7 +193,7 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
                 map lpModule (plugins (hsc_dflags hsc_env))
           deps <- mkDependencies
                     (thisInstalledUnitId (hsc_dflags hsc_env))
-                    pluginModules tc_result
+                    (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
@@ -204,7 +204,8 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           -- but if you pass that in here, we'll decide it's the local
           -- module and does not need to be recorded as a dependency.
           -- See Note [Identity versus semantic module]
-          usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names dep_files merged
+          usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names
+                      dep_files merged pluginModules
 
           let (doc_hdr', doc_map, arg_map) = extractDocs tc_result
 
@@ -792,7 +793,8 @@ sortDependencies d
  = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS.fst)) (dep_mods d),
           dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
-          dep_finsts = sortBy stableModuleCmp (dep_finsts d) }
+          dep_finsts = sortBy stableModuleCmp (dep_finsts d),
+          dep_plgins = sortBy (compare `on` moduleNameFS) (dep_plgins d) }
 
 -- | Creates cached lookup for the 'mi_anns' field of ModIface
 -- Hackily, we use "module" as the OccName for any module-level annotations
@@ -1391,6 +1393,7 @@ checkDependencies hsc_env summary iface
  = checkList (map dep_missing (ms_imps summary ++ ms_srcimps summary))
   where
    prev_dep_mods = dep_mods (mi_deps iface)
+   prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
 
    this_pkg = thisPackage (hsc_dflags hsc_env)
@@ -1401,7 +1404,7 @@ checkDependencies hsc_env summary iface
      case find_res of
         Found _ mod
           | pkg == this_pkg
-           -> if moduleName mod `notElem` map fst prev_dep_mods
+           -> if moduleName mod `notElem` map fst prev_dep_mods ++ prev_dep_plgn
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
                            text " not among previous dependencies"

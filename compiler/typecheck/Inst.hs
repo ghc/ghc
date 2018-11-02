@@ -45,7 +45,7 @@ import TcRnMonad
 import TcEnv
 import TcEvidence
 import InstEnv
-import TysWiredIn  ( heqDataCon, omegaDataConTy )
+import TysWiredIn  ( heqDataCon, eqDataCon, omegaDataConTy )
 import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
@@ -61,7 +61,6 @@ import Id
 import Name
 import Var      ( EvVar, mkTyVar, tyVarName, TyVarBndr(..) )
 import DataCon
-import TyCon
 import VarEnv
 import PrelNames
 import SrcLoc
@@ -579,10 +578,8 @@ mkHEqBoxTy co ty1 ty2
 -- | This takes @a ~# b@ and returns @a ~ b@.
 mkEqBoxTy :: TcCoercion -> Type -> Type -> TcM Type
 mkEqBoxTy co ty1 ty2
-  = do { eq_tc <- tcLookupTyCon eqTyConName
-       ; let [datacon] = tyConDataCons eq_tc
-       ; hetero <- mkHEqBoxTy co ty1 ty2
-       ; return $ mkTyConApp (promoteDataCon datacon) [k, ty1, ty2, hetero] }
+  = return $
+    mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
   where k = typeKind ty1
 
 {-

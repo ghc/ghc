@@ -105,3 +105,10 @@ plugin-recomp-flags:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:0
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:1
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin FingerprintPlugin -fplugin-opt FingerprintPlugin:1
+
+# Should recompile the module because the plugin changed
+.PHONY: plugin-recomp-change
+plugin-recomp-change:
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
+	"$(MAKE)" -s --no-print-directory -C plugin-recomp package.plugins01 TOP=$(TOP) RUN=-DRUN2
+	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -v0 plugin-recomp-test.hs -package-db plugin-recomp/pkg.plugins01/local.package.conf -fplugin PurePlugin
