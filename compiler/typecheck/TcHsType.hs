@@ -90,6 +90,7 @@ import DataCon
 import Class
 import Name
 import NameSet
+import NameEnv
 import VarEnv
 import TysWiredIn
 import BasicTypes
@@ -97,6 +98,7 @@ import SrcLoc
 import Constants ( mAX_CTUPLE_SIZE )
 import ErrUtils( MsgDoc )
 import Unique
+import UniqSet
 import Util
 import UniqSupply
 import Outputable
@@ -105,7 +107,7 @@ import PrelNames hiding ( wildCardName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
-import Data.List ( find, mapAccumR )
+import Data.List ( find, partition )
 import Control.Monad
 
 {-
@@ -326,10 +328,13 @@ tcHsClsInstType user_ctxt hs_inst_ty
        of method types. So failing isn't wrong. Yet, the reason we do it is
        to avoid the validity checker from seeing unsolved coercion holes in
        types. Much better just to report the kind error directly. -}
-    do { inst_ty <- failIfEmitsConstraints $
+    do { traceTc "tcHsClsInstType" (ppr hs_inst_ty)
+       ; inst_ty <- failIfEmitsConstraints $
                     tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty
                                            (TheKind constraintKind)
+       ; traceTc "tcHsClsInstType 2" (ppr inst_ty)
        ; inst_ty <- zonkTcTypeToType inst_ty
+       ; traceTc "tcHsClsInstType 3" (ppr inst_ty)
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
 ----------------------------------------------
@@ -1565,48 +1570,33 @@ kcLHsQTyVars name flav cusk
            -- Now, because we're in a CUSK,
            -- we quantify over the mentioned kind vars
        ; let spec_req_tkvs = scoped_kvs ++ tc_tvs
+
        ; all_kinds <- zonkTcTypes (res_kind : map tyVarKind spec_req_tkvs)
 
        ; let mentioned_kvs = tyCoVarsOfTypesDSet all_kinds
              kvs_to_gen = mentioned_kvs `delDVarSetList` spec_req_tkvs
              candidates = DV { dv_kvs = kvs_to_gen
                              , dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
+             -- 'candidates' are all the variables that we are going to
+             -- skolemise and then quantify over.  We exclude spec_req_tvs
+             -- because all of them are /already/ skolems
 
-       ; local_inferred <- setTcLevel topTcLevel $
-                             -- setTcLevel: We are in a CUSK, so we should generalise
-                             -- exactly as if we were at top level.  (We are actually
-                             -- at Level 1 in getInitialKinds.)
-                           quantifyTyVars emptyVarSet candidates
+       ; inferred <- setTcLevel topTcLevel $
+                     -- setTcLevel: We are in a CUSK, so we should generalise
+                     -- exactly as if we were at top level.  (We are actually
+                     -- at Level 1 in getInitialKinds.)
+                     quantifyTyVars emptyVarSet candidates
+          -- NB: qtkvs comes back sorted in dependency order
 
-       ; let class_tvs
-               | Just class_tc <- tyConFlavourAssoc_maybe flav
-               = tyConTyVars class_tc  -- class has a CUSK, so these are zonked
-                                       -- and fully settled
-               | otherwise
-               = []
+       ; scoped_kvs <- mapM zonkTcTyCoVarBndr scoped_kvs
+       ; tc_tvs     <- mapM zonkTyCoVarKind   tc_tvs
+       ; res_kind   <- zonkTcType             res_kind
 
-             class_tv_set = mkVarSet class_tvs
-             local_specified = filterOut (`elemVarSet` class_tv_set) scoped_kvs
-               -- NB: local_specified are guaranteed to be in a well-scoped
-               -- order because of tcImplicitQTKBndrs
+       ; let mentioned_kv_set = dVarSetToVarSet mentioned_kvs
+             specified        = scopedSort scoped_kvs
 
-       ; local_specified <- scopedSort <$> mapM zonkTyCoVarKind local_specified
-       ; tc_tvs          <- mapM zonkTyCoVarKind tc_tvs
-       ; res_kind        <- zonkTcType res_kind
-
-       ; let -- Work out which of the class tyvars are used in this TyCon
-             -- We will quantify over these first, as Specified
-             -- Their status in the original class is irrelevant; suppose we have
-             --    class C k where type F (x :: k)
-             -- Then k is Required for C, but only Specified for F
-             -- If it was Required for F it'd be among the tc_tvs
-             local_spec_tv_set = mkVarSet local_specified
-             used_class_tvs = filter (`elemVarSet` local_spec_tv_set) class_tvs
-
-             mentioned_kv_set = dVarSetToVarSet mentioned_kvs
-             final_tc_binders =  mkNamedTyConBinders Specified used_class_tvs
-                              ++ mkNamedTyConBinders Inferred  local_inferred
-                              ++ mkNamedTyConBinders Specified local_specified
+             final_tc_binders =  mkNamedTyConBinders Inferred  inferred
+                              ++ mkNamedTyConBinders Specified specified
                               ++ map (mkRequiredTyConBinder mentioned_kv_set) tc_tvs
 
          -- If the ordering from
@@ -1617,7 +1607,7 @@ kcLHsQTyVars name flav cusk
           -- If any of the specified tyvars aren't actually mentioned in a binder's
           -- kind (or the return kind), then we're in the CUSK case from
           -- Note [Free-floating kind vars]
-       ; let unmentioned_kvs   = filterOut (`elemVarSet` mentioned_kv_set) local_specified
+       ; let unmentioned_kvs   = filterOut (`elemVarSet` mentioned_kv_set) specified
        ; reportFloatingKvs name flav (map binderVar final_tc_binders) unmentioned_kvs
 
        ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
@@ -1634,6 +1624,9 @@ kcLHsQTyVars name flav cusk
               , text "scoped_kvs" <+> ppr scoped_kvs
               , text "tc_tvs" <+> ppr tc_tvs
               , text "res_kind" <+> ppr res_kind
+              , text "candidates" <+> ppr candidates
+              , text "inferred" <+> ppr inferred
+              , text "specified" <+> ppr specified
               , text "final_tc_binders" <+> ppr final_tc_binders
               , text "mkTyConKind final_tc_bndrs res_kind"
                 <+> ppr (mkTyConKind final_tc_binders res_kind)
@@ -1821,9 +1814,14 @@ kcImplicitTKBndrsX :: (Name -> TcM TcTyVar) -- new_tv function
                    -> TcM ([TcTyVar], a)  -- returns the tyvars created
                                           -- these are *not* dependency ordered
 kcImplicitTKBndrsX new_tv var_ns thing_inside
-  = do { tkvs <- mapM new_tv var_ns
+  = do { traceTc "kcImplicitTKBndrsX" (ppr var_ns)
+       ; env <- getLclEnv
+       ; let (in_scope, not_in_scope) = partition (`elemNameEnv` tcl_env env) var_ns
+       ; WARN( not (null in_scope), ppr in_scope ) return ()
+       ; tkvs <- mapM new_tv not_in_scope
        ; result <- tcExtendTyVarEnv tkvs thing_inside
        ; return (tkvs, result) }
+
 
 tcImplicitTKBndrs, tcImplicitTKBndrsSig, tcImplicitQTKBndrs
   :: SkolemInfo
@@ -2032,7 +2030,9 @@ kindGeneralize :: TcType -> TcM [KindVar]
 --        kindGeneralizeLocal emptyWC kind_or_type
 --
 kindGeneralize kind_or_type
-  = do { kvs <- zonkTcTypeAndFV kind_or_type
+  = do { kt <- zonkTcType kind_or_type
+       ; traceTc "kindGeneralise1" (ppr kt)
+       ; kvs <- zonkTcTypeAndFV kind_or_type
        ; let dvs = DV { dv_kvs = kvs
                       , dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
 
@@ -2063,11 +2063,13 @@ kindGeneralizeLocal wanted kind_or_type
          -- thus, every free variable is really a kv, never a tv.
        ; dvs <- candidateQTyVarsOfKind mono_tvs kind_or_type
 
-       ; traceTc "kindGeneralizeLocal" (vcat [ ppr wanted
-                                             , ppr kind_or_type
-                                             , ppr constrained
-                                             , ppr mono_tvs
-                                             , ppr dvs ])
+       ; traceTc "kindGeneralizeLocal" $
+         vcat [ text "Wanted:" <+> ppr wanted
+              , text "Kind or type:" <+> ppr kind_or_type
+              , text "tcvs of wanted:" <+> pprTyVars (nonDetEltsUniqSet (tyCoVarsOfWC wanted))
+              , text "constrained:" <+> pprTyVars (nonDetEltsUniqSet constrained)
+              , text "mono_tvs:" <+> pprTyVars (nonDetEltsUniqSet mono_tvs)
+              , text "dvs:" <+> ppr dvs ]
 
        ; quantifyTyVars mono_tvs dvs }
 
@@ -2246,10 +2248,12 @@ tcTyClTyVars tycon_name thing_inside
        ; checkNoErrs $ reportFloatingKvs tycon_name flav
                                          scoped_tvs still_sig_tvs
 
-       ; let res_kind   = tyConResKind tycon
-             binders    = correct_binders (tyConBinders tycon) res_kind
+       ; let res_kind = tyConResKind tycon
+             binders  = tyConBinders tycon
+--             binders    = correct_binders (tyConBinders tycon) res_kind
        ; traceTc "tcTyClTyVars" (ppr tycon_name <+> ppr binders)
-       ; scopeTyVars2 (TyConSkol flav tycon_name) scoped_prs $
+       ; pushTcLevelM_                   $
+         tcExtendNameTyVarEnv scoped_prs $
          thing_inside binders res_kind }
   where
     report_sig_tv_err (n1, n2)
@@ -2257,6 +2261,7 @@ tcTyClTyVars tycon_name thing_inside
         addErrTc (text "Couldn't match" <+> quotes (ppr n1)
                         <+> text "with" <+> quotes (ppr n2))
 
+{-
     -- Given some TyConBinders and a TyCon's result kind, make sure that the
     -- correct any wrong Named/Anon choices. For example, consider
     --   type Syn k = forall (a :: k). Proxy a
@@ -2287,6 +2292,7 @@ tcTyClTyVars tycon_name thing_inside
           where
             tv      = binderVar binder
             new_fvs = fvs `delVarSet` tv `unionVarSet` tyCoVarsOfType (tyVarKind tv)
+-}
 
 -----------------------------------
 tcDataKindSig :: [TyConBinder]
@@ -2887,13 +2893,14 @@ reportFloatingKvs tycon_name flav all_tvs bad_tvs
     ppr_tv_bndrs tvs = sep (map pp_tv tvs)
     pp_tv tv         = parens (ppr tv <+> dcolon <+> ppr (tyVarKind tv))
 
--- | If the inner action emits constraints, reports them as errors and fails;
+-- | If the inner action emits constraints, report them as errors and fail;
 -- otherwise, propagates the return value. Useful as a wrapper around
 -- 'tcImplicitTKBndrs', which uses solveLocalEqualities, when there won't be
 -- another chance to solve constraints
 failIfEmitsConstraints :: TcM a -> TcM a
 failIfEmitsConstraints thing_inside
-  = checkNoErrs $  -- c.f same checkNoErrs in solveEqualities
+  = checkNoErrs $  -- We say that we fail if there are constraints!
+                   -- c.f same checkNoErrs in solveEqualities
     do { (res, lie) <- captureConstraints thing_inside
        ; reportAllUnsolved lie
        ; return res

@@ -558,63 +558,36 @@ kcTyClGroup decls
 
       | otherwise
         -- See Note [Required, Specified, and Inferred for types]
-      = do {  -- Step 0: get the tyvars from the enclosing class (if any)
-             (all_class_tctvs, class_scoped_tvs) <- get_class_tvs tc
-
-              -- Step 1: gather all the free variables
+      = do {  -- Step 1: gather all the free variables
            ; tc_tvs          <- mapM zonkTcTyCoVarBndr (map binderVar (tyConBinders tc))
            ; tc_res_kind     <- zonkTcType (tyConResKind tc)
            ; scoped_tv_pairs <- zonkTyVarTyVarPairs (tcTyConScopedTyVars tc)
 
            ; let all_fvs    = tyCoVarsOfTypesDSet (tc_res_kind : map tyVarKind tc_tvs)
+                 all_fv_set = dVarSetToVarSet all_fvs
                  scoped_tvs = map snd scoped_tv_pairs
 
            ; MASSERT( all ((== Required) . tyConBinderArgFlag) (tyConBinders tc) )
 
-             -- Step 2: Select out the Required arguments; that is, the tc_binders
-           ; let no_req_fvs = all_fvs `delDVarSetList` tc_tvs
-
-             -- Step 3: partition remaining variables into class variables and
-             -- local variables (this matters only for associated types)
-                 (class_fvs, local_fvs)
-                   = partitionDVarSet (`elemDVarSet` all_class_tctvs) no_req_fvs
-
-             -- Step 4: For each set so far, use the set to select the scoped_tvs.
-             -- We take from the scoped_tvs to preserve order. These tvs will become
-             -- the Specified ones.
-                 class_specified = filter (`elemDVarSet` class_fvs) class_scoped_tvs
-                 local_specified = filter (`elemDVarSet` local_fvs) scoped_tvs
-
+           ; let
              -- Step 5: Order the specified variables by ScopedSort
              -- See Note [ScopedSort] in Type
-                 class_specified_sorted = scopedSort class_specified
-                 local_specified_sorted = scopedSort local_specified
+                 specified_sorted = scopedSort scoped_tvs
 
-             -- Step 6: Remove the Specified ones from the fv sets. These are the
-             -- Inferred ones.
-                 class_inferred_set = class_fvs `delDVarSetList` class_specified_sorted
-                 local_inferred_set = local_fvs `delDVarSetList` local_specified_sorted
-
-                 class_inferred = dVarSetElemsWellScoped class_inferred_set
-                 local_inferred = dVarSetElemsWellScoped local_inferred_set
+             -- Step 6: Remove the Specified ones from the fv sets.
+             -- These are the Inferred ones.
+                 inferred = dVarSetElemsWellScoped $
+                            all_fvs `delDVarSetList` specified_sorted
+                                    `delDVarSetList` tc_tvs
 
              -- Step 7: Make the TyConBinders.
-                 class_inferred_tcbs  = mkNamedTyConBinders Inferred class_inferred
-                 class_specified_tcbs = mkNamedTyConBinders Specified class_specified_sorted
-                 local_inferred_tcbs  = mkNamedTyConBinders Inferred local_inferred
-                 local_specified_tcbs = mkNamedTyConBinders Specified local_specified_sorted
-
-                 mk_req_tcb tv
-                   | tv `elemDVarSet` all_fvs = mkNamedTyConBinder Required tv
-                   | otherwise                = mkAnonTyConBinder tv
-
-                 required_tcbs = map mk_req_tcb tc_tvs
+                 inferred_tcbs  = mkNamedTyConBinders Inferred inferred
+                 specified_tcbs = mkNamedTyConBinders Specified specified_sorted
+                 required_tcbs  = map (mkRequiredTyConBinder all_fv_set) tc_tvs
 
              -- Step 8: Assemble the final list.
-                 final_tcbs = concat [ class_inferred_tcbs
-                                     , class_specified_tcbs
-                                     , local_inferred_tcbs
-                                     , local_specified_tcbs
+                 final_tcbs = concat [ inferred_tcbs
+                                     , specified_tcbs
                                      , required_tcbs ]
 
              -- Step 9: Check for validity. We do this here because we're about to
@@ -629,36 +602,16 @@ kcTyClGroup decls
            ; let name = tyConName tc
            ; traceTc "Generalise kind" $
              vcat [ text "name =" <+> ppr name
-                  , text "all_class_tctvs =" <+> ppr all_class_tctvs
-                  , text "class_scoped_tvs =" <+> ppr class_scoped_tvs
-                  , text "tc_tvs =" <+> ppr tc_tvs
+                  , text "tc_tvs =" <+> pprTyVars tc_tvs
                   , text "tc_res_kind =" <+> ppr tc_res_kind
-                  , text "scoped_tvs =" <+> ppr scoped_tvs
-                  , text "class_inferred_tcbs =" <+> ppr class_inferred_tcbs
-                  , text "class_specified_tcbs =" <+> ppr class_specified_tcbs
-                  , text "local_inferred_tcbs =" <+> ppr local_inferred_tcbs
-                  , text "local_specified_tcbs =" <+> ppr local_specified_tcbs
-                  , text "required_tcbs =" <+> ppr required_tcbs ]
+                  , text "scoped_tvs =" <+> pprTyVars scoped_tvs
+                  , text "inferred =" <+> pprTyVars inferred
+                  , text "specified_sorted =" <+> pprTyVars specified_sorted
+                  , text "required_tcbs =" <+> ppr required_tcbs
+                  , text "final_tcbs =" <+> ppr final_tcbs ]
            ; return $ mkTcTyCon name user_tyvars final_tcbs tc_res_kind scoped_tv_pairs
                                 True {- it's generalised now -} (tyConFlavour tc) }
 
-    get_class_tvs :: TcTyCon -> TcM (DTyCoVarSet, [TcTyVar])
-        -- returns all tyConTyVars of the enclosing class, as well as its
-        -- scoped type variables. Both are zonked.
-    get_class_tvs at_tc
-      | Just class_tc <- tyConAssoc_maybe at_tc
-      = do { -- We can't just call tyConTyVars, because the enclosing class
-             -- hasn't been generalised yet
-             tc_binders  <- zonkTyConBinders (tyConBinders class_tc)
-           ; tc_res_kind <- zonkTcType (tyConResKind class_tc)
-           ; scoped_tvs  <- mapM zonkTcTyVarToTyVar (map snd (tcTyConScopedTyVars class_tc))
-
-           ; return ( tyCoVarsOfTypesDSet (tc_res_kind : map binderType tc_binders)
-                      `extendDVarSetList` tyConTyVars class_tc
-                    , scoped_tvs ) }
-
-      | otherwise
-      = return (emptyDVarSet, [])
 
 {- Note [Required, Specified, and Inferred for types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1819,7 +1772,7 @@ kcFamTyPats :: TcTyCon
             -> TcM ()
 kcFamTyPats tc_fam_tc imp_vars mb_expl_bndrs arg_pats kind_checker
   = discardResult $
-    kcImplicitTKBndrsSkol imp_vars $
+    kcImplicitTKBndrs imp_vars $
     kcExplicitTKBndrs (fromMaybe [] mb_expl_bndrs) $
     do { let name     = tyConName tc_fam_tc
              loc      = nameSrcSpan name
@@ -3016,12 +2969,12 @@ checkValidDataCon dflags existential_ok tc con
                    user_tvbs_invariant
                      =    Set.fromList (filterEqSpec eq_spec univs ++ exs)
                        == Set.fromList user_tvs
-             ; MASSERT2( user_tvbs_invariant
+             ; WARN( not user_tvbs_invariant
                        , vcat ([ ppr con
                                , ppr univs
                                , ppr exs
                                , ppr eq_spec
-                               , ppr user_tvs ])) }
+                               , ppr user_tvs ])) return () }
 
         ; traceTc "Done validity of data con" $
           vcat [ ppr con

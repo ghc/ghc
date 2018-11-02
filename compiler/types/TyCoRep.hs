@@ -77,7 +77,8 @@ module TyCoRep (
 
         -- * Free variables
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
-        tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
+        tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
+        tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
@@ -1857,8 +1858,15 @@ tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars 
 
 tyCoFVsBndr :: TyCoVarBinder -> FV -> FV
 -- Free vars of (forall b. <thing with fvs>)
-tyCoFVsBndr (Bndr tv _) fvs = (delFV tv fvs)
-                              `unionFV` tyCoFVsOfType (varType tv)
+tyCoFVsBndr (Bndr tv _) fvs = tyCoFVsVarBndr tv fvs
+
+tyCoFVsVarBndrs :: [Var] -> FV -> FV
+tyCoFVsVarBndrs vars fvs = foldr tyCoFVsVarBndr fvs vars
+
+tyCoFVsVarBndr :: Var -> FV -> FV
+tyCoFVsVarBndr var fvs
+  = tyCoFVsOfType (varType var)   -- Free vars of its type/kind
+    `unionFV` delFV var fvs       -- Delete it from the thing-inside
 
 tyCoFVsOfTypes :: [Type] -> FV
 -- See Note [Free variables of types]
@@ -1894,7 +1902,7 @@ tyCoFVsOfCo (TyConAppCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand
 tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
-  = (delFV tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
+  = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
 tyCoFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
   = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc

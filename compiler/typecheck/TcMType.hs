@@ -1310,6 +1310,16 @@ to be later converted to a list in a deterministic order.
 
 For more information about deterministic sets see
 Note [Deterministic UniqFM] in UniqDFM.
+
+
+--------------- Note to tidy up --------
+Can we quantify over a non-unification variable? Sadly yes (Trac #15991b)
+  class C2 (a :: Type) (b :: Proxy a) (c :: Proxy b) where
+    type T4 a c
+
+When we come to T4 we have in Inferred b; but it is a skolem
+from the (fully settled) C2.
+
 -}
 
 quantifyTyVars
@@ -1322,8 +1332,10 @@ quantifyTyVars
 --   associated type declarations. Also accepts covars, but *never* returns any.
 quantifyTyVars gbl_tvs
                dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs, dv_cvs = covars })
-  = do { traceTc "quantifyTyVars 1" (vcat [ppr dvs, ppr gbl_tvs])
-       ; let mono_tvs = gbl_tvs `unionVarSet` closeOverKinds covars
+  = do { outer_tclvl <- getTcLevel
+       ; traceTc "quantifyTyVars 1" (vcat [ppr outer_tclvl, ppr dvs, ppr gbl_tvs])
+       ; let co_tvs = closeOverKinds covars
+             mono_tvs = gbl_tvs `unionVarSet` co_tvs
               -- NB: All variables in the kind of a covar must not be
               -- quantified over, as we don't quantify over the covar.
 
@@ -1346,22 +1358,25 @@ quantifyTyVars gbl_tvs
                  -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
 
                -- See Note [Naughty quantification candidates]
-             (naughty_deps, final_dep_kvs)       = partition (is_naughty_tv mono_tvs) dep_kvs
-             (naughty_nondeps, final_nondep_tvs) = partition (is_naughty_tv mono_tvs) nondep_tvs
+             (naughty_deps, final_dep_kvs)       = partition (is_naughty_tv outer_tclvl) dep_kvs
+             (naughty_nondeps, final_nondep_tvs) = partition (is_naughty_tv outer_tclvl) nondep_tvs
 
        ; mapM_ zap_naughty_tv (naughty_deps ++ naughty_nondeps)
 
        -- This block uses level numbers to decide what to quantify
        -- and emits a warning if the two methods do not give the same answer
-       ; outer_tclvl <- getTcLevel
        ; let dep_kvs2    = dVarSetElemsWellScoped $
                            filterDVarSet (quantifiableTv outer_tclvl) dep_tkvs
              nondep_tvs2 = filter (quantifiableTv outer_tclvl) $
                            dVarSetElems (nondep_tkvs `minusDVarSet` dep_tkvs)
 
              all_ok = dep_kvs == dep_kvs2 && nondep_tvs == nondep_tvs2
-             bad_msg = hang (text "Quantificaiton by level numbers would fail")
+             bad_msg = hang (text "Quantification by level numbers would fail")
                           2 (vcat [ text "Outer level =" <+> ppr outer_tclvl
+                                  , text "dep_tkvs ="    <+> ppr dep_tkvs
+                                  , text "co_vars ="     <+> vcat [ ppr cv <+> dcolon <+> ppr (varType cv)
+                                                                  | cv <- nonDetEltsUniqSet covars ]
+                                  , text "co_tvs ="      <+> ppr co_tvs
                                   , text "dep_kvs ="     <+> ppr dep_kvs
                                   , text "dep_kvs2 ="    <+> ppr dep_kvs2
                                   , text "nondep_tvs ="  <+> ppr nondep_tvs
@@ -1395,9 +1410,13 @@ quantifyTyVars gbl_tvs
        ; return final_qtvs }
   where
     -- See Note [Naughty quantification candidates]
-    is_naughty_tv mono_tvs tv
-      = anyVarSet (isSkolemTyVar <&&> (not . (`elemVarSet` mono_tvs))) $
-        tyCoVarsOfType (tyVarKind tv)
+    --  (a :: k) is naughty if the kind 'k' mentions a skolem
+    --  variable that is not in scope
+    is_naughty_tv outer_tclvl tv
+       = anyVarSet is_inner_skolem $
+         tyCoVarsOfType (tyVarKind tv)
+       where
+         is_inner_skolem tv = isSkolemTyVar tv &&  tcTyVarLevel tv > outer_tclvl
 
     -- zonk_quant returns a tyvar if it should be quantified over;
     -- otherwise, it returns Nothing. The latter case happens for
@@ -1409,8 +1428,10 @@ quantifyTyVars gbl_tvs
                          -- a coercion hole. Test case: typecheck/should_compile/T2494
 
       | not (isTcTyVar tkv)
-      = return (Just tkv)  -- For associated types, we have the class variables
+      = WARN( True, text "quantifying over a TyVar" <+> ppr tkv)
+        return (Just tkv)  -- For associated types, we have the class variables
                            -- in scope, and they are TyVars not TcTyVars
+
       | otherwise
       = do { deflt_done <- defaultTyVar default_kind tkv
            ; case deflt_done of
@@ -1715,8 +1736,8 @@ zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
    -- painful to make them into TcTyVars there
 
 zonkTyCoVarsAndFV :: TyCoVarSet -> TcM TyCoVarSet
-zonkTyCoVarsAndFV tycovars =
-  tyCoVarsOfTypes <$> mapM zonkTyCoVar (nonDetEltsUniqSet tycovars)
+zonkTyCoVarsAndFV tycovars
+  = tyCoVarsOfTypes <$> mapM zonkTyCoVar (nonDetEltsUniqSet tycovars)
   -- It's OK to use nonDetEltsUniqSet here because we immediately forget about
   -- the ordering by turning it into a nondeterministic set and the order
   -- of zonking doesn't matter for determinism.
@@ -1724,8 +1745,8 @@ zonkTyCoVarsAndFV tycovars =
 -- Takes a list of TyCoVars, zonks them and returns a
 -- deterministically ordered list of their free variables.
 zonkTyCoVarsAndFVList :: [TyCoVar] -> TcM [TyCoVar]
-zonkTyCoVarsAndFVList tycovars =
-  tyCoVarsOfTypesList <$> mapM zonkTyCoVar tycovars
+zonkTyCoVarsAndFVList tycovars
+  = tyCoVarsOfTypesList <$> mapM zonkTyCoVar tycovars
 
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
@@ -1920,8 +1941,9 @@ zonkTcTyCoVarBndr :: TcTyCoVar -> TcM TcTyCoVar
 -- A tyvar binder is never a unification variable (TauTv),
 -- rather it is always a skolem. It *might* be a TyVarTv.
 -- (Because non-CUSK type declarations use TyVarTvs.)
--- Regardless, it may have a kind that has not yet been zonked,
--- and may include kind unification variables.
+-- Regardless, it may have a kind
+-- that has not yet been zonked, and may include kind
+-- unification variables.
 zonkTcTyCoVarBndr tyvar
   | isTyVarTyVar tyvar
      -- We want to preserve the binding location of the original TyVarTv.

@@ -1984,8 +1984,12 @@ tyCoFVsOfImplic :: Implication -> FV
 tyCoFVsOfImplic (Implic { ic_skols = skols
                         , ic_given = givens
                         , ic_wanted = wanted })
-  = FV.delFVs (mkVarSet skols `unionVarSet` mkVarSet givens)
-      (tyCoFVsOfWC wanted `unionFV` tyCoFVsOfTypes (map evVarPred givens))
+  | isEmptyWC wanted
+  = emptyFV
+  | otherwise
+  = tyCoFVsVarBndrs skols  $
+    tyCoFVsVarBndrs givens $
+    tyCoFVsOfWC wanted
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
 tyCoFVsOfBag tvs_of = foldrBag (unionFV . tvs_of) emptyFV
