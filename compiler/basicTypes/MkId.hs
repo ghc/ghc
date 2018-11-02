@@ -694,7 +694,7 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
     (rep_tys, rep_strs) = unzip (concat rep_tys_w_strs)
 
     wrapper_reqd =
-      not (isClassTyCon tycon)
+      not (isClassTyCon tycon || isTcLevPoly tycon)
 
     initial_wrap_app = Var (dataConWorkId data_con)
                        `mkTyApps`  res_ty_args

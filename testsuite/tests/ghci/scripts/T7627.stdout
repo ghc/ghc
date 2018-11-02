@@ -34,6 +34,6 @@ data (#,#) (a :: TYPE k0) (b :: TYPE k1) :: TYPE
   = (#,#) a b
   	-- Defined in ‘GHC.Prim’
 (,) :: a -> b -> (a, b)
-(#,#) :: a -> b -> (# a, b #)
+(#,#) :: a ->@['One] b ->@['One] (# a, b #)
 (  ,  ) :: a -> b -> (a, b)
-(#  ,  #) :: a -> b -> (# a, b #)
+(#  ,  #) :: a ->@['One] b ->@['One] (# a, b #)

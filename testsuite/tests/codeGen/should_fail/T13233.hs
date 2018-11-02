@@ -3,19 +3,20 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE LinearTypes #-}
 module Bug where
 
 import GHC.Exts (TYPE, RuntimeRep, Weak#, State#, RealWorld, mkWeak# )
 
 class Foo (a :: TYPE rep) where
-  bar :: forall (b :: TYPE rep2). (a -> a -> b) -> a -> a -> b
+  bar :: forall (b :: TYPE rep2). (a ->. a ->. b) -> a ->. a ->. b
 
-baz :: forall (a :: TYPE rep). Foo a => a -> a -> (# a, a #)
+baz :: forall (a :: TYPE rep). Foo a => a ->. a ->. (# a, a #)
 baz = bar (#,#)
 
 obscure :: (forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep)
                    (a :: TYPE rep1) (b :: TYPE rep2).
-                   a -> b -> (# a, b #)) -> ()
+                   a ->. b ->. (# a, b #)) -> ()
 obscure _ = ()
 
 quux :: ()
