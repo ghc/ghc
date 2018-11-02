@@ -96,10 +96,11 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.2
+      - image: ghcci/x86_64-linux:0.0.4
     environment:
-      <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux
+      BUILD_SPHINX_PDF: "NO"
+      <<: *buildenv
     steps:
       - checkout
       - *prepare
