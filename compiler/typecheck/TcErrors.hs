@@ -1091,7 +1091,9 @@ mkHoleError _ _ ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
   -- in-scope variables in the message, and note inaccessible exact matches
   = do { dflags   <- getDynFlags
        ; imp_info <- getImports
-       ; let suggs_msg = unknownNameSuggestions dflags rdr_env0
+       ; curr_mod <- getModule
+       ; hpt <- getHpt
+       ; let suggs_msg = unknownNameSuggestions dflags hpt curr_mod rdr_env0
                                                 (tcl_rdr lcl_env) imp_info rdr
        ; rdr_env     <- getGlobalRdrEnv
        ; splice_locs <- getTopLevelSpliceLocs

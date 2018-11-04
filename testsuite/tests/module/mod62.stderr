@@ -4,4 +4,3 @@ mod62.hs:3:9: error: Qualified name in binding position: M.y
 mod62.hs:3:22: error:
     Not in scope: ‘M.y’
     Perhaps you meant ‘M.x’ (line 3)
-    No module named ‘M’ is imported.

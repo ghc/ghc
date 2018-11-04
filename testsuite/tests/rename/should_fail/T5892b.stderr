@@ -1,4 +1,2 @@
 
-T5892b.hs:11:7: error:
-    Not in scope: ‘T5892b.subForest’
-    No module named ‘T5892b’ is imported.
+T5892b.hs:11:7: error: Not in scope: ‘T5892b.subForest’
