@@ -173,6 +173,34 @@ same context. For example, this is fine: ::
 
 .. _infelicities-Modules:
 
+Default Module headers with -main-is
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Haskell2010 report specifies in <https://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-990005.1> that
+
+    "An abbreviated form of module, consisting only of the module body,
+     is permitted. If this is used, the header is assumed to be
+     `module Main(main) where`."
+
+Consider the following program: ::
+
+    -- file: Main.hs
+    program :: IO ()
+    program = return ()
+
+Under the report, this would fail with ``ghc -main-is Main.program Main.hs``
+with the following errors: ::
+
+    Main.hs:1:1: error:
+        Not in scope: 'main'
+        Perhaps you meant 'min' (imported from Prelude)
+
+    Main.hs:1:1: error:
+        The main IO action 'program' is not exported by module 'Main'
+
+GHC's flag '-main-is' allows one to change the entry point name so that
+the above example would succeed.
+
 Module system and interface files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

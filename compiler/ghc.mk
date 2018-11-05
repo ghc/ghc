@@ -84,8 +84,6 @@ compiler/stage%/build/Config.hs : mk/config.mk mk/project.mk | $$(dir $$@)/.
 	@echo 'cBooterVersion        = "$(GhcVersion)"'                     >> $@
 	@echo 'cStage                :: String'                             >> $@
 	@echo 'cStage                = show (STAGE :: Int)'                 >> $@
-	@echo 'cIntegerLibrary       :: String'                             >> $@
-	@echo 'cIntegerLibrary       = "$(INTEGER_LIBRARY)"'                >> $@
 	@echo 'cIntegerLibraryType   :: IntegerLibrary'                     >> $@
 ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
 	@echo 'cIntegerLibraryType   = IntegerGMP'                          >> $@

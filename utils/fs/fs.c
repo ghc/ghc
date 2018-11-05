@@ -107,15 +107,13 @@ int FS(swopen) (const wchar_t* filename, int oflag, int shflag, int pmode)
   /* Construct access mode.  */
   DWORD dwDesiredAccess = 0;
   if (HAS_FLAG (oflag, _O_RDONLY))
-    dwDesiredAccess |= GENERIC_READ | FILE_READ_DATA | FILE_READ_ATTRIBUTES |
-                       FILE_WRITE_ATTRIBUTES;;
+    dwDesiredAccess |= GENERIC_READ | FILE_READ_DATA | FILE_READ_ATTRIBUTES;
   if (HAS_FLAG (oflag, _O_RDWR))
     dwDesiredAccess |= GENERIC_WRITE | GENERIC_READ | FILE_READ_DATA |
                        FILE_WRITE_DATA | FILE_READ_ATTRIBUTES |
                        FILE_WRITE_ATTRIBUTES;
   if (HAS_FLAG (oflag,  _O_WRONLY))
-    dwDesiredAccess|= GENERIC_WRITE | FILE_WRITE_DATA |
-                      FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES;
+    dwDesiredAccess|= GENERIC_WRITE | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES;
 
   /* Construct shared mode.  */
   DWORD dwShareMode = FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE;

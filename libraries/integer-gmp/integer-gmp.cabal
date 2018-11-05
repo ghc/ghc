@@ -60,7 +60,10 @@ library
     UnliftedFFITypes
   build-depends:       ghc-prim ^>= 0.5.1.0
   hs-source-dirs:      src/
-  ghc-options: -this-unit-id integer-gmp -Wall
+  -- We need to set the unit ID to integer-wired-in
+  -- (without a version number) as it's magic.
+  -- See Note [The integer library] in PrelNames
+  ghc-options: -this-unit-id integer-wired-in -Wall
   cc-options: -std=c99 -Wall
 
   include-dirs: include

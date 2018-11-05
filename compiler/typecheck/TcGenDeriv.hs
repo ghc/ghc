@@ -1756,6 +1756,33 @@ a truly higher-rank type like so:
 
 Then the same situation will arise again. But at least it won't arise for the
 common case of methods with ordinary, prenex-quantified types.
+
+Note [GND and ambiguity]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We make an effort to make the code generated through GND be robust w.r.t.
+ambiguous type variables. As one example, consider the following example
+(from #15637):
+
+  class C a where f :: String
+  instance C () where f = "foo"
+  newtype T = T () deriving C
+
+A naïve attempt and generating a C T instance would be:
+
+  instance C T where
+    f = coerce @String @String f
+          :: String
+
+This isn't going to typecheck, however, since GHC doesn't know what to
+instantiate the type variable `a` with in the call to `f` in the method body.
+(Note that `f :: forall a. String`!) To compensate for the possibility of
+ambiguity here, we explicitly instantiate `a` like so:
+
+  instance C T where
+    f = coerce @String @String (f @())
+          :: String
+
+All better now.
 -}
 
 gen_Newtype_binds :: SrcSpan
@@ -1789,8 +1816,16 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         rhs_expr = nlHsVar (getRdrName coerceId)
                                       `nlHsAppType`     from_tau
                                       `nlHsAppType`     to_tau
-                                      `nlHsApp`         nlHsVar meth_RDR
+                                      `nlHsApp`         meth_app
                                       `nlExprWithTySig` to_ty
+
+        -- The class method, applied to all of the class instance types
+        -- (including the representation type) to avoid potential ambiguity.
+        -- See Note [GND and ambiguity]
+        meth_app = foldl' nlHsAppType (nlHsVar meth_RDR) $
+                   filterOutInferredTypes (classTyCon cls) underlying_inst_tys
+                     -- Filter out any inferred arguments, since they can't be
+                     -- applied with visible type application.
 
     mk_atf_inst :: TyCon -> TcM FamInst
     mk_atf_inst fam_tc = do
@@ -1807,7 +1842,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         in_scope    = mkInScopeSet $ mkVarSet inst_tvs
         lhs_env     = zipTyEnv cls_tvs inst_tys
         lhs_subst   = mkTvSubst in_scope lhs_env
-        rhs_env     = zipTyEnv cls_tvs $ changeLast inst_tys rhs_ty
+        rhs_env     = zipTyEnv cls_tvs underlying_inst_tys
         rhs_subst   = mkTvSubst in_scope rhs_env
         fam_tvs     = tyConTyVars fam_tc
         rep_lhs_tys = substTyVars lhs_subst fam_tvs
@@ -1818,6 +1853,11 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         rep_tvs'    = toposortTyVars rep_tvs
         rep_cvs'    = toposortTyVars rep_cvs
         pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
+
+    -- Same as inst_tys, but with the last argument type replaced by the
+    -- representation type.
+    underlying_inst_tys :: [Type]
+    underlying_inst_tys = changeLast inst_tys rhs_ty
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
 nlHsAppType e s = noLoc (HsAppType hs_ty e)
@@ -1841,7 +1881,7 @@ mkCoerceClassMethEqn :: Class   -- the class being derived
 -- See Note [Newtype-deriving instances]
 -- See also Note [Newtype-deriving trickiness]
 -- The pair is the (from_type, to_type), where to_type is
--- the type of the method we are tyrying to get
+-- the type of the method we are trying to get
 mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
   = Pair (substTy rhs_subst user_meth_ty)
          (substTy lhs_subst user_meth_ty)

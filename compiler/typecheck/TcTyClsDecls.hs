@@ -74,6 +74,7 @@ import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Control.Monad.Zip
 import Data.Functor.Compose ( Compose(..) )
 import Data.List
 import Data.List.NonEmpty ( NonEmpty(..) )
@@ -632,11 +633,12 @@ getInitialKind :: TyClDecl GhcRn -> TcM [TcTyCon]
 
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = do { let cusk = hsDeclHasCusk decl
-       ; tycon <- kcLHsQTyVars name ClassFlavour cusk ktvs $
+       ; tycon <- kcLHsQTyVars name ClassFlavour cusk [] ktvs $
                   return constraintKind
+       ; let parent_tv_prs = tcTyConScopedTyVars tycon
             -- See Note [Don't process associated types in kcLHsQTyVars]
-       ; inner_tcs <- tcExtendNameTyVarEnv (map (\(x,y) -> (x, unrestricted y)) $ tcTyConScopedTyVars tycon) $
-                      getFamDeclInitialKinds (Just cusk) ats
+       ; inner_tcs <- tcExtendNameTyVarEnv (map (\(x,y) -> (x, unrestricted y)) parent_tv_prs) $
+                      getFamDeclInitialKinds (Just (cusk, parent_tv_prs)) ats
        ; return (tycon : inner_tcs) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
@@ -644,7 +646,8 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                                          , dd_ND = new_or_data } })
   = do  { tycon <-
-           kcLHsQTyVars name (newOrDataToFlavour new_or_data) (hsDeclHasCusk decl) ktvs $
+           kcLHsQTyVars name (newOrDataToFlavour new_or_data)
+                        (hsDeclHasCusk decl) [] ktvs $
            case m_sig of
              Just ksig -> tcLHsKindSig (DataKindCtxt name) ksig
              Nothing   -> return liftedTypeKind
@@ -657,7 +660,8 @@ getInitialKind (FamDecl { tcdFam = decl })
 getInitialKind decl@(SynDecl { tcdLName = L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
-  = do  { tycon <- kcLHsQTyVars name TypeSynonymFlavour (hsDeclHasCusk decl) ktvs $
+  = do  { tycon <- kcLHsQTyVars name TypeSynonymFlavour (hsDeclHasCusk decl)
+                                [] ktvs $
             case kind_annotation rhs of
               Nothing -> newMetaKindVar
               Just ksig -> tcLHsKindSig (TySynKindCtxt name) ksig
@@ -673,20 +677,31 @@ getInitialKind (DataDecl _ (L _ _) _ _ (XHsDataDefn _)) = panic "getInitialKind"
 getInitialKind (XTyClDecl _) = panic "getInitialKind"
 
 ---------------------------------
-getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
-                       -> [LFamilyDecl GhcRn]
-                       -> TcM [TcTyCon]
-getFamDeclInitialKinds mb_cusk decls
-  = mapM (addLocM (getFamDeclInitialKind mb_cusk)) decls
+getFamDeclInitialKinds
+  :: Maybe (Bool, [(Name, TyVar)])
+     -- ^ If this family declaration is associated with a class, this is
+     --   @'Just' (cusk, cls_tv_prs)@, where @cusk@ indicates the CUSKness of
+     --   the associated class and @cls_tv_prs@ contains the class's scoped
+     --   type variables.
+  -> [LFamilyDecl GhcRn]
+  -> TcM [TcTyCon]
+getFamDeclInitialKinds mb_parent_info decls
+  = mapM (addLocM (getFamDeclInitialKind mb_parent_info)) decls
 
-getFamDeclInitialKind :: Maybe Bool  -- if assoc., CUSKness of assoc. class
-                      -> FamilyDecl GhcRn
-                      -> TcM TcTyCon
-getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
-                                               , fdTyVars    = ktvs
-                                               , fdResultSig = L _ resultSig
-                                               , fdInfo      = info })
-  = do { tycon <- kcLHsQTyVars name flav cusk ktvs $
+getFamDeclInitialKind
+  :: Maybe (Bool, [(Name, TyVar)])
+     -- ^ If this family declaration is associated with a class, this is
+     --   @'Just' (cusk, cls_tv_prs)@, where @cusk@ indicates the CUSKness of
+     --   the associated class and @cls_tv_prs@ contains the class's scoped
+     --   type variables.
+  -> FamilyDecl GhcRn
+  -> TcM TcTyCon
+getFamDeclInitialKind mb_parent_info
+    decl@(FamilyDecl { fdLName     = L _ name
+                     , fdTyVars    = ktvs
+                     , fdResultSig = L _ resultSig
+                     , fdInfo      = info })
+  = do { tycon <- kcLHsQTyVars name flav cusk parent_tv_prs ktvs $
            case resultSig of
              KindSig _ ki                          -> tcLHsKindSig ctxt ki
              TyVarSig _ (L _ (KindedTyVar _ _ ki)) -> tcLHsKindSig ctxt ki
@@ -697,7 +712,9 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                | otherwise                -> newMetaKindVar
        ; return tycon }
   where
-    cusk  = famDeclHasCusk mb_cusk decl
+    (mb_cusk, mb_parent_tv_prs) = munzip mb_parent_info
+    cusk          = famDeclHasCusk mb_cusk decl
+    parent_tv_prs = mb_parent_tv_prs `orElse` []
     flav  = case info of
       DataFamily         -> DataFamilyFlavour (isJust mb_cusk)
       OpenTypeFamily     -> OpenTypeFamilyFlavour (isJust mb_cusk)
@@ -3314,12 +3331,15 @@ checkValidRoleAnnots role_annots tc
     -- but a tycon stores roles for all variables.
     -- So, we drop the implicit roles (which are all Nominal, anyway).
     name                   = tyConName tc
-    tyvars                 = tyConTyVars tc
     roles                  = tyConRoles tc
-    (vis_roles, vis_vars)  = unzip $ snd $
-                             partitionInvisibles tc (mkTyVarTy . snd) $
-                             zip roles tyvars
+    (vis_roles, vis_vars)  = unzip $ mapMaybe pick_vis $
+                             zip roles (tyConBinders tc)
     role_annot_decl_maybe  = lookupRoleAnnot role_annots name
+
+    pick_vis :: (Role, TyConBinder) -> Maybe (Role, TyVar)
+    pick_vis (role, tvb)
+      | isVisibleTyConBinder tvb = Just (role, binderVar tvb)
+      | otherwise                = Nothing
 
     check_roles
       = whenIsJust role_annot_decl_maybe $

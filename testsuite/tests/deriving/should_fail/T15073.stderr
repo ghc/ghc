@@ -11,7 +11,7 @@ T15073.hs:8:12: error:
               -> (Unit# a :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
             @(Foo a
               -> (Unit# (Foo a) :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
-            p ::
+            (p @a) ::
             Foo a
             -> (Unit# (Foo a) :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep)))
       In an equation for ‘p’:
@@ -20,7 +20,7 @@ T15073.hs:8:12: error:
                   -> (Unit# a :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
                 @(Foo a
                   -> (Unit# (Foo a) :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep))))
-                p ::
+                (p @a) ::
                 Foo a
                 -> (Unit# (Foo a) :: TYPE (GHC.Types.TupleRep ((:) GHC.Types.LiftedRep ([] :: [] GHC.Types.RuntimeRep) :: [] GHC.Types.RuntimeRep)))
       When typechecking the code for ‘p’

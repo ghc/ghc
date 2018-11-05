@@ -10711,6 +10711,18 @@ Here are the details:
   In the kind of ``F``, the left-to-right ordering of ``j``, ``k``, and ``l``
   is preserved.
 
+  If a family declaration is associated with a class, then class-bound
+  variables always come first in the kind of the family. For instance: ::
+
+    class C (a :: Type) where
+      type T (x :: f a)
+      -- T :: forall a f. f a -> Type
+
+  Contrast this with the kind of the following top-level family declaration: ::
+
+    type family T2 (x :: f a)
+    -- T2 :: forall f a. f a -> Type
+
 .. _implicit-parameters:
 
 Implicit parameters

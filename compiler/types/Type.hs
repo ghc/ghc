@@ -63,8 +63,8 @@ module Type (
         coAxNthLHS,
         stripCoercionTy, splitCoercionType_maybe,
 
-        splitPiTysInvisible, filterOutInvisibleTypes,
-        partitionInvisibleTypes, partitionInvisibles,
+        splitPiTysInvisible, filterOutInvisibleTypes, filterOutInferredTypes,
+        partitionInvisibleTypes, partitionInvisibles, tyConArgFlags,
         synTyConResKind,
 
         modifyJoinResTy, setJoinResTy,
@@ -273,7 +273,6 @@ import Unique ( nonDetCmpUnique )
 import Maybes           ( orElse )
 import Data.Maybe       ( isJust, mapMaybe )
 import Control.Monad    ( guard )
-import Control.Arrow    ( first, second )
 
 -- $type_classification
 -- #type_classification#
@@ -1570,23 +1569,43 @@ splitPiTysInvisible ty = split ty ty []
       | isPredTy arg                   = split res res (Anon (mkWeighted w arg) : bs)
     split orig_ty _                bs  = (reverse bs, orig_ty)
 
--- | Given a tycon and its arguments, filters out any invisible arguments
+-- | Given a 'TyCon' and a list of argument types, filter out any invisible
+-- (i.e., 'Inferred' or 'Specified') arguments.
 filterOutInvisibleTypes :: TyCon -> [Type] -> [Type]
 filterOutInvisibleTypes tc tys = snd $ partitionInvisibleTypes tc tys
 
--- | Given a 'TyCon' and its arguments, partition the arguments into
--- (invisible arguments, visible arguments).
-partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
-partitionInvisibleTypes tc tys = partitionInvisibles tc id tys
+-- | Given a 'TyCon' and a list of argument types, filter out any 'Inferred'
+-- arguments.
+filterOutInferredTypes :: TyCon -> [Type] -> [Type]
+filterOutInferredTypes tc tys =
+  filterByList (map (/= Inferred) $ tyConArgFlags tc tys) tys
 
--- | Given a tycon and a list of things (which correspond to arguments),
--- partitions the things into
---      Inferred or Specified ones and
---      Required ones
--- The callback function is necessary for this scenario:
+-- | Given a 'TyCon' and a list of argument types, partition the arguments
+-- into:
+--
+-- 1. 'Inferred' or 'Specified' (i.e., invisible) arguments and
+--
+-- 2. 'Required' (i.e., visible) arguments
+partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
+partitionInvisibleTypes tc tys =
+  partitionByList (map isInvisibleArgFlag $ tyConArgFlags tc tys) tys
+
+-- | Given a list of things paired with their visibilities, partition the
+-- things into (invisible things, visible things).
+partitionInvisibles :: [(a, ArgFlag)] -> ([a], [a])
+partitionInvisibles = partitionWith pick_invis
+  where
+    pick_invis :: (a, ArgFlag) -> Either a a
+    pick_invis (thing, vis) | isInvisibleArgFlag vis = Left thing
+                            | otherwise              = Right thing
+
+-- | Given a 'TyCon' and a list of argument types, determine each argument's
+-- visibility ('Inferred', 'Specified', or 'Required').
+--
+-- Wrinkle: consider the following scenario:
 --
 -- > T :: forall k. k -> k
--- > partitionInvisibles T [forall m. m -> m -> m, S, R, Q]
+-- > tyConArgFlags T [forall m. m -> m -> m, S, R, Q]
 --
 -- After substituting, we get
 --
@@ -1594,23 +1613,19 @@ partitionInvisibleTypes tc tys = partitionInvisibles tc id tys
 --
 -- Thus, the first argument is invisible, @S@ is visible, @R@ is invisible again,
 -- and @Q@ is visible.
---
--- If you're absolutely sure that your tycon's kind doesn't end in a variable,
--- it's OK if the callback function panics, as that's the only time it's
--- consulted.
-partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
-partitionInvisibles tc get_ty = go emptyTCvSubst (tyConKind tc)
+tyConArgFlags :: TyCon -> [Type] -> [ArgFlag]
+tyConArgFlags tc = go emptyTCvSubst (tyConKind tc)
   where
-    go _ _ [] = ([], [])
-    go subst (ForAllTy (Bndr tv vis) res_ki) (x:xs)
-      | isVisibleArgFlag vis = second (x :) (go subst' res_ki xs)
-      | otherwise            = first  (x :) (go subst' res_ki xs)
+    go _ _ [] = []
+    go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)
+      = argf : go subst' res_ki arg_tys
       where
-        subst' = extendTCvSubst subst tv (get_ty x)
-    go subst (TyVarTy tv) xs
-      | Just ki <- lookupTyVar subst tv = go subst ki xs
-    go _ _ xs = ([], xs)  -- something is ill-kinded. But this can happen
-                          -- when printing errors. Assume everything is visible.
+        subst' = extendTvSubst subst tv arg_ty
+    go subst (TyVarTy tv) arg_tys
+      | Just ki <- lookupTyVar subst tv = go subst ki arg_tys
+    go _ _ arg_tys = map (const Required) arg_tys
+                        -- something is ill-kinded. But this can happen
+                        -- when printing errors. Assume everything is Required.
 
 -- @isTauTy@ tests if a type has no foralls
 isTauTy :: Type -> Bool
@@ -2893,7 +2908,7 @@ splitVisVarsOfType orig_ty = Pair invis_vars vis_vars
 
     invisible vs = Pair vs emptyVarSet
 
-    go_tc tc tys = let (invis, vis) = partitionInvisibles tc id tys in
+    go_tc tc tys = let (invis, vis) = partitionInvisibleTypes tc tys in
                    invisible (tyCoVarsOfTypes invis) `mappend` foldMap go vis
 
 splitVisVarsOfTypes :: [Type] -> Pair TyCoVarSet
