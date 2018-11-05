@@ -1329,14 +1329,12 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
-               Just (tvb, inner_ty) ->
+               Just (tvb, inner_ty)
+                 | binderArgFlag tvb == Specified ->
+                   -- It really can't be Inferred, because we've just instantiated those
+                   -- But, oddly, it might just be Required. See #15859.
                  do { let tv   = binderVar tvb
-                          vis  = binderArgFlag tvb
                           kind = tyVarKind tv
-                    ; MASSERT2( vis == Specified
-                        , (vcat [ ppr fun_ty, ppr upsilon_ty, ppr tvb
-                                , ppr inner_ty, pprTyVar tv
-                                , ppr vis ]) )
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
 
                     ; inner_ty <- zonkTcType inner_ty
