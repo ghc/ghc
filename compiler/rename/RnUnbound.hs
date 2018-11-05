@@ -12,7 +12,8 @@ module RnUnbound ( mkUnboundName
                  , WhereLooking(..)
                  , unboundName
                  , unboundNameX
-                 , perhapsForallMsg ) where
+                 , perhapsForallMsg
+                 , notInScopeErr ) where
 
 import GhcPrelude
 
@@ -60,8 +61,7 @@ unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-              err = unknownNameErr what rdr_name $$ extra
+              err = notInScopeErr rdr_name $$ extra
         ; if not show_helpful_errors
           then addErr err
           else do { local_env  <- getLocalRdrEnv
@@ -72,12 +72,13 @@ unboundNameX where_look rdr_name extra
                   ; addErr (err $$ suggestions) }
         ; return (mkUnboundNameRdr rdr_name) }
 
-unknownNameErr :: SDoc -> RdrName -> SDoc
-unknownNameErr what rdr_name
+notInScopeErr :: RdrName -> SDoc
+notInScopeErr rdr_name
   = vcat [ hang (text "Not in scope:")
               2 (what <+> quotes (ppr rdr_name))
          , extra ]
   where
+    what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
     extra | rdr_name == forall_tv_RDR = perhapsForallMsg
           | otherwise                 = Outputable.empty
 

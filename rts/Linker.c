@@ -516,6 +516,9 @@ initLinker_ (int retain_cafs)
 
 void
 exitLinker( void ) {
+#if defined(OBJFORMAT_PEi386)
+   exitLinker_PEi386();
+#endif
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    if (linker_init_done == 1) {
       regfree(&re_invalid);
@@ -1383,18 +1386,7 @@ preloadObjectFile (pathchar *path)
        return NULL;
    }
 
-#  if defined(mingw32_HOST_OS)
-
-        // TODO: We would like to use allocateExec here, but allocateExec
-        //       cannot currently allocate blocks large enough.
-    image = allocateImageAndTrampolines(path, "itself", f, fileSize,
-                                        HS_BOOL_FALSE);
-    if (image == NULL) {
-        fclose(f);
-        return NULL;
-    }
-
-#   elif defined(darwin_HOST_OS)
+#  if defined(darwin_HOST_OS)
 
     // In a Mach-O .o file, all sections can and will be misaligned
     // if the total size of the headers is not a multiple of the
@@ -1409,7 +1401,7 @@ preloadObjectFile (pathchar *path)
    image = stgMallocBytes(fileSize + misalignment, "loadObj(image)");
    image += misalignment;
 
-# else /* !defined(mingw32_HOST_OS) */
+# else /* !defined(darwin_HOST_OS) */
 
    image = stgMallocBytes(fileSize, "loadObj(image)");
 
@@ -1505,6 +1497,34 @@ HsInt loadOc (ObjectCode* oc)
        return r;
    }
 
+   /* Note [loadOc orderings]
+      ocAllocateSymbolsExtras has only two pre-requisites, it must run after
+      preloadObjectFile and ocVerify.   Neither have changed.   On most targets
+      allocating the extras is independent on parsing the section data, so the
+      order between these two never mattered.
+
+      On Windows, when we have an import library we (for now, as we don't honor
+      the lazy loading semantics of the library and instead GHCi is already
+      lazy) don't use the library after ocGetNames as it just populates the
+      symbol table.  Allocating space for jump tables in ocAllocateSymbolExtras
+      would just be a waste then as we'll be stopping further processing of the
+      library in the next few steps.  */
+
+   /* build the symbol list for this image */
+#  if defined(OBJFORMAT_ELF)
+   r = ocGetNames_ELF ( oc );
+#  elif defined(OBJFORMAT_PEi386)
+   r = ocGetNames_PEi386 ( oc );
+#  elif defined(OBJFORMAT_MACHO)
+   r = ocGetNames_MachO ( oc );
+#  else
+   barf("loadObj: no getNames method");
+#  endif
+   if (!r) {
+       IF_DEBUG(linker, debugBelch("loadOc: ocGetNames_* failed\n"));
+       return r;
+   }
+
 #if defined(NEED_SYMBOL_EXTRAS)
 #  if defined(OBJFORMAT_MACHO)
    r = ocAllocateSymbolExtras_MachO ( oc );
@@ -1524,21 +1544,6 @@ HsInt loadOc (ObjectCode* oc)
    ocAllocateSymbolExtras_PEi386 ( oc );
 #  endif
 #endif
-
-   /* build the symbol list for this image */
-#  if defined(OBJFORMAT_ELF)
-   r = ocGetNames_ELF ( oc );
-#  elif defined(OBJFORMAT_PEi386)
-   r = ocGetNames_PEi386 ( oc );
-#  elif defined(OBJFORMAT_MACHO)
-   r = ocGetNames_MachO ( oc );
-#  else
-   barf("loadObj: no getNames method");
-#  endif
-   if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocGetNames_* failed\n"));
-       return r;
-   }
 
    /* loaded, but not resolved yet, ensure the OC is in a consistent state */
    setOcInitialStatus( oc );
@@ -1809,7 +1814,9 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
    s->mapped_start = mapped_start; /* start of mmap() block */
    s->mapped_size  = mapped_size;  /* size of mmap() block */
 
-   s->info = (struct SectionFormatInfo*)stgCallocBytes(1, sizeof *s->info,
+   if (!s->info)
+     s->info
+       = (struct SectionFormatInfo*)stgCallocBytes(1, sizeof *s->info,
                                             "addSection(SectionFormatInfo)");
 
    IF_DEBUG(linker,

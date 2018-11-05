@@ -18,6 +18,7 @@ module GHC.Serialized (
     serializeWithData, deserializeWithData,
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import Data.Bits
 import Data.Word        ( Word8 )
 import Data.Data

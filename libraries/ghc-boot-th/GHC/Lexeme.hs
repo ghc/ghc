@@ -14,6 +14,7 @@ module GHC.Lexeme (
         startsVarSymASCII, isVarSymChar, okSymChar
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import Data.Char
 
 -- | Is this character acceptable in a symbol (after the first char)?

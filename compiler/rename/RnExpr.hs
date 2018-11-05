@@ -826,20 +826,29 @@ rnStmt :: Outputable (body GhcPs)
 
 rnStmt ctxt rnBody (L loc (LastStmt _ body noret _)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
-        ; (ret_op, fvs1)   <- lookupStmtName ctxt returnMName
-        ; (thing,  fvs3)   <- thing_inside []
+        ; (ret_op, fvs1) <- if isMonadCompContext ctxt
+                            then lookupStmtName ctxt returnMName
+                            else return (noSyntaxExpr, emptyFVs)
+                            -- The 'return' in a LastStmt is used only
+                            -- for MonadComp; and we don't want to report
+                            -- "non in scope: return" in other cases
+                            -- Trac #15607
+
+        ; (thing,  fvs3) <- thing_inside []
         ; return (([(L loc (LastStmt noExt body' noret ret_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs3) }
 
 rnStmt ctxt rnBody (L loc (BodyStmt _ body _ _)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
         ; (then_op, fvs1)  <- lookupStmtName ctxt thenMName
-        ; (guard_op, fvs2) <- if isListCompExpr ctxt
+
+        ; (guard_op, fvs2) <- if isComprehensionContext ctxt
                               then lookupStmtName ctxt guardMName
                               else return (noSyntaxExpr, emptyFVs)
                               -- Only list/monad comprehensions use 'guard'
                               -- Also for sub-stmts of same eg [ e | x<-xs, gd | blah ]
                               -- Here "gd" is a guard
+
         ; (thing, fvs3)    <- thing_inside []
         ; return ( ([(L loc (BodyStmt noExt body' then_op guard_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }
@@ -854,14 +863,17 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
                 -- If the pattern is irrefutable (e.g.: wildcard, tuple,
                 -- ~pat, etc.) we should not need to fail.
                 | isIrrefutableHsPat pat
-                                    = return (noSyntaxExpr, emptyFVs)
+                = return (noSyntaxExpr, emptyFVs)
+
                 -- For non-monadic contexts (e.g. guard patterns, list
                 -- comprehensions, etc.) we should not need to fail.
                 -- See Note [Failing pattern matches in Stmts]
                 | not (isMonadFailStmtContext ctxt)
-                                    = return (noSyntaxExpr, emptyFVs)
+                = return (noSyntaxExpr, emptyFVs)
+
                 | xMonadFailEnabled = lookupSyntaxName failMName
                 | otherwise         = lookupSyntaxName failMName_preMFP
+
         ; (fail_op, fvs2) <- getFailFunction
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do

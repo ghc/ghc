@@ -2196,7 +2196,7 @@ are some wrinkles:
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 If   * the inert set contains a canonical Given CTyEqCan (a ~ ty)
-and  * 'a' is a skolem bound in this very implication, b
+and  * 'a' is a skolem bound in this very implication,
 
 then:
 a) The Given is pretty much a let-binding, like
@@ -2215,6 +2215,31 @@ For an example, see Trac #9211.
 See also TcUnify Note [Deeper level on the left] for how we ensure
 that the right variable is on the left of the equality when both are
 tyvars.
+
+You might wonder whether the skokem really needs to be bound "in the
+very same implication" as the equuality constraint.
+(c.f. Trac #15009) Consider this:
+
+  data S a where
+    MkS :: (a ~ Int) => S a
+
+  g :: forall a. S a -> a -> blah
+  g x y = let h = \z. ( z :: Int
+                      , case x of
+                           MkS -> [y,z])
+          in ...
+
+From the type signature for `g`, we get `y::a` .  Then when when we
+encounter the `\z`, we'll assign `z :: alpha[1]`, say.  Next, from the
+body of the lambda we'll get
+
+  [W] alpha[1] ~ Int                             -- From z::Int
+  [W] forall[2]. (a ~ Int) => [W] alpha[1] ~ a   -- From [y,z]
+
+Now, suppose we decide to float `alpha ~ a` out of the implication
+and then unify `alpha := a`.  Now we are stuck!  But if treat
+`alpha ~ Int` first, and unify `alpha := Int`, all is fine.
+But we absolutely cannot float that equality or we will get stuck.
 -}
 
 removeInertCts :: [Ct] -> InertCans -> InertCans

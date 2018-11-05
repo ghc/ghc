@@ -57,6 +57,11 @@ Runtime system
   ``hs_free_stable_ptr_unsafe``, used in conjunction with manual
   locking and unlocking.
 
+- The runtime linker on Windows has been overhauled to properly handle section
+  alignment, lower the amount of wasted memory and lower the amount of in use memory.
+  See :ghc-ticket:`13617`. Note that committed memory may be slightly higher.
+
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

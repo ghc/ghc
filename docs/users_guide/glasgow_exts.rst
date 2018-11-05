@@ -2314,8 +2314,16 @@ Data types with no constructors
 
     Allow definition of empty ``data`` types.
 
-With the :extension:`EmptyDataDecls` extension, GHC
-lets you declare a data type with no constructors. For example: ::
+With the :extension:`EmptyDataDecls` extension, GHC lets you declare a
+data type with no constructors.
+
+You only need to enable this extension if the language you're using
+is Haskell 98, in which a data type must have at least one constructor.
+Haskell 2010 relaxed this rule to allow data types with no constructors,
+and thus :extension:`EmptyDataDecls` is enabled by default when the
+language is Haskell 2010.
+
+For example: ::
 
       data S      -- S :: Type
       data T a    -- T :: Type -> Type
@@ -3550,10 +3558,10 @@ More details:
        module M where
          data R = R { a,b,c :: Int }
        module X where
-         import M( R(a,c) )
-         f b = R { .. }
+         import M( R(R,a,c) )
+         f a b = R { .. }
 
-   The ``R{..}`` expands to ``R{M.a=a}``, omitting ``b`` since the
+   The ``R{..}`` expands to ``R{a=a}``, omitting ``b`` since the
    record field is not in scope, and omitting ``c`` since the variable
    ``c`` is not in scope (apart from the binding of the record selector
    ``c``, of course).
@@ -9752,7 +9760,7 @@ This idea is very old; see Seciton 7 of `Derivable type classes <https://www.mic
 Syntax changes
 ----------------
 
-`Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this ::
+`Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this
 
 .. code-block:: none
 
@@ -9762,7 +9770,7 @@ Syntax changes
     class ::= qtycls tyvar
             |  qtycls (tyvar atype1 ... atypen)
 
-We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration ::
+We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration
 
 .. code-block:: none
 
@@ -9775,9 +9783,9 @@ The ``context =>`` part is optional.  That is the only syntactic change to the l
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes ::
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes
 
-.. code-block:: none
+  .. code-block:: none
 
     class ::= ...
            | [forall tyavrs .] [context =>] qtycls inst1 ... instn
@@ -15332,7 +15340,7 @@ The solution is to define the instance-specific function yourself, with
 a pragma to prevent it being inlined too early, and give a RULE for it: ::
 
     instance C Bool where
-      op x y = opBool
+      op = opBool
 
     opBool :: Bool -> Bool -> Bool
     {-# NOINLINE [1] opBool #-}

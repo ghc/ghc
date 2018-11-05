@@ -32,8 +32,12 @@ typedef
           SECTIONKIND_RWDATA,
           /* Static initializer section. e.g. .ctors.  */
           SECTIONKIND_INIT_ARRAY,
+          /* Static finalizer section. e.g. .dtors.  */
+          SECTIONKIND_FINIT_ARRAY,
           /* We don't know what the section is and don't care.  */
           SECTIONKIND_OTHER,
+          /* Section contains debug information. e.g. .debug$.  */
+          SECTIONKIND_DEBUG,
           /* Section belongs to an import section group. e.g. .idata$.  */
           SECTIONKIND_IMPORT,
           /* Section defines an import library entry, e.g. idata$7.  */
@@ -46,7 +50,7 @@ typedef
    enum { SECTION_NOMEM,
           SECTION_M32,
           SECTION_MMAP,
-          SECTION_MALLOC,
+          SECTION_MALLOC
         }
    SectionAlloc;
 
@@ -296,28 +300,6 @@ ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                   int misalignment
                   );
 
-#if defined(mingw32_HOST_OS)
-/* We use myindex to calculate array addresses, rather than
-   simply doing the normal subscript thing.  That's because
-   some of the above structs have sizes which are not
-   a whole number of words.  GCC rounds their sizes up to a
-   whole number of words, which means that the address calcs
-   arising from using normal C indexing or pointer arithmetic
-   are just plain wrong.  Sigh.
-*/
-INLINE_HEADER unsigned char *
-myindex ( int scale, void* base, int index )
-{
-    return
-        ((unsigned char*)base) + scale * index;
-}
-
-// Defined in linker/PEi386.c
-char *cstring_from_section_name(
-    unsigned char* name,
-    unsigned char* strtab);
-#endif /* mingw32_HOST_OS */
-
 /* MAP_ANONYMOUS is MAP_ANON on some systems,
    e.g. OS X (before Sierra), OpenBSD etc */
 #if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
@@ -334,8 +316,7 @@ char *cstring_from_section_name(
 #  include "linker/ElfTypes.h"
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
-struct SectionFormatInfo { void* placeholder; };
-struct ObjectCodeFormatInfo { void* placeholder; };
+#  include "linker/PEi386Types.h"
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"

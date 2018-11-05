@@ -6,6 +6,7 @@ module GHC.Exts.Heap.ClosureTypes
     , closureTypeHeaderSize
     ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Generics
 
 {- ---------------------------------------------

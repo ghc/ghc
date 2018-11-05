@@ -130,10 +130,10 @@ when invoked:
 
     import GHC
     import GHC.Paths ( libdir )
-    import DynFlags ( defaultLogAction )
+    import DynFlags ( defaultFatalMessager, defaultFlushOut )
 
     main =
-        defaultErrorHandler defaultLogAction $ do
+        defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
           runGhc (Just libdir) $ do
             dflags <- getSessionDynFlags
             setSessionDynFlags dflags

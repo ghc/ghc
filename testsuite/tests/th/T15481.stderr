@@ -1,0 +1,8 @@
+T15481.hs:(7,19)-(10,63): Splicing expression
+    recover
+      (stringE "reifyFixity failed")
+      (do foo <- newName "foo"
+          _ <- reifyFixity foo
+          stringE "reifyFixity successful")
+  ======>
+    "reifyFixity failed"

@@ -776,7 +776,7 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 17675240, 15),
+          [(wordsize(64), 20499224, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
@@ -787,12 +787,13 @@ test('T9675',
           # 2016-03-14    38776008   Final demand analyzer run
           # 2016-04-01    29871032   Fix leaks in demand analysis
           # 2016-04-30    17675240   Fix leaks in tidy unfoldings
+          # 2018-09-21    20499224   See #15663
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 63, 15),
+          [(wordsize(64), 75, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
@@ -804,6 +805,7 @@ test('T9675',
           # 2016-04-14    144        Final demand analyzer run
           # 2016-07-26    121        Unboxed sums?
           # 2017-04-30    63         Fix leaks in tidy unfoldings
+          # 2018-09-21    75         See #15663
             (wordsize(32), 56, 15)
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
@@ -1135,7 +1137,7 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1141555816, 5),
+          [(wordsize(64), 1201750816, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
@@ -1145,6 +1147,7 @@ test('T12707',
           # 2017-05-14: 1163821528  (amd64/Linux) Two-pass CmmLayoutStack
           # 2018-04-09: 1237898376  Inexplicable, collateral of #14737
           # 2018-04-30: 1141555816  improved simplCast performance #15019
+          # 2018-09-21: 1201750816  (amd64/darwin) Drift
           ]),
      ],
      compile,
@@ -1303,10 +1306,11 @@ test ('T9630',
       [ compiler_stats_num_field('max_bytes_used', # Note [residency]
           [(platform('x86_64-unknown-mingw32'),   39867088, 15),
           # 2017-12-24:                     34171816 (x64/Windows)
-          (wordsize(64), 35324712, 15)
+          (wordsize(64), 41365088, 15)
           # initial:    56955240
           # 2017-06-07: 41568168     Stop the specialiser generating loopy code
           # 2018-02-25: 35324712     It's not entirely clear
+          # 2018-09-22: 41365088     It's not entirely clear (x86_64/darwin)
           ]),
       extra_clean(['T9630a.hi', 'T9630a.o'])
       ],

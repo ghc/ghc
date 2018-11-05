@@ -808,7 +808,7 @@ writeChunkNonBlocking h_@Handle__{..} ptr bytes
 -- on the 'Handle', and reads bytes directly.
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
-hGetBuf h ptr count
+hGetBuf h !ptr count
   | count == 0 = return 0
   | count <  0 = illegalBufferSize h "hGetBuf" count
   | otherwise =
@@ -890,7 +890,7 @@ bufReadEmpty h_@Handle__{..}
 -- 'NewlineMode' on the 'Handle', and reads bytes directly.
 
 hGetBufSome :: Handle -> Ptr a -> Int -> IO Int
-hGetBufSome h ptr count
+hGetBufSome h !ptr count
   | count == 0 = return 0
   | count <  0 = illegalBufferSize h "hGetBufSome" count
   | otherwise =
@@ -935,7 +935,7 @@ haFD h_@Handle__{..} = cast haDevice
 -- behaves identically to 'hGetBuf'.
 
 hGetBufNonBlocking :: Handle -> Ptr a -> Int -> IO Int
-hGetBufNonBlocking h ptr count
+hGetBufNonBlocking h !ptr count
   | count == 0 = return 0
   | count <  0 = illegalBufferSize h "hGetBufNonBlocking" count
   | otherwise =

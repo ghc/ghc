@@ -106,21 +106,6 @@ enlargeStableNameTable(void)
     initSnEntryFreeList(stable_name_table + old_SNT_size, old_SNT_size, NULL);
 }
 
-/* Note [Enlarging the stable pointer table]
- *
- * To enlarge the stable pointer table, we allocate a new table, copy the
- * existing entries, and then store the old version of the table in old_SPTs
- * until we free it during GC.  By not immediately freeing the old version
- * (or equivalently by not growing the table using realloc()), we ensure that
- * another thread simultaneously dereferencing a stable pointer using the old
- * version can safely access the table without causing a segfault (see Trac
- * #10296).
- *
- * Note that because the stable pointer table is doubled in size each time it is
- * enlarged, the total memory needed to store the old versions is always less
- * than that required to hold the current version.
- */
-
 
 /* -----------------------------------------------------------------------------
  * Freeing entries and tables
@@ -262,10 +247,10 @@ rememberOldStableNameAddresses(void)
 }
 
 /* -----------------------------------------------------------------------------
- * Thread the stable pointer table for compacting GC.
+ * Thread the stable name table for compacting GC.
  *
  * Here we must call the supplied evac function for each pointer into
- * the heap from the stable tables, because the compacting
+ * the heap from the stable name table, because the compacting
  * collector may move the object it points to.
  * -------------------------------------------------------------------------- */
 

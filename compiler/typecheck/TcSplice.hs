@@ -113,6 +113,7 @@ import Panic
 import Lexeme
 import qualified EnumSet
 import Plugins
+import Bag
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -1042,13 +1043,15 @@ runRemoteTH iserv recovers = do
       writeTcRef v emptyMessages
       runRemoteTH iserv (msgs : recovers)
     EndRecover caught_error -> do
-      v <- getErrsVar
-      let (prev_msgs, rest) = case recovers of
+      let (prev_msgs@(prev_warns,prev_errs), rest) = case recovers of
              [] -> panic "EndRecover"
              a : b -> (a,b)
-      if caught_error
-        then writeTcRef v prev_msgs
-        else updTcRef v (unionMessages prev_msgs)
+      v <- getErrsVar
+      (warn_msgs,_) <- readTcRef v
+      -- keep the warnings only if there were no errors
+      writeTcRef v $ if caught_error
+        then prev_msgs
+        else (prev_warns `unionBags` warn_msgs, prev_errs)
       runRemoteTH iserv rest
     _other -> do
       r <- handleTHMessage msg
@@ -1070,8 +1073,12 @@ Recover is slightly tricky to implement.
 
 The meaning of "recover a b" is
  - Do a
-   - If it finished successfully, then keep the messages it generated
+   - If it finished with no errors, then keep the warnings it generated
    - If it failed, discard any messages it generated, and do b
+
+Note that "failed" here can mean either
+  (1) threw an exception (failTc)
+  (2) generated an error message (addErrTcM)
 
 The messages are managed by GHC in the TcM monad, whereas the
 exception-handling is done in the ghc-iserv process, so we have to
@@ -1079,12 +1086,14 @@ coordinate between the two.
 
 On the server:
   - emit a StartRecover message
-  - run "a" inside a catch
-    - if it finishes, emit EndRecover False
-    - if it fails, emit EndRecover True, then run "b"
+  - run "a; FailIfErrs" inside a try
+  - emit an (EndRecover x) message, where x = True if "a; FailIfErrs" failed
+  - if "a; FailIfErrs" failed, run "b"
 
 Back in GHC, when we receive:
 
+  FailIfErrrs
+    failTc if there are any error messages (= failIfErrsM)
   StartRecover
     save the current messages and start with an empty set.
   EndRecover caught_error
@@ -1141,6 +1150,7 @@ handleTHMessage msg = case msg of
   AddForeignFilePath lang str -> wrapTHResult $ TH.qAddForeignFilePath lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
   ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
+  FailIfErrs -> wrapTHResult failIfErrsM
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)
 
 getAnnotationsByTypeRep :: TH.AnnLookup -> TypeRep -> TcM [[Word8]]

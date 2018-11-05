@@ -53,7 +53,7 @@ import RdrName
 import HscTypes
 import TcEnv
 import TcRnMonad
-import RdrHsSyn         ( setRdrNameSpace )
+import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
 import Name
 import NameSet
@@ -1653,4 +1653,4 @@ badOrigBinding name
     --
     -- (See Trac #13968.)
   where
-    occ = rdrNameOcc name
+    occ = rdrNameOcc $ filterCTuple name
