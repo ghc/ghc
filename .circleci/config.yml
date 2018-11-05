@@ -114,6 +114,27 @@ jobs:
       - *test
       - *store_test_results
 
+  "validate-x86_64-linux-dwarf":
+    resource_class: xlarge
+    docker:
+      - image: ghcci/x86_64-linux:0.0.4
+    environment:
+      <<: *buildenv
+      GHC_COLLECTOR_FLAVOR: x86_64-linux-dwarf
+      ENABLE_DWARF: 1
+      CONFIGURE_OPTS: --enable-dwarf-unwind
+    steps:
+      - checkout
+      - *prepare
+      - *submodules
+      - *boot
+      - *configure_unix
+      - *make
+      - *bindist
+      - *storeartifacts
+      - *test
+      - *store_test_results
+
   "validate-x86_64-freebsd":
     resource_class: xlarge
     docker:
@@ -291,6 +312,8 @@ workflows:
   validate:
     jobs:
     - validate-x86_64-linux:
+        *trigger_on_tags
+    - validate-x86_64-linux-dwarf:
         *trigger_on_tags
     # FreeBSD disabled: https://github.com/haskell/unix/issues/102
     # - validate-x86_64-freebsd
