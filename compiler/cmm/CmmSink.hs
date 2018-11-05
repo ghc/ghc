@@ -24,7 +24,6 @@ import PprCmm ()
 import qualified Data.IntSet as IntSet
 import Data.List (partition)
 import qualified Data.Set as Set
-import Data.List
 import Data.Maybe
 
 -- Compact sets for membership tests of local variables.
@@ -478,7 +477,7 @@ into
   (a != b)
 but there's one case it can't handle: when the comparison is over
 floating-point values, we can't invert it, because floating-point
-comparisions aren't invertible (because NaN).
+comparisons aren't invertible (because of NaNs).
 
 But we *can* optimise this conditional by swapping the true and false
 branches. Given

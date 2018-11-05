@@ -310,7 +310,9 @@ findIndices      :: (a -> Bool) -> [a] -> [Int]
 findIndices p xs = [ i | (x,i) <- zip xs [0..], p x]
 #else
 -- Efficient definition, adapted from Data.Sequence
-{-# INLINE findIndices #-}
+-- (Note that making this INLINABLE instead of INLINE allows
+-- 'findIndex' to fuse, fixing #15426.)
+{-# INLINABLE findIndices #-}
 findIndices p ls = build $ \c n ->
   let go x r k | p x       = I# k `c` r (k +# 1#)
                | otherwise = r (k +# 1#)

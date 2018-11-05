@@ -25,7 +25,8 @@
 #include "Trace.h"
 #include "Weak.h"
 #include "MarkWeak.h"
-#include "Stable.h"
+#include "StablePtr.h"
+#include "StableName.h"
 
 // Turn off inlining when debugging - it obfuscates things
 #if defined(DEBUG)
@@ -1000,7 +1001,10 @@ compact(StgClosure *static_objects)
     thread_static(static_objects /* ToDo: ok? */);
 
     // the stable pointer table
-    threadStableTables((evac_fn)thread_root, NULL);
+    threadStablePtrTable((evac_fn)thread_root, NULL);
+
+    // the stable name table
+    threadStableNameTable((evac_fn)thread_root, NULL);
 
     // the CAF list (used by GHCi)
     markCAFs((evac_fn)thread_root, NULL);

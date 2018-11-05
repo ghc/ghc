@@ -141,12 +141,12 @@ initSysTools top_dir
        mtool_dir <- findToolDir top_dir
              -- see Note [tooldir: How GHC finds mingw and perl on Windows]
 
-       let settingsFile = top_dir </> "settings"
-           platformConstantsFile = top_dir </> "platformConstants"
-           installed :: FilePath -> FilePath
+       let installed :: FilePath -> FilePath
            installed file = top_dir </> file
            libexec :: FilePath -> FilePath
            libexec file = top_dir </> "bin" </> file
+           settingsFile = installed "settings"
+           platformConstantsFile = installed "platformConstants"
 
        settingsStr <- readFile settingsFile
        platformConstantsStr <- readFile platformConstantsFile

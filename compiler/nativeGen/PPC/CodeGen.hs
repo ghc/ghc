@@ -1991,6 +1991,10 @@ genCCall' dflags gcp target dest_regs args
                     MO_F32_Tanh  -> (fsLit "tanh", True)
                     MO_F32_Pwr   -> (fsLit "pow", True)
 
+                    MO_F32_Asinh -> (fsLit "asinh", True)
+                    MO_F32_Acosh -> (fsLit "acosh", True)
+                    MO_F32_Atanh -> (fsLit "atanh", True)
+
                     MO_F64_Exp   -> (fsLit "exp", False)
                     MO_F64_Log   -> (fsLit "log", False)
                     MO_F64_Sqrt  -> (fsLit "sqrt", False)
@@ -2008,6 +2012,10 @@ genCCall' dflags gcp target dest_regs args
                     MO_F64_Cosh  -> (fsLit "cosh", False)
                     MO_F64_Tanh  -> (fsLit "tanh", False)
                     MO_F64_Pwr   -> (fsLit "pow", False)
+
+                    MO_F64_Asinh -> (fsLit "asinh", False)
+                    MO_F64_Acosh -> (fsLit "acosh", False)
+                    MO_F64_Atanh -> (fsLit "atanh", False)
 
                     MO_UF_Conv w -> (fsLit $ word2FloatLabel w, False)
 

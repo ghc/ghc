@@ -59,7 +59,7 @@ newtype Const a b = Const { getConst :: a }
              )
 
 -- | This instance would be equivalent to the derived instances of the
--- 'Const' newtype if the 'runConst' field were removed
+-- 'Const' newtype if the 'getConst' field were removed
 --
 -- @since 4.8.0.0
 instance Read a => Read (Const a b) where
@@ -67,7 +67,7 @@ instance Read a => Read (Const a b) where
         $ \r -> [(Const x,t) | ("Const", s) <- lex r, (x, t) <- readsPrec 11 s]
 
 -- | This instance would be equivalent to the derived instances of the
--- 'Const' newtype if the 'runConst' field were removed
+-- 'Const' newtype if the 'getConst' field were removed
 --
 -- @since 4.8.0.0
 instance Show a => Show (Const a b) where

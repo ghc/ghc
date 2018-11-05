@@ -159,7 +159,10 @@ mkInlineUnfoldingWithArity arity expr
     guide = UnfWhen { ug_arity = arity
                     , ug_unsat_ok = needSaturated
                     , ug_boring_ok = boring_ok }
-    boring_ok = inlineBoringOk expr'
+    -- See Note [INLINE pragmas and boring contexts] as to why we need to look
+    -- at the arity here.
+    boring_ok | arity == 0 = True
+              | otherwise  = inlineBoringOk expr'
 
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkInlinableUnfolding dflags expr
@@ -236,6 +239,72 @@ specUnfolding to specialise its unfolding.  Some important points:
         we keep it (so the specialised thing too will always inline)
      if a stable unfolding has UnfoldingGuidance of UnfIfGoodArgs
         (which arises from INLINABLE), we discard it
+
+Note [Honour INLINE on 0-ary bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+   x = <expensive>
+   {-# INLINE x #-}
+
+   f y = ...x...
+
+The semantics of an INLINE pragma is
+
+  inline x at every call site, provided it is saturated;
+  that is, applied to at least as many arguments as appear
+  on the LHS of the Haskell source definition.
+
+(This soure-code-derived arity is stored in the `ug_arity` field of
+the `UnfoldingGuidance`.)
+
+In the example, x's ug_arity is 0, so we should inline it at every use
+site.  It's rare to have such an INLINE pragma (usually INLINE Is on
+functions), but it's occasionally very important (Trac #15578, #15519).
+In #15519 we had something like
+   x = case (g a b) of I# r -> T r
+   {-# INLINE x #-}
+   f y = ...(h x)....
+
+where h is strict.  So we got
+   f y = ...(case g a b of I# r -> h (T r))...
+
+and that in turn allowed SpecConstr to ramp up performance.
+
+How do we deliver on this?  By adjusting the ug_boring_ok
+flag in mkInlineUnfoldingWithArity; see
+Note [INLINE pragmas and boring contexts]
+
+NB: there is a real risk that full laziness will float it right back
+out again. Consider again
+  x = factorial 200
+  {-# INLINE x #-}
+  f y = ...x...
+
+After inlining we get
+  f y = ...(factorial 200)...
+
+but it's entirely possible that full laziness will do
+  lvl23 = factorial 200
+  f y = ...lvl23...
+
+That's a problem for another day.
+
+Note [INLINE pragmas and boring contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An INLINE pragma uses mkInlineUnfoldingWithArity to build the
+unfolding.  That sets the ug_boring_ok flag to False if the function
+is not tiny (inlineBorkingOK), so that even INLINE functions are not
+inlined in an utterly boring context.  E.g.
+     \x y. Just (f y x)
+Nothing is gained by inlining f here, even if it has an INLINE
+pragma.
+
+But for 0-ary bindings, we want to inline regardless; see
+Note [Honour INLINE on 0-ary bindings].
+
+I'm a bit worried that it's possible for the same kind of problem
+to arise for non-0-ary functions too, but let's wait and see.
 -}
 
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
@@ -1153,11 +1222,11 @@ callSiteInline dflags id active_unfolding lone_variable arg_infos cont_info
       -- idUnfolding checks for loop-breakers, returning NoUnfolding
       -- Things with an INLINE pragma may have an unfolding *and*
       -- be a loop breaker  (maybe the knot is not yet untied)
-        CoreUnfolding { uf_tmpl = unf_template, uf_is_top = is_top
+        CoreUnfolding { uf_tmpl = unf_template
                       , uf_is_work_free = is_wf
                       , uf_guidance = guidance, uf_expandable = is_exp }
           | active_unfolding -> tryUnfolding dflags id lone_variable
-                                    arg_infos cont_info unf_template is_top
+                                    arg_infos cont_info unf_template
                                     is_wf is_exp guidance
           | otherwise -> traceInline dflags id "Inactive unfolding:" (ppr id) Nothing
         NoUnfolding      -> Nothing
@@ -1177,10 +1246,10 @@ traceInline dflags inline_id str doc result
  = result
 
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
-             -> CoreExpr -> Bool -> Bool -> Bool -> UnfoldingGuidance
+             -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
              -> Maybe CoreExpr
 tryUnfolding dflags id lone_variable
-             arg_infos cont_info unf_template is_top
+             arg_infos cont_info unf_template
              is_wf is_exp guidance
  = case guidance of
      UnfNever -> traceInline dflags id str (text "UnfNever") Nothing
@@ -1252,10 +1321,10 @@ tryUnfolding dflags id lone_variable
               CaseCtxt   -> not (lone_variable && is_exp)  -- Note [Lone variables]
               ValAppCtxt -> True                           -- Note [Cast then apply]
               RuleArgCtxt -> uf_arity > 0  -- See Note [Unfold info lazy contexts]
-              DiscArgCtxt -> uf_arity > 0  --
+              DiscArgCtxt -> uf_arity > 0  -- Note [Inlining in ArgCtxt]
               RhsCtxt     -> uf_arity > 0  --
-              _           -> not is_top && uf_arity > 0   -- Note [Nested functions]
-                                                      -- Note [Inlining in ArgCtxt]
+              _other      -> False         -- See Note [Nested functions]
+
 
 {-
 Note [Unfold into lazy contexts], Note [RHS of lets]
@@ -1325,18 +1394,17 @@ However for worker/wrapper it may be worth inlining even if the
 arity is not satisfied (as we do in the CoreUnfolding case) so we don't
 require saturation.
 
-
 Note [Nested functions]
 ~~~~~~~~~~~~~~~~~~~~~~~
-If a function has a nested defn we also record some-benefit, on the
-grounds that we are often able to eliminate the binding, and hence the
-allocation, for the function altogether; this is good for join points.
-But this only makes sense for *functions*; inlining a constructor
-doesn't help allocation unless the result is scrutinised.  UNLESS the
-constructor occurs just once, albeit possibly in multiple case
-branches.  Then inlining it doesn't increase allocation, but it does
-increase the chance that the constructor won't be allocated at all in
-the branches that don't use it.
+At one time we treated a call of a non-top-level function as
+"interesting" (regardless of how boring the context) in the hope
+that inlining it would eliminate the binding, and its allocation.
+Specifically, in the default case of interesting_call we had
+   _other -> not is_top && uf_arity > 0
+
+But actually postInlineUnconditionally does some of this and overall
+it makes virtually no difference to nofib.  So I simplified away this
+special case
 
 Note [Cast then apply]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1450,6 +1518,8 @@ This kind of thing can occur if you have
         foo = let x = e in (x,x)
 
 which Roman did.
+
+
 -}
 
 computeDiscount :: DynFlags -> [Int] -> Int -> [ArgSummary] -> CallCtxt

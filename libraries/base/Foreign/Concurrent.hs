@@ -40,33 +40,34 @@ newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- associating a finalizer - given by the monadic operation - with the
 -- reference.  The storage manager will start the finalizer, in a
 -- separate thread, some time after the last reference to the
--- @ForeignPtr@ is dropped.  There is no guarantee of promptness, and
+-- 'ForeignPtr' is dropped.  There is no guarantee of promptness, and
 -- in fact there is no guarantee that the finalizer will eventually
 -- run at all.
 --
 -- Note that references from a finalizer do not necessarily prevent
 -- another object from being finalized.  If A's finalizer refers to B
--- (perhaps using 'touchForeignPtr', then the only guarantee is that
--- B's finalizer will never be started before A's.  If both A and B
--- are unreachable, then both finalizers will start together.  See
--- 'touchForeignPtr' for more on finalizer ordering.
+-- (perhaps using 'Foreign.ForeignPtr.touchForeignPtr', then the only
+-- guarantee is that B's finalizer will never be started before A's.  If both
+-- A and B are unreachable, then both finalizers will start together.  See
+-- 'Foreign.ForeignPtr.touchForeignPtr' for more on finalizer ordering.
 --
 newForeignPtr = GHC.ForeignPtr.newConcForeignPtr
 
 addForeignPtrFinalizer :: ForeignPtr a -> IO () -> IO ()
--- ^This function adds a finalizer to the given @ForeignPtr@.  The
+-- ^This function adds a finalizer to the given 'ForeignPtr'.  The
 -- finalizer will run /before/ all other finalizers for the same
 -- object which have already been registered.
 --
--- This is a variant of @Foreign.ForeignPtr.addForeignPtrFinalizer@,
--- where the finalizer is an arbitrary @IO@ action.  When it is
+-- This is a variant of 'Foreign.ForeignPtr.addForeignPtrFinalizer',
+-- where the finalizer is an arbitrary 'IO' action.  When it is
 -- invoked, the finalizer will run in a new thread.
 --
 -- NB. Be very careful with these finalizers.  One common trap is that
 -- if a finalizer references another finalized value, it does not
--- prevent that value from being finalized.  In particular, 'Handle's
--- are finalized objects, so a finalizer should not refer to a 'Handle'
--- (including @stdout@, @stdin@ or @stderr@).
+-- prevent that value from being finalized.  In particular, 'System.IO.Handle's
+-- are finalized objects, so a finalizer should not refer to a
+-- 'System.IO.Handle' (including 'System.IO.stdout', 'System.IO.stdin', or
+-- 'System.IO.stderr').
 --
 addForeignPtrFinalizer = GHC.ForeignPtr.addForeignPtrConcFinalizer
 

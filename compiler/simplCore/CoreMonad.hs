@@ -47,17 +47,11 @@ module CoreMonad (
     putMsg, putMsgS, errorMsg, errorMsgS, warnMsg,
     fatalErrorMsg, fatalErrorMsgS,
     debugTraceMsg, debugTraceMsgS,
-    dumpIfSet_dyn,
-
-    -- * Getting 'Name's
-    thNameToGhcName
+    dumpIfSet_dyn
   ) where
 
 import GhcPrelude hiding ( read )
 
-import Convert
-import RdrName
-import Name
 import CoreSyn
 import HscTypes
 import Module
@@ -67,7 +61,6 @@ import Annotations
 
 import IOEnv hiding     ( liftIO, failM, failWithM )
 import qualified IOEnv  ( liftIO )
-import TcEnv            ( lookupGlobal )
 import Var
 import Outputable
 import FastString
@@ -82,15 +75,12 @@ import Data.List
 import Data.Ord
 import Data.Dynamic
 import Data.IORef
-import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
-
-import qualified Language.Haskell.TH as TH
 
 {-
 ************************************************************************
@@ -852,45 +842,3 @@ dumpIfSet_dyn flag str doc
        ; unqual <- getPrintUnqualified
        ; when (dopt flag dflags) $ liftIO $
          Err.dumpSDoc dflags unqual flag str doc }
-
-{-
-************************************************************************
-*                                                                      *
-               Finding TyThings
-*                                                                      *
-************************************************************************
--}
-
-instance MonadThings CoreM where
-    lookupThing name = do { hsc_env <- getHscEnv
-                          ; liftIO $ lookupGlobal hsc_env name }
-
-{-
-************************************************************************
-*                                                                      *
-               Template Haskell interoperability
-*                                                                      *
-************************************************************************
--}
-
--- | Attempt to convert a Template Haskell name to one that GHC can
--- understand. Original TH names such as those you get when you use
--- the @'foo@ syntax will be translated to their equivalent GHC name
--- exactly. Qualified or unqualified TH names will be dynamically bound
--- to names in the module being compiled, if possible. Exact TH names
--- will be bound to the name they represent, exactly.
-thNameToGhcName :: TH.Name -> CoreM (Maybe Name)
-thNameToGhcName th_name
-  =  do { names <- mapMaybeM lookup (thRdrNameGuesses th_name)
-          -- Pick the first that works
-          -- E.g. reify (mkName "A") will pick the class A in preference
-          -- to the data constructor A
-        ; return (listToMaybe names) }
-  where
-    lookup rdr_name
-      | Just n <- isExact_maybe rdr_name   -- This happens in derived code
-      = return $ if isExternalName n then Just n else Nothing
-      | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-      = do { cache <- getOrigNameCache
-           ; return $ lookupOrigNameCache cache rdr_mod rdr_occ }
-      | otherwise = return Nothing

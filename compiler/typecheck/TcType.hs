@@ -1153,7 +1153,7 @@ split_dvs bound dvs ty
   = go dvs ty
   where
     go dv (AppTy t1 t2)    = go (go dv t1) t2
-    go dv (TyConApp _ tys) = foldl go dv tys
+    go dv (TyConApp _ tys) = foldl' go dv tys
     go dv (FunTy w arg res)  = go (go (go_rig dv w) arg) res
     go dv (LitTy {})       = dv
     go dv (CastTy ty co)   = go dv ty `mappend` go_co co
@@ -1189,7 +1189,7 @@ split_dvs bound dvs ty
 
 -- | Like 'splitDepVarsOfType', but over a list of types
 candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs
-candidateQTyVarsOfTypes = foldl (split_dvs emptyVarSet) mempty
+candidateQTyVarsOfTypes = foldl' (split_dvs emptyVarSet) mempty
 
 {-
 ************************************************************************
@@ -1476,7 +1476,7 @@ mkNakedAppTys :: Type -> [Type] -> Type
 -- See Note [The well-kinded type invariant]
 mkNakedAppTys ty1                []   = ty1
 mkNakedAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkNakedAppTys ty1                tys2 = foldl AppTy ty1 tys2
+mkNakedAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
 mkNakedAppTy :: Type -> Type -> Type
 -- See Note [The well-kinded type invariant]
@@ -2099,7 +2099,7 @@ mkMinimalBySCs :: forall a. (a -> PredType) -> [a] -> [a]
 --   - can be deduced from another by superclasses,
 --
 --   - are a reflexive equality (e.g  * ~ *)
---     (see Note [Remove redundant provided dicts] in PatSyn)
+--     (see Note [Remove redundant provided dicts] in TcPatSyn)
 --
 -- The result is a subset of the input.
 -- The 'a' is just paired up with the PredType;
@@ -2121,7 +2121,8 @@ mkMinimalBySCs get_pred xs = go preds_with_scs []
        -- order as the input, which is generally saner
    go (work_item@(p,_,_) : work_list) min_preds
      | EqPred _ t1 t2 <- classifyPredType p
-     , t1 `tcEqType` t2   -- See Note [Discard reflexive equalities]
+     , t1 `tcEqType` t2   -- See TcPatSyn
+                          -- Note [Remove redundant provided dicts]
      = go work_list min_preds
      | p `in_cloud` work_list || p `in_cloud` min_preds
      = go work_list min_preds

@@ -44,6 +44,7 @@ import Demand           ( mkClosedStrictSig, topDmd, exnRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
 import MonadUtils       ( mapAccumLM, liftIO )
+import Var              ( isTyCoVar )
 import Maybes           (  orElse )
 import Control.Monad
 import Outputable
@@ -297,7 +298,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                      do { tick LetFloatFromLet
                         ; (poly_binds, body3) <- abstractFloats (seDynFlags env) top_lvl
                                                                 tvs' body_floats2 body2
-                        ; let floats = foldl extendFloats (emptyFloats env) poly_binds
+                        ; let floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; rhs' <- mkLam env tvs' body3 rhs_cont
                         ; return (floats, rhs') }
 
@@ -2269,7 +2270,7 @@ We treat the unlifted and lifted cases separately:
   However, we can turn the case into a /strict/ let if the 'r' is
   used strictly in the body.  Then we won't lose divergence; and
   we won't build a thunk because the let is strict.
-  See also Note [Eliminating redundant seqs]
+  See also Note [Case-to-let for strictly-used binders]
 
   NB: absentError satisfies exprIsHNF: see Note [aBSENT_ERROR_ID] in MkCore.
   We want to turn
@@ -2278,13 +2279,18 @@ We treat the unlifted and lifted cases separately:
      let r = absentError "foo" in ...MkT r...
 
 
-Note [Eliminating redundant seqs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Case-to-let for strictly-used binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have this:
-   case x of r { _ -> ..r.. }
-where 'r' is used strictly in (..r..), the case is effectively a 'seq'
-on 'x', but since 'r' is used strictly anyway, we can safely transform to
-   (...x...)
+   case <scrut> of r { _ -> ..r.. }
+
+where 'r' is used strictly in (..r..), we can safely transform to
+   let r = <scrut> in ...r...
+
+This is a Good Thing, because 'r' might be dead (if the body just
+calls error), or might be used just once (in which case it can be
+inlined); or we might be able to float the let-binding up or down.
+E.g. Trac #15631 has an example.
 
 Note that this can change the error behaviour.  For example, we might
 transform
@@ -2300,7 +2306,24 @@ transformation bit us in practice.
 
 See also Note [Empty case alternatives] in CoreSyn.
 
-Just for reference, the original code (added Jan 13) looked like this:
+Historical notes
+
+There have been various earlier versions of this patch:
+
+* By Sept 18 the code looked like this:
+     || scrut_is_demanded_var scrut
+
+    scrut_is_demanded_var :: CoreExpr -> Bool
+    scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
+    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
+    scrut_is_demanded_var _          = False
+
+  This only fired if the scrutinee was a /variable/, which seems
+  an unnecessary restriction. So in Trac #15631 I relaxed it to allow
+  arbitrary scrutinees.  Less code, less to explain -- but the change
+  had 0.00% effect on nofib.
+
+* Previously, in Jan 13 the code looked like this:
      || case_bndr_evald_next rhs
 
     case_bndr_evald_next :: CoreExpr -> Bool
@@ -2311,8 +2334,8 @@ Just for reference, the original code (added Jan 13) looked like this:
     case_bndr_evald_next (Case e _ _ _)  = case_bndr_evald_next e
     case_bndr_evald_next _               = False
 
-(This came up when fixing Trac #7542. See also Note [Eta reduction of
-an eval'd function] in CoreUtils.)
+  This patch was part of fixing Trac #7542. See also
+  Note [Eta reduction of an eval'd function] in CoreUtils.)
 
 
 Further notes about case elimination
@@ -2425,9 +2448,7 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   --           lifted case: the scrutinee is in HNF (or will later be demanded)
   -- See Note [Case to let transformation]
   | all_dead_bndrs
-  , if isUnliftedType (idType case_bndr)
-    then exprOkForSpeculation scrut
-    else exprIsHNF scrut || scrut_is_demanded_var scrut
+  , doCaseToLet scrut case_bndr
   = do { tick (CaseElim case_bndr)
        ; (floats1, env') <- simplNonRecX env case_bndr scrut
        ; (floats2, expr') <- simplExprF env' rhs cont
@@ -2446,15 +2467,26 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
     all_dead_bndrs = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq   = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
 
-    scrut_is_demanded_var :: CoreExpr -> Bool
-            -- See Note [Eliminating redundant seqs]
-    scrut_is_demanded_var (Cast s _) = scrut_is_demanded_var s
-    scrut_is_demanded_var (Var _)    = isStrictDmd (idDemandInfo case_bndr)
-    scrut_is_demanded_var _          = False
-
-
 rebuildCase env scrut case_bndr alts cont
   = reallyRebuildCase env scrut case_bndr alts cont
+
+
+doCaseToLet :: OutExpr          -- Scrutinee
+            -> InId             -- Case binder
+            -> Bool
+-- The situation is         case scrut of b { DEFAULT -> body }
+-- Can we transform thus?   let { b = scrut } in body
+doCaseToLet scrut case_bndr
+  | isTyCoVar case_bndr    -- Respect CoreSyn
+  = isTyCoArg scrut        -- Note [CoreSyn type and coercion invariant]
+
+  | isUnliftedType (idType case_bndr)
+  = exprOkForSpeculation scrut
+
+  | otherwise  -- Scrut has a lifted type
+  = exprIsHNF scrut
+    || isStrictDmd (idDemandInfo case_bndr)
+    -- See Note [Case-to-let for strictly-used binders]
 
 --------------------------------------------------
 --      3. Catch-all case
@@ -3000,7 +3032,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_w
   = do { (floats1, cont') <- mkDupableCont env cont
        ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg (getMode env))
                                            (ai_args info)
-       ; return ( foldl addLetFloats floats1 floats_s
+       ; return ( foldl' addLetFloats floats1 floats_s
                 , StrictArg { sc_fun = info { ai_args = args' }
                             , sc_cci = cci
                             , sc_cont = cont'
@@ -3426,14 +3458,24 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
                            Just cont -> simplJoinRhs unf_env id expr cont
                            Nothing   -> simplExprC unf_env expr (mkBoringStop rhs_ty)
               ; case guide of
-                  UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things
-                     -> let guide' = UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok
-                                             , ug_boring_ok = inlineBoringOk expr' }
+                  UnfWhen { ug_arity = arity
+                          , ug_unsat_ok = sat_ok
+                          , ug_boring_ok = boring_ok
+                          }
+                          -- Happens for INLINE things
+                     -> let guide' =
+                              UnfWhen { ug_arity = arity
+                                      , ug_unsat_ok = sat_ok
+                                      , ug_boring_ok =
+                                          boring_ok || inlineBoringOk expr'
+                                      }
                         -- Refresh the boring-ok flag, in case expr'
                         -- has got small. This happens, notably in the inlinings
                         -- for dfuns for single-method classes; see
                         -- Note [Single-method classes] in TcInstDcls.
                         -- A test case is Trac #4138
+                        -- But retain a previous boring_ok of True; e.g. see
+                        -- the way it is set in calcUnfoldingGuidanceWithArity
                         in return (mkCoreUnfolding src is_top_lvl expr' guide')
                             -- See Note [Top-level flag on inline rules] in CoreUnfold
 

@@ -72,7 +72,7 @@ registerDelay usecs = do
 -- | Block the current thread until data is available to read from the
 -- given file descriptor.
 --
--- This will throw an 'IOError' if the file descriptor was closed
+-- This will throw an 'Prelude.IOError' if the file descriptor was closed
 -- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
 threadWaitRead :: Fd -> IO ()
@@ -82,7 +82,7 @@ threadWaitRead = threadWait evtRead
 -- | Block the current thread until the given file descriptor can
 -- accept data to write.
 --
--- This will throw an 'IOError' if the file descriptor was closed
+-- This will throw an 'Prelude.IOError' if the file descriptor was closed
 -- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
@@ -145,7 +145,7 @@ threadWaitSTM evt fd = mask_ $ do
 -- The second element of the return value pair is an IO action that can be used
 -- to deregister interest in the file descriptor.
 --
--- The STM action will throw an 'IOError' if the file descriptor was closed
+-- The STM action will throw an 'Prelude.IOError' if the file descriptor was closed
 -- while the STM action is being executed.  To safely close a file descriptor
 -- that has been used with 'threadWaitReadSTM', use 'closeFdWith'.
 threadWaitReadSTM :: Fd -> IO (STM (), IO ())
@@ -157,7 +157,7 @@ threadWaitReadSTM = threadWaitSTM evtRead
 -- The second element of the return value pair is an IO action that can be used to deregister
 -- interest in the file descriptor.
 --
--- The STM action will throw an 'IOError' if the file descriptor was closed
+-- The STM action will throw an 'Prelude.IOError' if the file descriptor was closed
 -- while the STM action is being executed.  To safely close a file descriptor
 -- that has been used with 'threadWaitWriteSTM', use 'closeFdWith'.
 threadWaitWriteSTM :: Fd -> IO (STM (), IO ())

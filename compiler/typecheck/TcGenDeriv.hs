@@ -215,7 +215,9 @@ gen_Eq_binds loc tycon = do
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
-          = foldl1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+          = foldr1 and_Expr (zipWith3Equal "nested_eq" nested_eq tys as bs)
+          -- Using 'foldr1' here ensures that the derived code is correctly
+          -- associated. See Trac #10859.
           where
             nested_eq ty a b = nlHsPar (eq_Expr tycon ty (nlHsVar a) (nlHsVar b))
 
@@ -1363,7 +1365,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
-                   foldl mk_k_app (z_Expr `nlHsApp` (eta_expand_data_con con)) as_needed)
+                   foldl' mk_k_app (z_Expr `nlHsApp` (eta_expand_data_con con)) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1577,7 +1579,7 @@ gen_Lift_binds loc tycon = (unitBag lift_bind, emptyBag)
 
             lift_Expr
               | is_infix  = nlHsApps infixApp_RDR [a1, conE_Expr, a2]
-              | otherwise = foldl mk_appE_app conE_Expr lifted_as
+              | otherwise = foldl' mk_appE_app conE_Expr lifted_as
             (a1:a2:_) = lifted_as
 
 mk_appE_app :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs

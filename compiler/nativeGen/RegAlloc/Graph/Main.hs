@@ -27,7 +27,6 @@ import UniqSet
 import UniqSupply
 import Util (seqList)
 
-import Data.List
 import Data.Maybe
 import Control.Monad
 

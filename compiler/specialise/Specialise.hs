@@ -2098,7 +2098,7 @@ mkDB bind = (bind, bind_fvs bind)
 -- | Identify the free variables of a 'CoreBind'
 bind_fvs :: CoreBind -> VarSet
 bind_fvs (NonRec bndr rhs) = pair_fvs (bndr,rhs)
-bind_fvs (Rec prs)         = foldl delVarSet rhs_fvs bndrs
+bind_fvs (Rec prs)         = foldl' delVarSet rhs_fvs bndrs
                            where
                              bndrs = map fst prs
                              rhs_fvs = unionVarSets (map pair_fvs prs)

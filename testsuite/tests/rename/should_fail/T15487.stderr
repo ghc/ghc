@@ -1,0 +1,8 @@
+
+T15487.hs:7:9: error:
+    Ambiguous occurrence ‘null’
+    It could refer to
+       either ‘Prelude.null’,
+              imported from ‘Prelude’ at T15487.hs:1:8-13
+              (and originally defined in ‘Data.Foldable’)
+           or ‘T15487.null’, defined at T15487.hs:5:1

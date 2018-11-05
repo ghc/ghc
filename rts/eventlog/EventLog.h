@@ -47,6 +47,9 @@ void postMsg(char *msg, va_list ap);
 
 void postUserEvent(Capability *cap, EventTypeNum type, char *msg);
 
+void postUserBinaryEvent(Capability *cap, EventTypeNum type,
+                         uint8_t *msg, size_t size);
+
 void postCapMsg(Capability *cap, char *msg, va_list ap);
 
 /*

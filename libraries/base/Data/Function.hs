@@ -45,16 +45,18 @@ infixl 1 &
 -- 120
 --
 -- Instead of making a recursive call, we introduce a dummy parameter @rec@;
--- when used within 'fix', this parameter then refers to 'fix'' argument, hence
+-- when used within 'fix', this parameter then refers to 'fix' argument, hence
 -- the recursion is reintroduced.
 fix :: (a -> a) -> a
 fix f = let x = f x in x
 
--- | @'on' b u x y@ runs the binary function `b` /on/ the results of applying unary function `u` to two arguments `x` and `y`. From the opposite perspective, it transforms two inputs and combines the outputs.
+-- | @'on' b u x y@ runs the binary function @b@ /on/ the results of applying
+-- unary function @u@ to two arguments @x@ and @y@. From the opposite
+-- perspective, it transforms two inputs and combines the outputs.
 --
 -- @((+) \``on`\` f) x y = f x + f y@
 --
--- Typical usage: @'Data.List.sortBy' ('compare' \`on\` 'fst')@.
+-- Typical usage: @'Data.List.sortBy' ('Prelude.compare' \`on\` 'Prelude.fst')@.
 --
 -- Algebraic properties:
 --

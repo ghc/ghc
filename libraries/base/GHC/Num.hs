@@ -50,8 +50,8 @@ default ()              -- Double isn't available yet,
 -- @a * (b + c)@ = @(a * b) + (a * c)@ and @(b + c) * a@ = @(b * a) + (c * a)@
 --
 -- Note that it /isn't/ customarily expected that a type instance of both 'Num'
--- and 'Ord' implement an ordered ring. Indeed, in 'base' only 'Integer' and
--- 'Rational' do.
+-- and 'Ord' implement an ordered ring. Indeed, in @base@ only 'Integer' and
+-- 'Data.Ratio.Rational' do.
 class  Num a  where
     {-# MINIMAL (+), (*), abs, signum, fromInteger, (negate | (-)) #-}
 

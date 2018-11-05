@@ -16,8 +16,43 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- A class for monoids (types with an associative binary operation that
--- has an identity) with various general-purpose instances.
+-- A type @a@ is a 'Monoid' if it provides an associative function ('<>')
+-- that lets you combine any two values of type @a@ into one, and a neutral
+-- element (`mempty`) such that
+--
+-- > a <> mempty == mempty <> a == a
+--
+-- A 'Monoid' is a 'Semigroup' with the added requirement of a neutral element.
+-- Thus any 'Monoid' is a 'Semigroup', but not the other way around.
+--
+-- ==== __Examples__
+--
+-- The 'Sum' monoid is defined by the numerical addition operator and `0` as neutral element:
+--
+-- >>> mempty :: Sum Int
+-- Sum 0
+-- >>> Sum 1 <> Sum 2 <> Sum 3 <> Sum 4 :: Sum Int
+-- Sum {getSum = 10}
+--
+-- We can combine multiple values in a list into a single value using the `mconcat` function.
+-- Note that we have to specify the type here since 'Int' is a monoid under several different
+-- operations:
+--
+-- >>> mconcat [1,2,3,4] :: Sum Int
+-- Sum {getSum = 10}
+-- >>> mconcat [] :: Sum Int
+-- Sum {getSum = 0}
+--
+-- Another valid monoid instance of 'Int' is 'Product' It is defined by multiplication
+-- and `1` as neutral element:
+--
+-- >>> Product 1 <> Product 2 <> Product 3 <> Product 4 :: Product Int
+-- Product {getProduct = 24}
+-- >>> mconcat [1,2,3,4] :: Product Int
+-- Product {getProduct = 24}
+-- >>> mconcat [] :: Product Int
+-- Product {getProduct = 1}
+--
 --
 -----------------------------------------------------------------------------
 
@@ -56,7 +91,7 @@ import Control.Monad.Fail (MonadFail)
 import Data.Semigroup.Internal
 
 -- $MaybeExamples
--- To implement @find@ or @findLast@ on any 'Foldable':
+-- To implement @find@ or @findLast@ on any 'Data.Foldable.Foldable':
 --
 -- @
 -- findLast :: Foldable t => (a -> Bool) -> t a -> Maybe a
@@ -65,20 +100,20 @@ import Data.Semigroup.Internal
 --                                            else Last Nothing)
 -- @
 --
--- Much of Data.Map's interface can be implemented with
--- Data.Map.alter. Some of the rest can be implemented with a new
--- @alterA@ function and either 'First' or 'Last':
+-- Much of 'Data.Map.Lazy.Map's interface can be implemented with
+-- 'Data.Map.Lazy.alter'. Some of the rest can be implemented with a new
+-- 'Data.Map.Lazy.alterF' function and either 'First' or 'Last':
 --
--- > alterA :: (Applicative f, Ord k) =>
+-- > alterF :: (Functor f, Ord k) =>
 -- >           (Maybe a -> f (Maybe a)) -> k -> Map k a -> f (Map k a)
 -- >
--- > instance Monoid a => Applicative ((,) a)  -- from Control.Applicative
+-- > instance Monoid a => Functor ((,) a)  -- from Data.Functor
 --
 -- @
 -- insertLookupWithKey :: Ord k => (k -> v -> v -> v) -> k -> v
 --                     -> Map k v -> (Maybe v, Map k v)
 -- insertLookupWithKey combine key value =
---   Arrow.first getFirst . alterA doChange key
+--   Arrow.first getFirst . 'Data.Map.Lazy.alterF' doChange key
 --   where
 --   doChange Nothing = (First Nothing, Just value)
 --   doChange (Just oldValue) =

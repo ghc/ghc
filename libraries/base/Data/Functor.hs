@@ -57,26 +57,27 @@ infixl 4 <$>
 
 -- | An infix synonym for 'fmap'.
 --
--- The name of this operator is an allusion to '$'.
+-- The name of this operator is an allusion to 'Prelude.$'.
 -- Note the similarities between their types:
 --
 -- >  ($)  ::              (a -> b) ->   a ->   b
 -- > (<$>) :: Functor f => (a -> b) -> f a -> f b
 --
--- Whereas '$' is function application, '<$>' is function
+-- Whereas 'Prelude.$' is function application, '<$>' is function
 -- application lifted over a 'Functor'.
 --
 -- ==== __Examples__
 --
--- Convert from a @'Maybe' 'Int'@ to a @'Maybe' 'String'@ using 'show':
+-- Convert from a @'Data.Maybe.Maybe' 'Data.Int.Int'@ to a @'Data.Maybe.Maybe'
+-- 'Data.String.String'@ using 'Prelude.show':
 --
 -- >>> show <$> Nothing
 -- Nothing
 -- >>> show <$> Just 3
 -- Just "3"
 --
--- Convert from an @'Either' 'Int' 'Int'@ to an @'Either' 'Int'@
--- 'String' using 'show':
+-- Convert from an @'Data.Either.Either' 'Data.Int.Int' 'Data.Int.Int'@ to an
+-- @'Data.Either.Either' 'Data.Int.Int'@ 'Data.String.String' using 'Prelude.show':
 --
 -- >>> show <$> Left 17
 -- Left 17
@@ -88,7 +89,7 @@ infixl 4 <$>
 -- >>> (*2) <$> [1,2,3]
 -- [2,4,6]
 --
--- Apply 'even' to the second element of a pair:
+-- Apply 'Prelude.even' to the second element of a pair:
 --
 -- >>> even <$> (2,2)
 -- (2,True)
@@ -129,27 +130,29 @@ infixl 1 <&>
 --
 -- ==== __Examples__
 --
--- Replace the contents of a @'Maybe' 'Int'@ with a constant 'String':
+-- Replace the contents of a @'Data.Maybe.Maybe' 'Data.Int.Int'@ with a constant
+-- 'Data.String.String':
 --
 -- >>> Nothing $> "foo"
 -- Nothing
 -- >>> Just 90210 $> "foo"
 -- Just "foo"
 --
--- Replace the contents of an @'Either' 'Int' 'Int'@ with a constant
--- 'String', resulting in an @'Either' 'Int' 'String'@:
+-- Replace the contents of an @'Data.Either.Either' 'Data.Int.Int' 'Data.Int.Int'@
+-- with a constant 'Data.String.String', resulting in an @'Data.Either.Either'
+-- 'Data.Int.Int' 'Data.String.String'@:
 --
 -- >>> Left 8675309 $> "foo"
 -- Left 8675309
 -- >>> Right 8675309 $> "foo"
 -- Right "foo"
 --
--- Replace each element of a list with a constant 'String':
+-- Replace each element of a list with a constant 'Data.String.String':
 --
 -- >>> [1,2,3] $> "foo"
 -- ["foo","foo","foo"]
 --
--- Replace the second element of a pair with a constant 'String':
+-- Replace the second element of a pair with a constant 'Data.String.String':
 --
 -- >>> (1,2) $> "foo"
 -- (1,"foo")
@@ -162,15 +165,15 @@ infixl 1 <&>
 --
 -- ==== __Examples__
 --
--- Replace the contents of a @'Maybe' 'Int'@ with unit:
+-- Replace the contents of a @'Data.Maybe.Maybe' 'Data.Int.Int'@ with unit:
 --
 -- >>> void Nothing
 -- Nothing
 -- >>> void (Just 3)
 -- Just ()
 --
--- Replace the contents of an @'Either' 'Int' 'Int'@ with unit,
--- resulting in an @'Either' 'Int' '()'@:
+-- Replace the contents of an @'Data.Either.Either' 'Data.Int.Int' 'Data.Int.Int'@
+-- with unit, resulting in an @'Data.Either.Either' 'Data.Int.Int' '()'@:
 --
 -- >>> void (Left 8675309)
 -- Left 8675309

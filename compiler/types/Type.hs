@@ -60,7 +60,7 @@ module Type (
         stripCoercionTy, splitCoercionType_maybe,
 
         splitPiTysInvisible, filterOutInvisibleTypes,
-        partitionInvisibles,
+        partitionInvisibleTypes, partitionInvisibles,
         synTyConResKind,
 
         modifyJoinResTy, setJoinResTy,
@@ -720,13 +720,13 @@ mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
                                      -- Why do this? See (EQ1) of
                                      -- Note [Respecting definitional equality]
                                      -- in TyCoRep
-  = foldl AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+  = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
     (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
-mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
+mkAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -1073,12 +1073,18 @@ piResultTys ty orig_args@(arg:args)
       | ForAllTy (TvBndr tv _) res <- ty
       = go (extendVarEnv tv_env tv arg) res args
 
-      | otherwise  -- See Note [Care with kind instantiation]
-      = ASSERT2( not (isEmptyVarEnv tv_env)
-               , ppr ty $$ ppr orig_args $$ ppr all_args )
-        go emptyTvSubstEnv
+      | not (isEmptyVarEnv tv_env)  -- See Note [Care with kind instantiation]
+      = go emptyTvSubstEnv
           (substTy (mkTvSubst in_scope tv_env) ty)
           all_args
+
+      | otherwise
+      = -- We have not run out of arguments, but the function doesn't
+        -- have the right kind to apply to them; so panic.
+        -- Without the explicit isEmptyVarEnv test, an ill-kinded type
+        -- would give an infniite loop, which is very unhelpful
+        -- c.f. Trac #15473
+        pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
 applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
@@ -1109,7 +1115,7 @@ So
 
 In other words wwe must intantiate the forall!
 
-Similarly (Trac #154218)
+Similarly (Trac #15428)
    S :: forall k f. k -> f k
 and we are finding the kind of
    S * (* ->) Int Bool
@@ -1470,7 +1476,12 @@ splitPiTysInvisible ty = split ty ty []
 
 -- | Given a tycon and its arguments, filters out any invisible arguments
 filterOutInvisibleTypes :: TyCon -> [Type] -> [Type]
-filterOutInvisibleTypes tc tys = snd $ partitionInvisibles tc id tys
+filterOutInvisibleTypes tc tys = snd $ partitionInvisibleTypes tc tys
+
+-- | Given a 'TyCon' and its arguments, partition the arguments into
+-- (invisible arguments, visible arguments).
+partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])
+partitionInvisibleTypes tc tys = partitionInvisibles tc id tys
 
 -- | Given a tycon and a list of things (which correspond to arguments),
 -- partitions the things into
@@ -1932,7 +1943,7 @@ predTypeEqRel ty
 -- It is also meant to be stable: that is, variables should not
 -- be reordered unnecessarily. The implementation of this
 -- has been observed to be stable, though it is not proven to
--- be so. See also Note [Ordering of implicit variables] in HsTypes
+-- be so. See also Note [Ordering of implicit variables] in RnTypes
 toposortTyVars :: [TyCoVar] -> [TyCoVar]
 toposortTyVars tvs = reverse $
                      [ node_payload node | node <- topologicalSortG $

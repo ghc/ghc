@@ -222,6 +222,8 @@ data CoAxBranch
                                     -- See Note [CoAxiom locations]
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
                                     -- See Note [CoAxBranch type variables]
+                                    -- May be eta-reduded; see FamInstEnv
+                                    -- Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]       -- Bound coercion variables
                                     -- Always empty, for now.
                                     -- See Note [Constraints in patterns]

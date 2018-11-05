@@ -353,10 +353,10 @@ unpack_nl !buf !r !w acc0
 -- list returned by 'hGetContents' @hdl@.
 --
 -- Any operation that fails because a handle is closed,
--- also fails if a handle is semi-closed.  The only exception is 'hClose'.
--- A semi-closed handle becomes closed:
+-- also fails if a handle is semi-closed.  The only exception is
+-- 'System.IO.hClose'.  A semi-closed handle becomes closed:
 --
---  * if 'hClose' is applied to it;
+--  * if 'System.IO.hClose' is applied to it;
 --
 --  * if an I\/O error occurs when reading an item from the handle;
 --
@@ -684,7 +684,7 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release h_@Handle__{..}
 -- 'hPutBuf' ignores any text encoding that applies to the 'Handle',
 -- writing the bytes directly to the underlying file or device.
 --
--- 'hPutBuf' ignores the prevailing 'TextEncoding' and
+-- 'hPutBuf' ignores the prevailing 'System.IO.TextEncoding' and
 -- 'NewlineMode' on the 'Handle', and writes bytes directly.
 --
 -- This operation may fail with:
@@ -804,7 +804,7 @@ writeChunkNonBlocking h_@Handle__{..} ptr bytes
 -- If the handle is a pipe or socket, and the writing end
 -- is closed, 'hGetBuf' will behave as if EOF was reached.
 --
--- 'hGetBuf' ignores the prevailing 'TextEncoding' and 'NewlineMode'
+-- 'hGetBuf' ignores the prevailing 'System.IO.TextEncoding' and 'NewlineMode'
 -- on the 'Handle', and reads bytes directly.
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
@@ -886,8 +886,8 @@ bufReadEmpty h_@Handle__{..}
 -- If the handle is a pipe or socket, and the writing end
 -- is closed, 'hGetBufSome' will behave as if EOF was reached.
 --
--- 'hGetBufSome' ignores the prevailing 'TextEncoding' and 'NewlineMode'
--- on the 'Handle', and reads bytes directly.
+-- 'hGetBufSome' ignores the prevailing 'System.IO.TextEncoding' and
+-- 'NewlineMode' on the 'Handle', and reads bytes directly.
 
 hGetBufSome :: Handle -> Ptr a -> Int -> IO Int
 hGetBufSome h ptr count
@@ -928,7 +928,7 @@ haFD h_@Handle__{..} = cast haDevice
 -- If the handle is a pipe or socket, and the writing end
 -- is closed, 'hGetBufNonBlocking' will behave as if EOF was reached.
 --
--- 'hGetBufNonBlocking' ignores the prevailing 'TextEncoding' and
+-- 'hGetBufNonBlocking' ignores the prevailing 'System.IO.TextEncoding' and
 -- 'NewlineMode' on the 'Handle', and reads bytes directly.
 --
 -- NOTE: on Windows, this function does not work correctly; it

@@ -77,7 +77,7 @@ infixr 1 ^<<, <<^
 --
 --  * @'first' f >>> 'arr' ('id' *** g) = 'arr' ('id' *** g) >>> 'first' f@
 --
---  * @'first' ('first' f) >>> 'arr' 'assoc' = 'arr' 'assoc' >>> 'first' f@
+--  * @'first' ('first' f) >>> 'arr' assoc = 'arr' assoc >>> 'first' f@
 --
 -- where
 --
@@ -210,7 +210,7 @@ instance MonadPlus m => ArrowPlus (Kleisli m) where
 --
 --  * @'left' f >>> 'arr' ('id' +++ g) = 'arr' ('id' +++ g) >>> 'left' f@
 --
---  * @'left' ('left' f) >>> 'arr' 'assocsum' = 'arr' 'assocsum' >>> 'left' f@
+--  * @'left' ('left' f) >>> 'arr' assocsum = 'arr' assocsum >>> 'left' f@
 --
 -- where
 --

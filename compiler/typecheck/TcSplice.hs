@@ -1184,7 +1184,7 @@ reifyInstances th_nm th_tys
             <- failIfEmitsConstraints $  -- avoid error cascade if there are unsolved
                tcImplicitTKBndrs ReifySkol tv_names $
                fst <$> tcLHsType rn_ty
-        ; ty <- zonkTcTypeToType emptyZonkEnv ty
+        ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind
                 -- variables inside it (Trac #7477)
@@ -1577,13 +1577,17 @@ reifyClass cls
     (_, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
     fds' = map reifyFunDep fds
     reify_op (op, def_meth)
-      = do { ty <- reifyType (idType op)
+      = do { let (_, _, ty) = tcSplitMethodTy (idType op)
+               -- Use tcSplitMethodTy to get rid of the extraneous class
+               -- variables and predicates at the beginning of op's type
+               -- (see #15551).
+           ; ty' <- reifyType ty
            ; let nm' = reifyName op
            ; case def_meth of
                 Just (_, GenericDM gdm_ty) ->
                   do { gdm_ty' <- reifyType gdm_ty
-                     ; return [TH.SigD nm' ty, TH.DefaultSigD nm' gdm_ty'] }
-                _ -> return [TH.SigD nm' ty] }
+                     ; return [TH.SigD nm' ty', TH.DefaultSigD nm' gdm_ty'] }
+                _ -> return [TH.SigD nm' ty'] }
 
     reifyAT :: ClassATItem -> TcM [TH.Dec]
     reifyAT (ATI tycon def) = do
@@ -1769,7 +1773,7 @@ reifyKind :: Kind -> TcM TH.Kind
 reifyKind = reifyType
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
-reifyCxt   = mapM reifyPred
+reifyCxt   = mapM reifyType
 
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
@@ -1930,13 +1934,6 @@ reify_tc_app tc tys
 
         in not (subVarSet result_vars dropped_vars)
 
-reifyPred :: TyCoRep.PredType -> TcM TH.Pred
-reifyPred ty
-  -- We could reify the invisible parameter as a class but it seems
-  -- nicer to support them properly...
-  | isIPPred ty = noTH (sLit "implicit parameters") (ppr ty)
-  | otherwise   = reifyType ty
-
 ------------------------------
 reifyName :: NamedThing n => n -> TH.Name
 reifyName thing
@@ -2053,7 +2050,7 @@ reifyModule (TH.Module (TH.PkgName pkgString) (TH.ModName mString)) = do
 
 ------------------------------
 mkThAppTs :: TH.Type -> [TH.Type] -> TH.Type
-mkThAppTs fun_ty arg_tys = foldl TH.AppT fun_ty arg_tys
+mkThAppTs fun_ty arg_tys = foldl' TH.AppT fun_ty arg_tys
 
 noTH :: LitString -> SDoc -> TcM a
 noTH s d = failWithTc (hsep [text "Can't represent" <+> ptext s <+>

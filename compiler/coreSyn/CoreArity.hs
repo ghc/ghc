@@ -939,7 +939,7 @@ etaExpand n orig_expr
           -- See Note [Eta expansion and source notes]
           (expr', args) = collectArgs expr
           (ticks, expr'') = stripTicksTop tickishFloatable expr'
-          sexpr = foldl App expr'' args
+          sexpr = foldl' App expr'' args
           retick expr = foldr mkTick expr ticks
 
                                 -- Abstraction    Application

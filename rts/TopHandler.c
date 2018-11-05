@@ -1,5 +1,5 @@
 #include "Rts.h"
-#include "Stable.h"
+#include "StablePtr.h"
 #include "TopHandler.h"
 
 #if defined(THREADED_RTS)

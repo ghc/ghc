@@ -40,7 +40,7 @@ char *showStgWord64(StgWord64, char *, bool);
 void heapCheckFail( void );
 #endif
 
-void printRtsInfo(void);
+void printRtsInfo(const RtsConfig);
 
 void checkFPUStack(void);
 

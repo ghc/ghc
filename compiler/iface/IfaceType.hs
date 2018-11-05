@@ -118,7 +118,7 @@ type IfaceKind     = IfaceType
 -- | A kind of universal type, used for types and kinds.
 --
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
--- before being printed. See @Note [IfaceType and pretty-printing]@.
+-- before being printed. See Note [Pretty printing via IfaceSyn] in PprTyThing
 data IfaceType
   = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
@@ -145,28 +145,6 @@ type IfaceRig = IfaceType
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]
-
-{-
-Note [IfaceType and pretty-printing]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-IfaceType has a dual role. Similarly to other Iface data types, it is used as a
-serialization mechanism for Type when writing to and reading from interface
-files. Less obviously, it is also a vehicle for pretty-printing. Any time that
-a Type is pretty-printed, it is first converted to an IfaceType and /then/
-printed out.
-
-Why go through all this trouble? One major reason for this is that an IfaceType
-stores slightly more information about its structure than a Type does, which
-makes certain pretty-printing decisions easier. Most notably, in type
-application forms (such as IfaceAppTy, IfaceTyConApp, and IfaceTupleTy), we
-track whether each of the arguments to a function are visible or not, which
-makes it easier to suppress printing out the invisible arguments.
-See Note [Suppressing invisible arguments] for more.
-
-Another minor benefit of using IfaceTypes for pretty-printing is that this
-avoids the need to duplicate code between the Outputable instances for Type
-and IfaceType.
--}
 
 data IfaceTyLit
   = IfaceNumTyLit Integer
@@ -232,8 +210,8 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to
 an IfaceType and pretty printing that.  This eliminates a lot of
-pretty-print duplication, and it matches what we do with
-pretty-printing TyThings.
+pretty-print duplication, and it matches what we do with pretty-
+printing TyThings. See Note [Pretty printing via IfaceSyn] in PprTyThing.
 
 It works fine for closed types, but when printing debug traces (e.g.
 when using -ddump-tc-trace) we print a lot of /open/ types.  These

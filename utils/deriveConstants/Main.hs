@@ -724,7 +724,7 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
                      "",
                      "#include \"PosixSource.h\"",
                      "#include \"Rts.h\"",
-                     "#include \"Stable.h\"",
+                     "#include \"StableName.h\"",
                      "#include \"Capability.h\"",
                      "",
                      "#include <inttypes.h>",

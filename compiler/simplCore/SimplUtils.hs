@@ -1515,9 +1515,12 @@ tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
 --   (a) rhs' has manifest arity
 --   (b) if is_bot is True then rhs' applied to n args is guaranteed bottom
 tryEtaExpandRhs mode bndr rhs
-  | isJoinId bndr
-  = return (manifestArity rhs, False, rhs)
-    -- Note [Do not eta-expand join points]
+  | Just join_arity <- isJoinId_maybe bndr
+  = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
+       ; return (count isId join_bndrs, exprIsBottom join_body, rhs) }
+         -- Note [Do not eta-expand join points]
+         -- But do return the correct arity and bottom-ness, because
+         -- these are used to set the bndr's IdInfo (Trac #15517)
 
   | otherwise
   = do { (new_arity, is_bot, new_rhs) <- try_expand

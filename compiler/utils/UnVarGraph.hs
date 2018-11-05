@@ -34,7 +34,6 @@ import Id
 import VarEnv
 import UniqFM
 import Outputable
-import Data.List
 import Bag
 import Unique
 

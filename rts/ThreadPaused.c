@@ -306,13 +306,6 @@ threadPaused(Capability *cap, StgTSO *tso)
                 continue;
             }
 
-            // We should never have made it here in the event of blackholes that
-            // we already own; they should have been marked when we blackholed
-            // them and consequently we should have stopped our stack walk
-            // above.
-            ASSERT(!((bh_info == &stg_BLACKHOLE_info)
-                     && (((StgInd*)bh)->indirectee == (StgClosure*)tso)));
-
             // zero out the slop so that the sanity checker can tell
             // where the next closure is.
             OVERWRITING_CLOSURE(bh);

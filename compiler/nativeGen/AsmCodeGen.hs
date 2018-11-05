@@ -365,7 +365,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
 
           -- build the global register conflict graph
           let graphGlobal
-                  = foldl Color.union Color.initGraph
+                  = foldl' Color.union Color.initGraph
                   $ [ Color.raGraph stat
                           | stat@Color.RegAllocStatsStart{} <- stats]
 
@@ -957,7 +957,7 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     -- shorted.
     -- Don't completely eliminate loops here -- that can leave a dangling jump!
     (_, shortcut_blocks, others) =
-        foldl split (setEmpty :: LabelSet, [], []) blocks
+        foldl' split (setEmpty :: LabelSet, [], []) blocks
     split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
         | Just jd <- canShortcut ncgImpl insn,
           Just dest <- getJumpDestBlockId ncgImpl jd,

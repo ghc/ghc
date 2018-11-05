@@ -49,7 +49,7 @@ module GHC.Exts
         -- * Ids with special behaviour
         lazy, inline, oneShot,
 
-        -- * Running 'RealWorld' state transformers
+        -- * Running 'RealWorld' state thread
         runRW#,
 
         -- * Safe coercions

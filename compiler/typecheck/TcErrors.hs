@@ -212,7 +212,12 @@ report_unsolved mb_binds_var type_errors expr_holes
                             , cec_expr_holes = expr_holes
                             , cec_type_holes = type_holes
                             , cec_out_of_scope_holes = out_of_scope_holes
-                            , cec_suppress = False -- See Note [Suppressing error messages]
+                            , cec_suppress = insolubleWC wanted
+                                 -- See Note [Suppressing error messages]
+                                 -- Suppress low-priority errors if there
+                                 -- are insolule errors anywhere;
+                                 -- See Trac #15539 and c.f. setting ic_status
+                                 -- in TcSimplify.setImplicationStatus
                             , cec_warn_redundant = warn_redundant
                             , cec_binds    = mb_binds_var }
 
@@ -462,14 +467,14 @@ warnRedundantConstraints ctxt env info ev_vars
    redundant_evs =
        filterOut is_type_error $
        case info of -- See Note [Redundant constraints in instance decls]
-         InstSkol -> filterOut improving ev_vars
+         InstSkol -> filterOut (improving . idType) ev_vars
          _        -> ev_vars
 
    -- See #15232
    is_type_error = isJust . userTypeError_maybe . idType
 
-   improving ev_var = any isImprovementPred $
-                      transSuperClasses (idType ev_var)
+   improving pred -- (transSuperClasses p) does not include p
+     = any isImprovementPred (pred : transSuperClasses pred)
 
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> Maybe SDoc -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (Just telescope) skols
@@ -609,25 +614,28 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
 
-    given_eq_spec = case find_gadt_match (cec_encl ctxt) of
-       Just imp -> ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter imp)
-       Nothing  -> ("insoluble1b", is_given_eq, False, ignoreErrorReporter)
-                  -- False means don't suppress subsequent errors
-                  -- Reason: we don't report all given errors
-                  --         (see mkGivenErrorReporter), and we should only suppress
-                  --         subsequent errors if we actually report this one!
-                  --         Trac #13446 is an example
+    given_eq_spec  -- See Note [Given errors]
+      | has_gadt_match (cec_encl ctxt)
+      = ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter)
+      | otherwise
+      = ("insoluble1b", is_given_eq, False, ignoreErrorReporter)
+          -- False means don't suppress subsequent errors
+          -- Reason: we don't report all given errors
+          --         (see mkGivenErrorReporter), and we should only suppress
+          --         subsequent errors if we actually report this one!
+          --         Trac #13446 is an example
 
-    find_gadt_match [] = Nothing
-    find_gadt_match (implic : implics)
+    -- See Note [Given errors]
+    has_gadt_match [] = False
+    has_gadt_match (implic : implics)
       | PatSkol {} <- ic_info implic
       , not (ic_no_eqs implic)
       , wopt Opt_WarnInaccessibleCode (implicDynFlags implic)
           -- Don't bother doing this if -Winaccessible-code isn't enabled.
           -- See Note [Avoid -Winaccessible-code when deriving] in TcInstDcls.
-      = Just implic
+      = True
       | otherwise
-      = find_gadt_match implics
+      = has_gadt_match implics
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
@@ -696,14 +704,17 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                             Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
 
-mkGivenErrorReporter :: Implication -> Reporter
+mkGivenErrorReporter :: Reporter
 -- See Note [Given errors]
-mkGivenErrorReporter implic ctxt cts
+mkGivenErrorReporter ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; dflags <- getDynFlags
-       ; let ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (implicLclEnv implic))
+       ; let (implic:_) = cec_encl ctxt
+                 -- Always non-empty when mkGivenErrorReporter is called
+             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (implicLclEnv implic))
                    -- For given constraints we overwrite the env (and hence src-loc)
-                  -- with one from the implication.  See Note [Inaccessible code]
+                   -- with one from the immediately-enclosing implication.
+                   -- See Note [Inaccessible code]
 
              inaccessible_msg = hang (text "Inaccessible code in")
                                    2 (ppr (ic_info implic))
@@ -756,7 +767,7 @@ which arguably is OK.  It's more debatable for
 but it's tricky to distinguish these cases so we don't report
 either.
 
-The bottom line is this: find_gadt_match looks for an enclosing
+The bottom line is this: has_gadt_match looks for an enclosing
 pattern match which binds some equality constraints.  If we
 find one, we report the insoluble Given.
 -}

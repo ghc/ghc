@@ -352,14 +352,6 @@ emitPrimOp dflags [res] ByteArrayContents_Char [arg]
 emitPrimOp dflags [res] StableNameToIntOp [arg]
    = emitAssign (CmmLocal res) (cmmLoadIndexW dflags arg (fixedHdrSizeW dflags) (bWord dflags))
 
---  #define eqStableNamezh(r,sn1,sn2)                                   \
---    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
-emitPrimOp dflags [res] EqStableNameOp [arg1,arg2]
-   = emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [
-                                   cmmLoadIndexW dflags arg1 (fixedHdrSizeW dflags) (bWord dflags),
-                                   cmmLoadIndexW dflags arg2 (fixedHdrSizeW dflags) (bWord dflags)
-                         ])
-
 emitPrimOp dflags [res] ReallyUnsafePtrEqualityOp [arg1,arg2]
    = emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq dflags) [arg1,arg2])
 
@@ -1405,8 +1397,21 @@ translateOp dflags SameMutableArrayArrayOp= Just (mo_wordEq dflags)
 translateOp dflags SameSmallMutableArrayOp= Just (mo_wordEq dflags)
 translateOp dflags SameTVarOp             = Just (mo_wordEq dflags)
 translateOp dflags EqStablePtrOp          = Just (mo_wordEq dflags)
+-- See Note [Comparing stable names]
+translateOp dflags EqStableNameOp         = Just (mo_wordEq dflags)
 
 translateOp _      _ = Nothing
+
+-- Note [Comparing stable names]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- A StableName# is actually a pointer to a stable name object (SNO)
+-- containing an index into the stable name table (SNT). We
+-- used to compare StableName#s by following the pointers to the
+-- SNOs and checking whether they held the same SNT indices. However,
+-- this is not necessary: there is a one-to-one correspondence
+-- between SNOs and entries in the SNT, so simple pointer equality
+-- does the trick.
 
 -- These primops are implemented by CallishMachOps, because they sometimes
 -- turn into foreign calls depending on the backend.
@@ -1422,6 +1427,9 @@ callishOp DoubleTanhOp   = Just MO_F64_Tanh
 callishOp DoubleAsinOp   = Just MO_F64_Asin
 callishOp DoubleAcosOp   = Just MO_F64_Acos
 callishOp DoubleAtanOp   = Just MO_F64_Atan
+callishOp DoubleAsinhOp  = Just MO_F64_Asinh
+callishOp DoubleAcoshOp  = Just MO_F64_Acosh
+callishOp DoubleAtanhOp  = Just MO_F64_Atanh
 callishOp DoubleLogOp    = Just MO_F64_Log
 callishOp DoubleExpOp    = Just MO_F64_Exp
 callishOp DoubleSqrtOp   = Just MO_F64_Sqrt
@@ -1436,6 +1444,9 @@ callishOp FloatTanhOp   = Just MO_F32_Tanh
 callishOp FloatAsinOp   = Just MO_F32_Asin
 callishOp FloatAcosOp   = Just MO_F32_Acos
 callishOp FloatAtanOp   = Just MO_F32_Atan
+callishOp FloatAsinhOp  = Just MO_F32_Asinh
+callishOp FloatAcoshOp  = Just MO_F32_Acosh
+callishOp FloatAtanhOp  = Just MO_F32_Atanh
 callishOp FloatLogOp    = Just MO_F32_Log
 callishOp FloatExpOp    = Just MO_F32_Exp
 callishOp FloatSqrtOp   = Just MO_F32_Sqrt

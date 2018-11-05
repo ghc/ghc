@@ -154,7 +154,8 @@ withCStringsLen enc strs f = go [] strs
   go cs (s:ss) = withCString enc s $ \c -> go (c:cs) ss
   go cs [] = withArrayLen (reverse cs) f
 
--- | Determines whether a character can be accurately encoded in a 'CString'.
+-- | Determines whether a character can be accurately encoded in a
+-- 'Foreign.C.String.CString'.
 --
 -- Pretty much anyone who uses this function is in a state of sin because
 -- whether or not a character is encodable will, in general, depend on the
@@ -200,7 +201,7 @@ peekEncodedCString (TextEncoding { mkTextDecoder = mk_decoder }) (p, sz_bytes)
       from0 <- fmap (\fp -> bufferAdd sz_bytes (emptyBuffer fp sz_bytes ReadBuffer)) $ newForeignPtr_ (castPtr p)
       to <- newCharBuffer chunk_size WriteBuffer
 
-      let go iteration from = do
+      let go !iteration from = do
             (why, from', to') <- encode decoder from to
             if isEmptyBuffer from'
              then
@@ -229,7 +230,7 @@ withEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate 
   = bracket mk_encoder close $ \encoder -> withArrayLen s $ \sz p -> do
       from <- fmap (\fp -> bufferAdd sz (emptyBuffer fp sz ReadBuffer)) $ newForeignPtr_ p
 
-      let go iteration to_sz_bytes = do
+      let go !iteration to_sz_bytes = do
            putDebugMsg ("withEncodedCString: " ++ show iteration)
            allocaBytes to_sz_bytes $ \to_p -> do
             mb_res <- tryFillBufferAndCall encoder null_terminate from to_p to_sz_bytes act
@@ -249,7 +250,7 @@ newEncodedCString (TextEncoding { mkTextEncoder = mk_encoder }) null_terminate s
   = bracket mk_encoder close $ \encoder -> withArrayLen s $ \sz p -> do
       from <- fmap (\fp -> bufferAdd sz (emptyBuffer fp sz ReadBuffer)) $ newForeignPtr_ p
 
-      let go iteration to_p to_sz_bytes = do
+      let go !iteration to_p to_sz_bytes = do
            putDebugMsg ("newEncodedCString: " ++ show iteration)
            mb_res <- tryFillBufferAndCall encoder null_terminate from to_p to_sz_bytes return
            case mb_res of
@@ -271,7 +272,7 @@ tryFillBufferAndCall encoder null_terminate from0 to_p to_sz_bytes act = do
     to_fp <- newForeignPtr_ to_p
     go (0 :: Int) (from0, emptyBuffer to_fp to_sz_bytes WriteBuffer)
   where
-    go iteration (from, to) = do
+    go !iteration (from, to) = do
       (why, from', to') <- encode encoder from to
       putDebugMsg ("tryFillBufferAndCall: " ++ show iteration ++ " " ++ show why ++ " " ++ summaryBuffer from ++ " " ++ summaryBuffer from')
       if isEmptyBuffer from'

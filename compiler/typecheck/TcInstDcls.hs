@@ -26,8 +26,7 @@ import TcClassDcl( tcClassDecl2, tcATDefault,
 import TcSigs
 import TcRnMonad
 import TcValidity
-import TcHsSyn    ( zonkTyBndrsX, emptyZonkEnv
-                  , zonkTcTypeToTypes, zonkTcTypeToType )
+import TcHsSyn
 import TcMType
 import TcType
 import Weight
@@ -68,8 +67,6 @@ import SrcLoc
 import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
-
-import TysWiredIn
 
 import Control.Monad
 import Maybes
@@ -618,10 +615,10 @@ tcDataFamInstDecl mb_clsinfo
     do { stupid_theta <- solveEqualities $ tcHsContext ctxt
 
             -- Zonk the patterns etc into the Type world
-       ; (ze, tvs')    <- zonkTyBndrsX emptyZonkEnv tvs
-       ; pats'         <- zonkTcTypeToTypes ze pats
-       ; res_kind'     <- zonkTcTypeToType  ze res_kind
-       ; stupid_theta' <- zonkTcTypeToTypes ze stupid_theta
+       ; (ze, tvs')    <- zonkTyBndrs tvs
+       ; pats'         <- zonkTcTypesToTypesX ze pats
+       ; res_kind'     <- zonkTcTypeToTypeX   ze res_kind
+       ; stupid_theta' <- zonkTcTypesToTypesX ze stupid_theta
 
        ; gadt_syntax <- dataDeclChecks (tyConName fam_tc) new_or_data stupid_theta' cons
 
@@ -843,7 +840,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
-             con_app_args = foldl app_to_meth con_app_tys sc_meth_ids
+             con_app_args = foldl' app_to_meth con_app_tys sc_meth_ids
 
              app_to_meth :: HsExpr GhcTc -> Id -> HsExpr GhcTc
              app_to_meth fun meth_id = HsApp noExt (L loc fun)
@@ -1659,7 +1656,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
               fn   = noLoc (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderArgFlag tcb /= Inferred ]
-              rhs  = foldl mk_vta (nlHsVar dm_name) visible_inst_tys
+              rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = noLoc $ mkTopFunBind Generated fn $
                              [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 

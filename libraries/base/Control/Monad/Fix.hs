@@ -40,7 +40,7 @@ import System.IO
 -- Instances of 'MonadFix' should satisfy the following laws:
 --
 -- [/purity/]
---      @'mfix' ('return' . h)  =  'return' ('fix' h)@
+--      @'mfix' ('Control.Monad.return' . h)  =  'Control.Monad.return' ('fix' h)@
 --
 -- [/left shrinking/ (or /tightening/)]
 --      @'mfix' (\\x -> a >>= \\y -> f x y)  =  a >>= \\y -> 'mfix' (\\x -> f x y)@

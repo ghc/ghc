@@ -81,6 +81,7 @@ module BasicTypes(
 
         Activation(..), isActive, isActiveIn, competesWith,
         isNeverActive, isAlwaysActive, isEarlyActive,
+        activeAfterInitial, activeDuringFinal,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1142,6 +1143,15 @@ instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
    ppr InitialPhase = text "InitialPhase"
 
+activeAfterInitial :: Activation
+-- Active in the first phase after the initial phase
+-- Currently we have just phases [2,1,0]
+activeAfterInitial = ActiveAfter NoSourceText 2
+
+activeDuringFinal :: Activation
+-- Active in the final simplification phase (which is repeated)
+activeDuringFinal = ActiveAfter NoSourceText 0
+
 -- See note [Pragma source text]
 data Activation = NeverActive
                 | AlwaysActive
@@ -1436,9 +1446,12 @@ data IntegralLit
   deriving (Data, Show)
 
 mkIntegralLit :: Integral a => a -> IntegralLit
-mkIntegralLit i = IL { il_text = SourceText (show (fromIntegral i :: Int))
+mkIntegralLit i = IL { il_text = SourceText (show i_integer)
                      , il_neg = i < 0
-                     , il_value = toInteger i }
+                     , il_value = i_integer }
+  where
+    i_integer :: Integer
+    i_integer = toInteger i
 
 negateIntegralLit :: IntegralLit -> IntegralLit
 negateIntegralLit (IL text neg value)
@@ -1463,6 +1476,13 @@ data FractionalLit
 
 mkFractionalLit :: Real a => a -> FractionalLit
 mkFractionalLit r = FL { fl_text = SourceText (show (realToFrac r::Double))
+                           -- Converting to a Double here may technically lose
+                           -- precision (see #15502). We could alternatively
+                           -- convert to a Rational for the most accuracy, but
+                           -- it would cause Floats and Doubles to be displayed
+                           -- strangely, so we opt not to do this. (In contrast
+                           -- to mkIntegralLit, where we always convert to an
+                           -- Integer for the highest accuracy.)
                        , fl_neg = r < 0
                        , fl_value = toRational r }
 

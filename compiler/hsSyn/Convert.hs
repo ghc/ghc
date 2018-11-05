@@ -17,7 +17,6 @@ module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
 import GhcPrelude
 
 import HsSyn as Hs
-import qualified Class
 import PrelNames
 import RdrName
 import qualified Name
@@ -400,6 +399,12 @@ cvtDec (TH.PatSynSigD nm ty)
        ; ty' <- cvtPatSynSigTy ty
        ; returnJustL $ Hs.SigD noExt $ PatSynSig noExt [nm'] (mkLHsSigType ty')}
 
+-- Implicit parameter bindings are handled in cvtLocalDecs and
+-- cvtImplicitParamBind. They are not allowed in any other scope, so
+-- reaching this case indicates an error.
+cvtDec (TH.ImplicitParamBindD _ _)
+  = failWith (text "Implicit parameter binding only allowed in let or where")
+
 ----------------
 cvtTySynEqn :: Located RdrName -> TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
 cvtTySynEqn tc (TySynEqn lhs rhs)
@@ -496,6 +501,10 @@ is_sig decl                    = Right decl
 is_bind :: LHsDecl GhcPs -> Either (LHsBind GhcPs) (LHsDecl GhcPs)
 is_bind (L loc (Hs.ValD _ bind)) = Left (L loc bind)
 is_bind decl                     = Right decl
+
+is_ip_bind :: TH.Dec -> Either (String, TH.Exp) TH.Dec
+is_ip_bind (TH.ImplicitParamBindD n e) = Left (n, e)
+is_ip_bind decl             = Right decl
 
 mkBadDecMsg :: Outputable a => MsgDoc -> [a] -> MsgDoc
 mkBadDecMsg doc bads
@@ -599,7 +608,7 @@ cvtDerivs :: [TH.DerivClause] -> CvtM (HsDeriving GhcPs)
 cvtDerivs cs = do { cs' <- mapM cvtDerivClause cs
                   ; returnL cs' }
 
-cvt_fundep :: FunDep -> CvtM (Located (Class.FunDep (Located RdrName)))
+cvt_fundep :: FunDep -> CvtM (LHsFunDep GhcPs)
 cvt_fundep (FunDep xs ys) = do { xs' <- mapM tNameL xs
                                ; ys' <- mapM tNameL ys
                                ; returnL (xs', ys') }
@@ -707,8 +716,8 @@ cvtPragmaD (RuleP nm bndrs lhs rhs phases)
        ; rhs'   <- cvtl rhs
        ; returnJustL $ Hs.RuleD noExt
             $ HsRules noExt (SourceText "{-# RULES")
-                      [noLoc $ HsRule noExt (noLoc (SourceText nm,nm')) act
-                                                  bndrs' lhs' rhs']
+                      [noLoc $ HsRule noExt (noLoc (quotedSourceText nm,nm'))
+                                                  act bndrs' lhs' rhs']
        }
 
 cvtPragmaD (AnnP target exp)
@@ -768,14 +777,19 @@ cvtRuleBndr (TypedRuleVar n ty)
 
 cvtLocalDecs :: MsgDoc -> [TH.Dec] -> CvtM (HsLocalBinds GhcPs)
 cvtLocalDecs doc ds
-  | null ds
-  = return (EmptyLocalBinds noExt)
-  | otherwise
-  = do { ds' <- cvtDecs ds
-       ; let (binds, prob_sigs) = partitionWith is_bind ds'
-       ; let (sigs, bads) = partitionWith is_sig prob_sigs
-       ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-       ; return (HsValBinds noExt (ValBinds noExt (listToBag binds) sigs)) }
+  = case partitionWith is_ip_bind ds of
+      ([], []) -> return (EmptyLocalBinds noExt)
+      ([], _) -> do
+        ds' <- cvtDecs ds
+        let (binds, prob_sigs) = partitionWith is_bind ds'
+        let (sigs, bads) = partitionWith is_sig prob_sigs
+        unless (null bads) (failWith (mkBadDecMsg doc bads))
+        return (HsValBinds noExt (ValBinds noExt (listToBag binds) sigs))
+      (ip_binds, []) -> do
+        binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
+        return (HsIPBinds noExt (IPBinds noExt binds))
+      ((_:_), (_:_)) ->
+        failWith (text "Implicit parameters mixed with other bindings")
 
 cvtClause :: HsMatchContext RdrName
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
@@ -786,6 +800,11 @@ cvtClause ctxt (Clause ps body wheres)
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
         ; returnL $ Hs.Match noExt ctxt pps (GRHSs noExt g' (noLoc ds')) }
 
+cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
+cvtImplicitParamBind n e = do
+    n' <- wrapL (ipName n)
+    e' <- cvtl e
+    returnL (IPBind noExt (Left n') e')
 
 -------------------------------------------------------------------
 --              Expressions
@@ -861,6 +880,7 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsCase noExt e'
                                                  (mkMatchGroup FromSource ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
+    cvt (MDoE ss)      = cvtHsDo MDoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss
     cvt (ArithSeqE dd) = do { dd' <- cvtDD dd
                             ; return $ ArithSeq noExt Nothing dd' }
@@ -920,6 +940,7 @@ cvtl e = wrapL (cvt e)
                               { s' <- vcName s
                               ; return $ HsVar noExt (noLoc s') }
     cvt (LabelE s)       = do { return $ HsOverLabel noExt Nothing (fsLit s) }
+    cvt (ImplicitParamVarE n) = do { n' <- ipName n; return $ HsIPVar noExt n' }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1047,6 +1068,7 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
   where
     cvt_one ds = do { ds' <- cvtStmts ds
                     ; return (ParStmtBlock noExt ds' undefined noSyntaxExpr) }
+cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss; returnL (mkRecStmt ss') }
 
 cvtMatch :: HsMatchContext RdrName
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
@@ -1306,7 +1328,14 @@ cvtTypeKind ty_str ty
            VarT nm -> do { nm' <- tNameL nm
                          ; mk_apps (HsTyVar noExt NotPromoted nm') tys' }
            ConT nm -> do { nm' <- tconName nm
-                         ; mk_apps (HsTyVar noExt NotPromoted (noLoc nm')) tys'}
+                         ; -- ConT can contain both data constructor (i.e.,
+                           -- promoted) names and other (i.e, unpromoted)
+                           -- names, as opposed to PromotedT, which can only
+                           -- contain data constructor names. See #15572.
+                           let prom = if isRdrDataCon nm'
+                                      then Promoted
+                                      else NotPromoted
+                         ; mk_apps (HsTyVar noExt prom (noLoc nm')) tys'}
 
            ForallT tvs cxt ty
              | null tys'
@@ -1390,6 +1419,11 @@ cvtTypeKind ty_str ty
              | otherwise ->
                    mk_apps (HsTyVar noExt NotPromoted
                             (noLoc eqTyCon_RDR)) tys'
+           ImplicitParamT n t
+             -> do { n' <- wrapL $ ipName n
+                   ; t' <- cvtType t
+                   ; returnL (HsIParamTy noExt n' t')
+                   }
 
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }
@@ -1626,6 +1660,11 @@ tName n = cvtName OccName.tvName n
 -- Type Constructor names
 tconNameL n = wrapL (tconName n)
 tconName n = cvtName OccName.tcClsName n
+
+ipName :: String -> CvtM HsIPName
+ipName n
+  = do { unless (okVarOcc n) (failWith (badOcc OccName.varName n))
+       ; return (HsIPName (fsLit n)) }
 
 cvtName :: OccName.NameSpace -> TH.Name -> CvtM RdrName
 cvtName ctxt_ns (TH.Name occ flavour)

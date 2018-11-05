@@ -124,10 +124,11 @@ divZeroError = raise# divZeroException
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
--- >>> 2^20 :: Natural
+-- >>> 2^100 :: Natural
 -- 1267650600228229401496703205376
 --
--- Operations whose result would be negative @'throw' ('Underflow' :: 'ArithException')@,
+-- Operations whose result would be negative @'Control.Exception.throw'
+-- ('Control.Exception.Underflow' :: 'Control.Exception.ArithException')@,
 --
 -- >>> -1 :: Natural
 -- *** Exception: arithmetic underflow
@@ -320,7 +321,8 @@ timesNatural (NatJ# x) (NatS# y) = NatJ# (timesBigNatWord x y)
 timesNatural (NatJ# x) (NatJ# y) = NatJ# (timesBigNat     x y)
 {-# CONSTANT_FOLDED timesNatural #-}
 
--- | 'Natural' subtraction. May @'throw' 'Underflow'@.
+-- | 'Natural' subtraction. May @'Control.Exception.throw'
+-- 'Control.Exception.Underflow'@.
 minusNatural :: Natural -> Natural -> Natural
 minusNatural x         (NatS# 0##) = x
 minusNatural (NatS# x) (NatS# y) = case subWordC# x y of
@@ -351,7 +353,7 @@ minusNaturalMaybe (NatJ# x) (NatJ# y)
     res = minusBigNat x y
 
 -- | Convert 'BigNat' to 'Natural'.
--- Throws 'Underflow' if passed a 'nullBigNat'.
+-- Throws 'Control.Exception.Underflow' if passed a 'nullBigNat'.
 bigNatToNatural :: BigNat -> Natural
 bigNatToNatural bn
   | isTrue# (sizeofBigNat# bn ==# 1#) = NatS# (bigNatToWord bn)
@@ -393,8 +395,8 @@ wordToNaturalBase w# = NatS# w#
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
--- Operations whose result would be negative
--- @'throw' ('Underflow' :: 'ArithException')@.
+-- Operations whose result would be negative @'Control.Exception.throw'
+-- ('Control.Exception.Underflow' :: 'Control.Exception.ArithException')@.
 --
 -- @since 4.8.0.0
 newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
@@ -410,15 +412,15 @@ newtype Natural = Natural Integer -- ^ __Invariant__: non-negative 'Integer'
 isValidNatural :: Natural -> Bool
 isValidNatural (Natural i) = i >= wordToInteger 0##
 
--- | Convert a Word# into a Natural
+-- | Convert a 'Word#' into a 'Natural'
 --
--- Built-in rule ensures that applications of this function to literal Word# are
--- lifted into Natural literals.
+-- Built-in rule ensures that applications of this function to literal 'Word#'
+-- are lifted into 'Natural' literals.
 wordToNatural# :: Word# -> Natural
 wordToNatural# w## = Natural (wordToInteger w##)
 {-# CONSTANT_FOLDED wordToNatural# #-}
 
--- | Convert a Word# into a Natural
+-- | Convert a 'Word#' into a Natural
 --
 -- In base we can't use wordToNatural# as built-in rules transform some of them
 -- into Natural literals. Use this function instead.
@@ -598,7 +600,7 @@ mkNatural (W# i : is') = wordToNaturalBase (i `and#` 0xffffffff##) `orNatural`
 {-# CONSTANT_FOLDED mkNatural #-}
 
 -- | Convert 'Int' to 'Natural'.
--- Throws 'Underflow' when passed a negative 'Int'.
+-- Throws 'Control.Exception.Underflow' when passed a negative 'Int'.
 intToNatural :: Int -> Natural
 intToNatural (I# i#)
   | isTrue# (i# <# 0#) = underflowError

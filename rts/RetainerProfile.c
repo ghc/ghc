@@ -30,7 +30,8 @@
 #include "Stats.h"
 #include "ProfHeap.h"
 #include "Apply.h"
-#include "Stable.h" /* markStableTables */
+#include "StablePtr.h" /* markStablePtrTable */
+#include "StableName.h" /* rememberOldStableNameAddresses */
 #include "sm/Storage.h" // for END_OF_STATIC_LIST
 
 /* Note [What is a retainer?]
@@ -336,6 +337,7 @@ init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 static INLINE void
 init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
+    info->type = posTypeSRT;
     if (infoTable->i.srt) {
         info->next.srt.srt = (StgClosure*)GET_SRT(infoTable);
     } else {
@@ -488,8 +490,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     // layout.payload.ptrs, SRT
     case FUN_STATIC:
-        ASSERT(get_itbl(c)->srt != 0);
-        /* fallthrough */
     case FUN:           // *c is a heap object.
     case FUN_2_0:
         init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);
@@ -811,6 +811,10 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case MUT_ARR_PTRS_DIRTY:
         case MUT_ARR_PTRS_FROZEN_CLEAN:
         case MUT_ARR_PTRS_FROZEN_DIRTY:
+        case SMALL_MUT_ARR_PTRS_CLEAN:
+        case SMALL_MUT_ARR_PTRS_DIRTY:
+        case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+        case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
             *c = find_ptrs(&se->info);
             if (*c == NULL) {
                 popOff();
@@ -897,7 +901,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
         case IND:
         case INVALID_OBJECT:
         default:
-            barf("Invalid object *c in pop()");
+            barf("Invalid object *c in pop(): %d", get_itbl(se->c)->type);
             return;
         }
     } while (true);
@@ -1689,7 +1693,9 @@ computeRetainerSet( void )
     }
 
     // Consider roots from the stable ptr table.
-    markStableTables(retainRoot, NULL);
+    markStablePtrTable(retainRoot, NULL);
+    // Remember old stable name addresses.
+    rememberOldStableNameAddresses ();
 
     // The following code resets the rs field of each unvisited mutable
     // object (computing sumOfNewCostExtra and updating costArray[] when

@@ -619,6 +619,14 @@ T10320:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -fforce-recomp -ddump-to-file -ddump-rule-rewrites T10320.hs
 	[ -f T10320.dump-rule-rewrites ] && [ ! -s T10320.dump-rule-rewrites ]
 
+.PHONY: T10869
+T10869:
+	$(RM) -rf T10869.hi T10869.o T10869.hspp T10869
+	$(RM) -rf T10869A.hi T10869A.o T10869A.hspp
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c -keep-hscpp-files T10869A.hs T10869.hs
+	test -f T10869.hscpp
+	test -f T10869A.hscpp
+
 .PHONY: T12135
 T12135:
 	$(RM) -rf T12135.o T12135.hi T12135 T12135a T12135b

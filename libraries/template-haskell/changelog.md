@@ -3,7 +3,7 @@
 ## 2.14.0.0 *TBA*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
-    `qAddForeignFile` class method to `Quasi`. Unlike `addForeingFile`, which
+    `qAddForeignFile` class method to `Quasi`. Unlike `addForeignFile`, which
     takes the contents of the file as an argument, `addForeignFilePath` takes
     as an argument a path pointing to a foreign file. A new `addForeignSource`
     function has also been added which takes a file's contents as an argument.
@@ -17,6 +17,11 @@
     a given suffix.
 
   * Add a `ViaStrategy` constructor to `DerivStrategy`.
+
+  * Add support for `-XImplicitParams` via `ImplicitParamT`,
+    `ImplicitParamVarE`, and `ImplicitParamBindD`.
+
+  * Add support for `-XRecursiveDo` via `MDoE` and `RecS`.
 
 ## 2.13.0.0 *March 2018*
 

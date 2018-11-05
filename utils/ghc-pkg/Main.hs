@@ -17,6 +17,24 @@
 #endif
 #endif
 
+-- The SIMPLE_WIN_GETLIBDIR macro will only be set when
+-- building on windows.
+--
+-- Its purpose is to let us know whether the Windows implementation of
+-- 'getExecutablePath' follows symlinks or not (it does follow them in
+-- base >= 4.11). If it does, the implementation of getLibDir is straightforward
+-- but if it does not follow symlinks, we need to follow them ourselves here.
+-- Once we do not have to support building ghc-pkg with base < 4.11 anymore,
+-- we can keep only the simple, straightforward implementation that just uses
+-- 'getExecutablePath'.
+#if defined(mingw32_HOST_OS)
+#if MIN_VERSION_base(4,11,0)
+#define SIMPLE_WIN_GETLIBDIR 1
+#else
+#define SIMPLE_WIN_GETLIBDIR 0
+#endif
+#endif
+
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -66,7 +84,7 @@ import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
-#if defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(linux_HOST_OS) || SIMPLE_WIN_GETLIBDIR
 import System.Environment ( getExecutablePath )
 #endif
 import System.IO
@@ -80,10 +98,12 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 #if defined(mingw32_HOST_OS)
--- mingw32 needs these for getExecDir
+#if !SIMPLE_WIN_GETLIBDIR
+-- mingw32 needs these for getExecDir when base < 4.11
 import Foreign
 import Foreign.C
 import System.Directory ( canonicalizePath )
+#endif
 import GHC.ConsoleHandler
 #else
 import System.Posix hiding (fdToHandle)
@@ -2194,7 +2214,8 @@ dieForcible s = die (s ++ " (use --force to override)")
 -- Cut and pasted from ghc/compiler/main/SysTools
 
 getLibDir :: IO (Maybe String)
-#if defined(mingw32_HOST_OS)
+
+#if defined(mingw32_HOST_OS) && !SIMPLE_WIN_GETLIBDIR
 subst :: Char -> Char -> String -> String
 subst a b ls = map (\ x -> if x == a then b else x) ls
 
@@ -2233,16 +2254,7 @@ getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
-#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS)
--- TODO: a) this is copy-pasta from SysTools.hs / getBaseDir. Why can't we reuse
---          this here? and parameterise getBaseDir over the executable (for
---          windows)?
---          Answer: we can not, because if we share `getBaseDir` via `ghc-boot`,
---                  that would add `base` as a dependency for windows.
---       b) why is the windows getBaseDir logic, not part of getExecutablePath?
---          it would be much wider available then and we could drop all the
---          custom logic?
---          Answer: yes this should happen. No one has found the time just yet.
+#elif SIMPLE_WIN_GETLIBDIR || defined(darwin_HOST_OS) || defined(linux_HOST_OS)
 getLibDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
 #else
 getLibDir = return Nothing

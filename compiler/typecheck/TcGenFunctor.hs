@@ -941,7 +941,7 @@ gen_Traversable_binds loc tycon
         mkApCon con [] = nlHsApps pure_RDR [con]
         mkApCon con [x] = nlHsApps fmap_RDR [con,x]
         mkApCon con (x1:x2:xs) =
-            foldl appAp (nlHsApps liftA2_RDR [con,x1,x2]) xs
+            foldl' appAp (nlHsApps liftA2_RDR [con,x1,x2]) xs
           where appAp x y = nlHsApps ap_RDR [x,y]
 
 -----------------------------------------------------------------------

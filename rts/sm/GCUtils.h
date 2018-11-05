@@ -31,6 +31,7 @@ INLINE_HEADER bdescr *allocBlockOnNode_sync(uint32_t node)
 }
 
 void    freeChain_sync(bdescr *bd);
+void    freeGroup_sync(bdescr *bd);
 
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);
 StgPtr  todo_block_full      (uint32_t size, gen_workspace *ws);

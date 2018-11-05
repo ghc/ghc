@@ -24,6 +24,7 @@ import Class
 import TyCon
 import Weight
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
+import TysWiredIn( cTupleTyConName )
 import Coercion
 import CoreSyn
 import Id( idType, mkTemplateLocals )
@@ -488,16 +489,31 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
     size      = sizeTypes tys
 
     do_one_given evar given_loc sel_id
-      = do { let sc_pred = funResultTy (piResultTys (idType sel_id) tys)
-                 given_ty = mkInfSigmaTy tvs theta sc_pred
-           ; given_ev <- newGivenEvVar given_loc $
-                         (given_ty, mk_sc_sel evar sel_id)
+      | not (null tvs)
+      , null theta
+      , isUnliftedType sc_pred
+      -- Very special case for equality
+      -- See Note [Equality superclasses in quantified constraints]
+      = do { empty_ctuple_cls <- tcLookupClass (cTupleTyConName 0)
+           ; let theta1    = [mkClassPred empty_ctuple_cls []]
+                 dict_ids1 = mkTemplateLocals theta1
+           ; given_ev <- new_given theta1 dict_ids1 []
+           ; return [mkNonCanonical given_ev] }
+
+      | otherwise  -- Normal case
+      = do { given_ev <- new_given theta dict_ids dict_ids
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
 
-    mk_sc_sel evar sel_id
-      = EvExpr $ mkLams tvs $ mkLams dict_ids $
-        Var sel_id `mkTyApps` tys `App`
-        (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids)
+      where
+        sc_pred = funResultTy (piResultTys (idType sel_id) tys)
+
+        new_given theta_abs dict_ids_abs dict_ids_app
+          = newGivenEvVar given_loc (given_ty, given_ev)
+          where
+            given_ty = mkInfSigmaTy tvs theta_abs sc_pred
+            given_ev = EvExpr $ mkLams tvs $ mkLams dict_ids_abs $
+                       Var sel_id `mkTyApps` tys `App`
+                       (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids_app)
 
     mk_given_loc loc
        | isCTupleClass cls
@@ -575,7 +591,45 @@ mk_superclasses_of rec_clss ev tvs theta cls tys
                              , qci_pend_sc = loop_found })
 
 
-{-
+{- Note [Equality superclasses in quantified constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #15359, #15593, #15625)
+  f :: (forall a. theta => a ~ b) => stuff
+
+It's a bit odd to have a local, quantified constraint for `(a~b)`,
+but some people want such a thing (see the tickets). And for
+Coercible it is definitely useful
+  f :: forall m. (forall p q. Coercible p q => Coercible (m p) (m q)))
+                 => stuff
+
+Moreover it's not hard to arrange; we just need to look up /equality/
+constraints in the quantified-constraint environment, which we do in
+TcInteract.doTopReactOther.
+
+There is a wrinkle though, in the case where 'theta' is empty, so
+we have
+  f :: (forall a. a~b) => stuff
+
+Now the superclass machinery kicks in, in makeSuperClasses,
+giving us a a second quantified constrait
+       (forall a. a ~# b)
+BUT this is an unboxed value!  And nothing has prepared us for
+dictionary "functions" that are unboxed.  Actually it does just
+about work, but the simplier ends up with stuff like
+   case (/\a. eq_sel d) of df -> ...(df @Int)...
+and fails to simplify that any further.
+
+It seems eaiser to give such unboxed quantifed constraints a
+dummmy () argument, thus
+      (forall a. (% %) => a ~# b)
+where (% %) is the empty constraint tuple.  That makes everything
+be nicely boxed.
+
+(One might wonder about using void# instead, but this seems more
+uniform -- it's a constraint argument -- and I'm not worried about
+the last drop of efficiency for this very rare case.)
+
+
 ************************************************************************
 *                                                                      *
 *                      Irreducibles canonicalization
@@ -672,7 +726,6 @@ Here are the moving parts
 
   * TcCanonical.canForAll deals with solving a
     forall-constraint.  See
-       Note [Solving a Wanted forall-constraint]
        Note [Solving a Wanted forall-constraint]
 
   * We augment the kick-out code to kick out an inert
@@ -1716,6 +1769,11 @@ the new one, so we use dischargeFmv. This also kicks out constraints
 from the inert set; this behavior is correct, as the kind-change may
 allow more constraints to be solved.
 
+We use `isTcReflexiveCo`, to ensure that we only use the hetero-kinded case
+if we really need to.  Of course `flattenArgsNom` should return `Refl`
+whenever possible, but Trac #15577 was an infinite loop because even
+though the coercion was homo-kinded, `kind_co` was not `Refl`, so we
+made a new (identical) CFunEqCan, and then the entire process repeated.
 -}
 
 canCFunEqCan :: CtEvidence
@@ -1735,13 +1793,20 @@ canCFunEqCan ev fn tys fsk
 
              flav    = ctEvFlavour ev
        ; (ev', fsk')
-              -- See Note [canCFunEqCan]
-           <- if isTcReflCo kind_co
-              then do { let fsk_ty = mkTyVarTy fsk
+           <- if isTcReflexiveCo kind_co   -- See Note [canCFunEqCan]
+              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs $$ ppr lhs_co)
+                      ; let fsk_ty = mkTyVarTy fsk
                       ; ev' <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty
                                                  lhs_co (mkTcNomReflCo fsk_ty)
                       ; return (ev', fsk) }
-              else do { (ev', new_co, new_fsk)
+              else do { traceTcS "canCFunEqCan: non-refl" $
+                        vcat [ text "Kind co:" <+> ppr kind_co
+                             , text "RHS:" <+> ppr fsk <+> dcolon <+> ppr (tyVarKind fsk)
+                             , text "LHS:" <+> hang (ppr (mkTyConApp fn tys))
+                                                  2 (dcolon <+> ppr (typeKind (mkTyConApp fn tys)))
+                             , text "New LHS" <+> hang (ppr new_lhs)
+                                                     2 (dcolon <+> ppr (typeKind new_lhs)) ]
+                      ; (ev', new_co, new_fsk)
                           <- newFlattenSkolem flav (ctEvLoc ev) fn tys'
                       ; let xi = mkTyVarTy new_fsk `mkCastTy` kind_co
                                -- sym lhs_co :: F tys ~ F tys'
@@ -2004,7 +2069,7 @@ canEqTyVarTyVar, are these
    gets eliminated (improves error messages)
 
  * If one is a flatten-skolem, put it on the left so that it is
-   substituted out  Note [Elminate flat-skols]
+   substituted out  Note [Eliminate flat-skols] in TcUinfy
         fsk ~ a
 
 Note [Equalities with incompatible kinds]

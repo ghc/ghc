@@ -585,7 +585,9 @@ That is, underscores in numeric literals are ignored when
 :extension:`NumericUnderscores` is enabled.
 See also :ghc-ticket:`14473`.
 
-For example: ::
+For example:
+
+.. code-block:: none
 
     -- decimal
     million    = 1_000_000
@@ -617,7 +619,9 @@ For example: ::
 
     test8bit x = (0b01_0000_0000 .&. x) /= 0
 
-About validity: ::
+About validity:
+
+.. code-block:: none
 
     x0 = 1_000_000   -- valid
     x1 = 1__000000   -- valid
@@ -2290,6 +2294,9 @@ The following syntax is stolen:
 ``pattern``
     Stolen by: :extension:`PatternSynonyms`
 
+``static``
+    Stolen by: :extension:`StaticPointers`
+
 .. _data-type-extensions:
 
 Extensions to data types and type synonyms
@@ -3208,8 +3215,6 @@ Record field disambiguation
 .. extension:: DisambiguateRecordFields
     :shortdesc: Enable record field disambiguation.
         Implied by :extension:`RecordWildCards`.
-
-    :since: 6.8.1
 
     :since: 6.8.1
 
@@ -4507,7 +4512,7 @@ Deriving ``Lift`` instances
 .. extension:: DeriveLift
     :shortdesc: Enable deriving for the Lift class
 
-    :since: 7.2.1
+    :since: 8.0.1
 
     Enable automatic deriving of instances for the ``Lift`` typeclass for
     Template Haskell.
@@ -7036,7 +7041,7 @@ usual: ::
 
 The class ``IsString`` is not in scope by default. If you want to
 mention it explicitly (for example, to give an instance declaration for
-it), you can import it from module ``GHC.Exts``.
+it), you can import it from module ``Data.String``.
 
 Haskell's defaulting mechanism (`Haskell Report, Section
 4.3.4 <http://www.haskell.org/onlinereport/decls.html#sect4.3.4>`__) is
@@ -7064,7 +7069,7 @@ A small example:
 
     module Main where
 
-    import GHC.Exts( IsString(..) )
+    import Data.String( IsString(..) )
 
     newtype MyString = MyString String deriving (Eq, Show)
     instance IsString MyString where
@@ -9621,7 +9626,7 @@ The following things have kind ``Constraint``:
 
 -  Anything whose form is not yet known, but the user has declared to
    have kind ``Constraint`` (for which they need to import it from
-   ``GHC.Exts``). So for example
+   ``Data.Kind``). So for example
    ``type Foo (f :: Type -> Constraint) = forall b. f b => b -> b``
    is allowed, as well as examples involving type families: ::
 
@@ -10207,8 +10212,7 @@ Lexically scoped type variables
     To trigger those forms of ``ScopedTypeVariables``, the ``forall`` must appear against the top-level signature (or outer expression)
     but *not* against nested signatures referring to the same type variables.
 
-    Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent pattern-equiv-form` for the example in this section, or :ref:`pattern-type-sigs` .
-
+    Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent <pattern-equiv-form>` for the example in this section, or :ref:`pattern-type-sigs`.
 
 GHC supports *lexically scoped type variables*, without which some type
 signatures are simply impossible to write. For example: ::
@@ -10687,6 +10691,17 @@ Here are the details:
   application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
   if you want the most accurate information with respect to visible type
   application properties.
+
+- Although GHC supports visible *type* applications, it does not yet support
+  visible *kind* applications. However, GHC does follow similar rules for
+  quantifying variables in kind signatures as it does for quantifying type
+  signatures. For instance: ::
+
+    type family F (a :: j) (b :: k) :: l
+      -- F :: forall j k l. j -> k -> l
+
+  In the kind of ``F``, the left-to-right ordering of ``j``, ``k``, and ``l``
+  is preserved.
 
 .. _implicit-parameters:
 
@@ -14800,19 +14815,6 @@ to be called at type ``T``:
 
 However, sometimes there are no such calls, in which case the pragma can
 be useful.
-
-Obsolete ``SPECIALIZE`` syntax
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In earlier versions of GHC, it was possible to provide your own
-specialised function for a given type:
-
-::
-
-    {-# SPECIALIZE hammeredLookup :: [(Int, value)] -> Int -> value = intLookup #-}
-
-This feature has been removed, as it is now subsumed by the ``RULES``
-pragma (see :ref:`rule-spec`).
 
 .. _specialize-instance-pragma:
 

@@ -182,7 +182,7 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
          -- lists without evaluating extra_fvs, and hence without
          -- peering into each argument
 
-    (_, extra_fvs) = foldl add_arg (fun_ty, extra_fvs0) ann_args
+    (_, extra_fvs) = foldl' add_arg (fun_ty, extra_fvs0) ann_args
     extra_fvs0 = case ann_fun of
                    (_, AnnVar _) -> fun_fvs
                    _             -> emptyDVarSet
@@ -472,7 +472,7 @@ fiExpr dflags to_drop (_, AnnCase scrut case_bndr ty alts)
     alts_fvs     = map alt_fvs alts
     all_alts_fvs = unionDVarSets alts_fvs
     alt_fvs (_con, args, rhs)
-      = foldl delDVarSet (freeVarsOf rhs) (case_bndr:args)
+      = foldl' delDVarSet (freeVarsOf rhs) (case_bndr:args)
            -- Delete case_bndr and args from free vars of rhs
            -- to get free vars of alt
 

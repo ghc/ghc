@@ -303,6 +303,7 @@ GhcRTSWays += debug
 GhcRTSWays += thr thr_debug thr_l
 GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_p,)
 GhcRTSWays += $(if $(findstring dyn, $(GhcLibWays)),dyn debug_dyn thr_dyn thr_debug_dyn l_dyn thr_l_dyn,)
+GhcRTSWays += $(if $(findstring p, $(GhcLibWays)),thr_debug_p debug_p,)
 
 # We can only build GHCi threaded if we have a threaded RTS:
 GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
@@ -365,7 +366,7 @@ SplitObjs = $(if $(and $(filter YES,$(SupportsSplitObjs)),\
 # This is not supported on Darwin (where you can use subsections-via-symbols
 # instead) and Windows is disabled until we figure the linking performance
 # issues related to BFD out. (See #11445, #12913 and related tickets.)
-OsSupportsSplitSections=$(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES)
+OsSupportsSplitSections=$(if $(filter $(TargetOS_CPP),darwin),NO,YES)
 SupportsSplitSections=$(if $(and $(filter YES,$(OsSupportsSplitSections)),\
                                    $(filter YES,$(LdIsGNULd))),YES,NO)
 SplitSections ?= $(SupportsSplitSections)

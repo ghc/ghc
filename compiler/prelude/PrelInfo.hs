@@ -171,8 +171,8 @@ knownKeyNamesOkay all_names
   | otherwise
   = Just badNamesStr
   where
-    namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
-                          emptyUFM all_names
+    namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) singleton m n n)
+                           emptyUFM all_names
     badNamesEnv   = filterNameEnv (\ns -> ns `lengthExceeds` 1) namesEnv
     badNamesPairs = nonDetUFMToList badNamesEnv
       -- It's OK to use nonDetUFMToList here because the ordering only affects

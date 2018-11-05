@@ -32,10 +32,11 @@ import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
 import Literal  ( Literal(MachStr) )
 import Id
-import Var      ( varType )
+import Var      ( varType, isNonCoVarId )
 import VarSet
 import VarEnv
 import DataCon
+import Demand( etaExpandStrictSig )
 import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
@@ -144,7 +145,7 @@ simpleOptPgm dflags this_mod binds rules
                           (\_ -> False) {- No rules active -}
                           rules binds
 
-    (final_env, binds') = foldl do_one (emptyEnv dflags, []) occ_anald_binds
+    (final_env, binds') = foldl' do_one (emptyEnv dflags, []) occ_anald_binds
     final_subst = soe_subst final_env
 
     rules' = substRulesForImportedIds final_subst rules
@@ -332,7 +333,7 @@ simple_opt_bind env (Rec prs)
     res_bind          = Just (Rec (reverse rev_prs'))
     prs'              = joinPointBindings_maybe prs `orElse` prs
     (env', bndrs')    = subst_opt_bndrs env (map fst prs')
-    (env'', rev_prs') = foldl do_pr (env', []) (prs' `zip` bndrs')
+    (env'', rev_prs') = foldl' do_pr (env', []) (prs' `zip` bndrs')
     do_pr (env, prs) ((b,r), b')
        = (env', case mb_pr of
                   Just pr -> pr : prs
@@ -360,7 +361,10 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
   = ASSERT( isCoVar in_bndr )
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
-  | pre_inline_unconditionally
+  | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
+    -- The previous two guards got rid of tyvars and coercions
+    -- See Note [CoreSyn type and coercion invariant] in CoreSyn
+    pre_inline_unconditionally
   = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
 
   | otherwise
@@ -385,12 +389,11 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
     pre_inline_unconditionally :: Bool
     pre_inline_unconditionally
-       | isCoVar in_bndr          = False    -- See Note [Do not inline CoVars unconditionally]
-       | isExportedId in_bndr     = False    --     in SimplUtils
+       | isExportedId in_bndr     = False
        | stable_unf               = False
        | not active               = False    -- Note [Inline prag in simplOpt]
        | not (safe_to_inline occ) = False
-       | otherwise = True
+       | otherwise                = True
 
         -- Unconditionally safe to inline
     safe_to_inline :: OccInfo -> Bool
@@ -423,7 +426,10 @@ simple_out_bind_pair :: SimpleOptEnv
                      -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
                      occ_info active stable_unf
-  | post_inline_unconditionally
+  | ASSERT2( isNonCoVarId in_bndr, ppr in_bndr )
+    -- Type and coercion bindings are caught earlier
+    -- See Note [CoreSyn type and coercion invariant]
+    post_inline_unconditionally
   = ( env' { soe_subst = extendIdSubst (soe_subst env) in_bndr out_rhs }
     , Nothing)
 
@@ -437,14 +443,16 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
 
     post_inline_unconditionally :: Bool
     post_inline_unconditionally
-       | not active                  = False
-       | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
-                                             -- because it might be referred to "earlier"
-       | stable_unf                  = False -- Note [Stable unfoldings and postInlineUnconditionally]
-       | isExportedId in_bndr        = False -- Note [Exported Ids and trivial RHSs]
-       | exprIsTrivial out_rhs       = True
-       | coercible_hack              = True
-       | otherwise                   = False
+       | isExportedId in_bndr  = False -- Note [Exported Ids and trivial RHSs]
+       | stable_unf            = False -- Note [Stable unfoldings and postInlineUnconditionally]
+       | not active            = False --     in SimplUtils
+       | is_loop_breaker       = False -- If it's a loop-breaker of any kind, don't inline
+                                       -- because it might be referred to "earlier"
+       | exprIsTrivial out_rhs = True
+       | coercible_hack        = True
+       | otherwise             = False
+
+    is_loop_breaker = isWeakLoopBreaker occ_info
 
     -- See Note [Getting the map/coerce RULE to work]
     coercible_hack | (Var fun, args) <- collectArgs out_rhs
@@ -663,7 +671,11 @@ joinPointBinding_maybe bndr rhs
 
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  = Just (bndr `asJoinId` join_arity, mkLams bndrs body)
+  , let str_sig   = idStrictness bndr
+        str_arity = count isId bndrs  -- Strictness demands are for Ids only
+        join_bndr = bndr `asJoinId`        join_arity
+                         `setIdStrictness` etaExpandStrictSig str_arity str_sig
+  = Just (join_bndr, mkLams bndrs body)
 
   | otherwise
   = Nothing
@@ -672,6 +684,27 @@ joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
+
+{- Note [Strictness and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+   let f = \x.  if x>200 then e1 else e1
+
+and we know that f is strict in x.  Then if we subsequently
+discover that f is an arity-2 join point, we'll eta-expand it to
+
+   let f = \x y.  if x>200 then e1 else e1
+
+and now it's only strict if applied to two arguments.  So we should
+adjust the strictness info.
+
+A more common case is when
+
+   f = \x. error ".."
+
+and again its arity increses (Trac #15517)
+-}
 
 {- *********************************************************************
 *                                                                      *

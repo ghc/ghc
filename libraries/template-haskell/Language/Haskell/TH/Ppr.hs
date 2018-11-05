@@ -179,6 +179,11 @@ pprExp i (DoE ss_) = parensIf (i > noPrec) $ text "do" <+> pprStms ss_
     pprStms []  = empty
     pprStms [s] = ppr s
     pprStms ss  = braces (semiSep ss)
+pprExp i (MDoE ss_) = parensIf (i > noPrec) $ text "mdo" <+> pprStms ss_
+  where
+    pprStms []  = empty
+    pprStms [s] = ppr s
+    pprStms ss  = braces (semiSep ss)
 
 pprExp _ (CompE []) = text "<<Empty CompExp>>"
 -- This will probably break with fixity declarations - would need a ';'
@@ -203,6 +208,7 @@ pprExp i (StaticE e) = parensIf (i >= appPrec) $
                          text "static"<+> pprExp appPrec e
 pprExp _ (UnboundVarE v) = pprName' Applied v
 pprExp _ (LabelE s) = text "#" <> text s
+pprExp _ (ImplicitParamVarE n) = text ('?' : n)
 
 pprFields :: [(Name,Exp)] -> Doc
 pprFields = sep . punctuate comma . map (\(s,e) -> ppr s <+> equals <+> ppr e)
@@ -218,6 +224,7 @@ instance Ppr Stmt where
     ppr (NoBindS e) = ppr e
     ppr (ParS sss) = sep $ punctuate bar
                          $ map commaSep sss
+    ppr (RecS ss) = text "rec" <+> (braces (semiSep ss))
 
 ------------------------------
 instance Ppr Match where
@@ -386,6 +393,8 @@ ppr_dec _ (PatSynD name args dir pat)
                 | otherwise            = ppr pat
 ppr_dec _ (PatSynSigD name ty)
   = pprPatSynSig name ty
+ppr_dec _ (ImplicitParamBindD n e)
+  = hsep [text ('?' : n), text "=", ppr e]
 
 ppr_deriv_strategy :: DerivStrategy -> Doc
 ppr_deriv_strategy ds =
@@ -716,6 +725,7 @@ pprParendType (ParensT t)         = ppr t
 pprParendType tuple | (TupleT n, args) <- split tuple
                     , length args == n
                     = parens (commaSep args)
+pprParendType (ImplicitParamT n t)= text ('?':n) <+> text "::" <+> ppr t
 pprParendType other               = parens (ppr other)
 
 pprUInfixT :: Type -> Doc
@@ -784,6 +794,7 @@ pprCxt ts = ppr_cxt_preds ts <+> text "=>"
 
 ppr_cxt_preds :: Cxt -> Doc
 ppr_cxt_preds [] = empty
+ppr_cxt_preds [t@ImplicitParamT{}] = parens (ppr t)
 ppr_cxt_preds [t] = ppr t
 ppr_cxt_preds ts = parens (commaSep ts)
 

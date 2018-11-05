@@ -55,7 +55,7 @@ import NameSet
 import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
-import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
+import BasicTypes
 import DynFlags         ( DynFlags )
 import Outputable
 import FastString
@@ -290,9 +290,10 @@ addRuleInfo (RuleInfo rs1 fvs1) (RuleInfo rs2 fvs2)
   = RuleInfo (rs1 ++ rs2) (fvs1 `unionDVarSet` fvs2)
 
 addIdSpecialisations :: Id -> [CoreRule] -> Id
-addIdSpecialisations id []
-  = id
 addIdSpecialisations id rules
+  | null rules
+  = id
+  | otherwise
   = setIdSpecialisation id $
     extendRuleInfo (idSpecialisation id) rules
 
@@ -312,9 +313,8 @@ ruleIsVisible _ BuiltinRule{} = True
 ruleIsVisible vis_orphs Rule { ru_orphan = orph, ru_origin = origin }
     = notOrphan orph || origin `elemModuleSet` vis_orphs
 
-{-
-Note [Where rules are found]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Where rules are found]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The rules for an Id come from two places:
   (a) the ones it is born with, stored inside the Id iself (idCoreRules fn),
   (b) rules added in other modules, stored in the global RuleBase (imp_rules)
@@ -350,7 +350,7 @@ mkRuleBase rules = extendRuleBaseList emptyRuleBase rules
 
 extendRuleBaseList :: RuleBase -> [CoreRule] -> RuleBase
 extendRuleBaseList rule_base new_guys
-  = foldl extendRuleBase rule_base new_guys
+  = foldl' extendRuleBase rule_base new_guys
 
 unionRuleBase :: RuleBase -> RuleBase -> RuleBase
 unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
@@ -907,7 +907,7 @@ match_alts renv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
   = do  { subst1 <- match renv' subst r1 r2
         ; match_alts renv subst1 alts1 alts2 }
   where
-    renv' = foldl mb renv (vs1 `zip` vs2)
+    renv' = foldl' mb renv (vs1 `zip` vs2)
     mb renv (v1,v2) = rnMatchBndr2 renv subst v1 v2
 
 match_alts _ _ _ _

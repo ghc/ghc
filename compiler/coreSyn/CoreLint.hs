@@ -526,6 +526,11 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; binder_ty <- applySubstTy (idType binder)
        ; ensureEqTys binder_ty ty (mkRhsMsg binder (text "RHS") ty)
 
+       -- If the binding is for a CoVar, the RHS should be (Coercion co)
+       -- See Note [CoreSyn type and coercion invariant] in CoreSyn
+       ; checkL (not (isCoVar binder) || isCoArg rhs)
+                (mkLetErr binder rhs)
+
        -- Check that it's not levity-polymorphic
        -- Do this first, because otherwise isUnliftedType panics
        -- Annoyingly, this duplicates the test in lintIdBdr,
@@ -864,6 +869,7 @@ lintVarOcc :: Var -> Int -- Number of arguments (type or value) being passed
 lintVarOcc var nargs
   = do  { checkL (isNonCoVarId var)
                  (text "Non term variable" <+> ppr var)
+                 -- See CoreSyn Note [Variable occurrences in Core]
 
         -- Cneck that the type of the occurrence is the same
         -- as the type of the binding site

@@ -1203,10 +1203,10 @@ of ``-W(no-)*``.
      we warn when this special treatment of ``(*)`` takes place.
 
 .. ghc-flag:: -Wsimplifiable-class-constraints
-    :shortdesc: 2arn about class constraints in a type signature that can
+    :shortdesc: Warn about class constraints in a type signature that can
         be simplified using a top-level instance declaration.
     :type: dynamic
-    :reverse: -Wno-overlapping-patterns
+    :reverse: -Wno-simplifiable-class-constraints
     :category:
 
     :since: 8.2

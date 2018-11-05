@@ -1371,7 +1371,7 @@ data ImportAvails
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
           -> ModuleNameEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl add emptyUFM deps
+mkModDeps deps = foldl' add emptyUFM deps
                where
                  add env elt@(m,_) = addToUFM env m elt
 
@@ -2603,7 +2603,7 @@ instance Outputable Implication where
               , ic_given = given, ic_no_eqs = no_eqs
               , ic_wanted = wanted, ic_status = status
               , ic_binds = binds
---              , ic_need_inner = need_in, ic_need_outer = need_out
+              , ic_need_inner = need_in, ic_need_outer = need_out
               , ic_info = info })
    = hang (text "Implic" <+> lbrace)
         2 (sep [ text "TcLevel =" <+> ppr tclvl
@@ -2613,8 +2613,8 @@ instance Outputable Implication where
                , hang (text "Given =")  2 (pprEvVars given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
---               , text "Needed inner =" <+> ppr need_in
---               , text "Needed outer =" <+> ppr need_out
+               , whenPprDebug (text "Needed inner =" <+> ppr need_in)
+               , whenPprDebug (text "Needed outer =" <+> ppr need_out)
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable ImplicStatus where
@@ -2948,7 +2948,9 @@ ctFlavourRole (CTyEqCan { cc_ev = ev, cc_eq_rel = eq_rel })
 ctFlavourRole (CFunEqCan { cc_ev = ev })
   = (ctEvFlavour ev, NomEq)
 ctFlavourRole (CHoleCan { cc_ev = ev })
-  = (ctEvFlavour ev, NomEq)
+  = (ctEvFlavour ev, NomEq)  -- NomEq: CHoleCans can be rewritten by
+                             -- by nominal equalities but empahatically
+                             -- not by representational equalities
 ctFlavourRole ct
   = ctEvFlavourRole (ctEvidence ct)
 

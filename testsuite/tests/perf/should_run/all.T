@@ -595,3 +595,21 @@ test('T15226a',
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
+
+test('T15426',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 41272, 20) ]),
+		    # 2018-08-10   41272  Change findIndices from INLINE to INLINABLE
+		    # initial  160041176
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O2'])
+
+test('T15578',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 800041456, 5) ]),
+                    # 2018-09-07     800041456   Improvements from #15578
+                    # initial      42400041456
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O2'])

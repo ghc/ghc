@@ -192,22 +192,31 @@ Solution: eta-reduce both axioms, thus:
 Now
    d' = d |> Monad (sym (ax2 ; ax1))
 
-This eta reduction happens for data instances as well as newtype
-instances. Here we want to eta-reduce the data family axiom.
-All this is done in TcInstDcls.tcDataFamInstDecl.
+----- Bottom line ------
 
-See also Note [Newtype eta] in TyCon.
+For a FamInst with fi_flavour = DataFamilyInst rep_tc,
 
-Bottom line:
-  For a FamInst with fi_flavour = DataFamilyInst rep_tc,
-  - fi_tvs may be shorter than tyConTyVars of rep_tc.
+  - fi_tvs (and cab_tvs of its CoAxiom) may be shorter
+    than tyConTyVars of rep_tc.
+
   - fi_tys may be shorter than tyConArity of the family tycon
        i.e. LHS is unsaturated
+
   - fi_rhs will be (rep_tc fi_tvs)
        i.e. RHS is un-saturated
 
-  But when fi_flavour = SynFamilyInst,
+  - This eta reduction happens for data instances as well
+    as newtype instances. Here we want to eta-reduce the data family axiom.
+
+  - This eta-reduction is done in TcInstDcls.tcDataFamInstDecl.
+
+But when fi_flavour = SynFamilyInst,
   - fi_tys has the exact arity of the family tycon
+
+
+(See also Note [Newtype eta] in TyCon.  This is notionally separate
+and deals with the axiom connecting a newtype with its representation
+type; but it too is eta-reduced.)
 -}
 
 -- Obtain the axiom of a family instance
@@ -459,7 +468,7 @@ familyInstances (pkg_fie, home_fie) fam
                 Nothing                      -> []
 
 extendFamInstEnvList :: FamInstEnv -> [FamInst] -> FamInstEnv
-extendFamInstEnvList inst_env fis = foldl extendFamInstEnv inst_env fis
+extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env
@@ -1265,12 +1274,6 @@ topNormaliseType_maybe env ty
 
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
-          -- NB: It's OK to use normaliseTcArgs here instead of
-          -- normalise_tc_args (which takes the LiftingContext described
-          -- in Note [Normalising types]) because the reduceTyFamApp below
-          -- works only at top level. We'll never recur in this function
-          -- after reducing the kind of a bound tyvar.
-
         case reduceTyFamApp_maybe env Representational tc ntys of
           Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co)
           _              -> NS_Done

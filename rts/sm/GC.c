@@ -46,7 +46,8 @@
 #include "RetainerProfile.h"
 #include "LdvProfile.h"
 #include "RaiseAsync.h"
-#include "Stable.h"
+#include "StableName.h"
+#include "StablePtr.h"
 #include "CheckUnload.h"
 #include "CNF.h"
 #include "RtsFlags.h"
@@ -128,7 +129,9 @@ uint32_t mutlist_MUTVARS,
 gc_thread **gc_threads = NULL;
 
 #if !defined(THREADED_RTS)
-StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)];
+// Must be aligned to 64-bytes to meet stated 64-byte alignment of gen_workspace
+StgWord8 the_gc_thread[sizeof(gc_thread) + 64 * sizeof(gen_workspace)]
+    ATTRIBUTE_ALIGNED(64);
 #endif
 
 // Number of threads running in *this* GC.  Affects how many
@@ -236,8 +239,9 @@ GarbageCollect (uint32_t collect_gen,
   // tell the stats department that we've started a GC
   stat_startGC(cap, gct);
 
-  // lock the StablePtr table
-  stableLock();
+  // Lock the StablePtr table. This prevents FFI calls manipulating
+  // the table from occurring during GC.
+  stablePtrLock();
 
 #if defined(DEBUG)
   mutlist_MUTVARS = 0;
@@ -403,7 +407,10 @@ GarbageCollect (uint32_t collect_gen,
   initWeakForGC();
 
   // Mark the stable pointer table.
-  markStableTables(mark_root, gct);
+  markStablePtrTable(mark_root, gct);
+
+  // Remember old stable name addresses.
+  rememberOldStableNameAddresses ();
 
   /* -------------------------------------------------------------------------
    * Repeatedly scavenge all the areas we know about until there's no
@@ -429,7 +436,7 @@ GarbageCollect (uint32_t collect_gen,
   shutdown_gc_threads(gct->thread_index, idle_cap);
 
   // Now see which stable names are still alive.
-  gcStableTables();
+  gcStableNameTable();
 
 #if defined(THREADED_RTS)
   if (n_gc_threads == 1) {
@@ -728,15 +735,15 @@ GarbageCollect (uint32_t collect_gen,
   if (major_gc) { gcCAFs(); }
 #endif
 
-  // Update the stable pointer hash table.
-  updateStableTables(major_gc);
+  // Update the stable name hash table
+  updateStableNameTable(major_gc);
 
   // unlock the StablePtr table.  Must be before scheduleFinalizers(),
   // because a finalizer may call hs_free_fun_ptr() or
   // hs_free_stable_ptr(), both of which access the StablePtr table.
-  stableUnlock();
+  stablePtrUnlock();
 
-  // Must be after stableUnlock(), because it might free stable ptrs.
+  // Must be after stablePtrUnlock(), because it might free stable ptrs.
   if (major_gc) {
       checkUnload (gct->scavenged_static_objects);
   }

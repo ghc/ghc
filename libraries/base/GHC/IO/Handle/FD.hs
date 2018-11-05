@@ -128,11 +128,13 @@ addFilePathToIOError fun fp ioe
 --
 -- This operation may fail with:
 --
---  * 'isAlreadyInUseError' if the file is already open and cannot be reopened;
+--  * 'System.IO.Error.isAlreadyInUseError' if the file is already open and
+--    cannot be reopened;
 --
---  * 'isDoesNotExistError' if the file does not exist; or
+--  * 'System.IO.Error.isDoesNotExistError' if the file does not exist; or
 --
---  * 'isPermissionError' if the user does not have permission to open the file.
+--  * 'System.IO.Error.isPermissionError' if the user does not have permission
+--     to open the file.
 --
 -- Note: if you will be working with files containing binary data, you'll want to
 -- be using 'openBinaryFile'.
@@ -161,7 +163,7 @@ openFileBlocking fp im =
 -- this is undesirable; also, as usual under Microsoft operating systems,
 -- text mode treats control-Z as EOF.  Binary mode turns off all special
 -- treatment of end-of-line and end-of-file characters.
--- (See also 'hSetBinaryMode'.)
+-- (See also 'System.IO.hSetBinaryMode'.)
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =

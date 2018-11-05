@@ -296,14 +296,14 @@ setspeed =
 endif
 
 ifeq "$(accept)" "YES"
-setaccept = -e config.accept=1
+setaccept = -e config.accept=True
 
 ifeq "$(PLATFORM)" "YES"
-setaccept += -e config.accept_platform=1
+setaccept += -e config.accept_platform=True
 endif
 
 ifeq "$(OS)" "YES"
-setaccept += -e config.accept_os=1
+setaccept += -e config.accept_os=True
 endif
 
 else

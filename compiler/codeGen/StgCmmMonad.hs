@@ -632,7 +632,7 @@ forkAlts branch_fcodes
                                       , cgs_hp_usg = cgs_hp_usg state }
               (_us, results) = mapAccumL compile us branch_fcodes
               (branch_results, branch_out_states) = unzip results
-        ; setState $ foldl stateIncUsage state branch_out_states
+        ; setState $ foldl' stateIncUsage state branch_out_states
                 -- NB foldl.  state is the *left* argument to stateIncUsage
         ; return branch_results }
 

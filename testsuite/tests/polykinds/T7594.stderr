@@ -5,7 +5,7 @@ T7594.hs:37:12: error:
           inside the constraints: (:&:) c0 Real a
           bound by a type expected by the context:
                      forall a. (:&:) c0 Real a => a -> b
-          at T7594.hs:37:8-19
+          at T7594.hs:37:12-16
       ‘b’ is a rigid type variable bound by
         the inferred type of bar2 :: b
         at T7594.hs:37:1-19

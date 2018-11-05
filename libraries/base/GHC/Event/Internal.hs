@@ -216,7 +216,7 @@ delete :: Backend -> IO ()
 delete (Backend bState _ _ _ bDelete) = bDelete bState
 {-# INLINE delete #-}
 
--- | Throw an 'IOError' corresponding to the current value of
+-- | Throw an 'Prelude.IOError' corresponding to the current value of
 -- 'getErrno' if the result value of the 'IO' action is -1 and
 -- 'getErrno' is not 'eINTR'.  If the result value is -1 and
 -- 'getErrno' returns 'eINTR' 0 is returned.  Otherwise the result
