@@ -996,8 +996,8 @@ unify_ty env ty1 (AppTy ty2a ty2b) _kco
 
 unify_ty _ (LitTy x) (LitTy y) _kco | x == y = return ()
 
-unify_ty env (ForAllTy (TvBndr tv1 _) ty1) (ForAllTy (TvBndr tv2 _) ty2) kco
-  = do { unify_ty env (tyVarKind tv1) (tyVarKind tv2) (mkNomReflCo liftedTypeKind)
+unify_ty env (ForAllTy (Bndr tv1 _) ty1) (ForAllTy (Bndr tv2 _) ty2) kco
+  = do { unify_ty env (varType tv1) (varType tv2) (mkNomReflCo liftedTypeKind)
        ; let env' = umRnBndr2 env tv1 tv2
        ; unify_ty env' ty1 ty2 kco }
 
@@ -1441,9 +1441,10 @@ ty_co_match menv subst (FunTy w ty1 ty2) co _lkco _rkco
   = let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) [co_mult,co1,co2]
     in ty_co_match_args menv subst [fromMult w, ty1, ty2] [co_mult, co1, co2] lkcos rkcos
 
-ty_co_match menv subst (ForAllTy (TvBndr tv1 _) ty1)
+ty_co_match menv subst (ForAllTy (Bndr tv1 _) ty1)
                        (ForAllCo tv2 kind_co2 co2)
                        lkco rkco
+  | isTyVar tv1 && isTyVar tv2
   = do { subst1 <- ty_co_match menv subst (tyVarKind tv1) kind_co2
                                ki_ki_co ki_ki_co
        ; let rn_env0 = me_env menv
@@ -1452,6 +1453,29 @@ ty_co_match menv subst (ForAllTy (TvBndr tv1 _) ty1)
        ; ty_co_match menv' subst1 ty1 co2 lkco rkco }
   where
     ki_ki_co = mkNomReflCo liftedTypeKind
+
+-- ty_co_match menv subst (ForAllTy (Bndr cv1 _) ty1)
+--                        (ForAllCo cv2 kind_co2 co2)
+--                        lkco rkco
+--   | isCoVar cv1 && isCoVar cv2
+--   We seems not to have enough information for this case
+--   1. Given:
+--        cv1      :: (s1 :: k1) ~r (s2 :: k2)
+--        kind_co2 :: (s1' ~ s2') ~N (t1 ~ t2)
+--        eta1      = mkNthCo role 2 (downgradeRole r Nominal kind_co2)
+--                 :: s1' ~ t1
+--        eta2      = mkNthCo role 3 (downgradeRole r Nominal kind_co2)
+--                 :: s2' ~ t2
+--      Wanted:
+--        subst1 <- ty_co_match menv subst  s1 eta1 kco1 kco2
+--        subst2 <- ty_co_match menv subst1 s2 eta2 kco3 kco4
+--      Question: How do we get kcoi?
+--   2. Given:
+--        lkco :: <*>    -- See Note [Weird typing rule for ForAllTy] in Type
+--        rkco :: <*>
+--      Wanted:
+--        ty_co_match menv' subst2 ty1 co2 lkco' rkco'
+--      Question: How do we get lkco' and rkco'?
 
 ty_co_match _ subst (CoercionTy {}) _ _ _
   = Just subst -- don't inspect coercions
@@ -1526,7 +1550,7 @@ pushRefl co =
                                        , mkReflCo r ty1,  mkReflCo r ty2 ])
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))
-    Just (ForAllTy (TvBndr tv _) ty, r)
-      -> Just (mkHomoForAllCos_NoRefl [tv] (mkReflCo r ty))
+    Just (ForAllTy (Bndr tv _) ty, r)
+      -> Just (ForAllCo tv (mkNomReflCo (varType tv)) (mkReflCo r ty))
     -- NB: NoRefl variant. Otherwise, we get a loop!
     _ -> Nothing

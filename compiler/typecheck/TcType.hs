@@ -40,7 +40,7 @@ module TcType (
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
-  isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
+  tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isFskTyVar, isFmvTyVar, isFlattenTyVar,
   isAmbiguousTyVar, metaTyVarRef, metaTyVarInfo,
   isFlexi, isIndirect, isRuntimeUnkSkol,
@@ -59,7 +59,7 @@ module TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBndrs,
+  tcSplitForAllTys, tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
@@ -131,13 +131,14 @@ module TcType (
 
   --------------------------------
   -- Rexported from Type
-  Type, PredType, ThetaType, TyBinder, ArgFlag(..),
+  Type, PredType, ThetaType, TyCoBinder, ArgFlag(..),
 
-  mkForAllTy, mkForAllTys, mkInvForAllTys, mkSpecForAllTys, mkInvForAllTy,
+  mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
+  mkInvForAllTy, mkInvForAllTys,
   mkFunTy, mkFunTyOm, mkFunTys,
   mkTyConApp, mkAppTy, mkAppTys,
-  mkTyConTy, mkTyVarTy,
-  mkTyVarTys,
+  mkTyConTy, mkTyVarTy, mkTyVarTys,
+  mkTyCoVarTy, mkTyCoVarTys,
 
   isClassPred, isEqPred, isNomEqPred, isIPPred,
   mkClassPred,
@@ -179,7 +180,7 @@ module TcType (
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
-  pprTvBndr, pprTvBndrs,
+  pprTCvBndr, pprTCvBndrs,
 
   TypeSize, sizeType, sizeTypes, toposortTyVars,
 
@@ -339,8 +340,8 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- a cannot occur inside a MutTyVar in T; that is,
         -- T is "flattened" before quantifying over a
 
-type TcTyVarBinder = TyVarBinder
-type TcTyCon       = TyCon   -- these can be the TcTyCon constructor
+type TcTyVarBinder   = TyVarBinder
+type TcTyCon         = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -877,7 +878,7 @@ tcTyFamInsts (TyConApp tc tys)
   | isTypeFamilyTyCon tc        = [(tc, take (tyConArity tc) tys)]
   | otherwise                   = concat (map tcTyFamInsts tys)
 tcTyFamInsts (LitTy {})         = []
-tcTyFamInsts (ForAllTy bndr ty) = tcTyFamInsts (binderKind bndr)
+tcTyFamInsts (ForAllTy bndr ty) = tcTyFamInsts (binderType bndr)
                                   ++ tcTyFamInsts ty
 tcTyFamInsts (FunTy _ ty1 ty2)    = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
 tcTyFamInsts (AppTy ty1 ty2)    = tcTyFamInsts ty1 ++ tcTyFamInsts ty2
@@ -937,7 +938,7 @@ exactTyCoVarsOfType ty
     go (LitTy {})           = emptyVarSet
     go (AppTy fun arg)      = go fun `unionVarSet` go arg
     go (FunTy w arg res)    = go_rig w `unionVarSet` go arg `unionVarSet` go res
-    go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderKind bndr)
+    go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
 
@@ -1167,7 +1168,7 @@ split_dvs bound dvs ty
                       kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
            , dv_tvs = tvs `extendDVarSet` tv }
 
-    go dv (ForAllTy (TvBndr tv _) ty)
+    go dv (ForAllTy (Bndr tv _) ty)
       = DV { dv_kvs = kvs `unionDVarSet`
                       kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
            , dv_tvs = tvs }
@@ -1377,18 +1378,18 @@ findDupTyVarTvs prs
 ************************************************************************
 -}
 
-mkSigmaTy :: [TyVarBinder] -> [PredType] -> Type -> Type
+mkSigmaTy :: [TyCoVarBinder] -> [PredType] -> Type -> Type
 mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
 -- | Make a sigma ty where all type variables are 'Inferred'. That is,
 -- they cannot be used with visible type application.
-mkInfSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
-mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) theta ty
+mkInfSigmaTy :: [TyCoVar] -> [PredType] -> Type -> Type
+mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyCoVarBinders Inferred tyvars) theta ty
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
 mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
-mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyVarBinders Specified tyvars) preds ty
+mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyCoVarBinders Specified tyvars) preds ty
 
 mkPhiTy :: [PredType] -> Type -> Type
 mkPhiTy = mkFunTys . map unrestricted
@@ -1435,7 +1436,7 @@ then consider the type
 If we call typeKind on that, we'll crash, because the (un-zonked)
 kind of 'a' is just kappa, not an arrow kind.  If we zonk first
 we'd be fine, but that is too tiresome, so instead we maintain
-(TK-INV).  So we do not form (a Int); instead we form
+(INV-TK).  So we do not form (a Int); instead we form
     (a |> co) Int
 and typeKind has no problem with that.
 
@@ -1503,11 +1504,11 @@ nakedSubstTy subst ty
 
 nakedSubstMapper :: TyCoMapper TCvSubst Identity
 nakedSubstMapper
-  = TyCoMapper { tcm_smart    = False
-               , tcm_tyvar    = \subst tv -> return (substTyVar subst tv)
-               , tcm_covar    = \subst cv -> return (substCoVar subst cv)
-               , tcm_hole     = \_ hole   -> return (HoleCo hole)
-               , tcm_tybinder = \subst tv _ -> return (substTyVarBndr subst tv)
+  = TyCoMapper { tcm_smart      = False
+               , tcm_tyvar      = \subst tv -> return (substTyVar subst tv)
+               , tcm_covar      = \subst cv -> return (substCoVar subst cv)
+               , tcm_hole       = \_ hole   -> return (HoleCo hole)
+               , tcm_tycobinder = \subst tv _ -> return (substVarBndr subst tv)
                , tcm_tycon    = return }
 
 {-
@@ -1527,25 +1528,31 @@ variables.  It's up to you to make sure this doesn't matter.
 -- | Splits a forall type into a list of 'TyBinder's and the inner type.
 -- Always succeeds, even if it returns an empty list.
 tcSplitPiTys :: Type -> ([TyBinder], Type)
-tcSplitPiTys = splitPiTys
+tcSplitPiTys ty = ASSERT( all isTyBinder (fst sty) ) sty
+  where sty = splitPiTys ty
 
 -- | Splits a type into a TyBinder and a body, if possible. Panics otherwise
 tcSplitPiTy_maybe :: Type -> Maybe (TyBinder, Type)
-tcSplitPiTy_maybe = splitPiTy_maybe
+tcSplitPiTy_maybe ty = ASSERT( isMaybeTyBinder sty ) sty
+  where sty = splitPiTy_maybe ty
+        isMaybeTyBinder (Just (t,_)) = isTyBinder t
+        isMaybeTyBinder _ = True
 
 tcSplitForAllTy_maybe :: Type -> Maybe (TyVarBinder, Type)
 tcSplitForAllTy_maybe ty | Just ty' <- tcView ty = tcSplitForAllTy_maybe ty'
-tcSplitForAllTy_maybe (ForAllTy tv ty) = Just (tv, ty)
+tcSplitForAllTy_maybe (ForAllTy tv ty) = ASSERT( isTyVarBinder tv ) Just (tv, ty)
 tcSplitForAllTy_maybe _                = Nothing
 
 -- | Like 'tcSplitPiTys', but splits off only named binders, returning
 -- just the tycovars.
 tcSplitForAllTys :: Type -> ([TyVar], Type)
-tcSplitForAllTys = splitForAllTys
+tcSplitForAllTys ty = ASSERT( all isTyVar (fst sty) ) sty
+  where sty = splitForAllTys ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
-tcSplitForAllTyVarBndrs :: Type -> ([TyVarBinder], Type)
-tcSplitForAllTyVarBndrs = splitForAllTyVarBndrs
+tcSplitForAllVarBndrs :: Type -> ([TyVarBinder], Type)
+tcSplitForAllVarBndrs ty = ASSERT( all isTyVarBinder (fst sty)) sty
+  where sty = splitForAllVarBndrs ty
 
 -- | Is this a ForAllTy with a named binder?
 tcIsForAllTy :: Type -> Bool
@@ -1691,7 +1698,7 @@ tcSplitFunTy_maybe _                                    = Nothing
         --
         --      g = f () ()
 
-tcSplitFunTysN :: Arity                      -- N: Number of desired args
+tcSplitFunTysN :: Arity                      -- n: Number of desired args
                -> TcRhoType
                -> Either Arity               -- Number of missing arrows
                         ([Weighted TcSigmaType],-- Arg types (always N types)
@@ -1881,9 +1888,9 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
     go vis _   (LitTy lit1)        (LitTy lit2)
       = check vis $ lit1 == lit2
 
-    go vis env (ForAllTy (TvBndr tv1 vis1) ty1)
-               (ForAllTy (TvBndr tv2 vis2) ty2)
-      = go (isVisibleArgFlag vis1) env (tyVarKind tv1) (tyVarKind tv2)
+    go vis env (ForAllTy (Bndr tv1 vis1) ty1)
+               (ForAllTy (Bndr tv2 vis2) ty2)
+      = go (isVisibleArgFlag vis1) env (varType tv1) (varType tv2)
           <!> go vis (rnBndr2 env tv1 tv2) ty1 ty2
           <!> check vis (vis1 == vis2)
     -- Make sure we handle all FunTy cases since falling through to the
@@ -2188,9 +2195,9 @@ isInsolubleOccursCheck eq_rel tv ty
                          NomEq  -> go t1 || go t2
                          ReprEq -> go t1
     go (FunTy _ t1 t2) = go t1 || go t2
-    go (ForAllTy (TvBndr tv' _) inner_ty)
+    go (ForAllTy (Bndr tv' _) inner_ty)
       | tv' == tv = False
-      | otherwise = go (tyVarKind tv') || go inner_ty
+      | otherwise = go (varType tv') || go inner_ty
     go (CastTy ty _)  = go ty   -- ToDo: what about the coercion
     go (CoercionTy _) = False   -- ToDo: what about the coercion
     go (TyConApp tc tys)
@@ -2746,7 +2753,7 @@ sizeType = go
     go (LitTy {})                = 1
     go (FunTy _ arg res)         = go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
-    go (ForAllTy (TvBndr tv vis) ty)
+    go (ForAllTy (Bndr tv vis) ty)
         | isVisibleArgFlag vis   = go (tyVarKind tv) + go ty + 1
         | otherwise              = go ty + 1
     go (CastTy ty _)             = go ty

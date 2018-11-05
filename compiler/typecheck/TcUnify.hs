@@ -2231,7 +2231,7 @@ preCheck dflags ty_fam_ok tv ty
     fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
     fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
     fast_check (CoercionTy co) = fast_check_co co
-    fast_check (ForAllTy (TvBndr tv' _) ty)
+    fast_check (ForAllTy (Bndr tv' _) ty)
        | not impredicative_ok = OC_Bad
        | tv == tv'            = ok
        | otherwise = do { fast_check_occ (tyVarKind tv')

@@ -1155,7 +1155,7 @@ flatten_args_tc tc = flatten_args all_bndrs any_named_bndrs inner_ki emptyVarSet
     -- NB: Those bangs there drop allocations in T9872{a,c,d} by 8%.
 
 {-# INLINE flatten_args #-}
-flatten_args :: [TyBinder] -> Bool   -- Binders, and True iff any of them are
+flatten_args :: [TyCoBinder] -> Bool -- Binders, and True iff any of them are
                                      -- named.
              -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
              -> [Role] -> [Type]     -- these are in 1-to-1 correspondence
@@ -1188,7 +1188,7 @@ flatten_args orig_binders
 -- There are many bang patterns in here. It's been observed that they
 -- greatly improve performance of an optimized build.
 -- The T9872 test cases are good witnesses of this fact.
-flatten_args_fast :: [TyBinder]
+flatten_args_fast :: [TyCoBinder]
                   -> Kind
                   -> [Role]
                   -> [Type]
@@ -1199,8 +1199,8 @@ flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
 
     iterate :: [Type]
             -> [Role]
-            -> [TyBinder]
-            -> FlatM ([Xi], [Coercion], [TyBinder])
+            -> [TyCoBinder]
+            -> FlatM ([Xi], [Coercion], [TyCoBinder])
     iterate (ty:tys) (role:roles) (_:binders) = do
       (xi, co) <- go role ty
       (xis, cos, binders) <- iterate tys roles binders
@@ -1235,7 +1235,7 @@ flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
           --   mkCastTy x (Refl _ _) = x
           --   mkTcGReflLeftCo _ ty (Refl _ _) `mkTransCo` co = co
           --
-          -- Also, no need to check isAnonTyBinder or isNamedTyBinder, since
+          -- Also, no need to check isAnonTyCoBinder or isNamedTyCoBinder, since
           -- we've already established that they're all anonymous.
           Nominal          -> setEqRel NomEq  $ flatten_one ty
           Representational -> setEqRel ReprEq $ flatten_one ty
@@ -1245,7 +1245,7 @@ flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
 
 
     {-# INLINE finish #-}
-    finish :: ([Xi], [Coercion], [TyBinder]) -> ([Xi], [Coercion], CoercionN)
+    finish :: ([Xi], [Coercion], [TyCoBinder]) -> ([Xi], [Coercion], CoercionN)
     finish (xis, cos, binders) = (xis, cos, kind_co)
       where
         final_kind = mkPiTys binders orig_inner_ki
@@ -1254,7 +1254,7 @@ flatten_args_fast orig_binders orig_inner_ki orig_roles orig_tys
 {-# INLINE flatten_args_slow #-}
 -- | Slow path, compared to flatten_args_fast, because this one must track
 -- a lifting context.
-flatten_args_slow :: [TyBinder] -> Kind -> TcTyCoVarSet
+flatten_args_slow :: [TyCoBinder] -> Kind -> TcTyCoVarSet
                   -> [Role] -> [Type]
                   -> FlatM ([Xi], [Coercion], CoercionN)
 flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
@@ -1266,7 +1266,7 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
        -> [Coercion]  -- Coercions accumulator, in reverse order
                       -- These are in 1-to-1 correspondence
        -> LiftingContext  -- mapping from tyvars to flattening coercions
-       -> [TyBinder]  -- Unsubsted binders of function's kind
+       -> [TyCoBinder]    -- Unsubsted binders of function's kind
        -> Kind        -- Unsubsted result kind of function (not a Pi-type)
        -> [Role]      -- Roles at which to flatten these ...
        -> [Type]      -- ... unflattened types
@@ -1274,21 +1274,21 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
     go acc_xis acc_cos lc binders inner_ki _ []
       = return (reverse acc_xis, reverse acc_cos, kind_co)
       where
-        final_kind = mkPiTys binders inner_ki
+        final_kind = mkTyCoPiTys binders inner_ki
         kind_co = liftCoSubst Nominal lc final_kind
 
     go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) (ty:tys)
       = do { (xi, co) <- case role of
                Nominal          -> setEqRel NomEq $
-                                   if isNamedTyBinder binder
+                                   if isNamedTyCoBinder binder
                                    then noBogusCoercions $ flatten_one ty
                                    else                    flatten_one ty
 
-               Representational -> ASSERT( isAnonTyBinder binder )
+               Representational -> ASSERT( isAnonTyCoBinder binder )
                                    setEqRel ReprEq $ flatten_one ty
 
                Phantom          -> -- See Note [Phantoms in the flattener]
-                                   ASSERT( isAnonTyBinder binder )
+                                   ASSERT( isAnonTyCoBinder binder )
                                    do { ty <- liftTcS $ zonkTcType ty
                                       ; return (ty, mkReflCo Phantom ty) }
 
@@ -1301,12 +1301,12 @@ flatten_args_slow orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
              -- The bangs here have been observed to improve performance
              -- significantly in optimized builds.
            ; let kind_co = mkTcSymCo $
-                   liftCoSubst Nominal lc (tyBinderType binder)
+                   liftCoSubst Nominal lc (tyCoBinderType binder)
                  !casted_xi = xi `mkCastTy` kind_co
                  casted_co =  mkTcCoherenceLeftCo role xi kind_co co
 
              -- now, extend the lifting context with the new binding
-                 !new_lc | Just tv <- tyBinderVar_maybe binder
+                 !new_lc | Just tv <- tyCoBinderVar_maybe binder
                          = extendLiftingContextAndInScope lc tv casted_co
                          | otherwise
                          = lc
@@ -1424,7 +1424,7 @@ flatten_one ty@(ForAllTy {})
 
 -- We allow for-alls when, but only when, no type function
 -- applications inside the forall involve the bound type variables.
-  = do { let (bndrs, rho) = tcSplitForAllTyVarBndrs ty
+  = do { let (bndrs, rho) = tcSplitForAllVarBndrs ty
              tvs           = binderVars bndrs
        ; (rho', co) <- setMode FM_SubstOnly $ flatten_one rho
                          -- Substitute only under a forall
@@ -2163,7 +2163,7 @@ Flatten using the fun-eqs first.
 
 -- | Like 'splitPiTys'' but comes with a 'Bool' which is 'True' iff there is at
 -- least one named binder.
-split_pi_tys' :: Type -> ([TyBinder], Type, Bool)
+split_pi_tys' :: Type -> ([TyCoBinder], Type, Bool)
 split_pi_tys' ty = split ty ty
   where
   split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
@@ -2174,14 +2174,14 @@ split_pi_tys' ty = split ty ty
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
--- | Like 'tyConBindersTyBinders' but you also get a 'Bool' which is true iff
+-- | Like 'tyConBindersTyCoBinders' but you also get a 'Bool' which is true iff
 -- there is at least one named binder.
-ty_con_binders_ty_binders' :: [TyConBinder] -> ([TyBinder], Bool)
+ty_con_binders_ty_binders' :: [TyConBinder] -> ([TyCoBinder], Bool)
 ty_con_binders_ty_binders' = foldr go ([], False)
   where
-    go (TvBndr tv (NamedTCB vis)) (bndrs, _)
-      = (Named (TvBndr tv vis) : bndrs, True)
-    go (TvBndr tv AnonTCB)        (bndrs, n)
+    go (Bndr tv (NamedTCB vis)) (bndrs, _)
+      = (Named (Bndr tv vis) : bndrs, True)
+    go (Bndr tv AnonTCB)        (bndrs, n)
       = (Anon (mkWeighted Omega (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

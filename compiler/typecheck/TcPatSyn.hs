@@ -18,7 +18,7 @@ import GhcPrelude
 import HsSyn
 import TcPat
 import Weight
-import Type( mkEmptyTCvSubst, tidyTyVarBinders, tidyTypes, tidyType )
+import Type( mkEmptyTCvSubst, tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcType( mkMinimalBySCs )
@@ -619,8 +619,8 @@ tc_patsyn_finish lname dir is_infix lpat'
        ; pat_ty'         <- zonkTcTypeToTypeX ze pat_ty
        ; arg_tys'        <- zonkTcTypesToTypesX ze arg_tys
 
-       ; let (env1, univ_tvs) = tidyTyVarBinders emptyTidyEnv univ_tvs'
-             (env2, ex_tvs)   = tidyTyVarBinders env1 ex_tvs'
+       ; let (env1, univ_tvs) = tidyTyCoVarBinders emptyTidyEnv univ_tvs'
+             (env2, ex_tvs)   = tidyTyCoVarBinders env1 ex_tvs'
              req_theta  = tidyTypes env2 req_theta'
              prov_theta = tidyTypes env2 prov_theta'
              arg_tys    = tidyTypes env2 arg_tys'

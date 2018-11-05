@@ -525,7 +525,7 @@ rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 rnIfaceConDecl :: Rename IfaceConDecl
 rnIfaceConDecl d = do
     con_name <- rnIfaceGlobal (ifConName d)
-    con_ex_tvs <- mapM rnIfaceTvBndr (ifConExTvs d)
+    con_ex_tvs <- mapM rnIfaceBndr (ifConExTCvs d)
     con_user_tvbs <- mapM rnIfaceForAllBndr (ifConUserTvBinders d)
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
@@ -536,7 +536,7 @@ rnIfaceConDecl d = do
         rnIfaceBang bang = pure bang
     con_stricts <- mapM rnIfaceBang (ifConStricts d)
     return d { ifConName = con_name
-             , ifConExTvs = con_ex_tvs
+             , ifConExTCvs = con_ex_tvs
              , ifConUserTvBinders = con_user_tvbs
              , ifConEqSpec = con_eq_spec
              , ifConCtxt = con_ctxt
@@ -625,7 +625,7 @@ rnIfaceTvBndr :: Rename IfaceTvBndr
 rnIfaceTvBndr (fs, kind) = (,) fs <$> rnIfaceType kind
 
 rnIfaceTyConBinder :: Rename IfaceTyConBinder
-rnIfaceTyConBinder (TvBndr tv vis) = TvBndr <$> rnIfaceTvBndr tv <*> pure vis
+rnIfaceTyConBinder (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis
 
 rnIfaceAlt :: Rename IfaceAlt
 rnIfaceAlt (conalt, names, rhs)
@@ -657,7 +657,7 @@ rnIfaceCo (IfaceTyConAppCo role tc cos)
 rnIfaceCo (IfaceAppCo co1 co2)
     = IfaceAppCo <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceForAllCo bndr co1 co2)
-    = IfaceForAllCo <$> rnIfaceTvBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
+    = IfaceForAllCo <$> rnIfaceBndr bndr <*> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceFreeCoVar c) = pure (IfaceFreeCoVar c)
 rnIfaceCo (IfaceCoVarCo lcl) = IfaceCoVarCo <$> pure lcl
 rnIfaceCo (IfaceHoleCo lcl)  = IfaceHoleCo  <$> pure lcl
@@ -712,7 +712,7 @@ rnIfaceType (IfaceCastTy ty co)
     = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
 
 rnIfaceForAllBndr :: Rename IfaceForAllBndr
-rnIfaceForAllBndr (TvBndr tv vis) = TvBndr <$> rnIfaceTvBndr tv <*> pure vis
+rnIfaceForAllBndr (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis
 
 rnIfaceAppArgs :: Rename IfaceAppArgs
 rnIfaceAppArgs (IA_Invis t ts) = IA_Invis <$> rnIfaceType t <*> rnIfaceAppArgs ts
