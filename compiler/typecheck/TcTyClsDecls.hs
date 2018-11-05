@@ -3293,7 +3293,7 @@ checkValidDependency binders res_kind
         tcb_var  = binderVar tcb
         tcb_kind = tyVarKind tcb_var
 
-        pp_binder binder = ppr (binderVar binder) <+> dcolon <+> ppr (binderKind binder)
+        pp_binder binder = ppr (binderVar binder) <+> dcolon <+> ppr (binderType binder)
 
 {-
 ************************************************************************
@@ -3410,7 +3410,7 @@ checkValidRoles tc
       =  check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 
-    check_ty_roles env role (ForAllTy (TvBndr tv _) ty)
+    check_ty_roles env role (ForAllTy (Bndr tv _) ty)
       =  check_ty_roles env Nominal (tyVarKind tv)
       >> check_ty_roles (extendVarEnv env tv Nominal) role ty
 
@@ -3526,7 +3526,8 @@ noClassTyVarErr clas fam_tc
 
 badDataConTyCon :: DataCon -> Type -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl actual_res_ty
-  | tcIsForAllTy actual_res_ty
+  | ASSERT( all isTyVar actual_ex_tvs )
+    tcIsForAllTy actual_res_ty
   = nested_foralls_contexts_suggestion
   | isJust (tcSplitPredFunTy_maybe actual_res_ty)
   = nested_foralls_contexts_suggestion
@@ -3564,7 +3565,7 @@ badDataConTyCon data_con res_ty_tmpl actual_res_ty
     --    underneath the nested foralls and contexts.
     -- 3) Smash together the type variables and class predicates from 1) and
     --    2), and prepend them to the rho type from 2).
-    actual_ex_tvs = dataConExTyVars data_con
+    actual_ex_tvs = dataConExTyCoVars data_con
     actual_theta  = dataConTheta data_con
     (actual_res_tvs, actual_res_theta, actual_res_rho)
       = tcSplitNestedSigmaTys actual_res_ty

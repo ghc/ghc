@@ -76,7 +76,7 @@ import TcErrors ( reportAllUnsolved )
 import TcType
 import Weight
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
-import TyCoRep( TyBinder(..), Type )  -- Used in tcDataKindSig
+import TyCoRep( TyCoBinder(..), TyBinder, Type )  -- Used in tcDataKindSig
 import Type
 import Coercion
 import RdrName( lookupLocalRdrOcc )
@@ -1369,7 +1369,7 @@ Here
 and
   T :: forall {k3} k1. forall k3 -> k1 -> k2 -> k3 -> *
 
-See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility]
+See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility]
 in TyCoRep.
 
 kcLHsQTyVars uses the hsq_dependent field to decide whether
@@ -2209,15 +2209,15 @@ tcDataKindSig tc_bndrs kind
               arg'   = substTy subst (weightedThing arg)
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
-              tcb    = TvBndr tv AnonTCB
+              tcb    = Bndr tv AnonTCB
               (uniq:uniqs') = uniqs
               (occ:occs')   = occs
 
-          Just (Named (TvBndr tv vis), kind')
+          Just (Named (Bndr tv vis), kind')
             -> go loc occs uniqs subst' (tcb : acc) kind'
             where
               (subst', tv') = substTyVarBndr subst tv
-              tcb = TvBndr tv' (NamedTCB vis)
+              tcb = Bndr tv' (NamedTCB vis)
 
 badKindSig :: Bool -> Kind -> SDoc
 badKindSig check_for_type kind
@@ -2609,7 +2609,7 @@ zonkPromoteMapper = TyCoMapper { tcm_smart    = True
                                , tcm_tyvar    = const zonkPromoteTcTyVar
                                , tcm_covar    = const covar
                                , tcm_hole     = const hole
-                               , tcm_tybinder = const tybinder
+                               , tcm_tycobinder = const tybinder
                                , tcm_tycon    = return }
   where
     covar cv
@@ -2761,7 +2761,7 @@ reportFloatingKvs tycon_name flav all_tvs bad_tvs
     do { all_tvs <- mapM zonkTcTyVarToTyVar all_tvs
        ; bad_tvs <- mapM zonkTcTyVarToTyVar bad_tvs
        ; let (tidy_env, tidy_all_tvs) = tidyOpenTyCoVars emptyTidyEnv all_tvs
-             tidy_bad_tvs             = map (tidyTyVarOcc tidy_env) bad_tvs
+             tidy_bad_tvs             = map (tidyTyCoVarOcc tidy_env) bad_tvs
        ; mapM_ (report tidy_all_tvs) tidy_bad_tvs }
   where
     report tidy_all_tvs tidy_bad_tv

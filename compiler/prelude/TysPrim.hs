@@ -98,7 +98,7 @@ import {-# SOURCE #-} TysWiredIn
   , doubleElemRepDataConTy
   , mkPromotedListTy, multiplicityTy )
 
-import Var              ( TyVar, TyVarBndr(TvBndr), mkTyVar )
+import Var              ( TyVar, VarBndr(Bndr), mkTyVar )
 import Name
 import TyCon
 import SrcLoc
@@ -356,9 +356,9 @@ funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ TvBndr multiplicityTyVar (NamedTCB Inferred)
-               , TvBndr runtimeRep1TyVar (NamedTCB Inferred)
-               , TvBndr runtimeRep2TyVar (NamedTCB Inferred)
+    tc_bndrs = [ Bndr multiplicityTyVar (NamedTCB Inferred)
+               , Bndr runtimeRep1TyVar (NamedTCB Inferred)
+               , Bndr runtimeRep2TyVar (NamedTCB Inferred)
                ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
@@ -604,7 +604,7 @@ GHC sports a veritable menagerie of equality types:
          class?    L/U                        TyCon
 -----------------------------------------------------------------------------------------
 ~#         T        U      hetero   nominal   eqPrimTyCon      GHC.Prim
-~~         C        L      hetero   nominal   hEqTyCon         GHC.Types
+~~         C        L      hetero   nominal   heqTyCon         GHC.Types
 ~          C        L      homo     nominal   eqTyCon          GHC.Types
 :~:        T        L      homo     nominal   (not built-in)   Data.Type.Equality
 :~~:       T        L      hetero   nominal   (not built-in)   Data.Type.Equality

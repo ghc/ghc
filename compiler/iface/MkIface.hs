@@ -1647,7 +1647,7 @@ coAxBranchToIfaceBranch' tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                   , ifaxbRHS     = tidyToIfaceType env1 rhs
                   , ifaxbIncomps = [] }
   where
-    (env1, tidy_tvs) = tidyTyCoVarBndrs emptyTidyEnv tvs
+    (env1, tidy_tvs) = tidyVarBndrs emptyTidyEnv tvs
     -- Don't re-bind in-scope tyvars
     -- See Note [CoAxBranch type variables] in CoAxiom
 
@@ -1711,7 +1711,7 @@ tyConToIfaceDecl env tycon
     -- an error.
     (tc_env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
     tc_tyvars      = binderVars tc_binders
-    if_binders     = toIfaceTyVarBinders tc_binders
+    if_binders     = toIfaceTyCoVarBinders tc_binders
     if_res_kind    = tidyToIfaceType tc_env1 (tyConResKind tycon)
     if_syn_type ty = tidyToIfaceType tc_env1 ty
     if_res_var     = getOccFS `fmap` tyConFamilyResVar_maybe tycon
@@ -1752,7 +1752,7 @@ tyConToIfaceDecl env tycon
         = IfCon   { ifConName    = dataConName data_con,
                     ifConInfix   = dataConIsInfix data_con,
                     ifConWrapper = isJust (dataConWrapId_maybe data_con),
-                    ifConExTvs   = map toIfaceTvBndr ex_tvs',
+                    ifConExTCvs  = map toIfaceBndr ex_tvs',
                     ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
@@ -1779,27 +1779,27 @@ tyConToIfaceDecl env tycon
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 
-          (con_env2, ex_tvs') = tidyTyCoVarBndrs con_env1 ex_tvs
-          user_bndrs' = map (tidyUserTyVarBinder con_env2) user_bndrs
+          (con_env2, ex_tvs') = tidyVarBndrs con_env1 ex_tvs
+          user_bndrs' = map (tidyUserTyCoVarBinder con_env2) user_bndrs
           to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
 
           -- By this point, we have tidied every universal and existential
-          -- tyvar. Because of the dcUserTyVarBinders invariant
+          -- tyvar. Because of the dcUserTyCoVarBinders invariant
           -- (see Note [DataCon user type variable binders]), *every*
           -- user-written tyvar must be contained in the substitution that
           -- tidying produced. Therefore, tidying the user-written tyvars is a
           -- simple matter of looking up each variable in the substitution,
-          -- which tidyTyVarOcc accomplishes.
-          tidyUserTyVarBinder :: TidyEnv -> TyVarBinder -> TyVarBinder
-          tidyUserTyVarBinder env (TvBndr tv vis) =
-            TvBndr (tidyTyVarOcc env tv) vis
+          -- which tidyTyCoVarOcc accomplishes.
+          tidyUserTyCoVarBinder :: TidyEnv -> TyCoVarBinder -> TyCoVarBinder
+          tidyUserTyCoVarBinder env (Bndr tv vis) =
+            Bndr (tidyTyCoVarOcc env tv) vis
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
   = ( env1
     , IfaceClass { ifName   = getName tycon,
                    ifRoles  = tyConRoles (classTyCon clas),
-                   ifBinders = toIfaceTyVarBinders tc_binders,
+                   ifBinders = toIfaceTyCoVarBinders tc_binders,
                    ifBody   = body,
                    ifFDs    = map toIfaceFD clas_fds })
   where
@@ -1851,10 +1851,10 @@ tidyTyConBinder :: TidyEnv -> TyConBinder -> (TidyEnv, TyConBinder)
 -- If the type variable "binder" is in scope, don't re-bind it
 -- In a class decl, for example, the ATD binders mention
 -- (amd must mention) the class tyvars
-tidyTyConBinder env@(_, subst) tvb@(TvBndr tv vis)
+tidyTyConBinder env@(_, subst) tvb@(Bndr tv vis)
  = case lookupVarEnv subst tv of
-     Just tv' -> (env,  TvBndr tv' vis)
-     Nothing  -> tidyTyVarBinder env tvb
+     Just tv' -> (env,  Bndr tv' vis)
+     Nothing  -> tidyTyCoVarBinder env tvb
 
 tidyTyConBinders :: TidyEnv -> [TyConBinder] -> (TidyEnv, [TyConBinder])
 tidyTyConBinders = mapAccumL tidyTyConBinder

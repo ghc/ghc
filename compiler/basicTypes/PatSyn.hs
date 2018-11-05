@@ -80,7 +80,7 @@ data PatSyn
 
         -- Result type
         psResultTy   :: Type,  -- Mentions only psUnivTyVars
-                                -- See Note [Pattern synonym result type]
+                               -- See Note [Pattern synonym result type]
 
         -- See Note [Matchers and builders for pattern synonyms]
         psMatcher     :: (Id, Bool),
@@ -340,10 +340,10 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVarBinder], ThetaType) -- ^ Universially-quantified type variables
-                                 --   and required dicts
-         -> ([TyVarBinder], ThetaType) -- ^ Existentially-quantified type variables
-                                 --   and provided dicts
+         -> ([TyVarBinder], ThetaType) -- ^ Universially-quantified type
+                                       -- variables and required dicts
+         -> ([TyVarBinder], ThetaType) -- ^ Existentially-quantified type
+                                       -- variables and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher

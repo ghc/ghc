@@ -1552,7 +1552,7 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_tyvar = const zonkTcTyVar
   , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
   , tcm_hole  = hole
-  , tcm_tybinder = \_env tv _vis -> ((), ) <$> zonkTcTyCoVarBndr tv
+  , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTcTyCoVarBndr tv
   , tcm_tycon = return }
   where
     hole :: () -> CoercionHole -> TcM Coercion
@@ -1590,10 +1590,10 @@ zonkTcTyCoVarBndr tyvar
   = ASSERT2( isImmutableTyVar tyvar || (not $ isTyVar tyvar), pprTyVar tyvar )
     updateTyVarKindM zonkTcType tyvar
 
-zonkTcTyVarBinder :: TyVarBndr TcTyVar vis -> TcM (TyVarBndr TcTyVar vis)
-zonkTcTyVarBinder (TvBndr tv vis)
+zonkTcTyVarBinder :: VarBndr TcTyVar vis -> TcM (VarBndr TcTyVar vis)
+zonkTcTyVarBinder (Bndr tv vis)
   = do { tv' <- zonkTcTyCoVarBndr tv
-       ; return (TvBndr tv' vis) }
+       ; return (Bndr tv' vis) }
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis
@@ -1741,11 +1741,11 @@ tidySigSkol :: TidyEnv -> UserTypeCtxt
 tidySigSkol env cx ty tv_prs
   = SigSkol cx (tidy_ty env ty) tv_prs'
   where
-    tv_prs' = mapSnd (tidyTyVarOcc env) tv_prs
+    tv_prs' = mapSnd (tidyTyCoVarOcc env) tv_prs
     inst_env = mkNameEnv tv_prs'
 
-    tidy_ty env (ForAllTy (TvBndr tv vis) ty)
-      = ForAllTy (TvBndr tv' vis) (tidy_ty env' ty)
+    tidy_ty env (ForAllTy (Bndr tv vis) ty)
+      = ForAllTy (Bndr tv' vis) (tidy_ty env' ty)
       where
         (env', tv') = tidy_tv_bndr env tv
 
@@ -1754,13 +1754,13 @@ tidySigSkol env cx ty tv_prs
 
     tidy_ty env ty = tidyType env ty
 
-    tidy_tv_bndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+    tidy_tv_bndr :: TidyEnv -> TyCoVar -> (TidyEnv, TyCoVar)
     tidy_tv_bndr env@(occ_env, subst) tv
       | Just tv' <- lookupNameEnv inst_env (tyVarName tv)
       = ((occ_env, extendVarEnv subst tv tv'), tv')
 
       | otherwise
-      = tidyTyCoVarBndr env tv
+      = tidyVarBndr env tv
 
 -------------------------------------------------------------------------
 {-

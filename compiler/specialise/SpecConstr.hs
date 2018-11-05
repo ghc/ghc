@@ -39,7 +39,6 @@ import Weight
 import Id
 import PprCore          ( pprParendExpr )
 import MkCore           ( mkImpossibleExpr )
-import Var
 import VarEnv
 import VarSet
 import Name

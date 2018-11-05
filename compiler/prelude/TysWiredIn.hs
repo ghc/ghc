@@ -509,8 +509,8 @@ pcDataCon n univs = pcDataConWithFixity False n univs
 pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> Name      -- ^ datacon name
                     -> [TyVar]   -- ^ univ tyvars
-                    -> [TyVar]   -- ^ ex tyvars
-                    -> [TyVar]   -- ^ user-written tyvars
+                    -> [TyCoVar] -- ^ ex tycovars
+                    -> [TyCoVar] -- ^ user-written tycovars
                     -> [Type]    -- ^ args
                     -> TyCon
                     -> DataCon
@@ -524,7 +524,7 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (n
 -- one DataCon unique per pair of Ints.
 
 pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
-                     -> [TyVar] -> [TyVar] -> [TyVar]
+                     -> [TyVar] -> [TyCoVar] -> [TyCoVar]
                      -> [Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
@@ -545,7 +545,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (map (const no_bang) arg_tys)
                 []      -- No labelled fields
                 tyvars ex_tyvars
-                (mkTyVarBinders Specified user_tyvars)
+                (mkTyCoVarBinders Specified user_tyvars)
                 []      -- No equality spec
                 []      -- No theta
                 (map assign_weight arg_tys)
@@ -628,7 +628,7 @@ constraintKind   = mkTyConApp constraintKindTyCon []
 mkFunKind :: Kind -> Kind -> Kind
 mkFunKind = mkFunTy Omega -- no linearity in kinds
 
-mkForAllKind :: TyVar -> ArgFlag -> Kind -> Kind
+mkForAllKind :: TyCoVar -> ArgFlag -> Kind -> Kind
 mkForAllKind = mkForAllTy
 
 {-

@@ -996,8 +996,8 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 can_eq_nc_forall ev eq_rel s1 s2
  | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
  = do { let free_tvs       = tyCoVarsOfTypes [s1,s2]
-            (bndrs1, phi1) = tcSplitForAllTyVarBndrs s1
-            (bndrs2, phi2) = tcSplitForAllTyVarBndrs s2
+            (bndrs1, phi1) = tcSplitForAllVarBndrs s1
+            (bndrs2, phi2) = tcSplitForAllVarBndrs s2
       ; if not (equalLength bndrs1 bndrs2)
         then do { traceTcS "Forall failure" $
                      vcat [ ppr s1, ppr s2, ppr bndrs1, ppr bndrs2

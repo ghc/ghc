@@ -12,7 +12,7 @@ data Coercion
 data UnivCoProvenance
 data TCvSubst
 data TyLit
-data TyBinder
+data TyCoBinder
 data MCoercion
 
 type PredType = Type

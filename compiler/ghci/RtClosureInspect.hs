@@ -713,7 +713,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                   -- MutVar# :: contents_ty -> MutVar# s contents_ty
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
-         ASSERT(isUnliftedType my_ty) return ()
+         MASSERT(isUnliftedType my_ty)
          (mutvar_ty,_) <- instScheme $ quantifyType $ mkFunTyOm
                             contents_ty (mkTyConApp tycon [world,contents_ty])
          addConstraint (mkFunTyOm contents_tv my_ty) mutvar_ty
@@ -1003,6 +1003,9 @@ getDataConArgTys dc con_app_ty
   = do { let rep_con_app_ty = unwrapType con_app_ty
        ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
                    $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
+       ; ASSERT( all isTyVar ex_tvs ) return ()
+                 -- ex_tvs can only be tyvars as data types in source
+                 -- Haskell cannot mention covar yet (Aug 2018)
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
@@ -1011,7 +1014,7 @@ getDataConArgTys dc con_app_ty
        ; return con_arg_tys }
   where
     univ_tvs = dataConUnivTyVars dc
-    ex_tvs   = dataConExTyVars dc
+    ex_tvs   = dataConExTyCoVars dc
 
 {- Note [Constructor arg types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

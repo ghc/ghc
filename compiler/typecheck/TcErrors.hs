@@ -408,7 +408,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
   where
     tcl_env      = implicLclEnv implic
     insoluble    = isInsolubleStatus status
-    (env1, tvs') = mapAccumL tidyTyCoVarBndr (cec_tidy ctxt) tvs
+    (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) tvs
     info'        = tidySkolemInfo env1 info
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
@@ -1644,7 +1644,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
              extra3 = relevant_bindings $
                       ppWhen (not (null interesting_tyvars)) $
                       hang (text "Type variable kinds:") 2 $
-                      vcat (map (tyvar_binding . tidyTyVarOcc (cec_tidy ctxt))
+                      vcat (map (tyvar_binding . tidyTyCoVarOcc (cec_tidy ctxt))
                                 interesting_tyvars)
 
              tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)

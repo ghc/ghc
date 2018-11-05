@@ -8,7 +8,7 @@ module ToIface
     , toIfaceIdBndr
     , toIfaceBndr
     , toIfaceForAllBndr
-    , toIfaceTyVarBinders
+    , toIfaceTyCoVarBinders
     , toIfaceTyVar
       -- * Types
     , toIfaceType, toIfaceTypeX
@@ -83,23 +83,33 @@ toIfaceTvBndrX fr tyvar = ( occNameFS (getOccName tyvar)
                           , toIfaceTypeX fr (tyVarKind tyvar)
                           )
 
-
-toIfaceIdBndr :: Id -> IfaceIdBndr
-toIfaceIdBndr id = (toIfaceRig (idWeight id), occNameFS (getOccName id),    toIfaceType (idType id))
-
 toIfaceTvBndrs :: [TyVar] -> [IfaceTvBndr]
 toIfaceTvBndrs = map toIfaceTvBndr
+
+toIfaceIdBndr :: Id -> IfaceIdBndr
+toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
+
+toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
+toIfaceIdBndrX fr covar = ( toIfaceRig (idWeight covar)  
+                          , occNameFS (getOccName covar)
+                          , toIfaceTypeX fr (varType covar)
+                          )
 
 toIfaceBndr :: Var -> IfaceBndr
 toIfaceBndr var
   | isId var  = IfaceIdBndr (toIfaceIdBndr var)
   | otherwise = IfaceTvBndr (toIfaceTvBndr var)
 
-toIfaceTyVarBinder :: TyVarBndr TyVar vis -> TyVarBndr IfaceTvBndr vis
-toIfaceTyVarBinder (TvBndr tv vis) = TvBndr (toIfaceTvBndr tv) vis
+toIfaceBndrX :: VarSet -> Var -> IfaceBndr
+toIfaceBndrX fr var
+  | isId var  = IfaceIdBndr (toIfaceIdBndrX fr var)
+  | otherwise = IfaceTvBndr (toIfaceTvBndrX fr var)
 
-toIfaceTyVarBinders :: [TyVarBndr TyVar vis] -> [TyVarBndr IfaceTvBndr vis]
-toIfaceTyVarBinders = map toIfaceTyVarBinder
+toIfaceTyCoVarBinder :: VarBndr Var vis -> VarBndr IfaceBndr vis
+toIfaceTyCoVarBinder (Bndr tv vis) = Bndr (toIfaceBndr tv) vis
+
+toIfaceTyCoVarBinders :: [VarBndr Var vis] -> [VarBndr IfaceBndr vis]
+toIfaceTyCoVarBinders = map toIfaceTyCoVarBinder
 
 {-
 ************************************************************************
@@ -170,11 +180,11 @@ toIfaceTyVar = occNameFS . getOccName
 toIfaceCoVar :: CoVar -> FastString
 toIfaceCoVar = occNameFS . getOccName
 
-toIfaceForAllBndr :: TyVarBinder -> IfaceForAllBndr
+toIfaceForAllBndr :: TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 
-toIfaceForAllBndrX :: VarSet -> TyVarBinder -> IfaceForAllBndr
-toIfaceForAllBndrX fr (TvBndr v vis) = TvBndr (toIfaceTvBndrX fr v) vis
+toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
+toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
 toIfaceRig :: Rig -> IfaceRig
 toIfaceRig = toIfaceType . fromMult
@@ -262,7 +272,7 @@ toIfaceCoercionX fr co
         IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
     go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
 
-    go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
+    go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)
                                           (toIfaceCoercionX fr' co)
                           where
@@ -301,12 +311,12 @@ toIfaceAppArgsX fr kind ty_args
     go env ty                  ts
       | Just ty' <- coreView ty
       = go env ty' ts
-    go env (ForAllTy (TvBndr tv vis) res) (t:ts)
+    go env (ForAllTy (Bndr tv vis) res) (t:ts)
       | isVisibleArgFlag vis = IA_Vis   t' ts'
       | otherwise            = IA_Invis t' ts'
       where
         t'  = toIfaceTypeX fr t
-        ts' = go (extendTvSubst env tv t) res ts
+        ts' = go (extendTCvSubst env tv t) res ts
 
     go env (FunTy _ _ res) (t:ts) -- No type-class args in tycon apps
       = IA_Vis (toIfaceTypeX fr t) (go env res ts)
@@ -360,8 +370,8 @@ patSynToIfaceDecl ps
     (_univ_tvs, req_theta, _ex_tvs, prov_theta, args, rhs_ty) = patSynSig ps
     univ_bndrs = patSynUnivTyVarBinders ps
     ex_bndrs   = patSynExTyVarBinders ps
-    (env1, univ_bndrs') = tidyTyVarBinders emptyTidyEnv univ_bndrs
-    (env2, ex_bndrs')   = tidyTyVarBinders env1 ex_bndrs
+    (env1, univ_bndrs') = tidyTyCoVarBinders emptyTidyEnv univ_bndrs
+    (env2, ex_bndrs')   = tidyTyCoVarBinders env1 ex_bndrs
     to_if_pr (id, needs_dummy) = (idName id, needs_dummy)
 
 {-
