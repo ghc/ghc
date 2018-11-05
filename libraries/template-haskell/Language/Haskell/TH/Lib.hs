@@ -37,8 +37,8 @@ module Language.Haskell.TH.Lib (
         normalB, guardedB, normalG, normalGE, patG, patGE, match, clause,
 
     -- *** Expressions
-        dyn, varE, unboundVarE, labelE,  conE, litE, appE, appTypeE, uInfixE, parensE,
-        staticE, infixE, infixApp, sectionL, sectionR,
+        dyn, varE, unboundVarE, labelE, implicitParamVarE, conE, litE, staticE,
+        appE, appTypeE, uInfixE, parensE, infixE, infixApp, sectionL, sectionR,
         lamE, lam1E, lamCaseE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE,
         letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE, fieldExp,
     -- **** Ranges
@@ -48,13 +48,13 @@ module Language.Haskell.TH.Lib (
     arithSeqE,
     fromR, fromThenR, fromToR, fromThenToR,
     -- **** Statements
-    doE, compE,
-    bindS, letS, noBindS, parS,
+    doE, mdoE, compE,
+    bindS, letS, noBindS, parS, recS,
 
     -- *** Types
         forallT, varT, conT, appT, arrowT, infixT, uInfixT, parensT, equalityT,
         listT, tupleT, unboxedTupleT, unboxedSumT, sigT, litT, wildCardT,
-        promotedT, promotedTupleT, promotedNilT, promotedConsT,
+        promotedT, promotedTupleT, promotedNilT, promotedConsT, implicitParamT,
     -- **** Type literals
     numTyLit, strTyLit,
     -- **** Strictness
@@ -112,6 +112,9 @@ module Language.Haskell.TH.Lib (
     -- **** Pattern Synonyms
     patSynD, patSynSigD, unidir, implBidir, explBidir, prefixPatSyn,
     infixPatSyn, recordPatSyn,
+
+    -- **** Implicit Parameters
+    implicitParamBindD,
 
     -- ** Reify
     thisModule

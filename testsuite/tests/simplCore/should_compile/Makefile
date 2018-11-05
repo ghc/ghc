@@ -245,3 +245,8 @@ T14140:
 	$(RM) -f T14140.o T14140.hi
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T14140.hs | grep '[2-9]# *->'
 # Expecting no output from the grep, hence "-"
+
+T15631:
+	$(RM) -f T15631.o T15631.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T15631.hs | grep 'case'
+# Expecting one fewwer case expressions after fixing Trac #15631

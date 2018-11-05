@@ -677,6 +677,8 @@ checkNewDynFlags dflags = do
 
 checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags
 checkNewInteractiveDynFlags dflags0 = do
+  -- We currently don't support use of StaticPointers in expressions entered on
+  -- the REPL. See #12356.
   dflags1 <-
       if xopt LangExt.StaticPointers dflags0
       then do liftIO $ printOrThrowWarnings dflags0 $ listToBag

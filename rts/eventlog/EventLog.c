@@ -265,38 +265,9 @@ flushEventLog(void)
     }
 }
 
-void
-initEventLogging(const EventLogWriter *ev_writer)
+static void
+postHeaderEvents(void)
 {
-    uint32_t n_caps;
-
-    event_log_writer = ev_writer;
-    initEventLogWriter();
-
-    if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
-        barf("EventDesc array has the wrong number of elements");
-    }
-
-    /*
-     * Allocate buffer(s) to store events.
-     * Create buffer large enough for the header begin marker, all event
-     * types, and header end marker to prevent checking if buffer has room
-     * for each of these steps, and remove the need to flush the buffer to
-     * disk during initialization.
-     *
-     * Use a single buffer to store the header with event types, then flush
-     * the buffer so all buffers are empty for writing events.
-     */
-#if defined(THREADED_RTS)
-    // XXX n_capabilities hasn't been initialized yet
-    n_caps = RtsFlags.ParFlags.nCapabilities;
-#else
-    n_caps = 1;
-#endif
-    moreCapEventBufs(0, n_caps);
-
-    initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
-
     // Write in buffer: the header begin marker.
     postInt32(&eventBuf, EVENT_HEADER_BEGIN);
 
@@ -487,6 +458,44 @@ initEventLogging(const EventLogWriter *ev_writer)
 
     // Prepare event buffer for events (data).
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
+}
+
+void
+initEventLogging(const EventLogWriter *ev_writer)
+{
+    uint32_t n_caps;
+
+    event_log_writer = ev_writer;
+    initEventLogWriter();
+
+    if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
+        barf("EventDesc array has the wrong number of elements");
+    }
+
+    /*
+     * Allocate buffer(s) to store events.
+     * Create buffer large enough for the header begin marker, all event
+     * types, and header end marker to prevent checking if buffer has room
+     * for each of these steps, and remove the need to flush the buffer to
+     * disk during initialization.
+     *
+     * Use a single buffer to store the header with event types, then flush
+     * the buffer so all buffers are empty for writing events.
+     */
+#if defined(THREADED_RTS)
+    // XXX n_capabilities hasn't been initialized yet
+    n_caps = RtsFlags.ParFlags.nCapabilities;
+#else
+    n_caps = 1;
+#endif
+    moreCapEventBufs(0, n_caps);
+
+    initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
+#if defined(THREADED_RTS)
+    initMutex(&eventBufMutex);
+#endif
+
+    postHeaderEvents();
 
     // Flush capEventBuf with header.
     /*
@@ -498,10 +507,6 @@ initEventLogging(const EventLogWriter *ev_writer)
     for (uint32_t c = 0; c < n_caps; ++c) {
         postBlockMarker(&capEventBuf[c]);
     }
-
-#if defined(THREADED_RTS)
-    initMutex(&eventBufMutex);
-#endif
 }
 
 void

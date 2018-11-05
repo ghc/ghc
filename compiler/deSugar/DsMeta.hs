@@ -1140,6 +1140,10 @@ repTy (HsTyLit _ lit) = do
                           lit' <- repTyLit lit
                           repTLit lit'
 repTy (HsWildCardTy (AnonWildCard _)) = repTWildCard
+repTy (HsIParamTy _ n t) = do
+                             n' <- rep_implicit_param_name (unLoc n)
+                             t' <- repLTy t
+                             repTImplicitParam n' t'
 
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
@@ -1209,7 +1213,7 @@ repE (HsVar _ (L _ x))            =
         Just (DsBound y)   -> repVarOrCon x (coreVar y)
         Just (DsSplice e)  -> do { e' <- dsExpr e
                                  ; return (MkC e') } }
-repE e@(HsIPVar {}) = notHandled "Implicit parameters" (ppr e)
+repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
 repE e@(HsRecFld _ f) = case f of
@@ -1274,8 +1278,13 @@ repE e@(HsDo _ ctxt (L _ sts))
         e'      <- repComp (nonEmptyCoreList zs);
         wrapGenSyms ss e' }
 
+ | MDoExpr <- ctxt
+ = do { (ss,zs) <- repLSts sts;
+        e'      <- repMDoE (nonEmptyCoreList zs);
+        wrapGenSyms ss e' }
+
   | otherwise
-  = notHandled "mdo, monad comprehension and [: :]" (ppr e)
+  = notHandled "monad comprehension and [: :]" (ppr e)
 
 repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
 repE e@(ExplicitTuple _ es boxed)
@@ -1470,6 +1479,16 @@ repSts [LastStmt _ e _ _]
   = do { e2 <- repLE e
        ; z <- repNoBindSt e2
        ; return ([], [z]) }
+repSts (stmt@RecStmt{} : ss)
+  = do { let binders = collectLStmtsBinders (recS_stmts stmt)
+       ; ss1 <- mkGenSyms binders
+       -- Bring all of binders in the recursive group into scope for the
+       -- whole group.
+       ; (ss1_other,rss) <- addBinds ss1 $ repSts (map unLoc (recS_stmts stmt))
+       ; MASSERT(sort ss1 == sort ss1_other)
+       ; z <- repRecSt (nonEmptyCoreList rss)
+       ; (ss2,zs) <- addBinds ss1 (repSts ss)
+       ; return (ss1++ss2, z : zs) }
 repSts []    = return ([],[])
 repSts other = notHandled "Exotic statement" (ppr other)
 
@@ -1483,7 +1502,15 @@ repBinds (EmptyLocalBinds _)
   = do  { core_list <- coreList decQTyConName []
         ; return ([], core_list) }
 
-repBinds b@(HsIPBinds {}) = notHandled "Implicit parameters" (ppr b)
+repBinds (HsIPBinds _ (IPBinds _ decs))
+ = do   { ips <- mapM rep_implicit_param_bind decs
+        ; core_list <- coreList decQTyConName
+                                (de_loc (sort_by_loc ips))
+        ; return ([], core_list)
+        }
+
+repBinds b@(HsIPBinds _ XHsIPBinds {})
+ = notHandled "Implicit parameter binds extension" (ppr b)
 
 repBinds (HsValBinds _ decs)
  = do   { let { bndrs = hsScopedTvBinders decs ++ collectHsValBinders decs }
@@ -1498,6 +1525,21 @@ repBinds (HsValBinds _ decs)
                                 (de_loc (sort_by_loc prs))
         ; return (ss, core_list) }
 repBinds b@(XHsLocalBindsLR {}) = notHandled "Local binds extensions" (ppr b)
+
+rep_implicit_param_bind :: LIPBind GhcRn -> DsM (SrcSpan, Core TH.DecQ)
+rep_implicit_param_bind (L loc (IPBind _ ename (L _ rhs)))
+ = do { name <- case ename of
+                    Left (L _ n) -> rep_implicit_param_name n
+                    Right _ ->
+                        panic "rep_implicit_param_bind: post typechecking"
+      ; rhs' <- repE rhs
+      ; ipb <- repImplicitParamBind name rhs'
+      ; return (loc, ipb) }
+rep_implicit_param_bind (L _ b@(XIPBind _))
+ = notHandled "Implicit parameter bind extension" (ppr b)
+
+rep_implicit_param_name :: HsIPName -> DsM (Core String)
+rep_implicit_param_name (HsIPName name) = coreStringLit (unpackFS name)
 
 rep_val_binds :: HsValBinds GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 -- Assumes: all the binders of the binding are already in the meta-env
@@ -2012,6 +2054,9 @@ repCaseE (MkC e) (MkC ms) = rep2 caseEName [e, ms]
 repDoE :: Core [TH.StmtQ] -> DsM (Core TH.ExpQ)
 repDoE (MkC ss) = rep2 doEName [ss]
 
+repMDoE :: Core [TH.StmtQ] -> DsM (Core TH.ExpQ)
+repMDoE (MkC ss) = rep2 mdoEName [ss]
+
 repComp :: Core [TH.StmtQ] -> DsM (Core TH.ExpQ)
 repComp (MkC ss) = rep2 compEName [ss]
 
@@ -2038,6 +2083,9 @@ repSectionL (MkC x) (MkC y) = rep2 sectionLName [x,y]
 
 repSectionR :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repSectionR (MkC x) (MkC y) = rep2 sectionRName [x,y]
+
+repImplicitParamVar :: Core String -> DsM (Core TH.ExpQ)
+repImplicitParamVar (MkC x) = rep2 implicitParamVarEName [x]
 
 ------------ Right hand sides (guarded expressions) ----
 repGuarded :: Core [TH.Q (TH.Guard, TH.Exp)] -> DsM (Core TH.BodyQ)
@@ -2071,6 +2119,9 @@ repNoBindSt (MkC e) = rep2 noBindSName [e]
 
 repParSt :: Core [[TH.StmtQ]] -> DsM (Core TH.StmtQ)
 repParSt (MkC sss) = rep2 parSName [sss]
+
+repRecSt :: Core [TH.StmtQ] -> DsM (Core TH.StmtQ)
+repRecSt (MkC ss) = rep2 recSName [ss]
 
 -------------- Range (Arithmetic sequences) -----------
 repFrom :: Core TH.ExpQ -> DsM (Core TH.ExpQ)
@@ -2253,6 +2304,9 @@ repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
 repProto :: Name -> Core TH.Name -> Core TH.TypeQ -> DsM (Core TH.DecQ)
 repProto mk_sig (MkC s) (MkC ty) = rep2 mk_sig [s, ty]
 
+repImplicitParamBind :: Core String -> Core TH.ExpQ -> DsM (Core TH.DecQ)
+repImplicitParamBind (MkC n) (MkC e) = rep2 implicitParamBindDName [n, e]
+
 repCtxt :: Core [TH.PredQ] -> DsM (Core TH.CxtQ)
 repCtxt (MkC tys) = rep2 cxtName [tys]
 
@@ -2353,6 +2407,9 @@ repTLit (MkC lit) = rep2 litTName [lit]
 
 repTWildCard :: DsM (Core TH.TypeQ)
 repTWildCard = rep2 wildCardTName []
+
+repTImplicitParam :: Core String -> Core TH.TypeQ -> DsM (Core TH.TypeQ)
+repTImplicitParam (MkC n) (MkC e) = rep2 implicitParamTName [n, e]
 
 repTStar :: DsM (Core TH.TypeQ)
 repTStar = rep2 starKName []

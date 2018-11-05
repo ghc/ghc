@@ -15,7 +15,8 @@ import GhcPrelude
 import CoreSubst
 import Var              ( Var )
 import VarEnv           ( elemInScopeSet, mkInScopeSet )
-import Id               ( Id, idType, idInlineActivation, isDeadBinder
+import Id               ( Id, idType, isDeadBinder
+                        , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
 import CoreUtils        ( mkAltExpr, eqExpr
@@ -25,9 +26,7 @@ import CoreFVs          ( exprFreeVars )
 import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
-import BasicTypes       ( TopLevelFlag(..), isTopLevel
-                        , isAlwaysActive, isAnyInlinePragma,
-                          inlinePragmaSpec, noUserInlineSpec )
+import BasicTypes
 import CoreMap
 import Util             ( filterOut )
 import Data.List        ( mapAccumL )
@@ -335,14 +334,16 @@ cseBind toplevel env (NonRec b e)
     (env1, b1)       = addBinder env b
     (env2, (b2, e2)) = cse_bind toplevel env1 (b,e) b1
 
-cseBind _ env (Rec [(in_id, rhs)])
+cseBind toplevel env (Rec [(in_id, rhs)])
   | noCSE in_id
   = (env1, Rec [(out_id, rhs')])
 
   -- See Note [CSE for recursive bindings]
   | Just previous <- lookupCSRecEnv env out_id rhs''
   , let previous' = mkTicks ticks previous
-  = (extendCSSubst env1 in_id previous', NonRec out_id previous')
+        out_id'   = delayInlining toplevel out_id
+  = -- We have a hit in the recursive-binding cache
+    (extendCSSubst env1 in_id previous', NonRec out_id' previous')
 
   | otherwise
   = (extendCSRecEnv env1 out_id rhs'' id_expr', Rec [(zapped_id, rhs')])
@@ -382,10 +383,21 @@ cse_bind toplevel env (in_id, in_rhs) out_id
     in (env, (out_id, mkLams params' out_body))
 
   | otherwise
-  = (env', (out_id', out_rhs))
+  = (env', (out_id'', out_rhs))
   where
     (env', out_id') = addBinding env in_id out_id out_rhs
-    out_rhs         = tryForCSE env in_rhs
+    (cse_done, out_rhs) = try_for_cse env in_rhs
+    out_id'' | cse_done  = delayInlining toplevel out_id'
+             | otherwise = out_id'
+
+delayInlining :: TopLevelFlag -> Id -> Id
+-- Add a NOINLINE[2] if the Id doesn't have an INLNE pragma already
+delayInlining top_lvl bndr
+  | isTopLevel top_lvl
+  , isAlwaysActive (idInlineActivation bndr)
+  = bndr `setInlineActivation` activeAfterInitial
+  | otherwise
+  = bndr
 
 addBinding :: CSEnv                      -- Includes InId->OutId cloning
            -> InVar                      -- Could be a let-bound type
@@ -464,12 +476,46 @@ The net effect is that for the y-binding we want to
   - but leave the original binding for y undisturbed
 
 This is done by cse_bind.  I got it wrong the first time (Trac #13367).
+
+Note [Delay inlining after CSE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose (Trac #15445) we have
+   f,g :: Num a => a -> a
+   f x = ...f (x-1).....
+   g y = ...g (y-1) ....
+
+and we make some specialisations of 'g', either automatically, or via
+a SPECIALISE pragma.  Then CSE kicks in and notices that the RHSs of
+'f' and 'g' are identical, so we get
+   f x = ...f (x-1)...
+   g = f
+   {-# RULES g @Int _ = $sg #-}
+
+Now there is terrible danger that, in an importing module, we'll inline
+'g' before we have a chance to run its specialisation!
+
+Solution: during CSE, when adding a top-level
+  g = f
+binding after a "hit" in the CSE cache, add a NOINLINE[2] activation
+to it, to ensure it's not inlined right away.
+
+Why top level only?  Because for nested bindings we are already past
+phase 2 and will never return there.
 -}
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
-tryForCSE env expr
-  | Just e <- lookupCSEnv env expr'' = mkTicks ticks e
-  | otherwise                        = expr'
+tryForCSE env expr = snd (try_for_cse env expr)
+
+try_for_cse :: CSEnv -> InExpr -> (Bool, OutExpr)
+-- (False, e') => We did not CSE the entire expression,
+--                but we might have CSE'd some sub-expressions,
+--                yielding e'
+--
+-- (True, te') => We CSE'd the entire expression,
+--                yielding the trivial expression te'
+try_for_cse env expr
+  | Just e <- lookupCSEnv env expr'' = (True,  mkTicks ticks e)
+  | otherwise                        = (False, expr')
     -- The varToCoreExpr is needed if we have
     --   case e of xco { ...case e of yco { ... } ... }
     -- Then CSE will substitute yco -> xco;

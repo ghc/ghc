@@ -7,7 +7,7 @@ module Packages (
         module PackageConfig,
 
         -- * Reading the package config, and processing cmdline args
-        PackageState(preloadPackages, explicitPackages, requirementContext),
+        PackageState(preloadPackages, explicitPackages, moduleToPkgConfAll, requirementContext),
         PackageConfigMap,
         emptyPackageState,
         initPackages,

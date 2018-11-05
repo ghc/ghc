@@ -244,7 +244,8 @@ getOptions' dflags toks
               | IToptions_prag str <- getToken open
               , ITclose_prag       <- getToken close
               = case toArgs str of
-                  Left err -> panic ("getOptions'.parseToks: " ++ err)
+                  Left _err -> optionsParseError str dflags $   -- #15053
+                                 combineSrcSpans (getLoc open) (getLoc close)
                   Right args -> map (L (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
               | ITinclude_prag str <- getToken open
@@ -314,17 +315,15 @@ checkExtension dflags (L l ext)
 
 languagePragParseError :: DynFlags -> SrcSpan -> a
 languagePragParseError dflags loc =
-  throw $ mkSrcErr $ unitBag $
-     (mkPlainErrMsg dflags loc $
+    throwErr dflags loc $
        vcat [ text "Cannot parse LANGUAGE pragma"
             , text "Expecting comma-separated list of language options,"
             , text "each starting with a capital letter"
-            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ])
+            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-  throw $ mkSrcErr $ unitBag $
-    mkPlainErrMsg dflags loc $
+    throwErr dflags loc $
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
@@ -340,3 +339,14 @@ optionsErrorMsgs dflags unhandled_flags flags_lines _filename
             ErrUtils.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
+optionsParseError :: String -> DynFlags -> SrcSpan -> a     -- #15053
+optionsParseError str dflags loc =
+  throwErr dflags loc $
+      vcat [ text "Error while parsing OPTIONS_GHC pragma."
+           , text "Expecting whitespace-separated list of GHC options."
+           , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
+           , text ("Input was: " ++ show str) ]
+
+throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
+throwErr dflags loc doc =
+  throw $ mkSrcErr $ unitBag $ mkPlainErrMsg dflags loc doc

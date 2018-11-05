@@ -337,11 +337,11 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
     // it belongs to this cap, or send a message to the owning cap
     // otherwise.
 
-    // But we don't really want to send multiple messages if we write
-    // to the same TVar multiple times, and the owning cap hasn't yet
-    // woken up the thread and removed it from the TVar's watch list.
-    // So, we use the tso->block_info as a flag to indicate whether
-    // we've already done tryWakeupThread() for this thread.
+    // TODO: This sends multiple messages if we write to the same TVar multiple
+    // times and the owning cap hasn't yet woken up the thread and removed it
+    // from the TVar's watch list. We tried to optimise this in D4961, but that
+    // patch was incorrect and broke other things, see #15544 comment:17. See
+    // #15626 for the tracking ticket.
 
     // Safety Note: we hold the TVar lock at this point, so we know
     // that this thread is definitely still blocked, since the first
@@ -349,12 +349,7 @@ static void unpark_tso(Capability *cap, StgTSO *tso) {
     // TVar watch queues, and to do that it would need to lock the
     // TVar.
 
-    if (tso->block_info.closure != &stg_STM_AWOKEN_closure) {
-        // safe to do a non-atomic test-and-set here, because it's
-        // fine if we do multiple tryWakeupThread()s.
-        tso->block_info.closure = &stg_STM_AWOKEN_closure;
-        tryWakeupThread(cap,tso);
-    }
+    tryWakeupThread(cap,tso);
 }
 
 static void unpark_waiters_on(Capability *cap, StgTVar *s) {

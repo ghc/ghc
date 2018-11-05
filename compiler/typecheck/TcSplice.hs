@@ -1773,7 +1773,7 @@ reifyKind :: Kind -> TcM TH.Kind
 reifyKind = reifyType
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
-reifyCxt   = mapM reifyPred
+reifyCxt   = mapM reifyType
 
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
@@ -1933,13 +1933,6 @@ reify_tc_app tc tys
                            mapUnionFV injectiveVarsOfBinder dropped_binders
 
         in not (subVarSet result_vars dropped_vars)
-
-reifyPred :: TyCoRep.PredType -> TcM TH.Pred
-reifyPred ty
-  -- We could reify the invisible parameter as a class but it seems
-  -- nicer to support them properly...
-  | isIPPred ty = noTH (sLit "implicit parameters") (ppr ty)
-  | otherwise   = reifyType ty
 
 ------------------------------
 reifyName :: NamedThing n => n -> TH.Name

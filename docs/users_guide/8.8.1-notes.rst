@@ -76,6 +76,8 @@ Template Haskell
   longer included when reifying ``C``. It's possible that this may break some
   code which assumes the existence of ``forall a. C a =>``.
 
+- Template Haskell now supports implicit parameters and recursive do.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

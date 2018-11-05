@@ -1820,9 +1820,14 @@ topReactionsStage work_item
 
 --------------------
 doTopReactOther :: Ct -> TcS (StopOrContinue Ct)
+-- Try local quantified constraints for
+--     CTyEqCan  e.g.  (a ~# ty)
+-- and CIrredCan e.g.  (c a)
+--
+-- Why equalities? See TcCanonical
+-- Note [Equality superclasses in quantified constraints]
 doTopReactOther work_item
-  = do { -- Try local quantified constraints
-         res <- matchLocalInst pred (ctEvLoc ev)
+  = do { res <- matchLocalInst pred (ctEvLoc ev)
        ; case res of
            OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }

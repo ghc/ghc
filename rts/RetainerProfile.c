@@ -337,6 +337,7 @@ init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 static INLINE void
 init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
+    info->type = posTypeSRT;
     if (infoTable->i.srt) {
         info->next.srt.srt = (StgClosure*)GET_SRT(infoTable);
     } else {
@@ -489,8 +490,6 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     // layout.payload.ptrs, SRT
     case FUN_STATIC:
-        ASSERT(get_itbl(c)->srt != 0);
-        /* fallthrough */
     case FUN:           // *c is a heap object.
     case FUN_2_0:
         init_ptrs(&se.info, get_itbl(c)->layout.payload.ptrs, (StgPtr)c->payload);

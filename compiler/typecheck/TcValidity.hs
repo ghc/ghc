@@ -57,12 +57,12 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
-import Module
 import Bag         ( emptyBag )
 import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
+import Data.Foldable
 import Data.List        ( (\\), nub )
 import qualified Data.List.NonEmpty as NE
 
@@ -1114,14 +1114,13 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
-       ; this_mod <- getModule
        ; is_boot  <- tcIsHsBootOrSig
-       ; check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args }
+       ; check_valid_inst_head dflags is_boot ctxt clas cls_args }
 
-check_valid_inst_head :: DynFlags -> Module -> Bool
+check_valid_inst_head :: DynFlags -> Bool
                       -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
+check_valid_inst_head dflags is_boot ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
@@ -1141,19 +1140,12 @@ check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
-  -- For the most part we don't allow instances for Coercible;
+  -- For the most part we don't allow
+  -- instances for (~), (~~), or Coercible;
   -- but we DO want to allow them in quantified constraints:
   --   f :: (forall a b. Coercible a b => Coercible (m a) (m b)) => ...m...
-  | clas_nm == coercibleTyConName
+  | clas_nm `elem` [ heqTyConName, eqTyConName, coercibleTyConName ]
   , not quantified_constraint
-  = failWithTc rejected_class_msg
-
-  -- Handwritten instances of other nonminal-equality classes
-  -- is forbidden, except in the defining module to allow
-  --    instance a ~~ b => a ~ b
-  -- which occurs in Data.Type.Equality
-  | clas_nm `elem` [ heqTyConName, eqTyConName]
-  , nameModule clas_nm /= this_mod
   = failWithTc rejected_class_msg
 
   -- Check for hand-written Generic instances (disallowed in Safe Haskell)
@@ -1174,7 +1166,7 @@ check_valid_inst_head dflags this_mod is_boot ctxt clas cls_args
   = failWithTc (instTypeErr clas cls_args msg)
 
   | otherwise
-  = mapM_ checkValidTypePat ty_args
+  = checkValidTypePats (classTyCon clas) cls_args
   where
     clas_nm = getName clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
@@ -1963,7 +1955,7 @@ checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
 --         type instance F (T a) = a
 -- c) For associated types, are consistently instantiated
 checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
-  = do { mapM_ checkValidTypePat user_ty_pats
+  = do { checkValidTypePats fam_tc user_ty_pats
 
        ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes user_ty_pats)
                                       (tvs ++ cvs)
@@ -1972,19 +1964,44 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pat
          -- Check that type patterns match the class instance head
        ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
 
-checkValidTypePat :: Type -> TcM ()
--- Used for type patterns in class instances,
--- and in type/data family instances
-checkValidTypePat pat_ty
-  = do { -- Check that pat_ty is a monotype
-         checkValidMonoType pat_ty
-             -- One could imagine generalising to allow
-             --      instance C (forall a. a->a)
-             -- but we don't know what all the consequences might be
+-- | Checks for occurrences of type families in class instances and type/data
+-- family instances.
+checkValidTypePats :: TyCon -> [Type] -> TcM ()
+checkValidTypePats tc pat_ty_args =
+  traverse_ (check_valid_type_pat False) invis_ty_args *>
+  traverse_ (check_valid_type_pat True)  vis_ty_args
+  where
+    (invis_ty_args, vis_ty_args) = partitionInvisibleTypes tc pat_ty_args
+    inst_ty = mkTyConApp tc pat_ty_args
 
-          -- Ensure that no type family instances occur a type pattern
-       ; checkTc (isTyFamFree pat_ty) $
-         tyFamInstIllegalErr pat_ty }
+    check_valid_type_pat
+      :: Bool -- True if this is an /visible/ argument to the TyCon.
+      -> Type -> TcM ()
+    -- Used for type patterns in class instances,
+    -- and in type/data family instances
+    check_valid_type_pat vis_arg pat_ty
+      = do { -- Check that pat_ty is a monotype
+             checkValidMonoType pat_ty
+                 -- One could imagine generalising to allow
+                 --      instance C (forall a. a->a)
+                 -- but we don't know what all the consequences might be
+
+              -- Ensure that no type family instances occur a type pattern
+           ; case tcTyFamInsts pat_ty of
+               [] -> pure ()
+               ((tf_tc, tf_args):_) ->
+                 failWithTc $
+                 ty_fam_inst_illegal_err vis_arg (mkTyConApp tf_tc tf_args) }
+
+    ty_fam_inst_illegal_err :: Bool -> Type -> SDoc
+    ty_fam_inst_illegal_err vis_arg ty
+      = sdocWithDynFlags $ \dflags ->
+        hang (text "Illegal type synonym family application"
+                <+> quotes (ppr ty) <+> text "in instance" <>
+             colon) 2 $
+          vcat [ ppr inst_ty
+               , ppUnless (vis_arg || gopt Opt_PrintExplicitKinds dflags) $
+                 text "Use -fprint-explicit-kinds to see the kind arguments" ]
 
 -- Error messages
 
@@ -1992,12 +2009,6 @@ inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch fi_ax cur_branch
   = text "Type family instance equation is overlapped:" $$
     nest 2 (pprCoAxBranch fi_ax cur_branch)
-
-tyFamInstIllegalErr :: Type -> SDoc
-tyFamInstIllegalErr ty
-  = hang (text "Illegal type synonym family application in instance" <>
-         colon) 2 $
-      ppr ty
 
 nestedMsg :: SDoc -> SDoc
 nestedMsg what
