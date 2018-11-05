@@ -18,3 +18,8 @@ test('ArithWord8', omit_ways(['ghci']), compile_and_run, [''])
 test('CmpInt8', normal, compile_and_run, [''])
 test('CmpWord8', normal, compile_and_run, [''])
 test('ShowPrim', normal, compile_and_run, [''])
+
+test('ArithInt16', normal, compile_and_run, [''])
+test('ArithWord16', normal, compile_and_run, [''])
+test('CmpInt16', normal, compile_and_run, [''])
+test('CmpWord16', normal, compile_and_run, [''])

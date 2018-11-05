@@ -426,6 +426,88 @@ primop Word8LtOp "ltWord8#" Compare Word8# -> Word8# -> Int#
 primop Word8NeOp "neWord8#" Compare Word8# -> Word8# -> Int#
 
 ------------------------------------------------------------------------
+section "Int16#"
+        {Operations on 16-bit integers.}
+------------------------------------------------------------------------
+
+primtype Int16#
+
+primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
+primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
+
+primop Int16NegOp "negateInt16#" Monadic Int16# -> Int16#
+
+primop Int16AddOp "plusInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    commutable = True
+
+primop Int16SubOp "subInt16#" Dyadic Int16# -> Int16# -> Int16#
+
+primop Int16MulOp "timesInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    commutable = True
+
+primop Int16QuotOp "quotInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    can_fail = True
+
+primop Int16RemOp "remInt16#" Dyadic Int16# -> Int16# -> Int16#
+  with
+    can_fail = True
+
+primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, Int16# #)
+  with
+    can_fail = True
+
+primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16GtOp "gtInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16LeOp "leInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16LtOp "ltInt16#" Compare Int16# -> Int16# -> Int#
+primop Int16NeOp "neInt16#" Compare Int16# -> Int16# -> Int#
+
+------------------------------------------------------------------------
+section "Word16#"
+        {Operations on 16-bit unsigned integers.}
+------------------------------------------------------------------------
+
+primtype Word16#
+
+primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
+primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
+
+primop Word16NotOp "notWord16#" Monadic Word16# -> Word16#
+
+primop Word16AddOp "plusWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    commutable = True
+
+primop Word16SubOp "subWord16#" Dyadic Word16# -> Word16# -> Word16#
+
+primop Word16MulOp "timesWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    commutable = True
+
+primop Word16QuotOp "quotWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    can_fail = True
+
+primop Word16RemOp "remWord16#" Dyadic Word16# -> Word16# -> Word16#
+  with
+    can_fail = True
+
+primop Word16QuotRemOp "quotRemWord16#" GenPrimOp Word16# -> Word16# -> (# Word16#, Word16# #)
+  with
+    can_fail = True
+
+primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16GtOp "gtWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
+primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
+
+------------------------------------------------------------------------
 section "Word#"
         {Operations on native-sized unsigned words (32+ bits).}
 ------------------------------------------------------------------------

@@ -884,6 +884,11 @@ callishPrimOpSupported dflags op
                                      -> Left (MO_S_QuotRem W8)
                      | otherwise     -> Right (genericIntQuotRemOp W8)
 
+      Int16QuotRemOp | (ncg && x86ish)
+                        || llvm      -> Left (MO_S_QuotRem W16)
+                     | otherwise     -> Right (genericIntQuotRemOp W16)
+
+
       WordQuotRemOp  | ncg && (x86ish || ppc) ->
                          Left (MO_U_QuotRem  (wordWidth dflags))
                      | otherwise      ->
@@ -897,6 +902,10 @@ callishPrimOpSupported dflags op
       Word8QuotRemOp | (ncg && x86ish)
                                       -> Left (MO_U_QuotRem W8)
                      | otherwise      -> Right (genericWordQuotRemOp W8)
+
+      Word16QuotRemOp| (ncg && x86ish)
+                        || llvm      -> Left (MO_U_QuotRem W16)
+                     | otherwise     -> Right (genericWordQuotRemOp W16)
 
       WordAdd2Op     | (ncg && (x86ish
                                 || ppc))
@@ -1355,6 +1364,42 @@ translateOp _      Word8GtOp       = Just (MO_U_Gt W8)
 translateOp _      Word8LeOp       = Just (MO_U_Le W8)
 translateOp _      Word8LtOp       = Just (MO_U_Lt W8)
 translateOp _      Word8NeOp       = Just (MO_Ne W8)
+
+-- Int16# signed ops
+
+translateOp dflags Int16Extend     = Just (MO_SS_Conv W16 (wordWidth dflags))
+translateOp dflags Int16Narrow     = Just (MO_SS_Conv (wordWidth dflags) W16)
+translateOp _      Int16NegOp      = Just (MO_S_Neg W16)
+translateOp _      Int16AddOp      = Just (MO_Add W16)
+translateOp _      Int16SubOp      = Just (MO_Sub W16)
+translateOp _      Int16MulOp      = Just (MO_Mul W16)
+translateOp _      Int16QuotOp     = Just (MO_S_Quot W16)
+translateOp _      Int16RemOp      = Just (MO_S_Rem W16)
+
+translateOp _      Int16EqOp       = Just (MO_Eq W16)
+translateOp _      Int16GeOp       = Just (MO_S_Ge W16)
+translateOp _      Int16GtOp       = Just (MO_S_Gt W16)
+translateOp _      Int16LeOp       = Just (MO_S_Le W16)
+translateOp _      Int16LtOp       = Just (MO_S_Lt W16)
+translateOp _      Int16NeOp       = Just (MO_Ne W16)
+
+-- Word16# unsigned ops
+
+translateOp dflags Word16Extend     = Just (MO_UU_Conv W16 (wordWidth dflags))
+translateOp dflags Word16Narrow     = Just (MO_UU_Conv (wordWidth dflags) W16)
+translateOp _      Word16NotOp      = Just (MO_Not W16)
+translateOp _      Word16AddOp      = Just (MO_Add W16)
+translateOp _      Word16SubOp      = Just (MO_Sub W16)
+translateOp _      Word16MulOp      = Just (MO_Mul W16)
+translateOp _      Word16QuotOp     = Just (MO_U_Quot W16)
+translateOp _      Word16RemOp      = Just (MO_U_Rem W16)
+
+translateOp _      Word16EqOp       = Just (MO_Eq W16)
+translateOp _      Word16GeOp       = Just (MO_U_Ge W16)
+translateOp _      Word16GtOp       = Just (MO_U_Gt W16)
+translateOp _      Word16LeOp       = Just (MO_U_Le W16)
+translateOp _      Word16LtOp       = Just (MO_U_Lt W16)
+translateOp _      Word16NeOp       = Just (MO_Ne W16)
 
 -- Char# ops
 

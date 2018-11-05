@@ -1682,7 +1682,8 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     byteArrayPrimTyConKey, charPrimTyConKey, charTyConKey, doublePrimTyConKey,
     doubleTyConKey, floatPrimTyConKey, floatTyConKey, funTyConKey,
     intPrimTyConKey, intTyConKey, int8TyConKey, int16TyConKey,
-    int8PrimTyConKey, int32PrimTyConKey, int32TyConKey, int64PrimTyConKey, int64TyConKey,
+    int8PrimTyConKey, int16PrimTyConKey, int32PrimTyConKey, int32TyConKey,
+    int64PrimTyConKey, int64TyConKey,
     integerTyConKey, naturalTyConKey,
     listTyConKey, foreignObjPrimTyConKey, maybeTyConKey,
     weakPrimTyConKey, mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey,
@@ -1705,36 +1706,37 @@ intPrimTyConKey                         = mkPreludeTyConUnique 14
 intTyConKey                             = mkPreludeTyConUnique 15
 int8PrimTyConKey                        = mkPreludeTyConUnique 16
 int8TyConKey                            = mkPreludeTyConUnique 17
-int16TyConKey                           = mkPreludeTyConUnique 18
-int32PrimTyConKey                       = mkPreludeTyConUnique 19
-int32TyConKey                           = mkPreludeTyConUnique 20
-int64PrimTyConKey                       = mkPreludeTyConUnique 21
-int64TyConKey                           = mkPreludeTyConUnique 22
-integerTyConKey                         = mkPreludeTyConUnique 23
-naturalTyConKey                         = mkPreludeTyConUnique 24
+int16PrimTyConKey                       = mkPreludeTyConUnique 18
+int16TyConKey                           = mkPreludeTyConUnique 19
+int32PrimTyConKey                       = mkPreludeTyConUnique 20
+int32TyConKey                           = mkPreludeTyConUnique 21
+int64PrimTyConKey                       = mkPreludeTyConUnique 22
+int64TyConKey                           = mkPreludeTyConUnique 23
+integerTyConKey                         = mkPreludeTyConUnique 24
+naturalTyConKey                         = mkPreludeTyConUnique 25
 
-listTyConKey                            = mkPreludeTyConUnique 25
-foreignObjPrimTyConKey                  = mkPreludeTyConUnique 26
-maybeTyConKey                           = mkPreludeTyConUnique 27
-weakPrimTyConKey                        = mkPreludeTyConUnique 28
-mutableArrayPrimTyConKey                = mkPreludeTyConUnique 29
-mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 30
-orderingTyConKey                        = mkPreludeTyConUnique 31
-mVarPrimTyConKey                        = mkPreludeTyConUnique 32
-ratioTyConKey                           = mkPreludeTyConUnique 33
-rationalTyConKey                        = mkPreludeTyConUnique 34
-realWorldTyConKey                       = mkPreludeTyConUnique 35
-stablePtrPrimTyConKey                   = mkPreludeTyConUnique 36
-stablePtrTyConKey                       = mkPreludeTyConUnique 37
-eqTyConKey                              = mkPreludeTyConUnique 39
-heqTyConKey                             = mkPreludeTyConUnique 40
-arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 41
-mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 42
+listTyConKey                            = mkPreludeTyConUnique 26
+foreignObjPrimTyConKey                  = mkPreludeTyConUnique 27
+maybeTyConKey                           = mkPreludeTyConUnique 28
+weakPrimTyConKey                        = mkPreludeTyConUnique 29
+mutableArrayPrimTyConKey                = mkPreludeTyConUnique 30
+mutableByteArrayPrimTyConKey            = mkPreludeTyConUnique 31
+orderingTyConKey                        = mkPreludeTyConUnique 32
+mVarPrimTyConKey                        = mkPreludeTyConUnique 33
+ratioTyConKey                           = mkPreludeTyConUnique 34
+rationalTyConKey                        = mkPreludeTyConUnique 35
+realWorldTyConKey                       = mkPreludeTyConUnique 36
+stablePtrPrimTyConKey                   = mkPreludeTyConUnique 37
+stablePtrTyConKey                       = mkPreludeTyConUnique 38
+eqTyConKey                              = mkPreludeTyConUnique 40
+heqTyConKey                             = mkPreludeTyConUnique 41
+arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 42
+mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 43
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
     wordPrimTyConKey, wordTyConKey, word8PrimTyConKey, word8TyConKey,
-    word16TyConKey, word32PrimTyConKey, word32TyConKey,
+    word16PrimTyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
     word64PrimTyConKey, word64TyConKey,
     liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
@@ -1754,23 +1756,24 @@ wordPrimTyConKey                        = mkPreludeTyConUnique 59
 wordTyConKey                            = mkPreludeTyConUnique 60
 word8PrimTyConKey                       = mkPreludeTyConUnique 61
 word8TyConKey                           = mkPreludeTyConUnique 62
-word16TyConKey                          = mkPreludeTyConUnique 63
-word32PrimTyConKey                      = mkPreludeTyConUnique 64
-word32TyConKey                          = mkPreludeTyConUnique 65
-word64PrimTyConKey                      = mkPreludeTyConUnique 66
-word64TyConKey                          = mkPreludeTyConUnique 67
-liftedConKey                            = mkPreludeTyConUnique 68
-unliftedConKey                          = mkPreludeTyConUnique 69
-anyBoxConKey                            = mkPreludeTyConUnique 70
-kindConKey                              = mkPreludeTyConUnique 71
-boxityConKey                            = mkPreludeTyConUnique 72
-typeConKey                              = mkPreludeTyConUnique 73
-threadIdPrimTyConKey                    = mkPreludeTyConUnique 74
-bcoPrimTyConKey                         = mkPreludeTyConUnique 75
-ptrTyConKey                             = mkPreludeTyConUnique 76
-funPtrTyConKey                          = mkPreludeTyConUnique 77
-tVarPrimTyConKey                        = mkPreludeTyConUnique 78
-compactPrimTyConKey                     = mkPreludeTyConUnique 79
+word16PrimTyConKey                      = mkPreludeTyConUnique 63
+word16TyConKey                          = mkPreludeTyConUnique 64
+word32PrimTyConKey                      = mkPreludeTyConUnique 65
+word32TyConKey                          = mkPreludeTyConUnique 66
+word64PrimTyConKey                      = mkPreludeTyConUnique 67
+word64TyConKey                          = mkPreludeTyConUnique 68
+liftedConKey                            = mkPreludeTyConUnique 69
+unliftedConKey                          = mkPreludeTyConUnique 70
+anyBoxConKey                            = mkPreludeTyConUnique 71
+kindConKey                              = mkPreludeTyConUnique 72
+boxityConKey                            = mkPreludeTyConUnique 73
+typeConKey                              = mkPreludeTyConUnique 74
+threadIdPrimTyConKey                    = mkPreludeTyConUnique 75
+bcoPrimTyConKey                         = mkPreludeTyConUnique 76
+ptrTyConKey                             = mkPreludeTyConUnique 77
+funPtrTyConKey                          = mkPreludeTyConUnique 78
+tVarPrimTyConKey                        = mkPreludeTyConUnique 79
+compactPrimTyConKey                     = mkPreludeTyConUnique 80
 
 -- dotnet interop
 objectTyConKey :: Unique
@@ -2044,7 +2047,7 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
 liftedRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
-  = map mkPreludeDataConUnique [74..84]
+  = map mkPreludeDataConUnique [74..86]
 
 unliftedRepDataConKeys = vecRepDataConKey :
                          tupleRepDataConKey :
@@ -2054,29 +2057,29 @@ unliftedRepDataConKeys = vecRepDataConKey :
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [85..90]
+vecCountDataConKeys = map mkPreludeDataConUnique [87..92]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [91..100]
+vecElemDataConKeys = map mkPreludeDataConUnique [93..102]
 
 -- Typeable things
 kindRepTyConAppDataConKey, kindRepVarDataConKey, kindRepAppDataConKey,
     kindRepFunDataConKey, kindRepTYPEDataConKey,
     kindRepTypeLitSDataConKey, kindRepTypeLitDDataConKey
     :: Unique
-kindRepTyConAppDataConKey = mkPreludeDataConUnique 101
-kindRepVarDataConKey      = mkPreludeDataConUnique 102
-kindRepAppDataConKey      = mkPreludeDataConUnique 103
-kindRepFunDataConKey      = mkPreludeDataConUnique 104
-kindRepTYPEDataConKey     = mkPreludeDataConUnique 105
-kindRepTypeLitSDataConKey = mkPreludeDataConUnique 106
-kindRepTypeLitDDataConKey = mkPreludeDataConUnique 107
+kindRepTyConAppDataConKey = mkPreludeDataConUnique 103
+kindRepVarDataConKey      = mkPreludeDataConUnique 104
+kindRepAppDataConKey      = mkPreludeDataConUnique 105
+kindRepFunDataConKey      = mkPreludeDataConUnique 106
+kindRepTYPEDataConKey     = mkPreludeDataConUnique 107
+kindRepTypeLitSDataConKey = mkPreludeDataConUnique 108
+kindRepTypeLitDDataConKey = mkPreludeDataConUnique 109
 
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
-typeLitSymbolDataConKey   = mkPreludeDataConUnique 108
-typeLitNatDataConKey      = mkPreludeDataConUnique 109
+typeLitSymbolDataConKey   = mkPreludeDataConUnique 110
+typeLitNatDataConKey      = mkPreludeDataConUnique 111
 
 
 ---------------- Template Haskell -------------------
