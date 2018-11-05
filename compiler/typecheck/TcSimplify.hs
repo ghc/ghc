@@ -67,6 +67,7 @@ import Data.Foldable      ( toList )
 import Data.List          ( partition )
 import Data.List.NonEmpty ( NonEmpty(..) )
 import Maybes             ( isJust )
+import Weight
 
 {-
 *********************************************************************************
@@ -574,7 +575,7 @@ tcNormalise given_ids ty
     mk_wanted_ct = do
       let occ = mkVarOcc "$tcNorm"
       name <- newSysName occ
-      let ev = mkLocalId name ty
+      let ev = mkLocalId name (Regular Omega) ty -- TODO Krzysztof check
           hole = ExprHole $ OutOfScope occ emptyGlobalRdrEnv
       newHoleCt hole ev ty
 
