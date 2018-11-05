@@ -512,12 +512,14 @@ kcTyClGroup decls
 
                             ; return initial_tcs }
 
+{-
         -- Step 3: skolemisation
         -- Kind checking done for this group
         -- Now we have to kind skolemise the flexis
         ; candidates <- gather_quant_candidates initial_tcs
         ; _ <- quantifyTyVars emptyVarSet candidates
            -- We'll get the actual vars to quantify over later.
+-}
 
         -- Step 4: generalisation
         -- Finally, go through each tycon and give it its final kind,
@@ -556,29 +558,30 @@ kcTyClGroup decls
       = return tc  -- nothing to do here; we already have the final kind
                    -- This is just an optimization; generalising is a no-op
 
-      | otherwise
-        -- See Note [Required, Specified, and Inferred for types]
-      = do {  -- Step 1: gather all the free variables
-           ; tc_tvs          <- mapM zonkTcTyCoVarBndr (map binderVar (tyConBinders tc))
-           ; tc_res_kind     <- zonkTcType (tyConResKind tc)
-           ; scoped_tv_pairs <- zonkTyVarTyVarPairs (tcTyConScopedTyVars tc)
+      | otherwise -- See Note [Required, Specified, and Inferred for types]
+      = do { let (scoped_tv_names, scoped_tvs) = unzip (tcTyConScopedTyVars tc)
+                    -- scoped_tvs includes the tc_tvs
+                    -- ToDo: Is this a good idea?
+                 tc_res_kind = tyConResKind tc
+           ; scoped_tvs <- mapM zonkTcTyCoVarBndr scoped_tvs
+           ; DV { dv_kvs = fkvs } <- candidateQTyVarsOfKinds $
+                                     (tc_res_kind : map tyVarKind scoped_tvs)
 
-           ; let all_fvs    = tyCoVarsOfTypesDSet (tc_res_kind : map tyVarKind tc_tvs)
-                 all_fv_set = dVarSetToVarSet all_fvs
-                 scoped_tvs = map snd scoped_tv_pairs
+           ; let kvs_to_gen = mempty { dv_kvs = fkvs `delDVarSetList` scoped_tvs }
+                 all_fv_set = dVarSetToVarSet fkvs
+           ; inferred <- quantifyTyVars emptyVarSet kvs_to_gen
+
+           -- Skolemise the specified and required type variables
+           ; tc_tvs      <- mapM zonkQuantifiedTyVar (tyConTyVars tc)
+           ; scoped_tvs  <- mapM zonkQuantifiedTyVar scoped_tvs
+           ; tc_res_kind <- zonkTcType (tyConResKind tc)
 
            ; MASSERT( all ((== Required) . tyConBinderArgFlag) (tyConBinders tc) )
-
            ; let
              -- Step 5: Order the specified variables by ScopedSort
              -- See Note [ScopedSort] in Type
-                 specified_sorted = scopedSort scoped_tvs
-
-             -- Step 6: Remove the Specified ones from the fv sets.
-             -- These are the Inferred ones.
-                 inferred = dVarSetElemsWellScoped $
-                            all_fvs `delDVarSetList` specified_sorted
-                                    `delDVarSetList` tc_tvs
+                 specified_sorted = scopedSort $
+                                    filterOut (`elem` tc_tvs) scoped_tvs
 
              -- Step 7: Make the TyConBinders.
                  inferred_tcbs  = mkNamedTyConBinders Inferred inferred
@@ -589,6 +592,8 @@ kcTyClGroup decls
                  final_tcbs = concat [ inferred_tcbs
                                      , specified_tcbs
                                      , required_tcbs ]
+
+                 scoped_tv_pairs = scoped_tv_names `zip` scoped_tvs
 
              -- Step 9: Check for validity. We do this here because we're about to
              -- put the tycon into the environment, and we don't want anything malformed
@@ -1884,7 +1889,7 @@ tcFamTyPats fam_tc mb_clsinfo
              all_tvs = extra_tvs ++ user_tvs
 
           -- the user_tvs are already bound in the pats; don't quantify over these again.
-       ; vars  <- candidateQTyVarsOfType emptyVarSet $
+       ; vars  <- candidateQTyVarsOfType $
                   mkSpecForAllTys all_tvs fam_app
        ; qtkvs <- quantifyTyVars emptyVarSet vars
        ; let all_qtkvs = qtkvs ++ all_tvs

@@ -67,8 +67,9 @@ module TcMType (
   zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
-  candidateQTyVarsOfType, candidateQTyVarsOfKind,
-  candidateQTyVarsOfTypes, CandidatesQTvs(..),
+  candidateQTyVarsOfType,  candidateQTyVarsOfKind,
+  candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
+  CandidatesQTvs(..),
   zonkQuantifiedTyVar, defaultTyVar,
   quantifyTyVars,
   zonkTcTyCoVarBndr, zonkTyConBinders,
@@ -1136,21 +1137,28 @@ Any. Naughty variables are discovered by is_naughty_tv in quantifyTyVars.
 -- in both sets, if it's used in both a type and a kind.
 -- See Note [CandidatesQTvs determinism and order]
 -- See Note [Dependent type variables]
-candidateQTyVarsOfType :: TcTyVarSet   -- zonked set of global/mono tyvars
-                       -> TcType       -- not necessarily zonked
+candidateQTyVarsOfType :: TcType       -- not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfType gbl_tvs ty = closeOverKindsCQTvs gbl_tvs =<<
-                                    collect_cand_qtvs False gbl_tvs mempty ty
+candidateQTyVarsOfType ty = -- closeOverKindsCQTvs gbl_tvs =<<
+                            collect_cand_qtvs False emptyVarSet mempty ty
+
+-- | Like 'splitDepVarsOfType', but over a list of types
+candidateQTyVarsOfTypes :: [Type] -> TcM CandidatesQTvs
+candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempty tys
 
 -- | Like 'candidateQTyVarsOfType', but consider every free variable
 -- to be dependent. This is appropriate when generalizing a *kind*,
 -- instead of a type. (That way, -XNoPolyKinds will default the variables
 -- to Type.)
-candidateQTyVarsOfKind :: TcTyVarSet   -- zonked set of global/mono tyvars
-                       -> TcKind       -- not necessarily zonked
+candidateQTyVarsOfKind :: TcKind       -- not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKind gbl_tvs ty = closeOverKindsCQTvs gbl_tvs =<<
-                                    collect_cand_qtvs True gbl_tvs mempty ty
+candidateQTyVarsOfKind ty = -- closeOverKindsCQTvs gbl_tvs =<<
+                            collect_cand_qtvs True emptyVarSet mempty ty
+
+candidateQTyVarsOfKinds :: [TcKind]       -- not necessarily zonked
+                       -> TcM CandidatesQTvs
+candidateQTyVarsOfKinds tys = -- closeOverKindsCQTvs gbl_tvs =<<
+                              foldM (collect_cand_qtvs False emptyVarSet) mempty tys
 
 collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependent
                   -> VarSet -- bound variables (both locally bound and globally bound)
@@ -1158,6 +1166,9 @@ collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependen
 collect_cand_qtvs is_dep bound dvs ty
   = go dvs ty
   where
+    is_bound tv = tv `elemVarSet` bound
+
+    -----------------
     go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
     go dv (TyConApp _ tys) = foldlM go dv tys
     go dv (FunTy arg res)  = foldlM go dv [arg, res]
@@ -1170,6 +1181,7 @@ collect_cand_qtvs is_dep bound dvs ty
       | is_bound tv
       = return dv
 
+{-
       | isImmutableTyVar tv
       = WARN(True, (sep [ text "Note [Naughty quantification candidates] skolem:"
                         , ppr tv <+> dcolon <+> ppr (tyVarKind tv) ]))
@@ -1177,24 +1189,41 @@ collect_cand_qtvs is_dep bound dvs ty
                    -- Note [Naughty quantification candidates]
                    -- NB: CandidatesQTvs stores only MetaTvs, so don't store an
                    -- immutable tyvar here.
+-}
 
       | otherwise
-      = ASSERT2( isMetaTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) $$ ppr ty $$ ppr bound )
-        do { m_contents <- isFilledMetaTyVar_maybe tv
+      = do { m_contents <- isFilledMetaTyVar_maybe tv
            ; case m_contents of
                Just ind_ty -> go dv ind_ty
-
-               Nothing -> return $ insert_tv dv tv }
+               Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
            ; collect_cand_qtvs is_dep (bound `extendVarSet` tv) dv1 ty }
 
-    is_bound tv = tv `elemVarSet` bound
+    -----------------
+    go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
+      | is_dep    = do { DV { dv_kvs = tkvs }
+                            <- collect_cand_qtvs True emptyVarSet mempty tv_kind
+                       ; case tv `elemDVarSet` kvs of
+                           True  -> return dv
+                           False | intersectsVarSet bound (dVarSetToVarSet tkvs)
+                                 -> go dv tv_kind
+                                 | otherwise
+                                 -> return (dv { dv_kvs = kvs `unionDVarSet` tkvs
+                                                              `extendDVarSet` tv }) }
+      | otherwise = do { DV { dv_kvs = tkvs }
+                            <- collect_cand_qtvs True emptyVarSet mempty tv_kind
+                       ; case tv `elemDVarSet` kvs || tv `elemDVarSet` tvs of
+                           True  -> return dv
+                           False | intersectsVarSet bound (dVarSetToVarSet tkvs)
+                                 -> collect_cand_qtvs True bound dv tv_kind
+                                 | otherwise
+                                 -> return (dv { dv_kvs = kvs `unionDVarSet` tkvs
+                                               , dv_tvs = tvs `extendDVarSet` tv }) }
+      where
+        tv_kind = tyVarKind tv
 
-    insert_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
-      | is_dep    = dv { dv_kvs = kvs `extendDVarSet` tv }
-      | otherwise = dv { dv_tvs = tvs `extendDVarSet` tv }
     -- You might be tempted (like I was) to use unitDVarSet and mappend here.
     -- However, the union algorithm for deterministic sets depends on (roughly)
     -- the size of the sets. The elements from the smaller set end up to the
@@ -1235,13 +1264,9 @@ collect_cand_qtvs_co bound = go_co
     go_co dv (HoleCo hole) = do m_co <- unpackCoercionHole_maybe hole
                                 case m_co of
                                   Just co -> go_co dv co
-                                  Nothing -> return $ insert_cv dv (coHoleCoVar hole)
+                                  Nothing -> go_cv dv (coHoleCoVar hole)
 
-    go_co dv (CoVarCo cv)
-      | is_bound cv
-      = return dv
-      | otherwise
-      = return $ insert_cv dv cv
+    go_co dv (CoVarCo cv) = go_cv dv cv
 
     go_co dv (ForAllCo tcv kind_co co)
       = do { dv1 <- go_co dv kind_co
@@ -1255,16 +1280,16 @@ collect_cand_qtvs_co bound = go_co
     go_prov dv (ProofIrrelProv co) = go_co dv co
     go_prov dv (PluginProv _)      = return dv
 
-    insert_cv dv@(DV { dv_cvs = cvs }) cv
-      = dv { dv_cvs = cvs `extendVarSet` cv }
+    go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
+    go_cv dv@(DV { dv_cvs = cvs }) cv
+      | is_bound cv         = return dv
+      | cv `elemVarSet` cvs = return dv
+      | otherwise           = collect_cand_qtvs True emptyVarSet
+                                    (dv { dv_cvs = cvs `extendVarSet` cv })
+                                    (idType cv)
 
     is_bound tv = tv `elemVarSet` bound
 
--- | Like 'splitDepVarsOfType', but over a list of types
-candidateQTyVarsOfTypes :: TyCoVarSet  -- zonked global ty/covars
-                        -> [Type] -> TcM CandidatesQTvs
-candidateQTyVarsOfTypes gbl_tvs tys = closeOverKindsCQTvs gbl_tvs =<<
-                                      foldlM (collect_cand_qtvs False gbl_tvs) mempty tys
 
 {- *********************************************************************
 *                                                                      *
@@ -1358,10 +1383,12 @@ quantifyTyVars gbl_tvs
                  -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
 
                -- See Note [Naughty quantification candidates]
-             (naughty_deps, final_dep_kvs)       = partition (is_naughty_tv outer_tclvl) dep_kvs
-             (naughty_nondeps, final_nondep_tvs) = partition (is_naughty_tv outer_tclvl) nondep_tvs
+             final_dep_kvs = dep_kvs
+             final_nondep_tvs = nondep_tvs
+--             (naughty_deps, final_dep_kvs)       = partition (is_naughty_tv outer_tclvl) dep_kvs
+--             (naughty_nondeps, final_nondep_tvs) = partition (is_naughty_tv outer_tclvl) nondep_tvs
 
-       ; mapM_ zap_naughty_tv (naughty_deps ++ naughty_nondeps)
+--       ; mapM_ zap_naughty_tv (naughty_deps ++ naughty_nondeps)
 
        -- This block uses level numbers to decide what to quantify
        -- and emits a warning if the two methods do not give the same answer

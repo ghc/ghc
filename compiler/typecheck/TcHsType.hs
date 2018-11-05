@@ -1614,7 +1614,8 @@ kcLHsQTyVars name flav cusk
              tycon = mkTcTyCon name (ppr user_tyvars)
                                final_tc_binders
                                res_kind
-                               all_tv_prs True {- it is generalised -} flav
+                               all_tv_prs
+                               True {- it is generalised -} flav
 
        ; traceTc "kcLHsQTyVars: cusk" $
          vcat [ text "name" <+> ppr name
@@ -2061,7 +2062,7 @@ kindGeneralizeLocal wanted kind_or_type
          -- use the "Kind" variant here, as any types we see
          -- here will already have all type variables quantified;
          -- thus, every free variable is really a kv, never a tv.
-       ; dvs <- candidateQTyVarsOfKind mono_tvs kind_or_type
+       ; dvs <- candidateQTyVarsOfKind kind_or_type
 
        ; traceTc "kindGeneralizeLocal" $
          vcat [ text "Wanted:" <+> ppr wanted
@@ -2245,6 +2246,8 @@ tcTyClTyVars tycon_name thing_inside
 
        ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_prs)
 
+       ; traceTc "tyClTyVars" (vcat [ ppr tycon, ppr (tyConBinders tycon)
+                                    , pprTyVars scoped_tvs ])
        ; checkNoErrs $ reportFloatingKvs tycon_name flav
                                          scoped_tvs still_sig_tvs
 
