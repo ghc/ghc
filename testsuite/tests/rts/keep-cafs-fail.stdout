@@ -1,0 +1,5 @@
+KeepCafsMain: internal error: Evaluated a CAF (0xaac9d8) that was GC'd!
+    (GHC version 8.7.20180910 for x86_64_unknown_linux)
+    Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug
+Aborted (core dumped)
+exit(134)

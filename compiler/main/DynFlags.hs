@@ -32,7 +32,7 @@ module DynFlags (
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
-        wopt_fatal,
+        wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
         xopt, xopt_set, xopt_unset,
         lang_set,
         useUnicodeSyntax,
@@ -564,6 +564,7 @@ data GeneralFlag
    -- forwards all -L flags to the collect2 command without using a
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
+   | Opt_KeepCAFs
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -4003,7 +4004,8 @@ fFlagsDeps = [
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
-  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
+  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
+  flagSpec "keep-cafs"                        Opt_KeepCAFs
   ]
   ++ fHoleFlags
 

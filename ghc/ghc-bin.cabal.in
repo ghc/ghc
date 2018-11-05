@@ -24,6 +24,11 @@ Flag ghci
     Default: False
     Manual: True
 
+Flag threaded
+    Description: Link the ghc executable against the threaded RTS
+    Default: True
+    Manual: True
+
 Executable ghc
     Default-Language: Haskell2010
 
@@ -79,6 +84,13 @@ Executable ghc
             ScopedTypeVariables
             UnboxedTuples
             ViewPatterns
+
+    -- The flag being True by default, this reflects the
+    -- mk/config.mk.in logic for GhcThreaded (which ends up
+    -- always being True as well). One can still opt out by
+    -- disabling this flag.
+    if flag(threaded)
+      ghc-options: -threaded
 
     Other-Extensions:
         CPP

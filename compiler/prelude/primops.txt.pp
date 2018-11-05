@@ -2818,11 +2818,11 @@ primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
 primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
    Word# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr# #)
    { Attempt to allocate a compact block with the given size (in
-     bytes) at the given address. The first argument is a hint to
-     the allocator, allocation might be satisfied at a different
-     address (which is returned).
+     bytes, given by the first argument). The {\texttt Addr\#} is a pointer to
+     previous block of the compact or {\texttt nullAddr\#} to create a new compact.
+
      The resulting block is not known to the GC until
-     compactFixupPointers# is called on it, and care must be taken
+     {\texttt compactFixupPointers\#} is called on it, and care must be taken
      so that the address does not escape or memory will be leaked.
    }
    with

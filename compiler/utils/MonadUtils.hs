@@ -21,6 +21,7 @@ module MonadUtils
         , foldlM, foldlM_, foldrM
         , maybeMapM
         , whenM, unlessM
+        , filterOutM
         ) where
 
 -------------------------------------------------------------------------------
@@ -31,6 +32,7 @@ import GhcPrelude
 
 import Maybes
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
@@ -199,3 +201,8 @@ whenM mb thing = do { b <- mb
 unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = do { cond <- condM
                        ; unless cond acc }
+
+-- | Like 'filterM', only it reverses the sense of the test.
+filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
+filterOutM p =
+  foldr (\ x -> liftA2 (\ flg -> if flg then id else (x:)) (p x)) (pure [])
