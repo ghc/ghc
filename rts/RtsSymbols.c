@@ -615,6 +615,8 @@
       SymI_HasProto(hs_exit_nowait)                                     \
       SymI_HasProto(hs_set_argv)                                        \
       SymI_HasProto(hs_perform_gc)                                      \
+      SymI_HasProto(hs_lock_stable_ptr_table)                           \
+      SymI_HasProto(hs_unlock_stable_ptr_table)                         \
       SymI_HasProto(hs_lock_stable_tables)                              \
       SymI_HasProto(hs_unlock_stable_tables)                            \
       SymI_HasProto(hs_free_stable_ptr)                                 \

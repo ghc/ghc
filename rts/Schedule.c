@@ -41,7 +41,8 @@
 #include "Timer.h"
 #include "ThreadPaused.h"
 #include "Messages.h"
-#include "Stable.h"
+#include "StablePtr.h"
+#include "StableName.h"
 #include "TopHandler.h"
 
 #if defined(HAVE_SYS_TYPES_H)
@@ -1964,7 +1965,8 @@ forkProcess(HsStablePtr *entry
     // inconsistent state in the child.  See also #1391.
     ACQUIRE_LOCK(&sched_mutex);
     ACQUIRE_LOCK(&sm_mutex);
-    ACQUIRE_LOCK(&stable_mutex);
+    ACQUIRE_LOCK(&stable_ptr_mutex);
+    ACQUIRE_LOCK(&stable_name_mutex);
     ACQUIRE_LOCK(&task->lock);
 
     for (i=0; i < n_capabilities; i++) {
@@ -1989,7 +1991,8 @@ forkProcess(HsStablePtr *entry
 
         RELEASE_LOCK(&sched_mutex);
         RELEASE_LOCK(&sm_mutex);
-        RELEASE_LOCK(&stable_mutex);
+        RELEASE_LOCK(&stable_ptr_mutex);
+        RELEASE_LOCK(&stable_name_mutex);
         RELEASE_LOCK(&task->lock);
 
 #if defined(THREADED_RTS)
@@ -2012,7 +2015,8 @@ forkProcess(HsStablePtr *entry
 #if defined(THREADED_RTS)
         initMutex(&sched_mutex);
         initMutex(&sm_mutex);
-        initMutex(&stable_mutex);
+        initMutex(&stable_ptr_mutex);
+        initMutex(&stable_name_mutex);
         initMutex(&task->lock);
 
         for (i=0; i < n_capabilities; i++) {

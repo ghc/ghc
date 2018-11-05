@@ -1784,7 +1784,7 @@ numFoldingRules op dict = do
      (v   :-: L y) :-: (w :-: L x) -> return $ mkL (x-y)   `add` (v `sub` w)
      (v   :-: L y) :-: (L x :-: w) -> return $ mkL (0-x-y) `add` (v `add` w)
      (L y :-:   v) :-: (w :-: L x) -> return $ mkL (x+y)   `sub` (v `add` w)
-     (L y :-:   v) :-: (L x :-: w) -> return $ mkL (y-x)   `add` (w `add` v)
+     (L y :-:   v) :-: (L x :-: w) -> return $ mkL (y-x)   `add` (w `sub` v)
      (x :++: w)    :-: (y :++: v)  -> return $ mkL (x-y)   `add` (w `sub` v)
      (w :-: L x)   :-: (y :++: v)  -> return $ mkL (0-y-x) `add` (w `sub` v)
      (L x :-: w)   :-: (y :++: v)  -> return $ mkL (x-y)   `sub` (v `add` w)

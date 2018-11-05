@@ -1766,7 +1766,7 @@ tcImplicitTKBndrsX new_tv skol_info tv_names thing_inside
           -- use zonkTcTyCoVarBndr because a skol_tv might be a TyVarTv
 
           -- do a stable topological sort, following
-          -- Note [Ordering of implicit variables] in HsTypes
+          -- Note [Ordering of implicit variables] in RnTypes
        ; let final_tvs = toposortTyVars skol_tvs
        ; traceTc "tcImplicitTKBndrs" (ppr tv_names $$ ppr final_tvs)
        ; return (final_tvs, result) }

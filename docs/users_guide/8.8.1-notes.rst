@@ -48,6 +48,14 @@ Compiler
 Runtime system
 ~~~~~~~~~~~~~~
 
+- Add and document new FFI functions ``hs_lock_stable_ptr_table``
+  and ``hs_unlock_stable_ptr_table``. These replace the undocumented
+  functions ``hs_lock_stable_tables`` and ``hs_unlock_stable_tables``,
+  respectively. The latter should now be considered deprecated.
+
+- Document the heretofore undocumented FFI function
+  ``hs_free_stable_ptr_unsafe``, used in conjunction with manual
+  locking and unlocking.
 
 Template Haskell
 ~~~~~~~~~~~~~~~~

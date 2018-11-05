@@ -22,7 +22,7 @@
 #include "StgPrimFloat.h" // for __int_encodeFloat etc.
 #include "Proftimer.h"
 #include "GetEnv.h"
-#include "Stable.h"
+#include "StablePtr.h"
 #include "RtsSymbols.h"
 #include "RtsSymbolInfo.h"
 #include "Profiling.h"

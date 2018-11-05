@@ -10688,6 +10688,17 @@ Here are the details:
   if you want the most accurate information with respect to visible type
   application properties.
 
+- Although GHC supports visible *type* applications, it does not yet support
+  visible *kind* applications. However, GHC does follow similar rules for
+  quantifying variables in kind signatures as it does for quantifying type
+  signatures. For instance: ::
+
+    type family F (a :: j) (b :: k) :: l
+      -- F :: forall j k l. j -> k -> l
+
+  In the kind of ``F``, the left-to-right ordering of ``j``, ``k``, and ``l``
+  is preserved.
+
 .. _implicit-parameters:
 
 Implicit parameters

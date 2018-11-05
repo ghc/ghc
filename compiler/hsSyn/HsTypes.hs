@@ -251,10 +251,22 @@ the a in the code. Thus, GHC does a *stable topological sort* on the variables.
 By "stable", we mean that any two variables who do not depend on each other
 preserve their existing left-to-right ordering.
 
-Implicitly bound variables are collected by extractHsTysRdrTyVars and friends
-in RnTypes. These functions thus promise to keep left-to-right ordering.
+Implicitly bound variables are collected by the extract- family of functions
+(extractHsTysRdrTyVars, extractHsTyVarBndrsKVs, etc.) in RnTypes.
+These functions thus promise to keep left-to-right ordering.
 Look for pointers to this note to see the places where the action happens.
 
+Note that we also maintain this ordering in kind signatures. Even though
+there's no visible kind application (yet), having implicit variables be
+quantified in left-to-right order in kind signatures is nice since:
+
+* It's consistent with the treatment for type signatures.
+* It can affect how types are displayed with -fprint-explicit-kinds (see
+  #15568 for an example), which is a situation where knowing the order in
+  which implicit variables are quantified can be useful.
+* In the event that visible kind application is implemented, the order in
+  which we would expect implicit variables to be ordered in kinds will have
+  already been established.
 -}
 
 -- | Located Haskell Context
@@ -343,6 +355,7 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
                                          -- Implicitly-bound kind & type vars
                                          -- Order is important; see
                                          -- Note [Ordering of implicit variables]
+                                         -- in RnTypes
 
          , hsib_body :: thing            -- Main payload (type or list of types)
     }
