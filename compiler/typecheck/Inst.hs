@@ -45,7 +45,7 @@ import TcRnMonad
 import TcEnv
 import TcEvidence
 import InstEnv
-import TysWiredIn  ( heqDataCon, eqDataCon, omegaDataConTy )
+import TysWiredIn  ( heqDataCon, eqDataCon )
 import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType

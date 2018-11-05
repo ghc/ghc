@@ -68,8 +68,6 @@ import Util
 import BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )
 import qualified GHC.LanguageExtensions as LangExt
 
-import TysWiredIn
-
 import Control.Monad
 import Maybes
 
