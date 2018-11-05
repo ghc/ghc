@@ -1685,6 +1685,8 @@ commitFlexi flexi tv zonked_kind
 
       DefaultFlexi    | isRuntimeRepTy zonked_kind
                       -> liftedRepTy
+                      | isMultiplicityTy zonked_kind
+                      -> omegaDataConTy
                       | otherwise
                       -> anyTypeOfKind zonked_kind
 
