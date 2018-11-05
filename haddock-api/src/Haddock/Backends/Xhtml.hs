@@ -120,17 +120,23 @@ copyHtmlBits odir libdir themes withQuickjump = do
 
 headHtml :: String -> Themes -> Maybe String -> Html
 headHtml docTitle themes mathjax_url =
-  header << [
-    meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
-    thetitle << docTitle,
-    styleSheet themes,
-    thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml,
-    script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml,
-    script ! [src mjUrl, thetype "text/javascript"] << noHtml
+  header <<
+    [ meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"]
+    , thetitle << docTitle
+    , styleSheet themes
+    , thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml
+    , script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml
+    , script ! [thetype "text/x-mathjax-config"] << primHtml mjConf
+    , script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
   where
-    mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
-
+    mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
+    mjConf = unwords [ "MathJax.Hub.Config({"
+                     ,   "tex2jax: {"
+                     ,     "processClass: \"mathjax\","
+                     ,     "ignoreClass: \".*\""
+                     ,   "}"
+                     , "});" ]
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
