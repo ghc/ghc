@@ -27,6 +27,19 @@ Language
   they could only stand in for other type variables, but this restriction was deemed
   unnecessary in `GHC proposal #29 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0029-scoped-type-variables-types.rst>`__. Also see :ghc-ticket:`15050`.
 
+- The pattern-match coverage checker now checks for cases that are unreachable
+  due to constructors have strict argument types. For instance, in the
+  following example: ::
+
+    data K = K1 | K2 !Void
+
+    f :: K -> ()
+    f K1 = ()
+
+  ``K2`` cannot be matched on in ``f``, since it is impossible to construct a
+  terminating value of type ``Void``. Accordingly, GHC will not warn about
+  ``K2`` (whereas previous versions of GHC would).
+
 Compiler
 ~~~~~~~~
 
@@ -39,6 +52,21 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
+- Reifying type classes no longer shows redundant class type variables and
+  contexts in the type signature of each class method. For instance,
+  reifying the following class: ::
+
+    class C a where
+      method :: a
+
+  Used to produce the following: ::
+
+    class C a where
+      method :: forall a. C a => a
+
+  Where the ``forall a. C a =>`` part is entirely redundant. This part is no
+  longer included when reifying ``C``. It's possible that this may break some
+  code which assumes the existence of ``forall a. C a =>``.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
