@@ -888,6 +888,17 @@ Note that
 * One better way is to ensure that type patterns (the template
   in the matching process) have no casts.  See Trac #14119.
 
+Note [Polykinded tycon applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose  T :: forall k. Type -> K
+and we are unifying
+  ty1:  T @Type         Int       :: Type
+  ty2:  T @(Type->Type) Int Int   :: Type
+
+These two TyConApps have the same TyCon at the front but they
+(legitimately) have different numbers of arguments.  They
+are surelyApart, so we can report that without looking any
+further (see Trac #15704).
 -}
 
 -------------- unify_ty: the main workhorse -----------
@@ -1025,7 +1036,8 @@ unify_tys env orig_xs orig_ys
       = do { unify_ty env x y (mkNomReflCo $ typeKind x)
            ; go xs ys }
     go _ _ = surelyApart
-      -- Possibly different saturations of a polykinded tycon (See Trac #15704)
+      -- Possibly different saturations of a polykinded tycon
+      -- See Note [Polykinded tycon applications]
 
 ---------------------------------
 uVar :: UMEnv
