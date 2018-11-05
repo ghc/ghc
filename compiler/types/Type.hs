@@ -1081,7 +1081,7 @@ piResultTys ty orig_args@(arg:args)
       | otherwise
       = -- We have not run out of arguments, but the function doesn't
         -- have the right kind to apply to them; so panic.
-        -- Without hte explicit isEmptyVarEnv test, an ill-kinded type
+        -- Without the explicit isEmptyVarEnv test, an ill-kinded type
         -- would give an infniite loop, which is very unhelpful
         -- c.f. Trac #15473
         pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
@@ -1115,7 +1115,7 @@ So
 
 In other words wwe must intantiate the forall!
 
-Similarly (Trac #154218)
+Similarly (Trac #15428)
    S :: forall k f. k -> f k
 and we are finding the kind of
    S * (* ->) Int Bool

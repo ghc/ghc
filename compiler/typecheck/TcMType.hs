@@ -73,7 +73,7 @@ module TcMType (
   quantifyTyVars,
   zonkTcTyCoVarBndr, zonkTcTyVarBinder,
   zonkTcType, zonkTcTypes, zonkCo,
-  zonkTyCoVarKind, zonkTcTypeMapper,
+  zonkTyCoVarKind,
 
   zonkEvVar, zonkWC, zonkSimples,
   zonkId, zonkCoVar,
@@ -1606,7 +1606,10 @@ zonkTcTyVar tv
          -> do { cts <- readMutVar ref
                ; case cts of
                     Flexi       -> zonk_kind_and_return
-                    Indirect ty -> zonkTcType ty }
+                    Indirect ty -> do { zty <- zonkTcType ty
+                                      ; writeTcRef ref (Indirect zty)
+                                        -- See Note [Sharing in zonking]
+                                      ; return zty } }
 
   | otherwise -- coercion variable
   = zonk_kind_and_return
@@ -1632,7 +1635,26 @@ zonkTyVarTyVarPairs prs
     do_one (nm, tv) = do { tv' <- zonkTcTyVarToTyVar tv
                          ; return (nm, tv') }
 
-{-
+{- Note [Sharing in zonking]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   alpha :-> beta :-> gamma :-> ty
+where the ":->" means that the unification variable has been
+filled in with Indirect. Then when zonking alpha, it'd be nice
+to short-circuit beta too, so we end up with
+   alpha :-> zty
+   beta  :-> zty
+   gamma :-> zty
+where zty is the zonked version of ty.  That way, if we come across
+beta later, we'll have less work to do.  (And indeed the same for
+alpha.)
+
+This is easily achieved: just overwrite (Indirect ty) with (Indirect
+zty).  Non-systematic perf comparisons suggest that this is a modest
+win.
+
+But c.f Note [Sharing when zonking to Type] in TcHsSyn.
+
 %************************************************************************
 %*                                                                      *
                  Tidying

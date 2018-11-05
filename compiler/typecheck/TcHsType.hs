@@ -256,8 +256,8 @@ tcHsDeriv hs_ty
        ; ty <- checkNoErrs $
                  -- avoid redundant error report with "illegal deriving", below
                tc_hs_sig_type_and_gen (SigTypeSkol DerivClauseCtxt) hs_ty cls_kind
-       ; cls_kind <- zonkTcTypeToType emptyZonkEnv cls_kind
-       ; ty <- zonkTcTypeToType emptyZonkEnv ty
+       ; cls_kind <- zonkTcTypeToType cls_kind
+       ; ty <- zonkTcTypeToType ty
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
@@ -300,7 +300,7 @@ tcDerivStrategy user_ctxt mds thing_inside
       cls_kind <- newMetaKindVar
       ty' <- checkNoErrs $
              tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty cls_kind
-      ty' <- zonkTcTypeToType emptyZonkEnv ty'
+      ty' <- zonkTcTypeToType ty'
       let (via_tvs, via_pred) = splitForAllTys ty'
       tcExtendTyVarEnv (map unrestricted via_tvs) $ do   -- TODO: is this correct?
         (thing_tvs, thing) <- thing_inside
@@ -325,7 +325,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
        types. Much better just to report the kind error directly. -}
     do { inst_ty <- failIfEmitsConstraints $
                     tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty constraintKind
-       ; inst_ty <- zonkTcTypeToType emptyZonkEnv inst_ty
+       ; inst_ty <- zonkTcTypeToType inst_ty
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
 ----------------------------------------------
@@ -1485,7 +1485,7 @@ kind-generalize correctly.
 
 In Step 4, we have to deal with the fact that metatyvars generated
 in the type may have a bumped TcLevel, because explicit foralls
-raise the TcLevel. To avoid these variables from every being visible
+raise the TcLevel. To avoid these variables from ever being visible
 in the surrounding context, we must obey the following dictum:
 
   Every metavariable in a type must either be
@@ -1497,18 +1497,20 @@ has a proper TcLevel. (I'm ignoring the TcLevel on a skolem here, as
 it's not really in play here.) On the other hand, if it is not
 generalized (because we're not generalizing the construct -- e.g., pattern
 sig -- or because the metavars are constrained -- see kindGeneralizeLocal)
-we need to promote to (MetaTvInv) of Note [TcLevel and untouchable type variables]
+we need to promote to maintain (MetaTvInv) of Note [TcLevel and untouchable type variables]
 in TcType.
 
 After promoting/generalizing, we need to zonk *again* because both
 promoting and generalizing fill in metavariables.
 
 To avoid the double-zonk, we do two things:
- 1. zonkPromoteType and friends zonk and promote at the same time.
-    Accordingly, the function does setps 3-5 all at once, preventing
+ 1. When we're not generalizing:
+    zonkPromoteType and friends zonk and promote at the same time.
+    Accordingly, the function does steps 3-5 all at once, preventing
     the need for multiple traversals.
 
- 2. kindGeneralize does not require a zonked type -- it zonks as it
+ 2. When we are generalizing:
+    kindGeneralize does not require a zonked type -- it zonks as it
     gathers free variables. So this way effectively sidesteps step 3.
 
 -}

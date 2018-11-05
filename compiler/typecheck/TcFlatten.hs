@@ -1131,10 +1131,17 @@ TODO: a step-by-step replay of the refactor to analyze the performance.
 -}
 
 {-# INLINE flatten_args_tc #-}
-flatten_args_tc :: TyCon
-                -> [Role]
-                -> [Type]
-                -> FlatM ([Xi], [Coercion], CoercionN)
+flatten_args_tc
+  :: TyCon         -- T
+  -> [Role]        -- Role r
+  -> [Type]        -- Arg types [t1,..,tn]
+  -> FlatM ( [Xi]  -- List of flattened args [x1,..,xn]
+                   -- 1-1 corresp with [t1,..,tn]
+           , [Coercion]  -- List of arg coercions [co1,..,con]
+                         -- 1-1 corresp with [t1,..,tn]
+                         --    coi :: xi ~r ti
+           , CoercionN)  -- Result coercion, rco
+                         --    rco : (T t1..tn) ~N (T (x1 |> co1) .. (xn |> con))
 flatten_args_tc tc = flatten_args all_bndrs any_named_bndrs inner_ki emptyVarSet
   -- NB: TyCon kinds are always closed
   where

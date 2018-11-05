@@ -120,11 +120,10 @@ import Data.IORef
 import System.Directory
 import System.FilePath
 import Plugins ( PluginRecompile(..), Plugin(..), LoadedPlugin(..))
-#if __GLASGOW_HASKELL__ < 840
+
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
-#endif
 
 {-
 ************************************************************************
@@ -1114,7 +1113,7 @@ instance Semigroup RecompileRequired where
 
 instance Monoid RecompileRequired where
   mempty = UpToDate
-#if __GLASGOW_HASKELL__ < 840
+#if __GLASGOW_HASKELL__ < 804
   mappend = (Data.Semigroup.<>)
 #endif
 

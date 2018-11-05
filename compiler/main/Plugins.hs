@@ -23,11 +23,9 @@ import Fingerprint
 import Data.List
 import Outputable (Outputable(..), text, (<+>))
 
-#if __GLASGOW_HASKELL__ < 840
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
-#endif
 
 import Control.Monad
 
@@ -125,7 +123,7 @@ instance Semigroup PluginRecompile where
 
 instance Monoid PluginRecompile where
   mempty = NoForceRecompile
-#if __GLASGOW_HASKELL__ < 840
+#if __GLASGOW_HASKELL__ < 804
   mappend = (Data.Semigroup.<>)
 #endif
 

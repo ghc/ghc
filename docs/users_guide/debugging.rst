@@ -543,7 +543,7 @@ assembler.
     :shortdesc: Dump final assembly
     :type: dynamic
 
-    Dump assembly language produced by the
+    Dump the final assembly produced by the native code generator.
 
 
 Miscellaneous backend dumps
