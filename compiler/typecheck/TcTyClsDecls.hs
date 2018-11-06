@@ -486,7 +486,7 @@ kcTyClGroup :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 kcTyClGroup decls
   = do  { mod <- getModule
         ; traceTc "---- kcTyClGroup ---- {"
-            (text "module" <+> ppr mod $$ vcat (map ppr decls))
+                  (text "module" <+> ppr mod $$ vcat (map ppr decls))
 
           -- Kind checking;
           --    1. Bind kind variables for decls
@@ -512,20 +512,11 @@ kcTyClGroup decls
 
                             ; return initial_tcs }
 
-{-
-        -- Step 3: skolemisation
-        -- Kind checking done for this group
-        -- Now we have to kind skolemise the flexis
-        ; candidates <- gather_quant_candidates initial_tcs
-        ; _ <- quantifyTyVars emptyVarSet candidates
-           -- We'll get the actual vars to quantify over later.
--}
-
-        -- Step 4: generalisation
+        -- Step 3: generalisation
         -- Finally, go through each tycon and give it its final kind,
         -- with all the required, specified, and inferred variables
         -- in order.
-        ; poly_tcs <- mapAndReportM generalise initial_tcs
+        ; poly_tcs <- mapAndReportM generaliseTcTyCon initial_tcs
 
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return poly_tcs }
@@ -534,110 +525,115 @@ kcTyClGroup decls
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
 
-    gather_quant_candidates :: [TcTyCon] -> TcM CandidatesQTvs
-    gather_quant_candidates tcs = mconcat <$> mapM gather1 tcs
+generaliseTcTyCon :: TcTyCon -> TcM TcTyCon
+generaliseTcTyCon tc
+  | tcTyConIsPoly tc
+  = return tc  -- Nothing to do here; we already have the final kind
+               -- This is just an optimization; generalising is a no-op
 
-    gather1 :: TcTyCon -> TcM CandidatesQTvs
-    gather1 tc
-      | tcTyConIsPoly tc  -- these don't need generalisation
-      = return mempty
+  | otherwise -- See Note [Required, Specified, and Inferred for types]
+  = setSrcSpan (getSrcSpan tc) $
+    addTyConCtxt tc $
+    do { let tc_name     = tyConName tc
+             tc_flav     = tyConFlavour tc
+             tc_res_kind = tyConResKind tc
+             tc_tvs      = tyConTyVars  tc
+             user_tyvars = tcTyConUserTyVars tc  -- ToDo: nuke
 
-      | otherwise
-      = do { tc_binders  <- zonkTyConBinders (tyConBinders tc)
-           ; tc_res_kind <- zonkTcType (tyConResKind tc)
+             (scoped_tv_names, scoped_tvs) = unzip (tcTyConScopedTyVars tc)
+             -- NB: scoped_tvs includes both specified and required (tc_tvs)
+             -- ToDo: Is this a good idea?
 
-           ; let tvs = mkDVarSet $ map binderVar tc_binders
-                 kvs = tyCoVarsOfTypesDSet (tc_res_kind : map binderType tc_binders)
-                       `minusDVarSet` tvs
+       -- Step 1: find all the variables we want to quantify over,
+       --         including Inferred, Specfied, and Required
+       ; dvs <- candidateQTyVarsOfKinds $
+                (tc_res_kind : map tyVarKind scoped_tvs)
+       ; let full_dvs = dvs { dv_tvs = mkDVarSet tc_tvs }
 
-           ; return (mempty { dv_kvs = kvs, dv_tvs = tvs }) }
+       -- Step 2: quantify, mainly meaning skolemise the free variables
+       ; qtkvs <- quantifyTyVars emptyVarSet full_dvs
+                  -- Returned 'qtkvs' are scope-sorted and skolemised
 
-    generalise :: TcTyCon -> TcM TcTyCon
-    generalise tc
-      | tcTyConIsPoly tc
-      = return tc  -- nothing to do here; we already have the final kind
-                   -- This is just an optimization; generalising is a no-op
+       -- Step 3: find the final identity of the Specified and Required tc_tvs
+       -- (remember they all started as TyVarTvs).
+       -- They have been skolemised by quantifyTyVars.
+       ; scoped_tvs  <- mapM zonkTcTyVarToTyVar scoped_tvs
+       ; tc_tvs      <- mapM zonkTcTyVarToTyVar tc_tvs
+       ; tc_res_kind <- zonkTcType tc_res_kind
 
-      | otherwise -- See Note [Required, Specified, and Inferred for types]
-      = do { let (scoped_tv_names, scoped_tvs) = unzip (tcTyConScopedTyVars tc)
-                    -- scoped_tvs includes the tc_tvs
-                    -- ToDo: Is this a good idea?
-                 tc_res_kind = tyConResKind tc
-           ; scoped_tvs <- mapM zonkTcTyCoVarBndr scoped_tvs
-           ; DV { dv_kvs = fkvs } <- candidateQTyVarsOfKinds $
-                                     (tc_res_kind : map tyVarKind scoped_tvs)
+       ; traceTc "Generalise kind pre" $
+         vcat [ text "tycon =" <+> ppr tc
+              , text "tc_tvs =" <+> pprTyVars tc_tvs
+              , text "scoped_tvs =" <+> pprTyVars scoped_tvs ]
 
-           ; let kvs_to_gen = mempty { dv_kvs = fkvs `delDVarSetList` scoped_tvs }
-           ; inferred <- quantifyTyVars emptyVarSet kvs_to_gen
+       -- Step 4: Find the Specified and Inferred variables
+       -- First, delete the Required tc_tvs from qtkvs; then
+       -- partition by whether they are scoped (if so, Specified)
+       ; let qtkv_set      = mkVarSet qtkvs
+             tc_tv_set     = mkVarSet tc_tvs
+             specified     = scopedSort $
+                             [ tv | tv <- scoped_tvs
+                                  , not (tv `elemVarSet` tc_tv_set)
+                                  , tv `elemVarSet` qtkv_set ]
+                             -- NB: maintain the L-R order of scoped_tvs
+             spec_req_set  = mkVarSet specified `unionVarSet` tc_tv_set
+             inferred      = filterOut (`elemVarSet` spec_req_set) qtkvs
 
-           -- Skolemise the specified and required type variables
-           ; scoped_tvs  <- mapM skolemiseQuantifiedTyVar scoped_tvs
-           ; tc_tvs      <- mapM zonkTcTyCoVarBndr (tyConTyVars tc)
+       -- Step 5: Make the TyConBinders.
+             dep_fv_set     = candidateKindVars dvs
+             inferred_tcbs  = mkNamedTyConBinders Inferred inferred
+             specified_tcbs = mkNamedTyConBinders Specified specified
+             required_tcbs  = map (mkRequiredTyConBinder dep_fv_set) tc_tvs
 
-           ; traceTc "Generalise kind pre" $
-             vcat [ text "tycon =" <+> ppr tc
-                  , text "tc_tvs =" <+> pprTyVars tc_tvs
-                  , text "scoped_tvs =" <+> pprTyVars scoped_tvs ]
+       -- Step 6: Assemble the final list.
+             final_tcbs = concat [ inferred_tcbs
+                                 , specified_tcbs
+                                 , required_tcbs ]
 
-           ; let
-             -- Step 5: Order the specified variables by ScopedSort
-             -- See Note [ScopedSort] in Type
-                 specified = scopedSort $
-                             filterOut (`elem` tc_tvs) scoped_tvs
+             scoped_tv_pairs = scoped_tv_names `zip` scoped_tvs
 
-           ; (ze, inferred)  <- zonkTyBndrs inferred
-           ; (ze, specified) <- zonkTyBndrsX ze specified
-           ; (ze, tc_tvs)    <- zonkTyBndrsX ze tc_tvs
-           ; tc_res_kind     <- zonkTcTypeToTypeX ze (tyConResKind tc)
+       -- Step 7: Make the result TcTyCon
+             tycon = mkTcTyCon tc_name user_tyvars final_tcbs tc_res_kind
+                            scoped_tv_pairs
+                            True {- it's generalised now -}
+                            (tyConFlavour tc)
 
-           ; MASSERT( all ((== Required) . tyConBinderArgFlag) (tyConBinders tc) )
+       ; traceTc "Generalise kind" $
+         vcat [ text "tycon =" <+> ppr tc
+              , text "tc_tvs =" <+> pprTyVars tc_tvs
+              , text "tc_res_kind =" <+> ppr tc_res_kind
+              , text "scoped_tvs =" <+> pprTyVars scoped_tvs
+              , text "inferred =" <+> pprTyVars inferred
+              , text "specified =" <+> pprTyVars specified
+              , text "required_tcbs =" <+> ppr required_tcbs
+              , text "final_tcbs =" <+> ppr final_tcbs ]
 
-             -- Step 7: Make the TyConBinders.
-           ; let all_fv_set     = dVarSetToVarSet fkvs
-                 inferred_tcbs  = mkNamedTyConBinders Inferred inferred
-                 specified_tcbs = mkNamedTyConBinders Specified specified
-                 required_tcbs  = map (mkRequiredTyConBinder all_fv_set) tc_tvs
+       -- Step 8: check for floating kind vars
+       -- See Note [Free-floating kind vars]
+       -- They are easily identified by the fact that they
+       -- have not been skolemised by quantifyTyVars
+       ; let floating_specified = filter isTyVarTyVar scoped_tvs
+       ; reportFloatingKvs tc_name tc_flav
+                           scoped_tvs floating_specified
 
-             -- Step 8: Assemble the final list.
-                 final_tcbs = concat [ inferred_tcbs
-                                     , specified_tcbs
-                                     , required_tcbs ]
+       -- Step 9: Check for duplicates
+       -- E.g. data SameKind (a::k) (b::k)
+       --      data T (a::k1) (b::k2) = MkT (SameKind a b)
+       -- Here k1 and k2 start as TyVarTvs, and get unified with each other
+       ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_tv_pairs)
 
-                 scoped_tv_pairs = scoped_tv_names `zip`
-                                   [ expectJust "generaliseTyCon" $
-                                     TcHsSyn.lookupTyVarOcc ze tv
-                                   | tv <- scoped_tvs ]
- 
-           ; traceTc "Generalise kind" $
-             vcat [ text "tycon =" <+> ppr tc
-                  , text "tc_tvs =" <+> pprTyVars tc_tvs
-                  , text "tc_res_kind =" <+> ppr tc_res_kind
-                  , text "scoped_tvs =" <+> pprTyVars scoped_tvs
-                  , text "inferred =" <+> pprTyVars inferred
-                  , text "specified =" <+> pprTyVars specified
-                  , text "required_tcbs =" <+> ppr required_tcbs
-                  , text "final_tcbs =" <+> ppr final_tcbs ]
+       -- Step 10: Check for validity.
+       -- We do this here because we're about to put the tycon into
+       -- the environment, and we don't want anything malformed in the
+       -- environment.
+       ; checkValidTelescope tycon
 
-           -- Check for floating kind vars
-           ; let still_sig_tvs = filter isTyVarTyVar specified
-           ; reportFloatingKvs (tyConName tc) (tyConFlavour tc)
-                               scoped_tvs still_sig_tvs
-
-             -- Step 9: Check for validity. We do this here because we're about to
-             -- put the tycon into the environment, and we don't want anything malformed
-             -- in the environment.
-           ; let user_tyvars = tcTyConUserTyVars tc
-           ; setSrcSpan (getSrcSpan tc) $
-             addTyConCtxt tc $
-             checkValidTelescope final_tcbs user_tyvars
-
-             -- Step 10: Make the result TcTyCon
-           ; let name = tyConName tc
-           ; return $ mkTcTyCon name user_tyvars final_tcbs tc_res_kind
-                                scoped_tv_pairs
-                                True {- it's generalised now -}
-                                (tyConFlavour tc) }
-
+       ; return tycon }
+  where
+    report_sig_tv_err (n1, n2)
+      = setSrcSpan (getSrcSpan n2) $
+        addErrTc (text "Couldn't match" <+> quotes (ppr n1)
+                        <+> text "with" <+> quotes (ppr n2))
 
 {- Note [Required, Specified, and Inferred for types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -967,8 +963,8 @@ kcConDecl (ConDeclGADT { con_names = names
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
     discardResult $
-    kcImplicitTKBndrsSkol implicit_tkv_nms $
-    kcExplicitTKBndrs     explicit_tkv_nms $
+    kcImplicitTKBndrs implicit_tkv_nms $
+    kcExplicitTKBndrs explicit_tkv_nms $
     do { _ <- tcHsMbContext cxt
        ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty

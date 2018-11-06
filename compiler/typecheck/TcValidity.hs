@@ -39,6 +39,8 @@ import Class
 import TyCon
 
 -- others:
+import IfaceType( pprIfaceType )
+import ToIface( toIfaceType )
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
@@ -2092,16 +2094,17 @@ check works for `forall x y z.` written in a type.
 --     data type declarations
 -- and Note [Keeping scoped variables in order: Explicit] in TcHsType
 --     for foralls
-checkValidTelescope :: [TyConBinder]   -- explicit vars (zonked)
-                    -> SDoc            -- original, user-written telescope
-                    -> TcM ()
-checkValidTelescope tvbs user_tyvars
+checkValidTelescope :: TyCon -> TcM ()
+checkValidTelescope tc
   = unless (null bad_tvbs) $ addErr $
-    vcat [ hang (text "These kind and type variables:" <+> user_tyvars $$
-                 text "are out of dependency order. Perhaps try this ordering:")
-              2 (pprTyVars sorted_tidied_tvs)
-         , extra ]
+    hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
+       2 (vcat [ text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc)
+               , hang (text "Perhaps try this order instead:")
+                    2 (pprTyVars sorted_tidied_tvs)
+               , extra ])
   where
+    ppr_untidy ty = pprIfaceType (toIfaceType ty)
+    tvbs = tyConBinders tc
     tvs = binderVars tvbs
     (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (scopedSort tvs)
 

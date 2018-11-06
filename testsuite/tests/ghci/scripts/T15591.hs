@@ -7,6 +7,10 @@ module Foo where
 import Data.Kind
 import Data.Proxy
 
+class C2 (a :: Type) (b :: Proxy a) (c :: Proxy b) where
+  type T3 (x :: Proxy '(a, c))
+
+{-
 type family T1 (x :: f (a :: Type))
 
 class C (a :: Type) where
@@ -24,3 +28,4 @@ class C4 (a :: Type) b where
 
 class C5 a where
   type T6 (x :: f a)
+-}

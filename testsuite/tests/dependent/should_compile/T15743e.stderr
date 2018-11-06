@@ -19,7 +19,7 @@ TYPE CONSTRUCTORS
     -> forall (k5 :: k1).
        Proxy k5 -> forall k6 (k8 :: k6). Proxy k8 -> *
 DATA CONSTRUCTORS
-  MkT2 :: forall {k1} {k2 :: k1} {k7} {k3} {k4 :: k3} {k5} {k6 :: k5}
+  MkT2 :: forall {k7} {k1} {k2 :: k1} {k3} {k4 :: k3} {k5} {k6 :: k5}
                  (f :: k7 -> *) (c :: k7) k8 (a :: k8) (b :: Proxy k2)
                  (d :: Proxy k4) (e :: Proxy k6).
           f c -> T2 k8 a b f c d e

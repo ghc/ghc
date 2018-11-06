@@ -107,7 +107,7 @@ import PrelNames hiding ( wildCardName )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
-import Data.List ( find, partition )
+import Data.List ( find )
 import Control.Monad
 
 {-
@@ -1573,36 +1573,44 @@ kcLHsQTyVars name flav cusk
 
        ; all_kinds <- zonkTcTypes (res_kind : map tyVarKind spec_req_tkvs)
 
-       ; let mentioned_kvs = tyCoVarsOfTypesDSet all_kinds
-             kvs_to_gen = mentioned_kvs `delDVarSetList` spec_req_tkvs
-             candidates = DV { dv_kvs = kvs_to_gen
-                             , dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
+       ; candidates <- candidateQTyVarsOfKinds all_kinds
              -- 'candidates' are all the variables that we are going to
-             -- skolemise and then quantify over.  We exclude spec_req_tvs
-             -- because all of them are /already/ skolems
+             -- skolemise and then quantify over.  We do not include spec_req_tvs
+             -- because they are /already/ skolems
+
+       ; let inf_candidates = candidates `delCandidates` spec_req_tkvs
 
        ; inferred <- setTcLevel topTcLevel $
                      -- setTcLevel: We are in a CUSK, so we should generalise
                      -- exactly as if we were at top level.  (We are actually
                      -- at Level 1 in getInitialKinds.)
-                     quantifyTyVars emptyVarSet candidates
-          -- NB: qtkvs comes back sorted in dependency order
+                     quantifyTyVars emptyVarSet inf_candidates
+                     -- NB: qtkvs comes back sorted in dependency order
 
-       ; scoped_kvs <- mapM zonkTcTyCoVarBndr scoped_kvs
-       ; tc_tvs     <- mapM zonkTyCoVarKind   tc_tvs
-       ; res_kind   <- zonkTcType             res_kind
+       ; scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs
+       ; tc_tvs     <- mapM zonkTyCoVarKind tc_tvs
+       ; res_kind   <- zonkTcType           res_kind
 
-       ; let mentioned_kv_set = dVarSetToVarSet mentioned_kvs
-             specified        = scopedSort scoped_kvs
+       ; let mentioned_kv_set = candidateKindVars candidates
+             tc_tv_set        = mkVarSet tc_tvs
+             specified        = scopedSort $
+                                filterOut (`elemVarSet` tc_tv_set) scoped_kvs
+                                -- NB: maintain the L-R order of scoped_kvs
 
              final_tc_binders =  mkNamedTyConBinders Inferred  inferred
                               ++ mkNamedTyConBinders Specified specified
                               ++ map (mkRequiredTyConBinder mentioned_kv_set) tc_tvs
 
+             all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+             tycon = mkTcTyCon name (ppr user_tyvars)
+                               final_tc_binders
+                               res_kind
+                               all_tv_prs
+                               True {- it is generalised -} flav
          -- If the ordering from
          -- Note [Required, Specified, and Inferred for types] in TcTyClsDecls
          -- doesn't work, we catch it here, before an error cascade
-       ; checkValidTelescope final_tc_binders (ppr user_tyvars)
+       ; checkValidTelescope tycon
 
           -- If any of the specified tyvars aren't actually mentioned in a binder's
           -- kind (or the return kind), then we're in the CUSK case from
@@ -1610,12 +1618,6 @@ kcLHsQTyVars name flav cusk
        ; let unmentioned_kvs   = filterOut (`elemVarSet` mentioned_kv_set) specified
        ; reportFloatingKvs name flav (map binderVar final_tc_binders) unmentioned_kvs
 
-       ; let all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
-             tycon = mkTcTyCon name (ppr user_tyvars)
-                               final_tc_binders
-                               res_kind
-                               all_tv_prs
-                               True {- it is generalised -} flav
 
        ; traceTc "kcLHsQTyVars: cusk" $
          vcat [ text "name" <+> ppr name
@@ -1656,6 +1658,7 @@ kcLHsQTyVars name flav cusk
 
        ; traceTc "kcLHsQTyVars: not-cusk" $
          vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
+              , ppr scoped_kvs
               , ppr tc_tvs, ppr (mkTyConKind tc_binders res_kind) ]
        ; return tycon }
   where
@@ -1807,7 +1810,8 @@ kcImplicitTKBndrsSkol = kcImplicitTKBndrsX newFlexiKindedQTyVar
 kcImplicitTKBndrs     = kcImplicitTKBndrsX newFlexiKindedTyVarTyVar
 
 -- | Bring implicitly quantified type/kind variables into scope during
--- kind checking. Uses TyVarTvs, as per
+-- kind checking. The returned TcTyVars are in 1-1 correspondence
+--- with the names passed in.
 -- Note [Use TyVarTvs in kind-checking pass] in TcTyClsDecls.
 kcImplicitTKBndrsX :: (Name -> TcM TcTyVar) -- new_tv function
                    -> [Name]              -- of the vars
@@ -1815,14 +1819,16 @@ kcImplicitTKBndrsX :: (Name -> TcM TcTyVar) -- new_tv function
                    -> TcM ([TcTyVar], a)  -- returns the tyvars created
                                           -- these are *not* dependency ordered
 kcImplicitTKBndrsX new_tv var_ns thing_inside
-  = do { traceTc "kcImplicitTKBndrsX" (ppr var_ns)
-       ; env <- getLclEnv
-       ; let (in_scope, not_in_scope) = partition (`elemNameEnv` tcl_env env) var_ns
-       ; WARN( not (null in_scope), ppr in_scope ) return ()
-       ; tkvs <- mapM new_tv not_in_scope
+  = do { env <- getLclTypeEnv
+       ; tkvs <- mapM (kc_one env) var_ns
+       ; traceTc "kcImplicitTKBndrsX" (ppr var_ns $$ pprTyVars tkvs)
        ; result <- tcExtendTyVarEnv tkvs thing_inside
        ; return (tkvs, result) }
-
+  where
+    kc_one type_env name
+      = case lookupNameEnv type_env name of
+          Just (ATyVar _ tv) -> return tv
+          _                  -> new_tv name
 
 tcImplicitTKBndrs, tcImplicitTKBndrsSig, tcImplicitQTKBndrs
   :: SkolemInfo
@@ -2033,10 +2039,7 @@ kindGeneralize :: TcType -> TcM [KindVar]
 kindGeneralize kind_or_type
   = do { kt <- zonkTcType kind_or_type
        ; traceTc "kindGeneralise1" (ppr kt)
-       ; kvs <- zonkTcTypeAndFV kind_or_type
-       ; let dvs = DV { dv_kvs = kvs
-                      , dv_tvs = emptyDVarSet, dv_cvs = emptyVarSet }
-
+       ; dvs <- candidateQTyVarsOfKind kind_or_type
        ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
        ; traceTc "kindGeneralize" (vcat [ ppr kind_or_type
                                         , ppr dvs ])
@@ -2115,83 +2118,6 @@ look through unification variables!
 
 Hence using zonked_kinds when forming tvs'.
 
-Note [Free-floating kind vars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-
-  data T = MkT (forall (a :: k). Proxy a)
-  -- from test ghci/scripts/T7873
-
-This is not an existential datatype, but a higher-rank one (the forall
-to the right of MkT). Also consider
-
-  data S a = MkS (Proxy (a :: k))
-
-According to the rules around implicitly-bound kind variables, in both
-cases those k's scope over the whole declaration. The renamer grabs
-it and adds it to the hsq_implicits field of the HsQTyVars of the
-tycon. So it must be in scope during type-checking, but we want to
-reject T while accepting S.
-
-Why reject T? Because the kind variable isn't fixed by anything. For
-a variable like k to be implicit, it needs to be mentioned in the kind
-of a tycon tyvar. But it isn't.
-
-Why accept S? Because kind inference tells us that a has kind k, so it's
-all OK.
-
-Our approach depends on whether or not the datatype has a CUSK.
-
-Non-CUSK: In the first pass (kcTyClTyVars) we just bring
-k into scope. In the second pass (tcTyClTyVars),
-we check to make sure that k has been unified with some other variable
-(or generalized over, making k into a skolem). If it hasn't been, then
-it must be a free-floating kind var. Error.
-
-CUSK: When we determine the tycon's final, never-to-be-changed kind
-in kcLHsQTyVars, we check to make sure all implicitly-bound kind
-vars are indeed mentioned in a kind somewhere. If not, error.
-
-We also perform free-floating kind var analysis for type family instances
-(see #13985). Here is an interesting example:
-
-    type family   T :: k
-    type instance T = (Nothing :: Maybe a)
-
-Upon a cursory glance, it may appear that the kind variable `a` is
-free-floating above, since there are no (visible) LHS patterns in `T`. However,
-there is an *invisible* pattern due to the return kind, so inside of GHC, the
-instance looks closer to this:
-
-    type family T @k :: k
-    type instance T @(Maybe a) = (Nothing :: Maybe a)
-
-Here, we can see that `a` really is bound by a LHS type pattern, so `a` is in
-fact not free-floating. Contrast that with this example:
-
-    type instance T = Proxy (Nothing :: Maybe a)
-
-This would looks like this inside of GHC:
-
-    type instance T @(*) = Proxy (Nothing :: Maybe a)
-
-So this time, `a` is neither bound by a visible nor invisible type pattern on
-the LHS, so it would be reported as free-floating.
-
-Finally, here's one more brain-teaser (from #9574). In the example below:
-
-    class Funct f where
-      type Codomain f :: *
-    instance Funct ('KProxy :: KProxy o) where
-      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
-
-As it turns out, `o` is not free-floating in this example. That is because `o`
-bound by the kind signature of the LHS type pattern 'KProxy. To make this more
-obvious, one can also write the instance like so:
-
-    instance Funct ('KProxy :: KProxy o) where
-      type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> *)
-
 -}
 
 --------------------
@@ -2236,62 +2162,14 @@ tcTyClTyVars :: Name
 -- kind of the tycon is available in the local env.
 tcTyClTyVars tycon_name thing_inside
   = do { tycon <- kcLookupTcTyCon tycon_name
+       ; let scoped_prs = tcTyConScopedTyVars tycon
+             res_kind   = tyConResKind tycon
+             binders    = tyConBinders tycon
 
-       -- Do checks on scoped tyvars
-       -- See Note [Free-floating kind vars]
-       ; let flav = tyConFlavour tycon
-             scoped_prs = tcTyConScopedTyVars tycon
-             scoped_tvs = map snd scoped_prs
-
-       ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_prs)
-
-       ; traceTc "tyClTyVars" (vcat [ ppr tycon, ppr (tyConBinders tycon)
-                                    , pprTyVars scoped_tvs ])
-       ; let res_kind = tyConResKind tycon
-             binders  = tyConBinders tycon
---             binders    = correct_binders (tyConBinders tycon) res_kind
        ; traceTc "tcTyClTyVars" (ppr tycon_name <+> ppr binders)
        ; pushTcLevelM_                   $
          tcExtendNameTyVarEnv scoped_prs $
          thing_inside binders res_kind }
-  where
-    report_sig_tv_err (n1, n2)
-      = setSrcSpan (getSrcSpan n2) $
-        addErrTc (text "Couldn't match" <+> quotes (ppr n1)
-                        <+> text "with" <+> quotes (ppr n2))
-
-{-
-    -- Given some TyConBinders and a TyCon's result kind, make sure that the
-    -- correct any wrong Named/Anon choices. For example, consider
-    --   type Syn k = forall (a :: k). Proxy a
-    -- At first, it looks like k should be named -- after all, it appears on the RHS.
-    -- However, the correct kind for Syn is (* -> *).
-    -- (Why? Because k is the kind of a type, so k's kind is *. And the RHS also has
-    -- kind *.) See also #13963.
-    correct_binders :: [TyConBinder] -> Kind -> [TyConBinder]
-    correct_binders binders kind
-      = binders'
-      where
-        (_, binders') = mapAccumR go (tyCoVarsOfType kind) binders
-
-        go :: TyCoVarSet -> TyConBinder -> (TyCoVarSet, TyConBinder)
-        go fvs binder
-          | isNamedTyConBinder binder
-          , not (tv `elemVarSet` fvs)
-          = (new_fvs, mkAnonTyConBinder tv)
-
-          | not (isNamedTyConBinder binder)
-          , tv `elemVarSet` fvs
-          = (new_fvs, mkNamedTyConBinder Required tv)
-             -- always Required, because it was anonymous (i.e. visible) previously
-
-          | otherwise
-          = (new_fvs, binder)
-
-          where
-            tv      = binderVar binder
-            new_fvs = fvs `delVarSet` tv `unionVarSet` tyCoVarsOfType (tyVarKind tv)
--}
 
 -----------------------------------
 tcDataKindSig :: [TyConBinder]
@@ -2855,13 +2733,83 @@ badPatTyVarTvs sig_ty bad_tvs
 ************************************************************************
 -}
 
--- | Make an appropriate message for an error in a function argument.
--- Used for both expressions and types.
-funAppCtxt :: (Outputable fun, Outputable arg) => fun -> arg -> Int -> SDoc
-funAppCtxt fun arg arg_no
-  = hang (hsep [ text "In the", speakNth arg_no, ptext (sLit "argument of"),
-                    quotes (ppr fun) <> text ", namely"])
-       2 (quotes (ppr arg))
+
+{- Note [Free-floating kind vars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data S a = MkS (Proxy (a :: k))
+
+According to the rules around implicitly-bound kind variables,
+that k scopes over the whole declaration. The renamer grabs
+it and adds it to the hsq_implicits field of the HsQTyVars of the
+tycon.  So we get
+   S :: forall {k}. k -> Type
+
+That's fine.  But consider this variant:
+  data T = MkT (forall (a :: k). Proxy a)
+  -- from test ghci/scripts/T7873
+
+This is not an existential datatype, but a higher-rank one (the forall
+to the right of MkT). Again, 'k' scopes over the whole declaration,
+but we do not want to get
+   T :: forall {k}. Type
+Why not? Because the kind variable isn't fixed by anything. For
+a variable like k to be implicit, it needs to be mentioned in the kind
+of a tycon tyvar. But it isn't.
+
+Rejecting T depends on whether or not the datatype has a CUSK.
+
+Non-CUSK (handled in TcTyClsDecls.kcTyClGroup (generalise)):
+   When generalising the TyCon we check that every Specified 'k'
+   appears free in the kind of the TyCon; that is, in the kind of
+   one of its Required arguments, or the result kind.
+
+CUSK (handled in TcHsType.kcLHsQTyVars, the CUSK case):
+   When we determine the tycon's final, never-to-be-changed kind
+   in kcLHsQTyVars, we check to make sure all implicitly-bound kind
+   vars are indeed mentioned in a kind somewhere. If not, error.
+
+We also perform free-floating kind var analysis for type family instances
+(see #13985). Here is an interesting example:
+
+    type family   T :: k
+    type instance T = (Nothing :: Maybe a)
+
+Upon a cursory glance, it may appear that the kind variable `a` is
+free-floating above, since there are no (visible) LHS patterns in `T`. However,
+there is an *invisible* pattern due to the return kind, so inside of GHC, the
+instance looks closer to this:
+
+    type family T @k :: k
+    type instance T @(Maybe a) = (Nothing :: Maybe a)
+
+Here, we can see that `a` really is bound by a LHS type pattern, so `a` is in
+fact not free-floating. Contrast that with this example:
+
+    type instance T = Proxy (Nothing :: Maybe a)
+
+This would looks like this inside of GHC:
+
+    type instance T @(*) = Proxy (Nothing :: Maybe a)
+
+So this time, `a` is neither bound by a visible nor invisible type pattern on
+the LHS, so it would be reported as free-floating.
+
+Finally, here's one more brain-teaser (from #9574). In the example below:
+
+    class Funct f where
+      type Codomain f :: *
+    instance Funct ('KProxy :: KProxy o) where
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+
+As it turns out, `o` is not free-floating in this example. That is because `o`
+bound by the kind signature of the LHS type pattern 'KProxy. To make this more
+obvious, one can also write the instance like so:
+
+    instance Funct ('KProxy :: KProxy o) where
+      type Codomain ('KProxy :: KProxy o) = NatTr (Proxy :: o -> *)
+-}
 
 -- See Note [Free-floating kind vars]
 reportFloatingKvs :: Name         -- of the tycon
@@ -2904,6 +2852,14 @@ failIfEmitsConstraints thing_inside
        ; reportAllUnsolved lie
        ; return res
        }
+
+-- | Make an appropriate message for an error in a function argument.
+-- Used for both expressions and types.
+funAppCtxt :: (Outputable fun, Outputable arg) => fun -> arg -> Int -> SDoc
+funAppCtxt fun arg arg_no
+  = hang (hsep [ text "In the", speakNth arg_no, ptext (sLit "argument of"),
+                    quotes (ppr fun) <> text ", namely"])
+       2 (quotes (ppr arg))
 
 -- | Add a "In the data declaration for T" or some such.
 addTyConFlavCtxt :: Name -> TyConFlavour -> TcM a -> TcM a
