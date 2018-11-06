@@ -1697,6 +1697,14 @@ tyCoVarsOfType ty = ty_co_vars_of_type ty emptyVarSet emptyVarSet
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
 
+ty_co_vars_of_rig :: Rig -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
+ty_co_vars_of_rig Zero         is acc = acc
+ty_co_vars_of_rig One          is acc = acc
+ty_co_vars_of_rig Omega        is acc = acc
+ty_co_vars_of_rig (RigAdd x y) is acc = ty_co_vars_of_rig x is (ty_co_vars_of_rig y is acc)
+ty_co_vars_of_rig (RigMul x y) is acc = ty_co_vars_of_rig x is (ty_co_vars_of_rig y is acc)
+ty_co_vars_of_rig (RigThing x) is acc = ty_co_vars_of_type x is acc
+
 ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_type (TyVarTy v) is acc
   | v `elemVarSet` is  = acc
@@ -1705,7 +1713,7 @@ ty_co_vars_of_type (TyVarTy v) is acc
 ty_co_vars_of_type (TyConApp _ tys)   is acc = ty_co_vars_of_types tys is acc
 ty_co_vars_of_type (LitTy {})         _  acc = acc
 ty_co_vars_of_type (AppTy fun arg)    is acc = ty_co_vars_of_type fun is (ty_co_vars_of_type arg is acc)
-ty_co_vars_of_type (FunTy arg res)    is acc = ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc)
+ty_co_vars_of_type (FunTy w arg res)  is acc = ty_co_vars_of_rig w is (ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc))
 ty_co_vars_of_type (ForAllTy (Bndr tv _) ty) is acc = ty_co_vars_of_type (varType tv) is $
                                                       ty_co_vars_of_type ty (extendVarSet is tv) acc
 ty_co_vars_of_type (CastTy ty co)     is acc = ty_co_vars_of_type ty is (ty_co_vars_of_co co is acc)
@@ -1732,8 +1740,9 @@ ty_co_vars_of_co (AppCo co arg)       is acc = ty_co_vars_of_co co is $
                                                ty_co_vars_of_co arg is acc
 ty_co_vars_of_co (ForAllCo tv kind_co co) is acc = ty_co_vars_of_co kind_co is $
                                                    ty_co_vars_of_co co (extendVarSet is tv) acc
-ty_co_vars_of_co (FunCo _ co1 co2)    is acc = ty_co_vars_of_co co1 is $
-                                               ty_co_vars_of_co co2 is acc
+ty_co_vars_of_co (FunCo _ w co1 co2)    is acc = ty_co_vars_of_co w is $
+                                                 ty_co_vars_of_co co1 is $
+                                                 ty_co_vars_of_co co2 is acc
 ty_co_vars_of_co (CoVarCo v)          is acc = ty_co_vars_of_co_var v is acc
 ty_co_vars_of_co (HoleCo h)           is acc = ty_co_vars_of_co_var (coHoleCoVar h) is acc
     -- See Note [CoercionHoles and coercion free variables]
@@ -2635,7 +2644,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 
 -- | This checks if the substitution satisfies the invariant from
 -- Note [The substitution invariant].
-checkValidSubst :: (HasCallStack,Traversable t) => TCvSubst -> t Type -> [Coercion] -> a -> a
+checkValidSubst :: (HasCallStack) => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
 -- TODO (RAE): Change back to ASSERT
   = WARN( not (isValidTCvSubst subst),
@@ -2701,7 +2710,7 @@ substTyUnchecked subst ty
 substTys :: (HasCallStack, Traversable t) => TCvSubst -> t Type -> t Type
 substTys subst tys
   | isEmptyTCvSubst subst = tys
-  | otherwise = checkValidSubst subst tys [] $ fmap (subst_ty subst) tys
+  | otherwise = checkValidSubst subst (toList tys) [] $ fmap (subst_ty subst) tys
 
 -- | Substitute within several 'Type's disabling the sanity checks.
 -- The problems that the sanity checks in substTys catch are described in
