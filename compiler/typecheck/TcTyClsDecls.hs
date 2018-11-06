@@ -400,8 +400,7 @@ like this:
   data T a k = MkT (Proxy (a :: k))
 
 Clearly, the k has to come first. Checking for this problem must come before
-kind generalisation, as described in Note [Bad telescopes] in
-TcValidity.
+kind generalisation, as described in Note [Generalisation for type constructors]
 
 However, we have to check again *after* kind generalisation, to catch something
 like this:
@@ -557,13 +556,16 @@ kcTyClGroup decls
            ; tc_res_kind <- zonkTcType (tyConResKind tc)
            ; let scoped_tvs  = tcTyConScopedTyVars tc
                  user_tyvars = tcTyConUserTyVars tc
+                 tc_tyvars   = binderVars tc_binders
 
               -- See Note [checkValidDependency]
            ; checkValidDependency tc_binders tc_res_kind
 
-               -- See Note [Bad telescopes] in TcValidity
-           ; checkValidTelescope tc_binders user_tyvars empty
-           ; kvs <- kindGeneralize (mkTyConKind tc_binders tc_res_kind)
+           -- See Note [Generalisation for type constructors]
+           ; let kvs_to_gen = tyCoVarsOfTypesDSet (tc_res_kind : map tyVarKind tc_tyvars)
+                              `delDVarSetList` tc_tyvars
+                 dvs = DV { dv_kvs = kvs_to_gen, dv_tvs = emptyDVarSet }
+           ; kvs <- quantifyTyVars emptyVarSet dvs
 
            -- See Note [Work out final tyConBinders]
            ; scoped_tvs' <- zonkTyVarTyVarPairs scoped_tvs
@@ -578,8 +580,7 @@ kcTyClGroup decls
            ; tc_res_kind'        <- zonkTcTypeToTypeX env tc_res_kind
 
              -- See Note [Check telescope again during generalisation]
-           ; let extra = text "NB: Implicitly declared variables come before others."
-           ; checkValidTelescope all_binders user_tyvars extra
+           ; checkValidTelescope all_binders user_tyvars
 
                       -- Make sure tc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" $
@@ -592,6 +593,49 @@ kcTyClGroup decls
                                scoped_tvs'
                                (tyConFlavour tc)) }
 
+{- Note [Generalisation for type constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider test T14066g:
+  data SameKind :: k -> k -> Type
+
+We find that the Specified variable has kind (c :: a). We always
+put Specified variables before Required ones, so we should reject.
+
+
+Now that we can mix type and kind variables, there are an awful lot of
+ways to shoot yourself in the foot. Here are some.
+
+data SameKind :: k -> k -> *   -- just to force unification
+
+1.  data T1 a k (b :: k) (x :: SameKind a b)
+
+    The problem here is that we discover that a and b should have the same
+    kind. But this kind mentions k, which is bound *after* a.
+    (Testcase: dependent/should_fail/BadTelescope)
+
+2.  data Q a (b :: a) (d :: SameKind c b)
+
+    Note that c is not bound; it is Specified, not Required.  Yet its
+    kind mentions a. Because we have a nice rule that all Specified
+    variables come before Required ones this is bogus. (We could
+    probably figure out to put c between a and b.  But I think this is
+    doing users a disservice, in the long run.)  (Testcase:
+    dependent/should_fail/BadTelescope4)
+
+    So, when finding the free vars to generalise, we should look at the
+    kinds of all Q's binders, plus its result kind, and delete Q's
+    binders, leaving just {c}.  We should NOT try to short-cut by taking
+    the free vars of the half-baked kind
+      (forall a. a -> SameKind c b -> *)
+    because since 'c' is free we also think 'a' (another 'a'!) is
+    free in that kind.
+
+To catch these dependency errors, we call checkValidTelescope during
+kind-checking datatype declarations.
+
+See Note [Keeping scoped variables in order: Explicit] for how this
+check works for `forall x y z.` written in a type.
+-}
 
 {- Note [Work out final tyConBinders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
