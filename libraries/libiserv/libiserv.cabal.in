@@ -1,5 +1,5 @@
 Name: libiserv
-Version: 8.6.1
+Version: @ProjectVersionMunged@
 Copyright: XXX
 License: BSD3
 License-File: LICENSE
