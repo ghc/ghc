@@ -711,7 +711,7 @@ See also Note [Required, Specified, and Inferred for types] in TcTyClsDecls
   Visible Type Applications paper (ESOP'16).
 
 Note [No Required TyCoBinder in terms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't allow Required foralls for term variables, including pattern
 synonyms and data constructors.  Why?  Because then an application
 would need a /compulsory/ type argument (possibly without an "@"?),
@@ -719,6 +719,9 @@ thus (f Int); and we don't have concrete syntax for that.
 
 We could change this decision, but Required, Named TyCoBinders are rare
 anyway.  (Most are Anons.)
+
+However the type of a term can (just about) have a required quantifier;
+see Note [Required quantifiers in the type of a term] in TcExpr.
 -}
 
 
