@@ -8904,6 +8904,78 @@ This rule has occasionally-surprising consequences (see
 The kind-polymorphism from the class declaration makes ``D1``
 kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
 
+.. _inferring-variable-order:
+
+Inferring the order of variables in a type/class declaration
+------------------------------------------------------------
+
+It is possible to get intricate dependencies among the type variables
+introduced in a type or class declaration. Here is an example::
+
+  data T a (b :: k) c = MkT (a c)
+
+After analysing this declaration, GHC will discover that ``a`` and
+``c`` can be kind-polymorphic, with ``a :: k2 -> Type`` and
+``c :: k2``. We thus infer the following kind::
+
+  T :: forall {k2 :: Type} (k :: Type). (k2 -> Type) -> k -> k2 -> Type
+
+Note that ``k2`` is placed *before* ``k``, and that ``k`` is placed *before*
+``a``. Also, note that ``k2`` is written here in braces. As explained with
+:extension:`TypeApplications` (:ref:`inferred-vs-specified`),
+type and kind variables that GHC generalises
+over, but not written in the original program, are not available for visible
+type application. (These are called *inferred* variables.)
+Such variables are written in braces with
+:ghc-flag:`-fprint-explicit-foralls` enabled.
+
+The general principle is this:
+
+  * Variables not available for type application come first.
+    
+  * Then come variables the user has written, implicitly brought into scope
+    in a type variable's kind.
+
+  * Lastly come the normal type variables of a declaration.
+
+  * Variables not given an explicit ordering by the user are sorted according
+    to ScopedSort (:ref:`ScopedSort`).
+
+With the ``T`` example above, we could bind ``k`` *after* ``a``; doing so
+would not violate dependency concerns. However, it would violate our general
+principle, and so ``k`` comes first.
+    
+Sometimes, this ordering does not respect dependency. For example::
+
+  data T2 k (a :: k) (c :: Proxy '[a, b])
+
+It must be that ``a`` and ``b`` have the same kind. Note also that ``b``
+is implicitly declared in ``c``\'s kind. Thus, according to our general
+principle, ``b`` must come *before* ``k``. However, ``b`` *depends on*
+``k``. We thus reject ``T2`` with a suitable error message.
+
+In keeping with the way that class methods list their class variables
+first, associated types also list class variables before others. This
+means that the inferred variables from the class come before the
+specified variables from the class, which come before other implicitly
+bound variables. Here is an example::
+
+  class C (a :: k) b where
+    type F (c :: j) (d :: Proxy m) a b
+
+We infer these kinds::
+
+  C :: forall {k2 :: Type} (k :: Type). k -> k2 -> Constraint
+  F :: forall {k2 :: Type} (k :: Type)
+              {k3 :: Type} (j :: Type) (m :: k3).
+	      j -> Proxy m -> k -> k2 -> Type
+
+The "general principle" described here is meant to make all this more
+predictable for users. It would not be hard to extend GHC to relax
+this principle. If you should want a change here, consider writing
+a `proposal <https://github.com/ghc-proposals/ghc-proposals/>`_ to
+do so.
+
 .. index::
    single: CUSK
    single: complete user-supplied kind signature
@@ -10654,14 +10726,108 @@ is an identifier (the common case), its type is considered known only when
 the identifier has been given a type signature. If the identifier does
 not have a type signature, visible type application cannot be used.
 
-Here are the details:
+.. _inferred-vs-specified:
 
-- If an identifier's type signature does not include an
-  explicit ``forall``, the type variable arguments appear
-  in the left-to-right order in which the variables appear in the type.
-  So, ``foo :: Monad m => a b -> m (a c)``
-  will have its type variables
-  ordered as ``m, a, b, c``.
+Inferred vs. specified type variables
+-------------------------------------
+
+.. index::
+   single: type variable; inferred vs. specified
+
+GHC tracks a distinction between what we call *inferred* and *specified*
+type variables. Only specified type variables are available for instantiation
+with visible type application. An example illustrates this well::
+
+  f :: (Eq b, Eq a) => a -> b -> Bool
+  f x y = (x == x) && (y == y)
+
+  g x y = (x == x) && (y == y)
+
+The functions ``f`` and ``g`` have the same body, but only ``f`` is given
+a type signature. When GHC is figuring out how to process a visible type application,
+it must know what variable to instantiate. It thus must be able to provide
+an ordering to the type variables in a function's type.
+
+If the user has supplied a type signature, as in ``f``, then this is easy:
+we just take the ordering from the type signature, going left to right and
+using the first occurrence of a variable to choose its position within the
+ordering. Thus, the variables in ``f`` will be ``b``, then ``a``.
+
+In contrast, there is no reliable way to do this for ``g``; we will not know
+whether ``Eq a`` or ``Eq b`` will be listed first in the constraint in ``g``\'s
+type. In order to have visible type application be robust between releases of
+GHC, we thus forbid its use with ``g``.
+
+We say that the type variables in ``f`` are *specified*, while those in
+``g`` are *inferred*. The general rule is this: if the user has written
+a type variable in the source program, it is *specified*; if not, it is
+*inferred*.
+
+Thus rule applies in datatype declarations, too. For example, if we have
+``data Proxy a = Proxy`` (and :extension:`PolyKinds` is enabled), then
+``a`` will be assigned kind ``k``, where ``k`` is a fresh kind variable.
+Because ``k`` was not written by the user, it will be unavailable for
+type application in the type of the constructor ``Proxy``; only the ``a``
+will be available.
+
+When :ghc-flag:`-fprint-explicit-foralls` is enabled, inferred variables
+are printed in braces. Thus, the type of the data constructor ``Proxy``
+from the previous example would be ``forall {k} (a :: k). Proxy a``.
+We can observe this behavior in a GHCi session: ::
+
+  > :set -XTypeApplications -fprint-explicit-foralls
+  > let myLength1 :: Foldable f => f a -> Int; myLength1 = length
+  > :type +v myLength1
+  myLength1 :: forall (f :: * -> *) a. Foldable f => f a -> Int
+  > let myLength2 = length
+  > :type +v myLength2
+  myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
+  > :type +v myLength2 @[]
+
+  <interactive>:1:1: error:
+      • Cannot apply expression of type ‘t0 a0 -> Int’
+        to a visible type argument ‘[]’
+      • In the expression: myLength2 @[]
+
+Notice that since ``myLength1`` was defined with an explicit type signature,
+:ghci-cmd:`:type +v` reports that all of its type variables are available
+for type application. On the other hand, ``myLength2`` was not given a type
+signature. As a result, all of its type variables are surrounded with braces,
+and trying to use visible type application with ``myLength2`` fails.
+
+Also note the use of :ghci-cmd:`:type +v` in the GHCi session above instead
+of :ghci-cmd:`:type`. This is because :ghci-cmd:`:type` gives you the type
+that would be inferred for a variable assigned to the expression provided
+(that is, the type of ``x`` in ``let x = <expr>``). As we saw above with
+``myLength2``, this type will have no variables available to visible type
+application. On the other hand, :ghci-cmd:`:type +v` gives you the actual
+type of the expression provided. To illustrate this: ::
+
+  > :type myLength1
+  myLength1 :: forall {a} {f :: * -> *}. Foldable f => f a -> Int
+  > :type myLength2
+  myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
+
+Using :ghci-cmd:`:type` might lead one to conclude that none of the type
+variables in ``myLength1``'s type signature are available for type
+application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
+if you want the most accurate information with respect to visible type
+application properties.
+
+.. _ScopedSort:
+
+.. index::
+   single: ScopedSort
+
+Ordering of specified variables
+-------------------------------
+
+In the simple case of the previous section, we can say that specified variables
+appear in left-to-right order. However, not all cases are so simple. Here are
+the rules in the subtler cases:
+
+- If an identifier's type has a ``forall``, then the order of type variables
+  as written in the ``forall`` is retained.
 
 - If the type signature includes any kind annotations (either on variable
   binders or as annotations on types), any variables used in kind
@@ -10680,7 +10846,7 @@ Here are the details:
   of the variables are *kind* variables), the variables are reordered
   so that kind variables come before type variables, preserving the
   left-to-right order as much as possible. That is, GHC performs a
-  stable topological sort on the variables. Examples::
+  stable topological sort on the variables. Example::
 
     h :: Proxy (a :: (j, k)) -> Proxy (b :: Proxy a) -> ()
       -- as if h :: forall j k a b. ...
@@ -10693,10 +10859,12 @@ Here are the details:
   are not reordered with respect to each other, even though doing so would
   not violate dependency conditions.
 
-- Visible type application is available to instantiate only user-specified
-  type variables. This means that in ``data Proxy a = Proxy``, the unmentioned
-  kind variable used in ``a``'s kind is *not* available for visible type
-  application.
+  A "stable topological sort" here, we mean that we perform this algorithm
+  (which we call *ScopedSort*):
+
+  * Work left-to-right through the input list of type variables, with a cursor.
+  * If variable ``v`` at the cursor is depended on by any earlier variable ``w``,
+    move ``v`` immediately before the leftmost such ``w``.
 
 - Class methods' type arguments include the class type
   variables, followed by any variables an individual method is polymorphic
@@ -10719,72 +10887,9 @@ Here are the details:
   necessary to specify :extension:`PartialTypeSignatures` and your
   code will not generate a warning informing you of the omitted type.
 
-- When printing types with :ghc-flag:`-fprint-explicit-foralls` enabled,
-  type variables not available for visible type application are printed
-  in braces. We can observe this behavior in a GHCi session: ::
-
-    > :set -XTypeApplications -fprint-explicit-foralls
-    > let myLength1 :: Foldable f => f a -> Int; myLength1 = length
-    > :type +v myLength1
-    myLength1 :: forall (f :: * -> *) a. Foldable f => f a -> Int
-    > let myLength2 = length
-    > :type +v myLength2
-    myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
-    > :type +v myLength2 @[]
-
-    <interactive>:1:1: error:
-        • Cannot apply expression of type ‘t0 a0 -> Int’
-          to a visible type argument ‘[]’
-        • In the expression: myLength2 @[]
-
-  Notice that since ``myLength1`` was defined with an explicit type signature,
-  :ghci-cmd:`:type +v` reports that all of its type variables are available
-  for type application. On the other hand, ``myLength2`` was not given a type
-  signature. As a result, all of its type variables are surrounded with braces,
-  and trying to use visible type application with ``myLength2`` fails.
-
-  Also note the use of :ghci-cmd:`:type +v` in the GHCi session above instead
-  of :ghci-cmd:`:type`. This is because :ghci-cmd:`:type` gives you the type
-  that would be inferred for a variable assigned to the expression provided
-  (that is, the type of ``x`` in ``let x = <expr>``). As we saw above with
-  ``myLength2``, this type will have no variables available to visible type
-  application. On the other hand, :ghci-cmd:`:type +v` gives you the actual
-  type of the expression provided. To illustrate this: ::
-
-    > :type myLength1
-    myLength1 :: forall {a} {f :: * -> *}. Foldable f => f a -> Int
-    > :type myLength2
-    myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
-
-  Using :ghci-cmd:`:type` might lead one to conclude that none of the type
-  variables in ``myLength1``'s type signature are available for type
-  application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
-  if you want the most accurate information with respect to visible type
-  application properties.
-
-- Although GHC supports visible *type* applications, it does not yet support
-  visible *kind* applications. However, GHC does follow similar rules for
-  quantifying variables in kind signatures as it does for quantifying type
-  signatures. For instance: ::
-
-    type family F (a :: j) (b :: k) :: l
-      -- F :: forall j k l. j -> k -> l
-
-  In the kind of ``F``, the left-to-right ordering of ``j``, ``k``, and ``l``
-  is preserved.
-
-  If a family declaration is associated with a class, then class-bound
-  variables always come first in the kind of the family. For instance: ::
-
-    class C (a :: Type) where
-      type T (x :: f a)
-      -- T :: forall a f. f a -> Type
-
-  Contrast this with the kind of the following top-level family declaration: ::
-
-    type family T2 (x :: f a)
-    -- T2 :: forall f a. f a -> Type
-
+The section in this manual on kind polymorphism describes how variables
+in type and class declarations are ordered (:ref:`inferring-variable-order`).
+  
 .. _implicit-parameters:
 
 Implicit parameters

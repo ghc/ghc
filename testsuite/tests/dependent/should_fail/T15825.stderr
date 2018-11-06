@@ -1,0 +1,5 @@
+
+T15825.hs:14:29: error:
+    • Illegal type synonym family application ‘GHC.Types.Any’ in instance:
+        X a
+    • In the instance declaration for ‘X (a :: *)’

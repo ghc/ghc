@@ -1779,7 +1779,8 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pat
   = do { -- Check that the associated type indeed comes from this class
          -- See [Mismatched class methods and associated type families]
          -- in TcInstDecls.
-         checkTc (Just clas == tyConAssoc_maybe fam_tc)
+
+         checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
        -- Check type args first (more comprehensible)
@@ -1789,9 +1790,9 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pat
        ; checkTcM (all check_arg kind_shapes)
                   (tidy_env2, pp_wrong_at_arg $$ ppSuggestExplicitKinds)
 
-       ; traceTc "cfi" (vcat [ ppr inst_tvs
-                             , ppr arg_shapes
-                             , ppr mini_env ]) }
+       ; traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
+                                                , ppr arg_shapes
+                                                , ppr mini_env ]) }
   where
     arg_shapes :: [AssocInstArgShape]
     arg_shapes = [ (lookupVarEnv mini_env fam_tc_tv, at_ty)
@@ -2062,6 +2063,33 @@ famPatErr fam_tc tvs pats
    Telescope checking
 *                                                                      *
 ************************************************************************
+
+Note [Bad telescopes]
+~~~~~~~~~~~~~~~~~~~~~
+Now that we can mix type and kind variables, there are an awful lot of
+ways to shoot yourself in the foot. Here are some.
+
+  data SameKind :: k -> k -> *   -- just to force unification
+
+1.  data T1 a k (b :: k) (x :: SameKind a b)
+
+The problem here is that we discover that a and b should have the same
+kind. But this kind mentions k, which is bound *after* a.
+(Testcase: dependent/should_fail/BadTelescope)
+
+2.  data T2 a (c :: Proxy b) (d :: Proxy a) (x :: SameKind b d)
+
+Note that b is not bound. Yet its kind mentions a. Because we have
+a nice rule that all implicitly bound variables come before others,
+this is bogus.
+
+To catch these errors, we call checkValidTelescope during kind-checking
+datatype declarations. See also
+Note [Required, Specified, and Inferred for types] in TcTyClsDecls.
+
+Note [Keeping scoped variables in order: Explicit] discusses how this
+check works for `forall x y z.` written in a type.
+
 -}
 
 -- | Check a list of binders to see if they make a valid telescope.
@@ -2089,7 +2117,7 @@ checkValidTelescope tvbs user_tyvars
          , extra ]
   where
     tvs = binderVars tvbs
-    (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (toposortTyVars tvs)
+    (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (scopedSort tvs)
 
     (_, bad_tvbs) = foldl add_one (mkVarSet tvs, []) tvbs
 
@@ -2106,11 +2134,11 @@ checkValidTelescope tvbs user_tyvars
         fkvs = tyCoVarsOfType (tyVarKind tv)
         bad' = bad_bndrs `delVarSet` tv
 
-    extra | all (isVisibleArgFlag . tyConBinderArgFlag) bad_tvbs
-          = empty
-          | otherwise
-          = text "NB: Implicitly declared variables come before others."
-
+    extra
+      | any isInvisibleTyConBinder tvbs
+      = text "NB: Implicitly declared variables come before others."
+      | otherwise
+      = empty
 
 {-
 ************************************************************************

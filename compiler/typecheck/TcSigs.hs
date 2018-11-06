@@ -356,9 +356,9 @@ tcPatSynSig name sig_ty
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after kindGeneralize which may
        -- default kind variables to *.
-       ; implicit_tvs <- mapM zonkTcTyCoVarBndr implicit_tvs
-       ; univ_tvs     <- mapM zonkTcTyCoVarBndr univ_tvs
-       ; ex_tvs       <- mapM zonkTcTyCoVarBndr ex_tvs
+       ; implicit_tvs <- mapM zonkTyCoVarKind implicit_tvs
+       ; univ_tvs     <- mapM zonkTyCoVarKind univ_tvs
+       ; ex_tvs       <- mapM zonkTyCoVarKind ex_tvs
        ; req          <- zonkTcTypes req
        ; prov         <- zonkTcTypes prov
        ; body_ty      <- zonkTcType  body_ty

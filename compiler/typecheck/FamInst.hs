@@ -168,7 +168,13 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
            -- Note [Linting type synonym applications].
            case lintTypes dflags tcvs' (rhs':lhs') of
              Nothing       -> pure ()
-             Just fail_msg -> pprPanic "Core Lint error" fail_msg
+             Just fail_msg -> pprPanic "Core Lint error" (vcat [ fail_msg
+                                                               , ppr fam_tc
+                                                               , ppr subst
+                                                               , ppr tvs'
+                                                               , ppr cvs'
+                                                               , ppr lhs'
+                                                               , ppr rhs' ])
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
@@ -893,7 +899,7 @@ unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
       has_kinds = not $ isEmptyVarSet invis_vars
 
       doc = sep [ what <+> text "variable" <>
-                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . toposortTyVars)
+                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . scopedSort)
                 , text "cannot be inferred from the right-hand side." ]
       what = case (has_types, has_kinds) of
                (True, True)   -> text "Type and kind"

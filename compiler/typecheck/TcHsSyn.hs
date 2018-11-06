@@ -425,7 +425,7 @@ zonkTyBndrX :: ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
 -- This guarantees to return a TyVar (not a TcTyVar)
 -- then we add it to the envt, so all occurrences are replaced
 zonkTyBndrX env tv
-  = ASSERT( isImmutableTyVar tv )
+  = ASSERT2( isImmutableTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) )
     do { ki <- zonkTcTypeToTypeX env (tyVarKind tv)
                -- Internal names tidy up better, for iface files.
        ; let tv' = mkTyVar (tyVarName tv) ki
@@ -1815,7 +1815,9 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
                                    , text "Type-correct unfilled coercion hole"
                                      <+> ppr hole )
                          ; cv' <- zonkCoVar cv
-                         ; return $ mkHoleCo (hole { ch_co_var = cv' }) } }
+                         ; return $ mkCoVarCo cv' } }
+                             -- This will be an out-of-scope variable, but keeping
+                             -- this as a coercion hole led to #15787
 
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
 zonk_tycomapper = TyCoMapper

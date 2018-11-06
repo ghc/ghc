@@ -145,9 +145,11 @@ emptyUDFM = UDFM M.empty 0
 unitUDFM :: Uniquable key => key -> elt -> UniqDFM elt
 unitUDFM k v = UDFM (M.singleton (getKey $ getUnique k) (TaggedVal v 0)) 1
 
+-- The new binding always goes to the right of existing ones
 addToUDFM :: Uniquable key => UniqDFM elt -> key -> elt  -> UniqDFM elt
 addToUDFM m k v = addToUDFM_Directly m (getUnique k) v
 
+-- The new binding always goes to the right of existing ones
 addToUDFM_Directly :: UniqDFM elt -> Unique -> elt -> UniqDFM elt
 addToUDFM_Directly (UDFM m i) u v
   = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)

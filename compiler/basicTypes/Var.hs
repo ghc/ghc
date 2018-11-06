@@ -483,6 +483,27 @@ sameVis Required _        = False
 sameVis _        Required = False
 sameVis _        _        = True
 
+instance Outputable ArgFlag where
+  ppr Required  = text "[req]"
+  ppr Specified = text "[spec]"
+  ppr Inferred  = text "[infrd]"
+
+instance Binary ArgFlag where
+  put_ bh Required  = putByte bh 0
+  put_ bh Specified = putByte bh 1
+  put_ bh Inferred  = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Required
+      1 -> return Specified
+      _ -> return Inferred
+
+instance Outputable VarMult where
+  ppr (Regular w) = ppr w
+  ppr Alias = text"alias"
+
 {- *********************************************************************
 *                                                                      *
 *                   VarBndr, TyCoVarBinder
@@ -547,6 +568,19 @@ mkTyVarBinders vis = map (mkTyVarBinder vis)
 isTyVarBinder :: TyCoVarBinder -> Bool
 isTyVarBinder (Bndr v _) = isTyVar v
 
+instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
+  ppr (Bndr v Required)  = ppr v
+  ppr (Bndr v Specified) = char '@' <> ppr v
+  ppr (Bndr v Inferred)  = braces (ppr v)
+
+instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
+  put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
+
+  get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }
+
+instance NamedThing tv => NamedThing (VarBndr tv flag) where
+  getName (Bndr tv _) = getName tv
+
 {-
 ************************************************************************
 *                                                                      *
@@ -601,39 +635,6 @@ tcTyVarDetails var = pprPanic "tcTyVarDetails" (ppr var <+> dcolon <+> pprKind (
 
 setTcTyVarDetails :: TyVar -> TcTyVarDetails -> TyVar
 setTcTyVarDetails tv details = tv { tc_tv_details = details }
-
--------------------------------------
-instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
-  ppr (Bndr v Required)  = ppr v
-  ppr (Bndr v Specified) = char '@' <> ppr v
-  ppr (Bndr v Inferred)  = braces (ppr v)
-
-instance Outputable ArgFlag where
-  ppr Required  = text "[req]"
-  ppr Specified = text "[spec]"
-  ppr Inferred  = text "[infrd]"
-
-instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
-  put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
-
-  get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }
-
-
-instance Binary ArgFlag where
-  put_ bh Required  = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Inferred  = putByte bh 2
-
-  get bh = do
-    h <- getByte bh
-    case h of
-      0 -> return Required
-      1 -> return Specified
-      _ -> return Inferred
-
-instance Outputable VarMult where
-  ppr (Regular w) = ppr w
-  ppr Alias = text"alias"
 
 {-
 %************************************************************************

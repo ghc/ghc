@@ -2,3 +2,7 @@
 :set -fprint-explicit-foralls
 :kind T1
 :kind T2
+:kind T3
+:kind T4
+:kind T5
+:kind T6

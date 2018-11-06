@@ -649,7 +649,7 @@ tcDataFamInstDecl mb_clsinfo
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { let ty_binders = full_tcbs `chkAppend` extra_tcbs
               ; data_cons <- tcConDecls rec_rep_tc
-                                        (ty_binders, orig_res_ty) cons
+                                        ty_binders orig_res_ty cons
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
                      NewType  -> ASSERT( not (null data_cons) )

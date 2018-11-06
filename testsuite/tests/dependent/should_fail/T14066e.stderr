@@ -1,15 +1,15 @@
 
 T14066e.hs:13:59: error:
-    • Couldn't match kind ‘k1’ with ‘*’
-      ‘k1’ is a rigid type variable bound by
+    • Couldn't match kind ‘k’ with ‘*’
+      ‘k’ is a rigid type variable bound by
         the type signature for:
-          j :: forall k k1 (c :: k1) (b :: k).
+          j :: forall k k1 (c :: k) (b :: k1).
                Proxy a -> Proxy b -> Proxy c -> Proxy b
         at T14066e.hs:12:5-61
       When matching kinds
-        k :: *
-        c :: k1
-      Expected kind ‘c’, but ‘b'’ has kind ‘k’
+        k1 :: *
+        c :: k
+      Expected kind ‘c’, but ‘b'’ has kind ‘k1’
     • In the first argument of ‘Proxy’, namely ‘(b' :: c')’
       In an expression type signature: Proxy (b' :: c')
       In the expression: (p1 :: Proxy (b' :: c'))

@@ -1,5 +1,6 @@
 
-PolyKinds06.hs:9:11:
-    Type constructor ‘A’ cannot be used here
-      (it is defined and used in the same recursive group)
-    In the kind ‘A -> *’
+PolyKinds06.hs:9:11: error:
+    • Type constructor ‘A’ cannot be used here
+        (it is defined and used in the same recursive group)
+    • In the kind ‘A -> *’
+      In the data type declaration for ‘B’

@@ -19,6 +19,7 @@ module TyCon(
         -- * TyConBinder
         TyConBinder, TyConBndrVis(..), TyConTyCoBinder,
         mkNamedTyConBinder, mkNamedTyConBinders,
+        mkRequiredTyConBinder,
         mkAnonTyConBinder, mkAnonTyConBinders,
         tyConBinderArgFlag, tyConBndrVisArgFlag, isNamedTyConBinder,
         isVisibleTyConBinder, isInvisibleTyConBinder,
@@ -65,7 +66,7 @@ module TyCon(
         isBuiltInSynFamTyCon_maybe,
         isUnliftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
-        isTyConAssoc, tyConAssoc_maybe,
+        isTyConAssoc, tyConAssoc_maybe, tyConFlavourAssoc_maybe,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
         isTcTyCon, isTcLevPoly,
@@ -97,7 +98,7 @@ module TyCon(
         algTcFields,
         tyConRuntimeRepInfo,
         tyConBinders, tyConResKind, tyConTyVarBinders,
-        tcTyConScopedTyVars, tcTyConUserTyVars,
+        tcTyConScopedTyVars, tcTyConUserTyVars, tcTyConIsPoly,
         mkTyConTagMap,
 
         -- ** Manipulating TyCons
@@ -141,6 +142,7 @@ import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabel
 
 import Binary
 import Var
+import VarSet
 import Class
 import BasicTypes
 import DynFlags
@@ -309,7 +311,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
 Note [Associated families and their parent class]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 *Associated* families are just like *non-associated* families, except
-that they have a famTcParent field of (Just cls), which identifies the
+that they have a famTcParent field of (Just cls_tc), which identifies the
 parent class.
 
 However there is an important sharing relationship between
@@ -422,6 +424,15 @@ mkNamedTyConBinder vis tv = ASSERT( isTyVar tv )
 mkNamedTyConBinders :: ArgFlag -> [TyVar] -> [TyConBinder]
 -- The odd argument order supports currying
 mkNamedTyConBinders vis tvs = map (mkNamedTyConBinder vis) tvs
+
+-- | Make a Required TyConBinder. It chooses between NamedTCB and
+-- AnonTCB based on whether the tv is mentioned in the dependent set
+mkRequiredTyConBinder :: TyCoVarSet  -- these are used dependently
+                      -> TyVar
+                      -> TyConBinder
+mkRequiredTyConBinder dep_set tv
+  | tv `elemVarSet` dep_set = mkNamedTyConBinder Required tv
+  | otherwise               = mkAnonTyConBinder tv
 
 tyConBinderArgFlag :: TyConBinder -> ArgFlag
 tyConBinderArgFlag (Bndr _ vis) = tyConBndrVisArgFlag vis
@@ -769,8 +780,8 @@ data TyCon
                                       -- abstract, built-in. See comments for
                                       -- FamTyConFlav
 
-        famTcParent  :: Maybe Class,  -- ^ For *associated* type/data families
-                                      -- The class in whose declaration the family is declared
+        famTcParent  :: Maybe TyCon,  -- ^ For *associated* type/data families
+                                      -- The class tycon in which the family is declared
                                       -- See Note [Associated families and their parent class]
 
         famTcInj     :: Injectivity   -- ^ is this a type family injective in
@@ -840,8 +851,13 @@ data TyCon
         tcTyConScopedTyVars :: [(Name,TyVar)],
                            -- ^ Scoped tyvars over the tycon's body
                            -- See Note [How TcTyCons work] in TcTyClsDecls
-                           -- Order does *not* matter.
+                           -- Order *does* matter: for TcTyCons with a CUSK,
+                           -- it's the correct dependency order. For TcTyCons
+                           -- without a CUSK, it's the original left-to-right
+                           -- that the user wrote. Nec'y for getting Specified
+                           -- variables in the right order.
         tcTyConUserTyVars :: SDoc, -- ^ Original, user-written tycon tyvars
+        tcTyConIsPoly     :: Bool, -- ^ Is this TcTyCon already generalized?
 
         tcTyConFlavour :: TyConFlavour
                            -- ^ What sort of 'TyCon' this represents.
@@ -1559,9 +1575,10 @@ mkTcTyCon :: Name
           -> Kind                -- ^ /result/ kind only
           -> [(Name,TcTyVar)]    -- ^ Scoped type variables;
                                  -- see Note [How TcTyCons work] in TcTyClsDecls
+          -> Bool                -- ^ Is this TcTyCon generalised already?
           -> TyConFlavour        -- ^ What sort of 'TyCon' this represents
           -> TyCon
-mkTcTyCon name tyvars binders res_kind scoped_tvs flav
+mkTcTyCon name tyvars binders res_kind scoped_tvs poly flav
   = TcTyCon { tyConUnique  = getUnique name
             , tyConName    = name
             , tyConTyVars  = binderVars binders
@@ -1570,6 +1587,7 @@ mkTcTyCon name tyvars binders res_kind scoped_tvs flav
             , tyConKind    = mkTyConKind binders res_kind
             , tyConArity   = length binders
             , tcTyConScopedTyVars = scoped_tvs
+            , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav
             , tcTyConUserTyVars   = tyvars }
 
@@ -1649,7 +1667,7 @@ mkFamilyTyCon name binders res_kind resVar flav parent inj
       , tyConTyVars  = binderVars binders
       , famTcResVar  = resVar
       , famTcFlav    = flav
-      , famTcParent  = parent
+      , famTcParent  = classTyCon <$> parent
       , famTcInj     = inj
       }
 
@@ -1691,6 +1709,7 @@ makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc) empty
               (tyConBinders tc) (tyConResKind tc)
               [{- no scoped vars -}]
+              True
               (tyConFlavour tc)
 
 -- | Does this 'TyCon' represent something that cannot be defined in Haskell?
@@ -1976,14 +1995,19 @@ isDataFamFlav :: FamTyConFlav -> Bool
 isDataFamFlav (DataFamilyTyCon {}) = True   -- Data family
 isDataFamFlav _                    = False  -- Type synonym family
 
--- | Are we able to extract information 'TyVar' to class argument list
--- mapping from a given 'TyCon'?
+-- | Is this TyCon for an associated type?
 isTyConAssoc :: TyCon -> Bool
-isTyConAssoc tc = isJust (tyConAssoc_maybe tc)
+isTyConAssoc = isJust . tyConAssoc_maybe
 
-tyConAssoc_maybe :: TyCon -> Maybe Class
-tyConAssoc_maybe (FamilyTyCon { famTcParent = mb_cls }) = mb_cls
-tyConAssoc_maybe _                                      = Nothing
+-- | Get the enclosing class TyCon (if there is one) for the given TyCon.
+tyConAssoc_maybe :: TyCon -> Maybe TyCon
+tyConAssoc_maybe = tyConFlavourAssoc_maybe . tyConFlavour
+
+-- | Get the enclosing class TyCon (if there is one) for the given TyConFlavour
+tyConFlavourAssoc_maybe :: TyConFlavour -> Maybe TyCon
+tyConFlavourAssoc_maybe (DataFamilyFlavour mb_parent)     = mb_parent
+tyConFlavourAssoc_maybe (OpenTypeFamilyFlavour mb_parent) = mb_parent
+tyConFlavourAssoc_maybe _                                 = Nothing
 
 -- The unit tycon didn't used to be classed as a tuple tycon
 -- but I thought that was silly so I've undone it
@@ -2418,8 +2442,8 @@ data TyConFlavour
   | DataTypeFlavour
   | NewtypeFlavour
   | AbstractTypeFlavour
-  | DataFamilyFlavour Bool     -- True <=> associated
-  | OpenTypeFamilyFlavour Bool -- True <=> associated
+  | DataFamilyFlavour (Maybe TyCon)     -- Just tc <=> (tc == associated class)
+  | OpenTypeFamilyFlavour (Maybe TyCon) -- Just tc <=> (tc == associated class)
   | ClosedTypeFamilyFlavour
   | TypeSynonymFlavour
   | BuiltInTypeFlavour -- ^ e.g., the @(->)@ 'TyCon'.
@@ -2436,10 +2460,10 @@ instance Outputable TyConFlavour where
       go DataTypeFlavour         = "data type"
       go NewtypeFlavour          = "newtype"
       go AbstractTypeFlavour     = "abstract type"
-      go (DataFamilyFlavour True)      = "associated data family"
-      go (DataFamilyFlavour False)     = "data family"
-      go (OpenTypeFamilyFlavour True)  = "associated type family"
-      go (OpenTypeFamilyFlavour False) = "type family"
+      go (DataFamilyFlavour (Just _))  = "associated data family"
+      go (DataFamilyFlavour Nothing)   = "data family"
+      go (OpenTypeFamilyFlavour (Just _)) = "associated type family"
+      go (OpenTypeFamilyFlavour Nothing)  = "type family"
       go ClosedTypeFamilyFlavour = "type family"
       go TypeSynonymFlavour      = "type synonym"
       go BuiltInTypeFlavour      = "built-in type"
@@ -2457,8 +2481,8 @@ tyConFlavour (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
                   AbstractTyCon {}   -> AbstractTypeFlavour
 tyConFlavour (FamilyTyCon { famTcFlav = flav, famTcParent = parent })
   = case flav of
-      DataFamilyTyCon{}            -> DataFamilyFlavour (isJust parent)
-      OpenSynFamilyTyCon           -> OpenTypeFamilyFlavour (isJust parent)
+      DataFamilyTyCon{}            -> DataFamilyFlavour parent
+      OpenSynFamilyTyCon           -> OpenTypeFamilyFlavour parent
       ClosedSynFamilyTyCon{}       -> ClosedTypeFamilyFlavour
       AbstractClosedSynFamilyTyCon -> ClosedTypeFamilyFlavour
       BuiltInSynFamTyCon{}         -> ClosedTypeFamilyFlavour

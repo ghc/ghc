@@ -165,13 +165,6 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
              (prov_theta, prov_evs)
                  = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
 
-       -- Report bad universal type variables
-       -- See Note [Type variables whose kind is captured]
-       ; let bad_tvs    = [ tv | tv <- univ_tvs
-                               , tyCoVarsOfType (tyVarKind tv)
-                                 `intersectsVarSet` ex_tv_set ]
-       ; mapM_ (badUnivTvErr ex_tvs) bad_tvs
-
        -- Report coercions that esacpe
        -- See Note [Coercions that escape]
        ; args <- mapM zonkId args
@@ -217,20 +210,6 @@ mkProvEvidence ev_id
   where
     pred = evVarPred ev_id
     eq_con_args = [evId ev_id]
-
-badUnivTvErr :: [TyVar] -> TyVar -> TcM ()
--- See Note [Type variables whose kind is captured]
-badUnivTvErr ex_tvs bad_tv
-  = addErrTc $
-    vcat [ text "Universal type variable" <+> quotes (ppr bad_tv)
-                <+> text "has existentially bound kind:"
-         , nest 2 (ppr_with_kind bad_tv)
-         , hang (text "Existentially-bound variables:")
-              2 (vcat (map ppr_with_kind ex_tvs))
-         , text "Probable fix: give the pattern synonym a type signature"
-         ]
-  where
-    ppr_with_kind tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 
 dependentArgErr :: (Id, DTyCoVarSet) -> TcM ()
 -- See Note [Coercions that escape]
@@ -293,37 +272,6 @@ So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
 marginally less efficient, if the builder/martcher are not inlined.
 
 See also Note [Lift equality constaints when quantifying] in TcType
-
-Note [Type variables whose kind is captured]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  data AST a = Sym [a]
-  class Prj s where { prj :: [a] -> Maybe (s a)
-  pattern P x <= Sym (prj -> Just x)
-
-Here we get a matcher with this type
-  $mP :: forall s a. Prj s => AST a -> (s a -> r) -> r -> r
-
-No problem.  But note that 's' is not fixed by the type of the
-pattern (AST a), nor is it existentially bound.  It's really only
-fixed by the type of the continuation.
-
-Trac #14552 showed that this can go wrong if the kind of 's' mentions
-existentially bound variables.  We obviously can't make a type like
-  $mP :: forall (s::k->*) a. Prj s => AST a -> (forall k. s a -> r)
-                                   -> r -> r
-But neither is 's' itself existentially bound, so the forall (s::k->*)
-can't go in the inner forall either.  (What would the matcher apply
-the continuation to?)
-
-So we just fail in this case, with a pretty terrible error message.
-Maybe we could do better, but I can't see how.  (It'd be possible to
-default 's' to (Any k), but that probably isn't what the user wanted,
-and it not straightforward to implement, because by the time we see
-the problem, simplifyInfer has already skolemised 's'.)
-
-This stuff can only happen in the presence of view patterns, with
-PolyKinds, so it's a bit of a corner case.
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

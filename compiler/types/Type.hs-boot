@@ -22,5 +22,5 @@ tcView :: Type -> Maybe Type
 
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyCoVar]
 tyCoVarsOfTypeWellScoped :: Type -> [TyCoVar]
-toposortTyVars :: [TyCoVar] -> [TyCoVar]
+scopedSort :: [TyCoVar] -> [TyCoVar]
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])

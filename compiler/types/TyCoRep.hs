@@ -83,7 +83,6 @@ module TyCoRep (
         tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
-        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList, closeOverKinds,
         coVarsOfType, coVarsOfTypes,
         coVarsOfCo, coVarsOfCos,
         tyCoVarsOfCo, tyCoVarsOfCos,
@@ -163,7 +162,7 @@ import {-# SOURCE #-} DataCon( dataConFullSig
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
-                          , toposortTyVars
+                          , scopedSort
                           , coreView, eqType )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -593,7 +592,7 @@ Pi-types:
 
  * A dependent compile-time-only polytype,
    written with forall, e.g.  forall (a:*). ty
-   represented as ForAllTy (TvBndr a v) ty
+   represented as ForAllTy (Bndr a v) ty
 
 Both Pi-types classify terms/types that take an argument. In other
 words, if `x` is either a function or a polytype, `x arg` makes sense
@@ -712,6 +711,8 @@ Here Foo's TyConBinders are
    [Required 'a', Specified 'b', Anon]
 and its kind prints as
    Foo :: forall a -> forall b. (a -> b -> Type) -> Type
+
+See also Note [Required, Specified, and Inferred for types] in TcTyClsDecls
 
 ---- Printing -----
 
@@ -2150,32 +2151,6 @@ almost_devoid_co_var_of_types (ty:tys) cv
   = almost_devoid_co_var_of_type ty cv
   && almost_devoid_co_var_of_types tys cv
 
-------------- Closing over kinds -----------------
-
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a non-deterministic set.
-closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
-  -- It's OK to use nonDetEltsUniqSet here because we immediately forget
-  -- about the ordering by returning a set.
-
--- | Given a list of tyvars returns a deterministic FV computation that
--- returns the given tyvars with the kind variables free in the kinds of the
--- given tyvars.
-closeOverKindsFV :: [TyVar] -> FV
-closeOverKindsFV tvs =
-  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
-
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a deterministically ordered list.
-closeOverKindsList :: [TyVar] -> [TyVar]
-closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
-
--- | Add the kind variables free in the kinds of the tyvars in the given set.
--- Returns a deterministic set.
-closeOverKindsDSet :: DTyVarSet -> DTyVarSet
-closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
-
 ------------- Injective free vars -----------------
 
 -- | Returns the free variables of a 'TyConBinder' that are in injective
@@ -3327,7 +3302,7 @@ tidyToIfaceCo :: Coercion -> IfaceCoercion
 tidyToIfaceCo co = toIfaceCoercionX (mkVarSet free_tcvs) (tidyCo env co)
   where
     env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
-    free_tcvs = toposortTyVars $ tyCoVarsOfCoList co
+    free_tcvs = scopedSort $ tyCoVarsOfCoList co
 
 ------------
 pprClassPred :: Class -> [Type] -> SDoc

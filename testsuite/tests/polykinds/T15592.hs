@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE PolyKinds, TypeFamilies #-}
 {-# OPTIONS_GHC -ddump-types -fprint-explicit-foralls #-}
 module T15592 where
 

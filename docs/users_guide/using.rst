@@ -764,10 +764,13 @@ messages and in GHCi:
 
            ghci> :i Data.Type.Equality.sym
            Data.Type.Equality.sym ::
-             forall (k :: BOX) (a :: k) (b :: k).
+             forall k (a :: k) (b :: k).
              (a Data.Type.Equality.:~: b) -> b Data.Type.Equality.:~: a
                    -- Defined in Data.Type.Equality
 
+    This flag also enables the printing of *inferred* type variables
+    inside braces. See :ref:`inferred-vs-specified`.
+		   
 .. ghc-flag:: -fprint-explicit-kinds
     :shortdesc: Print explicit kind foralls and kind arguments in types.
         See also :ghc-flag:`-XKindSignatures`
@@ -784,10 +787,10 @@ messages and in GHCi:
         ghci> :set -XPolyKinds
         ghci> data T a = MkT
         ghci> :t MkT
-        MkT :: forall (k :: BOX) (a :: k). T a
-        ghci> :set -fprint-explicit-foralls
+        MkT :: forall (k :: Type) (a :: k). T a
+        ghci> :set -fprint-explicit-kinds
         ghci> :t MkT
-        MkT :: forall (k :: BOX) (a :: k). T k a
+        MkT :: forall (k :: Type) (a :: k). T k a
 
 .. ghc-flag:: -fprint-explicit-runtime-reps
     :shortdesc: Print ``RuntimeRep`` variables in types which are

@@ -3,3 +3,4 @@ SelfDep.hs:5:11: error:
     • Type constructor ‘T’ cannot be used here
         (it is defined and used in the same recursive group)
     • In the kind ‘T -> *’
+      In the data type declaration for ‘T’

@@ -102,7 +102,7 @@ sortQuantVars :: [Var] -> [Var]
 sortQuantVars vs = sorted_tcvs ++ ids
   where
     (tcvs, ids) = partition (isTyVar <||> isCoVar) vs
-    sorted_tcvs = toposortTyVars tcvs
+    sorted_tcvs = scopedSort tcvs
 
 -- | Bind a binding group over an expression, using a @let@ or @case@ as
 -- appropriate (see "CoreSyn#let_app_invariant")

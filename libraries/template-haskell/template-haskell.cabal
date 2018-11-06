@@ -1,5 +1,5 @@
 name:           template-haskell
-version:        2.14.0.0
+version:        2.15.0.0
 -- NOTE: Don't forget to update ./changelog.md
 license:        BSD3
 license-file:   LICENSE

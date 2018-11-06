@@ -2481,17 +2481,14 @@ types that you know are polymorphic, is quite surprising.  See Trac
 
 Note that the goal is to generalise the *kind of the type*, not
 the type itself! Example:
-  ghci> data T m a = MkT (m a)  -- T :: forall . (k -> *) -> k -> *
-  ghci> :k T
-We instantiate T to get (T kappa).  We do not want to kind-generalise
-that to forall k. T k!  Rather we want to take its kind
-   T kappa :: (kappa -> *) -> kappa -> *
-and now kind-generalise that kind, to forall k. (k->*) -> k -> *
-(It was Trac #10122 that made me realise how wrong the previous
-approach was.) -}
+  ghci> data SameKind :: k -> k -> Type
+  ghci> :k SameKind _
 
+We want to get `k -> Type`, not `Any -> Type`, which is what we would
+get without kind-generalisation. Note that `:k SameKind` is OK, as
+GHC will not instantiate SameKind here, and so we see its full kind
+of `forall k. k -> k -> Type`.
 
-{-
 ************************************************************************
 *                                                                      *
                  tcRnDeclsi

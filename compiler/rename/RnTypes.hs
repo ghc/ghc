@@ -850,7 +850,7 @@ bindHsQTyVars :: forall a b.
               -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
                   -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
-                  -- the TypeInType clause of Note [Complete user-supplied
+                  -- the last clause of Note [CUSKs: Complete user-supplied
                   -- kind signatures] in HsDecls
               -> RnM (b, FreeVars)
 
@@ -863,7 +863,6 @@ bindHsQTyVars :: forall a b.
 bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
   = do { let hs_tv_bndrs = hsQTvExplicit hsq_bndrs
              bndr_kv_occs = extractHsTyVarBndrsKVs hs_tv_bndrs
-       ; rdr_env <- getLocalRdrEnv
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
@@ -873,8 +872,7 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                                  -- Make sure to list the binder kvs before the
                                  -- body kvs, as mandated by
                                  -- Note [Ordering of implicit variables]
-             implicit_kvs = filter_occs rdr_env bndrs kv_occs
-                                 -- Deleting bndrs: See Note [Kind-variable ordering]
+             implicit_kvs = filter_occs bndrs kv_occs
              -- dep_bndrs is the subset of bndrs that are dependent
              --   i.e. appear in bndr/body_kv_occs
              -- Can't use implicit_kvs because we've deleted bndrs from that!
@@ -902,17 +900,15 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                       all_bound_on_lhs } }
 
   where
-    filter_occs :: LocalRdrEnv         -- In scope
-                -> [Located RdrName]   -- Bound here
+    filter_occs :: [Located RdrName]   -- Bound here
                 -> [Located RdrName]   -- Potential implicit binders
                 -> [Located RdrName]   -- Final implicit binders
     -- Filter out any potential implicit binders that are either
-    -- already in scope, or are explicitly bound here
-    filter_occs rdr_env bndrs occs
+    -- already in scope, or are explicitly bound in the same HsQTyVars
+    filter_occs bndrs occs
       = filterOut is_in_scope occs
       where
-        is_in_scope locc@(L _ occ) = isJust (lookupLocalRdrEnv rdr_env occ)
-                                  || locc `elemRdr` bndrs
+        is_in_scope locc = locc `elemRdr` bndrs
 
 {- Note [bindHsQTyVars examples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1611,9 +1607,8 @@ must come after any variables mentioned in their kinds.
   typeRep :: Typeable a => TypeRep (a :: k)   -- forall k a. ...
 
 The k comes first because a depends on k, even though the k appears later than
-the a in the code. Thus, GHC does a *stable topological sort* on the variables.
-By "stable", we mean that any two variables who do not depend on each other
-preserve their existing left-to-right ordering.
+the a in the code. Thus, GHC does ScopedSort on the variables.
+See Note [ScopedSort] in Type.
 
 Implicitly bound variables are collected by any function which returns a
 FreeKiTyVars, FreeKiTyVarsWithDups, or FreeKiTyVarsNoDups, which notably
