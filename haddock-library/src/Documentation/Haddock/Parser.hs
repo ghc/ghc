@@ -33,6 +33,7 @@ import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Monoid
 import qualified Data.Set as Set
 import           Documentation.Haddock.Doc
+import           Documentation.Haddock.Markup ( markup, plainMarkup )
 import           Documentation.Haddock.Parser.Monad
 import           Documentation.Haddock.Parser.Util
 import           Documentation.Haddock.Types
@@ -107,7 +108,7 @@ overIdentifier f d = g d
     g (DocOrderedList x) = DocOrderedList $ fmap g x
     g (DocDefList x) = DocDefList $ fmap (\(y, z) -> (g y, g z)) x
     g (DocCodeBlock x) = DocCodeBlock $ g x
-    g (DocHyperlink x) = DocHyperlink x
+    g (DocHyperlink (Hyperlink u x)) = DocHyperlink (Hyperlink u (fmap g x))
     g (DocPic x) = DocPic x
     g (DocMathInline x) = DocMathInline x
     g (DocMathDisplay x) = DocMathDisplay x
@@ -301,13 +302,19 @@ mathInline = DocMathInline . T.unpack
 -- >>> parseString "\\[\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}\\]"
 -- DocMathDisplay "\\int_{-\\infty}^{\\infty} e^{-x^2/2} = \\sqrt{2\\pi}"
 mathDisplay :: Parser (DocH mod a)
-mathDisplay = DocMathDisplay . T.unpack 
+mathDisplay = DocMathDisplay . T.unpack
               <$> ("\\[" *> takeUntil "\\]")
 
-markdownImage :: Parser (DocH mod a)
-markdownImage = fromHyperlink <$> ("!" *> linkParser)
+-- | Markdown image parser. As per the commonmark reference recommendation, the
+-- description text for an image converted to its a plain string representation.
+--
+-- >>> parseString "![some /emphasis/ in a description](www.site.com)"
+-- DocPic (Picture "www.site.com" (Just "some emphasis in a description"))
+markdownImage :: Parser (DocH mod Identifier)
+markdownImage = DocPic . fromHyperlink <$> ("!" *> linkParser)
   where
-    fromHyperlink (Hyperlink url label) = DocPic (Picture url label)
+    fromHyperlink (Hyperlink u l) = Picture u (fmap (markup stringMarkup) l)
+    stringMarkup = plainMarkup (const "") (\(l,c,r) -> [l] <> c <> [r])
 
 -- | Paragraph parser, called by 'parseParas'.
 paragraph :: Parser (DocH mod Identifier)
@@ -784,22 +791,22 @@ codeblock =
           | isNewline && isSpace c = Just isNewline
           | otherwise = Just $ c == '\n'
 
-hyperlink :: Parser (DocH mod a)
+hyperlink :: Parser (DocH mod Identifier)
 hyperlink = choice' [ angleBracketLink, markdownLink, autoUrl ]
 
 angleBracketLink :: Parser (DocH mod a)
 angleBracketLink =
-    DocHyperlink . makeLabeled Hyperlink 
+    DocHyperlink . makeLabeled (\s -> Hyperlink s . fmap DocString)
     <$> disallowNewline ("<" *> takeUntil ">")
 
-markdownLink :: Parser (DocH mod a)
+markdownLink :: Parser (DocH mod Identifier)
 markdownLink = DocHyperlink <$> linkParser
 
-linkParser :: Parser Hyperlink
+linkParser :: Parser (Hyperlink (DocH mod Identifier))
 linkParser = flip Hyperlink <$> label <*> (whitespace *> url)
   where
-    label :: Parser (Maybe String)
-    label = Just . decode . T.strip <$> ("[" *> takeUntil "]")
+    label :: Parser (Maybe (DocH mod Identifier))
+    label = Just . parseParagraph . T.strip <$> ("[" *> takeUntil "]")
 
     whitespace :: Parser ()
     whitespace = skipHorizontalSpace <* optional ("\n" *> skipHorizontalSpace)
@@ -825,7 +832,7 @@ autoUrl = mkLink <$> url
       Just (xs,x) | x `elem` (",.!?" :: String) -> DocHyperlink (mkHyperlink xs) `docAppend` DocString [x]
       _ -> DocHyperlink (mkHyperlink s)
 
-    mkHyperlink :: Text -> Hyperlink
+    mkHyperlink :: Text -> Hyperlink (DocH mod a)
     mkHyperlink lnk = Hyperlink (T.unpack lnk) Nothing
 
 

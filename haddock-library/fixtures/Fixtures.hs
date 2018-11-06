@@ -146,8 +146,8 @@ instance (ToExpr mod, ToExpr id)  => ToExpr (DocH mod id)
 deriving instance Generic (Header id)
 instance ToExpr id => ToExpr (Header id)
 
-deriving instance Generic Hyperlink
-instance ToExpr Hyperlink
+deriving instance Generic (Hyperlink id)
+instance ToExpr id => ToExpr (Hyperlink id)
 
 deriving instance Generic Picture
 instance ToExpr Picture

@@ -1,0 +1,8 @@
+DocParagraph
+  (DocAppend
+     (DocString "Bla ")
+     (DocHyperlink
+        Hyperlink
+          {hyperlinkLabel = Just (DocAppend (DocString "link ")
+                                            (DocEmphasis (DocString "emphasized"))),
+           hyperlinkUrl = "http://example.com"}))

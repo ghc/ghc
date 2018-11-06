@@ -83,7 +83,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if (__GLASGOW_HASKELL__ >= 807) && (__GLASGOW_HASKELL__ < 809)
-binaryInterfaceVersion = 33
+binaryInterfaceVersion = 34
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
@@ -434,7 +434,7 @@ instance Binary Example where
         result <- get bh
         return (Example expression result)
 
-instance Binary Hyperlink where
+instance Binary a => Binary (Hyperlink a) where
     put_ bh (Hyperlink url label) = do
         put_ bh url
         put_ bh label

@@ -62,8 +62,8 @@ parHtmlMarkup qual insertAnchors ppId = Markup {
   markupHyperlink            = \(Hyperlink url mLabel)
                                -> if insertAnchors
                                   then anchor ! [href url]
-                                       << fromMaybe url mLabel
-                                  else toHtml $ fromMaybe url mLabel,
+                                       << fromMaybe (toHtml url) mLabel
+                                  else fromMaybe (toHtml url) mLabel,
   markupAName                = \aname
                                -> if insertAnchors
                                   then namedAnchor aname << ""

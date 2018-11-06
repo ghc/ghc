@@ -1,3 +1,7 @@
+## TBA
+
+ * Support inline markup in markdown-style links (#875)
+
 ## Changes in version 1.7.0
 
  * Make `Documentation.Haddock.Parser.Monad` an internal module

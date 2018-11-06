@@ -37,7 +37,7 @@ parseParas = overDoc Parse.toRegular . Parse.parseParas Nothing
 parseString :: String -> Doc String
 parseString = Parse.toRegular . Parse.parseString
 
-hyperlink :: String -> Maybe String -> Doc String
+hyperlink :: String -> Maybe (Doc String) -> Doc String
 hyperlink url = DocHyperlink . Hyperlink url
 
 main :: IO ()
@@ -201,6 +201,10 @@ spec = do
         it "rejects whitespace in URL" $ do
           "[some label]( url)" `shouldParseTo`
             "[some label]( url)"
+
+        it "allows inline markup in the label" $ do
+          "[something /emphasized/](url)" `shouldParseTo`
+            hyperlink "url" (Just ("something " <> DocEmphasis "emphasized"))
 
         context "when URL is on a separate line" $ do
           it "allows URL to be on a separate line" $ do
