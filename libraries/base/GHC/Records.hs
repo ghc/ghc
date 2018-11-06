@@ -29,7 +29,7 @@ module GHC.Records
 -- | Constraint representing the fact that the field @x@ belongs to
 -- the record type @r@ and has field type @a@.  This will be solved
 -- automatically, but manual instances may be provided as well.
---
+
 --   HasField :: forall {k}. k -> * -> * -> Constraint
 --   getField :: forall {k} (x::k) r a. HasField x r a => r -> a
 -- NB: The {k} means that k is an 'inferred' type variable, and

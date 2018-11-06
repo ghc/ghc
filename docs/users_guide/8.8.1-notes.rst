@@ -50,10 +50,16 @@ Language
     data D1 = forall a b. (a + b) => D1 a b
     data D2 = forall a b.  a + b  => D2 a b -- now allowed
 
+- The requirement that kind signatures always be parenthesized has been relaxed.
+  For instance, it is now permissible to write ``Proxy '(a :: A, b :: B)``
+  (previous GHC versions required extra parens: ``Proxy '((a :: A), (b :: B))``).
+
 Compiler
 ~~~~~~~~
 
 - New :ghc-flag:`-keep-hscpp-files` to keep the output of the CPP pre-processor.
+
+- The :ghc-flag:`-Wcompat` warning group now includes :ghc-flag:`-Wstar-is-type`.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -100,6 +106,10 @@ Template Haskell
   eventlog events similar to ``traceBinaryEvent#`` but allows the user to pass
   the event payload as a binary blob instead of a ``String``.
 
+- The ``StableName#`` type parameter now has a phantom role instead of
+  a representational one. There is really no reason to care about the
+  type of the underlying object.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -109,6 +119,10 @@ Template Haskell
 
 - Support the characters from recent versions of Unicode (up to v. 12) in literals
     (see :ghc-ticket:`5518`).
+
+- The ``StableName`` type parameter now has a phantom role instead of
+  a representational one. There is really no reason to care about the
+  type of the underlying object.
 
 Build system
 ~~~~~~~~~~~~

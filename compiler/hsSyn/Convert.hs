@@ -257,7 +257,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
     cvt_at_def :: LTyFamInstDecl GhcPs -> CvtM (LTyFamDefltEqn GhcPs)
     -- Very similar to what happens in RdrHsSyn.mkClassDecl
     cvt_at_def decl = case RdrHsSyn.mkATDefault decl of
-                        Right def     -> return def
+                        Right (def, _) -> return def
                         Left (_, msg) -> failWith msg
 
 cvtDec (InstanceD o ctxt ty decs)
@@ -1355,7 +1355,7 @@ cvtTypeKind ty_str ty
                    }
 
            LitT lit
-             -> returnL (HsTyLit noExt (cvtTyLit lit))
+             -> mk_apps (HsTyLit noExt (cvtTyLit lit)) tys'
 
            WildCardT
              -> mk_apps mkAnonWildCardTy tys'
@@ -1364,17 +1364,19 @@ cvtTypeKind ty_str ty
              -> do { s'  <- tconName s
                    ; t1' <- cvtType t1
                    ; t2' <- cvtType t2
-                   ; mk_apps (HsTyVar noExt NotPromoted (noLoc s')) [t1', t2']
+                   ; mk_apps (HsTyVar noExt NotPromoted (noLoc s'))
+                             (t1' : t2' : tys')
                    }
 
            UInfixT t1 s t2
              -> do { t2' <- cvtType t2
-                   ; cvtOpAppT t1 s t2'
-                   } -- Note [Converting UInfix]
+                   ; t <- cvtOpAppT t1 s t2' -- Note [Converting UInfix]
+                   ; mk_apps (unLoc t) tys'
+                   }
 
            ParensT t
              -> do { t' <- cvtType t
-                   ; returnL $ HsParTy noExt t'
+                   ; mk_apps (HsParTy noExt t') tys'
                    }
 
            PromotedT nm -> do { nm' <- cName nm
@@ -1394,7 +1396,7 @@ cvtTypeKind ty_str ty
                m = length tys'
 
            PromotedNilT
-             -> returnL (HsExplicitListTy noExt Promoted [])
+             -> mk_apps (HsExplicitListTy noExt Promoted []) tys'
 
            PromotedConsT  -- See Note [Representing concrete syntax in types]
                           -- in Language.Haskell.TH.Syntax
@@ -1406,12 +1408,14 @@ cvtTypeKind ty_str ty
                         tys'
 
            StarT
-             -> returnL (HsTyVar noExt NotPromoted (noLoc
-                                              (getRdrName liftedTypeKindTyCon)))
+             -> mk_apps (HsTyVar noExt NotPromoted
+                              (noLoc (getRdrName liftedTypeKindTyCon)))
+                        tys'
 
            ConstraintT
-             -> returnL (HsTyVar noExt NotPromoted
+             -> mk_apps (HsTyVar noExt NotPromoted
                               (noLoc (getRdrName constraintKindTyCon)))
+                        tys'
 
            EqualityT
              | [x',y'] <- tys' ->

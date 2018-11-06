@@ -65,6 +65,16 @@ cgExpr (StgApp fun args)     = cgIdApp fun args
 cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
   cgIdApp a []
 
+-- dataToTag# :: a -> Int#
+-- See Note [dataToTag#] in primops.txt.pp
+cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
+  dflags <- getDynFlags
+  emitComment (mkFastString "dataToTag#")
+  tmp <- newTemp (bWord dflags)
+  _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
+  -- TODO: For small types look at the tag bits instead of reading info table
+  emitReturn [getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))]
+
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args
 cgExpr (StgTick t e)         = cgTick t >> cgExpr e
@@ -550,6 +560,8 @@ isSimpleScrut _                _           = return False
 isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 -- True iff the op cannot block or allocate
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
+-- dataToTag# evalautes its argument, see Note [dataToTag#] in primops.txt.pp
+isSimpleOp (StgPrimOp DataToTagOp) _ = return False
 isSimpleOp (StgPrimOp op) stg_args                  = do
     arg_exprs <- getNonVoidArgAmodes stg_args
     dflags <- getDynFlags

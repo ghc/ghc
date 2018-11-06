@@ -37,6 +37,7 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wtabs`
     * :ghc-flag:`-Wunrecognised-warning-flags`
     * :ghc-flag:`-Winaccessible-code`
+    * :ghc-flag:`-Wstar-is-type`
     * :ghc-flag:`-Wstar-binder`
 
 The following flags are simple ways to select standard "packages" of warnings:
@@ -116,6 +117,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wimplicit-kind-vars`
+        * :ghc-flag:`-Wstar-is-type`
 
 .. ghc-flag:: -Wno-compat
     :shortdesc: Disables all warnings enabled by :ghc-flag:`-Wcompat`.
@@ -1174,6 +1176,27 @@ of ``-W(no-)*``.
     ``checkTEQ`` to be able to produce a ``Just``, ``t ~ u`` must hold, but
     since we're passing ``Foo1`` and ``Foo2`` here, it follows that ``t ~
     Char``, and ``u ~ Int``, and thus ``t ~ u`` cannot hold.
+
+.. ghc-flag:: -Wstar-is-type
+     :shortdesc: warn when ``*`` is used to mean ``Data.Kind.Type``
+     :type: dynamic
+     :reverse: -Wno-star-is-type
+     :category:
+
+     :since: 8.6
+
+     The use of ``*`` to denote the kind of inhabited types relies on the
+     :extension:`StarIsType` extension, which in a future release will be
+     turned off by default and then possibly removed. The reasons for this and
+     the deprecation schedule are described in `GHC proposal #30
+     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0030-remove-star-kind.rst>`__.
+
+     This warning allows to detect such uses of ``*`` before the actual
+     breaking change takes place. The recommended fix is to replace ``*`` with
+     ``Type`` imported from ``Data.Kind``.
+
+     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
+     default, but will be switched on in a future GHC release.
 
 .. ghc-flag:: -Wstar-binder
      :shortdesc: warn about binding the ``(*)`` type operator despite

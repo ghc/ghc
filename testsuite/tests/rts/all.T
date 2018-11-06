@@ -291,6 +291,7 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T10017', [ when(opsys('mingw32'), skip)
+               , req_smp
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('T11108', normal, compile_and_run, [''])
@@ -427,6 +428,7 @@ test('alloccounter1', normal, compile_and_run,
 
 test('nursery-chunks1',
   [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
+  , req_smp
   , only_ways(['threaded1','threaded2'])
   ],
   compile_and_run,

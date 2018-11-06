@@ -160,7 +160,7 @@
          {OccName: Length}))
        (HsQTvs
         (NoExt)
-        [({ DumpParsedAst.hs:7:20-30 }
+        [({ DumpParsedAst.hs:7:21-29 }
           (KindedTyVar
            (NoExt)
            ({ DumpParsedAst.hs:7:21-22 }

@@ -614,7 +614,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %name parseTypeSignature sigdecl
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
-%name parseType ctype
+%name parseType ktype
 %name parseBackpack backpack
 %partial parseHeader header
 %%
@@ -1000,7 +1000,7 @@ impspec :: { Located (Bool, Located [LIE GhcPs]) }
 prec    :: { Located (SourceText,Int) }
         : {- empty -}           { noLoc (NoSourceText,9) }
         | INTEGER
-                 {% checkPrecP (sL1 $1 (getINTEGERs $1,fromInteger (il_value (getINTEGER $1)))) }
+                 { sL1 $1 (getINTEGERs $1,fromInteger (il_value (getINTEGER $1))) }
 
 infix   :: { Located FixityDirection }
         : 'infix'                               { sL1 $1 InfixN  }
@@ -1225,7 +1225,7 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
         | {- empty -}                 { noLoc [] }
 
 ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
-        : type '=' ctype
+        : type '=' ktype
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
               {% do { (eqn,ann) <- mkTyFamInstEqn $1 $3
@@ -1778,6 +1778,12 @@ unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
         : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
+-- A ktype is a ctype, possibly with a kind annotation
+ktype :: { LHsType GhcPs }
+        : ctype                { $1 }
+        | ctype '::' kind      {% ams (sLL $1 $> $ HsKindSig noExt $1 $3)
+                                      [mu AnnDcolon $2] }
+
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
         : 'forall' tv_bndrs '.' ctype   {% hintExplicitForall (getLoc $1) >>
@@ -1957,7 +1963,7 @@ atype :: { LHsType GhcPs }
         | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExt
                                                     HsBoxedOrConstraintTuple [])
                                                 [mop $1,mcp $2] }
-        | '(' ctype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
+        | '(' ktype ',' comma_types1 ')' {% addAnnotation (gl $2) AnnComma
                                                           (gl $3) >>
                                             ams (sLL $1 $> $ HsTupleTy noExt
 
@@ -1969,10 +1975,8 @@ atype :: { LHsType GhcPs }
                                              [mo $1,mc $3] }
         | '(#' bar_types2 '#)'        {% ams (sLL $1 $> $ HsSumTy noExt $2)
                                              [mo $1,mc $3] }
-        | '[' ctype ']'               {% ams (sLL $1 $> $ HsListTy  noExt $2) [mos $1,mcs $3] }
-        | '(' ctype ')'               {% ams (sLL $1 $> $ HsParTy   noExt $2) [mop $1,mcp $3] }
-        | '(' ctype '::' kind ')'     {% ams (sLL $1 $> $ HsKindSig noExt $2 $4)
-                                             [mop $1,mu AnnDcolon $3,mcp $5] }
+        | '[' ktype ']'               {% ams (sLL $1 $> $ HsListTy  noExt $2) [mos $1,mcs $3] }
+        | '(' ktype ')'               {% ams (sLL $1 $> $ HsParTy   noExt $2) [mop $1,mcp $3] }
         | quasiquote                  { sL1 $1 (HsSpliceTy noExt (unLoc $1) ) }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy HasParens $2)
                                              [mj AnnOpenPE $1,mj AnnCloseP $3] }
@@ -1981,7 +1985,7 @@ atype :: { LHsType GhcPs }
                                              [mj AnnThIdSplice $1] }
                                       -- see Note [Promotion] for the followings
         | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar noExt Promoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
+        | SIMPLEQUOTE  '(' ktype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
                                 ams (sLL $1 $> $ HsExplicitTupleTy noExt ($3 : $5))
                                     [mj AnnSimpleQuote $1,mop $2,mcp $6] }
@@ -1994,7 +1998,7 @@ atype :: { LHsType GhcPs }
         -- if you had written '[ty, ty, ty]
         -- (One means a list type, zero means the list type constructor,
         -- so you have to quote those.)
-        | '[' ctype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
+        | '[' ktype ',' comma_types1 ']'  {% addAnnotation (gl $2) AnnComma
                                                            (gl $3) >>
                                              ams (sLL $1 $> $ HsExplicitListTy noExt NotPromoted ($2 : $4))
                                                  [mos $1,mcs $5] }
@@ -2021,14 +2025,14 @@ comma_types0  :: { [LHsType GhcPs] }  -- Zero or more:  ty,ty,ty
         | {- empty -}                   { [] }
 
 comma_types1    :: { [LHsType GhcPs] }  -- One or more:  ty,ty,ty
-        : ctype                        { [$1] }
-        | ctype  ',' comma_types1      {% addAnnotation (gl $1) AnnComma (gl $2)
+        : ktype                        { [$1] }
+        | ktype  ',' comma_types1      {% addAnnotation (gl $1) AnnComma (gl $2)
                                           >> return ($1 : $3) }
 
 bar_types2    :: { [LHsType GhcPs] }  -- Two or more:  ty|ty|ty
-        : ctype  '|' ctype             {% addAnnotation (gl $1) AnnVbar (gl $2)
+        : ktype  '|' ktype             {% addAnnotation (gl $1) AnnVbar (gl $2)
                                           >> return [$1,$3] }
-        | ctype  '|' bar_types2        {% addAnnotation (gl $1) AnnVbar (gl $2)
+        | ktype  '|' bar_types2        {% addAnnotation (gl $1) AnnVbar (gl $2)
                                           >> return ($1 : $3) }
 
 tv_bndrs :: { [LHsTyVarBndr GhcPs] }
@@ -2398,7 +2402,8 @@ sigdecl :: { LHsDecl GhcPs }
                        [mu AnnDcolon $4] } }
 
         | infix prec ops
-              {% ams (sLL $1 $> $ SigD noExt
+              {% checkPrecP $2 $3 >>
+                 ams (sLL $1 $> $ SigD noExt
                         (FixSig noExt (FixitySig noExt (fromOL $ unLoc $3)
                                 (Fixity (fst $ unLoc $2) (snd $ unLoc $2) (unLoc $1)))))
                      [mj AnnInfix $1,mj AnnVal $2] }
@@ -2677,7 +2682,7 @@ aexp2   :: { LHsExpr GhcPs }
                                                     else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket noExt (TExpBr noExt $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
-        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket noExt (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
+        | '[t|' ktype '|]'    {% ams (sLL $1 $> $ HsBracket noExt (TypBr noExt $2)) [mo $1,mu AnnCloseQ $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
                                       ams (sLL $1 $> $ HsBracket noExt (PatBr noExt p))
                                           [mo $1,mu AnnCloseQ $3] }
@@ -3262,6 +3267,8 @@ tyconsym :: { Located RdrName }
 op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
+        | '->'                  { sL1 $1 $ getRdrName funTyCon }
+        | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 varop   :: { Located RdrName }
         : varsym                { $1 }

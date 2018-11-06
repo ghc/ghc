@@ -183,10 +183,11 @@ ppT : lowerName { TyVar $1 }
 
 pTycon :: { TyCon }
 pTycon : upperName { TyCon $1 }
-       | '(' ')'   { TyCon "()" }
-       | SCALAR    { SCALAR }
-       | VECTOR    { VECTOR }
-       | VECTUPLE  { VECTUPLE }
+       | '(' ')'      { TyCon "()" }
+       | '(' '->' ')' { TyCon "->" }
+       | SCALAR       { SCALAR }
+       | VECTOR       { VECTOR }
+       | VECTUPLE     { VECTUPLE }
 
 {
 parse :: String -> Either String Info

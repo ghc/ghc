@@ -2409,8 +2409,7 @@ specifically:
    sets the fixity for both type constructor ``T`` and data constructor
    ``T``, and similarly for ``:*:``. ``Int `a` Bool``.
 
--  Function arrow is ``infixr`` with fixity 0 (this might change; it's
-   not clear what it should be).
+-  The function arrow ``->`` is ``infixr`` with fixity -1.
 
 .. _type-operators:
 

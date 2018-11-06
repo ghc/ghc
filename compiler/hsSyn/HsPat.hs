@@ -735,7 +735,7 @@ patNeedsParens p = go
     go (SplicePat {})         = False
     go (ConPatIn _ ds)        = conPatNeedsParens p ds
     go cp@(ConPatOut {})      = conPatNeedsParens p (pat_args cp)
-    go (SigPat {})            = p > topPrec
+    go (SigPat {})            = p >= sigPrec
     go (ViewPat {})           = True
     go (CoPat _ _ p _)        = go p
     go (WildPat {})           = False

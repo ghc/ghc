@@ -635,11 +635,10 @@ data TcGblEnv
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls
 
-        tcg_th_modfinalizers :: TcRef [TcM ()],
+        tcg_th_modfinalizers :: TcRef [(TcLclEnv, ThModFinalizers)],
         -- ^ Template Haskell module finalizers.
         --
-        -- They are computations in the @TcM@ monad rather than @Q@ because we
-        -- set them to use particular local environments.
+        -- They can use particular local environments.
 
         tcg_th_coreplugins :: TcRef [String],
         -- ^ Core plugins added by Template Haskell code.

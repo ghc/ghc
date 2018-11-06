@@ -207,7 +207,7 @@
            [{Name: k}]
            {NameSet:
             []})
-          [({ DumpRenamedAst.hs:8:20-30 }
+          [({ DumpRenamedAst.hs:8:21-29 }
             (KindedTyVar
              (NoExt)
              ({ DumpRenamedAst.hs:8:21-22 }
@@ -292,28 +292,31 @@
            ({ DumpRenamedAst.hs:15:18-20 }
             {Name: DumpRenamedAst.Nat})
            [({ DumpRenamedAst.hs:15:22-34 }
-             (HsKindSig
+             (HsParTy
               (NoExt)
-              ({ DumpRenamedAst.hs:15:23 }
-               (HsTyVar
+              ({ DumpRenamedAst.hs:15:23-33 }
+               (HsKindSig
                 (NoExt)
-                (NotPromoted)
                 ({ DumpRenamedAst.hs:15:23 }
-                 {Name: a})))
-              ({ DumpRenamedAst.hs:15:28-33 }
-               (HsFunTy
-                (NoExt)
-                ({ DumpRenamedAst.hs:15:28 }
                  (HsTyVar
                   (NoExt)
                   (NotPromoted)
-                  ({ DumpRenamedAst.hs:15:28 }
-                   {Name: k})))
+                  ({ DumpRenamedAst.hs:15:23 }
+                   {Name: a})))
                 (HsOmega)
-                ({ DumpRenamedAst.hs:15:33 }
-                 (HsStarTy
+                ({ DumpRenamedAst.hs:15:28-33 }
+                 (HsFunTy
                   (NoExt)
-                  (False)))))))]
+                  ({ DumpRenamedAst.hs:15:28 }
+                   (HsTyVar
+                    (NoExt)
+                    (NotPromoted)
+                    ({ DumpRenamedAst.hs:15:28 }
+                     {Name: k})))
+                  ({ DumpRenamedAst.hs:15:33 }
+                   (HsStarTy
+                    (NoExt)
+                    (False)))))))))]
            (Prefix)
            (HsDataDefn
             (NoExt)

@@ -51,7 +51,6 @@ import {-# SOURCE #-} TcSplice
     , runMetaE
     , runMetaP
     , runMetaT
-    , runRemoteModFinalizers
     , tcTopSpliceExpr
     )
 
@@ -638,9 +637,16 @@ rnTopSpliceDecls splice
                                rnSplice splice
            -- As always, be sure to checkNoErrs above lest we end up with
            -- holes making it to typechecking, hence #12584.
+           --
+           -- Note that we cannot call checkNoErrs for the whole duration
+           -- of rnTopSpliceDecls. The reason is that checkNoErrs changes
+           -- the local environment to temporarily contain a new
+           -- reference to store errors, and add_mod_finalizers would
+           -- cause this reference to be stored after checkNoErrs finishes.
+           -- This is checked by test TH_finalizer.
          ; traceRn "rnTopSpliceDecls: untyped declaration splice" empty
-         ; (decls, mod_finalizers) <-
-              runRnSplice UntypedDeclSplice runMetaD ppr_decls rn_splice
+         ; (decls, mod_finalizers) <- checkNoErrs $
+               runRnSplice UntypedDeclSplice runMetaD ppr_decls rn_splice
          ; add_mod_finalizers_now mod_finalizers
          ; return (decls,fvs) }
    where
@@ -658,8 +664,9 @@ rnTopSpliceDecls splice
      add_mod_finalizers_now []             = return ()
      add_mod_finalizers_now mod_finalizers = do
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
+       env <- getLclEnv
        updTcRef th_modfinalizers_var $ \fins ->
-         runRemoteModFinalizers (ThModFinalizers mod_finalizers) : fins
+         (env, ThModFinalizers mod_finalizers) : fins
 
 
 {-

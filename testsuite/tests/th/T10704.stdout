@@ -1,4 +1,4 @@
-Just (Fixity 0 InfixR)
+Just (Fixity (-1) InfixR)
 Nothing
 Nothing
 Just (Fixity 6 InfixL)

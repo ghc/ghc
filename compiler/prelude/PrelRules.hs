@@ -1021,7 +1021,7 @@ tagToEnumRule = do
 
 ------------------------------
 dataToTagRule :: RuleM CoreExpr
--- Rules for dataToTag#
+-- See Note [dataToTag#] in primops.txt.pp
 dataToTagRule = a `mplus` b
   where
     -- dataToTag (tagToEnum x)   ==>   x
@@ -1030,19 +1030,6 @@ dataToTagRule = a `mplus` b
       guard $ tag_to_enum `hasKey` tagToEnumKey
       guard $ ty1 `eqType` ty2
       return tag
-
-    -- Why don't we simplify tagToEnum# (dataToTag# x) to x? We would
-    -- like to, but it seems tricky. See #14282. The trouble is that
-    -- we never actually see tagToEnum# (dataToTag# x). Because dataToTag#
-    -- is can_fail, this expression is immediately transformed into
-    --
-    --   case dataToTag# @T x of wild
-    --     { __DEFAULT -> tagToEnum# @T wild }
-    --
-    -- and wild has no unfolding. Simon Peyton Jones speculates one way around
-    -- might be to arrange to give unfoldings to case binders of CONLIKE
-    -- applications and mark dataToTag# CONLIKE, but he doubts it's really
-    -- worth the trouble.
 
     -- dataToTag (K e1 e2)  ==>   tag-of K
     -- This also works (via exprIsConApp_maybe) for
@@ -2119,6 +2106,8 @@ Instead, we deal with turning one branch into DEFAULT in SimplUtils
 
 Note [caseRules for dataToTag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [dataToTag#] in primpops.txt.pp
+
 We want to transform
   case dataToTag x of
     DEFAULT -> e1

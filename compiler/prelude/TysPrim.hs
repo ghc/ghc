@@ -20,6 +20,8 @@ module TysPrim(
 
         alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
         alphaTys, alphaTy, betaTy, gammaTy, deltaTy,
+        alphaTyVarsUnliftedRep, alphaTyVarUnliftedRep,
+        alphaTysUnliftedRep, alphaTyUnliftedRep,
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
@@ -316,6 +318,17 @@ alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars
 alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
+
+alphaTyVarsUnliftedRep :: [TyVar]
+alphaTyVarsUnliftedRep = mkTemplateTyVars $ repeat (tYPE unliftedRepDataConTy)
+
+alphaTyVarUnliftedRep :: TyVar
+(alphaTyVarUnliftedRep:_) = alphaTyVarsUnliftedRep
+
+alphaTysUnliftedRep :: [Type]
+alphaTysUnliftedRep = mkTyVarTys alphaTyVarsUnliftedRep
+alphaTyUnliftedRep :: Type
+(alphaTyUnliftedRep:_) = alphaTysUnliftedRep
 
 runtimeRep1TyVar, runtimeRep2TyVar :: TyVar
 (runtimeRep1TyVar : runtimeRep2TyVar : _)
@@ -949,7 +962,7 @@ mkStablePtrPrimTy ty = TyConApp stablePtrPrimTyCon [ty]
 -}
 
 stableNamePrimTyCon :: TyCon
-stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName [Representational] UnliftedRep
+stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName [Phantom] UnliftedRep
 
 mkStableNamePrimTy :: Type -> Type
 mkStableNamePrimTy ty = TyConApp stableNamePrimTyCon [ty]

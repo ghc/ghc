@@ -414,12 +414,11 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
         oc->image = NULL;
     }
 
-    if (oc->info->image) {
-        HeapFree(code_heap, 0, oc->info->image);
-        oc->info->image = NULL;
-    }
-
     if (oc->info) {
+        if (oc->info->image) {
+            HeapFree(code_heap, 0, oc->info->image);
+            oc->info->image = NULL;
+        }
         if (oc->info->ch_info)
            stgFree (oc->info->ch_info);
         stgFree (oc->info);
@@ -447,15 +446,15 @@ static void releaseOcInfo(ObjectCode* oc) {
         oc->info = NULL;
     }
     for (int i = 0; i < oc->n_sections; i++){
-        Section section = oc->sections[i];
-        if (section.info) {
-            stgFree (section.info->name);
-            if (section.info->relocs) {
-                stgFree (section.info->relocs);
-                section.info->relocs = NULL;
+        Section *section = &oc->sections[i];
+        if (section->info) {
+            stgFree (section->info->name);
+            if (section->info->relocs) {
+                stgFree (section->info->relocs);
+                section->info->relocs = NULL;
             }
-            stgFree (section.info);
-            section.info = NULL;
+            stgFree (section->info);
+            section->info = NULL;
         }
     }
 }
@@ -1161,6 +1160,11 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
 {
    COFF_HEADER_INFO *info = getHeaderInfo (oc);
 
+   /* If the header could not be read, then don't process the ObjectCode.
+      This the case when the ObjectCode has been partially freed.  */
+   if (!info)
+     return false;
+
    uint32_t i, noRelocs;
    COFF_section* sectab;
    COFF_symbol*  symtab;
@@ -1530,6 +1534,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           stgFree (oc->image);
           oc->image = NULL;
           releaseOcInfo (oc);
+          oc->status = OBJECT_DONT_RESOLVE;
           return true;
       }
 
@@ -1830,6 +1835,10 @@ ocResolve_PEi386 ( ObjectCode* oc )
       sense of buffer-overrun-proof. */
    uint8_t symbol[1000];
    /* debugBelch("resolving for %s\n", oc->fileName); */
+
+   /* Such libraries have been partially freed and can't be resolved.  */
+   if (oc->status == OBJECT_DONT_RESOLVE)
+     return 1;
 
    COFF_HEADER_INFO *info = oc->info->ch_info;
    uint32_t numberOfSections = info->numberOfSections;

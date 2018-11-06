@@ -87,7 +87,7 @@ import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
-import Type             ( TyThing(..) )
+import Type             ( TyThing(..), funTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
@@ -151,7 +151,8 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (text "class") whereDots cls tparams
-       ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
+       ; (at_defs, anns) <- fmap unzip $ mapM (eitherToP . mkATDefault) at_insts
+       ; sequence_ anns
        ; return (L loc (ClassDecl { tcdCExt = noExt, tcdCtxt = cxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
@@ -162,22 +163,26 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
                                   , tcdDocs  = docs })) }
 
 mkATDefault :: LTyFamInstDecl GhcPs
-            -> Either (SrcSpan, SDoc) (LTyFamDefltEqn GhcPs)
--- Take a type-family instance declaration and turn it into
--- a type-family default equation for a class declaration
+            -> Either (SrcSpan, SDoc) (LTyFamDefltEqn GhcPs, P ())
+-- ^ Take a type-family instance declaration and turn it into
+-- a type-family default equation for a class declaration.
 -- We parse things as the former and use this function to convert to the latter
 --
--- We use the Either monad because this also called
--- from Convert.hs
+-- We use the Either monad because this also called from "Convert".
+--
+-- The @P ()@ we return corresponds represents an action which will add
+-- some necessary paren annotations to the parsing context. Naturally, this
+-- is not something that the "Convert" use cares about.
 mkATDefault (L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
       | FamEqn { feqn_tycon = tc, feqn_pats = pats, feqn_fixity = fixity
                , feqn_rhs = rhs } <- e
-      = do { tvs <- checkTyVars (text "default") equalsDots tc pats
-           ; return (L loc (FamEqn { feqn_ext    = noExt
+      = do { (tvs, anns) <- checkTyVars (text "default") equalsDots tc pats
+           ; let f = L loc (FamEqn { feqn_ext    = noExt
                                    , feqn_tycon  = tc
                                    , feqn_pats   = tvs
                                    , feqn_fixity = fixity
-                                   , feqn_rhs    = rhs })) }
+                                   , feqn_rhs    = rhs })
+           ; pure (f, anns) }
 mkATDefault (L _ (TyFamInstDecl (HsIB _ (XFamEqn _)))) = panic "mkATDefault"
 mkATDefault (L _ (TyFamInstDecl (XHsImplicitBndrs _))) = panic "mkATDefault"
 
@@ -774,7 +779,10 @@ checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
              -> P (LHsQTyVars GhcPs)
 -- Same as checkTyVars, but in the P monad
 checkTyVarsP pp_what equals_or_where tc tparms
-  = eitherToP $ checkTyVars pp_what equals_or_where tc tparms
+  = do { let checkedTvs = checkTyVars pp_what equals_or_where tc tparms
+       ; (tvs, anns) <- eitherToP checkedTvs
+       ; anns
+       ; pure tvs }
 
 eitherToP :: Either (SrcSpan, SDoc) a -> P a
 -- Adapts the Either monad to the P monad
@@ -782,16 +790,24 @@ eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
-            -> Either (SrcSpan, SDoc) (LHsQTyVars GhcPs)
--- Check whether the given list of type parameters are all type variables
--- (possibly with a kind signature)
--- We use the Either monad because it's also called (via mkATDefault) from
--- Convert.hs
+            -> Either (SrcSpan, SDoc)
+                      ( LHsQTyVars GhcPs  -- the synthesized type variables
+                      , P () )            -- action which adds annotations
+-- ^ Check whether the given list of type parameters are all type variables
+-- (possibly with a kind signature).
+-- We use the Either monad because it's also called (via 'mkATDefault') from
+-- "Convert".
 checkTyVars pp_what equals_or_where tc tparms
-  = do { tvs <- mapM chk tparms
-       ; return (mkHsQTvs tvs) }
+  = do { (tvs, anns) <- fmap unzip $ mapM (chkParens []) tparms
+       ; return (mkHsQTvs tvs, sequence_ anns) }
   where
-    chk (L _ (HsParTy _ ty)) = chk ty
+        -- Keep around an action for adjusting the annotations of extra parens
+    chkParens :: [AddAnn] -> LHsType GhcPs
+              -> Either (SrcSpan, SDoc) (LHsTyVarBndr GhcPs, P ())
+    chkParens acc (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) ty
+    chkParens acc ty = case chk ty of
+      Left err -> Left err
+      Right tv@(L l _) -> Right (tv, addAnnsAt l (reverse acc))
 
         -- Check that the name space is correct!
     chk (L l (HsKindSig _ (L lv (HsTyVar _ _ (L _ tv))) k))
@@ -1740,11 +1756,19 @@ cmdStmtFail loc e = parseErrorSDoc loc
 ---------------------------------------------------------------------------
 -- Miscellaneous utilities
 
-checkPrecP :: Located (SourceText,Int) -> P (Located (SourceText,Int))
-checkPrecP (L l (src,i))
- | 0 <= i && i <= maxPrecedence = return (L l (src,i))
- | otherwise
-    = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
+-- | Check if a fixity is valid. We support bypassing the usual bound checks
+-- for some special operators.
+checkPrecP
+        :: Located (SourceText,Int)             -- ^ precedence
+        -> Located (OrdList (Located RdrName))  -- ^ operators
+        -> P ()
+checkPrecP (L l (_,i)) (L _ ol)
+ | 0 <= i, i <= maxPrecedence = pure ()
+ | all specialOp ol = pure ()
+ | otherwise = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
+  where
+    specialOp op = unLoc op `elem` [ eqTyCon_RDR
+                                   , getRdrName funTyCon ]
 
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs
@@ -2025,7 +2049,8 @@ warnStarIsType span = addWarning Opt_WarnStarIsType span msg
     msg =  text "Using" <+> quotes (text "*")
            <+> text "(or its Unicode variant) to mean"
            <+> quotes (text "Data.Kind.Type")
-        $$ text "relies on the StarIsType extension."
+        $$ text "relies on the StarIsType extension, which will become"
+        $$ text "deprecated in the future."
         $$ text "Suggested fix: use" <+> quotes (text "Type")
            <+> text "from" <+> quotes (text "Data.Kind") <+> text "instead."
 

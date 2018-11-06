@@ -42,7 +42,7 @@ data QuasiQuoter = QuasiQuoter {
     }
 
 -- | 'quoteFile' takes a 'QuasiQuoter' and lifts it into one that read
--- the data out of a file.  For example, suppose 'asmq' is an 
+-- the data out of a file.  For example, suppose @asmq@ is an
 -- assembly-language quoter, so that you can write [asmq| ld r1, r2 |]
 -- as an expression. Then if you define @asmq_f = quoteFile asmq@, then
 -- the quote [asmq_f|foo.s|] will take input from file @"foo.s"@ instead

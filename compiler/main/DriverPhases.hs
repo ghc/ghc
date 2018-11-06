@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 
 module DriverPhases (
-   HscSource(..), isHsBootOrSig, hscSourceString,
+   HscSource(..), isHsBootOrSig, isHsigFile, hscSourceString,
    Phase(..),
    happensBefore, eqPhase, anyHsc, isStopLn,
    startPhase,
@@ -123,6 +123,10 @@ isHsBootOrSig :: HscSource -> Bool
 isHsBootOrSig HsBootFile = True
 isHsBootOrSig HsigFile   = True
 isHsBootOrSig _          = False
+
+isHsigFile :: HscSource -> Bool
+isHsigFile HsigFile = True
+isHsigFile _        = False
 
 data Phase
         = Unlit HscSource

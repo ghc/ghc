@@ -1339,7 +1339,7 @@ instance Outputable ForeignLabelSource where
 
 internalNamePrefix :: Name -> SDoc
 internalNamePrefix name = getPprStyle $ \ sty ->
-  if codeStyle sty && isRandomGenerated then
+  if asmStyle sty && isRandomGenerated then
     sdocWithPlatform $ \platform ->
       ptext (asmTempLabelPrefix platform)
   else

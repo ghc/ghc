@@ -48,7 +48,7 @@ module TcRnMonad(
 
   -- * Typechecker global environment
   getIsGHCi, getGHCiMonad, getInteractivePrintName,
-  tcIsHsBootOrSig, tcSelfBootInfo, getGlobalRdrEnv,
+  tcIsHsBootOrSig, tcIsHsig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv, getRecFieldEnv,
   getDeclaredDefaultTys,
@@ -185,7 +185,6 @@ import Control.Monad
 import Data.Set ( Set )
 import qualified Data.Set as Set
 
-import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
 import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
@@ -787,6 +786,9 @@ getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC h
 
 tcIsHsBootOrSig :: TcRn Bool
 tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }
+
+tcIsHsig :: TcRn Bool
+tcIsHsig = do { env <- getGblEnv; return (isHsigFile (tcg_src env)) }
 
 tcSelfBootInfo :: TcRn SelfBootInfo
 tcSelfBootInfo = do { env <- getGblEnv; return (tcg_self_boot env) }
@@ -1720,8 +1722,7 @@ addModFinalizersWithLclEnv mod_finalizers
   = do lcl_env <- getLclEnv
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
        updTcRef th_modfinalizers_var $ \fins ->
-         setLclEnv lcl_env (runRemoteModFinalizers mod_finalizers)
-         : fins
+         (lcl_env, mod_finalizers) : fins
 
 {-
 ************************************************************************

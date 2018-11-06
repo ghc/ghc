@@ -33,3 +33,9 @@ Template.hs:21:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
     Noncanonical ‘mappend’ definition detected
     in the instance declaration for ‘Monoid S’.
     Define as ‘mappend = (<>)’
+
+Template.hs:25:15: warning: [-Wstar-is-type (in -Wcompat)]
+    Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’
+    relies on the StarIsType extension, which will become
+    deprecated in the future.
+    Suggested fix: use ‘Type’ from ‘Data.Kind’ instead.

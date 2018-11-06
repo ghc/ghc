@@ -47,7 +47,7 @@ module TcRnDriver (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TcSplice ( finishTH )
+import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )
 import TcHsType
@@ -471,8 +471,10 @@ run_th_modfinalizers = do
   then getEnvs
   else do
     writeTcRef th_modfinalizers_var []
-    (_, lie_th) <- captureTopConstraints $
-                   sequence_ th_modfinalizers
+    let run_finalizer (lcl_env, f) =
+            setLclEnv lcl_env (runRemoteModFinalizers f)
+
+    (_, lie_th) <- captureTopConstraints $ mapM_ run_finalizer th_modfinalizers
       -- Finalizers can add top-level declarations with addTopDecls, so
       -- we have to run tc_rn_src_decls to get them
     (tcg_env, tcl_env, lie_top_decls) <- tc_rn_src_decls []
@@ -551,8 +553,7 @@ tc_rn_src_decls ds
             do { recordTopLevelSpliceLoc loc
 
                  -- Rename the splice expression, and get its supporting decls
-               ; (spliced_decls, splice_fvs) <- checkNoErrs (rnTopSpliceDecls
-                                                             splice)
+               ; (spliced_decls, splice_fvs) <- rnTopSpliceDecls splice
 
                  -- Glue them on the front of the remaining decls and loop
                ; (tcg_env, tcl_env, lie2) <-
