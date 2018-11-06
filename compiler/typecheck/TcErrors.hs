@@ -543,7 +543,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- report1: ones that should *not* be suppresed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
-    -- (see TcRnTypes.insolubleWantedCt) is caught here, otherwise
+    -- (see TcRnTypes.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
     report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
@@ -1186,8 +1186,8 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
-        || isCoercionType hole_ty -- Don't print the kind of unlifted
-                                  -- equalities (#15039)
+        || isCoVarType hole_ty -- Don't print the kind of unlifted
+                               -- equalities (#15039)
       = pprType hole_ty
       | otherwise
       = pprType hole_ty <+> dcolon <+> pprKind hole_kind

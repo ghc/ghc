@@ -104,6 +104,7 @@ import RnEnv
 import RnSource
 import ErrUtils
 import Id
+import IdInfo( IdDetails(..) )
 import VarEnv
 import Module
 import UniqFM
@@ -2640,7 +2641,8 @@ loadUnqualIfaces hsc_env ictxt
 {-
 ************************************************************************
 *                                                                      *
-                Degugging output
+                Debugging output
+      This is what happens when you do -ddump-types
 *                                                                      *
 ************************************************************************
 -}
@@ -2677,8 +2679,10 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                         tcg_fam_insts = fam_insts,
                         tcg_rules     = rules,
                         tcg_imports   = imports })
-  = vcat [ ppr_types type_env
-         , ppr_tycons fam_insts type_env
+  = getPprDebug $ \debug ->
+    vcat [ ppr_types debug type_env
+         , ppr_tycons debug fam_insts type_env
+         , ppr_datacons debug type_env
          , ppr_patsyns type_env
          , ppr_insts insts
          , ppr_fam_insts fam_insts
@@ -2696,81 +2700,95 @@ ppr_rules rules
     hang (text "RULES")
        2 (vcat (map ppr rules))
 
-ppr_types :: TypeEnv -> SDoc
-ppr_types type_env = getPprDebug $ \dbg ->
-  let
+ppr_types :: Bool -> TypeEnv -> SDoc
+ppr_types debug type_env
+  = ppr_things "TYPE SIGNATURES" ppr_sig
+             (sortBy (comparing getOccName) ids)
+  where
     ids = [id | id <- typeEnvIds type_env, want_sig id]
-    want_sig id | dbg
-                = True
-                | otherwise
-                = isExternalName (idName id) &&
-                  (not (isDerivedOccName (getOccName id)))
-        -- Top-level user-defined things have External names.
-        -- Suppress internally-generated things unless -dppr-debug
-  in
-  ppr_sigs ids
+    want_sig id
+      | debug     = True
+      | otherwise = hasTopUserName id
+                    && case idDetails id of
+                         VanillaId    -> True
+                         RecSelId {}  -> True
+                         ClassOpId {} -> True
+                         FCallId {}   -> True
+                         _            -> False
+             -- Data cons (workers and wrappers), pattern synonyms,
+             -- etc are suppressed (unless -dppr-debug),
+             -- because they appear elsehwere
 
-ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
-ppr_tycons fam_insts type_env = getPprDebug $ \dbg ->
-  let
+    ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
+
+ppr_tycons :: Bool -> [FamInst] -> TypeEnv -> SDoc
+ppr_tycons debug fam_insts type_env
+  = vcat [ ppr_things "TYPE CONSTRUCTORS" ppr_tc tycons
+         , ppr_things "COERCION AXIOMS" pprCoAxiom
+                      (typeEnvCoAxioms type_env) ]
+  where
     fi_tycons = famInstsRepTyCons fam_insts
-    tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
-    want_tycon tycon | dbg        = True
+
+    tycons = sortBy (comparing getOccName) $
+             [tycon | tycon <- typeEnvTyCons type_env
+                    , want_tycon tycon]
+             -- Sort by OccName to reduce unnecessary changes
+    want_tycon tycon | debug      = True
                      | otherwise  = not (isImplicitTyCon tycon) &&
                                     isExternalName (tyConName tycon) &&
                                     not (tycon `elem` fi_tycons)
-  in
-  vcat [ hang (text "TYPE CONSTRUCTORS")
-            2 (ppr_tydecls tycons)
-       , hang (text "COERCION AXIOMS")
-            2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
-
-ppr_patsyns :: TypeEnv -> SDoc
-ppr_patsyns type_env
-  = ppUnless (null patsyns) $
-    hang (text "PATTERN SYNONYMS")
-       2 (vcat (map ppr_ps patsyns))
-  where
-    patsyns = typeEnvPatSyns type_env
-    ppr_ps ps = ppr ps <+> dcolon <+> pprPatSynType ps
-
-ppr_insts :: [ClsInst] -> SDoc
-ppr_insts ispecs
-  = ppUnless (null ispecs) $
-    hang (text "INSTANCES") 2 (pprInstances ispecs)
-
-ppr_fam_insts :: [FamInst] -> SDoc
-ppr_fam_insts fam_insts
-  = ppUnless (null fam_insts) $
-    hang (text "FAMILY INSTANCES")
-       2 (pprFamInsts fam_insts)
-
-ppr_sigs :: [Var] -> SDoc
-ppr_sigs ids -- Print type signatures; sort by OccName
-  = hang (text "TYPE SIGNATURES")
-       2 (vcat (map ppr_sig (sortBy (comparing getOccName) ids)))
-  where
-    ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
-
-ppr_tydecls :: [TyCon] -> SDoc
-ppr_tydecls tycons
-  -- Print type constructor info for debug purposes
-  -- Sort by OccName to reduce unnecessary changes
-  = getPprDebug $ \ debug ->
-    vcat $ map (ppr_tc debug) $ sortBy (comparing getOccName) tycons
-  where
-    ppr_tc debug tc
+    ppr_tc tc
        = vcat [ ppWhen show_roles $
                 hang (text "type role" <+> ppr tc)
                    2 (hsep (map ppr roles))
               , hang (ppr tc <+> dcolon)
                    2 (ppr (tidyTopType (tyConKind tc))) ]
        where
-         roles = tyConRoles tc
          show_roles = debug || not (all (== boring_role) roles)
+         roles = tyConRoles tc
          boring_role | isClassTyCon tc = Nominal
                      | otherwise       = Representational
             -- Matches the choice in IfaceSyn, calls to pprRoles
+
+ppr_datacons :: Bool -> TypeEnv -> SDoc
+ppr_datacons debug type_env
+  = ppr_things "DATA CONSTRUCTORS" ppr_dc wanted_dcs
+      -- The filter gets rid of class data constructors
+  where
+    ppr_dc dc = ppr dc <+> dcolon <+> ppr (dataConUserType dc)
+    all_dcs    = typeEnvDataCons type_env
+    wanted_dcs | debug     = all_dcs
+               | otherwise = filterOut is_cls_dc all_dcs
+    is_cls_dc dc = isClassTyCon (dataConTyCon dc)
+
+ppr_patsyns :: TypeEnv -> SDoc
+ppr_patsyns type_env
+  = ppr_things "PATTERN SYNONYMS" ppr_ps
+               (typeEnvPatSyns type_env)
+  where
+    ppr_ps ps = ppr ps <+> dcolon <+> pprPatSynType ps
+
+ppr_insts :: [ClsInst] -> SDoc
+ppr_insts ispecs
+  = ppr_things "CLASS INSTANCES" pprInstance ispecs
+
+ppr_fam_insts :: [FamInst] -> SDoc
+ppr_fam_insts fam_insts
+  = ppr_things "FAMILY INSTANCES" pprFamInst fam_insts
+
+ppr_things :: String -> (a -> SDoc) -> [a] -> SDoc
+ppr_things herald ppr_one things
+  | null things = empty
+  | otherwise   = text herald $$ nest 2 (vcat (map ppr_one things))
+
+hasTopUserName :: NamedThing x => x -> Bool
+-- A top-level thing whose name is not "derived"
+-- Thus excluding things like $tcX, from Typeable boilerplate
+-- and C:Coll from class-dictionary data constructors
+hasTopUserName x
+  = isExternalName name && not (isDerivedOccName (nameOccName name))
+  where
+    name = getName x
 
 {-
 ********************************************************************************

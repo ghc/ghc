@@ -1776,8 +1776,8 @@ neededEvVars implic@(Implic { ic_given = givens
       ; return (implic { ic_need_inner = need_inner
                        , ic_need_outer = need_outer }) }
  where
-   add_implic_seeds (Implic { ic_need_outer = needs, ic_given = givens }) acc
-      = (needs `delVarSetList` givens) `unionVarSet` acc
+   add_implic_seeds (Implic { ic_need_outer = needs }) acc
+      = needs `unionVarSet` acc
 
    needed_ev_bind needed (EvBind { eb_lhs = ev_var
                                  , eb_is_given = is_given })

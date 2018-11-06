@@ -1,8 +1,6 @@
 
 T8958.hs:1:31: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
-TYPE SIGNATURES
-  T8958.MkMap :: forall k v. [(k, v)] -> Map k v
 TYPE CONSTRUCTORS
   type role Map nominal representational
   Map :: * -> * -> *
@@ -11,7 +9,9 @@ TYPE CONSTRUCTORS
   Representational :: * -> Constraint
 COERCION AXIOMS
   axiom T8958.N:Map :: Map k v = [(k, v)] -- Defined at T8958.hs:13:1
-INSTANCES
+DATA CONSTRUCTORS
+  MkMap :: forall k v. [(k, v)] -> Map k v
+CLASS INSTANCES
   instance [incoherent] Representational a
     -- Defined at T8958.hs:10:10
   instance [incoherent] Nominal a -- Defined at T8958.hs:7:10

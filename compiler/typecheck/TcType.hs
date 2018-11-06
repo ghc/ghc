@@ -90,14 +90,13 @@ module TcType (
   deNoteType,
   orphNamesOfType, orphNamesOfCo,
   orphNamesOfTypes, orphNamesOfCoCon,
-  getDFunTyKey,
-  evVarPred_maybe, evVarPred,
+  getDFunTyKey, evVarPred,
 
   ---------------------------------
   -- Predicate types
   mkMinimalBySCs, transSuperClasses,
   pickQuantifiablePreds, pickCapturedPreds,
-  immSuperClasses,
+  immSuperClasses, boxEqPred,
   isImprovementPred,
 
   -- * Finding type instances
@@ -215,7 +214,7 @@ import Name -- hiding (varName)
 import NameSet
 import VarEnv
 import PrelNames
-import TysWiredIn( coercibleClass, unitTyCon, unitTyConKey
+import TysWiredIn( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                  , listTyCon, constraintKind )
 import Weight
 import BasicTypes
@@ -2013,18 +2012,12 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
        Just (ty, _) -> hasTyVarHead ty
        Nothing      -> False
 
-evVarPred_maybe :: EvVar -> Maybe PredType
-evVarPred_maybe v = if isPredTy ty then Just ty else Nothing
-  where ty = varType v
-
 evVarPred :: EvVar -> PredType
 evVarPred var
- | debugIsOn
-  = case evVarPred_maybe var of
-      Just pred -> pred
-      Nothing   -> pprPanic "tcEvVarPred" (ppr var <+> ppr (varType var))
- | otherwise
-  = varType var
+  = ASSERT2( isEvVarType var_ty, ppr var <+> dcolon <+> ppr var_ty )
+    var_ty
+ where
+    var_ty = varType var
 
 ------------------
 -- | When inferring types, should we quantify over a given predicate?
@@ -2042,31 +2035,38 @@ pickQuantifiablePreds qtvs theta
   = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
                              -- -XFlexibleContexts: see Trac #10608, #10351
          -- flex_ctxt <- xoptM Opt_FlexibleContexts
-    filter (pick_me flex_ctxt) theta
+    mapMaybe (pick_me flex_ctxt) theta
   where
     pick_me flex_ctxt pred
       = case classifyPredType pred of
 
           ClassPred cls tys
             | Just {} <- isCallStackPred cls tys
-              -- NEVER infer a CallStack constraint
-              -- Otherwise, we let the constraints bubble up to be
-              -- solved from the outer context, or be defaulted when we
-              -- reach the top-level.
-              -- see Note [Overview of implicit CallStacks]
-              -> False
+              -- NEVER infer a CallStack constraint.  Otherwise we let
+              -- the constraints bubble up to be solved from the outer
+              -- context, or be defaulted when we reach the top-level.
+              -- See Note [Overview of implicit CallStacks]
+            -> Nothing
 
-            | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
+            | isIPClass cls
+            -> Just pred -- See note [Inheriting implicit parameters]
 
-            | otherwise
-              -> pick_cls_pred flex_ctxt cls tys
+            | pick_cls_pred flex_ctxt cls tys
+            -> Just pred
 
-          EqPred ReprEq ty1 ty2 -> pick_cls_pred flex_ctxt coercibleClass [ty1, ty2]
-            -- representational equality is like a class constraint
+          EqPred eq_rel ty1 ty2
+            | quantify_equality eq_rel ty1 ty2
+            , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
+              -- boxEqPred: See Note [Lift equality constaints when quantifying]
+            , pick_cls_pred flex_ctxt cls tys
+            -> Just (mkClassPred cls tys)
 
-          EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
-          IrredPred ty          -> tyCoVarsOfType ty `intersectsVarSet` qtvs
-          ForAllPred {}         -> False
+          IrredPred ty
+            | tyCoVarsOfType ty `intersectsVarSet` qtvs
+            -> Just pred
+
+          _ -> Nothing
+
 
     pick_cls_pred flex_ctxt cls tys
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
@@ -2075,11 +2075,30 @@ pickQuantifiablePreds qtvs theta
            -- will pass!  See Trac #10351.
 
     -- See Note [Quantifying over equality constraints]
+    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
+    quantify_equality ReprEq _   _   = True
+
     quant_fun ty
       = case tcSplitTyConApp_maybe ty of
           Just (tc, tys) | isTypeFamilyTyCon tc
                          -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
           _ -> False
+
+boxEqPred :: EqRel -> Type -> Type -> Maybe (Class, [Type])
+-- Given (t1 ~# t2) or (t1 ~R# t2) return the boxed version
+--       (t1 ~ t2)  or (t1 `Coercible` t2)
+boxEqPred eq_rel ty1 ty2
+  = case eq_rel of
+      NomEq  | homo_kind -> Just (eqClass,        [k1,     ty1, ty2])
+             | otherwise -> Just (heqClass,       [k1, k2, ty1, ty2])
+      ReprEq | homo_kind -> Just (coercibleClass, [k1,     ty1, ty2])
+             | otherwise -> Nothing -- Sigh: we do not have hererogeneous Coercible
+                                    --       so we can't abstract over it
+                                    -- Nothing fundamental: we could add it
+ where
+   k1 = typeKind ty1
+   k2 = typeKind ty2
+   homo_kind = k1 `tcEqType` k2
 
 pickCapturedPreds
   :: TyVarSet           -- Quantifying over these
@@ -2236,6 +2255,18 @@ Notice that
    case for tuples.  Something better would be cool.
 
 See also TcTyDecls.checkClassCycles.
+
+Note [Lift equality constaints when quantifying]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can't quantify over a constraint (t1 ~# t2) because that isn't a
+predicate type; see Note [Types for coercions, predicates, and evidence]
+in Type.hs.
+
+So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
+to Coercible.
+
+This tiresome lifting is the reason that pick_me (in
+pickQuantifiablePreds) returns a Maybe rather than a Bool.
 
 Note [Quantifying over equality constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,8 +1,6 @@
-TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type role T nominal representational
   T :: forall k. k -> *
-COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [array-0.5.2.0, base-4.12.0.0, deepseq-1.4.4.0,
                      ghc-boot-th-8.7, ghc-prim-0.5.3, integer-gmp-1.0.2.0,

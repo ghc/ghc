@@ -28,7 +28,7 @@ type HalfWord = Word16
 type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
 
 -- | This is a somewhat faithful representation of an info table. See
--- <http://hackage.haskell.org/trac/ghc/browser/includes/rts/storage/InfoTables.h>
+-- <http://ghc.haskell.org/trac/ghc/browser/includes/rts/storage/InfoTables.h>
 -- for more details on this data structure.
 data StgInfoTable = StgInfoTable {
    entry  :: Maybe EntryFunPtr, -- Just <=> not ghciTablesNextToCode

@@ -5,7 +5,7 @@ TYPE CONSTRUCTORS
   C :: * -> Constraint
 COERCION AXIOMS
   axiom T12763.N:C :: C a = a -> () -- Defined at T12763.hs:6:1
-INSTANCES
+CLASS INSTANCES
   instance C Int -- Defined at T12763.hs:9:10
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,

@@ -6,8 +6,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type role NukeMonad phantom phantom phantom
   NukeMonad :: * -> * -> * -> *
-COERCION AXIOMS
-INSTANCES
+CLASS INSTANCES
   instance Functor (NukeMonad a b) -- Defined at Meltdown.hs:8:10
   instance Applicative (NukeMonad a b)
     -- Defined at Meltdown.hs:11:10

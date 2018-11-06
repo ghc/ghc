@@ -47,7 +47,7 @@ module TyCoRep (
         mkPiTys,
         isTYPE,
         isLiftedTypeKind, isUnliftedTypeKind,
-        isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
+        isRuntimeRepTy, isRuntimeRepVar,
         sameVis, isLinearType,
 
         isMultiplicityTy, isMultiplicityVar,
@@ -880,17 +880,6 @@ mkTyCoPiTys tbs ty = foldr mkTyCoPiTy ty tbs
 -- | Like 'mkTyCoPiTys', but does not check the occurrence of the binder
 mkPiTys :: [TyCoBinder] -> Type -> Type
 mkPiTys tbs ty = foldr mkPiTy ty tbs
-
--- | Does this type classify a core (unlifted) Coercion?
--- At either role nominal or representational
---    (t1 ~# t2) or (t1 ~R# t2)
-isCoercionType :: Type -> Bool
-isCoercionType (TyConApp tc tys)
-  | (tc `hasKey` eqPrimTyConKey) || (tc `hasKey` eqReprPrimTyConKey)
-  , tys `lengthIs` 4
-  = True
-isCoercionType _ = False
-
 
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type

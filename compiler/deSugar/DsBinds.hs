@@ -890,9 +890,9 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
                               , text "Orig lhs:" <+> ppr orig_lhs
                               , text "optimised lhs:" <+> ppr lhs2 ])
    pp_bndr bndr
-    | isTyVar bndr                      = text "type variable" <+> quotes (ppr bndr)
-    | Just pred <- evVarPred_maybe bndr = text "constraint" <+> quotes (ppr pred)
-    | otherwise                         = text "variable" <+> quotes (ppr bndr)
+    | isTyVar bndr = text "type variable" <+> quotes (ppr bndr)
+    | isEvVar bndr = text "constraint"    <+> quotes (ppr (varType bndr))
+    | otherwise    = text "variable"      <+> quotes (ppr bndr)
 
    constructor_msg con = vcat
      [ text "A constructor," <+> ppr con <>

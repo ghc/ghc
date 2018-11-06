@@ -1,0 +1,4 @@
+
+T15694.hs:22:35: error:
+    • Expected kind ‘k1 -> k00’, but ‘f a1’ has kind ‘ks’
+    • In the first argument of ‘(~~)’, namely ‘f a1 a2’
