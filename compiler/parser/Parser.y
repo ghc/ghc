@@ -1774,19 +1774,6 @@ sigtypes1 :: { (OrdList (LHsSigType GhcPs)) }
 -----------------------------------------------------------------------------
 -- Types
 
-strict_mark :: { Located ([AddAnn],HsSrcBang) }
-        : strictness { sL1 $1 (let (a, str) = unLoc $1 in (a, HsSrcBang NoSourceText NoSrcUnpack str)) }
-        | unpackedness { sL1 $1 (let (a, prag, unpk) = unLoc $1 in (a, HsSrcBang prag unpk NoSrcStrict)) }
-        | unpackedness strictness { sLL $1 $> (let { (a, prag, unpk) = unLoc $1
-                                                   ; (a', str) = unLoc $2 }
-                                                in (a ++ a', HsSrcBang prag unpk str)) }
-        -- Although UNPACK with no '!' without StrictData and UNPACK with '~' are illegal,
-        -- we get a better error message if we parse them here
-
-strictness :: { Located ([AddAnn], SrcStrictness) }
-        : '!' { sL1 $1 ([mj AnnBang $1], SrcStrict) }
-        | '~' { sL1 $1 ([mj AnnTilde $1], SrcLazy) }
-
 unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
         : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
@@ -1808,8 +1795,8 @@ ctype   :: { LHsType GhcPs }
                                              [mu AnnDcolon $2] }
         | type                        { $1 }
 
-----------------------
--- Notes for 'ctypedoc'
+-- Note [ctype and ctypedoc]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- It would have been nice to simplify the grammar by unifying `ctype` and
 -- ctypedoc` into one production, allowing comments on types everywhere (and
 -- rejecting them after parsing, where necessary).  This is however not possible
@@ -1842,11 +1829,6 @@ ctypedoc :: { LHsType GhcPs }
 --      (Eq a, Ord a)
 -- looks so much like a tuple type.  We can't tell until we find the =>
 
--- We have the t1 ~ t2 form both in 'context' and in type,
--- to permit an individual equational constraint without parenthesis.
--- Thus for some reason we allow    f :: a~b => blah
--- but not                          f :: ?x::Int => blah
--- See Note [Parsing ~]
 context :: { LHsContext GhcPs }
         :  btype                        {% do { (anns,ctx) <- checkContext $1
                                                 ; if null (unLoc ctx)
@@ -1855,14 +1837,14 @@ context :: { LHsContext GhcPs }
                                                 ; ams ctx anns
                                                 } }
 
-context_no_ops :: { LHsContext GhcPs }
-        : btype_no_ops                 {% do { ty <- splitTilde (reverse (unLoc $1))
-                                             ; (anns,ctx) <- checkContext ty
-                                             ; if null (unLoc ctx)
-                                                   then addAnnotation (gl ty) AnnUnit (gl ty)
+-- See Note [Constr variatons of non-terminals]
+constr_context :: { LHsContext GhcPs }
+        :  constr_btype                 {% do { (anns,ctx) <- checkContext $1
+                                                ; if null (unLoc ctx)
+                                                   then addAnnotation (gl $1) AnnUnit (gl $1)
                                                    else return ()
-                                             ; ams ctx anns
-                                             } }
+                                                ; ams ctx anns
+                                                } }
 
 {- Note [GADT decl discards annotations]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -1930,23 +1912,26 @@ typedoc :: { LHsType GhcPs }
                                                          $4)
                                                 [mu AnnRarrow $3] }
 
+-- See Note [Constr variatons of non-terminals]
+constr_btype :: { LHsType GhcPs }
+        : constr_tyapps                 {% mergeOps (unLoc $1) }
 
+-- See Note [Constr variatons of non-terminals]
+constr_tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
+        : constr_tyapp                  { sL1 $1 [$1] }
+        | constr_tyapps constr_tyapp    { sLL $1 $> $ $2 : (unLoc $1) }
 
--- See Note [Parsing ~]
+-- See Note [Constr variatons of non-terminals]
+constr_tyapp :: { Located TyEl }
+        : tyapp                         { $1 }
+        | docprev                       { sL1 $1 $ TyElDocPrev (unLoc $1) }
+
 btype :: { LHsType GhcPs }
-      : tyapps                      {%  mergeOps (unLoc $1) }
+        : tyapps                        {% mergeOps $1 }
 
--- Used for parsing Haskell98-style data constructors,
--- in order to forbid the blasphemous
--- > data Foo = Int :+ Char :* Bool
--- See also Note [Parsing data constructors is hard] in RdrHsSyn
-btype_no_ops :: { Located [LHsType GhcPs] } -- NB: This list is reversed
-        : atype_docs                    { sL1 $1 [$1] }
-        | btype_no_ops atype_docs       { sLL $1 $> $ $2 : (unLoc $1) }
-
-tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
-        : tyapp                         { sL1 $1 [$1] }
-        | tyapps tyapp                  { sLL $1 $> $ $2 : (unLoc $1) }
+tyapps :: { [Located TyEl] } -- NB: This list is reversed
+        : tyapp                         { [$1] }
+        | tyapps tyapp                  { $2 : $1 }
 
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
@@ -1956,18 +1941,15 @@ tyapp :: { Located TyEl }
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
         | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
-
-atype_docs :: { LHsType GhcPs }
-        : atype docprev                 { sLL $1 $> $ HsDocTy noExt $1 $2 }
-        | atype                         { $1 }
+        | '~'                           { sL1 $1 TyElTilde }
+        | '!'                           { sL1 $1 TyElBang }
+        | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- Not including unit tuples
         | tyvar                          { sL1 $1 (HsTyVar noExt NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExt (isUnicode $1)) } }
-        | strict_mark atype              {% ams (sLL $1 $> (HsBangTy noExt (snd $ unLoc $1) $2))
-                                                (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
                                                     (sLL $1 $> $ HsRecTy noExt $2))
                                                         -- Constructor sigs only
@@ -2078,23 +2060,6 @@ varids0 :: { Located [Located RdrName] }
         : {- empty -}                   { noLoc [] }
         | varids0 tyvar                 { sLL $1 $> ($2 : unLoc $1) }
 
-{-
-Note [Parsing ~]
-~~~~~~~~~~~~~~~~
-
-Due to parsing conflicts between laziness annotations in data type
-declarations (see strict_mark) and equality types ~'s are always
-parsed as laziness annotations, and turned into HsOpTy's in the
-correct places using RdrHsSyn.splitTilde.
-
-Since strict_mark is parsed as part of atype which is part of type,
-typedoc and context (where HsEqTy previously appeared) it made most
-sense and was simplest to parse ~ as part of strict_mark and later
-turn them into HsOpTy's.
-
--}
-
-
 -----------------------------------------------------------------------------
 -- Kinds
 
@@ -2191,8 +2156,60 @@ constrs1 :: { Located [LConDecl GhcPs] }
                >> return (sLL $1 $> (addConDoc $5 $2 : addConDocFirst (unLoc $1) $4)) }
         | constr                                          { sL1 $1 [$1] }
 
+{- Note [Constr variatons of non-terminals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In record declarations we assume that 'ctype' used to parse the type will not
+consume the trailing docprev:
+
+  data R = R { field :: Int -- ^ comment on the field }
+
+In 'R' we expect the comment to apply to the entire field, not to 'Int'. The
+same issue is detailed in Note [ctype and ctypedoc].
+
+So, we do not want 'ctype'  to consume 'docprev', therefore
+    we do not want 'btype'  to consume 'docprev', therefore
+    we do not want 'tyapps' to consume 'docprev'.
+
+At the same time, when parsing a 'constr', we do want to consume 'docprev':
+
+  data T = C Int  -- ^ comment on Int
+             Bool -- ^ comment on Bool
+
+So, we do want 'constr_stuff' to consume 'docprev'.
+
+The problem arises because the clauses in 'constr' have the following
+structure:
+
+  (a)  context '=>' constr_stuff   (e.g.  data T a = Ord a => C a)
+  (b)               constr_stuff   (e.g.  data T a =          C a)
+
+and to avoid a reduce/reduce conflict, 'context' and 'constr_stuff' must be
+compatible. And for 'context' to be compatible with 'constr_stuff', it must
+consume 'docprev'.
+
+So, we want 'context'  to consume 'docprev', therefore
+    we want 'btype'    to consume 'docprev', therefore
+    we want 'tyapps'   to consume 'docprev'.
+
+Our requirements end up conflicting: for parsing record types, we want 'tyapps'
+to leave 'docprev' alone, but for parsing constructors, we want it to consume
+'docprev'.
+
+As the result, we maintain two parallel hierarchies of non-terminals that
+either consume 'docprev' or not:
+
+  tyapps      constr_tyapps
+  btype       constr_btype
+  context     constr_context
+  ...
+
+They must be kept identical except for their treatment of 'docprev'.
+
+-}
+
 constr :: { LConDecl GhcPs }
-        : maybe_docnext forall context_no_ops '=>' constr_stuff
+        : maybe_docnext forall constr_context '=>' constr_stuff
                 {% ams (let (con,details,doc_prev) = unLoc $5 in
                   addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
                                                        (snd $ unLoc $2)
@@ -2214,17 +2231,8 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr GhcPs]) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
 constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs, Maybe LHsDocString) }
-    -- See Note [Parsing data constructors is hard] in RdrHsSyn
-        : btype_no_ops                     {% do { c <- splitCon (unLoc $1)
+        : constr_tyapps                    {% do { c <- mergeDataCon (unLoc $1)
                                                  ; return $ sL1 $1 c } }
-        | btype_no_ops conop maybe_docprev btype_no_ops
-            {% do { lhs <- splitTilde (reverse (unLoc $1))
-                  ; (_, ds_l) <- checkInfixConstr lhs
-                  ; let rhs1 = foldl1 mkHsAppTy (reverse (unLoc $4))
-                  ; (rhs, ds_r) <- checkInfixConstr rhs1
-                  ; return $ if isJust (ds_l `mplus` $3)
-                               then sLL $1 $> ($2, InfixCon (hsLinear lhs) (hsLinear rhs1), $3)
-                               else sLL $1 $> ($2, InfixCon (hsLinear lhs) (hsLinear rhs), ds_r) } }
 
 fielddecls :: { [LConDeclField GhcPs] }
         : {- empty -}     { [] }

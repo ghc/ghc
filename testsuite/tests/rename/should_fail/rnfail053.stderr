@@ -1,4 +1,5 @@
 
-rnfail053.hs:5:10:
-    Not a data constructor: ‘forall’
-    Perhaps you intended to use ExistentialQuantification
+rnfail053.hs:5:18: error:
+    Illegal symbol '.' in type
+    Perhaps you intended to use RankNTypes or a similar language
+    extension to enable explicit-forall syntax: forall <tvs>. <type>

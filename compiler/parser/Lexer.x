@@ -72,8 +72,7 @@ module Lexer (
    addWarning,
    lexTokenStream,
    addAnnotation,AddAnn,addAnnsAt,mkParensApiAnn,
-   commentToAnnotation,
-   moveAnnotations
+   commentToAnnotation
   ) where
 
 import GhcPrelude
@@ -3073,23 +3072,6 @@ mkParensApiAnn s@(RealSrcSpan ss) = [mj AnnOpenP lo,mj AnnCloseP lc]
     ec = srcSpanEndCol ss
     lo = mkSrcSpan (srcSpanStart s)         (mkSrcLoc f sl (sc+1))
     lc = mkSrcSpan (mkSrcLoc f el (ec - 1)) (srcSpanEnd s)
-
--- | Move the annotations and comments belonging to the @old@ span to the @new@
---   one.
-moveAnnotations :: SrcSpan -> SrcSpan -> P ()
-moveAnnotations old new = P $ \s ->
-  let
-    updateAnn ((l,a),v)
-      | l == old = ((new,a),v)
-      | otherwise = ((l,a),v)
-    updateComment (l,c)
-      | l == old = (new,c)
-      | otherwise = (l,c)
-  in
-    POk s {
-       annotations = map updateAnn (annotations s)
-     , annotations_comments = map updateComment (annotations_comments s)
-     } ()
 
 queueComment :: Located Token -> P()
 queueComment c = P $ \s -> POk s {
