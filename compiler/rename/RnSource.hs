@@ -702,8 +702,8 @@ rnFamInstEqn doc mb_cls rhs_kvars
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
 
-       ; pat_kity_vars_with_dups <- extractHsTysRdrTyVarsDups pats
-       ; let pat_vars = freeKiTyVarsAllVars $
+             pat_kity_vars_with_dups = extractHsTysRdrTyVarsDups pats
+             pat_vars = freeKiTyVarsAllVars $
                         rmDupsInRdrTyVars pat_kity_vars_with_dups
              -- Use the "...Dups" form because it's needed
              -- below to report unsed binder on the LHS
@@ -787,7 +787,7 @@ rnTyFamInstEqn :: Maybe (Name, [Name])
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
 rnTyFamInstEqn mb_cls eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
                                                      , feqn_rhs   = rhs }})
-  = do { rhs_kvs <- extractHsTyRdrTyVarsKindVars rhs
+  = do { let rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
        ; rnFamInstEqn (TySynCtx tycon) mb_cls rhs_kvs eqn rnTySyn }
 rnTyFamInstEqn _ (HsIB _ (XFamEqn _)) = panic "rnTyFamInstEqn"
 rnTyFamInstEqn _ (XHsImplicitBndrs _) = panic "rnTyFamInstEqn"
@@ -799,7 +799,7 @@ rnTyFamDefltEqn cls (FamEqn { feqn_tycon  = tycon
                             , feqn_pats   = tyvars
                             , feqn_fixity = fixity
                             , feqn_rhs    = rhs })
-  = do { kvs <- extractHsTyRdrTyVarsKindVars rhs
+  = do { let kvs = extractHsTyRdrTyVarsKindVars rhs
        ; bindHsQTyVars ctx Nothing (Just cls) kvs tyvars $ \ tyvars' _ ->
     do { tycon'      <- lookupFamInstName (Just cls) tycon
        ; (rhs', fvs) <- rnLHsType ctx rhs
@@ -818,7 +818,7 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_eqn = eqn@(HsIB { hsib_body =
                            FamEqn { feqn_tycon = tycon
                                   , feqn_rhs   = rhs }})})
-  = do { rhs_kvs <- extractDataDefnKindVars rhs
+  = do { let rhs_kvs = extractDataDefnKindVars rhs
        ; (eqn', fvs) <-
            rnFamInstEqn (TyDataCtx tycon) mb_cls rhs_kvs eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
@@ -1487,8 +1487,8 @@ rnTyClDecl (FamDecl { tcdFam = decl })
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
-       ; kvs <- extractHsTyRdrTyVarsKindVars rhs
-       ; let doc = TySynCtx tycon
+       ; let kvs = extractHsTyRdrTyVarsKindVars rhs
+             doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
     do { (rhs', fvs) <- rnTySyn doc rhs
@@ -1501,8 +1501,8 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
 rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
                        tcdFixity = fixity, tcdDataDefn = defn })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
-       ; kvs <- extractDataDefnKindVars defn
-       ; let doc = TyDataCtx tycon
+       ; let kvs = extractDataDefnKindVars defn
+             doc = TyDataCtx tycon
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
@@ -1787,7 +1787,6 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
-       ; kvs <- extractRdrKindSigVars res_sig
        ; ((tyvars', res_sig', injectivity'), fv1) <-
             bindHsQTyVars doc Nothing mb_cls kvs tyvars $ \ tyvars' _ ->
             do { let rn_sig = rnFamResultSig doc
@@ -1804,6 +1803,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                 , fv1 `plusFV` fv2) }
   where
      doc = TyFamilyCtx tycon
+     kvs = extractRdrKindSigVars res_sig
 
      ----------------------
      rn_info (ClosedTypeFamily (Just eqns))
@@ -2024,10 +2024,10 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- That order governs the order the implicitly-quantified type
           -- variable, and hence the order needed for visible type application
           -- See Trac #14808.
-        ; free_tkvs <- extractHsTysRdrTyVarsDups (theta ++ (map hsThing arg_tys) ++ [res_ty])
-        ; free_tkvs <- extractHsTvBndrs explicit_tkvs free_tkvs
+              free_tkvs = extractHsTvBndrs explicit_tkvs $
+                          extractHsTysRdrTyVarsDups (theta ++ map hsThing arg_tys ++ [res_ty])
 
-        ; let ctxt    = ConDeclCtx new_names
+              ctxt    = ConDeclCtx new_names
               mb_ctxt = Just (inHsDocContext ctxt)
 
         ; traceRn "rnConDecl" (ppr names $$ ppr free_tkvs $$ ppr explicit_forall )
