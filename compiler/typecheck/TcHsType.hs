@@ -2497,7 +2497,7 @@ tcHsPatSigType ctxt sig_ty
         ; sig_ty <- zonkPromoteType sig_ty
         ; checkValidType ctxt sig_ty
 
-        ; tv_pairs <- mapM mk_tv_pair sig_tkvs
+        ; let tv_pairs = mkTyVarNamePairs sig_tkvs
 
         ; traceTc "tcHsPatSigType" (ppr sig_vars)
         ; return (wcs, tv_pairs, sig_ty) }
@@ -2510,14 +2510,9 @@ tcHsPatSigType ctxt sig_ty
                _              -> newTauTyVar
       -- See Note [Pattern signature binders]
 
-    mk_tv_pair tv = do { tv' <- zonkTcTyVarToTyVar tv
-                       ; return (tyVarName tv, tv') }
-         -- The Name is one of sig_vars, the lexically scoped name
-         -- But if it's a TyVarTv, it might have been unified
-         -- with an existing in-scope skolem, so we must zonk
-         -- here.  See Note [Pattern signature binders]
+
 tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPatSigType"
-tcHsPatSigType _ (XHsWildCardBndrs _) = panic "tcHsPatSigType"
+tcHsPatSigType _ (XHsWildCardBndrs _)          = panic "tcHsPatSigType"
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
@@ -2556,8 +2551,8 @@ tcPatSig in_pat_bind sig res_ty
                 --      f :: Int -> Int
                 --      f (x :: T a) = ...
                 -- Here 'a' doesn't get a binding.  Sigh
-        ; let bad_tvs = [ tv | (_,tv) <- sig_tvs
-                             , not (tv `elemVarSet` exactTyCoVarsOfType sig_ty) ]
+        ; let bad_tvs = filterOut (`elemVarSet` exactTyCoVarsOfType sig_ty)
+                                  (tyCoVarsOfTypeList sig_ty)
         ; checkTc (null bad_tvs) (badPatTyVarTvs sig_ty bad_tvs)
 
         -- Now do a subsumption check of the pattern signature against res_ty
@@ -2586,13 +2581,14 @@ patBindSigErr sig_tvs
 
 {- Note [Pattern signature binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Type variables in the type environment] in TcRnTypes.
 Consider
 
   data T where
     MkT :: forall a. a -> (a -> Int) -> T
 
   f :: T -> ...
-  f (MkT x (f :: b -> c)) = ...
+  f (MkT x (f :: b -> c)) = <blah>
 
 Here
  * The pattern (MkT p1 p2) creates a *skolem* type variable 'a_sk',
@@ -2605,13 +2601,10 @@ Here
 
  * Then unification makes beta := a_sk, gamma := Int
    That's why we must make beta and gamma a MetaTv,
-   not a SkolemTv, so that it can unify to a_sk rsp. Int.
-   Note that gamma unifies with a type, not just a type variable
-   (see https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0029-scoped-type-variables-types.rst)
+   not a SkolemTv, so that it can unify to a_sk (or Int, respectively).
 
- * Finally, in 'blah' we must have the envt "b" :-> a_sk, "c" :-> Int.
-   The pairs ("b" :-> a_sk, "c" :-> Int) are returned by tcHsPatSigType,
-   constructed by mk_tv_pair in that function.
+ * Finally, in '<blah>' we have the envt "b" :-> beta, "c" :-> gamma,
+   so we return the pairs ("b" :-> beta, "c" :-> gamma) from tcHsPatSigType,
 
 Another example (Trac #13881):
    fl :: forall (l :: [a]). Sing l -> Sing l
@@ -2624,14 +2617,13 @@ We make up a fresh meta-TauTv, y_sig, for 'y', and kind-check
 the pattern signature
    Sing (l :: [y])
 That unifies y_sig := a_sk.  We return from tcHsPatSigType with
-the pair ("y" :-> a_sk).
+the pair ("y" :-> y_sig).
 
 For RULE binders, though, things are a bit different (yuk).
   RULE "foo" forall (x::a) (y::[a]).  f x y = ...
 Here this really is the binding site of the type variable so we'd like
 to use a skolem, so that we get a complaint if we unify two of them
-together.
-
+together.  Hence the new_tv function in tcHsPatSigType.
 
 
 ************************************************************************

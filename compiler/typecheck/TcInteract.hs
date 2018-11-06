@@ -921,18 +921,6 @@ unique match on the (Take n) instance.  That leads immediately to an
 infinite loop.  Hence the check that 'preds' have no type families
 (isTyFamFree).
 
-Note [Shortcut solving: overlap]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-  instance {-# OVERLAPPABLE #-} C a where ...
-and we are typechecking
-  f :: C a => a -> a
-  f = e  -- Gives rise to [W] C a
-
-We don't want to solve the wanted constraint with the overlappable
-instance; rather we want to use the supplied (C a)! That was the whole
-point of it being overlappable!  Trac #14434 wwas an example.
-
 Note [Shortcut solving: incoherence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This optimization relies on coherence of dictionaries to be correct. When we
@@ -1002,7 +990,7 @@ The workhorse of the short-cut solver is
                             -> MaybeT TcS (EvBindMap, DictMap CtEvidence)
 Note that:
 
-* The CtEvidence is teh goal to be solved
+* The CtEvidence is the goal to be solved
 
 * The MaybeT anages early failure if we find a subgoal that
   cannot be solved from instances.

@@ -6,6 +6,8 @@ TYPE SIGNATURES
     forall c a b. (Coll c, Num a, Num b, Elem c ~ (a, b)) => c -> c
 TYPE CONSTRUCTORS
   Coll :: * -> Constraint
+  type role Elem nominal
+  Elem :: * -> *
   ListColl :: * -> *
 COERCION AXIOMS
   axiom Foo.D:R:ElemListColl ::

@@ -1,0 +1,23 @@
+
+T15648.hs:23:21: error:
+    • Couldn't match type ‘(a0 GHC.Prim.~# b0) -> JankyEquality a0 b0’
+                     with ‘JankyEquality a a’
+      Expected type: JankyEquality a b
+        Actual type: (a0 GHC.Prim.~# b0) -> JankyEquality a0 b0
+    • Probable cause: ‘Jank’ is applied to too few arguments
+      In the expression: Jank
+      In an equation for ‘legitToJank’: legitToJank Legit = Jank
+    • Relevant bindings include
+        legitToJank :: LegitEquality a b -> JankyEquality a b
+          (bound at T15648.hs:23:1)
+
+T15648.hs:30:10: error:
+    • Couldn't match expected type ‘(a GHC.Prim.~# b)
+                                    -> b GHC.Prim.~# a’
+                  with actual type ‘b GHC.Prim.~# a’
+    • In the expression: unJank $ legitToJank $ mkLegit @b @a
+      In an equation for ‘ueqSym’:
+          ueqSym = unJank $ legitToJank $ mkLegit @b @a
+    • Relevant bindings include
+        ueqSym :: (a GHC.Prim.~# b) -> b GHC.Prim.~# a
+          (bound at T15648.hs:30:1)

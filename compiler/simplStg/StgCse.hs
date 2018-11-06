@@ -67,7 +67,23 @@ and nothing stops us from transforming that to
     foo [e] = case e of b { Left [n] -> …
                           , Right [x] -> b}
 
+
+Note [StgCse after unarisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider two unboxed sum terms:
+
+    (# 1 | #) :: (# Int | Int# #)
+    (# 1 | #) :: (# Int | Int  #)
+
+These two terms are not equal as they unarise to different unboxed
+tuples. However if we run StgCse before Unarise, it'll think the two
+terms (# 1 | #) are equal, and replace one of these with a binder to
+the other. That's bad -- Trac #15300.
+
+Solution: do unarise first.
+
 -}
+
 module StgCse (stgCse) where
 
 import GhcPrelude

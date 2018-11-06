@@ -6792,9 +6792,12 @@ like this:
    target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  Eliminate any candidate :math:`IX` for which both of the following hold:
+-  If no candidates remain, the search failes
 
-   -  There is another candidate :math:`IY` that is strictly more specific; that
+-  Eliminate any candidate :math:`IX` for which there is another candidate
+   :math:`IY` such that both of the following hold:
+
+   -  :math:`IY` is strictly more specific than :math:`IX`.  That
       is, :math:`IY` is a substitution instance of :math:`IX` but not vice versa.
 
    -  Either :math:`IX` is *overlappable*, or :math:`IY` is *overlapping*. (This
@@ -6802,19 +6805,20 @@ like this:
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
 
--  If exactly one non-incoherent candidate remains, select it. If all
-   remaining candidates are incoherent, select an arbitrary one.
-   Otherwise the search fails (i.e. when more than one surviving
-   candidate is not incoherent).
+-  If all the remaining candidates are incoherent, the search suceeds, returning
+   an arbitrary surviving candidate.
 
--  If the selected candidate (from the previous step) is incoherent, the
-   search succeeds, returning that candidate.
+-  If more than one non-incoherent candidate remains, the search fails.
 
--  If not, find all instances that *unify* with the target constraint,
+-  Otherwise there is exactly one non-incoherent candidate; call it the
+   "prime candidate".
+
+-  Now find all instances, or in-scope given constraints, that *unify* with
+   the target constraint,
    but do not *match* it. Such non-candidate instances might match when
    the target constraint is further instantiated. If all of them are
-   incoherent, the search succeeds, returning the selected candidate; if
-   not, the search fails.
+   incoherent top-level instances, the search succeeds, returning the prime candidate.
+   Otherwise the search fails.
 
 Notice that these rules are not influenced by flag settings in the
 client module, where the instances are *used*. These rules make it
@@ -6856,15 +6860,16 @@ former is a substitution instance of the latter. For example (D) is
 "more specific" than (C) because you can get from (C) to (D) by
 substituting ``a := Int``.
 
-GHC is conservative about committing to an overlapping instance. For
-example: ::
+The final bullet (about unifiying instances)
+makes GHC conservative about committing to an
+overlapping instance. For example: ::
 
       f :: [b] -> [b]
       f x = ...
 
 Suppose that from the RHS of ``f`` we get the constraint ``C b [b]``.
 But GHC does not commit to instance (C), because in a particular call of
-``f``, ``b`` might be instantiate to ``Int``, in which case instance (D)
+``f``, ``b`` might be instantiated to ``Int``, in which case instance (D)
 would be more specific still. So GHC rejects the program.
 
 If, however, you enable the extension :extension:`IncoherentInstances` when compiling
@@ -6904,6 +6909,23 @@ declaration, thus: ::
          f x = ...
 
 (You need :extension:`FlexibleInstances` to do this.)
+
+In the unification check in the final bullet, GHC also uses the
+"in-scope given constraints".  Consider for example ::
+
+   instance C a Int
+
+   g :: forall b c. C b Int => blah
+   g = ...needs (C c Int)...
+
+Here GHC will not solve the constraint ``(C c Int)`` from the
+top-level instance, because a particular call of ``g`` might
+instantiate both ``b`` and ``c`` to the same type, which would
+allow the constraint to be solved in a different way.  This latter
+restriction is principally to make the constraint-solver complete.
+(Interested folk can read ``Note [Instance and Given overlap]`` in ``TcInteract``.)
+It is easy to avoid: in a type signature avoid a constraint that
+matches a top-level instance.  The flag :ghc-flag:`-Wsimplifiable-class-constraints` warns about such signatures.
 
 .. warning::
     Overlapping instances must be used with care. They can give
