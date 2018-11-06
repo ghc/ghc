@@ -1,3 +1,4 @@
 type family T12646.F (a_0 :: k_1) :: * where
-    T12646.F (a_2 :: * -> *) = GHC.Types.Int
-    T12646.F (a_3 :: k_4) = GHC.Types.Char
+    forall (a_2 :: * -> *). T12646.F (a_2 :: * -> *) = GHC.Types.Int
+    forall (k_3 :: *)
+           (a_4 :: k_3). T12646.F (a_4 :: k_3) = GHC.Types.Char

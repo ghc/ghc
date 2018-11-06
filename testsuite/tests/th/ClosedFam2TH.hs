@@ -11,10 +11,12 @@ $( return [ ClosedTypeFamilyD
                 , KindedTV (mkName "b") (VarT (mkName "k")) ]
                 ( TyVarSig (KindedTV (mkName "r") (VarT (mkName "k"))))
                 Nothing)
-              [ TySynEqn [ (VarT (mkName "a"))
+              [ TySynEqn Nothing
+                         [ (VarT (mkName "a"))
                          , (VarT (mkName "a")) ]
                          (ConT (mkName "Int"))
-              , TySynEqn [ (VarT (mkName "a"))
+              , TySynEqn Nothing
+                         [ (VarT (mkName "a"))
                          , (VarT (mkName "b")) ]
                          (ConT (mkName "Bool")) ] ])
 

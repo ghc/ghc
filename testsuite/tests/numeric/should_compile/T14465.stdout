@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 34, types: 14, coercions: 0, joins: 0/0}
+  = {terms: 39, types: 19, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
@@ -62,14 +62,19 @@ M.minusOne1 :: Natural
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 M.minusOne1 = 1
 
--- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 11, types: 6, coercions: 0, joins: 0/0}
 minusOne :: Natural
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
-         WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 40 20}]
+         WorkFree=True, Expandable=False, Guidance=IF_ARGS [] 40 0}]
 minusOne
-  = case GHC.Natural.$wnegateNatural M.minusOne1 of ww { __DEFAULT ->
-    GHC.Natural.NatS# ww
+  = case M.minusOne1 of {
+      NatS# ds1 ->
+        case ds1 of {
+          __DEFAULT -> GHC.Natural.underflowError @ Natural;
+          0## -> GHC.Natural.lcmNatural1
+        };
+      NatJ# ipv -> GHC.Natural.underflowError @ Natural
     }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

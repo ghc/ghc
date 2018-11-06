@@ -51,6 +51,7 @@ import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )
 import TcHsType
+import TcValidity( checkValidType )
 import TcMatches
 import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
@@ -2276,7 +2277,7 @@ getGhciStepIO = do
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig stepTy (nlHsVar ghciStepIoMName))
+    return (noLoc $ ExprWithTySig noExt (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2396,6 +2397,9 @@ tcRnType hsc_env normalise rdr_type
        ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType ty
+
+       -- Do validity checking on type
+       ; checkValidType GhciCtxt ty
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
@@ -2817,7 +2821,7 @@ withTcPlugins hsc_env m =
     do s <- runTcPluginM start ev_binds_var
        return (solve s, stop s)
 
-getTcPlugins :: DynFlags -> [TcPlugin]
+getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
 getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
   where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
 

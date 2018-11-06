@@ -119,10 +119,7 @@ test('KindInvariant', normal, ghci_script, ['KindInvariant.script'])
 # unboxed sums and ghci does not support those yet.
 test('StrictPats', omit_ways(['ghci']), compile_and_run, [''])
 test('T12809', omit_ways(['ghci']), compile_and_run, [''])
-test('EtaExpandLevPoly', [ omit_ways(['ghci'])
-                         # triggers a core lint error in profiled ways
-			 , expect_broken_for(15066, ['profasm', 'profthreaded'])
-			 ], compile_and_run, [''])
+test('EtaExpandLevPoly', omit_ways(['ghci']), compile_and_run, [''])
 
 test('TestTypeableBinary', normal, compile_and_run, [''])
 test('Typeable1', normal, compile_fail, ['-Werror'])

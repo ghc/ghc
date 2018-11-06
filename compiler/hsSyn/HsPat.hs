@@ -250,11 +250,11 @@ data Pat p
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | SigPat          (XSigPat p)          -- Before typechecker
-                                         --  Signature can bind both
-                                         --  kind and type vars
-                                         -- After typechecker: Type
+  | SigPat          (XSigPat p)             -- After typechecker: Type
                     (LPat p)                -- Pattern with a type signature
+                    (LHsSigWcType (NoGhcTc p)) --  Signature can bind both
+                                               --  kind and type vars
+
     -- ^ Pattern with a type signature
 
         ------------ Pattern coercions (translation only) ---------------
@@ -319,8 +319,8 @@ type instance XNPlusKPat GhcPs = NoExt
 type instance XNPlusKPat GhcRn = NoExt
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = (LHsSigWcType GhcPs)
-type instance XSigPat GhcRn = (LHsSigWcType GhcRn)
+type instance XSigPat GhcPs = NoExt
+type instance XSigPat GhcRn = NoExt
 type instance XSigPat GhcTc = Type
 
 type instance XCoPat  (GhcPass _) = NoExt
@@ -524,7 +524,7 @@ pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
                                             -> if parens
                                                  then pprParendPat appPrec pat
                                                  else pprPat pat
-pprPat (SigPat ty pat)          = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)     = tupleParens (boxityTupleSort bx)
                                               (pprWithCommas ppr pats)
@@ -679,7 +679,7 @@ isIrrefutableHsPat pat
     go1 (ParPat _ pat)      = go pat
     go1 (AsPat _ _ pat)     = go pat
     go1 (ViewPat _ _ pat)   = go pat
-    go1 (SigPat _ pat)      = go pat
+    go1 (SigPat _ pat _)    = go pat
     go1 (TuplePat _ pats _) = all go pats
     go1 (SumPat {})         = False
                     -- See Note [Unboxed sum patterns aren't irrefutable]
@@ -793,7 +793,7 @@ collectEvVarsPat pat =
                                    $ unionManyBags
                                    $ map collectEvVarsLPat
                                    $ hsConPatArgs args
-    SigPat  _ p      -> collectEvVarsLPat p
+    SigPat  _ p _    -> collectEvVarsLPat p
     CoPat _ _ p _    -> collectEvVarsPat  p
     ConPatIn _  _    -> panic "foldMapPatBag: ConPatIn"
     _other_pat       -> emptyBag

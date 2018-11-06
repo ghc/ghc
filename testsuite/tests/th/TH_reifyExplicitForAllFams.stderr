@@ -1,0 +1,16 @@
+data family TH_reifyExplicitForAllFams.F (a_0 :: *) :: *
+data instance forall (a_1 :: *). TH_reifyExplicitForAllFams.F (GHC.Maybe.Maybe a_1)
+    = TH_reifyExplicitForAllFams.MkF a_1
+class TH_reifyExplicitForAllFams.C (a_0 :: *)
+    where type TH_reifyExplicitForAllFams.G (a_0 :: *) (b_1 :: *) :: *
+instance TH_reifyExplicitForAllFams.C ([a_2])
+type family TH_reifyExplicitForAllFams.G (a_0 :: *) (b_1 :: *) :: *
+type instance forall (a_2 :: *)
+                     (b_3 :: *). TH_reifyExplicitForAllFams.G ([a_2])
+                                                              b_3 = Data.Proxy.Proxy b_3
+type family TH_reifyExplicitForAllFams.H (a_0 :: *) (b_1 :: *) :: * where
+    forall (x_2 :: *) (y_3 :: *). TH_reifyExplicitForAllFams.H ([x_2])
+                                                               (Data.Proxy.Proxy y_3) = Data.Either.Either x_2
+                                                                                                           y_3
+    forall (z_4 :: *). TH_reifyExplicitForAllFams.H z_4
+                                                    z_4 = GHC.Maybe.Maybe z_4

@@ -103,6 +103,7 @@ REALGOALS=$(filter-out \
     fulltest \
     slowtest \
     fasttest \
+    fast \
   ,$(MAKECMDGOALS))
 
 # configure touches certain files even if they haven't changed.  This
@@ -225,3 +226,8 @@ test:
 .PHONY: slowtest fulltest
 slowtest fulltest:
 	$(MAKE) -C testsuite/tests CLEANUP=1 SUMMARY_FILE=../../testsuite_summary.txt slow
+
+.PHONY: fast
+fast:
+	@echo "You can use 'make fast' only from inside a sub-component directory."
+	@exit 1

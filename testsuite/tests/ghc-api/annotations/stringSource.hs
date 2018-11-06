@@ -73,7 +73,7 @@ testOneFile libdir fileName = do
 
      doRuleDecl :: RuleDecl GhcPs
                 -> [(String,[Located (SourceText,FastString)])]
-     doRuleDecl (HsRule _ ss _ _ _ _) = [("r",[ss])]
+     doRuleDecl (HsRule _ ss _ _ _ _ _) = [("r",[ss])]
 
      doCCallTarget :: CCallTarget
                    -> [(String,[Located (SourceText,FastString)])]

@@ -5,6 +5,7 @@
                                        -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module PlaceHolder
+{-# LANGUAGE TypeFamilies #-}
 
 module TcEnv(
         TyThing(..), TcTyThing(..), TcId,

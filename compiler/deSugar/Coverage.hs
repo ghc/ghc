@@ -500,9 +500,9 @@ addTickHsExpr (HsLamCase x mgs)    = liftM (HsLamCase x)
                                            (addTickMatchGroup True mgs)
 addTickHsExpr (HsApp x e1 e2)      = liftM2 (HsApp x) (addTickLHsExprNever e1)
                                                       (addTickLHsExpr      e2)
-addTickHsExpr (HsAppType ty e)   = liftM2 HsAppType (return ty)
-                                                    (addTickLHsExprNever e)
-
+addTickHsExpr (HsAppType x e ty)   = liftM3 HsAppType (return x)
+                                                      (addTickLHsExprNever e)
+                                                      (return ty)
 
 addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
@@ -578,11 +578,12 @@ addTickHsExpr expr@(RecordUpd { rupd_expr = e, rupd_flds = flds })
        ; flds' <- mapM addTickHsRecField flds
        ; return (expr { rupd_expr = e', rupd_flds = flds' }) }
 
-addTickHsExpr (ExprWithTySig ty e) =
-        liftM2 ExprWithTySig
-                (return ty)
+addTickHsExpr (ExprWithTySig x e ty) =
+        liftM3 ExprWithTySig
+                (return x)
                 (addTickLHsExprNever e) -- No need to tick the inner expression
                                         -- for expressions with signatures
+                (return ty)
 addTickHsExpr (ArithSeq ty wit arith_seq) =
         liftM3 ArithSeq
                 (return ty)

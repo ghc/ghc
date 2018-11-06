@@ -1,0 +1,3 @@
+{-# RULES "example"
+    forall a_0 . forall (x_1 :: a_0) . GHC.Base.id x_1
+    = x_1 #-}

@@ -7572,6 +7572,17 @@ instance for ``GMap`` is ::
 In this example, the declaration has only one variant. In general, it
 can be any number.
 
+When :extension:`ExplicitForAll` is enabled, type or kind variables used on
+the left hand side can be explicitly bound. For example: ::
+  
+    data instance forall a (b :: Proxy a). F (Proxy b) = FProxy Bool
+
+When an explicit ``forall`` is present, all *type* variables mentioned must
+be bound by the ``forall``. Kind variables will be implicitly bound if
+necessary, for example: ::
+  
+    data instance forall (a :: k). F a = FOtherwise
+
 When the flag :ghc-flag:`-Wunused-type-patterns` is enabled, type
 variables that are mentioned in the patterns on the left hand side, but not
 used on the right hand side are reported. Variables that occur multiple times
@@ -7584,6 +7595,9 @@ This resembles the wildcards that can be used in
 :ref:`partial-type-signatures`. However, there are some differences.
 No error messages reporting the inferred types are generated, nor does
 the extension :extension:`PartialTypeSignatures` have any effect.
+
+A type or kind variable explicitly bound using :extension:`ExplicitForAll` but
+not used on the left hand side will generate an error, not a warning.
 
 Data and newtype instance declarations are only permitted when an
 appropriate family declaration is in scope - just as a class instance
@@ -7737,6 +7751,10 @@ with underscores to avoid warnings when the
 :ghc-flag:`-Wunused-type-patterns` flag is enabled. The same rules apply
 as for :ref:`data-instance-declarations`.
 
+Also in the same way as :ref:`data-instance-declarations`, when
+:extension:`ExplicitForAll` is enabled, type and kind variables can be
+explicilty bound in a type instance declaration.
+
 Type family instance declarations are only legitimate when an
 appropriate family declaration is in scope - just like class instances
 require the class declaration to be visible. Moreover, each instance
@@ -7771,8 +7789,14 @@ Note that GHC must be sure that ``a`` cannot unify with ``Int`` or
 their code, GHC will not be able to simplify the type. After all, ``a``
 might later be instantiated with ``Int``.
 
-A closed type family's equations have the same restrictions as the
-equations for open type family instances.
+A closed type family's equations have the same restrictions and extensions as
+the equations for open type family instances. For instance, when
+:extension:`ExplicitForAll` is enabled, type or kind variables used on the
+left hand side of an equation can be explicitly bound, such as in: ::
+
+  type family R a where
+    forall t a. R (t a) = [a]
+    forall a.   R a     = a
 
 A closed type family may be declared with no equations. Such closed type
 families are opaque type-level definitions that will never reduce, are
@@ -8000,7 +8024,7 @@ Hence, the following contrived example is admissible: ::
 Here ``c`` and ``a`` are class parameters, but the type is also indexed
 on a third parameter ``x``.
 
-.. _assoc-data-inst:
+.. _assoc-inst:
 
 Associated instances
 ~~~~~~~~~~~~~~~~~~~~
@@ -8075,6 +8099,15 @@ Note the following points:
    cannot give any *subsequent* instances for ``(GMap Flob ...)``, this
    facility is most useful when the free indexed parameter is of a kind
    with a finite number of alternatives (unlike ``Type``).
+   
+-  When :extension:`ExplicitForAll` is enabled, type and kind variables can be
+   explicily bound in associated data or type family instances in the same way
+   (and with the same restrictions) as :ref:`data-instance-declarations` or
+   :ref:`type-instance-declarations`. For example, adapting the above, the
+   following is accepted: ::
+     
+     instance Eq (Elem [e]) => Collects [e] where
+       type forall e. Elem [e] = e
 
 .. _assoc-decl-defs:
 
@@ -8111,6 +8144,10 @@ Note the following points:
    variables that are explicitly bound on the left hand side. This restriction
    is relaxed for *kind* variables, however, as the right hand side is allowed
    to mention kind variables that are implicitly bound on the left hand side.
+   
+   Because of this, unlike :ref:`assoc-inst`, explicit binding of type/kind
+   variables in default declarations is not permitted by
+   :extension:`ExplicitForAll`.
 
 -  Unlike the associated type family declaration itself, the type variables of
    the default instance are independent of those of the parent class.
@@ -9988,6 +10025,10 @@ means this: ::
 
 The two are treated identically, except that the latter may bring type variables
 into scope (see :ref:`scoped-type-variables`).
+
+This extension also enables explicit quantification of type and kind variables
+in :ref:`data-instance-declarations`, :ref:`type-instance-declarations`,
+:ref:`closed-type-families`, :ref:`assoc-inst`, and :ref:`rewrite-rules`.
 
 Notes:
 
@@ -15172,7 +15213,7 @@ From a syntactic point of view:
    is never run by GHC, but is nevertheless parsed, typechecked etc, so
    that it is available to the plugin.
 
--  Each variable mentioned in a rule must either be in scope (e.g.
+-  Each (term) variable mentioned in a rule must either be in scope (e.g.
    ``map``), or bound by the ``forall`` (e.g. ``f``, ``g``, ``xs``). The
    variables bound by the ``forall`` are called the *pattern* variables.
    They are separated by spaces, just like in a type ``forall``.
@@ -15185,6 +15226,25 @@ From a syntactic point of view:
                      foldr k z (build g) = g k z
 
    Since ``g`` has a polymorphic type, it must have a type signature.
+
+-  If :extension:`ExplicitForAll` is enabled, type/kind variables can also be
+   explicitly bound. For example: ::
+     
+       {-# RULES "id" forall a. forall (x :: a). id @a x = x #-}
+   
+   When a type-level explicit ``forall`` is present, each type/kind variable
+   mentioned must now also be either in scope or bound by the ``forall``. In
+   particular, unlike some other places in Haskell, this means free kind
+   variables will not be implicitly bound. For example: ::
+     
+       "this_is_bad" forall (c :: k). forall (x :: Proxy c) ...
+       "this_is_ok"  forall k (c :: k). forall (x :: Proxy c) ...
+
+   When bound type/kind variables are needed, both foralls must always be
+   included, though if no pattern variables are needed, the second can be left
+   empty. For example: ::
+   
+       {-# RULES "map/id" forall a. forall. map (id @a) = id @[a] #-}
 
 -  The left hand side of a rule must consist of a top-level variable
    applied to arbitrary expressions. For example, this is *not* OK: ::

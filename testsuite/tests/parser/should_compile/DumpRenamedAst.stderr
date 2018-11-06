@@ -131,6 +131,7 @@
                (NoExt)
                ({ DumpRenamedAst.hs:11:3-8 }
                 {Name: DumpRenamedAst.Length})
+               (Nothing)
                [({ DumpRenamedAst.hs:11:10-17 }
                  (HsParTy
                   (NoExt)
@@ -186,6 +187,7 @@
                (NoExt)
                ({ DumpRenamedAst.hs:12:3-8 }
                 {Name: DumpRenamedAst.Length})
+               (Nothing)
                [({ DumpRenamedAst.hs:12:10-12 }
                  (HsExplicitListTy
                   (NoExt)
@@ -289,6 +291,7 @@
            (NoExt)
            ({ DumpRenamedAst.hs:17:18-20 }
             {Name: DumpRenamedAst.Nat})
+           (Nothing)
            [({ DumpRenamedAst.hs:17:22-37 }
              (HsParTy
               (NoExt)

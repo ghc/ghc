@@ -1007,7 +1007,7 @@ tcPatToExpr name args pat = go pat
           InfixCon l r  -> mkPrefixConExpr con [l,r]
           RecCon fields -> mkRecordConExpr con fields
 
-    go1 (SigPat _ pat) = go1 (unLoc pat)
+    go1 (SigPat _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
     go1 (VarPat _ (L l var))
@@ -1188,7 +1188,7 @@ tcCollectEx pat = go pat
     go1 (ViewPat _ _ p)    = go p
     go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con
-    go1 (SigPat _ p)       = go p
+    go1 (SigPat _ p _)     = go p
     go1 (CoPat _ _ p _)    = go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract

@@ -54,6 +54,9 @@ module   RdrHsSyn (
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         checkDoAndIfThenElse,
+        LRuleTyTmVar, RuleTyTmVar(..),
+        mkRuleBndrs, mkRuleTyVarBndrs,
+        checkRuleTyVarBndrNames,
         checkRecordSyntax,
         checkEmptyGADTs,
         parseErrorSDoc, hintBangPat,
@@ -174,11 +177,13 @@ mkATDefault :: LTyFamInstDecl GhcPs
 -- some necessary paren annotations to the parsing context. Naturally, this
 -- is not something that the "Convert" use cares about.
 mkATDefault (L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
-      | FamEqn { feqn_tycon = tc, feqn_pats = pats, feqn_fixity = fixity
-               , feqn_rhs = rhs } <- e
+      | FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs, feqn_pats = pats
+               , feqn_fixity = fixity, feqn_rhs = rhs } <- e
       = do { (tvs, anns) <- checkTyVars (text "default") equalsDots tc pats
            ; let f = L loc (FamEqn { feqn_ext    = noExt
                                    , feqn_tycon  = tc
+                                   , feqn_bndrs  = ASSERT( isNothing bndrs )
+                                                   Nothing
                                    , feqn_pats   = tvs
                                    , feqn_fixity = fixity
                                    , feqn_rhs    = rhs })
@@ -235,14 +240,16 @@ mkTySynonym loc lhs rhs
                                 , tcdFixity = fixity
                                 , tcdRhs = rhs })) }
 
-mkTyFamInstEqn :: LHsType GhcPs
+mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
+               -> LHsType GhcPs
                -> LHsType GhcPs
                -> P (TyFamInstEqn GhcPs,[AddAnn])
-mkTyFamInstEqn lhs rhs
+mkTyFamInstEqn bndrs lhs rhs
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; return (mkHsImplicitBndrs
                   (FamEqn { feqn_ext    = noExt
                           , feqn_tycon  = tc
+                          , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
                           , feqn_fixity = fixity
                           , feqn_rhs    = rhs }),
@@ -251,18 +258,19 @@ mkTyFamInstEqn lhs rhs
 mkDataFamInst :: SrcSpan
               -> NewOrData
               -> Maybe (Located CType)
-              -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
+              -> Located (Maybe (LHsContext GhcPs), Maybe [LHsTyVarBndr GhcPs], LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
               -> [LConDecl GhcPs]
               -> HsDeriving GhcPs
               -> P (LInstDecl GhcPs)
-mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
+mkDataFamInst loc new_or_data cType (L _ (mcxt, bndrs, tycl_hdr)) ksig data_cons maybe_deriv
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD noExt (DataFamInstDecl (mkHsImplicitBndrs
                   (FamEqn { feqn_ext    = noExt
                           , feqn_tycon  = tc
+                          , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
                           , feqn_fixity = fixity
                           , feqn_rhs    = defn }))))) }
@@ -844,6 +852,33 @@ checkDatatypeContext (Just (L loc c))
                  (text "Illegal datatype context (use DatatypeContexts):" <+>
                   pprHsContext c)
 
+type LRuleTyTmVar = Located RuleTyTmVar
+data RuleTyTmVar = RuleTyTmVar (Located RdrName) (Maybe (LHsType GhcPs))
+-- ^ Essentially a wrapper for a @RuleBndr GhcPs@
+
+-- turns RuleTyTmVars into RuleBnrs - this is straightforward
+mkRuleBndrs :: [LRuleTyTmVar] -> [LRuleBndr GhcPs]
+mkRuleBndrs = fmap (fmap cvt_one)
+  where cvt_one (RuleTyTmVar v Nothing)    = RuleBndr    noExt v
+        cvt_one (RuleTyTmVar v (Just sig)) = RuleBndrSig noExt v (mkLHsSigWcType sig)
+
+-- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
+mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr GhcPs]
+mkRuleTyVarBndrs = fmap (fmap cvt_one)
+  where cvt_one (RuleTyTmVar v Nothing)    = UserTyVar   noExt (fmap tm_to_ty v)
+        cvt_one (RuleTyTmVar v (Just sig)) = KindedTyVar noExt (fmap tm_to_ty v) sig
+        -- takes something in namespace 'varName' to something in namespace 'tvName'
+        tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
+        tm_to_ty _ = panic "mkRuleTyVarBndrs"
+
+-- See note [Parsing explicit foralls in Rules] in Parser.y
+checkRuleTyVarBndrNames :: [LHsTyVarBndr GhcPs] -> P ()
+checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
+  where check (L loc (Unqual occ)) = do
+          when ((occNameString occ ==) `any` ["forall","family","role"])
+               (parseErrorSDoc loc (text $ "parse error on input " ++ occNameString occ))
+        check _ = panic "checkRuleTyVarBndrNames"
+
 checkRecordSyntax :: Outputable a => Located a -> P (Located a)
 checkRecordSyntax lr@(L loc r)
     = do allowed <- extension traditionalRecordSyntaxEnabled
@@ -1038,8 +1073,8 @@ checkAPat msg loc e0 = do
    -- view pattern is well-formed if the pattern is
    EViewPat _ expr patE -> checkLPat msg patE >>=
                             (return . (\p -> ViewPat noExt expr p))
-   ExprWithTySig t e   -> do e <- checkLPat msg e
-                             return (SigPat t e)
+   ExprWithTySig _ e t  -> do e <- checkLPat msg e
+                              return (SigPat noExt e t)
 
    -- n+k patterns
    OpApp _ (L nloc (HsVar _ (L _ n))) (L _ (HsVar _ (L _ plus)))
@@ -1114,7 +1149,7 @@ checkValDef :: SDoc
 checkValDef msg _strictness lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = checkPatBind msg (L (combineLocs lhs sig)
-                        (ExprWithTySig (mkLHsSigWcType sig) lhs)) grhss
+                        (ExprWithTySig noExt lhs (mkLHsSigWcType sig))) grhss
 
 checkValDef msg strictness lhs Nothing g@(L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs

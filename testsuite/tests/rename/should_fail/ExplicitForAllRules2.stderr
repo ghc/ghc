@@ -1,0 +1,10 @@
+
+ExplicitForAllRules2.hs:6:41: error:
+    Not in scope: type variable ‘b’
+
+ExplicitForAllRules2.hs:7:11: error:
+    Rule "new5":
+    Forall'd variable ‘x’ does not appear on left hand side
+
+ExplicitForAllRules2.hs:8:49: error:
+    Not in scope: type variable ‘c’

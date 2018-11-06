@@ -25,8 +25,8 @@
 
 #pragma once
 
-#if !(__STDC_VERSION__ >= 199901L)
-# error __STDC_VERSION__ does not advertise C99 or later
+#if !(__STDC_VERSION__ >= 199901L) && !(__cplusplus >= 201103L)
+# error __STDC_VERSION__ does not advertise C99, C++11 or later
 #endif
 
 /*
