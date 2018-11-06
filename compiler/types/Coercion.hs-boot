@@ -16,7 +16,7 @@ import Util
 mkReflCo :: Role -> Type -> Coercion
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
-mkForAllCo :: TyVar -> Coercion -> Coercion -> Coercion
+mkForAllCo :: TyCoVar -> Coercion -> Coercion -> Coercion
 mkFunCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
