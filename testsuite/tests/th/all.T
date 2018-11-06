@@ -439,3 +439,5 @@ test('TH_recursiveDo', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
 test('T15481', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('TH_recover_warns', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15738', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T15783', normal, multimod_compile,
+    ['T15783A', '-v0 ' + config.ghc_th_way_flags])

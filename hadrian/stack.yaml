@@ -1,0 +1,30 @@
+# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
+
+# Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
+resolver: lts-12.10
+
+# Local packages, usually specified by relative directory name
+packages:
+- '.'
+- '../libraries/Cabal/Cabal'
+- '../libraries/text'
+
+# This is necessary to build until happy's version bounds are updated to work
+# with the new Cabal version.  Stack's error message explains the issue:
+#
+# In the dependencies for happy-1.19.9:
+#    Cabal-2.3.0.0 from stack configuration does not match <2.2  (latest matching version is 2.0.1.1)
+# needed due to hadrian-0.1.0.0 -> happy-1.19.9
+#
+# TODO: Remove this once it's no longer necessary
+allow-newer: true
+
+nix:
+   enable: false
+   packages:
+   - autoconf
+   - automake
+   - gcc
+   - git
+   - ncurses
+   - perl

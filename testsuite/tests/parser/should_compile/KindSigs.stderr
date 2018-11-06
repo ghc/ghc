@@ -502,54 +502,83 @@
            ({ KindSigs.hs:28:42 }
             (Unqual
              {OccName: b}))))])))))
-  ,({ KindSigs.hs:31:1-22 }
+  ,({ KindSigs.hs:31:1-31 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:31:6-17 }
+       (Unqual
+        {OccName: Sarsaparilla}))
+      (HsQTvs
+       (NoExt)
+       [])
+      (Prefix)
+      ({ KindSigs.hs:31:21-31 }
+       (HsKindSig
+        (NoExt)
+        ({ KindSigs.hs:31:21-23 }
+         (HsTyVar
+          (NoExt)
+          (NotPromoted)
+          ({ KindSigs.hs:31:21-23 }
+           (Unqual
+            {OccName: Int}))))
+        ({ KindSigs.hs:31:28-31 }
+         (HsTyVar
+          (NoExt)
+          (NotPromoted)
+          ({ KindSigs.hs:31:28-31 }
+           (Unqual
+            {OccName: Type})))))))))
+  ,({ KindSigs.hs:34:1-22 }
     (SigD
      (NoExt)
      (TypeSig
       (NoExt)
-      [({ KindSigs.hs:31:1-4 }
+      [({ KindSigs.hs:34:1-4 }
         (Unqual
          {OccName: true}))]
       (HsWC
        (NoExt)
        (HsIB
         (NoExt)
-        ({ KindSigs.hs:31:9-22 }
+        ({ KindSigs.hs:34:9-22 }
          (HsParTy
           (NoExt)
-          ({ KindSigs.hs:31:10-21 }
+          ({ KindSigs.hs:34:10-21 }
            (HsKindSig
             (NoExt)
-            ({ KindSigs.hs:31:10-13 }
+            ({ KindSigs.hs:34:10-13 }
              (HsTyVar
               (NoExt)
               (NotPromoted)
-              ({ KindSigs.hs:31:10-13 }
+              ({ KindSigs.hs:34:10-13 }
                (Unqual
                 {OccName: Bool}))))
-            ({ KindSigs.hs:31:18-21 }
+            ({ KindSigs.hs:34:18-21 }
              (HsTyVar
               (NoExt)
               (NotPromoted)
-              ({ KindSigs.hs:31:18-21 }
+              ({ KindSigs.hs:34:18-21 }
                (Unqual
                 {OccName: Type})))))))))))))
-  ,({ KindSigs.hs:32:1-11 }
+  ,({ KindSigs.hs:35:1-11 }
     (ValD
      (NoExt)
      (FunBind
       (NoExt)
-      ({ KindSigs.hs:32:1-4 }
+      ({ KindSigs.hs:35:1-4 }
        (Unqual
         {OccName: true}))
       (MG
        (NoExt)
-       ({ KindSigs.hs:32:1-11 }
-        [({ KindSigs.hs:32:1-11 }
+       ({ KindSigs.hs:35:1-11 }
+        [({ KindSigs.hs:35:1-11 }
           (Match
            (NoExt)
            (FunRhs
-            ({ KindSigs.hs:32:1-4 }
+            ({ KindSigs.hs:35:1-4 }
              (Unqual
               {OccName: true}))
             (Prefix)
@@ -557,14 +586,14 @@
            []
            (GRHSs
             (NoExt)
-            [({ KindSigs.hs:32:6-11 }
+            [({ KindSigs.hs:35:6-11 }
               (GRHS
                (NoExt)
                []
-               ({ KindSigs.hs:32:8-11 }
+               ({ KindSigs.hs:35:8-11 }
                 (HsVar
                  (NoExt)
-                 ({ KindSigs.hs:32:8-11 }
+                 ({ KindSigs.hs:35:8-11 }
                   (Unqual
                    {OccName: True}))))))]
             ({ <no location info> }
@@ -575,3 +604,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+

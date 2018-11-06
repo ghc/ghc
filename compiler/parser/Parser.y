@@ -1061,8 +1061,8 @@ cl_decl :: { LTyClDecl GhcPs }
 --
 ty_decl :: { LTyClDecl GhcPs }
            -- ordinary type synonyms
-        : 'type' type '=' ctypedoc
-                -- Note ctype, not sigtype, on the right of '='
+        : 'type' type '=' ktypedoc
+                -- Note ktypedoc, not sigtype, on the right of '='
                 -- We allow an explicit for-all but we don't insert one
                 -- in   type Foo a = (b,b)
                 -- Instead we just say b is out of scope
@@ -1778,10 +1778,15 @@ unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
         : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
--- A ktype is a ctype, possibly with a kind annotation
+-- A ktype/ktypedoc is a ctype/ctypedoc, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
         : ctype                { $1 }
         | ctype '::' kind      {% ams (sLL $1 $> $ HsKindSig noExt $1 $3)
+                                      [mu AnnDcolon $2] }
+
+ktypedoc :: { LHsType GhcPs }
+         : ctypedoc            { $1 }
+         | ctypedoc '::' kind  {% ams (sLL $1 $> $ HsKindSig noExt $1 $3)
                                       [mu AnnDcolon $2] }
 
 -- A ctype is a for-all type
