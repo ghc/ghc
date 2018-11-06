@@ -6,7 +6,9 @@
 
 module Expr1 where
 
-data Expr :: * -> * where       -- Not a GADT at all
+import Data.Kind (Type)
+
+data Expr :: Type -> Type where       -- Not a GADT at all
   Const :: Show a => a -> Expr a
                 -- Note the Show constraint here
   Var   :: Var a -> Expr a

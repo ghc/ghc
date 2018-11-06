@@ -4,11 +4,13 @@
 
 module Class1 where
 
+import Data.Kind (Type)
+
 class C a where
   foo :: a x -> a y
 
 class C (T a) => D a where
-  type T a :: * -> *
+  type T a :: Type -> Type
 
   bar :: a -> T a x -> T a y
 

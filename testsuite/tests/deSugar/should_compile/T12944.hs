@@ -3,6 +3,8 @@
 
 module T12944 () where
 
+import Data.Kind (Type)
+
 class AdditiveGroup v where
   (^+^) :: v -> v -> v
   negateV :: v -> v
@@ -10,7 +12,7 @@ class AdditiveGroup v where
   v ^-^ v' = v ^+^ negateV v'
 
 class AdditiveGroup v => VectorSpace v where
-  type Scalar v :: *
+  type Scalar v :: Type
   (*^) :: Scalar v -> v -> v
 
 data Poly1 a = Poly1 a a

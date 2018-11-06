@@ -5,5 +5,5 @@ class C.C1 a where
   data family C.F a
 class C.C1 a where
   data family C.F a
-  	-- Defined at T5417a.hs:5:5
+  	-- Defined at T5417a.hs:7:5
 data instance C.F (B1 a) = B2 a 	-- Defined at T5417.hs:8:10

@@ -8,27 +8,28 @@
 {-# LANGUAGE StandaloneDeriving #-}
 module DerivingViaStandalone where
 
+import Data.Kind (Type)
 import Control.Applicative
 import Data.Functor.Compose
 import Data.Proxy
 import Data.Semigroup
 
-newtype App (f :: * -> *) a = App (f a)
+newtype App (f :: Type -> Type) a = App (f a)
   deriving newtype
     (Functor, Applicative)
 
 instance (Applicative f, Semigroup a) => Semigroup (App f a) where
   (<>) = liftA2 (<>)
 
-deriving via (App (Compose (f :: * -> *) g) a)
+deriving via (App (Compose (f :: Type -> Type) g) a)
          instance (Applicative f, Applicative g, Semigroup a)
                => Semigroup (Compose f g a)
 
-class C (a :: k -> *)
+class C (a :: k -> Type)
 instance C Proxy
 
 newtype MyProxy a = MyProxy (Proxy a)
-deriving via (Proxy :: * -> *) instance C MyProxy
+deriving via (Proxy :: Type -> Type) instance C MyProxy
 
 class Z a b
 data T a

@@ -289,5 +289,5 @@ instance Semigroup Builder where
 
 instance Monoid Builder where
     mempty  = emptyBuilder
-    mappend = append
+    mappend = (<>)
 

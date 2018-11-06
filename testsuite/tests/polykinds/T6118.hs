@@ -3,13 +3,14 @@
 
 module T6118 where
 
-import GHC.Exts
+import GHC.Exts (Any)
+import Data.Kind (Type)
 
 data Nat = Zero | Succ Nat
 data List a = Nil | Cons a (List a)
 
 class SingE (a :: k) where
-  type Demote a :: *
+  type Demote a :: Type
 
 instance SingE (a :: Bool) where
   type Demote a = Bool

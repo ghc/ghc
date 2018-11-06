@@ -2,11 +2,13 @@
 
 module T2850 where
 
+import Data.Kind (Type)
+
 class K a where
   bar :: a -> a
 
 class K (B a) => M a where
-  data B a :: *
+  data B a :: Type
   foo :: B a -> B a
 
 instance M Bool where

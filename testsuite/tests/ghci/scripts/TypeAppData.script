@@ -16,7 +16,8 @@ data P6 = forall k (a :: k). P6 (P1 a)
 pattern P7 :: P1 a ; pattern P7 = P1
 pattern P8 :: forall a. P1 a ; pattern P8 = P1
 pattern P9 :: forall k (a :: k). P1 a ; pattern P9 = P1
-pattern P10 :: forall (a :: k). P1 a ; pattern P10 = P1
+-- P10 commented out because implicit kind variables are no longer allowed
+-- pattern P10 :: forall (a :: k). P1 a ; pattern P10 = P1
 pattern P11 :: () => P1 a -> P5 ; pattern P11 a = P5 a
 pattern P12 :: () => forall a. P1 a -> P5 ; pattern P12 a = P5 a
 pattern P13 :: () => forall k (a :: k). P1 a -> P5 ; pattern P13 a = P5 a
@@ -24,7 +25,6 @@ pattern P14 :: () => forall (a :: k). P1 a -> P5 ; pattern P14 a = P5 a
 :type P7
 :type P8
 :type P9
-:type P10
 :type P11
 :type P12
 :type P13

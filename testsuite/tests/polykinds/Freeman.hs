@@ -4,13 +4,13 @@
 {-
 In the following, I will write a polykinded version of the combinators
 fold and unfold, along with three examples: folds for regular
-datatypes (specialized to kind *), folds for nested datatypes
-(specialized to kind * -> *), and folds for mutually recursive data
-types (specialized to the product kind (*,*)). The approach should
+datatypes (specialized to kind Type), folds for nested datatypes
+(specialized to kind Type -> Type), and folds for mutually recursive data
+types (specialized to the product kind (Type, Type)). The approach should
 generalise easily enough to things such as types indexed by another
-kind (e.g. by specializing to kind Nat -> *, using the XDataKinds
+kind (e.g. by specializing to kind Nat -> Type, using the XDataKinds
 extension), or higher order nested datatypes (e.g. by specializing to
-kind (* -> *) -> (* -> *)).
+kind (Type -> Type) -> (Type -> Type)).
 
 The following will compile in the new GHC 7.4.1 release. We require
 the following GHC extensions:
@@ -26,6 +26,8 @@ the following GHC extensions:
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 module Main where
+
+import Data.Kind (Type)
 
 {- The basic fold and unfold combinators can be written as follows:
 
@@ -45,9 +47,9 @@ object, and for every two compatible morphisms, the composition of
 those morphisms.
 
 In earlier versions of GHC, the type hom would have been specialized
-to kind * -> * -> *, but with the new PolyKinds extension, hom is
+to kind Type -> Type -> Type, but with the new PolyKinds extension, hom is
 polykinded, and the Category typeclass can be instantiated to k -> k
--> * for any kind k. This means that in addition to all of the
+-> Type for any kind k. This means that in addition to all of the
 Category instances that we could have written before, we can now write
 instances of Category for type constructors, type constructor
 constructors, etc.
@@ -67,10 +69,10 @@ transformations. A natural transformation is defined as follows: -}
 newtype Nat f g = Nat { nu :: (forall a. f a -> g a) } 
 
 {- Here is the Category instance for natural transformations. This
-time the type hom is inferred to have kind (* -> *) -> (* -> *) ->
-*. Identity and composition are both defined pointwise. -}
+time the type hom is inferred to have kind (Type -> Type) -> (Type -> Type) ->
+Type. Identity and composition are both defined pointwise. -}
 
-instance Category (Nat :: (* -> *) -> (* -> *) -> *) where
+instance Category (Nat :: (Type -> Type) -> (Type -> Type) -> Type) where
   ident = Nat id
   compose f g = Nat (nu g . nu f)
 
@@ -143,14 +145,14 @@ depth = (fold :: (FTree a Int -> Int) -> Tree a -> Int) phi where
 -- FCTree defines the type constructor CTree as its fixed point:
 
 data FCTree f a = FCLeaf a | FCBranch (f (a, a))
-  -- FCTree :: (* -> *) -> * -> *
+  -- FCTree :: (Type -> Type) -> Type -> Type
 
 data CTree a = CLeaf a | CBranch (CTree (a, a))
 
 -- Again, we define type class instances for HFunctor and Rec:
 
 instance HFunctor Nat FCTree where
-  hmap (f :: Nat (f :: * -> *) (g :: * -> *)) = Nat ff where
+  hmap (f :: Nat (f :: Type -> Type) (g :: Type -> Type)) = Nat ff where
     ff :: forall a. FCTree f a -> FCTree g a
     ff (FCLeaf a) = FCLeaf a
     ff (FCBranch a) = FCBranch (nu f a)
@@ -167,7 +169,7 @@ instance Rec Nat FCTree CTree where
 -- need a type constructor to act as the target of the fold. For our
 -- purposes, a constant functor will do:
 
-data K a b = K a  -- K :: forall k. * -> k -> *
+data K a b = K a  -- K :: forall k. Type -> k -> Type
 
 
 -- And finally, the following fold calculates the depth of a complete binary leaf tree:
@@ -183,8 +185,8 @@ datatype of lists of even and odd lengths. The fold will take a list
 of even length and produce a list of pairs.
 
 We cannot express type constructors in Haskell whose return kind is
-anything other than *, so we cheat a little and emulate the product
-kind using an arrow kind Choice -> *, where Choice is a two point
+anything other than Type, so we cheat a little and emulate the product
+kind using an arrow kind Choice -> Type, where Choice is a two point
 kind, lifted using the XDataKinds extension: -}
 
 data Choice = Fst | Snd
@@ -207,14 +209,14 @@ instance (Category h1, Category h2) => Category (PHom h1 h2) where
 
 -- We can define the types of lists of even and odd length as
 -- follows. Note that the kind annotation indicates the appearance of the
--- kind Choice -> *:
+-- kind Choice -> Type:
 
-data FAlt :: * -> (Choice -> *) -> Choice -> * where
+data FAlt :: Type -> (Choice -> Type) -> Choice -> Type where
   FZero :: FAlt a p Fst
   FSucc1 :: a -> (p Snd) -> FAlt a p Fst
   FSucc2 :: a -> (p Fst) -> FAlt a p Snd
 
-data Alt :: * -> Choice -> * where
+data Alt :: Type -> Choice -> Type where
   Zero :: Alt a Fst
   Succ1 :: a -> Alt a Snd -> Alt a Fst
   Succ2 :: a -> Alt a Fst -> Alt a Snd
@@ -244,7 +246,7 @@ instance HFunctor (PHom (->) (->)) (FAlt a) where
 
 -- As before, we create a target type for our fold, and this time a type synonym as well:
 
-data K2 :: * -> * -> Choice -> * where
+data K2 :: Type -> Type -> Choice -> Type where
   K21 :: a -> K2 a b Fst
   K22 :: b -> K2 a b Snd
 

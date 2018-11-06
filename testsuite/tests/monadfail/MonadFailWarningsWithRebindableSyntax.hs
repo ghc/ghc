@@ -2,7 +2,7 @@
 -- RebindableSyntax does not play that well with MonadFail, so here we ensure
 -- that when both settings are enabled we get the proper warning.
 
-{-# OPTIONS_GHC -Wmissing-monadfail-instances #-}
+{-# OPTIONS_GHC -Wmissing-monadfail-instances -Wno-error=compat #-}
 {-# LANGUAGE RebindableSyntax #-}
 
 module MonadFailWarningsWithRebindableSyntax where

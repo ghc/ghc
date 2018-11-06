@@ -3,9 +3,11 @@
 
 module T7474 where
 
-type family T :: * -> *
+import Data.Kind (Type)
 
-data E :: * -> * where
+type family T :: Type -> Type
+
+data E :: Type -> Type where
     E :: C p => T (T p) -> E p
 
 class C' b a where c :: T b -> a

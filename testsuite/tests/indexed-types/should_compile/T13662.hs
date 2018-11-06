@@ -2,9 +2,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module T13662 (run) where
 
+import Data.Kind (Type)
+
 newtype Value a = Value a
 
-type family Repr (f :: * -> *) a :: *
+type family Repr (f :: Type -> Type) a :: Type
 type instance Repr f Int = f Int
 
 class (Repr Value i ~ Value ir) => Native i ir where

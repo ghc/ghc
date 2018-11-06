@@ -4,155 +4,155 @@
 [4 of 5] Compiling T6018Dfail       ( T6018Dfail.hs, T6018Dfail.o )
 [5 of 5] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
 
-T6018Afail.hs:7:15: error:
+T6018Afail.hs:9:15: error:
     Type family equations violate injectivity annotation:
-      G Char Bool Int = Int -- Defined at T6018Afail.hs:7:15
-      G Bool Int Char = Int -- Defined at T6018fail.hs:15:15
+      G Char Bool Int = Int -- Defined at T6018Afail.hs:9:15
+      G Bool Int Char = Int -- Defined at T6018fail.hs:17:15
 
 T6018Cfail.hs:8:15: error:
     Type family equations violate injectivity annotation:
       T6018Bfail.H Char Bool Int = Int -- Defined at T6018Cfail.hs:8:15
       T6018Bfail.H Bool Int Char = Int -- Defined at T6018Dfail.hs:7:15
 
-T6018fail.hs:13:15: error:
+T6018fail.hs:15:15: error:
     Type family equations violate injectivity annotation:
-      F Bool Int Char = Int -- Defined at T6018fail.hs:13:15
-      F Char Bool Int = Int -- Defined at T6018fail.hs:12:15
+      F Bool Int Char = Int -- Defined at T6018fail.hs:15:15
+      F Char Bool Int = Int -- Defined at T6018fail.hs:14:15
 
-T6018fail.hs:19:15: error:
+T6018fail.hs:21:15: error:
     Type family equations violate injectivity annotation:
-      I Int Int Int = Bool -- Defined at T6018fail.hs:19:15
-      I Int Char Bool = Bool -- Defined at T6018fail.hs:18:15
+      I Int Int Int = Bool -- Defined at T6018fail.hs:21:15
+      I Int Char Bool = Bool -- Defined at T6018fail.hs:20:15
 
-T6018fail.hs:28:15: error:
+T6018fail.hs:30:15: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation cannot be a type family:
-      IdProxy a = Id a -- Defined at T6018fail.hs:28:15
+      IdProxy a = Id a -- Defined at T6018fail.hs:30:15
 
-T6018fail.hs:36:15: error:
+T6018fail.hs:38:15: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘'Z’
-      P 'Z m = m -- Defined at T6018fail.hs:36:15
+      P 'Z m = m -- Defined at T6018fail.hs:38:15
 
-T6018fail.hs:37:15: error:
+T6018fail.hs:39:15: error:
     Type family equations violate injectivity annotation:
-      P ('S n) m = 'S (P n m) -- Defined at T6018fail.hs:37:15
-      P 'Z m = m -- Defined at T6018fail.hs:36:15
+      P ('S n) m = 'S (P n m) -- Defined at T6018fail.hs:39:15
+      P 'Z m = m -- Defined at T6018fail.hs:38:15
 
-T6018fail.hs:42:15: error:
+T6018fail.hs:44:15: error:
     Type family equation violates injectivity annotation.
     Type variable ‘b’ cannot be inferred from the right-hand side.
     In the type family equation:
-      J Int b c = Char -- Defined at T6018fail.hs:42:15
+      J Int b c = Char -- Defined at T6018fail.hs:44:15
 
-T6018fail.hs:46:15: error:
+T6018fail.hs:48:15: error:
     Type family equation violates injectivity annotation.
     Type variable ‘n’ cannot be inferred from the right-hand side.
     In the type family equation:
-      K ('S n) m = 'S m -- Defined at T6018fail.hs:46:15
+      K ('S n) m = 'S m -- Defined at T6018fail.hs:48:15
 
-T6018fail.hs:51:15: error:
+T6018fail.hs:53:15: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation cannot be a type family:
-      L a = MaybeSyn a -- Defined at T6018fail.hs:51:15
+      L a = MaybeSyn a -- Defined at T6018fail.hs:53:15
 
-T6018fail.hs:59:10: error:
+T6018fail.hs:61:10: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k1’ cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
-      PolyKindVarsF '[] = '[] -- Defined at T6018fail.hs:59:10
+      PolyKindVarsF '[] = '[] -- Defined at T6018fail.hs:61:10
 
-T6018fail.hs:62:15: error:
+T6018fail.hs:64:15: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k1’ cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
-      PolyKindVars '[] = '[] -- Defined at T6018fail.hs:62:15
+      PolyKindVars '[] = '[] -- Defined at T6018fail.hs:64:15
 
-T6018fail.hs:66:15: error:
+T6018fail.hs:68:15: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k’ cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
       forall k (a :: k) (b :: k).
-        Fc a b = Int -- Defined at T6018fail.hs:66:15
+        Fc a b = Int -- Defined at T6018fail.hs:68:15
 
-T6018fail.hs:70:15: error:
+T6018fail.hs:72:15: error:
     Type family equation violates injectivity annotation.
     Type and kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
       forall k (a :: k) (b :: k).
-        Gc a b = Int -- Defined at T6018fail.hs:70:15
+        Gc a b = Int -- Defined at T6018fail.hs:72:15
 
-T6018fail.hs:74:15: error:
+T6018fail.hs:76:15: error:
     Type family equations violate injectivity annotation:
-      F1 [a] = Maybe (GF1 a) -- Defined at T6018fail.hs:74:15
-      F1 (Maybe a) = Maybe (GF2 a) -- Defined at T6018fail.hs:75:15
+      F1 [a] = Maybe (GF1 a) -- Defined at T6018fail.hs:76:15
+      F1 (Maybe a) = Maybe (GF2 a) -- Defined at T6018fail.hs:77:15
 
-T6018fail.hs:87:15: error:
+T6018fail.hs:89:15: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘[a]’
-      W1 [a] = a -- Defined at T6018fail.hs:87:15
+      W1 [a] = a -- Defined at T6018fail.hs:89:15
 
-T6018fail.hs:90:15: error:
+T6018fail.hs:92:15: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation cannot be a type family:
-      W2 [a] = W2 a -- Defined at T6018fail.hs:90:15
+      W2 [a] = W2 a -- Defined at T6018fail.hs:92:15
 
-T6018fail.hs:95:15: error:
+T6018fail.hs:97:15: error:
     Type family equations violate injectivity annotation:
-      Z1 (Maybe b) = (b, [b]) -- Defined at T6018fail.hs:95:15
-      Z1 [a] = (a, a) -- Defined at T6018fail.hs:94:15
+      Z1 (Maybe b) = (b, [b]) -- Defined at T6018fail.hs:97:15
+      Z1 [a] = (a, a) -- Defined at T6018fail.hs:96:15
 
-T6018fail.hs:99:15: error:
+T6018fail.hs:101:15: error:
     Type family equations violate injectivity annotation:
-      G1 (Maybe b) = [(b, b)] -- Defined at T6018fail.hs:99:15
-      G1 [a] = [a] -- Defined at T6018fail.hs:98:15
+      G1 (Maybe b) = [(b, b)] -- Defined at T6018fail.hs:101:15
+      G1 [a] = [a] -- Defined at T6018fail.hs:100:15
 
-T6018fail.hs:103:15: error:
+T6018fail.hs:105:15: error:
     Type family equations violate injectivity annotation:
-      G3 a Bool = (Bool, a) -- Defined at T6018fail.hs:103:15
-      G3 a Int = (a, Int) -- Defined at T6018fail.hs:102:15
+      G3 a Bool = (Bool, a) -- Defined at T6018fail.hs:105:15
+      G3 a Int = (a, Int) -- Defined at T6018fail.hs:104:15
 
-T6018fail.hs:106:15: error:
+T6018fail.hs:108:15: error:
     Type family equation violates injectivity annotation.
     Type variable ‘b’ cannot be inferred from the right-hand side.
     In the type family equation:
-      G4 a b = [a] -- Defined at T6018fail.hs:106:15
+      G4 a b = [a] -- Defined at T6018fail.hs:108:15
 
-T6018fail.hs:110:15: error:
+T6018fail.hs:112:15: error:
     Type family equations violate injectivity annotation:
-      G5 Int = [Bool] -- Defined at T6018fail.hs:110:15
-      G5 [a] = [GF1 a] -- Defined at T6018fail.hs:109:15
+      G5 Int = [Bool] -- Defined at T6018fail.hs:112:15
+      G5 [a] = [GF1 a] -- Defined at T6018fail.hs:111:15
 
-T6018fail.hs:113:15: error:
+T6018fail.hs:115:15: error:
     Type family equation violates injectivity annotation.
     Type variable ‘a’ cannot be inferred from the right-hand side.
     In the type family equation:
-      G6 [a] = [HF1 a] -- Defined at T6018fail.hs:113:15
+      G6 [a] = [HF1 a] -- Defined at T6018fail.hs:115:15
 
-T6018fail.hs:118:15: error:
+T6018fail.hs:120:15: error:
     Type family equation violates injectivity annotation.
     Type and kind variables ‘k’, ‘c’
     cannot be inferred from the right-hand side.
     Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
       forall k a b (c :: k).
-        G7 a b c = [G7a a b c] -- Defined at T6018fail.hs:118:15
+        G7 a b c = [G7a a b c] -- Defined at T6018fail.hs:120:15
 
-T6018fail.hs:129:1: error:
+T6018fail.hs:131:1: error:
     Type family equations violate injectivity annotation:
-      FC Int Bool = Bool -- Defined at T6018fail.hs:129:1
-      FC Int Char = Bool -- Defined at T6018fail.hs:125:10
+      FC Int Bool = Bool -- Defined at T6018fail.hs:131:1
+      FC Int Char = Bool -- Defined at T6018fail.hs:127:10
 
-T6018fail.hs:134:1: error:
+T6018fail.hs:136:1: error:
     Type family equation violates injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘*’,
                                                                  ‘Char’
-      FC Char a = a -- Defined at T6018fail.hs:134:1
+      FC Char a = a -- Defined at T6018fail.hs:136:1

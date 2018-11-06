@@ -5,8 +5,10 @@
 
 module T11361 where
 
+import Data.Kind (Type)
+
 class Cls a where
-    type Fam a b :: *
+    type Fam a b :: Type
     -- Multiple defaults!
     type Fam a x = FamHelper a x
 

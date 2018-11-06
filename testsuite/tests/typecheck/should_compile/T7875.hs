@@ -9,10 +9,12 @@
 
 module T7875 where
 
+import Data.Kind (Type)
+
 class Het a b | a -> b where
   het :: m (f c) -> a -> m b
 
-class GHet (a :: * -> *) (b :: * -> *) | a -> b
+class GHet (a :: Type -> Type) (b :: Type -> Type) | a -> b
 instance            GHet (K a) (K [a])
 instance Het a b => GHet (K a) (K b)
 

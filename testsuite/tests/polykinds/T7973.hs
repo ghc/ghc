@@ -3,8 +3,10 @@
 
 module Test where
 
+import Data.Kind (Type)
+
 -- Kind-level proxies.
-data {-kind-} K (a :: *) = KP
+data {-kind-} K (a :: Type) = KP
 
 -- A type with 1 kind-polymorphic type argument.
 data T (n :: k)

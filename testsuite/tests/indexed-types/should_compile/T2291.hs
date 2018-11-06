@@ -1,9 +1,11 @@
 {-# LANGUAGE TypeFamilies #-}
 module Small where
 
+import Data.Kind (Type)
+
 class CoCCC k where
-        type Coexp k :: * -> * -> *
-        type Sum k :: * -> * -> *
+        type Coexp k :: Type -> Type -> Type
+        type Sum k :: Type -> Type -> Type
         coapply' :: k b (Sum k (Coexp k a b) a)
         cocurry' :: k c (Sum k a b) -> k (Coexp k b c) a
         uncocurry' :: k (Coexp k b c) a -> k c (Sum k a b)

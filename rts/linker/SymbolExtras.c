@@ -19,16 +19,23 @@
 #include "linker/SymbolExtras.h"
 #include "linker/M32Alloc.h"
 
+#if defined(OBJFORMAT_ELF)
+#  include "linker/Elf.h"
+#elif defined(OBJFORMAT_MACHO)
+#  include "linker/MachO.h"
+#endif
+
 #include <string.h>
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
 #endif /* RTS_LINKER_USE_MMAP */
 
 /*
-  ocAllocateSymbolExtras
+  ocAllocateExtras
 
   Allocate additional space at the end of the object file image to make room
-  for jump islands (powerpc, x86_64, arm) and GOT entries (x86_64).
+  for jump islands (powerpc, x86_64, arm), GOT entries (x86_64) and
+  bss sections.
 
   PowerPC relative branch instructions have a 24 bit displacement field.
   As PPC code is always 4-byte-aligned, this yields a +-32MB range.
@@ -43,16 +50,30 @@
   filled in by makeSymbolExtra below.
 */
 
-int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
+int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
 {
-  size_t n;
+  void* oldImage = oc->image;
 
-  if (RTS_LINKER_USE_MMAP && USE_CONTIGUOUS_MMAP) {
-      n = roundUpToPage(oc->fileSize);
+  if (count > 0 || bssSize > 0) {
+    if (!RTS_LINKER_USE_MMAP) {
 
-      /* Keep image and symbol_extras contiguous */
+      // round up to the nearest 4
+      int aligned = (oc->fileSize + 3) & ~3;
+      int misalignment = oc->misalignment;
 
-      size_t allocated_size = n + (sizeof(SymbolExtra) * count);
+      oc->image -= misalignment;
+      oc->image = stgReallocBytes( oc->image,
+                               misalignment +
+                               aligned + sizeof (SymbolExtra) * count,
+                               "ocAllocateExtras" );
+      oc->image += misalignment;
+
+      oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
+    } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
+      /* Keep image, bssExtras and symbol_extras contiguous */
+      size_t n = roundUpToPage(oc->fileSize);
+      bssSize = roundUpToAlign(bssSize, 8);
+      size_t allocated_size = n + bssSize + (sizeof(SymbolExtra) * count);
       void *new = mmapForLinker(allocated_size, MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
@@ -61,42 +82,35 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
           }
           oc->image = new;
           oc->imageMapped = true;
-          oc->fileSize = n + (sizeof(SymbolExtra) * count);
-          oc->symbol_extras = (SymbolExtra *) (oc->image + n);
-          if(mprotect(new, allocated_size, PROT_READ | PROT_EXEC) != 0) {
-              sysErrorBelch("unable to protect memory");
-          }
+          oc->fileSize = allocated_size;
+          oc->symbol_extras = (SymbolExtra *) (oc->image + n + bssSize);
+          oc->bssBegin = oc->image + n;
+          oc->bssEnd = oc->image + n + bssSize;
       }
       else {
           oc->symbol_extras = NULL;
           return 0;
       }
-  }
-  else if( count > 0 ) {
-    if (RTS_LINKER_USE_MMAP) {
-        n = roundUpToPage(oc->fileSize);
-
+    } else {
         oc->symbol_extras = m32_alloc(sizeof(SymbolExtra) * count, 8);
         if (oc->symbol_extras == NULL) return 0;
-    }
-    else {
-        // round up to the nearest 4
-        int aligned = (oc->fileSize + 3) & ~3;
-        int misalignment = oc->misalignment;
-
-        oc->image -= misalignment;
-        oc->image = stgReallocBytes( oc->image,
-                                 misalignment +
-                                 aligned + sizeof (SymbolExtra) * count,
-                                 "ocAllocateSymbolExtras" );
-        oc->image += misalignment;
-
-        oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
     }
   }
 
   if (oc->symbol_extras != NULL) {
       memset( oc->symbol_extras, 0, sizeof (SymbolExtra) * count );
+  }
+
+  // ObjectCodeFormatInfo contains computed addresses based on offset to
+  // image, if the address of image changes, we need to invalidate
+  // the ObjectCodeFormatInfo and recompute it.
+  if (oc->image != oldImage) {
+#if defined(OBJFORMAT_MACHO)
+    ocInit_MachO( oc );
+#endif
+#if defined(OBJFORMAT_ELF)
+    ocInit_ELF( oc );
+#endif
   }
 
   oc->first_symbol_extra = first;

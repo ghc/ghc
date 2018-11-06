@@ -61,6 +61,9 @@ Compiler
 
 - The :ghc-flag:`-Wcompat` warning group now includes :ghc-flag:`-Wstar-is-type`.
 
+- The :ghc-flag:`-fllvm-pass-vectors-in-regs` flag is now deprecated as vector
+  arguments are now passed in registers by default.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -76,6 +79,10 @@ Runtime system
 - The runtime linker on Windows has been overhauled to properly handle section
   alignment, lower the amount of wasted memory and lower the amount of in use memory.
   See :ghc-ticket:`13617`. Note that committed memory may be slightly higher.
+
+- A new flag ``-xp`` is added on x86_64. When it is passed, the runtime linker
+  can load object files compiled with ``-fPIC -fexternal-dynamic-refs``
+  anywhere in the address space. This used to be restricted to the low 2Gb.
 
 
 Template Haskell
@@ -140,7 +147,7 @@ for further change information.
     libraries/array/array.cabal:             Dependency of ``ghc`` library
     libraries/base/base.cabal:               Core library
     libraries/binary/binary.cabal:           Dependency of ``ghc`` library
-    libraries/bytestring/bytestring.cabal:   Deppendency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
     libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
     libraries/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library

@@ -2,7 +2,9 @@
 
 module Refl where
 
-type family T a :: * -> *
+import Data.Kind (Type)
+
+type family T a :: Type -> Type
 
 foo :: a x -> a y
 foo = undefined

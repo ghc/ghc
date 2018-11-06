@@ -11,6 +11,8 @@
 {-# LANGUAGE StarIsType #-}
 {-# LANGUAGE UnicodeSyntax #-}
 
+{-# OPTIONS -Wno-star-is-type #-}
+
 import Data.Typeable
 import Data.Kind
 import GHC.Exts

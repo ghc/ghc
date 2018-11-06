@@ -136,3 +136,4 @@ test('T13838', [exit_code(1), omit_ways(['ghci'])], compile_and_run, ['-fdefer-t
 test('T14218', normal, compile_and_run, [''])
 test('T14236', normal, compile_and_run, [''])
 test('T14925', normal, compile_and_run, [''])
+test('T14341', normal, compile_and_run, [''])

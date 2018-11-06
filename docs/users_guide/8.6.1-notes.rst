@@ -266,7 +266,7 @@ for further change information.
     libraries/array/array.cabal:             Dependency of ``ghc`` library
     libraries/base/base.cabal:               Core library
     libraries/binary/binary.cabal:           Dependency of ``ghc`` library
-    libraries/bytestring/bytestring.cabal:   Deppendency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
     libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
     libraries/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library

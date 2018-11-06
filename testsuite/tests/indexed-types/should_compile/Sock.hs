@@ -9,7 +9,7 @@
 module Sock where
 
 import Data.Proxy
-import GHC.Exts
+import Data.Kind
 
 data Message
 
@@ -17,11 +17,11 @@ data SocketType = Dealer | Push | Pull
 
 data SocketOperation = Read | Write
 
-data SockOp :: SocketType -> SocketOperation -> * where
+data SockOp :: SocketType -> SocketOperation -> Type where
     SRead :: Foo 'Read sock => SockOp sock 'Read
     SWrite :: Foo Write sock => SockOp sock Write
 
-data Socket :: SocketType -> * where
+data Socket :: SocketType -> Type where
     Socket :: proxy sock
            -> (forall op . Foo op sock => SockOp sock op -> Operation op)
            -> Socket sock
@@ -30,7 +30,7 @@ type family Foo (op :: SocketOperation) (s :: SocketType) :: Constraint where
     Foo 'Read s = Readable s
     Foo Write s = Writable s
 
-type family Operation (op :: SocketOperation) :: * where
+type family Operation (op :: SocketOperation) :: Type where
     Operation 'Read = IO Message
     Operation Write = Message -> IO ()
 

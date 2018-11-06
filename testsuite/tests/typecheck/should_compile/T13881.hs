@@ -12,6 +12,6 @@ data instance Sing (z :: [a]) where
   SNil  :: Sing '[]
   SCons :: Sing x -> Sing xs -> Sing (x ': xs)
 
-fl :: forall (l :: [a]). Sing l -> Sing l
+fl :: forall a (l :: [a]). Sing l -> Sing l
 fl (SNil :: Sing (l :: [y])) = SNil
 fl (SCons x xs)              = SCons x xs

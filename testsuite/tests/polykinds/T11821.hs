@@ -2,10 +2,11 @@
 module NotInScope where
 
 import Data.Proxy
+import Data.Kind (Type)
 
 type KindOf (a :: k) = ('KProxy :: KProxy k)
-data TyFun :: * -> * -> *
-type family Apply (f :: TyFun k1 k2 -> *) (x :: k1) :: k2
+data TyFun :: Type -> Type -> Type
+type family Apply (f :: TyFun k1 k2 -> Type) (x :: k1) :: k2
 
 data Lgo2 l1
           l2
@@ -18,7 +19,7 @@ data Lgo2 l1
 data Lgo1 l1
           l2
           l3
-          (l4 :: TyFun b (TyFun [a] b -> *))
+          (l4 :: TyFun b (TyFun [a] b -> Type))
   = forall (arg :: b) . KindOf (Apply (Lgo1 l1 l2 l3) arg) ~ KindOf (Lgo2 l1 l2 l3 arg) =>
     Lgo1KindInference
 

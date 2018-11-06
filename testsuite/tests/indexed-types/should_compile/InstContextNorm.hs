@@ -5,7 +5,9 @@
 module InstContextNorm
 where
 
-data EX _x _y (p :: * -> *)
+import Data.Kind (Type)
+
+data EX _x _y (p :: Type -> Type)
 data ANY
 
 class Base p

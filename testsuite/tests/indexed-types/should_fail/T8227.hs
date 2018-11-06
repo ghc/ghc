@@ -4,9 +4,10 @@ module T8227
     absoluteToParam
   ) where
 
+import Data.Kind (Type)
 import T8227a
 
-type family Scalar a :: *
+type family Scalar a :: Type
 type instance Scalar (a -> v) = a -> Scalar v
 
 arcLengthToParam :: Scalar (V p) -> p -> Scalar (V p) -> Scalar (V p)

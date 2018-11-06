@@ -2,7 +2,9 @@
 -- submitted by g9ks157k@acme.softbase.org as #1713
 module TypeFamilyBug where
 
-type family TestFamily a :: *
+import Data.Kind (Type)
+
+type family TestFamily a :: Type
 
 type instance TestFamily () = [()]
 

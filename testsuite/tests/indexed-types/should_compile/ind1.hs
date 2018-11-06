@@ -4,7 +4,9 @@
 
 module ShouldCompile where
 
-data family T a :: *
+import Data.Kind (Type)
+
+data family T a :: Type
 
 data instance T Bool = TBool !Bool
 

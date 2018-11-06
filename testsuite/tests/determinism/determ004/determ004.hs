@@ -217,15 +217,17 @@ $s$wsFoldr1_szbtK =
 
 module List (sFoldr1) where
 
+import Data.Kind (Type)
+
 data Proxy t
 
 data family Sing (a :: k)
 
-data TyFun (a :: *) (b :: *)
+data TyFun (a :: Type) (b :: Type)
 
-type family Apply (f :: TyFun k1 k2 -> *) (x :: k1) :: k2
+type family Apply (f :: TyFun k1 k2 -> Type) (x :: k1) :: k2
 
-data instance Sing (f :: TyFun k1 k2 -> *) =
+data instance Sing (f :: TyFun k1 k2 -> Type) =
   SLambda { applySing :: forall t. Sing t -> Sing (Apply f t) }
 
 type SingFunction1 f = forall t. Sing t -> Sing (Apply f t)
@@ -237,7 +239,7 @@ singFun2 _ f = SLambda (\x -> SLambda (f x))
 data (:$$) (j :: a) (i :: TyFun [a] [a])
 type instance Apply ((:$$) j) i = (:) j i
 
-data (:$) (l :: TyFun a (TyFun [a] [a] -> *))
+data (:$) (l :: TyFun a (TyFun [a] [a] -> Type))
 type instance Apply (:$) l = (:$$) l
 data instance Sing (z :: [a])
   = z ~ '[] =>
@@ -255,30 +257,31 @@ type Let1627448493Xs f_afe9
                      wild_1627448474_afeb
                      wild_1627448476_afec =
     Apply (Apply (:$) wild_1627448474_afeb) wild_1627448476_afec
-type Foldr1Sym2 (t_afdY :: TyFun a_afdP (TyFun a_afdP a_afdP -> *)
-                           -> *)
+type Foldr1Sym2 (t_afdY :: TyFun a_afdP (TyFun a_afdP a_afdP -> Type)
+                           -> Type)
                 (t_afdZ :: [a_afdP]) =
     Foldr1 t_afdY t_afdZ
-data Foldr1Sym1 (l_afe3 :: TyFun a_afdP (TyFun a_afdP a_afdP -> *)
-                           -> *)
+data Foldr1Sym1 (l_afe3 :: TyFun a_afdP (TyFun a_afdP a_afdP -> Type)
+                           -> Type)
                 (l_afe2 :: TyFun [a_afdP] a_afdP)
 type instance Apply (Foldr1Sym1 l_afe3) l_afe2 = Foldr1Sym2 l_afe3 l_afe2
 
 data Foldr1Sym0 (l_afe0 :: TyFun (TyFun a_afdP (TyFun a_afdP a_afdP
-                                                -> *)
-                                  -> *) (TyFun [a_afdP] a_afdP -> *))
+                                                -> Type)
+                                  -> Type) (TyFun [a_afdP] a_afdP -> Type))
 type instance Apply Foldr1Sym0 l = Foldr1Sym1 l
 
 type family Foldr1 (a_afe5 :: TyFun a_afdP (TyFun a_afdP a_afdP
-                                            -> *)
-                              -> *)
+                                            -> Type)
+                              -> Type)
                    (a_afe6 :: [a_afdP]) :: a_afdP where
   Foldr1 z_afe7 '[x_afe8] = x_afe8
   Foldr1 f_afe9 ((:) x_afea ((:) wild_1627448474_afeb wild_1627448476_afec)) = Apply (Apply f_afe9 x_afea) (Apply (Apply Foldr1Sym0 f_afe9) (Let1627448493XsSym4 f_afe9 x_afea wild_1627448474_afeb wild_1627448476_afec))
   Foldr1 z_afew '[] = Apply ErrorSym0 "Data.Singletons.List.foldr1: empty list"
 
 sFoldr1 ::
-  forall (x :: TyFun a_afdP (TyFun a_afdP a_afdP -> *) -> *)
+  forall a_afdP.
+  forall (x :: TyFun a_afdP (TyFun a_afdP a_afdP -> Type) -> Type)
          (y :: [a_afdP]).
   Sing x
   -> Sing y -> Sing (Apply (Apply Foldr1Sym0 x) y)

@@ -2,7 +2,9 @@
 
 module T11581 where
 
-type family F a :: * -> *
+import Data.Kind (Type)
+
+type family F a :: Type -> Type
 type family G a
 
 type instance G [a] = F a (Int,Bool)

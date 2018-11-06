@@ -795,6 +795,7 @@ pprCxt ts = ppr_cxt_preds ts <+> text "=>"
 ppr_cxt_preds :: Cxt -> Doc
 ppr_cxt_preds [] = empty
 ppr_cxt_preds [t@ImplicitParamT{}] = parens (ppr t)
+ppr_cxt_preds [t@ForallT{}] = parens (ppr t)
 ppr_cxt_preds [t] = ppr t
 ppr_cxt_preds ts = parens (commaSep ts)
 

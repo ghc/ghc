@@ -1,8 +1,10 @@
 {-# LANGUAGE UnicodeSyntax, RankNTypes, TypeFamilies #-}
 module T5595 where
 
+import Data.Kind (Type)
+
 class MonadTransControl t where
-  type St t :: * → *
+  type St t :: Type → Type
 
   liftControl :: Monad m =>(Run t → m a) → t m a
 

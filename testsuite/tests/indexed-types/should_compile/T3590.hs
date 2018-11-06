@@ -4,11 +4,13 @@
 
 module T3590 where
 
+import Data.Kind (Type)
+
 newtype ListT m a =
   ListT { runListT :: m (Maybe (a, ListT m a)) }
 
 class Monad (ItemM l) => List l where
-  type ItemM l :: * -> *
+  type ItemM l :: Type -> Type
   joinL :: [ItemM l (l a) -> l a]
 
 instance Monad m => List (ListT m) where

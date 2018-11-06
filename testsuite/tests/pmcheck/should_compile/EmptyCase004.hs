@@ -4,7 +4,9 @@
 -- Check some GADTs
 module EmptyCase004 where
 
-data A :: * -> * where
+import Data.Kind (Type)
+
+data A :: Type -> Type where
   A1 :: A Int
   A2 :: A Bool
 
@@ -20,7 +22,7 @@ f2 = \case
 f3 :: A [a] -> b
 f3 = \case
 
-data B :: * -> * -> * where
+data B :: Type -> Type -> Type where
   B1 :: Int -> B Bool Bool
   B2 ::        B Int  Bool
 

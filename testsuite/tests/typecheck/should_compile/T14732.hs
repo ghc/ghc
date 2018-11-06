@@ -8,6 +8,7 @@
 module T14732 where
 
 import Prelude hiding (zip, zipWith)
+import Data.Kind (Type)
 
 zipWith :: (a -> b -> c)
         -> Bundle v a
@@ -15,10 +16,10 @@ zipWith :: (a -> b -> c)
         -> Bundle v c
 zipWith = undefined
 
-class GVector (v :: * -> *) a
+class GVector (v :: Type -> Type) a
 instance GVector Vector a
 
-data Bundle (v :: * -> *) a
+data Bundle (v :: Type -> Type) a
 data Vector a
 class Unbox a
 

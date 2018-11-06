@@ -43,7 +43,9 @@
 
 module Main where
 
+import Data.Kind (Type)
 import Control.Monad (liftM, liftM2, when, ap)
+import Control.Monad.Fail (MonadFail(fail))
 -- import Control.Monad.Identity
 
 import Debug.Trace (trace)
@@ -95,6 +97,9 @@ instance (Monad m, Functor s) => Monad (Trampoline m s) where
    t >>= f = Trampoline (bounce t >>= apply f)
       where apply f (Done x) = bounce (f x)
             apply f (Suspend s) = return (Suspend (fmap (>>= f) s))
+
+instance (Monad m, Functor s) => MonadFail (Trampoline m s) where
+  fail = error
 
 data Yield x y = Yield! x y
 instance Functor (Yield x) where
@@ -176,10 +181,10 @@ liftOut (Trampoline ma) = trace "liftOut" $ Trampoline (liftM inject ma)
          inject (Suspend a) = trace "inject suspend" $ Suspend (liftFunctor $ trace "calling fmap" $ 
                               fmap liftOut (trace "poking a" a))
 
-data Sink (m :: * -> *) a x =
+data Sink (m :: Type -> Type) a x =
    Sink   {put :: forall d. (AncestorFunctor (EitherFunctor a (TryYield x)) d) => x -> Trampoline m d Bool,
            canPut :: forall d. (AncestorFunctor (EitherFunctor a (TryYield x)) d) => Trampoline m d Bool}
-newtype Source (m :: * -> *) a x =
+newtype Source (m :: Type -> Type) a x =
    Source {get :: forall d. (AncestorFunctor (EitherFunctor a (Await (Maybe x))) d) => Trampoline m d (Maybe x)}
 
 pipe :: forall m a x r1 r2. (Monad m, Functor a) =>

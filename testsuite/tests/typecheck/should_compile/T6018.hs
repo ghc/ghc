@@ -40,6 +40,7 @@ type family Gi a = r | r -> a
 type instance Gi Int = Char
 -}
 
+import Data.Kind (Type)
 import T6018a -- defines G, identical to F
 
 type family F a b c = (result :: k) | result -> a b c
@@ -81,7 +82,7 @@ type family FClosed a b c = result | result -> a b c where
     FClosed Char Bool Int  = Int
     FClosed Bool Int  Char = Char
 
-type family IClosed (a :: *) (b :: *) (c :: *) = r | r -> a b where
+type family IClosed (a :: Type) (b :: Type) (c :: Type) = r | r -> a b where
     IClosed Int  Char Bool = Bool
     IClosed Int  Char Int  = Bool
     IClosed Bool Int  Int  = Int
@@ -204,10 +205,10 @@ type family L (a :: k1) = (r :: k2) | r -> k1 where
     L Maybe  = 3
     L IO     = 3
 
-data KProxy (a :: *) = KProxy
+data KProxy (a :: Type) = KProxy
 type family KP (kproxy :: KProxy k) = r | r -> k
 type instance KP ('KProxy :: KProxy Bool) = Int
-type instance KP ('KProxy :: KProxy *)    = Char
+type instance KP ('KProxy :: KProxy Type) = Char
 
 kproxy_id :: KP ('KProxy :: KProxy k) -> KP ('KProxy :: KProxy k)
 kproxy_id x = x
@@ -264,7 +265,8 @@ type family Fa (a :: k) (b :: k) = (r :: k2) | r -> k
 type instance Fa a b = a
 
 -- Taken from #9587. This exposed a bug in the solver.
-type family Arr (repr :: * -> *) (a :: *) (b :: *) = (r :: *) | r -> repr a b
+type family Arr (repr :: Type -> Type) (a :: Type) (b :: Type)
+  = (r :: Type) | r -> repr a b
 
 class ESymantics repr where
     int :: Int  -> repr Int

@@ -4,7 +4,9 @@
 -- Arrow Kind, Newtypes, GADTs, DataFamilies
 module EmptyCase009 where
 
-data family DB a :: * -> *
+import Data.Kind (Type)
+
+data family DB a :: Type -> Type
 
 data instance DB Int a where
   MkDB1 :: DB Int ()
@@ -30,7 +32,7 @@ data instance DB () a where
 f19 :: Bar (DB ()) -> ()
 f19 = \case
 
-data GB :: * -> * where
+data GB :: Type -> Type where
   MkGB1 :: Int -> GB ()
   MkGB2 :: GB (a,a)
   MkGB3 :: GB b

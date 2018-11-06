@@ -2,8 +2,10 @@
 
 module T3220 where
 
+import Data.Kind (Type)
+
 class Foo m where
-    type Bar m :: *
+    type Bar m :: Type
     action :: m -> Bar m -> m
 
 right x m = action m (Right x)

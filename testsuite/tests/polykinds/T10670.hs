@@ -3,6 +3,7 @@
 module T10670 where
 
 import Unsafe.Coerce
+import Data.Kind (Type)
 
 data TypeRepT (a::k) where
   TRCon :: TypeRepT a
@@ -18,7 +19,7 @@ tyRepTArr :: TypeRepT (->)
 {-# NOINLINE tyRepTArr #-}
 tyRepTArr = TRCon
 
-s :: forall a x. TypeRepT (a :: *) -> Maybe x
+s :: forall a x. TypeRepT (a :: Type) -> Maybe x
 s tf = case getT2 tyRepTArr tf :: Maybe (G2 (->) a) of
           Just (G2 _ _) -> Nothing
           _ -> Nothing

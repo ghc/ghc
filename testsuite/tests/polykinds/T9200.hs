@@ -2,6 +2,8 @@
              TypeFamilies #-}
 
 module T9200 where
+
+import Data.Kind (Type)
 import Data.Proxy
 
 ------
@@ -18,7 +20,7 @@ class C () a => D a
 data T1 a b c = MkT1 (S True b c)
 data T2 p q r = MkT2 (S p 5 r)
 data T3 x y q = MkT3 (S x y '())
-type S (f :: k1) (g :: k2) (h :: k3) = ((T1 f g h, T2 f g h, T3 f g h) :: *)
+type S (f :: k1) (g :: k2) (h :: k3) = ((T1 f g h, T2 f g h, T3 f g h) :: Type)
 
 
 ----------

@@ -1,11 +1,11 @@
 {-# LANGUAGE PatternSynonyms, ViewPatterns, ConstraintKinds, TypeFamilies, PolyKinds, KindSignatures #-}
 module T10997_1a where
 
-import GHC.Exts
+import Data.Kind
 
 type family Showable (a :: k) :: Constraint where
-  Showable (a :: *) = (Show a)
-  Showable a       = ()
+  Showable (a :: Type) = (Show a)
+  Showable a           = ()
 
 extractJust :: Maybe a -> (Bool, a)
 extractJust (Just a) = (True, a)

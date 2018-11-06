@@ -6,6 +6,7 @@
 
 module T9750 where
 
+import Data.Kind (Type)
 import GHC.TypeLits ( Symbol, KnownSymbol )
 
 --------------------------------------------------------------------------------
@@ -14,7 +15,7 @@ data Meta = MetaCons Symbol
 data M1 (c :: Meta) = M1
 
 class Generic a where
-  type Rep a :: *
+  type Rep a :: Type
   from  :: a -> Rep a
 
 --------------------------------------------------------------------------------

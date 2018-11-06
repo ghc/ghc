@@ -2,6 +2,8 @@
 
 module T2767a where
 
+import Data.Kind (Type)
+
 main = return ()
 
 -- eval' :: Solver solver => Tree solver a -> [(Label solver,Tree solver a)] -> solver [a]
@@ -17,7 +19,7 @@ data Tree s a
                 | NewVar (Term s -> Tree s a)
 
 class Monad solver => Solver solver where
-        type Term solver        :: *
-        type Label solver       :: *
+        type Term solver        :: Type
+        type Label solver       :: Type
         newvarSM        :: solver (Term solver)
         gotoSM          :: Label solver -> solver ()

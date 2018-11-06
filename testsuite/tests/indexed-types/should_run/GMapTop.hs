@@ -5,12 +5,13 @@ module Main where
 import Prelude hiding (lookup)
 import Data.Char (ord)
 import qualified Data.Map as Map
+import Data.Kind (Type)
 
 
 -- Generic maps as toplevel indexed data types
 ----------------------------------------------
 
-data family GMap k :: * -> *
+data family GMap k :: Type -> Type
 data instance GMap Int          v = GMapInt    (Map.Map Int v)
 data instance GMap Char         v = GMapChar   (GMap Int v)
 data instance GMap ()           v = GMapUnit   (Maybe v)

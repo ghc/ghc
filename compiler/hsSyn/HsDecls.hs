@@ -1773,13 +1773,15 @@ pprFamInstLHS thing typats fixity context mb_kind_sig
                                               -- explicit type patterns
    = hsep [ pprHsContext context, pp_pats typats, pp_kind_sig ]
    where
-     pp_pats (patl:patsr)
-       | fixity == Infix
-          = hsep [pprHsType (unLoc patl), pprInfixOcc (unLoc thing)
-          , hsep (map (pprHsType.unLoc) patsr)]
-       | otherwise = hsep [ pprPrefixOcc (unLoc thing)
-                   , hsep (map (pprHsType.unLoc) (patl:patsr))]
-     pp_pats [] = pprPrefixOcc (unLoc thing)
+     pp_pats (patl:patr:pats)
+       | Infix <- fixity
+       = let pp_op_app = hsep [ ppr patl, pprInfixOcc (unLoc thing), ppr patr ] in
+         case pats of
+           [] -> pp_op_app
+           _  -> hsep (parens pp_op_app : map ppr pats)
+
+     pp_pats pats = hsep [ pprPrefixOcc (unLoc thing)
+                         , hsep (map ppr pats)]
 
      pp_kind_sig
        | Just k <- mb_kind_sig

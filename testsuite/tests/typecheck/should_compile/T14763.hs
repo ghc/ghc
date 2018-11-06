@@ -4,12 +4,14 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module T14763 where
 
+import Data.Kind (Type)
+
 data Value a = Value a
 
 data SomeValue expr where
   SomeValue :: Esqueleto query expr backend => expr (Value a) -> SomeValue expr
 
-class Esqueleto (query :: * -> *) (expr :: * -> *) backend
+class Esqueleto (query :: Type -> Type) (expr :: Type -> Type) backend
         | query -> expr backend, expr -> query backend
 
 data SqlQuery a

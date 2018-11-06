@@ -49,7 +49,7 @@ instance (ty ~ Ty x, Coercible x, Coercibles xs tys) => Coercibles (x, xs) '(ty,
 
 qqMarker
   :: forall
-     -- k                -- the kind variable shows up in Core
+     k                   -- the kind variable shows up in Core
      (args_tys :: k)     -- JType's of arguments
      tyres               -- JType of result
      (input :: Symbol)   -- input string of the quasiquoter

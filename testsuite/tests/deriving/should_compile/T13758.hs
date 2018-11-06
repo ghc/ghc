@@ -5,6 +5,9 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS -Wno-noncanonical-monoid-instances #-}
+
 module T13758 where
 
 import Data.Coerce

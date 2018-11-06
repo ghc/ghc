@@ -1,4 +1,5 @@
 {-# LANGUAGE KindSignatures, GADTs, DataKinds #-}
+{-# OPTIONS -Wno-star-is-type #-}
 module Foo where
 
 data Foo1 :: [*] -> * where

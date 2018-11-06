@@ -5,12 +5,13 @@
 module Data.Vector.Unboxed where
 
 import Control.Monad.ST ( ST )
+import Data.Kind (Type)
 
 
 data MVector s a = MV
 data Vector a    = V
 
-type family Mutable (v :: * -> *) :: * -> * -> *
+type family Mutable (v :: Type -> Type) :: Type -> Type -> Type
 type instance Mutable Vector = MVector
 
 create :: (forall s. MVector s a) -> Int

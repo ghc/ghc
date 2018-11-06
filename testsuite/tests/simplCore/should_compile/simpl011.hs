@@ -6,6 +6,7 @@
 
 module MHashTable (STHashTable, new, update) where
 
+import Data.Kind            (Type)
 import Data.Int             (Int32)
 import Control.Monad.ST     (ST)
 import Data.STRef           (STRef)
@@ -35,7 +36,8 @@ type STHashTable s key val = HashTable key val (STArray s) (STRef s) (ST s)
 
 newtype HashTable key val arr ref m = HashTable (ref (HT key val arr ref m))
 
-data HT key val arr (ref :: * -> *) (m :: * -> *) = HT { dir :: (arr Int32 (arr Int32 [(key,val)])) }
+data HT key val arr (ref :: Type -> Type) (m :: Type -> Type) =
+  HT { dir :: (arr Int32 (arr Int32 [(key,val)])) }
 
 new :: forall arr ref m key val. (MutHash arr ref m) => m (HashTable key val arr ref m)
 new = do

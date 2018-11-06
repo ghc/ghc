@@ -2,7 +2,9 @@
 
 module T6011 where
 
-data family GenMod :: Modulus * -> * -> *
+import Data.Kind (Type)
+
+data family GenMod :: Modulus Type -> Type -> Type
 
 type Mod n = GenMod (FiniteRing n) Integer
 

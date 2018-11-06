@@ -72,10 +72,6 @@
 #  include <mach-o/fat.h>
 #endif
 
-#if defined(x86_64_HOST_ARCH) && defined(darwin_HOST_OS)
-#define ALWAYS_PIC
-#endif
-
 #if defined(dragonfly_HOST_OS)
 #include <sys/tls.h>
 #endif
@@ -212,9 +208,7 @@ int ocTryLoad( ObjectCode* oc );
  * We pick a default address based on the OS, but also make this
  * configurable via an RTS flag (+RTS -xm)
  */
-#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
-
-#if defined(MAP_32BIT)
+#if defined(MAP_32BIT) || DEFAULT_LINKER_ALWAYS_PIC
 // Try to use MAP_32BIT
 #define MMAP_32BIT_BASE_DEFAULT 0
 #else
@@ -223,7 +217,6 @@ int ocTryLoad( ObjectCode* oc );
 #endif
 
 static void *mmap_32bit_base = (void *)MMAP_32BIT_BASE_DEFAULT;
-#endif
 
 static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
     ObjectCode *owner)
@@ -496,12 +489,10 @@ initLinker_ (int retain_cafs)
     }
 #   endif
 
-#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
     if (RtsFlags.MiscFlags.linkerMemBase != 0) {
         // User-override for mmap_32bit_base
         mmap_32bit_base = (void*)RtsFlags.MiscFlags.linkerMemBase;
     }
-#endif
 
     if (RTS_LINKER_USE_MMAP)
         m32_allocator_init();
@@ -1009,29 +1000,30 @@ mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset)
    void *map_addr = NULL;
    void *result;
    size_t size;
+   uint32_t tryMap32Bit = RtsFlags.MiscFlags.linkerAlwaysPic
+     ? 0
+     : TRY_MAP_32BIT;
    static uint32_t fixed = 0;
 
    IF_DEBUG(linker, debugBelch("mmapForLinker: start\n"));
    size = roundUpToPage(bytes);
 
-#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
 mmap_again:
 
    if (mmap_32bit_base != 0) {
        map_addr = mmap_32bit_base;
    }
-#endif
 
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tprotection %#0x\n",
                        PROT_EXEC | PROT_READ | PROT_WRITE));
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
-                       MAP_PRIVATE | TRY_MAP_32BIT | fixed | flags));
+                       MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
    result = mmap(map_addr, size,
                  PROT_EXEC|PROT_READ|PROT_WRITE,
-                 MAP_PRIVATE|TRY_MAP_32BIT|fixed|flags, fd, offset);
+                 MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
        sysErrorBelch("mmap %" FMT_Word " bytes at %p",(W_)size,map_addr);
@@ -1039,8 +1031,9 @@ mmap_again:
        return NULL;
    }
 
-#if !defined(ALWAYS_PIC) && defined(x86_64_HOST_ARCH)
-   if (mmap_32bit_base != 0) {
+#if defined(x86_64_HOST_ARCH)
+   if (RtsFlags.MiscFlags.linkerAlwaysPic) {
+   } else if (mmap_32bit_base != 0) {
        if (result == map_addr) {
            mmap_32bit_base = (StgWord8*)map_addr + size;
        } else {
@@ -1208,10 +1201,10 @@ void freeObjectCode (ObjectCode *oc)
 #if defined(NEED_SYMBOL_EXTRAS) && (!defined(x86_64_HOST_ARCH) \
                                     || !defined(mingw32_HOST_OS))
     if (RTS_LINKER_USE_MMAP) {
-        if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
-            m32_free(oc->symbol_extras,
-                    sizeof(SymbolExtra) * oc->n_symbol_extras);
-        }
+      if (!USE_CONTIGUOUS_MMAP && !RtsFlags.MiscFlags.linkerAlwaysPic &&
+          oc->symbol_extras != NULL) {
+        m32_free(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
+      }
     }
     else {
         stgFree(oc->symbol_extras);
@@ -1291,6 +1284,8 @@ mkOc( pathchar *path, char *image, int imageSize,
 #if defined(NEED_SYMBOL_EXTRAS)
    oc->symbol_extras     = NULL;
 #endif
+   oc->bssBegin          = NULL;
+   oc->bssEnd            = NULL;
    oc->imageMapped       = mapped;
 
    oc->misalignment      = misalignment;
@@ -1504,17 +1499,38 @@ HsInt loadOc (ObjectCode* oc)
    }
 
    /* Note [loadOc orderings]
-      ocAllocateSymbolsExtras has only two pre-requisites, it must run after
-      preloadObjectFile and ocVerify.   Neither have changed.   On most targets
-      allocating the extras is independent on parsing the section data, so the
-      order between these two never mattered.
+      The order of `ocAllocateExtras` and `ocGetNames` matters. For MachO
+      and ELF, `ocInit` and `ocGetNames` initialize a bunch of pointers based
+      on the offset to `oc->image`, but `ocAllocateExtras` may relocate
+      the address of `oc->image` and invalidate those pointers. So we must
+      compute or recompute those pointers after `ocAllocateExtras`.
 
       On Windows, when we have an import library we (for now, as we don't honor
       the lazy loading semantics of the library and instead GHCi is already
       lazy) don't use the library after ocGetNames as it just populates the
-      symbol table.  Allocating space for jump tables in ocAllocateSymbolExtras
+      symbol table.  Allocating space for jump tables in ocAllocateExtras
       would just be a waste then as we'll be stopping further processing of the
-      library in the next few steps.  */
+      library in the next few steps. If necessary, the actual allocation
+      happens in `ocGetNames_PEi386` and `ocAllocateExtras_PEi386` simply
+      set the correct pointers.
+      */
+
+#if defined(NEED_SYMBOL_EXTRAS)
+#  if defined(OBJFORMAT_MACHO)
+   r = ocAllocateExtras_MachO ( oc );
+   if (!r) {
+       IF_DEBUG(linker,
+                debugBelch("loadOc: ocAllocateExtras_MachO failed\n"));
+       return r;
+   }
+#  elif defined(OBJFORMAT_ELF)
+   r = ocAllocateExtras_ELF ( oc );
+   if (!r) {
+       IF_DEBUG(linker,
+                debugBelch("loadOc: ocAllocateExtras_ELF failed\n"));
+       return r;
+   }
+#  endif
 
    /* build the symbol list for this image */
 #  if defined(OBJFORMAT_ELF)
@@ -1531,23 +1547,8 @@ HsInt loadOc (ObjectCode* oc)
        return r;
    }
 
-#if defined(NEED_SYMBOL_EXTRAS)
-#  if defined(OBJFORMAT_MACHO)
-   r = ocAllocateSymbolExtras_MachO ( oc );
-   if (!r) {
-       IF_DEBUG(linker,
-                debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
-       return r;
-   }
-#  elif defined(OBJFORMAT_ELF)
-   r = ocAllocateSymbolExtras_ELF ( oc );
-   if (!r) {
-       IF_DEBUG(linker,
-                debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
-       return r;
-   }
-#  elif defined(OBJFORMAT_PEi386)
-   ocAllocateSymbolExtras_PEi386 ( oc );
+#  if defined(OBJFORMAT_PEi386)
+   ocAllocateExtras_PEi386 ( oc );
 #  endif
 #endif
 
@@ -1830,4 +1831,3 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                        start, (void*)((StgWord)start + size),
                        size, kind ));
 }
-

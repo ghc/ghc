@@ -18,6 +18,8 @@
 
 module Bug where
 
+import Data.Kind (Type)
+
 class Category arr where
   idA  :: arr a a
   comp :: arr a b -> arr b c -> arr a c
@@ -51,7 +53,7 @@ data V prod env t where
   Z :: V prod (prod env t) t
   S :: V prod env t -> V prod (prod env x) t
 
-data Lambda terminal (exp :: * -> * -> *) prod env t where
+data Lambda terminal (exp :: Type -> Type -> Type) prod env t where
     Unit :: Lambda foo exp prod env foo
     Var  :: V prod env t -> Lambda terminal exp prod env t
 {-    Lam  :: Lambda terminal exp prod (prod env a) t
