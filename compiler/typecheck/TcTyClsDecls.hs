@@ -361,24 +361,36 @@ TcTyCons are used for two distinct purposes
     environment in TcTyClsDecls, until the real full TyCons can be created
     during desugaring. A desugared program should never have a TcTyCon.
 
-    A challenging piece in all of this is that we end up taking three separate
-    passes over every declaration:
+3.  In a TcTyCon, everything is zonked after the kind-checking pass (S2).
+
+4.  tyConScopedTyVars.  A challenging piece in all of this is that we
+    end up taking three separate passes over every declaration:
       - one in getInitialKind (this pass look only at the head, not the body)
       - one in kcTyClDecls (to kind-check the body)
       - a final one in tcTyClDecls (to desugar)
+
     In the latter two passes, we need to connect the user-written type
     variables in an LHsQTyVars with the variables in the tycon's
     inferred kind. Because the tycon might not have a CUSK, this
     matching up is, in general, quite hard to do.  (Look through the
     git history between Dec 2015 and Apr 2016 for
-    TcHsType.splitTelescopeTvs!) Instead of trying, we just store the
-    list of type variables to bring into scope, in the
-    tyConScopedTyVars field of the TcTyCon.  These tyvars are brought
-    into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
+    TcHsType.splitTelescopeTvs!)
 
-    In a TcTyCon, everything is zonked after the kind-checking pass (S2).
+    Instead of trying, we just store the list of type variables to
+    bring into scope, in the tyConScopedTyVars field of the TcTyCon.
+    These tyvars are brought into scope in kcTyClTyVars and
+    tcTyClTyVars, both in TcHsType.
 
-    See also Note [Type checking recursive type and class declarations].
+    In a TcTyCon, why is tyConScopedTyVars :: [(Name,TcTyVar)] rather
+    than just [TcTyVar]?  Consider these mutually-recursive decls
+       data T (a :: k1) b = MkT (S a b)
+       data S (c :: k2) d = MkS (T c d)
+    We start with k1 bound to kappa1, and k2 to kappa2; so initially
+    in the (Name,TcTyVar) pairs the Name is that of the TcTyVar. But
+    then kappa1 and kappa2 get unified; so after the zonking in
+    'generalise' in 'kcTyClGroup' the Name and TcTyVar may differ.
+
+See also Note [Type checking recursive type and class declarations].
 
 Note [Check telescope again during generalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -553,11 +565,17 @@ kcTyClGroup decls
            ; checkValidTelescope tc_binders user_tyvars empty
            ; kvs <- kindGeneralize (mkTyConKind tc_binders tc_res_kind)
 
-           ; let all_binders = mkNamedTyConBinders Inferred kvs ++ tc_binders
+           -- See Note [Work out final tyConBinders]
+           ; scoped_tvs' <- zonkTyVarTyVarPairs scoped_tvs
+           ; let (specified_kvs, inferred_kvs) = partition is_specified kvs
+                 user_specified_tkvs = mkVarSet (map snd scoped_tvs')
+                 is_specified kv = kv `elemVarSet` user_specified_tkvs
+                 all_binders = mkNamedTyConBinders Inferred  inferred_kvs  ++
+                               mkNamedTyConBinders Specified specified_kvs ++
+                               tc_binders
 
            ; (env, all_binders') <- zonkTyVarBinders all_binders
            ; tc_res_kind'        <- zonkTcTypeToTypeX env tc_res_kind
-           ; scoped_tvs'         <- zonkTyVarTyVarPairs scoped_tvs
 
              -- See Note [Check telescope again during generalisation]
            ; let extra = text "NB: Implicitly declared variables come before others."
@@ -574,6 +592,34 @@ kcTyClGroup decls
                                scoped_tvs'
                                (tyConFlavour tc)) }
 
+
+{- Note [Work out final tyConBinders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   data T f (a::k1) b = MkT (f a b) (T f a b)
+
+We should get
+   T :: forall {k2} k1. (k1 -> k2 -> *) -> k1 -> k2 -> *
+
+Note that:
+  * k1 is Specified, because it appears in a user-written kind
+  * k2 is Inferred, because it doesn't appear at all in the
+                    original declaration
+
+However, at this point in kcTyClGroup, the tc_binders are
+simply [f, a, b], the user-written argumennts to the TyCon.
+(Why?  Because that's what we need for the recursive uses in
+T's RHS.)
+
+So kindGeneralize will generalise over /both/ k1 /and/ k2.
+Yet we must distinguish them, and we must put the Inferred
+ones first.  How can we tell the difference?  Well, the
+Specified variables will be among the tyConScopedTyVars of
+the TcTyCon.
+
+Hence partitioning by is_specified.  See Trac #15592 for
+some discussion.
+-}
 
 --------------
 tcExtendKindEnvWithTyCons :: [TcTyCon] -> TcM a -> TcM a

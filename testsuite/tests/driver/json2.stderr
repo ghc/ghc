@@ -1,1 +1,1 @@
-{"span": null,"doc": "TYPE SIGNATURES\n  foo :: forall a. a -> a\nTYPE CONSTRUCTORS\nCOERCION AXIOMS\nDependent modules: []\nDependent packages: [base-4.12.0.0, ghc-prim-0.5.3,\n                     integer-gmp-1.0.2.0]","severity": "SevOutput","reason": null}
+{"span": null,"doc": "TYPE SIGNATURES foo :: forall a. a -> a\nTYPE CONSTRUCTORS\nCOERCION AXIOMS\nDependent modules: []\nDependent packages: [base-4.12.0.0, ghc-prim-0.5.3,\n                     integer-gmp-1.0.2.0]","severity": "SevOutput","reason": null}

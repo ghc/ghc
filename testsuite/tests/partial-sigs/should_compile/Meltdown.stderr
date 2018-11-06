@@ -5,7 +5,7 @@ TYPE SIGNATURES
     NukeMonad param1 param2 () -> NukeMonad param1 param2 ()
 TYPE CONSTRUCTORS
   type role NukeMonad phantom phantom phantom
-  data NukeMonad a b c
+  NukeMonad :: * -> * -> * -> *
 COERCION AXIOMS
 INSTANCES
   instance Functor (NukeMonad a b) -- Defined at Meltdown.hs:8:10

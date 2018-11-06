@@ -11,8 +11,9 @@ TYPE SIGNATURES
     DataFamilyInstanceLHS.R:SingMyKind_ _
   foo :: Sing 'A
 TYPE CONSTRUCTORS
-  data MyKind = A | B
-  data family Sing (a :: k)
+  MyKind :: *
+  type role Sing nominal nominal
+  Sing :: forall k. k -> *
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
     Sing _ = DataFamilyInstanceLHS.R:SingMyKind_

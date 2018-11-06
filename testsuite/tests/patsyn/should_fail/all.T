@@ -34,6 +34,7 @@ test('T11667', normal, compile_fail, [''])
 test('T12165', normal, compile_fail, [''])
 test('T12819', normal, compile_fail, [''])
 test('UnliftedPSBind', normal, compile_fail, [''])
+test('T15695', normal, compile, [''])   # It has -fdefer-type-errors inside
 test('T13349', normal, compile_fail, [''])
 test('T13470', normal, compile_fail, [''])
 test('T14112', normal, compile_fail, [''])
@@ -43,3 +44,5 @@ test('T14498', normal, compile_fail, [''])
 test('T14552', normal, compile_fail, [''])
 test('T14507', normal, compile_fail, ['-dsuppress-uniques'])
 test('T15289', normal, compile_fail, [''])
+test('T15685', normal, compile_fail, [''])
+test('T15692', normal, compile, [''])   # It has -fdefer-type-errors inside

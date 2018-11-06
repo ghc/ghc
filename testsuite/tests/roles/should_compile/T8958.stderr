@@ -5,10 +5,10 @@ TYPE SIGNATURES
   T8958.MkMap :: forall k v. [(k, v)] -> Map k v
 TYPE CONSTRUCTORS
   type role Map nominal representational
-  newtype (Nominal k, Representational v) => Map k v = MkMap [(k, v)]
-  class Nominal a
+  Map :: * -> * -> *
+  Nominal :: * -> Constraint
   type role Representational representational
-  class Representational a
+  Representational :: * -> Constraint
 COERCION AXIOMS
   axiom T8958.N:Map :: Map k v = [(k, v)] -- Defined at T8958.hs:13:1
 INSTANCES

@@ -34,16 +34,16 @@ import GHC.Prim
 import GHC.CString ()
 import GHC.Types (RuntimeRep, TYPE)
 
--- | The call @inline f@ arranges that 'f' is inlined, regardless of
+-- | The call @inline f@ arranges that @f@ is inlined, regardless of
 -- its size. More precisely, the call @inline f@ rewrites to the
 -- right-hand side of @f@'s definition. This allows the programmer to
 -- control inlining from a particular call site rather than the
--- definition site of the function (c.f. 'INLINE' pragmas).
+-- definition site of the function (c.f. @INLINE@ pragmas).
 --
 -- This inlining occurs regardless of the argument to the call or the
 -- size of @f@'s definition; it is unconditional. The main caveat is
 -- that @f@'s definition must be visible to the compiler; it is
--- therefore recommended to mark the function with an 'INLINABLE'
+-- therefore recommended to mark the function with an @INLINABLE@
 -- pragma at its definition so that GHC guarantees to record its
 -- unfolding regardless of size.
 --
@@ -53,7 +53,7 @@ import GHC.Types (RuntimeRep, TYPE)
 inline :: a -> a
 inline x = x
 
--- | The call @noinline f@ arranges that 'f' will not be inlined.
+-- | The call @noinline f@ arranges that @f@ will not be inlined.
 -- It is removed during CorePrep so that its use imposes no overhead
 -- (besides the fact that it blocks inlining.)
 {-# NOINLINE noinline #-}
@@ -61,7 +61,7 @@ noinline :: a -> a
 noinline x = x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
--- call @lazy e@ means the same as 'e', but 'lazy' has a magical
+-- call @lazy e@ means the same as @e@, but 'lazy' has a magical
 -- property so far as strictness analysis is concerned: it is lazy in
 -- its first argument, even though its semantics is strict. After
 -- strictness analysis has run, calls to 'lazy' are inlined to be the
@@ -74,8 +74,8 @@ noinline x = x
 -- > par :: a -> b -> b
 -- > par x y = case (par# x) of _ -> lazy y
 --
--- If 'lazy' were not lazy, 'par' would look strict in 'y' which
--- would defeat the whole purpose of 'par'.
+-- If 'lazy' were not lazy, 'Control.Parallel.par' would look strict in
+-- @y@ which would defeat the whole purpose of 'Control.Parallel.par'.
 --
 -- Like 'seq', the argument of 'lazy' can have an unboxed type.
 lazy :: a -> a
@@ -105,8 +105,8 @@ oneShot f = f
 -- Implementation note: This is wired in in MkId.hs, so the code here is
 -- mostly there to have a place for the documentation.
 
--- | Apply a function to a 'State# RealWorld' token. When manually applying
--- a function to `realWorld#`, it is necessary to use `NOINLINE` to prevent
+-- | Apply a function to a @'State#' 'RealWorld'@ token. When manually applying
+-- a function to `realWorld#`, it is necessary to use @NOINLINE@ to prevent
 -- semantically undesirable floating. `runRW#` is inlined, but only very late
 -- in compilation after all floating is complete.
 

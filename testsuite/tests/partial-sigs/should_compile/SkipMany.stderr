@@ -6,7 +6,7 @@ TYPE SIGNATURES
   skipMany' ::
     forall tok st a. GenParser tok st a -> GenParser tok st ()
 TYPE CONSTRUCTORS
-  data GenParser tok st a = GenParser tok st a
+  GenParser :: * -> * -> * -> *
 COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,

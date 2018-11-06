@@ -10,8 +10,9 @@ TYPE SIGNATURES
     (_a ~ 'B) =>
     NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a
 TYPE CONSTRUCTORS
-  data MyKind = A | B
-  data family Sing (a :: k)
+  MyKind :: *
+  type role Sing nominal nominal
+  Sing :: forall k. k -> *
 COERCION AXIOMS
   axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
     Sing _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a

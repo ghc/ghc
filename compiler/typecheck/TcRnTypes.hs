@@ -93,7 +93,8 @@ module TcRnTypes(
         isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
-        Implication(..), newImplication, implicLclEnv, implicDynFlags,
+        Implication(..), newImplication, implicationPrototype,
+        implicLclEnv, implicDynFlags,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
@@ -2562,21 +2563,25 @@ data Implication
 newImplication :: TcM Implication
 newImplication
   = do env <- getEnv
-       pure $ Implic { -- These fields must be initialised
-                       ic_tclvl      = panic "newImplic:tclvl"
-                     , ic_binds      = panic "newImplic:binds"
-                     , ic_info       = panic "newImplic:info"
+       return (implicationPrototype { ic_env = env })
 
-                       -- The rest have sensible default values
-                     , ic_env        = env
-                     , ic_skols      = []
-                     , ic_telescope  = Nothing
-                     , ic_given      = []
-                     , ic_wanted     = emptyWC
-                     , ic_no_eqs     = False
-                     , ic_status     = IC_Unsolved
-                     , ic_need_inner = emptyVarSet
-                     , ic_need_outer = emptyVarSet }
+implicationPrototype :: Implication
+implicationPrototype
+   = Implic { -- These fields must be initialised
+              ic_tclvl      = panic "newImplic:tclvl"
+            , ic_binds      = panic "newImplic:binds"
+            , ic_info       = panic "newImplic:info"
+            , ic_env        = panic "newImplic:env"
+
+              -- The rest have sensible default values
+            , ic_skols      = []
+            , ic_telescope  = Nothing
+            , ic_given      = []
+            , ic_wanted     = emptyWC
+            , ic_no_eqs     = False
+            , ic_status     = IC_Unsolved
+            , ic_need_inner = emptyVarSet
+            , ic_need_outer = emptyVarSet }
 
 -- | Retrieve the enclosed 'TcLclEnv' from an 'Implication'.
 implicLclEnv :: Implication -> TcLclEnv

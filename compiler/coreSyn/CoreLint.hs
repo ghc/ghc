@@ -766,7 +766,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
         ; (body_ty, body_ue) <-
             addLoc (BodyOfLetRec [bndr]) $
             update_ue
-                 (lintIdBndr NotTopLevel LetBind bndr $ \_ ->
+                 (lintBinder LetBind bndr $ \_ ->
                   addGoodJoins [bndr] $
                   lintCoreExpr body)
         ; body_ue' <- checkLinearity body_ue bndr
@@ -847,7 +847,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; subst <- getTCvSubst
      ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
 
-     ; lintIdBndr NotTopLevel CaseBind var $ \_ ->
+     ; lintBinder CaseBind var $ \_ ->
        do { -- Check the alternatives
           ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_weight alt_ty) alts
           ; let case_ue = (scaleUE scrut_weight scrut_ue) `addUE` supUEs alt_ues
@@ -1356,6 +1356,7 @@ lintIdBndr top_lvl bind_site id linterF
            (mkNonTopExternalNameMsg id)
 
        ; (ty, k) <- lintInTy (idType id)
+
           -- See Note [Levity polymorphism invariants] in CoreSyn
        ; lintL (isJoinId id || not (isKindLevPoly k))
            (text "Levity-polymorphic binder:" <+>
@@ -1365,6 +1366,11 @@ lintIdBndr top_lvl bind_site id linterF
        ; when (isJoinId id) $
          checkL (not is_top_lvl && is_let_bind) $
          mkBadJoinBindMsg id
+
+       -- Check that the Id does not have type (t1 ~# t2) or (t1 ~R# t2);
+       -- if so, it should be a CoVar, and checked by lintCoVarBndr
+       ; lintL (not (isCoercionType ty))
+               (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr ty)
 
        ; let id' = setIdType id ty
        ; addInScopeVar id' $ (linterF id') }
