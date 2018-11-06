@@ -1577,7 +1577,7 @@ mergeDataCon all_xs =
     goFirst [L l (TyElOpd (HsTupleTy _ HsBoxedOrConstraintTuple ts))]
       = return ( pure ()
                , ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-                 , PrefixCon ts
+                 , PrefixCon (map hsLinear ts)
                  , mTrailingDoc ) )
     goFirst (L l (TyElOpd t):xs)
       | (_, t', addAnns, xs') <- pBangTy (L l t) xs
@@ -1587,7 +1587,7 @@ mergeDataCon all_xs =
 
     go addAnns mLastDoc ts [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
       = do { data_con <- tyConToDataCon l tc
-           ; return (addAnns, (data_con, PrefixCon ts, mkConDoc mLastDoc)) }
+           ; return (addAnns, (data_con, PrefixCon (map hsLinear ts), mkConDoc mLastDoc)) }
     go addAnns mLastDoc ts (L l (TyElDocPrev doc):xs) =
       go addAnns (mLastDoc `mplus` Just (L l doc)) ts xs
     go addAnns mLastDoc ts (L l (TyElOpd t):xs)
@@ -1621,7 +1621,7 @@ mergeDataCon all_xs =
          ; let rhs = mkLHsDocTyMaybe rhs_t trailingFieldDoc
                lhs = mkLHsDocTyMaybe lhs_t mLhsDoc
                addAnns = lhs_addAnns >> rhs_addAnns
-         ; return (addAnns, (op, InfixCon lhs rhs, mkConDoc mOpDoc)) }
+         ; return (addAnns, (op, InfixCon (hsLinear lhs) (hsLinear rhs), mkConDoc mOpDoc)) }
       where
         malformedErr =
           ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
