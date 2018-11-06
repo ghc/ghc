@@ -2497,7 +2497,7 @@ tcHsPatSigType ctxt sig_ty
         ; sig_ty <- zonkPromoteType sig_ty
         ; checkValidType ctxt sig_ty
 
-        ; let tv_pairs = mkTyVarNamePairs sig_tkvs
+        ; let tv_pairs = [(tyVarName v, v) | v <- sig_tkvs]
 
         ; traceTc "tcHsPatSigType" (ppr sig_vars)
         ; return (wcs, tv_pairs, sig_ty) }

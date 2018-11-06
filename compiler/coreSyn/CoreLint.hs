@@ -766,9 +766,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
         ; (body_ty, body_ue) <-
             addLoc (BodyOfLetRec [bndr]) $
             update_ue
-                 (lintBinder LetBind bndr $ \_ ->
-                  addGoodJoins [bndr] $
-                  lintCoreExpr body)
+                 (lintBinder LetBind bndr $ \_ -> addGoodJoins [bndr] $ lintCoreExpr body)
         ; body_ue' <- checkLinearity body_ue bndr
         ; return (body_ty, body_ue' `addUE` rhs_ue)}
 
