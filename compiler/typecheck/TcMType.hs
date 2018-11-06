@@ -119,6 +119,7 @@ import SrcLoc
 import Bag
 import Pair
 import UniqSet
+import Weight
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1151,9 +1152,17 @@ collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependen
 collect_cand_qtvs is_dep bound dvs ty
   = go dvs ty
   where
+    go_rig dv Zero  = return dv
+    go_rig dv One   = return dv
+    go_rig dv Omega = return dv
+    go_rig dv (RigAdd x y) = foldlM go_rig dv [x, y]
+    go_rig dv (RigMul x y) = foldlM go_rig dv [x, y]
+    go_rig dv (RigThing x) = go dv x
+
     go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
     go dv (TyConApp _ tys) = foldlM go dv tys
-    go dv (FunTy arg res)  = foldlM go dv [arg, res]
+    go dv (FunTy w arg res) = do dv1 <- go_rig dv w
+                                 foldlM go dv1 [arg, res]
     go dv (LitTy {})       = return dv
     go dv (CastTy ty co)   = do dv1 <- go dv ty
                                 collect_cand_qtvs_co bound dv1 co
@@ -1211,7 +1220,7 @@ collect_cand_qtvs_co bound = go_co
                                         go_mco dv1 mco
     go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
-    go_co dv (FunCo _ co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (FunCo _ w co1 co2)   = foldlM go_co dv [w, co1, co2]
     go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
     go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov
