@@ -569,7 +569,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
 --
 -- Invariant: the ATcIds are fully zonked. Reasons:
 --      (a) The kinds of the forall'd type variables are defaulted
---          (see Kind.defaultKind, done in zonkQuantifiedTyVar)
+--          (see Kind.defaultKind, done in skolemiseQuantifiedTyVar)
 --      (b) There are no via-Indirect occurrences of the bound variables
 --          in the types, because instantiation does not look through such things
 --      (c) The call to tyCoVarsOfTypes is ok without looking through refs

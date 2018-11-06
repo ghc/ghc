@@ -1889,7 +1889,7 @@ However the GHCi debugger creates top-level bindings for Ids whose
 types have free RuntimeUnk skolem variables, standing for unknown
 types.  If we don't register these free TyVars as global TyVars then
 the typechecker will try to quantify over them and fall over in
-zonkQuantifiedTyVar. so we must add any free TyVars to the
+skolemiseQuantifiedTyVar. so we must add any free TyVars to the
 typechecker's global TyVar set.  That is most conveniently by using
 tcExtendLocalTypeEnv, which automatically extends the global TyVar
 set.

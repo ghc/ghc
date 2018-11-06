@@ -2242,15 +2242,11 @@ tcTyClTyVars tycon_name thing_inside
        ; let flav = tyConFlavour tycon
              scoped_prs = tcTyConScopedTyVars tycon
              scoped_tvs = map snd scoped_prs
-             still_sig_tvs = filter isTyVarTyVar scoped_tvs
 
        ; mapM_ report_sig_tv_err (findDupTyVarTvs scoped_prs)
 
        ; traceTc "tyClTyVars" (vcat [ ppr tycon, ppr (tyConBinders tycon)
                                     , pprTyVars scoped_tvs ])
-       ; checkNoErrs $ reportFloatingKvs tycon_name flav
-                                         scoped_tvs still_sig_tvs
-
        ; let res_kind = tyConResKind tycon
              binders  = tyConBinders tycon
 --             binders    = correct_binders (tyConBinders tycon) res_kind

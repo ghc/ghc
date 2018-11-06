@@ -2141,7 +2141,7 @@ approximateWC to produce a list of candidate constraints.  Then we MUST
 To see (b), suppose the constraint is (C ((a :: OpenKind) -> Int)), and we
 have an instance (C ((x:*) -> Int)).  The instance doesn't match -- but it
 should!  If we don't solve the constraint, we'll stupidly quantify over
-(C (a->Int)) and, worse, in doing so zonkQuantifiedTyVar will quantify over
+(C (a->Int)) and, worse, in doing so skolemiseQuantifiedTyVar will quantify over
 (b:*) instead of (a:OpenKind), which can lead to disaster; see Trac #7332.
 Trac #7641 is a simpler example.
 

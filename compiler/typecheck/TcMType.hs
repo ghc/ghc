@@ -70,7 +70,7 @@ module TcMType (
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
   CandidatesQTvs(..),
-  zonkQuantifiedTyVar, defaultTyVar,
+  skolemiseQuantifiedTyVar, defaultTyVar,
   quantifyTyVars,
   zonkTcTyCoVarBndr, zonkTyConBinders,
   zonkTcType, zonkTcTypes, zonkCo,
@@ -1158,7 +1158,7 @@ candidateQTyVarsOfKind ty = -- closeOverKindsCQTvs gbl_tvs =<<
 candidateQTyVarsOfKinds :: [TcKind]       -- not necessarily zonked
                        -> TcM CandidatesQTvs
 candidateQTyVarsOfKinds tys = -- closeOverKindsCQTvs gbl_tvs =<<
-                              foldM (collect_cand_qtvs False emptyVarSet) mempty tys
+                              foldM (collect_cand_qtvs True emptyVarSet) mempty tys
 
 collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependent
                   -> VarSet -- bound variables (both locally bound and globally bound)
@@ -1306,7 +1306,7 @@ It takes these free type/kind variables (partitioned into dependent and
 non-dependent variables) and
   1. Zonks them and remove globals and covars
   2. Extends kvs1 with free kind vars in the kinds of tvs (removing globals)
-  3. Calls zonkQuantifiedTyVar on each
+  3. Calls skolemiseQuantifiedTyVar on each
 
 Step (2) is often unimportant, because the kind variable is often
 also free in the type.  Eg
@@ -1463,7 +1463,7 @@ quantifyTyVars gbl_tvs
       = do { deflt_done <- defaultTyVar default_kind tkv
            ; case deflt_done of
                True  -> return Nothing
-               False -> do { tv <- zonkQuantifiedTyVar tkv
+               False -> do { tv <- skolemiseQuantifiedTyVar tkv
                            ; return (Just tv) } }
 
     zap_naughty_tv tv
@@ -1479,7 +1479,7 @@ quantifiableTv outer_tclvl tcv
   | otherwise
   = False
 
-zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
+skolemiseQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables
 -- we want to freeze them into ordinary type variables
 -- The meta tyvar is updated to point to the new skolem TyVar.  Now any
@@ -1491,7 +1491,7 @@ zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- This function is called on both kind and type variables,
 -- but kind variables *only* if PolyKinds is on.
 
-zonkQuantifiedTyVar tv
+skolemiseQuantifiedTyVar tv
   = case tcTyVarDetails tv of
       SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind) }
@@ -1500,7 +1500,7 @@ zonkQuantifiedTyVar tv
 
       MetaTv {} -> skolemiseUnboundMetaTyVar tv
 
-      _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- RuntimeUnk
+      _other -> pprPanic "skolemiseQuantifiedTyVar" (ppr tv) -- RuntimeUnk
 
 defaultTyVar :: Bool      -- True <=> please default this kind variable to *
              -> TcTyVar   -- If it's a MetaTyVar then it is unbound
