@@ -638,36 +638,54 @@ generaliseTcTyCon tc
 
 {- Note [Required, Specified, and Inferred for types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We have some design choices in how we classify the tyvars bound
-in a type declaration. (Here, I use "type" to refer to any TyClDecl.)
-Much of the debate is memorialized in #15743. This Note documents
-the final conclusion.
+Each forall'd type variable in a type or kind is one of
 
-First, a reminder:
-  * a Required argument is one that must be provided at every call site
-  * a Specified argument is one that can be inferred at call sites, but
-    may be instantiated with visible type application
-  * an Inferred argument is one that must be inferred at call sites; it
-    is unavailable for use with visible type application.
+  * Required: an argument must be provided at every call site
 
-Why have Inferred at all? Because we just can't make user-facing promises
-about the ordering of some variables. These might swizzle around even between
-minor released. By forbidding visible type application, we ensure users
-aren't caught unawares. See also
-Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+  * Specified: the argument can be inferred at call sites, but
+    may be instantiated with visible type/kind application
 
-When inferring the ordering of variables (that is, for those
-variables that he user has not specified the order with an explicit `forall`)
-we use the following order:
+  * Inferred: the must be inferred at call sites; it
+    is unavailable for use with visible type/kind application.
 
- 1. Inferred variables from an enclosing class (associated types only)
- 2. Specified variables from an enclosing class (associated types only)
- 3. Inferred variables not from an enclosing class
- 4. Specified variables not from an enclosing class
- 5. Required variables before a top-level ::
- 6. All variables after a top-level ::
+Why have Inferred at all? Because we just can't make user-facing
+promises about the ordering of some variables. These might swizzle
+around even between minor released. By forbidding visible type
+application, we ensure users aren't caught unawares.
+
+Go read Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+
+The question for this Note is this:
+   given a TyClDecl, how are its quantified type variables classified?
+Much of the debate is memorialized in #15743.
+
+Here is our design choice. When inferring the ordering of variables
+for a TyCl declaration (that is, for those variables that he user
+has not specified the order with an explicit `forall`), we use the
+following order:
+
+ 1. Inferred variables
+ 2. Specified variables; in the left-to-right order in which
+    the user wrote them, modified by scopedSort (see below)
+    to put them in depdendency order.
+ 3. Required variables before a top-level ::
+ 4. All variables after a top-level ::
 
 If this ordering does not make a valid telescope, we reject the definition.
+
+Example:
+  data SameKind :: k -> k -> *
+  data X a (b :: SameKind a b) (c :: k) d
+
+For X:
+  - a, b, c, d are Required; they are explicitly listed by the user
+    as the positional arguments of X
+  - k is Specified; it appears explicitly in a kind signature
+  - k2, the kind of d, is Inferred; it is not mentioned explicitly at all
+
+Putting variables in the order Inferred, Specified, Required gives us
+  Inferred:  k2
+  Specified: k (a ::kb
 
 This idea is implemented in the generalise function within kcTyClGroup (for
 declarations without CUSKs), and in kcLHsQTyVars (for declarations with
