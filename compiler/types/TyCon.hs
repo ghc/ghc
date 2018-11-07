@@ -2265,7 +2265,7 @@ tyConRoles :: TyCon -> [Role]
 -- See also Note [TyCon Role signatures]
 tyConRoles tc
   = case tc of
-    { FunTyCon {}                         -> [Nominal, Nominal, Representational, Representational]
+    { FunTyCon {}                         -> const_role Representational
     ; AlgTyCon { tcRoles = roles }        -> roles
     ; SynonymTyCon { tcRoles = roles }    -> roles
     ; FamilyTyCon {}                      -> const_role Nominal
