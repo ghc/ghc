@@ -80,10 +80,6 @@ Runtime system
   alignment, lower the amount of wasted memory and lower the amount of in use memory.
   See :ghc-ticket:`13617`. Note that committed memory may be slightly higher.
 
-- A new flag ``-xp`` is added on x86_64. When it is passed, the runtime linker
-  can load object files compiled with ``-fPIC -fexternal-dynamic-refs``
-  anywhere in the address space. This used to be restricted to the low 2Gb.
-
 
 Template Haskell
 ~~~~~~~~~~~~~~~~

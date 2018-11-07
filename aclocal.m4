@@ -1536,7 +1536,7 @@ if test "$RELEASE" = "NO"; then
     if test -f VERSION_DATE; then
         PACKAGE_VERSION=${PACKAGE_VERSION}.`cat VERSION_DATE`
         AC_MSG_RESULT(given $PACKAGE_VERSION)
-    elif test -d .git; then
+    elif test -e .git; then
         changequote(, )dnl
         ver_posixtime=`git log -1 --pretty=format:%ct`
         ver_date=`perl -MPOSIX -e "print strftime('%Y%m%d', gmtime($ver_posixtime));"`

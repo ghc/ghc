@@ -39,9 +39,3 @@ test('T14708',
       extra_clean(['T14708scratch/*', 'T14708'])],
      run_command,
      ['$MAKE -s --no-print-directory T14708'])
-
-test('T15729',
-     [extra_files(['T15729.hs', 'T15729.c']),
-      unless(doing_ghci, skip)],
-     run_command,
-     ['$MAKE -s --no-print-directory T15729'])
