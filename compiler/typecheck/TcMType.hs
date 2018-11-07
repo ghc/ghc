@@ -1091,40 +1091,43 @@ Note [CandidatesQTvs determinism and order]
 
 Note [Naughty quantification candidates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (#14880, dependent/should_compile/T14880-2)
+Consider (#14880, dependent/should_compile/T14880-2), suppose
+we are trying to generalise this type:
 
   forall arg. ... (alpha[tau]:arg) ...
 
-We have a metavariable alpha whose kind is a locally bound (skolem) variable.
+We have a metavariable alpha whose kind mentions a skolem variable
+boudn inside the very type we are generalising.
 This can arise while type-checking a user-written type signature
-(see the test case for the full code). According to
-Note [Recipe for checking a signature] in TcHsType, we try to solve
-all constraints that arise during checking before looking to kind-generalize.
-However, in the case above, this solving pass does not unify alpha, because
-it is utterly unconstrained. The question is: what to do with alpha?
+(see the test case for the full code).
 
-We can't generalize it, because it would have to be generalized *after*
-arg, and implicit generalization always goes before explicit generalization.
-We can't simply leave it be, because this type is about to go into the
-typing environment (as the type of some let-bound variable, say), and then
-chaos erupts when we try to instantiate. In any case, we'll never learn
-anything more about alpha anyway.
+We cannot generalise over alpha!  That would produce a type like
+  forall {a :: arg}. forall arg. ...blah...
+The fact that alpha's kind mentions arg renders it completely
+ineligible for generaliation.
+
+However, we are not going to learn any new constraints on alpha,
+because its kind isn't even in scope in the outer context.  So alpha
+is entirely unconstrained.
+
+What then should we do with alpha?  During generalization, every
+metavariable is either (A) promoted, (B) generalized, or (C) zapped
+(according again to Note [Recipe for checking a signature] in
+TcHsType).
+
+ * We can't generalise it.
+ * We can't promote it, because its kind prevents that
+ * We can't simply leave it be, because this type is about to
+   go into the typing environment (as the type of some let-bound
+   variable, say), and then chaos erupts when we try to instantiate.
 
 So, we zap it, eagerly, to Any. We don't have to do this eager zapping
 in terms (say, in `length []`) because terms are never re-examined before
 the final zonk (which zaps any lingering metavariables to Any).
 
-The right time to do this eager zapping is during generalization, when
-every metavariable is either (A) promoted, (B) generalized, or (C) zapped
-(according again to Note [Recipe for checking a signature] in TcHsType).
-
-Accordingly, when quantifyTyVars is skolemizing the variables to quantify,
-these naughty ones are zapped to Any. We identify the naughty ones by
-looking for out-of-scope tyvars in the candidate tyvars' kinds, where
-we assume that all in-scope tyvars are in the gbl_tvs passed to quantifyTyVars.
-In the example above, we would have `alpha` in the CandidatesQTvs, but
-`arg` wouldn't be in the gbl_tvs. Hence, alpha is naughty, and zapped to
-Any. Naughty variables are discovered by is_naughty_tv in quantifyTyVars.
+We do this eager zapping in candidateQTyVars, which always precedes
+generalisation, because at that moment we have a clear picture of
+what skolems are in scope.
 
 -}
 
@@ -1180,8 +1183,6 @@ collect_cand_qtvs is_dep bound dvs ty
 
     go dv (TyVarTy tv)
       | is_bound tv = return dv
-      | isId tv     = WARN( True, text "Discarding Id in type:" <+> pprTyVar tv )
-                      return dv
       | otherwise   = do { m_contents <- isFilledMetaTyVar_maybe tv
                          ; case m_contents of
                              Just ind_ty -> go dv ind_ty
@@ -1197,9 +1198,8 @@ collect_cand_qtvs is_dep bound dvs ty
       = case tv `elemDVarSet` kvs of
          True  -> return dv    -- We have met this tyvar aleady
          False | intersectsVarSet bound (tyCoVarsOfType tv_kind)
-               -> zap_naughty  -- Does the kind of this tyvar mention
-                               -- an already-bound variable; if so
-                               -- we can zap it to Any
+               -> -- See Note [Naughty quantification candidates]
+                  zap_naughty
                | otherwise
                -> collect_cand_qtvs True emptyVarSet dv' tv_kind
                where
@@ -1210,7 +1210,8 @@ collect_cand_qtvs is_dep bound dvs ty
       = case tv `elemDVarSet` kvs || tv `elemDVarSet` tvs of
          True  -> return dv    -- We have met this tyvar aleady
          False | intersectsVarSet bound (tyCoVarsOfType tv_kind)
-               -> zap_naughty
+               -> -- See Note [Naughty quantification candidates]
+                  zap_naughty
                | otherwise
                -> collect_cand_qtvs True emptyVarSet dv' tv_kind
                where

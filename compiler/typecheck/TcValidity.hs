@@ -368,10 +368,13 @@ checkValidType ctxt ty
 
        ; env <- tcInitOpenTidyEnv (tyCoVarsOfTypeList ty)
 
-        -- Check the internal validity of the type itself
-       ; check_type env ctxt rank ty
-
-       ; checkUserTypeError ty
+       -- Check the internal validity of the type itself
+       -- Fail if bad things happen, else we misleading
+       -- (and more complicated) errors in checkAmbiguity
+       ; checkNoErrs $
+         do { check_type env ctxt rank ty
+            ; checkUserTypeError ty
+            ; traceTc "done ct" (ppr ty) }
 
        -- Check for ambiguous types.  See Note [When to call checkAmbiguity]
        -- NB: this will happen even for monotypes, but that should be cheap;
@@ -458,6 +461,14 @@ forAllAllowed ArbitraryRank             = True
 forAllAllowed (LimitedRank forall_ok _) = forall_ok
 forAllAllowed _                         = False
 
+constraintsAllowed :: UserTypeCtxt -> Bool
+-- We don't allow constraints in kinds
+constraintsAllowed (TyVarBndrKindCtxt {}) = False
+constraintsAllowed (DataKindCtxt {})      = False
+constraintsAllowed (TySynKindCtxt {})     = False
+constraintsAllowed (TyFamResKindCtxt {})  = False
+constraintsAllowed _ = True
+
 ----------------------------------------
 check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- The args say what the *type context* requires, independent
@@ -472,6 +483,11 @@ check_type env ctxt rank ty
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
+
+        ; checkTcM (null theta || constraintsAllowed ctxt)
+                   (constraintTyErr env ty)
+                -- Reject forall (a :: Eq b => b). blah
+                -- In a kind signature we don't allow constraints
 
         ; check_valid_theta env' SigmaCtxt theta
                 -- Allow     type T = ?x::Int => Int -> Int
@@ -631,6 +647,10 @@ ubxArgTyErr env ty
   = ( env, vcat [ sep [ text "Illegal unboxed tuple type as function argument:"
                       , ppr_tidy env ty ]
                 , text "Perhaps you intended to use UnboxedTuples" ] )
+
+constraintTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
+constraintTyErr env ty
+  = (env, text "Illegal constraint in a kind:" <+> ppr_tidy env ty)
 
 {-
 Note [Liberal type synonyms]
@@ -2096,38 +2116,51 @@ check works for `forall x y z.` written in a type.
 --     for foralls
 checkValidTelescope :: TyCon -> TcM ()
 checkValidTelescope tc
-  = unless (null bad_tvbs) $ addErr $
-    hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
-       2 (vcat [ text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc)
-               , hang (text "Perhaps try this order instead:")
-                    2 (pprTyVars sorted_tidied_tvs)
-               , extra ])
+  = unless (null bad_tcbs) $ addErr $
+    vcat [ hang (text "The kind of" <+> quotes (ppr tc) <+> text "is ill-scoped")
+              2 (text "Inferred kind:" <+> ppr tc <+> dcolon <+> ppr_untidy (tyConKind tc))
+         , extra
+         , hang (text "Perhaps try this order instead:")
+              2 (pprTyVars sorted_tidied_tvs) ]
   where
     ppr_untidy ty = pprIfaceType (toIfaceType ty)
-    tvbs = tyConBinders tc
-    tvs = binderVars tvbs
+    tcbs = tyConBinders tc
+    tvs = binderVars tcbs
     (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (scopedSort tvs)
 
-    (_, bad_tvbs) = foldl add_one (mkVarSet tvs, []) tvbs
+    (_, bad_tcbs) = foldl add_one (mkVarSet tvs, []) tcbs
 
     add_one :: (TyVarSet, [TyConBinder])
-            -> TyConBinder
-            -> (TyVarSet, [TyConBinder])
+            -> TyConBinder -> (TyVarSet, [TyConBinder])
     add_one (bad_bndrs, acc) tvb
-      | fkvs `intersectsVarSet` bad_bndrs
-      = (bad', tvb : acc)
-      | otherwise
-      = (bad', acc)
+      | fkvs `intersectsVarSet` bad_bndrs = (bad', tvb : acc)
+      | otherwise                         = (bad', acc)
       where
         tv = binderVar tvb
         fkvs = tyCoVarsOfType (tyVarKind tv)
         bad' = bad_bndrs `delVarSet` tv
 
+    inferred_tvs  = [ binderVar tcb
+                    | tcb <- tcbs, Inferred == tyConBinderArgFlag tcb ]
+    specified_tvs = [ binderVar tcb
+                    | tcb <- tcbs, Specified == tyConBinderArgFlag tcb ]
+
+    pp_inf  = parens (text "namely:" <+> pprTyVars inferred_tvs)
+    pp_spec = parens (text "namely:" <+> pprTyVars specified_tvs)
+
     extra
-      | any isInvisibleTyConBinder tvbs
-      = text "NB: Implicitly declared variables come before others."
-      | otherwise
+      | null inferred_tvs && null specified_tvs
       = empty
+      | null inferred_tvs
+      = hang (text "NB: Specified variables")
+           2 (sep [pp_spec, text "always come first"])
+      | null specified_tvs
+      = hang (text "NB: Inferred variables")
+           2 (sep [pp_inf, text "always come first"])
+      | otherwise
+      = hang (text "NB: Inferred variables")
+           2 (vcat [ sep [ pp_inf, text "always come first"]
+                   , sep [text "then Specified variables", pp_spec]])
 
 {-
 ************************************************************************

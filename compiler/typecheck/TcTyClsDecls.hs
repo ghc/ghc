@@ -481,8 +481,7 @@ kcTyClGroup :: [LTyClDecl GhcRn] -> TcM [TcTyCon]
 -- Kind check this group, kind generalize, and return the resulting local env
 -- This binds the TyCons and Classes of the group, but not the DataCons
 -- See Note [Kind checking for type and class decls]
--- Third return value is Nothing if the tycon be unsaturated; otherwise,
--- the arity
+-- and Note [Inferring kinds for type declarations]
 kcTyClGroup decls
   = do  { mod <- getModule
         ; traceTc "---- kcTyClGroup ---- {"
@@ -675,49 +674,69 @@ If this ordering does not make a valid telescope, we reject the definition.
 
 Example:
   data SameKind :: k -> k -> *
-  data X a (b :: SameKind a b) (c :: k) d
+  data Bad a (c :: Proxy b) (d :: Proxy a) (x :: SameKind b d)
 
 For X:
-  - a, b, c, d are Required; they are explicitly listed by the user
-    as the positional arguments of X
-  - k is Specified; it appears explicitly in a kind signature
-  - k2, the kind of d, is Inferred; it is not mentioned explicitly at all
+  - a, c, d, x are Required; they are explicitly listed by the user
+    as the positional arguments of Bad
+  - b is Specified; it appears explicitly in a kind signature
+  - k, the kind of a, is Inferred; it is not mentioned explicitly at all
 
-Putting variables in the order Inferred, Specified, Required gives us
-  Inferred:  k2
-  Specified: k (a ::kb
+Putting variables in the order Inferred, Specified, Required
+gives us this telescope:
+  Inferred:  k
+  Specified: b : Proxy a
+  Required : (a : k) (c : Proxy b) (d : Proxy a) (x : SameKind b d)
 
-This idea is implemented in the generalise function within kcTyClGroup (for
-declarations without CUSKs), and in kcLHsQTyVars (for declarations with
-CUSKs). Note that neither definition worries about point (6) above, as this
+But this order is ill-scoped, because b's kind mentions a, which occurs
+after b in the telescope. So we reject Bad.
+
+Associated types
+~~~~~~~~~~~~~~~~
+For associated types everything above is determined by the
+associated-type declaration alone, ignoring the class header.
+Here is an example (Trac #15592)
+  class C (a :: k) b where
+    type F (x :: b a)
+
+In the kind of C, 'k' is Specified.  But what about F?
+In the kind of F,
+
+ * Should k be Inferred or Specified?  It's Specified for C,
+   but not mentioned in F's declaration.
+
+ * In which order should the Specified variables a and b occur?
+   It's clearly 'a' then 'b' in C's declaration, but the L-R ordering
+   in F's declaration is 'b' then 'a'.
+
+In both cases we make the choice by looking at F's declaration alone,
+so it gets the kind
+   F :: forall {k}. forall b a. b a -> Type
+
+How it works
+~~~~~~~~~~~~
+These design choices are implemented by two completely different code
+paths for
+
+  * Declarations with a compulete user-specified kind signature (CUSK)
+    Handed by the CUSK case of kcLHsQTyVars.
+
+  * Declarations without a CUSK are handled by kcTyClDecl; see
+    Note [Inferring kinds for type declarations].
+
+Note that neither code path worries about point (4) above, as this
 is nicely handled by not mangling the res_kind. (Mangling res_kinds is done
-*after* all this stuff, in tcDataDefn's call to tcDataKindSig.) We can
-easily tell Inferred apart from Specified by looking at the scoped tyvars;
-Specified are always included there.
+*after* all this stuff, in tcDataDefn's call to tcDataKindSig.)
 
-One other small open question here: how to classify variables from an
-enclosing class? Here is an example:
+We can tell Inferred apart from Specified by looking at the scoped
+tyvars; Specified are always included there.
 
-  class C (a :: k) where
-    type F a
+Design alternatives
+~~~~~~~~~~~~~~~~~~~
 
-In the kind of F, should k be Inferred or Specified? Currently, we mark
-it as Specified, as we can commit to an ordering, based on the ordering
-of class variables in the enclosing class declaration. If k were not mentioned
-in the class head, then it would be Inferred. The alternative to this
-approach is to make the Inferred/Specified distinction locally, by just
-looking at the declaration for F. This lowers the availability of type
-application, but makes the reasoning more local. However, this alternative
-also disagrees with the treatment for methods, where all class variables
-are Specified, regardless of whether or not the variable is mentioned in the
-method type.
-
-A few points of motivation for the ordering above:
-
-* We put the class variables before the local variables in a nod to the
-  treatment for class methods, where class variables (and the class constraint)
-  come first. While this is an unforced design decision, it never rejects
-  more declarations, as class variables can never depend on local variables.
+* For associated types we considered putting the class variables
+  before the local variables, in a nod to the treatment for class
+  methods. But it got too compilicated; see Trac #15592, comment:21ff.
 
 * We rigidly require the ordering above, even though we could be much more
   permissive. Relevant musings are at
@@ -734,11 +753,94 @@ A few points of motivation for the ordering above:
   we can be sure that inference wouldn't change between versions. However,
   would users be able to predict it? That I cannot answer.
 
-Test cases (and tickets) relevant to these design decisions:
+Test cases (and tickets) relevant to these design decisions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   T15591*
   T15592*
   T15743*
 
+Note [Inferring kinds for type declarations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This note deals with /inference/ for type declarations
+that do not have a CUSK.  Consider
+  data T (a :: k1) k2 (x :: k2) = MkT (S a k2 x)
+  data S (b :: k3) k4 (y :: k4) = MkS (T b k4 y)
+
+We do kind inference as follows:
+
+* Step 1: Assign initial monomorophic kinds to S, T
+          S :: kk1 -> * -> kk2 -> *
+          T :: kk3 -> * -> kk4 -> *
+  Here kk1 etc are TyVarTvs: that is, unification variables that
+  are allowed to unify only with other type variables. See
+  Note [Signature skolems] in TcType
+
+* Step 2: Extend the environment with a TcTyCon for S and T, with
+  these monomophic kinds.  Now kind-check the declarations, and solve
+  the resulting equalities.  The goal here is to discover constraints
+  on all these unification variables.
+
+  Here we find that kk1 := kk3, and kk2 := kk4.
+
+  This is why we can't use skolems for kk1 etc; they have to
+  unify with each other.
+
+* Step 3. Generalise each TyCon in turn (generaliseTcTyCon).
+  We find the free variables of the kind, skolemise them,
+  sort them out into Inferred/Required/Specified (see the above
+  Note [Required, Specified, and Inferred for types]),
+  and perform some validity checks.
+
+  This makes the utterly-final TyConBinders for the TyCon
+
+  All this is very similar at the level of terms: see TcBinds
+  Note [Quantified variables in partial type signatures]
+
+* Step 4.  Extend the type environment with a TcTyCon for S and T, now
+  with their utterly-final polymorphic kinds (needed for recursive
+  occurrences of S, T).  Now typecheck the declarations, and build the
+  final AlgTyCOn for S and T resp.
+
+The first three steps are in kcTyClGroup;
+the fourth is in tcTyClDecls.
+
+There are some wrinkles
+
+* Do not default TyVarTvs.  We always want to kind-generalise over
+  TyVarTvs, and /not/ default them to Type. By definition a TyVarTv is
+  not allowed to unify with a type; it must stand for a type
+  variable. Hence the check in TcSimplify.defaultTyVarTcS, and
+  TcMType.defaultTyVar.  Here's another example (Trac #14555):
+     data Exp :: [TYPE rep] -> TYPE rep -> Type where
+        Lam :: Exp (a:xs) b -> Exp xs (a -> b)
+  We want to kind-generalise over the 'rep' variable.
+  Trac #14563 is another example.
+
+* Duplicate type variables. Consider Trac #11203
+    data SameKind :: k -> k -> *
+    data Q (a :: k1) (b :: k2) c = MkQ (SameKind a b)
+  Here we will unify k1 with k2, but this time doing so is an error,
+  because k1 and k2 are bound in the same declaration.
+
+  We spot this during validity checking (findDupTyVarTvs),
+  in generaliseTcTyCon.
+
+* Required arguments.  Even the Required arguments should be made
+  into TyVarTvs, not skolems.  Consider
+    data T k (a :: k)
+  Here, k is a Required, dependent variable. For uniformity, it is helpful
+  to have k be a TyVarTv, in parallel with other dependent variables.
+
+* Duplicate skolemisation is expected.  When generalising in Step 3,
+  we may find that one of the variables we want to quantify has
+  already been skolemised.  For example, suppose we have already
+  generalise S. When we come to T we'll find that kk1 (now the same as
+  kk3) has already been skolemised.
+
+  That's fine -- but it means that
+    a) when collecting quantification candidates, in
+       candidateQTyVarsOfKind, we must collect skolems
+    b) quantifyTyVars should be a no-op on such a skolem
 -}
 
 --------------
