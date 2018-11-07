@@ -1700,8 +1700,7 @@ doublePrimTyConKey                      = mkPreludeTyConUnique  9
 doubleTyConKey                          = mkPreludeTyConUnique 10
 floatPrimTyConKey                       = mkPreludeTyConUnique 11
 floatTyConKey                           = mkPreludeTyConUnique 12
--- TODO: Put this back in order MattP, RIP interface files
-funTyConKey                             = mkPreludeTyConUnique 42
+funTyConKey                             = mkPreludeTyConUnique 13
 intPrimTyConKey                         = mkPreludeTyConUnique 14
 intTyConKey                             = mkPreludeTyConUnique 15
 int8TyConKey                            = mkPreludeTyConUnique 16
