@@ -103,12 +103,14 @@
             []
             (Nothing)
             (PrefixCon
-             [({ DumpRenamedAst.hs:8:26-30 }
-               (HsTyVar
-                (NoExt)
-                (NotPromoted)
-                ({ DumpRenamedAst.hs:8:26-30 }
-                 {Name: DumpRenamedAst.Peano})))])
+             [(HsWeighted
+               (HsOne)
+               ({ DumpRenamedAst.hs:8:26-30 }
+                (HsTyVar
+                 (NoExt)
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:8:26-30 }
+                  {Name: DumpRenamedAst.Peano}))))])
             (Nothing)))]
          ({ <no location info> }
           []))))]
@@ -263,6 +265,7 @@
                (NotPromoted)
                ({ DumpRenamedAst.hs:14:20 }
                 {Name: k})))
+             (HsOmega)
              ({ DumpRenamedAst.hs:14:25-33 }
               (HsFunTy
                (NoExt)
@@ -272,6 +275,7 @@
                  (NotPromoted)
                  ({ DumpRenamedAst.hs:14:25 }
                   {Name: k})))
+               (HsOmega)
                ({ DumpRenamedAst.hs:14:30-33 }
                 (HsTyVar
                  (NoExt)
@@ -313,6 +317,7 @@
                     (NotPromoted)
                     ({ DumpRenamedAst.hs:17:28 }
                      {Name: k})))
+                  (HsOmega)
                   ({ DumpRenamedAst.hs:17:33-36 }
                    (HsTyVar
                     (NoExt)
@@ -342,12 +347,14 @@
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:17:43 }
                       {Name: k})))
+                   (HsOmega)
                    ({ DumpRenamedAst.hs:17:48-51 }
                     (HsTyVar
                      (NoExt)
                      (NotPromoted)
                      ({ DumpRenamedAst.hs:17:48-51 }
                       {Name: GHC.Types.Type})))))))
+               (HsOmega)
                ({ DumpRenamedAst.hs:17:57-60 }
                 (HsTyVar
                  (NoExt)
@@ -370,50 +377,53 @@
                 [])
                (Nothing)
                (PrefixCon
-                [({ DumpRenamedAst.hs:18:10-34 }
-                  (HsParTy
-                   (NoExt)
-                   ({ DumpRenamedAst.hs:18:11-33 }
-                    (HsForAllTy
-                     (NoExt)
-                     [({ DumpRenamedAst.hs:18:18-19 }
-                       (UserTyVar
+                [(HsWeighted
+                  (HsOne)
+                  ({ DumpRenamedAst.hs:18:10-34 }
+                   (HsParTy
+                    (NoExt)
+                    ({ DumpRenamedAst.hs:18:11-33 }
+                     (HsForAllTy
+                      (NoExt)
+                      [({ DumpRenamedAst.hs:18:18-19 }
+                        (UserTyVar
+                         (NoExt)
+                         ({ DumpRenamedAst.hs:18:18-19 }
+                          {Name: xx})))]
+                      ({ DumpRenamedAst.hs:18:22-33 }
+                       (HsFunTy
                         (NoExt)
-                        ({ DumpRenamedAst.hs:18:18-19 }
-                         {Name: xx})))]
-                     ({ DumpRenamedAst.hs:18:22-33 }
-                      (HsFunTy
-                       (NoExt)
-                       ({ DumpRenamedAst.hs:18:22-25 }
-                        (HsAppTy
-                         (NoExt)
-                         ({ DumpRenamedAst.hs:18:22 }
-                          (HsTyVar
-                           (NoExt)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:18:22 }
-                            {Name: f})))
-                         ({ DumpRenamedAst.hs:18:24-25 }
-                          (HsTyVar
-                           (NoExt)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:18:24-25 }
-                            {Name: xx})))))
-                       ({ DumpRenamedAst.hs:18:30-33 }
-                        (HsAppTy
-                         (NoExt)
-                         ({ DumpRenamedAst.hs:18:30 }
-                          (HsTyVar
-                           (NoExt)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:18:30 }
-                            {Name: g})))
-                         ({ DumpRenamedAst.hs:18:32-33 }
-                          (HsTyVar
-                           (NoExt)
-                           (NotPromoted)
-                           ({ DumpRenamedAst.hs:18:32-33 }
-                            {Name: xx})))))))))))])
+                        ({ DumpRenamedAst.hs:18:22-25 }
+                         (HsAppTy
+                          (NoExt)
+                          ({ DumpRenamedAst.hs:18:22 }
+                           (HsTyVar
+                            (NoExt)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:18:22 }
+                             {Name: f})))
+                          ({ DumpRenamedAst.hs:18:24-25 }
+                           (HsTyVar
+                            (NoExt)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:18:24-25 }
+                             {Name: xx})))))
+                        (HsOmega)
+                        ({ DumpRenamedAst.hs:18:30-33 }
+                         (HsAppTy
+                          (NoExt)
+                          ({ DumpRenamedAst.hs:18:30 }
+                           (HsTyVar
+                            (NoExt)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:18:30 }
+                             {Name: g})))
+                          ({ DumpRenamedAst.hs:18:32-33 }
+                           (HsTyVar
+                            (NoExt)
+                            (NotPromoted)
+                            ({ DumpRenamedAst.hs:18:32-33 }
+                             {Name: xx}))))))))))))])
                ({ DumpRenamedAst.hs:18:39-45 }
                 (HsAppTy
                  (NoExt)
