@@ -1162,9 +1162,12 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
              dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; traceTc "decideQuantifiedTyVars" (vcat
-           [ text "seed_tys =" <+> ppr seed_tys
+           [ text "candidates =" <+> ppr candidates
+           , text "tau_tys =" <+> ppr tau_tys
+           , text "seed_tys =" <+> ppr seed_tys
            , text "seed_tcvs =" <+> ppr (tyCoVarsOfTypes seed_tys)
-           , text "grown_tcvs =" <+> ppr grown_tcvs])
+           , text "grown_tcvs =" <+> ppr grown_tcvs
+           , text "dvs =" <+> ppr dvs_plus])
 
        ; quantifyTyVars mono_tvs dvs_plus }
 

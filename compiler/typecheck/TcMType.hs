@@ -1193,27 +1193,29 @@ collect_cand_qtvs is_dep bound dvs ty
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
-      | is_dep    = do { DV { dv_kvs = tkvs }
-                            <- collect_cand_qtvs True emptyVarSet mempty tv_kind
-                       ; case tv `elemDVarSet` kvs of
-                           True  -> return dv
-                           False | intersectsVarSet bound (dVarSetToVarSet tkvs)
-                                 -> zap_naughty
-                                 | otherwise
-                                 -> return (dv { dv_kvs = kvs `unionDVarSet` tkvs
-                                                              `extendDVarSet` tv }) }
-                                    -- See Note [Order of accumulation]
+      | is_dep
+      = case tv `elemDVarSet` kvs of
+         True  -> return dv    -- We have met this tyvar aleady
+         False | intersectsVarSet bound (tyCoVarsOfType tv_kind)
+               -> zap_naughty  -- Does the kind of this tyvar mention
+                               -- an already-bound variable; if so
+                               -- we can zap it to Any
+               | otherwise
+               -> collect_cand_qtvs True emptyVarSet dv' tv_kind
+               where
+                  dv' = dv { dv_kvs = kvs `extendDVarSet` tv }
+                        -- See Note [Order of accumulation]
 
-      | otherwise = do { DV { dv_kvs = tkvs }
-                            <- collect_cand_qtvs True emptyVarSet mempty tv_kind
-                       ; case tv `elemDVarSet` kvs || tv `elemDVarSet` tvs of
-                           True  -> return dv
-                           False | intersectsVarSet bound (dVarSetToVarSet tkvs)
-                                 -> zap_naughty
-                                 | otherwise
-                                 -> return (dv { dv_kvs = kvs `unionDVarSet` tkvs
-                                               , dv_tvs = tvs `extendDVarSet` tv }) }
-                                    -- See Note [Order of accumulation]
+      | otherwise
+      = case tv `elemDVarSet` kvs || tv `elemDVarSet` tvs of
+         True  -> return dv    -- We have met this tyvar aleady
+         False | intersectsVarSet bound (tyCoVarsOfType tv_kind)
+               -> zap_naughty
+               | otherwise
+               -> collect_cand_qtvs True emptyVarSet dv' tv_kind
+               where
+                  dv' = dv { dv_tvs = tvs `extendDVarSet` tv }
+                        -- See Note [Order of accumulation]
       where
         tv_kind = tyVarKind tv
         zap_naughty = do { traceTc "Zapping naughty quantifier" (pprTyVar tv)
@@ -1451,10 +1453,6 @@ quantifyTyVars gbl_tvs
                True  -> return Nothing
                False -> do { tv <- skolemiseQuantifiedTyVar tkv
                            ; return (Just tv) } }
-
-    zap_naughty_tv tv
-      = WARN(True, text "naughty quantification candidate: " <+> ppr tv <+> dcolon <+> ppr (tyVarKind tv))
-        writeMetaTyVar tv (anyTypeOfKind (tyVarKind tv))
 
 quantifiableTv :: TcLevel   -- Level of the context, outside the quantification
                -> TcTyVar

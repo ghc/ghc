@@ -548,6 +548,7 @@ generaliseTcTyCon tc
        --         including Inferred, Specfied, and Required
        ; dvs <- candidateQTyVarsOfKinds $
                 (tc_res_kind : map tyVarKind scoped_tvs)
+       ; tc_tvs      <- mapM zonkTcTyVarToTyVar tc_tvs
        ; let full_dvs = dvs { dv_tvs = mkDVarSet tc_tvs }
 
        -- Step 2: quantify, mainly meaning skolemise the free variables
