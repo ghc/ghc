@@ -1194,7 +1194,7 @@ genMachOp _ op [x] = case op of
         -> sameConv from (widthToLlvmInt to) LM_Trunc LM_Zext
 
     MO_XX_Conv from to
-        -> sameConv from (widthToLlvmInt to) LM_Bitcast LM_Bitcast
+        -> sameConv from (widthToLlvmInt to) LM_Trunc LM_Zext
 
     MO_FF_Conv from to
         -> sameConv from (widthToLlvmFloat to) LM_Fptrunc LM_Fpext
