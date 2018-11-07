@@ -80,6 +80,11 @@ aliases:
     run:
       name: Push Performance Git Notes
       command: .circleci/push-test-metrics.sh
+  - &store_test_artifacts
+    store_artifacts:
+      # we might want to add the whole output of the test phase
+      # too at some point
+      path: test-results/junit.xml
   - &slowtest
     run:
       name: Full Test
@@ -90,17 +95,13 @@ aliases:
     run:
       name: Create bindist
       # Reduce compression effort to 3
-      command: make binary-dist TAR_COMP_OPTS="-2"
+      command: make binary-dist TAR_COMP_OPTS="-2" && mv ghc*.tar.xz ghc.tar.xz
       # Building bindist takes ~15 minutes without output, account for
       # that.
       no_output_timeout: "30m"
-  - &storeartifacts
-    run:
-      name: Store artifacts
-      command: |
-        curl https://ghc-artifacts.s3.amazonaws.com/tools/ghc-artifact-collector-$GHC_COLLECTOR_FLAVOR --output ghc-artifact-collector
-        chmod +x ghc-artifact-collector
-        ./ghc-artifact-collector ghc*.tar.xz
+  - &store_bindist
+    store_artifacts:
+      path: ghc.tar.xz
   - &trigger_on_tags
     filters:
       tags:
@@ -124,9 +125,10 @@ jobs:
       - *configure_unix
       - *make
       - *bindist
-      - *storeartifacts
+      - *store_bindist
       - *test
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   "validate-x86_64-freebsd":
@@ -147,9 +149,10 @@ jobs:
       - *configure_bsd
       - *make
       - *bindist
-      - *storeartifacts
+      - *store_bindist
       - *test
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   "validate-x86_64-darwin":
@@ -173,9 +176,10 @@ jobs:
       - *configure_unix
       - *make
       - *bindist
-      - *storeartifacts
+      - *store_bindist
       - *test
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   "validate-hadrian-x86_64-linux":
@@ -211,6 +215,7 @@ jobs:
       - *test
       - *store_test_results
       - *push_perf_note
+      - *store_test_artifacts
 
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
@@ -237,6 +242,8 @@ jobs:
       - *configure_unix
       - *make
       - *test
+      - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   # Nightly build with -DDEBUG using devel2 flavour
@@ -259,6 +266,7 @@ jobs:
       - *make
       - *test
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   "validate-i386-linux":
@@ -278,9 +286,10 @@ jobs:
       - *configure_unix_32
       - *make
       - *bindist
-      - *storeartifacts
+      - *store_bindist
       - *test
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   "validate-x86_64-fedora":
@@ -300,9 +309,10 @@ jobs:
       - *configure_unix
       - *make
       - *bindist
-      - *storeartifacts
+      - *store_bindist
       - *test
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
   "slow-validate-x86_64-linux":
@@ -321,6 +331,7 @@ jobs:
       - *make
       - *slowtest
       - *store_test_results
+      - *store_test_artifacts
       - *push_perf_note
 
 workflows:
@@ -339,6 +350,9 @@ workflows:
     - validate-hadrian-x86_64-linux
     - validate-x86_64-fedora:
         *trigger_on_tags
+
+    branches:
+      ignore: /gitlab\/.*/
 
   nightly:
     triggers:
