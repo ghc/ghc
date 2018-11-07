@@ -784,13 +784,16 @@ messages and in GHCi:
 
     .. code-block:: none
 
-        ghci> :set -XPolyKinds
-        ghci> data T a = MkT
-        ghci> :t MkT
-        MkT :: forall (k :: Type) (a :: k). T a
-        ghci> :set -fprint-explicit-kinds
-        ghci> :t MkT
-        MkT :: forall (k :: Type) (a :: k). T k a
+           ghci> :set -XPolyKinds
+           ghci> data T a = MkT
+           ghci> :t MkT
+           MkT :: forall (k :: Type) (a :: k). T a
+           ghci> :set -fprint-explicit-kinds
+           ghci> :t MkT
+           MkT :: forall (k :: Type) (a :: k). T k a
+           ghci> :set -XNoPolyKinds
+           ghci> :t MkT
+           MkT :: T * a
 
 .. ghc-flag:: -fprint-explicit-runtime-reps
     :shortdesc: Print ``RuntimeRep`` variables in types which are

@@ -752,7 +752,12 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 -- | A variant of 'throw' that can only be used within the 'STM' monad.
 --
 -- Throwing an exception in @STM@ aborts the transaction and propagates the
--- exception.
+-- exception. If the exception is caught via 'catchSTM', only the changes
+-- enclosed by the catch are rolled back; changes made outside of 'catchSTM'
+-- persist.
+--
+-- If the exception is not caught inside of the 'STM', it is re-thrown by
+-- 'atomically', and the entire 'STM' is rolled back.
 --
 -- Although 'throwSTM' has a type that is an instance of the type of 'throw', the
 -- two functions are subtly different:
@@ -770,7 +775,12 @@ orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 throwSTM :: Exception e => e -> STM a
 throwSTM e = STM $ raiseIO# (toException e)
 
--- |Exception handling within STM actions.
+-- | Exception handling within STM actions.
+--
+-- @'catchSTM' m f@ catches any exception thrown by @m@ using 'throwSTM',
+-- using the function @f@ to handle the exception. If an exception is
+-- thrown, any changes made by @m@ are rolled back, but changes prior to
+-- @m@ persist.
 catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 catchSTM (STM m) handler = STM $ catchSTM# m handler'
     where
