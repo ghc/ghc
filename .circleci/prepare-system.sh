@@ -22,10 +22,6 @@ BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 EOF
 
-if [[ -z ${ENABLE_DWARF:-} ]]; then
-  echo "GhcLibHcOpts=-g3" >> mk/build.mk
-fi
-
 case "$(uname)" in
   Linux)
     if [[ -n ${TARGET:-} ]]; then
@@ -51,9 +47,6 @@ case "$(uname)" in
       cabal update
       cabal install --reinstall hscolour
       sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
-      if [[ -z ${ENABLE_DWARF:-} ]]; then
-        apt-get install -qy libdw1-dev
-      fi
     fi
     ;;
 
