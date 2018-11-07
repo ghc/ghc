@@ -1,0 +1,6 @@
+
+T15796.hs:6:3: error:
+    • A newtype constructor cannot have a context in its type
+      MkN :: forall a. Show a => a -> N a
+    • In the definition of data constructor ‘MkN’
+      In the newtype declaration for ‘N’

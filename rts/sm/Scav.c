@@ -498,7 +498,7 @@ scavenge_block (bdescr *bd)
 
     case FUN_1_0:
         scavenge_fun_srt(info);
-        /* fallthrough */
+        FALLTHROUGH;
     case CONSTR_1_0:
         evacuate(&((StgClosure *)p)->payload[0]);
         p += sizeofW(StgHeader) + 1;
@@ -511,7 +511,7 @@ scavenge_block (bdescr *bd)
 
     case FUN_0_1:
         scavenge_fun_srt(info);
-        /* fallthrough */
+        FALLTHROUGH;
     case CONSTR_0_1:
         p += sizeofW(StgHeader) + 1;
         break;
@@ -523,7 +523,7 @@ scavenge_block (bdescr *bd)
 
     case FUN_0_2:
         scavenge_fun_srt(info);
-        /* fallthrough */
+        FALLTHROUGH;
     case CONSTR_0_2:
         p += sizeofW(StgHeader) + 2;
         break;
@@ -536,7 +536,7 @@ scavenge_block (bdescr *bd)
 
     case FUN_1_1:
         scavenge_fun_srt(info);
-        /* fallthrough */
+        FALLTHROUGH;
     case CONSTR_1_1:
         evacuate(&((StgClosure *)p)->payload[0]);
         p += sizeofW(StgHeader) + 2;
@@ -1738,7 +1738,7 @@ scavenge_static(void)
 
     case FUN_STATIC:
       scavenge_fun_srt(info);
-      /* fallthrough */
+      FALLTHROUGH;
 
       // a FUN_STATIC can also be an SRT, so it may have pointer
       // fields.  See Note [SRTs] in CmmBuildInfoTables, specifically

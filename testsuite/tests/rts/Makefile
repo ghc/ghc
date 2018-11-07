@@ -200,3 +200,15 @@ KeepCafsFail:
 .PHONY: KeepCafs
 KeepCafs:
 	"${MAKE}" KeepCafsFail KEEPCAFS=-fkeep-cafs
+
+.PHONY: EventlogOutput1
+EventlogOutput1:
+	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
+	./EventlogOutput +RTS -l -olhello.eventlog
+	ls hello.eventlog >/dev/null
+
+.PHONY: EventlogOutput2
+EventlogOutput2:
+	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
+	./EventlogOutput +RTS -l
+	ls EventlogOutput.eventlog >/dev/null

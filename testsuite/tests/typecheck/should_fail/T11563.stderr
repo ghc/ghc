@@ -1,10 +1,4 @@
 
-T11563.hs:5:10: error:
-    • Variable ‘s’ occurs more often
-        in the constraint ‘C s’ than in the instance head ‘C T’
-      (Use UndecidableInstances to permit this)
-    • In the instance declaration for ‘C T’
-
 T11563.hs:5:19: error:
     • Expecting one more argument to ‘T’
       Expected a type, but ‘T’ has kind ‘* -> *’

@@ -1,1 +1,1 @@
-type T = MkT { a :: {-# UNPACK #-} + Int }
+type T = MkT { a :: Int + {-# UNPACK #-} }

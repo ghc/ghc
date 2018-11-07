@@ -837,15 +837,16 @@ freeReg :: RegNo -> Bool
 
 # if defined(MACHREGS_i386)
 freeReg esp = False -- %esp is the C stack pointer
-freeReg esi = False -- Note [esi/edi not allocatable]
+freeReg esi = False -- Note [esi/edi/ebp not allocatable]
 freeReg edi = False
+freeReg ebp = False
 # endif
 # if defined(MACHREGS_x86_64)
 freeReg rsp = False  --        %rsp is the C stack pointer
 # endif
 
 {-
-Note [esi/edi not allocatable]
+Note [esi/edi/ebp not allocatable]
 
 %esi is mapped to R1, so %esi would normally be allocatable while it
 is not being used for R1.  However, %esi has no 8-bit version on x86,
@@ -855,7 +856,7 @@ graph-colouring allocator also cannot handle this - it was designed
 with more flexibility in mind, but the current implementation is
 restricted to the same set of classes as the linear allocator.
 
-Hence, on x86 esi and edi are treated as not allocatable.
+Hence, on x86 esi, edi and ebp are treated as not allocatable.
 -}
 
 -- split patterns in two functions to prevent overlaps

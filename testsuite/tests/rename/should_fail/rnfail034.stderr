@@ -4,4 +4,3 @@ rnfail034.hs:4:11: error: Qualified name in binding position: M.y
 rnfail034.hs:4:26: error:
     Not in scope: ‘M.y’
     Perhaps you meant ‘M.g’ (line 4)
-    No module named ‘M’ is imported.

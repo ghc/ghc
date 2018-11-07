@@ -14,7 +14,7 @@ import LlvmCodeGen.Base
 import LlvmCodeGen.Regs
 
 import BlockId
-import CodeGen.Platform ( activeStgRegs )
+import CodeGen.Platform ( activeStgRegs, callerSaves )
 import CLabel
 import Cmm
 import PprCmm
@@ -211,6 +211,7 @@ genCall t@(PrimTarget (MO_Prefetch_Data localityInt)) [] args
     fptr    <- liftExprData $ getFunPtr funTy t
     argVars' <- castVarsW Signed $ zip argVars argTy
 
+    doTrashStmts
     let argSuffix = [mkIntLit i32 0, mkIntLit i32 localityInt, mkIntLit i32 1]
     statement $ Expr $ Call StdCall fptr (argVars' ++ argSuffix) []
   | otherwise = panic $ "prefetch locality level integer must be between 0 and 3, given: " ++ (show localityInt)
@@ -293,6 +294,7 @@ genCall t@(PrimTarget op) [] args
     fptr          <- getFunPtrW funTy t
     argVars' <- castVarsW Signed $ zip argVars argTy
 
+    doTrashStmts
     let alignVal = mkIntLit i32 align
         arguments = argVars' ++ (alignVal:isVolVal)
     statement $ Expr $ Call StdCall fptr arguments []
@@ -447,6 +449,7 @@ genCall target res args = runStmtsDecls $ do
                  | never_returns     = statement $ Unreachable
                  | otherwise         = return ()
 
+    doTrashStmts
 
     -- make the actual call
     case retTy of
@@ -1193,6 +1196,9 @@ genMachOp _ op [x] = case op of
     MO_UU_Conv from to
         -> sameConv from (widthToLlvmInt to) LM_Trunc LM_Zext
 
+    MO_XX_Conv from to
+        -> sameConv from (widthToLlvmInt to) LM_Trunc LM_Zext
+
     MO_FF_Conv from to
         -> sameConv from (widthToLlvmFloat to) LM_Fptrunc LM_Fpext
 
@@ -1454,6 +1460,7 @@ genMachOp_slow opt op [x, y] = case op of
     MO_FS_Conv _ _ -> panicOp
     MO_SS_Conv _ _ -> panicOp
     MO_UU_Conv _ _ -> panicOp
+    MO_XX_Conv _ _ -> panicOp
     MO_FF_Conv _ _ -> panicOp
 
     MO_V_Insert  {} -> panicOp
@@ -1783,9 +1790,12 @@ genLit _ CmmHighStackMark
 funPrologue :: LiveGlobalRegs -> [CmmBlock] -> LlvmM StmtData
 funPrologue live cmmBlocks = do
 
+  trash <- getTrashRegs
   let getAssignedRegs :: CmmNode O O -> [CmmReg]
       getAssignedRegs (CmmAssign reg _)  = [reg]
-      getAssignedRegs (CmmUnsafeForeignCall _ rs _) = map CmmLocal rs
+      -- Calls will trash all registers. Unfortunately, this needs them to
+      -- be stack-allocated in the first place.
+      getAssignedRegs (CmmUnsafeForeignCall _ rs _) = map CmmGlobal trash ++ map CmmLocal rs
       getAssignedRegs _                  = []
       getRegsBlock (_, body, _)          = concatMap getAssignedRegs $ blockToList body
       assignedRegs = nub $ concatMap (getRegsBlock . blockSplit) cmmBlocks
@@ -1814,14 +1824,19 @@ funPrologue live cmmBlocks = do
 -- STG Liveness optimisation done here.
 funEpilogue :: LiveGlobalRegs -> LlvmM ([LlvmVar], LlvmStatements)
 funEpilogue live = do
-    dflags <- getDynFlags
 
-    -- the bool indicates whether the register is padding.
-    let alwaysNeeded = map (\r -> (False, r)) alwaysLive
-        livePadded = alwaysNeeded ++ padLiveArgs dflags live
+    -- Have information and liveness optimisation is enabled?
+    let liveRegs = alwaysLive ++ live
+        isSSE (FloatReg _)  = True
+        isSSE (DoubleReg _) = True
+        isSSE (XmmReg _)    = True
+        isSSE (YmmReg _)    = True
+        isSSE (ZmmReg _)    = True
+        isSSE _             = False
 
     -- Set to value or "undef" depending on whether the register is
     -- actually live
+    dflags <- getDynFlags
     let loadExpr r = do
           (v, _, s) <- getCmmRegVal (CmmGlobal r)
           return (Just $ v, s)
@@ -1829,16 +1844,38 @@ funEpilogue live = do
           let ty = (pLower . getVarType $ lmGlobalRegVar dflags r)
           return (Just $ LMLitVar $ LMUndefLit ty, nilOL)
     platform <- getDynFlag targetPlatform
-    let allRegs = activeStgRegs platform
-    loads <- flip mapM allRegs $ \r -> case () of
-      _ | (False, r) `elem` livePadded
-                             -> loadExpr r   -- if r is not padding, load it
-        | not (isFPR r) || (True, r) `elem` livePadded
-                             -> loadUndef r
+    loads <- flip mapM (activeStgRegs platform) $ \r -> case () of
+      _ | r `elem` liveRegs  -> loadExpr r
+        | not (isSSE r)      -> loadUndef r
         | otherwise          -> return (Nothing, nilOL)
 
     let (vars, stmts) = unzip loads
     return (catMaybes vars, concatOL stmts)
+
+
+-- | A series of statements to trash all the STG registers.
+--
+-- In LLVM we pass the STG registers around everywhere in function calls.
+-- So this means LLVM considers them live across the entire function, when
+-- in reality they usually aren't. For Caller save registers across C calls
+-- the saving and restoring of them is done by the Cmm code generator,
+-- using Cmm local vars. So to stop LLVM saving them as well (and saving
+-- all of them since it thinks they're always live, we trash them just
+-- before the call by assigning the 'undef' value to them. The ones we
+-- need are restored from the Cmm local var and the ones we don't need
+-- are fine to be trashed.
+getTrashStmts :: LlvmM LlvmStatements
+getTrashStmts = do
+  regs <- getTrashRegs
+  stmts <- flip mapM regs $ \ r -> do
+    reg <- getCmmReg (CmmGlobal r)
+    let ty = (pLower . getVarType) reg
+    return $ Store (LMLitVar $ LMUndefLit ty) reg
+  return $ toOL stmts
+
+getTrashRegs :: LlvmM [GlobalReg]
+getTrashRegs = do plat <- getLlvmPlatform
+                  return $ filter (callerSaves plat) (activeStgRegs plat)
 
 -- | Get a function pointer to the CLabel specified.
 --
@@ -1960,6 +1997,11 @@ getCmmRegW = lift . getCmmReg
 
 genLoadW :: Atomic -> CmmExpr -> CmmType -> WriterT LlvmAccum LlvmM LlvmVar
 genLoadW atomic e ty = liftExprData $ genLoad atomic e ty
+
+doTrashStmts :: WriterT LlvmAccum LlvmM ()
+doTrashStmts = do
+    stmts <- lift getTrashStmts
+    tell $ LlvmAccum stmts mempty
 
 -- | Return element of single-element list; 'panic' if list is not a single-element list
 singletonPanic :: String -> [a] -> a
