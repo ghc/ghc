@@ -1818,14 +1818,14 @@ funPrologue live cmmBlocks = do
 -- STG Liveness optimisation done here.
 funEpilogue :: LiveGlobalRegs -> LlvmM ([LlvmVar], LlvmStatements)
 funEpilogue live = do
-    dflags <- getDynFlags
 
     -- the bool indicates whether the register is padding.
     let alwaysNeeded = map (\r -> (False, r)) alwaysLive
-        livePadded = alwaysNeeded ++ padLiveArgs dflags live
+        livePadded = alwaysNeeded ++ padLiveArgs live
 
     -- Set to value or "undef" depending on whether the register is
     -- actually live
+    dflags <- getDynFlags
     let loadExpr r = do
           (v, _, s) <- getCmmRegVal (CmmGlobal r)
           return (Just $ v, s)
@@ -1837,7 +1837,7 @@ funEpilogue live = do
     loads <- flip mapM allRegs $ \r -> case () of
       _ | (False, r) `elem` livePadded
                              -> loadExpr r   -- if r is not padding, load it
-        | not (isFPR r) || (True, r) `elem` livePadded
+        | not (isSSE r) || (True, r) `elem` livePadded
                              -> loadUndef r
         | otherwise          -> return (Nothing, nilOL)
 
