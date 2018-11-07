@@ -60,7 +60,7 @@ Library
                    process    >= 1   && < 1.7,
                    bytestring >= 0.9 && < 0.11,
                    binary     == 0.8.*,
-                   time       >= 1.4 && < 1.9,
+                   time       >= 1.4 && < 1.10,
                    containers >= 0.5 && < 0.7,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,

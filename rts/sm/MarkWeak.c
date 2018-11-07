@@ -155,7 +155,7 @@ traverseWeakPtrList(void)
 
       // otherwise, fall through...
   }
-  /* fallthrough */
+  FALLTHROUGH;
 
   case WeakPtrs:
   {

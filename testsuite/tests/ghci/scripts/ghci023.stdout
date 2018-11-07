@@ -4,7 +4,7 @@
 -- layout rule instead of explicit braces and semicolons works too
 (1,2,3)
 Data.Maybe.catMaybes :: [Maybe a] -> [a]
-Data.Maybe.fromJust :: Maybe a -> a
+Data.Maybe.fromJust :: GHC.Stack.Types.HasCallStack => Maybe a -> a
 Data.Maybe.fromMaybe :: a -> Maybe a -> a
 Data.Maybe.isJust :: Maybe a -> Bool
 Data.Maybe.isNothing :: Maybe a -> Bool

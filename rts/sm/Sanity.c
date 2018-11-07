@@ -102,7 +102,7 @@ checkStackFrame( StgPtr c )
 
     case UPDATE_FRAME:
       ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgUpdateFrame*)c)->updatee));
-    /* fallthrough */
+      FALLTHROUGH;
     case ATOMICALLY_FRAME:
     case CATCH_RETRY_FRAME:
     case CATCH_STM_FRAME:

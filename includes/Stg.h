@@ -196,6 +196,13 @@
 #define GNUC3_ATTRIBUTE(at)
 #endif
 
+/* Used to mark a switch case that falls-through */
+#if (defined(__GNUC__) && __GNUC__ >= 7) || defined(__clang__)
+#define FALLTHROUGH GNU_ATTRIBUTE(fallthrough)
+#else
+#define FALLTHROUGH ((void)0)
+#endif /* __GNUC__ >= 7 */
+
 #if !defined(DEBUG) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))
 #define GNUC_ATTR_HOT __attribute__((hot))
 #else

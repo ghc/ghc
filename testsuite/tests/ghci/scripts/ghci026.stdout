@@ -1,5 +1,5 @@
 catMaybes :: [Maybe a] -> [a]
-fromJust :: Maybe a -> a
+fromJust :: GHC.Stack.Types.HasCallStack => Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
 isJust :: Maybe a -> Bool
 isNothing :: Maybe a -> Bool

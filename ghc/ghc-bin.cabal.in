@@ -62,7 +62,7 @@ Executable ghc
             ghc-prim       == 0.5.*,
             ghci           == @ProjectVersionMunged@,
             haskeline      == 0.7.*,
-            time           == 1.8.*,
+            time           >= 1.8 && < 1.10,
             transformers   == 0.5.*
         CPP-Options: -DGHCI
         GHC-Options: -fno-warn-name-shadowing

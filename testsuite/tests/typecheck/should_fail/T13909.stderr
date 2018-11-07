@@ -1,10 +1,4 @@
 
-T13909.hs:11:10: error:
-    • Illegal type synonym family application ‘GHC.Types.Any’ in instance:
-        HasName Hm
-        Use -fprint-explicit-kinds to see the kind arguments
-    • In the instance declaration for ‘HasName Hm’
-
 T13909.hs:11:18: error:
     • Expected kind ‘k0’, but ‘Hm’ has kind ‘forall k -> k -> *’
     • In the first argument of ‘HasName’, namely ‘Hm’

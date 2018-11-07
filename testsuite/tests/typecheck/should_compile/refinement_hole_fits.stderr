@@ -71,7 +71,7 @@ refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           with ($) @'GHC.Types.LiftedRep @[Integer] @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
-        fail (_ :: String)
+        fail (_ :: [Char])
           where fail :: forall (m :: * -> *) a. Monad m => String -> m a
           with fail @((->) [Integer]) @Integer
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
@@ -172,7 +172,7 @@ refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           with ($) @'GHC.Types.LiftedRep @Integer @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30
            (and originally defined in ‘GHC.Base’))
-        fail (_ :: String)
+        fail (_ :: [Char])
           where fail :: forall (m :: * -> *) a. Monad m => String -> m a
           with fail @((->) Integer) @([Integer] -> Integer)
           (imported from ‘Prelude’ at refinement_hole_fits.hs:1:8-30

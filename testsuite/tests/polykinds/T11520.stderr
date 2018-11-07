@@ -1,10 +1,4 @@
 
-T11520.hs:15:57: error:
-    • Illegal type synonym family application ‘Any’ in instance:
-        Typeable (Compose f g)
-        Use -fprint-explicit-kinds to see the kind arguments
-    • In the instance declaration for ‘Typeable (Compose f g)’
-
 T11520.hs:15:77: error:
     • Expected kind ‘k20 -> k10’, but ‘g’ has kind ‘k’
     • In the second argument of ‘Compose’, namely ‘g’

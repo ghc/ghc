@@ -170,6 +170,7 @@ typedef struct _TRACE_FLAGS {
     bool sparks_sampled; /* trace spark events by a sampled method */
     bool sparks_full;    /* trace spark events 100% accurately */
     bool user;           /* trace user events (emitted from Haskell code) */
+    char *trace_output;  /* output filename for eventlog */
 } TRACE_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

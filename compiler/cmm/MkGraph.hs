@@ -38,6 +38,7 @@ import OrdList
 import SMRep (ByteOff)
 import UniqSupply
 import Util
+import Panic
 
 
 -----------------------------------------------------------------------------
@@ -309,18 +310,33 @@ copyIn :: DynFlags -> Convention -> Area
 copyIn dflags conv area formals extra_stk
   = (stk_size, [r | (_, RegisterParam r) <- args], map ci (stk_args ++ args))
   where
-     ci (reg, RegisterParam r) =
-          CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal r))
-     ci (reg, StackParam off) =
-          CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty)
-          where ty = localRegType reg
+    -- See Note [Width of parameters]
+    ci (reg, RegisterParam r@(VanillaReg {})) =
+        let local = CmmLocal reg
+            global = CmmReg (CmmGlobal r)
+            width = cmmRegWidth dflags local
+            expr
+                | width == wordWidth dflags = global
+                | width < wordWidth dflags =
+                    CmmMachOp (MO_XX_Conv (wordWidth dflags) width) [global]
+                | otherwise = panic "Parameter width greater than word width"
 
-     init_offset = widthInBytes (wordWidth dflags) -- infotable
+        in CmmAssign local expr
 
-     (stk_off, stk_args) = assignStack dflags init_offset localRegType extra_stk
+    -- Non VanillaRegs
+    ci (reg, RegisterParam r) =
+        CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal r))
 
-     (stk_size, args) = assignArgumentsPos dflags stk_off conv
-                                           localRegType formals
+    ci (reg, StackParam off) =
+         CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty)
+         where ty = localRegType reg
+
+    init_offset = widthInBytes (wordWidth dflags) -- infotable
+
+    (stk_off, stk_args) = assignStack dflags init_offset localRegType extra_stk
+
+    (stk_size, args) = assignArgumentsPos dflags stk_off conv
+                                          localRegType formals
 
 -- Factoring out the common parts of the copyout functions yielded something
 -- more complicated:
@@ -346,8 +362,21 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
   where
     (regs, graph) = foldr co ([], mkNop) (setRA ++ args ++ stack_params)
 
-    co (v, RegisterParam r) (rs, ms)
-       = (r:rs, mkAssign (CmmGlobal r) v <*> ms)
+    -- See Note [Width of parameters]
+    co (v, RegisterParam r@(VanillaReg {})) (rs, ms) =
+        let width = cmmExprWidth dflags v
+            value
+                | width == wordWidth dflags = v
+                | width < wordWidth dflags =
+                    CmmMachOp (MO_XX_Conv width (wordWidth dflags)) [v]
+                | otherwise = panic "Parameter width greater than word width"
+
+        in (r:rs, mkAssign (CmmGlobal r) value <*> ms)
+
+    -- Non VanillaRegs
+    co (v, RegisterParam r) (rs, ms) =
+        (r:rs, mkAssign (CmmGlobal r) v <*> ms)
+
     co (v, StackParam off)  (rs, ms)
        = (rs, mkStore (CmmStackSlot area off) v <*> ms)
 
@@ -373,6 +402,28 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
     (stk_size, args) = assignArgumentsPos dflags extra_stack_off conv
                                           (cmmExprType dflags) actuals
 
+
+-- Note [Width of parameters]
+--
+-- Consider passing a small (< word width) primitive like Int8# to a function
+-- through a register. It's actually non-trivial to do this without
+-- extending/narrowing:
+-- * Global registers are considered to have native word width (i.e., 64-bits on
+--   x86-64), so CmmLint would complain if we assigne an 8-bit parameter to a
+--   global register.
+-- * Same problem exists with LLVM IR.
+-- * Lowering gets harder since on x86-32 not every register exposes its lower
+--   8 bits (e.g., for %eax we can use %al, but there isn't a corresponding
+--   8-bit register for %edi). So we would either need to extend/narrow anyway,
+--   or complicate the calling convention.
+-- So instead, we always extend every parameter smaller than native word width
+-- in copyOutOflow and then truncate it back to the expected width in copyIn.
+-- Note that we do this in cmm using MO_XX_Conv to avoid requiring
+-- zero-/sign-extending - it's up to a backend to handle this in a most
+-- efficient way (e.g., a simple register move)
+--
+-- There was some discussion about this on this PR:
+-- https://github.com/ghc-proposals/ghc-proposals/pull/74
 
 
 mkCallEntry :: DynFlags -> Convention -> [CmmFormal] -> [CmmFormal]

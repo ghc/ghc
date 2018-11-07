@@ -219,6 +219,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.sparks_sampled= false;
     RtsFlags.TraceFlags.sparks_full   = false;
     RtsFlags.TraceFlags.user          = false;
+    RtsFlags.TraceFlags.trace_output  = NULL;
 #endif
 
 #if defined(PROFILING)
@@ -349,7 +350,8 @@ usage_text[] = {
 
 #if defined(TRACING)
 "",
-"  -l[flags]  Log events in binary format to the file <program>.eventlog",
+"  -ol<file>  Send binary eventlog to <file> (default: <program>.eventlog)",
+"  -l[flags]  Log events to a file",
 #  if defined(DEBUG)
 "  -v[flags]  Log events to stderr",
 #  endif
@@ -1434,7 +1436,30 @@ error = true;
                 }
                 ) break;
 
-              /* =========== TRACING ---------=================== */
+              /* =========== OUTPUT ============================ */
+
+              case 'o':
+                  switch(rts_argv[arg][2]) {
+                  case 'l':
+                      OPTION_SAFE;
+                      TRACING_BUILD_ONLY(
+                          if (strlen(&rts_argv[arg][3]) == 0) {
+                              errorBelch("-ol expects filename");
+                              error = true;
+                          } else {
+                              RtsFlags.TraceFlags.trace_output =
+                                  strdup(&rts_argv[arg][3]);
+                          }
+                          );
+                      break;
+
+                  default:
+                      errorBelch("Unknown output flag -o%c", rts_argv[arg][2]);
+                      error = true;
+                  }
+                  break;
+
+              /* =========== TRACING ============================ */
 
               case 'l':
                   OPTION_SAFE;

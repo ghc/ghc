@@ -4,10 +4,6 @@ T5951.hs:8:8: error:
       Expected a constraint, but ‘A’ has kind ‘* -> Constraint’
     • In the instance declaration for ‘B => C’
 
-T5951.hs:8:8: error:
-    • Instance head is not headed by a class: C
-    • In the instance declaration for ‘B => C’
-
 T5951.hs:9:8: error:
     • Expecting one more argument to ‘B’
       Expected a constraint, but ‘B’ has kind ‘* -> Constraint’

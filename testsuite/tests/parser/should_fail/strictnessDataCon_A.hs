@@ -1,1 +1,1 @@
-type T = MkT { a :: ! + Int }
+type T = MkT { a :: Int + ! }

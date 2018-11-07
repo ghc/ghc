@@ -109,15 +109,16 @@ valid_hole_fits.hs:30:10: warning: [-Wtyped-holes (in -Wdefault)]
         True :: Bool
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Types’))
-        EQ :: Ordering
+        LT :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Types’))
-        LT :: Ordering
+        EQ :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Types’))
         GT :: Ordering
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Types’))
+        () :: () (bound at <wired into compiler>)
         pi :: forall a. Floating a => a
           with pi @Double
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
@@ -194,13 +195,41 @@ valid_hole_fits.hs:34:14: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Enum’))
 
-valid_hole_fits.hs:37:8: warning: [-Wtyped-holes (in -Wdefault)]
+valid_hole_fits.hs:38:10: warning: [-Wtyped-holes (in -Wdefault)]
+    • Found hole: _ :: a -> [a] -> [a]
+      Where: ‘a’ is a rigid type variable bound by
+               the type signature for:
+                 myCons :: forall a. a -> [a] -> [a]
+               at valid_hole_fits.hs:37:1-25
+    • In the expression: _
+      In an equation for ‘myCons’: myCons = _
+    • Relevant bindings include
+        myCons :: a -> [a] -> [a] (bound at valid_hole_fits.hs:38:1)
+      Valid hole fits include
+        myCons :: a -> [a] -> [a] (bound at valid_hole_fits.hs:38:1)
+        (:) :: forall a. a -> [a] -> [a]
+          with (:) @a
+          (bound at <wired into compiler>)
+        (<$) :: forall (f :: * -> *) a b. Functor f => a -> f b -> f a
+          with (<$) @[] @a @a
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Base’))
+        seq :: forall a b. a -> b -> b
+          with seq @a @[a]
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Prim’))
+        mempty :: forall a. Monoid a => a
+          with mempty @(a -> [a] -> [a])
+          (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
+           (and originally defined in ‘GHC.Base’))
+
+valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Char] -> IO ()
     • In the expression: _
       In the expression: _ "hello, world"
       In an equation for ‘main’: main = _ "hello, world"
     • Relevant bindings include
-        main :: IO () (bound at valid_hole_fits.hs:37:1)
+        main :: IO () (bound at valid_hole_fits.hs:41:1)
       Valid hole fits include
         ps :: String -> IO () (defined at valid_hole_fits.hs:9:1)
         System.IO.putStr :: String -> IO ()
