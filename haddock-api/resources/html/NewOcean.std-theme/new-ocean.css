@@ -81,6 +81,9 @@ body.js-enabled .hide-when-js-enabled {
     position: fixed;
     max-width: 10vw;
     top: 10.2em;
+    left: 2em;
+    bottom: 1em;
+    overflow-y: scroll;
   }
 
   #synopsis {
@@ -94,10 +97,6 @@ body.js-enabled .hide-when-js-enabled {
     overflow-y: scroll;
     /* Ensure that synopsis covers everything (including MathJAX markup) */
     z-index: 1;
-  }
-
-  #table-of-contents {
-    left: 2em;
   }
 
   #synopsis .show {
@@ -518,7 +517,7 @@ div#style-menu-holder {
 /* @group Front Matter */
 
 #synopsis .caption,
-#table-of-contents .caption {
+#contents-list .caption {
   font-size: 1rem;
 }
 
@@ -526,26 +525,25 @@ div#style-menu-holder {
   font-size: 16px;
 }
 
-#table-of-contents {
+#contents-list {
   background:  #f7f7f7;
   padding: 1em;
   margin: 0;
-  margin-top: 1em;
 }
 
-#table-of-contents .caption {
+#contents-list .caption {
   text-align: left;
   margin: 0;
 }
 
-#table-of-contents ul {
+#contents-list ul {
   list-style: none;
   margin: 0;
   margin-top: 10px;
   font-size: 14px;
 }
 
-#table-of-contents ul ul {
+#contents-list ul ul {
   margin-left: 1.5em;
 }
 

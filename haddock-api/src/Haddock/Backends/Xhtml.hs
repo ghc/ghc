@@ -633,9 +633,9 @@ ppModuleContents pkg qual exports orphan
   | null sections && not orphan  = noHtml
   | otherwise                    = contentsDiv
  where
-  contentsDiv = divTableOfContents << (
+  contentsDiv = divTableOfContents << (divContentsList << (
     sectionName << "Contents" +++
-    unordList (sections ++ orphanSection))
+    unordList (sections ++ orphanSection)))
 
   (sections, _leftovers{-should be []-}) = process 0 exports
   orphanSection

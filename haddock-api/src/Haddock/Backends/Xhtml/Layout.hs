@@ -15,7 +15,7 @@ module Haddock.Backends.Xhtml.Layout (
 
   divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynopsis, divInterface,
-  divIndex, divAlphabet, divModuleList,
+  divIndex, divAlphabet, divModuleList, divContentsList,
 
   sectionName,
   nonEmptySectionName,
@@ -80,7 +80,7 @@ nonEmptySectionName c
 
 divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynopsis, divInterface,
-  divIndex, divAlphabet, divModuleList
+  divIndex, divAlphabet, divModuleList, divContentsList
     :: Html -> Html
 
 divPackageHeader    = sectionDiv "package-header"
@@ -88,6 +88,7 @@ divContent          = sectionDiv "content"
 divModuleHeader     = sectionDiv "module-header"
 divFooter           = sectionDiv "footer"
 divTableOfContents  = sectionDiv "table-of-contents"
+divContentsList     = sectionDiv "contents-list"
 divDescription      = sectionDiv "description"
 divSynopsis         = sectionDiv "synopsis"
 divInterface        = sectionDiv "interface"
