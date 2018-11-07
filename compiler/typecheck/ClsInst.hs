@@ -91,8 +91,10 @@ matchGlobalInst :: DynFlags
                              -- See Note [Shortcut solving: overlap]
                 -> Class -> [Type] -> TcM ClsInstResult
 matchGlobalInst dflags short_cut clas tys
-  | cls_name == knownNatClassName     = matchKnownNat        clas tys
-  | cls_name == knownSymbolClassName  = matchKnownSymbol     clas tys
+  | cls_name == knownNatClassName
+  = matchKnownNat    dflags short_cut clas tys
+  | cls_name == knownSymbolClassName
+  = matchKnownSymbol dflags short_cut clas tys
   | isCTupleClass clas                = matchCTuple          clas tys
   | cls_name == typeableClassName     = matchTypeable        clas tys
   | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
@@ -169,6 +171,27 @@ match_one so dfun_id mb_inst_tys
                                                            , iw_safe_over = so } } }
 
 
+{- Note [Shortcut solving: overlap]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+  instance {-# OVERLAPPABLE #-} C a where ...
+and we are typechecking
+  f :: C a => a -> a
+  f = e  -- Gives rise to [W] C a
+
+We don't want to solve the wanted constraint with the overlappable
+instance; rather we want to use the supplied (C a)! That was the whole
+point of it being overlappable!  Trac #14434 wwas an example.
+
+Alas even if the instance has no overlap flag, thus
+  instance C a where ...
+there is nothing to stop it being overlapped. GHC provides no way to
+declare an instance as "final" so it can't be overlapped.  But really
+only final instances are OK for short-cut solving.  Sigh. Trac #15135
+was a puzzling example.
+-}
+
+
 {- ********************************************************************
 *                                                                     *
                    Class lookup for CTuples
@@ -238,21 +261,77 @@ The story for kind `Symbol` is analogous:
   * class KnownSymbol
   * newtype SSymbol
   * Evidence: a Core literal (e.g. mkNaturalExpr)
+
+
+Note [Fabricating Evidence for Literals in Backpack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Let `T` be a type of kind `Nat`. When solving for a purported instance
+of `KnownNat T`, ghc tries to resolve the type `T` to an integer `n`,
+in which case the evidence `EvLit (EvNum n)` is generated on the
+fly. It might appear that this is sufficient as users cannot define
+their own instances of `KnownNat`. However, for backpack module this
+would not work (see issue #15379). Consider the signature `Abstract`
+
+> signature Abstract where
+>   data T :: Nat
+>   instance KnownNat T
+
+and a module `Util` that depends on it:
+
+> module Util where
+>  import Abstract
+>  printT :: IO ()
+>  printT = do print $ natVal (Proxy :: Proxy T)
+
+Clearly, we need to "use" the dictionary associated with `KnownNat T`
+in the module `Util`, but it is too early for the compiler to produce
+a real dictionary as we still have not fixed what `T` is. Only when we
+mixin a concrete module
+
+> module Concrete where
+>   type T = 42
+
+do we really get hold of the underlying integer. So the strategy that
+we follow is the following
+
+1. If T is indeed available as a type alias for an integer constant,
+   generate the dictionary on the fly, failing which
+
+2. Look up the type class environment for the evidence.
+
+Finally actual code gets generate for Util only when a module like
+Concrete gets "mixed-in" in place of the signature Abstract. As a
+result all things, including the typeclass instances, in Concrete gets
+reexported. So `KnownNat` gets resolved the normal way post-Backpack.
+
+A similar generation works for `KnownSymbol` as well
+
 -}
 
-matchKnownNat :: Class -> [Type] -> TcM ClsInstResult
-matchKnownNat clas [ty]     -- clas = KnownNat
+matchKnownNat :: DynFlags
+              -> Bool      -- True <=> caller is the short-cut solver
+                           -- See Note [Shortcut solving: overlap]
+              -> Class -> [Type] -> TcM ClsInstResult
+matchKnownNat _ _ clas [ty]     -- clas = KnownNat
   | Just n <- isNumLitTy ty = do
         et <- mkNaturalExpr n
         makeLitDict clas ty et
-matchKnownNat _ _           = return NoInstance
+matchKnownNat df sc clas tys = matchInstEnv df sc clas tys
+ -- See Note [Fabricating Evidence for Literals in Backpack] for why
+ -- this lookup into the instance environment is required.
 
-matchKnownSymbol :: Class -> [Type] -> TcM ClsInstResult
-matchKnownSymbol clas [ty]  -- clas = KnownSymbol
+matchKnownSymbol :: DynFlags
+                 -> Bool      -- True <=> caller is the short-cut solver
+                              -- See Note [Shortcut solving: overlap]
+                 -> Class -> [Type] -> TcM ClsInstResult
+matchKnownSymbol _ _ clas [ty]  -- clas = KnownSymbol
   | Just s <- isStrLitTy ty = do
         et <- mkStringExprFS s
         makeLitDict clas ty et
-matchKnownSymbol _ _       = return NoInstance
+matchKnownSymbol df sc clas tys = matchInstEnv df sc clas tys
+ -- See Note [Fabricating Evidence for Literals in Backpack] for why
+ -- this lookup into the instance environment is required.
 
 makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 -- makeLitDict adds a coercion that will convert the literal into a dictionary
@@ -455,14 +534,14 @@ matchHeteroEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~~ t2)
 matchHeteroEquality args
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId heqDataCon) args
+                    , cir_mk_ev     = evDataConApp heqDataCon args
                     , cir_what      = BuiltinInstance })
 
 matchHomoEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~ t2)
 matchHomoEquality args@[k,t1,t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId eqDataCon) args
+                    , cir_mk_ev     = evDataConApp eqDataCon args
                     , cir_what      = BuiltinInstance })
 matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 
@@ -470,8 +549,7 @@ matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 matchCoercible :: [Type] -> TcM ClsInstResult
 matchCoercible args@[k, t1, t2]
   = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
-                    , cir_mk_ev     = evDFunApp (dataConWrapId coercibleDataCon)
-                                                args
+                    , cir_mk_ev     = evDataConApp coercibleDataCon args
                     , cir_what      = BuiltinInstance })
   where
     args' = [k, k, t1, t2]

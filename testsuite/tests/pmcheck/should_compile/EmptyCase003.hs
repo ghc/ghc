@@ -5,7 +5,9 @@
 -- Check some type families and type synonyms
 module EmptyCase003 where
 
-type family A (a :: *) :: *
+import Data.Kind (Type)
+
+type family A (a :: Type) :: Type
 
 -- Conservatively considered non-exhaustive (A a missing),
 -- since A a does not reduce to anything.
@@ -14,14 +16,14 @@ f1 = \case
 
 data Void
 
-type family B (a :: *) :: *
+type family B (a :: Type) :: Type
 type instance B a = Void
 
 -- Exhaustive
 f2 :: B a -> b
 f2 = \case
 
-type family C (a :: *) :: *
+type family C (a :: Type) :: Type
 type instance C Int  = Char
 type instance C Bool = Void
 
@@ -38,7 +40,7 @@ f4 = \case
 f5 :: C Bool -> a
 f5 = \case
 
--- type family D (a :: *) :: *
+-- type family D (a :: Type) :: Type
 -- type instance D x = D x -- non-terminating
 --
 -- -- Exhaustive but *impossible* to detect that, since rewriting
@@ -57,7 +59,7 @@ type Ten = TenC Zero
 type Hundred = TenC (TenC (TenC (TenC (TenC
               (TenC (TenC (TenC (TenC (TenC Zero)))))))))
 
-type family E (n :: *) (a :: *) :: *
+type family E (n :: Type) (a :: Type) :: Type
 type instance E Zero     b = b
 type instance E (Succ n) b = E n b
 
@@ -69,11 +71,11 @@ f7 = \case
 f8 :: E Hundred Void -> b
 f8 = \case
 
-type family Add (a :: *) (b :: *) :: *
+type family Add (a :: Type) (b :: Type) :: Type
 type instance Add Zero     m = m
 type instance Add (Succ n) m = Succ (Add n m)
 
-type family Mult (a :: *) (b :: *) :: *
+type family Mult (a :: Type) (b :: Type) :: Type
 type instance Mult Zero     m = Zero
 type instance Mult (Succ n) m = Add m (Mult n m)
 

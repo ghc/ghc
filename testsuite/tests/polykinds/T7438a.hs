@@ -2,7 +2,9 @@
 
 module T7438a where
 
-data Thrist :: k -> k -> * where
+import Data.Kind (Type)
+
+data Thrist :: k -> k -> Type where
   Nil :: Thrist a a
 
 

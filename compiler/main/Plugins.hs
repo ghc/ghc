@@ -1,11 +1,39 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
 module Plugins (
-      FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction
-    , Plugin(..), CommandLineOption, LoadedPlugin(..), lpModuleName
-    , defaultPlugin, keepRenamedSource, withPlugins, withPlugins_
-    , PluginRecompile(..)
+      -- * Plugins
+      Plugin(..)
+    , defaultPlugin
+    , CommandLineOption
+      -- ** Recompilation checking
     , purePlugin, impurePlugin, flagRecompile
+    , PluginRecompile(..)
+
+      -- * Plugin types
+      -- ** Frontend plugins
+    , FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction
+      -- ** Core plugins
+      -- | Core plugins allow plugins to register as a Core-to-Core pass.
+    , CorePlugin
+      -- ** Typechecker plugins
+      -- | Typechecker plugins allow plugins to provide evidence to the
+      -- typechecker.
+    , TcPlugin
+      -- ** Source plugins
+      -- | GHC offers a number of points where plugins can access and modify its
+      -- front-end (\"source\") representation. These include:
+      --
+      -- - access to the parser result with 'parsedResultAction'
+      -- - access to the renamed AST with 'renamedResultAction'
+      -- - access to the typechecked AST with 'typeCheckResultAction'
+      -- - access to the Template Haskell splices with 'spliceRunAction'
+      -- - access to loaded interface files with 'interfaceLoadAction'
+      --
+    , keepRenamedSource
+
+      -- * Internal
+    , LoadedPlugin(..), lpModuleName
+    , withPlugins, withPlugins_
     ) where
 
 import GhcPrelude
@@ -123,9 +151,6 @@ instance Semigroup PluginRecompile where
 
 instance Monoid PluginRecompile where
   mempty = NoForceRecompile
-#if __GLASGOW_HASKELL__ < 804
-  mappend = (Data.Semigroup.<>)
-#endif
 
 type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin

@@ -7,6 +7,8 @@
 {-# LANGUAGE KindSignatures#-}
 module RedBlackTree where
 
+import Data.Kind (Type)
+
 data Nat = Zero | Succ Nat deriving (Eq, Ord, Show)
 type One = Succ Zero
 
@@ -17,7 +19,7 @@ data RedBlackTree a = forall n. T ( Node Black n a )
 deriving instance Show a => Show (RedBlackTree a)
 
 -- all paths from a node to a leaf have exactly n black nodes
-data Node :: RedBlack -> Nat -> * -> * where
+data Node :: RedBlack -> Nat -> Type -> Type where
   -- all leafs are black
   Leaf  :: Node Black One a 
   -- internal black nodes can have children of either color
@@ -27,7 +29,7 @@ data Node :: RedBlack -> Nat -> * -> * where
 deriving instance Show a => Show (Node c n a)
 
 -- one-hole context for red-black trees
-data Context :: Nat -> RedBlack -> Nat -> * -> *  where 
+data Context :: Nat -> RedBlack -> Nat -> Type -> Type  where
   -- if we're at the root, the hole is a black node
   Root :: Context n Black n a
   -- we can go left or right from a red node hole, creating a hole for a black node

@@ -5,8 +5,9 @@
 module T6068 where
 
 import Prelude hiding (Maybe, Nothing)
+import Data.Kind (Type)
 
-data Maybe :: * -> * where
+data Maybe :: Type -> Type where
   Nothing :: Maybe a
 
 data family Sing (a :: k)
@@ -14,7 +15,7 @@ data family Sing (a :: k)
 data instance Sing (a :: Maybe k) where
   SNothing :: Sing Nothing
 
-data KProxy (a :: *) = KProxy
+data KProxy (a :: Type) = KProxy
 data Existential (p :: KProxy k) =
   forall (a :: k). Exists (Sing a)
 
@@ -26,5 +27,6 @@ class Floop a b | a -> b
 instance Floop a (mp :: KProxy (Maybe ak)) => HasSingleton (Maybe a) mp where
   exists Nothing = Exists SNothing
 
--- instance forall (a ::*) (mp :: KProxy (Maybe ak)). HasSingleton (Maybe ak) (Maybe a) mp where
+-- instance forall (a ::Type) (mp :: KProxy (Maybe ak)).
+--          HasSingleton (Maybe ak) (Maybe a) mp where
 --   exists Nothing = Exists SNothing

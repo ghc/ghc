@@ -243,9 +243,9 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
   lbl = mkStrLitTy l
 
   applyFromLabel loc fromLabel =
-    HsAppType
-         (mkEmptyWildCardBndrs (L loc (HsTyLit noExt (HsStrTy NoSourceText l))))
+    HsAppType noExt
          (L loc (HsVar noExt (L loc fromLabel)))
+         (mkEmptyWildCardBndrs (L loc (HsTyLit noExt (HsStrTy NoSourceText l))))
 
 tcExpr (HsLam x match) res_ty
   = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
@@ -269,12 +269,12 @@ tcExpr e@(HsLamCase x matches) res_ty
               , text "requires"]
     match_ctxt = MC { mc_what = CaseAlt, mc_body = tcBody }
 
-tcExpr e@(ExprWithTySig sig_ty expr) res_ty
+tcExpr e@(ExprWithTySig _ expr sig_ty) res_ty
   = do { let loc = getLoc (hsSigWcType sig_ty)
        ; sig_info <- checkNoErrs $  -- Avoid error cascade
                      tcUserTypeSig loc sig_ty Nothing
        ; (expr', poly_ty) <- tcExprSig expr sig_info
-       ; let expr'' = ExprWithTySig sig_ty expr'
+       ; let expr'' = ExprWithTySig noExt expr' sig_ty
        ; tcWrapResult e expr'' poly_ty res_ty }
 
 {-
@@ -1151,7 +1151,7 @@ The SrcSpan is the span of the original HsPar
 
 -}
 
-wrapHsArgs :: (XAppTypeE (GhcPass id) ~ LHsWcType GhcRn)
+wrapHsArgs :: (NoGhcTc (GhcPass id) ~ GhcRn)
            => LHsExpr (GhcPass id)
            -> [HsArg (LHsExpr (GhcPass id)) (LHsWcType GhcRn)]
            -> LHsExpr (GhcPass id)
@@ -1161,9 +1161,9 @@ wrapHsArgs f (HsTypeArg t : args) = wrapHsArgs (mkHsAppType f t) args
 wrapHsArgs f (HsArgPar sp : args) = wrapHsArgs (L sp $ HsPar noExt f) args
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
-  ppr (HsValArg tm) = text "HsValArg" <> ppr tm
-  ppr (HsTypeArg ty) = text "HsTypeArg" <> ppr ty
-  ppr (HsArgPar sp) = text "HsArgPar" <> ppr sp
+  ppr (HsValArg tm)  = text "HsValArg"  <+> ppr tm
+  ppr (HsTypeArg ty) = text "HsTypeArg" <+> ppr ty
+  ppr (HsArgPar sp)  = text "HsArgPar"  <+> ppr sp
 
 isHsValArg :: HsArg tm ty -> Bool
 isHsValArg (HsValArg {})  = True
@@ -1203,7 +1203,7 @@ tcApp m_herald (L sp (HsPar _ fun)) args res_ty
 tcApp m_herald (L _ (HsApp _ fun arg1)) args res_ty
   = tcApp m_herald fun (HsValArg arg1 : args) res_ty
 
-tcApp m_herald (L _ (HsAppType ty1 fun)) args res_ty
+tcApp m_herald (L _ (HsAppType _ fun ty1)) args res_ty
   = tcApp m_herald fun (HsTypeArg ty1 : args) res_ty
 
 tcApp m_herald fun@(L loc (HsRecFld _ fld_lbl)) args res_ty
@@ -1271,6 +1271,7 @@ tcFunApp :: Maybe SDoc  -- like "The function `f' is applied to"
 tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
   = do { let orig = lexprCtOrigin rn_fun
 
+       ; traceTc "tcFunApp" (ppr rn_fun <+> dcolon <+> ppr fun_sigma $$ ppr rn_args $$ ppr res_ty)
        ; (wrap_fun, tc_args, actual_res_ty)
            <- tcArgs rn_fun fun_sigma orig rn_args
                      (m_herald `orElse` mk_app_msg rn_fun rn_args)
@@ -1717,8 +1718,10 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                         = ApplyMR
                         | otherwise
                         = NoRestrictions
-       ; (qtvs, givens, ev_binds, _)
+       ; (qtvs, givens, ev_binds, residual, _)
                  <- simplifyInfer tclvl infer_mode [sig_inst] [(name, tau)] wanted
+       ; emitConstraints residual
+
        ; tau <- zonkTcType tau
        ; let inferred_theta = map evVarPred givens
              tau_tvs        = tyCoVarsOfType tau
@@ -1904,12 +1907,7 @@ tcUnboundId rn_expr unbound res_ty
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
       ; let ev = mkLocalId name (Regular Omega) ty
-      ; loc <- getCtLocM HoleOrigin Nothing
-      ; let can = CHoleCan { cc_ev = CtWanted { ctev_pred = ty
-                                              , ctev_dest = EvVarDest ev
-                                              , ctev_nosh = WDeriv
-                                              , ctev_loc  = loc}
-                           , cc_hole = ExprHole unbound }
+      ; can <- newHoleCt (ExprHole unbound) ev ty
       ; emitInsoluble can
       ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar noExt (noLoc ev))
                                                                      ty res_ty }
@@ -2055,14 +2053,13 @@ checkThLocalId id
         ; case mb_local_use of
              Just (top_lvl, bind_lvl, use_stage)
                 | thLevel use_stage > bind_lvl
-                , isNotTopLevel top_lvl
-                -> checkCrossStageLifting id use_stage
+                -> checkCrossStageLifting top_lvl id use_stage
              _  -> return ()   -- Not a locally-bound thing, or
                                -- no cross-stage link
     }
 
 --------------------------------------
-checkCrossStageLifting :: Id -> ThStage -> TcM ()
+checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- If we are inside typed brackets, and (use_lvl > bind_lvl)
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
@@ -2072,7 +2069,12 @@ checkCrossStageLifting :: Id -> ThStage -> TcM ()
 -- This is similar to checkCrossStageLifting in RnSplice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
+checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
+  | isTopLevel top_lvl
+  = when (isExternalName id_name) (keepAlive id_name)
+    -- See Note [Keeping things alive for Template Haskell] in RnSplice
+
+  | otherwise
   =     -- Nested identifiers, such as 'x' in
         -- E.g. \x -> [|| h x ||]
         -- We must behave as if the reference to x was
@@ -2097,17 +2099,20 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
-                     newMethodFromName (OccurrenceOf (idName id))
+                     newMethodFromName (OccurrenceOf id_name)
                                        THNames.liftName id_ty
 
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
-        ; let pending_splice = PendingTcSplice (idName id) (nlHsApp (noLoc lift) (nlHsVar id))
+        ; let pending_splice = PendingTcSplice id_name
+                                 (nlHsApp (noLoc lift) (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
+  where
+    id_name = idName id
 
-checkCrossStageLifting _ _ = return ()
+checkCrossStageLifting _ _ _ = return ()
 
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
@@ -2409,7 +2414,7 @@ lookupParents rdr
 -- the record expression in an update must be "obvious", i.e. the
 -- outermost constructor ignoring parentheses.
 obviousSig :: HsExpr GhcRn -> Maybe (LHsSigWcType GhcRn)
-obviousSig (ExprWithTySig ty _) = Just ty
+obviousSig (ExprWithTySig _ _ ty) = Just ty
 obviousSig (HsPar _ p)          = obviousSig (unLoc p)
 obviousSig _                    = Nothing
 

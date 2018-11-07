@@ -69,9 +69,9 @@ module HsTypes (
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
         -- Printing
-        pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
+        pprHsType, pprHsForAll, pprHsForAllExtra, pprHsExplicitForAll,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
-        hsTypeNeedsParens, parenthesizeHsType
+        hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
 
 import GhcPrelude
@@ -1332,6 +1332,8 @@ instance Outputable HsWildCardInfo where
 pprAnonWildCard :: SDoc
 pprAnonWildCard = char '_'
 
+-- | Prints a forall; When passed an empty list, prints @forall.@ only when
+-- @-dppr-debug@
 pprHsForAll :: (OutputableBndrId (GhcPass p))
             => [LHsTyVarBndr (GhcPass p)] -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
@@ -1347,15 +1349,17 @@ pprHsForAllExtra :: (OutputableBndrId (GhcPass p))
                  => Maybe SrcSpan -> [LHsTyVarBndr (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
 pprHsForAllExtra extra qtvs cxt
-  = pprHsForAllTvs qtvs <+> pprHsContextExtra show_extra (unLoc cxt)
+  = pp_forall <+> pprHsContextExtra (isJust extra) (unLoc cxt)
   where
-    show_extra = isJust extra
+    pp_forall | null qtvs = whenPprDebug (forAllLit <> dot)
+              | otherwise = forAllLit <+> interppSP qtvs <> dot
 
-pprHsForAllTvs :: (OutputableBndrId (GhcPass p))
-               => [LHsTyVarBndr (GhcPass p)] -> SDoc
-pprHsForAllTvs qtvs
-  | null qtvs = whenPprDebug (forAllLit <+> dot)
-  | otherwise = forAllLit <+> interppSP qtvs <> dot
+-- | Version of 'pprHsForall' or 'pprHsForallExtra' that will always print
+-- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
+pprHsExplicitForAll :: (OutputableBndrId (GhcPass p))
+               => Maybe [LHsTyVarBndr (GhcPass p)] -> SDoc
+pprHsExplicitForAll (Just qtvs) = forAllLit <+> interppSP qtvs <> dot
+pprHsExplicitForAll Nothing     = empty
 
 pprHsContext :: (OutputableBndrId (GhcPass p)) => HsContext (GhcPass p) -> SDoc
 pprHsContext = maybe empty (<+> darrow) . pprHsContextMaybe
@@ -1424,7 +1428,7 @@ ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
-  = sep [pprHsForAllTvs tvs, ppr_mono_lty ty]
+  = sep [pprHsForAll tvs (noLoc []), ppr_mono_lty ty]
 
 ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
   = sep [pprHsContextAlways ctxt, ppr_mono_lty ty]
@@ -1444,7 +1448,7 @@ ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
 ppr_mono_ty (HsSumTy _ tys)
   = tupleParens UnboxedTuple (pprWithBars ppr tys)
 ppr_mono_ty (HsKindSig _ ty kind)
-  = parens (ppr_mono_lty ty <+> dcolon <+> ppr kind)
+  = ppr_mono_lty ty <+> dcolon <+> ppr kind
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
 ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
@@ -1512,7 +1516,7 @@ hsTypeNeedsParens p = go
     go (HsFunTy{})           = p >= funPrec
     go (HsTupleTy{})         = False
     go (HsSumTy{})           = False
-    go (HsKindSig{})         = False
+    go (HsKindSig{})         = p >= sigPrec
     go (HsListTy{})          = False
     go (HsIParamTy{})        = p > topPrec
     go (HsSpliceTy{})        = False
@@ -1534,3 +1538,15 @@ parenthesizeHsType :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => PprPrec -> LHsType
 parenthesizeHsType p lty@(L loc ty)
   | hsTypeNeedsParens p ty = L loc (HsParTy NoExt lty)
   | otherwise              = lty
+
+-- | @'parenthesizeHsContext' p ctxt@ checks if @ctxt@ is a single constraint
+-- @c@ such that @'hsTypeNeedsParens' p c@ is true, and if so, surrounds @c@
+-- with an 'HsParTy' to form a parenthesized @ctxt@. Otherwise, it simply
+-- returns @ctxt@ unchanged.
+parenthesizeHsContext :: PprPrec
+                      -> LHsContext (GhcPass p) -> LHsContext (GhcPass p)
+parenthesizeHsContext p lctxt@(L loc ctxt) =
+  case ctxt of
+    [c] -> L loc [parenthesizeHsType p c]
+    _   -> lctxt -- Other contexts are already "parenthesized" by virtue of
+                 -- being tuples.

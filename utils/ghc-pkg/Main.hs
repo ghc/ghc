@@ -17,24 +17,6 @@
 #endif
 #endif
 
--- The SIMPLE_WIN_GETLIBDIR macro will only be set when
--- building on windows.
---
--- Its purpose is to let us know whether the Windows implementation of
--- 'getExecutablePath' follows symlinks or not (it does follow them in
--- base >= 4.11). If it does, the implementation of getLibDir is straightforward
--- but if it does not follow symlinks, we need to follow them ourselves here.
--- Once we do not have to support building ghc-pkg with base < 4.11 anymore,
--- we can keep only the simple, straightforward implementation that just uses
--- 'getExecutablePath'.
-#if defined(mingw32_HOST_OS)
-#if MIN_VERSION_base(4,11,0)
-#define SIMPLE_WIN_GETLIBDIR 1
-#else
-#define SIMPLE_WIN_GETLIBDIR 0
-#endif
-#endif
-
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -84,7 +66,7 @@ import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
-#if defined(darwin_HOST_OS) || defined(linux_HOST_OS) || SIMPLE_WIN_GETLIBDIR
+#if defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(mingw32_HOST_OS)
 import System.Environment ( getExecutablePath )
 #endif
 import System.IO
@@ -98,12 +80,6 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 #if defined(mingw32_HOST_OS)
-#if !SIMPLE_WIN_GETLIBDIR
--- mingw32 needs these for getExecDir when base < 4.11
-import Foreign
-import Foreign.C
-import System.Directory ( canonicalizePath )
-#endif
 import GHC.ConsoleHandler
 #else
 import System.Posix hiding (fdToHandle)
@@ -2023,7 +1999,7 @@ checkDuplicateDepends deps
 checkHSLib :: Verbosity -> [String] -> String -> Validate ()
 checkHSLib _verbosity dirs lib = do
   let filenames = ["lib" ++ lib ++ ".a",
-                   "lib" ++ lib ++ ".p_a",
+                   "lib" ++ lib ++ "_p.a",
                    "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".so",
                    "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".dylib",
                             lib ++ "-ghc" ++ Version.version ++ ".dll"]
@@ -2215,46 +2191,7 @@ dieForcible s = die (s ++ " (use --force to override)")
 
 getLibDir :: IO (Maybe String)
 
-#if defined(mingw32_HOST_OS) && !SIMPLE_WIN_GETLIBDIR
-subst :: Char -> Char -> String -> String
-subst a b ls = map (\ x -> if x == a then b else x) ls
-
-unDosifyPath :: FilePath -> FilePath
-unDosifyPath xs = subst '\\' '/' xs
-
-getLibDir = do base   <- getExecDir "/ghc-pkg.exe"
-               case base of
-                 Nothing    -> return Nothing
-                 Just base' -> do
-                    libdir <- canonicalizePath $ base' </> "../lib"
-                    exists <- doesDirectoryExist libdir
-                    if exists
-                       then return $ Just libdir
-                       else return Nothing
-
--- (getExecDir cmd) returns the directory in which the current
---                  executable, which should be called 'cmd', is running
--- So if the full path is /a/b/c/d/e, and you pass "d/e" as cmd,
--- you'll get "/a/b/c" back as the result
-getExecDir :: String -> IO (Maybe String)
-getExecDir cmd =
-    getExecPath >>= maybe (return Nothing) removeCmdSuffix
-    where initN n = reverse . drop n . reverse
-          removeCmdSuffix = return . Just . initN (length cmd) . unDosifyPath
-
-getExecPath :: IO (Maybe String)
-getExecPath = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
-  where
-    try_size size = allocaArray (fromIntegral size) $ \buf -> do
-        ret <- c_GetModuleFileName nullPtr buf size
-        case ret of
-          0 -> return Nothing
-          _ | ret < size -> fmap Just $ peekCWString buf
-            | otherwise  -> try_size (size * 2)
-
-foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
-  c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
-#elif SIMPLE_WIN_GETLIBDIR || defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+#if defined(mingw32_HOST_OS) || defined(darwin_HOST_OS) || defined(linux_HOST_OS)
 getLibDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
 #else
 getLibDir = return Nothing

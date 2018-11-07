@@ -3,10 +3,12 @@
 
 module T2448 where
 
+import Data.Kind (Type)
+
 -- Demonstrates a bug in propagating type equality constraints
 
 class VectorSpace v where
-  type Scalar v :: *
+  type Scalar v :: Type
 
 class VectorSpace v => InnerSpace v
 

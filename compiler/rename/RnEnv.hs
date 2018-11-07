@@ -53,7 +53,7 @@ import RdrName
 import HscTypes
 import TcEnv
 import TcRnMonad
-import RdrHsSyn         ( setRdrNameSpace )
+import RdrHsSyn         ( filterCTuple, setRdrNameSpace )
 import TysWiredIn
 import Name
 import NameSet
@@ -1508,8 +1508,18 @@ lookupLocalTcNames ctxt what rdr_name
        ; when (null names) $ addErr (head errs) -- Bleat about one only
        ; return names }
   where
-    lookup rdr = do { name <- lookupBindGroupOcc ctxt what rdr
-                    ; return (fmap ((,) rdr) name) }
+    lookup rdr = do { this_mod <- getModule
+                    ; nameEither <- lookupBindGroupOcc ctxt what rdr
+                    ; return (guard_builtin_syntax this_mod rdr nameEither) }
+
+    -- Guard against the built-in syntax (ex: `infixl 6 :`), see #15233
+    guard_builtin_syntax this_mod rdr (Right name)
+      | Just _ <- isBuiltInOcc_maybe (occName rdr)
+      , this_mod /= nameModule name
+      = Left (hsep [text "Illegal", what, text "of built-in syntax:", ppr rdr])
+      | otherwise
+      = Right (rdr, name)
+    guard_builtin_syntax _ _ (Left err) = Left err
 
 dataTcOccs :: RdrName -> [RdrName]
 -- Return both the given name and the same name promoted to the TcClsName
@@ -1653,4 +1663,4 @@ badOrigBinding name
     --
     -- (See Trac #13968.)
   where
-    occ = rdrNameOcc name
+    occ = rdrNameOcc $ filterCTuple name

@@ -4,6 +4,7 @@
 {-# LANGUAGE GADTs #-}
 module Main where
 
+import Data.Kind (Type)
 import Foreign
 import Unsafe.Coerce
 
@@ -13,11 +14,11 @@ newtype S (a :: M) = S Int
 
 data SomeS = forall a . SomeS (S a)
 
-data V0 :: M -> * where
+data V0 :: M -> Type where
   V0A :: Int -> V0 A
   V0B :: Double -> V0 B
 
-data V1 :: M -> * where
+data V1 :: M -> Type where
   V1A :: Int -> V1 A
   V1B :: Double -> V1 B
   V1a :: () -> V1 a

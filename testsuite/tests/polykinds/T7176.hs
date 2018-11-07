@@ -9,7 +9,7 @@ data SMaybe (a :: Maybe c) where
    SJust :: Sing a -> SMaybe (Just a)
 type instance Sing (a :: Maybe d) = SMaybe a
 
-sIsJust :: forall (a :: Maybe e). Sing a -> ()
+sIsJust :: forall e (a :: Maybe e). Sing a -> ()
 sIsJust SNothing = ()
 sIsJust (SJust _) = ()
 

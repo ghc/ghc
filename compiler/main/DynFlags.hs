@@ -32,7 +32,7 @@ module DynFlags (
         dopt, dopt_set, dopt_unset,
         gopt, gopt_set, gopt_unset, setGeneralFlag', unSetGeneralFlag',
         wopt, wopt_set, wopt_unset,
-        wopt_fatal,
+        wopt_fatal, wopt_set_fatal, wopt_unset_fatal,
         xopt, xopt_set, xopt_unset,
         lang_set,
         useUnicodeSyntax,
@@ -474,7 +474,6 @@ data GeneralFlag
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
    | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
-   | Opt_LlvmPassVectorsInRegisters     -- Pass SIMD vectors in registers (requires a patched LLVM) (hidden flag)
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
@@ -564,6 +563,7 @@ data GeneralFlag
    -- forwards all -L flags to the collect2 command without using a
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
+   | Opt_KeepCAFs
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -679,7 +679,6 @@ optimisationFlags = EnumSet.fromList
    , Opt_RegsIterative
    , Opt_PedanticBottoms
    , Opt_LlvmTBAA
-   , Opt_LlvmPassVectorsInRegisters
    , Opt_LlvmFillUndefWithGarbage
    , Opt_IrrefutableTuples
    , Opt_CmmSink
@@ -817,6 +816,7 @@ data WarningFlag =
    | Opt_WarnStarIsType                   -- Since 8.6
    | Opt_WarnStarBinder                   -- Since 8.6
    | Opt_WarnImplicitKindVars             -- Since 8.6
+   | Opt_WarnSpaceAfterBang
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -849,6 +849,9 @@ data DynFlags = DynFlags {
   ghcLink               :: GhcLink,
   hscTarget             :: HscTarget,
   settings              :: Settings,
+  integerLibrary        :: IntegerLibrary,
+    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
+    --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmTargets           :: LlvmTargets,
   llvmPasses            :: LlvmPasses,
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
@@ -1754,6 +1757,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
+        integerLibrary          = cIntegerLibraryType,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -3375,6 +3379,9 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-refinement-level-hole-fits"
       (noArg (\d -> d { refLevelHoleFits = Nothing }))
 
+  , make_dep_flag defGhcFlag "fllvm-pass-vectors-in-regs"
+            (noArg id)
+            "vectors registers are now passed in registers by default."
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
@@ -3860,6 +3867,7 @@ wWarningFlagsDeps = [
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
   flagSpec "star-binder"                 Opt_WarnStarBinder,
   flagSpec "star-is-type"                Opt_WarnStarIsType,
+  flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
   flagSpec "partial-fields"              Opt_WarnPartialFields ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -3952,7 +3960,6 @@ fFlagsDeps = [
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
   flagSpec "late-specialise"                  Opt_LateSpecialise,
   flagSpec "liberate-case"                    Opt_LiberateCase,
-  flagSpec "llvm-pass-vectors-in-regs"        Opt_LlvmPassVectorsInRegisters,
   flagHiddenSpec "llvm-tbaa"                  Opt_LlvmTBAA,
   flagHiddenSpec "llvm-fill-undef-with-garbage" Opt_LlvmFillUndefWithGarbage,
   flagSpec "loopification"                    Opt_Loopification,
@@ -4003,7 +4010,8 @@ fFlagsDeps = [
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-loaded-modules"              Opt_ShowLoadedModules,
-  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
+  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
+  flagSpec "keep-cafs"                        Opt_KeepCAFs
   ]
   ++ fHoleFlags
 
@@ -4278,8 +4286,7 @@ defaultFlags settings
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros,
-      Opt_LlvmPassVectorsInRegisters
+      Opt_VersionMacros
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -4560,7 +4567,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnUnrecognisedWarningFlags,
         Opt_WarnSimplifiableClassConstraints,
         Opt_WarnStarBinder,
-        Opt_WarnInaccessibleCode
+        Opt_WarnInaccessibleCode,
+        Opt_WarnSpaceAfterBang
       ]
 
 -- | Things you get with -W
@@ -4609,6 +4617,7 @@ minusWcompatOpts
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
       , Opt_WarnImplicitKindVars
+      , Opt_WarnStarIsType
       ]
 
 enableUnusedBinds :: DynP ()

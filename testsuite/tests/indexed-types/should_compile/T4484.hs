@@ -2,15 +2,17 @@
 
 module T4484 where
 
-type family F f :: *
+import Data.Kind (Type)
+
+type family F f :: Type
 
 data Id c = Id
 type instance F (Id c) = c
 
-data C :: * -> * where
+data C :: Type -> Type where
   C :: f -> C (W (F f))
 
-data W :: * -> *
+data W :: Type -> Type
 
 fails :: C a -> C a
 fails (C _)

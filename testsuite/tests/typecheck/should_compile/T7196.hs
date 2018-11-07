@@ -7,14 +7,16 @@
 
 module Patch (qc_prim) where
 
-class PrimPatch (prim :: * -> * -> *)
+import Data.Kind (Type)
+
+class PrimPatch (prim :: Type -> Type -> Type)
 
 class PrimPatch (PrimOf p) => PrimPatchBase p where
-    type PrimOf (p :: * -> * -> *) :: * -> * -> *
+    type PrimOf (p :: Type -> Type -> Type) :: Type -> Type -> Type
 
 type TestGenerator thing gen = (forall t ctx . (forall xx yy . thing xx yy -> t) -> (gen ctx -> t))
 
-type family ModelOf (patch :: * -> * -> *) :: * -> *
+type family ModelOf (patch :: Type -> Type -> Type) :: Type -> Type
 
 data WithState s p x y = WithState {
                               _wsStartState :: s x

@@ -12,6 +12,7 @@ module GHCi.Run
   ( run, redirectInterrupts
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.CreateBCO
 import GHCi.InfoTable
 import GHCi.FFI

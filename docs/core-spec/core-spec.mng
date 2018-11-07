@@ -188,6 +188,10 @@ The constructor for a saturated $[[(->)]]$ is \texttt{FunTy}.
 a term-level literal, but we are ignoring this distinction here.
 \item A coercion used as a type should appear only in the right-hand side of
   an application.
+\item If $[[forall n. t]]$ is a polymorphic type over a coercion variable (i.e.
+  $[[n]]$ is a coercion variable), then $[[n]]$ must appear in $[[t]]$;
+  otherwise it should be represented as a \texttt{FunTy}. See \texttt{Note
+    [Unused coercion variable in ForAllTy]} in \ghcfile{types/TyCoRep.hs}.
 \end{itemize}
 
 Note that the use of the $[[T </ ti // i />]]$ form and the $[[t1 -> t2]]$ form
@@ -195,7 +199,7 @@ are purely representational. The metatheory would remain the same if these forms
 were removed in favor of $[[t1 t2]]$. Nevertheless, we keep all three forms in
 this documentation to accurately reflect the implementation.
 
-The \texttt{ArgFlag} field of a \texttt{TyVarBinder} (the first argument to a
+The \texttt{ArgFlag} field of a \texttt{TyCoVarBinder} (the first argument to a
 \texttt{ForAllTy}) also tracks visibility of arguments. Visibility affects
 only source Haskell, and is omitted from this presentation.
 
@@ -216,6 +220,10 @@ be a type function.
 \item The name in a coercion must be a term-level name (\ctor{Id}).
 \item The contents of $[[<t>]]$ must not be a coercion. In other words,
 the payload in a \texttt{Refl} must not be built with \texttt{CoercionTy}.
+\item If $[[forall z: h .g]]$ is a polymorphic coercion over a coercion variable
+  (i.e. $[[z]]$ is a coercion variable), then $[[z]]$ can only appear in
+  \texttt{Refl} and \texttt{GRefl} in $[[g]]$. See \texttt{Note[Unused coercion
+    variable in ForAllCo] in \ghcfile{types/Coercion.hs}}.
 \end{itemize}
 
 The \texttt{UnivCo} constructor takes several arguments: the two types coerced

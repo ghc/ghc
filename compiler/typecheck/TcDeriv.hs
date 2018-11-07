@@ -816,7 +816,7 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
                   final_tkvs      = tyCoVarsOfTypesWellScoped $
                                     final_cls_tys ++ final_tc_args
 
-        ; let tkvs = toposortTyVars $ fvVarList $
+        ; let tkvs = scopedSort $ fvVarList $
                      unionFV (tyCoFVsOfTypes tc_args_to_keep)
                              (FV.mkFVs deriv_tvs)
               Just kind_subst = mb_match

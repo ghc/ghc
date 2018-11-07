@@ -178,9 +178,9 @@ mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExt e1 e2)
 
-mkHsAppType :: (XAppTypeE (GhcPass id) ~ LHsWcType GhcRn)
+mkHsAppType :: (NoGhcTc (GhcPass id) ~ GhcRn)
             => LHsExpr (GhcPass id) -> LHsWcType GhcRn -> LHsExpr (GhcPass id)
-mkHsAppType e t = addCLoc e t_body (HsAppType paren_wct e)
+mkHsAppType e t = addCLoc e t_body (HsAppType noExt e paren_wct)
   where
     t_body    = hswc_body t
     paren_wct = t { hswc_body = parenthesizeHsType appPrec t_body }
@@ -681,7 +681,7 @@ typeToLHsType ty
       | any isInvisibleTyConBinder (tyConBinders tc)
         -- We must produce an explicit kind signature here to make certain
         -- programs kind-check. See Note [Kind signatures in typeToLHsType].
-      = noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
+      = nlHsParTy $ noLoc $ HsKindSig NoExt lhs_ty (go (typeKind ty))
       | otherwise = lhs_ty
        where
         lhs_ty = nlHsTyConApp (getRdrName tc) (map go args')
@@ -1086,7 +1086,7 @@ collect_lpat (L _ pat) bndrs
     go (NPat {})                    = bndrs
     go (NPlusKPat _ (L _ n) _ _ _ _)= n : bndrs
 
-    go (SigPat _ pat)               = collect_lpat pat bndrs
+    go (SigPat _ pat _)             = collect_lpat pat bndrs
 
     go (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                   = go pat
@@ -1368,7 +1368,7 @@ lPatImplicits = hs_lpat
     hs_pat (ListPat _ pats)     = hs_lpats pats
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
 
-    hs_pat (SigPat _ pat)       = hs_lpat pat
+    hs_pat (SigPat _ pat _)     = hs_lpat pat
     hs_pat (CoPat _ _ pat _)    = hs_pat pat
 
     hs_pat (ConPatIn _ ps)           = details ps

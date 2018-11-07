@@ -1,7 +1,9 @@
 {-# LANGUAGE PolyKinds, DataKinds, KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies #-}
 module CatPairs where
+
 import Prelude hiding (id, (.))
+import Data.Kind (Type)
 import Control.Monad ((>=>))
 import Control.Category
 
@@ -9,8 +11,8 @@ import Control.Category
 -- Taken from Twan van Laarhoven:
 --   http://twanvl.nl/blog/haskell/categories-over-pairs-of-types
 
-type family Fst (xy :: (*,*)) :: *
-type family Snd (xy :: (*,*)) :: *
+type family Fst (xy :: (Type, Type)) :: Type
+type family Snd (xy :: (Type, Type)) :: Type
 type instance Fst '(x,y) = x
 type instance Snd '(x,y) = y
 

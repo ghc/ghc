@@ -617,10 +617,11 @@
 #define mutArrPtrsCardWords(n) ROUNDUP_BYTES_TO_WDS(mutArrPtrCardUp(n))
 
 #if defined(PROFILING) || (!defined(THREADED_RTS) && defined(DEBUG))
+#define OVERWRITING_CLOSURE_SIZE(c, size) foreign "C" overwritingClosureSize(c "ptr", size)
 #define OVERWRITING_CLOSURE(c) foreign "C" overwritingClosure(c "ptr")
-#define OVERWRITING_CLOSURE_OFS(c,n) \
-    foreign "C" overwritingClosureOfs(c "ptr", n)
+#define OVERWRITING_CLOSURE_OFS(c,n) foreign "C" overwritingClosureOfs(c "ptr", n)
 #else
+#define OVERWRITING_CLOSURE_SIZE(c, size) /* nothing */
 #define OVERWRITING_CLOSURE(c) /* nothing */
 #define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif

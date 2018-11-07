@@ -773,7 +773,11 @@ showTypeable _ TrType = showChar '*'
 showTypeable _ rep
   | isListTyCon tc, [ty] <- tys =
     showChar '[' . shows ty . showChar ']'
-  | isTupleTyCon tc =
+
+    -- Take care only to render saturated tuple tycon applications
+    -- with tuple notation (#14341).
+  | isTupleTyCon tc,
+    Just _ <- TrType `eqTypeRep` typeRepKind rep =
     showChar '(' . showArgs (showChar ',') tys . showChar ')'
   where (tc, tys) = splitApps rep
 showTypeable _ (TrTyCon {trTyCon = tycon, trKindVars = []})

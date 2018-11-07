@@ -22,6 +22,7 @@ module GHCi.Message
   , Pipe(..), remoteCall, remoteTHCall, readPipe, writePipe
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import GHCi.RemoteTypes
 import GHCi.FFI
 import GHCi.TH.Binary ()
@@ -258,6 +259,7 @@ data THMessage a where
 
   StartRecover :: THMessage ()
   EndRecover :: Bool -> THMessage ()
+  FailIfErrs :: THMessage (THResult ())
 
   -- | Indicates that this RunTH is finished, and the next message
   -- will be the result of RunTH (a QResult).
@@ -288,9 +290,10 @@ getTHMessage = do
     14 -> THMsg <$> return ExtsEnabled
     15 -> THMsg <$> return StartRecover
     16 -> THMsg <$> EndRecover <$> get
-    17 -> return (THMsg RunTHDone)
-    18 -> THMsg <$> AddModFinalizer <$> get
-    19 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
+    17 -> THMsg <$> return FailIfErrs
+    18 -> return (THMsg RunTHDone)
+    19 -> THMsg <$> AddModFinalizer <$> get
+    20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
     _  -> THMsg <$> AddCorePlugin <$> get
 
 putTHMessage :: THMessage a -> Put
@@ -312,10 +315,11 @@ putTHMessage m = case m of
   ExtsEnabled                 -> putWord8 14
   StartRecover                -> putWord8 15
   EndRecover a                -> putWord8 16 >> put a
-  RunTHDone                   -> putWord8 17
-  AddModFinalizer a           -> putWord8 18 >> put a
-  AddForeignFilePath lang a   -> putWord8 19 >> put lang >> put a
-  AddCorePlugin a             -> putWord8 20 >> put a
+  FailIfErrs                  -> putWord8 17
+  RunTHDone                   -> putWord8 18
+  AddModFinalizer a           -> putWord8 19 >> put a
+  AddForeignFilePath lang a   -> putWord8 20 >> put lang >> put a
+  AddCorePlugin a             -> putWord8 21 >> put a
 
 
 data EvalOpts = EvalOpts

@@ -24,7 +24,6 @@ import Class
 import TyCon
 import Weight
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
-import TysWiredIn( cTupleTyConName )
 import Coercion
 import CoreSyn
 import Id( idType, mkTemplateLocals )
@@ -489,31 +488,22 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
     size      = sizeTypes tys
 
     do_one_given evar given_loc sel_id
-      | not (null tvs)
-      , null theta
-      , isUnliftedType sc_pred
-      -- Very special case for equality
-      -- See Note [Equality superclasses in quantified constraints]
-      = do { empty_ctuple_cls <- tcLookupClass (cTupleTyConName 0)
-           ; let theta1    = [mkClassPred empty_ctuple_cls []]
-                 dict_ids1 = mkTemplateLocals theta1
-           ; given_ev <- new_given theta1 dict_ids1 []
-           ; return [mkNonCanonical given_ev] }
-
-      | otherwise  -- Normal case
-      = do { given_ev <- new_given theta dict_ids dict_ids
+      | isUnliftedType sc_pred
+      , not (null tvs && null theta)
+      = -- See Note [Equality superclasses in quantified constraints]
+        return []
+      | otherwise
+      = do { given_ev <- newGivenEvVar given_loc $
+                         (given_ty, mk_sc_sel evar sel_id)
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
-
       where
-        sc_pred = funResultTy (piResultTys (idType sel_id) tys)
+        sc_pred  = funResultTy (piResultTys (idType sel_id) tys)
+        given_ty = mkInfSigmaTy tvs theta sc_pred
 
-        new_given theta_abs dict_ids_abs dict_ids_app
-          = newGivenEvVar given_loc (given_ty, given_ev)
-          where
-            given_ty = mkInfSigmaTy tvs theta_abs sc_pred
-            given_ev = EvExpr $ mkLams tvs $ mkLams dict_ids_abs $
-                       Var sel_id `mkTyApps` tys `App`
-                       (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids_app)
+    mk_sc_sel evar sel_id
+      = EvExpr $ mkLams tvs $ mkLams dict_ids $
+        Var sel_id `mkTyApps` tys `App`
+        (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids)
 
     mk_given_loc loc
        | isCTupleClass cls
@@ -610,24 +600,22 @@ There is a wrinkle though, in the case where 'theta' is empty, so
 we have
   f :: (forall a. a~b) => stuff
 
-Now the superclass machinery kicks in, in makeSuperClasses,
-giving us a a second quantified constrait
+Now, potentially, the superclass machinery kicks in, in
+makeSuperClasses, giving us a a second quantified constrait
        (forall a. a ~# b)
 BUT this is an unboxed value!  And nothing has prepared us for
 dictionary "functions" that are unboxed.  Actually it does just
 about work, but the simplier ends up with stuff like
    case (/\a. eq_sel d) of df -> ...(df @Int)...
-and fails to simplify that any further.
+and fails to simplify that any further.  And it doesn't satisfy
+isPredTy any more.
 
-It seems eaiser to give such unboxed quantifed constraints a
-dummmy () argument, thus
-      (forall a. (% %) => a ~# b)
-where (% %) is the empty constraint tuple.  That makes everything
-be nicely boxed.
+So for now we simply decline to take superclasses in the quantified
+case.  Instead we have a special case in TcInteract.doTopReactOther,
+which looks for primitive equalities specially in the quantified
+constraints.
 
-(One might wonder about using void# instead, but this seems more
-uniform -- it's a constraint argument -- and I'm not worried about
-the last drop of efficiency for this very rare case.)
+See also Note [Evidence for quantified constraints] in Type.
 
 
 ************************************************************************
@@ -1787,6 +1775,7 @@ canCFunEqCan :: CtEvidence
 canCFunEqCan ev fn tys fsk
   = do { (tys', cos, kind_co) <- flattenArgsNom ev fn tys
                         -- cos :: tys' ~ tys
+
        ; let lhs_co  = mkTcTyConAppCo Nominal fn cos
                         -- :: F tys' ~ F tys
              new_lhs = mkTyConApp fn tys'
@@ -1794,7 +1783,7 @@ canCFunEqCan ev fn tys fsk
              flav    = ctEvFlavour ev
        ; (ev', fsk')
            <- if isTcReflexiveCo kind_co   -- See Note [canCFunEqCan]
-              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs $$ ppr lhs_co)
+              then do { traceTcS "canCFunEqCan: refl" (ppr new_lhs)
                       ; let fsk_ty = mkTyVarTy fsk
                       ; ev' <- rewriteEqEvidence ev NotSwapped new_lhs fsk_ty
                                                  lhs_co (mkTcNomReflCo fsk_ty)

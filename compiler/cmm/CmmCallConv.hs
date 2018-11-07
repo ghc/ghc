@@ -102,19 +102,12 @@ passFloatArgsInXmm dflags = case platformArch (targetPlatform dflags) of
                               ArchX86_64 -> True
                               _          -> False
 
--- On X86_64, we always pass 128-bit-wide vectors in registers. On 32-bit X86
--- and for all larger vector sizes on X86_64, LLVM's GHC calling convention
--- does not currently pass vectors in registers. The patch to update the GHC
--- calling convention to support passing SIMD vectors in registers is small and
--- well-contained, so it may make it into LLVM 3.4. The hidden
--- -fllvm-pass-vectors-in-regs flag will generate LLVM code that attempts to
--- pass vectors in registers, but it must only be used with a version of LLVM
--- that has an updated GHC calling convention.
+-- We used to spill vector registers to the stack since the LLVM backend didn't
+-- support vector registers in its calling convention. However, this has now
+-- been fixed. This function remains only as a convenient way to re-enable
+-- spilling when debugging code generation.
 passVectorInReg :: Width -> DynFlags -> Bool
-passVectorInReg W128 dflags = case platformArch (targetPlatform dflags) of
-                                ArchX86_64 -> True
-                                _          -> gopt Opt_LlvmPassVectorsInRegisters dflags
-passVectorInReg _    dflags = gopt Opt_LlvmPassVectorsInRegisters dflags
+passVectorInReg _ _ = True
 
 assignStack :: DynFlags -> ByteOff -> (a -> CmmType) -> [a]
             -> (

@@ -1,0 +1,9 @@
+TYPE CONSTRUCTORS
+  type role T nominal nominal representational nominal nominal
+  T :: forall {k} k1. (k1 -> k -> *) -> k1 -> k -> *
+DATA CONSTRUCTORS
+  MkT :: forall {k} k1 (f :: k1 -> k -> *) (a :: k1) (b :: k).
+         f a b -> T f a b -> T f a b
+Dependent modules: []
+Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+                     integer-gmp-1.0.2.0]

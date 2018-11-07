@@ -2,7 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 module T4175 where
 
-import GHC.Exts
+import Data.Kind
 
 type family A a b
 type instance A Int Int = ()
@@ -30,5 +30,5 @@ class Z a
 class F (a :: Constraint)
 instance F (Z a)
 
-class G (a :: * -> *)
+class G (a :: Type -> Type)
 instance G B

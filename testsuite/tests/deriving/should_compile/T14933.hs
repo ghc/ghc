@@ -3,8 +3,10 @@
 {-# LANGUAGE TypeFamilies      #-}
 module T14933 where
 
+import Data.Kind (Type)
+
 class Wrapped s where
-  type Unwrapped s :: *
+  type Unwrapped s :: Type
 
 class Fork m where
     fork :: (x, m)

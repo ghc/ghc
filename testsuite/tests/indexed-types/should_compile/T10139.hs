@@ -4,8 +4,9 @@
 
 module T10139 where
 
-import GHC.Exts
 import Data.Monoid
+import Data.Kind
+import Data.Coerce
 
 class Monoid v => Measured v a | a -> v where
   _measure :: v -> a
@@ -16,10 +17,10 @@ singleton = undefined
 class DOps a where
   plus :: a -> D a -> a
 
-type family D a :: *
+type family D a :: Type
 type instance D (FingerTree (Size Int, v) (Sized a)) = [Diff (Normal a)]
 
-type family Normal a :: *
+type family Normal a :: Type
 
 data Diff a = Add Int a
 

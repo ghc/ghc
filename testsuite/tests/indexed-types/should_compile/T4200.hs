@@ -3,8 +3,10 @@
 
 module T4200 where
 
+import Data.Kind (Type)
+
 class C a where
-  type In a :: *
+  type In a :: Type
   op :: In a -> a -> Int
 
 -- Should be ok; no -XUndecidableInstances required

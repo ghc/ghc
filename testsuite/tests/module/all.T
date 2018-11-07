@@ -284,4 +284,4 @@ test('T11970B', normal, compile_fail, [''])
 test('MultiExport', normal, compile, [''])
 test('T13528', normal, compile, [''])
 test('T13622', normal, compile, [''])
-
+test('T13704', normal, compile, ['-main-is Main.program'])

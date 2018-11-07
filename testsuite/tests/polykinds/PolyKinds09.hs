@@ -6,13 +6,15 @@
 
 module Main where
 
+import Data.Kind (Type)
+
 --------------------------------------------------------------------------------
 -- Simple generic programming (instant-generics-like library)
 --------------------------------------------------------------------------------
 data U a = UNIT | SUM (U a) (U a) | PRODUCT (U a) (U a) | REC a
 
 -- GADT interpretation
-data I :: U * -> * where
+data I :: U Type -> Type where
   Unit          :: I UNIT
   Inl           :: I a -> I (SUM a b)
   Inr           :: I b -> I (SUM a b)
@@ -20,13 +22,13 @@ data I :: U * -> * where
   Rec           :: a -> I (REC a)
 
 -- Class embedding types and their generic representation
-class Generic (a :: *) where
-  type Rep a :: U *
+class Generic (a :: Type) where
+  type Rep a :: U Type
   from :: a -> I (Rep a)
   to   :: I (Rep a) -> a
 
 -- Generic size on representations
-class GSize (a :: U *) where
+class GSize (a :: U Type) where
   gsize :: I a -> Int
 
 instance GSize UNIT where
@@ -43,7 +45,7 @@ instance (Size a) => GSize (REC a) where
   gsize (Rec x) = 1 + size x
 
 -- Size on datatypes
-class Size (a :: *) where
+class Size (a :: Type) where
   size :: a -> Int
   default size :: (Generic a, GSize (Rep a)) => a -> Int
   size = gsize . from

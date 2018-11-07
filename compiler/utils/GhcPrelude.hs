@@ -12,11 +12,18 @@ module GhcPrelude (module X) where
 -- clashing with the (Outputable.<>) operator which is heavily used
 -- through GHC's code-base.
 
-#if MIN_VERSION_base(4,11,0)
 import Prelude as X hiding ((<>))
-#else
-import Prelude as X
-import Data.Semigroup as X (Semigroup)
-#endif
-
 import Data.Foldable as X (foldl')
+
+{-
+Note [Why do we import Prelude here?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The files ghc-boot-th.cabal, ghc-boot.cabal, ghci.cabal and
+ghc-heap.cabal contain the directive default-extensions:
+NoImplicitPrelude. There are two motivations for this:
+  - Consistency with the compiler directory, which enables
+    NoImplicitPrelude;
+  - Allows loading the above dependent packages with ghc-in-ghci,
+    giving a smoother development experience when adding new
+    extensions.
+-}

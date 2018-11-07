@@ -1,0 +1,611 @@
+
+==================== Parser AST ====================
+
+({ KindSigs.hs:1:1 }
+ (HsModule
+  (Just
+   ({ KindSigs.hs:6:8-15 }
+    {ModuleName: KindSigs}))
+  (Nothing)
+  [({ KindSigs.hs:8:1-16 }
+    (ImportDecl
+     (NoExt)
+     (NoSourceText)
+     ({ KindSigs.hs:8:8-16 }
+      {ModuleName: Data.Kind})
+     (Nothing)
+     (False)
+     (False)
+     (False)
+     (False)
+     (Nothing)
+     (Nothing)))]
+  [({ KindSigs.hs:11:1-17 }
+    (TyClD
+     (NoExt)
+     (FamDecl
+      (NoExt)
+      (FamilyDecl
+       (NoExt)
+       (ClosedTypeFamily
+        (Just
+         [({ KindSigs.hs:12:3-21 }
+           (HsIB
+            (NoExt)
+            (FamEqn
+             (NoExt)
+             ({ KindSigs.hs:12:3-5 }
+              (Unqual
+               {OccName: Foo}))
+             (Nothing)
+             [({ KindSigs.hs:12:7 }
+               (HsTyVar
+                (NoExt)
+                (NotPromoted)
+                ({ KindSigs.hs:12:7 }
+                 (Unqual
+                  {OccName: a}))))]
+             (Prefix)
+             ({ KindSigs.hs:12:11-21 }
+              (HsKindSig
+               (NoExt)
+               ({ KindSigs.hs:12:11-13 }
+                (HsTyVar
+                 (NoExt)
+                 (NotPromoted)
+                 ({ KindSigs.hs:12:11-13 }
+                  (Unqual
+                   {OccName: Int}))))
+               ({ KindSigs.hs:12:18-21 }
+                (HsTyVar
+                 (NoExt)
+                 (NotPromoted)
+                 ({ KindSigs.hs:12:18-21 }
+                  (Unqual
+                   {OccName: Type})))))))))]))
+       ({ KindSigs.hs:11:13-15 }
+        (Unqual
+         {OccName: Foo}))
+       (HsQTvs
+        (NoExt)
+        [({ KindSigs.hs:11:17 }
+          (UserTyVar
+           (NoExt)
+           ({ KindSigs.hs:11:17 }
+            (Unqual
+             {OccName: a}))))])
+       (Prefix)
+       ({ <no location info> }
+        (NoSig
+         (NoExt)))
+       (Nothing)))))
+  ,({ KindSigs.hs:15:1-51 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:15:6-8 }
+       (Unqual
+        {OccName: Bar}))
+      (HsQTvs
+       (NoExt)
+       [({ KindSigs.hs:15:10 }
+         (UserTyVar
+          (NoExt)
+          ({ KindSigs.hs:15:10 }
+           (Unqual
+            {OccName: a}))))])
+      (Prefix)
+      ({ KindSigs.hs:15:14-51 }
+       (HsTupleTy
+        (NoExt)
+        (HsBoxedOrConstraintTuple)
+        [({ KindSigs.hs:15:16-26 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:15:16-18 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:15:16-18 }
+              (Unqual
+               {OccName: Int}))))
+           ({ KindSigs.hs:15:23-26 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:15:23-26 }
+              (Unqual
+               {OccName: Type}))))))
+        ,({ KindSigs.hs:15:29-32 }
+          (HsTyVar
+           (NoExt)
+           (NotPromoted)
+           ({ KindSigs.hs:15:29-32 }
+            (Unqual
+             {OccName: Bool}))))
+        ,({ KindSigs.hs:15:35-49 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:15:35-41 }
+            (HsAppTy
+             (NoExt)
+             ({ KindSigs.hs:15:35-39 }
+              (HsTyVar
+               (NoExt)
+               (NotPromoted)
+               ({ KindSigs.hs:15:35-39 }
+                (Unqual
+                 {OccName: Maybe}))))
+             ({ KindSigs.hs:15:41 }
+              (HsTyVar
+               (NoExt)
+               (NotPromoted)
+               ({ KindSigs.hs:15:41 }
+                (Unqual
+                 {OccName: a}))))))
+           ({ KindSigs.hs:15:46-49 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:15:46-49 }
+              (Unqual
+               {OccName: Type}))))))])))))
+  ,({ KindSigs.hs:16:1-54 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:16:6-9 }
+       (Unqual
+        {OccName: Bar'}))
+      (HsQTvs
+       (NoExt)
+       [({ KindSigs.hs:16:11 }
+         (UserTyVar
+          (NoExt)
+          ({ KindSigs.hs:16:11 }
+           (Unqual
+            {OccName: a}))))])
+      (Prefix)
+      ({ KindSigs.hs:16:15-54 }
+       (HsTupleTy
+        (NoExt)
+        (HsUnboxedTuple)
+        [({ KindSigs.hs:16:18-28 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:16:18-20 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:16:18-20 }
+              (Unqual
+               {OccName: Int}))))
+           ({ KindSigs.hs:16:25-28 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:16:25-28 }
+              (Unqual
+               {OccName: Type}))))))
+        ,({ KindSigs.hs:16:31-34 }
+          (HsTyVar
+           (NoExt)
+           (NotPromoted)
+           ({ KindSigs.hs:16:31-34 }
+            (Unqual
+             {OccName: Bool}))))
+        ,({ KindSigs.hs:16:37-51 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:16:37-43 }
+            (HsAppTy
+             (NoExt)
+             ({ KindSigs.hs:16:37-41 }
+              (HsTyVar
+               (NoExt)
+               (NotPromoted)
+               ({ KindSigs.hs:16:37-41 }
+                (Unqual
+                 {OccName: Maybe}))))
+             ({ KindSigs.hs:16:43 }
+              (HsTyVar
+               (NoExt)
+               (NotPromoted)
+               ({ KindSigs.hs:16:43 }
+                (Unqual
+                 {OccName: a}))))))
+           ({ KindSigs.hs:16:48-51 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:16:48-51 }
+              (Unqual
+               {OccName: Type}))))))])))))
+  ,({ KindSigs.hs:19:1-26 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:19:6-8 }
+       (Unqual
+        {OccName: Baz}))
+      (HsQTvs
+       (NoExt)
+       [])
+      (Prefix)
+      ({ KindSigs.hs:19:12-26 }
+       (HsListTy
+        (NoExt)
+        ({ KindSigs.hs:19:14-24 }
+         (HsKindSig
+          (NoExt)
+          ({ KindSigs.hs:19:14-16 }
+           (HsTyVar
+            (NoExt)
+            (NotPromoted)
+            ({ KindSigs.hs:19:14-16 }
+             (Unqual
+              {OccName: Int}))))
+          ({ KindSigs.hs:19:21-24 }
+           (HsTyVar
+            (NoExt)
+            (NotPromoted)
+            ({ KindSigs.hs:19:21-24 }
+             (Unqual
+              {OccName: Type})))))))))))
+  ,({ KindSigs.hs:22:1-44 }
+    (SigD
+     (NoExt)
+     (TypeSig
+      (NoExt)
+      [({ KindSigs.hs:22:1-3 }
+        (Unqual
+         {OccName: qux}))]
+      (HsWC
+       (NoExt)
+       (HsIB
+        (NoExt)
+        ({ KindSigs.hs:22:8-44 }
+         (HsFunTy
+          (NoExt)
+          ({ KindSigs.hs:22:8-20 }
+           (HsParTy
+            (NoExt)
+            ({ KindSigs.hs:22:9-19 }
+             (HsKindSig
+              (NoExt)
+              ({ KindSigs.hs:22:9-11 }
+               (HsTyVar
+                (NoExt)
+                (NotPromoted)
+                ({ KindSigs.hs:22:9-11 }
+                 (Unqual
+                  {OccName: Int}))))
+              ({ KindSigs.hs:22:16-19 }
+               (HsTyVar
+                (NoExt)
+                (NotPromoted)
+                ({ KindSigs.hs:22:16-19 }
+                 (Unqual
+                  {OccName: Type}))))))))
+          (HsOmega)
+          ({ KindSigs.hs:22:25-44 }
+           (HsFunTy
+            (NoExt)
+            ({ KindSigs.hs:22:25-28 }
+             (HsTyVar
+              (NoExt)
+              (NotPromoted)
+              ({ KindSigs.hs:22:25-28 }
+               (Unqual
+                {OccName: Bool}))))
+            (HsOmega)
+            ({ KindSigs.hs:22:33-44 }
+             (HsParTy
+              (NoExt)
+              ({ KindSigs.hs:22:34-43 }
+               (HsKindSig
+                (NoExt)
+                ({ KindSigs.hs:22:34-35 }
+                 (HsTupleTy
+                  (NoExt)
+                  (HsBoxedOrConstraintTuple)
+                  []))
+                ({ KindSigs.hs:22:40-43 }
+                 (HsTyVar
+                  (NoExt)
+                  (NotPromoted)
+                  ({ KindSigs.hs:22:40-43 }
+                   (Unqual
+                    {OccName: Type})))))))))))))))))
+  ,({ KindSigs.hs:23:1-12 }
+    (ValD
+     (NoExt)
+     (FunBind
+      (NoExt)
+      ({ KindSigs.hs:23:1-3 }
+       (Unqual
+        {OccName: qux}))
+      (MG
+       (NoExt)
+       ({ KindSigs.hs:23:1-12 }
+        [({ KindSigs.hs:23:1-12 }
+          (Match
+           (NoExt)
+           (FunRhs
+            ({ KindSigs.hs:23:1-3 }
+             (Unqual
+              {OccName: qux}))
+            (Prefix)
+            (NoSrcStrict))
+           [({ KindSigs.hs:23:5 }
+             (WildPat
+              (NoExt)))
+           ,({ KindSigs.hs:23:7 }
+             (WildPat
+              (NoExt)))]
+           (GRHSs
+            (NoExt)
+            [({ KindSigs.hs:23:9-12 }
+              (GRHS
+               (NoExt)
+               []
+               ({ KindSigs.hs:23:11-12 }
+                (HsVar
+                 (NoExt)
+                 ({ KindSigs.hs:23:11-12 }
+                  (Exact
+                   {Name: ()}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExt))))))])
+       (FromSource))
+      (WpHole)
+      [])))
+  ,({ KindSigs.hs:26:1-29 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:26:6-9 }
+       (Unqual
+        {OccName: Quux}))
+      (HsQTvs
+       (NoExt)
+       [])
+      (Prefix)
+      ({ KindSigs.hs:26:13-29 }
+       (HsExplicitListTy
+        (NoExt)
+        (Promoted)
+        [({ KindSigs.hs:26:16-27 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:26:16-19 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:26:16-19 }
+              (Unqual
+               {OccName: True}))))
+           ({ KindSigs.hs:26:24-27 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:26:24-27 }
+              (Unqual
+               {OccName: Bool}))))))])))))
+  ,({ KindSigs.hs:27:1-45 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:27:6-10 }
+       (Unqual
+        {OccName: Quux'}))
+      (HsQTvs
+       (NoExt)
+       [])
+      (Prefix)
+      ({ KindSigs.hs:27:14-45 }
+       (HsExplicitListTy
+        (NoExt)
+        (NotPromoted)
+        [({ KindSigs.hs:27:16-27 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:27:16-19 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:27:16-19 }
+              (Unqual
+               {OccName: True}))))
+           ({ KindSigs.hs:27:24-27 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:27:24-27 }
+              (Unqual
+               {OccName: Bool}))))))
+        ,({ KindSigs.hs:27:30-42 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:27:30-34 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:27:30-34 }
+              (Unqual
+               {OccName: False}))))
+           ({ KindSigs.hs:27:39-42 }
+            (HsTyVar
+             (NoExt)
+             (NotPromoted)
+             ({ KindSigs.hs:27:39-42 }
+              (Unqual
+               {OccName: Bool}))))))])))))
+  ,({ KindSigs.hs:28:1-44 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:28:6-10 }
+       (Unqual
+        {OccName: Quuux}))
+      (HsQTvs
+       (NoExt)
+       [({ KindSigs.hs:28:12 }
+         (UserTyVar
+          (NoExt)
+          ({ KindSigs.hs:28:12 }
+           (Unqual
+            {OccName: b}))))])
+      (Prefix)
+      ({ KindSigs.hs:28:16-44 }
+       (HsExplicitTupleTy
+        (NoExt)
+        [({ KindSigs.hs:28:19-39 }
+          (HsKindSig
+           (NoExt)
+           ({ KindSigs.hs:28:19-29 }
+            (HsExplicitListTy
+             (NoExt)
+             (NotPromoted)
+             [({ KindSigs.hs:28:20-22 }
+               (HsTyVar
+                (NoExt)
+                (NotPromoted)
+                ({ KindSigs.hs:28:20-22 }
+                 (Unqual
+                  {OccName: Int}))))
+             ,({ KindSigs.hs:28:25-28 }
+               (HsTyVar
+                (NoExt)
+                (NotPromoted)
+                ({ KindSigs.hs:28:25-28 }
+                 (Unqual
+                  {OccName: Bool}))))]))
+           ({ KindSigs.hs:28:34-39 }
+            (HsListTy
+             (NoExt)
+             ({ KindSigs.hs:28:35-38 }
+              (HsTyVar
+               (NoExt)
+               (NotPromoted)
+               ({ KindSigs.hs:28:35-38 }
+                (Unqual
+                 {OccName: Type}))))))))
+        ,({ KindSigs.hs:28:42 }
+          (HsTyVar
+           (NoExt)
+           (NotPromoted)
+           ({ KindSigs.hs:28:42 }
+            (Unqual
+             {OccName: b}))))])))))
+  ,({ KindSigs.hs:31:1-31 }
+    (TyClD
+     (NoExt)
+     (SynDecl
+      (NoExt)
+      ({ KindSigs.hs:31:6-17 }
+       (Unqual
+        {OccName: Sarsaparilla}))
+      (HsQTvs
+       (NoExt)
+       [])
+      (Prefix)
+      ({ KindSigs.hs:31:21-31 }
+       (HsKindSig
+        (NoExt)
+        ({ KindSigs.hs:31:21-23 }
+         (HsTyVar
+          (NoExt)
+          (NotPromoted)
+          ({ KindSigs.hs:31:21-23 }
+           (Unqual
+            {OccName: Int}))))
+        ({ KindSigs.hs:31:28-31 }
+         (HsTyVar
+          (NoExt)
+          (NotPromoted)
+          ({ KindSigs.hs:31:28-31 }
+           (Unqual
+            {OccName: Type})))))))))
+  ,({ KindSigs.hs:34:1-22 }
+    (SigD
+     (NoExt)
+     (TypeSig
+      (NoExt)
+      [({ KindSigs.hs:34:1-4 }
+        (Unqual
+         {OccName: true}))]
+      (HsWC
+       (NoExt)
+       (HsIB
+        (NoExt)
+        ({ KindSigs.hs:34:9-22 }
+         (HsParTy
+          (NoExt)
+          ({ KindSigs.hs:34:10-21 }
+           (HsKindSig
+            (NoExt)
+            ({ KindSigs.hs:34:10-13 }
+             (HsTyVar
+              (NoExt)
+              (NotPromoted)
+              ({ KindSigs.hs:34:10-13 }
+               (Unqual
+                {OccName: Bool}))))
+            ({ KindSigs.hs:34:18-21 }
+             (HsTyVar
+              (NoExt)
+              (NotPromoted)
+              ({ KindSigs.hs:34:18-21 }
+               (Unqual
+                {OccName: Type})))))))))))))
+  ,({ KindSigs.hs:35:1-11 }
+    (ValD
+     (NoExt)
+     (FunBind
+      (NoExt)
+      ({ KindSigs.hs:35:1-4 }
+       (Unqual
+        {OccName: true}))
+      (MG
+       (NoExt)
+       ({ KindSigs.hs:35:1-11 }
+        [({ KindSigs.hs:35:1-11 }
+          (Match
+           (NoExt)
+           (FunRhs
+            ({ KindSigs.hs:35:1-4 }
+             (Unqual
+              {OccName: true}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExt)
+            [({ KindSigs.hs:35:6-11 }
+              (GRHS
+               (NoExt)
+               []
+               ({ KindSigs.hs:35:8-11 }
+                (HsVar
+                 (NoExt)
+                 ({ KindSigs.hs:35:8-11 }
+                  (Unqual
+                   {OccName: True}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExt))))))])
+       (FromSource))
+      (WpHole)
+      [])))]
+  (Nothing)
+  (Nothing)))
+
+

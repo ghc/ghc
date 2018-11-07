@@ -81,6 +81,10 @@ test('T2205', normal, compile, [''])
 
 test('T2334', normal, compile, [''])
 test('T2506', normal, compile, [''])
+
+test('ExplicitForAllRules1', normal, compile, ['-Wunused-foralls'])
+test('T2600', normal, compile, [''])
+
 test('T2914', normal, compile, [''])
 test('T3221', normal, compile, [''])
 test('T3262', normal, compile, [''])

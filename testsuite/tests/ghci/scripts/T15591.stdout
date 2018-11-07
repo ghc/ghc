@@ -1,0 +1,6 @@
+T1 :: forall (f :: * -> *) a. f a -> *
+T2 :: forall a (f :: * -> *). f a -> *
+T3 :: forall a (b :: Proxy a) (c :: Proxy b). Proxy '(a, c) -> *
+T4 :: forall a (b :: Proxy a) (c :: Proxy b). Proxy '(a, c) -> *
+T5 :: forall a (f :: * -> *). f a -> *
+T6 :: forall {k} (a :: k) (f :: k -> *). f a -> *

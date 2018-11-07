@@ -439,7 +439,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
-tc_pat penv (SigPat sig_ty pat ) pat_ty thing_inside
+tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
                 -- Using tcExtendNameTyVarEnv is appropriate here (not scopeTyVars2)
@@ -450,7 +450,7 @@ tc_pat penv (SigPat sig_ty pat ) pat_ty thing_inside
                          tcExtendNameTyVarEnv tv_binds $
                          tc_lpat pat (pat_ty `weightedSet` mkCheckExpType inner_ty) penv thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
-        ; return (mkHsWrapPat wrap (SigPat inner_ty pat') pat_ty, res) }
+        ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
 
 ------------------------
 -- Lists, tuples, arrays

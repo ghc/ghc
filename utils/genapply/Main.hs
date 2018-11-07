@@ -19,9 +19,7 @@ module Main(main) where
 -- Needed for TAG_BITS
 #include "../../includes/MachDeps.h"
 
-#if MIN_VERSION_base(4,11,0)
 import Prelude hiding ((<>))
-#endif
 
 import Text.PrettyPrint
 import Data.Word

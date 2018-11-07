@@ -1,0 +1,25 @@
+
+T15325.hs:11:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • No instance for (PolyList e0) arising from a use of ‘f’
+    • In the expression: f 0
+      In an equation for ‘plh’: plh = f 0
+
+T15325.hs:11:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
+    • Ambiguous type variable ‘e0’ arising from the literal ‘0’
+      prevents the constraint ‘(Num e0)’ from being solved.
+      Probable fix: use a type annotation to specify what ‘e0’ should be.
+      These potential instances exist:
+        instance Num Integer -- Defined in ‘GHC.Num’
+        instance Num Double -- Defined in ‘GHC.Float’
+        instance Num Float -- Defined in ‘GHC.Float’
+        ...plus two others
+        ...plus one instance involving out-of-scope types
+        (use -fprint-potential-instances to see them all)
+    • In the first argument of ‘f’, namely ‘0’
+      In the expression: f 0
+      In an equation for ‘plh’: plh = f 0
+*** Exception: T15325.hs:11:7: error:
+    • No instance for (PolyList e0) arising from a use of ‘f’
+    • In the expression: f 0
+      In an equation for ‘plh’: plh = f 0
+(deferred type error)

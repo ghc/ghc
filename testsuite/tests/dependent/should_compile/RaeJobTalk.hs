@@ -104,7 +104,7 @@ type family Primitive (a :: k) :: Constraint where
   Primitive _     = (() :: Constraint)
 
 data TypeRep (a :: k) where
-  TyCon :: forall (a :: k). (Primitive a, Typeable k) => TyCon a -> TypeRep a
+  TyCon :: forall k (a :: k). (Primitive a, Typeable k) => TyCon a -> TypeRep a
   TyApp :: TypeRep a -> TypeRep b -> TypeRep (a b)
 
 -- Equality on TypeReps
@@ -121,7 +121,7 @@ eqT _ _ = Nothing
 -- Existentials
 
 data TyConX where
-  TyConX :: forall (a :: k). (Primitive a, Typeable k) => TyCon a -> TyConX
+  TyConX :: forall k (a :: k). (Primitive a, Typeable k) => TyCon a -> TyConX
 
 instance Read TyConX where
   readsPrec _ "Int" = [(TyConX Int, "")]
@@ -408,11 +408,11 @@ loadTable name schema = do
 -- propositions. In Haskell, these inductively defined propositions take the form of
 -- GADTs. In their original form, they would look like this:
 {-
-data InProof :: Column -> Schema -> * where
+data InProof :: Column -> Schema -> Type where
   InHere  :: InProof col (col ': schTail)
   InThere :: InProof col cols -> InProof col (a ': cols)
 
-data SubsetProof :: Schema -> Schema -> * where
+data SubsetProof :: Schema -> Schema -> Type where
   SubsetEmpty :: SubsetProof '[] s'
   SubsetCons  :: InProof col s' -> SubsetProof cols s'
               -> SubsetProof (col ': cols) s'

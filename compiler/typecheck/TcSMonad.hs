@@ -105,7 +105,7 @@ module TcSMonad (
     zonkTyCoVarsAndFV, zonkTcType, zonkTcTypes, zonkTcTyVar, zonkCo,
     zonkTyCoVarsAndFVList,
     zonkSimples, zonkWC,
-    zonkTcTyCoVarBndr,
+    zonkTyCoVarKind,
 
     -- References
     newTcRef, readTcRef, writeTcRef, updTcRef,
@@ -2196,7 +2196,7 @@ are some wrinkles:
 Note [Let-bound skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 If   * the inert set contains a canonical Given CTyEqCan (a ~ ty)
-and  * 'a' is a skolem bound in this very implication, b
+and  * 'a' is a skolem bound in this very implication,
 
 then:
 a) The Given is pretty much a let-binding, like
@@ -2215,6 +2215,31 @@ For an example, see Trac #9211.
 See also TcUnify Note [Deeper level on the left] for how we ensure
 that the right variable is on the left of the equality when both are
 tyvars.
+
+You might wonder whether the skokem really needs to be bound "in the
+very same implication" as the equuality constraint.
+(c.f. Trac #15009) Consider this:
+
+  data S a where
+    MkS :: (a ~ Int) => S a
+
+  g :: forall a. S a -> a -> blah
+  g x y = let h = \z. ( z :: Int
+                      , case x of
+                           MkS -> [y,z])
+          in ...
+
+From the type signature for `g`, we get `y::a` .  Then when when we
+encounter the `\z`, we'll assign `z :: alpha[1]`, say.  Next, from the
+body of the lambda we'll get
+
+  [W] alpha[1] ~ Int                             -- From z::Int
+  [W] forall[2]. (a ~ Int) => [W] alpha[1] ~ a   -- From [y,z]
+
+Now, suppose we decide to float `alpha ~ a` out of the implication
+and then unify `alpha := a`.  Now we are stuck!  But if treat
+`alpha ~ Int` first, and unify `alpha := Int`, all is fine.
+But we absolutely cannot float that equality or we will get stuck.
 -}
 
 removeInertCts :: [Ct] -> InertCans -> InertCans
@@ -3070,14 +3095,7 @@ pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
 
 isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
-isFilledMetaTyVar_maybe tv
- = case tcTyVarDetails tv of
-     MetaTv { mtv_ref = ref }
-        -> do { cts <- readTcRef ref
-              ; case cts of
-                  Indirect ty -> return (Just ty)
-                  Flexi       -> return Nothing }
-     _ -> return Nothing
+isFilledMetaTyVar_maybe tv = wrapTcS (TcM.isFilledMetaTyVar_maybe tv)
 
 isFilledMetaTyVar :: TcTyVar -> TcS Bool
 isFilledMetaTyVar tv = wrapTcS (TcM.isFilledMetaTyVar tv)
@@ -3106,8 +3124,8 @@ zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
 zonkWC :: WantedConstraints -> TcS WantedConstraints
 zonkWC wc = wrapTcS (TcM.zonkWC wc)
 
-zonkTcTyCoVarBndr :: TcTyCoVar -> TcS TcTyCoVar
-zonkTcTyCoVarBndr tv = wrapTcS (TcM.zonkTcTyCoVarBndr tv)
+zonkTyCoVarKind :: TcTyCoVar -> TcS TcTyCoVar
+zonkTyCoVarKind tv = wrapTcS (TcM.zonkTyCoVarKind tv)
 
 {- *********************************************************************
 *                                                                      *
@@ -3315,12 +3333,12 @@ setEvBind ev_bind
 
 -- | Mark variables as used filling a coercion hole
 useVars :: CoVarSet -> TcS ()
-useVars vars
+useVars co_vars
   = do { ev_binds_var <- getTcEvBindsVar
        ; let ref = ebv_tcvs ev_binds_var
        ; wrapTcS $
          do { tcvs <- TcM.readTcRef ref
-            ; let tcvs' = tcvs `unionVarSet` vars
+            ; let tcvs' = tcvs `unionVarSet` co_vars
             ; TcM.writeTcRef ref tcvs' } }
 
 -- | Equalities only

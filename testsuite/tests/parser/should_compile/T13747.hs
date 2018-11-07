@@ -3,11 +3,13 @@
 
 module T13747 where
 
+import Data.Kind (Type)
+
 class C a where
-  type family TC a :: *
+  type family TC a :: Type
 
 class D a where
-  data family TD a :: *
+  data family TD a :: Type
 
 instance C Int where
   type instance TC Int = Int

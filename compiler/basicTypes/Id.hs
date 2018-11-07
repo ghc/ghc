@@ -285,20 +285,20 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
 mkLocalId :: Name -> VarMult -> Type -> Id
 mkLocalId name w ty = mkLocalIdWithInfo name w ty vanillaIdInfo
- -- It's tempting to ASSERT( not (isCoercionType ty) ), but don't. Sometimes,
+ -- It's tempting to ASSERT( not (isCoVarType ty) ), but don't. Sometimes,
  -- the type is a panic. (Search invented_id)
 
 -- | Make a local CoVar
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
-  = ASSERT( isCoercionType ty )
+  = ASSERT( isCoVarType ty )
     Var.mkLocalVar CoVarId name (Var.Regular Omega) ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> VarMult -> Type -> Id
 mkLocalIdOrCoVar name w ty
-  | isCoercionType ty = mkLocalCoVar name   ty
-  | otherwise         = mkLocalId    name w ty
+  | isCoVarType ty = mkLocalCoVar name   ty
+  | otherwise      = mkLocalId    name w ty
 
 -- | Make a local id, with the IdDetails set to CoVarId if the type indicates
 -- so.
@@ -306,8 +306,8 @@ mkLocalIdOrCoVarWithInfo :: Name -> VarMult -> Type -> IdInfo -> Id
 mkLocalIdOrCoVarWithInfo name w ty info
   = Var.mkLocalVar details name w ty info
   where
-    details | isCoercionType ty = CoVarId
-            | otherwise         = VanillaId
+    details | isCoVarType ty = CoVarId
+            | otherwise      = VanillaId
 
     -- proper ids only; no covars!
 mkLocalIdWithInfo :: Name -> VarMult -> Type -> IdInfo -> Id
@@ -329,7 +329,7 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Rig -> Type -> Id
-mkSysLocal fs uniq w ty = ASSERT( not (isCoercionType ty) )
+mkSysLocal fs uniq w ty = ASSERT( not (isCoVarType ty) )
                         mkLocalId (mkSystemVarName uniq fs) (Regular w) ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
@@ -346,7 +346,7 @@ mkSysLocalOrCoVarM fs w ty
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq w ty loc = ASSERT( not (isCoercionType ty) )
+mkUserLocal occ uniq w ty loc = ASSERT( not (isCoVarType ty) )
                                 mkLocalId (mkInternalName uniq occ loc) (Regular w) ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
@@ -606,7 +606,7 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 -}
 
 isEvVar :: Var -> Bool
-isEvVar var = isPredTy (varType var)
+isEvVar var = isEvVarType (varType var)
 
 isDictId :: Id -> Bool
 isDictId id = isDictTy (idType id)

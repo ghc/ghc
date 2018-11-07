@@ -3,7 +3,9 @@
 
 module T2944 where
 
-type family T a :: *
+import Data.Kind (Type)
+
+type family T a :: Type
 
 f1 :: T a ~ () => a
 f1 = f2

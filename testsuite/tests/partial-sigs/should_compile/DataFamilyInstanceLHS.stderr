@@ -1,22 +1,18 @@
 TYPE SIGNATURES
-  DataFamilyInstanceLHS.A :: MyKind
-  DataFamilyInstanceLHS.B :: MyKind
-  DataFamilyInstanceLHS.SingA ::
-    forall (_ :: MyKind).
-    (_ ~ 'A) =>
-    DataFamilyInstanceLHS.R:SingMyKind_ _
-  DataFamilyInstanceLHS.SingB ::
-    forall (_ :: MyKind).
-    (_ ~ 'B) =>
-    DataFamilyInstanceLHS.R:SingMyKind_ _
   foo :: Sing 'A
 TYPE CONSTRUCTORS
-  data MyKind = A | B
-  data family Sing (a :: k)
+  MyKind :: *
+  type role Sing nominal nominal
+  Sing :: forall k. k -> *
 COERCION AXIOMS
   axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
     Sing _ = DataFamilyInstanceLHS.R:SingMyKind_
       -- Defined at DataFamilyInstanceLHS.hs:8:15
+DATA CONSTRUCTORS
+  A :: MyKind
+  B :: MyKind
+  SingA :: Sing 'A
+  SingB :: Sing 'B
 FAMILY INSTANCES
   data instance Sing
 Dependent modules: []

@@ -1,20 +1,20 @@
 
-T15368.hs:9:15: warning: [-Wtyped-holes (in -Wdefault)]
+T15368.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: (F a b, F a0 b0)
       Where: ‘a0’ is an ambiguous type variable
              ‘b0’ is an ambiguous type variable
              ‘a’, ‘b’ are rigid type variables bound by
                the type signature for:
                  trigger :: forall a b. a -> b -> (F a b, F b a)
-               at T15368.hs:8:1-35
+               at T15368.hs:10:1-35
     • In the first argument of ‘transitive’, namely ‘_’
       In the expression: _ `transitive` trigger _ _
       In an equation for ‘trigger’:
           trigger _ _ = _ `transitive` trigger _ _
     • Relevant bindings include
-        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:9:1)
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
 
-T15368.hs:9:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T15368.hs:11:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘F b a’ with ‘F b0 a0’
       Expected type: (F a b, F b a)
         Actual type: (F a b, F b0 a0)
@@ -24,22 +24,22 @@ T15368.hs:9:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘trigger’:
           trigger _ _ = _ `transitive` trigger _ _
     • Relevant bindings include
-        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:9:1)
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
 
-T15368.hs:9:38: warning: [-Wtyped-holes (in -Wdefault)]
+T15368.hs:11:38: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a0
       Where: ‘a0’ is an ambiguous type variable
     • In the first argument of ‘trigger’, namely ‘_’
       In the second argument of ‘transitive’, namely ‘trigger _ _’
       In the expression: _ `transitive` trigger _ _
     • Relevant bindings include
-        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:9:1)
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
 
-T15368.hs:9:40: warning: [-Wtyped-holes (in -Wdefault)]
+T15368.hs:11:40: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: b0
       Where: ‘b0’ is an ambiguous type variable
     • In the second argument of ‘trigger’, namely ‘_’
       In the second argument of ‘transitive’, namely ‘trigger _ _’
       In the expression: _ `transitive` trigger _ _
     • Relevant bindings include
-        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:9:1)
+        trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)

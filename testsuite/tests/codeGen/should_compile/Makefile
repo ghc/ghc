@@ -5,9 +5,6 @@ include $(TOP)/mk/test.mk
 T2578:
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make T2578 -fforce-recomp -v0
 
-T14626:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-uniques T14626.hs | grep case
-
 debug:
 	# Without optimisations, we should get annotations for basically
 	# all expressions in the example program.
@@ -38,3 +35,11 @@ T14999:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -g -c T14999.cmm -o T14999.o
 	gdb --batch -ex 'file T14999.o' -ex 'disassemble stg_catch_frame_info' --nx | tr -s '[[:blank:]\n]'
 	readelf --debug-dump=frames-interp T14999.o | tr -s '[[:blank:]\n]'
+
+T15196:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-asm T15196.hs | grep "jp " ; echo $$?
+
+T15723:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -prof -fPIC -fexternal-dynamic-refs -fforce-recomp -O2 -c T15723A.hs -o T15723A.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -prof -fPIC -fexternal-dynamic-refs -fforce-recomp -O2 -c T15723B.hs -o T15723B.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dynamic -shared T15723B.o -o T15723B.so

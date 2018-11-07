@@ -766,9 +766,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
         ; (body_ty, body_ue) <-
             addLoc (BodyOfLetRec [bndr]) $
             update_ue
-                 (lintIdBndr NotTopLevel LetBind bndr $ \_ ->
-                  addGoodJoins [bndr] $
-                  lintCoreExpr body)
+                 (lintBinder LetBind bndr $ \_ -> addGoodJoins [bndr] $ lintCoreExpr body)
         ; body_ue' <- checkLinearity body_ue bndr
         ; return (body_ty, body_ue' `addUE` rhs_ue)}
 
@@ -847,7 +845,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; subst <- getTCvSubst
      ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
 
-     ; lintIdBndr NotTopLevel CaseBind var $ \_ ->
+     ; lintBinder CaseBind var $ \_ ->
        do { -- Check the alternatives
           ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_weight alt_ty) alts
           ; let case_ue = (scaleUE scrut_weight scrut_ue) `addUE` supUEs alt_ues
@@ -1323,7 +1321,7 @@ lintCoBndr cv thing_inside
   = do { subst <- getTCvSubst
        ; let (subst', cv') = substCoVarBndr subst cv
        ; lintKind (varType cv')
-       ; lintL (isCoercionType (varType cv'))
+       ; lintL (isCoVarType (varType cv'))
                (text "CoVar with non-coercion type:" <+> pprTyVar cv)
        ; updateTCvSubst subst' (thing_inside cv') }
 
@@ -1356,6 +1354,7 @@ lintIdBndr top_lvl bind_site id linterF
            (mkNonTopExternalNameMsg id)
 
        ; (ty, k) <- lintInTy (idType id)
+
           -- See Note [Levity polymorphism invariants] in CoreSyn
        ; lintL (isJoinId id || not (isKindLevPoly k))
            (text "Levity-polymorphic binder:" <+>
@@ -1365,6 +1364,11 @@ lintIdBndr top_lvl bind_site id linterF
        ; when (isJoinId id) $
          checkL (not is_top_lvl && is_let_bind) $
          mkBadJoinBindMsg id
+
+       -- Check that the Id does not have type (t1 ~# t2) or (t1 ~R# t2);
+       -- if so, it should be a CoVar, and checked by lintCoVarBndr
+       ; lintL (not (isCoVarType ty))
+               (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr ty)
 
        ; let id' = setIdType id ty
        ; addInScopeVar id' $ (linterF id') }
@@ -1433,9 +1437,9 @@ lintType ty@(AppTy t1 t2)
        ; lint_ty_app ty k1 [(t2,k2)] }
 
 lintType ty@(TyConApp tc tys)
-  | isTypeSynonymTyCon tc
+  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
   = do { report_unsat <- lf_report_unsat_syns <$> getLintFlags
-       ; lintTySynApp report_unsat ty tc tys }
+       ; lintTySynFamApp report_unsat ty tc tys }
 
   | isFunTyCon tc
   , tys `lengthIs` 5
@@ -1445,13 +1449,9 @@ lintType ty@(TyConApp tc tys)
     -- Note [Representation of function types].
   = failWithL (hang (text "Saturated application of (->)") 2 (ppr ty))
 
-  | isTypeFamilyTyCon tc -- Check for unsaturated type family
-  , tys `lengthLessThan` tyConArity tc
-  = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
-
-  | otherwise
+  | otherwise  -- Data types, data families, primitive types
   = do { checkTyCon tc
-       ; ks <- setReportUnsat True (mapM lintType tys)
+       ; ks <- mapM lintType tys
        ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
 
 -- arrows can related *unlifted* kinds, so this has to be separate from
@@ -1464,7 +1464,7 @@ lintType ty@(FunTy _ t1 t2)
 lintType t@(ForAllTy (Bndr tv _vis) ty)
   -- forall over types
   | isTyVar tv
-  = do { lintTyBndr tv $ \tv' ->
+  = lintTyBndr tv $ \tv' ->
     do { k <- lintType ty
        ; checkValueKind k (text "the body of forall:" <+> ppr t)
        ; case occCheckExpand [tv'] k of  -- See Note [Stupid type synonyms]
@@ -1472,7 +1472,7 @@ lintType t@(ForAllTy (Bndr tv _vis) ty)
            Nothing -> failWithL (hang (text "Variable escape in forall:")
                                     2 (vcat [ text "type:" <+> ppr t
                                             , text "kind:" <+> ppr k ]))
-    }}
+    }
 
 lintType t@(ForAllTy (Bndr cv _vis) ty)
   -- forall over coercions
@@ -1516,25 +1516,31 @@ with the same problem. A single systematic solution eludes me.
 -}
 
 -----------------
-lintTySynApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind
+lintTySynFamApp :: Bool -> Type -> TyCon -> [Type] -> LintM LintedKind
+-- The TyCon is a type synonym or a type family (not a data family)
 -- See Note [Linting type synonym applications]
-lintTySynApp report_unsat ty tc tys
+-- c.f. TcValidity.check_syn_tc_app
+lintTySynFamApp report_unsat ty tc tys
   | report_unsat   -- Report unsaturated only if report_unsat is on
   , tys `lengthLessThan` tyConArity tc
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
-  | otherwise
-  = do { ks <- setReportUnsat False (mapM lintType tys)
+  -- Deal with type synonyms
+  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  , let expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+  = do { -- Kind-check the argument types, but without reporting
+         -- un-saturated type families/synonyms
+         ks <- setReportUnsat False (mapM lintType tys)
 
        ; when report_unsat $
-         case expandSynTyCon_maybe tc tys of
-            Nothing -> pprPanic "lintTySynApp" (ppr tc <+> ppr tys)
-                       -- Previous guards should have made this impossible
-            Just (tenv, rhs, tys') -> do { _ <- lintType expanded_ty
-                                         ; return () }
-                where
-                  expanded_ty = mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys'
+         do { _ <- lintType expanded_ty
+            ; return () }
 
+       ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
+
+  -- Otherwise this must be a type family
+  | otherwise
+  = do { ks <- mapM lintType tys
        ; lint_ty_app ty (tyConKind tc) (tys `zip` ks) }
 
 -----------------
@@ -1829,7 +1835,9 @@ lintCoercion (ForAllCo tv1 kind_co co)
 lintCoercion (ForAllCo cv1 kind_co co)
   -- forall over coercions
   = ASSERT( isCoVar cv1 )
-    do { (_, k2) <- lintStarCoercion kind_co
+    do { lintL (almostDevoidCoVarOfCo cv1 co)
+               (text "Covar can only appear in Refl and GRefl: " <+> ppr co)
+       ; (_, k2) <- lintStarCoercion kind_co
        ; let cv2 = setVarType cv1 k2
        ; addInScopeVar cv1 $
     do {
@@ -2222,12 +2230,12 @@ Here we substitute 'ty' for 'a' in 'body', on the fly.
 
 Note [Linting type synonym applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When lining a type-synonym application
+When linting a type-synonym, or type-family, application
   S ty1 .. tyn
-we behave as follows (Trac #15057):
+we behave as follows (Trac #15057, #T15664):
 
 * If lf_report_unsat_syns = True, and S has arity < n,
-  complain about an unsaturated type synonym.
+  complain about an unsaturated type synonym or type family
 
 * Switch off lf_report_unsat_syns, and lint ty1 .. tyn.
 

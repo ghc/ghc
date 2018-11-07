@@ -21,7 +21,7 @@ data family T2 (a :: b)
 data instance T2 b
 class C2 a
 
-$(do FamilyI (DataFamilyD tName _ _) [DataInstD [] _ [tyVar] _ _ _]
+$(do FamilyI (DataFamilyD tName _ _) [DataInstD [] _ _ [tyVar] _ _ _]
        <- reify ''T2
      d <- instanceD (cxt [])
                     (conT ''C2 `appT` (conT tName `appT` return tyVar))

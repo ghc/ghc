@@ -291,6 +291,7 @@ test('T9045', [ omit_ways(['ghci']), extra_run_opts('10000 +RTS -A8k -RTS') ], c
 test('T9078', only_ways(['threaded1']), compile_and_run, [''])
 
 test('T10017', [ when(opsys('mingw32'), skip)
+               , req_smp
                , only_ways(threaded_ways), extra_run_opts('+RTS -N2 -RTS') ], compile_and_run, [''])
 
 test('T11108', normal, compile_and_run, [''])
@@ -391,6 +392,9 @@ test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])
 
+test('T13617', [ unless(opsys('mingw32'), skip)],
+               run_command, ['$MAKE -s --no-print-directory T13617'])
+
 # This test sometimes produces out of sequence samples in the profasm way, but
 # not reliably, so we just skip it. See ticket #15065.
 # Test is being skipped on darwin due to it's flakiness.
@@ -424,7 +428,30 @@ test('alloccounter1', normal, compile_and_run,
 
 test('nursery-chunks1',
   [ extra_run_opts('4 100 +RTS -n32k -A1m -RTS')
+  , req_smp
   , only_ways(['threaded1','threaded2'])
   ],
   compile_and_run,
   [''])
+
+# Test for the "Evaluated a CAF that was GC'd" assertion in the debug
+# runtime, by dynamically loading code that re-evaluates the CAF.
+# Also tests the -rdynamic and -fwhole-archive-hs-libs flags for constructing
+# binaries that support runtime dynamic loading.
+test('keep-cafs-fail',
+  [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
+                 'KeepCafs2.hs', 'KeepCafsMain.hs']),
+    filter_stdout_lines('Evaluated a CAF|exit.*'),
+    ignore_stderr, # on OS X the shell emits an "Abort trap" message to stderr
+  ],
+  run_command,
+  ['$MAKE -s --no-print-directory KeepCafsFail'])
+
+# Test the -fkeep-cafs flag
+test('keep-cafs',
+  [ extra_files(['KeepCafsBase.hs', 'KeepCafs1.hs',
+                 'KeepCafs2.hs', 'KeepCafsMain.hs'])
+  ],
+  run_command,
+  ['$MAKE -s --no-print-directory KeepCafs'])
+

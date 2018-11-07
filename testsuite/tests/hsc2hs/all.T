@@ -16,3 +16,6 @@ test('T10272', [], run_command, ['$MAKE -s --no-print-directory T10272'])
 
 test('T12504', [extra_files(['T12504']), ignore_stdout], run_command,
      ['$MAKE -s --no-print-directory T12504'])
+
+# Make sure response files are read and used.
+test('T15758', [], run_command, ['$MAKE -s --no-print-directory T15758'])

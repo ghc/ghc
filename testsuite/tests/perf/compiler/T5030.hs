@@ -4,6 +4,7 @@
 module SlowComp where
 
 import Control.Monad
+import Data.Kind
 
 -------------------------------------------------------------------------------
 -- Usual Peano integers.
@@ -111,7 +112,7 @@ class CPU cpu where
         -- immediate width.
         type ImmSize cpu
         -- variables in CPU - register indices, command format variables, etc.
-        type CPUVars cpu :: * -> *
+        type CPUVars cpu :: Type -> Type
 
 data Const size = Const Integer
 

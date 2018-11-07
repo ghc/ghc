@@ -76,6 +76,10 @@ test('TH_reifyMkName', normal, compile, ['-v0'])
 
 test('TH_reifyInstances', normal, compile, ['-v0'])
 
+test('TH_reifyExplicitForAllFams', normal, compile, ['-v0'])
+test('TH_ExplicitForAllRules', normal, multimod_compile_and_run,
+     ['TH_ExplicitForAllRules.hs', '-v0 ' + config.ghc_th_way_flags])
+
 test('TH_spliceDecl1', normal, compile, ['-v0'])
 test('TH_spliceDecl2', normal, compile, ['-v0'])
 test('TH_spliceDecl3', [], multimod_compile,
@@ -419,6 +423,8 @@ test('T15321', normal, compile_fail, [''])
 test('T15324', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15331', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T15365', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T15360a', normal, compile, [''])
+test('T15360b', normal, compile_fail, [''])
 # Note: T9693 should be only_ways(['ghci']) once it's fixed.
 test('T9693', expect_broken(9693), ghci_script, ['T9693.script'])
 test('T14471', normal, compile, [''])
@@ -434,3 +440,11 @@ test('TH_implicitParamsErr1', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('TH_implicitParamsErr2', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('TH_implicitParamsErr3', normal, compile_fail, ['-v0 -dsuppress-uniques'])
 test('TH_recursiveDo', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
+test('T15481', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('TH_recover_warns', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T15738', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T15783', normal, multimod_compile,
+    ['T15783A', '-v0 ' + config.ghc_th_way_flags])
+test('T15792', normal, compile, ['-v0 -dsuppress-uniques'])
+test('T15815', normal, multimod_compile,
+    ['T15815B', '-v0 ' + config.ghc_th_way_flags])

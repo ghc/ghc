@@ -1,6 +1,7 @@
 
 T13320.hs:32:21: error:
-    • Couldn't match expected type ‘TermX ξ’ with actual type ‘X_Var ξ’
+    • Couldn't match type ‘X_Var ξ’ with ‘TermX ξ’
+        arising from a use of ‘genTerm’
     • In the first argument of ‘sized’, namely ‘genTerm’
       In the expression: sized genTerm
       In an equation for ‘arbitrary’: arbitrary = sized genTerm

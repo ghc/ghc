@@ -4,7 +4,9 @@
 
 module ShouldCompile where
 
-type family Element c :: *
+import Data.Kind (Type)
+
+type family Element c :: Type
 
 f :: x -> Element x
 f x = undefined

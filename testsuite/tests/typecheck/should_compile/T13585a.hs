@@ -4,6 +4,7 @@ module T13585a where
 
 import Data.Monoid (First(..))
 import Data.Functor.Identity
+import Data.Kind (Type)
 
 class Profunctor p where
   dimap :: (a -> b) -> (c -> d) -> p b c -> p a d
@@ -54,10 +55,10 @@ instance Wrapped (First a) where
     _Wrapped' = iso getFirst First
     {-# INLINE _Wrapped' #-}
 
-class Wrapped s => Rewrapped (s :: *) (t :: *)
+class Wrapped s => Rewrapped (s :: Type) (t :: Type)
 
 class Wrapped s where
-    type Unwrapped s :: *
+    type Unwrapped s :: Type
     _Wrapped' :: Iso' s (Unwrapped s)
 
 _Wrapping :: Rewrapping s t => (Unwrapped s -> s) -> Iso s t (Unwrapped s) (Unwrapped t)

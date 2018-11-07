@@ -292,7 +292,7 @@ hsExprToPmExpr (HsBinTick      _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsTickPragma _ _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsSCC          _ _ _ e) = lhsExprToPmExpr e
 hsExprToPmExpr (HsCoreAnn      _ _ _ e) = lhsExprToPmExpr e
-hsExprToPmExpr (ExprWithTySig      _ e) = lhsExprToPmExpr e
+hsExprToPmExpr (ExprWithTySig    _ e _) = lhsExprToPmExpr e
 hsExprToPmExpr (HsWrap           _ _ e) =  hsExprToPmExpr e
 hsExprToPmExpr e = PmExprOther e -- the rest are not handled by the oracle
 

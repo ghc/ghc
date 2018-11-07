@@ -213,7 +213,7 @@ matchNameMaker ctxt = LamMk report_unused
                       _                     -> True
 
 rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
-rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped PatCtx sig)
+rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx sig)
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
 newPatLName name_maker rdr_name@(L loc _)
@@ -393,7 +393,7 @@ rnPatAndThen mk (VarPat x (L l rdr)) = do { loc <- liftCps getSrcSpanM
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
-rnPatAndThen mk (SigPat sig pat )
+rnPatAndThen mk (SigPat x pat sig)
   -- When renaming a pattern type signature (e.g. f (a :: T) = ...), it is
   -- important to rename its type signature _before_ renaming the rest of the
   -- pattern, so that type variables are first bound by the _outermost_ pattern
@@ -405,7 +405,7 @@ rnPatAndThen mk (SigPat sig pat )
   -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
   = do { sig' <- rnHsSigCps sig
        ; pat' <- rnLPatAndThen mk pat
-       ; return (SigPat sig' pat' ) }
+       ; return (SigPat x pat' sig' ) }
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit

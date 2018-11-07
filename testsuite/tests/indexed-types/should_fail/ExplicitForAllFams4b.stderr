@@ -1,0 +1,44 @@
+
+ExplicitForAllFams4b.hs:7:24: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the type instance declaration for ‘J’
+
+ExplicitForAllFams4b.hs:8:22: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the type instance declaration for ‘J’
+
+ExplicitForAllFams4b.hs:11:24: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the data instance declaration for ‘K’
+
+ExplicitForAllFams4b.hs:12:22: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the data instance declaration for ‘K’
+
+ExplicitForAllFams4b.hs:15:27: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the newtype instance declaration for ‘L’
+
+ExplicitForAllFams4b.hs:16:25: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the newtype instance declaration for ‘L’
+
+ExplicitForAllFams4b.hs:23:17: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the type instance declaration for ‘CT’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:24:15: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the type instance declaration for ‘CT’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:25:17: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the data instance declaration for ‘CD’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:26:15: error:
+    • Explicitly quantified but not used in LHS pattern: type variable ‘b’
+    • In the data instance declaration for ‘CD’
+      In the instance declaration for ‘C Int’

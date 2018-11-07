@@ -2314,8 +2314,16 @@ Data types with no constructors
 
     Allow definition of empty ``data`` types.
 
-With the :extension:`EmptyDataDecls` extension, GHC
-lets you declare a data type with no constructors. For example: ::
+With the :extension:`EmptyDataDecls` extension, GHC lets you declare a
+data type with no constructors.
+
+You only need to enable this extension if the language you're using
+is Haskell 98, in which a data type must have at least one constructor.
+Haskell 2010 relaxed this rule to allow data types with no constructors,
+and thus :extension:`EmptyDataDecls` is enabled by default when the
+language is Haskell 2010.
+
+For example: ::
 
       data S      -- S :: Type
       data T a    -- T :: Type -> Type
@@ -2401,8 +2409,7 @@ specifically:
    sets the fixity for both type constructor ``T`` and data constructor
    ``T``, and similarly for ``:*:``. ``Int `a` Bool``.
 
--  Function arrow is ``infixr`` with fixity 0 (this might change; it's
-   not clear what it should be).
+-  The function arrow ``->`` is ``infixr`` with fixity -1.
 
 .. _type-operators:
 
@@ -3550,10 +3557,10 @@ More details:
        module M where
          data R = R { a,b,c :: Int }
        module X where
-         import M( R(a,c) )
-         f b = R { .. }
+         import M( R(R,a,c) )
+         f a b = R { .. }
 
-   The ``R{..}`` expands to ``R{M.a=a}``, omitting ``b`` since the
+   The ``R{..}`` expands to ``R{a=a}``, omitting ``b`` since the
    record field is not in scope, and omitting ``c`` since the variable
    ``c`` is not in scope (apart from the binding of the record selector
    ``c``, of course).
@@ -6785,9 +6792,12 @@ like this:
    target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  Eliminate any candidate :math:`IX` for which both of the following hold:
+-  If no candidates remain, the search failes
 
-   -  There is another candidate :math:`IY` that is strictly more specific; that
+-  Eliminate any candidate :math:`IX` for which there is another candidate
+   :math:`IY` such that both of the following hold:
+
+   -  :math:`IY` is strictly more specific than :math:`IX`.  That
       is, :math:`IY` is a substitution instance of :math:`IX` but not vice versa.
 
    -  Either :math:`IX` is *overlappable*, or :math:`IY` is *overlapping*. (This
@@ -6795,19 +6805,20 @@ like this:
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
 
--  If exactly one non-incoherent candidate remains, select it. If all
-   remaining candidates are incoherent, select an arbitrary one.
-   Otherwise the search fails (i.e. when more than one surviving
-   candidate is not incoherent).
+-  If all the remaining candidates are incoherent, the search suceeds, returning
+   an arbitrary surviving candidate.
 
--  If the selected candidate (from the previous step) is incoherent, the
-   search succeeds, returning that candidate.
+-  If more than one non-incoherent candidate remains, the search fails.
 
--  If not, find all instances that *unify* with the target constraint,
+-  Otherwise there is exactly one non-incoherent candidate; call it the
+   "prime candidate".
+
+-  Now find all instances, or in-scope given constraints, that *unify* with
+   the target constraint,
    but do not *match* it. Such non-candidate instances might match when
    the target constraint is further instantiated. If all of them are
-   incoherent, the search succeeds, returning the selected candidate; if
-   not, the search fails.
+   incoherent top-level instances, the search succeeds, returning the prime candidate.
+   Otherwise the search fails.
 
 Notice that these rules are not influenced by flag settings in the
 client module, where the instances are *used*. These rules make it
@@ -6849,15 +6860,16 @@ former is a substitution instance of the latter. For example (D) is
 "more specific" than (C) because you can get from (C) to (D) by
 substituting ``a := Int``.
 
-GHC is conservative about committing to an overlapping instance. For
-example: ::
+The final bullet (about unifiying instances)
+makes GHC conservative about committing to an
+overlapping instance. For example: ::
 
       f :: [b] -> [b]
       f x = ...
 
 Suppose that from the RHS of ``f`` we get the constraint ``C b [b]``.
 But GHC does not commit to instance (C), because in a particular call of
-``f``, ``b`` might be instantiate to ``Int``, in which case instance (D)
+``f``, ``b`` might be instantiated to ``Int``, in which case instance (D)
 would be more specific still. So GHC rejects the program.
 
 If, however, you enable the extension :extension:`IncoherentInstances` when compiling
@@ -6897,6 +6909,23 @@ declaration, thus: ::
          f x = ...
 
 (You need :extension:`FlexibleInstances` to do this.)
+
+In the unification check in the final bullet, GHC also uses the
+"in-scope given constraints".  Consider for example ::
+
+   instance C a Int
+
+   g :: forall b c. C b Int => blah
+   g = ...needs (C c Int)...
+
+Here GHC will not solve the constraint ``(C c Int)`` from the
+top-level instance, because a particular call of ``g`` might
+instantiate both ``b`` and ``c`` to the same type, which would
+allow the constraint to be solved in a different way.  This latter
+restriction is principally to make the constraint-solver complete.
+(Interested folk can read ``Note [Instance and Given overlap]`` in ``TcInteract``.)
+It is easy to avoid: in a type signature avoid a constraint that
+matches a top-level instance.  The flag :ghc-flag:`-Wsimplifiable-class-constraints` warns about such signatures.
 
 .. warning::
     Overlapping instances must be used with care. They can give
@@ -7543,6 +7572,17 @@ instance for ``GMap`` is ::
 In this example, the declaration has only one variant. In general, it
 can be any number.
 
+When :extension:`ExplicitForAll` is enabled, type or kind variables used on
+the left hand side can be explicitly bound. For example: ::
+  
+    data instance forall a (b :: Proxy a). F (Proxy b) = FProxy Bool
+
+When an explicit ``forall`` is present, all *type* variables mentioned must
+be bound by the ``forall``. Kind variables will be implicitly bound if
+necessary, for example: ::
+  
+    data instance forall (a :: k). F a = FOtherwise
+
 When the flag :ghc-flag:`-Wunused-type-patterns` is enabled, type
 variables that are mentioned in the patterns on the left hand side, but not
 used on the right hand side are reported. Variables that occur multiple times
@@ -7555,6 +7595,9 @@ This resembles the wildcards that can be used in
 :ref:`partial-type-signatures`. However, there are some differences.
 No error messages reporting the inferred types are generated, nor does
 the extension :extension:`PartialTypeSignatures` have any effect.
+
+A type or kind variable explicitly bound using :extension:`ExplicitForAll` but
+not used on the left hand side will generate an error, not a warning.
 
 Data and newtype instance declarations are only permitted when an
 appropriate family declaration is in scope - just as a class instance
@@ -7708,6 +7751,10 @@ with underscores to avoid warnings when the
 :ghc-flag:`-Wunused-type-patterns` flag is enabled. The same rules apply
 as for :ref:`data-instance-declarations`.
 
+Also in the same way as :ref:`data-instance-declarations`, when
+:extension:`ExplicitForAll` is enabled, type and kind variables can be
+explicilty bound in a type instance declaration.
+
 Type family instance declarations are only legitimate when an
 appropriate family declaration is in scope - just like class instances
 require the class declaration to be visible. Moreover, each instance
@@ -7742,8 +7789,14 @@ Note that GHC must be sure that ``a`` cannot unify with ``Int`` or
 their code, GHC will not be able to simplify the type. After all, ``a``
 might later be instantiated with ``Int``.
 
-A closed type family's equations have the same restrictions as the
-equations for open type family instances.
+A closed type family's equations have the same restrictions and extensions as
+the equations for open type family instances. For instance, when
+:extension:`ExplicitForAll` is enabled, type or kind variables used on the
+left hand side of an equation can be explicitly bound, such as in: ::
+
+  type family R a where
+    forall t a. R (t a) = [a]
+    forall a.   R a     = a
 
 A closed type family may be declared with no equations. Such closed type
 families are opaque type-level definitions that will never reduce, are
@@ -7971,7 +8024,7 @@ Hence, the following contrived example is admissible: ::
 Here ``c`` and ``a`` are class parameters, but the type is also indexed
 on a third parameter ``x``.
 
-.. _assoc-data-inst:
+.. _assoc-inst:
 
 Associated instances
 ~~~~~~~~~~~~~~~~~~~~
@@ -8046,6 +8099,15 @@ Note the following points:
    cannot give any *subsequent* instances for ``(GMap Flob ...)``, this
    facility is most useful when the free indexed parameter is of a kind
    with a finite number of alternatives (unlike ``Type``).
+   
+-  When :extension:`ExplicitForAll` is enabled, type and kind variables can be
+   explicily bound in associated data or type family instances in the same way
+   (and with the same restrictions) as :ref:`data-instance-declarations` or
+   :ref:`type-instance-declarations`. For example, adapting the above, the
+   following is accepted: ::
+     
+     instance Eq (Elem [e]) => Collects [e] where
+       type forall e. Elem [e] = e
 
 .. _assoc-decl-defs:
 
@@ -8082,6 +8144,10 @@ Note the following points:
    variables that are explicitly bound on the left hand side. This restriction
    is relaxed for *kind* variables, however, as the right hand side is allowed
    to mention kind variables that are implicitly bound on the left hand side.
+   
+   Because of this, unlike :ref:`assoc-inst`, explicit binding of type/kind
+   variables in default declarations is not permitted by
+   :extension:`ExplicitForAll`.
 
 -  Unlike the associated type family declaration itself, the type variables of
    the default instance are independent of those of the parent class.
@@ -8837,6 +8903,78 @@ This rule has occasionally-surprising consequences (see
 
 The kind-polymorphism from the class declaration makes ``D1``
 kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
+
+.. _inferring-variable-order:
+
+Inferring the order of variables in a type/class declaration
+------------------------------------------------------------
+
+It is possible to get intricate dependencies among the type variables
+introduced in a type or class declaration. Here is an example::
+
+  data T a (b :: k) c = MkT (a c)
+
+After analysing this declaration, GHC will discover that ``a`` and
+``c`` can be kind-polymorphic, with ``a :: k2 -> Type`` and
+``c :: k2``. We thus infer the following kind::
+
+  T :: forall {k2 :: Type} (k :: Type). (k2 -> Type) -> k -> k2 -> Type
+
+Note that ``k2`` is placed *before* ``k``, and that ``k`` is placed *before*
+``a``. Also, note that ``k2`` is written here in braces. As explained with
+:extension:`TypeApplications` (:ref:`inferred-vs-specified`),
+type and kind variables that GHC generalises
+over, but not written in the original program, are not available for visible
+type application. (These are called *inferred* variables.)
+Such variables are written in braces with
+:ghc-flag:`-fprint-explicit-foralls` enabled.
+
+The general principle is this:
+
+  * Variables not available for type application come first.
+    
+  * Then come variables the user has written, implicitly brought into scope
+    in a type variable's kind.
+
+  * Lastly come the normal type variables of a declaration.
+
+  * Variables not given an explicit ordering by the user are sorted according
+    to ScopedSort (:ref:`ScopedSort`).
+
+With the ``T`` example above, we could bind ``k`` *after* ``a``; doing so
+would not violate dependency concerns. However, it would violate our general
+principle, and so ``k`` comes first.
+    
+Sometimes, this ordering does not respect dependency. For example::
+
+  data T2 k (a :: k) (c :: Proxy '[a, b])
+
+It must be that ``a`` and ``b`` have the same kind. Note also that ``b``
+is implicitly declared in ``c``\'s kind. Thus, according to our general
+principle, ``b`` must come *before* ``k``. However, ``b`` *depends on*
+``k``. We thus reject ``T2`` with a suitable error message.
+
+In keeping with the way that class methods list their class variables
+first, associated types also list class variables before others. This
+means that the inferred variables from the class come before the
+specified variables from the class, which come before other implicitly
+bound variables. Here is an example::
+
+  class C (a :: k) b where
+    type F (c :: j) (d :: Proxy m) a b
+
+We infer these kinds::
+
+  C :: forall {k2 :: Type} (k :: Type). k -> k2 -> Constraint
+  F :: forall {k2 :: Type} (k :: Type)
+              {k3 :: Type} (j :: Type) (m :: k3).
+	      j -> Proxy m -> k -> k2 -> Type
+
+The "general principle" described here is meant to make all this more
+predictable for users. It would not be hard to extend GHC to relax
+this principle. If you should want a change here, consider writing
+a `proposal <https://github.com/ghc-proposals/ghc-proposals/>`_ to
+do so.
 
 .. index::
    single: CUSK
@@ -9752,7 +9890,7 @@ This idea is very old; see Seciton 7 of `Derivable type classes <https://www.mic
 Syntax changes
 ----------------
 
-`Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this ::
+`Haskell 2010 <https://www.haskell.org/onlinereport/haskell2010/haskellch10.html#x17-18000010.5>`_ defines a ``context`` (the bit to the left of ``=>`` in a type) like this
 
 .. code-block:: none
 
@@ -9762,7 +9900,7 @@ Syntax changes
     class ::= qtycls tyvar
             |  qtycls (tyvar atype1 ... atypen)
 
-We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration ::
+We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration
 
 .. code-block:: none
 
@@ -9775,9 +9913,9 @@ The ``context =>`` part is optional.  That is the only syntactic change to the l
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes ::
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes
 
-.. code-block:: none
+  .. code-block:: none
 
     class ::= ...
            | [forall tyavrs .] [context =>] qtycls inst1 ... instn
@@ -9959,6 +10097,10 @@ means this: ::
 
 The two are treated identically, except that the latter may bring type variables
 into scope (see :ref:`scoped-type-variables`).
+
+This extension also enables explicit quantification of type and kind variables
+in :ref:`data-instance-declarations`, :ref:`type-instance-declarations`,
+:ref:`closed-type-families`, :ref:`assoc-inst`, and :ref:`rewrite-rules`.
 
 Notes:
 
@@ -10584,14 +10726,108 @@ is an identifier (the common case), its type is considered known only when
 the identifier has been given a type signature. If the identifier does
 not have a type signature, visible type application cannot be used.
 
-Here are the details:
+.. _inferred-vs-specified:
 
-- If an identifier's type signature does not include an
-  explicit ``forall``, the type variable arguments appear
-  in the left-to-right order in which the variables appear in the type.
-  So, ``foo :: Monad m => a b -> m (a c)``
-  will have its type variables
-  ordered as ``m, a, b, c``.
+Inferred vs. specified type variables
+-------------------------------------
+
+.. index::
+   single: type variable; inferred vs. specified
+
+GHC tracks a distinction between what we call *inferred* and *specified*
+type variables. Only specified type variables are available for instantiation
+with visible type application. An example illustrates this well::
+
+  f :: (Eq b, Eq a) => a -> b -> Bool
+  f x y = (x == x) && (y == y)
+
+  g x y = (x == x) && (y == y)
+
+The functions ``f`` and ``g`` have the same body, but only ``f`` is given
+a type signature. When GHC is figuring out how to process a visible type application,
+it must know what variable to instantiate. It thus must be able to provide
+an ordering to the type variables in a function's type.
+
+If the user has supplied a type signature, as in ``f``, then this is easy:
+we just take the ordering from the type signature, going left to right and
+using the first occurrence of a variable to choose its position within the
+ordering. Thus, the variables in ``f`` will be ``b``, then ``a``.
+
+In contrast, there is no reliable way to do this for ``g``; we will not know
+whether ``Eq a`` or ``Eq b`` will be listed first in the constraint in ``g``\'s
+type. In order to have visible type application be robust between releases of
+GHC, we thus forbid its use with ``g``.
+
+We say that the type variables in ``f`` are *specified*, while those in
+``g`` are *inferred*. The general rule is this: if the user has written
+a type variable in the source program, it is *specified*; if not, it is
+*inferred*.
+
+Thus rule applies in datatype declarations, too. For example, if we have
+``data Proxy a = Proxy`` (and :extension:`PolyKinds` is enabled), then
+``a`` will be assigned kind ``k``, where ``k`` is a fresh kind variable.
+Because ``k`` was not written by the user, it will be unavailable for
+type application in the type of the constructor ``Proxy``; only the ``a``
+will be available.
+
+When :ghc-flag:`-fprint-explicit-foralls` is enabled, inferred variables
+are printed in braces. Thus, the type of the data constructor ``Proxy``
+from the previous example would be ``forall {k} (a :: k). Proxy a``.
+We can observe this behavior in a GHCi session: ::
+
+  > :set -XTypeApplications -fprint-explicit-foralls
+  > let myLength1 :: Foldable f => f a -> Int; myLength1 = length
+  > :type +v myLength1
+  myLength1 :: forall (f :: * -> *) a. Foldable f => f a -> Int
+  > let myLength2 = length
+  > :type +v myLength2
+  myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
+  > :type +v myLength2 @[]
+
+  <interactive>:1:1: error:
+      • Cannot apply expression of type ‘t0 a0 -> Int’
+        to a visible type argument ‘[]’
+      • In the expression: myLength2 @[]
+
+Notice that since ``myLength1`` was defined with an explicit type signature,
+:ghci-cmd:`:type +v` reports that all of its type variables are available
+for type application. On the other hand, ``myLength2`` was not given a type
+signature. As a result, all of its type variables are surrounded with braces,
+and trying to use visible type application with ``myLength2`` fails.
+
+Also note the use of :ghci-cmd:`:type +v` in the GHCi session above instead
+of :ghci-cmd:`:type`. This is because :ghci-cmd:`:type` gives you the type
+that would be inferred for a variable assigned to the expression provided
+(that is, the type of ``x`` in ``let x = <expr>``). As we saw above with
+``myLength2``, this type will have no variables available to visible type
+application. On the other hand, :ghci-cmd:`:type +v` gives you the actual
+type of the expression provided. To illustrate this: ::
+
+  > :type myLength1
+  myLength1 :: forall {a} {f :: * -> *}. Foldable f => f a -> Int
+  > :type myLength2
+  myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
+
+Using :ghci-cmd:`:type` might lead one to conclude that none of the type
+variables in ``myLength1``'s type signature are available for type
+application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
+if you want the most accurate information with respect to visible type
+application properties.
+
+.. _ScopedSort:
+
+.. index::
+   single: ScopedSort
+
+Ordering of specified variables
+-------------------------------
+
+In the simple case of the previous section, we can say that specified variables
+appear in left-to-right order. However, not all cases are so simple. Here are
+the rules in the subtler cases:
+
+- If an identifier's type has a ``forall``, then the order of type variables
+  as written in the ``forall`` is retained.
 
 - If the type signature includes any kind annotations (either on variable
   binders or as annotations on types), any variables used in kind
@@ -10610,7 +10846,7 @@ Here are the details:
   of the variables are *kind* variables), the variables are reordered
   so that kind variables come before type variables, preserving the
   left-to-right order as much as possible. That is, GHC performs a
-  stable topological sort on the variables. Examples::
+  stable topological sort on the variables. Example::
 
     h :: Proxy (a :: (j, k)) -> Proxy (b :: Proxy a) -> ()
       -- as if h :: forall j k a b. ...
@@ -10623,10 +10859,12 @@ Here are the details:
   are not reordered with respect to each other, even though doing so would
   not violate dependency conditions.
 
-- Visible type application is available to instantiate only user-specified
-  type variables. This means that in ``data Proxy a = Proxy``, the unmentioned
-  kind variable used in ``a``'s kind is *not* available for visible type
-  application.
+  A "stable topological sort" here, we mean that we perform this algorithm
+  (which we call *ScopedSort*):
+
+  * Work left-to-right through the input list of type variables, with a cursor.
+  * If variable ``v`` at the cursor is depended on by any earlier variable ``w``,
+    move ``v`` immediately before the leftmost such ``w``.
 
 - Class methods' type arguments include the class type
   variables, followed by any variables an individual method is polymorphic
@@ -10649,60 +10887,9 @@ Here are the details:
   necessary to specify :extension:`PartialTypeSignatures` and your
   code will not generate a warning informing you of the omitted type.
 
-- When printing types with :ghc-flag:`-fprint-explicit-foralls` enabled,
-  type variables not available for visible type application are printed
-  in braces. We can observe this behavior in a GHCi session: ::
-
-    > :set -XTypeApplications -fprint-explicit-foralls
-    > let myLength1 :: Foldable f => f a -> Int; myLength1 = length
-    > :type +v myLength1
-    myLength1 :: forall (f :: * -> *) a. Foldable f => f a -> Int
-    > let myLength2 = length
-    > :type +v myLength2
-    myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
-    > :type +v myLength2 @[]
-
-    <interactive>:1:1: error:
-        • Cannot apply expression of type ‘t0 a0 -> Int’
-          to a visible type argument ‘[]’
-        • In the expression: myLength2 @[]
-
-  Notice that since ``myLength1`` was defined with an explicit type signature,
-  :ghci-cmd:`:type +v` reports that all of its type variables are available
-  for type application. On the other hand, ``myLength2`` was not given a type
-  signature. As a result, all of its type variables are surrounded with braces,
-  and trying to use visible type application with ``myLength2`` fails.
-
-  Also note the use of :ghci-cmd:`:type +v` in the GHCi session above instead
-  of :ghci-cmd:`:type`. This is because :ghci-cmd:`:type` gives you the type
-  that would be inferred for a variable assigned to the expression provided
-  (that is, the type of ``x`` in ``let x = <expr>``). As we saw above with
-  ``myLength2``, this type will have no variables available to visible type
-  application. On the other hand, :ghci-cmd:`:type +v` gives you the actual
-  type of the expression provided. To illustrate this: ::
-
-    > :type myLength1
-    myLength1 :: forall {a} {f :: * -> *}. Foldable f => f a -> Int
-    > :type myLength2
-    myLength2 :: forall {a} {t :: * -> *}. Foldable t => t a -> Int
-
-  Using :ghci-cmd:`:type` might lead one to conclude that none of the type
-  variables in ``myLength1``'s type signature are available for type
-  application. This isn't true, however! Be sure to use :ghci-cmd:`:type +v`
-  if you want the most accurate information with respect to visible type
-  application properties.
-
-- Although GHC supports visible *type* applications, it does not yet support
-  visible *kind* applications. However, GHC does follow similar rules for
-  quantifying variables in kind signatures as it does for quantifying type
-  signatures. For instance: ::
-
-    type family F (a :: j) (b :: k) :: l
-      -- F :: forall j k l. j -> k -> l
-
-  In the kind of ``F``, the left-to-right ordering of ``j``, ``k``, and ``l``
-  is preserved.
-
+The section in this manual on kind polymorphism describes how variables
+in type and class declarations are ordered (:ref:`inferring-variable-order`).
+  
 .. _implicit-parameters:
 
 Implicit parameters
@@ -14174,9 +14361,11 @@ Certain pragmas are *file-header pragmas*:
 ``LANGUAGE`` pragma
 -------------------
 
-.. index::
-   single: LANGUAGE; pragma
-   single: pragma; LANGUAGE
+.. pragma:: LANGUAGE ⟨ext⟩, ⟨ext⟩, ...
+
+    :where: file header
+
+    Enable or disable a set of language extensions.
 
 The ``LANGUAGE`` pragma allows language extensions to be enabled in a
 portable way. It is the intention that all Haskell compilers support the
@@ -14206,9 +14395,9 @@ if any of the requested extensions are not supported.
 ``OPTIONS_GHC`` pragma
 ----------------------
 
-.. index::
-   single: OPTIONS_GHC
-   single: pragma; OPTIONS_GHC
+.. pragma:: OPTIONS_GHC ⟨flags⟩
+
+    :where: file header
 
 The ``OPTIONS_GHC`` pragma is used to specify additional options that
 are given to the compiler when compiling this source file. See
@@ -14234,14 +14423,21 @@ other compilers.
 ``WARNING`` and ``DEPRECATED`` pragmas
 --------------------------------------
 
-.. index::
-   single: WARNING
-   single: DEPRECATED
+.. pragma:: WARNING
 
-The ``WARNING`` pragma allows you to attach an arbitrary warning to a
-particular function, class, or type. A ``DEPRECATED`` pragma lets you
-specify that a particular function, class, or type is deprecated. There
-are two ways of using these pragmas.
+    :where: declaration
+
+    The ``WARNING`` pragma allows you to attach an arbitrary warning to a
+    particular function, class, or type.
+
+.. pragma:: DEPRECATED
+
+    :where: declaration
+
+    A ``DEPRECATED`` pragma lets you specify that a particular function, class,
+    or type is deprecated.
+
+There are two ways of using these pragmas.
 
 -  You can work on an entire module thus: ::
 
@@ -14292,9 +14488,11 @@ You can suppress the warnings with the flag
 ``MINIMAL`` pragma
 ------------------
 
-.. index::
-   single: MINIMAL
-   single: pragma; MINIMAL
+.. pragma:: MINIMAL ⟨name⟩ | ⟨name⟩ , ...
+
+    :where: in class body
+
+    Define the methods needed for a minimal complete instance of a class.
 
 The ``MINIMAL`` pragma is used to specify the minimal complete definition of
 a class, i.e. specify which methods must be implemented by all
@@ -14343,9 +14541,11 @@ These pragmas control the inlining of function definitions.
 ``INLINE`` pragma
 ~~~~~~~~~~~~~~~~~
 
-.. index::
-   single: INLINE
-   single: pragma; INLINE
+.. pragma:: INLINE ⟨name⟩
+
+    :where: top-level
+
+    Force GHC to inline a value.
 
 GHC (with :ghc-flag:`-O`, as always) tries to inline (or "unfold")
 functions/values that are "small enough," thus avoiding the call
@@ -14409,7 +14609,7 @@ has a number of other effects:
    which will optimise better than the corresponding use of ``comp2``.
 
 -  It is useful for GHC to optimise the definition of an INLINE function
-   ``f`` just like any other non-INLINE function, in case the
+   ``f`` just like any other non-``INLINE`` function, in case the
    non-inlined version of ``f`` is ultimately called. But we don't want
    to inline the *optimised* version of ``f``; a major reason for ``INLINE``
    pragmas is to expose functions in ``f``\'s RHS that have rewrite
@@ -14422,7 +14622,7 @@ has a number of other effects:
    usual. For externally-visible functions the inline-RHS (not the
    optimised RHS) is recorded in the interface file.
 
--  An INLINE function is not worker/wrappered by strictness analysis.
+-  An ``INLINE`` function is not worker/wrappered by strictness analysis.
    It's going to be inlined wholesale instead.
 
 GHC ensures that inlining cannot go on forever: every mutually-recursive
@@ -14452,6 +14652,12 @@ See also the ``NOINLINE`` (:ref:`noinline-pragma`) and ``INLINABLE``
 
 ``INLINABLE`` pragma
 ~~~~~~~~~~~~~~~~~~~~
+
+.. pragma:: INLINEABLE ⟨name⟩
+
+    :where: top-level
+
+    Suggest that the compiler always consider inlining ``name``.
 
 An ``{-# INLINABLE f #-}`` pragma on a function ``f`` has the following
 behaviour:
@@ -14492,10 +14698,15 @@ The alternative spelling ``INLINEABLE`` is also accepted by GHC.
 ~~~~~~~~~~~~~~~~~~~
 
 .. index::
-   single: NOINLINE
    single: NOTINLINE
 
-The ``NOINLINE`` pragma does exactly what you'd expect: it stops the
+.. pragma:: NOINLINE ⟨name⟩
+
+    :where: top-level
+
+    Instructs the compiler not to inline a value.
+
+The :pragma:`NOINLINE` pragma does exactly what you'd expect: it stops the
 named function from being inlined by the compiler. You shouldn't ever
 need to do this, unless you're very cautious about code size.
 
@@ -14508,23 +14719,26 @@ used if you want your code to be portable).
 ``CONLIKE`` modifier
 ~~~~~~~~~~~~~~~~~~~~
 
-.. index::
-   single: CONLIKE
+.. pragma:: CONLINE
 
-An ``INLINE`` or ``NOINLINE`` pragma may have a ``CONLIKE`` modifier, which affects
-matching in RULEs (only). See :ref:`conlike`.
+    :where: modifies :pragma:`INLINE` or :pragma:`NOINLINE` pragma
+
+    Instructs GHC to consider a value to be especially cheap to inline.
+
+An :pragma:`INLINE` or :pragma:`NOINLINE` pragma may have a :pragma:`CONLIKE` modifier, which affects
+matching in :pragma:`RULE`\s (only). See :ref:`conlike`.
 
 .. _phase-control:
 
 Phase control
 ~~~~~~~~~~~~~
 
-Sometimes you want to control exactly when in GHC's pipeline the ``INLINE``
+Sometimes you want to control exactly when in GHC's pipeline the :pragma:`INLINE`
 pragma is switched on. Inlining happens only during runs of the
 *simplifier*. Each run of the simplifier has a different *phase number*;
 the phase number decreases towards zero. If you use
-``-dverbose-core2core`` you'll see the sequence of phase numbers for
-successive runs of the simplifier. In an ``INLINE`` pragma you can
+:ghc-flag:`-dverbose-core2core` you will see the sequence of phase numbers for
+successive runs of the simplifier. In an :pragma:`INLINE` pragma you can
 optionally specify a phase number, thus:
 
 -  "``INLINE[k] f``" means: do not inline ``f`` until phase ``k``, but
@@ -14542,7 +14756,7 @@ optionally specify a phase number, thus:
 
 The same information is summarised here:
 
-::
+.. code-block:: none
 
                                -- Before phase 2     Phase 2 and later
       {-# INLINE   [2]  f #-}  --      No                 Yes
@@ -14557,14 +14771,14 @@ By "Maybe" we mean that the usual heuristic inlining rules apply (if the
 function body is small, or it is applied to interesting-looking
 arguments etc). Another way to understand the semantics is this:
 
--  For both ``INLINE`` and ``NOINLINE``, the phase number says when inlining is
-   allowed at all.
+-  For both :pragma:`INLINE` and :pragma:`NOINLINE`, the phase number says when
+   inlining is allowed at all.
 
--  The ``INLINE`` pragma has the additional effect of making the function
+-  The :pragma:`INLINE` pragma has the additional effect of making the function
    body look small, so that when inlining is allowed it is very likely
    to happen.
 
-The same phase-numbering control is available for RULES
+The same phase-numbering control is available for :pragma:`RULE`\s
 (:ref:`rewrite-rules`).
 
 .. _line-pragma:
@@ -14572,9 +14786,12 @@ The same phase-numbering control is available for RULES
 ``LINE`` pragma
 ---------------
 
-.. index::
-   single: LINE; pragma
-   single: pragma; LINE
+.. pragma:: LINE ⟨lineno⟩ "⟨file⟩"
+
+    :where: anywhere
+
+    Generated by preprocessors to convey source line numbers of the original
+    source.
 
 This pragma is similar to C's ``#line`` pragma, and is mainly for use in
 automatically generated Haskell code. It lets you specify the line
@@ -14622,7 +14839,7 @@ diagnostics and does not change the syntax of the code itself.
 ``RULES`` pragma
 ----------------
 
-The ``RULES`` pragma lets you specify rewrite rules. It is described in
+The :pragma:`RULES` pragma lets you specify rewrite rules. It is described in
 :ref:`rewrite-rules`.
 
 .. _specialize-pragma:
@@ -14635,8 +14852,12 @@ The ``RULES`` pragma lets you specify rewrite rules. It is described in
    single: pragma, SPECIALIZE
    single: overloading, death to
 
+.. pragma:: SPECIALIZE ⟨name⟩ :: ⟨type⟩
+
+    Ask that GHC specialize a polymorphic value to a particular type.
+
 (UK spelling also accepted.) For key overloaded functions, you can
-create extra versions (NB: more code space) specialised to particular
+create extra versions (NB: at the cost of larger code) specialised to particular
 types. Thus, if you have an overloaded function:
 
 ::
@@ -14733,6 +14954,10 @@ specialise it as follows:
 ``SPECIALIZE INLINE``
 ~~~~~~~~~~~~~~~~~~~~~
 
+.. pragma:: SPECIALIZE INLINE ⟨name⟩ :: ⟨type⟩
+
+    :where: top-level
+
 A ``SPECIALIZE`` pragma can optionally be followed with a ``INLINE`` or
 ``NOINLINE`` pragma, optionally followed by a phase, as described in
 :ref:`inline-noinline-pragma`. The ``INLINE`` pragma affects the
@@ -14758,9 +14983,9 @@ fire the first specialisation, whose body is also inlined. The result is
 a type-based unrolling of the indexing function.
 
 You can add explicit phase control (:ref:`phase-control`) to
-``SPECIALISE INLINE`` pragma, just like on an ``INLINE`` pragma; if you
-do so, the same phase is used for the rewrite rule and the INLINE
-control of the specialised function.
+``SPECIALISE INLINE`` pragma, just like on an :pragma:`INLINE` pragma; if you do
+so, the same phase is used for the rewrite rule and the INLINE control of the
+specialised function.
 
 .. warning:: You can make GHC diverge by using ``SPECIALISE INLINE`` on an
              ordinarily-recursive function.
@@ -14768,9 +14993,9 @@ control of the specialised function.
 ``SPECIALIZE`` for imported functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Generally, you can only give a ``SPECIALIZE`` pragma for a function
+Generally, you can only give a :pragma:`SPECIALIZE` pragma for a function
 defined in the same module. However if a function ``f`` is given an
-``INLINABLE`` pragma at its definition site, then it can subsequently be
+:pragma:`INLINABLE` pragma at its definition site, then it can subsequently be
 specialised by importing modules (see :ref:`inlinable-pragma`). For example ::
 
     module Map( lookup, blah blah ) where
@@ -14784,7 +15009,7 @@ specialised by importing modules (see :ref:`inlinable-pragma`). For example ::
       data T = T1 | T2 deriving( Eq, Ord )
       {-# SPECIALISE lookup :: [(T,a)] -> T -> Maybe a
 
-Here, ``lookup`` is declared ``INLINABLE``, but it cannot be specialised
+Here, ``lookup`` is declared :pragma:`INLINABLE`, but it cannot be specialised
 for type ``T`` at its definition site, because that type does not exist
 yet. Instead a client module can define ``T`` and then specialise
 ``lookup`` at that type.
@@ -14792,13 +15017,13 @@ yet. Instead a client module can define ``T`` and then specialise
 Moreover, every module that imports ``Client`` (or imports a module that
 imports ``Client``, transitively) will "see", and make use of, the
 specialised version of ``lookup``. You don't need to put a
-``SPECIALIZE`` pragma in every module.
+:pragma:`SPECIALIZE` pragma in every module.
 
-Moreover you often don't even need the ``SPECIALIZE`` pragma in the
+Moreover you often don't even need the :pragma:`SPECIALIZE` pragma in the
 first place. When compiling a module ``M``, GHC's optimiser (when given the
 :ghc-flag:`-O` flag) automatically considers each top-level overloaded function declared
 in ``M``, and specialises it for the different types at which it is called in
-``M``. The optimiser *also* considers each *imported* ``INLINABLE``
+``M``. The optimiser *also* considers each *imported* :pragma:`INLINABLE`
 overloaded function, and specialises it for the different types at which
 it is called in ``M``. So in our example, it would be enough for ``lookup``
 to be called at type ``T``:
@@ -14822,8 +15047,12 @@ be useful.
 ------------------------------
 
 .. index::
-   single: SPECIALIZE pragma
+   single: instance, specializing
    single: overloading, death to
+
+.. pragma:: SPECIALIZE instance ⟨instance head⟩
+
+   :where: instance body
 
 Same idea, except for instance declarations. For example:
 
@@ -14842,8 +15071,12 @@ declaration.
 ``UNPACK`` pragma
 -----------------
 
-.. index::
-   single: UNPACK
+.. pragma:: UNPACK
+
+    :where: data constructor field
+
+    Instructs the compiler to unpack the contents of a constructor field into
+    the constructor itself.
 
 The ``UNPACK`` indicates to the compiler that it should unpack the
 contents of a constructor field into the constructor itself, removing a
@@ -14884,7 +15117,7 @@ See also the :ghc-flag:`-funbox-strict-fields` flag, which essentially has the
 effect of adding ``{-# UNPACK #-}`` to every strict constructor field.
 
 .. [1]
-   In fact, ``UNPACK`` has no effect without :ghc-flag:`-O`, for technical
+   In fact, :pragma:`UNPACK` has no effect without :ghc-flag:`-O`, for technical
    reasons (see :ghc-ticket:`5252`).
 
 .. _nounpack-pragma:
@@ -14892,8 +15125,11 @@ effect of adding ``{-# UNPACK #-}`` to every strict constructor field.
 ``NOUNPACK`` pragma
 -------------------
 
-.. index::
-   single: NOUNPACK
+.. pragma:: NOUNPACK
+
+    :where: top-level
+
+    Instructs the compiler not to unpack a constructor field.
 
 The ``NOUNPACK`` pragma indicates to the compiler that it should not
 unpack the contents of a constructor field. Example: ::
@@ -14908,9 +15144,11 @@ field of the constructor ``T`` is not unpacked.
 ``SOURCE`` pragma
 -----------------
 
-.. index::
-   single: SOURCE
-   single: pragma; SOURCE
+.. pragma:: SOURCE
+
+    :where: after ``import`` statement
+
+    Import a module by ``hs-boot`` file to break a module loop. 
 
 The ``{-# SOURCE #-}`` pragma is used only in ``import`` declarations,
 to break a module loop. It is described in detail in
@@ -14920,6 +15158,13 @@ to break a module loop. It is described in detail in
 
 ``COMPLETE`` pragmas
 --------------------
+
+.. pragma:: COMPLETE
+
+    :where: at top level
+
+    Specify the set of constructors or pattern synonyms which constitute a total
+    match.
 
 The ``COMPLETE`` pragma is used to inform the pattern match checker that a
 certain set of patterns is complete and that any function which matches
@@ -15048,6 +15293,13 @@ this order:
    single: INCOHERENT
    single: pragma; INCOHERENT
 
+.. pragma:: OVERLAPPING
+.. pragma:: OVERLAPPABLE
+.. pragma:: OVERLAPS
+.. pragma:: INCOHERENT
+
+    :where: on instance head
+
 The pragmas ``OVERLAPPING``, ``OVERLAPPABLE``, ``OVERLAPS``,
 ``INCOHERENT`` are used to specify the overlap behavior for individual
 instances, as described in Section :ref:`instance-overlap`. The pragmas
@@ -15063,15 +15315,19 @@ Rewrite rules
 =============
 
 .. index::
-   single: RULES pragma
-   single: pragma; RULES
    single: rewrite rules
+
+.. pragma:: RULES "⟨name⟩" forall ⟨binder⟩ ... . ⟨expr⟩ = ⟨expr⟩ ...
+
+    :where: top-level
+
+    Define a rewrite rule to be used to optimize a source program.
 
 The programmer can specify rewrite rules as part of the source program
 (in a pragma). Here is an example: ::
 
       {-# RULES
-      "map/map"    forall f g xs.  map f (map g xs) = map (f.g) xs
+            "map/map"    forall f g xs.  map f (map g xs) = map (f.g) xs
         #-}
 
 Use the debug flag :ghc-flag:`-ddump-simpl-stats` to see what rules fired. If
@@ -15094,7 +15350,7 @@ Syntax
 
 From a syntactic point of view:
 
--  There may be zero or more rules in a ``RULES`` pragma, separated by
+-  There may be zero or more rules in a :pragma:`RULES` pragma, separated by
    semicolons (which may be generated by the layout rule).
 
 -  The layout rule applies in a pragma. Currently no new indentation
@@ -15103,8 +15359,8 @@ From a syntactic point of view:
    the same column as the enclosing definitions. ::
 
          {-# RULES
-         "map/map"    forall f g xs.  map f (map g xs) = map (f.g) xs
-         "map/append" forall f xs ys. map f (xs ++ ys) = map f xs ++ map f ys
+               "map/map"    forall f g xs.  map f (map g xs) = map (f.g) xs
+               "map/append" forall f xs ys. map f (xs ++ ys) = map f xs ++ map f ys
            #-}
 
    Furthermore, the closing ``#-}`` should start in a column to the
@@ -15131,7 +15387,7 @@ From a syntactic point of view:
    is never run by GHC, but is nevertheless parsed, typechecked etc, so
    that it is available to the plugin.
 
--  Each variable mentioned in a rule must either be in scope (e.g.
+-  Each (term) variable mentioned in a rule must either be in scope (e.g.
    ``map``), or bound by the ``forall`` (e.g. ``f``, ``g``, ``xs``). The
    variables bound by the ``forall`` are called the *pattern* variables.
    They are separated by spaces, just like in a type ``forall``.
@@ -15144,6 +15400,25 @@ From a syntactic point of view:
                      foldr k z (build g) = g k z
 
    Since ``g`` has a polymorphic type, it must have a type signature.
+
+-  If :extension:`ExplicitForAll` is enabled, type/kind variables can also be
+   explicitly bound. For example: ::
+     
+       {-# RULES "id" forall a. forall (x :: a). id @a x = x #-}
+   
+   When a type-level explicit ``forall`` is present, each type/kind variable
+   mentioned must now also be either in scope or bound by the ``forall``. In
+   particular, unlike some other places in Haskell, this means free kind
+   variables will not be implicitly bound. For example: ::
+     
+       "this_is_bad" forall (c :: k). forall (x :: Proxy c) ...
+       "this_is_ok"  forall k (c :: k). forall (x :: Proxy c) ...
+
+   When bound type/kind variables are needed, both foralls must always be
+   included, though if no pattern variables are needed, the second can be left
+   empty. For example: ::
+   
+       {-# RULES "map/id" forall a. forall. map (id @a) = id @[a] #-}
 
 -  The left hand side of a rule must consist of a top-level variable
    applied to arbitrary expressions. For example, this is *not* OK: ::
@@ -15165,12 +15440,12 @@ From a syntactic point of view:
    then C's rules are in force when compiling A.) The situation is very
    similar to that for instance declarations.
 
--  Inside a RULE "``forall``" is treated as a keyword, regardless of any
+-  Inside a :pragma:`RULE` "``forall``" is treated as a keyword, regardless of any
    other flag settings. Furthermore, inside a RULE, the language
    extension :extension:`ScopedTypeVariables` is automatically enabled; see
    :ref:`scoped-type-variables`.
 
--  Like other pragmas, ``RULE`` pragmas are always checked for scope errors,
+-  Like other pragmas, :pragma:`RULE` pragmas are always checked for scope errors,
    and are typechecked. Typechecking means that the LHS and RHS of a
    rule are typechecked, and must have the same type. However, rules are
    only *enabled* if the :ghc-flag:`-fenable-rewrite-rules` flag is on (see
@@ -15259,12 +15534,12 @@ give ::
 
     g y = y
 
-Now ``g`` is inlined into ``h``, but ``f``\'s RULE has no chance to fire.
-If instead GHC had first inlined ``g`` into ``h`` then there would have
-been a better chance that ``f``\'s RULE might fire.
+Now ``g`` is inlined into ``h``, but ``f``\'s :pragma:`RULE` has no chance to
+fire. If instead GHC had first inlined ``g`` into ``h`` then there would have
+been a better chance that ``f``\'s :pragma:`RULE` might fire.
 
-The way to get predictable behaviour is to use a ``NOINLINE`` pragma, or an
-``INLINE[⟨phase⟩]`` pragma, on ``f``, to ensure that it is not inlined until
+The way to get predictable behaviour is to use a :pragma:`NOINLINE` pragma, or an
+INLINE[⟨phase⟩] pragma, on ``f``, to ensure that it is not inlined until
 its RULEs have had a chance to fire. The warning flag
 :ghc-flag:`-Winline-rule-shadowing` (see :ref:`options-sanity`) warns about
 this situation.
@@ -15297,9 +15572,9 @@ an application of ``f`` to one argument (in general, the number of arguments
 to the left of the ``=`` sign) should be considered cheap enough to
 duplicate, if such a duplication would make rule fire. (The name
 "CONLIKE" is short for "constructor-like", because constructors
-certainly have such a property.) The ``CONLIKE`` pragma is a modifier to
-INLINE/NOINLINE because it really only makes sense to match ``f`` on the
-LHS of a rule if you are sure that ``f`` is not going to be inlined
+certainly have such a property.) The :pragma:`CONLIKE` pragma is a modifier to
+:pragma:`INLINE`/:pragma:`NOINLINE` because it really only makes sense to match
+``f`` on the LHS of a rule if you are sure that ``f`` is not going to be inlined
 before the rule has a chance to fire.
 
 .. _rules-class-methods:
@@ -15332,7 +15607,7 @@ The solution is to define the instance-specific function yourself, with
 a pragma to prevent it being inlined too early, and give a RULE for it: ::
 
     instance C Bool where
-      op x y = opBool
+      op = opBool
 
     opBool :: Bool -> Bool -> Bool
     {-# NOINLINE [1] opBool #-}
@@ -15494,7 +15769,7 @@ Controlling what's going on in rewrite rules
                {-# INLINE build #-}
                build g = g (:) []
 
-   Notice the ``INLINE``! That prevents ``(:)`` from being inlined when
+   Notice the :pragma:`INLINE`! That prevents ``(:)`` from being inlined when
    compiling ``PrelBase``, so that an importing module will “see” the
    ``(:)``, and can match it on the LHS of a rule. ``INLINE`` prevents
    any inlining happening in the RHS of the ``INLINE`` thing. I regret

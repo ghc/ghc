@@ -3,12 +3,14 @@
 
 module Simple24 where
 
+import Data.Kind (Type)
+
 linear :: HasTrie (Basis v) => (Basis v, v)
 linear =  basisValue
  
 class HasTrie a where
  
-type family Basis u :: *
+type family Basis u :: Type
  
 basisValue :: (Basis v,v)
 basisValue = error "urk"

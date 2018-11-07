@@ -209,3 +209,9 @@ GIT_COMMIT_ID
 # Output of ghc-in-ghci
 
 /.ghci-objects/
+
+# -----------------------------------------------------------------------------
+# ghc.nix
+ghc.nix/
+
+

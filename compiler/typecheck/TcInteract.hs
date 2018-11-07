@@ -39,6 +39,7 @@ import TcSMonad
 import Bag
 import MonadUtils ( concatMapM, foldlM )
 
+import CoreSyn
 import Data.List( partition, foldl', deleteFirstsBy )
 import SrcLoc
 import VarEnv
@@ -920,18 +921,6 @@ unique match on the (Take n) instance.  That leads immediately to an
 infinite loop.  Hence the check that 'preds' have no type families
 (isTyFamFree).
 
-Note [Shortcut solving: overlap]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-  instance {-# OVERLAPPABLE #-} C a where ...
-and we are typechecking
-  f :: C a => a -> a
-  f = e  -- Gives rise to [W] C a
-
-We don't want to solve the wanted constraint with the overlappable
-instance; rather we want to use the supplied (C a)! That was the whole
-point of it being overlappable!  Trac #14434 wwas an example.
-
 Note [Shortcut solving: incoherence]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This optimization relies on coherence of dictionaries to be correct. When we
@@ -1001,7 +990,7 @@ The workhorse of the short-cut solver is
                             -> MaybeT TcS (EvBindMap, DictMap CtEvidence)
 Note that:
 
-* The CtEvidence is teh goal to be solved
+* The CtEvidence is the goal to be solved
 
 * The MaybeT anages early failure if we find a subgoal that
   cannot be solved from instances.
@@ -1827,13 +1816,50 @@ doTopReactOther :: Ct -> TcS (StopOrContinue Ct)
 -- Why equalities? See TcCanonical
 -- Note [Equality superclasses in quantified constraints]
 doTopReactOther work_item
-  = do { res <- matchLocalInst pred (ctEvLoc ev)
+  | isGiven ev
+  = continueWith work_item
+
+  | EqPred eq_rel t1 t2 <- classifyPredType pred
+  = -- See Note [Looking up primitive equalities in quantified constraints]
+    case boxEqPred eq_rel t1 t2 of
+      Nothing -> continueWith work_item
+      Just (cls, tys)
+        -> do { res <- matchLocalInst (mkClassPred cls tys) loc
+              ; case res of
+                  OneInst { cir_mk_ev = mk_ev }
+                    -> chooseInstance work_item
+                           (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
+                    where
+                  _ -> continueWith work_item }
+
+  | otherwise
+  = do { res <- matchLocalInst pred loc
        ; case res of
            OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }
   where
     ev = ctEvidence work_item
+    loc  = ctEvLoc ev
     pred = ctEvPred ev
+
+    mk_eq_ev cls tys mk_ev evs
+      = case (mk_ev evs) of
+          EvExpr e -> EvExpr (Var sc_id `mkTyApps` tys `App` e)
+          ev       -> pprPanic "mk_eq_ev" (ppr ev)
+      where
+        [sc_id] = classSCSelIds cls
+
+{- Note [Looking up primitive equalities in quantified constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For equalities (a ~# b) look up (a ~ b), and then do a superclass
+selection. This avoids having to support quantified constraints whose
+kind is not Constraint, such as (forall a. F a ~# b)
+
+See
+ * Note [Evidence for quantified constraints] in Type
+ * Note [Equality superclasses in quantified constraints]
+   in TcCanonical
+-}
 
 --------------------
 doTopReactFunEq :: Ct -> TcS (StopOrContinue Ct)
@@ -2539,8 +2565,8 @@ nullary case of what's happening here.
 -}
 
 matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
--- Try any Given quantified constraints, which are
--- effectively just local instance declarations.
+-- Look up the predicate in Given quantified constraints,
+-- which are effectively just local instance declarations.
 matchLocalInst pred loc
   = do { ics <- getInertCans
        ; case match_local_inst (inert_insts ics) of

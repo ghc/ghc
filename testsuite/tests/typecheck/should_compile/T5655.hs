@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, GADTs, ConstraintKinds, RankNTypes #-}
 module T5655 where
 
-import Data.Kind (Constraint)
+import Data.Kind (Type, Constraint)
 
 class Show a => Twice a where twice :: a -> a
 
@@ -10,7 +10,7 @@ instance Twice Int where twice = (*2)
 data ETwice where ETwice :: Twice a => a -> ETwice
 
 class E e where
-    type C e :: * -> Constraint
+    type C e :: Type -> Constraint
     ap :: (forall a. C e a => a -> r) -> e -> r
 
 instance E ETwice where

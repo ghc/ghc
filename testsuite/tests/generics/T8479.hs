@@ -5,8 +5,9 @@
 module T8479 where
 
 import GHC.Generics
+import Data.Kind (Type)
 
-class Blah (a :: * -> *) where
-  type F a :: * -> *
+class Blah (a :: Type -> Type) where
+  type F a :: Type -> Type
 
-data Foo (f :: * -> *) a = MkFoo ((F f) a) deriving Generic1
+data Foo (f :: Type -> Type) a = MkFoo ((F f) a) deriving Generic1

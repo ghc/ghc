@@ -5,6 +5,8 @@
 
 module T7891 where
 
+import Data.Kind (Type)
+
 newtype T = T (forall t. t -> t)
 
 tf :: T
@@ -27,7 +29,7 @@ b = f 'b'
 -------------
 
 class C t where
-  data F t :: *
+  data F t :: Type
   mkF :: t -> F t
 
 instance C () where

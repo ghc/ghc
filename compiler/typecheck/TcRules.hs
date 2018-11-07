@@ -35,7 +35,6 @@ import SrcLoc
 import Outputable
 import FastString
 import Bag
-import Data.List( partition )
 
 {-
 Note [Typechecking rules]
@@ -53,28 +52,43 @@ an example (test simplCore/should_compile/rule2.hs) produced by Roman:
    {-# RULES "foo/bar" foo = bar #-}
 
 He wanted the rule to typecheck.
+
+Note [TcLevel in type checking rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Bringing type variables into scope naturally bumps the TcLevel. Thus, we type
+check the term-level binders in a bumped level, and we must accordingly bump
+the level whenever these binders are in scope.
 -}
 
 tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTcId]
 tcRules decls = mapM (wrapLocM tcRuleDecls) decls
 
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
-tcRuleDecls (HsRules _ src decls)
+tcRuleDecls (HsRules { rds_src = src
+                     , rds_rules = decls })
    = do { tc_decls <- mapM (wrapLocM tcRule) decls
-        ; return (HsRules noExt src tc_decls) }
+        ; return $ HsRules { rds_ext   = noExt
+                           , rds_src   = src
+                           , rds_rules = tc_decls } }
 tcRuleDecls (XRuleDecls _) = panic "tcRuleDecls"
 
 tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
-tcRule (HsRule fvs rname@(L _ (_,name))
-               act hs_bndrs lhs rhs)
+tcRule (HsRule { rd_ext  = ext
+               , rd_name = rname@(L _ (_,name))
+               , rd_act  = act
+               , rd_tyvs = ty_bndrs
+               , rd_tmvs = tm_bndrs
+               , rd_lhs  = lhs
+               , rd_rhs  = rhs })
   = addErrCtxt (ruleCtxt name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName rname)
 
         -- Note [Typechecking rules]
-       ; (stuff, tc_lvl) <- pushTcLevelM $
-                            generateRuleConstraints hs_bndrs lhs rhs
+       ; (stuff,_) <- pushTcLevelM $
+                      generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
 
-       ; let ( id_bndrs, lhs', lhs_wanted, rhs', rhs_wanted, rule_ty) = stuff
+       ; let (tv_bndrs, id_bndrs, lhs', lhs_wanted
+                                , rhs', rhs_wanted, rule_ty, tc_lvl) = stuff
 
        ; traceTc "tcRule 1" (vcat [ pprFullRuleName rname
                                   , ppr lhs_wanted
@@ -97,14 +111,16 @@ tcRule (HsRule fvs rname@(L _ (_,name))
        -- during zonking (see TcHsSyn.zonkRule)
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
-       ; forall_tkvs <- zonkTcTypesAndSplitDepVars $
-                        rule_ty : map idType tpl_ids
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
+       ; forall_tkvs <- candidateQTyVarsOfTypes gbls $
+                        map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
+                        rule_ty : map idType tpl_ids
        ; qtkvs <- quantifyTyVars gbls forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName rname
                                 , ppr forall_tkvs
                                 , ppr qtkvs
+                                , ppr tv_bndrs
                                 , ppr rule_ty
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
@@ -114,65 +130,87 @@ tcRule (HsRule fvs rname@(L _ (_,name))
        -- For the LHS constraints we must solve the remaining constraints
        -- (a) so that we report insoluble ones
        -- (b) so that we bind any soluble ones
-       ; let skol_info = RuleSkol name
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
+       ; let all_qtkvs = qtkvs ++ tv_bndrs
+             skol_info = RuleSkol name
+       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
                                          lhs_evs residual_lhs_wanted
-       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info qtkvs
+       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
-       ; return (HsRule fvs rname act
-                    (map (noLoc . RuleBndr noExt . noLoc) (qtkvs ++ tpl_ids))
-                    (mkHsDictLet lhs_binds lhs')
-                    (mkHsDictLet rhs_binds rhs')) }
+       ; return $ HsRule { rd_ext = ext
+                         , rd_name = rname
+                         , rd_act = act
+                         , rd_tyvs = ty_bndrs -- preserved for ppr-ing
+                         , rd_tmvs = map (noLoc . RuleBndr noExt . noLoc) (all_qtkvs ++ tpl_ids)
+                         , rd_lhs  = mkHsDictLet lhs_binds lhs'
+                         , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
 tcRule (XRuleDecl _) = panic "tcRule"
 
-generateRuleConstraints :: [LRuleBndr GhcRn] -> LHsExpr GhcRn -> LHsExpr GhcRn
-                        -> TcM ( [TcId]
+generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
+                        -> LHsExpr GhcRn -> LHsExpr GhcRn
+                        -> TcM ( [TyVar]
+                               , [TcId]
                                , LHsExpr GhcTc, WantedConstraints
                                , LHsExpr GhcTc, WantedConstraints
-                               , TcType )
-generateRuleConstraints hs_bndrs lhs rhs
-  = do { (vars, bndr_wanted) <- captureConstraints $
-                                tcRuleBndrs hs_bndrs
+                               , TcType
+                               , TcLevel )
+generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
+  = do { ((tv_bndrs, id_bndrs, lvl), bndr_wanted) <- captureConstraints $
+                                                     tcRuleBndrs ty_bndrs tm_bndrs
               -- bndr_wanted constraints can include wildcard hole
               -- constraints, which we should not forget about.
               -- It may mention the skolem type variables bound by
               -- the RULE.  c.f. Trac #10072
 
-       ; let (id_bndrs, tv_bndrs) = partition isId vars
-       ; tcExtendTyVarEnv (map unrestricted tv_bndrs) $
+       ; setTcLevel lvl $
+         tcExtendTyVarEnv (map unrestricted tv_bndrs) $
          tcExtendIdEnv    (map unrestricted id_bndrs) $
     do { -- See Note [Solve order for RULES]
          ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
        ; (rhs',            rhs_wanted) <- captureConstraints $
                                           tcMonoExpr rhs (mkCheckExpType rule_ty)
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
-                -- Slightly curious that tv_bndrs is not returned
+       ; return (tv_bndrs, id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty, lvl) } }
 
+-- See Note [TcLevel in type checking rules]
+tcRuleBndrs :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
+            -> TcM ([TcTyVar],[Id],TcLevel)
+tcRuleBndrs (Just bndrs) xs
+  = do { (tys1,(tys2,tms,lvl)) <- tcExplicitTKBndrs
+                                  (ForAllSkol (pprHsExplicitForAll (Just bndrs)))
+                                  bndrs $ do { lvl <- getTcLevel
+                                             ; (tys,tms) <- tcRuleTmBndrs xs
+                                             ; return (tys,tms,lvl) }
+       ; return (tys1 ++ tys2, tms, lvl) }
+tcRuleBndrs Nothing xs
+  = do { lvl <- getTcLevel
+       ; (tys,tms) <- tcRuleTmBndrs xs
+       ; return (tys,tms,lvl) }
 
-tcRuleBndrs :: [LRuleBndr GhcRn] -> TcM [Var]
-tcRuleBndrs []
-  = return []
-tcRuleBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
+-- See Note [TcLevel in type checking rules]
+tcRuleTmBndrs :: [LRuleBndr GhcRn] -> TcM ([TcTyVar],[Id])
+tcRuleTmBndrs [] = return ([],[])
+tcRuleTmBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
-        ; vars <- tcRuleBndrs rule_bndrs
-        ; return (mkLocalId name (Regular Omega) ty : vars) }
-tcRuleBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
+        ; (tyvars, tmvars) <- tcRuleTmBndrs rule_bndrs
+        ; return (tyvars, mkLocalId name (Regular Omega) ty : tmvars) }
+tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a
+--  If there's an explicit forall, the renamer would have already reported an
+--   error for each out-of-scope type variable used
   = do  { let ctxt = RuleSigCtxt name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
         ; let id  = mkLocalIdOrCoVar name (Regular Omega) id_ty
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendNameTyVarEnv (map (\(a, b) -> (a, unrestricted b)) tvs) $
-                  tcRuleBndrs rule_bndrs
-        ; return (map snd tvs ++ id : vars) }
-tcRuleBndrs (L _ (XRuleBndr _) : _) = panic "tcRuleBndrs"
+        ; (tyvars, tmvars) <- tcExtendNameTyVarEnv (map (\(a, b) -> (a, unrestricted b)) tvs) $
+                                   tcRuleTmBndrs rule_bndrs
+        ; return (map snd tvs ++ tyvars, id : tmvars) }
+tcRuleTmBndrs (L _ (XRuleBndr _) : _) = panic "tcRuleTmBndrs"
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = text "When checking the transformation rule" <+>

@@ -48,7 +48,7 @@ module TcRnMonad(
 
   -- * Typechecker global environment
   getIsGHCi, getGHCiMonad, getInteractivePrintName,
-  tcIsHsBootOrSig, tcSelfBootInfo, getGlobalRdrEnv,
+  tcIsHsBootOrSig, tcIsHsig, tcSelfBootInfo, getGlobalRdrEnv,
   getRdrEnvs, getImports,
   getFixityEnv, extendFixityEnv, getRecFieldEnv,
   getDeclaredDefaultTys,
@@ -90,7 +90,7 @@ module TcRnMonad(
 
   -- * Type constraints
   newTcEvBinds, newNoTcEvBinds, cloneEvBindsVar,
-  addTcEvBind,
+  addTcEvBind, addTopEvBinds,
   getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
   getConstraintVar, setConstraintVar,
@@ -185,7 +185,6 @@ import Control.Monad
 import Data.Set ( Set )
 import qualified Data.Set as Set
 
-import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
 import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
 
 import qualified Data.Map as Map
@@ -788,6 +787,9 @@ getInteractivePrintName = do { hsc <- getTopEnv; return (ic_int_print $ hsc_IC h
 tcIsHsBootOrSig :: TcRn Bool
 tcIsHsBootOrSig = do { env <- getGblEnv; return (isHsBootOrSig (tcg_src env)) }
 
+tcIsHsig :: TcRn Bool
+tcIsHsig = do { env <- getGblEnv; return (isHsigFile (tcg_src env)) }
+
 tcSelfBootInfo :: TcRn SelfBootInfo
 tcSelfBootInfo = do { env <- getGblEnv; return (tcg_self_boot env) }
 
@@ -959,6 +961,8 @@ reportWarning reason err
 
 try_m :: TcRn r -> TcRn (Either IOEnvFailure r)
 -- Does tryM, with a debug-trace on failure
+-- If we do recover from an exception, /insoluble/ constraints
+-- (only) in 'thing' are are propagated
 try_m thing
   = do { (mb_r, lie) <- tryCaptureConstraints thing
        ; emitConstraints lie
@@ -966,7 +970,7 @@ try_m thing
        -- Debug trace
        ; case mb_r of
             Left exn -> traceTc "tryTc/recoverM recovering from" $
-                        text (showException exn)
+                        (text (showException exn) $$ ppr lie)
             Right {} -> return ()
 
        ; return mb_r }
@@ -977,6 +981,8 @@ recoverM :: TcRn r      -- Recovery action; do this if the main one fails
                         --  if it generates errors, propagate them all
          -> TcRn r
 -- Errors in 'thing' are retained
+-- If we do recover from an exception, /insoluble/ constraints
+-- (only) in 'thing' are are propagated
 recoverM recover thing
   = do { mb_res <- try_m thing ;
          case mb_res of
@@ -1360,6 +1366,13 @@ debugTc thing
 ************************************************************************
 -}
 
+addTopEvBinds :: Bag EvBind -> TcM a -> TcM a
+addTopEvBinds new_ev_binds thing_inside
+  =updGblEnv upd_env thing_inside
+  where
+    upd_env tcg_env = tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env
+                                               `unionBags` new_ev_binds }
+
 newTcEvBinds :: TcM EvBindsVar
 newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
                   ; tcvs_ref  <- newTcRef emptyVarSet
@@ -1443,6 +1456,9 @@ emitStaticConstraints static_lie
 
 emitConstraints :: WantedConstraints -> TcM ()
 emitConstraints ct
+  | isEmptyWC ct
+  = return ()
+  | otherwise
   = do { lie_var <- getConstraintVar ;
          updTcRef lie_var (`andWC` ct) }
 
@@ -1488,7 +1504,7 @@ tryCaptureConstraints :: TcM a -> TcM (Either IOEnvFailure a, WantedConstraints)
 -- (captureConstraints_maybe m) runs m,
 -- and returns the type constraints it generates
 -- It never throws an exception; instead if thing_inside fails,
---   it returns Left exn and the insoluble constraints
+--   it returns Left exn and the /insoluble/ constraints
 tryCaptureConstraints thing_inside
   = do { lie_var <- newTcRef emptyWC
        ; mb_res <- tryM $
@@ -1706,8 +1722,7 @@ addModFinalizersWithLclEnv mod_finalizers
   = do lcl_env <- getLclEnv
        th_modfinalizers_var <- fmap tcg_th_modfinalizers getGblEnv
        updTcRef th_modfinalizers_var $ \fins ->
-         setLclEnv lcl_env (runRemoteModFinalizers mod_finalizers)
-         : fins
+         (lcl_env, mod_finalizers) : fins
 
 {-
 ************************************************************************

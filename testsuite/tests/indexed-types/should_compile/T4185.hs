@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveFunctor, StandaloneDeriving, FlexibleInstances, TypeFamilies, GeneralizedNewtypeDeriving #-}
 module T4185 where
 
-data family Foo k :: * -> *
+import Data.Kind (Type)
+
+data family Foo k :: Type -> Type
 
 ------------- Generalised newtype deriving of user class -----------
 class Bar f where

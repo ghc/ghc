@@ -864,7 +864,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
         -- Add extra tyvar binders: Note [Free tyvars in rule LHS]
         -- and extra dict binders: Note [Free dictionaries in rule LHS]
    mk_extra_bndrs fn_id args
-     = toposortTyVars unbound_tvs ++ unbound_dicts
+     = scopedSort unbound_tvs ++ unbound_dicts
      where
        unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
        unbound_dicts = [ mkLocalId (localiseName (idName d)) (Regular Omega) (idType d)
@@ -890,9 +890,9 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
                               , text "Orig lhs:" <+> ppr orig_lhs
                               , text "optimised lhs:" <+> ppr lhs2 ])
    pp_bndr bndr
-    | isTyVar bndr                      = text "type variable" <+> quotes (ppr bndr)
-    | Just pred <- evVarPred_maybe bndr = text "constraint" <+> quotes (ppr pred)
-    | otherwise                         = text "variable" <+> quotes (ppr bndr)
+    | isTyVar bndr = text "type variable" <+> quotes (ppr bndr)
+    | isEvVar bndr = text "constraint"    <+> quotes (ppr (varType bndr))
+    | otherwise    = text "variable"      <+> quotes (ppr bndr)
 
    constructor_msg con = vcat
      [ text "A constructor," <+> ppr con <>

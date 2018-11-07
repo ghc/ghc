@@ -3,10 +3,10 @@
 
 module T7601 where
 
-import GHC.Exts
+import Data.Kind
 
 class C (a :: k) where
    type F (a :: k)
 
-class Category (c :: k -> k -> *) where
+class Category (c :: k -> k -> Type) where
    type Ob c :: k -> Constraint

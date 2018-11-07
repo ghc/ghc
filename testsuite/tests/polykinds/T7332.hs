@@ -8,6 +8,7 @@
 module T7332 where
 
 import GHC.Exts( IsString(..) )
+import Data.Kind (Type)
 import Data.Monoid
 import Data.Semigroup
 
@@ -19,7 +20,7 @@ instance IsString (DC String) where
 
 
 class Monoid acc => Build acc r where
-    type BuildR r :: *          -- Result type
+    type BuildR r :: Type       -- Result type
     build :: (acc -> BuildR r) -> acc -> r
 
 instance Monoid dc => Build dc (DC dx) where

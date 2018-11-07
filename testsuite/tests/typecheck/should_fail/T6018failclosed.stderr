@@ -24,11 +24,11 @@ T6018failclosed.hs:19:5: error:
 
 T6018failclosed.hs:25:5: error:
     • Type family equation violates injectivity annotation.
-      Type and kind variables ‘k2’, ‘b’
+      Type and kind variables ‘k1’, ‘b’
       cannot be inferred from the right-hand side.
       Use -fprint-explicit-kinds to see the kind arguments
       In the type family equation:
-        forall k1 k2 (b :: k2) (c :: k1).
+        forall k1 k2 (b :: k1) (c :: k2).
           JClosed Int b c = Char -- Defined at T6018failclosed.hs:25:5
     • In the equations for closed type family ‘JClosed’
       In the type family declaration for ‘JClosed’

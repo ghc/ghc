@@ -1,10 +1,12 @@
 {-# LANGUAGE TemplateHaskell, KindSignatures, FlexibleInstances #-}
 
 module T5452 where
-import Language.Haskell.TH
 
-class C (f :: * -> *)
-class D (f :: * -> *)
+import Language.Haskell.TH hiding (Type)
+import Data.Kind (Type)
+
+class C (f :: Type -> Type)
+class D (f :: Type -> Type)
 
 instance C ((,) Int)
 

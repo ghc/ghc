@@ -137,7 +137,6 @@ module Module
 
 import GhcPrelude
 
-import Config
 import Outputable
 import Unique
 import UniqFM
@@ -1042,36 +1041,45 @@ parseModSubst = Parse.between (Parse.char '[') (Parse.char ']')
            return (k, v)
 
 
--- -----------------------------------------------------------------------------
--- $wired_in_packages
--- Certain packages are known to the compiler, in that we know about certain
--- entities that reside in these packages, and the compiler needs to
--- declare static Modules and Names that refer to these packages.  Hence
--- the wired-in packages can't include version numbers, since we don't want
--- to bake the version numbers of these packages into GHC.
---
--- So here's the plan.  Wired-in packages are still versioned as
--- normal in the packages database, and you can still have multiple
--- versions of them installed.  However, for each invocation of GHC,
--- only a single instance of each wired-in package will be recognised
--- (the desired one is selected via @-package@\/@-hide-package@), and GHC
--- will use the unversioned 'UnitId' below when referring to it,
--- including in .hi files and object file symbols.  Unselected
--- versions of wired-in packages will be ignored, as will any other
--- package that depends directly or indirectly on it (much as if you
--- had used @-ignore-package@).
+{-
+Note [Wired-in packages]
+~~~~~~~~~~~~~~~~~~~~~~~~
 
--- Make sure you change 'Packages.findWiredInPackages' if you add an entry here
+Certain packages are known to the compiler, in that we know about certain
+entities that reside in these packages, and the compiler needs to
+declare static Modules and Names that refer to these packages.  Hence
+the wired-in packages can't include version numbers in their package UnitId,
+since we don't want to bake the version numbers of these packages into GHC.
+
+So here's the plan.  Wired-in packages are still versioned as
+normal in the packages database, and you can still have multiple
+versions of them installed. To the user, everything looks normal.
+
+However, for each invocation of GHC, only a single instance of each wired-in
+package will be recognised (the desired one is selected via
+@-package@\/@-hide-package@), and GHC will internall pretend that it has the
+*unversioned* 'UnitId', including in .hi files and object file symbols.
+
+Unselected versions of wired-in packages will be ignored, as will any other
+package that depends directly or indirectly on it (much as if you
+had used @-ignore-package@).
+
+The affected packages are compiled with, e.g., @-this-unit-id base@, so that
+the symbols in the object files have the unversioned unit id in their name.
+
+Make sure you change 'Packages.findWiredInPackages' if you add an entry here.
+
+For `integer-gmp`/`integer-simple` we also change the base name to
+`integer-wired-in`, but this is fundamentally no different.
+See Note [The integer library] in PrelNames.
+-}
 
 integerUnitId, primUnitId,
   baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 primUnitId        = fsToUnitId (fsLit "ghc-prim")
-integerUnitId     = fsToUnitId (fsLit n)
-  where
-    n = case cIntegerLibraryType of
-        IntegerGMP    -> "integer-gmp"
-        IntegerSimple -> "integer-simple"
+integerUnitId     = fsToUnitId (fsLit "integer-wired-in")
+   -- See Note [The integer library] in PrelNames
 baseUnitId        = fsToUnitId (fsLit "base")
 rtsUnitId         = fsToUnitId (fsLit "rts")
 thUnitId          = fsToUnitId (fsLit "template-haskell")

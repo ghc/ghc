@@ -2,5 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module T14817 where
 
-$([d| data family Foo :: *
-      data instance Foo :: * |])
+import Data.Kind (Type)
+
+$([d| data family Foo :: Type
+      data instance Foo :: Type |])

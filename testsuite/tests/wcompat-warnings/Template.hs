@@ -1,4 +1,4 @@
-{-# LANGUAGE NoMonadFailDesugaring #-}
+{-# LANGUAGE NoMonadFailDesugaring, KindSignatures #-}
 
 module WCompatWarningsOnOff where
 
@@ -21,3 +21,6 @@ instance Monoid S where
   S a `mappend` S b = S (a+b)
   mempty = S 0
 
+-- -fwarn-star-is-type
+b :: (Bool :: *)
+b = True

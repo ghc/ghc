@@ -515,8 +515,8 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              rhs'     = substTyUnchecked subst' rhs_ty
              tcv' = tyCoVarsOfTypesList pat_tys'
              (tv', cv') = partition isTyVar tcv'
-             tvs'     = toposortTyVars tv'
-             cvs'     = toposortTyVars cv'
+             tvs'     = scopedSort tv'
+             cvs'     = scopedSort cv'
        ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' cvs'
                                      fam_tc pat_tys' rhs'

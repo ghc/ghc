@@ -639,7 +639,7 @@ niFixTCvSubst tenv
     not_fixpoint  = any in_domain range_tvs
     in_domain tv  = tv `elemVarEnv` tenv
 
-    free_tvs = toposortTyVars (filterOut in_domain range_tvs)
+    free_tvs = scopedSort (filterOut in_domain range_tvs)
 
     -- See Note [Finding the substitution fixpoint], Step 6
     init_in_scope = mkInScopeSet (fvVarSet range_fvs)

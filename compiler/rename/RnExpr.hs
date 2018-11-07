@@ -167,10 +167,10 @@ rnExpr (HsApp x fun arg)
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsApp x fun' arg', fvFun `plusFV` fvArg) }
 
-rnExpr (HsAppType arg fun)
+rnExpr (HsAppType x fun arg)
   = do { (fun',fvFun) <- rnLExpr fun
        ; (arg',fvArg) <- rnHsWcType HsTypeCtx arg
-       ; return (HsAppType arg' fun', fvFun `plusFV` fvArg) }
+       ; return (HsAppType x fun' arg', fvFun `plusFV` fvArg) }
 
 rnExpr (OpApp _ e1 op e2)
   = do  { (e1', fv_e1) <- rnLExpr e1
@@ -310,11 +310,11 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
                             , rupd_flds = rbinds' }
                  , fvExpr `plusFV` fvRbinds) }
 
-rnExpr (ExprWithTySig pty expr)
-  = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
+rnExpr (ExprWithTySig _ expr pty)
+  = do  { (pty', fvTy)    <- rnHsSigWcType BindUnlessForall ExprWithTySigCtx pty
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
-        ; return (ExprWithTySig pty' expr', fvExpr `plusFV` fvTy) }
+        ; return (ExprWithTySig noExt expr' pty', fvExpr `plusFV` fvTy) }
 
 rnExpr (HsIf x _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
@@ -826,20 +826,29 @@ rnStmt :: Outputable (body GhcPs)
 
 rnStmt ctxt rnBody (L loc (LastStmt _ body noret _)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
-        ; (ret_op, fvs1)   <- lookupStmtName ctxt returnMName
-        ; (thing,  fvs3)   <- thing_inside []
+        ; (ret_op, fvs1) <- if isMonadCompContext ctxt
+                            then lookupStmtName ctxt returnMName
+                            else return (noSyntaxExpr, emptyFVs)
+                            -- The 'return' in a LastStmt is used only
+                            -- for MonadComp; and we don't want to report
+                            -- "non in scope: return" in other cases
+                            -- Trac #15607
+
+        ; (thing,  fvs3) <- thing_inside []
         ; return (([(L loc (LastStmt noExt body' noret ret_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs3) }
 
 rnStmt ctxt rnBody (L loc (BodyStmt _ body _ _)) thing_inside
   = do  { (body', fv_expr) <- rnBody body
         ; (then_op, fvs1)  <- lookupStmtName ctxt thenMName
-        ; (guard_op, fvs2) <- if isListCompExpr ctxt
+
+        ; (guard_op, fvs2) <- if isComprehensionContext ctxt
                               then lookupStmtName ctxt guardMName
                               else return (noSyntaxExpr, emptyFVs)
                               -- Only list/monad comprehensions use 'guard'
                               -- Also for sub-stmts of same eg [ e | x<-xs, gd | blah ]
                               -- Here "gd" is a guard
+
         ; (thing, fvs3)    <- thing_inside []
         ; return ( ([(L loc (BodyStmt noExt body' then_op guard_op), fv_expr)]
                   , thing), fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }
@@ -854,14 +863,17 @@ rnStmt ctxt rnBody (L loc (BindStmt _ pat body _ _)) thing_inside
                 -- If the pattern is irrefutable (e.g.: wildcard, tuple,
                 -- ~pat, etc.) we should not need to fail.
                 | isIrrefutableHsPat pat
-                                    = return (noSyntaxExpr, emptyFVs)
+                = return (noSyntaxExpr, emptyFVs)
+
                 -- For non-monadic contexts (e.g. guard patterns, list
                 -- comprehensions, etc.) we should not need to fail.
                 -- See Note [Failing pattern matches in Stmts]
                 | not (isMonadFailStmtContext ctxt)
-                                    = return (noSyntaxExpr, emptyFVs)
+                = return (noSyntaxExpr, emptyFVs)
+
                 | xMonadFailEnabled = lookupSyntaxName failMName
                 | otherwise         = lookupSyntaxName failMName_preMFP
+
         ; (fail_op, fvs2) <- getFailFunction
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
@@ -1808,7 +1820,7 @@ isStrictPattern (L _ pat) =
     AsPat _ _ p     -> isStrictPattern p
     ParPat _ p      -> isStrictPattern p
     ViewPat _ _ p   -> isStrictPattern p
-    SigPat _ p      -> isStrictPattern p
+    SigPat _ p _    -> isStrictPattern p
     BangPat{}       -> True
     ListPat{}       -> True
     TuplePat{}      -> True
@@ -1932,7 +1944,7 @@ isReturnApp monad_names (L _ e) = case e of
   _otherwise -> Nothing
  where
   is_var f (L _ (HsPar _ e)) = is_var f e
-  is_var f (L _ (HsAppType _ e)) = is_var f e
+  is_var f (L _ (HsAppType _ e _)) = is_var f e
   is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False

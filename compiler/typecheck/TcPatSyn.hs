@@ -42,6 +42,8 @@ import TcBinds
 import BasicTypes
 import TcSimplify
 import TcUnify
+import Type( PredTree(..), EqRel(..), classifyPredType )
+import TysWiredIn
 import TcType
 import TcEvidence
 import BuildTyCl
@@ -53,7 +55,8 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
-import Control.Monad ( zipWithM, when )
+import Data.Maybe( mapMaybe )
+import Control.Monad ( zipWithM )
 import Data.List( partition )
 
 #include "HsVersions.h"
@@ -69,21 +72,23 @@ import Data.List( partition )
 tcPatSynDecl :: PatSynBind GhcRn GhcRn
              -> Maybe TcSigInfo
              -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcPatSynDecl psb@(PSB { psb_id = L _ name, psb_args = details }) mb_sig
-  = recoverM recover $
+tcPatSynDecl psb mb_sig
+  = recoverM (recoverPSB psb) $
     case mb_sig of
       Nothing                 -> tcInferPatSynDecl psb
       Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi
-      _ -> panic "tcPatSynDecl"
+      _                       -> panic "tcPatSynDecl"
 
+recoverPSB :: PatSynBind GhcRn GhcRn
+           -> TcM (LHsBinds GhcTc, TcGblEnv)
+-- See Note [Pattern synonym error recovery]
+recoverPSB (PSB { psb_id = L _ name, psb_args = details })
+ = do { matcher_name <- newImplicitBinder name mkMatcherOcc
+      ; let placeholder = AConLike $ PatSynCon $
+                          mk_placeholder matcher_name
+      ; gbl_env <- tcExtendGlobalEnv [placeholder] getGblEnv
+      ; return (emptyBag, gbl_env) }
   where
-    -- See Note [Pattern synonym error recovery]
-    recover = do { matcher_name <- newImplicitBinder name mkMatcherOcc
-                 ; let placeholder = AConLike $ PatSynCon $
-                                     mk_placeholder matcher_name
-                 ; gbl_env <- tcExtendGlobalEnv [placeholder] getGblEnv
-                 ; return (emptyBag, gbl_env) }
-
     (_arg_names, _rec_fields, is_infix) = collectPatSynArgInfo details
     mk_placeholder matcher_name
       = mkPatSyn name is_infix
@@ -98,30 +103,40 @@ tcPatSynDecl psb@(PSB { psb_id = L _ name, psb_args = details }) mb_sig
          matcher_id = mkLocalId matcher_name Alias $  -- todo Krzysztof is Alias right?
                       mkSpecForAllTys [alphaTyVar] alphaTy
 
-tcPatSynDecl (XPatSynBind {}) _ = panic "tcPatSynDecl"
+recoverPSB (XPatSynBind {}) = panic "recoverPSB"
 
 {- Note [Pattern synonym error recovery]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If type inference for a pattern synonym fails , we can't continue with
+If type inference for a pattern synonym fails, we can't continue with
 the rest of tc_patsyn_finish, because we may get knock-on errors, or
 even a crash.  E.g. from
    pattern What = True :: Maybe
 we get a kind error; and we must stop right away (Trac #15289).
-Hence the 'when insoluble failM' in tcInferPatSyn.
 
-But does that abort compilation entirely?  No -- we can recover
-and carry on, just as we do for value bindings, provided we plug in
-placeholder for the pattern synonym.  The goal of the placeholder
-is not to cause a raft of follow-on errors.  I've used the simplest
-thing for now, but we might need to elaborate it a bit later.  (e.g.
-I've given it zero args, which may cause knock-on errors if it is
-used in a pattern.) But it'll do for now.
+We stop if there are /any/ unsolved constraints, not just insoluble
+ones; because pattern synonyms are top-level things, we will never
+solve them later if we can't solve them now.  And if we were to carry
+on, tc_patsyn_finish does zonkTcTypeToType, which defaults any
+unsolved unificatdion variables to Any, which confuses the error
+reporting no end (Trac #15685).
+
+So we use simplifyTop to completely solve the constraint, report
+any errors, throw an exception.
+
+Even in the event of such an error we can recover and carry on, just
+as we do for value bindings, provided we plug in placeholder for the
+pattern synonym: see recoverPSB.  The goal of the placeholder is not
+to cause a raft of follow-on errors.  I've used the simplest thing for
+now, but we might need to elaborate it a bit later.  (e.g.  I've given
+it zero args, which may cause knock-on errors if it is used in a
+pattern.) But it'll do for now.
+
 -}
 
 tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
-                       psb_def = lpat, psb_dir = dir }
+tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
+                       , psb_def = lpat, psb_dir = dir })
   = addPatSynCtxt lname $
     do { traceTc "tcInferPatSynDecl {" $ ppr name
 
@@ -134,30 +149,21 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
-       ; (qtvs, req_dicts, ev_binds, insoluble)
+       ; (qtvs, req_dicts, ev_binds, residual, _)
                <- simplifyInfer tclvl NoRestrictions [] named_taus wanted
+       ; top_ev_binds <- checkNoErrs (simplifyTop residual)
+       ; addTopEvBinds top_ev_binds $
 
-       ; when insoluble failM
-              -- simplifyInfer doesn't fail if there are errors.  But to avoid
-              -- knock-on errors, or even crashes, we want to stop here.
-              -- See Note [Pattern synonym error recovery]
-
-       ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
+    do { let (ex_tvs, prov_dicts) = tcCollectEx lpat'
              ex_tv_set  = mkVarSet ex_tvs
              univ_tvs   = filterOut (`elemVarSet` ex_tv_set) qtvs
              req_theta  = map evVarPred req_dicts
 
        ; prov_dicts <- mapM zonkId prov_dicts
        ; let filtered_prov_dicts = mkMinimalBySCs evVarPred prov_dicts
-             prov_theta = map evVarPred filtered_prov_dicts
              -- Filtering: see Note [Remove redundant provided dicts]
-
-       -- Report bad universal type variables
-       -- See Note [Type variables whose kind is captured]
-       ; let bad_tvs    = [ tv | tv <- univ_tvs
-                               , tyCoVarsOfType (tyVarKind tv)
-                                 `intersectsVarSet` ex_tv_set ]
-       ; mapM_ (badUnivTvErr ex_tvs) bad_tvs
+             (prov_theta, prov_evs)
+                 = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
 
        -- Report coercions that esacpe
        -- See Note [Coercions that escape]
@@ -173,25 +179,37 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                           (mkTyVarBinders Inferred univ_tvs
                             , req_theta,  ev_binds, req_dicts)
                           (mkTyVarBinders Inferred ex_tvs
-                            , mkTyVarTys ex_tvs, prov_theta
-                            , map (EvExpr . evId) filtered_prov_dicts)
+                            , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
-                          pat_ty rec_fields }
+                          pat_ty rec_fields } }
 tcInferPatSynDecl (XPatSynBind _) = panic "tcInferPatSynDecl"
 
-badUnivTvErr :: [TyVar] -> TyVar -> TcM ()
--- See Note [Type variables whose kind is captured]
-badUnivTvErr ex_tvs bad_tv
-  = addErrTc $
-    vcat [ text "Universal type variable" <+> quotes (ppr bad_tv)
-                <+> text "has existentially bound kind:"
-         , nest 2 (ppr_with_kind bad_tv)
-         , hang (text "Existentially-bound variables:")
-              2 (vcat (map ppr_with_kind ex_tvs))
-         , text "Probable fix: give the pattern synonym a type signature"
-         ]
+mkProvEvidence :: EvId -> Maybe (PredType, EvTerm)
+-- See Note [Equality evidence in pattern synonyms]
+mkProvEvidence ev_id
+  | EqPred r ty1 ty2 <- classifyPredType pred
+  , let k1 = typeKind ty1
+        k2 = typeKind ty2
+        is_homo = k1 `tcEqType` k2
+        homo_tys   = [k1, ty1, ty2]
+        hetero_tys = [k1, k2, ty1, ty2]
+  = case r of
+      ReprEq | is_homo
+             -> Just ( mkClassPred coercibleClass    homo_tys
+                     , evDataConApp coercibleDataCon homo_tys eq_con_args )
+             | otherwise -> Nothing
+      NomEq  | is_homo
+             -> Just ( mkClassPred eqClass    homo_tys
+                     , evDataConApp eqDataCon homo_tys eq_con_args )
+             | otherwise
+             -> Just ( mkClassPred heqClass    hetero_tys
+                     , evDataConApp heqDataCon hetero_tys eq_con_args )
+
+  | otherwise
+  = Just (pred, EvExpr (evId ev_id))
   where
-    ppr_with_kind tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
+    pred = evVarPred ev_id
+    eq_con_args = [evId ev_id]
 
 dependentArgErr :: (Id, DTyCoVarSet) -> TcM ()
 -- See Note [Coercions that escape]
@@ -231,36 +249,29 @@ Similarly consider
 The pattern (Bam x y) binds two (Ord a) dictionaries, but we only
 need one.  Agian mkMimimalWithSCs removes the redundant one.
 
-Note [Type variables whose kind is captured]
+Note [Equality evidence in pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
-  data AST a = Sym [a]
-  class Prj s where { prj :: [a] -> Maybe (s a)
-  pattern P x <= Sym (prj -> Just x)
+  data X a where
+     MkX :: Eq a => [a] -> X (Maybe a)
+  pattern P x = MkG x
 
-Here we get a matcher with this type
-  $mP :: forall s a. Prj s => AST a -> (s a -> r) -> r -> r
+Then there is a danger that GHC will infer
+  P :: forall a.  () =>
+       forall b. (a ~# Maybe b, Eq b) => [b] -> X a
 
-No problem.  But note that 's' is not fixed by the type of the
-pattern (AST a), nor is it existentially bound.  It's really only
-fixed by the type of the continuation.
+The 'builder' for P, which is called in user-code, will then
+have type
+  $bP :: forall a b. (a ~# Maybe b, Eq b) => [b] -> X a
 
-Trac #14552 showed that this can go wrong if the kind of 's' mentions
-existentially bound variables.  We obviously can't make a type like
-  $mP :: forall (s::k->*) a. Prj s => AST a -> (forall k. s a -> r)
-                                   -> r -> r
-But neither is 's' itself existentially bound, so the forall (s::k->*)
-can't go in the inner forall either.  (What would the matcher apply
-the continuation to?)
+and that is bad because (a ~# Maybe b) is not a predicate type
+(see Note [Types for coercions, predicates, and evidence] in Type)
+and is not implicitly instantiated.
 
-So we just fail in this case, with a pretty terrible error message.
-Maybe we could do better, but I can't see how.  (It'd be possible to
-default 's' to (Any k), but that probably isn't what the user wanted,
-and it not straightforward to implement, because by the time we see
-the problem, simplifyInfer has already skolemised 's'.)
+So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
+marginally less efficient, if the builder/martcher are not inlined.
 
-This stuff can only happen in the presence of view patterns, with
-PolyKinds, so it's a bit of a corner case.
+See also Note [Lift equality constaints when quantifying] in TcType
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -944,7 +955,7 @@ tcPatToExpr name args pat = go pat
           InfixCon l r  -> mkPrefixConExpr con [l,r]
           RecCon fields -> mkRecordConExpr con fields
 
-    go1 (SigPat _ pat) = go1 (unLoc pat)
+    go1 (SigPat _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
     go1 (VarPat _ (L l var))
@@ -1125,7 +1136,7 @@ tcCollectEx pat = go pat
     go1 (ViewPat _ _ p)    = go p
     go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
                               goConDetails $ pat_args con
-    go1 (SigPat _ p)       = go p
+    go1 (SigPat _ p _)     = go p
     go1 (CoPat _ _ p _)    = go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract

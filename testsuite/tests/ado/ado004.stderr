@@ -41,8 +41,6 @@ TYPE SIGNATURES
     forall (m :: * -> *) a p.
     (Monad m, Num (m a)) =>
     (m a -> m (m a)) -> p -> m a
-TYPE CONSTRUCTORS
-COERCION AXIOMS
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

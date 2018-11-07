@@ -347,18 +347,21 @@ ppr_dec isTop (DataFamilyD tc tvs kind)
                 | otherwise = empty
     maybeKind | (Just k') <- kind = dcolon <+> ppr k'
               | otherwise = empty
-ppr_dec isTop (DataInstD ctxt tc tys ksig cs decs)
-  = ppr_data maybeInst ctxt tc (sep (map pprParendType tys)) ksig cs decs
+ppr_dec isTop (DataInstD ctxt tc bndrs tys ksig cs decs)
+  = ppr_data (maybeInst <+> ppr_bndrs bndrs) ctxt tc
+             (sep (map pprParendType tys)) ksig cs decs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec isTop (NewtypeInstD ctxt tc tys ksig c decs)
-  = ppr_newtype maybeInst ctxt tc (sep (map pprParendType tys)) ksig c decs
+ppr_dec isTop (NewtypeInstD ctxt tc bndrs tys ksig c decs)
+  = ppr_newtype (maybeInst <+> ppr_bndrs bndrs) ctxt tc
+                (sep (map pprParendType tys)) ksig c decs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
-ppr_dec isTop (TySynInstD tc (TySynEqn tys rhs))
-  = ppr_tySyn maybeInst tc (sep (map pprParendType tys)) rhs
+ppr_dec isTop (TySynInstD tc (TySynEqn mb_bndrs tys rhs))
+  = ppr_tySyn (maybeInst <+> ppr_bndrs mb_bndrs) tc
+              (sep (map pprParendType tys)) rhs
   where
     maybeInst | isTop     = text "instance"
               | otherwise = empty
@@ -371,8 +374,9 @@ ppr_dec _ (ClosedTypeFamilyD tfhead@(TypeFamilyHead tc _ _ _) eqns)
   = hang (text "type family" <+> ppr_tf_head tfhead <+> text "where")
       nestDepth (vcat (map ppr_eqn eqns))
   where
-    ppr_eqn (TySynEqn lhs rhs)
-      = ppr tc <+> sep (map pprParendType lhs) <+> text "=" <+> ppr rhs
+    ppr_eqn (TySynEqn mb_bndrs lhs rhs)
+      = ppr_bndrs mb_bndrs <+> ppr tc <+> sep (map pprParendType lhs)
+        <+> text "=" <+> ppr rhs
 ppr_dec _ (RoleAnnotD name roles)
   = hsep [ text "type role", ppr name ] <+> hsep (map ppr roles)
 ppr_dec _ (StandaloneDerivD ds cxt ty)
@@ -484,6 +488,10 @@ ppr_tf_head (TypeFamilyHead tc tvs res inj)
     maybeInj | (Just inj') <- inj = ppr inj'
              | otherwise          = empty
 
+ppr_bndrs :: Maybe [TyVarBndr] -> Doc
+ppr_bndrs (Just bndrs) = text "forall" <+> sep (map ppr bndrs) <> text "."
+ppr_bndrs Nothing = empty
+
 ------------------------------
 instance Ppr FunDep where
     ppr (FunDep xs ys) = hsep (map ppr xs) <+> text "->" <+> hsep (map ppr ys)
@@ -535,14 +543,19 @@ instance Ppr Pragma where
        <+> text "#-}"
     ppr (SpecialiseInstP inst)
        = text "{-# SPECIALISE instance" <+> ppr inst <+> text "#-}"
-    ppr (RuleP n bndrs lhs rhs phases)
+    ppr (RuleP n ty_bndrs tm_bndrs lhs rhs phases)
        = sep [ text "{-# RULES" <+> pprString n <+> ppr phases
-             , nest 4 $ ppr_forall <+> ppr lhs
+             , nest 4 $ ppr_ty_forall ty_bndrs <+> ppr_tm_forall ty_bndrs
+                                               <+> ppr lhs
              , nest 4 $ char '=' <+> ppr rhs <+> text "#-}" ]
-      where ppr_forall | null bndrs =   empty
-                       | otherwise  =   text "forall"
-                                    <+> fsep (map ppr bndrs)
-                                    <+> char '.'
+      where ppr_ty_forall Nothing      = empty
+            ppr_ty_forall (Just bndrs) = text "forall"
+                                         <+> fsep (map ppr bndrs)
+                                         <+> char '.'
+            ppr_tm_forall Nothing | null tm_bndrs = empty
+            ppr_tm_forall _ = text "forall"
+                              <+> fsep (map ppr tm_bndrs)
+                              <+> char '.'
     ppr (AnnP tgt expr)
        = text "{-# ANN" <+> target1 tgt <+> ppr expr <+> text "#-}"
       where target1 ModuleAnnotation    = text "module"
@@ -795,6 +808,7 @@ pprCxt ts = ppr_cxt_preds ts <+> text "=>"
 ppr_cxt_preds :: Cxt -> Doc
 ppr_cxt_preds [] = empty
 ppr_cxt_preds [t@ImplicitParamT{}] = parens (ppr t)
+ppr_cxt_preds [t@ForallT{}] = parens (ppr t)
 ppr_cxt_preds [t] = ppr t
 ppr_cxt_preds ts = parens (commaSep ts)
 

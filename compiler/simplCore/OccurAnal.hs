@@ -2502,6 +2502,10 @@ zapDetails = markAllMany . markAllNonTailCalled -- effectively sets to noOccInfo
 
 lookupDetails :: UsageDetails -> Id -> OccInfo
 lookupDetails ud id
+  | isCoVar id  -- We do not currenly gather occurrence info (from types)
+  = noOccInfo   -- for CoVars, so we must conservatively mark them as used
+                -- See Note [DoO not mark CoVars as dead]
+  | otherwise
   = case lookupVarEnv (ud_env ud) id of
       Just occ -> doZapping ud id occ
       Nothing  -> IAmDead
@@ -2512,6 +2516,25 @@ v `usedIn` ud = isExportedId v || v `elemVarEnv` ud_env ud
 udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
 udFreeVars bndrs ud = restrictUniqSetToUFM bndrs (ud_env ud)
+
+{- Note [Do not mark CoVars as dead]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's obviously wrong to mark CoVars as dead if they are used.
+Currently we don't traverse types to gather usase info for CoVars,
+so we had better treat them as having noOccInfo.
+
+This showed up in Trac #15696 we had something like
+  case eq_sel d of co -> ...(typeError @(...co...) "urk")...
+
+Then 'd' was substitued by a dictionary, so the expression
+simpified to
+  case (Coercion <blah>) of co -> ...(typeError @(...co...) "urk")...
+
+But then the "drop the case altogether" equation of rebuildCase
+thought that 'co' was dead, and discarded the entire case. Urk!
+
+I have no idea how we managed to avoid this pitfall for so long!
+-}
 
 -------------------
 -- Auxiliary functions for UsageDetails implementation

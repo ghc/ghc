@@ -80,6 +80,7 @@ module TysWiredIn (
 
         -- ** Constraint tuples
         cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
+        cTupleTyConNameArity_maybe,
         cTupleDataConName, cTupleDataConNames,
 
         -- * Any
@@ -167,6 +168,8 @@ import Util
 import BooleanFormula   ( mkAnd )
 
 import qualified Data.ByteString.Char8 as BS
+
+import Data.List        ( elemIndex )
 
 alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
@@ -731,6 +734,9 @@ isBuiltInOcc_maybe occ =
       -- equality tycon
       "~"    -> Just eqTyConName
 
+      -- function tycon
+      "->"   -> Just funTyConName
+
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
       _ | Just rest <- "(" `BS.stripPrefix` name
@@ -819,6 +825,17 @@ isCTupleTyConName n
  = ASSERT2( isExternalName n, ppr n )
    nameModule n == gHC_CLASSES
    && n `elemNameSet` cTupleTyConNameSet
+
+-- | If the given name is that of a constraint tuple, return its arity.
+-- Note that this is inefficient.
+cTupleTyConNameArity_maybe :: Name -> Maybe Arity
+cTupleTyConNameArity_maybe n
+  | not (isCTupleTyConName n) = Nothing
+  | otherwise = fmap adjustArity (n `elemIndex` cTupleTyConNames)
+  where
+    -- Since `cTupleTyConNames` jumps straight from the `0` to the `2`
+    -- case, we have to adjust accordingly our calculated arity.
+    adjustArity a = if a > 0 then a + 1 else a
 
 cTupleDataConName :: Arity -> Name
 cTupleDataConName arity
@@ -1291,7 +1308,7 @@ liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
 
 -- The type ('LiftedRep)
 liftedRepTy :: Type
-liftedRepTy = mkTyConTy liftedRepDataConTyCon
+liftedRepTy = liftedRepDataConTy
 
 {- *********************************************************************
 *                                                                      *

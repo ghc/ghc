@@ -89,11 +89,12 @@ module TcRnTypes(
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
-        tyCoVarsOfWCList, insolubleWantedCt, insolubleEqCt,
+        tyCoVarsOfWCList, insolubleCt, insolubleEqCt,
         isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
-        Implication(..), newImplication, implicLclEnv, implicDynFlags,
+        Implication(..), newImplication, implicationPrototype,
+        implicLclEnv, implicDynFlags,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
@@ -634,11 +635,10 @@ data TcGblEnv
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls
 
-        tcg_th_modfinalizers :: TcRef [TcM ()],
+        tcg_th_modfinalizers :: TcRef [(TcLclEnv, ThModFinalizers)],
         -- ^ Template Haskell module finalizers.
         --
-        -- They are computations in the @TcM@ monad rather than @Q@ because we
-        -- set them to use particular local environments.
+        -- They can use particular local environments.
 
         tcg_th_coreplugins :: TcRef [String],
         -- ^ Core plugins added by Template Haskell code.
@@ -1086,10 +1086,7 @@ data TcTyThing
       , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
       }
 
-  | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
-                                -- variable is bound. We only need the Name
-                                -- for error-message purposes; it is the corresponding
-                                -- Name in the domain of the envt
+  | ATyVar  Name TcTyVar   -- See Note [Type variables in the type environment]
 
   | ATcTyCon TyCon   -- Used temporarily, during kind checking, for the
                      -- tycons and clases in this recursive group
@@ -1256,6 +1253,48 @@ variables have ClosedTypeId=True (or imported).  This is an extension
 compared to the JFP paper on OutsideIn, which used "top-level" as a
 proxy for "closed".  (It's not a good proxy anyway -- the MR can make
 a top-level binding with a free type variable.)
+
+Note [Type variables in the type environment]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type environment has a binding for each lexically-scoped
+type variable that is in scope.  For example
+
+  f :: forall a. a -> a
+  f x = (x :: a)
+
+  g1 :: [a] -> a
+  g1 (ys :: [b]) = head ys :: b
+
+  g2 :: [Int] -> Int
+  g2 (ys :: [c]) = head ys :: c
+
+* The forall'd variable 'a' in the signature scopes over f's RHS.
+
+* The pattern-bound type variable 'b' in 'g1' scopes over g1's
+  RHS; note that it is bound to a skolem 'a' which is not itself
+  lexically in scope.
+
+* The pattern-bound type variable 'c' in 'g2' is bound to
+  Int; that is, pattern-bound type variables can stand for
+  arbitrary types. (see
+    GHC proposal #128 "Allow ScopedTypeVariables to refer to types"
+    https://github.com/ghc-proposals/ghc-proposals/pull/128,
+  and the paper
+    "Type variables in patterns", Haskell Symposium 2018.
+
+
+This is implemented by the constructor
+   ATyVar Name TcTyVar
+in the type environment.
+
+* The Name is the name of the original, lexically scoped type
+  variable
+
+* The TcTyVar is sometimes a skolem (like in 'f'), and sometimes
+  a unification variable (like in 'g1', 'g2').  We never zonk the
+  type environment so in the latter case it always stays as a
+  unification variable, although that variable may be later
+  unified with a type (such as Int in 'g2').
 -}
 
 instance Outputable IdBindingInfo where
@@ -2392,7 +2431,7 @@ addInsols wc cts
 insolublesOnly :: WantedConstraints -> WantedConstraints
 -- Keep only the definitely-insoluble constraints
 insolublesOnly (WC { wc_simple = simples, wc_impl = implics })
-  = WC { wc_simple = filterBag insolubleWantedCt simples
+  = WC { wc_simple = filterBag insolubleCt simples
        , wc_impl   = mapBag implic_insols_only implics }
   where
     implic_insols_only implic
@@ -2412,16 +2451,19 @@ insolubleImplic ic = isInsolubleStatus (ic_status ic)
 
 insolubleWC :: WantedConstraints -> Bool
 insolubleWC (WC { wc_impl = implics, wc_simple = simples })
-  =  anyBag insolubleWantedCt simples
+  =  anyBag insolubleCt simples
   || anyBag insolubleImplic implics
 
-insolubleWantedCt :: Ct -> Bool
+insolubleCt :: Ct -> Bool
 -- Definitely insoluble, in particular /excluding/ type-hole constraints
-insolubleWantedCt ct
-  | isGivenCt ct     = False              -- See Note [Given insolubles]
-  | isHoleCt ct      = isOutOfScopeCt ct  -- See Note [Insoluble holes]
-  | insolubleEqCt ct = True
-  | otherwise        = False
+-- Namely: a) an equality constraint
+--         b) that is insoluble
+--         c) and does not arise from a Given
+insolubleCt ct
+  | isHoleCt ct            = isOutOfScopeCt ct  -- See Note [Insoluble holes]
+  | not (insolubleEqCt ct) = False
+  | arisesFromGivens ct    = False              -- See Note [Given insolubles]
+  | otherwise              = True
 
 insolubleEqCt :: Ct -> Bool
 -- Returns True of /equality/ constraints
@@ -2474,6 +2516,12 @@ We do /not/ want to set the implication status to IC_Insoluble,
 because that'll suppress reports of [W] C b (f b).  But we
 may not report the insoluble [G] f b ~# b either (see Note [Given errors]
 in TcErrors), so we may fail to report anything at all!  Yikes.
+
+The same applies to Derived constraints that /arise from/ Givens.
+E.g.   f :: (C Int [a]) => blah
+where a fundep means we get
+       [D] Int ~ [a]
+By the same reasoning we must not suppress other errors (Trac #15767)
 
 Bottom line: insolubleWC (called in TcSimplify.setImplicationStatus)
              should ignore givens even if they are insoluble.
@@ -2562,21 +2610,25 @@ data Implication
 newImplication :: TcM Implication
 newImplication
   = do env <- getEnv
-       pure $ Implic { -- These fields must be initialised
-                       ic_tclvl      = panic "newImplic:tclvl"
-                     , ic_binds      = panic "newImplic:binds"
-                     , ic_info       = panic "newImplic:info"
+       return (implicationPrototype { ic_env = env })
 
-                       -- The rest have sensible default values
-                     , ic_env        = env
-                     , ic_skols      = []
-                     , ic_telescope  = Nothing
-                     , ic_given      = []
-                     , ic_wanted     = emptyWC
-                     , ic_no_eqs     = False
-                     , ic_status     = IC_Unsolved
-                     , ic_need_inner = emptyVarSet
-                     , ic_need_outer = emptyVarSet }
+implicationPrototype :: Implication
+implicationPrototype
+   = Implic { -- These fields must be initialised
+              ic_tclvl      = panic "newImplic:tclvl"
+            , ic_binds      = panic "newImplic:binds"
+            , ic_info       = panic "newImplic:info"
+            , ic_env        = panic "newImplic:env"
+
+              -- The rest have sensible default values
+            , ic_skols      = []
+            , ic_telescope  = Nothing
+            , ic_given      = []
+            , ic_wanted     = emptyWC
+            , ic_no_eqs     = False
+            , ic_status     = IC_Unsolved
+            , ic_need_inner = emptyVarSet
+            , ic_need_outer = emptyVarSet }
 
 -- | Retrieve the enclosed 'TcLclEnv' from an 'Implication'.
 implicLclEnv :: Implication -> TcLclEnv
@@ -2820,7 +2872,7 @@ ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ })
             = Coercion $ ctEvCoercion ev
 ctEvExpr ev = evId (ctEvEvId ev)
 
-ctEvCoercion :: CtEvidence -> Coercion
+ctEvCoercion :: HasDebugCallStack => CtEvidence -> Coercion
 ctEvCoercion (CtGiven { ctev_evar = ev_id })
   = mkTcCoVarCo ev_id
 ctEvCoercion (CtWanted { ctev_dest = dest })
@@ -3583,7 +3635,7 @@ exprCtOrigin (HsLit {})           = Shouldn'tHappenOrigin "concrete literal"
 exprCtOrigin (HsLam _ matches)    = matchesCtOrigin matches
 exprCtOrigin (HsLamCase _ ms)     = matchesCtOrigin ms
 exprCtOrigin (HsApp _ e1 _)       = lexprCtOrigin e1
-exprCtOrigin (HsAppType _ e1)     = lexprCtOrigin e1
+exprCtOrigin (HsAppType _ e1 _)   = lexprCtOrigin e1
 exprCtOrigin (OpApp _ _ op _)     = lexprCtOrigin op
 exprCtOrigin (NegApp _ e _)       = lexprCtOrigin e
 exprCtOrigin (HsPar _ e)          = lexprCtOrigin e

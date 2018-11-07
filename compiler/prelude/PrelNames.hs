@@ -110,6 +110,36 @@ by the user. For those things that *can* appear in source programs,
      original-name cache.
 
      See also Note [Built-in syntax and the OrigNameCache]
+
+
+Note [The integer library]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Clearly, we need to know the names of various definitions of the integer
+library, e.g. the type itself, `mkInteger` etc. But there are two possible
+implementations of the integer library:
+
+ * integer-gmp (fast, but uses libgmp, which may not be available on all
+   targets and is GPL licensed)
+ * integer-simple (slow, but pure Haskell and BSD-licensed)
+
+We want the compiler to work with either one. The way we achieve this is:
+
+ * When compiling the integer-{gmp,simple} library, we pass
+     -this-unit-id  integer-wired-in
+   to GHC (see the cabal file libraries/integer-{gmp,simple}.
+ * This way, GHC can use just this UnitID (see Module.integerUnitId) when
+   generating code, and the linker will succeed.
+
+Unfortuately, the abstraction is not complete: When using integer-gmp, we
+really want to use the S# constructor directly. This is controlled by
+the `integerLibrary` field of `DynFlags`: If it is IntegerGMP, we use
+this constructor directly (see  CorePrep.lookupIntegerSDataConName)
+
+When GHC reads the package data base, it (internally only) pretends it has UnitId
+`integer-wired-in` instead of the actual UnitId (which includes the version
+number); just like for `base` and other packages, as described in
+Note [Wired-in packages] in Module. This is done in Packages.findWiredInPackages.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -136,8 +166,6 @@ import Unique
 import Name
 import SrcLoc
 import FastString
-import Config ( cIntegerLibraryType, IntegerLibrary(..) )
-import Panic ( panic )
 
 {-
 ************************************************************************
@@ -355,6 +383,7 @@ basicKnownKeyNames
         gcdIntegerName, lcmIntegerName,
         andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
         shiftLIntegerName, shiftRIntegerName, bitIntegerName,
+        integerSDataConName,naturalSDataConName,
 
         -- Natural
         naturalTyConName,
@@ -433,9 +462,7 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
-    ] ++ case cIntegerLibraryType of
-           IntegerGMP    -> [integerSDataConName,naturalSDataConName]
-           IntegerSimple -> []
+    ]
 
 genericTyConNames :: [Name]
 genericTyConNames = [
@@ -630,9 +657,9 @@ le_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<=")
 lt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<")
 gt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit ">")
 compare_RDR             = varQual_RDR  gHC_CLASSES (fsLit "compare")
-ltTag_RDR               = dataQual_RDR gHC_TYPES (fsLit "LT")
-eqTag_RDR               = dataQual_RDR gHC_TYPES (fsLit "EQ")
-gtTag_RDR               = dataQual_RDR gHC_TYPES (fsLit "GT")
+ltTag_RDR               = nameRdrName  ordLTDataConName
+eqTag_RDR               = nameRdrName  ordEQDataConName
+gtTag_RDR               = nameRdrName  ordGTDataConName
 
 eqClass_RDR, numClass_RDR, ordClass_RDR, enumClass_RDR, monadClass_RDR
     :: RdrName
@@ -643,10 +670,11 @@ enumClass_RDR           = nameRdrName enumClassName
 monadClass_RDR          = nameRdrName monadClassName
 
 map_RDR, append_RDR :: RdrName
-map_RDR                 = varQual_RDR gHC_BASE (fsLit "map")
-append_RDR              = varQual_RDR gHC_BASE (fsLit "++")
+map_RDR                 = nameRdrName mapName
+append_RDR              = nameRdrName appendName
 
-foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR_preMFP, failM_RDR:: RdrName
+foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR_preMFP,
+  failM_RDR :: RdrName
 foldr_RDR               = nameRdrName foldrName
 build_RDR               = nameRdrName buildName
 returnM_RDR             = nameRdrName returnMName
@@ -822,9 +850,9 @@ conIsRecord_RDR   = varQual_RDR gHC_GENERICS (fsLit "conIsRecord")
 
 prefixDataCon_RDR     = dataQual_RDR gHC_GENERICS (fsLit "Prefix")
 infixDataCon_RDR      = dataQual_RDR gHC_GENERICS (fsLit "Infix")
-leftAssocDataCon_RDR  = dataQual_RDR gHC_GENERICS (fsLit "LeftAssociative")
-rightAssocDataCon_RDR = dataQual_RDR gHC_GENERICS (fsLit "RightAssociative")
-notAssocDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "NotAssociative")
+leftAssocDataCon_RDR  = nameRdrName leftAssociativeDataConName
+rightAssocDataCon_RDR = nameRdrName rightAssociativeDataConName
+notAssocDataCon_RDR   = nameRdrName notAssociativeDataConName
 
 uAddrDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UAddr")
 uCharDataCon_RDR   = dataQual_RDR gHC_GENERICS (fsLit "UChar")
@@ -843,7 +871,7 @@ uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
     foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
     mappend_RDR :: RdrName
-fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
+fmap_RDR                = nameRdrName fmapName
 replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
 pure_RDR                = nameRdrName pureAName
 ap_RDR                  = nameRdrName apAName
@@ -853,8 +881,8 @@ foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
 null_RDR                = varQual_RDR dATA_FOLDABLE       (fsLit "null")
 all_RDR                 = varQual_RDR dATA_FOLDABLE       (fsLit "all")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
-mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
-mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")
+mempty_RDR              = nameRdrName memptyName
+mappend_RDR             = nameRdrName mappendName
 
 ----------------------
 varQual_RDR, tcQual_RDR, clsQual_RDR, dataQual_RDR
@@ -1117,11 +1145,8 @@ integerTyConName, mkIntegerName, integerSDataConName,
     gcdIntegerName, lcmIntegerName,
     andIntegerName, orIntegerName, xorIntegerName, complementIntegerName,
     shiftLIntegerName, shiftRIntegerName, bitIntegerName :: Name
-integerTyConName      = tcQual  gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
-integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit n)                    integerSDataConKey
-  where n = case cIntegerLibraryType of
-            IntegerGMP    -> "S#"
-            IntegerSimple -> panic "integerSDataConName evaluated for integer-simple"
+integerTyConName      = tcQual gHC_INTEGER_TYPE (fsLit "Integer")           integerTyConKey
+integerSDataConName   = dcQual gHC_INTEGER_TYPE (fsLit "S#")                integerSDataConKey
 mkIntegerName         = varQual gHC_INTEGER_TYPE (fsLit "mkInteger")         mkIntegerIdKey
 integerToWord64Name   = varQual gHC_INTEGER_TYPE (fsLit "integerToWord64")   integerToWord64IdKey
 integerToInt64Name    = varQual gHC_INTEGER_TYPE (fsLit "integerToInt64")    integerToInt64IdKey
@@ -1168,10 +1193,7 @@ bitIntegerName        = varQual gHC_INTEGER_TYPE (fsLit "bitInteger")        bit
 -- GHC.Natural types
 naturalTyConName, naturalSDataConName :: Name
 naturalTyConName     = tcQual gHC_NATURAL (fsLit "Natural") naturalTyConKey
-naturalSDataConName  = dcQual gHC_NATURAL (fsLit n)         naturalSDataConKey
-  where n = case cIntegerLibraryType of
-            IntegerGMP    -> "NatS#"
-            IntegerSimple -> panic "naturalSDataConName evaluated for integer-simple"
+naturalSDataConName  = dcQual gHC_NATURAL (fsLit "NatS#")   naturalSDataConKey
 
 naturalFromIntegerName :: Name
 naturalFromIntegerName = varQual gHC_NATURAL (fsLit "naturalFromInteger") naturalFromIntegerIdKey

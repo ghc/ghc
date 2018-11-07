@@ -7,6 +7,7 @@ module GHC.Exts.Heap.InfoTable
 
 #include "Rts.h"
 
+import Prelude -- See note [Why do we import Prelude here?]
 import GHC.Exts.Heap.InfoTable.Types
 #if !defined(TABLES_NEXT_TO_CODE)
 import GHC.Exts.Heap.Constants
@@ -58,7 +59,7 @@ pokeItbl a0 itbl = do
 #endif
   (#poke StgInfoTable, layout.payload.ptrs) a0 (ptrs itbl)
   (#poke StgInfoTable, layout.payload.nptrs) a0 (nptrs itbl)
-  (#poke StgInfoTable, type) a0 (fromEnum (tipe itbl))
+  (#poke StgInfoTable, type) a0 (toHalfWord (fromEnum (tipe itbl)))
 #if __GLASGOW_HASKELL__ > 804
   (#poke StgInfoTable, srt) a0 (srtlen itbl)
 #else
@@ -71,6 +72,9 @@ pokeItbl a0 itbl = do
     Just (Left xs) -> pokeArray code_offset xs
     Just (Right xs) -> pokeArray code_offset xs
 #endif
+  where
+    toHalfWord :: Int -> HalfWord
+    toHalfWord i = fromIntegral i
 
 -- | Size in bytes of a standard InfoTable
 itblSize :: Int

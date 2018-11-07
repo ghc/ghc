@@ -1025,9 +1025,10 @@ ppr_iface_forall_part show_forall tvs ctxt sdoc
 pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprIfaceForAll [] = empty
 pprIfaceForAll bndrs@(Bndr _ vis : _)
-  = add_separator (forAllLit <+> doc) <+> pprIfaceForAll bndrs'
+  = sep [ add_separator (forAllLit <+> fsep docs)
+        , pprIfaceForAll bndrs' ]
   where
-    (bndrs', doc) = ppr_itv_bndrs bndrs vis
+    (bndrs', docs) = ppr_itv_bndrs bndrs vis
 
     add_separator stuff = case vis of
                             Required -> stuff <+> arrow
@@ -1039,12 +1040,12 @@ pprIfaceForAll bndrs@(Bndr _ vis : _)
 -- No anonymous binders here!
 ppr_itv_bndrs :: [IfaceForAllBndr]
              -> ArgFlag  -- ^ visibility of the first binder in the list
-             -> ([IfaceForAllBndr], SDoc)
+             -> ([IfaceForAllBndr], [SDoc])
 ppr_itv_bndrs all_bndrs@(bndr@(Bndr _ vis) : bndrs) vis1
   | vis `sameVis` vis1 = let (bndrs', doc) = ppr_itv_bndrs bndrs vis1 in
-                         (bndrs', pprIfaceForAllBndr bndr <+> doc)
-  | otherwise   = (all_bndrs, empty)
-ppr_itv_bndrs [] _ = ([], empty)
+                         (bndrs', pprIfaceForAllBndr bndr : doc)
+  | otherwise   = (all_bndrs, [])
+ppr_itv_bndrs [] _ = ([], [])
 
 pprIfaceForAllCo :: [(IfLclName, IfaceCoercion)] -> SDoc
 pprIfaceForAllCo []  = empty

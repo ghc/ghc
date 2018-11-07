@@ -132,11 +132,6 @@ AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
-  # See #15281
-  if test "$GhcMajVersion" = "8" && test "$GhcMinVersion" = "2" && test "$GhcPatchLevel" = "1"; then
-     AC_MSG_ERROR([GHC 8.2.1 is known to be buggy and cannot bootstrap this GHC release (See Trac 15281); please use GHC 8.2.2 or later.])
-  fi
-
   if test "$GhcMajVersion" = "unknown" || test "$GhcMinVersion" = "unknown"; then
      AC_MSG_ERROR([Cannot determine the version of $WithGhc.  Is it really GHC?])
   fi
@@ -164,8 +159,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.2],
-    [AC_MSG_ERROR([GHC version 8.2 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.4],
+    [AC_MSG_ERROR([GHC version 8.4 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -738,6 +733,11 @@ FP_GCC_VERSION
 
 dnl ** See whether gcc supports -no-pie
 FP_GCC_SUPPORTS_NO_PIE
+
+dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
+dnl    unregisterised, Sparc, and PPC backends.
+FP_GCC_SUPPORTS__ATOMICS
+AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
 
 FP_GCC_EXTRA_FLAGS
 

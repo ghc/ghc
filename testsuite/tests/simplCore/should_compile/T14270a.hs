@@ -17,7 +17,7 @@ f :: T (a :: Type) -> Bool
 f (T1 x) = f x
 f T2     = True
 
-g :: forall (a :: k). K a -> T a -> Bool
+g :: forall k (a :: k). K a -> T a -> Bool
 g kv x = case kv of
             K1 -> f @a T2   -- f @a (T1 x) gives a different crash
             k2 -> True

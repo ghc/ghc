@@ -1113,9 +1113,6 @@ instance Semigroup RecompileRequired where
 
 instance Monoid RecompileRequired where
   mempty = UpToDate
-#if __GLASGOW_HASKELL__ < 804
-  mappend = (Data.Semigroup.<>)
-#endif
 
 recompileRequired :: RecompileRequired -> Bool
 recompileRequired UpToDate = False

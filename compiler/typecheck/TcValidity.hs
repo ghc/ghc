@@ -1115,12 +1115,39 @@ checkValidInstHead :: UserTypeCtxt -> Class -> [Type] -> TcM ()
 checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
        ; is_boot  <- tcIsHsBootOrSig
-       ; check_valid_inst_head dflags is_boot ctxt clas cls_args }
+       ; is_sig   <- tcIsHsig
+       ; check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+       }
 
-check_valid_inst_head :: DynFlags -> Bool
+{-
+
+Note [Instances of built-in classes in signature files]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+User defined instances for KnownNat, KnownSymbol and Typeable are
+disallowed -- they are generated when needed by GHC itself on-the-fly.
+
+However, if they occur in a Backpack signature file, they have an
+entirely different meaning. Suppose in M.hsig we see
+
+  signature M where
+    data T :: Nat
+    instance KnownNat T
+
+That says that any module satisfying M.hsig must provide a KnownNat
+instance for T.  We absolultely need that instance when compiling a
+module that imports M.hsig: see Trac #15379 and
+Note [Fabricating Evidence for Literals in Backpack] in ClsInst.
+
+Hence, checkValidInstHead accepts a user-written instance declaration
+in hsig files, where `is_sig` is True.
+
+-}
+
+check_valid_inst_head :: DynFlags -> Bool -> Bool
                       -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags is_boot ctxt clas cls_args
+check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
@@ -1129,14 +1156,18 @@ check_valid_inst_head dflags is_boot ctxt clas cls_args
 
   -- For Typeable, don't complain about instances for
   -- standalone deriving; they are no-ops, and we warn about
-  -- it in TcDeriv.deriveStandalone
+  -- it in TcDeriv.deriveStandalone.
   | clas_nm == typeableClassName
+  , not is_sig
+    -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
   -- Handwritten instances of KnownNat/KnownSymbol class
   -- are always forbidden (#12837)
   | clas_nm `elem` [ knownNatClassName, knownSymbolClassName ]
+  , not is_sig
+    -- Note [Instances of built-in classes in signature files]
   , hand_written_bindings
   = failWithTc rejected_class_msg
 
@@ -1748,7 +1779,8 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pat
   = do { -- Check that the associated type indeed comes from this class
          -- See [Mismatched class methods and associated type families]
          -- in TcInstDecls.
-         checkTc (Just clas == tyConAssoc_maybe fam_tc)
+
+         checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
        -- Check type args first (more comprehensible)
@@ -1758,15 +1790,17 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pat
        ; checkTcM (all check_arg kind_shapes)
                   (tidy_env2, pp_wrong_at_arg $$ ppSuggestExplicitKinds)
 
-       ; traceTc "cfi" (vcat [ ppr inst_tvs
-                             , ppr arg_shapes
-                             , ppr mini_env ]) }
+       ; traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
+                                                , ppr arg_shapes
+                                                , ppr mini_env ]) }
   where
     arg_shapes :: [AssocInstArgShape]
     arg_shapes = [ (lookupVarEnv mini_env fam_tc_tv, at_ty)
                  | (fam_tc_tv, at_ty) <- tyConTyVars fam_tc `zip` at_tys ]
 
-    (kind_shapes, type_shapes) = partitionInvisibles fam_tc snd arg_shapes
+    kind_shapes, type_shapes :: [AssocInstArgShape]
+    (kind_shapes, type_shapes) = partitionInvisibles $
+                                 arg_shapes `zip` tyConArgFlags fam_tc at_tys
 
     check_arg :: AssocInstArgShape -> Bool
     check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
@@ -2047,16 +2081,11 @@ kind. But this kind mentions k, which is bound *after* a.
 
 Note that b is not bound. Yet its kind mentions a. Because we have
 a nice rule that all implicitly bound variables come before others,
-this is bogus. (We could probably figure out to put b between a and c.
-But I think this is doing users a disservice, in the long run.)
-(Testcase: dependent/should_fail/BadTelescope4)
+this is bogus.
 
 To catch these errors, we call checkValidTelescope during kind-checking
-datatype declarations. This must be done *before* kind-generalization,
-because kind-generalization might observe, say, T1, see that k is free
-in a's kind, and generalize over it, producing nonsense. It also must
-be done *after* kind-generalization, in order to catch the T2 case, which
-becomes apparent only after generalizing.
+datatype declarations. See also
+Note [Required, Specified, and Inferred for types] in TcTyClsDecls.
 
 Note [Keeping scoped variables in order: Explicit] discusses how this
 check works for `forall x y z.` written in a type.
@@ -2071,35 +2100,45 @@ check works for `forall x y z.` written in a type.
 -- because k isn't in scope when a is bound. This check has to come before
 -- general validity checking, because once we kind-generalise, this sort
 -- of problem is harder to spot (as we'll generalise over the unbound
--- k in a's type.) See also Note [Bad telescopes].
+-- k in a's type.)
+--
+-- See Note [Generalisation for type constructors] in TcTyClsDecls for
+--     data type declarations
+-- and Note [Keeping scoped variables in order: Explicit] in TcHsType
+--     for foralls
 checkValidTelescope :: [TyConBinder]   -- explicit vars (zonked)
                     -> SDoc            -- original, user-written telescope
-                    -> SDoc            -- extra text to print
                     -> TcM ()
-checkValidTelescope tvbs user_tyvars extra
-  = do { let tvs      = binderVars tvbs
-
-             (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv $
-                                      toposortTyVars tvs
-       ; unless (go [] emptyVarSet (binderVars tvbs)) $
-         addErr $
-         vcat [ hang (text "These kind and type variables:" <+> user_tyvars $$
-                      text "are out of dependency order. Perhaps try this ordering:")
-                   2 (pprTyVars sorted_tidied_tvs)
-              , extra ] }
-
+checkValidTelescope tvbs user_tyvars
+  = unless (null bad_tvbs) $ addErr $
+    vcat [ hang (text "These kind and type variables:" <+> user_tyvars $$
+                 text "are out of dependency order. Perhaps try this ordering:")
+              2 (pprTyVars sorted_tidied_tvs)
+         , extra ]
   where
-    go :: [TyVar]  -- misplaced variables
-       -> TyVarSet -> [TyVar] -> Bool
-    go errs in_scope [] = null (filter (`elemVarSet` in_scope) errs)
-        -- report an error only when the variable in the kind is brought
-        -- into scope later in the telescope. Otherwise, we'll just quantify
-        -- over it in kindGeneralize, as we should.
+    tvs = binderVars tvbs
+    (_, sorted_tidied_tvs) = tidyVarBndrs emptyTidyEnv (scopedSort tvs)
 
-    go errs in_scope  (tv:tvs)
-      = let bad_tvs = filterOut (`elemVarSet` in_scope) $
-                      tyCoVarsOfTypeList (tyVarKind tv)
-        in go (bad_tvs ++ errs) (in_scope `extendVarSet` tv) tvs
+    (_, bad_tvbs) = foldl add_one (mkVarSet tvs, []) tvbs
+
+    add_one :: (TyVarSet, [TyConBinder])
+            -> TyConBinder
+            -> (TyVarSet, [TyConBinder])
+    add_one (bad_bndrs, acc) tvb
+      | fkvs `intersectsVarSet` bad_bndrs
+      = (bad', tvb : acc)
+      | otherwise
+      = (bad', acc)
+      where
+        tv = binderVar tvb
+        fkvs = tyCoVarsOfType (tyVarKind tv)
+        bad' = bad_bndrs `delVarSet` tv
+
+    extra
+      | any isInvisibleTyConBinder tvbs
+      = text "NB: Implicitly declared variables come before others."
+      | otherwise
+      = empty
 
 {-
 ************************************************************************

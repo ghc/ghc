@@ -2,8 +2,10 @@
 
 module Ind2_help where
 
+import Data.Kind (Type)
+
 class C a where
-  data T a :: *
+  data T a :: Type
   unT :: T a -> a
   mkT :: a -> T a
 

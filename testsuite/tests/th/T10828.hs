@@ -3,11 +3,12 @@
 
 module T10828 where
 
-import Language.Haskell.TH
+import Language.Haskell.TH hiding (Type)
 import System.IO
+import Data.Kind (Type)
 
-$( do { decl <- [d| data family D a :: * -> *
-                    data instance D Int Bool :: * where
+$( do { decl <- [d| data family D a :: Type -> Type
+                    data instance D Int Bool :: Type where
                          DInt :: D Int Bool
 
                     data E where
@@ -16,7 +17,7 @@ $( do { decl <- [d| data family D a :: * -> *
                     data Foo a b where
                       MkFoo, MkFoo' :: a -> Foo a b
 
-                    newtype Bar :: * -> Bool -> * where
+                    newtype Bar :: Type -> Bool -> Type where
                       MkBar :: a -> Bar a b
                  |]
 
@@ -24,7 +25,7 @@ $( do { decl <- [d| data family D a :: * -> *
       ; return decl }
  )
 
--- data T a :: * where
+-- data T a :: Type where
 --    MkT :: a -> a -> T a
 --    MkC :: forall a b. (a ~ Int) => { foo :: a, bar :: b } -> T Int
 
@@ -65,7 +66,7 @@ $( do { -- test reification
 
         -- test quoting
       ; d <- runQ $ [d|
-             data T' a :: * where
+             data T' a :: Type where
                 MkT' :: a -> a -> T' a
                 MkC' :: forall a b. (a ~ Int) => { foo :: a, bar :: b }
                                               -> T' Int |]

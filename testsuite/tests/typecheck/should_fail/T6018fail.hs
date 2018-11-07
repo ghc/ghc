@@ -3,11 +3,13 @@
 
 module T6018fail where
 
+import Data.Kind (Type)
+
 import T6018Afail -- defines G, identical to F
 import T6018Cfail -- imports H from T6018Bfail, defines some equations for H
 import T6018Dfail -- imports H from T6018Bfail, defines conflicting eqns
 
-type family F a b c = (result :: *) | result -> a b c
+type family F a b c = (result :: Type) | result -> a b c
 type instance F Int  Char Bool = Bool
 type instance F Char Bool Int  = Int
 type instance F Bool Int  Char = Int
@@ -118,7 +120,7 @@ type family G7 a b (c :: k) = r | r -> a b c
 type instance G7 a b c = [G7a a b c]
 
 class C a b where
-    type FC a (b :: *) = r | r -> b
+    type FC a (b :: Type) = r | r -> b
     type instance FC a b = b
 
 instance C Int Char where

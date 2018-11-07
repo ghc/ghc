@@ -478,16 +478,6 @@ void traceOSProcessInfo_(void) {
                                    argc, argv);
             }
         }
-        {
-            int envc = 0; char **envv;
-            getProgEnvv(&envc, &envv);
-            if (envc != 0) {
-                postCapsetVecEvent(EVENT_PROGRAM_ENV,
-                                   CAPSET_OSPROCESS_DEFAULT,
-                                   envc, envv);
-            }
-            freeProgEnvv(envc, envv);
-        }
     }
 }
 

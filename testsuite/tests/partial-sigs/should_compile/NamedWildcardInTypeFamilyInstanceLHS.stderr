@@ -1,9 +1,6 @@
-TYPE SIGNATURES
 TYPE CONSTRUCTORS
-  type family F a :: *
-    where
-        F _t = Int
-      axiom NamedWildcardInTypeFamilyInstanceLHS.D:R:F
+  type role F nominal
+  F :: * -> *
 COERCION AXIOMS
   axiom NamedWildcardInTypeFamilyInstanceLHS.D:R:F ::
     F _t = Int

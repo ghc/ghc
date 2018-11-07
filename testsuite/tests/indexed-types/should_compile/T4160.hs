@@ -4,9 +4,14 @@
 
 module Foo where
 
+import Data.Kind (Type)
+
 data P f g r = f r :*: g r
-type family TrieMapT (f :: * -> *) :: * -> (* -> *) -> * -> *
-newtype PMap m1 (m2 :: * -> (* -> *) -> * -> *) k (a :: * -> *) ix = PMap (m1 k (m2 k a) ix)
+type family TrieMapT (f :: Type -> Type) ::
+  Type -> (Type -> Type) -> Type -> Type
+newtype PMap m1 (m2 :: Type -> (Type -> Type) -> Type -> Type)
+             k (a :: Type -> Type) ix
+  = PMap (m1 k (m2 k a) ix)
 type instance TrieMapT (P f g) = PMap (TrieMapT f) (TrieMapT g)
 
 class TrieKeyT f m where

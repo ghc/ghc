@@ -104,6 +104,10 @@ mkExtraObjToLinkIntoBinary dflags = do
             <> text (if rtsOptsSuggestions dflags
                         then "true"
                         else "false") <> semi,
+        text "__conf.keep_cafs = "
+            <> text (if gopt Opt_KeepCAFs dflags
+                       then "true"
+                       else "false") <> semi,
         case rtsOpts dflags of
             Nothing   -> Outputable.empty
             Just opts -> text "    __conf.rts_opts= " <>

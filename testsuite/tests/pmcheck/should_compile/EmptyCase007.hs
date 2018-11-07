@@ -4,7 +4,9 @@
 -- Check interaction between Newtypes and Type Families
 module EmptyCase007 where
 
-type family FA a :: * -- just an open type family
+import Data.Kind (Type)
+
+type family FA a :: Type -- just an open type family
 type instance FA Int     = (Char, Bool)
 type instance FA Char    = Char
 type instance FA [a]     = [FA a]

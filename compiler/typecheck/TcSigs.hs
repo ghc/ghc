@@ -304,6 +304,24 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
   universal and existential vars.
 
 * After we kind-check the pieces and convert to Types, we do kind generalisation.
+
+Note [solveEqualities in tcPatSynSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important that we solve /all/ the equalities in a pattern
+synonym signature, because we are going to zonk the signature to
+a Type (not a TcType), in TcPatSyn.tc_patsyn_finish, and that
+fails if there are un-filled-in coercion variables mentioned
+in the type (Trac #15694).
+
+The best thing is simply to use solveEqualities to solve all the
+equalites, rather than leaving them in the ambient constraints
+to be solved later.  Pattern synonyms are top-level, so there's
+no problem with completely solving them.
+
+(NB: this solveEqualities wraps tcImplicitTKBndrs, which itself
+does a solveLocalEqualities; so solveEqualities isn't going to
+make any further progress; it'll just report any unsolved ones,
+and fail, as it should.)
 -}
 
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
@@ -314,8 +332,10 @@ tcPatSynSig name sig_ty
          , hsib_body = hs_ty }  <- sig_ty
   , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTy hs_ty
   , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
-  = do { (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
-           <-  -- NB: tcImplicitTKBndrs calls solveLocalEqualities
+  = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
+       ; (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
+           <- solveEqualities                             $
+                -- See Note [solveEqualities in tcPatSynSig]
               tcImplicitTKBndrs skol_info implicit_hs_tvs $
               tcExplicitTKBndrs skol_info univ_hs_tvs     $
               tcExplicitTKBndrs skol_info ex_hs_tvs       $
@@ -331,13 +351,14 @@ tcPatSynSig name sig_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralize ungen_patsyn_ty
+       ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after kindGeneralize which may
        -- default kind variables to *.
-       ; implicit_tvs <- mapM zonkTcTyCoVarBndr implicit_tvs
-       ; univ_tvs     <- mapM zonkTcTyCoVarBndr univ_tvs
-       ; ex_tvs       <- mapM zonkTcTyCoVarBndr ex_tvs
+       ; implicit_tvs <- mapM zonkTyCoVarKind implicit_tvs
+       ; univ_tvs     <- mapM zonkTyCoVarKind univ_tvs
+       ; ex_tvs       <- mapM zonkTyCoVarKind ex_tvs
        ; req          <- zonkTcTypes req
        ; prov         <- zonkTcTypes prov
        ; body_ty      <- zonkTcType  body_ty

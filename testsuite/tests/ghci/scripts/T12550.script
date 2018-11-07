@@ -1,4 +1,5 @@
 :set -fprint-explicit-foralls -XKindSignatures -XExplicitNamespaces -XUnicodeSyntax
+:set -Wno-star-is-type
 import Data.Kind (type Type)
 
 

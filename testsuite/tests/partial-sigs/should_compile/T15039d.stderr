@@ -27,7 +27,7 @@ T15039d.hs:22:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
 T15039d.hs:25:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’
         standing for ‘Dict ((a :: *) ~~ (b :: k))’
-      Where: ‘a’, ‘b’, ‘k’ are rigid type variables bound by
+      Where: ‘a’, ‘k’, ‘b’ are rigid type variables bound by
                the type signature for:
                  ex3 :: forall k a (b :: k). Dict ((a :: *) ~~ (b :: k)) -> ()
                at T15039d.hs:24:1-43
@@ -50,10 +50,9 @@ T15039d.hs:33:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
         ex6 :: Dict (Coercible * a b) -> () (bound at T15039d.hs:33:1)
 
 T15039d.hs:35:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘(a :: *) ~R# (b :: *)’
+    • Found type wildcard ‘_’ standing for ‘Coercible * a b’
       Where: ‘a’, ‘b’ are rigid type variables bound by
-               the inferred type of
-                 ex7 :: ((a :: *) ~R# (b :: *)) => Coercion * a b
+               the inferred type of ex7 :: Coercible * a b => Coercion * a b
                at T15039d.hs:36:1-14
     • In the type signature:
         ex7 :: _ => Coercion (a :: Type) (b :: Type)

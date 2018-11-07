@@ -1,0 +1,54 @@
+{-# LANGUAGE ConstraintKinds             #-}
+{-# LANGUAGE DataKinds                   #-}
+{-# LANGUAGE KindSignatures              #-}
+{-# LANGUAGE MultiParamTypeClasses       #-}
+{-# LANGUAGE FlexibleInstances           #-}
+{-# LANGUAGE TypeFamilies                #-}
+{-# LANGUAGE FlexibleContexts            #-}
+
+unit indef where
+
+   signature Abstract where
+     import GHC.TypeLits
+     import Data.Typeable
+     data NatType :: Nat
+     instance KnownNat NatType
+
+     data SymbolType :: Symbol
+     instance KnownSymbol SymbolType
+
+     data TypeableType
+     instance Typeable TypeableType
+
+   module Util where
+     import Abstract
+     import Data.Proxy
+     import Data.Typeable
+     import GHC.TypeLits
+
+     name :: String
+     name = showsTypeRep (typeRep (Proxy :: Proxy TypeableType)) ""
+
+     printSomething :: IO ()
+     printSomething = do putStr $ symbolVal (Proxy :: Proxy SymbolType)
+		         print $ natVal (Proxy :: Proxy NatType)
+			 putStrLn $ name ++ " is its type"
+
+unit concrete where
+
+    module Concrete where
+
+     type TypeableType = Int
+     type NatType = 42
+     type SymbolType = "The answer to life, universe and everything is: "
+
+
+unit main where
+   dependency indef[Abstract=concrete:Concrete] (Util as MyUtil)
+
+   module Main where
+     import Data.Proxy
+     import MyUtil
+
+     main :: IO ()
+     main = printSomething

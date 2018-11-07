@@ -1,0 +1,32 @@
+TYPE CONSTRUCTORS
+  type role T
+    nominal nominal nominal nominal nominal nominal phantom phantom representational nominal nominal phantom nominal phantom
+  T ::
+    forall {k1} {k2} {k3} (k4 :: k2) k5. forall k6 ->
+    k6
+    -> Proxy k4
+    -> (k3 -> *)
+    -> k3
+    -> forall (k7 :: k1). Proxy k7 -> forall (k8 :: k5). Proxy k8 -> *
+  type role T2
+    nominal nominal nominal nominal nominal phantom phantom representational nominal nominal phantom nominal nominal phantom
+  T2 ::
+    forall {k1} {k2} (k3 :: k1) k7. forall k4 ->
+    k4
+    -> Proxy k3
+    -> (k7 -> *)
+    -> k7
+    -> forall (k5 :: k2).
+       Proxy k5 -> forall k6 (k8 :: k6). Proxy k8 -> *
+DATA CONSTRUCTORS
+  MkT2 :: forall {k7} {k1} {k2 :: k1} {k3} {k4 :: k3} {k5} {k6 :: k5}
+                 (f :: k7 -> *) (c :: k7) k8 (a :: k8) (b :: Proxy k2)
+                 (d :: Proxy k4) (e :: Proxy k6).
+          f c -> T2 k8 a b f c d e
+  MkT :: forall {k1} {k2} {k3 :: k2} {k4} {k5 :: k4} {k6} {k7 :: k6}
+                (f :: k1 -> *) (c :: k1) k8 (a :: k8) (b :: Proxy k3)
+                (d :: Proxy k5) (e :: Proxy k7).
+         f c -> T k8 a b f c d e
+Dependent modules: []
+Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+                     integer-gmp-1.0.2.0]

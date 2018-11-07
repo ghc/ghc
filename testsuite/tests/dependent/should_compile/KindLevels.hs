@@ -5,7 +5,7 @@ module KindLevels where
 import Data.Kind
 
 data A
-data B :: A -> *
-data C :: B a -> *
-data D :: C b -> *
-data E :: D c -> *
+data B :: A -> Type
+data C :: B a -> Type
+data D :: C b -> Type
+data E :: D c -> Type

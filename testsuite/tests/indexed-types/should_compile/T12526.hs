@@ -1,10 +1,12 @@
 {-# LANGUAGE TypeFamilies, MonoLocalBinds #-}
 module T12526 where
 
-type family P (s :: * -> *) :: * -> * -> *
+import Data.Kind (Type)
+
+type family P (s :: Type -> Type) :: Type -> Type -> Type
 type instance P Signal = Causal
 
-type family S (p :: * -> * -> *) :: * -> *
+type family S (p :: Type -> Type -> Type) :: Type -> Type
 type instance S Causal = Signal
 
 class (P (S p) ~ p) => CP p

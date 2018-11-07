@@ -764,10 +764,13 @@ messages and in GHCi:
 
            ghci> :i Data.Type.Equality.sym
            Data.Type.Equality.sym ::
-             forall (k :: BOX) (a :: k) (b :: k).
+             forall k (a :: k) (b :: k).
              (a Data.Type.Equality.:~: b) -> b Data.Type.Equality.:~: a
                    -- Defined in Data.Type.Equality
 
+    This flag also enables the printing of *inferred* type variables
+    inside braces. See :ref:`inferred-vs-specified`.
+		   
 .. ghc-flag:: -fprint-explicit-kinds
     :shortdesc: Print explicit kind foralls and kind arguments in types.
         See also :ghc-flag:`-XKindSignatures`
@@ -781,13 +784,16 @@ messages and in GHCi:
 
     .. code-block:: none
 
-        ghci> :set -XPolyKinds
-        ghci> data T a = MkT
-        ghci> :t MkT
-        MkT :: forall (k :: BOX) (a :: k). T a
-        ghci> :set -fprint-explicit-foralls
-        ghci> :t MkT
-        MkT :: forall (k :: BOX) (a :: k). T k a
+           ghci> :set -XPolyKinds
+           ghci> data T a = MkT
+           ghci> :t MkT
+           MkT :: forall (k :: Type) (a :: k). T a
+           ghci> :set -fprint-explicit-kinds
+           ghci> :t MkT
+           MkT :: forall (k :: Type) (a :: k). T k a
+           ghci> :set -XNoPolyKinds
+           ghci> :t MkT
+           MkT :: T * a
 
 .. ghc-flag:: -fprint-explicit-runtime-reps
     :shortdesc: Print ``RuntimeRep`` variables in types which are
@@ -997,6 +1003,16 @@ messages and in GHCi:
     Note that line numbers start counting at one, but column numbers
     start at zero. This choice was made to follow existing convention
     (i.e. this is how Emacs does it).
+
+.. ghc-flag:: -freverse-errors
+    :shortdesc: Output errors in reverse order
+    :type: dynamic
+    :reverse: -fno-reverse-errors
+    :category: verbosity
+
+    Causes GHC to output errors in reverse line-number order, so that
+    the errors and warnings that originate later in the file are
+    displayed first.
 
 .. ghc-flag:: -H ⟨size⟩
     :shortdesc: Set the minimum size of the heap to ⟨size⟩

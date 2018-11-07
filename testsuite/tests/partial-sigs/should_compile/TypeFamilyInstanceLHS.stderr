@@ -1,12 +1,13 @@
 TYPE SIGNATURES
   foo :: F Int Char -> Int
 TYPE CONSTRUCTORS
-  type family F a b :: * open
+  type role F nominal nominal
+  F :: * -> * -> *
 COERCION AXIOMS
   axiom TypeFamilyInstanceLHS.D:R:FBool_ ::
-    F Bool _ = Bool -- Defined at TypeFamilyInstanceLHS.hs:6:15
+    F Bool _ = Bool -- Defined at TypeFamilyInstanceLHS.hs:8:15
   axiom TypeFamilyInstanceLHS.D:R:FInt_ ::
-    F Int _ = Int -- Defined at TypeFamilyInstanceLHS.hs:5:15
+    F Int _ = Int -- Defined at TypeFamilyInstanceLHS.hs:7:15
 FAMILY INSTANCES
   type instance F Int _
   type instance F Bool _

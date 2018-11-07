@@ -1,0 +1,20 @@
+
+T13600b.hs:3:3: warning: [-Wmissing-space-after-bang (in -Wdefault)]
+      Did you forget to enable BangPatterns?
+      If you mean to bind (!) then perhaps you want
+      to add a space after the bang for clarity.
+
+T13600b.hs:4:3: warning: [-Wmissing-space-after-bang (in -Wdefault)]
+      Did you forget to enable BangPatterns?
+      If you mean to bind (!) then perhaps you want
+      to add a space after the bang for clarity.
+
+T13600b.hs:8:7: warning: [-Wmissing-space-after-bang (in -Wdefault)]
+      Did you forget to enable BangPatterns?
+      If you mean to bind (!) then perhaps you want
+      to add a space after the bang for clarity.
+
+T13600b.hs:9:7: warning: [-Wmissing-space-after-bang (in -Wdefault)]
+      Did you forget to enable BangPatterns?
+      If you mean to bind (!) then perhaps you want
+      to add a space after the bang for clarity.

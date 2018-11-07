@@ -6,11 +6,13 @@
 
 module T10931 ( BugC(..) ) where
 
+import Data.Kind (Type)
+
 data IdT f a = IdC (f a)
 
-class ( m ~ Outer m (Inner m) ) => BugC (m :: * -> *) where
-    type Inner m :: * -> *
-    type Outer m :: (* -> *) -> * -> *
+class ( m ~ Outer m (Inner m) ) => BugC (m :: Type -> Type) where
+    type Inner m :: Type -> Type
+    type Outer m :: (Type -> Type) -> Type -> Type
 
     bug :: ( forall n. ( n ~ Outer n (Inner n)
                        , Outer n ~ Outer m

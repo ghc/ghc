@@ -4,7 +4,9 @@
 
 module Foo where
 
-data HT (ref :: * -> *)
+import Data.Kind (Type)
+
+data HT (ref :: Type -> Type)
   = HT { kcount :: Int }
 
 set_kcount :: Int -> HT s -> HT s

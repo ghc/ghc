@@ -47,10 +47,11 @@ module TcRnDriver (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TcSplice ( finishTH )
+import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
 import IfaceEnv( externaliseName )
 import TcHsType
+import TcValidity( checkValidType )
 import TcMatches
 import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
@@ -66,6 +67,7 @@ import DynFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
 import IfaceType( ShowForAllFlag(..) )
+import PatSyn( pprPatSynType )
 import PrelNames
 import PrelInfo
 import RdrName
@@ -76,7 +78,6 @@ import TcRnExports
 import TcEvidence
 import qualified BooleanFormula as BF
 import PprTyThing( pprTyThingInContext )
-import MkIface( tyThingToIfaceDecl )
 import Coercion( pprCoAxiom )
 import CoreFVs( orphNamesOfFamInst )
 import FamInst
@@ -104,6 +105,7 @@ import RnEnv
 import RnSource
 import ErrUtils
 import Id
+import IdInfo( IdDetails(..) )
 import VarEnv
 import Module
 import UniqFM
@@ -471,8 +473,10 @@ run_th_modfinalizers = do
   then getEnvs
   else do
     writeTcRef th_modfinalizers_var []
-    (_, lie_th) <- captureTopConstraints $
-                   sequence_ th_modfinalizers
+    let run_finalizer (lcl_env, f) =
+            setLclEnv lcl_env (runRemoteModFinalizers f)
+
+    (_, lie_th) <- captureTopConstraints $ mapM_ run_finalizer th_modfinalizers
       -- Finalizers can add top-level declarations with addTopDecls, so
       -- we have to run tc_rn_src_decls to get them
     (tcg_env, tcl_env, lie_top_decls) <- tc_rn_src_decls []
@@ -482,11 +486,8 @@ run_th_modfinalizers = do
       -- (see #12777).
       new_ev_binds <- {-# SCC "simplifyTop2" #-}
                       simplifyTop (lie_th `andWC` lie_top_decls)
-      updGblEnv (\tcg_env ->
-        tcg_env { tcg_ev_binds = tcg_ev_binds tcg_env `unionBags` new_ev_binds }
-        )
+      addTopEvBinds new_ev_binds run_th_modfinalizers
         -- addTopDecls can add declarations which add new finalizers.
-        run_th_modfinalizers
 
 tc_rn_src_decls :: [LHsDecl GhcPs]
                 -> TcM (TcGblEnv, TcLclEnv, WantedConstraints)
@@ -554,8 +555,7 @@ tc_rn_src_decls ds
             do { recordTopLevelSpliceLoc loc
 
                  -- Rename the splice expression, and get its supporting decls
-               ; (spliced_decls, splice_fvs) <- checkNoErrs (rnTopSpliceDecls
-                                                             splice)
+               ; (spliced_decls, splice_fvs) <- rnTopSpliceDecls splice
 
                  -- Glue them on the front of the remaining decls and loop
                ; (tcg_env, tcl_env, lie2) <-
@@ -2277,7 +2277,7 @@ getGhciStepIO = do
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig stepTy (nlHsVar ghciStepIoMName))
+    return (noLoc $ ExprWithTySig noExt (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2326,17 +2326,15 @@ tcRnExpr hsc_env mode rdr_expr
                   else return expr_ty } ;
 
     -- Generalise
-    ((qtvs, dicts, _, _), lie_top) <- captureTopConstraints $
-                                      {-# SCC "simplifyInfer" #-}
-                                      simplifyInfer tclvl
-                                                 infer_mode
-                                                 []    {- No sig vars -}
-                                                 [(fresh_it, res_ty)]
-                                                 lie ;
+    (qtvs, dicts, _, residual, _)
+         <- simplifyInfer tclvl infer_mode
+                          []    {- No sig vars -}
+                          [(fresh_it, res_ty)]
+                          lie ;
 
     -- Ignore the dictionary bindings
     _ <- perhaps_disable_default_warnings $
-         simplifyInteractive lie_top ;
+         simplifyInteractive residual ;
 
     let { all_expr_ty = mkInvForAllTys qtvs (mkLamTypes dicts res_ty) } ;
     ty <- zonkTcType all_expr_ty ;
@@ -2399,6 +2397,9 @@ tcRnType hsc_env normalise rdr_type
        ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
        ; ty  <- zonkTcTypeToType ty
+
+       -- Do validity checking on type
+       ; checkValidType GhciCtxt ty
 
        ; ty' <- if normalise
                 then do { fam_envs <- tcGetFamInstEnvs
@@ -2480,17 +2481,14 @@ types that you know are polymorphic, is quite surprising.  See Trac
 
 Note that the goal is to generalise the *kind of the type*, not
 the type itself! Example:
-  ghci> data T m a = MkT (m a)  -- T :: forall . (k -> *) -> k -> *
-  ghci> :k T
-We instantiate T to get (T kappa).  We do not want to kind-generalise
-that to forall k. T k!  Rather we want to take its kind
-   T kappa :: (kappa -> *) -> kappa -> *
-and now kind-generalise that kind, to forall k. (k->*) -> k -> *
-(It was Trac #10122 that made me realise how wrong the previous
-approach was.) -}
+  ghci> data SameKind :: k -> k -> Type
+  ghci> :k SameKind _
 
+We want to get `k -> Type`, not `Any -> Type`, which is what we would
+get without kind-generalisation. Note that `:k SameKind` is OK, as
+GHC will not instantiate SameKind here, and so we see its full kind
+of `forall k. k -> k -> Type`.
 
-{-
 ************************************************************************
 *                                                                      *
                  tcRnDeclsi
@@ -2644,7 +2642,8 @@ loadUnqualIfaces hsc_env ictxt
 {-
 ************************************************************************
 *                                                                      *
-                Degugging output
+                Debugging output
+      This is what happens when you do -ddump-types
 *                                                                      *
 ************************************************************************
 -}
@@ -2681,11 +2680,14 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                         tcg_fam_insts = fam_insts,
                         tcg_rules     = rules,
                         tcg_imports   = imports })
-  = vcat [ ppr_types type_env
-         , ppr_tycons fam_insts type_env
+  = getPprDebug $ \debug ->
+    vcat [ ppr_types debug type_env
+         , ppr_tycons debug fam_insts type_env
+         , ppr_datacons debug type_env
+         , ppr_patsyns type_env
          , ppr_insts insts
          , ppr_fam_insts fam_insts
-         , vcat (map ppr rules)
+         , ppr_rules rules
          , text "Dependent modules:" <+>
                 pprUFM (imp_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
@@ -2693,60 +2695,100 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
   where         -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
 
-ppr_types :: TypeEnv -> SDoc
-ppr_types type_env = getPprDebug $ \dbg ->
-  let
-    ids = [id | id <- typeEnvIds type_env, want_sig id]
-    want_sig id | dbg
-                = True
-                | otherwise
-                = isExternalName (idName id) &&
-                  (not (isDerivedOccName (getOccName id)))
-        -- Top-level user-defined things have External names.
-        -- Suppress internally-generated things unless -dppr-debug
-  in
-  text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
+ppr_rules :: [LRuleDecl GhcTc] -> SDoc
+ppr_rules rules
+  = ppUnless (null rules) $
+    hang (text "RULES")
+       2 (vcat (map ppr rules))
 
-ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
-ppr_tycons fam_insts type_env = getPprDebug $ \dbg ->
-  let
-    fi_tycons = famInstsRepTyCons fam_insts
-    tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
-    want_tycon tycon | dbg        = True
-                     | otherwise  = not (isImplicitTyCon tycon) &&
-                                    isExternalName (tyConName tycon) &&
-                                    not (tycon `elem` fi_tycons)
-  in
-  vcat [ text "TYPE CONSTRUCTORS"
-       ,   nest 2 (ppr_tydecls tycons)
-       , text "COERCION AXIOMS"
-       ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
-
-ppr_insts :: [ClsInst] -> SDoc
-ppr_insts []     = empty
-ppr_insts ispecs = text "INSTANCES" $$ nest 2 (pprInstances ispecs)
-
-ppr_fam_insts :: [FamInst] -> SDoc
-ppr_fam_insts []        = empty
-ppr_fam_insts fam_insts =
-  text "FAMILY INSTANCES" $$ nest 2 (pprFamInsts fam_insts)
-
-ppr_sigs :: [Var] -> SDoc
-ppr_sigs ids
-        -- Print type signatures; sort by OccName
-  = vcat (map ppr_sig (sortBy (comparing getOccName) ids))
+ppr_types :: Bool -> TypeEnv -> SDoc
+ppr_types debug type_env
+  = ppr_things "TYPE SIGNATURES" ppr_sig
+             (sortBy (comparing getOccName) ids)
   where
+    ids = [id | id <- typeEnvIds type_env, want_sig id]
+    want_sig id
+      | debug     = True
+      | otherwise = hasTopUserName id
+                    && case idDetails id of
+                         VanillaId    -> True
+                         RecSelId {}  -> True
+                         ClassOpId {} -> True
+                         FCallId {}   -> True
+                         _            -> False
+             -- Data cons (workers and wrappers), pattern synonyms,
+             -- etc are suppressed (unless -dppr-debug),
+             -- because they appear elsehwere
+
     ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
-ppr_tydecls :: [TyCon] -> SDoc
-ppr_tydecls tycons
-  -- Print type constructor info for debug purposes
-  -- Sort by OccName to reduce unnecessary changes
-  = vcat [ ppr (tyThingToIfaceDecl (ATyCon tc))
-         | tc <- sortBy (comparing getOccName) tycons ]
-    -- The Outputable instance for IfaceDecl uses
-    -- showToIface, which is what we want here, whereas
-    -- pprTyThing uses ShowSome.
+ppr_tycons :: Bool -> [FamInst] -> TypeEnv -> SDoc
+ppr_tycons debug fam_insts type_env
+  = vcat [ ppr_things "TYPE CONSTRUCTORS" ppr_tc tycons
+         , ppr_things "COERCION AXIOMS" pprCoAxiom
+                      (typeEnvCoAxioms type_env) ]
+  where
+    fi_tycons = famInstsRepTyCons fam_insts
+
+    tycons = sortBy (comparing getOccName) $
+             [tycon | tycon <- typeEnvTyCons type_env
+                    , want_tycon tycon]
+             -- Sort by OccName to reduce unnecessary changes
+    want_tycon tycon | debug      = True
+                     | otherwise  = isExternalName (tyConName tycon) &&
+                                    not (tycon `elem` fi_tycons)
+    ppr_tc tc
+       = vcat [ ppWhen show_roles $
+                hang (text "type role" <+> ppr tc)
+                   2 (hsep (map ppr roles))
+              , hang (ppr tc <+> dcolon)
+                   2 (ppr (tidyTopType (tyConKind tc))) ]
+       where
+         show_roles = debug || not (all (== boring_role) roles)
+         roles = tyConRoles tc
+         boring_role | isClassTyCon tc = Nominal
+                     | otherwise       = Representational
+            -- Matches the choice in IfaceSyn, calls to pprRoles
+
+ppr_datacons :: Bool -> TypeEnv -> SDoc
+ppr_datacons debug type_env
+  = ppr_things "DATA CONSTRUCTORS" ppr_dc wanted_dcs
+      -- The filter gets rid of class data constructors
+  where
+    ppr_dc dc = ppr dc <+> dcolon <+> ppr (dataConUserType dc)
+    all_dcs    = typeEnvDataCons type_env
+    wanted_dcs | debug     = all_dcs
+               | otherwise = filterOut is_cls_dc all_dcs
+    is_cls_dc dc = isClassTyCon (dataConTyCon dc)
+
+ppr_patsyns :: TypeEnv -> SDoc
+ppr_patsyns type_env
+  = ppr_things "PATTERN SYNONYMS" ppr_ps
+               (typeEnvPatSyns type_env)
+  where
+    ppr_ps ps = ppr ps <+> dcolon <+> pprPatSynType ps
+
+ppr_insts :: [ClsInst] -> SDoc
+ppr_insts ispecs
+  = ppr_things "CLASS INSTANCES" pprInstance ispecs
+
+ppr_fam_insts :: [FamInst] -> SDoc
+ppr_fam_insts fam_insts
+  = ppr_things "FAMILY INSTANCES" pprFamInst fam_insts
+
+ppr_things :: String -> (a -> SDoc) -> [a] -> SDoc
+ppr_things herald ppr_one things
+  | null things = empty
+  | otherwise   = text herald $$ nest 2 (vcat (map ppr_one things))
+
+hasTopUserName :: NamedThing x => x -> Bool
+-- A top-level thing whose name is not "derived"
+-- Thus excluding things like $tcX, from Typeable boilerplate
+-- and C:Coll from class-dictionary data constructors
+hasTopUserName x
+  = isExternalName name && not (isDerivedOccName (nameOccName name))
+  where
+    name = getName x
 
 {-
 ********************************************************************************
@@ -2776,7 +2818,7 @@ withTcPlugins hsc_env m =
     do s <- runTcPluginM start ev_binds_var
        return (solve s, stop s)
 
-getTcPlugins :: DynFlags -> [TcPlugin]
+getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
 getTcPlugins dflags = catMaybes $ map get_plugin (plugins dflags)
   where get_plugin p = tcPlugin (lpPlugin p) (lpArguments p)
 

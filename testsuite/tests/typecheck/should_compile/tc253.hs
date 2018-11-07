@@ -3,8 +3,10 @@
   -- this is needed because |FamHelper a x| /< |Fam a x|
 module ShouldCompile where
 
+import Data.Kind (Type)
+
 class Cls a where
-    type Fam a b :: *
+    type Fam a b :: Type
     -- Multiple defaults!
     type Fam a x = FamHelper a x
 

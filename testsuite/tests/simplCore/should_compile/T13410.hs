@@ -13,6 +13,7 @@ import Control.Monad (liftM2)
 import Data.Functor.Identity (Identity(..))
 import GHC.ST (ST, runST)
 import Text.Read (ReadPrec, readPrec)
+import Data.Kind (Type)
 
 -----
 
@@ -28,7 +29,7 @@ class GMVector v a where
   gmbasicUnsafeNew   :: PrimMonad m => Int -> m (v (PrimState m) a)
   gmbasicUnsafeWrite :: PrimMonad m => v (PrimState m) a -> Int -> a -> m ()
 
-type family GMutable (v :: * -> *) :: * -> * -> *
+type family GMutable (v :: Type -> Type) :: Type -> Type -> Type
 
 class GMVector (GMutable v) a => GVector v a where
   gbasicUnsafeFreeze :: PrimMonad m => GMutable v (PrimState m) a -> m (v a)
@@ -126,7 +127,9 @@ greadPrec = do
 
 -----
 
-data MVector :: (* -> * -> *) -> (* -> * -> *) -> * -> * -> * where
+data MVector :: (Type -> Type -> Type) ->
+                (Type -> Type -> Type) ->
+                (Type -> Type -> Type) where
   MV :: !(u s a) -> !(v s b) -> MVector u v s (a, b)
 
 instance (GMVector u a, GMVector v b) => GMVector (MVector u v) (a, b) where
@@ -141,7 +144,7 @@ instance (GMVector u a, GMVector v b) => GMVector (MVector u v) (a, b) where
     gmbasicUnsafeWrite ks n k
     gmbasicUnsafeWrite vs n v
 
-data Vector :: (* -> *) -> (* -> *) -> * -> *
+data Vector :: (Type -> Type) -> (Type -> Type) -> Type -> Type
 
 type instance GMutable (Vector u v) = MVector (GMutable u) (GMutable v)
 

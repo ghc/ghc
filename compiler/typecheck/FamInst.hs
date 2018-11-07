@@ -168,7 +168,13 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
            -- Note [Linting type synonym applications].
            case lintTypes dflags tcvs' (rhs':lhs') of
              Nothing       -> pure ()
-             Just fail_msg -> pprPanic "Core Lint error" fail_msg
+             Just fail_msg -> pprPanic "Core Lint error" (vcat [ fail_msg
+                                                               , ppr fam_tc
+                                                               , ppr subst
+                                                               , ppr tvs'
+                                                               , ppr cvs'
+                                                               , ppr lhs'
+                                                               , ppr rhs' ])
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
@@ -763,11 +769,15 @@ unusedInjTvsInRHS :: TyCon -> [Bool] -> [Type] -> Type -> Pair TyVarSet
 unusedInjTvsInRHS tycon injList lhs rhs =
   (`minusVarSet` injRhsVars) <$> injLHSVars
     where
+      inj_pairs :: [(Type, ArgFlag)]
+      -- All the injective arguments, paired with their visiblity
+      inj_pairs = ASSERT2( injList `equalLength` lhs
+                         , ppr tycon $$ ppr injList $$ ppr lhs )
+                  filterByList injList (lhs `zip` tyConArgFlags tycon lhs)
+
       -- set of type and kind variables in which type family is injective
-      (invis_pairs, vis_pairs)
-        = partitionInvisibles tycon snd (zipEqual "unusedInjTvsInRHS" injList lhs)
-      invis_lhs = uncurry filterByList $ unzip invis_pairs
-      vis_lhs   = uncurry filterByList $ unzip vis_pairs
+      invis_lhs, vis_lhs :: [Type]
+      (invis_lhs, vis_lhs) = partitionInvisibles inj_pairs
 
       invis_vars = tyCoVarsOfTypes invis_lhs
       Pair invis_vars' vis_vars = splitVisVarsOfTypes vis_lhs
@@ -788,6 +798,9 @@ injTyVarsOfType :: TcTauType -> TcTyVarSet
 -- E.g.   Suppose F is injective in its second arg, but not its first
 --        then injVarOfType (Either a (F [b] (a,c))) = {a,c}
 --        Determining the overall type determines a,c but not b.
+injTyVarsOfType ty
+  | Just ty' <- coreView ty -- #12430
+  = injTyVarsOfType ty'
 injTyVarsOfType (TyVarTy v)
   = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
 injTyVarsOfType (TyConApp tc tys)
@@ -886,7 +899,7 @@ unusedInjectiveVarsErr (Pair invis_vars vis_vars) errorBuilder tyfamEqn
       has_kinds = not $ isEmptyVarSet invis_vars
 
       doc = sep [ what <+> text "variable" <>
-                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . toposortTyVars)
+                  pluralVarSet tvs <+> pprVarSet tvs (pprQuotedList . scopedSort)
                 , text "cannot be inferred from the right-hand side." ]
       what = case (has_types, has_kinds) of
                (True, True)   -> text "Type and kind"

@@ -750,8 +750,10 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
       MO_F_Ne _ -> condFltReg is32Bit NE  x y
       MO_F_Gt _ -> condFltReg is32Bit GTT x y
       MO_F_Ge _ -> condFltReg is32Bit GE  x y
-      MO_F_Lt _ -> condFltReg is32Bit LTT x y
-      MO_F_Le _ -> condFltReg is32Bit LE  x y
+      -- Invert comparison condition and swap operands
+      -- See Note [SSE Parity Checks]
+      MO_F_Lt _ -> condFltReg is32Bit GTT  y x
+      MO_F_Le _ -> condFltReg is32Bit GE   y x
 
       MO_Eq _   -> condIntReg EQQ x y
       MO_Ne _   -> condIntReg NE  x y
@@ -1365,15 +1367,17 @@ getCondCode (CmmMachOp mop [x, y])
       MO_F_Ne W32 -> condFltCode NE  x y
       MO_F_Gt W32 -> condFltCode GTT x y
       MO_F_Ge W32 -> condFltCode GE  x y
-      MO_F_Lt W32 -> condFltCode LTT x y
-      MO_F_Le W32 -> condFltCode LE  x y
+      -- Invert comparison condition and swap operands
+      -- See Note [SSE Parity Checks]
+      MO_F_Lt W32 -> condFltCode GTT  y x
+      MO_F_Le W32 -> condFltCode GE   y x
 
       MO_F_Eq W64 -> condFltCode EQQ x y
       MO_F_Ne W64 -> condFltCode NE  x y
       MO_F_Gt W64 -> condFltCode GTT x y
       MO_F_Ge W64 -> condFltCode GE  x y
-      MO_F_Lt W64 -> condFltCode LTT x y
-      MO_F_Le W64 -> condFltCode LE  x y
+      MO_F_Lt W64 -> condFltCode GTT y x
+      MO_F_Le W64 -> condFltCode GE  y x
 
       _ -> condIntCode (machOpToCond mop) x y
 
@@ -1673,11 +1677,19 @@ genCondJump' _ id bool = do
     else do
         lbl <- getBlockIdNat
 
-        -- see comment with condFltReg
+        -- See Note [SSE Parity Checks]
         let code = case cond of
                         NE  -> or_unordered
                         GU  -> plain_test
                         GEU -> plain_test
+                        -- Use ASSERT so we don't break releases if
+                        -- LTT/LE creep in somehow.
+                        LTT ->
+                          ASSERT2(False, ppr "Should have been turned into >")
+                          and_ordered
+                        LE  ->
+                          ASSERT2(False, ppr "Should have been turned into >=")
+                          and_ordered
                         _   -> and_ordered
 
             plain_test = unitOL (
@@ -2918,6 +2930,59 @@ condIntReg cond x y = do
   return (Any II32 code)
 
 
+-----------------------------------------------------------
+---          Note [SSE Parity Checks]                   ---
+-----------------------------------------------------------
+
+-- We have to worry about unordered operands (eg. comparisons
+-- against NaN).  If the operands are unordered, the comparison
+-- sets the parity flag, carry flag and zero flag.
+-- All comparisons are supposed to return false for unordered
+-- operands except for !=, which returns true.
+--
+-- Optimisation: we don't have to test the parity flag if we
+-- know the test has already excluded the unordered case: eg >
+-- and >= test for a zero carry flag, which can only occur for
+-- ordered operands.
+--
+-- By reversing comparisons we can avoid testing the parity
+-- for < and <= as well. If any of the arguments is an NaN we
+-- return false either way. If both arguments are valid then
+-- x <= y  <->  y >= x  holds. So it's safe to swap these.
+--
+-- We invert the condition inside getRegister'and  getCondCode
+-- which should cover all invertable cases.
+-- All other functions translating FP comparisons to assembly
+-- use these to two generate the comparison code.
+--
+-- As an example consider a simple check:
+--
+-- func :: Float -> Float -> Int
+-- func x y = if x < y then 1 else 0
+--
+-- Which in Cmm gives the floating point comparison.
+--
+--  if (%MO_F_Lt_W32(F1, F2)) goto c2gg; else goto c2gf;
+--
+-- We used to compile this to an assembly code block like this:
+-- _c2gh:
+--  ucomiss %xmm2,%xmm1
+--  jp _c2gf
+--  jb _c2gg
+--  jmp _c2gf
+--
+-- Where we have to introduce an explicit
+-- check for unordered results (using jmp parity):
+--
+-- We can avoid this by exchanging the arguments and inverting the direction
+-- of the comparison. This results in the sequence of:
+--
+--  ucomiss %xmm1,%xmm2
+--  ja _c2g2
+--  jmp _c2g1
+--
+-- Removing the jump reduces the pressure on the branch predidiction system
+-- and plays better with the uOP cache.
 
 condFltReg :: Bool -> Cond -> CmmExpr -> CmmExpr -> NatM Register
 condFltReg is32Bit cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
@@ -2936,27 +3001,18 @@ condFltReg is32Bit cond x y = if_sse2 condFltReg_sse2 condFltReg_x87
     CondCode _ cond cond_code <- condFltCode cond x y
     tmp1 <- getNewRegNat (archWordFormat is32Bit)
     tmp2 <- getNewRegNat (archWordFormat is32Bit)
-    let
-        -- We have to worry about unordered operands (eg. comparisons
-        -- against NaN).  If the operands are unordered, the comparison
-        -- sets the parity flag, carry flag and zero flag.
-        -- All comparisons are supposed to return false for unordered
-        -- operands except for !=, which returns true.
-        --
-        -- Optimisation: we don't have to test the parity flag if we
-        -- know the test has already excluded the unordered case: eg >
-        -- and >= test for a zero carry flag, which can only occur for
-        -- ordered operands.
-        --
-        -- ToDo: by reversing comparisons we could avoid testing the
-        -- parity flag in more cases.
-
+    let -- See Note [SSE Parity Checks]
         code dst =
            cond_code `appOL`
              (case cond of
                 NE  -> or_unordered dst
                 GU  -> plain_test   dst
                 GEU -> plain_test   dst
+                -- Use ASSERT so we don't break releases if these creep in.
+                LTT -> ASSERT2(False, ppr "Should have been turned into >")
+                       and_ordered  dst
+                LE  -> ASSERT2(False, ppr "Should have been turned into >=")
+                       and_ordered  dst
                 _   -> and_ordered  dst)
 
         plain_test dst = toOL [

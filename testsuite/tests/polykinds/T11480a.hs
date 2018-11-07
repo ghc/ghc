@@ -6,15 +6,15 @@
 
 module T11480a where
 
-import GHC.Types (Constraint)
+import Data.Kind (Type, Constraint)
 import qualified Prelude
 
-data Nat (c :: i -> i -> *) (d :: j -> j -> *) (f :: i -> j) (g :: i -> j)
+data Nat (c :: i -> i -> Type) (d :: j -> j -> Type) (f :: i -> j) (g :: i -> j)
 
-class Functor p (Nat p (->)) p => Category (p :: i -> i -> *)
+class Functor p (Nat p (->)) p => Category (p :: i -> i -> Type)
 
 class (Category dom, Category cod)
-   => Functor (dom :: i -> i -> *) (cod :: j -> j -> *) (f :: i -> j)
+   => Functor (dom :: i -> i -> Type) (cod :: j -> j -> Type) (f :: i -> j)
     | f -> dom cod
 
 instance (Category c, Category d) => Category (Nat c d)

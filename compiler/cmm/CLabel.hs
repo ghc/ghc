@@ -1019,7 +1019,7 @@ labelDynamic dflags this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
-     (gopt Opt_ExternalDynamicRefs dflags) && (this_pkg /= rtsUnitId)
+     externalDynamicRefs && (this_pkg /= rtsUnitId)
 
    IdLabel n _ _ ->
      isDllName dflags this_mod n
@@ -1028,7 +1028,7 @@ labelDynamic dflags this_mod lbl =
    -- its own shared library.
    CmmLabel pkg _ _
     | os == OSMinGW32 ->
-       (gopt Opt_ExternalDynamicRefs dflags) && (this_pkg /= pkg)
+       externalDynamicRefs && (this_pkg /= pkg)
     | otherwise ->
        gopt Opt_ExternalDynamicRefs dflags
 
@@ -1048,19 +1048,26 @@ labelDynamic dflags this_mod lbl =
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
-                (gopt Opt_ExternalDynamicRefs dflags) && (this_pkg /= pkgId)
+                externalDynamicRefs && (this_pkg /= pkgId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
             -- libraries
             True
 
+   CC_Label cc ->
+     externalDynamicRefs && not (ccFromThisModule cc this_mod)
+
+   -- CCS_Label always contains a CostCentre defined in the current module
+   CCS_Label _ -> False
+
    HpcTicksLabel m ->
-     (gopt Opt_ExternalDynamicRefs dflags) && this_mod /= m
+     externalDynamicRefs && this_mod /= m
 
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _                 -> False
   where
+    externalDynamicRefs = gopt Opt_ExternalDynamicRefs dflags
     os = platformOS (targetPlatform dflags)
     this_pkg = moduleUnitId this_mod
 
@@ -1339,7 +1346,7 @@ instance Outputable ForeignLabelSource where
 
 internalNamePrefix :: Name -> SDoc
 internalNamePrefix name = getPprStyle $ \ sty ->
-  if codeStyle sty && isRandomGenerated then
+  if asmStyle sty && isRandomGenerated then
     sdocWithPlatform $ \platform ->
       ptext (asmTempLabelPrefix platform)
   else

@@ -518,6 +518,13 @@ test('T13001',
      compile_and_run,
      ['-O2'])
 
+test('T8763',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64),    41056, 20) ]),
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O2'])
+
 test('T12990',
     [stats_num_field('bytes allocated',
                      [ (wordsize(64), 20040936, 5) ]),
@@ -579,7 +586,9 @@ test('T14936',
 
 test('T15226',
     [stats_num_field('bytes allocated',
-                    [ (wordsize(64), 41040, 5) ]),
+                    [(platform('x86_64-unknown-mingw32'),   37488, 4),
+                    # 2018-09-23   37488  Linker changes
+                     (wordsize(64), 41040, 5) ]),
                     # 2018-06-06   41040  Let the simplifier know the result
                     #                     of seq# is in WHNF
                     # initial  400041040
@@ -589,7 +598,9 @@ test('T15226',
 
 test('T15226a',
     [stats_num_field('bytes allocated',
-                    [ (wordsize(64), 41040, 5) ]),
+                    [(platform('x86_64-unknown-mingw32'),   37488, 4),
+                    # 2018-09-23   37488  Linker changes
+                     (wordsize(64), 41040, 5) ]),
                     # 2018-06-06   41040  Look through casts for seq#
                     # initial  400041040
      only_ways(['normal'])],

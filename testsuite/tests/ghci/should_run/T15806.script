@@ -1,0 +1,3 @@
+:set -XRankNTypes
+:k (Maybe Int)
+:k (Maybe (forall a. a -> a))

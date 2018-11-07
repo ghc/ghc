@@ -1,2 +1,2 @@
 <command line>: Could not find module ‘Simple.NonExistentPlugin’
-Use -v to see a list of the files searched for.
+Use -v (or `:set -v` in ghci) to see a list of the files searched for.

@@ -40,10 +40,29 @@ Language
   terminating value of type ``Void``. Accordingly, GHC will not warn about
   ``K2`` (whereas previous versions of GHC would).
 
+- ``(!)`` is now a valid type operator: ::
+
+      type family a ! b
+
+- An existential context no longer requires parenthesization: ::
+
+    class a + b
+    data D1 = forall a b. (a + b) => D1 a b
+    data D2 = forall a b.  a + b  => D2 a b -- now allowed
+
+- The requirement that kind signatures always be parenthesized has been relaxed.
+  For instance, it is now permissible to write ``Proxy '(a :: A, b :: B)``
+  (previous GHC versions required extra parens: ``Proxy '((a :: A), (b :: B))``).
+
 Compiler
 ~~~~~~~~
 
 - New :ghc-flag:`-keep-hscpp-files` to keep the output of the CPP pre-processor.
+
+- The :ghc-flag:`-Wcompat` warning group now includes :ghc-flag:`-Wstar-is-type`.
+
+- The :ghc-flag:`-fllvm-pass-vectors-in-regs` flag is now deprecated as vector
+  arguments are now passed in registers by default.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -56,6 +75,11 @@ Runtime system
 - Document the heretofore undocumented FFI function
   ``hs_free_stable_ptr_unsafe``, used in conjunction with manual
   locking and unlocking.
+
+- The runtime linker on Windows has been overhauled to properly handle section
+  alignment, lower the amount of wasted memory and lower the amount of in use memory.
+  See :ghc-ticket:`13617`. Note that committed memory may be slightly higher.
+
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
@@ -85,6 +109,10 @@ Template Haskell
   eventlog events similar to ``traceBinaryEvent#`` but allows the user to pass
   the event payload as a binary blob instead of a ``String``.
 
+- The ``StableName#`` type parameter now has a phantom role instead of
+  a representational one. There is really no reason to care about the
+  type of the underlying object.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -94,6 +122,10 @@ Template Haskell
 
 - Support the characters from recent versions of Unicode (up to v. 12) in literals
     (see :ghc-ticket:`5518`).
+
+- The ``StableName`` type parameter now has a phantom role instead of
+  a representational one. There is really no reason to care about the
+  type of the underlying object.
 
 Build system
 ~~~~~~~~~~~~
@@ -111,7 +143,7 @@ for further change information.
     libraries/array/array.cabal:             Dependency of ``ghc`` library
     libraries/base/base.cabal:               Core library
     libraries/binary/binary.cabal:           Dependency of ``ghc`` library
-    libraries/bytestring/bytestring.cabal:   Deppendency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
     libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
     libraries/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library

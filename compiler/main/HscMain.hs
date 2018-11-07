@@ -909,7 +909,7 @@ hscCheckSafeImports tcg_env = do
               -> return tcg_env'
 
     warns dflags rules = listToBag $ map (warnRules dflags) rules
-    warnRules dflags (L loc (HsRule _ n _ _ _ _)) =
+    warnRules dflags (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg dflags loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
@@ -1693,8 +1693,7 @@ hscTcExpr hsc_env0 mode expr = runInteractiveHsc hsc_env0 $ do
   parsed_expr <- hscParseExpr expr
   ioMsgMaybe $ tcRnExpr hsc_env mode parsed_expr
 
--- | Find the kind of a type
--- Currently this does *not* generalise the kinds of the type
+-- | Find the kind of a type, after generalisation
 hscKcType
   :: HscEnv
   -> Bool            -- ^ Normalise the type

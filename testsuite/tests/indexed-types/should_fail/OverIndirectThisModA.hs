@@ -3,6 +3,8 @@
 module OverIndirectThisModA (C, D)
 where
 
-data family C a b :: *
+import Data.Kind (Type)
 
-type family D a b :: *
+data family C a b :: Type
+
+type family D a b :: Type

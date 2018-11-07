@@ -1,0 +1,9 @@
+
+T15767.hs:7:5: error:
+    • No instance for (C () b) arising from a use of ‘x’
+    • In the expression: x
+      In an equation for ‘y’:
+          y = x
+            where
+                x :: (C () b, C Bool b) => b
+                x = f ()

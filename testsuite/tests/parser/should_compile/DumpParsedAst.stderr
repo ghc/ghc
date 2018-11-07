@@ -80,6 +80,7 @@
              ({ DumpParsedAst.hs:8:3-8 }
               (Unqual
                {OccName: Length}))
+             (Nothing)
              [({ DumpParsedAst.hs:8:10-17 }
                (HsParTy
                 (NoExt)
@@ -142,6 +143,7 @@
              ({ DumpParsedAst.hs:9:3-8 }
               (Unqual
                {OccName: Length}))
+             (Nothing)
              [({ DumpParsedAst.hs:9:10-12 }
                (HsExplicitListTy
                 (NoExt)
@@ -160,7 +162,7 @@
          {OccName: Length}))
        (HsQTvs
         (NoExt)
-        [({ DumpParsedAst.hs:7:20-30 }
+        [({ DumpParsedAst.hs:7:21-29 }
           (KindedTyVar
            (NoExt)
            ({ DumpParsedAst.hs:7:21-22 }

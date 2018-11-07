@@ -64,6 +64,7 @@ module GHC.PackageDb (
        writePackageDb
   ) where
 
+import Prelude -- See note [Why do we import Prelude here?]
 import Data.Version (Version(..))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
@@ -259,9 +260,7 @@ lockPackageDbWith mode file = do
 
 lockPackageDb = lockPackageDbWith ExclusiveLock
 unlockPackageDb (PackageDbLock hnd) = do
-#if MIN_VERSION_base(4,11,0)
     hUnlock hnd
-#endif
     hClose hnd
 
 -- | Mode to open a package db in.

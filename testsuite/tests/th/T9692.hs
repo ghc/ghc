@@ -2,13 +2,14 @@
 
 module T9692 where
 
-import Language.Haskell.TH
-import Language.Haskell.TH.Syntax
+import Data.Kind (Type)
+import Language.Haskell.TH hiding (Type)
+import Language.Haskell.TH.Syntax hiding (Type)
 import Language.Haskell.TH.Ppr
 import System.IO
 
 class C a where
-        data F a (b :: k) :: *
+        data F a (b :: k) :: Type
 
 instance C Int where
         data F Int x = FInt x

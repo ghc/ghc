@@ -90,14 +90,13 @@ module TcType (
   deNoteType,
   orphNamesOfType, orphNamesOfCo,
   orphNamesOfTypes, orphNamesOfCoCon,
-  getDFunTyKey,
-  evVarPred_maybe, evVarPred,
+  getDFunTyKey, evVarPred,
 
   ---------------------------------
   -- Predicate types
   mkMinimalBySCs, transSuperClasses,
   pickQuantifiablePreds, pickCapturedPreds,
-  immSuperClasses,
+  immSuperClasses, boxEqPred,
   isImprovementPred,
 
   -- * Finding type instances
@@ -105,7 +104,6 @@ module TcType (
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  candidateQTyVarsOfType, candidateQTyVarsOfTypes, CandidatesQTvs(..),
   anyRewritableTyVar,
 
   ---------------------------------
@@ -182,7 +180,7 @@ module TcType (
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTCvBndr, pprTCvBndrs,
 
-  TypeSize, sizeType, sizeTypes, toposortTyVars,
+  TypeSize, sizeType, sizeTypes, scopedSort,
 
   ---------------------------------
   -- argument visibility
@@ -215,7 +213,7 @@ import Name -- hiding (varName)
 import NameSet
 import VarEnv
 import PrelNames
-import TysWiredIn( coercibleClass, unitTyCon, unitTyConKey
+import TysWiredIn( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                  , listTyCon, constraintKind )
 import Weight
 import BasicTypes
@@ -227,11 +225,10 @@ import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List  ( mapAccumL )
+import Data.List  ( mapAccumL, foldl' )
 import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
-import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -580,7 +577,7 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
 
 -------------------------------------
 -- UserTypeCtxt describes the origin of the polymorphic type
--- in the places where we need to an expression has that type
+-- in the places where we need an expression to have that type
 
 data UserTypeCtxt
   = FunSigCtxt      -- Function type signature, when checking the type
@@ -719,7 +716,7 @@ Note [TcLevel and untouchable type variables]
 
 * A unification variable is *touchable* if its level number
   is EQUAL TO that of its immediate parent implication,
-  and it is a TauTv or TyVarTv (but /not/ FlatMetaTv or FlatSkolTv
+  and it is a TauTv or TyVarTv (but /not/ FlatMetaTv or FlatSkolTv)
 
 Note [WantedInv]
 ~~~~~~~~~~~~~~~~
@@ -902,28 +899,13 @@ Note [Silly type synonym]
 Consider
   type T a = Int
 What are the free tyvars of (T x)?  Empty, of course!
-Here's the example that Ralf Laemmel showed me:
-  foo :: (forall a. C u a -> C u a) -> u
-  mappend :: Monoid u => u -> u -> u
-
-  bar :: Monoid u => u
-  bar = foo (\t -> t `mappend` t)
-We have to generalise at the arg to f, and we don't
-want to capture the constraint (Monad (C u a)) because
-it appears to mention a.  Pretty silly, but it was useful to him.
 
 exactTyCoVarsOfType is used by the type checker to figure out exactly
-which type variables are mentioned in a type.  It's also used in the
-smart-app checking code --- see TcExpr.tcIdApp
+which type variables are mentioned in a type.  It only matters
+occasionally -- see the calls to exactTyCoVarsOfType.
 
-On the other hand, consider a *top-level* definition
-  f = (\x -> x) :: T a -> T a
-If we don't abstract over 'a' it'll get fixed to GHC.Prim.Any, and then
-if we have an application like (f "x") we get a confusing error message
-involving Any.  So the conclusion is this: when generalising
-  - at top level use tyCoVarsOfType
-  - in nested bindings use exactTyCoVarsOfType
-See Trac #1813 for example.
+Historical note: years and years ago this function was used during
+generalisation -- see Trac #1813.  But that code has long since died.
 -}
 
 exactTyCoVarsOfType :: Type -> TyCoVarSet
@@ -1011,7 +993,7 @@ anyRewritableTyVar ignore_cos role pred ty
     go_rig _ _ _ = False
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
-    go_tc ReprEq bvs tc tys = foldr ((&&) . go_arg bvs) False $
+    go_tc ReprEq bvs tc tys = any (go_arg bvs)
                               (tyConRolesRepresentational tc `zip` tys)
 
     go_arg bvs (Nominal,          ty) = go NomEq  bvs ty
@@ -1043,155 +1025,6 @@ would re-occur and we end up with an infinite loop in which each kicks
 out the other (Trac #14363).
 -}
 
-{- *********************************************************************
-*                                                                      *
-          Type and kind variables in a type
-*                                                                      *
-********************************************************************* -}
-
-data CandidatesQTvs  -- See Note [Dependent type variables]
-                     -- See Note [CandidatesQTvs determinism]
-  = DV { dv_kvs :: DTyCoVarSet  -- "kind" variables (dependent)
-       , dv_tvs :: DTyVarSet    -- "type" variables (non-dependent)
-         -- A variable may appear in both sets
-         -- E.g.   T k (x::k)    The first occurrence of k makes it
-         --                      show up in dv_tvs, the second in dv_kvs
-         -- See Note [Dependent type variables]
-    }
-
-instance Semi.Semigroup CandidatesQTvs where
-   (DV { dv_kvs = kv1, dv_tvs = tv1 }) <> (DV { dv_kvs = kv2, dv_tvs = tv2 })
-          = DV { dv_kvs = kv1 `unionDVarSet` kv2
-               , dv_tvs = tv1 `unionDVarSet` tv2}
-
-instance Monoid CandidatesQTvs where
-   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
-   mappend = (Semi.<>)
-
-instance Outputable CandidatesQTvs where
-  ppr (DV {dv_kvs = kvs, dv_tvs = tvs })
-    = text "DV" <+> braces (sep [ text "dv_kvs =" <+> ppr kvs
-                                , text "dv_tvs =" <+> ppr tvs ])
-
-{- Note [Dependent type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Haskell type inference we quantify over type variables; but we only
-quantify over /kind/ variables when -XPolyKinds is on.  Without -XPolyKinds
-we default the kind variables to *.
-
-So, to support this defaulting, and only for that reason, when
-collecting the free vars of a type, prior to quantifying, we must keep
-the type and kind variables separate.
-
-But what does that mean in a system where kind variables /are/ type
-variables? It's a fairly arbitrary distinction based on how the
-variables appear:
-
-  - "Kind variables" appear in the kind of some other free variable
-     PLUS any free coercion variables
-
-     These are the ones we default to * if -XPolyKinds is off
-
-  - "Type variables" are all free vars that are not kind variables
-
-E.g.  In the type    T k (a::k)
-      'k' is a kind variable, because it occurs in the kind of 'a',
-          even though it also appears at "top level" of the type
-      'a' is a type variable, because it doesn't
-
-We gather these variables using a CandidatesQTvs record:
-  DV { dv_kvs: Variables free in the kind of a free type variable
-               or of a forall-bound type variable
-     , dv_tvs: Variables sytactically free in the type }
-
-So:  dv_kvs            are the kind variables of the type
-     (dv_tvs - dv_kvs) are the type variable of the type
-
-Note that
-
-* A variable can occur in both.
-      T k (x::k)    The first occurrence of k makes it
-                    show up in dv_tvs, the second in dv_kvs
-
-* We include any coercion variables in the "dependent",
-  "kind-variable" set because we never quantify over them.
-
-* Both sets are un-ordered, of course.
-
-* The "kind variables" might depend on each other; e.g
-     (k1 :: k2), (k2 :: *)
-  The "type variables" do not depend on each other; if
-  one did, it'd be classified as a kind variable!
-
-Note [CandidatesQTvs determinism and order]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Determinism: when we quantify over type variables we decide the
-  order in which they appear in the final type. Because the order of
-  type variables in the type can end up in the interface file and
-  affects some optimizations like worker-wrapper, we want this order to
-  be deterministic.
-
-  To achieve that we use deterministic sets of variables that can be
-  converted to lists in a deterministic order. For more information
-  about deterministic sets see Note [Deterministic UniqFM] in UniqDFM.
-
-* Order: as well as being deterministic, we use an
-  accumulating-parameter style for candidateQTyVarsOfType so that we
-  add variables one at a time, left to right.  That means we tend to
-  produce the variables in left-to-right order.  This is just to make
-  it bit more predicatable for the programmer.
--}
-
--- | Worker for 'splitDepVarsOfType'. This might output the same var
--- in both sets, if it's used in both a type and a kind.
--- See Note [CandidatesQTvs determinism and order]
--- See Note [Dependent type variables]
-candidateQTyVarsOfType :: Type -> CandidatesQTvs
-candidateQTyVarsOfType = split_dvs emptyVarSet mempty
-
-split_dvs :: VarSet -> CandidatesQTvs -> Type -> CandidatesQTvs
-split_dvs bound dvs ty
-  = go dvs ty
-  where
-    go dv (AppTy t1 t2)    = go (go dv t1) t2
-    go dv (TyConApp _ tys) = foldl' go dv tys
-    go dv (FunTy w arg res)  = go (go (go_rig dv w) arg) res
-    go dv (LitTy {})       = dv
-    go dv (CastTy ty co)   = go dv ty `mappend` go_co co
-    go dv (CoercionTy co)  = dv `mappend` go_co co
-
-    go dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) (TyVarTy tv)
-      | tv `elemVarSet` bound
-      = dv
-      | otherwise
-      = DV { dv_kvs = kvs `unionDVarSet`
-                      kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
-           , dv_tvs = tvs `extendDVarSet` tv }
-
-    go dv (ForAllTy (Bndr tv _) ty)
-      = DV { dv_kvs = kvs `unionDVarSet`
-                      kill_bound (tyCoVarsOfTypeDSet (tyVarKind tv))
-           , dv_tvs = tvs }
-      where
-        DV { dv_kvs = kvs, dv_tvs = tvs } = split_dvs (bound `extendVarSet` tv) dv ty
-
-    go_rig dv (RigThing ty) =  go dv ty
-    go_rig dv (RigAdd m1 m2) = go_rig dv m1 `mappend` go_rig dv m2
-    go_rig dv (RigMul m1 m2) = go_rig dv m1 `mappend` go_rig dv m2
-    go_rig dv _              = dv
-
-
-    go_co co = DV { dv_kvs = kill_bound (tyCoVarsOfCoDSet co)
-                  , dv_tvs = emptyDVarSet }
-
-    kill_bound free
-      | isEmptyVarSet bound = free
-      | otherwise           = free `dVarSetMinusVarSet` bound
-
--- | Like 'splitDepVarsOfType', but over a list of types
-candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs
-candidateQTyVarsOfTypes = foldl' (split_dvs emptyVarSet) mempty
-
 {-
 ************************************************************************
 *                                                                      *
@@ -1220,8 +1053,7 @@ isFloatedTouchableMetaTyVar ctxt_tclvl tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
   , MetaTv { mtv_tclvl = tv_tclvl, mtv_info = info } <- tcTyVarDetails tv
   , not (isFlattenInfo info)
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    tv_tclvl `strictlyDeeperThan` ctxt_tclvl
+  = tv_tclvl `strictlyDeeperThan` ctxt_tclvl
 
   | otherwise = False
 
@@ -1237,8 +1069,7 @@ isTyConableTyVar tv
         -- with a type constructor application; in particular,
         -- not a TyVarTv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
         MetaTv { mtv_info = TyVarTv } -> False
         _                             -> True
   | otherwise = True
@@ -1255,7 +1086,7 @@ isFskTyVar tv
         MetaTv { mtv_info = FlatSkolTv } -> True
         _                                -> False
 
--- | True of both given and wanted flatten-skolems (fak and usk)
+-- | True of both given and wanted flatten-skolems (fmv and fsk)
 isFlattenTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
@@ -1270,16 +1101,14 @@ isSkolemTyVar tv
 
 isOverlappableTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
         SkolemTv _ overlappable -> overlappable
         _                       -> False
   | otherwise = False
 
 isMetaTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
         MetaTv {} -> True
         _         -> False
   | otherwise = False
@@ -2013,18 +1842,12 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
        Just (ty, _) -> hasTyVarHead ty
        Nothing      -> False
 
-evVarPred_maybe :: EvVar -> Maybe PredType
-evVarPred_maybe v = if isPredTy ty then Just ty else Nothing
-  where ty = varType v
-
 evVarPred :: EvVar -> PredType
 evVarPred var
- | debugIsOn
-  = case evVarPred_maybe var of
-      Just pred -> pred
-      Nothing   -> pprPanic "tcEvVarPred" (ppr var <+> ppr (varType var))
- | otherwise
-  = varType var
+  = ASSERT2( isEvVarType var_ty, ppr var <+> dcolon <+> ppr var_ty )
+    var_ty
+ where
+    var_ty = varType var
 
 ------------------
 -- | When inferring types, should we quantify over a given predicate?
@@ -2042,31 +1865,38 @@ pickQuantifiablePreds qtvs theta
   = let flex_ctxt = True in  -- Quantify over non-tyvar constraints, even without
                              -- -XFlexibleContexts: see Trac #10608, #10351
          -- flex_ctxt <- xoptM Opt_FlexibleContexts
-    filter (pick_me flex_ctxt) theta
+    mapMaybe (pick_me flex_ctxt) theta
   where
     pick_me flex_ctxt pred
       = case classifyPredType pred of
 
           ClassPred cls tys
             | Just {} <- isCallStackPred cls tys
-              -- NEVER infer a CallStack constraint
-              -- Otherwise, we let the constraints bubble up to be
-              -- solved from the outer context, or be defaulted when we
-              -- reach the top-level.
-              -- see Note [Overview of implicit CallStacks]
-              -> False
+              -- NEVER infer a CallStack constraint.  Otherwise we let
+              -- the constraints bubble up to be solved from the outer
+              -- context, or be defaulted when we reach the top-level.
+              -- See Note [Overview of implicit CallStacks]
+            -> Nothing
 
-            | isIPClass cls    -> True -- See note [Inheriting implicit parameters]
+            | isIPClass cls
+            -> Just pred -- See note [Inheriting implicit parameters]
 
-            | otherwise
-              -> pick_cls_pred flex_ctxt cls tys
+            | pick_cls_pred flex_ctxt cls tys
+            -> Just pred
 
-          EqPred ReprEq ty1 ty2 -> pick_cls_pred flex_ctxt coercibleClass [ty1, ty2]
-            -- representational equality is like a class constraint
+          EqPred eq_rel ty1 ty2
+            | quantify_equality eq_rel ty1 ty2
+            , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
+              -- boxEqPred: See Note [Lift equality constaints when quantifying]
+            , pick_cls_pred flex_ctxt cls tys
+            -> Just (mkClassPred cls tys)
 
-          EqPred NomEq ty1 ty2  -> quant_fun ty1 || quant_fun ty2
-          IrredPred ty          -> tyCoVarsOfType ty `intersectsVarSet` qtvs
-          ForAllPred {}         -> False
+          IrredPred ty
+            | tyCoVarsOfType ty `intersectsVarSet` qtvs
+            -> Just pred
+
+          _ -> Nothing
+
 
     pick_cls_pred flex_ctxt cls tys
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
@@ -2075,11 +1905,30 @@ pickQuantifiablePreds qtvs theta
            -- will pass!  See Trac #10351.
 
     -- See Note [Quantifying over equality constraints]
+    quantify_equality NomEq  ty1 ty2 = quant_fun ty1 || quant_fun ty2
+    quantify_equality ReprEq _   _   = True
+
     quant_fun ty
       = case tcSplitTyConApp_maybe ty of
           Just (tc, tys) | isTypeFamilyTyCon tc
                          -> tyCoVarsOfTypes tys `intersectsVarSet` qtvs
           _ -> False
+
+boxEqPred :: EqRel -> Type -> Type -> Maybe (Class, [Type])
+-- Given (t1 ~# t2) or (t1 ~R# t2) return the boxed version
+--       (t1 ~ t2)  or (t1 `Coercible` t2)
+boxEqPred eq_rel ty1 ty2
+  = case eq_rel of
+      NomEq  | homo_kind -> Just (eqClass,        [k1,     ty1, ty2])
+             | otherwise -> Just (heqClass,       [k1, k2, ty1, ty2])
+      ReprEq | homo_kind -> Just (coercibleClass, [k1,     ty1, ty2])
+             | otherwise -> Nothing -- Sigh: we do not have hererogeneous Coercible
+                                    --       so we can't abstract over it
+                                    -- Nothing fundamental: we could add it
+ where
+   k1 = typeKind ty1
+   k2 = typeKind ty2
+   homo_kind = k1 `tcEqType` k2
 
 pickCapturedPreds
   :: TyVarSet           -- Quantifying over these
@@ -2236,6 +2085,18 @@ Notice that
    case for tuples.  Something better would be cool.
 
 See also TcTyDecls.checkClassCycles.
+
+Note [Lift equality constaints when quantifying]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can't quantify over a constraint (t1 ~# t2) because that isn't a
+predicate type; see Note [Types for coercions, predicates, and evidence]
+in Type.hs.
+
+So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
+to Coercible.
+
+This tiresome lifting is the reason that pick_me (in
+pickQuantifiablePreds) returns a Maybe rather than a Bool.
 
 Note [Quantifying over equality constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

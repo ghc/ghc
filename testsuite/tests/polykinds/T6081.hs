@@ -2,7 +2,9 @@
 
 module T6081 where
 
-data KProxy (a :: *) = KP
+import Data.Kind (Type)
+
+data KProxy (a :: Type) = KP
 
 class KindClass (kp :: KProxy k)
 instance KindClass (KP :: KProxy [k])

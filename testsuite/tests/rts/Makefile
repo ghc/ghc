@@ -177,6 +177,11 @@ T11788:
 T12497:
 	echo main | "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE)) T12497.hs
 
+.PHONY: T13617
+T13617:
+	"$(TEST_CC)"  -O3 -ffast-math -ftree-vectorize -c T13617.c -o T13617_sse.o
+	echo main | "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) T13617.hs T13617_sse.o
+
 .PHONY: T14695
 T14695:
 	echo ":quit" | LD_LIBRARY_PATH="foo:" "$(TEST_HC)" $(filter-out -rtsopts, $(TEST_HC_OPTS_INTERACTIVE))
@@ -185,3 +190,13 @@ T14695:
 InternalCounters:
 	"$(TEST_HC)" +RTS -s --internal-counters -RTS 2>&1 | grep "Internal Counters"
 	-"$(TEST_HC)" +RTS -s -RTS 2>&1 | grep "Internal Counters"
+
+.PHONY: KeepCafsFail
+KeepCafsFail:
+	"$(TEST_HC)" -c -g -v0 KeepCafsBase.hs KeepCafs1.hs KeepCafs2.hs
+	"$(TEST_HC)" -g -v0 KeepCafsMain.hs KeepCafsBase.o -debug -rdynamic -fwhole-archive-hs-libs $(KEEPCAFS)
+	./KeepCafsMain 2>&1 || echo "exit($$?)"
+
+.PHONY: KeepCafs
+KeepCafs:
+	"${MAKE}" KeepCafsFail KEEPCAFS=-fkeep-cafs

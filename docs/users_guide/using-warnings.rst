@@ -8,8 +8,13 @@ Warnings and sanity-checking
    single: warnings
 
 GHC has a number of options that select which types of non-fatal error
-messages, otherwise known as warnings, can be generated during
-compilation. By default, you get a standard set of warnings which are
+messages, otherwise known as warnings, can be generated during compilation.
+Some options control individual warnings and others control collections
+of warnings.
+To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
+To reverse``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
+
+By default, you get a standard set of warnings which are
 generally likely to indicate bugs in your program. These are:
 
 .. hlist::
@@ -20,13 +25,16 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wdeprecations`
     * :ghc-flag:`-Wdeprecated-flags`
     * :ghc-flag:`-Wunrecognised-pragmas`
-    * :ghc-flag:`-Wduplicate-constraints`
     * :ghc-flag:`-Wduplicate-exports`
     * :ghc-flag:`-Woverflowed-literals`
     * :ghc-flag:`-Wempty-enumerations`
     * :ghc-flag:`-Wmissing-fields`
     * :ghc-flag:`-Wmissing-methods`
     * :ghc-flag:`-Wwrong-do-bind`
+    * :ghc-flag:`-Wsimplifiable-class-constraints`
+    * :ghc-flag:`-Wtyped-holes`
+    * :ghc-flag:`-Wdeferred-type-errors`
+    * :ghc-flag:`-Wpartial-type-signatures`
     * :ghc-flag:`-Wunsupported-calling-conventions`
     * :ghc-flag:`-Wdodgy-foreign-imports`
     * :ghc-flag:`-Winline-rule-shadowing`
@@ -34,7 +42,9 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wtabs`
     * :ghc-flag:`-Wunrecognised-warning-flags`
     * :ghc-flag:`-Winaccessible-code`
+    * :ghc-flag:`-Wstar-is-type`
     * :ghc-flag:`-Wstar-binder`
+    * :ghc-flag:`-Wspace-after-bang`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -113,6 +123,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wimplicit-kind-vars`
+        * :ghc-flag:`-Wstar-is-type`
 
 .. ghc-flag:: -Wno-compat
     :shortdesc: Disables all warnings enabled by :ghc-flag:`-Wcompat`.
@@ -140,7 +151,9 @@ to abort.
     :category:
 
     Makes any warning into a fatal error. Useful so that you don't miss
-    warnings when doing batch compilation.
+    warnings when doing batch compilation. To reverse ``-Werror`` and stop
+    treating any warnings as errors use ``-Wwarn``, or use ``-Wwarn=<wflag>``
+    to stop treating specific warnings as errors.
 
 .. ghc-flag:: -Werror=⟨wflag⟩
     :shortdesc: make a specific warning fatal
@@ -152,7 +165,7 @@ to abort.
     :implies: ``-W<wflag>``
 
     Makes a specific warning into a fatal error. The warning will be enabled if
-    it hasn't been enabled yet.
+    it hasn't been enabled yet. Can be reversed with ``-Wwarn=<wflag>``.
 
     ``-Werror=compat`` has the same effect as ``-Werror=...`` for each warning
     flag in the :ghc-flag:`-Wcompat` option group.
@@ -286,7 +299,7 @@ of ``-W(no-)*``.
 
     Defer variable out-of-scope errors (errors about names without a leading underscore)
     until runtime. This will turn variable-out-of-scope errors into warnings.
-    Using a value that depends on a typed hole produces a runtime error,
+    Using a value that depends on an out-of-scope variable produces a runtime error,
     the same as :ghc-flag:`-fdefer-type-errors` (which implies this option).
     See :ref:`typed-holes` and :ref:`defer-type-errors`.
 
@@ -1172,6 +1185,27 @@ of ``-W(no-)*``.
     since we're passing ``Foo1`` and ``Foo2`` here, it follows that ``t ~
     Char``, and ``u ~ Int``, and thus ``t ~ u`` cannot hold.
 
+.. ghc-flag:: -Wstar-is-type
+     :shortdesc: warn when ``*`` is used to mean ``Data.Kind.Type``
+     :type: dynamic
+     :reverse: -Wno-star-is-type
+     :category:
+
+     :since: 8.6
+
+     The use of ``*`` to denote the kind of inhabited types relies on the
+     :extension:`StarIsType` extension, which in a future release will be
+     turned off by default and then possibly removed. The reasons for this and
+     the deprecation schedule are described in `GHC proposal #30
+     <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0030-remove-star-kind.rst>`__.
+
+     This warning allows to detect such uses of ``*`` before the actual
+     breaking change takes place. The recommended fix is to replace ``*`` with
+     ``Type`` imported from ``Data.Kind``.
+
+     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
+     default, but will be switched on in a future GHC release.
+
 .. ghc-flag:: -Wstar-binder
      :shortdesc: warn about binding the ``(*)`` type operator despite
          :ghc-flag:`-XStarIsType`
@@ -1230,6 +1264,12 @@ of ``-W(no-)*``.
     per-module basis with :ghc-flag:`-Wno-simplifiable-class-constraints
     <-Wsimplifiable-class-constraints>`.
 
+.. ghc-flag:: -Wspace-after-bang
+     :shortdesc: warn for missing space before the second argument
+        of an infix definition of ``(!)`` when
+        :ghc-flag:`-XBangPatterns` are not enabled
+     :type: dynamic
+     :reverse: -Wno-missing-space-after-bang
 .. ghc-flag:: -Wtabs
     :shortdesc: warn if there are tabs in the source file
     :type: dynamic
@@ -1470,7 +1510,7 @@ of ``-W(no-)*``.
         do { mapM_ popInt xs ; return 10 }
 
 .. ghc-flag:: -Wunused-type-patterns
-    :shortdesc: warn about unused type variables which arise from patterns
+    :shortdesc: warn about unused type variables which arise from patterns in
         in type family and data family instances
     :type: dynamic
     :reverse: -Wno-unused-type-patterns
@@ -1480,22 +1520,30 @@ of ``-W(no-)*``.
        single: unused type patterns, warning
        single: type patterns, unused
 
-    Report all unused type variables which arise from patterns in type family
-    and data family instances. For instance: ::
+    Report all unused implicitly bound type variables which arise from
+    patterns in type family and data family instances. For instance: ::
 
         type instance F x y = []
 
-    would report ``x`` and ``y`` as unused. The warning is suppressed if the
-    type variable name begins with an underscore, like so: ::
+    would report ``x`` and ``y`` as unused on the right hand side. The warning
+    is suppressed if the type variable name begins with an underscore, like
+    so: ::
 
         type instance F _x _y = []
+
+    When :extension:`ExplicitForAll` is enabled, explicitly quantified type
+    variables may also be identified as unused. For instance: ::
+      
+        type instance forall x y. F x y = []
+    
+    would still report ``x`` and ``y`` as unused on the right hand side
 
     Unlike :ghc-flag:`-Wunused-matches`, :ghc-flag:`-Wunused-type-patterns` is
     not implied by :ghc-flag:`-Wall`. The rationale for this decision is that
     unlike term-level pattern names, type names are often chosen expressly for
     documentation purposes, so using underscores in type names can make the
     documentation harder to read.
-
+    
 .. ghc-flag:: -Wunused-foralls
     :shortdesc: warn about type variables in user-written
         ``forall``\\s that are unused

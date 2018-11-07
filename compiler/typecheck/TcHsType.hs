@@ -52,10 +52,14 @@ module TcHsType (
         -- Zonking and promoting
         zonkPromoteType,
 
-        -- Pattern type signatures
-        tcHsPatSigType, tcPatSig, funAppCtxt,
         -- Weight
-        tcWeight
+        tcWeight,
+
+        -- Pattern type signatures
+        tcHsPatSigType, tcPatSig,
+
+        -- Error messages
+        funAppCtxt, addTyConFlavCtxt
    ) where
 
 #include "HsVersions.h"
@@ -177,7 +181,7 @@ pprSigCtxt ctxt hs_ty
 
 tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- This one is used when we have a LHsSigWcType, but in
--- a place where wildards aren't allowed. The renamer has
+-- a place where wildcards aren't allowed. The renamer has
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
@@ -1389,7 +1393,7 @@ as a degenerate case of some (pi (x :: t) -> s) and then this will
 all get more permissive.
 
 Note [Kind generalisation and TyVarTvs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data T (a :: k1) x = MkT (S a ())
   data S (b :: k2) y = MkS (T b ())
@@ -1404,7 +1408,7 @@ in TcBinds.
 There are some wrinkles
 
 * We always want to kind-generalise over TyVarTvs, and /not/ default
-  them to Type.  Another way to say this is: a SigTV should /never/
+  them to Type.  Another way to say this is: a TyVarTv should /never/
   stand for a type, even via defaulting. Hence the check in
   TcSimplify.defaultTyVarTcS, and TcMType.defaultTyVar.  Here's
   another example (Trac #14555):
@@ -1417,11 +1421,21 @@ There are some wrinkles
     data SameKind :: k -> k -> *
     data Q (a :: k1) (b :: k2) c = MkQ (SameKind a b)
   Here we will unify k1 with k2, but this time doing so is an error,
-  because k1 and k2 are bound in the same delcaration.
+  because k1 and k2 are bound in the same declaration.
 
-  We sort this out using findDupTyVarTvs, in TcTyClTyVars; very much
+  We sort this out using findDupTyVarTvs, in TcHsType.tcTyClTyVars; very much
   as we do with partial type signatures in mk_psig_qtvs in
   TcBinds.chooseInferredQuantifiers
+
+* Even the Required arguments should be made into TyVarTvs, not skolems.
+  Consider
+
+    data T k (a :: k)
+
+  Here, k is a Required, dependent variable. For uniformity, it is helpful
+  to have k be a TyVarTv, in parallel with other dependent variables.
+  (This is key in the call to quantifyTyVars in kcTyClGroup, where quantifyTyVars
+  expects not to see unknown skolems.)
 
 Note [Keeping scoped variables in order: Explicit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1453,7 +1467,7 @@ signature), we need to come up with some ordering on these variables.
 This is done by bumping the TcLevel, bringing the tyvars into scope,
 and then type-checking the thing_inside. The constraints are all
 wrapped in an implication, which is then solved. Finally, we can
-zonk all the binders and then order them with toposortTyVars.
+zonk all the binders and then order them with scopedSort.
 
 It's critical to solve before zonking and ordering in order to uncover
 any unifications. You might worry that this eager solving could cause
@@ -1489,8 +1503,9 @@ raise the TcLevel. To avoid these variables from ever being visible
 in the surrounding context, we must obey the following dictum:
 
   Every metavariable in a type must either be
-    (A) promoted, or
-    (B) generalized.
+    (A) promoted
+    (B) generalized, or
+    (C) zapped to Any
 
 If a variable is generalized, then it becomes a skolem and no longer
 has a proper TcLevel. (I'm ignoring the TcLevel on a skolem here, as
@@ -1499,6 +1514,8 @@ generalized (because we're not generalizing the construct -- e.g., pattern
 sig -- or because the metavars are constrained -- see kindGeneralizeLocal)
 we need to promote to maintain (MetaTvInv) of Note [TcLevel and untouchable type variables]
 in TcType.
+
+For more about (C), see Note [Naughty quantification candidates] in TcMType.
 
 After promoting/generalizing, we need to zonk *again* because both
 promoting and generalizing fill in metavariables.
@@ -1544,52 +1561,98 @@ kcLHsQTyVars name flav cusk
                                            , hsq_dependent = dep_names }
                       , hsq_explicit = hs_tvs }) thing_inside
   | cusk
-  = do { (scoped_kvs, (tc_tvs, res_kind))
+    -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
+  = addTyConFlavCtxt name flav $
+    do { (scoped_kvs, (tc_tvs, res_kind))
            <- solveEqualities                    $
               tcImplicitQTKBndrs skol_info kv_ns $
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
-           -- Now, because we're in a CUSK, quantify over the mentioned
-           -- kind vars, in dependency order.
-       ; let tc_binders_unzonked = zipWith mk_tc_binder hs_tvs tc_tvs
-       ; dvs  <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys scoped_kvs $
-                                            mkTyConKind tc_binders_unzonked res_kind)
-       ; qkvs <- quantifyTyVars emptyVarSet dvs
-         -- don't call tcGetGlobalTyCoVars. For associated types, it gets the
-         -- tyvars from the enclosing class -- but that's wrong. We *do* want
-         -- to quantify over those tyvars.
+       ; let class_tc_binders
+               | Just class_tc <- tyConFlavourAssoc_maybe flav
+               = tyConBinders class_tc  -- class has a CUSK, so these are zonked
+                                       -- and fully settled
+               | otherwise
+               = []
 
-       ; scoped_kvs <- mapM zonkTcTyVarToTyVar scoped_kvs
-       ; tc_tvs     <- mapM zonkTcTyVarToTyVar tc_tvs
-       ; res_kind   <- zonkTcType res_kind
-       ; let tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
+             class_tv_set = mkVarSet (binderVars class_tc_binders)
+             local_specified = filterOut (`elemVarSet` class_tv_set) scoped_kvs
+               -- NB: local_specified are guaranteed to be in a well-scoped
+               -- order because of tcImplicitQTKBndrs
 
-          -- If any of the scoped_kvs aren't actually mentioned in a binder's
+         -- NB: candidateQTyVarsOfType is OK with unzonked input
+       ; candidates <- candidateQTyVarsOfType class_tv_set $
+                       mkSpecForAllTys local_specified $
+                       mkSpecForAllTys tc_tvs $
+                       res_kind
+               -- The type above is a bit wrong, in that we're using foralls for all
+               -- the tc_tvs, even those that aren't dependent. This is OK, though,
+               -- because we're building the type only to extract the variables to
+               -- quantify. We use mk_tc_binder below to get this right.
+
+       ; local_inferred <- quantifyTyVars class_tv_set candidates
+
+       ; local_specified <- mapM zonkTyCoVarKind local_specified
+       ; tc_tvs          <- mapM zonkTyCoVarKind tc_tvs
+       ; res_kind        <- zonkTcType res_kind
+
+       ; let dep_tv_set = tyCoVarsOfTypes (res_kind : map tyVarKind tc_tvs)
+             local_tcbs = concat [ mkNamedTyConBinders Inferred local_inferred
+                                 , mkNamedTyConBinders Specified local_specified
+                                 , map (mkRequiredTyConBinder dep_tv_set) tc_tvs ]
+
+             free_class_tv_set = tyCoVarsOfTypes (res_kind : map binderType local_tcbs)
+                                 `delVarSetList` map binderVar local_tcbs
+
+             used_class_tcbs = filter ((`elemVarSet` free_class_tv_set) . binderVar)
+                                      class_tc_binders
+
+              -- Suppose we have class C k where type F (x :: k). We can't have
+              -- k *required* in F, so it becomes Specified
+             to_invis_tcb tcb
+               | Required <- tyConBinderArgFlag tcb
+               = mkNamedTyConBinder Specified (binderVar tcb)
+               | otherwise
+               = tcb
+
+             used_class_tcbs_invis = map to_invis_tcb used_class_tcbs
+
+             all_tcbs = used_class_tcbs_invis ++ local_tcbs
+
+         -- If the ordering from
+         -- Note [Required, Specified, and Inferred for types] in TcTyClsDecls
+         -- doesn't work, we catch it here, before an error cascade
+       ; checkValidTelescope all_tcbs (ppr user_tyvars)
+
+          -- If any of the all_kvs aren't actually mentioned in a binder's
           -- kind (or the return kind), then we're in the CUSK case from
           -- Note [Free-floating kind vars]
-       ; let all_tc_tvs        = scoped_kvs ++ tc_tvs
-             all_mentioned_tvs = mapUnionVarSet (tyCoVarsOfType . tyVarKind)
-                                                all_tc_tvs
-                                 `unionVarSet` tyCoVarsOfType res_kind
-             unmentioned_kvs   = filterOut (`elemVarSet` all_mentioned_tvs)
-                                           scoped_kvs
-       ; reportFloatingKvs name flav all_tc_tvs unmentioned_kvs
+       ; let all_kvs = concat [ map binderVar used_class_tcbs_invis
+                              , local_inferred
+                              , local_specified ]
 
-       ; let final_binders =  map (mkNamedTyConBinder Inferred) qkvs
-                           ++ map (mkNamedTyConBinder Specified) scoped_kvs
-                           ++ tc_binders
-             tycon = mkTcTyCon name (ppr user_tyvars) final_binders res_kind
-                                [(tyVarName var, var) | var <- (scoped_kvs ++ tc_tvs)]
-                               flav
-                           -- the tvs contain the binders already
-                           -- in scope from an enclosing class, but
-                           -- re-adding tvs to the env't doesn't cause
-                           -- harm
+             all_mentioned_tvs = dep_tv_set `unionVarSet`
+                                 tyCoVarsOfTypes (map tyVarKind all_kvs)
+
+             unmentioned_kvs   = filterOut (`elemVarSet` all_mentioned_tvs) all_kvs
+       ; reportFloatingKvs name flav (map binderVar all_tcbs) unmentioned_kvs
+
+       ; let all_tv_prs = [(tyVarName var, var) | var <- (scoped_kvs ++ tc_tvs)]
+             tycon = mkTcTyCon name (ppr user_tyvars) all_tcbs res_kind
+                               all_tv_prs True {- it is generalised -} flav
 
        ; traceTc "kcLHsQTyVars: cusk" $
-         vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
-              , ppr tc_tvs, ppr (mkTyConKind final_binders res_kind)
-              , ppr qkvs, ppr final_binders ]
+         vcat [ text "name" <+> ppr name
+              , text "kv_ns" <+> ppr kv_ns
+              , text "hs_tvs" <+> ppr hs_tvs
+              , text "dep_names" <+> ppr dep_names
+              , text "scoped_kvs" <+> ppr scoped_kvs
+              , text "tc_tvs" <+> ppr tc_tvs
+              , text "res_kind" <+> ppr res_kind
+              , text "all_tcbs" <+> ppr all_tcbs
+              , text "mkTyConKind all_tcbs res_kind"
+                <+> ppr (mkTyConKind all_tcbs res_kind)
+              , text "all_tv_prs" <+> ppr all_tv_prs ]
 
        ; return tycon }
 
@@ -1601,10 +1664,15 @@ kcLHsQTyVars name flav cusk
               kcLHsQTyVarBndrs cusk open_fam skol_info hs_tvs thing_inside
 
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
-               -- must remain lined up with the binders
+               -- might unify with kind vars in other types in a mutually
+               -- recursive group. See Note [Kind generalisation and TyVarTvs]
              tc_binders = zipWith mk_tc_binder hs_tvs tc_tvs
+               -- Also, note that tc_binders has the tyvars from only the
+               -- user-written tyvarbinders. See S1 in Note [How TcTyCons work]
+               -- in TcTyClsDecls
              tycon = mkTcTyCon name (ppr user_tyvars) tc_binders res_kind
                                ([(tyVarName var, var) | var <- (scoped_kvs ++ tc_tvs)])
+                               False -- not yet generalised
                                flav
 
        ; traceTc "kcLHsQTyVars: not-cusk" $
@@ -1673,7 +1741,7 @@ kcLHsQTyVarBndrs cusk open_fam skol_info (L _ hs_tv : hs_tvs) thing
                                   -- Open type/data families default their variables
                                   -- variables to kind *.  But don't default in-scope
                                   -- class tyvars, of course
-                        ; tv <- newSkolemTyVar name kind
+                        ; tv <- new_tv name kind
                         ; return (tv, False) } }
 
     kc_hs_tv (KindedTyVar _ lname@(L _ name) lhs_kind)
@@ -1685,10 +1753,17 @@ kcLHsQTyVarBndrs cusk open_fam skol_info (L _ hs_tv : hs_tvs) thing
                            unifyKind (Just (HsTyVar noExt NotPromoted lname))
                                      kind (tyVarKind tv)
                        ; return (tv, True) }
-               _ -> do { tv <- newSkolemTyVar name kind
+               _ -> do { tv <- new_tv name kind
                        ; return (tv, False) } }
 
     kc_hs_tv (XTyVarBndr{}) = panic "kc_hs_tv"
+
+
+    new_tv :: Name -> Kind -> TcM TcTyVar
+    new_tv
+      | cusk      = newSkolemTyVar
+      | otherwise = newTyVarTyVar
+          -- Third wrinkle in Note [Kind generalisation and TyVarTvs]
 
 {- Note [Kind-checking tyvar binders for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1707,6 +1782,40 @@ See Note [Associated type tyvar names] in Class and
 We must do the same for family instance decls, where the in-scope
 variables may be bound by the enclosing class instance decl.
 Hence the use of tcImplicitQTKBndrs in tcFamTyPats.
+
+Note [Kind variable ordering for associated types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What should be the kind of `T` in the following example? (#15591)
+
+  class C (a :: Type) where
+    type T (x :: f a)
+
+As per Note [Ordering of implicit variables] in RnTypes, we want to quantify
+the kind variables in left-to-right order of first occurrence in order to
+support visible kind application. But we cannot perform this analysis on just
+T alone, since its variable `a` actually occurs /before/ `f` if you consider
+the fact that `a` was previously bound by the parent class `C`. That is to say,
+the kind of `T` should end up being:
+
+  T :: forall a f. f a -> Type
+
+(It wouldn't necessarily be /wrong/ if the kind ended up being, say,
+forall f a. f a -> Type, but that would not be as predictable for users of
+visible kind application.)
+
+In contrast, if `T` were redefined to be a top-level type family, like `T2`
+below:
+
+  type family T2 (x :: f (a :: Type))
+
+Then `a` first appears /after/ `f`, so the kind of `T2` should be:
+
+  T2 :: forall f a. f a -> Type
+
+In order to make this distinction, we need to know (in kcLHsQTyVars) which
+type variables have been bound by the parent class (if there is one). With
+the class-bound variables in hand, we can ensure that we always quantify
+these first.
 -}
 
 
@@ -1722,10 +1831,13 @@ kcImplicitTKBndrs :: [Name]     -- of the vars
                   -> TcM ([TcTyVar], a)  -- returns the tyvars created
                                          -- these are *not* dependency ordered
 kcImplicitTKBndrs var_ns thing_inside
-  = do { tkvs <- mapM newFlexiKindedTyVarTyVar var_ns
-       ; result <- tcExtendTyVarEnv (map unrestricted tkvs) thing_inside
-       ; return (tkvs, result) }
-
+  -- NB: Just use tyvars that are in scope, if any. Otherwise, we
+  -- get #15711, where GHC forgets that a variable used in an associated
+  -- type is the same as the one used in the enclosing class
+  = do { tkvs_pairs <- mapM (newFlexiKindedQTyVar newTyVarTyVar) var_ns
+       ; let tkvs_to_scope = [ unrestricted tkv | (tkv, True) <- tkvs_pairs ]
+       ; result <- tcExtendTyVarEnv tkvs_to_scope thing_inside
+       ; return (map fst tkvs_pairs, result) }
 
 tcImplicitTKBndrs, tcImplicitTKBndrsSig, tcImplicitQTKBndrs
   :: SkolemInfo
@@ -1734,7 +1846,8 @@ tcImplicitTKBndrs, tcImplicitTKBndrsSig, tcImplicitQTKBndrs
   -> TcM ([TcTyVar], a)
 tcImplicitTKBndrs    = tcImplicitTKBndrsX newFlexiKindedSkolemTyVar
 tcImplicitTKBndrsSig = tcImplicitTKBndrsX newFlexiKindedTyVarTyVar
-tcImplicitQTKBndrs   = tcImplicitTKBndrsX newFlexiKindedQTyVar
+tcImplicitQTKBndrs   = tcImplicitTKBndrsX
+                         (\nm -> fst <$> newFlexiKindedQTyVar newSkolemTyVar nm)
 
 tcImplicitTKBndrsX :: (Name -> TcM TcTyVar) -- new_tv function
                    -> SkolemInfo
@@ -1769,19 +1882,20 @@ tcImplicitTKBndrsX new_tv skol_info tv_names thing_inside
 
           -- do a stable topological sort, following
           -- Note [Ordering of implicit variables] in RnTypes
-       ; let final_tvs = toposortTyVars skol_tvs
+       ; let final_tvs = scopedSort skol_tvs
        ; traceTc "tcImplicitTKBndrs" (ppr tv_names $$ ppr final_tvs)
        ; return (final_tvs, result) }
 
-newFlexiKindedQTyVar :: Name -> TcM TcTyVar
--- Make a new skolem for an implicit binder in a type/class/type
+newFlexiKindedQTyVar :: (Name -> Kind -> TcM TyVar) -> Name -> TcM (TcTyVar, Bool)
+-- Make a new tyvar for an implicit binder in a type/class/type
 -- instance declaration, with a flexi-kind
 -- But check for in-scope-ness, and if so return that instead
-newFlexiKindedQTyVar name
+-- Returns True as second return value iff this created a real new tyvar
+newFlexiKindedQTyVar mk_tv name
   = do { mb_tv <- tcLookupLcl_maybe name
        ; case mb_tv of
-           Just (ATyVar _ tv) -> return tv
-           _ -> newFlexiKindedSkolemTyVar name }
+           Just (ATyVar _ tv) -> return (tv, False)
+           _ -> (, True) <$> newFlexiKindedTyVar mk_tv name }
 
 newFlexiKindedTyVar :: (Name -> Kind -> TcM TyVar) -> Name -> TcM TyVar
 newFlexiKindedTyVar new_tv name
@@ -1941,17 +2055,21 @@ kindGeneralizeLocal wanted kind_or_type
        ; constrained <- zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
        ; (_, constrained) <- promoteTyVarSet constrained
 
-         -- NB: zonk here, after promotion
-       ; kvs <- zonkTcTypeAndFV kind_or_type
-       ; let dvs = DV { dv_kvs = kvs, dv_tvs = emptyDVarSet }
-
        ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
+       ; let mono_tvs = gbl_tvs `unionVarSet` constrained
+
+         -- use the "Kind" variant here, as any types we see
+         -- here will already have all type variables quantified;
+         -- thus, every free variable is really a kv, never a tv.
+       ; dvs <- candidateQTyVarsOfKind mono_tvs kind_or_type
+
        ; traceTc "kindGeneralizeLocal" (vcat [ ppr wanted
                                              , ppr kind_or_type
                                              , ppr constrained
+                                             , ppr mono_tvs
                                              , ppr dvs ])
 
-       ; quantifyTyVars (gbl_tvs `unionVarSet` constrained) dvs }
+       ; quantifyTyVars mono_tvs dvs }
 
 {-
 Note [Kind generalisation]
@@ -2435,7 +2553,7 @@ tcHsPatSigType ctxt sig_ty
         ; sig_ty <- zonkPromoteType sig_ty
         ; checkValidType ctxt sig_ty
 
-        ; tv_pairs <- mapM mk_tv_pair sig_tkvs
+        ; let tv_pairs = [(tyVarName v, v) | v <- sig_tkvs]
 
         ; traceTc "tcHsPatSigType" (ppr sig_vars)
         ; return (wcs, tv_pairs, sig_ty) }
@@ -2448,14 +2566,9 @@ tcHsPatSigType ctxt sig_ty
                _              -> newTauTyVar
       -- See Note [Pattern signature binders]
 
-    mk_tv_pair tv = do { tv' <- zonkTcTyVarToTyVar tv
-                       ; return (tyVarName tv, tv') }
-         -- The Name is one of sig_vars, the lexically scoped name
-         -- But if it's a TyVarTv, it might have been unified
-         -- with an existing in-scope skolem, so we must zonk
-         -- here.  See Note [Pattern signature binders]
+
 tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPatSigType"
-tcHsPatSigType _ (XHsWildCardBndrs _) = panic "tcHsPatSigType"
+tcHsPatSigType _ (XHsWildCardBndrs _)          = panic "tcHsPatSigType"
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
@@ -2494,8 +2607,8 @@ tcPatSig in_pat_bind sig res_ty
                 --      f :: Int -> Int
                 --      f (x :: T a) = ...
                 -- Here 'a' doesn't get a binding.  Sigh
-        ; let bad_tvs = [ tv | (_,tv) <- sig_tvs
-                             , not (tv `elemVarSet` exactTyCoVarsOfType sig_ty) ]
+        ; let bad_tvs = filterOut (`elemVarSet` exactTyCoVarsOfType sig_ty)
+                                  (tyCoVarsOfTypeList sig_ty)
         ; checkTc (null bad_tvs) (badPatTyVarTvs sig_ty bad_tvs)
 
         -- Now do a subsumption check of the pattern signature against res_ty
@@ -2524,13 +2637,14 @@ patBindSigErr sig_tvs
 
 {- Note [Pattern signature binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Type variables in the type environment] in TcRnTypes.
 Consider
 
   data T where
     MkT :: forall a. a -> (a -> Int) -> T
 
   f :: T -> ...
-  f (MkT x (f :: b -> c)) = ...
+  f (MkT x (f :: b -> c)) = <blah>
 
 Here
  * The pattern (MkT p1 p2) creates a *skolem* type variable 'a_sk',
@@ -2543,13 +2657,10 @@ Here
 
  * Then unification makes beta := a_sk, gamma := Int
    That's why we must make beta and gamma a MetaTv,
-   not a SkolemTv, so that it can unify to a_sk rsp. Int.
-   Note that gamma unifies with a type, not just a type variable
-   (see https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0029-scoped-type-variables-types.rst)
+   not a SkolemTv, so that it can unify to a_sk (or Int, respectively).
 
- * Finally, in 'blah' we must have the envt "b" :-> a_sk, "c" :-> Int.
-   The pairs ("b" :-> a_sk, "c" :-> Int) are returned by tcHsPatSigType,
-   constructed by mk_tv_pair in that function.
+ * Finally, in '<blah>' we have the envt "b" :-> beta, "c" :-> gamma,
+   so we return the pairs ("b" :-> beta, "c" :-> gamma) from tcHsPatSigType,
 
 Another example (Trac #13881):
    fl :: forall (l :: [a]). Sing l -> Sing l
@@ -2562,14 +2673,13 @@ We make up a fresh meta-TauTv, y_sig, for 'y', and kind-check
 the pattern signature
    Sing (l :: [y])
 That unifies y_sig := a_sk.  We return from tcHsPatSigType with
-the pair ("y" :-> a_sk).
+the pair ("y" :-> y_sig).
 
 For RULE binders, though, things are a bit different (yuk).
   RULE "foo" forall (x::a) (y::[a]).  f x y = ...
 Here this really is the binding site of the type variable so we'd like
 to use a skolem, so that we get a complaint if we unify two of them
-together.
-
+together.  Hence the new_tv function in tcHsPatSigType.
 
 
 ************************************************************************
@@ -2789,3 +2899,9 @@ failIfEmitsConstraints thing_inside
        ; reportAllUnsolved lie
        ; return res
        }
+
+-- | Add a "In the data declaration for T" or some such.
+addTyConFlavCtxt :: Name -> TyConFlavour -> TcM a -> TcM a
+addTyConFlavCtxt name flav
+  = addErrCtxt $ hsep [ text "In the", ppr flav
+                      , text "declaration for", quotes (ppr name) ]

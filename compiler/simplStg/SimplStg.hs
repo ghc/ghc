@@ -40,6 +40,8 @@ stg2stg dflags binds
         ; stg_linter False "Pre-unarise" binds
         ; let un_binds = unarise us binds
         ; stg_linter True "Unarise" un_binds
+         -- Important that unarisation comes first
+         -- See Note [StgCse after unarisation] in StgCse
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:"
                         (pprStgTopBindings un_binds)

@@ -15,6 +15,7 @@ import Prelude hiding (max)
 import Data.List(nub,sort)
 import Control.Monad(liftM)
 import Data.Type.Equality
+import Data.Kind (Type)
 import Data.Maybe(isJust)
 
 --
@@ -35,7 +36,7 @@ data Nat = Z | S Nat
 -- Well-formed Red/Black trees
 -- n statically tracks the black height of the tree
 -- c statically tracks the color of the root node
-data CT (n :: Nat) (c :: Color) (a :: *) where
+data CT (n :: Nat) (c :: Color) (a :: Type) where
    E  :: CT Z Black a
    T  :: Valid c c1 c2 =>
          SColor c -> (CT n c1 a) -> a -> (CT n c2 a) -> CT (Incr c n) c a

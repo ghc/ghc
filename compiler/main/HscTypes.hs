@@ -36,7 +36,7 @@ module HscTypes (
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
-        HscSource(..), isHsBootOrSig, hscSourceString,
+        HscSource(..), isHsBootOrSig, isHsigFile, hscSourceString,
 
 
         -- * State relating to modules in this package
@@ -179,7 +179,8 @@ import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser
 import DynFlags
-import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
+import DriverPhases     ( Phase, HscSource(..), hscSourceString
+                        , isHsBootOrSig, isHsigFile )
 import BasicTypes
 import IfaceSyn
 import Maybes
@@ -1532,7 +1533,7 @@ It's exactly the same for type-family instances.  See Trac #7102
 -}
 
 -- | Interactive context, recording information about the state of the
--- context in which statements are executed in a GHC session.
+-- context in which statements are executed in a GHCi session.
 data InteractiveContext
   = InteractiveContext {
          ic_dflags     :: DynFlags,
@@ -2014,8 +2015,8 @@ tyThingParent_maybe (AConLike cl) = case cl of
     RealDataCon dc  -> Just (ATyCon (dataConTyCon dc))
     PatSynCon{}     -> Nothing
 tyThingParent_maybe (ATyCon tc)   = case tyConAssoc_maybe tc of
-                                      Just cls -> Just (ATyCon (classTyCon cls))
-                                      Nothing  -> Nothing
+                                      Just tc -> Just (ATyCon tc)
+                                      Nothing -> Nothing
 tyThingParent_maybe (AnId id)     = case idDetails id of
                                       RecSelId { sel_tycon = RecSelData tc } ->
                                           Just (ATyCon tc)

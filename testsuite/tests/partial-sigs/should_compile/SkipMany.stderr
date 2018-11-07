@@ -1,13 +1,12 @@
 TYPE SIGNATURES
-  SkipMany.GenParser ::
-    forall tok st a. tok -> st -> a -> GenParser tok st a
   skipMany ::
     forall tok st a. GenParser tok st a -> GenParser tok st ()
   skipMany' ::
     forall tok st a. GenParser tok st a -> GenParser tok st ()
 TYPE CONSTRUCTORS
-  data GenParser tok st a = GenParser tok st a
-COERCION AXIOMS
+  GenParser :: * -> * -> * -> *
+DATA CONSTRUCTORS
+  GenParser :: forall tok st a. tok -> st -> a -> GenParser tok st a
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

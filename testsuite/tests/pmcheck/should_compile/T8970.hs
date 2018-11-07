@@ -3,15 +3,17 @@
 
 module T8970 where
 
+import Data.Kind (Type)
+
 data K = Foo
        | Bar
 
-data D1 :: K -> * where
+data D1 :: K -> Type where
     F1 :: D1 Foo
     B1 :: D1 Bar
 
-class C (a :: K -> *) where
-    data D2 a :: K -> *
+class C (a :: K -> Type) where
+    data D2 a :: K -> Type
     foo :: a k -> D2 a k -> Bool
 
 instance C D1 where

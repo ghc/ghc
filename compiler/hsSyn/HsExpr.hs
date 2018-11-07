@@ -180,8 +180,15 @@ is Less Cool because
     typecheck do-notation with (>>=) :: m1 a -> (a -> m2 b) -> m2 b.)
 -}
 
--- | An unbound variable; used for treating out-of-scope variables as
--- expression holes
+-- | An unbound variable; used for treating
+-- out-of-scope variables as expression holes
+--
+-- Either "x", "y"     Plain OutOfScope
+-- or     "_", "_x"    A TrueExprHole
+--
+-- Both forms indicate an out-of-scope variable,  but the latter
+-- indicates that the user /expects/ it to be out of scope, and
+-- just wants GHC to report its type
 data UnboundVar
   = OutOfScope OccName GlobalRdrEnv  -- ^ An (unqualified) out-of-scope
                                      -- variable, together with the GlobalRdrEnv
@@ -329,7 +336,7 @@ data HsExpr p
 
   | HsApp     (XApp p) (LHsExpr p) (LHsExpr p) -- ^ Application
 
-  | HsAppType (XAppTypeE p) (LHsExpr p)  -- ^ Visible type application
+  | HsAppType (XAppTypeE p) (LHsExpr p) (LHsWcType (NoGhcTc p))  -- ^ Visible type application
        --
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
@@ -493,10 +500,10 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | ExprWithTySig
-                (XExprWithTySig p)   -- Retain the signature,
-                                     -- as HsSigType Name, for
-                                     -- round-tripping purposes
+                (XExprWithTySig p)
+
                 (LHsExpr p)
+                (LHsSigWcType (NoGhcTc p))
 
   -- | Arithmetic sequence
   --
@@ -717,9 +724,7 @@ type instance XLam           (GhcPass _) = NoExt
 type instance XLamCase       (GhcPass _) = NoExt
 type instance XApp           (GhcPass _) = NoExt
 
-type instance XAppTypeE      GhcPs = LHsWcType GhcPs
-type instance XAppTypeE      GhcRn = LHsWcType GhcRn
-type instance XAppTypeE      GhcTc = LHsWcType GhcRn
+type instance XAppTypeE      (GhcPass _) = NoExt
 
 type instance XOpApp         GhcPs = NoExt
 type instance XOpApp         GhcRn = Fixity
@@ -760,9 +765,7 @@ type instance XRecordUpd     GhcPs = NoExt
 type instance XRecordUpd     GhcRn = NoExt
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
-type instance XExprWithTySig GhcPs = (LHsSigWcType GhcPs)
-type instance XExprWithTySig GhcRn = (LHsSigWcType GhcRn)
-type instance XExprWithTySig GhcTc = (LHsSigWcType GhcRn)
+type instance XExprWithTySig (GhcPass _) = NoExt
 
 type instance XArithSeq      GhcPs = NoExt
 type instance XArithSeq      GhcRn = NoExt
@@ -1085,7 +1088,7 @@ ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
   = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
-ppr_expr (ExprWithTySig sig expr)
+ppr_expr (ExprWithTySig _ expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
          4 (ppr sig)
 
@@ -1162,11 +1165,11 @@ ppr_expr (XExpr x) = ppr x
 
 ppr_apps :: (OutputableBndrId (GhcPass p))
          => HsExpr (GhcPass p)
-         -> [Either (LHsExpr (GhcPass p)) (XAppTypeE (GhcPass p))]
+         -> [Either (LHsExpr (GhcPass p)) (LHsWcType (NoGhcTc (GhcPass p)))]
          -> SDoc
 ppr_apps (HsApp _ (L _ fun) arg)        args
   = ppr_apps fun (Left arg : args)
-ppr_apps (HsAppType arg (L _ fun))    args
+ppr_apps (HsAppType _ (L _ fun) arg)    args
   = ppr_apps fun (Right arg : args)
 ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
   where
@@ -1240,11 +1243,11 @@ hsExprNeedsParens p = go
     go (HsMultiIf{})                  = p > topPrec
     go (HsLet{})                      = p > topPrec
     go (HsDo _ sc _)
-      | isListCompExpr sc             = False
+      | isComprehensionContext sc     = False
       | otherwise                     = p > topPrec
     go (ExplicitList{})               = False
     go (RecordUpd{})                  = False
-    go (ExprWithTySig{})              = p > topPrec
+    go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
     go (EWildPat{})                   = False
     go (ELazyPat{})                   = False
@@ -1854,18 +1857,17 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 -- For details on above see note [Api annotations] in ApiAnnotation
 data StmtLR idL idR body -- body should always be (LHs**** idR)
   = LastStmt  -- Always the last Stmt in ListComp, MonadComp,
-              -- and (after the renamer) DoExpr, MDoExpr
+              -- and (after the renamer, see RnExpr.checkLastStmt) DoExpr, MDoExpr
               -- Not used for GhciStmtCtxt, PatGuard, which scope over other stuff
           (XLastStmt idL idR body)
           body
           Bool               -- True <=> return was stripped by ApplicativeDo
-          (SyntaxExpr idR)   -- The return operator, used only for
-                             -- MonadComp For ListComp we
-                             -- use the baked-in 'return' For DoExpr,
-                             -- MDoExpr, we don't apply a 'return' at
-                             -- all See Note [Monad Comprehensions] |
-                             -- - 'ApiAnnotation.AnnKeywordId' :
-                             -- 'ApiAnnotation.AnnLarrow'
+          (SyntaxExpr idR)   -- The return operator
+            -- The return operator is used only for MonadComp
+            -- For ListComp we use the baked-in 'return'
+            -- For DoExpr, MDoExpr, we don't apply a 'return' at all
+            -- See Note [Monad Comprehensions]
+            -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | BindStmt (XBindStmt idL idR body) -- Post typechecking, multiplicity of the
@@ -1880,7 +1882,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              -- if the pattern match can't fail
 
   -- | 'ApplicativeStmt' represents an applicative expression built with
-  -- <$> and <*>.  It is generated by the renamer, and is desugared into the
+  -- '<$>' and '<*>'.  It is generated by the renamer, and is desugared into the
   -- appropriate applicative expression by the desugarer, but it is intended
   -- to be invisible in error messages.
   --
@@ -2752,13 +2754,13 @@ data HsStmtContext id
   deriving Functor
 deriving instance (Data id) => Data (HsStmtContext id)
 
-isListCompExpr :: HsStmtContext id -> Bool
--- Uses syntax [ e | quals ]
-isListCompExpr ListComp          = True
-isListCompExpr MonadComp         = True
-isListCompExpr (ParStmtCtxt c)   = isListCompExpr c
-isListCompExpr (TransStmtCtxt c) = isListCompExpr c
-isListCompExpr _ = False
+isComprehensionContext :: HsStmtContext id -> Bool
+-- Uses comprehension syntax [ e | quals ]
+isComprehensionContext ListComp          = True
+isComprehensionContext MonadComp         = True
+isComprehensionContext (ParStmtCtxt c)   = isComprehensionContext c
+isComprehensionContext (TransStmtCtxt c) = isComprehensionContext c
+isComprehensionContext _ = False
 
 -- | Should pattern match failure in a 'HsStmtContext' be desugared using
 -- 'MonadFail'?
@@ -2770,6 +2772,10 @@ isMonadFailStmtContext GhciStmtCtxt         = True
 isMonadFailStmtContext (ParStmtCtxt ctxt)   = isMonadFailStmtContext ctxt
 isMonadFailStmtContext (TransStmtCtxt ctxt) = isMonadFailStmtContext ctxt
 isMonadFailStmtContext _ = False -- ListComp, PatGuard, ArrowExpr
+
+isMonadCompContext :: HsStmtContext id -> Bool
+isMonadCompContext MonadComp = True
+isMonadCompContext _         = False
 
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})   = text "="
@@ -2893,7 +2899,7 @@ pprStmtInCtxt :: (OutputableBndrId (GhcPass idL),
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc
 pprStmtInCtxt ctxt (LastStmt _ e _ _)
-  | isListCompExpr ctxt      -- For [ e | .. ], do not mutter about "stmts"
+  | isComprehensionContext ctxt      -- For [ e | .. ], do not mutter about "stmts"
   = hang (text "In the expression:") 2 (ppr e)
 
 pprStmtInCtxt ctxt stmt
