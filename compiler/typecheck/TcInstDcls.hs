@@ -465,14 +465,14 @@ tcLocalInstDecl (L _ (XInstDecl _)) = panic "tcLocalInstDecl"
 tcClsInstDecl :: LClsInstDecl GhcRn
               -> TcM ([InstInfo GhcRn], [FamInst], [DerivInfo])
 -- The returned DerivInfos are for any associated data families
-tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
+tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
                                   , cid_datafam_insts = adts }))
   = setSrcSpan loc                      $
-    addErrCtxt (instDeclCtxt1 poly_ty)  $
+    addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { (tyvars, theta, clas, inst_tys)
-             <- tcHsClsInstType (InstDeclCtxt False) poly_ty
+             <- tcHsClsInstType (InstDeclCtxt False) hs_ty
              -- NB: tcHsClsInstType does checkValidInstance
 
         ; tcExtendTyVarEnv tyvars $
@@ -481,7 +481,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
               mb_info    = Just (clas, tyvars, mini_env)
 
         -- Next, process any associated types.
-        ; traceTc "tcLocalInstDecl" (ppr poly_ty)
+        ; traceTc "tcLocalInstDecl" (ppr hs_ty)
         ; tyfam_insts0  <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
         ; datafam_stuff <- mapAndRecoverM (tcDataFamInstDecl mb_info) adts
         ; let (datafam_insts, m_deriv_infos) = unzip datafam_stuff
@@ -500,7 +500,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
 
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
-        ; dfun_name <- newDFunName clas inst_tys (getLoc (hsSigType poly_ty))
+        ; dfun_name <- newDFunName clas inst_tys (getLoc (hsSigType hs_ty))
                 -- Dfun location is that of instance *header*
 
         ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name tyvars theta

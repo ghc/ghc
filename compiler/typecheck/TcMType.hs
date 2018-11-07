@@ -1499,7 +1499,7 @@ defaultTyVar default_kind tv
     -- Do not default TyVarTvs. Doing so would violate the invariants
     -- on TyVarTvs; see Note [Signature skolems] in TcType.
     -- Trac #13343 is an example; #14555 is another
-    -- See Note [Kind generalisation and TyVarTvs]
+    -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
   = return False
 
 
