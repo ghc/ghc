@@ -195,17 +195,18 @@ subEquations :: Maybe Package -> Qualification -> [SubDecl] -> Html
 subEquations pkg qual = divSubDecls "equations" "Equations" . subTable pkg qual
 
 
--- | Generate sub table for instance declarations, with source
+-- | Generate collapsible sub table for instance declarations, with source
 subInstances :: Maybe Package -> Qualification
              -> String -- ^ Class name, used for anchor generation
              -> LinksInfo -> Bool
              -> [(SubDecl, Maybe Module, Located DocName)] -> Html
 subInstances pkg qual nm lnks splice = maybe noHtml wrap . instTable
   where
-    wrap contents = subSection (collapseDetails id_ DetailsOpen (summary +++ contents))
+    wrap contents = subSection (hdr +++ collapseDetails id_ DetailsOpen (summary +++ contents))
     instTable = subTableSrc pkg qual lnks splice
     subSection = thediv ! [theclass "subs instances"]
-    summary = thesummary << "Instances"
+    hdr = h4 ! collapseControl id_ "instances" << "Instances"
+    summary = thesummary ! [ theclass "hide-when-js-enabled" ] << "Instances details"
     id_ = makeAnchorId $ "i:" ++ nm
 
 

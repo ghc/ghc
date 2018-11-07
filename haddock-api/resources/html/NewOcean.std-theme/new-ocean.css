@@ -352,7 +352,7 @@ ul.links li a {
 .show { display: inherit; }
 .clear { clear: both; }
 
-.collapser:before, .expander:before {
+.collapser:before, .expander:before, .noexpander:before {
   font-size: 1.2em;
   color: #9C5791;
   display: inline-block;
@@ -360,10 +360,14 @@ ul.links li a {
 }
 
 .collapser:before {
-  content: '⊗';
+  content: '⊖';
 }
 .expander:before {
   content: "⊕";
+}
+.noexpander:before {
+  content: "⊕";
+  visibility: hidden;
 }
 
 .collapser, .expander {
@@ -380,12 +384,6 @@ ul.links li a {
 summary {
   cursor: pointer;
   outline: none;
-  list-style-image: url(plus.gif);
-  list-style-position: outside;
-}
-
-details[open] > summary {
-  list-style-image: url(minus.gif);
 }
 
 pre {

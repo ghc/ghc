@@ -324,6 +324,7 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
 
     cBtn = case (ts, leaf) of
       (_:_, Just _) -> thespan ! collapseControl p "" << spaceHtml
+      ([] , Just _) -> thespan ! [theclass "noexpander"] << spaceHtml
       (_,   _   ) -> noHtml
       -- We only need an explicit collapser button when the module name
       -- is also a leaf, and so is a link to a module page. Indeed, the
