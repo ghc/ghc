@@ -5,9 +5,27 @@ import shutil
 
 import threading
 
+def passed():
+    return {'passFail': 'pass'}
+
+def failBecause(reason, tag=None):
+    return {'passFail': 'fail', 'reason': reason, 'tag': tag}
+
 def strip_quotes(s):
     # Don't wrap commands to subprocess.call/Popen in quotes.
     return s.strip('\'"')
+
+def str_fail(s):
+    return '\033[1m\033[43m\033[31m' + s + '\033[0m'
+
+def str_pass(s):
+    return '\033[1m\033[32m' + s + '\033[0m'
+
+def str_warn(s):
+    return '\033[1m\033[33m' + s + '\033[0m'
+
+def str_info(s):
+    return '\033[1m\033[34m' + s + '\033[0m'
 
 def getStdout(cmd_and_args):
     # Can't use subprocess.check_output, since we also verify that

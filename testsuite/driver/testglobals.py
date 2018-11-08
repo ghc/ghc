@@ -31,6 +31,9 @@ class TestConfig:
         self.accept_platform = False
         self.accept_os = False
 
+        # File in which to save the performance metrics.
+        self.metrics_file = ''
+
         # File in which to save the summary
         self.summary_file = ''
 
@@ -122,6 +125,15 @@ class TestConfig:
         # Should we skip performance tests
         self.skip_perf_tests = False
 
+        # Only do performance tests
+        self.only_perf_tests = False
+
+        # Allowed performance changes (see perf_notes.get_allowed_perf_changes())
+        self.allowed_perf_changes = {}
+
+        # The test environment.
+        self.test_env = 'local'
+
 global config
 config = TestConfig()
 
@@ -155,6 +167,12 @@ class TestRun:
        self.unexpected_passes = []
        self.unexpected_failures = []
        self.unexpected_stat_failures = []
+
+       # List of all metrics measured in this test run.
+       # [(change, PerfStat)] where change is one of the  MetricChange
+       # constants: NewMetric, NoChange, Increase, Decrease.
+       # NewMetric happens when the previous git commit has no metric recorded.
+       self.metrics = []
 
 global t
 t = TestRun()
@@ -215,15 +233,13 @@ class TestOptions:
        # extra files to copy to the testdir
        self.extra_files = []
 
-       # which -t numeric fields do we want to look at, and what bounds must
-       # they fall within?
-       # Elements of these lists should be things like
-       # ('bytes allocated',
-       #   9300000000,
-       #   10)
-       # To allow a 10% deviation from 9300000000.
-       self.compiler_stats_range_fields = {}
+       # Map from metric to expectected value and allowed percentage deviation. e.g.
+       #     { 'bytes allocated': (9300000000, 10) }
+       # To allow a 10% deviation from 9300000000 for the 'bytes allocated' metric.
        self.stats_range_fields = {}
+
+       # Does this test the compiler's performance as opposed to the generated code.
+       self.is_compiler_stats_test = False
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
@@ -292,4 +308,3 @@ default_testopts = TestOptions()
 # (bug, directory, name) of tests marked broken
 global brokens
 brokens = []
-

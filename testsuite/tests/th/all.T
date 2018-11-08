@@ -448,3 +448,4 @@ test('T15783', normal, multimod_compile,
 test('T15792', normal, compile, ['-v0 -dsuppress-uniques'])
 test('T15815', normal, multimod_compile,
     ['T15815B', '-v0 ' + config.ghc_th_way_flags])
+test('T15845', normal, compile, ['-v0 -dsuppress-uniques'])
