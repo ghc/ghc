@@ -1710,23 +1710,16 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                                    (TH.TySynEqn th_tvs annot_th_lhs th_rhs)) }
 
       DataFamilyInst rep_tc ->
-        do { let rep_tvs = tyConTyVars rep_tc
-                 fam' = reifyName fam
-
-                   -- eta-expand lhs types, because sometimes data/newtype
-                   -- instances are eta-reduced; See Trac #9692
-                   -- See Note [Eta reduction for data family axioms]
-                   -- in TcInstDcls
-                 (_rep_tc, rep_tc_args) = splitTyConApp rhs
-                 etad_tyvars            = dropList rep_tc_args rep_tvs
-                 etad_tys               = mkTyVarTys etad_tyvars
-                 eta_expanded_tvs = mkTyVarTys fam_tvs `chkAppend` etad_tys
-                 eta_expanded_lhs = lhs `chkAppend` etad_tys
+        do { let -- eta-expand lhs types, because sometimes data/newtype
+                 -- instances are eta-reduced; See Trac #9692
+                 -- See Note [Eta reduction for data families] in FamInstEnv
+                 (ee_tvs, ee_lhs) = etaExpandFamInstLHS fam_tvs lhs rhs
+                 fam'             = reifyName fam
                  dataCons         = tyConDataCons rep_tc
                  isGadt           = isGadtSyntaxTyCon rep_tc
-           ; th_tvs <- reifyTyVarsToMaybe fam_tvs
-           ; cons <- mapM (reifyDataCon isGadt eta_expanded_tvs) dataCons
-           ; let types_only = filterOutInvisibleTypes fam_tc eta_expanded_lhs
+           ; th_tvs <- reifyTyVarsToMaybe ee_tvs
+           ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys ee_tvs)) dataCons
+           ; let types_only = filterOutInvisibleTypes fam_tc ee_lhs
            ; th_tys <- reifyTypes types_only
            ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
            ; return $

@@ -211,20 +211,10 @@ ppr_co_ax_branch ppr_rhs
           = text "in" <+>
               quotes (ppr (nameModule name))
 
-        (ee_tvs, ee_lhs)
-          | Just (tycon, tc_args) <- splitTyConApp_maybe rhs
-          , isDataFamilyTyCon fam_tc
-          = -- Eta-expand LHS types, because sometimes data family instances
-            -- are eta-reduced.
-            -- See Note [Eta reduction for data family axioms] in TcInstDecls.
-            let tc_tvs           = tyConTyVars tycon
-                etad_tvs         = dropList tc_args tc_tvs
-                etad_tys         = mkTyVarTys etad_tvs
-                eta_expanded_tvs = tvs `chkAppend` etad_tvs
-                eta_expanded_lhs = lhs `chkAppend` etad_tys
-            in (eta_expanded_tvs, eta_expanded_lhs)
-          | otherwise
-          = (tvs, lhs)
+        -- Eta-expand LHS types, because sometimes data family instances
+        -- are eta-reduced.
+        -- See Note [Eta reduction for data families] in FamInstEnv.
+        (ee_tvs, ee_lhs) = etaExpandFamInstLHS tvs lhs rhs
 
 {-
 %************************************************************************
