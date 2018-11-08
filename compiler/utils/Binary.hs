@@ -1122,7 +1122,7 @@ instance Binary StringLiteral where
             fs <- get bh
             return (StringLiteral st fs)
 
-instance Binary a => Binary (GenLocated SrcSpan a) where
+instance Binary a => Binary (Located a) where
     put_ bh (L l x) = do
             put_ bh l
             put_ bh x

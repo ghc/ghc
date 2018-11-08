@@ -15,6 +15,7 @@ https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/TypeChecker
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
@@ -2005,7 +2006,7 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (L loc (BodyStmt _ expr _ _))
+tcUserStmt (dL->(loc , BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
@@ -2015,42 +2016,42 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
               matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = L loc $ (mkTopFunBind FromSource
-                                     (L loc fresh_it) matches) { fun_ext = fvs }
+              the_bind  = cL loc $ (mkTopFunBind FromSource
+                                     (cL loc fresh_it) matches) { fun_ext = fvs }
                           -- Care here!  In GHCi the expression might have
                           -- free variables, and they in turn may have free type variables
                           -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt noExt $ noLoc $ HsValBinds noExt
+              let_stmt  = cL loc $ LetStmt noExt $ noLoc $ HsValBinds noExt
                            $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt noExt
-                                       (L loc (VarPat noExt (L loc fresh_it)))
+              bind_stmt = cL loc $ BindStmt noExt
+                                       (cL loc (VarPat noExt (cL loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr
 
               -- [; print it]
-              print_it  = L loc $ BodyStmt noExt
+              print_it  = cL loc $ BodyStmt noExt
                                            (nlHsApp (nlHsVar interPrintName)
                                            (nlHsVar fresh_it))
                                            (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr
 
               -- NewA
-              no_it_a = L loc $ BodyStmt noExt (nlHsApps bindIOName
+              no_it_a = cL loc $ BodyStmt noExt (nlHsApps bindIOName
                                        [rn_expr , nlHsVar interPrintName])
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_b = L loc $ BodyStmt noExt (rn_expr)
+              no_it_b = cL loc $ BodyStmt noExt (rn_expr)
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_c = L loc $ BodyStmt noExt
+              no_it_c = cL loc $ BodyStmt noExt
                                       (nlHsApp (nlHsVar interPrintName) rn_expr)
                                       (mkRnSyntaxExpr thenIOName)
                                       noSyntaxExpr

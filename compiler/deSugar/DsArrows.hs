@@ -8,6 +8,7 @@ Desugaring arrow commands
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module DsArrows ( dsProcExpr ) where
 
@@ -1202,7 +1203,7 @@ collectPatsBinders pats = foldr collectl [] pats
 ---------------------
 collectl :: LPat GhcTc -> [Id] -> [Id]
 -- See Note [Dictionary binders in ConPatOut]
-collectl (L _ pat) bndrs
+collectl (dL->(_ , pat)) bndrs
   = go pat
   where
     go (VarPat _ (L _ var))       = var : bndrs

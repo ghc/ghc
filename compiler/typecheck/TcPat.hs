@@ -9,6 +9,7 @@ TcPat: Typechecking patterns
 {-# LANGUAGE CPP, RankNTypes, TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcPat ( tcLetPat, newLetBndr, LetBndrSpec(..)
              , tcPat, tcPat_O, tcPats
@@ -300,11 +301,11 @@ tc_lpat :: LPat GhcRn
         -> PatEnv
         -> TcM a
         -> TcM (LPat GhcTcId, a)
-tc_lpat (L span pat) pat_ty penv thing_inside
+tc_lpat (dL->(span , pat)) pat_ty penv thing_inside
   = setSrcSpan span $
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat penv pat pat_ty)
                                           thing_inside
-        ; return (L span pat', res) }
+        ; return (cL span pat', res) }
 
 tc_lpats :: PatEnv
          -> [LPat GhcRn] -> [ExpSigmaType]
@@ -324,11 +325,11 @@ tc_pat  :: PatEnv
         -> TcM (Pat GhcTcId,    -- Translated pattern
                 a)              -- Result of thing inside
 
-tc_pat penv (VarPat x (L l name)) pat_ty thing_inside
+tc_pat penv (VarPat x (dL->(l , name))) pat_ty thing_inside
   = do  { (wrap, id) <- tcPatBndr penv name pat_ty
         ; res <- tcExtendIdEnv1 name id thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
+        ; return (mkHsWrapPat wrap (VarPat x (cL l id)) pat_ty, res) }
 
 tc_pat penv (ParPat x pat) pat_ty thing_inside
   = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
@@ -359,7 +360,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
         ; pat_ty <- expTypeToType pat_ty
         ; return (WildPat pat_ty, res) }
 
-tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
+tc_pat penv (AsPat x (dL->(nm_loc , name)) pat) pat_ty thing_inside
   = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat pat (mkCheckExpType $ idType bndr_id)
@@ -372,7 +373,7 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty,
+        ; return (mkHsWrapPat wrap (AsPat x (cL nm_loc bndr_id) pat') pat_ty,
                   res) }
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside

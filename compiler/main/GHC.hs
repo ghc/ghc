@@ -250,6 +250,10 @@ module GHC (
 
         -- *** Deconstructing Located
         getLoc, unLoc,
+        getRealSrcSpan, unRealSrcSpan,
+
+        -- ** HasSrcSpan
+        HasSrcSpan(..), SrcSpanLess, dL, cL,
 
         -- *** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,

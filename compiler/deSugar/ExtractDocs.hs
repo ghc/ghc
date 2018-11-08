@@ -1,6 +1,8 @@
 -- | Extract docs from the renamer output so they can be be serialized.
 {-# language LambdaCase #-}
 {-# language TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module ExtractDocs (extractDocs) where
 
 import GhcPrelude
@@ -110,7 +112,7 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
 
-getMainDeclBinder :: HsDecl pass -> [IdP pass]
+getMainDeclBinder :: HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of

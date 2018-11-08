@@ -599,18 +599,22 @@ rnSplicePat :: HsSplice GhcPs -> RnM ( Either (Pat GhcPs) (Pat GhcRn)
 rnSplicePat splice
   = rnSpliceGen run_pat_splice pend_pat_splice splice
   where
+    pend_pat_splice :: HsSplice GhcRn ->
+                       (PendingRnSplice, Either b (Pat GhcRn))
     pend_pat_splice rn_splice
       = (makePending UntypedPatSplice rn_splice
         , Right (SplicePat noExt rn_splice))
 
+    run_pat_splice :: HsSplice GhcRn ->
+                      RnM (Either (Pat GhcPs) (Pat GhcRn), FreeVars)
     run_pat_splice rn_splice
       = do { traceRn "rnSplicePat: untyped pattern splice" empty
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat noExt $ (SplicePat noExt)
+           ; return ( Left $ ParPat noExt $ ((SplicePat noExt)
                               . HsSpliced noExt (ThModFinalizers mod_finalizers)
-                              . HsSplicedPat <$>
+                              . HsSplicedPat)  `onHasSrcSpan`
                               pat
                     , emptyFVs
                     ) }

@@ -8,6 +8,7 @@ TcTyClsDecls: Typecheck type and class declarations
 
 {-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcTyClsDecls (
         tcTyAndClassDecls,
@@ -903,7 +904,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcM ()
 
 kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
   | HsDataDefn { dd_cons = cons@(L _ (ConDeclGADT {}) : _), dd_ctxt = L _ [] } <- defn
-  = mapM_ (wrapLocM kcConDecl) cons
+  = mapM_ (wrapLocM_ kcConDecl) cons
     -- hs_tvs and dd_kindSig already dealt with in getInitialKind
     -- This must be a GADT-style decl,
     --        (see invariants of DataDefn declaration)
@@ -914,7 +915,7 @@ kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
   = kcTyClTyVars name $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kcConDecl) cons }
+        ; mapM_ (wrapLocM_ kcConDecl) cons }
 
 kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = lrhs })
   = kcTyClTyVars name $
@@ -927,7 +928,7 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs })
   = kcTyClTyVars name $
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM kc_sig)     sigs }
+        ; mapM_ (wrapLocM_ kc_sig)     sigs }
   where
     kc_sig (ClassOpSig _ _ nms op_ty)
              = kcHsSigType (TyConSkol ClassFlavour name) nms op_ty
@@ -1700,7 +1701,7 @@ kcDataDefn mb_kind_env
                                                 , dd_kindSig = mb_kind } }}})
            res_k
   = do  { _ <- tcHsContext ctxt
-        ; checkNoErrs $ mapM_ (wrapLocM kcConDecl) cons
+        ; checkNoErrs $ mapM_ (wrapLocM_ kcConDecl) cons
           -- See Note [Failing early in kcDataDefn]
         ; exp_res_kind <- case mb_kind of
             Nothing -> return liftedTypeKind
@@ -1798,7 +1799,7 @@ kcFamTyPats tc_fam_tc imp_vars mb_expl_bndrs arg_pats kind_checker
     kcExplicitTKBndrs (fromMaybe [] mb_expl_bndrs) $
     do { let name     = tyConName tc_fam_tc
              loc      = nameSrcSpan name
-             lhs_fun  = L loc (HsTyVar noExt NotPromoted (L loc name))
+             lhs_fun  = cL loc (HsTyVar noExt NotPromoted (cL loc name))
                         -- lhs_fun is for error messages only
              no_fun   = pprPanic "kcFamTyPats" (ppr name)
              fun_kind = tyConKind tc_fam_tc
@@ -1852,8 +1853,8 @@ tcFamTyPats fam_tc mb_clsinfo
                tcImplicitQTKBndrs FamInstSkol imp_vars $
                tcExplicitTKBndrs FamInstSkol (fromMaybe [] mb_expl_bndrs) $
                do { let loc = nameSrcSpan fam_name
-                        lhs_fun = L loc (HsTyVar noExt NotPromoted
-                                                               (L loc fam_name))
+                        lhs_fun = cL loc (HsTyVar noExt NotPromoted
+                                                              (cL loc fam_name))
                         fun_ty = mkTyConApp fam_tc []
                         fun_kind = tyConKind fam_tc
                         mb_kind_env = thdOf3 <$> mb_clsinfo
@@ -2098,7 +2099,7 @@ dataDeclChecks tc_name new_or_data stupid_theta cons
 
 -----------------------------------
 consUseGadtSyntax :: [LConDecl a] -> Bool
-consUseGadtSyntax (L _ (ConDeclGADT { }) : _) = True
+consUseGadtSyntax ((dL->(_ , ConDeclGADT { })) : _) = True
 consUseGadtSyntax _                           = False
                  -- All constructors have same shape
 
@@ -2181,7 +2182,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
            -- the universals followed by the existentials.
            -- See Note [DataCon user type variable binders] in DataCon.
            user_tvbs = univ_tvbs ++ ex_tvbs
-           buildOneDataCon (L _ name) = do
+           buildOneDataCon (dL->(_ , name)) = do
              { is_infix <- tcConIsInfixH98 name hs_args
              ; rep_nm   <- newTyConRepName name
 
@@ -2209,7 +2210,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
            , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1" (ppr names)
-       ; let (L _ name : _) = names
+       ; let ((dL->(_ , name)) : _) = names
              skol_info      = DataConSkol name
 
        ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
@@ -2261,7 +2262,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; let
-           buildOneDataCon (L _ name) = do
+           buildOneDataCon (dL->(_ , name)) = do
              { is_infix <- tcConIsInfixGADT name hs_args
              ; rep_nm   <- newTyConRepName name
 
@@ -2324,7 +2325,7 @@ tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f)) (unLoc fields)
+    combined = map (\(dL->(_ , f)) -> (cd_fld_names f,cd_fld_type f)) (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
     (_,btys) = unzip exploded
@@ -3476,7 +3477,7 @@ checkValidRoleAnnots role_annots tc
 
     check_roles
       = whenIsJust role_annot_decl_maybe $
-          \decl@(L loc (RoleAnnotDecl _ _ the_role_annots)) ->
+          \decl@(dL->(loc , RoleAnnotDecl _ _ the_role_annots)) ->
           addRoleAnnotCtxt name $
           setSrcSpan loc $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations

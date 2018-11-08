@@ -8,6 +8,7 @@ The @match@ function
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Match ( match, matchEquations, matchWrapper, matchSimply
              , matchSinglePat, matchSinglePatVar ) where
@@ -269,7 +270,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
-         let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
+          let ViewPat _ viewExpr (dL->(_ , pat)) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var pat_ty'
@@ -404,8 +405,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 tidy1 v (ParPat _ pat)      = tidy1 v (unLoc pat)
 tidy1 v (SigPat _ pat _)    = tidy1 v (unLoc pat)
 tidy1 _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
-tidy1 v (BangPat _ (L l p)) = tidy_bang_pat v l p
-
+tidy1 v (BangPat _ (dL->(l , p))) = tidy_bang_pat v l p
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
 tidy1 v (VarPat _ (L _ var))
@@ -479,14 +479,14 @@ tidy1 _ non_interesting_pat
 tidy_bang_pat :: Id -> SrcSpan -> Pat GhcTc -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v _ (ParPat _ (L l p)) = tidy_bang_pat v l p
-tidy_bang_pat v _ (SigPat _ (L l p) _) = tidy_bang_pat v l p
+tidy_bang_pat v _ (ParPat _ (dL->(l , p))) = tidy_bang_pat v l p
+tidy_bang_pat v _ (SigPat _ (dL->(l , p)) _) = tidy_bang_pat v l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v l (AsPat x v' p) = tidy1 v (AsPat x v' (L l (BangPat noExt p)))
+tidy_bang_pat v l (AsPat x v' p) = tidy1 v (AsPat x v' (cL l (BangPat noExt p)))
 tidy_bang_pat v l (CoPat x w p t)
-  = tidy1 v (CoPat x w (BangPat noExt (L l p)) t)
+  = tidy1 v (CoPat x w (BangPat noExt (cL l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v _ p@(LitPat {})    = tidy1 v p
@@ -521,7 +521,7 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ l p = return (idDsWrapper, BangPat noExt (L l p))
+tidy_bang_pat _ l p = return (idDsWrapper, BangPat noExt (cL l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpan
@@ -532,16 +532,16 @@ push_bang_into_newtype_arg :: SrcSpan
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = ASSERT( null args)
-    PrefixCon [L l (BangPat noExt arg)]
+    PrefixCon [cL l (BangPat noExt arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
   = ASSERT( null flds)
-    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
-                                           = L l (BangPat noExt arg) })] })
+    RecCon (rf { rec_flds = [cL lf (fld { hsRecFieldArg
+                                           = cL l (BangPat noExt arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [L l (BangPat noExt (noLoc (WildPat ty)))]
+  = PrefixCon [cL l (BangPat noExt (noLoc (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 

@@ -990,14 +990,14 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kvs }
 hsAllLTyVarNames (XLHsQTyVars _) = panic "hsAllLTyVarNames"
 
 hsLTyVarLocName :: LHsTyVarBndr pass -> Located (IdP pass)
-hsLTyVarLocName = fmap hsTyVarName
+hsLTyVarLocName = onHasSrcSpan hsTyVarName
 
 hsLTyVarLocNames :: LHsQTyVars pass -> [Located (IdP pass)]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
-hsLTyVarBndrToType = fmap cvt
+hsLTyVarBndrToType = onHasSrcSpan cvt
   where cvt (UserTyVar _ n) = HsTyVar noExt NotPromoted n
         cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig noExt

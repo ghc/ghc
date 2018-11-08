@@ -54,7 +54,7 @@
 
 module Lexer (
    Token(..), lexer, pragState, mkPState, mkPStatePure, PState(..),
-   P(..), ParseResult(..), mkParserFlags, ParserFlags(..), getSrcLoc,
+   P(..), ParseResult(..), mkParserFlags, ParserFlags(..), getRealSrcLoc,
    getPState, extopt, withThisPackage,
    failLocMsgP, failSpanMsgP, srcParseFail,
    getMessages,
@@ -1161,7 +1161,7 @@ parseNestedPragma input@(AI _ buf) = do
   setExts (.&. complement (xbit InNestedCommentBit))
   postInput@(AI _ postBuf) <- getInput
   setInput origInput
-  case unLoc lt of
+  case unRealSrcSpan lt of
     ITcomment_line_prag -> do
       let bytes = byteDiff buf postBuf
           diff  = lexemeToString buf bytes
@@ -1574,9 +1574,9 @@ alrInitialLoc file = mkRealSrcSpan loc loc
 lex_string_prag :: (String -> Token) -> Action
 lex_string_prag mkTok span _buf _len
     = do input <- getInput
-         start <- getSrcLoc
+         start <- getRealSrcLoc
          tok <- go [] input
-         end <- getSrcLoc
+         end <- getRealSrcLoc
          return (L (mkRealSrcSpan start end) tok)
     where go acc input
               = if isString input "#-}"
@@ -1848,9 +1848,9 @@ getCharOrFail i =  do
 lex_qquasiquote_tok :: Action
 lex_qquasiquote_tok span buf len = do
   let (qual, quoter) = splitQualName (stepOn buf) (len - 2) False
-  quoteStart <- getSrcLoc
+  quoteStart <- getRealSrcLoc
   quote <- lex_quasiquote quoteStart ""
-  end <- getSrcLoc
+  end <- getRealSrcLoc
   return (L (mkRealSrcSpan (realSrcSpanStart span) end)
            (ITqQuasiQuote (qual,
                            quoter,
@@ -1862,9 +1862,9 @@ lex_quasiquote_tok span buf len = do
   let quoter = tail (lexemeToString buf (len - 1))
                 -- 'tail' drops the initial '[',
                 -- while the -1 drops the trailing '|'
-  quoteStart <- getSrcLoc
+  quoteStart <- getRealSrcLoc
   quote <- lex_quasiquote quoteStart ""
-  end <- getSrcLoc
+  end <- getRealSrcLoc
   return (L (mkRealSrcSpan (realSrcSpanStart span) end)
            (ITquasiQuote (mkFastString quoter,
                           mkFastString (reverse quote),
@@ -2078,8 +2078,8 @@ setExts f = P $ \s -> POk s {
 setSrcLoc :: RealSrcLoc -> P ()
 setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
 
-getSrcLoc :: P RealSrcLoc
-getSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
+getRealSrcLoc :: P RealSrcLoc
+getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
 
 addSrcFile :: FastString -> P ()
 addSrcFile f = P $ \s -> POk s{ srcfiles = f : srcfiles s } ()
@@ -2630,7 +2630,7 @@ srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
 -- not over a token range.
 lexError :: String -> P a
 lexError str = do
-  loc <- getSrcLoc
+  loc <- getRealSrcLoc
   (AI end buf) <- getInput
   reportLexError loc end buf str
 
@@ -2668,8 +2668,8 @@ lexTokenAlr = do mPending <- popPendingImplicitToken
                              alternativeLayoutRuleToken t
                       Just t ->
                           return t
-                 setAlrLastLoc (getLoc t)
-                 case unLoc t of
+                 setAlrLastLoc (getRealSrcSpan t)
+                 case unRealSrcSpan t of
                      ITwhere -> setAlrExpectingOCurly (Just ALRLayoutWhere)
                      ITlet   -> setAlrExpectingOCurly (Just ALRLayoutLet)
                      ITof    -> setAlrExpectingOCurly (Just ALRLayoutOf)
@@ -2688,10 +2688,10 @@ alternativeLayoutRuleToken t
          transitional <- getALRTransitional
          justClosedExplicitLetBlock <- getJustClosedExplicitLetBlock
          setJustClosedExplicitLetBlock False
-         let thisLoc = getLoc t
+         let thisLoc = getRealSrcSpan t
              thisCol = srcSpanStartCol thisLoc
              newLine = srcSpanStartLine thisLoc > srcSpanEndLine lastLoc
-         case (unLoc t, context, mExpectingOCurly) of
+         case (unRealSrcSpan t, context, mExpectingOCurly) of
              -- This case handles a GHC extension to the original H98
              -- layout rule...
              (ITocurly, _, Just alrLayout) ->
@@ -2899,7 +2899,7 @@ lexToken = do
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
-        case unLoc lt of
+        case unRealSrcSpan lt of
           ITlineComment _  -> return lt
           ITblockComment _ -> return lt
           lt' -> do

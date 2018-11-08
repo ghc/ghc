@@ -13,6 +13,7 @@ free variables.
 {-# LANGUAGE CPP, RankNTypes, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module RnPat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
@@ -126,12 +127,14 @@ liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
                                      ; (r,fvs2) <- k v
                                      ; return (r, fvs1 `plusFV` fvs2) })
 
-wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
+wrapSrcSpanCps :: (HasSrcSpan a , HasSrcSpan b) =>
+                  (SrcSpanLess a -> CpsRn (SrcSpanLess b)) ->
+                  a -> CpsRn b
 -- Set the location, and also wrap it around the value returned
-wrapSrcSpanCps fn (L loc a)
+wrapSrcSpanCps fn (dL->(loc , a))
   = CpsRn (\k -> setSrcSpan loc $
                  unCpsRn (fn a) $ \v ->
-                 k (L loc v))
+                 k (cL loc v))
 
 lookupConCps :: Located RdrName -> CpsRn (Located Name)
 lookupConCps con_rdr
@@ -559,12 +562,12 @@ data HsRecFieldContext
   | HsRecFieldUpd
 
 rnHsRecFields
-    :: forall arg.
+    :: forall arg. HasSrcSpan arg =>
        HsRecFieldContext
-    -> (SrcSpan -> RdrName -> arg)
+    -> (SrcSpan -> RdrName -> SrcSpanLess arg)
          -- When punning, use this to build a new field
-    -> HsRecFields GhcPs (Located arg)
-    -> RnM ([LHsRecField GhcRn (Located arg)], FreeVars)
+    -> HsRecFields GhcPs arg
+    -> RnM ([LHsRecField GhcRn arg], FreeVars)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -590,31 +593,32 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                 HsRecFieldPat con  -> Just con
                 _ {- update -}     -> Nothing
 
-    rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (Located arg)
-           -> RnM (LHsRecField GhcRn (Located arg))
-    rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl
-                                              = L loc (FieldOcc _ (L ll lbl))
-                                          , hsRecFieldArg = arg
-                                          , hsRecPun      = pun }))
+    rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs arg
+           -> RnM (LHsRecField GhcRn arg)
+    rn_fld pun_ok parent (dL->(l , HsRecField
+                                   { hsRecFieldLbl =
+                                       (dL->(loc , FieldOcc _ (dL->(ll , lbl))))
+                                   , hsRecFieldArg = arg
+                                   , hsRecPun      = pun }))
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
+                     then do { checkErr pun_ok (badPun (cL loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L loc (mk_arg loc arg_rdr)) }
+                             ; return (cL loc (mk_arg loc arg_rdr)) }
                      else return arg
-           ; return (L l (HsRecField { hsRecFieldLbl
-                                         = L loc (FieldOcc sel (L ll lbl))
+           ; return (cL l (HsRecField { hsRecFieldLbl
+                                         = cL loc (FieldOcc sel (L ll lbl))
                                      , hsRecFieldArg = arg'
                                      , hsRecPun      = pun })) }
-    rn_fld _ _ (L _ (HsRecField (L _ (XFieldOcc _)) _ _))
+    rn_fld _ _ (dL->(_ , HsRecField (dL->(_ , _)) _ _))
       = panic "rnHsRecFields"
 
     rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
               -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
-              -> [LHsRecField GhcRn (Located arg)] -- Explicit fields
-              -> RnM [LHsRecField GhcRn (Located arg)]   -- Filled in .. fields
+              -> [LHsRecField GhcRn arg] -- Explicit fields
+              -> RnM [LHsRecField GhcRn arg]   -- Filled in .. fields
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
       | not (isUnboundName con) -- This test is because if the constructor
                                 -- isn't in scope the constructor lookup will add
@@ -648,9 +652,9 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                     _other           -> True ]
 
            ; addUsedGREs dot_dot_gres
-           ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc sel (L loc arg_rdr))
-                        , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
+           ; return [ cL loc (HsRecField
+                        { hsRecFieldLbl = cL loc (FieldOcc sel (L loc arg_rdr))
+                        , hsRecFieldArg = cL loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
                     , let sel     = flSelector fl
