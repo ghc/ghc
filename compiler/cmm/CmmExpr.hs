@@ -6,7 +6,7 @@
 
 module CmmExpr
     ( CmmExpr(..), cmmExprType, cmmExprWidth, maybeInvertCmmExpr
-    , CmmReg(..), cmmRegType
+    , CmmReg(..), cmmRegType, cmmRegWidth
     , CmmLit(..), cmmLitType
     , LocalReg(..), localRegType
     , GlobalReg(..), isArgReg, globalRegType
@@ -272,6 +272,9 @@ instance Uniquable LocalReg where
 cmmRegType :: DynFlags -> CmmReg -> CmmType
 cmmRegType _      (CmmLocal  reg) = localRegType reg
 cmmRegType dflags (CmmGlobal reg) = globalRegType dflags reg
+
+cmmRegWidth :: DynFlags -> CmmReg -> Width
+cmmRegWidth dflags = typeWidth . cmmRegType dflags
 
 localRegType :: LocalReg -> CmmType
 localRegType (LocalReg _ rep) = rep

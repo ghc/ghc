@@ -26,7 +26,8 @@ holes2.hs:3:10: warning: [-Wtyped-holes (in -Wdefault)]
         otherwise :: Bool
         False :: Bool
         True :: Bool
-        EQ :: Ordering
         LT :: Ordering
+        EQ :: Ordering
         GT :: Ordering
+        () :: ()
         pi :: forall a. Floating a => a

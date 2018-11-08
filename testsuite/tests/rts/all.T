@@ -143,6 +143,18 @@ test('traceBinaryEvent', [ omit_ways(['dyn', 'ghci'] + prof_ways),
                            extra_run_opts('+RTS -ls -RTS') ],
                          compile_and_run, ['-eventlog'])
 
+# Test that -ol flag works as expected
+test('EventlogOutput1',
+     [ extra_files(["EventlogOutput.hs"]),
+       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+     run_command, ['$MAKE -s --no-print-directory EventlogOutput1'])
+
+# Test that -ol flag defaults to <program>.eventlog
+test('EventlogOutput2',
+     [ extra_files(["EventlogOutput.hs"]),
+       omit_ways(['dyn', 'ghci'] + prof_ways) ],
+     run_command, ['$MAKE -s --no-print-directory EventlogOutput2'])
+
 test('T4059', [], run_command, ['$MAKE -s --no-print-directory T4059'])
 
 # Test for #4274

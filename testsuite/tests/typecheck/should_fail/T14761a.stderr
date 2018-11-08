@@ -1,5 +1,15 @@
 
-T14761a.hs:3:34: error:
-    {-# UNPACK #-} applied to a compound type.
-    Did you mean to add parentheses?
-      {-# UNPACK #-} (Maybe Int)
+T14761a.hs:13:10: error: [-Werror]
+    • UNPACK pragma lacks '!' on the first argument of ‘A’
+    • In the definition of data constructor ‘A’
+      In the data type declaration for ‘A’
+
+T14761a.hs:17:10: error: [-Werror]
+    • UNPACK pragma lacks '!' on the first argument of ‘B’
+    • In the definition of data constructor ‘B’
+      In the data type declaration for ‘B’
+
+T14761a.hs:20:3: error: [-Werror]
+    • UNPACK pragma lacks '!' on the first argument of ‘MkG2’
+    • In the definition of data constructor ‘MkG2’
+      In the data type declaration for ‘G’

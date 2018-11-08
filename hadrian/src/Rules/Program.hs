@@ -28,14 +28,23 @@ buildProgram rs = do
             -- TODO: Shall we use Stage2 for testsuite packages instead?
             let allPackages = sPackages
                            ++ if stage == Stage1 then tPackages else []
-            nameToCtxList <- forM allPackages $ \pkg -> do
-                let ctx = vanillaContext stage pkg
-                name <- programName ctx
-                return (name <.> exe, ctx)
+            nameToCtxList <- fmap concat . forM allPackages $ \pkg -> do
+                -- the iserv pkg results in two different programs at
+                -- the moment, ghc-iserv (built the vanilla way)
+                -- and ghc-iserv-prof (built the profiling way), and
+                -- the testsuite requires both to be present, so we
+                -- make sure that we cover these
+                -- "prof-build-under-other-name" cases.
+                -- iserv gets its two names from Packages.hs:programName
+                let ctxV = vanillaContext stage pkg
+                    ctxProf = Context stage pkg profiling
+                nameV <- programName ctxV
+                nameProf <- programName ctxProf
+                return [ (nameV <.> exe, ctxV), (nameProf <.> exe, ctxProf) ]
 
             case lookup (takeFileName bin) nameToCtxList of
                 Nothing -> error $ "Unknown program " ++ show bin
-                Just (Context {..}) -> do
+                Just ctx@(Context {..}) -> do
                     -- Custom dependencies: this should be modeled better in the
                     -- Cabal file somehow.
                     -- TODO: Is this still needed? See 'runtimeDependencies'.
@@ -58,7 +67,7 @@ buildProgram rs = do
                         (False, s) | s > Stage0 && (package `elem` [touchy, unlit]) -> do
                             srcDir <- stageLibPath Stage0 <&> (-/- "bin")
                             copyFile (srcDir -/- takeFileName bin) bin
-                        _ -> buildBinary rs bin =<< programContext stage package
+                        _ -> buildBinary rs bin ctx
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do

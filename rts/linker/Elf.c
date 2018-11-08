@@ -1536,7 +1536,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
          case R_PPC_PLTREL24:
             value -= 0x8000; /* See Note [.LCTOC1 in PPC PIC code] */
-            /* fallthrough */
+            FALLTHROUGH;
          case R_PPC_REL24:
             delta = value - P;
 

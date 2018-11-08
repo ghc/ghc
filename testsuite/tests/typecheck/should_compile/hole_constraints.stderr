@@ -44,6 +44,7 @@ hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
         f3 :: [a]
         f1 :: forall a. Eq a => a
         mempty :: forall a. Monoid a => a
+        [] :: forall a. [a]
 
 hole_constraints.hs:20:19: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: a
@@ -74,3 +75,4 @@ hole_constraints.hs:27:32: warning: [-Wtyped-holes (in -Wdefault)]
         f1 :: forall a. Eq a => a
         f2 :: forall a. (Show a, Eq a) => a
         mempty :: forall a. Monoid a => a
+        [] :: forall a. [a]

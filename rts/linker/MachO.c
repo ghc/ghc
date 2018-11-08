@@ -1530,6 +1530,7 @@ ocGetNames_MachO(ObjectCode* oc)
                 secArray[i].info->macho_section = section;
                 secArray[i].info->relocation_info
                 = (MachORelocationInfo*)(oc->image + section->reloff);
+                FALLTHROUGH;
             }
             default: {
                 // just set the pointer to the loaded image.

@@ -24,13 +24,14 @@ import Name
 import Module
 import SrcLoc
 import Outputable
-import PrelNames ( mkUnboundName, forall_tv_RDR, isUnboundName )
+import PrelNames ( mkUnboundName, forall_tv_RDR, isUnboundName, getUnique)
 import Util
 import Maybes
 import DynFlags
 import FastString
 import Data.List
 import Data.Function ( on )
+import UniqDFM (udfmToList)
 
 {-
 ************************************************************************
@@ -67,8 +68,11 @@ unboundNameX where_look rdr_name extra
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
+                  ; currmod <- getModule
+                  ; hpt <- getHpt
                   ; let suggestions = unknownNameSuggestions_ where_look
-                                        dflags global_env local_env impInfo rdr_name
+                          dflags hpt currmod global_env local_env impInfo
+                          rdr_name
                   ; addErr (err $$ suggestions) }
         ; return (mkUnboundNameRdr rdr_name) }
 
@@ -89,16 +93,19 @@ type HowInScope = Either SrcSpan ImpDeclSpec
 
 -- | Called from the typechecker (TcErrors) when we find an unbound variable
 unknownNameSuggestions :: DynFlags
+                       -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
 unknownNameSuggestions = unknownNameSuggestions_ WL_Any
 
 unknownNameSuggestions_ :: WhereLooking -> DynFlags
+                       -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
                        -> RdrName -> SDoc
-unknownNameSuggestions_ where_look dflags global_env local_env imports tried_rdr_name =
+unknownNameSuggestions_ where_look dflags hpt curr_mod global_env local_env
+                          imports tried_rdr_name =
     similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions where_look  imports tried_rdr_name $$
+    importSuggestions where_look hpt curr_mod imports tried_rdr_name $$
     extensionSuggestions tried_rdr_name
 
 
@@ -223,12 +230,15 @@ similarNameSuggestions where_look dflags global_env
         | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: WhereLooking -> ImportAvails -> RdrName -> SDoc
-importSuggestions where_look imports rdr_name
+importSuggestions :: WhereLooking
+                  -> HomePackageTable -> Module
+                  -> ImportAvails -> RdrName -> SDoc
+importSuggestions where_look hpt currMod imports rdr_name
   | WL_LocalOnly <- where_look                 = Outputable.empty
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
   , Just name <- mod_name
+  , showNotImportedLine (fromJust mod_name)
   = hsep
       [ text "No module named"
       , quotes (ppr name)
@@ -245,6 +255,7 @@ importSuggestions where_look imports rdr_name
       ]
   | is_qualified
   , null helpful_imports
+  , not (null interesting_imports)
   , mods <- map fst interesting_imports
   = hsep
       [ text "Neither"
@@ -330,6 +341,19 @@ importSuggestions where_look imports rdr_name
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
 
+  -- See note [showNotImportedLine]
+  showNotImportedLine :: ModuleName -> Bool                           -- #15611
+  showNotImportedLine modnam
+      | modnam `elem`
+          fmap moduleName (moduleEnvKeys (imp_mods imports)) = False   -- 1
+      | moduleName currMod == modnam       = False                     -- 2.1
+      | isLastLoadedMod modnam hptUniques  = False                     -- 2.2
+      | otherwise                          = True
+    where
+      hptUniques = map fst (udfmToList hpt)
+      isLastLoadedMod _ []         = False
+      isLastLoadedMod modnam uniqs = last uniqs == getUnique modnam
+
 extensionSuggestions :: RdrName -> SDoc
 extensionSuggestions rdrName
   | rdrName == mkUnqual varName (fsLit "mdo") ||
@@ -341,3 +365,20 @@ perhapsForallMsg :: SDoc
 perhapsForallMsg
   = vcat [ text "Perhaps you intended to use ExplicitForAll or similar flag"
          , text "to enable explicit-forall syntax: forall <tvs>. <type>"]
+
+{- Note [showNotImportedLine]                                   -- #15611
+For the error message:
+    Not in scope X.Y
+    Module X does not export Y
+    No module named ‘X’ is imported:
+there are 2 cases, where we hide the last "no module is imported" line:
+1. If the module X has been imported.
+2. If the module X is the current module. There are 2 subcases:
+   2.1 If the unknown module name is in a input source file,
+       then we can use the getModule function to get the current module name.
+       (See test T15611a)
+   2.2 If the unknown module name has been entered by the user in GHCi,
+       then the getModule function returns something like "interactive:Ghci1",
+       and we have to check the current module in the last added entry of
+       the HomePackageTable. (See test T15611b)
+-}

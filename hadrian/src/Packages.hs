@@ -132,10 +132,17 @@ programName Context {..} = do
     targetPlatform <- setting TargetPlatformFull
     let prefix = if cross then targetPlatform ++ "-" else ""
     -- TODO: Can we extract this information from Cabal files?
+    -- Alp: We could, but then the iserv package would have to
+    --      use Cabal conditionals + a 'profiling' flag
+    --      to declare the executable name, and I'm not sure
+    --      this is allowed (or desired for that matter).
     return $ prefix ++ case package of
                               p | p == ghc    -> "ghc"
                                 | p == hpcBin -> "hpc"
-                                | p == iserv  -> "ghc-iserv"
+                                | p == iserv  ->
+                                    if Profiling `wayUnit` way
+                                      then "ghc-iserv-prof"
+                                      else "ghc-iserv"
                               _               -> pkgName package
 
 -- | The 'FilePath' to a program executable in a given 'Context'.
@@ -144,10 +151,11 @@ programPath context@Context {..} = do
     -- TODO: The @touchy@ utility lives in the @lib/bin@ directory instead of
     -- @bin@, which is likely just a historical accident that should be fixed.
     -- See: https://github.com/snowleopard/hadrian/issues/570
-    -- Likewise for 'unlit'.
+    -- Likewise for @iserv@ and @unlit@.
     name <- programName context
-    path <- if package `elem` [touchy, unlit] then stageLibPath stage <&> (-/- "bin")
-                                              else stageBinPath stage
+    path <- if package `elem` [iserv, touchy, unlit]
+              then stageLibPath stage <&> (-/- "bin")
+              else stageBinPath stage
     return $ path -/- name <.> exe
 
 -- TODO: Move @timeout@ to the @util@ directory and build in a more standard

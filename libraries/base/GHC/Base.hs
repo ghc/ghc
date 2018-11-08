@@ -448,8 +448,11 @@ instance Monoid a => Monoid (IO a) where
 lets you apply any function from @(a -> b)@ to turn an @f a@ into an @f b@, preserving the
 structure of @f@. Furthermore @f@ needs to adhere to the following laws:
 
-> fmap id == id
-> fmap (f . g) == fmap f . fmap g
+[/identity/]
+  @'fmap' 'id' = 'id'@
+
+[/composition/]
+  @'fmap' (f . g) = 'fmap' f . 'fmap' g@
 -}
 
 class  Functor f  where

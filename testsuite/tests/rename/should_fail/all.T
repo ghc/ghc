@@ -138,5 +138,7 @@ test('T15539', normal, compile_fail, [''])
 test('T15487', normal, multimod_compile_fail, ['T15487','-v0'])
 test('T15659', normal, compile_fail, [''])
 test('T15607', normal, compile_fail, [''])
+test('T15611a', normal, compile_fail, [''])
+test('T15611b', normal, ghci_script, ['T15611b.script'])
 
 test('ExplicitForAllRules2', normal, compile_fail, [''])
