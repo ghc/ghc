@@ -83,7 +83,7 @@ body.js-enabled .hide-when-js-enabled {
     top: 10.2em;
     left: 2em;
     bottom: 1em;
-    overflow-y: scroll;
+    overflow-y: auto;
   }
 
   #synopsis {
@@ -94,7 +94,7 @@ body.js-enabled .hide-when-js-enabled {
     bottom: 1em;
     right: 0;
     max-width: 65vw;
-    overflow-y: scroll;
+    overflow-y: auto;
     /* Ensure that synopsis covers everything (including MathJAX markup) */
     z-index: 1;
   }
