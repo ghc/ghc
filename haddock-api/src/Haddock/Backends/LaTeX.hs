@@ -243,8 +243,8 @@ ppDocGroup lev doc = sec lev <> braces doc
 
 -- | Given a declaration, extract out the names being declared
 declNames :: LHsDecl DocNameI
-          -> ( LaTeX           -- ^ to print before each name in an export list
-             , [DocName]       -- ^ names being declared
+          -> ( LaTeX           --   to print before each name in an export list
+             , [DocName]       --   names being declared
              )
 declNames (L _ decl) = case decl of
   TyClD _ d  -> (empty, [tcdName d])
@@ -444,9 +444,9 @@ ppLPatSig doc docnames ty unicode
 -- arguments as needed.
 ppTypeOrFunSig :: HsType DocNameI
                -> DocForDecl DocName  -- ^ documentation
-               -> ( LaTeX             -- ^ first-line (no-argument docs only)
-                  , LaTeX             -- ^ first-line (argument docs only)
-                  , LaTeX             -- ^ type prefix (argument docs only)
+               -> ( LaTeX             --   first-line (no-argument docs only)
+                  , LaTeX             --   first-line (argument docs only)
+                  , LaTeX             --   type prefix (argument docs only)
                   )
                -> Bool                -- ^ unicode
                -> LaTeX
