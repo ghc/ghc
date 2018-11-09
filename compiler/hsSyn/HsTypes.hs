@@ -18,7 +18,7 @@ HsTypes: Abstract syntax: user-defined types
 
 module HsTypes (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
-        HsTyVarBndr(..), LHsTyVarBndr,
+        HsTyVarBndr(..), HasBraces(..), LHsTyVarBndr,
         LHsQTyVars(..), HsQTvsRn(..),
         HsImplicitBndrs(..),
         HsWildCardBndrs(..),
@@ -466,11 +466,15 @@ instance OutputableBndr HsIPName where
 --------------------------------------------------
 
 -- | Haskell Type Variable Binder
+data HasBraces = Yes | No
+    deriving (Data, Show)
+
 data HsTyVarBndr pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
          (Located (IdP pass))
         -- See Note [Located RdrNames] in HsExpr
+         HasBraces
   | KindedTyVar
          (XKindedTyVar pass)
          (Located (IdP pass))
@@ -480,9 +484,10 @@ data HsTyVarBndr pass
         --          'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-
+         HasBraces
   | XTyVarBndr
       (XXTyVarBndr pass)
+      HasBraces
 
 type instance XUserTyVar    (GhcPass _) = NoExt
 type instance XKindedTyVar  (GhcPass _) = NoExt
@@ -971,8 +976,8 @@ I don't know if this is a good idea, but there it is.
 
 ---------------------
 hsTyVarName :: HsTyVarBndr pass -> IdP pass
-hsTyVarName (UserTyVar _ (L _ n))     = n
-hsTyVarName (KindedTyVar _ (L _ n) _) = n
+hsTyVarName (UserTyVar _ (L _ n) _)     = n
+hsTyVarName (KindedTyVar _ (L _ n) _ _) = n
 hsTyVarName (XTyVarBndr{}) = panic "hsTyVarName"
 
 hsLTyVarName :: LHsTyVarBndr pass -> IdP pass
@@ -998,8 +1003,8 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
 hsLTyVarBndrToType = fmap cvt
-  where cvt (UserTyVar _ n) = HsTyVar noExt NotPromoted n
-        cvt (KindedTyVar _ (L name_loc n) kind)
+  where cvt (UserTyVar _ n _) = HsTyVar noExt NotPromoted n
+        cvt (KindedTyVar _ (L name_loc n) kind _)
           = HsKindSig noExt
                    (L name_loc (HsTyVar noExt NotPromoted (L name_loc n))) kind
         cvt (XTyVarBndr{}) = panic "hsLTyVarBndrToType"
@@ -1278,9 +1283,9 @@ instance (p ~ GhcPass pass, OutputableBndrId p)
 
 instance (p ~ GhcPass pass, OutputableBndrId p)
        => Outputable (HsTyVarBndr p) where
-    ppr (UserTyVar _ n)     = ppr n
-    ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    ppr (XTyVarBndr n)      = ppr n
+    ppr (UserTyVar _ n _)     = ppr n
+    ppr (KindedTyVar _ n k _) = parens $ hsep [ppr n, dcolon, ppr k]
+    ppr (XTyVarBndr n _)      = ppr n
 
 instance (p ~ GhcPass pass,Outputable thing)
        => Outputable (HsImplicitBndrs p thing) where
