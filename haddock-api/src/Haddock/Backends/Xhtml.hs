@@ -634,7 +634,7 @@ ppModuleContents pkg qual exports orphan
   | otherwise                    = contentsDiv
  where
   contentsDiv = divTableOfContents << (divContentsList << (
-    sectionName << "Contents" +++
+    (sectionName << "Contents") ! [ strAttr "onclick" "window.scrollTo(0,0)" ] +++
     unordList (sections ++ orphanSection)))
 
   (sections, _leftovers{-should be []-}) = process 0 exports
