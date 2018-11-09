@@ -1342,16 +1342,6 @@ to be later converted to a list in a deterministic order.
 
 For more information about deterministic sets see
 Note [Deterministic UniqFM] in UniqDFM.
-
-
---------------- Note to tidy up --------
-Can we quantify over a non-unification variable? Sadly yes (Trac #15991b)
-  class C2 (a :: Type) (b :: Proxy a) (c :: Proxy b) where
-    type T4 a c
-
-When we come to T4 we have in Inferred b; but it is a skolem
-from the (fully settled) C2.
-
 -}
 
 quantifyTyVars
@@ -1444,10 +1434,10 @@ quantifyTyVars gbl_tvs
       = return Nothing   -- this can happen for a covar that's associated with
                          -- a coercion hole. Test case: typecheck/should_compile/T2494
 
-      | not (isTcTyVar tkv)
-      = WARN( True, text "quantifying over a TyVar" <+> ppr tkv)
-        return (Just tkv)  -- For associated types, we have the class variables
-                           -- in scope, and they are TyVars not TcTyVars
+      | not (isTcTyVar tkv)  -- I don't think this can ever happen.
+                             -- Hence the assert
+      = ASSERT2( False, text "quantifying over a TyVar" <+> ppr tkv)
+        return (Just tkv)
 
       | otherwise
       = do { deflt_done <- defaultTyVar default_kind tkv

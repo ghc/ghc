@@ -230,19 +230,15 @@ tc_hs_sig_type_and_gen skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (_inner_lvl, wanted, (tkvs, ty))
               <- pushLevelAndCaptureConstraints $
-                 tcImplicitTKBndrs skol_info sig_vars $
-                   -- tcImplicitTKBndrs does a solveLocalEqualities
-                 do { kind <- case ctxt_kind of
+                 do { -- See Note [Levels and generalisation]
+                      res_kind <- case ctxt_kind of
                         TheKind k -> return k
                         AnyKind   -> newMetaKindVar
                         OpenKind  -> newOpenTypeKind
-              -- The kind is checked by checkValidType, and isn't necessarily
-              -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
-                    ; tc_lhs_type typeLevelMode hs_ty kind }
-         -- Any remaining variables (unsolved in the solveLocalEqualities
-         -- in the tcImplicitTKBndrs) should be in the global tyvars,
-         -- and therefore won't be quantified over
+                    ; tcImplicitTKBndrs skol_info sig_vars $
+                      -- tcImplicitTKBndrs does a solveLocalEqualities
+                      tc_lhs_type typeLevelMode hs_ty res_kind }
 
        ; let ty1 = mkSpecForAllTys tkvs ty
        ; kvs <- kindGeneralizeLocal wanted ty1
@@ -1468,20 +1464,6 @@ To avoid the double-zonk, we do two things:
  2. When we are generalizing:
     kindGeneralize does not require a zonked type -- it zonks as it
     gathers free variables. So this way effectively sidesteps step 3.
-
-Note [TcLevel for CUSKs]
-~~~~~~~~~~~~~~~~~~~~~~~~
-In getInitialKinds we are at level 1, busy making unification
-variables over which we will subsequently generalise.
-
-But when we find a CUSK we want to jump back to top level (0)
-because that's the right starting point for a completee,
-stand-alone kind signature.
-
-More precisely, we want to make level-1 skolems, because
-the end up as the TyConBinders of the TyCon, and are brought
-into scope when we type-check the body of the type declaration
-(in tcTyClDecl).
 -}
 
 tcWildCardBinders :: [Name]
@@ -2004,7 +1986,26 @@ kindGeneralizeLocal wanted kind_or_type
 
        ; quantifyTyVars mono_tvs dvs }
 
-{-
+{- Note [Levels and generalisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f x = e
+with no type signature. We are currently at level i.
+We must
+  * Push the level to level (i+1)
+  * Allocate a fresh alpha[i+1] for the result type
+  * Check that e :: alpha[i+1], gathering constraint WC
+  * Solve WC as far as possible
+  * Zonking the result type alpha[i+1], say to beta[i-1] -> gamma[i]
+  * Find the free variables with level > i, in this case gamma[i]
+  * Skolemise those free variables and quantify over them, giving
+       f :: forall g. beta[i-1] -> g
+  * Emit the residiual constraint wrapped in an implication for g,
+    thus   forall g. WC
+
+All of this happens for types too.  Consider
+  f :: Int -> (forall a. Proxy a -> Int)
+
 Note [Kind generalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 We do kind generalisation only at the outer level of a type signature.
