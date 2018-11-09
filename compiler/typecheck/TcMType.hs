@@ -662,7 +662,8 @@ but this restriction was dropped, and ScopedTypeVariables can now refer to full
 types (GHC Proposal 29).
 
 The remaining uses of newTyVarTyVars are
-* in kind signatures, see Note [Kind generalisation and TyVarTvs]
+* In kind signatures, see
+  TcTyClsDecls Note [Inferring kinds for type declarations]
   and Note [Use TyVarTvs in kind-checking pass]
 * in partial type signatures, see Note [Quantified variables in partial type signatures]
 -}
