@@ -534,7 +534,7 @@ pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
       -- is the pattern inside that matters.  Sigh.
 
 pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
-pprPat (VarPat _ (L _ var))     = pprPatBndr var
+pprPat (VarPat _ (dL->(_  , var))) = pprPatBndr var
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
 pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
@@ -569,7 +569,7 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
                          , ppr binds])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
-pprPat (XPat x)               = ppr x
+pprPat (XPat (l , e)) = whenPprDebug (braces (ppr l)) $$ ppr e
 
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId (GhcPass p))
@@ -714,12 +714,12 @@ isIrrefutableHsPat pat
     go1 (ListPat {})        = False
 
     go1 (ConPatIn {})       = False     -- Conservative
-    go1 (ConPatOut{ pat_con = L _ (RealDataCon con), pat_args = details })
+    go1 (ConPatOut{ pat_con = dL->(_ , RealDataCon con), pat_args = details })
         =  isJust (tyConSingleDataCon_maybe (dataConTyCon con))
            -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
            -- the latter is false of existentials. See Trac #4439
         && all go (hsConPatArgs details)
-    go1 (ConPatOut{ pat_con = L _ (PatSynCon _pat) })
+    go1 (ConPatOut{})
         = False -- Conservative
 
     go1 (LitPat {})         = False
@@ -776,7 +776,7 @@ patNeedsParens p = go
     go (SumPat {})            = False
     go (ListPat {})           = False
     go (LitPat _ l)           = hsLitNeedsParens p l
-    go (NPat _ (L _ ol) _ _)  = hsOverLitNeedsParens p ol
+    go (NPat _ (dL->(_ , ol)) _ _)  = hsOverLitNeedsParens p ol
     go (XPat {})              = True -- conservative default
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
