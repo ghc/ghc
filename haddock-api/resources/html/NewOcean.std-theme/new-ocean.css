@@ -291,7 +291,7 @@ pre, code, kbd, samp, tt, .src {
 .caption, h1, h2, h3, h4, h5, h6, summary {
   font-weight: bold;
   color: #5E5184;
-  margin: 2em 0 1em 0;
+  margin: 1.5em 0 1em 0;
 }
 
 
@@ -595,7 +595,7 @@ div#style-menu-holder {
 /* @group Main Content */
 
 #interface div.top + div.top {
-  margin-top: 1em;
+  margin-top: 1.5em;
 }
 
 #interface p + div.top,
@@ -709,10 +709,6 @@ div#style-menu-holder {
 .subs .subs p.src {
   border: none;
   background-color: #f8f8f8;
-}
-
-.top > .subs:last-of-type {
-  margin-bottom: 2em;
 }
 
 .subs .subs .caption {
