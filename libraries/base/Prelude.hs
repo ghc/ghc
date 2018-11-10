@@ -73,7 +73,8 @@ module Prelude (
     -- ** Monads and functors
     Functor(fmap, (<$)), (<$>),
     Applicative(pure, (<*>), (*>), (<*)),
-    Monad((>>=), (>>), return, fail),
+    Monad((>>=), (>>), return),
+    MonadFail(fail),
     mapM_, sequence_, (=<<),
 
     -- ** Folds and traversals
