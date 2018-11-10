@@ -51,7 +51,6 @@ Executable ghc
 
     GHC-Options: -Wall
                  -Wnoncanonical-monad-instances
-                 -Wnoncanonical-monadfail-instances
                  -Wnoncanonical-monoid-instances
 
     if flag(ghci)

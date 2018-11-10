@@ -2,13 +2,11 @@
 -- is reflected by calling the monadic 'fail', not by a
 -- runtime exception
 
-{-# LANGUAGE NoMonadFailDesugaring #-}
-{-# OPTIONS -Wno-missing-monadfail-instances #-}
-
 import Control.Monad
+import Control.Monad.Fail
 import Data.Maybe
 
-test :: (MonadPlus m) => [a] -> m Bool
+test :: (MonadPlus m, MonadFail m) => [a] -> m Bool
 test xs
   =   do
         (_:_) <- return xs

@@ -2,7 +2,7 @@ TYPE SIGNATURES
   bar :: forall t _. t -> (t -> _) -> _
   foo :: forall a. (Show a, Enum a) => a -> String
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+Dependent packages: [base-4.13.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]
 
 WarningWildcardInstantiations.hs:5:8: warning: [-Wpartial-type-signatures (in -Wdefault)]

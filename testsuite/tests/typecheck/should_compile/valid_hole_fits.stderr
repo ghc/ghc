@@ -244,10 +244,10 @@ valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
           with print @[Char]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘System.IO’))
-        fail :: forall (m :: * -> *) a. Monad m => String -> m a
+        fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
           with fail @IO @()
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘Control.Monad.Fail’))
         mempty :: forall a. Monoid a => a
           with mempty @([Char] -> IO ())
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40

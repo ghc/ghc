@@ -43,7 +43,6 @@ import Module
 import HscTypes         ( Warnings(..), plusWarns )
 import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
-                        , monadFailClassName, failMName, failMName_preMFP
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
@@ -457,9 +456,6 @@ checkCanonicalInstances cls poly_ty mbinds = do
     whenWOptM Opt_WarnNonCanonicalMonadInstances
         checkCanonicalMonadInstances
 
-    whenWOptM Opt_WarnNonCanonicalMonadFailInstances
-        checkCanonicalMonadFailInstances
-
     whenWOptM Opt_WarnNonCanonicalMonoidInstances
         checkCanonicalMonoidInstances
 
@@ -506,45 +502,6 @@ checkCanonicalInstances cls poly_ty mbinds = do
                       -> addWarnNonCanonicalMethod2
                             Opt_WarnNonCanonicalMonadInstances "(>>)" "(*>)"
 
-                  _ -> return ()
-
-      | otherwise = return ()
-
-    -- | Warn about unsound/non-canonical 'Monad'/'MonadFail' instance
-    -- declarations. Specifically, the following conditions are verified:
-    --
-    -- In 'Monad' instances declarations:
-    --
-    --  * If 'fail' is overridden it must be canonical
-    --    (i.e. @fail = Control.Monad.Fail.fail@)
-    --
-    -- In 'MonadFail' instance declarations:
-    --
-    --  * Warn if 'fail' is defined backwards
-    --    (i.e. @fail = Control.Monad.fail@).
-    --
-    checkCanonicalMonadFailInstances
-      | cls == monadFailClassName  = do
-          forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
-              case mbind of
-                  FunBind { fun_id = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == failMName, isAliasMG mg == Just failMName_preMFP
-                      -> addWarnNonCanonicalMethod1
-                            Opt_WarnNonCanonicalMonadFailInstances "fail"
-                            "Control.Monad.fail"
-
-                  _ -> return ()
-
-      | cls == monadClassName  = do
-          forM_ (bagToList mbinds) $ \(dL->L loc mbind) -> setSrcSpan loc $ do
-              case mbind of
-                  FunBind { fun_id      = (dL->L _ name)
-                          , fun_matches = mg }
-                      | name == failMName_preMFP, isAliasMG mg /= Just failMName
-                      -> addWarnNonCanonicalMethod2
-                            Opt_WarnNonCanonicalMonadFailInstances "fail"
-                            "Control.Monad.Fail.fail"
                   _ -> return ()
 
       | otherwise = return ()

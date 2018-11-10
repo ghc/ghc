@@ -20,7 +20,7 @@
 -- | Module "Trampoline" defines the pipe computations and their basic building blocks.
 
 {-# LANGUAGE ScopedTypeVariables, Rank2Types, MultiParamTypeClasses,
-             TypeFamilies, KindSignatures, FlexibleContexts, NoMonadFailDesugaring,
+             TypeFamilies, KindSignatures, FlexibleContexts,
              FlexibleInstances, OverlappingInstances, UndecidableInstances
  #-}
 
@@ -81,6 +81,9 @@ instance Monad Identity where
     return a = Identity a
     m >>= k  = k (runIdentity m)
 
+instance MonadFail Identity where
+    fail = error "Identity(fail)"
+
 newtype Trampoline m s r = Trampoline {bounce :: m (TrampolineState m s r)}
 data TrampolineState m s r = Done r | Suspend! (s (Trampoline m s r))
 
@@ -96,6 +99,9 @@ instance (Monad m, Functor s) => Monad (Trampoline m s) where
    t >>= f = Trampoline (bounce t >>= apply f)
       where apply f (Done x) = bounce (f x)
             apply f (Suspend s) = return (Suspend (fmap (>>= f) s))
+
+instance (MonadFail m, Functor s) => MonadFail (Trampoline m s) where
+   fail = error "Trampoline(fail)"
 
 data Yield x y = Yield! x y
 instance Functor (Yield x) where

@@ -89,7 +89,6 @@ instance Applicative (TCMT m) where
 instance Monad (TCMT m) where
     return = undefined
     (>>=) = undefined
-    fail = undefined
 
 instance Monad m => MonadIO (TCMT m) where
 

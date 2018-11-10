@@ -314,7 +314,7 @@ basicKnownKeyNames
         returnMName, joinMName,
 
         -- MonadFail
-        monadFailClassName, failMName, failMName_preMFP,
+        monadFailClassName, failMName,
 
         -- MonadFix
         monadFixClassName, mfixName,
@@ -669,13 +669,12 @@ map_RDR, append_RDR :: RdrName
 map_RDR                 = nameRdrName mapName
 append_RDR              = nameRdrName appendName
 
-foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR_preMFP,
-  failM_RDR :: RdrName
+foldr_RDR, build_RDR, returnM_RDR, bindM_RDR, failM_RDR
+    :: RdrName
 foldr_RDR               = nameRdrName foldrName
 build_RDR               = nameRdrName buildName
 returnM_RDR             = nameRdrName returnMName
 bindM_RDR               = nameRdrName bindMName
-failM_RDR_preMFP        = nameRdrName failMName_preMFP
 failM_RDR               = nameRdrName failMName
 
 left_RDR, right_RDR :: RdrName
@@ -1018,12 +1017,11 @@ functorClassName  = clsQual gHC_BASE    (fsLit "Functor") functorClassKey
 fmapName          = varQual gHC_BASE    (fsLit "fmap")    fmapClassOpKey
 
 -- Class Monad
-monadClassName, thenMName, bindMName, returnMName, failMName_preMFP :: Name
+monadClassName, thenMName, bindMName, returnMName :: Name
 monadClassName     = clsQual gHC_BASE (fsLit "Monad")  monadClassKey
 thenMName          = varQual gHC_BASE (fsLit ">>")     thenMClassOpKey
 bindMName          = varQual gHC_BASE (fsLit ">>=")    bindMClassOpKey
 returnMName        = varQual gHC_BASE (fsLit "return") returnMClassOpKey
-failMName_preMFP   = varQual gHC_BASE (fsLit "fail")   failMClassOpKey_preMFP
 
 -- Class MonadFail
 monadFailClassName, failMName :: Name
@@ -2279,8 +2277,7 @@ unboundKey                    = mkPreludeMiscIdUnique 158
 fromIntegerClassOpKey, minusClassOpKey, fromRationalClassOpKey,
     enumFromClassOpKey, enumFromThenClassOpKey, enumFromToClassOpKey,
     enumFromThenToClassOpKey, eqClassOpKey, geClassOpKey, negateClassOpKey,
-    failMClassOpKey_preMFP, bindMClassOpKey, thenMClassOpKey, returnMClassOpKey,
-    fmapClassOpKey
+    bindMClassOpKey, thenMClassOpKey, returnMClassOpKey, fmapClassOpKey
     :: Unique
 fromIntegerClassOpKey         = mkPreludeMiscIdUnique 160
 minusClassOpKey               = mkPreludeMiscIdUnique 161
@@ -2292,7 +2289,6 @@ enumFromThenToClassOpKey      = mkPreludeMiscIdUnique 166
 eqClassOpKey                  = mkPreludeMiscIdUnique 167
 geClassOpKey                  = mkPreludeMiscIdUnique 168
 negateClassOpKey              = mkPreludeMiscIdUnique 169
-failMClassOpKey_preMFP        = mkPreludeMiscIdUnique 170
 bindMClassOpKey               = mkPreludeMiscIdUnique 171 -- (>>=)
 thenMClassOpKey               = mkPreludeMiscIdUnique 172 -- (>>)
 fmapClassOpKey                = mkPreludeMiscIdUnique 173

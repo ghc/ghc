@@ -2,8 +2,8 @@
   [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, nothing )
 [2 of 2] Processing q
   Instantiating q
-  [1 of 1] Including p[ShouldFail=base-4.12.0.0:Data.Bool]
-    Instantiating p[ShouldFail=base-4.12.0.0:Data.Bool]
+  [1 of 1] Including p[ShouldFail=base-4.13.0.0:Data.Bool]
+    Instantiating p[ShouldFail=base-4.13.0.0:Data.Bool]
     [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail16.out/p/p-1OqLaT7dAn947wScQQKCw5/ShouldFail.o )
 
 bkpfail16.out/p/p-1OqLaT7dAn947wScQQKCw5/../ShouldFail.hi:1:1: error:

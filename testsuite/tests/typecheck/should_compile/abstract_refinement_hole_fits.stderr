@@ -36,8 +36,6 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         ($) (_ :: [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
-        fail (_ :: [Char])
-          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: Integer)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer)
@@ -116,8 +114,6 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         ($) (_ :: a5 -> [Integer] -> Integer) (_ :: a5)
           where ($) :: forall a b. (a -> b) -> a -> b
-        fail (_ :: [Char]) (_ :: t1)
-          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: [Integer] -> Integer) (_ :: t1)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer) (_ :: t1)
@@ -156,8 +152,6 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         ($) (_ :: Integer -> [Integer] -> Integer)
           where ($) :: forall a b. (a -> b) -> a -> b
-        fail (_ :: [Char])
-          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: [Integer] -> Integer)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: [Integer] -> Integer)
@@ -240,8 +234,6 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where const :: forall a b. a -> b -> a
         ($) (_ :: a5 -> Integer -> [Integer] -> Integer) (_ :: a5)
           where ($) :: forall a b. (a -> b) -> a -> b
-        fail (_ :: [Char]) (_ :: t1)
-          where fail :: forall (m :: * -> *) a. Monad m => String -> m a
         return (_ :: Integer -> [Integer] -> Integer) (_ :: t1)
           where return :: forall (m :: * -> *) a. Monad m => a -> m a
         pure (_ :: Integer -> [Integer] -> Integer) (_ :: t1)

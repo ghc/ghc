@@ -18,7 +18,6 @@ mzero :: MonadPlus m => m a
 -- imported via Control.Monad, Prelude
 (>>) :: Monad m => m a -> m b -> m b
 (>>=) :: Monad m => m a -> (a -> m b) -> m b
-fail :: Monad m => GHC.Base.String -> m a
 return :: Monad m => a -> m a
 -- imported via Control.Monad, Prelude, T
 class GHC.Base.Applicative m => Monad (m :: * -> *)

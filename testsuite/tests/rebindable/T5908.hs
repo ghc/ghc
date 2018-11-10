@@ -25,11 +25,9 @@ class Monad m where
   (>>=) :: forall e ex x a b . m e ex a -> (a -> m ex x b) -> m e x b
   (>>) :: forall e ex x a b . m e ex a -> m ex x b -> m e x b
   return :: a -> m ex ex a
-  fail :: String -> m e x a
 
   {-# INLINE (>>) #-}
   m >> k = m >>= \ _ -> k
-  fail = error
 
 type Writer w = WriterT w Identity
 
@@ -60,9 +58,6 @@ instance (Category w, Prelude.Monad m) => Monad (WriterT w m) where
     where
       (>>=) = (Prelude.>>=)
       return = Prelude.return
-  fail msg = WriterT $ fail msg
-    where
-      fail = Prelude.fail
 
 tell :: (Category w, Prelude.Monad m) => w e x -> WriterT w m e x ()
 tell w = WriterT $ return ((), w)
