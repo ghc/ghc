@@ -1,4 +1,4 @@
 
 SafeFlags17.hs:4:8: error:
     Prelude: Can't be safely imported!
-    The package (base-4.12.0.0) the module resides in isn't trusted.
+    The package (base-4.13.0.0) the module resides in isn't trusted.

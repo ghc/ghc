@@ -28,9 +28,6 @@ instance Monad (Parser s) where
   Parser f >>= k =
     Parser (\fut -> f (\a -> let Parser g = k a in g fut))
 
-  fail s =
-    Parser (\fut exp -> Fail exp [s])
-
 instance Alternative (Parser s) where
     empty = mzero
     (<|>) = mplus

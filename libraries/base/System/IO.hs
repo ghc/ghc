@@ -236,7 +236,7 @@ import System.Posix.Types
 
 import GHC.Base
 import GHC.List
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import GHC.IORef
 #endif
 import GHC.Num
@@ -485,7 +485,7 @@ openTempFile' :: String -> FilePath -> String -> Bool -> CMode
               -> IO (FilePath, Handle)
 openTempFile' loc tmp_dir template binary mode
     | pathSeparator template
-    = fail $ "openTempFile': Template string must not contain path separator characters: "++template
+    = failIO $ "openTempFile': Template string must not contain path separator characters: "++template
     | otherwise = findTempName
   where
     -- We split off the last extension, so we can use .foo.ext files
