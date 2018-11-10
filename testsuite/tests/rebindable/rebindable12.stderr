@@ -1,4 +1,0 @@
-rebindable12.hs:11:5: error: [-Wmissing-monadfail-instances (in -Wcompat), -Werror=missing-monadfail-instances]
-    The failable pattern ‘Just x’
-      is used together with -XRebindableSyntax. If this is intentional,
-      compile with -Wno-missing-monadfail-instances.

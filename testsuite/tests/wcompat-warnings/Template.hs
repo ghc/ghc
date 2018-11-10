@@ -1,13 +1,8 @@
-{-# LANGUAGE NoMonadFailDesugaring, KindSignatures #-}
+{-# LANGUAGE KindSignatures #-}
 
 module WCompatWarningsOnOff where
 
 import qualified Data.Semigroup as Semi
-
-monadFail :: Monad m => m a
-monadFail = do
-    Just _ <- undefined
-    undefined
 
 (<>) = undefined -- Semigroup warnings
 

@@ -664,17 +664,6 @@ class Applicative m => Monad m where
     return      :: a -> m a
     return      = pure
 
-    -- | Fail with a message.  This operation is not part of the
-    -- mathematical definition of a monad, but is invoked on pattern-match
-    -- failure in a @do@ expression.
-    --
-    -- As part of the MonadFail proposal (MFP), this function is moved
-    -- to its own class 'Control.Monad.MonadFail' (see "Control.Monad.Fail" for
-    -- more details). The definition here will be removed in a future
-    -- release.
-    fail        :: String -> m a
-    fail s      = errorWithoutStackTrace s
-
 {- Note [Recursive bindings for Applicative/Monad]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -855,8 +844,6 @@ instance  Monad Maybe  where
 
     (>>) = (*>)
 
-    fail _              = Nothing
-
 -- -----------------------------------------------------------------------------
 -- The Alternative class definition
 
@@ -984,8 +971,6 @@ instance Monad []  where
     xs >>= f             = [y | x <- xs, y <- f x]
     {-# INLINE (>>) #-}
     (>>) = (*>)
-    {-# INLINE fail #-}
-    fail _              = []
 
 -- | @since 2.01
 instance Alternative [] where
@@ -1365,7 +1350,6 @@ instance  Monad IO  where
     {-# INLINE (>>=)  #-}
     (>>)      = (*>)
     (>>=)     = bindIO
-    fail s    = failIO s
 
 -- | @since 4.9.0.0
 instance Alternative IO where

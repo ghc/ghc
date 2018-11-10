@@ -19,7 +19,8 @@ module Control.Monad
     -- * Functor and monad classes
 
       Functor(fmap)
-    , Monad((>>=), (>>), return, fail)
+    , Monad((>>=), (>>), return)
+    , MonadFail(fail)
     , MonadPlus(mzero, mplus)
     -- * Functions
 
@@ -75,6 +76,7 @@ module Control.Monad
     , (<$!>)
     ) where
 
+import Control.Monad.Fail ( MonadFail(fail) )
 import Data.Foldable ( Foldable, sequence_, sequenceA_, msum, mapM_, foldlM, forM_ )
 import Data.Functor ( void, (<$>) )
 import Data.Traversable ( forM, mapM, traverse, sequence, sequenceA )
