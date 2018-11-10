@@ -5,8 +5,8 @@ T15321.hs:9:9: error:
       In the expression: _ "baz"
       In the untyped splice: $(_ "baz")
     • Valid hole fits include
-        fail :: forall (m :: * -> *) a. Monad m => String -> m a
+        fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
           with fail @Language.Haskell.TH.Syntax.Q
                     @Language.Haskell.TH.Syntax.Exp
           (imported from ‘Prelude’ at T15321.hs:3:8-13
-           (and originally defined in ‘GHC.Base’))
+           (and originally defined in ‘Control.Monad.Fail’))

@@ -12,5 +12,5 @@ CLASS INSTANCES
     -- Defined at Meltdown.hs:11:10
   instance Monad (NukeMonad a b) -- Defined at Meltdown.hs:15:10
 Dependent modules: []
-Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
+Dependent packages: [base-4.13.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

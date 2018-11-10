@@ -1,12 +1,12 @@
 
-MonadFailErrors.hs:16:5: error:
+MonadFailErrors.hs:14:5: error:
     • Could not deduce (MonadFail m)
         arising from a do statement
         with the failable pattern ‘Just x’
       from the context: Monad m
         bound by the type signature for:
                    general :: forall (m :: * -> *) a. Monad m => m a
-        at MonadFailErrors.hs:14:1-25
+        at MonadFailErrors.hs:12:1-25
       Possible fix:
         add (MonadFail m) to the context of
           the type signature for:
@@ -20,7 +20,7 @@ MonadFailErrors.hs:16:5: error:
             = do Just x <- undefined
                  undefined
 
-MonadFailErrors.hs:30:5: error:
+MonadFailErrors.hs:28:5: error:
     • No instance for (MonadFail Identity)
         arising from a do statement
         with the failable pattern ‘Just x’
@@ -33,7 +33,7 @@ MonadFailErrors.hs:30:5: error:
             = do Just x <- undefined
                  undefined
 
-MonadFailErrors.hs:51:5: error:
+MonadFailErrors.hs:49:5: error:
     • No instance for (MonadFail ((->) r))
         arising from a do statement
         with the failable pattern ‘Just x’
