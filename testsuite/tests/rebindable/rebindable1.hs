@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -Wno-missing-monadfail-instances #-}
-{-# LANGUAGE RebindableSyntax, NPlusKPatterns, NoMonadFailDesugaring #-}
+{-# LANGUAGE RebindableSyntax, NPlusKPatterns #-}
 
 module RebindableCase1 where
         {

@@ -64,7 +64,7 @@ anti   = lexeme $
              cs <- many idchar
              return $ AntiIntExpr (c : cs)
 
-parseExpr :: Monad m => TH.Loc -> String -> m Expr
+parseExpr :: MonadFail m => TH.Loc -> String -> m Expr
 parseExpr (Loc {loc_filename = file, loc_start = (line,col)}) s =
     case runParser p () "" s of
       Left err  -> fail $ show err

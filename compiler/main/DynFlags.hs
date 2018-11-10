@@ -823,7 +823,7 @@ data WarningFlag =
    | Opt_WarnDeferredTypeErrors
    | Opt_WarnDeferredOutOfScopeVariables
    | Opt_WarnNonCanonicalMonadInstances   -- since 8.0
-   | Opt_WarnNonCanonicalMonadFailInstances -- since 8.0
+   | Opt_WarnNonCanonicalMonadFailInstances   -- since 8.0, removed 8.8
    | Opt_WarnNonCanonicalMonoidInstances  -- since 8.0
    | Opt_WarnMissingPatternSynonymSignatures -- since 8.0
    | Opt_WarnUnrecognisedWarningFlags     -- since 8.0
@@ -2245,7 +2245,6 @@ languageExtensions (Just Haskell98)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
-       LangExt.MonadFailDesugaring,
        LangExt.MonomorphismRestriction,
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
@@ -2262,7 +2261,6 @@ languageExtensions (Just Haskell2010)
     = [LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
-       LangExt.MonadFailDesugaring,
        LangExt.MonomorphismRestriction,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
@@ -4007,8 +4005,9 @@ wWarningFlagsDeps = [
   flagSpec "name-shadowing"              Opt_WarnNameShadowing,
   flagSpec "noncanonical-monad-instances"
                                          Opt_WarnNonCanonicalMonadInstances,
-  flagSpec "noncanonical-monadfail-instances"
-                                         Opt_WarnNonCanonicalMonadFailInstances,
+  depFlagSpec "noncanonical-monadfail-instances"
+                                         Opt_WarnNonCanonicalMonadInstances
+    "fail is no longer a method of Monad",
   flagSpec "noncanonical-monoid-instances"
                                          Opt_WarnNonCanonicalMonoidInstances,
   flagSpec "orphans"                     Opt_WarnOrphans,
@@ -4392,7 +4391,8 @@ xFlagsDeps = [
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
-  flagSpec "MonadFailDesugaring"              LangExt.MonadFailDesugaring,
+  depFlagSpec "MonadFailDesugaring"           LangExt.MonadFailDesugaring
+    "MonadFailDesugaring is now the default behavior",
   flagSpec "MonoLocalBinds"                   LangExt.MonoLocalBinds,
   depFlagSpecCond "MonoPatBinds"              LangExt.MonoPatBinds
     id

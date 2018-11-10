@@ -30,11 +30,11 @@ m1 >> m2 = m1 >>= (const m2)
 
 newtype RegularM m a = RegularM{unRM :: m a}
 
-instance Prelude.Monad m => MN2 (RegularM m) a where
+instance Prelude.MonadFail m => MN2 (RegularM m) a where
     return = RegularM . Prelude.return
-    fail   = RegularM . Prelude.fail
+    fail = fail
 
-instance Prelude.Monad m => MN3 (RegularM m) a b where
+instance Prelude.MonadFail m => MN3 (RegularM m) a b where
     m >>= f = RegularM ((Prelude.>>=) (unRM m) (unRM . f))
 
 -- We try to inject Maybe (as the regular monad) into Restricted Monad

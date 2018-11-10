@@ -19,6 +19,8 @@ instance (Monad m) => Monad (ReaderT r m) where
     m >>= k  = ReaderT $ \r -> do
         a <- runReaderT m r
         runReaderT (k a) r
+
+instance (MonadFail m) => MonadFail (ReaderT r m) where
     fail msg = ReaderT $ \_ -> fail msg
 
 newtype ResourceT r s m v = ResourceT { unResourceT :: ReaderT r m v }

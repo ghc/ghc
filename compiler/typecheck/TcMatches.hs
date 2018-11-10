@@ -42,9 +42,6 @@ import TcEvidence
 import Outputable
 import Util
 import SrcLoc
-import DynFlags
-import PrelNames (monadFailClassName)
-import qualified GHC.LanguageExtensions as LangExt
 
 -- Create chunkified tuple tybes for monad comprehensions
 import MkCore
@@ -940,43 +937,8 @@ tcMonadFailOp orig pat fail_op res_ty
   = return noSyntaxExpr
 
   | otherwise
-  = do { -- Issue MonadFail warnings
-         rebindableSyntax <- xoptM LangExt.RebindableSyntax
-       ; desugarFlag      <- xoptM LangExt.MonadFailDesugaring
-       ; missingWarning   <- woptM Opt_WarnMissingMonadFailInstances
-       ; if | rebindableSyntax && desugarFlag && missingWarning
-              -> warnRebindableClash pat
-            | not desugarFlag && missingWarning
-              -> emitMonadFailConstraint pat res_ty
-            | otherwise
-              -> return ()
-
-        -- Get the fail op itself
-        ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
-                             (mkCheckExpType res_ty) $ \_ -> return ()) }
-
-emitMonadFailConstraint :: LPat GhcTcId -> TcType -> TcRn ()
-emitMonadFailConstraint pat res_ty
-  = do { -- We expect res_ty to be of form (monad_ty arg_ty)
-         (_co, (monad_ty, _arg_ty)) <- matchExpectedAppTy res_ty
-
-         -- Emit (MonadFail m), but ignore the evidence; it's
-         -- just there to generate a warning
-       ; monadFailClass <- tcLookupClass monadFailClassName
-       ; _ <- emitWanted (FailablePattern pat)
-                         (mkClassPred monadFailClass [monad_ty])
-       ; return () }
-
-warnRebindableClash :: LPat GhcTcId -> TcRn ()
-warnRebindableClash pattern = addWarnAt
-    (Reason Opt_WarnMissingMonadFailInstances)
-    (getLoc pattern)
-    (text "The failable pattern" <+> quotes (ppr pattern)
-     $$
-     nest 2 (text "is used together with -XRebindableSyntax."
-             <+> text "If this is intentional,"
-             $$
-             text "compile with -Wno-missing-monadfail-instances."))
+  = snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
+                             (mkCheckExpType res_ty) $ \_ -> return ())
 
 {-
 Note [Treat rebindable syntax first]

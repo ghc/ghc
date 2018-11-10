@@ -23,6 +23,8 @@ instance (Monad m) => Monad (ReaderT r m) where
     m >>= k  = ReaderT $ \ r -> do
         a <- runReaderT m r
         runReaderT (k a) r
+
+instance MonadFail m => MonadFail (ReaderT r m) where
     fail msg = ReaderT (\_ -> fail msg)
 
 mapReaderT :: (m a -> n b) -> ReaderT r m a -> ReaderT r n b

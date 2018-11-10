@@ -8,7 +8,7 @@ module Main where
         import Prelude(String,undefined,Maybe(..),IO,putStrLn,
                 Integer,(++),Rational, (==), (>=) );
 
-        import Prelude(Monad(..),Applicative(..),Functor(..));
+        import Prelude(Monad(..),Applicative(..),Functor(..),MonadFail(..));
         import Control.Monad(ap, liftM);
 
         debugFunc :: String -> IO a -> IO a;
@@ -35,7 +35,9 @@ module Main where
                 (>>=) ma amb = MkTM (debugFunc ">>=" ((Prelude.>>=) (unTM ma) (\a -> unTM (amb a))));
 
                 (>>) ma mb = MkTM (debugFunc ">>" ((Prelude.>>) (unTM ma) (unTM mb)));
-
+                };
+        instance (MonadFail TM) where
+                {
                 fail s = MkTM (debugFunc "fail" (Prelude.return undefined));
                 };
 
