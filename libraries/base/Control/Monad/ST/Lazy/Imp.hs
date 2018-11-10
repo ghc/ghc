@@ -180,9 +180,6 @@ instance Applicative (ST s) where
 
 -- | @since 2.01
 instance Monad (ST s) where
-
-    fail s   = errorWithoutStackTrace s
-
     (>>) = (*>)
 
     m >>= k = ST $ \ s ->
