@@ -359,13 +359,13 @@ ul.links li a {
 }
 
 .collapser:before {
-  content: '⊖';
+  content: '▿';
 }
 .expander:before {
-  content: "⊕";
+  content: '▹';
 }
 .noexpander:before {
-  content: "⊕";
+  content: '▿';
   visibility: hidden;
 }
 
