@@ -367,7 +367,7 @@ to avoid contention with other processes in the machine.
 -}
 setNumCapabilities :: Int -> IO ()
 setNumCapabilities i
-  | i <= 0    = fail $ "setNumCapabilities: Capability count ("++show i++") must be positive"
+  | i <= 0    = failIO $ "setNumCapabilities: Capability count ("++show i++") must be positive"
   | otherwise = c_setNumCapabilities (fromIntegral i)
 
 foreign import ccall safe "setNumCapabilities"
