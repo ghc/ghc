@@ -1,6 +1,8 @@
 ## Changes in TBA
 
- * NewOcean is the new default theme (#721, #782)
+ * NewOcean is the new default theme (#721, #782, #949)
+
+ * Fix style switcher (enabled by `--built-in-themes`) (#949)
 
 ## Changes in version 2.22.0
 
