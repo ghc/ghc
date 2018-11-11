@@ -118,10 +118,14 @@ commaSeparate dflags = showSDocUnqual dflags . interpp'SP
 
 ppExport :: DynFlags -> ExportItem GhcRn -> [String]
 ppExport dflags ExportDecl { expItemDecl    = L _ decl
-                           , expItemMbDoc   = (dc, _)
+                           , expItemPats    = bundledPats
+                           , expItemMbDoc   = mbDoc
                            , expItemSubDocs = subdocs
                            , expItemFixities = fixities
-                           } = ppDocumentation dflags dc ++ f decl ++ ppFixities
+                           } = concat [ ppDocumentation dflags dc ++ f d
+                                      | (d, (dc, _)) <- (decl, mbDoc) : bundledPats
+                                      ] ++
+                               ppFixities
     where
         f (TyClD _ d@DataDecl{})  = ppData dflags d subdocs
         f (TyClD _ d@SynDecl{})   = ppSynonym dflags d
@@ -136,12 +140,13 @@ ppExport dflags ExportDecl { expItemDecl    = L _ decl
 ppExport _ _ = []
 
 ppSigWithDoc :: DynFlags -> Sig GhcRn -> [(Name, DocForDecl Name)] -> [String]
-ppSigWithDoc dflags (TypeSig _ names sig) subdocs
-    = concatMap mkDocSig names
-    where
-        mkDocSig n = mkSubdoc dflags n subdocs [pp_sig dflags [n] (hsSigWcType sig)]
-
-ppSigWithDoc _ _ _ = []
+ppSigWithDoc dflags sig subdocs = case sig of
+    TypeSig _ names t -> concatMap (mkDocSig "" (hsSigWcType t)) names
+    PatSynSig _ names t -> concatMap (mkDocSig "pattern " (hsSigType t)) names
+    _ -> []
+  where
+    mkDocSig leader typ n = mkSubdoc dflags n subdocs
+                                     [leader ++ pp_sig dflags [n] typ]
 
 ppSig :: DynFlags -> Sig GhcRn -> [String]
 ppSig dflags x  = ppSigWithDoc dflags x []

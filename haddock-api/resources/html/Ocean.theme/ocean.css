@@ -401,7 +401,7 @@ div#style-menu-holder {
 #interface h3 + div.top,
 #interface h4 + div.top,
 #interface h5 + div.top {
- 	margin-top: 1em;
+	margin-top: 1em;
 }
 #interface .src .selflink,
 #interface .src .link {
@@ -466,13 +466,13 @@ div#style-menu-holder {
   visibility: hidden;
 }
 
-.subs ul {
+.subs.fields ul {
   list-style: none;
   display: table;
   margin: 0;
 }
 
-.subs ul li {
+.subs.fields ul li {
   display: table-row;
 }
 

@@ -33,6 +33,7 @@ import Haddock.Version
 import Haddock.Utils
 import Haddock.Utils.Json
 import Text.XHtml hiding ( name, title, p, quote )
+import qualified Text.XHtml as XHtml
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
@@ -120,17 +121,26 @@ copyHtmlBits odir libdir themes withQuickjump = do
 
 headHtml :: String -> Themes -> Maybe String -> Html
 headHtml docTitle themes mathjax_url =
-  header << [
-    meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
-    thetitle << docTitle,
-    styleSheet themes,
-    thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml,
-    script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml,
-    script ! [src mjUrl, thetype "text/javascript"] << noHtml
+  header <<
+    [ meta ! [ httpequiv "Content-Type", content "text/html; charset=UTF-8"]
+    , meta ! [ XHtml.name "viewport", content "width=device-width, initial-scale=1"]
+    , thetitle << docTitle
+    , styleSheet themes
+    , thelink ! [ rel "stylesheet", thetype "text/css", href quickJumpCssFile] << noHtml
+    , thelink ! [ rel "stylesheet", thetype "text/css", href fontUrl] << noHtml
+    , script ! [src haddockJsFile, emptyAttr "async", thetype "text/javascript"] << noHtml
+    , script ! [thetype "text/x-mathjax-config"] << primHtml mjConf
+    , script ! [src mjUrl, thetype "text/javascript"] << noHtml
     ]
   where
-    mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
-
+    fontUrl = "https://fonts.googleapis.com/css?family=PT+Sans:400,400i,700"
+    mjUrl = fromMaybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML" mathjax_url
+    mjConf = unwords [ "MathJax.Hub.Config({"
+                     ,   "tex2jax: {"
+                     ,     "processClass: \"mathjax\","
+                     ,     "ignoreClass: \".*\""
+                     ,   "}"
+                     , "});" ]
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
 srcButton (Just src_base_url, _, _, _) Nothing =
@@ -177,13 +187,13 @@ bodyHtml doctitle iface
            pageContent =
   body << [
     divPackageHeader << [
+      nonEmptySectionName << doctitle,
       unordList (catMaybes [
         srcButton maybe_source_url iface,
         wikiButton maybe_wiki_url (ifaceMod <$> iface),
         contentsButton maybe_contents_url,
         indexButton maybe_index_url])
-            ! [theclass "links", identifier "page-menu"],
-      nonEmptySectionName << doctitle
+            ! [theclass "links", identifier "page-menu"]
       ],
     divContent << pageContent,
     divFooter << paragraph << (
@@ -321,6 +331,7 @@ mkNode pkg qual ss p (Node s leaf _pkg srcPkg short ts) =
 
     cBtn = case (ts, leaf) of
       (_:_, Just _) -> thespan ! collapseControl p "" << spaceHtml
+      ([] , Just _) -> thespan ! [theclass "noexpander"] << spaceHtml
       (_,   _   ) -> noHtml
       -- We only need an explicit collapser button when the module name
       -- is also a leaf, and so is a link to a module page. Indeed, the
@@ -629,9 +640,9 @@ ppModuleContents pkg qual exports orphan
   | null sections && not orphan  = noHtml
   | otherwise                    = contentsDiv
  where
-  contentsDiv = divTableOfContents << (
-    sectionName << "Contents" +++
-    unordList (sections ++ orphanSection))
+  contentsDiv = divTableOfContents << (divContentsList << (
+    (sectionName << "Contents") ! [ strAttr "onclick" "window.scrollTo(0,0)" ] +++
+    unordList (sections ++ orphanSection)))
 
   (sections, _leftovers{-should be []-}) = process 0 exports
   orphanSection

@@ -1,6 +1,6 @@
 cabal-version:        2.0
 name:                 haddock-api
-version:              2.21.0
+version:              2.22.0
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -29,11 +29,13 @@ data-files:
   html/Classic.theme/minus.gif
   html/Classic.theme/plus.gif
   html/Classic.theme/xhaddock.css
-  html/Ocean.std-theme/hslogo-16.png
-  html/Ocean.std-theme/minus.gif
-  html/Ocean.std-theme/ocean.css
-  html/Ocean.std-theme/plus.gif
-  html/Ocean.std-theme/synopsis.png
+  html/Ocean.theme/hslogo-16.png
+  html/Ocean.theme/minus.gif
+  html/Ocean.theme/ocean.css
+  html/Ocean.theme/plus.gif
+  html/Ocean.theme/synopsis.png
+  html/NewOcean.std-theme/new-ocean.css
+  html/NewOcean.std-theme/synopsis.png
   latex/haddock.sty
 
 library

@@ -1,8 +1,18 @@
-## TBA
+## Changes in TBA
+
+ * NewOcean is the new default theme (#721, #782, #949)
+
+ * Fix style switcher (enabled by `--built-in-themes`) (#949)
+
+ * Support inline markup in markdown-style links (#875)
+
+## Changes in version 2.22.0
 
  * Make `--package-version` optional for `--hoogle` (#899)
 
- * Support inline markup in markdown-style links (#875)
+ * Support type and data families in the LaTeX backend (#734)
+
+ * Support pattern synonyms in the Hoogle backend (#947)
 
 ## Changes in version 2.21.0
 

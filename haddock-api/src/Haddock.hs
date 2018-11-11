@@ -278,9 +278,9 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     allIfaces        = map toInstalledIface ifaces ++ installedIfaces
     allVisibleIfaces = [ i | i <- allIfaces, OptHide `notElem` instOptions i ]
 
-    pkgMod           = ifaceMod (head ifaces)
-    pkgKey           = moduleUnitId pkgMod
-    pkgStr           = Just (unitIdString pkgKey)
+    pkgMod           = fmap ifaceMod (listToMaybe ifaces)
+    pkgKey           = fmap moduleUnitId pkgMod
+    pkgStr           = fmap unitIdString pkgKey
     pkgNameVer       = modulePackageInfo dflags flags pkgMod
     pkgName          = fmap (unpackFS . (\(PackageName n) -> n)) (fst pkgNameVer)
     sincePkg         = case sinceQual of
@@ -299,16 +299,22 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
 
     pkgSrcMap = Map.mapKeys moduleUnitId extSrcMap
     pkgSrcMap'
-      | Flag_HyperlinkedSource `elem` flags =
-          Map.insert pkgKey hypSrcModuleNameUrlFormat pkgSrcMap
-      | Just srcNameUrl <- srcEntity = Map.insert pkgKey srcNameUrl pkgSrcMap
+      | Flag_HyperlinkedSource `elem` flags
+      , Just k <- pkgKey
+      = Map.insert k hypSrcModuleNameUrlFormat pkgSrcMap
+      | Just srcNameUrl <- srcEntity
+      , Just k <- pkgKey
+      = Map.insert k srcNameUrl pkgSrcMap
       | otherwise = pkgSrcMap
 
     -- TODO: Get these from the interface files as with srcMap
     pkgSrcLMap'
-      | Flag_HyperlinkedSource `elem` flags =
-          Map.singleton pkgKey hypSrcModuleLineUrlFormat
-      | Just path <- srcLEntity = Map.singleton pkgKey path
+      | Flag_HyperlinkedSource `elem` flags
+      , Just k <- pkgKey
+      = Map.singleton k hypSrcModuleLineUrlFormat
+      | Just path <- srcLEntity
+      , Just k <- pkgKey
+      = Map.singleton k path
       | otherwise = Map.empty
 
     sourceUrls' = (srcBase, srcModule', pkgSrcMap', pkgSrcLMap')
@@ -385,7 +391,8 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
                visibleIfaces odir
       _ -> putStrLn . unlines $
           [ "haddock: Unable to find a package providing module "
-            ++ moduleNameString (moduleName pkgMod) ++ ", skipping Hoogle."
+            ++ maybe "<no-mod>" (moduleNameString . moduleName) pkgMod
+            ++ ", skipping Hoogle."
           , ""
           , "         Perhaps try specifying the desired package explicitly"
             ++ " using the --package-name"

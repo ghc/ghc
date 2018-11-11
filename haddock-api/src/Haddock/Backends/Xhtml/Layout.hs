@@ -15,7 +15,7 @@ module Haddock.Backends.Xhtml.Layout (
 
   divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynopsis, divInterface,
-  divIndex, divAlphabet, divModuleList,
+  divIndex, divAlphabet, divModuleList, divContentsList,
 
   sectionName,
   nonEmptySectionName,
@@ -74,13 +74,13 @@ sectionName = paragraph ! [theclass "caption"]
 -- If it would have otherwise been empty, then give it the class ".empty".
 nonEmptySectionName :: Html -> Html
 nonEmptySectionName c
-  | isNoHtml c = paragraph ! [theclass "caption empty"] $ spaceHtml
-  | otherwise  = paragraph ! [theclass "caption"]       $ c
+  | isNoHtml c = thespan ! [theclass "caption empty"] $ spaceHtml
+  | otherwise  = thespan ! [theclass "caption"]       $ c
 
 
 divPackageHeader, divContent, divModuleHeader, divFooter,
   divTableOfContents, divDescription, divSynopsis, divInterface,
-  divIndex, divAlphabet, divModuleList
+  divIndex, divAlphabet, divModuleList, divContentsList
     :: Html -> Html
 
 divPackageHeader    = sectionDiv "package-header"
@@ -88,6 +88,7 @@ divContent          = sectionDiv "content"
 divModuleHeader     = sectionDiv "module-header"
 divFooter           = sectionDiv "footer"
 divTableOfContents  = sectionDiv "table-of-contents"
+divContentsList     = sectionDiv "contents-list"
 divDescription      = sectionDiv "description"
 divSynopsis         = sectionDiv "synopsis"
 divInterface        = sectionDiv "interface"
@@ -195,17 +196,18 @@ subEquations :: Maybe Package -> Qualification -> [SubDecl] -> Html
 subEquations pkg qual = divSubDecls "equations" "Equations" . subTable pkg qual
 
 
--- | Generate sub table for instance declarations, with source
+-- | Generate collapsible sub table for instance declarations, with source
 subInstances :: Maybe Package -> Qualification
              -> String -- ^ Class name, used for anchor generation
              -> LinksInfo -> Bool
              -> [(SubDecl, Maybe Module, Located DocName)] -> Html
 subInstances pkg qual nm lnks splice = maybe noHtml wrap . instTable
   where
-    wrap contents = subSection (collapseDetails id_ DetailsOpen (summary +++ contents))
+    wrap contents = subSection (hdr +++ collapseDetails id_ DetailsOpen (summary +++ contents))
     instTable = subTableSrc pkg qual lnks splice
     subSection = thediv ! [theclass "subs instances"]
-    summary = thesummary << "Instances"
+    hdr = h4 ! collapseControl id_ "instances" << "Instances"
+    summary = thesummary ! [ theclass "hide-when-js-enabled" ] << "Instances details"
     id_ = makeAnchorId $ "i:" ++ nm
 
 

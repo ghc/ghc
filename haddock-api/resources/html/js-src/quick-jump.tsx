@@ -78,7 +78,7 @@ type QuickJumpState = {
   activeLinkIndex: number
   moduleResults: ResultsInModule[]
   failedLoading?: boolean
-  fuse: Fuse
+  fuse: Fuse<DocItem>
 }
 
 class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
@@ -182,7 +182,7 @@ class QuickJump extends Component<QuickJumpProps, QuickJumpState> {
 
   updateResults() {
     const searchString = (this.input && this.input.value) || '';
-    const results: FuseResult<DocItem>[] = this.state.fuse.search(searchString);
+    const results: FuseResult<DocItem>[] = this.state.fuse.search(searchString) as any as FuseResult<DocItem>[];
 
     const resultsByModule: { [name: string]: FuseResult<DocItem>[] } = {};
 
