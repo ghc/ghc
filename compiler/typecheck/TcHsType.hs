@@ -20,8 +20,10 @@ module TcHsType (
         tcHsDeriv, tcDerivStrategy,
         tcHsTypeApp,
         UserTypeCtxt(..),
-        bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Q_Skol,
-        bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Q_Skol,
+        bindImplicitTKBndrs_Tv, bindImplicitTKBndrs_Skol,
+            bindImplicitTKBndrs_Q_Skol,
+        bindExplicitTKBndrs_Tv, bindExplicitTKBndrs_Skol,
+            bindExplicitTKBndrs_Q_Skol,
         ContextKind(..),
 
                 -- Type checking type and class decls
@@ -44,7 +46,8 @@ module TcHsType (
 
         typeLevelMode, kindLevelMode,
 
-        kindGeneralize, checkExpectedKindX, instantiateTyUntilN,
+        kindGeneralize, checkExpectedKindX,
+        instantiateTyN, instantiateTyUntilN,
         reportFloatingKvs,
 
         -- Sort-checking kinds
@@ -999,9 +1002,10 @@ checkExpectedKindX mb_kind_env pp_hs_ty ty act_kind exp_kind
         -- foralls out front. If the actual kind has more, instantiate accordingly.
         -- Otherwise, just pass the type & kind through: the errors are caught
         -- in unifyType.
-        let (exp_bndrs, _) = splitPiTysInvisible exp_kind
-            n_exp          = length exp_bndrs
-      ; (new_args, act_kind') <- instantiateTyUntilN mb_kind_env n_exp act_kind
+        let (exp_bndrs, _)            = splitPiTysInvisible exp_kind
+            (act_bndrs, act_inner_ki) = splitPiTysInvisible act_kind
+            n_to_inst                 = length act_bndrs - length exp_bndrs
+      ; (new_args, act_kind') <- instantiateTyN mb_kind_env n_to_inst act_bndrs act_inner_ki
 
       ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                   , uo_expected = exp_kind
@@ -1029,14 +1033,17 @@ checkExpectedKindX mb_kind_env pp_hs_ty ty act_kind exp_kind
 -- occurs. If @n@ is too big, then all available invisible arguments are instantiated.
 -- (In other words, this function is very forgiving about bad values of @n@.)
 -- Why zonk the result? So that tcTyVar can obey (IT6) of Note [The tcType invariant]
-instantiateTyN :: Maybe (VarEnv Kind)              -- ^ Predetermined instantiations
+instantiateTyN :: HasDebugCallStack
+               => Maybe (VarEnv Kind)              -- ^ Predetermined instantiations
                                                    -- (for assoc. type patterns)
                -> Int                              -- ^ @n@
                -> [TyBinder] -> TcKind             -- ^ its kind (zonked)
                -> TcM ([TcType], TcKind)   -- ^ The inst'ed type, new args, kind (zonked)
 instantiateTyN mb_kind_env n bndrs inner_ki
-  | n <= 0
-  = return ([], ki)
+  | n <= 0            -- It's fine for it to be < 0.  E.g.
+  = return ([], ki)   -- Check that (Maybe :: forall {k}. k->*),
+                      --       and see the call to instantiateTyN in checkExpectedKind
+                      -- A user bug to be reported as such; it is not a compiler crash!
 
   | otherwise
   = do { (subst, inst_args) <- tcInstTyBinders empty_subst mb_kind_env inst_bndrs
@@ -1798,7 +1805,6 @@ bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt
 
 -- | Used during the "kind-checking" pass in TcTyClsDecls only,
 -- and even then only for data-con declarations.
--- See Note [Use TyVarTvs in kind-checking pass] in TcTyClsDecls
 bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
     -> [LHsTyVarBndr GhcRn]

@@ -1,0 +1,6 @@
+
+T15740.hs:14:20: error:
+    • Expected kind ‘forall k. k -> *’,
+        but ‘SBool’ has kind ‘Bool -> *’
+    • In the type ‘SBool’
+      In the type instance declaration for ‘F2’

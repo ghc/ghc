@@ -664,8 +664,8 @@ types (GHC Proposal 29).
 The remaining uses of newTyVarTyVars are
 * In kind signatures, see
   TcTyClsDecls Note [Inferring kinds for type declarations]
-  and Note [Use TyVarTvs in kind-checking pass]
-* in partial type signatures, see Note [Quantified variables in partial type signatures]
+           and Note [Kind checking for GADTs]
+* In partial type signatures, see Note [Quantified variables in partial type signatures]
 -}
 
 -- see Note [TyVarTv]

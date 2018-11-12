@@ -7,10 +7,7 @@ T13985.hs:12:1: error:
     • In the data instance declaration for ‘Fam’
 
 T13985.hs:15:15: error:
-    • Kind variable ‘a’ is implicitly bound in type family
-      ‘T’, but does not appear as the kind of any
-      of its type variables. Perhaps you meant
-      to bind it explicitly somewhere?
+    • LHS of family instance fails to bind type variable ‘a’
     • In the type instance declaration for ‘T’
 
 T13985.hs:22:3: error:
@@ -22,10 +19,7 @@ T13985.hs:22:3: error:
       In the instance declaration for ‘C Type’
 
 T13985.hs:23:8: error:
-    • Kind variable ‘a’ is implicitly bound in associated type family
-      ‘CT’, but does not appear as the kind of any
-      of its type variables. Perhaps you meant
-      to bind it explicitly somewhere?
+    • LHS of family instance fails to bind type variable ‘a’
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Type’
 

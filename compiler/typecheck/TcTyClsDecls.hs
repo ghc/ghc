@@ -1062,7 +1062,6 @@ kcConDecl :: ConDecl GhcRn -> TcM ()
 kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                       , con_mb_cxt = ex_ctxt, con_args = args })
   = addErrCtxt (dataConCtxtName [name]) $
-      -- See Note [Use TyVarTvs in kind-checking pass]
     discardResult                   $
     bindExplicitTKBndrs_Skol ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
@@ -1084,8 +1083,9 @@ kcConDecl (ConDeclGADT { con_names = names
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
     discardResult $
-    bindImplicitTKBndrs_Skol implicit_tkv_nms $
-    bindExplicitTKBndrs_Skol explicit_tkv_nms $
+    bindImplicitTKBndrs_Tv implicit_tkv_nms $
+    bindExplicitTKBndrs_Tv explicit_tkv_nms $
+        -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
        ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
@@ -1110,8 +1110,8 @@ mappings:
 APromotionErr is only used for DataCons, and only used during type checking
 in tcTyClGroup.
 
-Note [Use TyVarTvs in kind-checking pass]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Kind-checking for GADTs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
   data Proxy a where
@@ -1777,15 +1777,34 @@ tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 
-tcTyFamInstEqn fam_tc mb_clsinfo
-    eqn@(dl->L loc (HsIB { hsib_ext = imp_vars
+tcTyFamInstEqn fam_tc _mb_clsinfo
+    (dl->L loc (HsIB { hsib_ext = imp_vars
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
                                       , feqn_rhs    = hs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
     setSrcSpan loc $
-    do { traceTc "tcTyFamInstEqn {" (ppr eqn_tc_name <+> ppr hs_pats)
+    do { let flav      = tyConFlavour fam_tc
+             vis_arity = length (tyConVisibleTyVars fam_tc)
+       ; traceTc "tcTyFamInstEqn {" (vcat [ ppr fam_tc <+> ppr hs_pats
+                                          , text "arity:" <+> ppr (tyConArity fam_tc)
+                                          , text "vis_arity:" <+> ppr vis_arity ])
+
+         -- First, check the arity.
+         -- If we wait until validity checking, we'll get kind
+         -- errors below when an arity error will be much easier to
+         -- understand.
+       ; let should_check_arity
+               | DataFamilyFlavour _ <- flav = False
+                  -- why not check data families? See [Arity of data families] in FamInstEnv
+               | otherwise                   = True
+
+       ; when should_check_arity $
+         checkTc (hs_pats `lengthIs` vis_arity) $
+         wrongNumberOfParmsErr vis_arity
+                      -- report only explicit arguments
+
        ; (_imp_tvs, (_exp_tvs, ((pats, rhs_ty))))
            <- pushTcLevelM_                     $
               solveEqualities                   $
@@ -1800,8 +1819,22 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                   ; (_, pats, res_kind) <- tcInferApps typeLevelMode Nothing
                                                  lhs_fun fun_ty fun_kind hs_pats
 
+                  ; let n_extra = tyConArity fam_tc - length pats
+                        (rk_bndrs, rk_body) = splitPiTysInvisible res_kind
+                  ; (extra_pats, res_kind)
+                        <- instantiateTyN Nothing n_extra rk_bndrs rk_body
+                           -- It's still possible the lhs_ki has some foralls.
+                           -- Instantiate these away.  Example:
+                           --     type family T (a :: *) :: forall k. k -> *
+                           --     type instance T Int = Proxy
+                           -- We want to elaborate to
+                           --     type instance T Int k = Proxy k
+                           -- ToDo: is this right??   Should we not make
+                           --       tcCHeckLHsType deal with polykinds;
+                           --       and there would be a skolem-escape check
+
                   ; rhs_ty <- tcCheckLHsType hs_ty res_kind
-                  ; return (pats, rhs_ty) }
+                  ; return (pats ++ extra_pats, rhs_ty) }
 
        ; dvs <- candidateQTyVarsOfTypes (rhs_ty : pats)
        ; qtkvs <- quantifyTyVars emptyVarSet dvs

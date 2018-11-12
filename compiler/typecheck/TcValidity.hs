@@ -1992,9 +1992,18 @@ checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
 checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
   = do { checkValidTypePats fam_tc user_ty_pats
 
-       ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes user_ty_pats)
-                                      (tvs ++ cvs)
-       ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs user_ty_pats)
+       ; let exact_tvs = exactTyCoVarsOfTypes user_ty_pats
+             free_tvs  = tyCoVarsOfTypes      user_ty_pats
+             dodgy_tvs = free_tvs `minusVarSet` exact_tvs
+             unbound_tcvs = filterOut (`elemVarSet` exact_tvs) (tvs ++ cvs)
+             extra = ppWhen (any (`elemVarSet` dodgy_tvs) unbound_tcvs) $
+                     hang (text "The real LHS (expanding synonyms) is:")
+                        2 (pprTypeApp fam_tc (map expandTypeSynonyms user_ty_pats))
+
+       ; checkTc (null unbound_tcvs) $
+         hang (text "LHS of family instance fails to bind type variable"
+               <> plural tvs <+> pprQuotedList tvs)
+            2 extra
 
          -- Check that type patterns match the class instance head
        ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
@@ -2035,14 +2044,6 @@ nestedMsg :: SDoc -> SDoc
 nestedMsg what
   = sep [ text "Illegal nested" <+> what
         , parens undecidableMsg ]
-
-famPatErr :: TyCon -> [TyVar] -> [Type] -> SDoc
-famPatErr fam_tc tvs pats
-  = hang (text "Family instance purports to bind type variable" <> plural tvs
-          <+> pprQuotedList tvs)
-       2 (hang (text "but the real LHS (expanding synonyms) is:")
-             2 (pprTypeApp fam_tc (map expandTypeSynonyms pats) <+>
-                text "= ..."))
 
 {-
 ************************************************************************
