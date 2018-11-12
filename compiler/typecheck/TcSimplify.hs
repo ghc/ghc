@@ -7,7 +7,7 @@ module TcSimplify(
        simplifyDefault,
        simplifyTop, simplifyTopImplic,
        simplifyInteractive,
-       solveEqualities, solveLocalEqualities,
+       solveEqualities, solveLocalEqualities, solveLocalEqualitiesX,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
        tcNormalise,
@@ -145,26 +145,30 @@ simplifyTop wanteds
 
        ; return (evBindMapBinds binds1 `unionBags` binds2) }
 
+
 -- | Type-check a thing that emits only equality constraints, solving any
 -- constraints we can and re-emitting constraints that we can't. The thing_inside
 -- should generally bump the TcLevel to make sure that this run of the solver
 -- doesn't affect anything lying around.
 solveLocalEqualities :: String -> TcM a -> TcM a
 solveLocalEqualities callsite thing_inside
-  = do { lvl <- TcM.getTcLevel
-       ; traceTc "solveLocalEqualities {" (vcat [ text "Called from" <+> text callsite
-                                                , text "level =" <+> ppr lvl ])
+  = do { (wanted, res) <- solveLocalEqualitiesX callsite thing_inside
+       ; emitConstraints wanted
+       ; return res }
+
+solveLocalEqualitiesX :: String -> TcM a -> TcM (WantedConstraints, a)
+solveLocalEqualitiesX callsite thing_inside
+  = do { traceTc "solveLocalEqualitiesX {" (vcat [ text "Called from" <+> text callsite ])
 
        ; (result, wanted) <- captureConstraints thing_inside
 
        ; traceTc "solveLocalEqualities: running solver" (ppr wanted)
        ; residual_wanted <- runTcSEqualities (solveWanteds wanted)
 
-       ; traceTc "solveLocalEqualities end }" $
+       ; traceTc "solveLocalEqualitiesX end }" $
          text "residual_wanted =" <+> ppr residual_wanted
 
-       ; emitConstraints residual_wanted
-       ; return result }
+       ; return (residual_wanted, result) }
 
 -- | Type-check a thing that emits only equality constraints, then
 -- solve those constraints. Fails outright if there is trouble.

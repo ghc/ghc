@@ -5,6 +5,15 @@ module T12369 where
 
 import Data.Kind
 
+type FREE k = (k -> Constraint) -> (k -> k)
+type f  ~> g = forall a. f a -> g a
+
+data    family   Free k :: FREE k
+
+newtype instance Free (j -> Type) k p a where
+  Free1 :: (forall q. k q => (p  ~> q) -> q a) -> Free (j -> Type) k p a
+
+{-
 data family Fix :: (k -> Type) -> k
 newtype instance Fix f = In { out :: f (Fix f) }
 
@@ -33,3 +42,4 @@ newtype instance Free2 :: forall k. FREE (k -> Type) where
 
 newtype instance Free2 :: forall k1 k2. FREE (k1 -> k2 -> Type) where
   Free22 :: (forall q. k q => (p ~~> q) -> q a b) -> Free2 k p a b
+-}

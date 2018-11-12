@@ -683,7 +683,7 @@ simplifyDeriv pred tvs thetas
        -- with the skolemized variables.  Start "one level down" because
        -- we are going to wrap the result in an implication with tvs_skols,
        -- in step [DAC RESIDUAL]
-       ; (wanteds, tc_lvl) <- pushTcLevelM $
+       ; (tc_lvl, wanteds) <- pushTcLevelM $
                               mapM mk_wanteds thetas
 
        ; traceTc "simplifyDeriv inputs" $

@@ -793,7 +793,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
          -- See Note [Typechecking plan for instance declarations]
        ; dfun_ev_binds_var <- newTcEvBinds
        ; let dfun_ev_binds = TcEvBinds dfun_ev_binds_var
-       ; ((sc_meth_ids, sc_meth_binds, sc_meth_implics), tclvl)
+       ; (tclvl, (sc_meth_ids, sc_meth_binds, sc_meth_implics))
              <- pushTcLevelM $
                 do { (sc_ids, sc_binds, sc_implics)
                         <- tcSuperClasses dfun_id clas inst_tyvars dfun_ev_vars

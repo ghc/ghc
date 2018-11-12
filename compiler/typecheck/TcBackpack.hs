@@ -208,7 +208,7 @@ check_inst sig_inst = do
            (tvs, theta, pred) }}
         origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
     (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
-    (cts, tclvl) <- pushTcLevelM $ do
+    (tclvl,cts) <- pushTcLevelM $ do
        wanted <- newWanted origin
                            (Just TypeLevel)
                            (substTy skol_subst pred)

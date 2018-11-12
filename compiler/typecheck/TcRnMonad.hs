@@ -1551,14 +1551,14 @@ pushLevelAndCaptureConstraints thing_inside
 pushTcLevelM_ :: TcM a -> TcM a
 pushTcLevelM_ x = updLclEnv (\ env -> env { tcl_tclvl = pushTcLevel (tcl_tclvl env) }) x
 
-pushTcLevelM :: TcM a -> TcM (a, TcLevel)
+pushTcLevelM :: TcM a -> TcM (TcLevel, a)
 -- See Note [TcLevel assignment] in TcType
 pushTcLevelM thing_inside
   = do { env <- getLclEnv
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
        ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
                           thing_inside
-       ; return (res, tclvl') }
+       ; return (tclvl', res) }
 
 -- Returns pushed TcLevel
 pushTcLevelsM :: Int -> TcM a -> TcM (a, TcLevel)
