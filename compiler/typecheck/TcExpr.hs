@@ -1559,10 +1559,10 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
 
                      ; (op_mult, res_mult, arg_inferred_mult) <- synMult (scaledMult arg_ty)
                      ; tcSynArgA orig arg_tc_ty [] arg_shape $
-                       \ arg_results arg_res_weights ->
+                       \ arg_results arg_res_mults ->
                        tcSynArgE orig res_tc_ty res_shape $
-                       \ res_results res_res_weights ->
-                       do { result <- thing_inside (arg_results ++ res_results) (arg_inferred_mult ++ arg_res_weights ++ res_res_weights)
+                       \ res_results res_res_mults ->
+                       do { result <- thing_inside (arg_results ++ res_results) (arg_inferred_mult ++ arg_res_mults ++ res_res_mults)
                           ; return (result, arg_tc_ty, res_tc_ty, op_mult, res_mult) }}
 
            ; return ( result
@@ -1603,9 +1603,9 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
            <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
-           <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_weights ->
+           <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_mults ->
               tc_syn_arg    res_ty  res_shape  $ \ res_results ->
-              thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_weights)
+              thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_mults)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
     herald = text "This rebindable syntax expects a function with"
@@ -1616,9 +1616,9 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
                     -- the wrappers are for arguments
     tc_syn_args_e (arg_ty : arg_tys) (arg_shape : arg_shapes) thing_inside
       = do { ((result, arg_wraps), arg_wrap)
-               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results arg1_weights ->
-                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results args_weights ->
-                  thing_inside (arg1_results ++ args_results) (arg1_weights ++ args_weights)
+               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results arg1_mults ->
+                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results args_mults ->
+                  thing_inside (arg1_results ++ args_results) (arg1_mults ++ args_mults)
            ; return (result, arg_wrap : arg_wraps) }
     tc_syn_args_e _ _ thing_inside = (, []) <$> thing_inside [] []
 

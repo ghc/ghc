@@ -674,7 +674,7 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
     orig_bangs   = dataConSrcBangs data_con
 
     w_ty = RigThing (mkTyVarTy multiplicityTyVar)
-    -- See Note [Wrapper weights]
+    -- See Note [Wrapper multiplicities]
     wrap_arg_tys = (map unrestricted theta)
                     ++ (map (scaleScaled w_ty) orig_arg_tys)
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
@@ -802,8 +802,8 @@ mean that this newtype constructor requires another level of indirection when
 being called, but the inliner should make swift work of that.
 
 
-Note [Wrapper weights]
-~~~~~~~~~~~~~~~~~~~~~~
+Note [Wrapper multiplicities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When we made the wrapper for a data type of different multiplicity fields,
 we only want to make the ones which are linear multiplicity polymorphic. If we
@@ -943,10 +943,10 @@ dataConArgUnpack (Scaled arg_mult arg_ty)
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
-          ; let r_weight = idWeight arg_id
+          ; let r_mult = idWeight arg_id
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, map (flip scaleIdBy r_weight) rep_ids, body)]
+                         [(DataAlt con, map (flip scaleIdBy r_mult) rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . fmap (TcType.substTyUnchecked subst)) rep_tys

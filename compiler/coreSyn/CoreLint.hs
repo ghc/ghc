@@ -1249,7 +1249,7 @@ lintCoreAlt scrut scrut_ty scrut_mult alt_ty alt@(DataAlt con, args, rhs)
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
           ; ex_tvs_n = length (dataConExTyCoVars con)
-          -- See Note [Alt arg weights]
+          -- See Note [Alt arg multiplicities]
           ; multiplicities = replicate ex_tvs_n Omega ++
                              map scaledMult (dataConRepArgTys con) }
 
@@ -1274,7 +1274,7 @@ lintLinearBinder doc actual_usage described_usage
                 $$ ppr actual_usage
                 $$ text "Annotation:" <+> ppr described_usage)
 
-{- Note [Alt arg weights]
+{- Note [Alt arg multiplicities]
 It is necessary to use `dataConRepArgTys` so you get the arg tys from
 the wrapper if there is one.
 
