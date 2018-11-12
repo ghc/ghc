@@ -683,13 +683,13 @@ rnHsTyKi env (HsWildCardTy _)
          --           user-written binding site, so don't treat
          --           it as a free variable
 
-rnRig :: RnTyKiEnv -> HsRig GhcPs -> RnM ((HsRig GhcRn), FreeVars)
+rnRig :: RnTyKiEnv -> HsMult GhcPs -> RnM ((HsMult GhcRn), FreeVars)
 rnRig env r =
   case r of
     HsZero -> return (HsZero, emptyFVs)
     HsOne  -> return (HsOne, emptyFVs)
     HsOmega -> return (HsOmega, emptyFVs)
-    HsRigTy ty -> (\(ty, fvs) -> (HsRigTy ty, fvs)) <$> rnLHsTyKi env ty
+    HsMultTy ty -> (\(ty, fvs) -> (HsMultTy ty, fvs)) <$> rnLHsTyKi env ty
     _r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
@@ -1846,9 +1846,9 @@ extract_lty t_or_k (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
 
-extract_rig :: TypeOrKind -> HsRig GhcPs -> FreeKiTyVarsWithDups ->
+extract_rig :: TypeOrKind -> HsMult GhcPs -> FreeKiTyVarsWithDups ->
                FreeKiTyVarsWithDups
-extract_rig t_or_k (HsRigTy t) acc = extract_lty t_or_k t acc
+extract_rig t_or_k (HsMultTy t) acc = extract_lty t_or_k t acc
 extract_rig t_or_k _ acc = acc
 
 extractHsTvBndrs :: [LHsTyVarBndr GhcPs]

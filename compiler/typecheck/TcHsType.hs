@@ -396,7 +396,7 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
   where
     mode = allowUnsaturated typeLevelMode
 
-tcWeight :: HsRig GhcRn -> TcM Rig
+tcWeight :: HsMult GhcRn -> TcM Rig
 tcWeight hc = tc_weight typeLevelMode hc
 
 {-
@@ -582,7 +582,7 @@ tc_lhs_type mode (L span ty) exp_kind
     tc_hs_type mode ty exp_kind
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> HsRig GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
+tc_fun_type :: TcTyMode -> HsMult GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
 tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
@@ -597,12 +597,12 @@ tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
        ; weight' <- tc_weight mode weight
        ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
 
-tc_weight :: TcTyMode -> HsRig GhcRn -> TcM Rig
+tc_weight :: TcTyMode -> HsMult GhcRn -> TcM Rig
 tc_weight mode r = case r of
                          HsZero -> return Zero
                          HsOne  -> return One
                          HsOmega -> return Omega
-                         HsRigTy ty -> do
+                         HsMultTy ty -> do
                           ty' <- tc_lhs_type mode ty multiplicityTy
                           case ty' of
                             t | isOneMultiplicity t -> return One
