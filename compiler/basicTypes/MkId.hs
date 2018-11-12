@@ -732,11 +732,17 @@ the left
 Since the LHS of rules are simplified with InitialPhase, we won't
 inline the wrapper on the LHS either.
 
-It used to activate in phases 2 (afterInitial) and later, but it makes it
-awkward to write a RULE[1] with a constructor on the left: it would work if a
-constructor has no wrapper, but whether a constructor has a wrapper depends, for
-instance, on the order of type argument of that constructors. Therefore changing
-the order of type argument could make previously working RULEs fail.
+It used to activate in phases 2 (afterInitial) and later, but it is problematic
+with linear types adding a wrapper to most constructors: all the rules of the
+form RULE[1] (which fire in phase one) with a data constructor on the left,
+would start misbehaving (there are, for instance, such rules with ':', the list
+constructor).
+
+Even before linear types it made it awkward to write a RULE[1] with a
+constructor on the left: it would work if a constructor had no wrapper, but
+whether a constructor had a wrapper depends, for instance, on the order of type
+argument of that constructors. Therefore changing the order of type argument
+could make previously working RULEs fail.
 
 See also https://ghc.haskell.org/trac/ghc/ticket/15840 .
 
