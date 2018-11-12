@@ -295,7 +295,7 @@ The following options are available:
     reader can switch between themes with browsers that support
     alternate style sheets, or with the "Style" menu that gets added
     when the page is loaded. If no themes are specified, then just the
-    default built-in theme ("NewOcean") is used.
+    default built-in theme ("Linuwial") is used.
 
     The path parameter can be one of:
 
@@ -307,11 +307,11 @@ The following options are available:
     -  A *CSS file*: The base name of the file becomes the name of the
        theme.
 
-    -  The *name* of a built-in theme ("NewOcean", "Ocean", or "Classic").
+    -  The *name* of a built-in theme ("Linuwial", "Ocean", or "Classic").
 
 .. option:: --built-in-themes
 
-    Includes the built-in themes ("NewOcean", "Ocean", and "Classic"). Can be
+    Includes the built-in themes ("Linuwial", "Ocean", and "Classic"). Can be
     combined with :option:`--theme`. Note that order matters: The first
     specified theme will be the default.
 

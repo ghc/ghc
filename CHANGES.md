@@ -1,6 +1,6 @@
 ## Changes in TBA
 
- * NewOcean is the new default theme (#721, #782, #949)
+ * "Linuwial" is the new default theme (#721, #782, #949)
 
  * Fix style switcher (enabled by `--built-in-themes`) (#949)
 

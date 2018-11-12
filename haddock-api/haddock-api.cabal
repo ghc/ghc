@@ -34,8 +34,8 @@ data-files:
   html/Ocean.theme/ocean.css
   html/Ocean.theme/plus.gif
   html/Ocean.theme/synopsis.png
-  html/NewOcean.std-theme/new-ocean.css
-  html/NewOcean.std-theme/synopsis.png
+  html/Linuwial.std-theme/linuwial.css
+  html/Linuwial.std-theme/synopsis.png
   latex/haddock.sty
 
 library
