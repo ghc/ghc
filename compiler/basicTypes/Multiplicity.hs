@@ -29,7 +29,7 @@ module Multiplicity
   , weightedSet
   , setWeight
   , scaleScaled
-  , IsSubweight(..)
+  , IsSubmult(..)
   , submultMaybe ) where
 
 import GhcPrelude
@@ -181,17 +181,17 @@ scaleScaled w x =
 -- * Multiplicity ordering
 --
 
-data IsSubweight = Smaller -- Definitely a submult
-                 | Larger  -- Definitely not a submult
-                 | Unknown -- Could be a submult, need to ask the typechecker
-                 deriving (Show, Eq, Ord)
+data IsSubmult = Smaller -- Definitely a submult
+               | Larger  -- Definitely not a submult
+               | Unknown -- Could be a submult, need to ask the typechecker
+               deriving (Show, Eq, Ord)
 
-instance Outputable IsSubweight where
+instance Outputable IsSubmult where
   ppr = text . show
 
 -- | @submult w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
-submultMaybe :: GMult t -> GMult t -> IsSubweight
+submultMaybe :: GMult t -> GMult t -> IsSubmult
 submultMaybe r1 r2 = go r1 r2
   where
     go _     Omega = Smaller
