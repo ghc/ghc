@@ -22,7 +22,7 @@ module Multiplicity
   , unrestricted
   , linear
   , staticOnly
-  , tyweight
+  , tymult
   , knownOmega
   , irrelevantWeight
   , mkScaled
@@ -145,13 +145,13 @@ sup _     _     = Omega
 data GScaled t a = Scaled {scaledMult :: GMult t, scaledThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
-unrestricted, linear, staticOnly, tyweight :: a -> GScaled t a
+unrestricted, linear, staticOnly, tymult :: a -> GScaled t a
 unrestricted = Scaled Omega
 linear = Scaled One
 staticOnly = Scaled Zero
 
 -- Used for type arguments in core
-tyweight = Scaled Omega
+tymult = Scaled Omega
 
 knownOmega :: GScaled t a -> a
 knownOmega = scaledThing

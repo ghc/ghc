@@ -1726,7 +1726,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
     -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
     -- kind variable, which causes things to blow up.
     go vis env (FunTy w1 arg1 res1) (FunTy w2 arg2 res2)
-      = check vis (w1 `eqRig` w2) <!> go vis env arg1 arg2 <!> go vis env res1 res2
+      = check vis (w1 `eqMult` w2) <!> go vis env arg1 arg2 <!> go vis env res1 res2
     go vis env ty (FunTy _ arg res)
       = eqFunTy vis env arg res ty
     go vis env (FunTy _ arg res) ty

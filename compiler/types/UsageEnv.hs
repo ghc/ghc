@@ -17,9 +17,9 @@ import Control.Monad
 --
 
 -- | Like in the mathematical presentation, we have a context on which the
--- semi-ring of weights acts (that is, 'UsageEnv' is a 'Mult'-module). Unlike the
+-- semi-ring of multiplicities acts (that is, 'UsageEnv' is a 'Mult'-module). Unlike the
 -- mathematical presentation they are not type contexts, but only contain
--- weights corresponding to the weight required for a given variable in a
+-- multiplicities corresponding to the multiplicity required for a given variable in a
 -- type-checked expression. The reason is twofold: it interacts less with the
 -- rest of the type-checking infrastructure so it is easier to fit into the
 -- existing implementation, and it is always an inferred datum (in the sense of
@@ -85,7 +85,7 @@ deleteListUE :: NamedThing n => UsageEnv -> [n] -> UsageEnv
 deleteListUE e xs = foldl' deleteUE e xs
 
 
--- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
+-- | |lookupUE x env| returns the multiplicity assigned to |x| in |env|, if |x| is not
 -- bound in |env|, then returns |Zero|.
 lookupUE :: NamedThing n => UsageEnv -> n -> Mult
 lookupUE (UsageEnv e) x =

@@ -1079,7 +1079,7 @@ zonk_eq_types = go
     go ty1 ty2
       | Just (Scaled w1 arg1, res1) <- split1
       , Just (Scaled w2 arg2, res2) <- split2
-      , w1 `eqRig` w2
+      , w1 `eqMult` w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
            ; return $ combine_rev (mkFunTy w1) res_b res_a
@@ -2427,7 +2427,7 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy w1 s1 t1) (FunTy w2 s2 t2) | w1 `eqRig` w2
+    go (FunTy w1 s1 t1) (FunTy w2 s2 t2) | w1 `eqMult` w2
       = do { unify_derived loc role s1 s2
            ; unify_derived loc role t1 t2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)

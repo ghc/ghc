@@ -200,8 +200,8 @@ tcExpr (HsOverLit x lit) res_ty
 tcExpr (NegApp x expr neg_expr) res_ty
   = do  { (expr', neg_expr')
             <- tcSyntaxOp NegateOrigin neg_expr [SynAny] res_ty $
-               \[arg_ty] [arg_weight] ->
-               tcScalingUsage arg_weight $ tcMonoExpr expr (mkCheckExpType arg_ty)
+               \[arg_ty] [arg_mult] ->
+               tcScalingUsage arg_mult $ tcMonoExpr expr (mkCheckExpType arg_ty)
         ; return (NegApp x expr' neg_expr') }
 
 tcExpr e@(HsIPVar _ x) res_ty
@@ -913,9 +913,9 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Take apart a representative constructor
         ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-              (con1_tvs, _, _, _prov_theta, req_theta, weighted_con1_arg_tys, _)
+              (con1_tvs, _, _, _prov_theta, req_theta, scaled_con1_arg_tys, _)
                  = conLikeFullSig con1
-              con1_arg_tys = map scaledThing weighted_con1_arg_tys
+              con1_arg_tys = map scaledThing scaled_con1_arg_tys
                 -- Remark: we can safely drop the weight of field because it's
                 -- always 1, this way we don't need to handle it in the rest of
                 -- the function
@@ -1453,9 +1453,9 @@ and we had the visible type application
 ----------------
 tcArg :: LHsExpr GhcRn                    -- The function (for error messages)
       -> LHsExpr GhcRn                    -- Actual arguments
-      -> Scaled TcRhoType              -- expected (weighted) arg type
-      -> Int                             -- # of argument
-      -> TcM (LHsExpr GhcTcId)             -- Resulting argument
+      -> Scaled TcRhoType                 -- expected (scaled) arg type
+      -> Int                              -- # of argument
+      -> TcM (LHsExpr GhcTcId)            -- Resulting argument
 tcArg fun arg (Scaled weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
                           tcScalingUsage weight $ tcPolyExprNC arg ty
 

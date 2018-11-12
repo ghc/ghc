@@ -880,7 +880,7 @@ mkOneRecordSelector all_cons idDetails fl
                           mkFunTy Omega data_ty             $
                             -- Record selectors are always typed with Omega. We
                             -- could improve on it in the case where all the
-                            -- fields in all the constructor have weight Omega.
+                            -- fields in all the constructor have multiplicity Omega.
                           mkSpecForAllTys field_tvs         $
                           mkPhiTy field_theta               $
                           -- req_theta is empty for normal DataCon

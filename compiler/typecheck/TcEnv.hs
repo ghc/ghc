@@ -608,7 +608,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
 
     check_then_add_usage :: UsageEnv -> TcM ()
     -- Checks that the usage of the newly introduced binders is compatible with
-    -- their weight. If so, combines the usage of non-new binders to |uenv|
+    -- their multiplicity. If so, combines the usage of non-new binders to |uenv|
     check_then_add_usage u0
       = do { uok <- foldM (\u (x,w_) -> check_binder (scaledMult w_) x u) u0 extra_env
            ; env <- getLclEnv
@@ -626,7 +626,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
           addErrTc $ text "Couldn't match expected weight" <+> quotes (ppr w) <+>
                      text "of variable" <+> quotes (ppr x) <+>
                      text "with actual weight" <+> quotes (ppr actual_w)
-          -- In case of error, recover by pretending that the weight usage was correct
+          -- In case of error, recover by pretending that the multiplicity usage was correct
       return $ deleteUE uenv x
 
 
@@ -695,12 +695,12 @@ tcCollectingUsage thing_inside
       = do { usage <- newTcRef zeroUE
            ; return ( usage , env { tcl_usage = usage } ) }
 
--- | @tcScalingUsage weight thing_inside@ runs @thing_inside@ and scales all the
--- usage information by @weight@.
+-- | @tcScalingUsage mult thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @mult@.
 tcScalingUsage :: Mult -> TcM a -> TcM a
-tcScalingUsage weight thing_inside
+tcScalingUsage mult thing_inside
   = do { (usage, result) <- tcCollectingUsage thing_inside
-       ; tcEmitBindingUsage $ scaleUE weight usage
+       ; tcEmitBindingUsage $ scaleUE mult usage
        ; return result }
 
 {- *********************************************************************

@@ -524,7 +524,7 @@ instance Eq (DeBruijn Type) where
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (FunTy w1 t1 t2, FunTy w1' t1' t2')
-            -> w1 `eqRig` w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
+            -> w1 `eqMult` w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -803,7 +803,7 @@ fdBndrMap f (BndrMap tm) = foldTM (f . fst) tm
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
 lkBndr env v (BndrMap tymap) = do
   (a, w) <- lkG (D env (varType v)) tymap
-  guard (w `eqRig` varWeightDef v)
+  guard (w `eqMult` varWeightDef v)
   return a
 
 

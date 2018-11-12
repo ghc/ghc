@@ -163,7 +163,7 @@ module Type (
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
         nonDetCmpTypesX, nonDetCmpTc,
-        eqVarBndrs, eqRig,
+        eqVarBndrs, eqMult,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -1301,7 +1301,7 @@ tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 tyConBindersTyCoBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
-    to_tyb (Bndr tv AnonTCB)        = Anon (tyweight (varType tv))
+    to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv))
 
 {-
 --------------------------------------------------------------------
@@ -2714,7 +2714,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
 
     go_rig :: RnEnv2 -> Mult -> Mult -> TypeOrdering
     go_rig env r1 r2 =
-      if r1 `eqRig` r2
+      if r1 `eqMult` r2
         then TEQ
         else
           case submultMaybe r1 r2 of
@@ -2728,14 +2728,14 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     gos _   _          []         = TGT
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
-eqRig :: Mult -> Mult -> Bool
-eqRig Zero Zero = True
-eqRig One One = True
-eqRig Omega Omega = True
-eqRig (RigThing ty) (RigThing ty') = eqType ty ty'
-eqRig (RigAdd r1 r2) (RigAdd r1' r2') = eqRig r1 r1' && eqRig r2 r2'
-eqRig (RigMul r1 r2) (RigMul r1' r2') = eqRig r1 r1' && eqRig r2 r2'
-eqRig _ _ = False
+eqMult :: Mult -> Mult -> Bool
+eqMult Zero Zero = True
+eqMult One One = True
+eqMult Omega Omega = True
+eqMult (RigThing ty) (RigThing ty') = eqType ty ty'
+eqMult (RigAdd r1 r2) (RigAdd r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult (RigMul r1 r2) (RigMul r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult _ _ = False
 
 -------------
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering

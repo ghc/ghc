@@ -1101,9 +1101,9 @@ splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType Gh
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
-splitHsFunType (L _ (HsFunTy _ x weight y))
+splitHsFunType (L _ (HsFunTy _ x mult y))
   | (args, res) <- splitHsFunType y
-  = ((HsScaled weight x):args, res)
+  = ((HsScaled mult x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
@@ -1440,7 +1440,7 @@ ppr_mono_ty (HsTyVar _ Promoted (L _ name))
   = space <> quote (pprPrefixOcc name)
                          -- We need a space before the ' above, so the parser
                          -- does not attach it to the previous symbol
-ppr_mono_ty (HsFunTy _ ty1 weight ty2)   = ppr_fun_ty ty1 weight ty2
+ppr_mono_ty (HsFunTy _ ty1 mult ty2)   = ppr_fun_ty ty1 mult ty2
 ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
@@ -1486,10 +1486,10 @@ ppr_mono_ty (XHsType t) = ppr t
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
            => LHsType (GhcPass p) -> HsMult (GhcPass p) -> LHsType (GhcPass p) -> SDoc
-ppr_fun_ty ty1 weight ty2
+ppr_fun_ty ty1 mult ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
-        arr = case weight of
+        arr = case mult of
           HsZero -> text "->_0"
           HsOne -> text "⊸"
           HsOmega -> text "->"

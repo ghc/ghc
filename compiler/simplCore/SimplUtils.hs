@@ -123,7 +123,7 @@ data SimplCont
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont
-      , sc_weight :: Mult }
+      , sc_mult :: Mult }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -154,7 +154,7 @@ data SimplCont
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
       , sc_cont :: SimplCont
-      , sc_weight :: Mult }
+      , sc_mult :: Mult }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -313,7 +313,7 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg w e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest, sc_weight = w }
+      ValArg w e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest, sc_mult = w }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -412,11 +412,11 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg  { sc_fun = ai, sc_weight = _w })      = funArgTy (ai_type ai)
+contHoleType (StrictArg  { sc_fun = ai, sc_mult = _m })      = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
-                         , sc_weight = w })
-  = mkFunTy w (perhapsSubstTy dup se (exprType e))
+                         , sc_mult = m })
+  = mkFunTy m (perhapsSubstTy dup se (exprType e))
                   (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)

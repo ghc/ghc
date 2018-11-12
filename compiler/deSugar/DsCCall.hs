@@ -192,8 +192,8 @@ unboxArg arg
     arg_ty                                      = exprType arg
     maybe_product_type                          = splitDataProductType_maybe arg_ty
     is_product_type                             = isJust maybe_product_type
-    Just (_, _, data_con, weighted_data_con_arg_tys) = maybe_product_type
-    data_con_arg_tys                            = map scaledThing weighted_data_con_arg_tys
+    Just (_, _, data_con, scaled_data_con_arg_tys) = maybe_product_type
+    data_con_arg_tys                            = map scaledThing scaled_data_con_arg_tys
     data_con_arity                              = dataConSourceArity data_con
     (data_con_arg_ty1 : _)                      = data_con_arg_tys
 

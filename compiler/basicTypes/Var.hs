@@ -419,7 +419,7 @@ varWeightDef = fromMaybe Omega . varWeightMaybe
 varWeight :: Id -> Mult
 varWeight id = case varWeightMaybe id of
   Just x -> x
-  Nothing -> error "Attempted to retrieve the weight of a non-Id variable"
+  Nothing -> error "Attempted to retrieve the multiplicity of a non-Id variable"
 
 scaleVarBy :: Id -> Mult -> Id
 scaleVarBy id@(Id { varMult = Regular w }) r =
