@@ -27,7 +27,7 @@ module Type (
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
         mkFunTy, mkFunTyOm, mkFunTys, mkFunTysOm, splitFunTy, splitFunTy_maybe,
-        splitFunTys, funResultTy, funArgTy, funTyWeight, funTyWeight_maybe,
+        splitFunTys, funResultTy, funArgTy,
 
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
@@ -982,17 +982,6 @@ splitFunTy_maybe :: Type -> Maybe (Scaled Type, Type)
 splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
 splitFunTy_maybe (FunTy w arg res) = Just (Scaled w arg, res)
 splitFunTy_maybe _               = Nothing
-
-funTyWeight :: Type -> Rig
-funTyWeight ty = case funTyWeight_maybe ty of
-                    Just w -> w
-                    Nothing -> pprPanic "funTyWeight" (ppr ty)
-
-funTyWeight_maybe :: Type -> Maybe Rig
-funTyWeight_maybe ty | Just ty' <- coreView ty = funTyWeight_maybe ty'
-funTyWeight_maybe (FunTy w _ _) = Just w
-funTyWeight_maybe (ForAllTy _ ty) = funTyWeight_maybe ty
-funTyWeight_maybe _ = Nothing
 
 splitFunTys :: Type -> ([Scaled Type], Type)
 splitFunTys ty = split [] ty ty
