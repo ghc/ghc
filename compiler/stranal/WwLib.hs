@@ -181,7 +181,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
     -- Note [Do not split void functions]
     only_one_void_argument
       | [d] <- demands
-      , Just (Weighted _ arg_ty1, _) <- splitFunTy_maybe fun_ty
+      , Just (Scaled _ arg_ty1, _) <- splitFunTy_maybe fun_ty
       , isAbsDmd d && isVoidTy arg_ty1
       = True
       | otherwise
@@ -463,8 +463,8 @@ mkWWargs subst fun_ty demands
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
-mk_wrap_arg :: Unique -> Weighted Type -> Demand -> Id
-mk_wrap_arg uniq (Weighted w ty) dmd
+mk_wrap_arg :: Unique -> Scaled Type -> Demand -> Id
+mk_wrap_arg uniq (Scaled w ty) dmd
   = mkSysLocalOrCoVar (fsLit "w") uniq (Regular w) ty
        `setIdDemandInfo` dmd
 
@@ -615,7 +615,7 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   , cs `equalLength` inst_con_arg_tys
       -- See Note [mkWWstr and unsafeCoerce]
   = do { (uniq1:uniqs) <- getUniquesM
-        ; let   scale = scaleWeighted (idWeight arg)
+        ; let   scale = scaleScaled (idWeight arg)
                 scaled_inst_con_arg_tys = map (\(t,s) -> (scale t, s)) inst_con_arg_tys
                 unpk_args = zipWith3 mk_ww_arg uniqs scaled_inst_con_arg_tys cs
                 unbox_fn  = mkUnpackCase (Var arg) co (idWeight arg) uniq1
@@ -722,7 +722,7 @@ the first time.
 
 deepSplitProductType_maybe
     :: FamInstEnvs -> Type
-    -> Maybe (DataCon, [Type], [(Weighted Type, StrictnessMark)], Coercion)
+    -> Maybe (DataCon, [Type], [(Scaled Type, StrictnessMark)], Coercion)
 -- If    deepSplitProductType_maybe ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
@@ -740,7 +740,7 @@ deepSplitProductType_maybe _ _ = Nothing
 
 deepSplitCprType_maybe
     :: FamInstEnvs -> ConTag -> Type
-    -> Maybe (DataCon, [Type], [(Weighted Type, StrictnessMark)], Coercion)
+    -> Maybe (DataCon, [Type], [(Scaled Type, StrictnessMark)], Coercion)
 -- If    deepSplitCprType_maybe n ty = Just (dc, tys, arg_tys, co)
 -- then  dc @ tys (args::arg_tys) :: rep_ty
 --       co :: ty ~ rep_ty
@@ -764,8 +764,8 @@ deepSplitCprType_maybe fam_envs con_tag ty
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
 
-isLinear :: Weighted a -> Bool
-isLinear (Weighted w _ ) =
+isLinear :: Scaled a -> Bool
+isLinear (Scaled w _ ) =
   case w of
     One -> True
     _ -> False
@@ -831,7 +831,7 @@ mkWWcpr opt_CprAnal fam_envs body_ty res
                     -> WARN( True, text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
                        return (False, id, id, body_ty)
 
-mkWWcpr_help :: (DataCon, [Type], [(Weighted Type,StrictnessMark)], Coercion)
+mkWWcpr_help :: (DataCon, [Type], [(Scaled Type,StrictnessMark)], Coercion)
              -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
@@ -887,7 +887,7 @@ mkUnpackCase scrut co mult uniq boxing_con unpk_args body
          [(DataAlt boxing_con, unpk_args, body)]
   where
     casted_scrut = scrut `mkCast` co
-    bndr = mk_ww_local uniq (Weighted mult (exprType casted_scrut), MarkedStrict)
+    bndr = mk_ww_local uniq (Scaled mult (exprType casted_scrut), MarkedStrict)
       -- An unpacking case can always be chosen linear, because the variables
       -- are always passed to a constructor. This limits the
 {-
@@ -1025,10 +1025,10 @@ sanitiseCaseBndr :: Id -> Id
 -- like         (x+y) `seq` ....
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
-mk_ww_local :: Unique -> (Weighted Type, StrictnessMark) -> Id
+mk_ww_local :: Unique -> (Scaled Type, StrictnessMark) -> Id
 -- The StrictnessMark comes form the data constructor and says
 -- whether this field is strict
 -- See Note [Record evaluated-ness in worker/wrapper]
-mk_ww_local uniq (Weighted w ty,str)
+mk_ww_local uniq (Scaled w ty,str)
   = setCaseBndrEvald str $
     mkSysLocalOrCoVar (fsLit "ww") uniq (Regular w) ty

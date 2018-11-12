@@ -349,7 +349,7 @@ resultWrapper result_ty
   -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
-  , [Weighted _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
+  , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let narrow_wrapper = maybeNarrow dflags tycon

@@ -107,7 +107,7 @@ buildDataCon :: FamInstEnvs
            -> [EqSpec]                 -- Equality spec
            -> KnotTied ThetaType       -- Does not include the "stupid theta"
                                        -- or the GADT equalities
-           -> [KnotTied (Weighted Type)] -- Arguments
+           -> [KnotTied (Scaled Type)] -- Arguments
            -> KnotTied Type            -- Result types
            -> KnotTied TyCon           -- Rep tycon
            -> NameEnv ConTag           -- Maps the Name of each DataCon to its

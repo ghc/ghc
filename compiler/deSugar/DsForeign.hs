@@ -478,7 +478,7 @@ dsFExportDynamic id co0 cconv = do
  where
   ty                       = pFst (coercionKind co0)
   (tvs,sans_foralls)       = tcSplitForAllTys ty
-  ([Weighted arg_weight arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
+  ([Scaled arg_weight arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 

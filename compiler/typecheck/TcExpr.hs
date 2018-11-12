@@ -453,7 +453,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
 tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
-       ; (wrap_fun, [Weighted w arg1_ty, arg2_ty], op_res_ty) <-
+       ; (wrap_fun, [Scaled w arg1_ty, arg2_ty], op_res_ty) <-
            matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
                                  (mkFunTy w arg1_ty op_res_ty) res_ty
@@ -511,7 +511,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
             w_ty  = mkTyVarTy multiplicityTyVar
        ; let actual_res_ty
                  =  mkForAllTys [w_tvb] $
-                    mkFunTys [ mkWeighted (RigThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                    mkFunTys [ mkScaled (RigThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
@@ -580,7 +580,7 @@ tcExpr (HsCase x scrut matches) res_ty
         ; (scrut', scrut_ty) <- tcScalingUsage weight $ tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; matches' <- tcMatchesCase match_ctxt (Weighted weight scrut_ty) matches res_ty
+        ; matches' <- tcMatchesCase match_ctxt (Scaled weight scrut_ty) matches res_ty
         ; return (HsCase x scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
@@ -1453,10 +1453,10 @@ and we had the visible type application
 ----------------
 tcArg :: LHsExpr GhcRn                    -- The function (for error messages)
       -> LHsExpr GhcRn                    -- Actual arguments
-      -> Weighted TcRhoType              -- expected (weighted) arg type
+      -> Scaled TcRhoType              -- expected (weighted) arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTcId)             -- Resulting argument
-tcArg fun arg (Weighted weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
+tcArg fun arg (Scaled weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
                           tcScalingUsage weight $ tcPolyExprNC arg ty
 
 ----------------
@@ -1568,7 +1568,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
            ; return ( result
                     , match_wrapper <.>
                       mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              (Weighted op_mult arg_ty) res_ty doc ) }
+                              (Scaled op_mult arg_ty) res_ty doc ) }
       where
         herald = text "This rebindable syntax expects a function with"
         doc = text "When checking a rebindable syntax operator arising from" <+> ppr orig
@@ -2847,7 +2847,7 @@ checkClosedInStaticForm name = do
       -- The @visited@ set is an accumulating parameter that contains the set of
       -- visited nodes, so we avoid repeating cycles in the traversal.
       case lookupNameEnv type_env n of
-        Just (Weighted _ (ATcId { tct_id = tcid, tct_info = info })) -> case info of
+        Just (Scaled _ (ATcId { tct_id = tcid, tct_info = info })) -> case info of
           ClosedLet   -> Nothing
           NotLetBound -> Just NotLetBoundReason
           NonClosedLet fvs type_closed -> listToMaybe $

@@ -29,7 +29,7 @@ module TyCoRep (
         KnotTied,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..),
-        Rig, Weighted,
+        Rig, Scaled,
 
         -- * Coercions
         Coercion(..),
@@ -335,7 +335,7 @@ data Type
 
 -- | Common short-hands
 type Rig = GMult Type
-type Weighted = GWeighted Type
+type Scaled = GScaled Type
 
 instance Multable Type where
   fromMult One = oneDataConTy
@@ -548,7 +548,7 @@ type KnotTied ty = ty
 -- not. See Note [TyCoBinders]
 data TyCoBinder
   = Named TyCoVarBinder -- A type-lambda binder
-  | Anon (Weighted Type)           -- A term-lambda binder. Type here can be CoercionTy.
+  | Anon (Scaled Type)           -- A term-lambda binder. Type here can be CoercionTy.
                         -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
@@ -830,16 +830,16 @@ infixr 3 `mkFunTyOm`
 mkFunTy :: Rig -> Type -> Type -> Type
 mkFunTy weight arg res = FunTy weight arg res
 
-mkWeightedFunTy :: Weighted Type -> Type -> Type
-mkWeightedFunTy (Weighted weight arg) res = FunTy weight arg res
+mkScaledFunTy :: Scaled Type -> Type -> Type
+mkScaledFunTy (Scaled weight arg) res = FunTy weight arg res
 
 -- | Special, common, case: Arrow type with weight Omega
 mkFunTyOm :: Type -> Type -> Type
 mkFunTyOm = mkFunTy Omega
 
 -- | Make nested arrow types
-mkFunTys :: [Weighted Type] -> Type -> Type
-mkFunTys tys ty = foldr (\(Weighted w t) -> mkFunTy w t) ty tys
+mkFunTys :: [Scaled Type] -> Type -> Type
+mkFunTys tys ty = foldr (\(Scaled w t) -> mkFunTy w t) ty tys
 
 mkFunTysOm :: [Type] -> Type -> Type
 mkFunTysOm tys ty = mkFunTys (map unrestricted tys) ty
@@ -866,11 +866,11 @@ mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 mkPiTy :: TyCoBinder -> Type -> Type
-mkPiTy (Anon wty1) ty2          = mkWeightedFunTy wty1 ty2
+mkPiTy (Anon wty1) ty2          = mkScaledFunTy wty1 ty2
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
 mkTyCoPiTy :: TyCoBinder -> Type -> Type
-mkTyCoPiTy (Anon wty1) ty2          = mkWeightedFunTy wty1 ty2
+mkTyCoPiTy (Anon wty1) ty2          = mkScaledFunTy wty1 ty2
 mkTyCoPiTy (Named (Bndr tv vis)) ty = mkTyCoForAllTy tv vis ty
 
 -- | Like 'mkTyCoPiTy', but does not check the occurrence of the binder

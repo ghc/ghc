@@ -1961,7 +1961,7 @@ dataConInstPat fss uniqs weight con inst_tys
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
       -- Ignore the weights above, as there are Core ignores linearity at the moment.
-    mk_id_var uniq fs (Weighted w ty) str
+    mk_id_var uniq fs (Scaled w ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkLocalIdOrCoVar name (Regular $ weight * w) (Type.substTy full_subst ty)
       where
@@ -2399,13 +2399,13 @@ tryEtaReduce bndrs body
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let weight = idWeight v
-       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty
+       , Just (Scaled fun_weight _, _) <- splitFunTy_maybe fun_ty
        , weight `eqRig` fun_weight -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
          in Just (mkFunCo Representational (rigToCo weight) reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
+       , Just (Scaled fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
        , bndr == v
        , fun_weight `eqRig` idWeight v
        = Just (mkFunCo Representational (rigToCo fun_weight) (mkSymCo co_arg) co, ticks)

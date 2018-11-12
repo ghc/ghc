@@ -22,7 +22,7 @@ import DsBinds
 import ConLike
 import TcType
 import Multiplicity
-import Type ( Weighted )
+import Type ( Scaled )
 import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
@@ -161,7 +161,7 @@ matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single construc
                             , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
-        ; let scaled_arg_tys = map (scaleWeighted weight) val_arg_tys
+        ; let scaled_arg_tys = map (scaleScaled weight) val_arg_tys
             -- The 'val_arg_tys' are taken from the data type definition, they
             -- do not take into account the context multiplicity, therefore we
             -- need to scale them back to get the correct context multiplicity
@@ -226,7 +226,7 @@ same_fields flds1 flds2
 
 
 -----------------
-selectConMatchVars :: [Weighted Type] -> ConArgPats -> DsM [Id]
+selectConMatchVars :: [Scaled Type] -> ConArgPats -> DsM [Id]
 selectConMatchVars arg_tys con = case con of
                                    (RecCon {}) -> newSysLocalsDsNoLP arg_tys
                                    (PrefixCon ps) -> selectMatchVars (zipWeights arg_tys ps)
@@ -234,7 +234,7 @@ selectConMatchVars arg_tys con = case con of
   where
     zipWeights = zipWithEqual "selectConMatchVar" (\a b -> (weightedWeight a, unLoc b))
 
-conArgPats :: [Weighted Type]-- Instantiated argument types
+conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which
                           -- are probably never looked at anyway
            -> ConArgPats

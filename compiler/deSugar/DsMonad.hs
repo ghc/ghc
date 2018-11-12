@@ -354,9 +354,9 @@ newFailLocalDs = mkSysLocalOrCoVarM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
-newSysLocalsDsNoLP, newSysLocalsDs :: [Weighted Type] -> DsM [Id]
-newSysLocalsDsNoLP = mapM (\(Weighted w t) -> newSysLocalDsNoLP w t)
-newSysLocalsDs = mapM (\(Weighted w t) -> newSysLocalDs w t)
+newSysLocalsDsNoLP, newSysLocalsDs :: [Scaled Type] -> DsM [Id]
+newSysLocalsDsNoLP = mapM (\(Scaled w t) -> newSysLocalDsNoLP w t)
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
 
 mk_local :: FastString -> Rig -> Type -> DsM Id
 mk_local fs w ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>

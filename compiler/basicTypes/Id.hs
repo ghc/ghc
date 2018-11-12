@@ -369,8 +369,8 @@ mkWorkerId uniq unwrkr ty
 mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkTemplateLocalW i (unrestricted ty)
 
-mkTemplateLocalW :: Int -> Weighted Type -> Id
-mkTemplateLocalW i (Weighted w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (Regular w) ty
+mkTemplateLocalW :: Int -> Scaled Type -> Id
+mkTemplateLocalW i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (Regular w) ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]

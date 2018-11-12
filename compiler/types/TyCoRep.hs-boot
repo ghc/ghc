@@ -31,5 +31,5 @@ instance Data Type
   -- To support Data instances in CoAxiom
 
 type Rig = GMult Type
-type Weighted = GWeighted Type
+type Scaled = GScaled Type
 instance Multable Type

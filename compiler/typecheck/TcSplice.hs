@@ -1307,7 +1307,7 @@ tcLookupTh :: Name -> TcM TcTyThing
 tcLookupTh name
   = do  { (gbl_env, lcl_env) <- getEnvs
         ; case lookupNameEnv (tcl_env lcl_env) name of {
-                Just (Weighted _ thing) -> return thing; -- TODO: arnaud: tcLookUpTh should probably return a weighted type as well
+                Just (Scaled _ thing) -> return thing; -- TODO: arnaud: tcLookUpTh should probably return a weighted type as well
                 Nothing    ->
 
           case lookupNameEnv (tcg_type_env gbl_env) name of {
@@ -1788,7 +1788,7 @@ reifyTypes :: (Traversable t) => t Type -> TcM (t TH.Type)
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Weighted Type], Type) -> TcM TH.Type
+  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]

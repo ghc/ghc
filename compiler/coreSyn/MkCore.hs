@@ -162,12 +162,12 @@ mkCoreApps fun args
 mkCoreConApps :: DataCon -> [CoreExpr] -> CoreExpr
 mkCoreConApps con args = mkCoreApps (Var (dataConWorkId con)) args
 
-mk_val_app :: CoreExpr -> CoreExpr -> Weighted Type -> Type -> CoreExpr
+mk_val_app :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 -- Build an application (e1 e2),
 -- or a strict binding  (case e2 of x -> e1 x)
 -- using the latter when necessary to respect the let/app invariant
 --   See Note [CoreSyn let/app invariant]
-mk_val_app fun arg (Weighted w arg_ty) res_ty
+mk_val_app fun arg (Scaled w arg_ty) res_ty
   | not (needsCaseBinding arg_ty arg)
   = App fun arg                -- The vastly common case
 
@@ -196,10 +196,10 @@ mkWildEvBinder pred = mkWildValBinder Omega pred
 mkWildValBinder :: Rig -> Type -> Id
 mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (Regular w) ty
 
-mkWildCase :: CoreExpr -> Weighted Type -> Type -> [CoreAlt] -> CoreExpr
+mkWildCase :: CoreExpr -> Scaled Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
 -- The alts should not have any occurrences of WildId
-mkWildCase scrut (Weighted w scrut_ty) res_ty alts
+mkWildCase scrut (Scaled w scrut_ty) res_ty alts
   = Case scrut (mkWildValBinder w scrut_ty) res_ty alts
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr

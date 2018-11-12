@@ -1588,7 +1588,7 @@ data MatchGroup p body
 
 data MatchGroupTc
   = MatchGroupTc
-       { mg_arg_tys :: [Weighted Type]  -- Types of the arguments, t1..tn
+       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
        } deriving Data
 

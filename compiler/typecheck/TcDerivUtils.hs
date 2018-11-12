@@ -748,7 +748,7 @@ cond_args cls _ _ rep_tc
                              2 (text "for type" <+> quotes (ppr ty)))
   where
     bad_args = [ arg_ty | con <- tyConDataCons rep_tc
-                        , Weighted _ arg_ty <- dataConOrigArgTys con
+                        , Scaled _ arg_ty <- dataConOrigArgTys con
                         , isUnliftedType arg_ty
                         , not (ok_ty arg_ty) ]
 

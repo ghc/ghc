@@ -1146,7 +1146,7 @@ etaBodyForJoinPoint need_args body
     init_subst e = mkEmptyTCvSubst (mkInScopeSet (exprFreeVars e))
 
 --------------
-freshEtaId :: Int -> TCvSubst -> Weighted Type -> (TCvSubst, Id)
+freshEtaId :: Int -> TCvSubst -> Scaled Type -> (TCvSubst, Id)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope

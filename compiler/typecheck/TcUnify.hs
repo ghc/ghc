@@ -136,7 +136,7 @@ matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
-                    -> ([Weighted ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
                           -- must fill in these ExpTypes here
                     -> TcM (a, HsWrapper)
 -- If    matchExpectedFunTys n ty = (_, wrap)
@@ -156,10 +156,10 @@ matchExpectedFunTys herald arity orig_ty thing_inside
 
     go acc_arg_tys n (FunTy weight arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (result, wrap_res) <- go ((Weighted weight $ mkCheckExpType arg_ty) : acc_arg_tys)
+        do { (result, wrap_res) <- go ((Scaled weight $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
-                    , mkWpFun idHsWrapper wrap_res (Weighted weight arg_ty) res_ty doc ) }
+                    , mkWpFun idHsWrapper wrap_res (Scaled weight arg_ty) res_ty doc ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -190,7 +190,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [Weighted ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
+    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n newInferExpTypeNoInst
            ; res_ty       <- newInferExpTypeInst
@@ -221,7 +221,7 @@ matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
                   -> Arity
                   -> TcSigmaType
-                  -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
+                  -> TcM (HsWrapper, [Scaled TcSigmaType], TcSigmaType)
 -- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
 matchActualFunTys herald ct_orig mb_thing arity ty
@@ -234,9 +234,9 @@ matchActualFunTysPart :: SDoc -- See Note [Herald for matchExpectedFunTys]
                       -> Maybe (HsExpr GhcRn)  -- the thing with type TcSigmaType
                       -> Arity
                       -> TcSigmaType
-                      -> [Weighted TcSigmaType] -- reversed args. See (*) below.
+                      -> [Scaled TcSigmaType] -- reversed args. See (*) below.
                       -> Arity   -- overall arity of the function, for errs
-                      -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
+                      -> TcM (HsWrapper, [Scaled TcSigmaType], TcSigmaType)
 matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
                       orig_old_args full_arity
   = go arity orig_old_args orig_ty
@@ -267,9 +267,9 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     --
     -- Refactoring is welcome.
     go :: Arity
-       -> [Weighted TcSigmaType] -- accumulator of arguments (reversed)
+       -> [Scaled TcSigmaType] -- accumulator of arguments (reversed)
        -> TcSigmaType   -- the remainder of the type as we're processing
-       -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
+       -> TcM (HsWrapper, [Scaled TcSigmaType], TcSigmaType)
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
@@ -285,9 +285,9 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
 
     go n acc_args (FunTy w arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (wrap_res, tys, ty_r) <- go (n-1) (Weighted w arg_ty : acc_args) res_ty
-           ; return ( mkWpFun idHsWrapper wrap_res (Weighted w arg_ty) ty_r doc
-                    , Weighted w arg_ty : tys, ty_r ) }
+        do { (wrap_res, tys, ty_r) <- go (n-1) (Scaled w arg_ty : acc_args) res_ty
+           ; return ( mkWpFun idHsWrapper wrap_res (Scaled w arg_ty) ty_r doc
+                    , Scaled w arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -326,7 +326,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
            ; return (mkWpCastN co, map unrestricted arg_tys, res_ty) }
 
     ------------
-    mk_ctxt :: [Weighted TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: [Scaled TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
       = do { let ty = mkFunTys arg_tys res_ty
            ; (env1, zonked) <- zonkTidyTcType env ty
@@ -763,7 +763,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
                          -- GenSigCtxt: See Note [Setting the argument context]
-           ; return (mkWpFun arg_wrap res_wrap (Weighted exp_weight exp_arg) exp_res doc) }
+           ; return (mkWpFun arg_wrap res_wrap (Scaled exp_weight exp_arg) exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where

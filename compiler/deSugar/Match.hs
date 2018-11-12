@@ -240,7 +240,7 @@ matchEmpty :: HasCallStack => MatchId -> Type -> DsM [MatchResult]
 matchEmpty var res_ty
   = return [MatchResult CanFail mk_seq]
   where
-    mk_seq fail = return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) res_ty
+    mk_seq fail = return $ mkWildCase (Var var) (Scaled (idWeight var) (idType var)) res_ty
                                       [(DEFAULT, [], fail)]
 
 matchVariables :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
@@ -713,7 +713,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> mapM (\(Weighted w ty) -> newSysLocalDsNoLP w ty) arg_tys
+                           []    -> mapM (\(Scaled w ty) -> newSysLocalDsNoLP w ty) arg_tys
                            (m:_) ->
                             selectMatchVars (zipWithEqual "matchWrapper"
                                               (\a b -> (weightedWeight a, unLoc b))

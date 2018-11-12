@@ -187,7 +187,7 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper (Weighted TcType) SDoc
+  | WpFun HsWrapper HsWrapper (Scaled TcType) SDoc
        -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
@@ -273,7 +273,7 @@ wpLet_constr     = mkHsWrapperConstr "WpLet"
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> Weighted TcType -> HsWrapper
+wpFunEmpty :: HsWrapper -> HsWrapper -> Scaled TcType -> HsWrapper
 wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
@@ -285,7 +285,7 @@ multRefl :: Rig -> TcCoercion
 multRefl w = mkReflCo Representational (fromMult w)
 
 mkWpFun :: HsWrapper -> HsWrapper
-        -> (Weighted TcType)    -- the "from" type of the first wrapper
+        -> (Scaled TcType)    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
@@ -294,9 +294,9 @@ mkWpFun :: HsWrapper -> HsWrapper
 -- don't currently need to actually record the source multiplicity: it is just
 -- here to prevent making a coercion between two incoercible function arrow
 mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) (Weighted w t1) _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       (Weighted w _)  t2 _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) (Weighted w _)  _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = WpCast (mkTcFunCo Representational (multRefl w) (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 
@@ -899,7 +899,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 (Weighted w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
+    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]

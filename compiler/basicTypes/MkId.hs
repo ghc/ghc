@@ -591,7 +591,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con =
 
 
 mkDataConRepX :: Monad m =>
-                ([Weighted Type] -> m [Id])
+                ([Scaled Type] -> m [Id])
              -> ([(Id, Unboxer)] -> CoreExpr -> m CoreExpr)
              -> FamInstEnvs
              -> Name
@@ -676,7 +676,7 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
     w_ty = RigThing (mkTyVarTy multiplicityTyVar)
     -- See Note [Wrapper weights]
     wrap_arg_tys = (map unrestricted theta)
-                    ++ (map (scaleWeighted w_ty) orig_arg_tys)
+                    ++ (map (scaleScaled w_ty) orig_arg_tys)
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -822,15 +822,15 @@ So the arguments end up with the right multiplicity all very elegantly.
 -- need to update the notes in this file.
 
 -------------------------
-newLocal :: Weighted Type -> UniqSM Var
-newLocal (Weighted w ty) = do { uniq <- getUniqueM
+newLocal :: Scaled Type -> UniqSM Var
+newLocal (Scaled w ty) = do { uniq <- getUniqueM
                               ; return (mkSysLocalOrCoVar (fsLit "dt") uniq (Regular w) ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang
    :: DynFlags
    -> FamInstEnvs
-   -> Weighted Type
+   -> Scaled Type
    -> HsSrcBang
    -> HsImplBang
 
@@ -876,9 +876,9 @@ dataConSrcToImplBang dflags fam_envs arg_ty
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
 dataConArgRep
-  :: Weighted Type
+  :: Scaled Type
   -> HsImplBang
-  -> ([(Weighted Type,StrictnessMark)] -- Rep types
+  -> ([(Scaled Type,StrictnessMark)] -- Rep types
      ,(Unboxer,Boxer))
 
 dataConArgRep arg_ty HsLazy
@@ -891,9 +891,9 @@ dataConArgRep arg_ty (HsUnpack Nothing)
   | (rep_tys, wrappers) <- dataConArgUnpack arg_ty
   = (rep_tys, wrappers)
 
-dataConArgRep (Weighted w _) (HsUnpack (Just co))
+dataConArgRep (Scaled w _) (HsUnpack (Just co))
   | let co_rep_ty = pSnd (coercionKind co)
-  , (rep_tys, wrappers) <- dataConArgUnpack (Weighted w co_rep_ty)
+  , (rep_tys, wrappers) <- dataConArgUnpack (Scaled w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -927,17 +927,17 @@ unitBoxer = UnitBox
 
 -------------------------
 dataConArgUnpack
-   :: Weighted Type
-   ->  ( [(Weighted Type, StrictnessMark)]   -- Rep types
+   :: Scaled Type
+   ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack (Weighted arg_mult arg_ty)
+dataConArgUnpack (Scaled arg_mult arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = map (scaleWeighted arg_mult) $ dataConInstArgTys con tc_args
+  , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyCoVars con) )
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
@@ -981,7 +981,7 @@ isUnpackableType dflags fam_envs ty
          dc_name = getName con
          dcs' = dcs `extendNameSet` dc_name
 
-    ok_arg dcs (Weighted _ ty, bang)
+    ok_arg dcs (Scaled _ ty, bang)
       = not (attempt_unpack bang) || ok_ty dcs norm_ty
       where
         norm_ty = topNormaliseType fam_envs ty

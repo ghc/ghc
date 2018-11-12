@@ -844,7 +844,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
 
-type TcTypeEnv = NameEnv (Weighted TcTyThing)
+type TcTypeEnv = NameEnv (Scaled TcTyThing)
 
 type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
         -- Monadic so that we have a chance

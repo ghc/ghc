@@ -34,7 +34,7 @@ import UsageEnv (subweight)
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
-import Type ( Weighted, pprTyVars )
+import Type ( Scaled, pprTyVars )
 import TcType
 import TcUnify
 import TcHsType
@@ -67,7 +67,7 @@ import Data.Functor.Compose ( Compose(..) )
 
 tcLetPat :: (Name -> Maybe TcId)
          -> LetBndrSpec
-         -> LPat GhcRn -> Weighted ExpSigmaType
+         -> LPat GhcRn -> Scaled ExpSigmaType
          -> TcM a
          -> TcM (LPat GhcTcId, a)
 tcLetPat sig_fn no_gen pat pat_ty thing_inside
@@ -84,7 +84,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
 -----------------
 tcPats :: HsMatchContext Name
        -> [LPat GhcRn]            -- Patterns,
-       -> [Weighted ExpSigmaType]         --   and their types
+       -> [Scaled ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
        -> TcM ([LPat GhcTcId], a)
 
@@ -105,7 +105,7 @@ tcPats ctxt pats pat_tys thing_inside
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
 tcPat :: HsMatchContext Name
-      -> LPat GhcRn -> Weighted ExpSigmaType
+      -> LPat GhcRn -> Scaled ExpSigmaType
       -> TcM a                     -- Checker for body
       -> TcM (LPat GhcTcId, a)
 tcPat ctxt = tcPat_O ctxt PatOrigin
@@ -113,7 +113,7 @@ tcPat ctxt = tcPat_O ctxt PatOrigin
 -- | A variant of 'tcPat' that takes a custom origin
 tcPat_O :: HsMatchContext Name
         -> CtOrigin              -- ^ origin to use if the type needs inst'ing
-        -> LPat GhcRn -> Weighted ExpSigmaType
+        -> LPat GhcRn -> Scaled ExpSigmaType
         -> TcM a                 -- Checker for body
         -> TcM (LPat GhcTcId, a)
 tcPat_O ctxt orig pat pat_ty thing_inside
@@ -179,7 +179,7 @@ inPatBind (PE { pe_ctxt = LamPat {} }) = False
 *                                                                      *
 ********************************************************************* -}
 
-tcPatBndr :: PatEnv -> Name -> Weighted ExpSigmaType -> TcM (HsWrapper, TcId)
+tcPatBndr :: PatEnv -> Name -> Scaled ExpSigmaType -> TcM (HsWrapper, TcId)
 -- (coi, xp) = tcPatBndr penv x pat_ty
 -- Then coi : pat_ty ~ typeof(xp)
 --
@@ -302,7 +302,7 @@ tcMultiple tc_pat args penv thing_inside
 
 --------------------
 tc_lpat :: LPat GhcRn
-        -> Weighted ExpSigmaType
+        -> Scaled ExpSigmaType
         -> PatEnv
         -> TcM a
         -> TcM (LPat GhcTcId, a)
@@ -313,7 +313,7 @@ tc_lpat (L span pat) pat_ty penv thing_inside
         ; return (L span pat', res) }
 
 tc_lpats :: PatEnv
-         -> [LPat GhcRn] -> [Weighted ExpSigmaType]
+         -> [LPat GhcRn] -> [Scaled ExpSigmaType]
          -> TcM a
          -> TcM ([LPat GhcTcId], a)
 tc_lpats penv pats tys thing_inside
@@ -325,7 +325,7 @@ tc_lpats penv pats tys thing_inside
 --------------------
 tc_pat  :: PatEnv
         -> Pat GhcRn
-        -> Weighted ExpSigmaType  -- Fully refined result type
+        -> Scaled ExpSigmaType  -- Fully refined result type
         -> TcM a                -- Thing inside
         -> TcM (Pat GhcTcId,    -- Translated pattern
                 a)              -- Result of thing inside
@@ -412,7 +412,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
-        ; (expr_wrap1, [Weighted _weight inf_arg_ty], inf_res_ty)
+        ; (expr_wrap1, [Scaled _weight inf_arg_ty], inf_res_ty)
             <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr'_inferred
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
@@ -423,10 +423,10 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- pattern must have inf_res_ty
         ; (pat', res) <- tc_lpat pat (overall_pat_ty `weightedSet` mkCheckExpType inf_res_ty) penv thing_inside
 
-        ; let Weighted w h_overall_pat_ty = overall_pat_ty
+        ; let Scaled w h_overall_pat_ty = overall_pat_ty
         ; overall_pat_ty <- readExpType h_overall_pat_ty
         ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
-                                    (Weighted w overall_pat_ty) inf_res_ty doc
+                                    (Scaled w overall_pat_ty) inf_res_ty doc
                -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
                --                (overall_pat_ty -> inf_res_ty)
               expr_wrap = expr_wrap2' <.> expr_wrap1
@@ -752,7 +752,7 @@ to express the local scope of GADT refinements.
 --       with scrutinee of type (T ty)
 
 tcConPat :: PatEnv -> Located Name
-         -> Weighted ExpSigmaType           -- Type of the pattern
+         -> Scaled ExpSigmaType           -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
 tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
@@ -765,7 +765,7 @@ tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
         }
 
 tcDataConPat :: PatEnv -> Located Name -> DataCon
-             -> Weighted ExpSigmaType               -- Type of the pattern
+             -> Scaled ExpSigmaType               -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTcId, a)
 tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_inside
@@ -801,7 +801,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
 
               arg_tys' = getCompose $ substTys tenv (Compose arg_tys)
               pat_weight = weightedWeight pat_ty_weighted
-              arg_tys_weighted = map (scaleWeighted pat_weight) arg_tys'
+              arg_tys_weighted = map (scaleScaled pat_weight) arg_tys'
 
         ; traceTc "tcConPat" (vcat [ ppr con_name
                                    , pprTyVars univ_tvs
@@ -862,7 +862,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
         } }
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
-            -> Weighted ExpSigmaType                -- Type of the pattern
+            -> Scaled ExpSigmaType                -- Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTcId, a)
 tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
@@ -876,7 +876,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; let ty'         = substTy tenv ty
               arg_tys'    = getCompose $ substTys tenv (Compose arg_tys)
               pat_weight  = weightedWeight pat_ty
-              arg_tys_weighted = map (scaleWeighted pat_weight) arg_tys'
+              arg_tys_weighted = map (scaleScaled pat_weight) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
@@ -936,7 +936,7 @@ matchExpectedConTy :: PatEnv
                                  -- constructor actually returns
                                  -- In the case of a data family this is
                                  -- the /representation/ TyCon
-                   -> Weighted ExpSigmaType  -- The type of the pattern; in the
+                   -> Scaled ExpSigmaType  -- The type of the pattern; in the
                                              -- case of a data family this would
                                              -- mention the /family/ TyCon
                    -> TcM (HsWrapper, [TcSigmaType])
@@ -1007,7 +1007,7 @@ Suppose (coi, tys) = matchExpectedConType data_tc pat_ty
    error messages; it's a purely internal thing
 -}
 
-tcConArgs :: ConLike -> [Weighted TcSigmaType]
+tcConArgs :: ConLike -> [Scaled TcSigmaType]
           -> Checker (HsConPatDetails GhcRn) (HsConPatDetails GhcTc)
 
 tcConArgs con_like arg_tys (PrefixCon arg_pats) penv thing_inside
@@ -1048,7 +1048,7 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
     tc_field (L _ (HsRecField (L _ (XFieldOcc _)) _ _)) _ _
            = panic "tcConArgs"
 
-    find_field_ty :: Name -> FieldLabelString -> TcM (Weighted TcType)
+    find_field_ty :: Name -> FieldLabelString -> TcM (Scaled TcType)
     find_field_ty sel lbl
         = case [ty | (fl, ty) <- field_tys, flSelector fl == sel] of
 
@@ -1065,13 +1065,13 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
                 traceTc "find_field" (ppr pat_ty <+> ppr extras)
                 ASSERT( null extras ) (return pat_ty)
 
-    field_tys :: [(FieldLabel, Weighted TcType)]
+    field_tys :: [(FieldLabel, Scaled TcType)]
     field_tys = zip (conLikeFieldLabels con_like) arg_tys
           -- Don't use zipEqual! If the constructor isn't really a record, then
           -- dataConFieldLabels will be empty (and each field in the pattern
           -- will generate an error below).
 
-tcConArg :: Checker (LPat GhcRn, Weighted TcSigmaType) (LPat GhcTc)
+tcConArg :: Checker (LPat GhcRn, Scaled TcSigmaType) (LPat GhcTc)
 tcConArg (arg_pat, arg_ty) penv thing_inside
   = tc_lpat arg_pat (mkCheckExpType <$> arg_ty) penv thing_inside
 

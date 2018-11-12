@@ -2315,7 +2315,7 @@ tcConIsInfixGADT con details
                | otherwise -> return False
 
 tcConArgs :: HsConDeclDetails GhcRn
-          -> TcM [(Weighted TcType, HsSrcBang)]
+          -> TcM [(Scaled TcType, HsSrcBang)]
 tcConArgs (PrefixCon btys)
   = mapM tcConArg btys
 tcConArgs (InfixCon bty1 bty2)
@@ -2332,7 +2332,7 @@ tcConArgs (RecCon fields)
     (_,btys) = unzip exploded
 
 
-tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
+tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
 tcConArg (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
@@ -2341,7 +2341,7 @@ tcConArg (HsScaled w bty)
              -- that in checkValidDataCon; this tcConArg stuff
              -- doesn't happen for GADT-style declarations
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (Weighted w' arg_ty, getBangStrictness bty) }
+        ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
 {-
 Note [Infix GADT constructors]

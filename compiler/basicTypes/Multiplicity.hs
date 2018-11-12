@@ -18,17 +18,17 @@ module Multiplicity
   , Multable(..)
   , unsafeRigThing
   , sup
-  , GWeighted(..)
+  , GScaled(..)
   , unrestricted
   , linear
   , staticOnly
   , tyweight
   , knownOmega
   , irrelevantWeight
-  , mkWeighted
+  , mkScaled
   , weightedSet
   , setWeight
-  , scaleWeighted
+  , scaleScaled
   , IsSubweight(..)
   , isUnknown
   , subweightMaybe ) where
@@ -144,38 +144,38 @@ sup _     _     = Omega
 --
 
 -- | A shorthand for data with an attached 'Rig' element (the weight).
-data GWeighted t a = Weighted {weightedWeight :: GMult t, weightedThing :: a}
+data GScaled t a = Scaled {weightedWeight :: GMult t, weightedThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
-unrestricted, linear, staticOnly, tyweight :: a -> GWeighted t a
-unrestricted = Weighted Omega
-linear = Weighted One
-staticOnly = Weighted Zero
+unrestricted, linear, staticOnly, tyweight :: a -> GScaled t a
+unrestricted = Scaled Omega
+linear = Scaled One
+staticOnly = Scaled Zero
 
 -- Used for type arguments in core
-tyweight = Weighted Omega
+tyweight = Scaled Omega
 
-knownOmega :: GWeighted t a -> a
+knownOmega :: GScaled t a -> a
 knownOmega = weightedThing
 
-irrelevantWeight :: GWeighted t a -> a
+irrelevantWeight :: GScaled t a -> a
 irrelevantWeight = weightedThing
 
-mkWeighted :: GMult t -> a -> GWeighted t a
-mkWeighted = Weighted
+mkScaled :: GMult t -> a -> GScaled t a
+mkScaled = Scaled
 
-instance (Multable t, Outputable a) => Outputable (GWeighted t a) where
-   ppr (Weighted _cnt t) = ppr t
+instance (Multable t, Outputable a) => Outputable (GScaled t a) where
+   ppr (Scaled _cnt t) = ppr t
      -- Do not print the multiplicity here because it tends to be too verbose
 
-weightedSet :: GWeighted t a -> b -> GWeighted t b
+weightedSet :: GScaled t a -> b -> GScaled t b
 weightedSet x b = fmap (\_->b) x
 
-setWeight :: GMult t -> GWeighted t a -> GWeighted t a
+setWeight :: GMult t -> GScaled t a -> GScaled t a
 setWeight r x = x { weightedWeight = r }
 
-scaleWeighted :: GMult t -> GWeighted t a -> GWeighted t a
-scaleWeighted w x =
+scaleScaled :: GMult t -> GScaled t a -> GScaled t a
+scaleScaled w x =
   x { weightedWeight = w * weightedWeight x }
 
 --

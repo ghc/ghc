@@ -1123,7 +1123,7 @@ dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; return (w1 . w2) }
  -- See comments on WpFun in TcEvidence for an explanation of what
  -- the specification of this clause is
-dsHsWrapper (WpFun c1 c2 (Weighted w t1) doc)
+dsHsWrapper (WpFun c1 c2 (Scaled w t1) doc)
                               = do { x <- newSysLocalDsNoLP w t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
@@ -1261,7 +1261,7 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
        ; mkTrApp <- dsLookupGlobalId mkTrAppName
                     -- mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                     --            TypeRep a -> TypeRep b -> TypeRep (a b)
-       ; let (Weighted _ k1, k2) = splitFunTy (typeKind t1)
+       ; let (Scaled _ k1, k2) = splitFunTy (typeKind t1)
        ; let expr =  mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
                             [ e1, e2 ]
        -- ; pprRuntimeTrace "Trace mkTrApp" (ppr expr) expr
@@ -1269,7 +1269,7 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
        }
 
 ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
-  | Just (Weighted _ t1,t2) <- splitFunTy_maybe ty
+  | Just (Scaled _ t1,t2) <- splitFunTy_maybe ty
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
        ; mkTrFun <- dsLookupGlobalId mkTrFunName

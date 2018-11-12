@@ -143,7 +143,7 @@ warnAboutIdentities :: DynFlags -> CoreExpr -> Type -> DsM ()
 warnAboutIdentities dflags (Var conv_fn) type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
-  , Just (Weighted _ arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
+  , Just (Scaled _ arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = warnDs (Reason Opt_WarnIdentities)
            (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv

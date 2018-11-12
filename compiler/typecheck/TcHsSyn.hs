@@ -1047,7 +1047,7 @@ zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; return (env2, WpCompose c1' c2') }
 zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; (env2, c2') <- zonkCoFn env1 c2
-                                     ; t1'         <- zonkWeightedTcTypeToTypeX env2 t1
+                                     ; t1'         <- zonkScaledTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
                               ; return (env, WpCast co') }
@@ -1847,8 +1847,8 @@ zonkTcTypeToTypeX = mapType zonk_tycomapper
 zonkTcTypesToTypes :: [TcType] -> TcM [Type]
 zonkTcTypesToTypes = initZonkEnv zonkTcTypesToTypesX
 
-zonkWeightedTcTypeToTypeX :: ZonkEnv -> Weighted TcType -> TcM (Weighted TcType)
-zonkWeightedTcTypeToTypeX env (Weighted r ty) = Weighted <$> zonkRigX env r
+zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
+zonkScaledTcTypeToTypeX env (Scaled r ty) = Scaled <$> zonkRigX env r
                                                          <*> zonkTcTypeToTypeX env ty
 
 zonkRigX :: ZonkEnv -> Rig -> TcM Rig

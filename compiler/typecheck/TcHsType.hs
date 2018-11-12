@@ -2018,13 +2018,13 @@ newWildTyVar _name
 --
 -- Use this (not tcExtendTyVarEnv) wherever you expect a Λ or ∀ in Core.
 -- Use tcExtendTyVarEnv otherwise.
-scopeTyVars :: SkolemInfo -> [Weighted TcTyVar] -> TcM a -> TcM a
+scopeTyVars :: SkolemInfo -> [Scaled TcTyVar] -> TcM a -> TcM a
 scopeTyVars skol_info tvs = scopeTyVars2 skol_info
                               [(tyVarName (weightedThing tv), tv) | tv <- tvs]
 
 -- | Like 'scopeTyVars', but allows you to specify different scoped names
 -- than the Names stored within the tyvars.
-scopeTyVars2 :: SkolemInfo -> [(Name, Weighted TcTyVar)] -> TcM a -> TcM a
+scopeTyVars2 :: SkolemInfo -> [(Name, Scaled TcTyVar)] -> TcM a -> TcM a
 scopeTyVars2 skol_info prs thing_inside
   = fmap snd $ -- discard the TcEvBinds, which will always be empty
     checkConstraints skol_info (map (weightedThing . snd) prs) [{- no EvVars -}] $
@@ -2572,11 +2572,11 @@ tcHsPatSigType _ (XHsWildCardBndrs _)          = panic "tcHsPatSigType"
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
-         -> Weighted ExpSigmaType
+         -> Scaled ExpSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
-                 [(Name, Weighted TcTyVar)],-- The new bit of type environment, binding
+                 [(Name, Scaled TcTyVar)],-- The new bit of type environment, binding
                                     -- the scoped type variables
-                 [(Name, Weighted TcTyVar)],  -- The wildcards
+                 [(Name, Scaled TcTyVar)],  -- The wildcards
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
 tcPatSig in_pat_bind sig res_ty

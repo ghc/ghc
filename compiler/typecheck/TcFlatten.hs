@@ -2173,7 +2173,7 @@ split_pi_tys' ty = split ty ty
   split _       (ForAllTy b res) = let (bs, ty, _) = split res res
                                    in  (Named b : bs, ty, True)
   split _       (FunTy w arg res)  = let (bs, ty, named) = split res res
-                                     in  (Anon (mkWeighted w arg) : bs, ty, named)
+                                     in  (Anon (mkScaled w arg) : bs, ty, named)
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
@@ -2185,6 +2185,6 @@ ty_con_binders_ty_binders' = foldr go ([], False)
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
     go (Bndr tv AnonTCB)        (bndrs, n)
-      = (Anon (mkWeighted Omega (tyVarKind tv))   : bndrs, n)
+      = (Anon (mkScaled Omega (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

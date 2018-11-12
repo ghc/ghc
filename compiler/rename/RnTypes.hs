@@ -19,7 +19,7 @@ module RnTypes (
         rnConDeclFields,
         rnLTyVar,
 
-        rnWeightedLHsType,
+        rnScaledLHsType,
 
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -480,9 +480,9 @@ rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 rnLHsTypes :: Traversable t => HsDocContext -> t (LHsType GhcPs) -> RnM (t (LHsType GhcRn), FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
-rnWeightedLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
+rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
                                   -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
-rnWeightedLHsType doc (HsScaled w ty) = do
+rnScaledLHsType doc (HsScaled w ty) = do
   (w' , fvs_w) <- rnRig (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
   return (HsScaled w' ty', fvs `plusFV` fvs_w)

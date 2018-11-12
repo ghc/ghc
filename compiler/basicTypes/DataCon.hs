@@ -380,7 +380,7 @@ data DataCon
                 -- the wrapper Id, because that makes it harder to use the wrap-id
                 -- to rebuild values after record selection or in generics.
 
-        dcOrigArgTys :: [Weighted Type],-- Original argument types
+        dcOrigArgTys :: [Scaled Type],-- Original argument types
                                         -- (before unboxing and flattening of strict fields)
         dcOrigResTy :: Type,            -- Original result type, as seen by the user
                 -- NB: for a data instance, the original user result type may
@@ -576,7 +576,7 @@ data DataConRep
 
         , dcr_boxer   :: DataConBoxer
 
-        , dcr_arg_tys :: [Weighted Type]  -- Final, representation argument types,
+        , dcr_arg_tys :: [Scaled Type]  -- Final, representation argument types,
                                           -- after unboxing and flattening,
                                           -- and *including* all evidence args
 
@@ -887,7 +887,7 @@ mkDataCon :: Name
                                 --   See @Note [TyVarBinders in DataCons]@
           -> [EqSpec]           -- ^ GADT equalities
           -> KnotTied ThetaType -- ^ Theta-type occuring before the arguments proper
-          -> [KnotTied (Weighted Type)]    -- ^ Original argument types
+          -> [KnotTied (Scaled Type)]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
           -> RuntimeRepInfo     -- ^ See comments on 'TyCon.RuntimeRepInfo'
           -> KnotTied TyCon     -- ^ Representation type constructor
@@ -1226,7 +1226,7 @@ dataConBoxer _ = Nothing
 -- 3) The type arguments to the constructor with linearity annotations
 --
 -- 4) The /original/ result type of the 'DataCon'
-dataConSig :: DataCon -> ([TyCoVar], ThetaType, [Weighted Type], Type)
+dataConSig :: DataCon -> ([TyCoVar], ThetaType, [Scaled Type], Type)
 dataConSig con@(MkData {dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (dataConUnivAndExTyCoVars con, dataConTheta con, arg_tys, res_ty)
 
@@ -1271,7 +1271,7 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
 --
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Weighted Type], Type)
+               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Scaled Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs,
                         dcEqSpec = eq_spec, dcOtherTheta = theta,
                         dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
@@ -1314,7 +1314,7 @@ dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
   = let tvb = mkTyVarBinder Inferred multiplicityTyVar
         ty  = mkTyVarTy multiplicityTyVar
         -- See Note [Wrapper weights]
-        arg_tys' = map (scaleWeighted (RigThing ty)) arg_tys
+        arg_tys' = map (scaleScaled (RigThing ty)) arg_tys
     in
       mkForAllTys (tvb : user_tvbs) $
       mkFunTys (map unrestricted theta) $
@@ -1330,7 +1330,7 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                                 -- However, it can have a dcTheta (notably it can be a
                                 -- class dictionary, with superclasses)
                   -> [Type]     -- ^ Instantiated at these types
-                  -> [Weighted Type]
+                  -> [Scaled Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyCoVars = ex_tvs}) inst_tys
  = ASSERT2( univ_tvs `equalLength` inst_tys
@@ -1345,7 +1345,7 @@ dataConInstOrigArgTys
         => DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
-        -> [Weighted Type]
+        -> [Scaled Type]
 -- For vanilla datacons, it's all quite straightforward
 -- But for the call in MatchCon, we really do want just the value args
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
@@ -1364,13 +1364,13 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
-dataConOrigArgTys :: DataCon -> [Weighted Type]
+dataConOrigArgTys :: DataCon -> [Scaled Type]
 dataConOrigArgTys dc = dcOrigArgTys dc
 
 -- | Returns the arg types of the worker, including *all* non-dependent
 -- evidence, after any flattening has been done and without substituting for
 -- any type variables
-dataConRepArgTys :: DataCon -> [Weighted Type]
+dataConRepArgTys :: DataCon -> [Scaled Type]
 dataConRepArgTys (MkData { dcRep = rep
                          , dcEqSpec = eq_spec
                          , dcOtherTheta = theta
@@ -1484,7 +1484,7 @@ splitDataProductType_maybe
         -> Maybe (TyCon,                -- The type constructor
                   [Type],               -- Type args of the tycon
                   DataCon,              -- The data constructor
-                  [Weighted Type])      -- Its /representation/ arg types
+                  [Scaled Type])      -- Its /representation/ arg types
 
         -- Rejecting existentials is conservative.  Maybe some things
         -- could be made to work with them, but I'm not going to sweat

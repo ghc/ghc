@@ -30,7 +30,7 @@ import TcRnMonad
 import TcEnv
 import TcPat
 import Multiplicity
-import Type ( Weighted )
+import Type ( Scaled )
 import UsageEnv
 import TcMType
 import TcType
@@ -120,7 +120,7 @@ parser guarantees that each equation has exactly one argument.
 
 tcMatchesCase :: (Outputable (body GhcRn)) =>
                  TcMatchCtxt body                             -- Case context
-              -> Weighted TcSigmaType                         -- Type of scrutinee
+              -> Scaled TcSigmaType                         -- Type of scrutinee
               -> MatchGroup GhcRn (Located (body GhcRn))        -- The case alternatives
               -> ExpRhoType                                   -- Type of whole case expressions
               -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
@@ -194,7 +194,7 @@ still gets assigned a polytype.
 -- expected type into TauTvs.
 -- See Note [Case branches must never infer a non-tau type]
 tauifyMultipleMatches :: [LMatch id body]
-                      -> [Weighted ExpType] -> TcM [Weighted ExpType]
+                      -> [Scaled ExpType] -> TcM [Scaled ExpType]
 tauifyMultipleMatches group exp_tys
   | isSingletonMatchGroup group = return exp_tys
   | otherwise                   = mapM (mapM tauifyExpType) exp_tys
@@ -202,7 +202,7 @@ tauifyMultipleMatches group exp_tys
 
 -- | Type-check a MatchGroup.
 tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
-          -> [Weighted ExpSigmaType]      -- Expected pattern types
+          -> [Scaled ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
           -> MatchGroup GhcRn (Located (body GhcRn))
           -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
@@ -215,7 +215,7 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcM (Located (body GhcTcId)) }
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { (Weighted _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Weighted One rhs_ty):pat_tys) -- return type has implicitly weight 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
+  = do { (Scaled _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Scaled One rhs_ty):pat_tys) -- return type has implicitly weight 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
             -- See Note [Case branches must never infer a non-tau type]
 
        ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
@@ -230,7 +230,7 @@ tcMatches _ _ _ (XMatchGroup {}) = panic "tcMatches"
 
 -------------
 tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
-        -> [Weighted ExpSigmaType]        -- Expected pattern types
+        -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (Located (body GhcRn))
         -> TcM (LMatch GhcTcId (Located (body GhcTcId)))
@@ -573,7 +573,7 @@ tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
                \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight, fun_weight, pat_weight] ->
                do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
                   ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
-                                           (Weighted pat_weight $ mkCheckExpType pat_ty) $
+                                           (Scaled pat_weight $ mkCheckExpType pat_ty) $
                                      thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', pat_weight, pat', thing, new_res_ty) }
 
@@ -836,7 +836,7 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
                 \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight,fun_weight,pat_weight] ->
                 do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
                    ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
-                                            (Weighted pat_weight $ mkCheckExpType pat_ty) $
+                                            (Scaled pat_weight $ mkCheckExpType pat_ty) $
                                       thing_inside (mkCheckExpType new_res_ty)
                    ; return (rhs', pat_weight, pat', new_res_ty, thing) }
 

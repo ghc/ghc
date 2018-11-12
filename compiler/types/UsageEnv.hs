@@ -8,7 +8,7 @@ import Name
 import NameEnv
 import UniqFM ( nonDetEltsUFM, plusUFM_CD )
 import Outputable
-import TyCoRep ( Rig, Weighted )
+import TyCoRep ( Rig, Scaled )
 
 import Control.Monad
 
@@ -34,7 +34,7 @@ newtype UsageEnv = UsageEnv (NameEnv Rig)
 unitUE :: NamedThing n => n -> Rig -> UsageEnv
 unitUE x w = UsageEnv $ unitNameEnv (getName x) w
 
-mkUE :: [Weighted Name] -> UsageEnv
+mkUE :: [Scaled Name] -> UsageEnv
 mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (weightedThing wx,weightedWeight wx)) ws)
 
 zeroUE, emptyUE :: UsageEnv
