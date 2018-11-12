@@ -45,7 +45,7 @@ module Id (
 
         -- ** Taking an Id apart
         VarMult(..),
-        idName, idType, idWeight, idWeightedness, idUnique, idInfo, idDetails,
+        idName, idType, idWeight, idMult, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
 
         -- ** Modifying an Id
@@ -195,8 +195,8 @@ idWeight x =
  -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
   Var.varWeight x
 
-idWeightedness :: Id -> VarMult
-idWeightedness = Var.varWeightedness
+idMult :: Id -> VarMult
+idMult = Var.varMult
 
 scaleIdBy :: Id -> Rig -> Id
 scaleIdBy = Var.scaleVarBy
@@ -228,7 +228,7 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varWeightedness id) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varMult id) (idType id) (idInfo id)
   where
     name = idName id
 

@@ -930,7 +930,7 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
     || no_free_vars
   = id
   | otherwise =
-      setVarWeightedness
+      setVarMult
         (Id.setIdType id
           (Type.substTy subst old_ty))
           (Type.substVarMult subst old_w)
@@ -942,4 +942,4 @@ substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv
     no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfVarMult old_w
     subst = TCvSubst in_scope tv_env cv_env
     old_ty = idType id
-    old_w  = varWeightedness id
+    old_w  = varMult id

@@ -44,11 +44,11 @@ module Var (
         -- ** Taking 'Var's apart
         VarMult(..),
         varName, varUnique, varType, varWeight, varWeightMaybe, varWeightDef,
-        varWeightedness, varWeightednessMaybe,
+        varMult, varMultMaybe,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType, updateVarType,
-        updateVarTypeM, scaleVarBy, setVarWeight, setVarWeightedness,
+        updateVarTypeM, scaleVarBy, setVarWeight, setVarMult,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -245,7 +245,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
-        varWeightedness  :: VarMult,
+        varMult  :: VarMult,
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -312,14 +312,14 @@ instance Outputable Var where
   ppr var = sdocWithDynFlags $ \dflags ->
             getPprStyle $ \ppr_style ->
             if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
-                 -> parens (ppr (varName var) <+> ppr (varWeightednessMaybe var)
+                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
                                               <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
 
                |  codeStyle ppr_style
                  -> ppr (varName var) <> ppr_debug var ppr_style
                |  otherwise
-                 -> ppr (varName var)  -- <> maybe empty (brackets . ppr) (varWeightednessMaybe var)
+                 -> ppr (varName var)  -- <> maybe empty (brackets . ppr) (varMultMaybe var)
                                         -- Types don't have multiplicites
                                       <> ppr_debug var ppr_style
 
@@ -397,13 +397,13 @@ updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
 updateVarTypeM f id = do { ty' <- f (varType id)
                          ; return (id { varType = ty' }) }
 
-varWeightednessMaybe :: Id -> Maybe VarMult
-varWeightednessMaybe (Id { varWeightedness = mult }) = Just mult
-varWeightednessMaybe _ = Nothing
+varMultMaybe :: Id -> Maybe VarMult
+varMultMaybe (Id { varMult = mult }) = Just mult
+varMultMaybe _ = Nothing
 
 varWeightMaybe :: Id -> Maybe Rig
 varWeightMaybe v =
-  case varWeightednessMaybe v of
+  case varMultMaybe v of
     Just (Regular w) -> Just w
     Just Alias -> Just One
   -- It may be preferable to fail returning a multiplicity in the 'Alias' case,
@@ -422,8 +422,8 @@ varWeight id = case varWeightMaybe id of
   Nothing -> error "Attempted to retrieve the weight of a non-Id variable"
 
 scaleVarBy :: Id -> Rig -> Id
-scaleVarBy id@(Id { varWeightedness = Regular w }) r =
-  id { varWeightedness = Regular (r * w) }
+scaleVarBy id@(Id { varMult = Regular w }) r =
+  id { varMult = Regular (r * w) }
   -- Note that alias-like variables are preserved by scaling. Consider the
   -- transformation `let x_π = let y_ue = u in v in e ==> let y_ue = u in let
   -- x_π = v in e` if `y` were regular it would need to be scaled (by a factor
@@ -434,19 +434,19 @@ scaleVarBy id@(Id { varWeightedness = Regular w }) r =
   -- introduces a multiplicity constraint, while an alias-like let doesn't.
 scaleVarBy id _ = id
 
-setVarWeightedness :: Id -> VarMult -> Id
-setVarWeightedness id r | isId id = id { varWeightedness = r }
-setVarWeightedness id _ = id
+setVarMult :: Id -> VarMult -> Id
+setVarMult id r | isId id = id { varMult = r }
+setVarMult id _ = id
 
 setVarWeight :: Id -> Rig -> Id
-setVarWeight id w = setVarWeightedness id (Regular w)
+setVarWeight id w = setVarMult id (Regular w)
 
 isUnrestrictedVar :: Id -> Bool
-isUnrestrictedVar Id { varWeightedness = Regular Omega } = True
+isUnrestrictedVar Id { varMult = Regular Omega } = True
 isUnrestrictedVar _ = False
 
 isAliasLikeVar :: Id -> Bool
-isAliasLikeVar Id { varWeightedness = Alias } = True
+isAliasLikeVar Id { varMult = Alias } = True
 isAliasLikeVar _ = False
 
 {- *********************************************************************
@@ -678,7 +678,7 @@ mk_id :: Name -> VarMult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
 mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
-         varWeightedness  = w,
+         varMult  = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,

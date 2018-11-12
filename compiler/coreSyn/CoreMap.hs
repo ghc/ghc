@@ -194,7 +194,7 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
-      && D env1 (varWeightednessMaybe b1) == D env2 (varWeightednessMaybe b2)
+      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)

@@ -760,7 +760,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
   = do  { let_ue <- lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
         ; let (rhs_ue, update_ue) =
-                case varWeightedness bndr of
+                case varMult bndr of
                   Regular w -> (w `scaleUE` let_ue, id)
                   Alias -> (zeroUE, addAliasUE bndr let_ue)
         ; (body_ty, body_ue) <-
@@ -950,7 +950,7 @@ checkJoinOcc var n_args
 -- from the usage environment (this is important because of shadowing).
 checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
 checkLinearity body_ue lam_var =
-  case varWeightednessMaybe lam_var of
+  case varMultMaybe lam_var of
     Just (Regular mult) -> do
       ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
       return $ deleteUE body_ue lam_var

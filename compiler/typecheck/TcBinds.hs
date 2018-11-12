@@ -696,7 +696,7 @@ tcPolyCheck prag_fn
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
        ; ev_vars   <- newEvVars theta
-       ; let mono_id   = mkLocalId mono_name (varWeightedness poly_id) tau
+       ; let mono_id   = mkLocalId mono_name (varMult poly_id) tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
 
