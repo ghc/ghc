@@ -3,7 +3,7 @@ Linear17.hs:13:8: error:
     Variable not in scope: error :: [GHC.Types.Char] -> a
 
 Linear17.hs:19:3: error:
-    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘0’
+    • Couldn't match expected multiplicity ‘1’ of variable ‘x’ with actual multiplicity ‘0’
     • In a stmt of a 'do' block: x <- ()
       In the expression:
         do x <- ()
@@ -19,7 +19,7 @@ Linear17.hs:19:3: error:
                  ....
 
 Linear17.hs:27:6: error:
-    • Couldn't match expected weight ‘1’ of variable ‘z’ with actual weight ‘0’
+    • Couldn't match expected multiplicity ‘1’ of variable ‘z’ with actual multiplicity ‘0’
     • In the pattern: (y, z)
       In a stmt of a 'do' block: (y, z) <- ((), x)
       In the expression:

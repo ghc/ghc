@@ -623,9 +623,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
         Smaller -> return ()
         Unknown -> tcSubMult actual_w w
         Larger  ->
-          addErrTc $ text "Couldn't match expected weight" <+> quotes (ppr w) <+>
+          addErrTc $ text "Couldn't match expected multiplicity" <+> quotes (ppr w) <+>
                      text "of variable" <+> quotes (ppr x) <+>
-                     text "with actual weight" <+> quotes (ppr actual_w)
+                     text "with actual multiplicity" <+> quotes (ppr actual_w)
           -- In case of error, recover by pretending that the multiplicity usage was correct
       return $ deleteUE uenv x
 
