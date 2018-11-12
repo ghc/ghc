@@ -121,7 +121,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
-import Data.List        ( mapAccumL, partition )
+import Data.List        ( mapAccumL )
 import Control.Arrow    ( second )
 import qualified Data.Semigroup as Semi
 

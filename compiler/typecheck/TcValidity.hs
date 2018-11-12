@@ -7,7 +7,6 @@
 
 module TcValidity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
-  ContextKind(..), expectedKindInCtxt,
   checkValidTheta, checkValidFamPats,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
@@ -403,26 +402,6 @@ checkTySynRhs ctxt ty
   = return ()
   where
     actual_kind = typeKind ty
-
--- | The kind expected in a certain context.
-data ContextKind = TheKind Kind   -- ^ a specific kind
-                 | AnyKind        -- ^ any kind will do
-                 | OpenKind       -- ^ something of the form @TYPE _@
-
--- Depending on the context, we might accept any kind (for instance, in a TH
--- splice), or only certain kinds (like in type signatures).
-expectedKindInCtxt :: UserTypeCtxt -> ContextKind
-expectedKindInCtxt (TySynCtxt _)   = AnyKind
-expectedKindInCtxt ThBrackCtxt     = AnyKind
-expectedKindInCtxt GhciCtxt        = AnyKind
--- The types in a 'default' decl can have varying kinds
--- See Note [Extended defaults]" in TcEnv
-expectedKindInCtxt DefaultDeclCtxt     = AnyKind
-expectedKindInCtxt TypeAppCtxt         = AnyKind
-expectedKindInCtxt (ForSigCtxt _)      = TheKind liftedTypeKind
-expectedKindInCtxt (InstDeclCtxt {})   = TheKind constraintKind
-expectedKindInCtxt SpecInstCtxt        = TheKind constraintKind
-expectedKindInCtxt _                   = OpenKind
 
 {-
 Note [Higher rank types]
