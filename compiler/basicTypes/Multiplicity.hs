@@ -24,7 +24,7 @@ module Multiplicity
   , staticOnly
   , tymult
   , knownOmega
-  , irrelevantWeight
+  , irrelevantMult
   , mkScaled
   , scaledSet
   , scaleScaled
@@ -156,8 +156,8 @@ tymult = Scaled Omega
 knownOmega :: GScaled t a -> a
 knownOmega = scaledThing
 
-irrelevantWeight :: GScaled t a -> a
-irrelevantWeight = scaledThing
+irrelevantMult :: GScaled t a -> a
+irrelevantMult = scaledThing
 
 mkScaled :: GMult t -> a -> GScaled t a
 mkScaled = Scaled

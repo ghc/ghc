@@ -578,7 +578,7 @@ rnHsTyKi env ty@(HsRecTy _ flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy _ ty1 weight ty2)
+rnHsTyKi env (HsFunTy _ ty1 mult ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
         -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
@@ -586,8 +586,8 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; (weight', w_fvs) <- rnRig env weight
-       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') funTyConName funTyFixity ty1' ty2'
+       ; (mult', w_fvs) <- rnRig env mult
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
     hs_fun_ty w a b = HsFunTy noExt a w b
@@ -1188,11 +1188,11 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExt ty21 op2 ty22))
                       (\t1 t2 -> HsOpTy noExt t1 op2 t2)
                       (unLoc op2) fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 weight ty22))
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 mult ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
                 hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
   where
-    hs_fun_ty a b = HsFunTy noExt a weight b
+    hs_fun_ty a b = HsFunTy noExt a mult b
 
 mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
   = return (mk1 ty1 ty2)

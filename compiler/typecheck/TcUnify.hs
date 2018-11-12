@@ -154,12 +154,12 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy weight arg_ty res_ty)
+    go acc_arg_tys n (FunTy mult arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (result, wrap_res) <- go ((Scaled weight $ mkCheckExpType arg_ty) : acc_arg_tys)
+        do { (result, wrap_res) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
-                    , mkWpFun idHsWrapper wrap_res (Scaled weight arg_ty) res_ty doc ) }
+                    , mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty doc ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -755,15 +755,15 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- caused Trac #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
-    go (FunTy act_weight act_arg act_res) (FunTy exp_weight exp_arg exp_res)
+    go (FunTy act_mult act_arg act_res) (FunTy exp_mult exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { tcEqMult eq_orig inst_orig ctxt act_weight exp_weight
+        do { tcEqMult eq_orig inst_orig ctxt act_mult exp_mult
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
                          -- GenSigCtxt: See Note [Setting the argument context]
-           ; return (mkWpFun arg_wrap res_wrap (Scaled exp_weight exp_arg) exp_res doc) }
+           ; return (mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
@@ -830,14 +830,14 @@ tcSubMult :: Mult -> Mult -> TcM ()
 tcSubMult actual_w w
   = do_one actual_w
   where
-    do_one weight =
-      case weight of
+    do_one mult =
+      case mult of
         RigAdd _ _ -> do
           tcSubMult Omega w
         RigMul m1 m2 -> do
           tcSubMult m1 w
           tcSubMult m2 w
-        _ -> do_one_action weight w
+        _ -> do_one_action mult w
 
     do_one_action a_w c_w
        = tcEqMult AppOrigin AppOrigin TypeAppCtxt a_w c_w

@@ -754,7 +754,7 @@ isHsOmega :: HsMult pass -> Bool
 isHsOmega HsOmega = True
 isHsOmega _ = False
 
-data HsScaled pass a = HsScaled { hsWeight :: HsMult pass, hsThing :: a }
+data HsScaled pass a = HsScaled { hsMult :: HsMult pass, hsThing :: a }
   deriving (Traversable, Functor, Foldable)
 
 instance Outputable a => Outputable (HsScaled pass a) where

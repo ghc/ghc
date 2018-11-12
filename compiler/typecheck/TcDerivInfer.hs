@@ -134,10 +134,10 @@ inferConstraintsDataConArgs inst_ty inst_tys
                             dataConInstOrigArgTys data_con all_rep_tc_args
                        -- No constraints for unlifted types
                        -- See Note [Deriving and unboxed types]
-                     , not (isUnliftedType (irrelevantWeight arg_ty))
+                     , not (isUnliftedType (irrelevantMult arg_ty))
                      , let orig = DerivOriginDC data_con arg_n wildcard
                      , preds_and_mbSubst
-                         <- get_arg_constraints orig arg_t_or_k (irrelevantWeight arg_ty)
+                         <- get_arg_constraints orig arg_t_or_k (irrelevantMult arg_ty)
                      ]
                    preds = concat predss
                    -- If the constraints require a subtype to be of kind

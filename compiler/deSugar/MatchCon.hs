@@ -94,13 +94,13 @@ matchConFamily :: [Id]
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
 matchConFamily (var:vars) ty groups
-  = do let weight = idWeight var
+  = do let mult = idWeight var
            -- Each variable in the argument list correspond to one column in the
            -- pattern matching equations. Its multiplicity is the context
            -- multiplicity of the pattern. We extract that multiplicity, so that
            -- 'matchOneconLike' knows the context multiplicity, in case it needs
            -- to come up with new variables.
-       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty weight) groups
+       alts <- mapM (fmap toRealAlt . matchOneConLike vars ty mult) groups
        return (mkCoAlgCaseMatchResult var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
@@ -114,8 +114,8 @@ matchPatSyn :: [Id]
             -> DsM MatchResult
 matchPatSyn (var:vars) ty eqns
   = do
-       let weight = idWeight var
-       alt <- fmap toSynAlt $ matchOneConLike vars ty weight eqns
+       let mult = idWeight var
+       alt <- fmap toSynAlt $ matchOneConLike vars ty mult eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
@@ -130,7 +130,7 @@ matchOneConLike :: [Id]
                 -> Mult
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single constructor
+matchOneConLike vars ty mult (eqn1 : eqns)   -- All eqns for a single constructor
   = do  { let inst_tys = ASSERT( all tcIsTcTyVar ex_tvs )
                            -- ex_tvs can only be tyvars as data types in source
                            -- Haskell cannot mention covar yet (Aug 2018).
@@ -161,7 +161,7 @@ matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single construc
                             , eqn { eqn_pats = conArgPats val_arg_tys args ++ pats }
                             )
               shift (_, (EqnInfo { eqn_pats = ps })) = pprPanic "matchOneCon/shift" (ppr ps)
-        ; let scaled_arg_tys = map (scaleScaled weight) val_arg_tys
+        ; let scaled_arg_tys = map (scaleScaled mult) val_arg_tys
             -- The 'val_arg_tys' are taken from the data type definition, they
             -- do not take into account the context multiplicity, therefore we
             -- need to scale them back to get the correct context multiplicity

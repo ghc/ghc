@@ -52,7 +52,7 @@ module TcHsType (
         -- Zonking and promoting
         zonkPromoteType,
 
-        -- Weight
+        -- Multiplicity
         tcMult,
 
         -- Pattern type signatures
@@ -397,7 +397,7 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
     mode = allowUnsaturated typeLevelMode
 
 tcMult :: HsMult GhcRn -> TcM Mult
-tcMult hc = tc_weight typeLevelMode hc
+tcMult hc = tc_mult typeLevelMode hc
 
 {-
 ************************************************************************
@@ -583,22 +583,22 @@ tc_lhs_type mode (L span ty) exp_kind
 
 ------------------------------------------
 tc_fun_type :: TcTyMode -> HsMult GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
-tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
+tc_fun_type mode mult ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; weight' <- tc_weight mode weight
-       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
+       ; mult' <- tc_mult mode mult
+       ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; weight' <- tc_weight mode weight
-       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
+       ; mult' <- tc_mult mode mult
+       ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
 
-tc_weight :: TcTyMode -> HsMult GhcRn -> TcM Mult
-tc_weight mode r = case r of
+tc_mult :: TcTyMode -> HsMult GhcRn -> TcM Mult
+tc_mult mode r = case r of
                          HsZero -> return Zero
                          HsOne  -> return One
                          HsOmega -> return Omega
@@ -649,11 +649,11 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
-tc_hs_type mode ty@(HsFunTy _ ty1 weight ty2) exp_kind
-  | mode_level mode == KindLevel && not (isHsOmega weight)
+tc_hs_type mode ty@(HsFunTy _ ty1 mult ty2) exp_kind
+  | mode_level mode == KindLevel && not (isHsOmega mult)
     = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
   | otherwise
-    = tc_fun_type mode weight ty1 ty2 exp_kind
+    = tc_fun_type mode mult ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
@@ -2586,7 +2586,7 @@ tcPatSig in_pat_bind sig res_ty
         -- that should be brought into scope
 
         ; let sig_wcs = map (\(x,y)-> (x,scaledSet res_ty y)) sig_wcs0
-        ; let sig_tvs_weighted = map (\(x, y) -> (x, scaledSet res_ty y)) sig_tvs
+        ; let sig_tvs_scaled = map (\(x, y) -> (x, scaledSet res_ty y)) sig_tvs
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $
@@ -2616,7 +2616,7 @@ tcPatSig in_pat_bind sig res_ty
                   tcSubTypeET PatSigOrigin PatSigCtxt (scaledThing res_ty) sig_ty
 
         -- Phew!
-        ; return (sig_ty, sig_tvs_weighted, sig_wcs, wrap)
+        ; return (sig_ty, sig_tvs_scaled, sig_wcs, wrap)
         } }
   where
     mk_msg sig_ty tidy_env

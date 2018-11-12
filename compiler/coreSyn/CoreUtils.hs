@@ -2398,11 +2398,11 @@ tryEtaReduce bndrs body
        , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
-       , let weight = idWeight v
+       , let mult = idWeight v
        , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty
-       , weight `eqMult` fun_mult -- There is no change in multiplicity, otherwise we must abort
+       , mult `eqMult` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
-         in Just (mkFunCo Representational (multToCo weight) reflCo co, [])
+         in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty -- TODO: see above

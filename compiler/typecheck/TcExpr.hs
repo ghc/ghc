@@ -574,13 +574,13 @@ tcExpr (HsCase x scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          let weight = Omega
+          let mult = Omega
             -- There is not yet syntax or inference mechanism for case
             -- expressions to be anything else than unrestricted.
-        ; (scrut', scrut_ty) <- tcScalingUsage weight $ tcInferRho scrut
+        ; (scrut', scrut_ty) <- tcScalingUsage mult $ tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; matches' <- tcMatchesCase match_ctxt (Scaled weight scrut_ty) matches res_ty
+        ; matches' <- tcMatchesCase match_ctxt (Scaled mult scrut_ty) matches res_ty
         ; return (HsCase x scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
@@ -916,7 +916,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
               (con1_tvs, _, _, _prov_theta, req_theta, scaled_con1_arg_tys, _)
                  = conLikeFullSig con1
               con1_arg_tys = map scaledThing scaled_con1_arg_tys
-                -- Remark: we can safely drop the weight of field because it's
+                -- Remark: we can safely drop the multiplicity of field because it's
                 -- always 1, this way we don't need to handle it in the rest of
                 -- the function
               con1_flds   = map flLabel $ conLikeFieldLabels con1
@@ -1456,8 +1456,8 @@ tcArg :: LHsExpr GhcRn                    -- The function (for error messages)
       -> Scaled TcRhoType                 -- expected (scaled) arg type
       -> Int                              -- # of argument
       -> TcM (LHsExpr GhcTcId)            -- Resulting argument
-tcArg fun arg (Scaled weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcScalingUsage weight $ tcPolyExprNC arg ty
+tcArg fun arg (Scaled mult ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
+                          tcScalingUsage mult $ tcPolyExprNC arg ty
 
 ----------------
 tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTcId]

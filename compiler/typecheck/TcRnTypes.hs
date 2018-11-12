@@ -828,7 +828,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
-        tcl_usage :: TcRef UsageEnv, -- Required weight of bindings is accumulated here.
+        tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
 
 
         tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,

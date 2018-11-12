@@ -611,9 +611,9 @@ AST is used for the subtraction operation.
 -}
 
 -- See Note [NPlusK patterns]
-tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted thing_inside
+tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_scaled thing_inside
   = do  { checkLinearity
-        ; pat_ty <- expTypeToType (scaledThing pat_ty_weighted)
+        ; pat_ty <- expTypeToType (scaledThing pat_ty_scaled)
         ; let orig = LiteralOrigin lit
         ; (lit1', ge')
             <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
@@ -625,7 +625,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
                \ [lit2_ty, var_ty] _ ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
                   ; (wrap, bndr_id) <- setSrcSpan nm_loc $
-                                     tcPatBndr penv name (pat_ty_weighted `scaledSet` mkCheckExpType var_ty)
+                                     tcPatBndr penv name (pat_ty_scaled `scaledSet` mkCheckExpType var_ty)
                            -- co :: var_ty ~ idType bndr_id
 
                            -- minus_wrap is applicable to minus'
@@ -637,7 +637,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
           do { icls <- tcLookupClass integralClassName
              ; instStupidTheta orig [mkClassPred icls [pat_ty]] }
 
-        ; res <- tcExtendIdEnv1 name (pat_ty_weighted `scaledSet` bndr_id) thing_inside
+        ; res <- tcExtendIdEnv1 name (pat_ty_scaled `scaledSet` bndr_id) thing_inside
 
         ; let minus'' = minus' { syn_res_wrap =
                                     minus_wrap <.> syn_res_wrap minus' }
@@ -646,7 +646,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
         ; return (pat', res) }
     where
       checkLinearity =
-        when (not $ submult Omega (scaledMult pat_ty_weighted)) $
+        when (not $ submult Omega (scaledMult pat_ty_scaled)) $
           addErrTc $ text "N+K patterns are only allowed at multiplicity ω"
 
 
@@ -768,7 +768,7 @@ tcDataConPat :: PatEnv -> Located Name -> DataCon
              -> Scaled ExpSigmaType               -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTcId, a)
-tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_inside
+tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
                   -- For data families this is the representation tycon
               (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
@@ -778,8 +778,8 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
           -- Instantiate the constructor type variables [a->ty]
           -- This may involve doing a family-instance coercion,
           -- and building a wrapper
-        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty_weighted
-        ; pat_ty <- readExpType (scaledThing pat_ty_weighted)
+        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty_scaled
+        ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
 
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
@@ -800,8 +800,8 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
               -- pat_ty' /= pat_ty iff coi /= IdCo
 
               arg_tys' = getCompose $ substTys tenv (Compose arg_tys)
-              pat_mult = scaledMult pat_ty_weighted
-              arg_tys_weighted = map (scaleScaled pat_mult) arg_tys'
+              pat_mult = scaledMult pat_ty_scaled
+              arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
 
         ; traceTc "tcConPat" (vcat [ ppr con_name
                                    , pprTyVars univ_tvs
@@ -815,7 +815,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
         ; if null ex_tvs && null eq_spec && null theta
           then do { -- The common case; no class bindings etc
                     -- (see Note [Arrows and patterns])
-                    (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys_weighted
+                    (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys_scaled
                                                   arg_pats penv thing_inside
                   ; let res_pat = ConPatOut { pat_con = header,
                                               pat_tvs = [], pat_dicts = [],
@@ -849,7 +849,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
         ; given <- newEvVars theta'
         ; (ev_binds, (arg_pats', res))
              <- checkConstraints skol_info ex_tvs' given $
-                tcConArgs (RealDataCon data_con) arg_tys_weighted arg_pats penv thing_inside
+                tcConArgs (RealDataCon data_con) arg_tys_scaled arg_pats penv thing_inside
 
         ; let res_pat = ConPatOut { pat_con   = header,
                                     pat_tvs   = ex_tvs',
@@ -876,7 +876,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; let ty'         = substTy tenv ty
               arg_tys'    = getCompose $ substTys tenv (Compose arg_tys)
               pat_mult    = scaledMult pat_ty
-              arg_tys_weighted = map (scaleScaled pat_mult) arg_tys'
+              arg_tys_scaled = map (scaleScaled pat_mult) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
@@ -904,7 +904,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; traceTc "checkConstraints {" Outputable.empty
         ; (ev_binds, (arg_pats', res))
              <- checkConstraints skol_info ex_tvs' prov_dicts' $
-                tcConArgs (PatSynCon pat_syn) arg_tys_weighted arg_pats penv thing_inside
+                tcConArgs (PatSynCon pat_syn) arg_tys_scaled arg_pats penv thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPatOut { pat_con   = L con_span $ PatSynCon pat_syn,
