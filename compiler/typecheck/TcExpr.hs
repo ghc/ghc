@@ -380,7 +380,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
-       ; tcSubWeight Omega (weightedWeight arg2_sigma)
+       ; tcSubMult Omega (weightedWeight arg2_sigma)
          -- When ($) becomes multiplicity-polymorphic, then the above check will
          -- need to go. But in the meantime, it would produce ill-typed
          -- desugared code to accept linear functions to the left of a ($).

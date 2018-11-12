@@ -11,7 +11,7 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubWeight,
+  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubMult,
   tcSubTypeDS_NC_O, tcSubTypeET,
   checkConstraints, checkTvConstraints,
   buildImplicationFor,
@@ -826,17 +826,17 @@ tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
 -- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
 -- <= w
 -- The error messages from this function are currently awful.
-tcSubWeight :: Rig -> Rig -> TcM ()
-tcSubWeight actual_w w
+tcSubMult :: Rig -> Rig -> TcM ()
+tcSubMult actual_w w
   = do_one actual_w
   where
     do_one weight =
       case weight of
         RigAdd _ _ -> do
-          tcSubWeight Omega w
+          tcSubMult Omega w
         RigMul m1 m2 -> do
-          tcSubWeight m1 w
-          tcSubWeight m2 w
+          tcSubMult m1 w
+          tcSubMult m2 w
         _ -> do_one_action weight w
 
     do_one_action a_w c_w

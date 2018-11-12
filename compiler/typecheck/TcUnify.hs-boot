@@ -14,4 +14,4 @@ import HsExtension ( GhcRn )
 unifyType :: Maybe (HsExpr GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
 unifyKind :: Maybe (HsType GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
 
-tcSubWeight :: Rig -> Rig -> TcM ()
+tcSubMult :: Rig -> Rig -> TcM ()

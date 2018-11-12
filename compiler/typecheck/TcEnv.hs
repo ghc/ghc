@@ -83,7 +83,7 @@ import TcMType
 import Multiplicity
 import UsageEnv
 import TcType
-import {-# SOURCE #-} TcUnify ( tcSubWeight )
+import {-# SOURCE #-} TcUnify ( tcSubMult )
 import LoadIface
 import PrelNames
 import TysWiredIn
@@ -621,7 +621,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
       traceTc "check_binder" (ppr w $$ ppr actual_w)
       case subweightMaybe actual_w w of
         Smaller -> return ()
-        Unknown -> tcSubWeight actual_w w
+        Unknown -> tcSubMult actual_w w
         Larger  ->
           addErrTc $ text "Couldn't match expected weight" <+> quotes (ppr w) <+>
                      text "of variable" <+> quotes (ppr x) <+>
