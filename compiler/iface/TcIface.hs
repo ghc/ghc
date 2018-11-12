@@ -1154,7 +1154,7 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
-tcIfaceRig :: IfaceType -> IfL Rig
+tcIfaceRig :: IfaceType -> IfL Mult
 tcIfaceRig if_ty = toMult <$> tcIfaceType if_ty
 
 tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceAppArgs -> IfL Type
@@ -1392,7 +1392,7 @@ tcIfaceLit (LitNumber LitNumNatural i _)
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> Rig -> (TyCon, [Type])
+tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> (IfaceConAlt, [FastString], IfaceExpr)
            -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceAlt _ _ _ (IfaceDefault, names, rhs)
@@ -1415,7 +1415,7 @@ tcIfaceAlt scrut weight (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
         ; tcIfaceDataAlt weight con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: Rig -> DataCon -> [Type] -> [FastString] -> IfaceExpr
+tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [FastString] -> IfaceExpr
                -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceDataAlt weight con inst_tys arg_strs rhs
   = do  { us <- newUniqueSupply

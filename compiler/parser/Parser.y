@@ -61,7 +61,7 @@ import Module
 import BasicTypes
 
 -- compiler/types
-import Type             ( funTyCon, Rig(..) )
+import Type             ( funTyCon, Mult(..) )
 import Kind             ( Kind )
 import Class            ( FunDep )
 

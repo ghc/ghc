@@ -662,7 +662,7 @@ filterAlts _tycon inst_tys imposs_cons alts
 -- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
 -- See Note [Refine Default Alts]
 refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
-                 -> Rig               -- ^ Weight
+                 -> Mult              -- ^ Multiplicity
                  -> TyCon             -- ^ Type constructor of scrutinee's type
                  -> [Type]            -- ^ Type arguments of scrutinee's type
                  -> [AltCon]          -- ^ Constructors that cannot match the DEFAULT (if any)
@@ -909,7 +909,7 @@ combineIdenticalAlts imposs_cons alts
 
 -- Scales the multiplicity of the binders of a list of case alternatives. That
 -- is, in [C x1…xn -> u], the multiplicity of x1…xn is scaled.
-scaleAltsBy :: Rig -> [CoreAlt] -> [CoreAlt]
+scaleAltsBy :: Mult -> [CoreAlt] -> [CoreAlt]
 scaleAltsBy w alts = map scaleAlt alts
   where
     scaleAlt :: CoreAlt -> CoreAlt
@@ -1887,15 +1887,15 @@ exprIsTickedString_maybe _ = Nothing
 These InstPat functions go here to avoid circularity between DataCon and Id
 -}
 
-dataConRepInstPat   ::                 [Unique] -> Rig -> DataCon -> [Type] -> ([TyCoVar], [Id])
-dataConRepFSInstPat :: [FastString] -> [Unique] -> Rig -> DataCon -> [Type] -> ([TyCoVar], [Id])
+dataConRepInstPat   ::                 [Unique] -> Mult -> DataCon -> [Type] -> ([TyCoVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> Mult -> DataCon -> [Type] -> ([TyCoVar], [Id])
 
 dataConRepInstPat   = dataConInstPat (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat
 
 dataConInstPat :: [FastString]          -- A long enough list of FSs to use for names
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
-               -> Rig                   -- The multiplicity annotation of the case expression: scales the multiplicity of variables
+               -> Mult                  -- The multiplicity annotation of the case expression: scales the multiplicity of variables
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
                -> ([TyCoVar], [Id])     -- Return instantiated variables

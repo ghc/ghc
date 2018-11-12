@@ -29,7 +29,7 @@ module TyCoRep (
         KnotTied,
         PredType, ThetaType,      -- Synonyms
         ArgFlag(..),
-        Rig, Scaled,
+        Mult, Scaled,
 
         -- * Coercions
         Coercion(..),
@@ -314,7 +314,7 @@ data Type
         {-# UNPACK #-} !TyCoVarBinder
         Type            -- ^ A Π type.
 
-  | FunTy Rig Type Type     -- ^ t1 ->_p t2   Very common, so an important special case
+  | FunTy Mult Type Type     -- ^ t1 ->_p t2   Very common, so an important special case
 
   | LitTy TyLit     -- ^ Type literals are similar to type constructors.
 
@@ -334,7 +334,7 @@ data Type
   deriving Data.Data
 
 -- | Common short-hands
-type Rig = GMult Type
+type Mult = GMult Type
 type Scaled = GScaled Type
 
 instance Multable Type where
@@ -827,7 +827,7 @@ mkTyCoVarTys = map mkTyCoVarTy
 infixr 3 `mkFunTy`      -- Associates to the right
 infixr 3 `mkFunTyOm`
 -- | Make an arrow type
-mkFunTy :: Rig -> Type -> Type -> Type
+mkFunTy :: Mult -> Type -> Type -> Type
 mkFunTy weight arg res = FunTy weight arg res
 
 mkScaledFunTy :: Scaled Type -> Type -> Type
@@ -1758,7 +1758,7 @@ tyCoVarsOfType ty = ty_co_vars_of_type ty emptyVarSet emptyVarSet
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
 
-ty_co_vars_of_rig :: Rig -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
+ty_co_vars_of_rig :: Mult -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_rig Zero         is acc = acc
 ty_co_vars_of_rig One          is acc = acc
 ty_co_vars_of_rig Omega        is acc = acc
@@ -1864,7 +1864,7 @@ tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
-tyCoVarsOfRigDSet :: Rig -> DTyCoVarSet
+tyCoVarsOfRigDSet :: Mult -> DTyCoVarSet
 tyCoVarsOfRigDSet r = fvDVarSet $ tyCoFVsOfRig r
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
@@ -1923,7 +1923,7 @@ tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfT
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
 
-tyCoFVsOfRig :: Rig -> FV
+tyCoFVsOfRig :: Mult -> FV
 tyCoFVsOfRig (RigThing t) a b c = (tyCoFVsOfType t) a b c
 tyCoFVsOfRig (RigAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
 tyCoFVsOfRig (RigMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
@@ -2032,7 +2032,7 @@ getCoVarSet fv = snd (fv isCoVar emptyVarSet ([], emptyVarSet))
 coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
 
-coVarsOfRig :: Rig -> CoVarSet
+coVarsOfRig :: Mult -> CoVarSet
 coVarsOfRig (RigThing t) = coVarsOfType t
 coVarsOfRig _ = emptyVarSet
 
@@ -2111,7 +2111,7 @@ almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
 almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
 
-almost_devoid_co_var_of_rig :: Rig -> CoVar -> Bool
+almost_devoid_co_var_of_rig :: Mult -> CoVar -> Bool
 almost_devoid_co_var_of_rig Zero _ = False
 almost_devoid_co_var_of_rig One _ = False
 almost_devoid_co_var_of_rig Omega _ = False
@@ -2204,7 +2204,7 @@ noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
-noFreeVarsOfRig :: Rig -> Bool
+noFreeVarsOfRig :: Mult -> Bool
 noFreeVarsOfRig (RigThing ty) = noFreeVarsOfType ty
 noFreeVarsOfRig (RigAdd m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
 noFreeVarsOfRig (RigMul m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
@@ -2838,7 +2838,7 @@ substTy subst ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
-substRigUnchecked :: TCvSubst -> Rig -> Rig
+substRigUnchecked :: TCvSubst -> Mult -> Mult
 substRigUnchecked subst r
   | isEmptyTCvSubst subst = r
   | otherwise             = subst_rig subst r
@@ -2915,7 +2915,7 @@ subst_ty subst ty
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
-subst_rig :: TCvSubst -> Rig -> Rig
+subst_rig :: TCvSubst -> Mult -> Mult
 subst_rig subst (RigThing t) = RigThing (subst_ty subst t)
 subst_rig subst (RigAdd m1 m2) = RigAdd (subst_rig subst m1) (subst_rig subst m2)
 subst_rig subst (RigMul m1 m2) = RigMul (subst_rig subst m1) (subst_rig subst m2)

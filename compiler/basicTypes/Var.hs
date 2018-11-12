@@ -88,7 +88,7 @@ module Var (
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType, Rig )
+import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType, Mult )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
@@ -260,7 +260,7 @@ data ExportFlag   -- See Note [ExportFlag on binders]
   | Exported      -- ^ Exported: kept alive
 
 data VarMult
-  = Regular Rig
+  = Regular Mult
   -- ^ a normal variable, carrying a multiplicity like in the Linear Haskell
   -- paper
   | Alias
@@ -401,7 +401,7 @@ varMultMaybe :: Id -> Maybe VarMult
 varMultMaybe (Id { varMult = mult }) = Just mult
 varMultMaybe _ = Nothing
 
-varWeightMaybe :: Id -> Maybe Rig
+varWeightMaybe :: Id -> Maybe Mult
 varWeightMaybe v =
   case varMultMaybe v of
     Just (Regular w) -> Just w
@@ -412,16 +412,16 @@ varWeightMaybe v =
   -- binders.
     Nothing -> Nothing
 
-varWeightDef :: Id -> Rig
+varWeightDef :: Id -> Mult
 varWeightDef = fromMaybe Omega . varWeightMaybe
 
 -- Assumes that `id` is a term variable (`Id`)
-varWeight :: Id -> Rig
+varWeight :: Id -> Mult
 varWeight id = case varWeightMaybe id of
   Just x -> x
   Nothing -> error "Attempted to retrieve the weight of a non-Id variable"
 
-scaleVarBy :: Id -> Rig -> Id
+scaleVarBy :: Id -> Mult -> Id
 scaleVarBy id@(Id { varMult = Regular w }) r =
   id { varMult = Regular (r * w) }
   -- Note that alias-like variables are preserved by scaling. Consider the
@@ -438,7 +438,7 @@ setVarMult :: Id -> VarMult -> Id
 setVarMult id r | isId id = id { varMult = r }
 setVarMult id _ = id
 
-setVarWeight :: Id -> Rig -> Id
+setVarWeight :: Id -> Mult -> Id
 setVarWeight id w = setVarMult id (Regular w)
 
 isUnrestrictedVar :: Id -> Bool

@@ -30,6 +30,6 @@ isMultiplicityTy :: Type -> Bool
 instance Data Type
   -- To support Data instances in CoAxiom
 
-type Rig = GMult Type
+type Mult = GMult Type
 type Scaled = GScaled Type
 instance Multable Type

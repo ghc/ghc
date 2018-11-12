@@ -123,7 +123,7 @@ data SimplCont
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_weight :: Mult }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -154,7 +154,7 @@ data SimplCont
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
       , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_weight :: Mult }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -274,7 +274,7 @@ data ArgInfo
     }
 
 data ArgSpec
-  = ValArg Rig OutExpr                -- Apply to this (coercion or value); c.f. ApplyToVal
+  = ValArg Mult OutExpr               -- Apply to this (coercion or value); c.f. ApplyToVal
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
@@ -284,7 +284,7 @@ instance Outputable ArgSpec where
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo -> (Rig, OutExpr) -> ArgInfo
+addValArgTo :: ArgInfo -> (Mult, OutExpr) -> ArgInfo
 addValArgTo ai (w, arg) = ai { ai_args = ValArg w arg : ai_args ai
                           , ai_type = applyTypeToArg (ai_type ai) arg
                           , ai_rules = decRules (ai_rules ai) }

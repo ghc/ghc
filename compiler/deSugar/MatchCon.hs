@@ -127,7 +127,7 @@ type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
 
 matchOneConLike :: [Id]
                 -> Type
-                -> Rig
+                -> Mult
                 -> [EquationInfo]
                 -> DsM (CaseAlt ConLike)
 matchOneConLike vars ty weight (eqn1 : eqns)   -- All eqns for a single constructor

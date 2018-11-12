@@ -586,7 +586,7 @@ substCoVarBndr (Subst in_scope id_env tv_env cv_env) cv
 substTy :: Subst -> Type -> Type
 substTy subst ty = Type.substTyUnchecked (getTCvSubst subst) ty
 
-substRig :: Subst -> Rig -> Rig
+substRig :: Subst -> Mult -> Mult
 substRig subst ty = Type.substRigUnchecked (getTCvSubst subst) ty
 
 getTCvSubst :: Subst -> TCvSubst

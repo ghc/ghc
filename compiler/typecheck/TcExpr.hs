@@ -1475,7 +1475,7 @@ tcSyntaxOp :: CtOrigin
            -> SyntaxExpr GhcRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpRhoType               -- ^ overall result type
-           -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ Type check any arguments
+           -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ Type check any arguments
            -> TcM (a, SyntaxExpr GhcTcId)
 -- ^ Typecheck a syntax operator
 -- The operator is always a variable at this stage (i.e. renamer output)
@@ -1488,7 +1488,7 @@ tcSyntaxOpGen :: CtOrigin
               -> SyntaxExpr GhcRn
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> [Rig] -> TcM a)
+              -> ([TcSigmaType] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExpr GhcTcId)
 tcSyntaxOpGen orig (SyntaxExpr { syn_expr = HsVar _ (L _ op) })
               arg_tys res_ty thing_inside
@@ -1517,7 +1517,7 @@ two tcSynArgs.
 tcSynArgE :: CtOrigin
           -> TcSigmaType
           -> SyntaxOpType                -- ^ shape it is expected to have
-          -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ check the arguments
+          -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper)
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig sigma_ty syn_ty thing_inside
@@ -1593,7 +1593,7 @@ tcSynArgA :: CtOrigin
           -> TcSigmaType
           -> [SyntaxOpType]              -- ^ argument shapes
           -> SyntaxOpType                -- ^ result shape
-          -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ check the arguments
+          -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper, [HsWrapper], HsWrapper)
             -- ^ returns a wrapper to be applied to the original function,
             -- wrappers to be applied to arguments
@@ -1611,7 +1611,7 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
     herald = text "This rebindable syntax expects a function with"
 
     tc_syn_args_e :: [TcSigmaType] -> [SyntaxOpType]
-                  -> ([TcSigmaType] -> [Rig] -> TcM a)
+                  -> ([TcSigmaType] -> [Mult] -> TcM a)
                   -> TcM (a, [HsWrapper])
                     -- the wrappers are for arguments
     tc_syn_args_e (arg_ty : arg_tys) (arg_shape : arg_shapes) thing_inside

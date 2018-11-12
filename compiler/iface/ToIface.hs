@@ -186,7 +186,7 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
-toIfaceRig :: Rig -> IfaceRig
+toIfaceRig :: Mult -> IfaceRig
 toIfaceRig = toIfaceType . fromMult
 
 ----------------

@@ -615,7 +615,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
            ; let usage = tcl_usage env
            ; updTcRef usage (addUE uok) }
 
-    check_binder :: Rig -> Name -> UsageEnv -> TcM UsageEnv
+    check_binder :: Mult -> Name -> UsageEnv -> TcM UsageEnv
     check_binder w x uenv = do
       let actual_w = lookupUE uenv x
       traceTc "check_binder" (ppr w $$ ppr actual_w)
@@ -697,7 +697,7 @@ tcCollectingUsage thing_inside
 
 -- | @tcScalingUsage weight thing_inside@ runs @thing_inside@ and scales all the
 -- usage information by @weight@.
-tcScalingUsage :: Rig -> TcM a -> TcM a
+tcScalingUsage :: Mult -> TcM a -> TcM a
 tcScalingUsage weight thing_inside
   = do { (usage, result) <- tcCollectingUsage thing_inside
        ; tcEmitBindingUsage $ scaleUE weight usage

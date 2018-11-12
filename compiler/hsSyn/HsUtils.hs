@@ -696,7 +696,7 @@ typeToLHsType ty
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
-rigToHsMult :: Rig -> HsMult p
+rigToHsMult :: Mult -> HsMult p
 rigToHsMult Zero = HsZero
 rigToHsMult One  = HsOne
 rigToHsMult Omega = HsOmega

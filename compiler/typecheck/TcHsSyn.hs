@@ -1851,7 +1851,7 @@ zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
 zonkScaledTcTypeToTypeX env (Scaled r ty) = Scaled <$> zonkRigX env r
                                                          <*> zonkTcTypeToTypeX env ty
 
-zonkRigX :: ZonkEnv -> Rig -> TcM Rig
+zonkRigX :: ZonkEnv -> Mult -> TcM Mult
 zonkRigX env (RigThing t) = RigThing <$> zonkTcTypeToTypeX env t
 zonkRigX env (RigAdd m1 m2) = RigAdd <$> zonkRigX env m1 <*> zonkRigX env m2
 zonkRigX env (RigMul m1 m2) = RigMul <$> zonkRigX env m1 <*> zonkRigX env m2

@@ -193,7 +193,7 @@ mkWildEvBinder pred = mkWildValBinder Omega pred
 -- occurrence sites because it has a single, fixed unique, and it's very
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 -- See Note [WildCard binders] in SimplEnv
-mkWildValBinder :: Rig -> Type -> Id
+mkWildValBinder :: Mult -> Type -> Id
 mkWildValBinder w ty = mkLocalIdOrCoVar wildCardName (Regular w) ty
 
 mkWildCase :: CoreExpr -> Scaled Type -> Type -> [CoreAlt] -> CoreExpr

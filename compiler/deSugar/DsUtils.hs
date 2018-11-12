@@ -98,7 +98,7 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 -}
 
-selectSimpleMatchVarL :: Rig -> LPat GhcTc -> DsM Id
+selectSimpleMatchVarL :: Mult -> LPat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 
@@ -118,11 +118,11 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [(Rig, Pat GhcTc)] -> DsM [Id]
+selectMatchVars :: [(Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
-selectMatchVar :: Rig -> Pat GhcTc -> DsM Id
+selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)

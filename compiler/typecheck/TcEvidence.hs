@@ -281,7 +281,7 @@ WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-multRefl :: Rig -> TcCoercion
+multRefl :: Mult -> TcCoercion
 multRefl w = mkReflCo Representational (fromMult w)
 
 mkWpFun :: HsWrapper -> HsWrapper

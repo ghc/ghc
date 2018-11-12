@@ -396,7 +396,7 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
   where
     mode = allowUnsaturated typeLevelMode
 
-tcWeight :: HsMult GhcRn -> TcM Rig
+tcWeight :: HsMult GhcRn -> TcM Mult
 tcWeight hc = tc_weight typeLevelMode hc
 
 {-
@@ -597,7 +597,7 @@ tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
        ; weight' <- tc_weight mode weight
        ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
 
-tc_weight :: TcTyMode -> HsMult GhcRn -> TcM Rig
+tc_weight :: TcTyMode -> HsMult GhcRn -> TcM Mult
 tc_weight mode r = case r of
                          HsZero -> return Zero
                          HsOne  -> return One

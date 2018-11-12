@@ -811,7 +811,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM ()
+tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Mult -> Mult -> TcM ()
 tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
   { -- Note that here we do not call to `submultMaybe`, so we check
     -- for strict equality.
@@ -826,7 +826,7 @@ tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
 -- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
 -- <= w
 -- The error messages from this function are currently awful.
-tcSubMult :: Rig -> Rig -> TcM ()
+tcSubMult :: Mult -> Mult -> TcM ()
 tcSubMult actual_w w
   = do_one actual_w
   where

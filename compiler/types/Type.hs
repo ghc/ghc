@@ -16,7 +16,7 @@ module Type (
         -- $representation_types
         TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
-        Rig, Scaled,
+        Mult, Scaled,
         KnotTied,
 
         -- ** Constructing and deconstructing types
@@ -2712,7 +2712,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (ForAllTy {})   = 7
 
 
-    go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
+    go_rig :: RnEnv2 -> Mult -> Mult -> TypeOrdering
     go_rig env r1 r2 =
       if r1 `eqRig` r2
         then TEQ
@@ -2728,7 +2728,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     gos _   _          []         = TGT
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
-eqRig :: Rig -> Rig -> Bool
+eqRig :: Mult -> Mult -> Bool
 eqRig Zero Zero = True
 eqRig One One = True
 eqRig Omega Omega = True

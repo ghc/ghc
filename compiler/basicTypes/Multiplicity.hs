@@ -4,7 +4,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS -Wno-missing-methods #-}
 
--- | This module defines the semi-ring (aka Rig) of weights, and associated
+-- | This module defines the semi-ring (aka Mult) of weights, and associated
 -- functions. Weights annotate arrow types to indicate the linearity of the
 -- arrow (in the sense of linear types).
 module Multiplicity
@@ -143,7 +143,7 @@ sup _     _     = Omega
 -- * Utilities
 --
 
--- | A shorthand for data with an attached 'Rig' element (the weight).
+-- | A shorthand for data with an attached 'Mult' element (the weight).
 data GScaled t a = Scaled {scaledMult :: GMult t, scaledThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 

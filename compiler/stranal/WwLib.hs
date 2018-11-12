@@ -875,7 +875,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
                 , \ body     -> mkUnpackCase body co One work_uniq data_con args ubx_tup_app
                 , ubx_tup_ty ) }
 
-mkUnpackCase ::  CoreExpr -> Coercion -> Rig -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
+mkUnpackCase ::  CoreExpr -> Coercion -> Mult -> Unique -> DataCon -> [Id] -> CoreExpr -> CoreExpr
 -- (mkUnpackCase e co uniq Con args body)
 --      returns
 -- case e |> co of bndr { Con args -> body }

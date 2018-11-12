@@ -380,7 +380,7 @@ splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
   where cos = [w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
 
-rigToCo :: Rig -> Coercion
+rigToCo :: Mult -> Coercion
 rigToCo r = mkNomReflCo (fromMult r)
 
 -- first result has role equal to input; third result is Nominal

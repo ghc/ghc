@@ -638,7 +638,7 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> Rig -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId :: FastString -> Mult -> TcType -> TcRnIf gbl lcl TcId
 newSysLocalId fs w ty
   = do  { u <- newUnique
         ; return (mkSysLocalOrCoVar fs u (Regular w) ty) }

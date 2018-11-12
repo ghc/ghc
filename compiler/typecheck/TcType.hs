@@ -422,7 +422,7 @@ data SyntaxOpType
 
 data SyntaxOpMultiplicity
   = SynAnyMult  -- ^ A multiplicity hole
-  | SynMult Rig -- ^ A known multiplicity
+  | SynMult Mult -- ^ A known multiplicity
 
 -- | Shortcut for unrestricted functions
 synFun :: SyntaxOpType -> SyntaxOpType -> SyntaxOpType

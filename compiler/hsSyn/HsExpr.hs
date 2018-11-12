@@ -1993,7 +1993,7 @@ type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExt
 
 type instance XBindStmt        (GhcPass _) GhcPs b = NoExt
 type instance XBindStmt        (GhcPass _) GhcRn b = NoExt
-type instance XBindStmt        (GhcPass _) GhcTc b = (Rig, Type)
+type instance XBindStmt        (GhcPass _) GhcTc b = (Mult, Type)
 
 type instance XApplicativeStmt (GhcPass _) GhcPs b = NoExt
 type instance XApplicativeStmt (GhcPass _) GhcRn b = NoExt

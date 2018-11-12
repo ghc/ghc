@@ -1083,7 +1083,7 @@ lintAltBinders :: UsageEnv
                -> Var         -- Scrutinee name
                -> OutType     -- Scrutinee type
                -> OutType     -- Constructor type
-               -> [(Rig, OutVar)]    -- Binders
+               -> [(Mult, OutVar)]    -- Binders
                -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -1100,7 +1100,7 @@ lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
        ; lintAltBinders rhs_ue' scrut scrut_ty con_ty' bndrs }
 
 -- | Implements the case rules for linearity
-checkCaseLinearity :: UsageEnv -> Var ->  Rig -> Var -> LintM UsageEnv
+checkCaseLinearity :: UsageEnv -> Var ->  Mult -> Var -> LintM UsageEnv
 checkCaseLinearity ue scrut var_w bndr = do
   ensureEqWeights lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
@@ -1218,7 +1218,7 @@ lintAltExpr expr ann_ty
 
 lintCoreAlt :: Var              -- Scrut Var
             -> OutType          -- Type of scrutinee
-            -> Rig              -- Weight of scrutinee
+            -> Mult             -- Multiplicity of scrutinee
             -> OutType          -- Type of the alternative
             -> CoreAlt
             -> LintM UsageEnv
@@ -1265,7 +1265,7 @@ lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
 
-lintLinearBinder :: SDoc -> Rig -> Rig -> LintM ()
+lintLinearBinder :: SDoc -> Mult -> Mult -> LintM ()
 lintLinearBinder doc actual_usage described_usage
   = ensureEqWeights actual_usage described_usage err_msg
     where
@@ -2466,7 +2466,7 @@ ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- Assumes ty1,ty2 are have already had the substitution applied
 ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
 
-ensureEqWeights :: Rig -> Rig -> SDoc -> LintM ()
+ensureEqWeights :: Mult -> Mult -> SDoc -> LintM ()
 ensureEqWeights actual_usage described_usage err_msg =
     case (actual_usage `submultMaybe` described_usage) of
       Smaller -> return ()
