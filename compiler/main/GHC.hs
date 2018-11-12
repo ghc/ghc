@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections, NamedFieldPuns #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -125,6 +126,7 @@ module GHC (
         -- ** Looking up a Name
         parseName,
         lookupName,
+        initRdrNameMap, NameMap,
 
         -- ** Compiling expressions
         HValue, parseExpr, compileParsedExpr,
@@ -306,6 +308,7 @@ import TcRnTypes
 import Packages
 import NameSet
 import RdrName
+import Var
 import HsSyn
 import Type     hiding( typeKind )
 import TcType           hiding( typeKind )
@@ -352,7 +355,9 @@ import TcRnDriver
 import Inst
 import FamInst
 import FileCleanup
+import Unique ( mkUnique )
 
+import Data.Data ( Data, gmapQ, cast )
 import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -1531,6 +1536,134 @@ lookupName :: GhcMonad m => Name -> m (Maybe TyThing)
 lookupName name =
      withSession $ \hsc_env ->
        liftIO $ hscTcRcLookupName hsc_env name
+-- -----------------------------------------------------------------------------
+
+-- | Map of 'SrcSpan's from 'Located' 'RdrName's in the 'ParsedSource'
+-- to the corresponding 'Name' from renaming.
+type NameMap = Map.Map SrcSpan Name
+
+-- | Tools prefer to work with the 'ParsedSource' because it more
+-- closely reflects the actual source code, but must be able to work
+-- with the renamed representation of the names involved. This
+-- function constructs a map from every 'Located' 'RdrName' in the
+-- 'ParsedSource' to its corresponding name in the 'RenamedSource' and
+-- 'TypecheckedSource'.
+initRdrNameMap :: TypecheckedModule -> NameMap
+initRdrNameMap tm = r
+  where
+    parsed  = pm_parsed_source $ tm_parsed_module tm
+    renamed = tm_renamed_source tm
+    typechecked = tm_typechecked_source tm
+
+    checkRdr :: Located RdrName -> Maybe [(SrcSpan,RdrName)]
+    checkRdr (L l n@(Unqual _)) = Just [(l,n)]
+    checkRdr (L l n@(Qual _ _)) = Just [(l,n)]
+    checkRdr (L _ _)= Nothing
+
+    checkName :: Located Name -> Maybe [Located Name]
+    checkName ln = Just [ln]
+
+    rdrNames = fromMaybe (panic "initRdrNameMap")
+             $ everything mappend (nameSybQuery checkRdr ) parsed
+    names1   = fromMaybe (panic "initRdrNameMap")
+             $ everything mappend (nameSybQuery checkName) renamed
+    names2   = names1 ++ everything (++) ([] `mkQ` fieldOcc
+                                            `extQ` hsRecFieldN) renamed
+    names    = names2 ++ everything (++) ([] `mkQ` hsRecFieldT) typechecked
+
+    fieldOcc :: FieldOcc GhcRn -> [Located Name]
+    fieldOcc (FieldOcc n (L l _)) = [(L l n)]
+    fieldOcc XFieldOcc {}         = []
+
+    hsRecFieldN :: LHsExpr GhcRn -> [Located Name]
+    hsRecFieldN (L _ (HsRecFld _ (Unambiguous n (L l _) ))) = [L l n]
+    hsRecFieldN _ = []
+
+    hsRecFieldT :: LHsExpr GhcTc -> [Located Name]
+    hsRecFieldT (L _ (HsRecFld _ (Ambiguous n (L l _)) ))
+      = [L l (Var.varName n)]
+    hsRecFieldT _ = []
+
+    nameMap = Map.fromList $ map (\(L l n) -> (l,n)) names
+
+    -- If the name does not exist (e.g. a TH Splice that has been
+    -- expanded, make a new one)
+    -- No attempt is made to make sure that equivalent ones have
+    -- equivalent names.
+    lookupName l n i = case Map.lookup l nameMap of
+      Just v -> v
+      Nothing ->
+        case n of
+          Unqual u -> mkNewGhcNamePure 'h' i Nothing  (occNameString u)
+          Qual q u -> mkNewGhcNamePure 'h' i
+                         (Just (Module (stringToUnitId "") q)) (occNameString u)
+          _        -> panic "initRdrNameMap"
+
+    r = Map.fromList $ map (\((l,n),i) -> (l,lookupName l n i))
+                     $ zip rdrNames [1..]
+
+    nameSybQuery :: (Typeable a, Typeable t)
+                 => (Located a -> Maybe r) -> t -> Maybe r
+    nameSybQuery checker = q
+      where
+        q = Nothing `mkQ`  worker
+
+        worker (pnt :: (Located a))
+          = checker pnt
+
+    mkNewGhcNamePure :: Char -> Int -> Maybe Module -> String -> Name
+    mkNewGhcNamePure c i maybeMod name =
+      let un = mkUnique c i -- H for HaRe :)
+          n = case maybeMod of
+                   Nothing   -> mkInternalName un      (mkVarOcc name) noSrcSpan
+                   Just modu -> mkExternalName un modu (mkVarOcc name) noSrcSpan
+      in n
+
+
+-- Copied from SYB
+
+
+-- | Generic queries of type \"r\",
+--   i.e., take any \"a\" and return an \"r\"
+--
+type GenericQ r = forall a. Data a => a -> r
+
+
+-- | Make a generic query;
+--   start from a type-specific case;
+--   return a constant otherwise
+--
+mkQ :: ( Typeable a
+       , Typeable b
+       )
+    => r
+    -> (b -> r)
+    -> a
+    -> r
+(r `mkQ` br) a = case cast a of
+                        Just b  -> br b
+                        Nothing -> r
+
+-- | Extend a generic query by a type-specific case
+extQ :: ( Typeable a
+        , Typeable b
+        )
+     => (a -> q)
+     -> (b -> q)
+     -> a
+     -> q
+extQ f g a = maybe (f a) g (cast a)
+
+
+
+-- | Summarise all nodes in top-down, left-to-right order
+everything :: (r -> r -> r) -> GenericQ r -> GenericQ r
+
+-- Apply f to x to summarise top-level node;
+-- use gmapQ to recurse into immediate subterms;
+-- use ordinary foldl to reduce list of intermediate results
+
+everything k f x = foldl k (f x) (gmapQ (everything k f) x)
 
 -- -----------------------------------------------------------------------------
 -- Pure API
