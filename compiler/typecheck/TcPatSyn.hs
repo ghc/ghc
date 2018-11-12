@@ -17,7 +17,7 @@ import GhcPrelude
 
 import HsSyn
 import TcPat
-import Weight
+import Multiplicity
 import Type( mkEmptyTCvSubst, tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )

@@ -80,7 +80,7 @@ import HsSyn
 import IfaceEnv
 import TcRnMonad
 import TcMType
-import Weight
+import Multiplicity
 import UsageEnv
 import TcType
 import {-# SOURCE #-} TcUnify ( tcSubWeight )

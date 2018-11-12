@@ -163,7 +163,7 @@ import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
-import Weight
+import Multiplicity
 import UsageEnv
 import TcType
 import Annotations

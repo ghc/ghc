@@ -32,7 +32,7 @@ import Name
 import Type
 import RepType
 import TyCon
-import Weight
+import Multiplicity
 import Coercion
 import TcEnv
 import TcType

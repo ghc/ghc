@@ -50,7 +50,7 @@ import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
 import Type
-import Weight
+import Multiplicity
 import TyCoRep
 import TcType
 import HscTypes

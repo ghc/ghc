@@ -3,7 +3,7 @@ module UsageEnv where
 
 import Data.Foldable
 import GhcPrelude
-import Weight
+import Multiplicity
 import Name
 import NameEnv
 import UniqFM ( nonDetEltsUFM, plusUFM_CD )

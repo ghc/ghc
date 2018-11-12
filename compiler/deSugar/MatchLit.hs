@@ -31,7 +31,7 @@ import Id
 import CoreSyn
 import MkCore
 import TyCon
-import Weight
+import Multiplicity
 import DataCon
 import TcHsSyn ( shortCutLit )
 import TcType

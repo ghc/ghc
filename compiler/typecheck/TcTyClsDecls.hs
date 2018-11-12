@@ -41,7 +41,7 @@ import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
-import Weight
+import Multiplicity
 import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv

@@ -41,7 +41,7 @@ import MatchLit
 import Type
 import Coercion ( eqCoercion )
 import TyCon( isNewTyCon )
-import Weight
+import Multiplicity
 import TysWiredIn
 import SrcLoc
 import Maybes

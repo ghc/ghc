@@ -43,7 +43,7 @@ import CoreSyn
 import Coercion
 import Name
 import Type
-import Weight
+import Multiplicity
 import TyCoRep
 import Var
 import FastString(FastString)

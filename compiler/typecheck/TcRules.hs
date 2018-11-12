@@ -25,7 +25,7 @@ import TcEnv
 import TcUnify( buildImplicationFor )
 import TcEvidence( mkTcCoVarCo )
 import Type
-import Weight
+import Multiplicity
 import Id
 import Var( EvVar )
 import TyCon( isTypeFamilyTyCon )

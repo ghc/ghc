@@ -68,7 +68,7 @@ import Type
 import ForeignCall ( CType )
 import Coercion
 import Unify
-import Weight
+import Multiplicity
 import TyCon
 import FieldLabel
 import Class

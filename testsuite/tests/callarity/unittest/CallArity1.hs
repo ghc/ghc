@@ -3,7 +3,7 @@ import CoreSyn
 import CoreUtils
 import Id
 import Type
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 import MkCore
 import CallArity (callArityRHS)
 import MkId

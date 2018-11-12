@@ -45,7 +45,7 @@ import TcMType
 import TcRnMonad
 import TcType
 import Type
-import Weight
+import Multiplicity
 import Coercion
 import TcEvidence
 import Name( isSystemName )

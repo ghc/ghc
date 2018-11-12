@@ -29,7 +29,7 @@ import HsSyn
 import TcRnMonad
 import TcEnv
 import TcPat
-import Weight
+import Multiplicity
 import Type ( Weighted )
 import UsageEnv
 import TcMType

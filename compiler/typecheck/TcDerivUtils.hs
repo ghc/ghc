@@ -48,7 +48,7 @@ import TcRnMonad
 import TcType
 import THNames (liftClassKey)
 import TyCon
-import Weight
+import Multiplicity
 import Type
 import Util
 import VarSet

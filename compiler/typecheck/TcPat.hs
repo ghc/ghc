@@ -29,7 +29,7 @@ import Id
 import Var
 import Name
 import RdrName
-import Weight
+import Multiplicity
 import UsageEnv (subweight)
 import TcEnv
 import TcMType

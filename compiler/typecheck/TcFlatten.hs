@@ -32,7 +32,7 @@ import Control.Monad
 
 import Control.Arrow ( first )
 
-import Weight
+import Multiplicity
 
 {-
 Note [The flattening story]

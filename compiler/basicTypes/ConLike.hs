@@ -38,7 +38,7 @@ import BasicTypes
 import TyCoRep (Type, ThetaType, Weighted)
 import Var
 import Type (mkTyConApp)
-import Weight
+import Multiplicity
 
 import qualified Data.Data as Data
 

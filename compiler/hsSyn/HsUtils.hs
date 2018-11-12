@@ -105,7 +105,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
-import Weight ( pattern Zero, pattern One, pattern Omega )
+import Multiplicity ( pattern Zero, pattern One, pattern Omega )
 import Type   ( filterOutInvisibleTypes )
 import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType

@@ -32,7 +32,7 @@ import TcEnv
 import TcUnify
 import TcSimplify
 import TcEvidence
-import Weight
+import Multiplicity
 import TcHsType
 import TcPat
 import TcMType

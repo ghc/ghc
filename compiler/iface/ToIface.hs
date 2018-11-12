@@ -61,7 +61,7 @@ import PrelNames
 import Name
 import BasicTypes
 import Type
-import Weight
+import Multiplicity
 import PatSyn
 import Outputable
 import FastString

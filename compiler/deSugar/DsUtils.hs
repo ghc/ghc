@@ -63,7 +63,7 @@ import TyCon
 import DataCon
 import PatSyn
 import Type
-import Weight
+import Multiplicity
 import Coercion
 import TysPrim
 import TysWiredIn

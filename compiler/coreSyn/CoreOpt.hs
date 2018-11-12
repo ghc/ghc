@@ -40,7 +40,7 @@ import Demand( etaExpandStrictSig )
 import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
-import Weight
+import Multiplicity
 import Coercion hiding ( substCo, substCoVarBndr )
 import TyCon        ( tyConArity )
 import TysWiredIn

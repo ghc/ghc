@@ -25,7 +25,7 @@ import Outputable
 import DynFlags
 import Maybes
 import FV ( fvVarList, fvVarSet, unionFV, mkFVs, FV )
-import Weight (unrestricted)
+import Multiplicity (unrestricted)
 
 import Control.Arrow ( (&&&) )
 

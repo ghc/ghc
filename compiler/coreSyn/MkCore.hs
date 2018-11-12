@@ -66,7 +66,7 @@ import PrelNames
 
 import HsUtils          ( mkChunkified, chunkify )
 import Type
-import Weight
+import Multiplicity
 import Coercion         ( isCoVar )
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )

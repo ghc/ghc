@@ -53,7 +53,7 @@ import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
-import Weight
+import Multiplicity
 
 import PrimOp          ( PrimOp (SeqOp) )
 

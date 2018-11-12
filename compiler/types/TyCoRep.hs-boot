@@ -4,7 +4,7 @@ import GhcPrelude
 
 import Outputable ( SDoc )
 import Data.Data  ( Data )
-import Weight
+import Multiplicity
 
 data Type
 data TyThing

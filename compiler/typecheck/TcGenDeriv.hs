@@ -66,7 +66,7 @@ import TcValidity ( checkValidTyFamEqn )
 import TysPrim
 import TysWiredIn
 import Type
-import Weight
+import Multiplicity
 import Class
 import VarSet
 import VarEnv

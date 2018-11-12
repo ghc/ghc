@@ -32,7 +32,7 @@ import DsUtils
 
 import TcType
 import Type
-import Weight
+import Multiplicity
 import Id   ( Id )
 import Coercion
 import PrimOp

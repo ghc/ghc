@@ -40,7 +40,7 @@ import RepType
 import DataCon
 import Name
 import TyCon
-import Weight
+import Multiplicity
 import Module
 import Outputable
 import Stream

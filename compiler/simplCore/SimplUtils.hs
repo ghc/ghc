@@ -57,7 +57,7 @@ import Var
 import Demand
 import SimplMonad
 import Type     hiding( substTy )
-import Weight
+import Multiplicity
 import Coercion hiding( substCo )
 import DataCon          ( dataConWorkId, isNullaryRepDataCon )
 import VarSet

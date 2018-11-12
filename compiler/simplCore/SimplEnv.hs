@@ -61,7 +61,7 @@ import DynFlags                 ( DynFlags )
 import TysWiredIn
 import qualified Type
 import Type hiding              ( substTy, substTyVar, substTyVarBndr )
-import Weight
+import Multiplicity
 import qualified Coercion
 import Coercion hiding          ( substCo, substCoVar, substCoVarBndr )
 import BasicTypes

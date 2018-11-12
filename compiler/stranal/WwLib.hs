@@ -30,7 +30,7 @@ import Literal          ( absentLiteralOf, rubbishLit )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
-import Weight
+import Multiplicity
 import RepType          ( isVoidTy, typePrimRep )
 import Coercion
 import FamInstEnv

@@ -95,7 +95,7 @@ import GhcPrelude
 import TyCoRep
 import TcType
 import Type
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 import TyCon
 import Coercion
 import Class
@@ -119,7 +119,7 @@ import SrcLoc
 import Bag
 import Pair
 import UniqSet
-import Weight
+import Multiplicity
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

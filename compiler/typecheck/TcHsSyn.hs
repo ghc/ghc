@@ -79,7 +79,7 @@ import Outputable
 import Util
 import UniqFM
 import CoreSyn
-import Weight
+import Multiplicity
 
 import Control.Monad
 import Data.Functor.Compose ( Compose(..) )

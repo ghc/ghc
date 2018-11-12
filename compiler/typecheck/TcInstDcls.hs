@@ -29,7 +29,7 @@ import TcValidity
 import TcHsSyn
 import TcMType
 import TcType
-import Weight
+import Multiplicity
 import BuildTyCl
 import Inst
 import InstEnv

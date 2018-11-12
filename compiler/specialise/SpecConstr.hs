@@ -35,7 +35,7 @@ import Coercion         hiding( substCo )
 import Rules
 import Type             hiding ( substTy )
 import TyCon            ( tyConName )
-import Weight
+import Multiplicity
 import Id
 import PprCore          ( pprParendExpr )
 import MkCore           ( mkImpossibleExpr )

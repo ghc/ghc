@@ -46,7 +46,7 @@ import FamInst
 import FamInstEnv
 import Coercion
 import Type
-import Weight
+import Multiplicity
 import ForeignCall
 import ErrUtils
 import Id

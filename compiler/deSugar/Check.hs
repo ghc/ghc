@@ -47,7 +47,7 @@ import ErrUtils
 import Var           (EvVar)
 import TyCoRep
 import Type
-import Weight
+import Multiplicity
 import UniqSupply
 import DsUtils       (isTrueLHsExpr)
 import Maybes        (expectJust)

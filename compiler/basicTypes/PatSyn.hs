@@ -31,7 +31,7 @@ import Name
 import Outputable
 import Unique
 import Util
-import Weight
+import Multiplicity
 import BasicTypes
 import Var
 import FieldLabel

@@ -42,7 +42,7 @@ import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
                    , tyConFamilySize )
 import DataCon     ( dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
-import Weight
+import Multiplicity
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )

@@ -501,7 +501,7 @@ Library
         FamInstEnv
         FunDeps
         InstEnv
-        Weight
+        Multiplicity
         UsageEnv
         TyCon
         CoAxiom

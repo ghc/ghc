@@ -158,7 +158,7 @@ import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
                           SourceText(..) )
-import Weight
+import Multiplicity
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique

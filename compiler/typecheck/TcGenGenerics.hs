@@ -23,7 +23,7 @@ import TcGenDeriv
 import TcGenFunctor
 import DataCon
 import TyCon
-import Weight
+import Multiplicity
 import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( moduleName, moduleNameFS

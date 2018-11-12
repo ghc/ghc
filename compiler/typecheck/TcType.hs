@@ -215,7 +215,7 @@ import VarEnv
 import PrelNames
 import TysWiredIn( coercibleClass, eqClass, heqClass, unitTyCon, unitTyConKey
                  , listTyCon, constraintKind )
-import Weight
+import Multiplicity
 import BasicTypes
 import Util
 import Maybes

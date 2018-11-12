@@ -79,7 +79,7 @@ import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyCoBinder(..), TyBinder )
-import Weight
+import Multiplicity
 import Coercion
 import TyCon
 import Unique

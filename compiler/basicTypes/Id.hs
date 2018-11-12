@@ -153,7 +153,7 @@ import Unique
 import UniqSupply
 import FastString
 import Util
-import Weight
+import Multiplicity
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,

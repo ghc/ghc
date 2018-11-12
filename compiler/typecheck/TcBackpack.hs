@@ -47,7 +47,7 @@ import SrcLoc
 import HscTypes
 import Outputable
 import Type
-import Weight
+import Multiplicity
 import FastString
 import RnFixity ( lookupFixityRn )
 import Maybes

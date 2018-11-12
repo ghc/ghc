@@ -32,7 +32,7 @@ import TcRnMonad
 import TcType
 import TyCon
 import Type
-import Weight
+import Multiplicity
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor, checkConstraints)

@@ -7,7 +7,7 @@
 -- | This module defines the semi-ring (aka Rig) of weights, and associated
 -- functions. Weights annotate arrow types to indicate the linearity of the
 -- arrow (in the sense of linear types).
-module Weight
+module Multiplicity
   ( GMult
   , pattern Zero
   , pattern One

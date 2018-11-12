@@ -34,7 +34,7 @@ import PprCore
 import Literal
 import PrimOp
 import CoreFVs
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 import Type
 import RepType
 import Kind            ( isLiftedTypeKind )

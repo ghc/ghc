@@ -39,7 +39,7 @@ import FamInstEnv       ( FamInstEnvs )
 import RnEnv            ( addUsedGRE )
 import RnUtils          ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
-import Weight
+import Multiplicity
 import UsageEnv
 import TcArrows
 import TcMatches

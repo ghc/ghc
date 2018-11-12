@@ -92,7 +92,7 @@ import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind, pprType, Rig )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
-import Weight
+import Multiplicity
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique

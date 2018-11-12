@@ -74,7 +74,7 @@ import Module
 import Outputable
 import SrcLoc
 import Type
-import Weight
+import Multiplicity
 import UniqSupply
 import Name
 import NameEnv

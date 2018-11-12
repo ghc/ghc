@@ -45,7 +45,7 @@ import TyCon
 import TcEvidence
 import TcType
 import Type
-import Weight
+import Multiplicity
 import Coercion
 import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id

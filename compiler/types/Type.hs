@@ -241,7 +241,7 @@ import BasicTypes
 
 import Kind
 import TyCoRep
-import Weight
+import Multiplicity
 
 -- friends:
 import Var

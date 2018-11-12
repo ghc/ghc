@@ -36,7 +36,7 @@ import DynFlags
 import Outputable
 -- import Data.List        ( mapAccumL )
 import BasicTypes       ( RecFlag(..), isRec )
-import Weight
+import Multiplicity
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not

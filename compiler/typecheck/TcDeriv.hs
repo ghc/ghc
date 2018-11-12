@@ -43,7 +43,7 @@ import Avail
 import Unify( tcUnifyTy )
 import Class
 import Type
-import Weight
+import Multiplicity
 import ErrUtils
 import DataCon
 import Maybes

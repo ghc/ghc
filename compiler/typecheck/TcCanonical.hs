@@ -22,7 +22,7 @@ import TcEvidence
 import TcEvTerm
 import Class
 import TyCon
-import Weight
+import Multiplicity
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
 import Coercion
 import CoreSyn

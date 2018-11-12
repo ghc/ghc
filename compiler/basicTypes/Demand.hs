@@ -77,7 +77,7 @@ import Maybes           ( orElse )
 import Type            ( Type, isUnliftedType )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
-import Weight          ( weightedThing )
+import Multiplicity    ( weightedThing )
 
 {-
 ************************************************************************

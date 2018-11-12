@@ -33,7 +33,7 @@ import TcRnMonad
 import TcEnv
 import TcBinds( tcValBinds, addTypecheckedBinds )
 import TyCoRep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
-import Weight
+import Multiplicity
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )

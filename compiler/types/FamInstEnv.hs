@@ -41,7 +41,7 @@ module FamInstEnv (
 import GhcPrelude
 
 import Unify
-import Weight
+import Multiplicity
 import Type
 import TyCoRep
 import TyCon

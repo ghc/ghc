@@ -14,7 +14,7 @@ import GhcPrelude
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 import Module( Module, HasModule(..) )
 import Coercion( Coercion )
 import CoreMonad

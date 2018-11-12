@@ -21,7 +21,7 @@ import HsSyn
 import DsBinds
 import ConLike
 import TcType
-import Weight
+import Multiplicity
 import Type ( Weighted )
 import DsMonad
 import DsUtils

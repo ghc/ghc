@@ -132,7 +132,7 @@ import TysPrim          ( eqPhantPrimTyCon )
 import ListSetOps
 import Maybes
 import UniqFM
-import Weight
+import Multiplicity
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )

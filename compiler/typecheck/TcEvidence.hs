@@ -77,7 +77,7 @@ import Outputable
 import SrcLoc
 import Data.IORef( IORef )
 import UniqSet
-import Weight
+import Multiplicity
 
 {-
 Note [TcCoercions]

@@ -27,7 +27,7 @@ import PrelNames
 
 import Id
 import Type
-import Weight
+import Multiplicity
 import MkCore ( mkStringExprFS, mkNaturalExpr )
 
 import Unique ( hasKey )

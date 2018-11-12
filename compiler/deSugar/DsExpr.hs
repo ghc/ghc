@@ -38,7 +38,7 @@ import TcEvidence
 import TcRnMonad
 import TcHsSyn
 import Type
-import Weight
+import Multiplicity
 import CoreSyn
 import CoreUtils
 import MkCore

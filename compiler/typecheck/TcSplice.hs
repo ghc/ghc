@@ -39,7 +39,7 @@ import Finder
 import Name
 import TcRnMonad
 import TcType
-import Weight
+import Multiplicity
 
 import Outputable
 import TcExpr

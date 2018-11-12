@@ -34,7 +34,7 @@ import TcType
 import TyCon
 import TyCoRep
 import Type
-import Weight
+import Multiplicity
 import Util
 import Var
 import VarSet

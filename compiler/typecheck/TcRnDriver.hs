@@ -88,7 +88,7 @@ import TcBinds
 import HeaderInfo       ( mkPrelImports )
 import TcDefaults
 import TcEnv
-import Weight
+import Multiplicity
 import TcRules
 import TcForeign
 import TcInstDcls

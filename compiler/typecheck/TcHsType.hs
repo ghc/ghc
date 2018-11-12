@@ -78,7 +78,7 @@ import TcSimplify
 import TcHsSyn
 import TcErrors ( reportAllUnsolved )
 import TcType
-import Weight
+import Multiplicity
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyCoBinder(..), TyBinder, Type )  -- Used in tcDataKindSig
 import Type

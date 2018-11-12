@@ -39,7 +39,7 @@ import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
 import Type( mkTyVarBinders )
-import Weight
+import Multiplicity
 
 import DynFlags
 import Var      ( TyVar, tyVarKind )

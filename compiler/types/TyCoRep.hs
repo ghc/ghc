@@ -178,7 +178,7 @@ import Var
 import VarEnv
 import VarSet
 import Name hiding ( varName )
-import Weight
+import Multiplicity
 import TyCon
 import Class
 import CoAxiom

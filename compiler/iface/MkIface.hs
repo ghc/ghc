@@ -108,7 +108,7 @@ import Fingerprint
 import Exception
 import UniqSet
 import Packages
-import Weight
+import Multiplicity
 import ExtractDocs
 
 import Control.Monad

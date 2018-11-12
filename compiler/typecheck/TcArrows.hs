@@ -18,7 +18,7 @@ import HsSyn
 import TcMatches
 import TcHsSyn( hsLPatType )
 import TcType
-import Weight
+import Multiplicity
 import TcMType
 import TcBinds
 import TcPat

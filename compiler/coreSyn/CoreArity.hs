@@ -29,7 +29,7 @@ import Var
 import VarEnv
 import Id
 import Type
-import Weight
+import Multiplicity
 import TyCon    ( initRecTc, checkRecTc )
 import Coercion
 import BasicTypes

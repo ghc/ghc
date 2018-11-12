@@ -43,7 +43,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
-import Weight
+import Multiplicity
 import FamInstEnv
 import Coercion
 import TcType

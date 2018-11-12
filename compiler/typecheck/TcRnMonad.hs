@@ -151,7 +151,7 @@ import Module
 import RdrName
 import Name
 import UsageEnv
-import Weight
+import Multiplicity
 import Type
 
 import TcType

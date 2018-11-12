@@ -32,7 +32,7 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyn
 
 import TcType
 import Type ( splitPiTy )
-import Weight
+import Multiplicity
 import TcEvidence
 import CoreSyn
 import CoreFVs

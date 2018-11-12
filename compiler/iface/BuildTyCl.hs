@@ -34,7 +34,7 @@ import TyCon
 import Type
 import Id
 import TcType
-import Weight
+import Multiplicity
 
 import SrcLoc( SrcSpan, noSrcSpan )
 import DynFlags
