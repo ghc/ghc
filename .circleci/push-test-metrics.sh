@@ -7,6 +7,10 @@ fail() {
   exit 1
 }
 
+if [ "$CIRCLE_REPOSITORY_URL" != "git@github.com:ghc/ghc.git" ]; then
+  exit 0
+fi
+
 GHC_ORIGIN=git@git.haskell.org:ghc
 
 # Add git.haskell.org as a known host.
