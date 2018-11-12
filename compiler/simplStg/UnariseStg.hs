@@ -281,11 +281,11 @@ unariseBinding rho (StgRec xrhss)
   = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho rhs) xrhss
 
 unariseRhs :: UnariseEnv -> StgRhs -> UniqSM StgRhs
-unariseRhs rho (StgRhsClosure ccs b_info fvs update_flag args expr)
+unariseRhs rho (StgRhsClosure ccs fvs update_flag args expr)
   = do (rho', args1) <- unariseFunArgBinders rho args
        expr' <- unariseExpr rho' expr
        let fvs' = unariseFreeVars rho fvs
-       return (StgRhsClosure ccs b_info fvs' update_flag args1 expr')
+       return (StgRhsClosure ccs fvs' update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con args)
   = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))

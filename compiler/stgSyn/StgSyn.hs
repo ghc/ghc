@@ -19,10 +19,6 @@ module StgSyn (
 
         UpdateFlag(..), isUpdatable,
 
-        StgBinderInfo,
-        noBinderInfo, stgSatOcc, stgUnsatOcc, satCallsOnly,
-        combineStgBinderInfo,
-
         -- a set of synonyms for the most common (only :-) parameterisation
         StgArg,
         StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt,
@@ -393,7 +389,6 @@ flavour is for closures:
 data GenStgRhs bndr occ
   = StgRhsClosure
         CostCentreStack         -- CCS to be attached (default is CurrentCCS)
-        StgBinderInfo           -- Info about how this binder is used (see below)
         [occ]                   -- non-global free vars; a list, rather than
                                 -- a set, because order is important
         !UpdateFlag             -- ReEntrant | Updatable | SingleEntry
@@ -428,7 +423,7 @@ The second flavour of right-hand-side is for constructors (simple but important)
         [GenStgArg occ]  -- Args
 
 stgRhsArity :: StgRhs -> Int
-stgRhsArity (StgRhsClosure _ _ _ _ bndrs _)
+stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   = ASSERT( all isId bndrs ) length bndrs
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _) = 0
@@ -455,7 +450,7 @@ topStgBindHasCafRefs StgTopStringLit{}
   = False
 
 topRhsHasCafRefs :: GenStgRhs bndr Id -> Bool
-topRhsHasCafRefs (StgRhsClosure _ _ _ upd _ body)
+topRhsHasCafRefs (StgRhsClosure _ _ upd _ body)
   = -- See Note [CAF consistency]
     isUpdatable upd || exprHasCafRefs body
 topRhsHasCafRefs (StgRhsCon _ _ args)
@@ -488,7 +483,7 @@ bindHasCafRefs (StgRec binds)
   = any rhsHasCafRefs (map snd binds)
 
 rhsHasCafRefs :: GenStgRhs bndr Id -> Bool
-rhsHasCafRefs (StgRhsClosure _ _ _ _ _ body)
+rhsHasCafRefs (StgRhsClosure _ _ _ _ body)
   = exprHasCafRefs body
 rhsHasCafRefs (StgRhsCon _ _ args)
   = any stgArgHasCafRefs args
@@ -508,33 +503,6 @@ stgIdHasCafRefs id =
   -- have CAF refs. At this point (after TidyPgm) top-level Ids (whether
   -- imported or defined in this module) are GlobalIds, so the test is easy.
   isGlobalId id && mayHaveCafRefs (idCafInfo id)
-
--- Here's the @StgBinderInfo@ type, and its combining op:
-
-data StgBinderInfo
-  = NoStgBinderInfo
-  | SatCallsOnly        -- All occurrences are *saturated* *function* calls
-                        -- This means we don't need to build an info table and
-                        -- slow entry code for the thing
-                        -- Thunks never get this value
-
-noBinderInfo, stgUnsatOcc, stgSatOcc :: StgBinderInfo
-noBinderInfo = NoStgBinderInfo
-stgUnsatOcc  = NoStgBinderInfo
-stgSatOcc    = SatCallsOnly
-
-satCallsOnly :: StgBinderInfo -> Bool
-satCallsOnly SatCallsOnly    = True
-satCallsOnly NoStgBinderInfo = False
-
-combineStgBinderInfo :: StgBinderInfo -> StgBinderInfo -> StgBinderInfo
-combineStgBinderInfo SatCallsOnly SatCallsOnly = SatCallsOnly
-combineStgBinderInfo _            _            = NoStgBinderInfo
-
---------------
-pp_binder_info :: StgBinderInfo -> SDoc
-pp_binder_info NoStgBinderInfo = empty
-pp_binder_info SatCallsOnly    = text "sat-only"
 
 {-
 ************************************************************************
@@ -818,19 +786,17 @@ pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
           => GenStgRhs bndr bdee -> SDoc
 
 -- special case
-pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag [{-no args-}] (StgApp func []))
+pprStgRhs (StgRhsClosure cc [free_var] upd_flag [{-no args-}] (StgApp func []))
   = sdocWithDynFlags $ \dflags ->
     hsep [ ppr cc,
-           pp_binder_info bi,
            if not $ gopt Opt_SuppressStgFreeVars dflags
              then brackets (ppr free_var) else empty,
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
 
 -- general case
-pprStgRhs (StgRhsClosure cc bi free_vars upd_flag args body)
+pprStgRhs (StgRhsClosure cc free_vars upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
-                pp_binder_info bi,
                 if not $ gopt Opt_SuppressStgFreeVars dflags
                   then brackets (interppSP free_vars) else empty,
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])

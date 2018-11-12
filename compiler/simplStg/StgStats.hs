@@ -131,7 +131,7 @@ statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 statRhs top (_, StgRhsCon _ _ _)
   = countOne (ConstructorBinds top)
 
-statRhs top (_, StgRhsClosure _ _ fv u _ body)
+statRhs top (_, StgRhsClosure _ fv u _ body)
   = statExpr body                       `combineSE`
     countN FreeVariables (length fv)    `combineSE`
     countOne (
