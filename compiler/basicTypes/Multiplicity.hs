@@ -30,7 +30,6 @@ module Multiplicity
   , setWeight
   , scaleScaled
   , IsSubweight(..)
-  , isUnknown
   , submultMaybe ) where
 
 import GhcPrelude
@@ -186,10 +185,6 @@ data IsSubweight = Smaller -- Definitely a submult
                  | Larger  -- Definitely not a submult
                  | Unknown -- Could be a submult, need to ask the typechecker
                  deriving (Show, Eq, Ord)
-
-isUnknown :: IsSubweight -> Bool
-isUnknown Unknown = True
-isUnknown _ = False
 
 instance Outputable IsSubweight where
   ppr = text . show
