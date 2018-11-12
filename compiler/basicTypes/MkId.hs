@@ -809,7 +809,7 @@ When we made the wrapper for a data type of different multiplicity fields,
 we only want to make the ones which are linear multiplicity polymorphic. If we
 do not do this then the wrapper will not be well-typed.
 
-The way we ensure this is by scaling the weight of the field by the multiplicity
+The way we ensure this is by scaling the multiplicity of the field by the multiplicity
 variable. This works because..
 
 1 * p = p

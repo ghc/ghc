@@ -919,10 +919,10 @@ dsDo stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt (pat_weight, res1_ty) pat rhs bind_op fail_op) stmts
+    go _ (BindStmt (pat_mult, res1_ty) pat rhs bind_op fail_op) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
-            ; var   <- selectSimpleMatchVarL pat_weight pat
+            ; var   <- selectSimpleMatchVarL pat_mult pat
             ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
             ; match_code <- handle_failure pat match fail_op

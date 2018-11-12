@@ -4,8 +4,8 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS -Wno-missing-methods #-}
 
--- | This module defines the semi-ring (aka Mult) of weights, and associated
--- functions. Weights annotate arrow types to indicate the linearity of the
+-- | This module defines the semi-ring (aka Mult) of multiplicities, and associated
+-- functions. Multiplicities annotate arrow types to indicate the linearity of the
 -- arrow (in the sense of linear types).
 module Multiplicity
   ( GMult
@@ -37,7 +37,7 @@ import Data.Data
 import Outputable
 
 --
--- * Core properties of weights
+-- * Core properties of multiplicities
 --
 
 data GMult a
@@ -126,7 +126,7 @@ instance Multable a => Outputable (GMult a) where
   ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
   ppr (RigThing t) = ppr t
 
--- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
+-- | @sup w1 w2@ returns the smallest multiplicity larger than or equal to both @w1@
 -- and @w2@.
 sup :: GMult a -> GMult a -> GMult a
 sup Zero  Zero  = Zero
@@ -141,7 +141,7 @@ sup _     _     = Omega
 -- * Utilities
 --
 
--- | A shorthand for data with an attached 'Mult' element (the weight).
+-- | A shorthand for data with an attached 'Mult' element (the multiplicity).
 data GScaled t a = Scaled {scaledMult :: GMult t, scaledThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
@@ -185,8 +185,8 @@ data IsSubmult = Smaller -- Definitely a submult
 instance Outputable IsSubmult where
   ppr = text . show
 
--- | @submult w1 w2@ check whether a value of weight @w1@ is allowed where a
--- value of weight @w2@ is expected. This is a partial order.
+-- | @submult w1 w2@ check whether a value of multiplicity @w1@ is allowed where a
+-- value of multiplicity @w2@ is expected. This is a partial order.
 submultMaybe :: GMult t -> GMult t -> IsSubmult
 submultMaybe r1 r2 = go r1 r2
   where

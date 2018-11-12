@@ -134,7 +134,7 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- an @-pattern), then w is the same as the
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
-                                  -- variable, so we ignore the weight.
+                                  -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _) = return (unLoc var)
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 

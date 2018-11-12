@@ -215,7 +215,7 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcM (Located (body GhcTcId)) }
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { (Scaled _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Scaled One rhs_ty):pat_tys) -- return type has implicitly weight 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
+  = do { (Scaled _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Scaled One rhs_ty):pat_tys) -- return type has implicitly multiplicity 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
             -- See Note [Case branches must never infer a non-tau type]
 
        ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
@@ -567,20 +567,20 @@ tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
 
 tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
-  = do  { ((rhs', pat_weight, pat', thing, new_res_ty), bind_op')
+  = do  { ((rhs', pat_mult, pat', thing, new_res_ty), bind_op')
             <- tcSyntaxOp MCompOrigin bind_op
                           [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
-               \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight, fun_weight, pat_weight] ->
+               \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight, fun_weight, pat_mult] ->
                do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
                   ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
-                                           (Scaled pat_weight $ mkCheckExpType pat_ty) $
+                                           (Scaled pat_mult $ mkCheckExpType pat_ty) $
                                      thing_inside (mkCheckExpType new_res_ty)
-                  ; return (rhs', pat_weight, pat', thing, new_res_ty) }
+                  ; return (rhs', pat_mult, pat', thing, new_res_ty) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- tcMonadFailOp (MCompPatOrigin pat) pat' fail_op new_res_ty
 
-        ; return (BindStmt (pat_weight, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
+        ; return (BindStmt (pat_mult, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
 
 -- Boolean expressions.
 --
@@ -827,23 +827,23 @@ tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
 
 tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
-                --       (>>=) :: rhs_ty ->_rhs_weight (pat_ty ->_pat_weight new_res_ty) ->_fun_weight res_ty
+                --       (>>=) :: rhs_ty ->_rhs_weight (pat_ty ->_pat_mult new_res_ty) ->_fun_weight res_ty
                 -- This level of generality is needed for using do-notation
                 -- in full generality; see Trac #1537
 
-          ((rhs', pat_weight, pat', new_res_ty, thing), bind_op')
+          ((rhs', pat_mult, pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
-                \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight,fun_weight,pat_weight] ->
+                \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight,fun_weight,pat_mult] ->
                 do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
                    ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
-                                            (Scaled pat_weight $ mkCheckExpType pat_ty) $
+                                            (Scaled pat_mult $ mkCheckExpType pat_ty) $
                                       thing_inside (mkCheckExpType new_res_ty)
-                   ; return (rhs', pat_weight, pat', new_res_ty, thing) }
+                   ; return (rhs', pat_mult, pat', new_res_ty, thing) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op new_res_ty
 
-        ; return (BindStmt (pat_weight, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
+        ; return (BindStmt (pat_mult, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
 
 tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
   = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $

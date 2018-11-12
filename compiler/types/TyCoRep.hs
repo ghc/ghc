@@ -828,12 +828,12 @@ infixr 3 `mkFunTy`      -- Associates to the right
 infixr 3 `mkFunTyOm`
 -- | Make an arrow type
 mkFunTy :: Mult -> Type -> Type -> Type
-mkFunTy weight arg res = FunTy weight arg res
+mkFunTy mult arg res = FunTy mult arg res
 
 mkScaledFunTy :: Scaled Type -> Type -> Type
-mkScaledFunTy (Scaled weight arg) res = FunTy weight arg res
+mkScaledFunTy (Scaled mult arg) res = FunTy mult arg res
 
--- | Special, common, case: Arrow type with weight Omega
+-- | Special, common, case: Arrow type with mult Omega
 mkFunTyOm :: Type -> Type -> Type
 mkFunTyOm = mkFunTy Omega
 
@@ -3382,9 +3382,9 @@ debug_ppr_ty _ (LitTy l)
 debug_ppr_ty _ (TyVarTy tv)
   = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
-debug_ppr_ty prec (FunTy weight arg res)
+debug_ppr_ty prec (FunTy mult arg res)
   =
-    let arr = case weight of
+    let arr = case mult of
                 Zero -> text "->0"
                 One -> text "⊸"
                 Omega -> arrow

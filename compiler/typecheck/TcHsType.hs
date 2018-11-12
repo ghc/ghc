@@ -53,7 +53,7 @@ module TcHsType (
         zonkPromoteType,
 
         -- Weight
-        tcWeight,
+        tcMult,
 
         -- Pattern type signatures
         tcHsPatSigType, tcPatSig,
@@ -396,8 +396,8 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
   where
     mode = allowUnsaturated typeLevelMode
 
-tcWeight :: HsMult GhcRn -> TcM Mult
-tcWeight hc = tc_weight typeLevelMode hc
+tcMult :: HsMult GhcRn -> TcM Mult
+tcMult hc = tc_weight typeLevelMode hc
 
 {-
 ************************************************************************

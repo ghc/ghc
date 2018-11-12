@@ -1413,10 +1413,10 @@ flatten_one (TyConApp tc tys)
 --                   _ -> fmode
   = flatten_ty_con_app tc tys
 
-flatten_one (FunTy weight ty1 ty2)
+flatten_one (FunTy mult ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; (xi2,co2) <- flatten_one ty2
-       ; (xi3, co3) <- flatten_one (fromMult weight)
+       ; (xi3, co3) <- flatten_one (fromMult mult)
        ; role <- getRole
        ; return (mkFunTy (toMult xi3) xi1 xi2, mkFunCo role co3 co1 co2) }
 

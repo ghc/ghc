@@ -212,10 +212,10 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
        ; return (mkWpCastN co, bndr_id) }
 
 tcPatBndr _ bndr_name pat_ty
-  = do { let pat_weight = scaledMult pat_ty
+  = do { let pat_mult = scaledMult pat_ty
        ; pat_ty <- expTypeToType (scaledThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalId bndr_name (Regular pat_weight) pat_ty) }
+       ; return (idHsWrapper, mkLocalId bndr_name (Regular pat_mult) pat_ty) }
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
@@ -412,7 +412,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
-        ; (expr_wrap1, [Scaled _weight inf_arg_ty], inf_res_ty)
+        ; (expr_wrap1, [Scaled _mult inf_arg_ty], inf_res_ty)
             <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr'_inferred
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
@@ -800,8 +800,8 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
               -- pat_ty' /= pat_ty iff coi /= IdCo
 
               arg_tys' = getCompose $ substTys tenv (Compose arg_tys)
-              pat_weight = scaledMult pat_ty_weighted
-              arg_tys_weighted = map (scaleScaled pat_weight) arg_tys'
+              pat_mult = scaledMult pat_ty_weighted
+              arg_tys_weighted = map (scaleScaled pat_mult) arg_tys'
 
         ; traceTc "tcConPat" (vcat [ ppr con_name
                                    , pprTyVars univ_tvs
@@ -875,12 +875,12 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
         ; let ty'         = substTy tenv ty
               arg_tys'    = getCompose $ substTys tenv (Compose arg_tys)
-              pat_weight  = scaledMult pat_ty
-              arg_tys_weighted = map (scaleScaled pat_weight) arg_tys'
+              pat_mult    = scaledMult pat_ty
+              arg_tys_weighted = map (scaleScaled pat_mult) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
-        ; when (not $ submult Omega pat_weight) $
+        ; when (not $ submult Omega pat_mult) $
             addErrTc $ text "Pattern synonyms are only allowed at multiplicity ω"
 
         ; wrap <- tcSubTypePat penv (scaledThing pat_ty) ty'

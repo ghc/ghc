@@ -759,7 +759,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { tcEqWeight eq_orig inst_orig ctxt act_weight exp_weight
+        do { tcEqMult eq_orig inst_orig ctxt act_weight exp_weight
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
                          -- GenSigCtxt: See Note [Setting the argument context]
@@ -811,8 +811,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Mult -> Mult -> TcM ()
-tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
+tcEqMult :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Mult -> Mult -> TcM ()
+tcEqMult eq_orig inst_orig ctxt w_actual w_expected = do
   { -- Note that here we do not call to `submultMaybe`, so we check
     -- for strict equality.
   ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
@@ -840,7 +840,7 @@ tcSubMult actual_w w
         _ -> do_one_action weight w
 
     do_one_action a_w c_w
-       = tcEqWeight AppOrigin AppOrigin TypeAppCtxt a_w c_w
+       = tcEqMult AppOrigin AppOrigin TypeAppCtxt a_w c_w
 
 
 {- Note [Settting the argument context]
