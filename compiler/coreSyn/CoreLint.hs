@@ -966,7 +966,7 @@ checkLinearity body_ue lam_var =
 -- error messages.
 checkSubUE :: Var -> UsageEnv -> UsageEnv -> LintM ()
 checkSubUE var ue1 ue2 =
-  lintL (ue1 `subweightUE` ue2) $
+  lintL (ue1 `submultUE` ue2) $
   text "Alias-like variable" <+> ppr var
   <+> text "doesn't have the same usage environment as its right-hand side"
   $$ text "Recorded (var's) environment:" <+> ppr ue2
@@ -2468,7 +2468,7 @@ ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
 
 ensureEqWeights :: Rig -> Rig -> SDoc -> LintM ()
 ensureEqWeights actual_usage described_usage err_msg =
-    case (actual_usage `subweightMaybe` described_usage) of
+    case (actual_usage `submultMaybe` described_usage) of
       Smaller -> return ()
       Larger -> addErrL err_msg
       Unknown -> ensureEqTys (fromMult actual_usage)

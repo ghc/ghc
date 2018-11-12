@@ -1576,7 +1576,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
           case mult_shape of
             SynAnyMult -> return (arg_mult, arg_mult, [arg_mult])
             SynMult mult ->
-              if subweight arg_mult mult then
+              if submult arg_mult mult then
                 return (arg_mult, mult, [])
               else
                 addErrTc (text "Incorrect multiplicity in rebindable syntax") >>

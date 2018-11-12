@@ -2728,7 +2728,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       if r1 `eqRig` r2
         then TEQ
         else
-          case subweightMaybe r1 r2 of
+          case submultMaybe r1 r2 of
             Smaller -> TLT
             Larger  -> TGT
             Unknown -> go env (fromMult r1) (fromMult r2)

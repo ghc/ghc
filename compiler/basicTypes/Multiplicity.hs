@@ -31,7 +31,7 @@ module Multiplicity
   , scaleScaled
   , IsSubweight(..)
   , isUnknown
-  , subweightMaybe ) where
+  , submultMaybe ) where
 
 import GhcPrelude
 
@@ -182,9 +182,9 @@ scaleScaled w x =
 -- * Multiplicity ordering
 --
 
-data IsSubweight = Smaller -- Definitely a subweight
-                 | Larger  -- Definitely not a subweight
-                 | Unknown -- Could be a subweight, need to ask the typechecker
+data IsSubweight = Smaller -- Definitely a submult
+                 | Larger  -- Definitely not a submult
+                 | Unknown -- Could be a submult, need to ask the typechecker
                  deriving (Show, Eq, Ord)
 
 isUnknown :: IsSubweight -> Bool
@@ -194,16 +194,16 @@ isUnknown _ = False
 instance Outputable IsSubweight where
   ppr = text . show
 
--- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
+-- | @submult w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
-subweightMaybe :: GMult t -> GMult t -> IsSubweight
-subweightMaybe r1 r2 = go r1 r2
+submultMaybe :: GMult t -> GMult t -> IsSubweight
+submultMaybe r1 r2 = go r1 r2
   where
     go _     Omega = Smaller
     go Zero  Zero  = Smaller
     go _     Zero  = Larger
     go Zero  One   = Larger
-    -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
+    -- It is no mistake: 'Zero' is not a submult of 'One': a value which must be
     -- used zero times cannot be used one time.
     -- Zero = {0}
     -- One  = {1}

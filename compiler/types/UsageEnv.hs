@@ -67,15 +67,15 @@ supUEs [] = zeroUE -- This is incorrect, it should be the bottom usage env, but
 supUEs l = foldr1 supUE l
 
 -- | @deleteUEAsserting w x env@ deletes the binding to @x@ in @env@ under one
--- condition: if @x@ is bound to @w'@ in @env@, then @w'@ must be a subweight of
--- @w@, if @x@ is not bound in @env@ then 'Zero' must be a subweight of @W@. If
+-- condition: if @x@ is bound to @w'@ in @env@, then @w'@ must be a submult of
+-- @w@, if @x@ is not bound in @env@ then 'Zero' must be a submult of @W@. If
 -- the condition is not met, then @Nothing@ is returned.
 deleteUEAsserting :: UsageEnv -> Rig -> Name -> Maybe UsageEnv
 deleteUEAsserting (UsageEnv e) w x | Just w' <- lookupNameEnv e x = do
-  guard (subweight w' w)
+  guard (submult w' w)
   return $ UsageEnv (delFromNameEnv e x)
 deleteUEAsserting (UsageEnv e) w _x = do
-  guard (subweight Zero w)
+  guard (submult Zero w)
   return $ UsageEnv e
 
 deleteUE :: NamedThing n => UsageEnv -> n -> UsageEnv
@@ -102,14 +102,14 @@ allUE p (UsageEnv ue) = all p (nonDetEltsUFM ue)
 instance Outputable UsageEnv where
   ppr (UsageEnv ne) = text "UsageEnv:" <+> ppr ne
 
-subweight :: Rig -> Rig -> Bool
-subweight r1 r2 = case subweightMaybe r1 r2 of
+submult :: Rig -> Rig -> Bool
+submult r1 r2 = case submultMaybe r1 r2 of
                     Smaller -> True
                     _ -> False
 
-subweightUE :: UsageEnv -> UsageEnv -> Bool
-subweightUE (UsageEnv lhs) (UsageEnv rhs) =
-    all (uncurry subweight) (nonDetEltsUFM pairs)
+submultUE :: UsageEnv -> UsageEnv -> Bool
+submultUE (UsageEnv lhs) (UsageEnv rhs) =
+    all (uncurry submult) (nonDetEltsUFM pairs)
   where
     pairs =
       plusUFM_CD (,) lhs Zero rhs Zero

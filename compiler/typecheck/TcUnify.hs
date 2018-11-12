@@ -813,7 +813,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
 tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM ()
 tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
-  { -- Note that here we do not call to `subweightMaybe`, so we check
+  { -- Note that here we do not call to `submultMaybe`, so we check
     -- for strict equality.
   ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
   -- I don't know why, but `_wrap` need not be an identity wrapper. At any rate,

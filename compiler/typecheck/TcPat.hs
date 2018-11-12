@@ -30,7 +30,7 @@ import Var
 import Name
 import RdrName
 import Multiplicity
-import UsageEnv (subweight)
+import UsageEnv (submult)
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
@@ -362,7 +362,7 @@ tc_pat penv (LazyPat x pat) pat_ty thing_inside
         ; return (LazyPat x pat', res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (scaledMult pat_ty)) $
+        when (not $ submult Omega (scaledMult pat_ty)) $
           addErrTc $ text "Lazy patterns are only allowed at multiplicity ω"
 
 tc_pat _ (WildPat _) pat_ty thing_inside
@@ -372,7 +372,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
         ; return (WildPat pat_ty, res) }
     where
       checkLinearity =
-        when (not $ subweight Zero (scaledMult pat_ty)) $
+        when (not $ submult Zero (scaledMult pat_ty)) $
           addErrTc $ text "Wildcard patterns of weight " <+>
                      quotes (ppr $ scaledMult pat_ty) <+>
                      text "are not allowed"
@@ -395,7 +395,7 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (scaledMult pat_ty)) $
+        when (not $ submult Omega (scaledMult pat_ty)) $
           addErrTc $ text "@-patterns are only allowed at multiplicity ω"
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
@@ -434,7 +434,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
         ; return (ViewPat overall_pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
     where
       checkLinearity =
-        when (not $ subweight Omega (scaledMult overall_pat_ty)) $
+        when (not $ submult Omega (scaledMult overall_pat_ty)) $
           addErrTc $ text "View patterns are only allowed at multiplicity ω"
 
 -- Type signatures in patterns
@@ -578,7 +578,7 @@ tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
         ; return (NPat pat_ty (L l lit') mb_neg' eq', res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (scaledMult pat_ty)) $
+        when (not $ submult Omega (scaledMult pat_ty)) $
           addErrTc $ text "Literal patterns are only allowed at multiplicity ω"
 
 
@@ -646,7 +646,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
         ; return (pat', res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (scaledMult pat_ty_weighted)) $
+        when (not $ submult Omega (scaledMult pat_ty_weighted)) $
           addErrTc $ text "N+K patterns are only allowed at multiplicity ω"
 
 
@@ -880,7 +880,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 
-        ; when (not $ subweight Omega pat_weight) $
+        ; when (not $ submult Omega pat_weight) $
             addErrTc $ text "Pattern synonyms are only allowed at multiplicity ω"
 
         ; wrap <- tcSubTypePat penv (scaledThing pat_ty) ty'
