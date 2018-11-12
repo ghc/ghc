@@ -21,7 +21,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
-        Rig, HsMult(..), HsWeighted(..),
+        Rig, HsMult(..), HsScaled(..),
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
@@ -746,19 +746,19 @@ instance
   ppr HsOmega = text "ω"
   ppr (HsMultTy p) = ppr p
 
-hsUnrestricted, hsLinear :: a -> HsWeighted pass a
-hsUnrestricted = HsWeighted HsOmega
-hsLinear = HsWeighted HsOne
+hsUnrestricted, hsLinear :: a -> HsScaled pass a
+hsUnrestricted = HsScaled HsOmega
+hsLinear = HsScaled HsOne
 
 isHsOmega :: HsMult pass -> Bool
 isHsOmega HsOmega = True
 isHsOmega _ = False
 
-data HsWeighted pass a = HsWeighted { hsWeight :: HsMult pass, hsThing :: a }
+data HsScaled pass a = HsScaled { hsWeight :: HsMult pass, hsThing :: a }
   deriving (Traversable, Functor, Foldable)
 
-instance Outputable a => Outputable (HsWeighted pass a) where
-   ppr (HsWeighted _cnt t) = -- ppr cnt <> ppr t
+instance Outputable a => Outputable (HsScaled pass a) where
+   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
 
@@ -1097,13 +1097,13 @@ mkHsAppTys = foldl' mkHsAppTy
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
-splitHsFunType :: LHsType GhcRn -> ([HsWeighted GhcRn (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
 splitHsFunType (L _ (HsFunTy _ x weight y))
   | (args, res) <- splitHsFunType y
-  = ((HsWeighted weight x):args, res)
+  = ((HsScaled weight x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]

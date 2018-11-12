@@ -51,7 +51,7 @@
           []
           (Nothing)
           (PrefixCon
-           [(HsWeighted
+           [(HsScaled
              (HsOne)
              ({ DumpParsedAst.hs:5:26-30 }
               (HsTyVar

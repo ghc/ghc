@@ -2111,8 +2111,8 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (HsWeighted GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
-   -> RnM ((HsConDetails (HsWeighted GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
+   -> HsConDetails (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails (HsScaled GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
   = do { (new_tys, fvs) <- mapFvRn (rnWeightedLHsType doc) tys

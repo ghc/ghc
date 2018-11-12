@@ -2301,7 +2301,7 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (HsWeighted GhcRn (LHsType GhcRn)) r
+             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
@@ -2332,8 +2332,8 @@ tcConArgs (RecCon fields)
     (_,btys) = unzip exploded
 
 
-tcConArg :: HsWeighted GhcRn (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
-tcConArg (HsWeighted w bty)
+tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
+tcConArg (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
         ; w' <- tcWeight w

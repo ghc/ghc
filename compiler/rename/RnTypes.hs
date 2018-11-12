@@ -480,12 +480,12 @@ rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 rnLHsTypes :: Traversable t => HsDocContext -> t (LHsType GhcPs) -> RnM (t (LHsType GhcRn), FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
-rnWeightedLHsType :: HsDocContext -> HsWeighted GhcPs (LHsType GhcPs)
-                                  -> RnM (HsWeighted GhcRn (LHsType GhcRn), FreeVars)
-rnWeightedLHsType doc (HsWeighted w ty) = do
+rnWeightedLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
+                                  -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
+rnWeightedLHsType doc (HsScaled w ty) = do
   (w' , fvs_w) <- rnRig (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
-  return (HsWeighted w' ty', fvs `plusFV` fvs_w)
+  return (HsScaled w' ty', fvs `plusFV` fvs_w)
 
 
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
