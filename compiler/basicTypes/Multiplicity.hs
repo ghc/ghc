@@ -26,8 +26,7 @@ module Multiplicity
   , knownOmega
   , irrelevantWeight
   , mkScaled
-  , weightedSet
-  , setWeight
+  , scaledSet
   , scaleScaled
   , IsSubmult(..)
   , submultMaybe ) where
@@ -167,11 +166,8 @@ instance (Multable t, Outputable a) => Outputable (GScaled t a) where
    ppr (Scaled _cnt t) = ppr t
      -- Do not print the multiplicity here because it tends to be too verbose
 
-weightedSet :: GScaled t a -> b -> GScaled t b
-weightedSet x b = fmap (\_->b) x
-
-setWeight :: GMult t -> GScaled t a -> GScaled t a
-setWeight r x = x { scaledMult = r }
+scaledSet :: GScaled t a -> b -> GScaled t b
+scaledSet x b = fmap (\_->b) x
 
 scaleScaled :: GMult t -> GScaled t a -> GScaled t a
 scaleScaled w x =

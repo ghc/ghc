@@ -2585,8 +2585,8 @@ tcPatSig in_pat_bind sig res_ty
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
-        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0
-        ; let sig_tvs_weighted = map (\(x, y) -> (x, weightedSet res_ty y)) sig_tvs
+        ; let sig_wcs = map (\(x,y)-> (x,scaledSet res_ty y)) sig_wcs0
+        ; let sig_tvs_weighted = map (\(x, y) -> (x, scaledSet res_ty y)) sig_tvs
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $

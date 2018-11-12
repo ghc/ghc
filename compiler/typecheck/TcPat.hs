@@ -332,7 +332,7 @@ tc_pat  :: PatEnv
 
 tc_pat penv (VarPat x (L l name)) pat_ty thing_inside
   = do  { (wrap, id) <- tcPatBndr penv name pat_ty
-        ; res <- tcExtendIdEnv1 name (pat_ty `weightedSet` id) thing_inside
+        ; res <- tcExtendIdEnv1 name (pat_ty `scaledSet` id) thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 
@@ -381,8 +381,8 @@ tc_pat _ (WildPat _) pat_ty thing_inside
 tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
   = do  { checkLinearity
         ; (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
-        ; (pat', res) <- tcExtendIdEnv1 name (pat_ty `weightedSet` bndr_id) $
-                         tc_lpat pat (pat_ty `weightedSet`(mkCheckExpType $ idType bndr_id))
+        ; (pat', res) <- tcExtendIdEnv1 name (pat_ty `scaledSet` bndr_id) $
+                         tc_lpat pat (pat_ty `scaledSet`(mkCheckExpType $ idType bndr_id))
                                  penv thing_inside
             -- NB: if we do inference on:
             --          \ (y@(x::forall a. a->a)) = e
@@ -421,7 +421,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
             -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
 
          -- pattern must have inf_res_ty
-        ; (pat', res) <- tc_lpat pat (overall_pat_ty `weightedSet` mkCheckExpType inf_res_ty) penv thing_inside
+        ; (pat', res) <- tc_lpat pat (overall_pat_ty `scaledSet` mkCheckExpType inf_res_ty) penv thing_inside
 
         ; let Scaled w h_overall_pat_ty = overall_pat_ty
         ; overall_pat_ty <- readExpType h_overall_pat_ty
@@ -448,7 +448,7 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
                 -- from an outer scope to mention one of these tyvars in its kind.
         ; (pat', res) <- tcExtendNameTyVarEnv wcs      $
                          tcExtendNameTyVarEnv tv_binds $
-                         tc_lpat pat (pat_ty `weightedSet` mkCheckExpType inner_ty) penv thing_inside
+                         tc_lpat pat (pat_ty `scaledSet` mkCheckExpType inner_ty) penv thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
 
@@ -456,7 +456,7 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
 -- Lists, tuples, arrays
 tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
   = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv (scaledThing pat_ty)
-        ; (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
+        ; (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `scaledSet` mkCheckExpType elt_ty))
                                      pats penv thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi
@@ -469,7 +469,7 @@ tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
                                           SynList $
                  \ [elt_ty] _ ->
-                 do { (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
+                 do { (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `scaledSet` mkCheckExpType elt_ty))
                                                  pats penv thing_inside
                     ; return (pats', res, elt_ty) }
         ; return (ListPat (ListPatTc elt_ty (Just (tau_pat_ty,e'))) pats', res)
@@ -484,7 +484,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
                      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
         ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
                                            Boxed   -> arg_tys
-        ; (pats', res) <- tc_lpats penv pats (map (weightedSet pat_ty . mkCheckExpType) con_arg_tys)
+        ; (pats', res) <- tc_lpats penv pats (map (scaledSet pat_ty . mkCheckExpType) con_arg_tys)
                                    thing_inside
 
         ; dflags <- getDynFlags
@@ -512,7 +512,7 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
                                                penv (scaledThing pat_ty)
         ; -- Drop levity vars, we don't care about them here
           let con_arg_tys = drop arity arg_tys
-        ; (pat', res) <- tc_lpat pat (pat_ty `weightedSet` mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
+        ; (pat', res) <- tc_lpat pat (pat_ty `scaledSet` mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
                                  penv thing_inside
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi (SumPat con_arg_tys pat' alt arity) pat_ty, res)
@@ -625,7 +625,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
                \ [lit2_ty, var_ty] _ ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
                   ; (wrap, bndr_id) <- setSrcSpan nm_loc $
-                                     tcPatBndr penv name (pat_ty_weighted `weightedSet` mkCheckExpType var_ty)
+                                     tcPatBndr penv name (pat_ty_weighted `scaledSet` mkCheckExpType var_ty)
                            -- co :: var_ty ~ idType bndr_id
 
                            -- minus_wrap is applicable to minus'
@@ -637,7 +637,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
           do { icls <- tcLookupClass integralClassName
              ; instStupidTheta orig [mkClassPred icls [pat_ty]] }
 
-        ; res <- tcExtendIdEnv1 name (pat_ty_weighted `weightedSet` bndr_id) thing_inside
+        ; res <- tcExtendIdEnv1 name (pat_ty_weighted `scaledSet` bndr_id) thing_inside
 
         ; let minus'' = minus' { syn_res_wrap =
                                     minus_wrap <.> syn_res_wrap minus' }

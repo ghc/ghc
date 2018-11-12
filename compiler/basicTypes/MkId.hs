@@ -856,7 +856,7 @@ dataConSrcToImplBang dflags fam_envs arg_ty
           -- we use -fomit-iface-pragmas as the indication
   , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of { Just (_,ty) -> weightedSet arg_ty ty; Nothing -> arg_ty }
+        arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
   , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
