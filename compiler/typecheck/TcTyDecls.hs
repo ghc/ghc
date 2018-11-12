@@ -577,7 +577,7 @@ irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
     mapM_ (irType ex_var_set)
-          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ (map weightedThing arg_tys))
+          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys))
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)

@@ -533,7 +533,7 @@ tcInstTyBinder _ subst (Anon ty)
        ; return (subst, tv_ty) }
 
   where
-    substed_ty = substTy subst (weightedThing ty)
+    substed_ty = substTy subst (scaledThing ty)
 
       -- See Note [Constraints handled in types]
     get_eq_tys_maybe :: Type

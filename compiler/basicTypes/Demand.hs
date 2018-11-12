@@ -77,7 +77,7 @@ import Maybes           ( orElse )
 import Type            ( Type, isUnliftedType )
 import TyCon           ( isNewTyCon, isClassTyCon )
 import DataCon         ( splitDataProductType_maybe )
-import Multiplicity    ( weightedThing )
+import Multiplicity    ( scaledThing )
 
 {-
 ************************************************************************
@@ -2028,7 +2028,7 @@ strictifyDictDmd ty dmd = case getUseDmd dmd of
              -- smells like reboxing; results in CBV boxed
              --
              -- TODO revisit this if we ever do boxity analysis
-           | otherwise -> case mkProdDmd $ zipWith strictifyDictDmd (map weightedThing inst_con_arg_tys) dmds of
+           | otherwise -> case mkProdDmd $ zipWith strictifyDictDmd (map scaledThing inst_con_arg_tys) dmds of
                JD {sd = s,ud = a} -> JD (Str VanStr s) (Use n a)
              -- TODO could optimize with an aborting variant of zipWith since
              -- the superclass dicts are always a prefix

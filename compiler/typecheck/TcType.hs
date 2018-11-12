@@ -1186,7 +1186,7 @@ isRuntimeUnkSkol x
 
 mkTyVarNamePairs :: [Scaled TyVar] -> [(Name, Scaled TyVar)]
 -- Just pair each TyVar with its own name
-mkTyVarNamePairs tvs = [(tyVarName (weightedThing tv), tv) | tv <- tvs]
+mkTyVarNamePairs tvs = [(tyVarName (scaledThing tv), tv) | tv <- tvs]
 
 
 findDupTyVarTvs :: [(Name,TcTyVar)] -> [(Name,Name)]
@@ -1629,7 +1629,7 @@ tcSplitDFunTy ty
   = case tcSplitForAllTys ty   of { (tvs, rho)    ->
     case splitFunTys rho       of { (theta, tau)  ->
     case tcSplitDFunHead tau   of { (clas, tys)   ->
-    (tvs, map weightedThing theta, clas, tys) }}}
+    (tvs, map scaledThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys

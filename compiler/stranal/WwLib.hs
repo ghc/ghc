@@ -777,7 +777,7 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 findTypeShape fam_envs ty
   | Just (tc, tc_args)  <- splitTyConApp_maybe ty
   , Just con <- isDataProductTyCon_maybe tc
-  = TsProd (map (findTypeShape fam_envs) $ map weightedThing $ dataConInstArgTys con tc_args)
+  = TsProd (map (findTypeShape fam_envs) $ map scaledThing $ dataConInstArgTys con tc_args)
 
   | Just (_, res) <- splitFunTy_maybe ty
   = TsFun (findTypeShape fam_envs res)
@@ -836,7 +836,7 @@ mkWWcpr_help :: (DataCon, [Type], [(Scaled Type,StrictnessMark)], Coercion)
 
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | [arg1@(arg_ty1, _)] <- arg_tys
-  , isUnliftedType (weightedThing arg_ty1)
+  , isUnliftedType (scaledThing arg_ty1)
   , isLinear arg_ty1
         -- Special case when there is a single result of unlifted, linear, type
         --
@@ -851,7 +851,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
                 , \ body     -> mkUnpackCase body co One work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused Trac #10658
-                , weightedThing arg_ty1 ) }
+                , scaledThing arg_ty1 ) }
 
   | otherwise   -- The general case
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
@@ -867,7 +867,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
        ; let wrap_wild   = mk_ww_local wild_uniq (linear ubx_tup_ty,MarkedStrict)
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
-             ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
+             ubx_tup_app = mkCoreUbxTup (map (scaledThing . fst) arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True

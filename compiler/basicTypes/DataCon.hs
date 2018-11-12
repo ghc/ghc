@@ -958,7 +958,7 @@ mkDataCon name declared_infix prom_info
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
                     | Bndr tv vis <- user_tvbs ]
 
-    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ map weightedThing orig_arg_tys)
+    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ map scaledThing orig_arg_tys)
     prom_res_kind  = orig_res_ty
     promoted       = mkPromotedDataCon con name prom_info
                                        (prom_tv_bndrs ++ prom_arg_bndrs)
@@ -1166,7 +1166,7 @@ dataConFieldType con label = case dataConFieldType_maybe con label of
 dataConFieldType_maybe :: DataCon -> FieldLabelString
                        -> Maybe (FieldLabel, Type)
 dataConFieldType_maybe con label
-  = find ((== label) . flLabel . fst) (dcFields con `zip` (weightedThing <$> dcOrigArgTys con))
+  = find ((== label) . flLabel . fst) (dcFields con `zip` (scaledThing <$> dcOrigArgTys con))
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file
@@ -1246,7 +1246,7 @@ dataConInstSig con@(MkData { dcUnivTyVars = univ_tvs, dcExTyCoVars = ex_tvs
                univ_tys
   = ( ex_tvs'
     , substTheta subst (dataConTheta con)
-    , substTys subst (map weightedThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
+    , substTys subst (map scaledThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
   where
     univ_subst = zipTvSubst univ_tvs univ_tys
     (subst, ex_tvs') = Type.substVarBndrs univ_subst ex_tvs

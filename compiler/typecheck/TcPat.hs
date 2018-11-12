@@ -191,20 +191,20 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
   -- Note [Typechecking pattern bindings] in TcBinds
 
   | Just bndr_id <- sig_fn bndr_name   -- There is a signature
-  = do { wrap <- tcSubTypePat penv (weightedThing exp_pat_ty) (idType bndr_id)
+  = do { wrap <- tcSubTypePat penv (scaledThing exp_pat_ty) (idType bndr_id)
            -- See Note [Subsumption check at pattern variables]
        ; traceTc "tcPatBndr(sig)" (ppr bndr_id $$ ppr (idType bndr_id) $$ ppr exp_pat_ty)
        ; return (wrap, bndr_id) }
 
   | otherwise                          -- No signature
-  = do { (co, bndr_ty) <- case weightedThing exp_pat_ty of
+  = do { (co, bndr_ty) <- case scaledThing exp_pat_ty of
              Check pat_ty    -> promoteTcType bind_lvl pat_ty
              Infer infer_res -> ASSERT( bind_lvl == ir_lvl infer_res )
                                 -- If we were under a constructor that bumped
                                 -- the level, we'd be in checking mode
                                 do { bndr_ty <- inferResultToType infer_res
                                    ; return (mkTcNomReflCo bndr_ty, bndr_ty) }
-       ; let bndr_mult = weightedWeight exp_pat_ty
+       ; let bndr_mult = scaledMult exp_pat_ty
        ; bndr_id <- newLetBndr no_gen bndr_name (Regular bndr_mult) bndr_ty
        ; traceTc "tcPatBndr(nosig)" (vcat [ ppr bind_lvl
                                           , ppr exp_pat_ty, ppr bndr_ty, ppr co
@@ -212,8 +212,8 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
        ; return (mkWpCastN co, bndr_id) }
 
 tcPatBndr _ bndr_name pat_ty
-  = do { let pat_weight = weightedWeight pat_ty
-       ; pat_ty <- expTypeToType (weightedThing pat_ty)
+  = do { let pat_weight = scaledMult pat_ty
+       ; pat_ty <- expTypeToType (scaledThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
        ; return (idHsWrapper, mkLocalId bndr_name (Regular pat_weight) pat_ty) }
                -- Whether or not there is a sig is irrelevant,
@@ -333,7 +333,7 @@ tc_pat  :: PatEnv
 tc_pat penv (VarPat x (L l name)) pat_ty thing_inside
   = do  { (wrap, id) <- tcPatBndr penv name pat_ty
         ; res <- tcExtendIdEnv1 name (pat_ty `weightedSet` id) thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 
 tc_pat penv (ParPat x pat) pat_ty thing_inside
@@ -356,25 +356,25 @@ tc_pat penv (LazyPat x pat) pat_ty thing_inside
         --   see Note [Hopping the LIE in lazy patterns]
 
         -- Check that the expected pattern type is itself lifted
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; _ <- unifyType Nothing (typeKind pat_ty) liftedTypeKind
 
         ; return (LazyPat x pat', res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (weightedWeight pat_ty)) $
+        when (not $ subweight Omega (scaledMult pat_ty)) $
           addErrTc $ text "Lazy patterns are only allowed at multiplicity ω"
 
 tc_pat _ (WildPat _) pat_ty thing_inside
   = do  { checkLinearity
         ; res <- thing_inside
-        ; pat_ty <- expTypeToType (weightedThing pat_ty)
+        ; pat_ty <- expTypeToType (scaledThing pat_ty)
         ; return (WildPat pat_ty, res) }
     where
       checkLinearity =
-        when (not $ subweight Zero (weightedWeight pat_ty)) $
+        when (not $ subweight Zero (scaledMult pat_ty)) $
           addErrTc $ text "Wildcard patterns of weight " <+>
-                     quotes (ppr $ weightedWeight pat_ty) <+>
+                     quotes (ppr $ scaledMult pat_ty) <+>
                      text "are not allowed"
 
 
@@ -391,11 +391,11 @@ tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
             -- perhaps be fixed, but only with a bit more work.
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty, res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (weightedWeight pat_ty)) $
+        when (not $ subweight Omega (scaledMult pat_ty)) $
           addErrTc $ text "@-patterns are only allowed at multiplicity ω"
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
@@ -417,7 +417,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
          -- check that overall pattern is more polymorphic than arg type
-        ; expr_wrap2 <- tcSubTypePat penv (weightedThing overall_pat_ty) inf_arg_ty
+        ; expr_wrap2 <- tcSubTypePat penv (scaledThing overall_pat_ty) inf_arg_ty
             -- expr_wrap2 :: overall_pat_ty "->" inf_arg_ty
 
          -- pattern must have inf_res_ty
@@ -434,7 +434,7 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
         ; return (ViewPat overall_pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
     where
       checkLinearity =
-        when (not $ subweight Omega (weightedWeight overall_pat_ty)) $
+        when (not $ subweight Omega (scaledMult overall_pat_ty)) $
           addErrTc $ text "View patterns are only allowed at multiplicity ω"
 
 -- Type signatures in patterns
@@ -449,22 +449,22 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
         ; (pat', res) <- tcExtendNameTyVarEnv wcs      $
                          tcExtendNameTyVarEnv tv_binds $
                          tc_lpat pat (pat_ty `weightedSet` mkCheckExpType inner_ty) penv thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
 
 ------------------------
 -- Lists, tuples, arrays
 tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
-  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv (weightedThing pat_ty)
+  = do  { (coi, elt_ty) <- matchExpectedPatTy matchExpectedListTy penv (scaledThing pat_ty)
         ; (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
                                      pats penv thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi
                          (ListPat (ListPatTc elt_ty Nothing) pats') pat_ty, res)
 }
 
 tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
-  = do  { tau_pat_ty <- expTypeToType (weightedThing pat_ty)
+  = do  { tau_pat_ty <- expTypeToType (scaledThing pat_ty)
         ; ((pats', res, elt_ty), e')
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
                                           SynList $
@@ -479,7 +479,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
   = do  { let arity = length pats
               tc = tupleTyCon boxity arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
-                                               penv (weightedThing pat_ty)
+                                               penv (scaledThing pat_ty)
                      -- Unboxed tuples have RuntimeRep vars, which we discard:
                      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
         ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
@@ -501,7 +501,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
                   isBoxed boxity      = LazyPat noExt (noLoc unmangled_result)
                 | otherwise           = unmangled_result
 
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; ASSERT( con_arg_tys `equalLength` pats ) -- Syntactically enforced
           return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
@@ -509,12 +509,12 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
 tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
   = do  { let tc = sumTyCon arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
-                                               penv (weightedThing pat_ty)
+                                               penv (scaledThing pat_ty)
         ; -- Drop levity vars, we don't care about them here
           let con_arg_tys = drop arity arg_tys
         ; (pat', res) <- tc_lpat pat (pat_ty `weightedSet` mkCheckExpType (con_arg_tys `getNth` (alt - 1)))
                                  penv thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat coi (SumPat con_arg_tys pat' alt arity) pat_ty, res)
         }
 
@@ -527,9 +527,9 @@ tc_pat penv (ConPatIn con arg_pats) pat_ty thing_inside
 -- Literal patterns
 tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
   = do  { let lit_ty = hsLitType simple_lit
-        ; wrap   <- tcSubTypePat penv (weightedThing pat_ty) lit_ty
+        ; wrap   <- tcSubTypePat penv (scaledThing pat_ty) lit_ty
         ; res    <- thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return ( mkHsWrapPat wrap (LitPat x (convertLit simple_lit)) pat_ty
                  , res) }
 
@@ -557,7 +557,7 @@ tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
           -- linear environments. But it is not clear how useful this is.
         ; let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
-            <- tcSyntaxOp orig eq [SynType (weightedThing pat_ty), SynAny]
+            <- tcSyntaxOp orig eq [SynType (scaledThing pat_ty), SynAny]
                           (mkCheckExpType boolTy) $
                \ [neg_lit_ty] _ ->
                let new_over_lit lit_ty = newOverloadedLit over_lit
@@ -574,11 +574,11 @@ tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
                      -- all multiplicities.
 
         ; res <- thing_inside
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (NPat pat_ty (L l lit') mb_neg' eq', res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (weightedWeight pat_ty)) $
+        when (not $ subweight Omega (scaledMult pat_ty)) $
           addErrTc $ text "Literal patterns are only allowed at multiplicity ω"
 
 
@@ -613,7 +613,7 @@ AST is used for the subtraction operation.
 -- See Note [NPlusK patterns]
 tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted thing_inside
   = do  { checkLinearity
-        ; pat_ty <- expTypeToType (weightedThing pat_ty_weighted)
+        ; pat_ty <- expTypeToType (scaledThing pat_ty_weighted)
         ; let orig = LiteralOrigin lit
         ; (lit1', ge')
             <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
@@ -646,7 +646,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name) (L loc lit) _ ge minus) pat_ty_weighted
         ; return (pat', res) }
     where
       checkLinearity =
-        when (not $ subweight Omega (weightedWeight pat_ty_weighted)) $
+        when (not $ subweight Omega (scaledMult pat_ty_weighted)) $
           addErrTc $ text "N+K patterns are only allowed at multiplicity ω"
 
 
@@ -779,12 +779,12 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
           -- This may involve doing a family-instance coercion,
           -- and building a wrapper
         ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty_weighted
-        ; pat_ty <- readExpType (weightedThing pat_ty_weighted)
+        ; pat_ty <- readExpType (scaledThing pat_ty_weighted)
 
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
-        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ (map weightedThing arg_tys)
+        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys)
         ; checkExistentials ex_tvs all_arg_tys penv
 
         ; tenv <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
@@ -800,7 +800,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
               -- pat_ty' /= pat_ty iff coi /= IdCo
 
               arg_tys' = getCompose $ substTys tenv (Compose arg_tys)
-              pat_weight = weightedWeight pat_ty_weighted
+              pat_weight = scaledMult pat_ty_weighted
               arg_tys_weighted = map (scaleScaled pat_weight) arg_tys'
 
         ; traceTc "tcConPat" (vcat [ ppr con_name
@@ -870,12 +870,12 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
 
-        ; let all_arg_tys = ty : prov_theta ++ (map weightedThing arg_tys)
+        ; let all_arg_tys = ty : prov_theta ++ (map scaledThing arg_tys)
         ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
         ; let ty'         = substTy tenv ty
               arg_tys'    = getCompose $ substTys tenv (Compose arg_tys)
-              pat_weight  = weightedWeight pat_ty
+              pat_weight  = scaledMult pat_ty
               arg_tys_weighted = map (scaleScaled pat_weight) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
@@ -883,7 +883,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; when (not $ subweight Omega pat_weight) $
             addErrTc $ text "Pattern synonyms are only allowed at multiplicity ω"
 
-        ; wrap <- tcSubTypePat penv (weightedThing pat_ty) ty'
+        ; wrap <- tcSubTypePat penv (scaledThing pat_ty) ty'
         ; traceTc "tcPatSynPat" (ppr pat_syn $$
                                  ppr pat_ty $$
                                  ppr ty' $$
@@ -914,7 +914,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
                                     pat_args  = arg_pats',
                                     pat_arg_tys = mkTyVarTys univ_tvs',
                                     pat_wrap  = req_wrap }
-        ; pat_ty <- readExpType (weightedThing pat_ty)
+        ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
 
 ----------------------------
@@ -946,7 +946,7 @@ matchExpectedConTy (PE { pe_orig = orig }) data_tc exp_pat_ty
   | Just (fam_tc, fam_args, co_tc) <- tyConFamInstSig_maybe data_tc
          -- Comments refer to Note [Matching constructor patterns]
          -- co_tc :: forall a. T [a] ~ T7 a
-  = do { pat_ty <- expTypeToType (weightedThing exp_pat_ty)
+  = do { pat_ty <- expTypeToType (scaledThing exp_pat_ty)
        ; (wrap, pat_rho) <- topInstantiate orig pat_ty
 
        ; (subst, tvs') <- newMetaTyVars (tyConTyVars data_tc)
@@ -973,7 +973,7 @@ matchExpectedConTy (PE { pe_orig = orig }) data_tc exp_pat_ty
        ; return ( mkWpCastR full_co <.> wrap, tys') }
 
   | otherwise
-  = do { pat_ty <- expTypeToType (weightedThing exp_pat_ty)
+  = do { pat_ty <- expTypeToType (scaledThing exp_pat_ty)
        ; (wrap, pat_rho) <- topInstantiate orig pat_ty
        ; (coi, tys) <- matchExpectedTyConApp data_tc pat_rho
        ; return (mkWpCastN (mkTcSymCo coi) <.> wrap, tys) }

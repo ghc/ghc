@@ -163,7 +163,7 @@ canDoGenerics tc
         -- then we can't build the embedding-projection pair, because
         -- it relies on instantiating *polymorphic* sum and product types
         -- at the argument types of the constructors
-    bad_con dc = if (any bad_arg_type (map weightedThing $ dataConOrigArgTys dc))
+    bad_con dc = if (any bad_arg_type (map scaledThing $ dataConOrigArgTys dc))
                   then (NotValid (ppr dc <+> text
                     "must not have exotic unlifted or polymorphic arguments"))
                   else (if (not (isVanillaDataCon dc))
@@ -574,7 +574,7 @@ tc_mkRepTy gk_ tycon k =
         mkD    a   = mkTyConApp d1 [ k, metaDataTy, sumP (tyConDataCons a) ]
         mkC      a = mkTyConApp c1 [ k
                                    , metaConsTy a
-                                   , prod (map weightedThing . dataConInstOrigArgTys a
+                                   , prod (map scaledThing . dataConInstOrigArgTys a
                                             . mkTyVarTys . tyConTyVars $ tycon)
                                           (dataConSrcBangs    a)
                                           (dataConImplBangs   a)
@@ -742,7 +742,7 @@ mk1Sum gk_ us i n datacon = (from_alt, to_alt)
     argTys = dataConOrigArgTys datacon
     n_args = dataConSourceArity datacon
 
-    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) (map weightedThing argTys)
+    datacon_varTys = zip (map mkGenericLocal [us .. us+n_args-1]) (map scaledThing argTys)
     datacon_vars = map fst datacon_varTys
     us'          = us + n_args
 

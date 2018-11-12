@@ -507,7 +507,7 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
   -- Newtypes: push bang inwards (Trac #9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (weightedThing ty) args })
+      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
       else tidy1 v p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys
@@ -716,7 +716,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                            []    -> mapM (\(Scaled w ty) -> newSysLocalDsNoLP w ty) arg_tys
                            (m:_) ->
                             selectMatchVars (zipWithEqual "matchWrapper"
-                                              (\a b -> (weightedWeight a, unLoc b))
+                                              (\a b -> (scaledMult a, unLoc b))
                                                 arg_tys
                                                 (hsLMatchPats m))
 

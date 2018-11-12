@@ -402,13 +402,13 @@ tcLookupLocated = addLocM tcLookup
 tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
 tcLookupLcl_maybe name
   = do { local_env <- getLclTypeEnv
-       ; return (fmap weightedThing $ lookupNameEnv local_env name) }
+       ; return (fmap scaledThing $ lookupNameEnv local_env name) }
 
 tcLookup :: Name -> TcM TcTyThing
 tcLookup name = do
     local_env <- getLclTypeEnv
     case lookupNameEnv local_env name of
-        Just thing -> return (weightedThing thing)
+        Just thing -> return (scaledThing thing)
         Nothing    -> AGlobal <$> tcLookupGlobal name
 
 tcLookupTyVar :: Name -> TcM TcTyVar
@@ -446,7 +446,7 @@ tcLookupLocalIds ns
   where
     lookup lenv name
         = case lookupNameEnv lenv name of
-                Just (Scaled { weightedThing = (ATcId { tct_id = id })}) ->  id
+                Just (Scaled { scaledThing = (ATcId { tct_id = id })}) ->  id
                 _ -> pprPanic "tcLookupLocalIds" (ppr name)
 
 getInLocalScope :: TcM (Name -> Bool)
@@ -517,10 +517,10 @@ tcExtendSigIds :: TopLevelFlag -> [Scaled TcId] -> TcM a -> TcM a
 -- Does not extend the TcBinderStack
 tcExtendSigIds top_lvl sig_ids thing_inside
   = tc_extend_local_env top_lvl
-          [ (idName (weightedThing wid), (\id -> ATcId { tct_id   = id
+          [ (idName (scaledThing wid), (\id -> ATcId { tct_id   = id
                                                        , tct_info = info }) <$> wid)
           | wid <- sig_ids
-          , let closed = isTypeClosedLetBndr (weightedThing wid)
+          , let closed = isTypeClosedLetBndr (scaledThing wid)
                 info   = NonClosedLet emptyNameSet closed ]
      thing_inside
 
@@ -533,7 +533,7 @@ tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
   = tcExtendBinderStack [TcIdBndr id top_lvl | Scaled _ id <- ids] $
     tc_extend_local_env top_lvl
-          [ (idName (weightedThing wid), (\id -> ATcId { tct_id   = id
+          [ (idName (scaledThing wid), (\id -> ATcId { tct_id   = id
                                                        , tct_info = mk_tct_info id }) <$> wid)
           | wid <- ids ]
     thing_inside
@@ -551,7 +551,7 @@ tcExtendIdEnv :: [Scaled TcId] -> TcM a -> TcM a
 -- For lambda-bound and case-bound Ids
 -- Extends the TcBinderStack as well
 tcExtendIdEnv ids thing_inside
-  = tcExtendIdEnv2 [(idName (weightedThing id), id) | id <- ids] thing_inside
+  = tcExtendIdEnv2 [(idName (scaledThing id), id) | id <- ids] thing_inside
 
 tcExtendIdEnv1 :: Name -> Scaled TcId -> TcM a -> TcM a
 -- Exactly like tcExtendIdEnv2, but for a single (name,id) pair
@@ -610,7 +610,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
     -- Checks that the usage of the newly introduced binders is compatible with
     -- their weight. If so, combines the usage of non-new binders to |uenv|
     check_then_add_usage u0
-      = do { uok <- foldM (\u (x,w_) -> check_binder (weightedWeight w_) x u) u0 extra_env
+      = do { uok <- foldM (\u (x,w_) -> check_binder (scaledMult w_) x u) u0 extra_env
            ; env <- getLclEnv
            ; let usage = tcl_usage env
            ; updTcRef usage (addUE uok) }

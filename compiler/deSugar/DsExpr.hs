@@ -544,8 +544,8 @@ ds_expr _ (RecordCon { rcon_flds = rbinds
              labels = conLikeFieldLabels con_like
 
        ; con_args <- if null labels
-                     then mapM unlabelled_bottom (map weightedThing arg_tys)
-                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" (map weightedThing arg_tys) labels)
+                     then mapM unlabelled_bottom (map scaledThing arg_tys)
+                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" (map scaledThing arg_tys) labels)
 
        ; return (mkCoreApps con_expr' con_args) }
 

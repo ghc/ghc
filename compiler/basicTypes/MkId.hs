@@ -340,7 +340,7 @@ mkDictSelId name clas
 
     sel_ty = mkForAllTys tyvars $
              mkFunTy Omega (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
-             weightedThing (getNth arg_tys val_index)
+             scaledThing (getNth arg_tys val_index)
 
     base_info = noCafIdInfo
                 `setArityInfo`          1
@@ -394,7 +394,7 @@ mkDictSelRhs clas val_index
     the_arg_id     = getNth arg_ids val_index
     pred           = mkClassPred clas (mkTyVarTys tyvars)
     dict_id        = mkTemplateLocal 1 pred
-    arg_ids        = mkTemplateLocalsNum 2 (map weightedThing arg_tys)
+    arg_ids        = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
                                                    (Var dict_id)
@@ -561,7 +561,7 @@ mkDataConRepSimple :: Name -> DataCon -> DataConRep
 mkDataConRepSimple n dc =
   runIdentity $
     mkDataConRepX
-      (\tys -> Identity $ mkTemplateLocals (map weightedThing tys))
+      (\tys -> Identity $ mkTemplateLocals (map scaledThing tys))
       (\idus ini -> return (mkVarApps ini (map fst idus))) -- They are all going to be unitUnboxer
       emptyFamInstEnvs
       n
@@ -847,17 +847,17 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
 
 dataConSrcToImplBang dflags fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
-  | isUnliftedType (weightedThing arg_ty)
+  | isUnliftedType (scaledThing arg_ty)
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
-  , let mb_co   = topNormaliseType_maybe fam_envs (weightedThing arg_ty)
+  , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
         arg_ty' = case mb_co of { Just (_,ty) -> weightedSet arg_ty ty; Nothing -> arg_ty }
-  , isUnpackableType dflags fam_envs (weightedThing arg_ty')
+  , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
       NoSrcUnpack ->

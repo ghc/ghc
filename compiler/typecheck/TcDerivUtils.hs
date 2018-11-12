@@ -716,7 +716,7 @@ cond_stdOK deriv_ctxt permissive dflags tc rep_tc
       = bad "has existential type variables in its type"
       | not (null theta) -- 4.
       = bad "has constraints in its type"
-      | not (permissive || all isTauTy (map weightedThing $ dataConOrigArgTys con)) -- 5.
+      | not (permissive || all isTauTy (map scaledThing $ dataConOrigArgTys con)) -- 5.
       = bad "has a higher-rank type"
       | otherwise
       = IsValid

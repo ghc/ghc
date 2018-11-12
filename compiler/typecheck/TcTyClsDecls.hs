@@ -2972,7 +2972,7 @@ checkValidDataCon dflags existential_ok tc con
           -- Check all argument types for validity
         ; checkValidType ctxt (dataConUserType con)
         ; mapM_ (checkForLevPoly empty)
-                (map weightedThing $ dataConOrigArgTys con)
+                (map scaledThing $ dataConOrigArgTys con)
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
@@ -3055,10 +3055,10 @@ checkNewDataCon con
   = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
               -- One argument
 
-        ; checkTc (not (isUnliftedType (weightedThing arg_ty1))) $
+        ; checkTc (not (isUnliftedType (scaledThing arg_ty1))) $
           text "A newtype cannot have an unlifted argument type"
 
-        ; checkTc (ok_weight (weightedWeight arg_ty1)) $
+        ; checkTc (ok_weight (scaledMult arg_ty1)) $
           text "A newtype constructor must be linear"
 
         ; check_con (null eq_spec) $
@@ -3531,7 +3531,7 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ (map weightedThing arg_tys) }
+                    eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys) }
                     -- See Note [Role-checking data constructor arguments] in TcTyDecls
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)

@@ -1212,7 +1212,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated)
-    arg_tys = map weightedThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    arg_tys = map scaledThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
@@ -1630,7 +1630,7 @@ mkOneConFull x con = do
 
   (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 
-  let arg_tys' = substTys subst (map weightedThing arg_tys)
+  let arg_tys' = substTys subst (map scaledThing arg_tys)
   -- Fresh term variables (VAs) as arguments to the constructor
   arguments <-  mapM mkPmVar arg_tys'
   -- All constraints bound by the constructor (alpha-renamed)

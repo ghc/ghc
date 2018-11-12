@@ -1511,7 +1511,7 @@ reifyDataCon isGadtDataCon tys dc
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
        ; let (tvb_subst, g_user_tvs) = substTyVarBndrs univ_subst g_user_tvs'
              g_theta   = substTys tvb_subst g_theta'
-             g_arg_tys = substTys tvb_subst (map weightedThing g_arg_tys')
+             g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)

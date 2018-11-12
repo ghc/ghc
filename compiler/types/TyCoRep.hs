@@ -564,7 +564,7 @@ delBinderVar vars (Bndr tv _) = vars `delVarSet` tv
 -- | Does this binder bind an invisible argument?
 isInvisibleBinder :: TyCoBinder -> Bool
 isInvisibleBinder (Named (Bndr _ vis)) = isInvisibleArgFlag vis
-isInvisibleBinder (Anon ty)            = isPredTy (weightedThing ty)
+isInvisibleBinder (Anon ty)            = isPredTy (scaledThing ty)
 
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyCoBinder -> Bool
@@ -3475,7 +3475,7 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
     user_bndrs = dataConUserTyVarBinders dc
     forAllDoc  = pprUserForAll user_bndrs
     thetaDoc   = pprThetaArrowTy theta
-    argsDoc    = hsep (fmap pprParendType (map weightedThing arg_tys))
+    argsDoc    = hsep (fmap pprParendType (map scaledThing arg_tys))
 
 
 pprTypeApp :: TyCon -> [Type] -> SDoc

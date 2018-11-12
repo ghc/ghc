@@ -144,7 +144,7 @@ sup _     _     = Omega
 --
 
 -- | A shorthand for data with an attached 'Rig' element (the weight).
-data GScaled t a = Scaled {weightedWeight :: GMult t, weightedThing :: a}
+data GScaled t a = Scaled {scaledMult :: GMult t, scaledThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
 unrestricted, linear, staticOnly, tyweight :: a -> GScaled t a
@@ -156,10 +156,10 @@ staticOnly = Scaled Zero
 tyweight = Scaled Omega
 
 knownOmega :: GScaled t a -> a
-knownOmega = weightedThing
+knownOmega = scaledThing
 
 irrelevantWeight :: GScaled t a -> a
-irrelevantWeight = weightedThing
+irrelevantWeight = scaledThing
 
 mkScaled :: GMult t -> a -> GScaled t a
 mkScaled = Scaled
@@ -172,11 +172,11 @@ weightedSet :: GScaled t a -> b -> GScaled t b
 weightedSet x b = fmap (\_->b) x
 
 setWeight :: GMult t -> GScaled t a -> GScaled t a
-setWeight r x = x { weightedWeight = r }
+setWeight r x = x { scaledMult = r }
 
 scaleScaled :: GMult t -> GScaled t a -> GScaled t a
 scaleScaled w x =
-  x { weightedWeight = w * weightedWeight x }
+  x { scaledMult = w * scaledMult x }
 
 --
 -- * Multiplicity ordering

@@ -35,7 +35,7 @@ unitUE :: NamedThing n => n -> Rig -> UsageEnv
 unitUE x w = UsageEnv $ unitNameEnv (getName x) w
 
 mkUE :: [Scaled Name] -> UsageEnv
-mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (weightedThing wx,weightedWeight wx)) ws)
+mkUE ws = UsageEnv $ mkNameEnv (map (\wx -> (scaledThing wx,scaledMult wx)) ws)
 
 zeroUE, emptyUE :: UsageEnv
 zeroUE = UsageEnv emptyNameEnv

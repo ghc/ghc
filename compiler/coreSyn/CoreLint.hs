@@ -1251,7 +1251,7 @@ lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
           ; ex_tvs_n = length (dataConExTyCoVars con)
           -- See Note [Alt arg weights]
           ; weights = replicate ex_tvs_n Omega ++
-                      map weightedWeight (dataConRepArgTys con) }
+                      map scaledMult (dataConRepArgTys con) }
 
         -- And now bring the new binders into scope
     ; lintBinders CasePatBind args $ \ args' -> do

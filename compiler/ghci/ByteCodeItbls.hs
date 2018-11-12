@@ -19,7 +19,7 @@ import Name             ( Name, getName )
 import NameEnv
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
 import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
-import Multiplicity           ( weightedThing )
+import Multiplicity           ( scaledThing )
 import RepType
 import StgCmmLayout     ( mkVirtConstrSizes )
 import StgCmmClosure    ( tagForCon, NonVoid (..) )
@@ -59,7 +59,7 @@ make_constr_itbls hsc_env cons =
   mk_itbl dcon conNo = do
      let rep_args = [ NonVoid prim_rep
                     | arg <- dataConRepArgTys dcon
-                    , prim_rep <- typePrimRep (weightedThing arg) ]
+                    , prim_rep <- typePrimRep (scaledThing arg) ]
 
          (tot_wds, ptr_wds) =
              mkVirtConstrSizes dflags rep_args

@@ -211,7 +211,7 @@ gen_Eq_binds loc tycon = do
             bs_needed   = take con_arity bs_RDRs
             tys_needed  = dataConOrigArgTys data_con
         in
-        ([con1_pat, con2_pat], nested_eq_expr (map weightedThing tys_needed) as_needed bs_needed)
+        ([con1_pat, con2_pat], nested_eq_expr (map scaledThing tys_needed) as_needed bs_needed)
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
@@ -457,7 +457,7 @@ gen_Ord_binds loc tycon = do
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
     mkInnerEqAlt op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR bs_needed) $
-        mkCompareFields op (map weightedThing $ dataConOrigArgTys data_con)
+        mkCompareFields op (map scaledThing $ dataConOrigArgTys data_con)
       where
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
@@ -1041,7 +1041,7 @@ gen_Read_binds get_fixity loc tycon
         is_infix     = dataConIsInfix data_con
         is_record    = labels `lengthExceeds` 0
         as_needed    = take con_arity as_RDRs
-        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (map weightedThing $ dataConOrigArgTys data_con)
+        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (map scaledThing $ dataConOrigArgTys data_con)
         (read_a1:read_a2:_) = read_args
 
         prefix_prec = appPrecedence
@@ -1184,7 +1184,7 @@ gen_Show_binds get_fixity loc tycon
                  where
                    nm       = wrapOpParens (unpackFS l)
 
-             show_args               = zipWith show_arg bs_needed (map weightedThing arg_tys)
+             show_args               = zipWith show_arg bs_needed (map scaledThing arg_tys)
              (show_arg1:show_arg2:_) = show_args
              show_prefix_args        = intersperse (nlHsVar showSpace_RDR) show_args
 
@@ -1583,7 +1583,7 @@ gen_Lift_binds loc tycon = (unitBag lift_bind, emptyBag)
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
             lifted_as    = zipWithEqual "mk_lift_app" mk_lift_app
-                             (map weightedThing tys_needed) as_needed
+                             (map scaledThing tys_needed) as_needed
             tycon_name   = tyConName tycon
             is_infix     = dataConIsInfix data_con
             tys_needed   = dataConOrigArgTys data_con

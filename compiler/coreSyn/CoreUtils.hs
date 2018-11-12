@@ -1398,7 +1398,7 @@ isExpandableApp fn n_val_args
        | Just (bndr, ty) <- splitPiTy_maybe ty
        = caseBinder bndr
            (\_tv -> all_pred_args n_val_args ty)
-           (\bndr_ty -> isPredTy (weightedThing bndr_ty) && all_pred_args (n_val_args-1) ty)
+           (\bndr_ty -> isPredTy (scaledThing bndr_ty) && all_pred_args (n_val_args-1) ty)
 
        | otherwise
        = False
@@ -1592,7 +1592,7 @@ app_ok primop_ok fun args
     arg_ok :: TyBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty) arg        -- A term argument
-       | isUnliftedType (weightedThing ty) = expr_ok primop_ok arg
+       | isUnliftedType (scaledThing ty) = expr_ok primop_ok arg
        | otherwise         = True  -- See Note [Primops with lifted arguments]
 
 -----------------------------

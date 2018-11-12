@@ -3740,7 +3740,7 @@ pprCtOrigin (UnboundOccurrenceOf name)
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
           <+> text "field of" <+> quotes (ppr dc))
-       2 (parens (text "type" <+> quotes (ppr (weightedThing ty))))
+       2 (parens (text "type" <+> quotes (ppr (scaledThing ty))))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 

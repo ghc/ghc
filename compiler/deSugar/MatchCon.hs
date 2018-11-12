@@ -232,7 +232,7 @@ selectConMatchVars arg_tys con = case con of
                                    (PrefixCon ps) -> selectMatchVars (zipWeights arg_tys ps)
                                    (InfixCon p1 p2) -> selectMatchVars (zipWeights arg_tys [p1, p2])
   where
-    zipWeights = zipWithEqual "selectConMatchVar" (\a b -> (weightedWeight a, unLoc b))
+    zipWeights = zipWithEqual "selectConMatchVar" (\a b -> (scaledMult a, unLoc b))
 
 conArgPats :: [Scaled Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which
@@ -242,7 +242,7 @@ conArgPats :: [Scaled Type]-- Instantiated argument types
 conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
 conArgPats _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
 conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
-  | null rpats = map WildPat (map weightedThing arg_tys)
+  | null rpats = map WildPat (map scaledThing arg_tys)
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
   | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats

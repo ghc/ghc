@@ -380,7 +380,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
-       ; tcSubMult Omega (weightedWeight arg2_sigma)
+       ; tcSubMult Omega (scaledMult arg2_sigma)
          -- When ($) becomes multiplicity-polymorphic, then the above check will
          -- need to go. But in the meantime, it would produce ill-typed
          -- desugared code to accept linear functions to the left of a ($).
@@ -398,8 +398,8 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        --
        -- The *result* type can have any kind (Trac #8739),
        -- so we don't need to check anything for that
-       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy (weightedThing arg2_sigma)))
-                        (typeKind (weightedThing arg2_sigma)) liftedTypeKind
+       ; _ <- unifyKind (Just (XHsType $ NHsCoreTy (scaledThing arg2_sigma)))
+                        (typeKind (scaledThing arg2_sigma)) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -414,7 +414,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ;
        ; arg1_ty_read <- zonkTcType arg1_ty
        ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
-                                               , weightedThing arg2_sigma
+                                               , scaledThing arg2_sigma
                                                , res_ty])
                                    (HsVar noExt (L lv op_id)))
              -- arg1' :: arg1_ty
@@ -698,7 +698,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                Just con_id -> do {
                   res_wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "RecordCon")
                                           (Just expr) actual_res_ty res_ty
-                ; rbinds' <- tcRecordBinds con_like (map weightedThing arg_tys) rbinds
+                ; rbinds' <- tcRecordBinds con_like (map scaledThing arg_tys) rbinds
                 ; return $
                   mkHsWrap res_wrap $
                   RecordCon { rcon_ext = RecordConTc
@@ -915,7 +915,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
               (con1_tvs, _, _, _prov_theta, req_theta, weighted_con1_arg_tys, _)
                  = conLikeFullSig con1
-              con1_arg_tys = map weightedThing weighted_con1_arg_tys
+              con1_arg_tys = map scaledThing weighted_con1_arg_tys
                 -- Remark: we can safely drop the weight of field because it's
                 -- always 1, this way we don't need to handle it in the rest of
                 -- the function
@@ -1407,7 +1407,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; (inner_wrap, args', inner_res_ty)
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
-           ; let w = weightedWeight arg_ty
+           ; let w = scaledMult arg_ty
            ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
                     , HsValArg arg' : args'
                     , inner_res_ty ) }
@@ -1546,7 +1546,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
                <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
-                  do { arg_tc_ty <- expTypeToType (weightedThing arg_ty)
+                  do { arg_tc_ty <- expTypeToType (scaledThing arg_ty)
                      ; res_tc_ty <- expTypeToType res_ty
 
                          -- another nested arrow is too much for now,
@@ -1557,7 +1557,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                                , text "Too many nested arrows in SyntaxOpType" $$
                                  pprCtOrigin orig )
 
-                     ; (op_mult, res_mult, arg_inferred_mult) <- synMult (weightedWeight arg_ty)
+                     ; (op_mult, res_mult, arg_inferred_mult) <- synMult (scaledMult arg_ty)
                      ; tcSynArgA orig arg_tc_ty [] arg_shape $
                        \ arg_results arg_res_weights ->
                        tcSynArgE orig res_tc_ty res_shape $
@@ -1603,9 +1603,9 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
            <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
-           <- tc_syn_args_e (map weightedThing arg_tys) arg_shapes $ \ arg_results arg_res_weights ->
+           <- tc_syn_args_e (map scaledThing arg_tys) arg_shapes $ \ arg_results arg_res_weights ->
               tc_syn_arg    res_ty  res_shape  $ \ res_results ->
-              thing_inside (arg_results ++ res_results) (map weightedWeight arg_tys ++ arg_res_weights)
+              thing_inside (arg_results ++ res_results) (map scaledMult arg_tys ++ arg_res_weights)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
     herald = text "This rebindable syntax expects a function with"
@@ -1791,7 +1791,7 @@ tcCheckRecSelId rn_expr f@(Unambiguous _ (L _ lbl)) res_ty
 tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
-      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl (weightedThing arg)
+      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl (scaledThing arg)
                           ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl) res_ty }
 tcCheckRecSelId _ (XAmbiguousFieldOcc _) _ = panic "tcCheckRecSelId"
 
@@ -2154,7 +2154,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                                      ++ prov_theta
                                      ++ req_theta
                             flds = conLikeFieldLabels con
-                            fixed_tvs = exactTyCoVarsOfTypes (map weightedThing fixed_tys)
+                            fixed_tvs = exactTyCoVarsOfTypes (map scaledThing fixed_tys)
                                     -- fixed_tys: See Note [Type of a record update]
                                         `unionVarSet` tyCoVarsOfTypes theta
                                     -- Universally-quantified tyvars that

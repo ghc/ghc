@@ -265,7 +265,7 @@ tcHsDeriv hs_ty
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, (cls, tys, map weightedThing args))
+           Just (cls, tys) -> return (tvs, (cls, tys, map scaledThing args))
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 -- | Typecheck something within the context of a deriving strategy.
@@ -2020,14 +2020,14 @@ newWildTyVar _name
 -- Use tcExtendTyVarEnv otherwise.
 scopeTyVars :: SkolemInfo -> [Scaled TcTyVar] -> TcM a -> TcM a
 scopeTyVars skol_info tvs = scopeTyVars2 skol_info
-                              [(tyVarName (weightedThing tv), tv) | tv <- tvs]
+                              [(tyVarName (scaledThing tv), tv) | tv <- tvs]
 
 -- | Like 'scopeTyVars', but allows you to specify different scoped names
 -- than the Names stored within the tyvars.
 scopeTyVars2 :: SkolemInfo -> [(Name, Scaled TcTyVar)] -> TcM a -> TcM a
 scopeTyVars2 skol_info prs thing_inside
   = fmap snd $ -- discard the TcEvBinds, which will always be empty
-    checkConstraints skol_info (map (weightedThing . snd) prs) [{- no EvVars -}] $
+    checkConstraints skol_info (map (scaledThing . snd) prs) [{- no EvVars -}] $
     tcExtendNameTyVarEnv prs $
     thing_inside
 
@@ -2324,7 +2324,7 @@ tcDataKindSig tc_bndrs kind
           Just (Anon arg, kind')
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
-              arg'   = substTy subst (weightedThing arg)
+              arg'   = substTy subst (scaledThing arg)
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
               tcb    = Bndr tv AnonTCB
@@ -2590,7 +2590,7 @@ tcPatSig in_pat_bind sig res_ty
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $
-                          tcSubTypeET PatSigOrigin PatSigCtxt (weightedThing res_ty) sig_ty
+                          tcSubTypeET PatSigOrigin PatSigCtxt (scaledThing res_ty) sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
         } else do
                 -- Type signature binds at least one scoped type variable
@@ -2613,7 +2613,7 @@ tcPatSig in_pat_bind sig res_ty
 
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
-                  tcSubTypeET PatSigOrigin PatSigCtxt (weightedThing res_ty) sig_ty
+                  tcSubTypeET PatSigOrigin PatSigCtxt (scaledThing res_ty) sig_ty
 
         -- Phew!
         ; return (sig_ty, sig_tvs_weighted, sig_wcs, wrap)
@@ -2621,7 +2621,7 @@ tcPatSig in_pat_bind sig res_ty
   where
     mk_msg sig_ty tidy_env
        = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
-            ; res_ty <- readExpType (weightedThing res_ty)   -- should be filled in by now
+            ; res_ty <- readExpType (scaledThing res_ty)   -- should be filled in by now
             ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
             ; let msg = vcat [ hang (text "When checking that the pattern signature:")
                                   4 (ppr sig_ty)

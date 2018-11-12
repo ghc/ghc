@@ -1693,19 +1693,19 @@ tyCoBinderVar_maybe _          = Nothing
 tyCoBinderType :: TyCoBinder -> Type
 -- Barely used
 tyCoBinderType (Named tvb) = binderType tvb
-tyCoBinderType (Anon ty)   = weightedThing ty
+tyCoBinderType (Anon ty)   = scaledThing ty
 
 tyBinderType :: TyBinder -> Type
 tyBinderType (Named (Bndr tv _))
   = ASSERT( isTyVar tv )
     tyVarKind tv
-tyBinderType (Anon ty)   = weightedThing ty
+tyBinderType (Anon ty)   = scaledThing ty
 
 
 -- | Extract a relevant type, if there is one.
 binderRelevantType_maybe :: TyCoBinder -> Maybe Type
 binderRelevantType_maybe (Named {}) = Nothing
-binderRelevantType_maybe (Anon ty)  = Just (weightedThing ty)
+binderRelevantType_maybe (Anon ty)  = Just (scaledThing ty)
 
 -- | Like 'maybe', but for binders.
 caseBinder :: TyCoBinder           -- ^ binder to scrutinize
@@ -2081,7 +2081,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     _ | (tvs, rho) <- splitForAllVarBndrs ev_ty
       , (theta, pred) <- splitFunTys rho
       , not (null tvs && null theta)
-      -> ForAllPred tvs (map weightedThing theta) pred
+      -> ForAllPred tvs (map scaledThing theta) pred
 
       | otherwise
       -> IrredPred ev_ty

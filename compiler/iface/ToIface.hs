@@ -362,7 +362,7 @@ patSynToIfaceDecl ps
                 , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2 . weightedThing) args
+                , ifPatArgs       = map (tidyToIfaceType env2 . scaledThing) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 , ifFieldLabels   = (patSynFieldLabels ps)
                 }

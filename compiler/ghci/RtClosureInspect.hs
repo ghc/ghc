@@ -1021,7 +1021,7 @@ getDataConArgTys dc con_app_ty
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
-       ; let con_arg_tys = substTys subst (map weightedThing $ dataConRepArgTys dc)
+       ; let con_arg_tys = substTys subst (map scaledThing $ dataConRepArgTys dc)
        ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
        ; return con_arg_tys }
   where
@@ -1300,7 +1300,7 @@ isMonomorphicOnNonPhantomArgs ty
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
   | Just (ty1, ty2) <- splitFunTy_maybe ty
-  = all isMonomorphicOnNonPhantomArgs [weightedThing ty1,ty2]
+  = all isMonomorphicOnNonPhantomArgs [scaledThing ty1,ty2]
   | otherwise = isMonomorphic ty
 
 tyConPhantomTyVars :: TyCon -> [TyVar]

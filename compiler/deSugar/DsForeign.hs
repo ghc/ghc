@@ -254,7 +254,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       mHeadersArgTypeList
                           = [ (header, cType <+> char 'a' <> int n)
                             | (t, n) <- zip arg_tys [1..]
-                            , let (header, cType) = toCType (weightedThing t) ]
+                            , let (header, cType) = toCType (scaledThing t) ]
                       (mHeaders, argTypeList) = unzip mHeadersArgTypeList
                       argTypes = if null argTypeList
                                  then text "void"
@@ -792,7 +792,7 @@ getPrimTyOf ty
         ASSERT2(isUnliftedType prim_ty, ppr prim_ty)
         prim_ty
         where
-          prim_ty = weightedThing weighted_prim_ty
+          prim_ty = scaledThing weighted_prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where
         rep_ty = unwrapType ty
