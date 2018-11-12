@@ -1777,29 +1777,46 @@ tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 
-
 tcTyFamInstEqn fam_tc mb_clsinfo
-    (dL->L loc (HsIB { hsib_ext = imp_vars
-                     , hsib_body = FamEqn { feqn_tycon  = (dL->L _ eqn_tc_name)
-                                          , feqn_bndrs  = mb_expl_bndrs
-                                          , feqn_pats   = pats
-                                          , feqn_rhs    = hs_ty }}))
+    eqn@(dl->L loc (HsIB { hsib_ext = imp_vars
+                 , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
+                                      , feqn_bndrs  = mb_expl_bndrs
+                                      , feqn_pats   = hs_pats
+                                      , feqn_rhs    = hs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
     setSrcSpan loc $
-    tcFamTyPats fam_tc mb_clsinfo imp_vars mb_expl_bndrs pats
-                (kcTyFamEqnRhs mb_clsinfo hs_ty) $
-                    \tvs pats res_kind ->
-    do { traceTc "tcTyFamInstEqn {" (ppr eqn_tc_name <+> ppr pats)
-       ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
-       ; (ze, tvs') <- zonkTyBndrs tvs
+    do { traceTc "tcTyFamInstEqn {" (ppr eqn_tc_name <+> ppr hs_pats)
+       ; (_imp_tvs, (_exp_tvs, ((pats, rhs_ty))))
+           <- pushTcLevelM_                     $
+              solveEqualities                   $
+              bindImplicitTKBndrs_Q_Skol imp_vars $
+              bindExplicitTKBndrs_Q_Skol AnyKind (mb_expl_bndrs `orElse` []) $
+              do { let fam_name  = tyConName fam_tc
+                       lhs_fun = L loc (HsTyVar noExt NotPromoted
+                                                (L loc fam_name))
+                       fun_ty = mkTyConApp fam_tc []
+                       fun_kind = tyConKind fam_tc
+
+                  ; (_, pats, res_kind) <- tcInferApps typeLevelMode Nothing
+                                                 lhs_fun fun_ty fun_kind hs_pats
+
+                  ; rhs_ty <- tcCheckLHsType hs_ty res_kind
+                  ; return (pats, rhs_ty) }
+
+       ; dvs <- candidateQTyVarsOfTypes (rhs_ty : pats)
+       ; qtkvs <- quantifyTyVars emptyVarSet dvs
+
+       ; (ze, tvs') <- zonkTyBndrs qtkvs
        ; pats'      <- zonkTcTypesToTypesX ze pats
        ; rhs_ty'    <- zonkTcTypeToTypeX ze rhs_ty
        ; traceTc "tcTyFamInstEqn }" (ppr fam_tc <+> pprTyVars tvs')
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }
+
+
 tcTyFamInstEqn _ _ (dl->L _ (XHsImplicitBndrs _)) = panic "tcTyFamInstEqn"
-tcTyFamInstEqn _ _ (dL->L _ (HsIB _ (XFamEqn _))) = panic "tcTyFamInstEqn"
+tcTyFamInstEqn _ _ (dl->L _ (HsIB _ (XFamEqn _))) = panic "tcTyFamInstEqn"
 
 kcDataDefn :: Maybe (VarEnv Kind) -- ^ Possibly, instantiations for vars
                                   -- (associated types only)
