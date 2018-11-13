@@ -330,13 +330,6 @@ instance Ord SomeTypeRep where
 --
 --
 
-data IsOmega m where
-   YesOmega :: IsOmega 'Omega
-   No :: IsOmega a
-
-isOmega :: TypeRep m -> IsOmega m
-isOmega x = undefined
-
 pattern Fun :: forall k (fun :: k). ()
             => forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (arg :: TYPE r1) (res :: TYPE r2).
@@ -344,7 +337,7 @@ pattern Fun :: forall k (fun :: k). ()
             => TypeRep arg
             -> TypeRep res
             -> TypeRep fun
-pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res, trFunMul = (isOmega -> YesOmega)}
+pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res, trFunMul = (eqTypeRep trOmega -> Just HRefl)}
   where Fun arg res = mkTrFun (typeRep @'Omega) arg res
 
 -- | Observe the 'Fingerprint' of a type representation
@@ -391,6 +384,9 @@ trTYPE = typeRep
 
 trLiftedRep :: TypeRep 'LiftedRep
 trLiftedRep = typeRep
+
+trOmega :: TypeRep 'Omega
+trOmega = typeRep
 
 -- | Construct a representation for a type application that is
 -- NOT a saturated arrow type. This is not checked!
@@ -821,7 +817,7 @@ splitApps = go []
       = (tc, xs)
     go xs (TrApp {trAppFun = f, trAppArg = x})
       = go (SomeTypeRep x : xs) f
-    go [] (TrFun {trFunArg = a, trFunRes = b})
+    go [] (TrFun {trFunArg = a, trFunRes = b}) -- TODO
       = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
     go _  (TrFun {})
       = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 1"
