@@ -328,8 +328,6 @@ instance Ord SomeTypeRep where
 -- typeRep \@(Int -> Char) === Fun (typeRep \@Int) (typeRep \@Char)
 -- @
 --
---
-
 pattern Fun :: forall k (fun :: k). ()
             => forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (arg :: TYPE r1) (res :: TYPE r2).
@@ -338,7 +336,7 @@ pattern Fun :: forall k (fun :: k). ()
             -> TypeRep res
             -> TypeRep fun
 pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res, trFunMul = (eqTypeRep trOmega -> Just HRefl)}
-  where Fun arg res = mkTrFun (typeRep @'Omega) arg res
+  where Fun arg res = mkTrFun trOmega arg res
 
 -- | Observe the 'Fingerprint' of a type representation
 --
@@ -431,7 +429,7 @@ mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x :: TypeRep x})
   , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
   , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
                   $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
-  = mkTrFun (typeRep @'Omega) x y -- TODO
+  = mkTrFun trOmega x y -- TODO
 mkTrAppChecked a b = mkTrApp a b
 
 -- | A type application.
@@ -476,8 +474,8 @@ splitApp :: forall k (a :: k). ()
          -> AppOrCon a
 splitApp TrType = IsApp trTYPE trLiftedRep
 splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
-splitApp rep@(TrFun {trFunArg=a, trFunRes=b}) = IsApp (mkTrApp arr a) b
-  where arr = undefined --bareArrow rep
+splitApp rep@(TrFun {trFunArg=a, trFunRes=b, trFunMul = (eqTypeRep trOmega -> Just HRefl)}) = IsApp (mkTrApp arr a) b
+  where arr = bareArrow rep  -- TODO handle multiplicity
 splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
   = case unsafeCoerce Refl :: IsApplication a :~: "" of
       Refl -> IsCon con kinds
@@ -621,7 +619,7 @@ instantiateKindRep vars = go
     go (KindRepApp f a)
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
-      = SomeTypeRep $ mkTrFun (typeRep @Omega) (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
+      = SomeTypeRep $ mkTrFun trOmega (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
     go (KindRepTYPE LiftedRep) = SomeTypeRep TrType
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
