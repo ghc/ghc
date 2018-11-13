@@ -1017,12 +1017,11 @@ bindLHsTyVarBndr :: HsDocContext
                  -> Maybe a   -- associated class
                  -> LHsTyVarBndr GhcPs
                  -> (LHsTyVarBndr GhcRn -> RnM (b, FreeVars))
-                 -> HasBraces
                  -> RnM (b, FreeVars)
-bindLHsTyVarBndr _doc mb_assoc (L loc (UserTyVar x lrdr@(L lv _))) thing_inside braces
+bindLHsTyVarBndr _doc mb_assoc (L loc (UserTyVar x lrdr@(L lv _) braces)) thing_inside
   = do { nm <- newTyVarNameRn mb_assoc lrdr
        ; bindLocalNamesFV [nm] $
-         thing_inside (L loc (UserTyVar x (L lv nm)) braces) }
+         thing_inside (L loc (UserTyVar x (L lv nm) braces)) }
 
 bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x lrdr@(L lv _) kind braces))
                  thing_inside
@@ -1031,7 +1030,7 @@ bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x lrdr@(L lv _) kind braces))
            ; (kind', fvs1) <- rnLHsKind doc kind
            ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
            ; (b, fvs2) <- bindLocalNamesFV [tv_nm] $
-                         thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind'))
+                         thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind' braces))
            ; return (b, fvs1 `plusFV` fvs2) }
 
 bindLHsTyVarBndr _ _ (L _ (XTyVarBndr{})) _ = panic "bindLHsTyVarBndr"
