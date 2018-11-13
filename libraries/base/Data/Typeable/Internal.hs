@@ -337,7 +337,7 @@ data IsOmega m where
 isOmega :: TypeRep m -> IsOmega m
 isOmega x = undefined
 
-pattern Fun :: forall k (fun :: k) (m :: Multiplicity). ()
+pattern Fun :: forall k (fun :: k). ()
             => forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (arg :: TYPE r1) (res :: TYPE r2).
                (k ~ Type, fun ~~ (arg -->.('Omega) res))
