@@ -798,31 +798,31 @@ eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
-            -> Either (SrcSpan, SDoc)
+            -> HasBraces -> Either (SrcSpan, SDoc)
                       ( LHsQTyVars GhcPs  -- the synthesized type variables
                       , P () )            -- action which adds annotations
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
 -- We use the Either monad because it's also called (via 'mkATDefault') from
 -- "Convert".
-checkTyVars pp_what equals_or_where tc tparms
-  = do { (tvs, anns) <- fmap unzip $ mapM (chkParens []) tparms
+checkTyVars pp_what equals_or_where tc tparms braces
+  = do { (tvs, anns) <- fmap unzip $ mapM (chkParens [] braces) tparms
        ; return (mkHsQTvs tvs, sequence_ anns) }
   where
         -- Keep around an action for adjusting the annotations of extra parens
-    chkParens :: [AddAnn] -> LHsType GhcPs
+    chkParens :: [AddAnn] -> HasBraces -> LHsType GhcPs
               -> Either (SrcSpan, SDoc) (LHsTyVarBndr GhcPs, P ())
-    chkParens acc (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) ty
-    chkParens acc ty = case chk ty of
+    chkParens acc braces (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) braces ty
+    chkParens acc braces ty = case chk ty braces of
       Left err -> Left err
       Right tv@(L l _) -> Right (tv, addAnnsAt l (reverse acc))
 
         -- Check that the name space is correct!
-    chk (L l (HsKindSig _ (L lv (HsTyVar _ _ (L _ tv))) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar noExt (L lv tv) k))
-    chk (L l (HsTyVar _ _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L l (UserTyVar noExt (L ltv tv)))
-    chk t@(L loc _)
+    chk (L l (HsKindSig _ (L lv (HsTyVar _ _ (L _ tv))) k)) braces
+        | isRdrTyVar tv    = return (L l (KindedTyVar noExt (L lv tv) k braces))
+    chk (L l (HsTyVar _ _ (L ltv tv))) braces
+        | isRdrTyVar tv    = return (L l (UserTyVar noExt (L ltv tv) braces))
+    chk t@(L loc _) _
         = Left (loc,
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
                      , text "In the" <+> pp_what <+> ptext (sLit "declaration for") <+> quotes tc'
