@@ -31,4 +31,4 @@ instance Mk a where
 -- So now the kind error can be deferred.
 -- Consequence of a fast-path for tcImplicitTKBndrsX I think.
 
-
+-- Later (Nov 18) we are back to a kind error, which is fine

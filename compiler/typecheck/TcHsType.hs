@@ -21,9 +21,9 @@ module TcHsType (
         tcHsTypeApp,
         UserTypeCtxt(..),
         bindImplicitTKBndrs_Tv, bindImplicitTKBndrs_Skol,
-            bindImplicitTKBndrs_Q_Skol,
+            bindImplicitTKBndrs_Q_Tv, bindImplicitTKBndrs_Q_Skol,
         bindExplicitTKBndrs_Tv, bindExplicitTKBndrs_Skol,
-            bindExplicitTKBndrs_Q_Skol,
+            bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
         ContextKind(..),
 
                 -- Type checking type and class decls

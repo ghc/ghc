@@ -42,6 +42,7 @@ import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
+import Inst( tcInstTyBinders )
 import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv
@@ -1427,8 +1428,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = (dL->L _ tc_name)
                  (wrongNumberOfParmsErr fam_arity)
 
        -- Typecheck RHS
-       ; let all_vars = imp_vars ++ map hsLTyVarName exp_vars
-             pats     = map hsLTyVarBndrToType exp_vars
+       ; let pats = map hsLTyVarBndrToType exp_vars
 
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
@@ -1438,18 +1438,8 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = (dL->L _ tc_name)
           -- at an associated type. But this would be wrong, because an associated
           -- type default LHS can mention *different* type variables than the
           -- enclosing class. So it's treated more as a freestanding beast.
-       ; (pats', rhs_ty)
-           <- tcFamTyPats fam_tc Nothing all_vars Nothing pats
-              (kcTyFamEqnRhs Nothing rhs) $
-              \tvs pats rhs_kind ->
-              do { rhs_ty <- solveEqualities $
-                             tcCheckLHsType rhs rhs_kind
-
-                     -- Zonk the patterns etc into the Type world
-                 ; (ze, _) <- zonkTyBndrs tvs
-                 ; pats'   <- zonkTcTypesToTypesX ze pats
-                 ; rhs_ty' <- zonkTcTypeToTypeX ze rhs_ty
-                 ; return (pats', rhs_ty') }
+       ; (_tvs', pats', rhs_ty) <- tcFamTyPatsAndGen fam_tc Nothing
+                                                     imp_vars exp_vars pats rhs
 
          -- See Note [Type-checking default assoc decls]
        ; case tcMatchTys pats' (mkTyVarTys (tyConTyVars fam_tc)) of
@@ -1736,121 +1726,50 @@ kcTyFamInstEqn tc_fam_tc
           -- this check reports an arity error instead of a kind error; easier for user
        ; checkTc (pats `lengthIs` vis_arity) $
                   wrongNumberOfParmsErr vis_arity
-       ; kcFamTyPats tc_fam_tc imp_vars mb_expl_bndrs pats $ \ rhs_kind ->
-         discardResult $ kcTyFamEqnRhs Nothing hs_ty rhs_kind }
+       ; discardResult $
+         bindImplicitTKBndrs_Q_Tv imp_vars $
+         bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
+         tcFamTyPats_new tc_fam_tc Nothing pats hs_ty }
+             -- Why "_Tv" here?  Consider (Trac #14066
+             --  type family Bar x y where
+             --      Bar (x :: a) (y :: b) = Int
+             --      Bar (x :: c) (y :: d) = Bool
+             -- During kind-checkig, a,b,c,d should be TyVarTvs and unify appropriately
   where
     fam_name = tyConName tc_fam_tc
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
-kcTyFamInstEqn _ (dL->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
-kcTyFamInstEqn _ (dL->L _ (HsIB _ (XFamEqn _))) = panic "kcTyFamInstEqn"
+
+kcTyFamInstEqn _ (dl->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
+kcTyFamInstEqn _ (dl->L _ (HsIB _ (XFamEqn _))) = panic "kcTyFamInstEqn"
 kcTyFamInstEqn _ _ = panic "kcTyFamInstEqn: Impossible Match" -- due to #15884
 
--- Infer the kind of the type on the RHS of a type family eqn. Then use
--- this kind to check the kind of the LHS of the equation. This is useful
--- as the callback to tcFamTyPats.
-kcTyFamEqnRhs :: Maybe ClsInstInfo
-              -> LHsType GhcRn        -- ^ Eqn RHS
-              -> TcKind               -- ^ Inferred kind of left-hand side
-              -> TcM ([TcTyVar], [TcType], TcKind)
-                -- ^ New pattern skolems, New pats, inst'ed kind of left-hand side
-kcTyFamEqnRhs mb_clsinfo rhs_hs_ty lhs_ki
-  = do { -- It's still possible the lhs_ki has some foralls. Instantiate these away.
-         (new_pats, insted_lhs_ki)
-           <- instantiateTyUntilN mb_kind_env 0 lhs_ki
 
-       ; traceTc "kcTyFamEqnRhs" (vcat
-           [ text "rhs_hs_ty =" <+> ppr rhs_hs_ty
-           , text "lhs_ki =" <+> ppr lhs_ki
-           , text "insted_lhs_ki =" <+> ppr insted_lhs_ki
-           , text "new_pats =" <+> ppr new_pats
-           ])
-
-       ; _ <- tcCheckLHsType rhs_hs_ty insted_lhs_ki
-
-       ; return ([], new_pats, insted_lhs_ki) }
-        -- we never introduce new skolems here
-  where
-    mb_kind_env = thdOf3 <$> mb_clsinfo
-
+--------------------------
 tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
                -> TcM (KnotTied CoAxBranch)
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 
-tcTyFamInstEqn fam_tc _mb_clsinfo
+tcTyFamInstEqn fam_tc mb_clsinfo
     (dl->L loc (HsIB { hsib_ext = imp_vars
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_bndrs  = mb_expl_bndrs
-                                      , feqn_pats   = hs_pats
-                                      , feqn_rhs    = hs_ty }}))
+                                      , feqn_pats   = lhs_hs_pats
+                                      , feqn_rhs    = rhs_hs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
     setSrcSpan loc $
-    do { let flav      = tyConFlavour fam_tc
-             vis_arity = length (tyConVisibleTyVars fam_tc)
-       ; traceTc "tcTyFamInstEqn {" (vcat [ ppr fam_tc <+> ppr hs_pats
-                                          , text "arity:" <+> ppr (tyConArity fam_tc)
-                                          , text "vis_arity:" <+> ppr vis_arity ])
+    do { (tvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc mb_clsinfo
+                                     imp_vars (mb_expl_bndrs `orElse` [])
+                                     lhs_hs_pats rhs_hs_ty
 
-         -- First, check the arity.
-         -- If we wait until validity checking, we'll get kind
-         -- errors below when an arity error will be much easier to
-         -- understand.
-       ; let should_check_arity
-               | DataFamilyFlavour _ <- flav = False
-                  -- why not check data families? See [Arity of data families] in FamInstEnv
-               | otherwise                   = True
-
-       ; when should_check_arity $
-         checkTc (hs_pats `lengthIs` vis_arity) $
-         wrongNumberOfParmsErr vis_arity
-                      -- report only explicit arguments
-
-       ; (_imp_tvs, (_exp_tvs, ((pats, rhs_ty))))
-           <- pushTcLevelM_                     $
-              solveEqualities                   $
-              bindImplicitTKBndrs_Q_Skol imp_vars $
-              bindExplicitTKBndrs_Q_Skol AnyKind (mb_expl_bndrs `orElse` []) $
-              do { let fam_name  = tyConName fam_tc
-                       lhs_fun = L loc (HsTyVar noExt NotPromoted
-                                                (L loc fam_name))
-                       fun_ty = mkTyConApp fam_tc []
-                       fun_kind = tyConKind fam_tc
-
-                  ; (_, pats, res_kind) <- tcInferApps typeLevelMode Nothing
-                                                 lhs_fun fun_ty fun_kind hs_pats
-
-                  ; let n_extra = tyConArity fam_tc - length pats
-                        (rk_bndrs, rk_body) = splitPiTysInvisible res_kind
-                  ; (extra_pats, res_kind)
-                        <- instantiateTyN Nothing n_extra rk_bndrs rk_body
-                           -- It's still possible the lhs_ki has some foralls.
-                           -- Instantiate these away.  Example:
-                           --     type family T (a :: *) :: forall k. k -> *
-                           --     type instance T Int = Proxy
-                           -- We want to elaborate to
-                           --     type instance T Int k = Proxy k
-                           -- ToDo: is this right??   Should we not make
-                           --       tcCHeckLHsType deal with polykinds;
-                           --       and there would be a skolem-escape check
-
-                  ; rhs_ty <- tcCheckLHsType hs_ty res_kind
-                  ; return (pats ++ extra_pats, rhs_ty) }
-
-       ; dvs <- candidateQTyVarsOfTypes (rhs_ty : pats)
-       ; qtkvs <- quantifyTyVars emptyVarSet dvs
-
-       ; (ze, tvs') <- zonkTyBndrs qtkvs
-       ; pats'      <- zonkTcTypesToTypesX ze pats
-       ; rhs_ty'    <- zonkTcTypeToTypeX ze rhs_ty
-       ; traceTc "tcTyFamInstEqn }" (ppr fam_tc <+> pprTyVars tvs')
-       ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
-                              (map (const Nominal) tvs')
+       ; return (mkCoAxBranch tvs [] pats rhs_ty
+                              (map (const Nominal) tvs)
                               loc) }
-
 
 tcTyFamInstEqn _ _ (dl->L _ (XHsImplicitBndrs _)) = panic "tcTyFamInstEqn"
 tcTyFamInstEqn _ _ (dl->L _ (HsIB _ (XFamEqn _))) = panic "tcTyFamInstEqn"
 
+----------------
 kcDataDefn :: Maybe (VarEnv Kind) -- ^ Possibly, instantiations for vars
                                   -- (associated types only)
            -> DataFamInstDecl GhcRn
@@ -1957,29 +1876,90 @@ two bad things could happen:
     checking, we can get a panic in rejigConRes. See Trac #8368.
 -}
 
+
+--------------------------
+tcFamTyPatsAndGen :: TyCon -> Maybe ClsInstInfo
+                  -> [Name] -> [LHsTyVarBndr GhcRn]  -- Implicit and explicicit binder
+                  -> HsTyPats GhcRn                  -- Patterns
+                  -> LHsType GhcRn                   -- RHS type
+                  -> TcM ([TyVar], [TcType], TcType) -- (tyvars, pats, rhs)
+tcFamTyPatsAndGen fam_tc mb_cls_info imp_vars exp_bndrs hs_pats rhs_hs_ty
+  = do { let flav      = tyConFlavour fam_tc
+             tc_arity  = tyConArity fam_tc
+             vis_arity = length (tyConVisibleTyVars fam_tc)
+       ; traceTc "tcTyFamInstEqn {" (vcat [ ppr fam_tc <+> ppr hs_pats
+                                          , text "arity:" <+> ppr tc_arity
+                                          , text "vis_arity:" <+> ppr vis_arity ])
+
+         -- First, check the arity.
+         -- If we wait until validity checking, we'll get kind
+         -- errors below when an arity error will be much easier to
+         -- understand.
+       ; let should_check_arity
+               | DataFamilyFlavour _ <- flav = False
+                  -- why not check data families? See [Arity of data families] in FamInstEnv
+               | otherwise                   = True
+
+       ; when should_check_arity $
+         checkTc (hs_pats `lengthIs` vis_arity) $
+         wrongNumberOfParmsErr vis_arity
+                      -- report only explicit arguments
+
+       ; (_, (_, (pats, rhs_ty)))
+               <- pushTcLevelM_                                $
+                  solveEqualities                              $
+                  bindImplicitTKBndrs_Q_Skol imp_vars          $
+                  bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
+                  tcFamTyPats_new fam_tc mb_cls_info hs_pats rhs_hs_ty
+
+       -- Ignore which variables are Inferred, Specified, etc
+       -- (i.e. returned by bindImplicit/ExplicitTKBndrs)
+       -- The user never explicitly invokes a type-family instance.
+       -- So visible type application etc doesn't matter.
+       -- So we can just quantify over all the variabes in
+       -- whatever order quantifyTyVars decides.
+       ; dvs   <- candidateQTyVarsOfTypes (rhs_ty : pats)
+       ; qtkvs <- quantifyTyVars emptyVarSet dvs
+
+       ; (ze, tvs') <- zonkTyBndrs qtkvs
+       ; pats'      <- zonkTcTypesToTypesX ze pats
+       ; rhs_ty'    <- zonkTcTypeToTypeX ze rhs_ty
+       ; traceTc "tcTyFamInstEqn }" (ppr fam_tc <+> pprTyVars tvs')
+       ; return (tvs', pats', rhs_ty') }
+
 -----------------
-kcFamTyPats :: TcTyCon
-            -> [Name]
-            -> Maybe [LHsTyVarBndr GhcRn]
-            -> HsTyPats GhcRn
-            -> (TcKind -> TcM ())
-            -> TcM ()
-kcFamTyPats tc_fam_tc imp_vars mb_expl_bndrs arg_pats kind_checker
-  = discardResult $
-    bindImplicitTKBndrs_Skol imp_vars $
-    bindExplicitTKBndrs_Skol (fromMaybe [] mb_expl_bndrs) $
-    do { let name     = tyConName tc_fam_tc
-             loc      = nameSrcSpan name
-             lhs_fun  = cL loc (HsTyVar noExt NotPromoted (cL loc name))
-                        -- lhs_fun is for error messages only
-             no_fun   = pprPanic "kcFamTyPats" (ppr name)
-             fun_kind = tyConKind tc_fam_tc
+tcFamTyPats_new :: TyCon -> Maybe ClsInstInfo
+                -> HsTyPats GhcRn                  -- Patterns
+                -> LHsType GhcRn                   -- RHS type
+                -> TcM ([TcType], TcType)          -- (pats, rhs)
+tcFamTyPats_new fam_tc mb_clsinfo hs_pats rhs_hs_ty
+  = do { traceTc "tcFamTyPats_new {" $
+         vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
+              , text "arity:" <+> ppr fam_arity
+              , text "invis_bndrs:" <+> ppr invis_bndrs ]
+       ; (subst, invis_pats) <- tcInstTyBinders emptyTCvSubst mb_kind_env invis_bndrs
+       ; let fun_ty = mkTyConApp fam_tc invis_pats
 
-       ; (_, _, res_kind_out) <- tcInferApps typeLevelMode Nothing lhs_fun no_fun
-                                             fun_kind arg_pats
-       ; traceTc "kcFamTyPats" (vcat [ ppr tc_fam_tc, ppr arg_pats, ppr res_kind_out ])
-       ; kind_checker res_kind_out }
+       ; (_, pats, res_kind)
+             <- tcInferApps typeLevelMode Nothing lhs_fun fun_ty
+                            (substTy subst body_kind) hs_pats
 
+       ; rhs_ty <- tcCheckLHsType rhs_hs_ty res_kind
+       ; traceTc "End tcFamTyPats_new }" $
+         vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
+              , text "res_kind:" <+> ppr res_kind
+              , text "rhs_ty:" <+> ppr rhs_ty ]
+       ; return (invis_pats ++ pats, rhs_ty) }
+  where
+    fam_name  = tyConName fam_tc
+    fam_arity = tyConArity fam_tc
+    fun_kind  = tyConKind fam_tc
+    lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
+    (invis_bndrs, body_kind) = splitPiTysInvisibleN fam_arity fun_kind
+    mb_kind_env = thdOf3 <$> mb_clsinfo
+
+
+-------------------
 tcFamTyPats :: TyCon
             -> Maybe ClsInstInfo
             -> [Name]          -- Implicitly bound kind/type variable names

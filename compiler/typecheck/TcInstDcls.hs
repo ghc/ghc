@@ -506,13 +506,13 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
         ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name tyvars theta
                               clas inst_tys
 
-        ; let inst_info = InstInfo { iSpec  = ispec
-                                   , iBinds = InstBindings
-                                     { ib_binds = binds
-                                     , ib_tyvars = map Var.varName tyvars -- Scope over bindings
-                                     , ib_pragmas = uprags
-                                     , ib_extensions = []
-                                     , ib_derived = False } }
+        ; let inst_binds = InstBindings
+                             { ib_binds = binds
+                             , ib_tyvars = map Var.varName tyvars -- Scope over bindings
+                             , ib_pragmas = uprags
+                             , ib_extensions = []
+                             , ib_derived = False }
+              inst_info = InstInfo { iSpec  = ispec, iBinds = inst_binds }
 
          -- In hs-boot files there should be no bindings
         ; is_boot <- tcIsHsBootOrSig

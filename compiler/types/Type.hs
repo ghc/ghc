@@ -62,7 +62,8 @@ module Type (
         coAxNthLHS,
         stripCoercionTy, splitCoercionType_maybe,
 
-        splitPiTysInvisible, filterOutInvisibleTypes, filterOutInferredTypes,
+        splitPiTysInvisible, splitPiTysInvisibleN,
+        filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
         tyConArgFlags, appTyArgFlags,
         synTyConResKind,
@@ -1543,12 +1544,29 @@ splitPiTys ty = split ty ty
 splitPiTysInvisible :: Type -> ([TyCoBinder], Type)
 splitPiTysInvisible ty = split ty ty []
    where
-    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split _       (ForAllTy b@(Bndr _ vis) res) bs
-      | isInvisibleArgFlag vis         = split res res (Named b  : bs)
-    split _       (FunTy arg res)  bs
-      | isPredTy arg                   = split res res (Anon arg : bs)
-    split orig_ty _                bs  = (reverse bs, orig_ty)
+    split orig_ty ty bs
+      | Just ty' <- coreView ty  = split orig_ty ty' bs
+    split _ (ForAllTy b res) bs
+      | Bndr _ vis <- b
+      , isInvisibleArgFlag vis   = split res res (Named b  : bs)
+    split _ (FunTy arg res)  bs
+      | isPredTy arg             = split res res (Anon arg : bs)
+    split orig_ty _          bs  = (reverse bs, orig_ty)
+
+splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
+-- Same as splitPiTysInvisible, but stop when
+-- you have found 'n' TyCoBinders
+splitPiTysInvisibleN n ty = split n ty ty []
+   where
+    split n orig_ty ty bs
+      | n == 0                  = (reverse bs, orig_ty)
+      | Just ty' <- coreView ty = split n orig_ty ty' bs
+      | ForAllTy b res <- ty
+      , Bndr _ vis <- b
+      , isInvisibleArgFlag vis  = split (n-1) res res (Named b  : bs)
+      | FunTy arg res <- ty
+      , isPredTy arg            = split (n-1) res res (Anon arg : bs)
+      | otherwise               = (reverse bs, orig_ty)
 
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
 -- (i.e., 'Inferred' or 'Specified') arguments.
