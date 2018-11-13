@@ -82,6 +82,7 @@ import IdInfo
 import Var
 import VarSet
 import UniqSet          ( nonDetFoldUniqSet )
+import UniqDSet         ( getUniqDSet )
 import VarEnv
 import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
@@ -1404,7 +1405,7 @@ isFunction (_, AnnLam b e) | isId b    = True
 isFunction _                           = False
 
 countFreeIds :: DVarSet -> Int
-countFreeIds = nonDetFoldUDFM add 0
+countFreeIds = nonDetFoldUDFM add 0 . getUniqDSet
   -- It's OK to use nonDetFoldUDFM here because we're just counting things.
   where
     add :: Var -> Int -> Int

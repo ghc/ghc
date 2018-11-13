@@ -268,7 +268,7 @@ dVarSetIntersectVarSet = uniqDSetIntersectUniqSet
 
 -- | True if empty intersection
 disjointDVarSet :: DVarSet -> DVarSet -> Bool
-disjointDVarSet s1 s2 = disjointUDFM s1 s2
+disjointDVarSet s1 s2 = disjointUDFM (getUniqDSet s1) (getUniqDSet s2)
 
 -- | True if non-empty intersection
 intersectsDVarSet :: DVarSet -> DVarSet -> Bool
@@ -290,10 +290,10 @@ foldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
 foldDVarSet = foldUniqDSet
 
 anyDVarSet :: (Var -> Bool) -> DVarSet -> Bool
-anyDVarSet = anyUDFM
+anyDVarSet p = anyUDFM p . getUniqDSet
 
 allDVarSet :: (Var -> Bool) -> DVarSet -> Bool
-allDVarSet = allUDFM
+allDVarSet p = allUDFM p . getUniqDSet
 
 filterDVarSet :: (Var -> Bool) -> DVarSet -> DVarSet
 filterDVarSet = filterUniqDSet
@@ -318,7 +318,7 @@ extendDVarSetList = addListToUniqDSet
 
 -- | Convert a DVarSet to a VarSet by forgeting the order of insertion
 dVarSetToVarSet :: DVarSet -> VarSet
-dVarSetToVarSet = unsafeUFMToUniqSet . udfmToUfm
+dVarSetToVarSet = unsafeUFMToUniqSet . udfmToUfm . getUniqDSet
 
 -- | transCloVarSet for DVarSet
 transCloDVarSet :: (DVarSet -> DVarSet)
