@@ -146,15 +146,16 @@ mkClassDecl :: SrcSpan
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
             -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
+            -> HasBraces
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
+mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls braces
   = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
-       ; tyvars <- checkTyVarsP (text "class") whereDots cls tparams
-       ; (at_defs, anns) <- fmap unzip $ mapM (eitherToP . mkATDefault) at_insts
+       ; tyvars <- checkTyVarsP (text "class") whereDots cls tparams braces
+       ; (at_defs, anns) <- fmap unzip $ mapM (eitherToP . (mkATDefault braces)) at_insts
        ; sequence_ anns
        ; return (L loc (ClassDecl { tcdCExt = noExt, tcdCtxt = cxt
                                   , tcdLName = cls, tcdTyVars = tyvars
@@ -165,7 +166,7 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
                                   , tcdATs = ats, tcdATDefs = at_defs
                                   , tcdDocs  = docs })) }
 
-mkATDefault :: LTyFamInstDecl GhcPs
+mkATDefault :: HasBraces -> LTyFamInstDecl GhcPs
             -> Either (SrcSpan, SDoc) (LTyFamDefltEqn GhcPs, P ())
 -- ^ Take a type-family instance declaration and turn it into
 -- a type-family default equation for a class declaration.
@@ -176,10 +177,10 @@ mkATDefault :: LTyFamInstDecl GhcPs
 -- The @P ()@ we return corresponds represents an action which will add
 -- some necessary paren annotations to the parsing context. Naturally, this
 -- is not something that the "Convert" use cares about.
-mkATDefault (L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
+mkATDefault braces (L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
       | FamEqn { feqn_tycon = tc, feqn_bndrs = bndrs, feqn_pats = pats
                , feqn_fixity = fixity, feqn_rhs = rhs } <- e
-      = do { (tvs, anns) <- checkTyVars (text "default") equalsDots tc pats
+      = do { (tvs, anns) <- checkTyVars (text "default") equalsDots tc pats braces
            ; let f = L loc (FamEqn { feqn_ext    = noExt
                                    , feqn_tycon  = tc
                                    , feqn_bndrs  = ASSERT( isNothing bndrs )
@@ -188,8 +189,8 @@ mkATDefault (L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
                                    , feqn_fixity = fixity
                                    , feqn_rhs    = rhs })
            ; pure (f, anns) }
-mkATDefault (L _ (TyFamInstDecl (HsIB _ (XFamEqn _)))) = panic "mkATDefault"
-mkATDefault (L _ (TyFamInstDecl (XHsImplicitBndrs _))) = panic "mkATDefault"
+mkATDefault _ (L _ (TyFamInstDecl (HsIB _ (XFamEqn _)))) = panic "mkATDefault"
+mkATDefault _ (L _ (TyFamInstDecl (XHsImplicitBndrs _))) = panic "mkATDefault"
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -198,11 +199,12 @@ mkTyData :: SrcSpan
          -> Maybe (LHsKind GhcPs)
          -> [LConDecl GhcPs]
          -> HsDeriving GhcPs
+         -> HasBraces
          -> P (LTyClDecl GhcPs)
-mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
+mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv braces
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
-       ; tyvars <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams
+       ; tyvars <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams braces
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdDExt = noExt,
                                    tcdLName = tc, tcdTyVars = tyvars,
@@ -230,11 +232,12 @@ mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
 mkTySynonym :: SrcSpan
             -> LHsType GhcPs  -- LHS
             -> LHsType GhcPs  -- RHS
+            -> HasBraces
             -> P (LTyClDecl GhcPs)
-mkTySynonym loc lhs rhs
+mkTySynonym loc lhs rhs braces
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
-       ; tyvars <- checkTyVarsP (text "type") equalsDots tc tparams
+       ; tyvars <- checkTyVarsP (text "type") equalsDots tc tparams braces
        ; return (L loc (SynDecl { tcdSExt = noExt
                                 , tcdLName = tc, tcdTyVars = tyvars
                                 , tcdFixity = fixity
@@ -286,11 +289,12 @@ mkFamDecl :: SrcSpan
           -> LHsType GhcPs                   -- LHS
           -> Located (FamilyResultSig GhcPs) -- Optional result signature
           -> Maybe (LInjectivityAnn GhcPs)   -- Injectivity annotation
+          -> HasBraces
           -> P (LTyClDecl GhcPs)
-mkFamDecl loc info lhs ksig injAnn
+mkFamDecl loc info lhs ksig injAnn braces
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
-       ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams
+       ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams braces
        ; return (L loc (FamDecl noExt (FamilyDecl
                                            { fdExt       = noExt
                                            , fdInfo      = info, fdLName = tc
@@ -784,10 +788,11 @@ really doesn't matter!
 -}
 
 checkTyVarsP :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
+             -> HasBraces
              -> P (LHsQTyVars GhcPs)
 -- Same as checkTyVars, but in the P monad
-checkTyVarsP pp_what equals_or_where tc tparms
-  = do { let checkedTvs = checkTyVars pp_what equals_or_where tc tparms
+checkTyVarsP pp_what equals_or_where tc tparms braces
+  = do { let checkedTvs = checkTyVars pp_what equals_or_where tc tparms braces
        ; (tvs, anns) <- eitherToP checkedTvs
        ; anns
        ; pure tvs }
@@ -798,31 +803,31 @@ eitherToP (Left (loc, doc)) = parseErrorSDoc loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsType GhcPs]
-            -> Either (SrcSpan, SDoc)
+            -> HasBraces -> Either (SrcSpan, SDoc)
                       ( LHsQTyVars GhcPs  -- the synthesized type variables
                       , P () )            -- action which adds annotations
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
 -- We use the Either monad because it's also called (via 'mkATDefault') from
 -- "Convert".
-checkTyVars pp_what equals_or_where tc tparms
-  = do { (tvs, anns) <- fmap unzip $ mapM (chkParens []) tparms
+checkTyVars pp_what equals_or_where tc tparms braces
+  = do { (tvs, anns) <- fmap unzip $ mapM (chkParens [] braces) tparms
        ; return (mkHsQTvs tvs, sequence_ anns) }
   where
         -- Keep around an action for adjusting the annotations of extra parens
-    chkParens :: [AddAnn] -> LHsType GhcPs
+    chkParens :: [AddAnn] -> HasBraces -> LHsType GhcPs
               -> Either (SrcSpan, SDoc) (LHsTyVarBndr GhcPs, P ())
-    chkParens acc (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) ty
-    chkParens acc ty = case chk ty of
+    chkParens acc braces (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) braces ty
+    chkParens acc braces ty = case chk ty braces of
       Left err -> Left err
       Right tv@(L l _) -> Right (tv, addAnnsAt l (reverse acc))
 
         -- Check that the name space is correct!
-    chk (L l (HsKindSig _ (L lv (HsTyVar _ _ (L _ tv))) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar noExt (L lv tv) k))
-    chk (L l (HsTyVar _ _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L l (UserTyVar noExt (L ltv tv)))
-    chk t@(L loc _)
+    chk (L l (HsKindSig _ (L lv (HsTyVar _ _ (L _ tv))) k)) braces
+        | isRdrTyVar tv    = return (L l (KindedTyVar noExt (L lv tv) k braces))
+    chk (L l (HsTyVar _ _ (L ltv tv))) braces
+        | isRdrTyVar tv    = return (L l (UserTyVar noExt (L ltv tv) braces))
+    chk t@(L loc _) _
         = Left (loc,
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
                      , text "In the" <+> pp_what <+> ptext (sLit "declaration for") <+> quotes tc'
@@ -863,10 +868,10 @@ mkRuleBndrs = fmap (fmap cvt_one)
         cvt_one (RuleTyTmVar v (Just sig)) = RuleBndrSig noExt v (mkLHsSigWcType sig)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
-mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr GhcPs]
-mkRuleTyVarBndrs = fmap (fmap cvt_one)
-  where cvt_one (RuleTyTmVar v Nothing)    = UserTyVar   noExt (fmap tm_to_ty v)
-        cvt_one (RuleTyTmVar v (Just sig)) = KindedTyVar noExt (fmap tm_to_ty v) sig
+mkRuleTyVarBndrs :: HasBraces -> [LRuleTyTmVar] -> [LHsTyVarBndr GhcPs]
+mkRuleTyVarBndrs braces = fmap (fmap cvt_one)
+  where cvt_one (RuleTyTmVar v Nothing)    = UserTyVar   noExt (fmap tm_to_ty v) braces
+        cvt_one (RuleTyTmVar v (Just sig)) = KindedTyVar noExt (fmap tm_to_ty v) sig braces
         -- takes something in namespace 'varName' to something in namespace 'tvName'
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"

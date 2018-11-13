@@ -371,14 +371,15 @@ mkHsStringPrimLit fs
 
 -------------
 userHsLTyVarBndrs :: SrcSpan -> [Located (IdP (GhcPass p))]
+                  -> [HasBraces]
                   -> [LHsTyVarBndr (GhcPass p)]
 -- Caller sets location
-userHsLTyVarBndrs loc bndrs = [ L loc (UserTyVar noExt v) | v <- bndrs ]
+userHsLTyVarBndrs loc bndrs braces = [ L loc (UserTyVar noExt v brace) | v <- bndrs, brace <- braces ]
 
-userHsTyVarBndrs :: SrcSpan -> [IdP (GhcPass p)] -> [LHsTyVarBndr (GhcPass p)]
+userHsTyVarBndrs :: SrcSpan -> [IdP (GhcPass p)] -> [HasBraces] -> [LHsTyVarBndr (GhcPass p)]
 -- Caller sets location
-userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar noExt (L loc v))
-                             | v <- bndrs ]
+userHsTyVarBndrs loc bndrs braces = [ L loc (UserTyVar noExt (L loc v) brace)
+                             | v <- bndrs, brace <- braces]
 
 
 {-
@@ -687,7 +688,7 @@ typeToLHsType ty
 
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
-                                   (go (tyVarKind tv))
+                                   (go (tyVarKind tv)) No
 
 {-
 Note [Kind signatures in typeToLHsType]
