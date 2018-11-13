@@ -658,7 +658,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                 -- I'm not bothering to clone the ex_tvs
            ; eqs_vars   <- mapM newPredVarDs (substTheta in_subst (eqSpecPreds eq_spec))
            ; theta_vars <- mapM newPredVarDs (substTheta in_subst prov_theta)
-           ; arg_ids    <- newSysLocalsDs (getCompose $ substTysUnchecked in_subst (Compose arg_tys))
+           ; arg_ids    <- newSysLocalsDs (getCompose $ substTysUnchecked in_subst (Compose arg_tys'))
            ; let field_labels = conLikeFieldLabels con
                  val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
                                          field_labels arg_ids
