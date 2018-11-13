@@ -1,75 +1,34 @@
--- CI Failures but not locally #85
-scc002
-T3001-2
 -- Type of data constructors are now linear
-ADT
-Roles1
-Roles2
-SkipMany
-T12550
-T3017
 ghci025
-tc231
 T8958
--- Fails on CI but not locally
-scc001
-ghcpkg05
 -- Fails with linearity checks enable, skipped for data constructor type
 T7360
 -- See #42
 T14682
--- #41
-T3234
--- #82
-
-### Simplifier
-T3591
 
 ### Polymorphism See #91
 
 AmapCoerce
-DsStrict
 Roles13
 T10019
-T10145
 T11345
 T11524a
-T11627b
 T11721
 T11721_TH
 T11985
-T12600
 T12785b
 T13032
-T13156
-T13317
-T13340
 T13988
-T14051
-T14066a
-T14186
 T14236
 T14394
 T14773b
-T14796
 T2110
 T2431
-T2486
-T4007
-T4918
 T5327
-T5644
-T5996
-T7116
-T7785
-T7837
 T8274
-T8535
 TH_reifyDecl1
 TestTypeableBinary
 ghci
-ghci020
-inline-check
 print002
 print003
 print006
@@ -87,25 +46,11 @@ records-req-only
 records-run
 rule2
 spec001
-str-rules
-tcrun041
 
 # FunCo fallout
 
 readRun004
 EtaExpandLevPoly
-
-# Eta-reduction performance
-
-T5363
-T3245
-list003
-
-# This profiling test fails with a timeout on CI (but not on local machines)
-callstack002
-
-# Other tests which timeout on CI, but not locally
-concprog001
 
 # Unknown, to be checked
 dynamic-paper
