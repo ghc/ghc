@@ -1275,11 +1275,11 @@ ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
        ; em <- getRep evm (fromMult m) -- TODO
        ; mkTrFun <- dsLookupGlobalId mkTrFunName
                     -- mkTrFun :: forall (m :: Multiplicity) r1 r2 (a :: TYPE r1) (b :: TYPE r2).
-                    --            TypeRep a -> TypeRep b -> TypeRep (a -->.(m) b)
+                    --            TypeRep m -> TypeRep a -> TypeRep b -> TypeRep (a -->.(m) b)
        ; let r1 = getRuntimeRep t1
              r2 = getRuntimeRep t2
        ; return $ mkApps (mkTyApps (Var mkTrFun) [fromMult m, r1, r2, t1, t2])
-                         [ e1, e2 ]
+                         [ em, e1, e2 ]
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)
