@@ -48,7 +48,7 @@ import Coercion
 import SrcLoc
 import Kind
 import Type
-import Weight
+import Multiplicity
 import UsageEnv
 import RepType
 import TyCoRep       -- checks validity of types/coercions
@@ -760,7 +760,7 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
   = do  { let_ue <- lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
         ; let (rhs_ue, update_ue) =
-                case varWeightedness bndr of
+                case varMult bndr of
                   Regular w -> (w `scaleUE` let_ue, id)
                   Alias -> (zeroUE, addAliasUE bndr let_ue)
         ; (body_ty, body_ue) <-
@@ -810,7 +810,7 @@ lintCoreExpr (Lam var expr)
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
   do { let scrut_diverges = exprIsBottom scrut
-           scrut_weight = varWeight var
+           scrut_mult = varWeight var
      ; (scrut_ty, scrut_ue) <- markAllJoinsBad $ lintCoreExpr scrut
      ; (alt_ty, _) <- lintInTy alt_ty
      ; (var_ty, _) <- lintInTy (idType var)
@@ -847,8 +847,8 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
 
      ; lintBinder CaseBind var $ \_ ->
        do { -- Check the alternatives
-          ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_weight alt_ty) alts
-          ; let case_ue = (scaleUE scrut_weight scrut_ue) `addUE` supUEs alt_ues
+          ; alt_ues <- mapM (lintCoreAlt var scrut_ty scrut_mult alt_ty) alts
+          ; let case_ue = (scaleUE scrut_mult scrut_ue) `addUE` supUEs alt_ues
           ; checkCaseAlts e scrut_ty alts
           ; return (alt_ty, case_ue) } }
 
@@ -950,9 +950,9 @@ checkJoinOcc var n_args
 -- from the usage environment (this is important because of shadowing).
 checkLinearity :: UsageEnv -> Var -> LintM UsageEnv
 checkLinearity body_ue lam_var =
-  case varWeightednessMaybe lam_var of
+  case varMultMaybe lam_var of
     Just (Regular mult) -> do
-      ensureEqWeights (lookupUE body_ue lam_var) mult (err_msg mult)
+      ensureEqMults (lookupUE body_ue lam_var) mult (err_msg mult)
       return $ deleteUE body_ue lam_var
     Just Alias -> return body_ue -- aliases do not generate multiplicity constraints
     Nothing   -> return body_ue -- A type variable
@@ -966,7 +966,7 @@ checkLinearity body_ue lam_var =
 -- error messages.
 checkSubUE :: Var -> UsageEnv -> UsageEnv -> LintM ()
 checkSubUE var ue1 ue2 =
-  lintL (ue1 `subweightUE` ue2) $
+  lintL (ue1 `submultUE` ue2) $
   text "Alias-like variable" <+> ppr var
   <+> text "doesn't have the same usage environment as its right-hand side"
   $$ text "Recorded (var's) environment:" <+> ppr ue2
@@ -1083,7 +1083,7 @@ lintAltBinders :: UsageEnv
                -> Var         -- Scrutinee name
                -> OutType     -- Scrutinee type
                -> OutType     -- Constructor type
-               -> [(Rig, OutVar)]    -- Binders
+               -> [(Mult, OutVar)]    -- Binders
                -> LintM UsageEnv
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -1100,9 +1100,9 @@ lintAltBinders rhs_ue scrut scrut_ty con_ty ((var_w, bndr):bndrs)
        ; lintAltBinders rhs_ue' scrut scrut_ty con_ty' bndrs }
 
 -- | Implements the case rules for linearity
-checkCaseLinearity :: UsageEnv -> Var ->  Rig -> Var -> LintM UsageEnv
+checkCaseLinearity :: UsageEnv -> Var ->  Mult -> Var -> LintM UsageEnv
 checkCaseLinearity ue scrut var_w bndr = do
-  ensureEqWeights lhs rhs err_msg
+  ensureEqMults lhs rhs err_msg
   lintLinearBinder (ppr bndr) (scrut_w * var_w) (varWeight bndr)
   return $ deleteUE ue bndr
   where
@@ -1139,7 +1139,7 @@ lintTyApp fun_ty arg_ty
 -----------------
 lintValApp :: CoreExpr -> OutType -> OutType -> UsageEnv -> UsageEnv -> LintM (OutType, UsageEnv)
 lintValApp arg fun_ty arg_ty fun_ue arg_ue
-  | Just (Weighted w arg,res) <- splitFunTy_maybe fun_ty
+  | Just (Scaled w arg,res) <- splitFunTy_maybe fun_ty
   = do { ensureEqTys arg arg_ty err1
        ; let app_ue =  addUE fun_ue (scaleUE w arg_ue)
        ; return (res, app_ue) }
@@ -1218,7 +1218,7 @@ lintAltExpr expr ann_ty
 
 lintCoreAlt :: Var              -- Scrut Var
             -> OutType          -- Type of scrutinee
-            -> Rig              -- Weight of scrutinee
+            -> Mult             -- Multiplicity of scrutinee
             -> OutType          -- Type of the alternative
             -> CoreAlt
             -> LintM UsageEnv
@@ -1238,7 +1238,7 @@ lintCoreAlt _scrut scrut_ty _ alt_ty (LitAlt lit, args, rhs)
   where
     lit_ty = literalType lit
 
-lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
+lintCoreAlt scrut scrut_ty scrut_mult alt_ty alt@(DataAlt con, args, rhs)
   | isNewTyCon (dataConTyCon con)
   = zeroUE <$ addErrL (mkNewTyDataConAltMsg scrut_ty alt)
   | Just (tycon, tycon_arg_tys) <- splitTyConApp_maybe scrut_ty
@@ -1249,32 +1249,32 @@ lintCoreAlt scrut scrut_ty scrut_weight alt_ty alt@(DataAlt con, args, rhs)
       lintL (tycon == dataConTyCon con) (mkBadConMsg tycon con)
     ; let { con_payload_ty = piResultTys (dataConRepType con) tycon_arg_tys
           ; ex_tvs_n = length (dataConExTyCoVars con)
-          -- See Note [Alt arg weights]
-          ; weights = replicate ex_tvs_n Omega ++
-                      map weightedWeight (dataConRepArgTys con) }
+          -- See Note [Alt arg multiplicities]
+          ; multiplicities = replicate ex_tvs_n Omega ++
+                             map scaledMult (dataConRepArgTys con) }
 
         -- And now bring the new binders into scope
     ; lintBinders CasePatBind args $ \ args' -> do
     {
     rhs_ue <- lintAltExpr rhs alt_ty ;
---    ; pprTrace "lintCoreAlt" (ppr weights $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
-    ; rhs_ue' <- addLoc (CasePat alt) (lintAltBinders rhs_ue scrut scrut_ty con_payload_ty (zipEqual "lintCoreAlt" weights  args')) ;
+--    ; pprTrace "lintCoreAlt" (ppr multiplicities $$ ppr args' $$ ppr (dataConRepArgTys con) $$ ppr (dataConSig con)) ( return ())
+    ; rhs_ue' <- addLoc (CasePat alt) (lintAltBinders rhs_ue scrut scrut_ty con_payload_ty (zipEqual "lintCoreAlt" multiplicities  args')) ;
     return $ deleteUE rhs_ue' scrut
     } }
 
   | otherwise   -- Scrut-ty is wrong shape
   = zeroUE <$ addErrL (mkBadAltMsg scrut_ty alt)
 
-lintLinearBinder :: SDoc -> Rig -> Rig -> LintM ()
+lintLinearBinder :: SDoc -> Mult -> Mult -> LintM ()
 lintLinearBinder doc actual_usage described_usage
-  = ensureEqWeights actual_usage described_usage err_msg
+  = ensureEqMults actual_usage described_usage err_msg
     where
       err_msg = (text "Multiplicity of variable does agree with its context"
                 $$ doc
                 $$ ppr actual_usage
                 $$ text "Annotation:" <+> ppr described_usage)
 
-{- Note [Alt arg weights]
+{- Note [Alt arg multiplicities]
 It is necessary to use `dataConRepArgTys` so you get the arg tys from
 the wrapper if there is one.
 
@@ -2466,9 +2466,9 @@ ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- Assumes ty1,ty2 are have already had the substitution applied
 ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
 
-ensureEqWeights :: Rig -> Rig -> SDoc -> LintM ()
-ensureEqWeights actual_usage described_usage err_msg =
-    case (actual_usage `subweightMaybe` described_usage) of
+ensureEqMults :: Mult -> Mult -> SDoc -> LintM ()
+ensureEqMults actual_usage described_usage err_msg =
+    case (actual_usage `submultMaybe` described_usage) of
       Smaller -> return ()
       Larger -> addErrL err_msg
       Unknown -> ensureEqTys (fromMult actual_usage)

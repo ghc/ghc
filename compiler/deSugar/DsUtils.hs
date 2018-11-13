@@ -63,7 +63,7 @@ import TyCon
 import DataCon
 import PatSyn
 import Type
-import Weight
+import Multiplicity
 import Coercion
 import TysPrim
 import TysWiredIn
@@ -98,7 +98,7 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 -}
 
-selectSimpleMatchVarL :: Rig -> LPat GhcTc -> DsM Id
+selectSimpleMatchVarL :: Mult -> LPat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 
@@ -118,11 +118,11 @@ selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [(Rig, Pat GhcTc)] -> DsM [Id]
+selectMatchVars :: [(Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
-selectMatchVar :: Rig -> Pat GhcTc -> DsM Id
+selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
 selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
 selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
@@ -134,7 +134,7 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- an @-pattern), then w is the same as the
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
-                                  -- variable, so we ignore the weight.
+                                  -- variable, so we ignore the multiplicity.
 selectMatchVar _w (AsPat _ var _) = return (unLoc var)
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
@@ -362,7 +362,7 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
     mk_case :: CoreExpr -> DsM CoreExpr
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) ty (mk_default fail ++ alts)
+        return $ mkWildCase (Var var) (Scaled (idWeight var) (idType var)) ty (mk_default fail ++ alts)
 
     mk_alt :: CoreExpr -> CaseAlt DataCon -> DsM CoreAlt
     mk_alt fail MkCaseAlt{ alt_pat = con,

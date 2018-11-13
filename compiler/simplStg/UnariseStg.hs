@@ -216,7 +216,7 @@ import TysWiredIn
 import UniqSupply
 import Util
 import VarEnv
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)

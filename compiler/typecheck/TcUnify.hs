@@ -11,7 +11,7 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubWeight,
+  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS, tcSubMult,
   tcSubTypeDS_NC_O, tcSubTypeET,
   checkConstraints, checkTvConstraints,
   buildImplicationFor,
@@ -45,7 +45,7 @@ import TcMType
 import TcRnMonad
 import TcType
 import Type
-import Weight
+import Multiplicity
 import Coercion
 import TcEvidence
 import Name( isSystemName )
@@ -136,7 +136,7 @@ matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
-                    -> ([Weighted ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
                           -- must fill in these ExpTypes here
                     -> TcM (a, HsWrapper)
 -- If    matchExpectedFunTys n ty = (_, wrap)
@@ -154,12 +154,12 @@ matchExpectedFunTys herald arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy weight arg_ty res_ty)
+    go acc_arg_tys n (FunTy mult arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (result, wrap_res) <- go ((Weighted weight $ mkCheckExpType arg_ty) : acc_arg_tys)
+        do { (result, wrap_res) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
-                    , mkWpFun idHsWrapper wrap_res (Weighted weight arg_ty) res_ty doc ) }
+                    , mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty doc ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -190,7 +190,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [Weighted ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
+    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n newInferExpTypeNoInst
            ; res_ty       <- newInferExpTypeInst
@@ -221,7 +221,7 @@ matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
                   -> Arity
                   -> TcSigmaType
-                  -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
+                  -> TcM (HsWrapper, [Scaled TcSigmaType], TcSigmaType)
 -- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
 matchActualFunTys herald ct_orig mb_thing arity ty
@@ -234,9 +234,9 @@ matchActualFunTysPart :: SDoc -- See Note [Herald for matchExpectedFunTys]
                       -> Maybe (HsExpr GhcRn)  -- the thing with type TcSigmaType
                       -> Arity
                       -> TcSigmaType
-                      -> [Weighted TcSigmaType] -- reversed args. See (*) below.
+                      -> [Scaled TcSigmaType] -- reversed args. See (*) below.
                       -> Arity   -- overall arity of the function, for errs
-                      -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
+                      -> TcM (HsWrapper, [Scaled TcSigmaType], TcSigmaType)
 matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
                       orig_old_args full_arity
   = go arity orig_old_args orig_ty
@@ -267,9 +267,9 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     --
     -- Refactoring is welcome.
     go :: Arity
-       -> [Weighted TcSigmaType] -- accumulator of arguments (reversed)
+       -> [Scaled TcSigmaType] -- accumulator of arguments (reversed)
        -> TcSigmaType   -- the remainder of the type as we're processing
-       -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
+       -> TcM (HsWrapper, [Scaled TcSigmaType], TcSigmaType)
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
@@ -285,9 +285,9 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
 
     go n acc_args (FunTy w arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (wrap_res, tys, ty_r) <- go (n-1) (Weighted w arg_ty : acc_args) res_ty
-           ; return ( mkWpFun idHsWrapper wrap_res (Weighted w arg_ty) ty_r doc
-                    , Weighted w arg_ty : tys, ty_r ) }
+        do { (wrap_res, tys, ty_r) <- go (n-1) (Scaled w arg_ty : acc_args) res_ty
+           ; return ( mkWpFun idHsWrapper wrap_res (Scaled w arg_ty) ty_r doc
+                    , Scaled w arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -326,7 +326,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
            ; return (mkWpCastN co, map unrestricted arg_tys, res_ty) }
 
     ------------
-    mk_ctxt :: [Weighted TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: [Scaled TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
       = do { let ty = mkFunTys arg_tys res_ty
            ; (env1, zonked) <- zonkTidyTcType env ty
@@ -755,15 +755,15 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     -- caused Trac #12616 because (also bizarrely) 'deriving' code had
     -- -XImpredicativeTypes on.  I deleted the entire case.
 
-    go (FunTy act_weight act_arg act_res) (FunTy exp_weight exp_arg exp_res)
+    go (FunTy act_mult act_arg act_res) (FunTy exp_mult exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { tcEqWeight eq_orig inst_orig ctxt act_weight exp_weight
+        do { tcEqMult eq_orig inst_orig ctxt act_mult exp_mult
            ; res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
                          -- GenSigCtxt: See Note [Setting the argument context]
-           ; return (mkWpFun arg_wrap res_wrap (Weighted exp_weight exp_arg) exp_res doc) }
+           ; return (mkWpFun arg_wrap res_wrap (Scaled exp_mult exp_arg) exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
@@ -811,9 +811,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
      -- use versions without synonyms expanded
     unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
 
-tcEqWeight :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Rig -> Rig -> TcM ()
-tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
-  { -- Note that here we do not call to `subweightMaybe`, so we check
+tcEqMult :: CtOrigin -> CtOrigin -> UserTypeCtxt -> Mult -> Mult -> TcM ()
+tcEqMult eq_orig inst_orig ctxt w_actual w_expected = do
+  { -- Note that here we do not call to `submultMaybe`, so we check
     -- for strict equality.
   ; _wrap <- tc_sub_type_ds eq_orig inst_orig ctxt (fromMult w_actual) (fromMult w_expected)
   -- I don't know why, but `_wrap` need not be an identity wrapper. At any rate,
@@ -826,21 +826,21 @@ tcEqWeight eq_orig inst_orig ctxt w_actual w_expected = do
 -- For w1 + w2 <= w we instantiate w1 and w2 to Omega and check that Omega
 -- <= w
 -- The error messages from this function are currently awful.
-tcSubWeight :: Rig -> Rig -> TcM ()
-tcSubWeight actual_w w
+tcSubMult :: Mult -> Mult -> TcM ()
+tcSubMult actual_w w
   = do_one actual_w
   where
-    do_one weight =
-      case weight of
+    do_one mult =
+      case mult of
         RigAdd _ _ -> do
-          tcSubWeight Omega w
+          tcSubMult Omega w
         RigMul m1 m2 -> do
-          tcSubWeight m1 w
-          tcSubWeight m2 w
-        _ -> do_one_action weight w
+          tcSubMult m1 w
+          tcSubMult m2 w
+        _ -> do_one_action mult w
 
     do_one_action a_w c_w
-       = tcEqWeight AppOrigin AppOrigin TypeAppCtxt a_w c_w
+       = tcEqMult AppOrigin AppOrigin TypeAppCtxt a_w c_w
 
 
 {- Note [Settting the argument context]

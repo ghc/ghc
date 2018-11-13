@@ -21,7 +21,7 @@ HsTypes: Abstract syntax: user-defined types
 {-# LANGUAGE FlexibleInstances #-}
 
 module HsTypes (
-        Rig, HsRig(..), HsWeighted(..),
+        Mult, HsMult(..), HsScaled(..),
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
@@ -541,7 +541,7 @@ data HsType pass
 
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
-                        (HsRig pass)
+                        (HsMult pass)
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
@@ -736,29 +736,29 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-data HsRig pass = HsZero | HsOne | HsOmega | HsRigTy (LHsType pass)
+data HsMult pass = HsZero | HsOne | HsOmega | HsMultTy (LHsType pass)
 
 instance
       (OutputableBndrId (GhcPass pass)) =>
-      Outputable (HsRig (GhcPass pass)) where
+      Outputable (HsMult (GhcPass pass)) where
   ppr HsZero = text "0"
   ppr HsOne = text "1"
   ppr HsOmega = text "ω"
-  ppr (HsRigTy p) = ppr p
+  ppr (HsMultTy p) = ppr p
 
-hsUnrestricted, hsLinear :: a -> HsWeighted pass a
-hsUnrestricted = HsWeighted HsOmega
-hsLinear = HsWeighted HsOne
+hsUnrestricted, hsLinear :: a -> HsScaled pass a
+hsUnrestricted = HsScaled HsOmega
+hsLinear = HsScaled HsOne
 
-isHsOmega :: HsRig pass -> Bool
+isHsOmega :: HsMult pass -> Bool
 isHsOmega HsOmega = True
 isHsOmega _ = False
 
-data HsWeighted pass a = HsWeighted { hsWeight :: HsRig pass, hsThing :: a }
+data HsScaled pass a = HsScaled { hsMult :: HsMult pass, hsThing :: a }
   deriving (Traversable, Functor, Foldable)
 
-instance Outputable a => Outputable (HsWeighted pass a) where
-   ppr (HsWeighted _cnt t) = -- ppr cnt <> ppr t
+instance Outputable a => Outputable (HsScaled pass a) where
+   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
 
@@ -1097,13 +1097,13 @@ mkHsAppTys = foldl' mkHsAppTy
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
-splitHsFunType :: LHsType GhcRn -> ([HsWeighted GhcRn (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
-splitHsFunType (L _ (HsFunTy _ x weight y))
+splitHsFunType (L _ (HsFunTy _ x mult y))
   | (args, res) <- splitHsFunType y
-  = ((HsWeighted weight x):args, res)
+  = ((HsScaled mult x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
@@ -1440,7 +1440,7 @@ ppr_mono_ty (HsTyVar _ Promoted (L _ name))
   = space <> quote (pprPrefixOcc name)
                          -- We need a space before the ' above, so the parser
                          -- does not attach it to the previous symbol
-ppr_mono_ty (HsFunTy _ ty1 weight ty2)   = ppr_fun_ty ty1 weight ty2
+ppr_mono_ty (HsFunTy _ ty1 mult ty2)   = ppr_fun_ty ty1 mult ty2
 ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
@@ -1485,15 +1485,15 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> HsRig (GhcPass p) -> LHsType (GhcPass p) -> SDoc
-ppr_fun_ty ty1 weight ty2
+           => LHsType (GhcPass p) -> HsMult (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+ppr_fun_ty ty1 mult ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
-        arr = case weight of
+        arr = case mult of
           HsZero -> text "->_0"
           HsOne -> text "⊸"
           HsOmega -> text "->"
-          HsRigTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
+          HsMultTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
     in
     sep [p1, arr <+> p2]
 

@@ -38,7 +38,7 @@ import TcEvidence
 import TcRnMonad
 import TcHsSyn
 import Type
-import Weight
+import Multiplicity
 import CoreSyn
 import CoreUtils
 import MkCore
@@ -366,7 +366,7 @@ ds_expr _ e@(SectionR _ op expr) = do
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
         -- See comment with SectionL
     y_core <- dsLExpr expr
-    dsWhenNoErrs (mapM (\(Weighted w ty) -> newSysLocalDsNoLP w ty) [x_ty, y_ty])
+    dsWhenNoErrs (mapM (\(Scaled w ty) -> newSysLocalDsNoLP w ty) [x_ty, y_ty])
                  (\[x_id, y_id] -> bindNonRec y_id y_core $
                                    Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
                                                           core_op [Var x_id, Var y_id]))
@@ -544,8 +544,8 @@ ds_expr _ (RecordCon { rcon_flds = rbinds
              labels = conLikeFieldLabels con_like
 
        ; con_args <- if null labels
-                     then mapM unlabelled_bottom (map weightedThing arg_tys)
-                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" (map weightedThing arg_tys) labels)
+                     then mapM unlabelled_bottom (map scaledThing arg_tys)
+                     else mapM mk_arg (zipEqual "dsExpr:RecordCon" (map scaledThing arg_tys) labels)
 
        ; return (mkCoreApps con_expr' con_args) }
 
@@ -644,7 +644,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
     mk_alt upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
-                 arg_tys' = scaleWeighted Omega <$> arg_tys
+                 arg_tys' = scaleScaled Omega <$> arg_tys
                    -- Record updates consume the source record with multiplicity
                    -- Omega. Therefore all the fields need to be scaled thus.
                  user_tvs =
@@ -919,10 +919,10 @@ dsDo stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt (pat_weight, res1_ty) pat rhs bind_op fail_op) stmts
+    go _ (BindStmt (pat_mult, res1_ty) pat rhs bind_op fail_op) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
-            ; var   <- selectSimpleMatchVarL pat_weight pat
+            ; var   <- selectSimpleMatchVarL pat_mult pat
             ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
             ; match_code <- handle_failure pat match fail_op

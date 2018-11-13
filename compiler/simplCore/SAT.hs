@@ -56,7 +56,7 @@ import GhcPrelude
 import Var
 import CoreSyn
 import CoreUtils
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 import Type
 import Coercion
 import Id

@@ -29,8 +29,8 @@ import HsSyn
 import TcRnMonad
 import TcEnv
 import TcPat
-import Weight
-import Type ( Weighted )
+import Multiplicity
+import Type ( Scaled )
 import UsageEnv
 import TcMType
 import TcType
@@ -120,7 +120,7 @@ parser guarantees that each equation has exactly one argument.
 
 tcMatchesCase :: (Outputable (body GhcRn)) =>
                  TcMatchCtxt body                             -- Case context
-              -> Weighted TcSigmaType                         -- Type of scrutinee
+              -> Scaled TcSigmaType                         -- Type of scrutinee
               -> MatchGroup GhcRn (Located (body GhcRn))        -- The case alternatives
               -> ExpRhoType                                   -- Type of whole case expressions
               -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
@@ -194,7 +194,7 @@ still gets assigned a polytype.
 -- expected type into TauTvs.
 -- See Note [Case branches must never infer a non-tau type]
 tauifyMultipleMatches :: [LMatch id body]
-                      -> [Weighted ExpType] -> TcM [Weighted ExpType]
+                      -> [Scaled ExpType] -> TcM [Scaled ExpType]
 tauifyMultipleMatches group exp_tys
   | isSingletonMatchGroup group = return exp_tys
   | otherwise                   = mapM (mapM tauifyExpType) exp_tys
@@ -202,7 +202,7 @@ tauifyMultipleMatches group exp_tys
 
 -- | Type-check a MatchGroup.
 tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
-          -> [Weighted ExpSigmaType]      -- Expected pattern types
+          -> [Scaled ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
           -> MatchGroup GhcRn (Located (body GhcRn))
           -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
@@ -215,7 +215,7 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> TcM (Located (body GhcTcId)) }
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { (Weighted _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Weighted One rhs_ty):pat_tys) -- return type has implicitly weight 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
+  = do { (Scaled _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Scaled One rhs_ty):pat_tys) -- return type has implicitly multiplicity 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
             -- See Note [Case branches must never infer a non-tau type]
 
        ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
@@ -230,7 +230,7 @@ tcMatches _ _ _ (XMatchGroup {}) = panic "tcMatches"
 
 -------------
 tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
-        -> [Weighted ExpSigmaType]        -- Expected pattern types
+        -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (Located (body GhcRn))
         -> TcM (LMatch GhcTcId (Located (body GhcTcId)))
@@ -554,8 +554,8 @@ tcMcStmt :: TcExprStmtChecker
 tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
   = do  { (body', return_op')
             <- tcSyntaxOp MCompOrigin return_op [SynRho] res_ty $
-               \ [a_ty] [weight]->
-               tcScalingUsage weight $ tcMonoExprNC body (mkCheckExpType a_ty)
+               \ [a_ty] [mult]->
+               tcScalingUsage mult $ tcMonoExprNC body (mkCheckExpType a_ty)
         ; thing      <- thing_inside (panic "tcMcStmt: thing_inside")
         ; return (LastStmt x body' noret return_op', thing) }
 
@@ -567,20 +567,20 @@ tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
 
 tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
-  = do  { ((rhs', pat_weight, pat', thing, new_res_ty), bind_op')
+  = do  { ((rhs', pat_mult, pat', thing, new_res_ty), bind_op')
             <- tcSyntaxOp MCompOrigin bind_op
                           [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
-               \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight, fun_weight, pat_weight] ->
-               do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                  ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
-                                           (Weighted pat_weight $ mkCheckExpType pat_ty) $
+               \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult, fun_mult, pat_mult] ->
+               do { rhs' <- tcScalingUsage rhs_mult $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                  ; (pat', thing) <- tcScalingUsage fun_mult $ tcPat (StmtCtxt ctxt) pat
+                                           (Scaled pat_mult $ mkCheckExpType pat_ty) $
                                      thing_inside (mkCheckExpType new_res_ty)
-                  ; return (rhs', pat_weight, pat', thing, new_res_ty) }
+                  ; return (rhs', pat_mult, pat', thing, new_res_ty) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- tcMonadFailOp (MCompPatOrigin pat) pat' fail_op new_res_ty
 
-        ; return (BindStmt (pat_weight, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
+        ; return (BindStmt (pat_mult, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
 
 -- Boolean expressions.
 --
@@ -593,14 +593,14 @@ tcMcStmt _ (BodyStmt _ rhs then_op guard_op) res_ty thing_inside
           -- Where test_ty is, for example, Bool
         ; ((thing, rhs', rhs_ty, guard_op'), then_op')
             <- tcSyntaxOp MCompOrigin then_op [SynRho, SynRho] res_ty $
-               \ [rhs_ty, new_res_ty] [rhs_weight, fun_weight] ->
+               \ [rhs_ty, new_res_ty] [rhs_mult, fun_mult] ->
                do { (rhs', guard_op')
-                      <- tcScalingUsage rhs_weight $
+                      <- tcScalingUsage rhs_mult $
                          tcSyntaxOp MCompOrigin guard_op [SynAny]
                                     (mkCheckExpType rhs_ty) $
-                         \ [test_ty] [test_weight] ->
-                         tcScalingUsage test_weight $ tcMonoExpr rhs (mkCheckExpType test_ty)
-                  ; thing <- tcScalingUsage fun_weight $ thing_inside (mkCheckExpType new_res_ty)
+                         \ [test_ty] [test_mult] ->
+                         tcScalingUsage test_mult $ tcMonoExpr rhs (mkCheckExpType test_ty)
+                  ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (thing, rhs', rhs_ty, guard_op') }
         ; return (BodyStmt rhs_ty rhs' then_op' guard_op', thing) }
 
@@ -827,23 +827,23 @@ tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
 
 tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
-                --       (>>=) :: rhs_ty ->_rhs_weight (pat_ty ->_pat_weight new_res_ty) ->_fun_weight res_ty
+                --       (>>=) :: rhs_ty ->_rhs_mult (pat_ty ->_pat_mult new_res_ty) ->_fun_mult res_ty
                 -- This level of generality is needed for using do-notation
                 -- in full generality; see Trac #1537
 
-          ((rhs', pat_weight, pat', new_res_ty, thing), bind_op')
+          ((rhs', pat_mult, pat', new_res_ty, thing), bind_op')
             <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
-                \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight,fun_weight,pat_weight] ->
-                do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                   ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
-                                            (Weighted pat_weight $ mkCheckExpType pat_ty) $
+                \ [rhs_ty, pat_ty, new_res_ty] [rhs_mult,fun_mult,pat_mult] ->
+                do { rhs' <- tcScalingUsage rhs_mult $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                   ; (pat', thing) <- tcScalingUsage fun_mult $ tcPat (StmtCtxt ctxt) pat
+                                            (Scaled pat_mult $ mkCheckExpType pat_ty) $
                                       thing_inside (mkCheckExpType new_res_ty)
-                   ; return (rhs', pat_weight, pat', new_res_ty, thing) }
+                   ; return (rhs', pat_mult, pat', new_res_ty, thing) }
 
         -- If (but only if) the pattern can fail, typecheck the 'fail' operator
         ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op new_res_ty
 
-        ; return (BindStmt (pat_weight, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
+        ; return (BindStmt (pat_mult, new_res_ty) pat' rhs' bind_op' fail_op', thing) }
 
 tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
   = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
@@ -853,7 +853,7 @@ tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
             Just join_op ->
               second Just <$>
               (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
-               \ [rhs_ty] [rhs_weight] -> tcScalingUsage rhs_weight $ tc_app_stmts (mkCheckExpType rhs_ty))
+               \ [rhs_ty] [rhs_mult] -> tcScalingUsage rhs_mult $ tc_app_stmts (mkCheckExpType rhs_ty))
 
         ; return (ApplicativeStmt body_ty pairs' mb_join', thing) }
 
@@ -862,9 +862,9 @@ tcDoStmt _ (BodyStmt _ rhs then_op _) res_ty thing_inside
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
         ; ((rhs', rhs_ty, thing), then_op')
             <- tcSyntaxOp DoOrigin then_op [SynRho, SynRho] res_ty $
-               \ [rhs_ty, new_res_ty] [rhs_weight,fun_weight] ->
-               do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                  ; thing <- tcScalingUsage fun_weight $ thing_inside (mkCheckExpType new_res_ty)
+               \ [rhs_ty, new_res_ty] [rhs_mult,fun_mult] ->
+               do { rhs' <- tcScalingUsage rhs_mult $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                  ; thing <- tcScalingUsage fun_mult $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', rhs_ty, thing) }
         ; return (BodyStmt rhs_ty rhs' then_op' noSyntaxExpr, thing) }
 

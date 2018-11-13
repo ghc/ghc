@@ -1,12 +1,12 @@
 
 Linear9.hs:9:17: error:
-    • Wildcard patterns of weight  ‘1’ are not allowed
+    • Wildcard patterns of multiplicity  ‘1’ are not allowed
     • In the pattern: _
       In the pattern: (a, _)
       In an equation for ‘incorrectFst’: incorrectFst (a, _) = a
 
 Linear9.hs:12:20: error:
-    • Couldn't match expected weight ‘1’ of variable ‘b’ with actual weight ‘0’
+    • Couldn't match expected multiplicity ‘1’ of variable ‘b’ with actual multiplicity ‘0’
     • In the pattern: (a, b)
       In an equation for ‘incorrectFstVar’: incorrectFstVar (a, b) = a
 
@@ -18,20 +18,20 @@ Linear9.hs:15:20: error:
           incorrectFirstDup (a, b) = ((a, a), b)
 
 Linear9.hs:18:21: error:
-    • Wildcard patterns of weight  ‘1’ are not allowed
+    • Wildcard patterns of multiplicity  ‘1’ are not allowed
     • In the pattern: _
       In the pattern: (a, _)
       In the pattern: ((a, _), _)
 
 Linear9.hs:18:24: error:
-    • Wildcard patterns of weight  ‘1’ are not allowed
+    • Wildcard patterns of multiplicity  ‘1’ are not allowed
     • In the pattern: _
       In the pattern: ((a, _), _)
       In an equation for ‘incorrectFstFst’:
           incorrectFstFst ((a, _), _) = a
 
 Linear9.hs:25:25: error:
-    • Wildcard patterns of weight  ‘1’ are not allowed
+    • Wildcard patterns of multiplicity  ‘1’ are not allowed
     • In the pattern: _
       In the pattern: Foo a _
       In an equation for ‘incorrectTestFst’:

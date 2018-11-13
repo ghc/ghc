@@ -74,7 +74,7 @@ import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
-import Weight
+import Multiplicity
 
 import Control.Monad
 import qualified Data.Map as Map
@@ -933,7 +933,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                 -- the argument types was recursively defined.
                 -- See also Note [Tying the knot]
                 ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                           $ mapM (\(w, ty) -> mkWeighted <$> tcIfaceRig w <*> tcIfaceType ty) args
+                           $ mapM (\(w, ty) -> mkScaled <$> tcIfaceRig w <*> tcIfaceType ty) args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1154,7 +1154,7 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
-tcIfaceRig :: IfaceType -> IfL Rig
+tcIfaceRig :: IfaceType -> IfL Mult
 tcIfaceRig if_ty = toMult <$> tcIfaceType if_ty
 
 tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceAppArgs -> IfL Type
@@ -1317,8 +1317,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
         scrut_ty   = exprType scrut'
-        case_weight = Omega
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name (Regular case_weight) scrut_ty
+        case_mult = Omega
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name (Regular case_mult) scrut_ty
         tc_app     = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases
@@ -1327,7 +1327,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                 --     corresponds to the datacon in this case alternative
 
     extendIfaceIdEnv [case_bndr'] $ do
-     alts' <- mapM (tcIfaceAlt scrut' case_weight tc_app) alts
+     alts' <- mapM (tcIfaceAlt scrut' case_mult tc_app) alts
      return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
@@ -1392,7 +1392,7 @@ tcIfaceLit (LitNumber LitNumNatural i _)
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> Rig -> (TyCon, [Type])
+tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> (IfaceConAlt, [FastString], IfaceExpr)
            -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceAlt _ _ _ (IfaceDefault, names, rhs)
@@ -1409,19 +1409,19 @@ tcIfaceAlt _ _ _ (IfaceLitAlt lit, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcIfaceAlt scrut weight (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
+tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do  { con <- tcIfaceDataCon data_occ
         ; when (debugIsOn && not (con `elem` tyConDataCons tycon))
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
-        ; tcIfaceDataAlt weight con inst_tys arg_strs rhs }
+        ; tcIfaceDataAlt mult con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: Rig -> DataCon -> [Type] -> [FastString] -> IfaceExpr
+tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [FastString] -> IfaceExpr
                -> IfL (AltCon, [TyVar], CoreExpr)
-tcIfaceDataAlt weight con inst_tys arg_strs rhs
+tcIfaceDataAlt mult con inst_tys arg_strs rhs
   = do  { us <- newUniqueSupply
         ; let uniqs = uniqsFromSupply us
         ; let (ex_tvs, arg_ids)
-                      = dataConRepFSInstPat arg_strs uniqs weight con inst_tys
+                      = dataConRepFSInstPat arg_strs uniqs mult con inst_tys
 
         ; rhs' <- extendIfaceEnvs  ex_tvs       $
                   extendIfaceIdEnv arg_ids      $

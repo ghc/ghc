@@ -4,7 +4,7 @@ import GhcPrelude
 
 import Outputable ( SDoc )
 import Data.Data  ( Data )
-import Weight
+import Multiplicity
 
 data Type
 data TyThing
@@ -30,6 +30,6 @@ isMultiplicityTy :: Type -> Bool
 instance Data Type
   -- To support Data instances in CoAxiom
 
-type Rig = GMult Type
-type Weighted = GWeighted Type
+type Mult = GMult Type
+type Scaled = GScaled Type
 instance Multable Type

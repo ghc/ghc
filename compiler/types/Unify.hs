@@ -33,7 +33,7 @@ import VarEnv
 import VarSet
 import Name( Name )
 import Type hiding ( getTvSubstEnv )
-import Weight ( Multable(..) )
+import Multiplicity ( Multable(..) )
 import Coercion hiding ( getCvSubstEnv )
 import TyCon
 import TyCoRep hiding ( getTvSubstEnv, getCvSubstEnv )
@@ -1527,7 +1527,7 @@ pushRefl co =
     Just (FunTy w ty1 ty2, r)
       | Just rep1 <- getRuntimeRep_maybe ty1
       , Just rep2 <- getRuntimeRep_maybe ty2
-      ->  Just (TyConAppCo r funTyCon [ rigToCo w, mkReflCo r rep1, mkReflCo r rep2
+      ->  Just (TyConAppCo r funTyCon [ multToCo w, mkReflCo r rep1, mkReflCo r rep2
                                        , mkReflCo r ty1,  mkReflCo r ty2 ])
     Just (TyConApp tc tys, r)
       -> Just (TyConAppCo r tc (zipWith mkReflCo (tyConRolesX r tc) tys))

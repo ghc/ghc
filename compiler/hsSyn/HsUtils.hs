@@ -105,7 +105,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
-import Weight ( pattern Zero, pattern One, pattern Omega )
+import Multiplicity ( pattern Zero, pattern One, pattern Omega )
 import Type   ( filterOutInvisibleTypes )
 import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType
@@ -499,19 +499,19 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => LHsType p -> HsRig p -> LHsType p -> LHsType p
+nlHsFunTy :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => LHsType p -> HsMult p -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExt NotPromoted (noLoc x))
 
-nlHsFunTy a weight b = noLoc (HsFunTy noExt (parenthesizeHsType funPrec a)
-                                     weight
+nlHsFunTy a mult b = noLoc (HsFunTy noExt (parenthesizeHsType funPrec a)
+                                     mult
                                      (parenthesize_fun_tail b))
   where
-    parenthesize_fun_tail (L loc (HsFunTy ext ty1 weight ty2))
+    parenthesize_fun_tail (L loc (HsFunTy ext ty1 mult ty2))
       = L loc (HsFunTy ext (parenthesizeHsType funPrec ty1)
-                           weight
+                           mult
                            (parenthesize_fun_tail ty2))
     parenthesize_fun_tail lty = lty
 nlHsParTy t   = noLoc (HsParTy noExt t)
@@ -665,7 +665,7 @@ typeToLHsType ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                         , hst_xqual = noExt
                         , hst_body = go tau })
-    go (FunTy weight arg res) = nlHsFunTy (go arg) (rigToHsRig weight) (go res)
+    go (FunTy mult arg res) = nlHsFunTy (go arg) (multToHsMult mult) (go res)
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
@@ -696,11 +696,11 @@ typeToLHsType ty
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
-rigToHsRig :: Rig -> HsRig p
-rigToHsRig Zero = HsZero
-rigToHsRig One  = HsOne
-rigToHsRig Omega = HsOmega
-rigToHsRig _ = panic "rigToHsRig: polymorphism not yet implemented"
+multToHsMult :: Mult -> HsMult p
+multToHsMult Zero = HsZero
+multToHsMult One  = HsOne
+multToHsMult Omega = HsOmega
+multToHsMult _ = panic "multToHsMult: polymorphism not yet implemented"
 {-
 Note [Kind signatures in typeToLHsType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

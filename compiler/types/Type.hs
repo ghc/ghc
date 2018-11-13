@@ -16,7 +16,7 @@ module Type (
         -- $representation_types
         TyThing(..), Type, ArgFlag(..), KindOrType, PredType, ThetaType,
         Var, TyVar, isTyVar, TyCoVar, TyCoBinder, TyCoVarBinder, TyVarBinder,
-        Rig, Weighted,
+        Mult, Scaled,
         KnotTied,
 
         -- ** Constructing and deconstructing types
@@ -27,7 +27,7 @@ module Type (
         splitAppTy_maybe, repSplitAppTy_maybe, tcRepSplitAppTy_maybe,
 
         mkFunTy, mkFunTyOm, mkFunTys, mkFunTysOm, splitFunTy, splitFunTy_maybe,
-        splitFunTys, funResultTy, funArgTy, funTyWeight, funTyWeight_maybe,
+        splitFunTys, funResultTy, funArgTy,
 
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
@@ -163,7 +163,7 @@ module Type (
         -- * Type comparison
         eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
         nonDetCmpTypesX, nonDetCmpTc,
-        eqVarBndrs, eqRig,
+        eqVarBndrs, eqMult,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -241,7 +241,7 @@ import BasicTypes
 
 import Kind
 import TyCoRep
-import Weight
+import Multiplicity
 
 -- friends:
 import Var
@@ -428,8 +428,8 @@ expandTypeSynonyms ty
     go _     (LitTy l)     = LitTy l
     go subst (TyVarTy tv)  = substTyVar subst tv
     go subst (AppTy t1 t2) = mkAppTy (go subst t1) (go subst t2)
-    go subst (FunTy weight arg res)
-      = mkFunTy (toMult $ go subst (fromMult weight)) (go subst arg) (go subst res)
+    go subst (FunTy mult arg res)
+      = mkFunTy (toMult $ go subst (fromMult mult)) (go subst arg) (go subst res)
     go subst (ForAllTy (Bndr tv vis) t)
       = let (subst', tv') = substVarBndrUsing go subst tv in
         ForAllTy (Bndr tv' vis) (go subst' t)
@@ -970,35 +970,24 @@ See #11714.
 isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
-splitFunTy :: HasCallStack => Type -> (Weighted Type, Type)
+splitFunTy :: HasCallStack => Type -> (Scaled Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
-splitFunTy (FunTy w arg res) = (Weighted w arg, res)
+splitFunTy (FunTy w arg res) = (Scaled w arg, res)
 splitFunTy other           = pprPanic "splitFunTy" (ppr other)
 
-splitFunTy_maybe :: Type -> Maybe (Weighted Type, Type)
+splitFunTy_maybe :: Type -> Maybe (Scaled Type, Type)
 -- ^ Attempts to extract the argument and result types from a type
 splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
-splitFunTy_maybe (FunTy w arg res) = Just (Weighted w arg, res)
+splitFunTy_maybe (FunTy w arg res) = Just (Scaled w arg, res)
 splitFunTy_maybe _               = Nothing
 
-funTyWeight :: Type -> Rig
-funTyWeight ty = case funTyWeight_maybe ty of
-                    Just w -> w
-                    Nothing -> pprPanic "funTyWeight" (ppr ty)
-
-funTyWeight_maybe :: Type -> Maybe Rig
-funTyWeight_maybe ty | Just ty' <- coreView ty = funTyWeight_maybe ty'
-funTyWeight_maybe (FunTy w _ _) = Just w
-funTyWeight_maybe (ForAllTy _ ty) = funTyWeight_maybe ty
-funTyWeight_maybe _ = Nothing
-
-splitFunTys :: Type -> ([Weighted Type], Type)
+splitFunTys :: Type -> ([Scaled Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
-    split args _       (FunTy w arg res) = split ((Weighted w arg):args) res res
+    split args _       (FunTy w arg res) = split ((Scaled w arg):args) res res
     split args orig_ty _               = (reverse args, orig_ty)
 
 funResultTy :: Type -> Type
@@ -1312,7 +1301,7 @@ tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 tyConBindersTyCoBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
-    to_tyb (Bndr tv AnonTCB)        = Anon (tyweight (varType tv))
+    to_tyb (Bndr tv AnonTCB)        = Anon (tymult (varType tv))
 
 {-
 --------------------------------------------------------------------
@@ -1541,7 +1530,7 @@ splitPiTy_maybe ty = go ty
   where
     go ty | Just ty' <- coreView ty = go ty'
     go (ForAllTy bndr ty) = Just (Named bndr, ty)
-    go (FunTy w arg res)  = Just (Anon (mkWeighted w arg), res)
+    go (FunTy w arg res)  = Just (Anon (mkScaled w arg), res)
     go _                  = Nothing
 
 -- | Takes a forall type apart, or panics
@@ -1559,7 +1548,7 @@ splitPiTys ty = split ty ty
     split _       (ForAllTy b res) = let (bs, ty) = split res res
                                      in  (Named b : bs, ty)
     split _       (FunTy w arg res)  = let (bs, ty) = split res res
-                                     in  (Anon (mkWeighted w arg) : bs, ty)
+                                     in  (Anon (mkScaled w arg) : bs, ty)
     split orig_ty _                = ([], orig_ty)
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
@@ -1571,7 +1560,7 @@ splitPiTysInvisible ty = split ty ty []
     split _       (ForAllTy b@(Bndr _ vis) res) bs
       | isInvisibleArgFlag vis         = split res res (Named b  : bs)
     split _       (FunTy w arg res)  bs
-      | isPredTy arg                   = split res res (Anon (mkWeighted w arg) : bs)
+      | isPredTy arg                   = split res res (Anon (mkScaled w arg) : bs)
     split orig_ty _                bs  = (reverse bs, orig_ty)
 
 -- | Given a 'TyCon' and a list of argument types, filter out any invisible
@@ -1673,7 +1662,7 @@ isTauTy (CoercionTy _)        = False  -- Not sure about this
 -}
 
 -- | Make an anonymous binder
-mkAnonBinder :: Weighted Type -> TyCoBinder
+mkAnonBinder :: Scaled Type -> TyCoBinder
 mkAnonBinder = Anon
 
 -- | Does this binder bind a variable that is /not/ erased? Returns
@@ -1693,24 +1682,24 @@ tyCoBinderVar_maybe _          = Nothing
 tyCoBinderType :: TyCoBinder -> Type
 -- Barely used
 tyCoBinderType (Named tvb) = binderType tvb
-tyCoBinderType (Anon ty)   = weightedThing ty
+tyCoBinderType (Anon ty)   = scaledThing ty
 
 tyBinderType :: TyBinder -> Type
 tyBinderType (Named (Bndr tv _))
   = ASSERT( isTyVar tv )
     tyVarKind tv
-tyBinderType (Anon ty)   = weightedThing ty
+tyBinderType (Anon ty)   = scaledThing ty
 
 
 -- | Extract a relevant type, if there is one.
 binderRelevantType_maybe :: TyCoBinder -> Maybe Type
 binderRelevantType_maybe (Named {}) = Nothing
-binderRelevantType_maybe (Anon ty)  = Just (weightedThing ty)
+binderRelevantType_maybe (Anon ty)  = Just (scaledThing ty)
 
 -- | Like 'maybe', but for binders.
 caseBinder :: TyCoBinder           -- ^ binder to scrutinize
            -> (TyCoVarBinder -> a) -- ^ named case
-           -> (Weighted Type -> a) -- ^ anonymous case
+           -> (Scaled Type -> a) -- ^ anonymous case
            -> a
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t
@@ -2081,7 +2070,7 @@ classifyPredType ev_ty = case splitTyConApp_maybe ev_ty of
     _ | (tvs, rho) <- splitForAllVarBndrs ev_ty
       , (theta, pred) <- splitFunTys rho
       , not (null tvs && null theta)
-      -> ForAllPred tvs (map weightedThing theta) pred
+      -> ForAllPred tvs (map scaledThing theta) pred
 
       | otherwise
       -> IrredPred ev_ty
@@ -2723,12 +2712,12 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (ForAllTy {})   = 7
 
 
-    go_rig :: RnEnv2 -> Rig -> Rig -> TypeOrdering
+    go_rig :: RnEnv2 -> Mult -> Mult -> TypeOrdering
     go_rig env r1 r2 =
-      if r1 `eqRig` r2
+      if r1 `eqMult` r2
         then TEQ
         else
-          case subweightMaybe r1 r2 of
+          case submultMaybe r1 r2 of
             Smaller -> TLT
             Larger  -> TGT
             Unknown -> go env (fromMult r1) (fromMult r2)
@@ -2739,14 +2728,14 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     gos _   _          []         = TGT
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
-eqRig :: Rig -> Rig -> Bool
-eqRig Zero Zero = True
-eqRig One One = True
-eqRig Omega Omega = True
-eqRig (RigThing ty) (RigThing ty') = eqType ty ty'
-eqRig (RigAdd r1 r2) (RigAdd r1' r2') = eqRig r1 r1' && eqRig r2 r2'
-eqRig (RigMul r1 r2) (RigMul r1' r2') = eqRig r1 r1' && eqRig r2 r2'
-eqRig _ _ = False
+eqMult :: Mult -> Mult -> Bool
+eqMult Zero Zero = True
+eqMult One One = True
+eqMult Omega Omega = True
+eqMult (RigThing ty) (RigThing ty') = eqType ty ty'
+eqMult (RigAdd r1 r2) (RigAdd r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult (RigMul r1 r2) (RigMul r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult _ _ = False
 
 -------------
 nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering

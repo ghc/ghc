@@ -103,7 +103,7 @@
             []
             (Nothing)
             (PrefixCon
-             [(HsWeighted
+             [(HsScaled
                (HsOne)
                ({ DumpRenamedAst.hs:8:26-30 }
                 (HsTyVar
@@ -377,7 +377,7 @@
                 [])
                (Nothing)
                (PrefixCon
-                [(HsWeighted
+                [(HsScaled
                   (HsOne)
                   ({ DumpRenamedAst.hs:18:10-34 }
                    (HsParTy

@@ -34,7 +34,7 @@ import HscTypes
 import DataCon
 import Type
 import RepType
-import Weight
+import Multiplicity
 import qualified Unify as U
 import Var
 import TcRnMonad
@@ -1021,7 +1021,7 @@ getDataConArgTys dc con_app_ty
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
-       ; let con_arg_tys = substTys subst (map weightedThing $ dataConRepArgTys dc)
+       ; let con_arg_tys = substTys subst (map scaledThing $ dataConRepArgTys dc)
        ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
        ; return con_arg_tys }
   where
@@ -1229,9 +1229,9 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (Weighted w1 l1,l2) <- splitFunTy_maybe l
-    , Just (Weighted w2 r1,r2) <- splitFunTy_maybe r
-    , w1 `eqRig` w2
+    | Just (Scaled w1 l1,l2) <- splitFunTy_maybe l
+    , Just (Scaled w2 r1,r2) <- splitFunTy_maybe r
+    , w1 `eqMult` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
          return (mkFunTy w1 r1' r2')
@@ -1300,7 +1300,7 @@ isMonomorphicOnNonPhantomArgs ty
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
   | Just (ty1, ty2) <- splitFunTy_maybe ty
-  = all isMonomorphicOnNonPhantomArgs [weightedThing ty1,ty2]
+  = all isMonomorphicOnNonPhantomArgs [scaledThing ty1,ty2]
   | otherwise = isMonomorphic ty
 
 tyConPhantomTyVars :: TyCon -> [TyVar]

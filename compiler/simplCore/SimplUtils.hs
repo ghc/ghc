@@ -57,7 +57,7 @@ import Var
 import Demand
 import SimplMonad
 import Type     hiding( substTy )
-import Weight
+import Multiplicity
 import Coercion hiding( substCo )
 import DataCon          ( dataConWorkId, isNullaryRepDataCon )
 import VarSet
@@ -123,7 +123,7 @@ data SimplCont
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_mult :: Mult }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -154,7 +154,7 @@ data SimplCont
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
       , sc_cont :: SimplCont
-      , sc_weight :: Rig }
+      , sc_mult :: Mult }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -274,7 +274,7 @@ data ArgInfo
     }
 
 data ArgSpec
-  = ValArg Rig OutExpr                -- Apply to this (coercion or value); c.f. ApplyToVal
+  = ValArg Mult OutExpr               -- Apply to this (coercion or value); c.f. ApplyToVal
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
@@ -284,7 +284,7 @@ instance Outputable ArgSpec where
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo -> (Rig, OutExpr) -> ArgInfo
+addValArgTo :: ArgInfo -> (Mult, OutExpr) -> ArgInfo
 addValArgTo ai (w, arg) = ai { ai_args = ValArg w arg : ai_args ai
                           , ai_type = applyTypeToArg (ai_type ai) arg
                           , ai_rules = decRules (ai_rules ai) }
@@ -313,7 +313,7 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg w e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest, sc_weight = w }
+      ValArg w e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest, sc_mult = w }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -412,11 +412,11 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg  { sc_fun = ai, sc_weight = _w })      = funArgTy (ai_type ai)
+contHoleType (StrictArg  { sc_fun = ai, sc_mult = _m })      = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k
-                         , sc_weight = w })
-  = mkFunTy w (perhapsSubstTy dup se (exprType e))
+                         , sc_mult = m })
+  = mkFunTy m (perhapsSubstTy dup se (exprType e))
                   (contHoleType k)
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
@@ -522,7 +522,7 @@ mkArgInfo env fun rules n_val_args call_cont
 
     add_type_str _ [] = []
     add_type_str fun_ty all_strs@(str:strs)
-      | Just (Weighted _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      | Just (Scaled _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       = (str || Just False == isLiftedType_maybe arg_ty)
         : add_type_str fun_ty' strs
           -- If the type is levity-polymorphic, we can't know whether it's
@@ -1803,7 +1803,7 @@ abstractFloats dflags top_lvl main_tvs floats body
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
                   poly_ty   = mkInvForAllTys tvs_here (idType var) -- But new type of course
                   poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.hs
-                              mkLocalIdOrCoVar poly_name (idWeightedness var) poly_ty
+                              mkLocalIdOrCoVar poly_name (idMult var) poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
                 -- because we were looking at occurrence-analysed but as yet unsimplified code!

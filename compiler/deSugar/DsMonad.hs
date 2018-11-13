@@ -74,7 +74,7 @@ import Module
 import Outputable
 import SrcLoc
 import Type
-import Weight
+import Multiplicity
 import UniqSupply
 import Name
 import NameEnv
@@ -331,7 +331,7 @@ still reporting nice error messages.
 -}
 
 -- Make a new Id with the same print name, but different type, and new unique
-newUniqueId :: Id -> Rig -> Type -> DsM Id
+newUniqueId :: Id -> Mult -> Type -> DsM Id
 newUniqueId id = mk_local (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
@@ -343,7 +343,7 @@ newPredVarDs :: PredType -> DsM Var
 newPredVarDs pred
  = newSysLocalDs Omega pred
 
-newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Rig -> Type -> DsM Id
+newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")
 
 -- this variant should be used when the caller can be sure that the variable type
@@ -354,11 +354,11 @@ newFailLocalDs = mkSysLocalOrCoVarM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
-newSysLocalsDsNoLP, newSysLocalsDs :: [Weighted Type] -> DsM [Id]
-newSysLocalsDsNoLP = mapM (\(Weighted w t) -> newSysLocalDsNoLP w t)
-newSysLocalsDs = mapM (\(Weighted w t) -> newSysLocalDs w t)
+newSysLocalsDsNoLP, newSysLocalsDs :: [Scaled Type] -> DsM [Id]
+newSysLocalsDsNoLP = mapM (\(Scaled w t) -> newSysLocalDsNoLP w t)
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
 
-mk_local :: FastString -> Rig -> Type -> DsM Id
+mk_local :: FastString -> Mult -> Type -> DsM Id
 mk_local fs w ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
                                         ppr ty)  -- could improve the msg with another
                                                  -- parameter indicating context

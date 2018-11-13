@@ -4,10 +4,10 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# OPTIONS -Wno-missing-methods #-}
 
--- | This module defines the semi-ring (aka Rig) of weights, and associated
--- functions. Weights annotate arrow types to indicate the linearity of the
+-- | This module defines the semi-ring (aka Mult) of multiplicities, and associated
+-- functions. Multiplicities annotate arrow types to indicate the linearity of the
 -- arrow (in the sense of linear types).
-module Weight
+module Multiplicity
   ( GMult
   , pattern Zero
   , pattern One
@@ -18,20 +18,18 @@ module Weight
   , Multable(..)
   , unsafeRigThing
   , sup
-  , GWeighted(..)
+  , GScaled(..)
   , unrestricted
   , linear
   , staticOnly
-  , tyweight
+  , tymult
   , knownOmega
-  , irrelevantWeight
-  , mkWeighted
-  , weightedSet
-  , setWeight
-  , scaleWeighted
-  , IsSubweight(..)
-  , isUnknown
-  , subweightMaybe ) where
+  , irrelevantMult
+  , mkScaled
+  , scaledSet
+  , scaleScaled
+  , IsSubmult(..)
+  , submultMaybe ) where
 
 import GhcPrelude
 
@@ -39,7 +37,7 @@ import Data.Data
 import Outputable
 
 --
--- * Core properties of weights
+-- * Core properties of multiplicities
 --
 
 data GMult a
@@ -128,7 +126,7 @@ instance Multable a => Outputable (GMult a) where
   ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
   ppr (RigThing t) = ppr t
 
--- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
+-- | @sup w1 w2@ returns the smallest multiplicity larger than or equal to both @w1@
 -- and @w2@.
 sup :: GMult a -> GMult a -> GMult a
 sup Zero  Zero  = Zero
@@ -143,67 +141,60 @@ sup _     _     = Omega
 -- * Utilities
 --
 
--- | A shorthand for data with an attached 'Rig' element (the weight).
-data GWeighted t a = Weighted {weightedWeight :: GMult t, weightedThing :: a}
+-- | A shorthand for data with an attached 'Mult' element (the multiplicity).
+data GScaled t a = Scaled {scaledMult :: GMult t, scaledThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
-unrestricted, linear, staticOnly, tyweight :: a -> GWeighted t a
-unrestricted = Weighted Omega
-linear = Weighted One
-staticOnly = Weighted Zero
+unrestricted, linear, staticOnly, tymult :: a -> GScaled t a
+unrestricted = Scaled Omega
+linear = Scaled One
+staticOnly = Scaled Zero
 
 -- Used for type arguments in core
-tyweight = Weighted Omega
+tymult = Scaled Omega
 
-knownOmega :: GWeighted t a -> a
-knownOmega = weightedThing
+knownOmega :: GScaled t a -> a
+knownOmega = scaledThing
 
-irrelevantWeight :: GWeighted t a -> a
-irrelevantWeight = weightedThing
+irrelevantMult :: GScaled t a -> a
+irrelevantMult = scaledThing
 
-mkWeighted :: GMult t -> a -> GWeighted t a
-mkWeighted = Weighted
+mkScaled :: GMult t -> a -> GScaled t a
+mkScaled = Scaled
 
-instance (Multable t, Outputable a) => Outputable (GWeighted t a) where
-   ppr (Weighted _cnt t) = ppr t
+instance (Multable t, Outputable a) => Outputable (GScaled t a) where
+   ppr (Scaled _cnt t) = ppr t
      -- Do not print the multiplicity here because it tends to be too verbose
 
-weightedSet :: GWeighted t a -> b -> GWeighted t b
-weightedSet x b = fmap (\_->b) x
+scaledSet :: GScaled t a -> b -> GScaled t b
+scaledSet x b = fmap (\_->b) x
 
-setWeight :: GMult t -> GWeighted t a -> GWeighted t a
-setWeight r x = x { weightedWeight = r }
-
-scaleWeighted :: GMult t -> GWeighted t a -> GWeighted t a
-scaleWeighted w x =
-  x { weightedWeight = w * weightedWeight x }
+scaleScaled :: GMult t -> GScaled t a -> GScaled t a
+scaleScaled w x =
+  x { scaledMult = w * scaledMult x }
 
 --
 -- * Multiplicity ordering
 --
 
-data IsSubweight = Smaller -- Definitely a subweight
-                 | Larger  -- Definitely not a subweight
-                 | Unknown -- Could be a subweight, need to ask the typechecker
-                 deriving (Show, Eq, Ord)
+data IsSubmult = Smaller -- Definitely a submult
+               | Larger  -- Definitely not a submult
+               | Unknown -- Could be a submult, need to ask the typechecker
+               deriving (Show, Eq, Ord)
 
-isUnknown :: IsSubweight -> Bool
-isUnknown Unknown = True
-isUnknown _ = False
-
-instance Outputable IsSubweight where
+instance Outputable IsSubmult where
   ppr = text . show
 
--- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
--- value of weight @w2@ is expected. This is a partial order.
-subweightMaybe :: GMult t -> GMult t -> IsSubweight
-subweightMaybe r1 r2 = go r1 r2
+-- | @submult w1 w2@ check whether a value of multiplicity @w1@ is allowed where a
+-- value of multiplicity @w2@ is expected. This is a partial order.
+submultMaybe :: GMult t -> GMult t -> IsSubmult
+submultMaybe r1 r2 = go r1 r2
   where
     go _     Omega = Smaller
     go Zero  Zero  = Smaller
     go _     Zero  = Larger
     go Zero  One   = Larger
-    -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
+    -- It is no mistake: 'Zero' is not a submult of 'One': a value which must be
     -- used zero times cannot be used one time.
     -- Zero = {0}
     -- One  = {1}

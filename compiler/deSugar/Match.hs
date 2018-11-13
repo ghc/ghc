@@ -41,7 +41,7 @@ import MatchLit
 import Type
 import Coercion ( eqCoercion )
 import TyCon( isNewTyCon )
-import Weight
+import Multiplicity
 import TysWiredIn
 import SrcLoc
 import Maybes
@@ -240,7 +240,7 @@ matchEmpty :: HasCallStack => MatchId -> Type -> DsM [MatchResult]
 matchEmpty var res_ty
   = return [MatchResult CanFail mk_seq]
   where
-    mk_seq fail = return $ mkWildCase (Var var) (Weighted (idWeight var) (idType var)) res_ty
+    mk_seq fail = return $ mkWildCase (Var var) (Scaled (idWeight var) (idType var)) res_ty
                                       [(DEFAULT, [], fail)]
 
 matchVariables :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
@@ -507,7 +507,7 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
   -- Newtypes: push bang inwards (Trac #9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (weightedThing ty) args })
+      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (scaledThing ty) args })
       else tidy1 v p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys
@@ -713,10 +713,10 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> mapM (\(Weighted w ty) -> newSysLocalDsNoLP w ty) arg_tys
+                           []    -> mapM (\(Scaled w ty) -> newSysLocalDsNoLP w ty) arg_tys
                            (m:_) ->
                             selectMatchVars (zipWithEqual "matchWrapper"
-                                              (\a b -> (weightedWeight a, unLoc b))
+                                              (\a b -> (scaledMult a, unLoc b))
                                                 arg_tys
                                                 (hsLMatchPats m))
 

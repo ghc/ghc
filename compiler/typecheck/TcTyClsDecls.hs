@@ -41,7 +41,7 @@ import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
-import Weight
+import Multiplicity
 import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv
@@ -2301,7 +2301,7 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (HsWeighted GhcRn (LHsType GhcRn)) r
+             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
@@ -2315,7 +2315,7 @@ tcConIsInfixGADT con details
                | otherwise -> return False
 
 tcConArgs :: HsConDeclDetails GhcRn
-          -> TcM [(Weighted TcType, HsSrcBang)]
+          -> TcM [(Scaled TcType, HsSrcBang)]
 tcConArgs (PrefixCon btys)
   = mapM tcConArg btys
 tcConArgs (InfixCon bty1 bty2)
@@ -2332,16 +2332,16 @@ tcConArgs (RecCon fields)
     (_,btys) = unzip exploded
 
 
-tcConArg :: HsWeighted GhcRn (LHsType GhcRn) -> TcM (Weighted TcType, HsSrcBang)
-tcConArg (HsWeighted w bty)
+tcConArg :: HsScaled GhcRn (LHsType GhcRn) -> TcM (Scaled TcType, HsSrcBang)
+tcConArg (HsScaled w bty)
   = do  { traceTc "tcConArg 1" (ppr bty)
         ; arg_ty <- tcHsOpenType (getBangType bty)
-        ; w' <- tcWeight w
+        ; w' <- tcMult w
              -- Newtypes can't have unboxed types, but we check
              -- that in checkValidDataCon; this tcConArg stuff
              -- doesn't happen for GADT-style declarations
         ; traceTc "tcConArg 2" (ppr bty)
-        ; return (Weighted w' arg_ty, getBangStrictness bty) }
+        ; return (Scaled w' arg_ty, getBangStrictness bty) }
 
 {-
 Note [Infix GADT constructors]
@@ -2972,7 +2972,7 @@ checkValidDataCon dflags existential_ok tc con
           -- Check all argument types for validity
         ; checkValidType ctxt (dataConUserType con)
         ; mapM_ (checkForLevPoly empty)
-                (map weightedThing $ dataConOrigArgTys con)
+                (map scaledThing $ dataConOrigArgTys con)
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
@@ -3055,10 +3055,10 @@ checkNewDataCon con
   = do  { checkTc (isSingleton arg_tys) (newtypeFieldErr con (length arg_tys))
               -- One argument
 
-        ; checkTc (not (isUnliftedType (weightedThing arg_ty1))) $
+        ; checkTc (not (isUnliftedType (scaledThing arg_ty1))) $
           text "A newtype cannot have an unlifted argument type"
 
-        ; checkTc (ok_weight (weightedWeight arg_ty1)) $
+        ; checkTc (ok_mult (scaledMult arg_ty1)) $
           text "A newtype constructor must be linear"
 
         ; check_con (null eq_spec) $
@@ -3088,8 +3088,8 @@ checkNewDataCon con
     ok_bang (HsSrcBang _ _ SrcLazy)   = False
     ok_bang _                         = True
 
-    ok_weight One = True
-    ok_weight _   = False
+    ok_mult One = True
+    ok_mult _   = False
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -3531,7 +3531,7 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ (map weightedThing arg_tys) }
+                    eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys) }
                     -- See Note [Role-checking data constructor arguments] in TcTyDecls
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)

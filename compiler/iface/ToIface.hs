@@ -61,7 +61,7 @@ import PrelNames
 import Name
 import BasicTypes
 import Type
-import Weight
+import Multiplicity
 import PatSyn
 import Outputable
 import FastString
@@ -144,7 +144,7 @@ toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy w t1 t2)
-  | isPredTy t1 && w `eqRig` Omega   = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+  | isPredTy t1 && w `eqMult` Omega   = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
   | otherwise                   = IfaceFunTy (toIfaceRig w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
@@ -186,7 +186,7 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
-toIfaceRig :: Rig -> IfaceRig
+toIfaceRig :: Mult -> IfaceRig
 toIfaceRig = toIfaceType . fromMult
 
 ----------------
@@ -362,7 +362,7 @@ patSynToIfaceDecl ps
                 , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2 . weightedThing) args
+                , ifPatArgs       = map (tidyToIfaceType env2 . scaledThing) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 , ifFieldLabels   = (patSynFieldLabels ps)
                 }

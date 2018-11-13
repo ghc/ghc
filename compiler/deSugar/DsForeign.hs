@@ -32,7 +32,7 @@ import Name
 import Type
 import RepType
 import TyCon
-import Weight
+import Multiplicity
 import Coercion
 import TcEnv
 import TcType
@@ -254,7 +254,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       mHeadersArgTypeList
                           = [ (header, cType <+> char 'a' <> int n)
                             | (t, n) <- zip arg_tys [1..]
-                            , let (header, cType) = toCType (weightedThing t) ]
+                            , let (header, cType) = toCType (scaledThing t) ]
                       (mHeaders, argTypeList) = unzip mHeadersArgTypeList
                       argTypes = if null argTypeList
                                  then text "void"
@@ -424,7 +424,7 @@ dsFExportDynamic id co0 cconv = do
             (moduleStableString mod ++ "$" ++ toCName dflags id)
         -- Construct the label based on the passed id, don't use names
         -- depending on Unique. See #13807 and Note [Unique Determinism].
-    cback <- newSysLocalDs arg_weight arg_ty
+    cback <- newSysLocalDs arg_mult arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
@@ -478,7 +478,7 @@ dsFExportDynamic id co0 cconv = do
  where
   ty                       = pFst (coercionKind co0)
   (tvs,sans_foralls)       = tcSplitForAllTys ty
-  ([Weighted arg_weight arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
+  ([Scaled arg_mult arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 
@@ -787,12 +787,12 @@ getPrimTyOf ty
   -- with a single primitive-typed argument (see TcType.legalFEArgTyCon).
   | otherwise =
   case splitDataProductType_maybe rep_ty of
-     Just (_, _, data_con, [weighted_prim_ty]) ->
+     Just (_, _, data_con, [scaled_prim_ty]) ->
         ASSERT(dataConSourceArity data_con == 1)
         ASSERT2(isUnliftedType prim_ty, ppr prim_ty)
         prim_ty
         where
-          prim_ty = weightedThing weighted_prim_ty
+          prim_ty = scaledThing scaled_prim_ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where
         rep_ty = unwrapType ty

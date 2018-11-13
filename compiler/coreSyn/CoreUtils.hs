@@ -79,7 +79,7 @@ import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
 import TyCoRep( TyCoBinder(..), TyBinder )
-import Weight
+import Multiplicity
 import Coercion
 import TyCon
 import Unique
@@ -662,13 +662,13 @@ filterAlts _tycon inst_tys imposs_cons alts
 -- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
 -- See Note [Refine Default Alts]
 refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
-                 -> Rig               -- ^ Weight
+                 -> Mult              -- ^ Multiplicity
                  -> TyCon             -- ^ Type constructor of scrutinee's type
                  -> [Type]            -- ^ Type arguments of scrutinee's type
                  -> [AltCon]          -- ^ Constructors that cannot match the DEFAULT (if any)
                  -> [CoreAlt]
                  -> (Bool, [CoreAlt]) -- ^ 'True', if a default alt was replaced with a 'DataAlt'
-refineDefaultAlt us weight tycon tys imposs_deflt_cons all_alts
+refineDefaultAlt us mult tycon tys imposs_deflt_cons all_alts
   | (DEFAULT,_,rhs) : rest_alts <- all_alts
   , isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
   , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
@@ -689,7 +689,7 @@ refineDefaultAlt us weight tycon tys imposs_deflt_cons all_alts
        [con] -> (True, mergeAlts rest_alts [(DataAlt con, ex_tvs ++ arg_ids, rhs)])
                        -- We need the mergeAlts to keep the alternatives in the right order
              where
-                (ex_tvs, arg_ids) = dataConRepInstPat us weight con tys
+                (ex_tvs, arg_ids) = dataConRepInstPat us mult con tys
 
        -- It matches more than one, so do nothing
        _  -> (False, all_alts)
@@ -909,7 +909,7 @@ combineIdenticalAlts imposs_cons alts
 
 -- Scales the multiplicity of the binders of a list of case alternatives. That
 -- is, in [C x1…xn -> u], the multiplicity of x1…xn is scaled.
-scaleAltsBy :: Rig -> [CoreAlt] -> [CoreAlt]
+scaleAltsBy :: Mult -> [CoreAlt] -> [CoreAlt]
 scaleAltsBy w alts = map scaleAlt alts
   where
     scaleAlt :: CoreAlt -> CoreAlt
@@ -1398,7 +1398,7 @@ isExpandableApp fn n_val_args
        | Just (bndr, ty) <- splitPiTy_maybe ty
        = caseBinder bndr
            (\_tv -> all_pred_args n_val_args ty)
-           (\bndr_ty -> isPredTy (weightedThing bndr_ty) && all_pred_args (n_val_args-1) ty)
+           (\bndr_ty -> isPredTy (scaledThing bndr_ty) && all_pred_args (n_val_args-1) ty)
 
        | otherwise
        = False
@@ -1592,7 +1592,7 @@ app_ok primop_ok fun args
     arg_ok :: TyBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty) arg        -- A term argument
-       | isUnliftedType (weightedThing ty) = expr_ok primop_ok arg
+       | isUnliftedType (scaledThing ty) = expr_ok primop_ok arg
        | otherwise         = True  -- See Note [Primops with lifted arguments]
 
 -----------------------------
@@ -1887,19 +1887,19 @@ exprIsTickedString_maybe _ = Nothing
 These InstPat functions go here to avoid circularity between DataCon and Id
 -}
 
-dataConRepInstPat   ::                 [Unique] -> Rig -> DataCon -> [Type] -> ([TyCoVar], [Id])
-dataConRepFSInstPat :: [FastString] -> [Unique] -> Rig -> DataCon -> [Type] -> ([TyCoVar], [Id])
+dataConRepInstPat   ::                 [Unique] -> Mult -> DataCon -> [Type] -> ([TyCoVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> Mult -> DataCon -> [Type] -> ([TyCoVar], [Id])
 
 dataConRepInstPat   = dataConInstPat (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat
 
 dataConInstPat :: [FastString]          -- A long enough list of FSs to use for names
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
-               -> Rig                   -- The multiplicity annotation of the case expression: scales the multiplicity of variables
+               -> Mult                  -- The multiplicity annotation of the case expression: scales the multiplicity of variables
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
                -> ([TyCoVar], [Id])     -- Return instantiated variables
--- dataConInstPat arg_fun fss us weight con inst_tys returns a tuple
+-- dataConInstPat arg_fun fss us mult con inst_tys returns a tuple
 -- (ex_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
@@ -1926,7 +1926,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
-dataConInstPat fss uniqs weight con inst_tys
+dataConInstPat fss uniqs mult con inst_tys
   = ASSERT( univ_tvs `equalLength` inst_tys )
     (ex_bndrs, arg_ids)
   where
@@ -1960,10 +1960,10 @@ dataConInstPat fss uniqs weight con inst_tys
 
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
-      -- Ignore the weights above, as there are Core ignores linearity at the moment.
-    mk_id_var uniq fs (Weighted w ty) str
+      -- Ignore the multiplicities above, as there are Core ignores linearity at the moment.
+    mk_id_var uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
-        mkLocalIdOrCoVar name (Regular $ weight * w) (Type.substTy full_subst ty)
+        mkLocalIdOrCoVar name (Regular $ mult * m) (Type.substTy full_subst ty)
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
 
@@ -2398,17 +2398,17 @@ tryEtaReduce bndrs body
        , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
-       , let weight = idWeight v
-       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty
-       , weight `eqRig` fun_weight -- There is no change in multiplicity, otherwise we must abort
+       , let mult = idWeight v
+       , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty
+       , mult `eqMult` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
-         in Just (mkFunCo Representational (rigToCo weight) reflCo co, [])
+         in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
+       , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty -- TODO: see above
        , bndr == v
-       , fun_weight `eqRig` idWeight v
-       = Just (mkFunCo Representational (rigToCo fun_weight) (mkSymCo co_arg) co, ticks)
+       , fun_mult `eqMult` idWeight v
+       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co fun_ty

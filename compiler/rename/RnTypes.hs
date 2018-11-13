@@ -19,7 +19,7 @@ module RnTypes (
         rnConDeclFields,
         rnLTyVar,
 
-        rnWeightedLHsType,
+        rnScaledLHsType,
 
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
@@ -480,12 +480,12 @@ rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 rnLHsTypes :: Traversable t => HsDocContext -> t (LHsType GhcPs) -> RnM (t (LHsType GhcRn), FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
-rnWeightedLHsType :: HsDocContext -> HsWeighted GhcPs (LHsType GhcPs)
-                                  -> RnM (HsWeighted GhcRn (LHsType GhcRn), FreeVars)
-rnWeightedLHsType doc (HsWeighted w ty) = do
+rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
+                                  -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
+rnScaledLHsType doc (HsScaled w ty) = do
   (w' , fvs_w) <- rnRig (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
-  return (HsWeighted w' ty', fvs `plusFV` fvs_w)
+  return (HsScaled w' ty', fvs `plusFV` fvs_w)
 
 
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
@@ -578,7 +578,7 @@ rnHsTyKi env ty@(HsRecTy _ flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy _ ty1 weight ty2)
+rnHsTyKi env (HsFunTy _ ty1 mult ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
         -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
@@ -586,8 +586,8 @@ rnHsTyKi env (HsFunTy _ ty1 weight ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; (weight', w_fvs) <- rnRig env weight
-       ; res_ty <- mkHsOpTyRn (hs_fun_ty weight') funTyConName funTyFixity ty1' ty2'
+       ; (mult', w_fvs) <- rnRig env mult
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
     hs_fun_ty w a b = HsFunTy noExt a w b
@@ -683,13 +683,13 @@ rnHsTyKi env (HsWildCardTy _)
          --           user-written binding site, so don't treat
          --           it as a free variable
 
-rnRig :: RnTyKiEnv -> HsRig GhcPs -> RnM ((HsRig GhcRn), FreeVars)
+rnRig :: RnTyKiEnv -> HsMult GhcPs -> RnM ((HsMult GhcRn), FreeVars)
 rnRig env r =
   case r of
     HsZero -> return (HsZero, emptyFVs)
     HsOne  -> return (HsOne, emptyFVs)
     HsOmega -> return (HsOmega, emptyFVs)
-    HsRigTy ty -> (\(ty, fvs) -> (HsRigTy ty, fvs)) <$> rnLHsTyKi env ty
+    HsMultTy ty -> (\(ty, fvs) -> (HsMultTy ty, fvs)) <$> rnLHsTyKi env ty
     _r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
@@ -1188,11 +1188,11 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExt ty21 op2 ty22))
                       (\t1 t2 -> HsOpTy noExt t1 op2 t2)
                       (unLoc op2) fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 weight ty22))
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 mult ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
                 hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
   where
-    hs_fun_ty a b = HsFunTy noExt a weight b
+    hs_fun_ty a b = HsFunTy noExt a mult b
 
 mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
   = return (mk1 ty1 ty2)
@@ -1846,9 +1846,9 @@ extract_lty t_or_k (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
 
-extract_rig :: TypeOrKind -> HsRig GhcPs -> FreeKiTyVarsWithDups ->
+extract_rig :: TypeOrKind -> HsMult GhcPs -> FreeKiTyVarsWithDups ->
                FreeKiTyVarsWithDups
-extract_rig t_or_k (HsRigTy t) acc = extract_lty t_or_k t acc
+extract_rig t_or_k (HsMultTy t) acc = extract_lty t_or_k t acc
 extract_rig t_or_k _ acc = acc
 
 extractHsTvBndrs :: [LHsTyVarBndr GhcPs]

@@ -25,7 +25,7 @@ import Var              ( Var, isTyVar, mkLocalVar, VarMult(..) )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import Type             ( Type, mkLamTypes, Rig(..) )
+import Type             ( Type, mkLamTypes, Mult(..) )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
 import UniqSupply
@@ -179,7 +179,7 @@ getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
-newId :: FastString -> Rig -> Type -> SimplM Id
+newId :: FastString -> Mult -> Type -> SimplM Id
 newId fs w ty = do uniq <- getUniqueM
                    return (mkSysLocalOrCoVar fs uniq (Regular w) ty)
 

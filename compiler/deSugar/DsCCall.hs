@@ -32,7 +32,7 @@ import DsUtils
 
 import TcType
 import Type
-import Weight
+import Multiplicity
 import Id   ( Id )
 import Coercion
 import PrimOp
@@ -192,8 +192,8 @@ unboxArg arg
     arg_ty                                      = exprType arg
     maybe_product_type                          = splitDataProductType_maybe arg_ty
     is_product_type                             = isJust maybe_product_type
-    Just (_, _, data_con, weighted_data_con_arg_tys) = maybe_product_type
-    data_con_arg_tys                            = map weightedThing weighted_data_con_arg_tys
+    Just (_, _, data_con, scaled_data_con_arg_tys) = maybe_product_type
+    data_con_arg_tys                            = map scaledThing scaled_data_con_arg_tys
     data_con_arity                              = dataConSourceArity data_con
     (data_con_arg_ty1 : _)                      = data_con_arg_tys
 
@@ -349,7 +349,7 @@ resultWrapper result_ty
   -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
-  , [Weighted _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
+  , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
        ; let narrow_wrapper = maybeNarrow dflags tycon

@@ -17,7 +17,7 @@ import GhcPrelude
 
 import HsSyn
 import TcPat
-import Weight
+import Multiplicity
 import Type( mkEmptyTCvSubst, tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
@@ -367,7 +367,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                   -- substitution.
                   -- See also Note [The substitution invariant] in TyCoRep.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
-              ; args'      <- zipWithM (tc_arg subst) arg_names (map weightedThing arg_tys)
+              ; args'      <- zipWithM (tc_arg subst) arg_names (map scaledThing arg_tys)
               ; return (ex_tvs', prov_dicts, args') }
 
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
@@ -388,7 +388,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_bndrs, req_theta, ev_binds, req_dicts)
                           (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
-                          (args', (map weightedThing arg_tys))
+                          (args', (map scaledThing arg_tys))
                           pat_ty rec_fields }
   where
     tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTcId)

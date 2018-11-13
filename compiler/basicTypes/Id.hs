@@ -45,7 +45,7 @@ module Id (
 
         -- ** Taking an Id apart
         VarMult(..),
-        idName, idType, idWeight, idWeightedness, idUnique, idInfo, idDetails,
+        idName, idType, idWeight, idMult, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
 
         -- ** Modifying an Id
@@ -153,7 +153,7 @@ import Unique
 import UniqSupply
 import FastString
 import Util
-import Weight
+import Multiplicity
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setIdUnfolding`,
@@ -190,18 +190,18 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
-idWeight :: HasCallStack => Id -> Rig
+idWeight :: HasCallStack => Id -> Mult
 idWeight x =
  -- pprTrace "idWeight" (ppr x <+> ppr (Var.varWeightMaybe x) <+> callStackDoc) $
   Var.varWeight x
 
-idWeightedness :: Id -> VarMult
-idWeightedness = Var.varWeightedness
+idMult :: Id -> VarMult
+idMult = Var.varMult
 
-scaleIdBy :: Id -> Rig -> Id
+scaleIdBy :: Id -> Mult -> Id
 scaleIdBy = Var.scaleVarBy
 
-setIdWeight :: Id -> Rig -> Id
+setIdWeight :: Id -> Mult -> Id
 setIdWeight = Var.setVarWeight
 
 setIdName :: Id -> Name -> Id
@@ -228,7 +228,7 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varWeightedness id) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (Var.varMult id) (idType id) (idInfo id)
   where
     name = idName id
 
@@ -328,7 +328,7 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
-mkSysLocal :: FastString -> Unique -> Rig -> Type -> Id
+mkSysLocal :: FastString -> Unique -> Mult -> Type -> Id
 mkSysLocal fs uniq w ty = ASSERT( not (isCoVarType ty) )
                         mkLocalId (mkSystemVarName uniq fs) (Regular w) ty
 
@@ -337,20 +337,20 @@ mkSysLocalOrCoVar :: FastString -> Unique -> VarMult -> Type -> Id
 mkSysLocalOrCoVar fs uniq w ty
   = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
 
-mkSysLocalM :: MonadUnique m => FastString -> Rig -> Type -> m Id
+mkSysLocalM :: MonadUnique m => FastString -> Mult -> Type -> m Id
 mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
-mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Rig -> Type -> m Id
+mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Mult -> Type -> m Id
 mkSysLocalOrCoVarM fs w ty
   = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq (Regular w) ty))
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
-mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
+mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq w ty loc = ASSERT( not (isCoVarType ty) )
                                 mkLocalId (mkInternalName uniq occ loc) (Regular w) ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
+mkUserLocalOrCoVar :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
 mkUserLocalOrCoVar occ uniq w ty loc
   = mkLocalIdOrCoVar (mkInternalName uniq occ loc) (Regular w) ty
 
@@ -369,8 +369,8 @@ mkWorkerId uniq unwrkr ty
 mkTemplateLocal :: Int -> Type -> Id
 mkTemplateLocal i ty = mkTemplateLocalW i (unrestricted ty)
 
-mkTemplateLocalW :: Int -> Weighted Type -> Id
-mkTemplateLocalW i (Weighted w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (Regular w) ty
+mkTemplateLocalW :: Int -> Scaled Type -> Id
+mkTemplateLocalW i (Scaled w ty) = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) (Regular w) ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]

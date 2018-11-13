@@ -32,7 +32,7 @@ import Control.Monad
 
 import Control.Arrow ( first )
 
-import Weight
+import Multiplicity
 
 {-
 Note [The flattening story]
@@ -1413,10 +1413,10 @@ flatten_one (TyConApp tc tys)
 --                   _ -> fmode
   = flatten_ty_con_app tc tys
 
-flatten_one (FunTy weight ty1 ty2)
+flatten_one (FunTy mult ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; (xi2,co2) <- flatten_one ty2
-       ; (xi3, co3) <- flatten_one (fromMult weight)
+       ; (xi3, co3) <- flatten_one (fromMult mult)
        ; role <- getRole
        ; return (mkFunTy (toMult xi3) xi1 xi2, mkFunCo role co3 co1 co2) }
 
@@ -2173,7 +2173,7 @@ split_pi_tys' ty = split ty ty
   split _       (ForAllTy b res) = let (bs, ty, _) = split res res
                                    in  (Named b : bs, ty, True)
   split _       (FunTy w arg res)  = let (bs, ty, named) = split res res
-                                     in  (Anon (mkWeighted w arg) : bs, ty, named)
+                                     in  (Anon (mkScaled w arg) : bs, ty, named)
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
@@ -2185,6 +2185,6 @@ ty_con_binders_ty_binders' = foldr go ([], False)
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
     go (Bndr tv AnonTCB)        (bndrs, n)
-      = (Anon (mkWeighted Omega (tyVarKind tv))   : bndrs, n)
+      = (Anon (mkScaled Omega (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

@@ -29,7 +29,7 @@ import DynFlags
 import CoreUtils
 import Id
 import Type
-import Weight
+import Multiplicity
 import TysWiredIn
 import Match
 import PrelNames

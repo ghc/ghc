@@ -158,7 +158,7 @@ import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
                           SourceText(..) )
-import Weight
+import Multiplicity
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique
@@ -560,7 +560,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
                 (mkTyCoVarBinders Specified user_tyvars)
                 []      -- No equality spec
                 []      -- No theta
-                (map assign_weight arg_tys)
+                (map assign_mult arg_tys)
                 (mkTyConApp tycon (mkTyVarTys tyvars))
                 rri
                 tycon
@@ -573,8 +573,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri
      -- We assume that we don't need non-linear wired-in types. Constraints are,
      -- on the other hand, always unrestricted (constraint arguments occur, in
      -- particular, in @Eq#@)
-    assign_weight ty | isPredTy ty = unrestricted ty
-    assign_weight ty | otherwise = linear ty
+    assign_mult ty | isPredTy ty = unrestricted ty
+    assign_mult ty | otherwise = linear ty
 
     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 

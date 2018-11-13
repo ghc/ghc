@@ -106,7 +106,7 @@ module Coercion (
         -- * Other
         promoteCoercion, buildCoercion,
 
-        rigToCo
+        multToCo
        ) where
 
 #include "HsVersions.h"
@@ -132,7 +132,7 @@ import TysPrim          ( eqPhantPrimTyCon )
 import ListSetOps
 import Maybes
 import UniqFM
-import Weight
+import Multiplicity
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -380,8 +380,8 @@ splitTyConAppCo_maybe (FunCo _ w arg res)     = Just (funTyCon, cos)
   where cos = [w, mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
 
-rigToCo :: Rig -> Coercion
-rigToCo r = mkNomReflCo (fromMult r)
+multToCo :: Mult -> Coercion
+multToCo r = mkNomReflCo (fromMult r)
 
 -- first result has role equal to input; third result is Nominal
 splitAppCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
@@ -1480,8 +1480,8 @@ mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
                   -- want it to be r. It is only called in 'mkPiCos', which is
                   -- only used in SimplUtils, where we are sure for
                   -- now (Aug 2018) v won't occur in co.
-                            mkFunCo r (rigToCo (varWeight v)) (mkReflCo r (varType v)) co
-              | otherwise = mkFunCo r (rigToCo (varWeight v)) (mkReflCo r (varType v)) co
+                            mkFunCo r (multToCo (varWeight v)) (mkReflCo r (varType v)) co
+              | otherwise = mkFunCo r (multToCo (varWeight v)) (mkReflCo r (varType v)) co
 
 -- mkCoCast (c :: s1 ~?r t1) (g :: (s1 ~?r t1) ~#R (s2 ~?r t2)) :: s2 ~?r t2
 -- The first coercion might be lifted or unlifted; thus the ~? above

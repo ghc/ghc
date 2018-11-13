@@ -71,7 +71,7 @@ import Name
 import VarSet
 import Var
 import Type
-import Weight (Multable(..))
+import Multiplicity (Multable(..))
 import TyCoRep
 import TyCon
 import CoAxiom

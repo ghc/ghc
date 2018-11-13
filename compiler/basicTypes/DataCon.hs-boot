@@ -8,7 +8,7 @@ import FieldLabel ( FieldLabel )
 import Unique ( Uniquable )
 import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
-import {-# SOURCE #-} TyCoRep ( Type, ThetaType, Weighted )
+import {-# SOURCE #-} TyCoRep ( Type, ThetaType, Scaled )
 import Util (  HasCallStack )
 
 data DataCon
@@ -22,10 +22,10 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConInstOrigArgTys  :: HasCallStack => DataCon -> [Type] -> [Weighted Type]
+dataConInstOrigArgTys  :: HasCallStack => DataCon -> [Type] -> [Scaled Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Weighted Type], Type)
+               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Scaled Type], Type)
 isUnboxedSumCon :: DataCon -> Bool
 
 instance Eq DataCon

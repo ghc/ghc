@@ -30,7 +30,7 @@ import Name
 import Util
 import SrcLoc
 import Outputable
-import Weight
+import Multiplicity
 
 {-
 @dsGuarded@ is used for pattern bindings.

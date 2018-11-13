@@ -1588,7 +1588,7 @@ data MatchGroup p body
 
 data MatchGroupTc
   = MatchGroupTc
-       { mg_arg_tys :: [Weighted Type]  -- Types of the arguments, t1..tn
+       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
        } deriving Data
 
@@ -1993,7 +1993,7 @@ type instance XLastStmt        (GhcPass _) (GhcPass _) b = NoExt
 
 type instance XBindStmt        (GhcPass _) GhcPs b = NoExt
 type instance XBindStmt        (GhcPass _) GhcRn b = NoExt
-type instance XBindStmt        (GhcPass _) GhcTc b = (Rig, Type)
+type instance XBindStmt        (GhcPass _) GhcTc b = (Mult, Type)
 
 type instance XApplicativeStmt (GhcPass _) GhcPs b = NoExt
 type instance XApplicativeStmt (GhcPass _) GhcRn b = NoExt

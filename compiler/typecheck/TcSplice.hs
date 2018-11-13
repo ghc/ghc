@@ -39,7 +39,7 @@ import Finder
 import Name
 import TcRnMonad
 import TcType
-import Weight
+import Multiplicity
 
 import Outputable
 import TcExpr
@@ -1307,7 +1307,7 @@ tcLookupTh :: Name -> TcM TcTyThing
 tcLookupTh name
   = do  { (gbl_env, lcl_env) <- getEnvs
         ; case lookupNameEnv (tcl_env lcl_env) name of {
-                Just (Weighted _ thing) -> return thing; -- TODO: arnaud: tcLookUpTh should probably return a weighted type as well
+                Just (Scaled _ thing) -> return thing; -- TODO: arnaud: tcLookUpTh should probably return a scaled type as well
                 Nothing    ->
 
           case lookupNameEnv (tcg_type_env gbl_env) name of {
@@ -1511,7 +1511,7 @@ reifyDataCon isGadtDataCon tys dc
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
        ; let (tvb_subst, g_user_tvs) = substTyVarBndrs univ_subst g_user_tvs'
              g_theta   = substTys tvb_subst g_theta'
-             g_arg_tys = substTys tvb_subst (map weightedThing g_arg_tys')
+             g_arg_tys = substTys tvb_subst (map scaledThing g_arg_tys')
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
@@ -1788,7 +1788,7 @@ reifyTypes :: (Traversable t) => t Type -> TcM (t TH.Type)
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Weighted Type], Type) -> TcM TH.Type
+  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]

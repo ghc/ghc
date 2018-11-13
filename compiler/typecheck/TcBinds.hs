@@ -32,7 +32,7 @@ import TcEnv
 import TcUnify
 import TcSimplify
 import TcEvidence
-import Weight
+import Multiplicity
 import TcHsType
 import TcPat
 import TcMType
@@ -696,7 +696,7 @@ tcPolyCheck prag_fn
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
        ; ev_vars   <- newEvVars theta
-       ; let mono_id   = mkLocalId mono_name (varWeightedness poly_id) tau
+       ; let mono_id   = mkLocalId mono_name (varMult poly_id) tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
 
@@ -1730,7 +1730,7 @@ isClosedBndrGroup type_env binds
     is_closed :: Name -> ClosedTypeId
     is_closed name
       | Just thing <- lookupNameEnv type_env name
-      = case weightedThing thing of
+      = case scaledThing thing of
           AGlobal {}                     -> True
           ATcId { tct_info = ClosedLet } -> True
           _                              -> False
@@ -1743,7 +1743,7 @@ isClosedBndrGroup type_env binds
     -- We're already removed Global and ClosedLet Ids
     is_closed_type_id name
       | Just thing <- lookupNameEnv type_env name
-      = case weightedThing thing of
+      = case scaledThing thing of
           ATcId { tct_info = NonClosedLet _ cl } -> cl
           ATcId { tct_info = NotLetBound }       -> False
           ATyVar {}                              -> False

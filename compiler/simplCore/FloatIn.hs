@@ -36,7 +36,7 @@ import DynFlags
 import Outputable
 -- import Data.List        ( mapAccumL )
 import BasicTypes       ( RecFlag(..), isRec )
-import Weight
+import Multiplicity
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -196,7 +196,7 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
       = (piResultTy fun_ty ty, extra_fvs)
 
     add_arg (fun_ty, extra_fvs) (arg_fvs, arg)
-      | noFloatIntoArg arg (irrelevantWeight arg_ty)
+      | noFloatIntoArg arg (irrelevantMult arg_ty)
       = (res_ty, extra_fvs `unionDVarSet` arg_fvs)
       | otherwise
       = (res_ty, extra_fvs)

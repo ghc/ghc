@@ -43,7 +43,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
-import Weight
+import Multiplicity
 import FamInstEnv
 import Coercion
 import TcType
@@ -340,7 +340,7 @@ mkDictSelId name clas
 
     sel_ty = mkForAllTys tyvars $
              mkFunTy Omega (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
-             weightedThing (getNth arg_tys val_index)
+             scaledThing (getNth arg_tys val_index)
 
     base_info = noCafIdInfo
                 `setArityInfo`          1
@@ -394,7 +394,7 @@ mkDictSelRhs clas val_index
     the_arg_id     = getNth arg_ids val_index
     pred           = mkClassPred clas (mkTyVarTys tyvars)
     dict_id        = mkTemplateLocal 1 pred
-    arg_ids        = mkTemplateLocalsNum 2 (map weightedThing arg_tys)
+    arg_ids        = mkTemplateLocalsNum 2 (map scaledThing arg_tys)
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
                                                    (Var dict_id)
@@ -561,7 +561,7 @@ mkDataConRepSimple :: Name -> DataCon -> DataConRep
 mkDataConRepSimple n dc =
   runIdentity $
     mkDataConRepX
-      (\tys -> Identity $ mkTemplateLocals (map weightedThing tys))
+      (\tys -> Identity $ mkTemplateLocals (map scaledThing tys))
       (\idus ini -> return (mkVarApps ini (map fst idus))) -- They are all going to be unitUnboxer
       emptyFamInstEnvs
       n
@@ -591,7 +591,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con =
 
 
 mkDataConRepX :: Monad m =>
-                ([Weighted Type] -> m [Id])
+                ([Scaled Type] -> m [Id])
              -> ([(Id, Unboxer)] -> CoreExpr -> m CoreExpr)
              -> FamInstEnvs
              -> Name
@@ -674,9 +674,9 @@ mkDataConRepX mkArgs mkBody fam_envs wrap_name mb_bangs data_con
     orig_bangs   = dataConSrcBangs data_con
 
     w_ty = RigThing (mkTyVarTy multiplicityTyVar)
-    -- See Note [Wrapper weights]
+    -- See Note [Wrapper multiplicities]
     wrap_arg_tys = (map unrestricted theta)
-                    ++ (map (scaleWeighted w_ty) orig_arg_tys)
+                    ++ (map (scaleScaled w_ty) orig_arg_tys)
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -802,14 +802,14 @@ mean that this newtype constructor requires another level of indirection when
 being called, but the inliner should make swift work of that.
 
 
-Note [Wrapper weights]
-~~~~~~~~~~~~~~~~~~~~~~
+Note [Wrapper multiplicities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When we made the wrapper for a data type of different multiplicity fields,
 we only want to make the ones which are linear multiplicity polymorphic. If we
 do not do this then the wrapper will not be well-typed.
 
-The way we ensure this is by scaling the weight of the field by the multiplicity
+The way we ensure this is by scaling the multiplicity of the field by the multiplicity
 variable. This works because..
 
 1 * p = p
@@ -822,15 +822,15 @@ So the arguments end up with the right multiplicity all very elegantly.
 -- need to update the notes in this file.
 
 -------------------------
-newLocal :: Weighted Type -> UniqSM Var
-newLocal (Weighted w ty) = do { uniq <- getUniqueM
+newLocal :: Scaled Type -> UniqSM Var
+newLocal (Scaled w ty) = do { uniq <- getUniqueM
                               ; return (mkSysLocalOrCoVar (fsLit "dt") uniq (Regular w) ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang
    :: DynFlags
    -> FamInstEnvs
-   -> Weighted Type
+   -> Scaled Type
    -> HsSrcBang
    -> HsImplBang
 
@@ -847,17 +847,17 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
 
 dataConSrcToImplBang dflags fam_envs arg_ty
                      (HsSrcBang _ unpk_prag SrcStrict)
-  | isUnliftedType (weightedThing arg_ty)
+  | isUnliftedType (scaledThing arg_ty)
   = HsLazy  -- For !Int#, say, use HsLazy
             -- See Note [Data con wrappers and unlifted types]
 
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
-  , let mb_co   = topNormaliseType_maybe fam_envs (weightedThing arg_ty)
+  , let mb_co   = topNormaliseType_maybe fam_envs (scaledThing arg_ty)
                      -- Unwrap type families and newtypes
-        arg_ty' = case mb_co of { Just (_,ty) -> weightedSet arg_ty ty; Nothing -> arg_ty }
-  , isUnpackableType dflags fam_envs (weightedThing arg_ty')
+        arg_ty' = case mb_co of { Just (_,ty) -> scaledSet arg_ty ty; Nothing -> arg_ty }
+  , isUnpackableType dflags fam_envs (scaledThing arg_ty')
   , (rep_tys, _) <- dataConArgUnpack arg_ty'
   , case unpk_prag of
       NoSrcUnpack ->
@@ -876,9 +876,9 @@ dataConSrcToImplBang dflags fam_envs arg_ty
 -- | Wrappers/Workers and representation following Unpack/Strictness
 -- decisions
 dataConArgRep
-  :: Weighted Type
+  :: Scaled Type
   -> HsImplBang
-  -> ([(Weighted Type,StrictnessMark)] -- Rep types
+  -> ([(Scaled Type,StrictnessMark)] -- Rep types
      ,(Unboxer,Boxer))
 
 dataConArgRep arg_ty HsLazy
@@ -891,9 +891,9 @@ dataConArgRep arg_ty (HsUnpack Nothing)
   | (rep_tys, wrappers) <- dataConArgUnpack arg_ty
   = (rep_tys, wrappers)
 
-dataConArgRep (Weighted w _) (HsUnpack (Just co))
+dataConArgRep (Scaled w _) (HsUnpack (Just co))
   | let co_rep_ty = pSnd (coercionKind co)
-  , (rep_tys, wrappers) <- dataConArgUnpack (Weighted w co_rep_ty)
+  , (rep_tys, wrappers) <- dataConArgUnpack (Scaled w co_rep_ty)
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
 
@@ -927,26 +927,26 @@ unitBoxer = UnitBox
 
 -------------------------
 dataConArgUnpack
-   :: Weighted Type
-   ->  ( [(Weighted Type, StrictnessMark)]   -- Rep types
+   :: Scaled Type
+   ->  ( [(Scaled Type, StrictnessMark)]   -- Rep types
        , (Unboxer, Boxer) )
 
-dataConArgUnpack (Weighted arg_mult arg_ty)
+dataConArgUnpack (Scaled arg_mult arg_ty)
   | Just (tc, tc_args) <- splitTyConApp_maybe arg_ty
   , Just con <- tyConSingleAlgDataCon_maybe tc
       -- NB: check for an *algebraic* data type
       -- A recursive newtype might mean that
       -- 'arg_ty' is a newtype
-  , let rep_tys = map (scaleWeighted arg_mult) $ dataConInstArgTys con tc_args
+  , let rep_tys = map (scaleScaled arg_mult) $ dataConInstArgTys con tc_args
   = ASSERT( null (dataConExTyCoVars con) )
       -- Note [Unpacking GADTs and existentials]
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
-          ; let r_weight = idWeight arg_id
+          ; let r_mult = idWeight arg_id
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, map (flip scaleIdBy r_weight) rep_ids, body)]
+                         [(DataAlt con, map (flip scaleIdBy r_mult) rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . fmap (TcType.substTyUnchecked subst)) rep_tys
@@ -981,7 +981,7 @@ isUnpackableType dflags fam_envs ty
          dc_name = getName con
          dcs' = dcs `extendNameSet` dc_name
 
-    ok_arg dcs (Weighted _ ty, bang)
+    ok_arg dcs (Scaled _ ty, bang)
       = not (attempt_unpack bang) || ok_ty dcs norm_ty
       where
         norm_ty = topNormaliseType fam_envs ty

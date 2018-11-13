@@ -33,7 +33,7 @@ import TcRnMonad
 import TcEnv
 import TcBinds( tcValBinds, addTypecheckedBinds )
 import TyCoRep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
-import Weight
+import Multiplicity
 import TcType
 import TysWiredIn( unitTy )
 import MkCore( rEC_SEL_ERROR_ID )
@@ -577,7 +577,7 @@ irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
     mapM_ (irType ex_var_set)
-          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ (map weightedThing arg_tys))
+          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys))
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -880,7 +880,7 @@ mkOneRecordSelector all_cons idDetails fl
                           mkFunTy Omega data_ty             $
                             -- Record selectors are always typed with Omega. We
                             -- could improve on it in the case where all the
-                            -- fields in all the constructor have weight Omega.
+                            -- fields in all the constructor have multiplicity Omega.
                           mkSpecForAllTys field_tvs         $
                           mkPhiTy field_theta               $
                           -- req_theta is empty for normal DataCon

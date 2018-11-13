@@ -46,7 +46,7 @@ import FamInst
 import FamInstEnv
 import Coercion
 import Type
-import Weight
+import Multiplicity
 import ForeignCall
 import ErrUtils
 import Id
@@ -290,7 +290,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
     checkCg checkCOrAsmOrLlvmOrInterp
     cconv' <- checkCConv cconv
     case arg_tys of
-        [arg1_ty] -> do checkForeignArgs isFFIExternalTy (map weightedThing arg1_tys)
+        [arg1_ty] -> do checkForeignArgs isFFIExternalTy (map scaledThing arg1_tys)
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where

@@ -2385,7 +2385,7 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
     -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
     -- Also we don't want any INLINE or NOINLINE pragmas!
     localise scrut_var = mkLocalIdOrCoVar (localiseName (idName scrut_var))
-                                          (idWeightedness scrut_var)
+                                          (idMult scrut_var)
                                           (idType scrut_var)
 
 {-

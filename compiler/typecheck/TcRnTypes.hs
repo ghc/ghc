@@ -163,7 +163,7 @@ import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
 import PatSyn   ( PatSyn, pprPatSynType )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
-import Weight
+import Multiplicity
 import UsageEnv
 import TcType
 import Annotations
@@ -828,7 +828,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
-        tcl_usage :: TcRef UsageEnv, -- Required weight of bindings is accumulated here.
+        tcl_usage :: TcRef UsageEnv, -- Required multiplicity of bindings is accumulated here.
 
 
         tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
@@ -844,7 +844,7 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
 
-type TcTypeEnv = NameEnv (Weighted TcTyThing)
+type TcTypeEnv = NameEnv (Scaled TcTyThing)
 
 type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
         -- Monadic so that we have a chance
@@ -3740,7 +3740,7 @@ pprCtOrigin (UnboundOccurrenceOf name)
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
           <+> text "field of" <+> quotes (ppr dc))
-       2 (parens (text "type" <+> quotes (ppr (weightedThing ty))))
+       2 (parens (text "type" <+> quotes (ppr (scaledThing ty))))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 

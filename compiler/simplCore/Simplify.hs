@@ -53,7 +53,7 @@ import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
-import Weight
+import Multiplicity
 
 import PrimOp          ( PrimOp (SeqOp) )
 
@@ -886,11 +886,11 @@ simplExprF1 env (App fun arg) cont
                                 , sc_cont    = cont } }
       _       ->
         let fun_ty = exprType fun
-            (Weighted w _, _) = splitFunTy fun_ty
+            (Scaled m _, _) = splitFunTy fun_ty
         in
                 simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
-                            , sc_dup = NoDup, sc_cont = cont, sc_weight = w }
+                            , sc_dup = NoDup, sc_cont = cont, sc_mult = m }
 
 
 simplExprF1 env expr@(Lam {}) cont
@@ -1195,8 +1195,8 @@ rebuild env expr cont
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
-      StrictArg { sc_fun = fun, sc_cont = cont, sc_weight = w }
-        -> rebuildCall env (fun `addValArgTo` (w, expr)) cont
+      StrictArg { sc_fun = fun, sc_cont = cont, sc_mult = m }
+        -> rebuildCall env (fun `addValArgTo` (m, expr)) cont
       StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
                  , sc_env = se, sc_cont = cont }
         -> do { (floats1, env') <- simplNonRecX (se `setInScopeFromE` env) b expr
@@ -1280,7 +1280,7 @@ simplCast env body co0 cont0
                ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
 
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                      , sc_dup = dup, sc_cont = tail, sc_weight = w })
+                                      , sc_dup = dup, sc_cont = tail, sc_mult = m })
           | Just (co1, m_co2) <- pushCoValArg co
           , Pair _ new_ty <- coercionKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
@@ -1303,7 +1303,7 @@ simplCast env body co0 cont0
                                     , sc_env  = arg_se'
                                     , sc_dup  = dup'
                                     , sc_cont = tail'
-                                    , sc_weight = w }) } }
+                                    , sc_mult = m }) } }
 
         addCoerce co cont
           | isReflexiveCo co = return cont  -- Having this at the end makes a huge
@@ -1830,16 +1830,16 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
 rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
                               , ai_strs = str:strs, ai_discs = disc:discs })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                        , sc_dup = dup_flag, sc_cont = cont, sc_weight = w })
+                        , sc_dup = dup_flag, sc_cont = cont, sc_mult = m })
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
-  = rebuildCall env (addValArgTo info' (w, arg)) cont
+  = rebuildCall env (addValArgTo info' (m, arg)) cont
 
   | str         -- Strict argument
   , sm_case_case (getMode env)
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = info', sc_cci = cci_strict
-                          , sc_dup = Simplified, sc_cont = cont, sc_weight = w })
+                          , sc_dup = Simplified, sc_cont = cont, sc_mult = m })
                 -- Note [Shadowing]
 
   | otherwise                           -- Lazy argument
@@ -1849,7 +1849,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
                              (mkLazyArgStop arg_ty cci_lazy)
-        ; rebuildCall env (addValArgTo info' (w, arg')) cont }
+        ; rebuildCall env (addValArgTo info' (m, arg')) cont }
   where
     info'  = info { ai_strs = strs, ai_discs = discs }
     arg_ty = funArgTy fun_ty
@@ -2067,14 +2067,14 @@ trySeqRules in_env scrut rhs cont
                 -- affine multiplicity, then we could use the multiplicity of
                 -- the case (held in the case binder) instead.
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
-                           , sc_env = in_env, sc_cont = cont, sc_weight = Omega}
-                           -- The multiplicity in sc_weight above is the
+                           , sc_env = in_env, sc_cont = cont, sc_mult = Omega}
+                           -- The multiplicity in sc_mult above is the
                            -- multiplicity of the second argument of seq. Since
                            -- seq's type, as it stands, imposes that its second
                            -- argument be unrestricted, so is
-                           -- sc_weight. However, a more precise typing rule,
+                           -- sc_mult. However, a more precise typing rule,
                            -- for seq, would be to have it be linear. In which
-                           -- case, sc_weight should be 1.
+                           -- case, sc_mult should be 1.
 
     -- Lazily evaluated, so we don't do most of this
 
@@ -3026,7 +3026,7 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
-mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_weight = w })
+mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_mult = m })
         -- See Note [Duplicating StrictArg]
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   = do { (floats1, cont') <- mkDupableCont env cont
@@ -3037,7 +3037,7 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont, sc_w
                             , sc_cci = cci
                             , sc_cont = cont'
                             , sc_dup = OkToDup
-                            , sc_weight = w } ) }
+                            , sc_mult = m } ) }
 
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
@@ -3065,7 +3065,7 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- arg'' in its in-scope set, even if makeTrivial
                                          -- has turned arg'' into a fresh variable
                                          -- See Note [StaticEnv invariant] in SimplUtils
-                              , sc_dup = OkToDup, sc_cont = cont', sc_weight = Omega }) }
+                              , sc_dup = OkToDup, sc_cont = cont', sc_mult = Omega }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })

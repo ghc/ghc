@@ -43,7 +43,7 @@ import CoreSyn
 import Coercion
 import Name
 import Type
-import Weight
+import Multiplicity
 import TyCoRep
 import Var
 import FastString(FastString)
@@ -194,7 +194,7 @@ instance Eq (DeBruijn CoreExpr) where
 
     go (Lam b1 e1)  (Lam b2 e2)
       =  D env1 (varType b1) == D env2 (varType b2)
-      && D env1 (varWeightednessMaybe b1) == D env2 (varWeightednessMaybe b2)
+      && D env1 (varMultMaybe b1) == D env2 (varMultMaybe b2)
       && D (extendCME env1 b1) e1 == D (extendCME env2 b2) e2
 
     go (Let (NonRec v1 r1) e1) (Let (NonRec v2 r2) e2)
@@ -524,7 +524,7 @@ instance Eq (DeBruijn Type) where
         (s, AppTy t1' t2') | Just (t1, t2) <- repSplitAppTy_maybe s
             -> D env t1 == D env' t1' && D env t2 == D env' t2'
         (FunTy w1 t1 t2, FunTy w1' t1' t2')
-            -> w1 `eqRig` w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
+            -> w1 `eqMult` w1' && D env t1 == D env' t1' && D env t2 == D env' t2'
         (TyConApp tc tys, TyConApp tc' tys')
             -> tc == tc' && D env tys == D env' tys'
         (LitTy l, LitTy l')
@@ -778,7 +778,7 @@ instance Eq (DeBruijn a) => Eq (DeBruijn (Maybe a)) where
 -- We also need to do the same for linearity! The easiest way to do this is
 -- to store the linearity of a variable along with the payload and then
 -- check that they also match up when retrieving the value.
-data BndrMap a = BndrMap (TypeMapG (a, Rig))
+data BndrMap a = BndrMap (TypeMapG (a, Mult))
 
 instance TrieMap BndrMap where
    type Key BndrMap = Var
@@ -803,13 +803,13 @@ fdBndrMap f (BndrMap tm) = foldTM (f . fst) tm
 lkBndr :: CmEnv -> Var -> BndrMap a -> Maybe a
 lkBndr env v (BndrMap tymap) = do
   (a, w) <- lkG (D env (varType v)) tymap
-  guard (w `eqRig` varWeightDef v)
+  guard (w `eqMult` varWeightDef v)
   return a
 
 
 xtBndr :: forall a . CmEnv -> Var -> XT a -> BndrMap a -> BndrMap a
 xtBndr env v xt (BndrMap tymap)  =
-  let xt' :: Maybe (a, Rig) -> Maybe (a, Rig)
+  let xt' :: Maybe (a, Mult) -> Maybe (a, Mult)
       xt' mv = (\a -> (a, varWeightDef v)) <$> xt (fst <$> mv)
   in BndrMap (xtG (D env (varType v)) xt' tymap)
 

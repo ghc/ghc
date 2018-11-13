@@ -686,8 +686,8 @@ nudgeHsSrcBangs details
       RecCon r -> RecCon r
       InfixCon a1 a2 -> InfixCon (go a1) (go a2)
   where
-    go (HsWeighted w (L l (HsDocTy _ (L _ (HsBangTy _ s lty)) lds))) =
-      HsWeighted w (L l (HsBangTy noExt s (addCLoc lty lds (HsDocTy noExt lty lds))))
+    go (HsScaled w (L l (HsDocTy _ (L _ (HsBangTy _ s lty)) lds))) =
+      HsScaled w (L l (HsBangTy noExt s (addCLoc lty lds (HsDocTy noExt lty lds))))
     go lty = lty
 
 

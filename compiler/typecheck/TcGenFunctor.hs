@@ -34,7 +34,7 @@ import TcType
 import TyCon
 import TyCoRep
 import Type
-import Weight
+import Multiplicity
 import Util
 import Var
 import VarSet
@@ -418,7 +418,7 @@ deepSubtypesContaining tv
 foldDataConArgs :: FFoldType a -> DataCon -> [a]
 -- Fold over the arguments of the datacon
 foldDataConArgs ft con
-  = map foldArg (map weightedThing $ dataConOrigArgTys con)
+  = map foldArg (map scaledThing $ dataConOrigArgTys con)
   where
     foldArg
       = case getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con))) of

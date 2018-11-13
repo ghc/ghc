@@ -42,7 +42,7 @@ import TyCon       ( tyConDataCons_maybe, isAlgTyCon, isEnumerationTyCon
                    , tyConFamilySize )
 import DataCon     ( dataConTagZ, dataConTyCon, dataConWorkId )
 import CoreUtils   ( cheapEqExpr, exprIsHNF, exprType )
-import Weight
+import Multiplicity
 import CoreUnfold  ( exprIsConApp_maybe )
 import Type
 import OccName     ( occNameFS )
@@ -1397,8 +1397,8 @@ match_inline _ = Nothing
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
   | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (dictTy, _)    <- splitFunTy_maybe (weightedThing fieldTy)
-  , Just dictTc         <- tyConAppTyCon_maybe (weightedThing dictTy)
+  , Just (dictTy, _)    <- splitFunTy_maybe (scaledThing fieldTy)
+  , Just dictTc         <- tyConAppTyCon_maybe (scaledThing dictTy)
   , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc
   = Just
   $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))

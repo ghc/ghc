@@ -41,7 +41,7 @@ module FamInstEnv (
 import GhcPrelude
 
 import Unify
-import Weight
+import Multiplicity
 import Type
 import TyCoRep
 import TyCon
@@ -1567,9 +1567,9 @@ coreFlattenTy = go
       = let (env', tys') = coreFlattenTys env tys in
         (env', mkTyConApp tc tys')
 
-    go env (FunTy weight ty1 ty2) = let (env1, ty1') = go env  ty1
-                                        (env2, ty2') = go env1 ty2 in
-                                    (env2, mkFunTy weight ty1' ty2')
+    go env (FunTy mult ty1 ty2) = let (env1, ty1') = go env  ty1
+                                      (env2, ty2') = go env1 ty2 in
+                                  (env2, mkFunTy mult ty1' ty2')
 
     go env (ForAllTy (Bndr tv vis) ty)
       = let (env1, tv') = coreFlattenVarBndr env tv

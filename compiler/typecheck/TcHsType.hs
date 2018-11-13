@@ -52,8 +52,8 @@ module TcHsType (
         -- Zonking and promoting
         zonkPromoteType,
 
-        -- Weight
-        tcWeight,
+        -- Multiplicity
+        tcMult,
 
         -- Pattern type signatures
         tcHsPatSigType, tcPatSig,
@@ -78,7 +78,7 @@ import TcSimplify
 import TcHsSyn
 import TcErrors ( reportAllUnsolved )
 import TcType
-import Weight
+import Multiplicity
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
 import TyCoRep( TyCoBinder(..), TyBinder, Type )  -- Used in tcDataKindSig
 import Type
@@ -265,7 +265,7 @@ tcHsDeriv hs_ty
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, (cls, tys, map weightedThing args))
+           Just (cls, tys) -> return (tvs, (cls, tys, map scaledThing args))
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 -- | Typecheck something within the context of a deriving strategy.
@@ -396,8 +396,8 @@ tcLHsTypeUnsaturated ty = addTypeCtxt ty (tc_infer_lhs_type mode ty)
   where
     mode = allowUnsaturated typeLevelMode
 
-tcWeight :: HsRig GhcRn -> TcM Rig
-tcWeight hc = tc_weight typeLevelMode hc
+tcMult :: HsMult GhcRn -> TcM Mult
+tcMult hc = tc_mult typeLevelMode hc
 
 {-
 ************************************************************************
@@ -582,27 +582,27 @@ tc_lhs_type mode (L span ty) exp_kind
     tc_hs_type mode ty exp_kind
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> HsRig GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
-tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
+tc_fun_type :: TcTyMode -> HsMult GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind -> TcM TcType
+tc_fun_type mode mult ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; weight' <- tc_weight mode weight
-       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
+       ; mult' <- tc_mult mode mult
+       ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; weight' <- tc_weight mode weight
-       ; checkExpectedKind (HsFunTy noExt ty1 weight ty2) (mkFunTy weight' ty1' ty2') liftedTypeKind exp_kind }
+       ; mult' <- tc_mult mode mult
+       ; checkExpectedKind (HsFunTy noExt ty1 mult ty2) (mkFunTy mult' ty1' ty2') liftedTypeKind exp_kind }
 
-tc_weight :: TcTyMode -> HsRig GhcRn -> TcM Rig
-tc_weight mode r = case r of
+tc_mult :: TcTyMode -> HsMult GhcRn -> TcM Mult
+tc_mult mode r = case r of
                          HsZero -> return Zero
                          HsOne  -> return One
                          HsOmega -> return Omega
-                         HsRigTy ty -> do
+                         HsMultTy ty -> do
                           ty' <- tc_lhs_type mode ty multiplicityTy
                           case ty' of
                             t | isOneMultiplicity t -> return One
@@ -649,11 +649,11 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
-tc_hs_type mode ty@(HsFunTy _ ty1 weight ty2) exp_kind
-  | mode_level mode == KindLevel && not (isHsOmega weight)
+tc_hs_type mode ty@(HsFunTy _ ty1 mult ty2) exp_kind
+  | mode_level mode == KindLevel && not (isHsOmega mult)
     = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
   | otherwise
-    = tc_fun_type mode weight ty1 ty2 exp_kind
+    = tc_fun_type mode mult ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
@@ -2018,16 +2018,16 @@ newWildTyVar _name
 --
 -- Use this (not tcExtendTyVarEnv) wherever you expect a Λ or ∀ in Core.
 -- Use tcExtendTyVarEnv otherwise.
-scopeTyVars :: SkolemInfo -> [Weighted TcTyVar] -> TcM a -> TcM a
+scopeTyVars :: SkolemInfo -> [Scaled TcTyVar] -> TcM a -> TcM a
 scopeTyVars skol_info tvs = scopeTyVars2 skol_info
-                              [(tyVarName (weightedThing tv), tv) | tv <- tvs]
+                              [(tyVarName (scaledThing tv), tv) | tv <- tvs]
 
 -- | Like 'scopeTyVars', but allows you to specify different scoped names
 -- than the Names stored within the tyvars.
-scopeTyVars2 :: SkolemInfo -> [(Name, Weighted TcTyVar)] -> TcM a -> TcM a
+scopeTyVars2 :: SkolemInfo -> [(Name, Scaled TcTyVar)] -> TcM a -> TcM a
 scopeTyVars2 skol_info prs thing_inside
   = fmap snd $ -- discard the TcEvBinds, which will always be empty
-    checkConstraints skol_info (map (weightedThing . snd) prs) [{- no EvVars -}] $
+    checkConstraints skol_info (map (scaledThing . snd) prs) [{- no EvVars -}] $
     tcExtendNameTyVarEnv prs $
     thing_inside
 
@@ -2324,7 +2324,7 @@ tcDataKindSig tc_bndrs kind
           Just (Anon arg, kind')
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
-              arg'   = substTy subst (weightedThing arg)
+              arg'   = substTy subst (scaledThing arg)
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
               tcb    = Bndr tv AnonTCB
@@ -2572,11 +2572,11 @@ tcHsPatSigType _ (XHsWildCardBndrs _)          = panic "tcHsPatSigType"
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
-         -> Weighted ExpSigmaType
+         -> Scaled ExpSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
-                 [(Name, Weighted TcTyVar)],-- The new bit of type environment, binding
+                 [(Name, Scaled TcTyVar)],-- The new bit of type environment, binding
                                     -- the scoped type variables
-                 [(Name, Weighted TcTyVar)],  -- The wildcards
+                 [(Name, Scaled TcTyVar)],  -- The wildcards
                  HsWrapper)         -- Coercion due to unification with actual ty
                                     -- Of shape:  res_ty ~ sig_ty
 tcPatSig in_pat_bind sig res_ty
@@ -2585,12 +2585,12 @@ tcPatSig in_pat_bind sig res_ty
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
-        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0
-        ; let sig_tvs_weighted = map (\(x, y) -> (x, weightedSet res_ty y)) sig_tvs
+        ; let sig_wcs = map (\(x,y)-> (x,scaledSet res_ty y)) sig_wcs0
+        ; let sig_tvs_scaled = map (\(x, y) -> (x, scaledSet res_ty y)) sig_tvs
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
                   wrap <- addErrCtxtM (mk_msg sig_ty) $
-                          tcSubTypeET PatSigOrigin PatSigCtxt (weightedThing res_ty) sig_ty
+                          tcSubTypeET PatSigOrigin PatSigCtxt (scaledThing res_ty) sig_ty
                 ; return (sig_ty, [], sig_wcs, wrap)
         } else do
                 -- Type signature binds at least one scoped type variable
@@ -2613,15 +2613,15 @@ tcPatSig in_pat_bind sig res_ty
 
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
-                  tcSubTypeET PatSigOrigin PatSigCtxt (weightedThing res_ty) sig_ty
+                  tcSubTypeET PatSigOrigin PatSigCtxt (scaledThing res_ty) sig_ty
 
         -- Phew!
-        ; return (sig_ty, sig_tvs_weighted, sig_wcs, wrap)
+        ; return (sig_ty, sig_tvs_scaled, sig_wcs, wrap)
         } }
   where
     mk_msg sig_ty tidy_env
        = do { (tidy_env, sig_ty) <- zonkTidyTcType tidy_env sig_ty
-            ; res_ty <- readExpType (weightedThing res_ty)   -- should be filled in by now
+            ; res_ty <- readExpType (scaledThing res_ty)   -- should be filled in by now
             ; (tidy_env, res_ty) <- zonkTidyTcType tidy_env res_ty
             ; let msg = vcat [ hang (text "When checking that the pattern signature:")
                                   4 (ppr sig_ty)

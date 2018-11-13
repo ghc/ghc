@@ -50,7 +50,7 @@ import VarEnv
 import CoreFVs
 import FastString
 import Type
-import Weight ( pattern Omega )
+import Multiplicity ( pattern Omega )
 import Util( mapSnd )
 
 import Data.Bifunctor

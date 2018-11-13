@@ -28,7 +28,7 @@ import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
 import Name
 import Id
 import Type
-import Weight
+import Multiplicity
 import Kind ( isTYPEApp )
 import TyCon
 import DataCon
