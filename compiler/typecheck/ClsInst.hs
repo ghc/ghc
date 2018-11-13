@@ -391,14 +391,14 @@ matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
 doFunTy :: Class -> Type -> Scaled Type -> Type -> TcM ClsInstResult
-doFunTy clas ty (Scaled _ arg_ty) ret_ty -- arnaud: TODO: bug here, where linear and unrestricted arrows are considered the same type in Typeable. Change EvTypeableTrFun below to have multiplicity information 
+doFunTy clas ty (Scaled mult arg_ty) ret_ty
   = return $ OneInst { cir_new_theta = preds
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }
   where
-    preds = map (mk_typeable_pred clas) [arg_ty, ret_ty]
-    mk_ev [arg_ev, ret_ev] = evTypeable ty $
-                             EvTypeableTrFun (EvExpr arg_ev) (EvExpr ret_ev)
+    preds = map (mk_typeable_pred clas) [fromMult mult, arg_ty, ret_ty]
+    mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
+                        EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "TcInteract.doFunTy"
 
 

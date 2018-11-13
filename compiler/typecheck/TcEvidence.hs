@@ -569,7 +569,7 @@ data EvTypeable
     -- ^ Dictionary for @Typeable (s t)@,
     -- given a dictionaries for @s@ and @t@.
 
-  | EvTypeableTrFun EvTerm EvTerm
+  | EvTypeableTrFun EvTerm EvTerm EvTerm
     -- ^ Dictionary for @Typeable (s -> t)@,
     -- given a dictionaries for @s@ and @t@.
 
@@ -854,10 +854,10 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e   -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTyLit e     -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
+    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
+    EvTypeableTyLit e        -> evVarsOfTerm e
 
 
 {- Note [Free vars of EvFun]
@@ -954,7 +954,7 @@ instance Outputable EvCallStack where
 instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun t1 t2) = parens (ppr t1 <+> arrow <+> ppr t2)
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> ppr tm <+> arrow <+> ppr t2)
   ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
 
 
