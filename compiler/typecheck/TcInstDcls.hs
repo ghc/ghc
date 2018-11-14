@@ -585,6 +585,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
 tcDataFamInstDecl :: Maybe ClsInstInfo
                   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
+{-
 tcDataFamInstDecl mb_clsinfo
     (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_ext = tv_names
                                                    , hsib_body =
@@ -711,6 +712,159 @@ tcDataFamInstDecl mb_clsinfo
     go pats etad_tvs = (reverse pats, etad_tvs)
 
     pp_hs_pats = pprFamInstLHS fam_tc_name mb_bndrs pats fixity (unLoc ctxt) m_ksig
+-}
+
+tcDataFamInstDecl mb_clsinfo
+    (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_ext = imp_vars
+                                                   , hsib_body =
+      FamEqn { feqn_bndrs  = mb_bndrs
+             , feqn_pats   = hs_pats
+             , feqn_tycon  = fam_name
+             , feqn_fixity = fixity
+             , feqn_rhs    = HsDataDefn { dd_ND = new_or_data
+                                        , dd_cType = cType
+                                        , dd_ctxt = ctxt
+                                        , dd_cons = cons
+                                        , dd_kindSig = m_ksig
+                                        , dd_derivs = derivs } }}}))
+  = setSrcSpan loc             $
+    tcAddDataFamInstCtxt decl  $
+    do { fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_name
+
+         -- Check that the family declaration is for the right kind
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+       ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+
+         -- Kind check type patterns
+       ; let exp_bndrs = mb_bndrs `orElse` []
+             data_ctxt = DataKindCtxt (unLoc fam_name)
+       ; 
+
+       ; (_, (_, (pats, stupid_theta, res_kind)))
+               <- pushTcLevelM_                                $
+                  solveEqualities                              $
+                  bindImplicitTKBndrs_Q_Skol imp_vars          $
+                  bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
+                  do { (pats, res_kind) <- tcFamTyPats_new fam_tc mb_clsinfo hs_pats
+                     ; stupid_theta <- tcHsContext ctxt
+                     ; mapM_ (wrapLocM kcConDecl) cons
+                     ; exp_res_kind <- case m_ksig of
+                          Nothing   -> return liftedTypeKind
+                          Just hs_k -> tcLHsKindSig data_ctxt hs_k
+
+                     ; _ <- checkExpectedKindX Nothing pp_hs_pats bogus_ty
+                                               res_kind exp_res_kind
+                            -- ToDo: what about a non-triv result?a
+                     ; return (pats, stupid_theta, res_kind) }
+
+       ; dvs   <- candidateQTyVarsOfTypes (res_kind : pats)
+       ; qtkvs <- quantifyTyVars emptyVarSet dvs
+       
+       -- Zonk the patterns etc into the Type world
+       ; (ze, tvs)    <- zonkTyBndrs qtkvs
+       ; pats         <- zonkTcTypesToTypesX ze pats
+       ; res_kind     <- zonkTcTypeToTypeX   ze res_kind
+       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+
+       ; gadt_syntax <- dataDeclChecks (unLoc fam_name) new_or_data
+                                       stupid_theta cons
+
+         -- Construct representation tycon
+       ; rep_tc_name <- newFamInstTyConName fam_name pats
+       ; axiom_name  <- newFamInstAxiomName fam_name [pats]
+
+       ; let (eta_pats, etad_tvs) = eta_reduce pats
+             eta_tvs              = filterOut (`elem` etad_tvs) tvs
+                 -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
+
+             full_tcbs = mkTyConBindersPreferAnon (eta_tvs ++ etad_tvs) res_kind
+                 -- Put the eta-removed tyvars at the end
+                 -- Remember, tvs' is in arbitrary order, except kind vars are
+                 -- first, so there is no reason to suppose that the etad_tvs
+                 -- (obtained from the pats) are at the end (Trac #11148)
+
+         -- Deal with any kind signature.
+         -- See also Note [Arity of data families] in FamInstEnv
+       ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind
+       ; checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
+
+       ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
+             all_pats    = pats `chkAppend` extra_pats
+             orig_res_ty = mkTyConApp fam_tc all_pats
+             ty_binders  = full_tcbs `chkAppend` extra_tcbs
+
+       ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
+           do { data_cons <- tcExtendTyVarEnv tvs $
+                             -- For H98 decls, the tyvars scope
+                             -- over the data constructors
+                             tcConDecls rec_rep_tc ty_binders orig_res_ty cons
+
+              ; tc_rhs <- case new_or_data of
+                     DataType -> return (mkDataTyConRhs data_cons)
+                     NewType  -> ASSERT( not (null data_cons) )
+                                 mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
+
+              ; let axiom  = mkSingleCoAxiom Representational
+                                             axiom_name eta_tvs [] fam_tc eta_pats
+                                             (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
+                    parent = DataFamInstTyCon axiom fam_tc all_pats
+
+
+                      -- NB: Use the full ty_binders from the pats. See bullet toward
+                      -- the end of Note [Data type families] in TyCon
+                    rep_tc   = mkAlgTyCon rep_tc_name
+                                          ty_binders liftedTypeKind
+                                          (map (const Nominal) ty_binders)
+                                          (fmap unLoc cType) stupid_theta
+                                          tc_rhs parent
+                                          gadt_syntax
+                 -- We always assume that indexed types are recursive.  Why?
+                 -- (1) Due to their open nature, we can never be sure that a
+                 -- further instance might not introduce a new recursive
+                 -- dependency.  (2) They are always valid loop breakers as
+                 -- they involve a coercion.
+              ; return (rep_tc, axiom) }
+
+         -- Remember to check validity; no recursion to worry about here
+         -- Check that left-hand sides are ok (mono-types, no type families,
+         -- consistent instantiations, etc)
+       ; checkValidFamPats mb_clsinfo fam_tc tvs [] pats extra_pats pp_hs_pats
+
+         -- Result kind must be '*' (otherwise, we have too few patterns)
+       ; checkTc (tcIsLiftedTypeKind final_res_kind) $
+         tooFewParmsErr (tyConArity fam_tc)
+
+       ; checkValidTyCon rep_tc
+
+       ; let m_deriv_info = case derivs of
+               L _ []    -> Nothing
+               L _ preds ->
+                 Just $ DerivInfo { di_rep_tc  = rep_tc
+                                  , di_clauses = preds
+                                  , di_ctxt    = tcMkDataFamInstCtxt decl }
+
+       ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
+       ; return (fam_inst, m_deriv_info) }
+  where
+
+    eta_reduce :: [Type] -> ([Type], [TyVar])
+    -- See Note [Eta reduction for data families] in FamInstEnv
+    -- Splits the incoming patterns into two: the [TyVar]
+    -- are the patterns that can be eta-reduced away.
+    -- e.g.     T [a] Int a d c   ==>  (T [a] Int a, [d,c])
+    --
+    -- NB: quadratic algorithm, but types are small here
+    eta_reduce pats
+      = go (reverse pats) []
+    go (pat:pats) etad_tvs
+      | Just tv <- getTyVar_maybe pat
+      , not (tv `elemVarSet` tyCoVarsOfTypes pats)
+      = go pats (tv : etad_tvs)
+    go pats etad_tvs = (reverse pats, etad_tvs)
+
+    pp_hs_pats = pprFamInstLHS fam_name mb_bndrs hs_pats fixity (unLoc ctxt) m_ksig
+    bogus_ty   = pprPanic "kcDataDefn" (ppr fam_name <+> ppr hs_pats)
+
 
 tcDataFamInstDecl _
     (L _ (DataFamInstDecl

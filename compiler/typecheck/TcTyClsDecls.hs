@@ -15,8 +15,8 @@ module TcTyClsDecls (
 
         -- Functions used by TcInstDcls to check
         -- data/type family instance declarations
-        kcDataDefn, tcConDecls, dataDeclChecks, checkValidTyCon,
-        tcFamTyPats, tcTyFamInstEqn,
+        kcDataDefn, kcConDecl, tcConDecls, dataDeclChecks, checkValidTyCon,
+        tcFamTyPats, tcFamTyPats_new, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         wrongKindOfFamily, dataConCtxt
     ) where
@@ -1645,17 +1645,17 @@ tcDataDefn :: RolesInfo -> Name
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn roles_info
            tc_name tycon_binders res_kind
-         (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                     , dd_ctxt = ctxt, dd_kindSig = mb_ksig
-                     , dd_cons = cons })
- =  do { tcg_env         <- getGblEnv
-       ; let hsc_src = tcg_src tcg_env
+           (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                       , dd_ctxt = ctxt
+                       , dd_kindSig = mb_ksig  -- Already in tc's kind
+                                               -- via getInitialKinds
+                       , dd_cons = cons })
+ =  do { tcg_env <- getGblEnv
        ; (extra_bndrs, final_res_kind) <- tcDataKindSig tycon_binders res_kind
+
+       ; let hsc_src = tcg_src tcg_env
        ; unless (mk_permissive_kind hsc_src cons) $
          checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
-
-       ; let final_bndrs  = tycon_binders `chkAppend` extra_bndrs
-             roles        = roles_info tc_name
 
        ; stupid_tc_theta <- solveEqualities $ tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypesToTypes stupid_tc_theta
@@ -1668,7 +1668,10 @@ tcDataDefn roles_info
        ; gadt_syntax <- dataDeclChecks tc_name new_or_data stupid_theta cons
 
        ; tycon <- fixM $ \ tycon -> do
-             { let res_ty = mkTyConApp tycon (mkTyVarTys (binderVars final_bndrs))
+             { let final_bndrs = tycon_binders `chkAppend` extra_bndrs
+                   res_ty      = mkTyConApp tycon (mkTyVarTys (binderVars final_bndrs))
+                   roles       = roles_info tc_name
+
              ; data_cons <- tcConDecls tycon final_bndrs res_ty cons
              ; tc_rhs    <- mk_tc_rhs hsc_src tycon data_cons
              ; tc_rep_nm <- newTyConRepName tc_name
@@ -1707,36 +1710,39 @@ tcDataDefn _ _ _ _ (XHsDataDefn _) = panic "tcDataDefn"
 
 -------------------------
 kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
+-- Used for the equations of a closee type family only
+-- Not used for data/type instances
 kcTyFamInstEqn tc_fam_tc
-    (dL->L loc
-           (HsIB { hsib_ext = imp_vars
-                 , hsib_body = FamEqn { feqn_tycon  = (dL->L _ eqn_tc_name)
-                                      , feqn_bndrs  = mb_expl_bndrs
-                                      , feqn_pats   = pats
-                                      , feqn_rhs    = hs_ty }}))
+    (dl->L loc (HsIB { hsib_ext = imp_vars
+                 , hsib_body = FamEqn { feqn_tycon = dL->L _ eqn_tc_name
+                                      , feqn_bndrs = mb_expl_bndrs
+                                      , feqn_pats  = hs_pats
+                                      , feqn_rhs   = rhs_hs_ty }}))
   = setSrcSpan loc $
     do { traceTc "kcTyFamInstEqn" (vcat
-           [ text "tc_name =" <+> ppr eqn_tc_name
-           , text "fam_tc =" <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
-           , text "hsib_vars =" <+> ppr imp_vars
+           [ text "tc_name ="    <+> ppr eqn_tc_name
+           , text "fam_tc ="     <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
+           , text "hsib_vars ="  <+> ppr imp_vars
            , text "feqn_bndrs =" <+> ppr mb_expl_bndrs
-           , text "feqn_pats =" <+> ppr pats ])
+           , text "feqn_pats ="  <+> ppr hs_pats ])
        ; checkTc (fam_name == eqn_tc_name)
                  (wrongTyFamName fam_name eqn_tc_name)
           -- this check reports an arity error instead of a kind error; easier for user
-       ; checkTc (pats `lengthIs` vis_arity) $
+       ; checkTc (hs_pats `lengthIs` vis_arity) $
                   wrongNumberOfParmsErr vis_arity
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         tcFamTyPats_new tc_fam_tc Nothing pats hs_ty }
+         do { (_, res_kind) <- tcFamTyPats_new tc_fam_tc Nothing hs_pats
+            ; tcCheckLHsType rhs_hs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
              --      Bar (x :: c) (y :: d) = Bool
              -- During kind-checkig, a,b,c,d should be TyVarTvs and unify appropriately
+    }
   where
-    fam_name = tyConName tc_fam_tc
+    fam_name  = tyConName tc_fam_tc
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
 
 kcTyFamInstEqn _ (dl->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
@@ -1910,7 +1916,9 @@ tcFamTyPatsAndGen fam_tc mb_cls_info imp_vars exp_bndrs hs_pats rhs_hs_ty
                   solveEqualities                              $
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
-                  tcFamTyPats_new fam_tc mb_cls_info hs_pats rhs_hs_ty
+                  do { (pats, res_kind) <- tcFamTyPats_new fam_tc mb_cls_info hs_pats
+                     ; rhs_ty <- tcCheckLHsType rhs_hs_ty res_kind
+                     ; return (pats, rhs_ty) }
 
        -- Ignore which variables are Inferred, Specified, etc
        -- (i.e. returned by bindImplicit/ExplicitTKBndrs)
@@ -1930,9 +1938,8 @@ tcFamTyPatsAndGen fam_tc mb_cls_info imp_vars exp_bndrs hs_pats rhs_hs_ty
 -----------------
 tcFamTyPats_new :: TyCon -> Maybe ClsInstInfo
                 -> HsTyPats GhcRn                  -- Patterns
-                -> LHsType GhcRn                   -- RHS type
-                -> TcM ([TcType], TcType)          -- (pats, rhs)
-tcFamTyPats_new fam_tc mb_clsinfo hs_pats rhs_hs_ty
+                -> TcM ([TcType], TcKind)          -- (pats, rhs_kind)
+tcFamTyPats_new fam_tc mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats_new {" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
               , text "arity:" <+> ppr fam_arity
@@ -1944,12 +1951,10 @@ tcFamTyPats_new fam_tc mb_clsinfo hs_pats rhs_hs_ty
              <- tcInferApps typeLevelMode Nothing lhs_fun fun_ty
                             (substTy subst body_kind) hs_pats
 
-       ; rhs_ty <- tcCheckLHsType rhs_hs_ty res_kind
        ; traceTc "End tcFamTyPats_new }" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
-              , text "res_kind:" <+> ppr res_kind
-              , text "rhs_ty:" <+> ppr rhs_ty ]
-       ; return (invis_pats ++ pats, rhs_ty) }
+              , text "res_kind:" <+> ppr res_kind ]
+       ; return (invis_pats ++ pats, res_kind) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
