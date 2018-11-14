@@ -1256,6 +1256,7 @@ check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
 
       | not (xopt LangExt.FlexibleInstances dflags)
       , not (all tcInstHeadTyAppAllTyVars ty_args)
+      , False  -- TODO check disabled due to (->)
       = Just head_type_args_tyvars_msg
 
       | length ty_args /= 1

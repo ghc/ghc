@@ -79,7 +79,8 @@ import ForeignCall
 import TysPrim          ( eqPrimTyCon )
 import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilDataCon,
                           unboxedUnitTyCon, unboxedUnitDataCon,
-                          listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR )
+                          listTyCon_RDR, consDataCon_RDR, eqTyCon_RDR,
+                          omegaDataConTyCon)
 
 -- compiler/utils
 import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
@@ -2039,6 +2040,9 @@ atype :: { LHsType GhcPs }
 
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
+        | '(' '->' ')'                {% ams (sLL $1 $> $ HsAppTy noExt (noLoc $ HsTyVar noExt NotPromoted (noLoc $ getRdrName funTyCon))
+                                                                        (noLoc $ HsTyVar noExt NotPromoted (noLoc $ getRdrName omegaDataConTyCon)))
+                                             [mop $1,mu AnnRarrow $2,mcp $3] }
         | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
                                              [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
@@ -3262,8 +3266,6 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
-        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
-                                       [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;

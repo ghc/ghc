@@ -371,13 +371,13 @@ funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 -- | The @(->)@ type constructor.
 --
 -- @
--- (->) :: forall (m :: Multiplicity) (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
+-- (->) :: forall (m :: Multiplicity) {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ Bndr multiplicityTyVar (NamedTCB Inferred)
+    tc_bndrs = [ Bndr multiplicityTyVar (NamedTCB Required)
                , Bndr runtimeRep1TyVar (NamedTCB Inferred)
                , Bndr runtimeRep2TyVar (NamedTCB Inferred)
                ]
