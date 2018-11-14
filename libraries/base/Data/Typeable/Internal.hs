@@ -478,6 +478,7 @@ splitApp TrType = IsApp trTYPE trLiftedRep
 splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
 splitApp rep@(TrFun {trFunArg=a, trFunRes=b, trFunMul = (eqTypeRep trOmega -> Just HRefl)}) = IsApp (mkTrApp arr a) b
   where arr = bareArrow rep  -- TODO handle multiplicity
+splitApp (TrFun {}) = error "Data.Typeable.Internal.splitApp: Only unrestricted functions are supported"
 splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
   = case unsafeCoerce Refl :: IsApplication a :~: "" of
       Refl -> IsCon con kinds
@@ -818,8 +819,7 @@ splitApps = go []
     go xs (TrApp {trAppFun = f, trAppArg = x})
       = go (SomeTypeRep x : xs) f
     go [] (TrFun {trFunArg = a, trFunRes = b, trFunMul = mul})
-      | Just HRefl <- eqTypeRep trOmega mul =
-      = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
+      | Just HRefl <- eqTypeRep trOmega mul = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
       | otherwise = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Only unrestricted functions are supported"
     -- TODO handle multiplicity
     go _  (TrFun {})
