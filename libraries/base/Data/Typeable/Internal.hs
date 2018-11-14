@@ -431,7 +431,7 @@ mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x :: TypeRep x})
   , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
   , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
                   $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
-  = mkTrFun trOmega x y -- TODO
+  = mkTrFun trOmega x y -- TODO handle multiplicity
 mkTrAppChecked a b = mkTrApp a b
 
 -- | A type application.
@@ -817,7 +817,7 @@ splitApps = go []
       = (tc, xs)
     go xs (TrApp {trAppFun = f, trAppArg = x})
       = go (SomeTypeRep x : xs) f
-    go [] (TrFun {trFunArg = a, trFunRes = b}) -- TODO
+    go [] (TrFun {trFunArg = a, trFunRes = b}) -- TODO handle multiplicity
       = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
     go _  (TrFun {})
       = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 1"
