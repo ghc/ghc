@@ -32,6 +32,7 @@ aliases:
         endif
         GhcLibHcOpts       = -O -dcore-lint
         # TODO: arnaud: revert the above line before merge (hack)
+        HADDOCK_DOCS=NO
         EOF
   - &configure_unix
     run:
