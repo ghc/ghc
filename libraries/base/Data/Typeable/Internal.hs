@@ -18,7 +18,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE LinearTypes #-}   -- TODO make data constructors linear?
+
+-- The constructors in this file can be unrestricted.
+{-# LANGUAGE LinearTypes #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -208,7 +210,7 @@ data TypeRep (a :: k) where
                , trAppKind :: !(TypeRep k2) }   -- See Note [Kind caching]
             -> TypeRep (a b)
 
-    -- | @TrFun fpr a b@ represents a function type @a -> b@. We use this for
+    -- | @TrFun fpr m a b@ represents a function type @a -->.(m) b@. We use this for
     -- the sake of efficiency as functions are quite ubiquitous.
     TrFun   :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).
@@ -331,7 +333,7 @@ instance Ord SomeTypeRep where
 pattern Fun :: forall k (fun :: k). ()
             => forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (arg :: TYPE r1) (res :: TYPE r2).
-               (k ~ Type, fun ~~ (arg -->.('Omega) res))
+               (k ~ Type, fun ~~ (arg -> res))
             => TypeRep arg
             -> TypeRep res
             -> TypeRep fun

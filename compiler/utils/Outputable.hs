@@ -622,7 +622,7 @@ lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 blankLine  = docToSDoc $ Pretty.text ""
 dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.text "::")
 arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.text "->")
-lollipop   = char '⊸'
+lollipop   = unicodeSyntax (char '⊸') (docToSDoc $ Pretty.text "->.")
 larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.text "<-")
 darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.text "=>")
 arrowt     = unicodeSyntax (char '⤚') (docToSDoc $ Pretty.text ">-")
