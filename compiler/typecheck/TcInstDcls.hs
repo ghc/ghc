@@ -738,7 +738,6 @@ tcDataFamInstDecl mb_clsinfo
          -- Kind check type patterns
        ; let exp_bndrs = mb_bndrs `orElse` []
              data_ctxt = DataKindCtxt (unLoc fam_name)
-       ; 
 
        ; (_, (_, (pats, stupid_theta, res_kind)))
                <- pushTcLevelM_                                $
@@ -759,7 +758,7 @@ tcDataFamInstDecl mb_clsinfo
 
        ; dvs   <- candidateQTyVarsOfTypes (res_kind : pats)
        ; qtkvs <- quantifyTyVars emptyVarSet dvs
-       
+
        -- Zonk the patterns etc into the Type world
        ; (ze, tvs)    <- zonkTyBndrs qtkvs
        ; pats         <- zonkTcTypesToTypesX ze pats

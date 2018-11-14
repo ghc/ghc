@@ -1501,17 +1501,22 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   { traceTc "data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
-  -- Check the kind signature, if any.
-  -- Data families might have a variable return kind.
-  -- See See Note [Arity of data families] in FamInstEnv.
-  ; (extra_binders, final_res_kind) <- tcDataKindSig binders res_kind
+  -- Check that the result kind is OK
+  -- We allow things like
+  --   data family T (a :: Type) :: forall k. k -> Type
+  -- We treat T as having arity 1, but result kind forall k. k -> Type
+  -- But we want to check that the result kind finishes in
+  --   Type or a kind-variable
+  -- For the latter, consider
+  --   data family D a :: forall k. Type -> k
+  ; let (_, final_res_kind) = splitPiTys res_kind
   ; checkTc (tcIsLiftedTypeKind final_res_kind
              || isJust (tcGetCastedTyVar_maybe final_res_kind))
             (badKindSig False res_kind)
 
   ; tc_rep_name <- newTyConRepName tc_name
-  ; let tycon = mkFamilyTyCon tc_name (binders `chkAppend` extra_binders)
-                              final_res_kind
+  ; let tycon = mkFamilyTyCon tc_name binders
+                              res_kind
                               (resultVariableName sig)
                               (DataFamilyTyCon tc_rep_name)
                               parent NotInjective
