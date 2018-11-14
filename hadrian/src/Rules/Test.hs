@@ -106,7 +106,7 @@ timeoutProgBuilder = do
 needIservBins :: Action ()
 needIservBins =
     need =<< traverse programPath
-      [ Context Stage1 iserv w | w <- [vanilla, profiling] ]
+      [ Context Stage1 iserv w | w <- [vanilla, profiling, dynamic] ]
 
 needTestBuilders :: Action ()
 needTestBuilders = do
