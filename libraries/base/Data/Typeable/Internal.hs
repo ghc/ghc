@@ -818,7 +818,7 @@ splitApps = go []
     go xs (TrApp {trAppFun = f, trAppArg = x})
       = go (SomeTypeRep x : xs) f
     go [] (TrFun {trFunArg = a, trFunRes = b, trFunMul = mul})
-      | eqTypeRep trOmega mul -> Just HRefl =
+      | Just HRefl <- eqTypeRep trOmega mul =
       = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
       | otherwise = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Only unrestricted functions are supported"
     -- TODO handle multiplicity
