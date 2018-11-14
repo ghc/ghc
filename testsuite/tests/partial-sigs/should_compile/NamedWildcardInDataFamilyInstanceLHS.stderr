@@ -1,7 +1,7 @@
 TYPE CONSTRUCTORS
-  MyKind :: *
+  MyKind{0} :: *
   type role Sing nominal nominal
-  Sing :: forall k. k -> *
+  Sing{2} :: forall k. k -> *
 COERCION AXIOMS
   axiom NamedWildcardInDataFamilyInstanceLHS.D:R:SingMyKind_a0 ::
     Sing _a = NamedWildcardInDataFamilyInstanceLHS.R:SingMyKind_a _a

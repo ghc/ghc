@@ -4,17 +4,17 @@ TYPE SIGNATURES
   meth3 :: forall a b. C3 a b => a -> F3 b -> F3 b
   meth4 :: forall a b. C4 a b => a -> F4 b -> F4 b
 TYPE CONSTRUCTORS
-  C1 :: * -> Constraint
-  C2 :: * -> * -> Constraint
-  C3 :: * -> * -> Constraint
-  C4 :: * -> * -> Constraint
+  C1{1} :: * -> Constraint
+  C2{2} :: * -> * -> Constraint
+  C3{2} :: * -> * -> Constraint
+  C4{2} :: * -> * -> Constraint
   type role F3 nominal
-  F3 :: * -> *
+  F3{1} :: * -> *
   type role F4 nominal
-  F4 :: * -> *
+  F4{1} :: * -> *
   type role Syn1 nominal
-  Syn1 :: * -> *
-  Syn2 :: * -> *
+  Syn1{1} :: * -> *
+  Syn2{1} :: * -> *
 COERCION AXIOMS
   axiom Roles3.N:C1 :: C1 a = a -> a -- Defined at Roles3.hs:6:1
   axiom Roles3.N:C2 ::

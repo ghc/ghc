@@ -2747,7 +2747,7 @@ ppr_tycons debug fam_insts type_env
        = vcat [ ppWhen show_roles $
                 hang (text "type role" <+> ppr tc)
                    2 (hsep (map ppr roles))
-              , hang (ppr tc <+> dcolon)
+              , hang (ppr tc <> braces (ppr (tyConArity tc)) <+> dcolon)
                    2 (ppr (tidyTopType (tyConKind tc))) ]
        where
          show_roles = debug || not (all (== boring_role) roles)

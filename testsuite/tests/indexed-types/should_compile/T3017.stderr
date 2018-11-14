@@ -5,10 +5,10 @@ TYPE SIGNATURES
   test2 ::
     forall c a b. (Coll c, Num a, Num b, Elem c ~ (a, b)) => c -> c
 TYPE CONSTRUCTORS
-  Coll :: * -> Constraint
+  Coll{1} :: * -> Constraint
   type role Elem nominal
-  Elem :: * -> *
-  ListColl :: * -> *
+  Elem{1} :: * -> *
+  ListColl{1} :: * -> *
 COERCION AXIOMS
   axiom Foo.D:R:ElemListColl ::
     Elem (ListColl a) = a -- Defined at T3017.hs:13:9

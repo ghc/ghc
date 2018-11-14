@@ -1,7 +1,7 @@
 TYPE CONSTRUCTORS
-  C :: forall {k}. k -> Constraint
+  C{2} :: forall {k}. k -> Constraint
   type role T nominal nominal nominal nominal
-  T :: forall k (f :: k -> *) (a :: k). f a -> *
+  T{4} :: forall k (f :: k -> *) (a :: k). f a -> *
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

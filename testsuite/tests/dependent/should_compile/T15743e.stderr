@@ -1,7 +1,7 @@
 TYPE CONSTRUCTORS
   type role T
     nominal nominal nominal nominal nominal nominal phantom phantom representational nominal nominal phantom nominal phantom
-  T ::
+  T{14} ::
     forall {k1} {k2} {k3} (k4 :: k2) k5. forall k6 ->
     k6
     -> Proxy k4
@@ -10,7 +10,7 @@ TYPE CONSTRUCTORS
     -> forall (k7 :: k1). Proxy k7 -> forall (k8 :: k5). Proxy k8 -> *
   type role T2
     nominal nominal nominal nominal nominal phantom phantom representational nominal nominal phantom nominal nominal phantom
-  T2 ::
+  T2{14} ::
     forall {k1} {k2} (k3 :: k2) k7. forall k4 ->
     k4
     -> Proxy k3
