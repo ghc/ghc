@@ -114,9 +114,6 @@ data Literal
   | LitRational !Integer !Integer Type
                                 --  ^ Rationals expressed as significand and exponent
 
-  | LitRational !Integer !Integer Type
-      --  ^ Rationals expressed as significand and exponent
-
   | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @'\0'@
@@ -653,15 +650,15 @@ litIsLifted _                  = False
 
 -- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
-literalType LitNullAddr       = addrPrimTy
-literalType (LitChar _)       = charPrimTy
-literalType (LitString  _)    = addrPrimTy
-literalType (LitFloat _)      = floatPrimTy
-literalType (LitDouble _)     = doublePrimTy
-literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t
+literalType LitNullAddr         = addrPrimTy
+literalType (LitChar _)         = charPrimTy
+literalType (LitString  _)      = addrPrimTy
+literalType (LitFloat _)        = floatPrimTy
+literalType (LitDouble _)       = doublePrimTy
+literalType (LitLabel _ _ _)    = addrPrimTy
+literalType (LitNumber _ _ t)   = t
 literalType (LitRational _ _ t) = t
-literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish)        = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
@@ -702,7 +699,7 @@ cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
 cmpLit (LitRational i1 e1 _) (LitRational i2 e2 _)
   | e1 == e2 = i1 `compare` i2
   | otherwise = e1 `compare` e2
-cmpLit (LitRubbish)         (LitRubbish)          = EQ
+cmpLit (LitRubbish)          (LitRubbish)           = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
