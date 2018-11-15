@@ -218,8 +218,13 @@ instance Binary Literal where
              put_ bh i
              put_ bh e
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
+=======
+=======
+
+>>>>>>> Fix a large rationals bug (#15646)
 >>>>>>> Fix a large rationals bug (#15646)
     put_ bh (LitRubbish)      = do putByte bh 8
     get bh = do
