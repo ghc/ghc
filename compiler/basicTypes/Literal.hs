@@ -217,10 +217,6 @@ instance Binary Literal where
         = do putByte bh 7
              put_ bh i
              put_ bh e
-<<<<<<< HEAD
-=======
-
->>>>>>> Fix a large rationals bug (#15646)
     put_ bh (LitRubbish)      = do putByte bh 8
     get bh = do
             h <- getByte bh
@@ -653,15 +649,15 @@ litIsLifted _                  = False
 
 -- | Find the Haskell 'Type' the literal occupies
 literalType :: Literal -> Type
-literalType LitNullAddr       = addrPrimTy
-literalType (LitChar _)       = charPrimTy
-literalType (LitString  _)    = addrPrimTy
-literalType (LitFloat _)      = floatPrimTy
-literalType (LitDouble _)     = doublePrimTy
-literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t
+literalType LitNullAddr         = addrPrimTy
+literalType (LitChar _)         = charPrimTy
+literalType (LitString  _)      = addrPrimTy
+literalType (LitFloat _)        = floatPrimTy
+literalType (LitDouble _)       = doublePrimTy
+literalType (LitLabel _ _ _)    = addrPrimTy
+literalType (LitNumber _ _ t)   = t
 literalType (LitRational _ _ t) = t
-literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish)        = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
@@ -738,6 +734,8 @@ pprLiteral add_par (LitNumber nt i _)
        LitNumInt64   -> pprPrimInt64 i
        LitNumWord    -> pprPrimWord i
        LitNumWord64  -> pprPrimWord64 i
+pprLiteral add_par (LitRational i e _) =
+    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
 pprLiteral add_par (LitRational i e _) = 
