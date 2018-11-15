@@ -11898,7 +11898,7 @@ fixing the hole, this can help users understand what options they have.
 
 .. ghc-flag:: -fabstract-refinement-hole-fits
     :shortdesc: *default: off.* Toggles whether refinements where one or more
-         or more of the holes are abstract are reported.
+         of the holes are abstract are reported.
     :type: dynamic
     :reverse: -fno-abstract-refinement-hole-fits
     :category: verbosity
