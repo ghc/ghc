@@ -547,20 +547,23 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 -}
 
-tcFamInstDeclCombined :: Maybe ClsInstInfo
+tcFamInstDeclChecks :: Maybe ClsInstInfo
                       -> Located Name -> TcM TyCon
-tcFamInstDeclCombined mb_clsinfo fam_tc_lname
+tcFamInstDeclChecks mb_clsinfo fam_tc_lname
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
        ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
        ; type_families <- xoptM LangExt.TypeFamilies
-       ; is_boot <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
+       ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
        ; checkTc type_families $ badFamInstDecl fam_tc_lname
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
        -- Look up the family TyCon and check for validity including
        -- check that toplevel type instances are not for associated types.
        ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
+
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+
        ; when (isNothing mb_clsinfo &&   -- Not in a class decl
                isTyConAssoc fam_tc)      -- but an associated type
               (addErr $ assocInClassErr fam_tc_lname)
@@ -570,14 +573,14 @@ tcFamInstDeclCombined mb_clsinfo fam_tc_lname
 tcTyFamInstDecl :: Maybe ClsInstInfo
                 -> LTyFamInstDecl GhcRn -> TcM FamInst
   -- "type instance"
+  -- See Note [Associated type instances]
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpan loc           $
     tcAddTyFamInstCtxt decl  $
     do { let fam_lname = feqn_tycon (hsib_body eqn)
-       ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
+       ; fam_tc <- tcFamInstDeclChecks mb_clsinfo fam_lname
 
          -- (0) Check it's an open type family
-       ; checkTc (isFamilyTyCon fam_tc)         (notFamily fam_tc)
        ; checkTc (isTypeFamilyTyCon fam_tc)     (wrongKindOfFamily fam_tc)
        ; checkTc (isOpenTypeFamilyTyCon fam_tc) (notOpenFamily fam_tc)
 
@@ -586,7 +589,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
                                         (L (getLoc fam_lname) eqn)
 
          -- (2) check for validity
-       ; checkValidCoAxBranch mb_clsinfo fam_tc co_ax_branch
+       ; checkValidCoAxBranch fam_tc co_ax_branch
 
          -- (3) construct coercion axiom
        ; rep_tc_name <- newFamInstAxiomName fam_lname [coAxBranchLHS co_ax_branch]
@@ -611,10 +614,9 @@ tcDataFamInstDecl mb_clsinfo
                                         , dd_derivs = derivs } }}}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
-    do { fam_tc <- tcFamInstDeclCombined mb_clsinfo lfam_name
+    do { fam_tc <- tcFamInstDeclChecks mb_clsinfo lfam_name
 
        -- Check that the family declaration is for the right kind
-       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
        ; gadt_syntax <- dataDeclChecks fam_name new_or_data ctxt cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
@@ -636,7 +638,7 @@ tcDataFamInstDecl mb_clsinfo
                      ; exp_res_kind <- case m_ksig of
                           Nothing   -> return liftedTypeKind
                           Just hs_k -> tcLHsKindSig data_ctxt hs_k
-                     ; _ <- checkExpectedKindX Nothing pp_hs_pats bogus_ty
+                     ; _ <- checkExpectedKindX pp_hs_pats bogus_ty
                                                res_kind exp_res_kind
                             -- ToDo: what about a non-triv result?
 
@@ -676,6 +678,9 @@ tcDataFamInstDecl mb_clsinfo
              orig_res_ty = mkTyConApp fam_tc all_pats
              ty_binders  = full_tcbs `chkAppend` extra_tcbs
 
+       -- Check that type patterns match the class instance head
+       ; checkConsistentFamInst mb_clsinfo fam_tc all_pats
+
        ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr exp_bndrs
                                       $$ ppr cons)
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
@@ -713,7 +718,7 @@ tcDataFamInstDecl mb_clsinfo
        -- Remember to check validity; no recursion to worry about here
        -- Check that left-hand sides are ok (mono-types, no type families,
        -- consistent instantiations, etc)
-       ; checkValidCoAxBranch mb_clsinfo fam_tc (coAxiomSingleBranch axiom)
+       ; checkValidCoAxBranch fam_tc (coAxiomSingleBranch axiom)
 
        -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (tcIsLiftedTypeKind final_res_kind) $
@@ -760,6 +765,24 @@ tcDataFamInstDecl _ (L _ (DataFamInstDecl (XHsImplicitBndrs _)))
 tcDataFamInstDecl _ (L _ (DataFamInstDecl (HsIB _ (XFamEqn _))))
   = panic "tcDataFamInstDecl"
 
+
+{- Note [Associated type instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow this:
+  class C a where
+    type T x a
+  instance C Int where
+    type T (S y) Int = y
+    type T Z     Int = Char
+
+Note that
+  a) The variable 'x' is not bound by the class decl
+  b) 'x' is instantiated to a non-type-variable in the instance
+  c) There are several type instance decls for T in the instance
+
+All this is fine.  Of course, you can't give any *more* instances
+for (T ty Int) elsewhere, because it's an *associated* type.
+-}
 
 {- *********************************************************************
 *                                                                      *

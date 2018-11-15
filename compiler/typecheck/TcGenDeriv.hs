@@ -1871,8 +1871,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' rep_cvs'
                                     fam_tc rep_lhs_tys rep_rhs_ty
         -- Check (c) from Note [GND and associated type families] in TcDeriv
-        checkValidCoAxBranch (Just (cls, cls_tvs, lhs_env)) fam_tc
-                             (coAxiomSingleBranch axiom)
+        checkValidCoAxBranch fam_tc (coAxiomSingleBranch axiom)
         newFamInst SynFamilyInst axiom
       where
         cls_tvs     = classTyVars cls

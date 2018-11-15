@@ -10,9 +10,9 @@ module TcValidity (
   checkValidTheta, checkValidFamPats,
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
-  ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
+  checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
-  arityErr, badATErr,
+  arityErr,
   checkValidTelescope,
   allDistinctTyVars
   ) where
@@ -50,8 +50,8 @@ import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
+import Var         ( VarBndr(..) )
 import Id          ( idType, idName )
-import Var         ( VarBndr(..), mkTyVar )
 import FV
 import ErrUtils
 import DynFlags
@@ -60,7 +60,6 @@ import ListSetOps
 import SrcLoc
 import Outputable
 import Bag         ( emptyBag )
-import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1621,118 +1620,6 @@ arbitrarily large type, depending on how 'a' is instantiated.
 So we require UndecidableInstances if we have a type family
 in the instance head.  Trac #15172.
 
-Note [Associated type instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow this:
-  class C a where
-    type T x a
-  instance C Int where
-    type T (S y) Int = y
-    type T Z     Int = Char
-
-Note that
-  a) The variable 'x' is not bound by the class decl
-  b) 'x' is instantiated to a non-type-variable in the instance
-  c) There are several type instance decls for T in the instance
-
-All this is fine.  Of course, you can't give any *more* instances
-for (T ty Int) elsewhere, because it's an *associated* type.
-
-Note [Checking consistent instantiation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See Trac #11450 for background discussion on this check.
-
-  class C a b where
-    type T a x b
-
-With this class decl, if we have an instance decl
-  instance C ty1 ty2 where ...
-then the type instance must look like
-     type T ty1 v ty2 = ...
-with exactly 'ty1' for 'a', 'ty2' for 'b', and some type 'v' for 'x'.
-For example:
-
-  instance C [p] Int
-    type T [p] y Int = (p,y,y)
-
-Note that
-
-* We used to allow completely different bound variables in the
-  associated type instance; e.g.
-    instance C [p] Int
-      type T [q] y Int = ...
-  But from GHC 8.2 onwards, we don't.  It's much simpler this way.
-  See Trac #11450.
-
-* When the class variable isn't used on the RHS of the type instance,
-  it's tempting to allow wildcards, thus
-    instance C [p] Int
-      type T [_] y Int = (y,y)
-  But it's awkward to do the test, and it doesn't work if the
-  variable is repeated:
-    instance C (p,p) Int
-      type T (_,_) y Int = (y,y)
-  Even though 'p' is not used on the RHS, we still need to use 'p'
-  on the LHS to establish the repeated pattern.  So to keep it simple
-  we just require equality.
-
-* For variables in associated type families that are not bound by the class
-  itself, we do _not_ check if they are over-specific. In other words,
-  it's perfectly acceptable to have an instance like this:
-
-    instance C [p] Int where
-      type T [p] (Maybe x) Int = x
-
-  While the first and third arguments to T are required to be exactly [p] and
-  Int, respectively, since they are bound by C, the second argument is allowed
-  to be more specific than just a type variable. Furthermore, it is permissible
-  to define multiple equations for T that differ only in the non-class-bound
-  argument:
-
-    instance C [p] Int where
-      type T [p] (Maybe x)    Int = x
-      type T [p] (Either x y) Int = x -> y
-
-  We once considered requiring that non-class-bound variables in associated
-  type family instances be instantiated with distinct type variables. However,
-  that requirement proved too restrictive in practice, as there were examples
-  of extremely simple associated type family instances that this check would
-  reject, and fixing them required tiresome boilerplate in the form of
-  auxiliary type families. For instance, you would have to define the above
-  example as:
-
-    instance C [p] Int where
-      type T [p] x Int = CAux x
-
-    type family CAux x where
-      CAux (Maybe x)    = x
-      CAux (Either x y) = x -> y
-
-  We decided that this restriction wasn't buying us much, so we opted not
-  to pursue that design (see also GHC Trac #13398).
-
-Implementation
-  * Form the mini-envt from the class type variables a,b
-    to the instance decl types [p],Int:   [a->[p], b->Int]
-
-  * Look at the tyvars a,x,b of the type family constructor T
-    (it shares tyvars with the class C)
-
-  * Apply the mini-evnt to them, and check that the result is
-    consistent with the instance types [p] y Int. (where y can be any type, as
-    it is not scoped over the class type variables.
-
-We make all the instance type variables scope over the
-type instances, of course, which picks up non-obvious kinds.  Eg
-   class Foo (a :: k) where
-      type F a
-   instance Foo (b :: k -> k) where
-      type F b = Int
-Here the instance is kind-indexed and really looks like
-      type F (k->k) (b::k->k) = Int
-But if the 'b' didn't scope, we would make F's instance too
-poly-kinded.
-
 Note [Invisible arguments and termination]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When checking the ​Paterson conditions for termination an instance
@@ -1748,101 +1635,6 @@ described in Trac #15177, which contains a number of examples.
 The suspicious bits are the calls to filterOutInvisibleTypes.
 -}
 
--- | Extra information about the parent instance declaration, needed
--- when type-checking associated types. The 'Class' is the enclosing
--- class, the [TyVar] are the type variable of the instance decl,
--- and and the @VarEnv Type@ maps class variables to their instance
--- types.
-type ClsInstInfo = (Class, [TyVar], VarEnv Type)
-
-type AssocInstArgShape = (Maybe Type, Type)
-  -- AssocInstArgShape is used only for associated family instances
-  --    (mb_exp, actual)
-  -- mb_exp = Just ty  => this arg corresponds to a class variable
-  --        = Nothing  => it doesn't correspond to a class variable
-  -- e.g.  class C b where
-  --          type F a b c
-  --       instance C [x] where
-  --          type F p [x] q
-  -- We get [AssocInstArgShape] = [ (Nothing,  p)
-  --                              , (Just [x], [x])
-  --                              , (Nothing,  q)]
-
-checkConsistentFamInst
-               :: Maybe ClsInstInfo
-               -> TyCon              -- ^ Family tycon
-               -> [Type]             -- ^ Type patterns from instance
-               -> TcM ()
--- See Note [Checking consistent instantiation]
-
-checkConsistentFamInst Nothing _ _ = return ()
-checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys
-  = do { -- Check that the associated type indeed comes from this class
-         -- See [Mismatched class methods and associated type families]
-         -- in TcInstDecls.
-
-         checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
-                 (badATErr (className clas) (tyConName fam_tc))
-
-       -- Check type args first (more comprehensible)
-       ; checkTc (all check_arg type_shapes)   pp_wrong_at_arg
-
-       -- And now kind args
-       ; checkTcM (all check_arg kind_shapes)
-                  (tidy_env2, pprWithExplicitKindsWhen True pp_wrong_at_arg)
-
-       ; traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
-                                                , ppr arg_shapes
-                                                , ppr mini_env ]) }
-  where
-    arg_shapes :: [AssocInstArgShape]
-    arg_shapes = [ (lookupVarEnv mini_env fam_tc_tv, at_ty)
-                 | (fam_tc_tv, at_ty) <- tyConTyVars fam_tc `zip` at_tys ]
-
-    kind_shapes, type_shapes :: [AssocInstArgShape]
-    (kind_shapes, type_shapes) = partitionInvisibles $
-                                 arg_shapes `zip` tyConArgFlags fam_tc at_tys
-
-    check_arg :: AssocInstArgShape -> Bool
-    check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
-    check_arg (Nothing,     _    ) = True -- Arg position does not correspond
-                                          -- to a class variable
-
-    pp_wrong_at_arg
-      = vcat [ text "Type indexes must match class instance head"
-             , pp_exp_act ]
-
-    pp_exp_act
-      = vcat [ text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-             , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_tys)
-             , sdocWithDynFlags $ \dflags ->
-               ppWhen (has_poly_args dflags) $
-               vcat [ text "where the `<tv>' arguments are type variables,"
-                    , text "distinct from each other and from the instance variables" ] ]
-
-    -- We need to tidy, since it's possible that expected_args will contain
-    -- inferred kind variables with names identical to those in at_tys. If we
-    -- don't, we'll end up with horrible messages like this one (#13972):
-    --
-    --   Expected: T (a -> Either a b)
-    --     Actual: T (a -> Either a b)
-    (tidy_env1, _) = tidyOpenTypes emptyTidyEnv at_tys
-    (tidy_env2, expected_args)
-      = tidyOpenTypes tidy_env1 [ exp_ty `orElse` mk_tv at_ty
-                                | (exp_ty, at_ty) <- arg_shapes ]
-    mk_tv at_ty   = mkTyVarTy (mkTyVar tv_name (typeKind at_ty))
-    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "<tv>") noSrcSpan
-
-    has_poly_args dflags = any (isNothing . fst) shapes
-      where
-        shapes | gopt Opt_PrintExplicitKinds dflags = arg_shapes
-               | otherwise                          = type_shapes
-
-badATErr :: Name -> Name -> SDoc
-badATErr clas op
-  = hsep [text "Class", quotes (ppr clas),
-          text "does not have an associated type", quotes (ppr op)]
-
 
 {-
 ************************************************************************
@@ -1854,7 +1646,7 @@ badATErr clas op
 
 checkValidCoAxiom :: CoAxiom Branched -> TcM ()
 checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
-  = do { mapM_ (checkValidCoAxBranch Nothing fam_tc) branch_list
+  = do { mapM_ (checkValidCoAxBranch fam_tc) branch_list
        ; foldlM_ check_branch_compat [] branch_list }
   where
     branch_list = fromBranches branches
@@ -1907,26 +1699,24 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
 -- Check that a "type instance" is well-formed (which includes decidability
 -- unless -XUndecidableInstances is given).
 --
-checkValidCoAxBranch :: Maybe ClsInstInfo
-                     -> TyCon -> CoAxBranch -> TcM ()
-checkValidCoAxBranch mb_clsinfo fam_tc
+checkValidCoAxBranch :: TyCon -> CoAxBranch -> TcM ()
+checkValidCoAxBranch fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                                 , cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
   = setSrcSpan loc $
-    checkValidTyFamEqn mb_clsinfo fam_tc (tvs++cvs) typats rhs
+    checkValidTyFamEqn fam_tc (tvs++cvs) typats rhs
 
 -- | Do validity checks on a type family equation, including consistency
 -- with any enclosing class instance head, termination, and lack of
 -- polytypes.
-checkValidTyFamEqn :: Maybe ClsInstInfo
-                   -> TyCon   -- ^ of the type family
+checkValidTyFamEqn :: TyCon   -- ^ of the type family
                    -> [Var]   -- ^ Bound variables in the equation
                    -> [Type]  -- ^ Type patterns
                    -> Type    -- ^ Rhs
                    -> TcM ()
-checkValidTyFamEqn mb_clsinfo fam_tc qvs typats rhs
-  = do { checkValidFamPats mb_clsinfo fam_tc qvs typats rhs
+checkValidTyFamEqn fam_tc qvs typats rhs
+  = do { checkValidFamPats fam_tc qvs typats rhs
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -1971,23 +1761,20 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
                        --   [a,b,a,a] \\ [a,a] = [b,a]
                        -- So we are counting repetitions
 
-checkValidFamPats :: Maybe ClsInstInfo
-                  -> TyCon -> [Var]
+checkValidFamPats :: TyCon -> [Var]
                   -> [Type]   -- ^ patterns
                   -> Type     -- ^ RHS
                   -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
--- a) contain no type family applications
+-- a) Shoule contain no type family applications
 --    (vanilla synonyms are fine, though)
 -- b) For associated types, are consistently instantiated
-checkValidFamPats mb_clsinfo fam_tc qvs pats rhs
+checkValidFamPats fam_tc qvs pats rhs
   = do { checkValidTypePats fam_tc pats
 
          -- Check for things used on the right but not bound on the left
        ; checkFamPatBinders fam_tc qvs pats rhs
 
-         -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc pats
        ; traceTc "checkValidFamPats" (ppr fam_tc <+> ppr pats)
        }
 

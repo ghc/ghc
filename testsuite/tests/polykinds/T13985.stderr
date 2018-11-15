@@ -1,27 +1,27 @@
 
-T13985.hs:12:41: error:
+T13985.hs:13:41: error:
     • Type variable ‘k’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘Fam’
 
-T13985.hs:15:43: error:
+T13985.hs:16:43: error:
     • Type variable ‘a’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘T’
 
-T13985.hs:22:26: error:
+T13985.hs:23:26: error:
     • Type variable ‘k’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Type’
 
-T13985.hs:23:37: error:
+T13985.hs:24:37: error:
     • Type variable ‘a’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Type’
 
-T13985.hs:27:39: error:
+T13985.hs:28:39: error:
     • Type variable ‘x’ is mentioned in the RHS,
         but not bound on the LHS of the family instance
     • In the default type instance declaration for ‘ZT’
