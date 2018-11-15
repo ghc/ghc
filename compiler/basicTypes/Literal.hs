@@ -617,8 +617,8 @@ litIsTrivial _                  = True
 -- | True if code space does not go bad if we duplicate this literal
 litIsDupable :: DynFlags -> Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable _      (LitString _)      = False
-litIsDupable dflags (LitNumber nt i _) = case nt of
+litIsDupable _      (LitString _)       = False
+litIsDupable dflags (LitNumber nt i _)  = case nt of
   LitNumInteger -> inIntRange dflags i
   LitNumNatural -> inIntRange dflags i
   LitNumInt     -> True
@@ -699,7 +699,7 @@ cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
 cmpLit (LitRational i1 e1 _) (LitRational i2 e2 _)
   | e1 == e2 = i1 `compare` i2
   | otherwise = e1 `compare` e2
-cmpLit (LitRubbish)          (LitRubbish)           = EQ
+cmpLit (LitRubbish)         (LitRubbish)          = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
@@ -713,7 +713,7 @@ litTag (LitDouble    _)    = 5
 litTag (LitLabel _ _ _)    = 6
 litTag (LitNumber  {})     = 7
 litTag (LitRational _ _ _) = 8
-litTag (RubbishLit)        = 9
+litTag (LitRubbish)        = 9
 
 {-
         Printing
@@ -739,6 +739,8 @@ pprLiteral add_par (LitRational i e _) =
     (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
+pprLiteral add_par (LitRational i e _) = 
+    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
