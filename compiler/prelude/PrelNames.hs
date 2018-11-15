@@ -1208,11 +1208,12 @@ mkNaturalName         = varQual gHC_NATURAL (fsLit "mkNatural")         mkNatura
 wordToNaturalName     = varQual gHC_NATURAL (fsLit "wordToNatural#")    wordToNaturalIdKey
 
 -- GHC.Real types and classes
-rationalTyConName, ratioTyConName, ratioDataConName, realClassName,
+rationalTyConName, mkRationalName, ratioTyConName, ratioDataConName, realClassName,
     integralClassName, realFracClassName, fractionalClassName,
     fromRationalName, toIntegerName, toRationalName, fromIntegralName,
     realToFracName :: Name
 rationalTyConName   = tcQual  gHC_REAL (fsLit "Rational")     rationalTyConKey
+mkRationalName      = tcQual  gHC_REAL (fsLit "mkRational")   mkRationalIdKey
 ratioTyConName      = tcQual  gHC_REAL (fsLit "Ratio")        ratioTyConKey
 ratioDataConName    = dcQual  gHC_REAL (fsLit ":%")           ratioDataConKey
 realClassName       = clsQual gHC_REAL (fsLit "Real")         realClassKey
@@ -2428,7 +2429,7 @@ makeStaticKey = mkPreludeMiscIdUnique 561
 -- Natural
 naturalFromIntegerIdKey, naturalToIntegerIdKey, plusNaturalIdKey,
    minusNaturalIdKey, timesNaturalIdKey, mkNaturalIdKey,
-   naturalSDataConKey, wordToNaturalIdKey :: Unique
+   naturalSDataConKey, wordToNaturalIdKey, mkRationalIdKey :: Unique
 naturalFromIntegerIdKey = mkPreludeMiscIdUnique 562
 naturalToIntegerIdKey   = mkPreludeMiscIdUnique 563
 plusNaturalIdKey        = mkPreludeMiscIdUnique 564
@@ -2437,6 +2438,7 @@ timesNaturalIdKey       = mkPreludeMiscIdUnique 566
 mkNaturalIdKey          = mkPreludeMiscIdUnique 567
 naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
+mkRationalIdKey         = mkPreludeMiscIdUnique 570
 
 {-
 ************************************************************************
