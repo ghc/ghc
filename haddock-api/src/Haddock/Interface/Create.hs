@@ -59,7 +59,7 @@ import Bag
 import RdrName
 import TcRnTypes
 import FastString ( unpackFS, fastStringToByteString)
-import BasicTypes ( StringLiteral(..), SourceText(..) )
+import BasicTypes ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified Outputable as O
 import HsDecls ( getConArgs )
 
