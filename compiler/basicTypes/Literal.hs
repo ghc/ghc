@@ -217,6 +217,10 @@ instance Binary Literal where
         = do putByte bh 7
              put_ bh i
              put_ bh e
+<<<<<<< HEAD
+=======
+
+>>>>>>> Fix a large rationals bug (#15646)
     put_ bh (LitRubbish)      = do putByte bh 8
     get bh = do
             h <- getByte bh
@@ -712,7 +716,7 @@ litTag (LitDouble    _)    = 5
 litTag (LitLabel _ _ _)    = 6
 litTag (LitNumber  {})     = 7
 litTag (LitRational _ _ _) = 8
-litTag (RubbishLit)        = 9
+litTag (LitRubbish)        = 9
 
 {-
         Printing
@@ -737,7 +741,7 @@ pprLiteral add_par (LitNumber nt i _)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
 pprLiteral add_par (LitRational i e _) = 
-    pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)    
+    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
