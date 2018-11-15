@@ -871,7 +871,6 @@ bigConstraintTuple arity
 -- These kinds should be used to instantiate invisible kind variables;
 -- they come from an enclosing class for an associated type/data family.
 tcInferApps :: TcTyMode
-            -> Maybe (VarEnv Kind)  -- ^ Possibly, kind info (see above)
             -> LHsType GhcRn        -- ^ Function (for printing only)
             -> TcType               -- ^ Function
             -> TcKind               -- ^ Function kind (zonked)
@@ -882,7 +881,7 @@ tcInferApps :: TcTyMode
 --            and that type must be well-kinded
 --            See Note [The tcType invariant]
 -- Postcondition: Result kind is zonked.
-tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
+tcInferApps mode orig_hs_ty fun_ty fun_ki orig_hs_args
   = do { traceTc "tcInferApps {" (ppr orig_hs_ty $$ ppr orig_hs_args $$ ppr fun_ki)
        ; (f_args, args, res_k) <- go 1 [] empty_subst fun_ty orig_ki_binders orig_inner_ki orig_hs_args
        ; traceTc "tcInferApps }" empty
@@ -915,7 +914,7 @@ tcInferApps mode mb_kind_info orig_hs_ty fun_ty fun_ki orig_hs_args
       | isInvisibleBinder ki_binder
         -- It's invisible. Instantiate.
       = do { traceTc "tcInferApps (invis)" (ppr ki_binder $$ ppr subst)
-           ; (subst', arg') <- tcInstTyBinder mb_kind_info subst ki_binder
+           ; (subst', arg') <- tcInstTyBinder Nothing subst ki_binder
            ; go n (arg' : acc_args) subst' (mkNakedAppTy fun arg')
                 ki_binders inner_ki all_args }
 
@@ -969,7 +968,7 @@ tcTyApps :: TcTyMode
          -> TcM (TcType, TcKind) -- ^ (f args, result kind)   result kind is zonked
 -- Precondition: see precondition for tcInferApps
 tcTyApps mode orig_hs_ty fun_ty fun_ki args
-  = do { (ty', _args, ki') <- tcInferApps mode Nothing orig_hs_ty fun_ty fun_ki args
+  = do { (ty', _args, ki') <- tcInferApps mode orig_hs_ty fun_ty fun_ki args
        ; return (ty' `mkNakedCastTy` mkNomReflCo ki', ki') }
           -- The mkNakedCastTy is for (IT3) of Note [The tcType invariant]
 
@@ -1548,9 +1547,9 @@ kcLHsQTyVars name flav cusk
        ; res_kind   <- zonkTcType           res_kind
 
        ; let mentioned_kv_set = candidateKindVars candidates
-             tc_tv_set        = mkVarSet tc_tvs
-             specified        = scopedSort $
-                                filterOut (`elemVarSet` tc_tv_set) scoped_kvs
+--             tc_tv_set        = mkVarSet tc_tvs
+             specified        = scopedSort scoped_kvs
+--                                filterOut (`elemVarSet` tc_tv_set) scoped_kvs
                                 -- NB: maintain the L-R order of scoped_kvs
 
              final_tc_binders =  mkNamedTyConBinders Inferred  inferred
@@ -1811,7 +1810,8 @@ bindExplicitTKBndrsX
     -> TcM a
     -> TcM ([TcTyVar], a)
 bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
-  = go hs_tvs
+  = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)
+       ; go hs_tvs }
   where
     go [] = do { res <- thing_inside
                ; return ([], res) }

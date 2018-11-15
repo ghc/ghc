@@ -601,7 +601,7 @@ tcDataFamInstDecl mb_clsinfo
                                                    , hsib_body =
       FamEqn { feqn_bndrs  = mb_bndrs
              , feqn_pats   = hs_pats
-             , feqn_tycon  = fam_name
+             , feqn_tycon  = lfam_name@(L _ fam_name)
              , feqn_fixity = fixity
              , feqn_rhs    = HsDataDefn { dd_ND = new_or_data
                                         , dd_cType = cType
@@ -611,61 +611,64 @@ tcDataFamInstDecl mb_clsinfo
                                         , dd_derivs = derivs } }}}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
-    do { fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_name
+    do { fam_tc <- tcFamInstDeclCombined mb_clsinfo lfam_name
 
-         -- Check that the family declaration is for the right kind
+       -- Check that the family declaration is for the right kind
        ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
+       ; gadt_syntax <- dataDeclChecks fam_name new_or_data ctxt cons
+          -- Do /not/ check that the number of patterns = tyConArity fam_tc
+          -- See [Arity of data families] in FamInstEnv
 
-         -- Kind check type patterns
+       -- Kind check type patterns
        ; let exp_bndrs = mb_bndrs `orElse` []
-             data_ctxt = DataKindCtxt (unLoc fam_name)
+             data_ctxt = DataKindCtxt fam_name
 
-       ; (_, (_, (pats, stupid_theta, res_kind)))
+       ; (imp_tvs, (exp_tvs, (pats, stupid_theta, res_kind)))
                <- pushTcLevelM_                                $
                   solveEqualities                              $
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
-                  do { (pats, res_kind) <- tcFamTyPats_new fam_tc mb_clsinfo hs_pats
+                  do { (pats, res_kind) <- tcFamTyPats fam_tc mb_clsinfo hs_pats
                      ; stupid_theta <- tcHsContext ctxt
                      ; mapM_ (wrapLocM kcConDecl) cons
+
                      ; exp_res_kind <- case m_ksig of
                           Nothing   -> return liftedTypeKind
                           Just hs_k -> tcLHsKindSig data_ctxt hs_k
-
                      ; _ <- checkExpectedKindX Nothing pp_hs_pats bogus_ty
                                                res_kind exp_res_kind
-                            -- ToDo: what about a non-triv result?a
+                            -- ToDo: what about a non-triv result?
+
                      ; return (pats, stupid_theta, res_kind) }
 
-       ; dvs   <- candidateQTyVarsOfTypes (res_kind : pats)
-       ; qtkvs <- quantifyTyVars emptyVarSet dvs
+       ; dvs  <- candidateQTyVarsOfTypes pats
+       ; qtvs <- quantifyTyVars emptyVarSet dvs
 
+       ; checkFamPatBinders fam_tc imp_tvs exp_tvs qtvs pats
+       
        -- Zonk the patterns etc into the Type world
-       ; (ze, tvs)    <- zonkTyBndrs qtkvs
+       ; (ze, qtvs)   <- zonkTyBndrs qtvs
        ; pats         <- zonkTcTypesToTypesX ze pats
        ; res_kind     <- zonkTcTypeToTypeX   ze res_kind
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
 
-       ; gadt_syntax <- dataDeclChecks (unLoc fam_name) new_or_data
-                                       stupid_theta cons
-
-         -- Construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName fam_name pats
-       ; axiom_name  <- newFamInstAxiomName fam_name [pats]
+       -- Construct representation tycon
+       ; rep_tc_name <- newFamInstTyConName lfam_name pats
+       ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
 
        ; let (eta_pats, etad_tvs) = eta_reduce pats
-             eta_tvs              = filterOut (`elem` etad_tvs) tvs
+             eta_tvs              = filterOut (`elem` etad_tvs) qtvs
                  -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
 
              full_tcbs = mkTyConBindersPreferAnon (eta_tvs ++ etad_tvs) res_kind
                  -- Put the eta-removed tyvars at the end
-                 -- Remember, tvs' is in arbitrary order, except kind vars are
+                 -- Remember, qtvs is in arbitrary order, except kind vars are
                  -- first, so there is no reason to suppose that the etad_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
 
-         -- Deal with any kind signature.
-         -- See also Note [Arity of data families] in FamInstEnv
+       -- Deal with any kind signature.
+       -- See also Note [Arity of data families] in FamInstEnv
        ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind
        ; checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
 
@@ -674,8 +677,9 @@ tcDataFamInstDecl mb_clsinfo
              orig_res_ty = mkTyConApp fam_tc all_pats
              ty_binders  = full_tcbs `chkAppend` extra_tcbs
 
+       ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr imp_vars $$ ppr exp_bndrs $$ ppr cons)
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcExtendTyVarEnv tvs $
+           do { data_cons <- tcExtendTyVarEnv qtvs $
                              -- For H98 decls, the tyvars scope
                              -- over the data constructors
                              tcConDecls rec_rep_tc ty_binders orig_res_ty cons
@@ -706,12 +710,12 @@ tcDataFamInstDecl mb_clsinfo
                  -- they involve a coercion.
               ; return (rep_tc, axiom) }
 
-         -- Remember to check validity; no recursion to worry about here
-         -- Check that left-hand sides are ok (mono-types, no type families,
-         -- consistent instantiations, etc)
-       ; checkValidFamPats mb_clsinfo fam_tc tvs [] pats extra_pats pp_hs_pats
+       -- Remember to check validity; no recursion to worry about here
+       -- Check that left-hand sides are ok (mono-types, no type families,
+       -- consistent instantiations, etc)
+       ; checkValidFamPats mb_clsinfo fam_tc qtvs [] pats extra_pats pp_hs_pats
 
-         -- Result kind must be '*' (otherwise, we have too few patterns)
+       -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (tcIsLiftedTypeKind final_res_kind) $
          tooFewParmsErr (tyConArity fam_tc)
 
@@ -743,8 +747,8 @@ tcDataFamInstDecl mb_clsinfo
       = go pats (tv : etad_tvs)
     go pats etad_tvs = (reverse pats, etad_tvs)
 
-    pp_hs_pats = pprFamInstLHS fam_name mb_bndrs hs_pats fixity (unLoc ctxt) m_ksig
-    bogus_ty   = pprPanic "kcDataDefn" (ppr fam_name <+> ppr hs_pats)
+    pp_hs_pats = pprFamInstLHS lfam_name mb_bndrs hs_pats fixity (unLoc ctxt) m_ksig
+    bogus_ty   = pprPanic "tcDataFamInstDecl" (ppr fam_name <+> ppr hs_pats)
 
 
 tcDataFamInstDecl _

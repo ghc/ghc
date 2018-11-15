@@ -1984,26 +1984,9 @@ checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
 -- Patterns in a 'type instance' or 'data instance' decl should
 -- a) contain no type family applications
 --    (vanilla synonyms are fine, though)
--- b) properly bind all their free type variables
---    e.g. we disallow (Trac #7536)
---         type T a = Int
---         type instance F (T a) = a
--- c) For associated types, are consistently instantiated
+-- b) For associated types, are consistently instantiated
 checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
   = do { checkValidTypePats fam_tc user_ty_pats
-
-       ; let exact_tvs = exactTyCoVarsOfTypes user_ty_pats
-             free_tvs  = tyCoVarsOfTypes      user_ty_pats
-             dodgy_tvs = free_tvs `minusVarSet` exact_tvs
-             unbound_tcvs = filterOut (`elemVarSet` exact_tvs) (tvs ++ cvs)
-             extra = ppWhen (any (`elemVarSet` dodgy_tvs) unbound_tcvs) $
-                     hang (text "The real LHS (expanding synonyms) is:")
-                        2 (pprTypeApp fam_tc (map expandTypeSynonyms user_ty_pats))
-
-       ; checkTc (null unbound_tcvs) $
-         hang (text "LHS of family instance fails to bind type variable"
-               <> plural tvs <+> pprQuotedList tvs)
-            2 extra
 
          -- Check that type patterns match the class instance head
        ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
