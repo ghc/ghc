@@ -19,6 +19,9 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
+-- The constructors in this file can be unrestricted.
+{-# LANGUAGE LinearTypes #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Typeable.Internal
@@ -82,7 +85,7 @@ module Data.Typeable.Internal (
 
 import GHC.Base
 import qualified GHC.Arr as A
-import GHC.Types ( TYPE )
+import GHC.Types ( TYPE, Multiplicity (Omega) )
 import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
@@ -207,18 +210,19 @@ data TypeRep (a :: k) where
                , trAppKind :: !(TypeRep k2) }   -- See Note [Kind caching]
             -> TypeRep (a b)
 
-    -- | @TrFun fpr a b@ represents a function type @a -> b@. We use this for
+    -- | @TrFun fpr m a b@ represents a function type @a -->.(m) b@. We use this for
     -- the sake of efficiency as functions are quite ubiquitous.
-    TrFun   :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+    TrFun   :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).
                { -- See Note [TypeRep fingerprints]
                  trFunFingerprint :: {-# UNPACK #-} !Fingerprint
 
                  -- The TypeRep represents a function from trFunArg to
                  -- trFunRes.
+               , trFunMul :: !(TypeRep m)
                , trFunArg :: !(TypeRep a)
                , trFunRes :: !(TypeRep b) }
-            -> TypeRep (a -> b)
+            -> TypeRep (a -->.(m) b)
 
 {- Note [TypeRep fingerprints]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -333,8 +337,8 @@ pattern Fun :: forall k (fun :: k). ()
             => TypeRep arg
             -> TypeRep res
             -> TypeRep fun
-pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res}
-  where Fun arg res = mkTrFun arg res
+pattern Fun arg res <- TrFun {trFunArg = arg, trFunRes = res, trFunMul = (eqTypeRep trOmega -> Just HRefl)}
+  where Fun arg res = mkTrFun trOmega arg res
 
 -- | Observe the 'Fingerprint' of a type representation
 --
@@ -381,6 +385,9 @@ trTYPE = typeRep
 trLiftedRep :: TypeRep 'LiftedRep
 trLiftedRep = typeRep
 
+trOmega :: TypeRep 'Omega
+trOmega = typeRep
+
 -- | Construct a representation for a type application that is
 -- NOT a saturated arrow type. This is not checked!
 
@@ -424,7 +431,7 @@ mkTrAppChecked rep@(TrApp {trAppFun = p, trAppArg = x :: TypeRep x})
   , Just (IsTYPE (ry :: TypeRep ry)) <- isTYPE (typeRepKind y)
   , Just HRefl <- withTypeable x $ withTypeable rx $ withTypeable ry
                   $ typeRep @((->) x :: TYPE ry -> Type) `eqTypeRep` rep
-  = mkTrFun x y
+  = mkTrFun trOmega x y -- TODO handle multiplicity
 mkTrAppChecked a b = mkTrApp a b
 
 -- | A type application.
@@ -469,8 +476,9 @@ splitApp :: forall k (a :: k). ()
          -> AppOrCon a
 splitApp TrType = IsApp trTYPE trLiftedRep
 splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
-splitApp rep@(TrFun {trFunArg=a, trFunRes=b}) = IsApp (mkTrApp arr a) b
-  where arr = bareArrow rep
+splitApp rep@(TrFun {trFunArg=a, trFunRes=b, trFunMul = (eqTypeRep trOmega -> Just HRefl)}) = IsApp (mkTrApp arr a) b
+  where arr = bareArrow rep  -- TODO handle multiplicity
+splitApp (TrFun {}) = error "Data.Typeable.Internal.splitApp: Only unrestricted functions are supported"
 splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
   = case unsafeCoerce Refl :: IsApplication a :~: "" of
       Refl -> IsCon con kinds
@@ -614,7 +622,7 @@ instantiateKindRep vars = go
     go (KindRepApp f a)
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
-      = SomeTypeRep $ mkTrFun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
+      = SomeTypeRep $ mkTrFun trOmega (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
     go (KindRepTYPE LiftedRep) = SomeTypeRep TrType
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
@@ -710,7 +718,7 @@ bareArrow :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                     (a :: TYPE r1) (b :: TYPE r2). ()
           => TypeRep (a -> b)
           -> TypeRep ((->) :: TYPE r1 -> TYPE r2 -> Type)
-bareArrow (TrFun _ a b) =
+bareArrow (TrFun _ _ a b) =
     mkTrCon funTyCon [SomeTypeRep rep1, SomeTypeRep rep2]
   where
     rep1 = getRuntimeRep $ typeRepKind a :: TypeRep r1
@@ -810,8 +818,10 @@ splitApps = go []
       = (tc, xs)
     go xs (TrApp {trAppFun = f, trAppArg = x})
       = go (SomeTypeRep x : xs) f
-    go [] (TrFun {trFunArg = a, trFunRes = b})
-      = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
+    go [] (TrFun {trFunArg = a, trFunRes = b, trFunMul = mul})
+      | Just HRefl <- eqTypeRep trOmega mul = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
+      | otherwise = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Only unrestricted functions are supported"
+    -- TODO handle multiplicity
     go _  (TrFun {})
       = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 1"
     go [] TrType = (tyConTYPE, [SomeTypeRep trLiftedRep])
@@ -991,14 +1001,16 @@ typeLitTypeRep :: forall k (a :: k). (Typeable k) =>
 typeLitTypeRep nm kind_tycon = mkTrCon (mkTypeLitTyCon nm kind_tycon) []
 
 -- | For compiler use.
-mkTrFun :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+mkTrFun :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                   (a :: TYPE r1) (b :: TYPE r2).
-           TypeRep a -> TypeRep b -> TypeRep ((a -> b) :: Type)
-mkTrFun arg res = TrFun
+           TypeRep m -> TypeRep a -> TypeRep b -> TypeRep ((a -->.(m) b) :: Type)
+mkTrFun mul arg res = TrFun
     { trFunFingerprint = fpr
+    , trFunMul = mul
     , trFunArg = arg
     , trFunRes = res }
-  where fpr = fingerprintFingerprints [ typeRepFingerprint arg
+  where fpr = fingerprintFingerprints [ typeRepFingerprint mul
+                                      , typeRepFingerprint arg
                                       , typeRepFingerprint res]
 
 {- $kind_instantiation
