@@ -68,7 +68,8 @@ module Id (
         isClassOpId_maybe, isDFunId,
         isPrimOpId, isPrimOpId_maybe,
         isFCallId, isFCallId_maybe,
-        isDataConWorkId, isDataConWorkId_maybe, isDataConId_maybe, idDataCon,
+        isDataConWorkId, isDataConWorkId_maybe, isDataConWrapId, isDataConId_maybe,
+        idDataCon,
         isConLikeId, isBottomingId, idIsFrom,
         hasNoBinding,
 
@@ -494,6 +495,10 @@ isDataConWorkId id = case Var.idDetails id of
 isDataConWorkId_maybe id = case Var.idDetails id of
                         DataConWorkId con -> Just con
                         _                 -> Nothing
+
+isDataConWrapId id = case Var.idDetails id of
+                       DataConWrapId _ -> True
+                       _               -> False
 
 isDataConId_maybe :: Id -> Maybe DataCon
 isDataConId_maybe id = case Var.idDetails id of

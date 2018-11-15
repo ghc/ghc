@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 121, types: 61, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-T7360.$WFoo1 [InlPrag=INLINE[2]] :: Foo
+T7360.$WFoo1 [InlPrag=INLINE[0]] :: Foo
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
@@ -14,7 +14,7 @@ T7360.$WFoo1 [InlPrag=INLINE[2]] :: Foo
 T7360.$WFoo1 = \ (@ (n :: GHC.Types.Multiplicity)) -> T7360.Foo1
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-T7360.$WFoo2 [InlPrag=INLINE[2]] :: Foo
+T7360.$WFoo2 [InlPrag=INLINE[0]] :: Foo
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
@@ -24,7 +24,7 @@ T7360.$WFoo2 [InlPrag=INLINE[2]] :: Foo
 T7360.$WFoo2 = \ (@ (n :: GHC.Types.Multiplicity)) -> T7360.Foo2
 
 -- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
-T7360.$WFoo3 [InlPrag=INLINE[2]] :: Int -> Foo
+T7360.$WFoo3 [InlPrag=INLINE[0]] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
  Caf=NoCafRefs,
@@ -66,7 +66,9 @@ T7360.fun4 :: Int
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun4 = GHC.Types.I# 0#
+T7360.fun4
+  = src<libraries/base/GHC/List.hs:141:1-13>
+    src<libraries/base/GHC/Base.hs:1254:1-28> GHC.Types.I# 0#
 
 -- RHS size: {terms: 16, types: 13, coercions: 0, joins: 0/0}
 fun2 :: forall a. [a] -> ((), Int)

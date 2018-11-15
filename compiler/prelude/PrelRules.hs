@@ -1039,7 +1039,11 @@ dataToTagRule = a `mplus` b
       dflags <- getDynFlags
       [_, val_arg] <- getArgs
       in_scope <- getInScopeEnv
-      (dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
+      ([], dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
+        -- It's probably sound to make `dataToTag#` commute with lets, on the
+        -- other hand, commuting with `case` (for strict fields) is, I believe,
+        -- less strict than the original. To be on the safe side, let's not
+        -- commute with anything for the moment.
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
       return $ mkIntVal dflags (toInteger (dataConTagZ dc))
 
