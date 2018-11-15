@@ -111,6 +111,8 @@ data Literal
   | LitNumber !LitNumType !Integer Type
                                 -- ^ Any numeric literal that can be
                                 -- internally represented with an Integer
+  | LitRational !Integer !Integer Type
+                                --  ^ Rationals expressed as significand and exponent
 
   | LitRational !Integer !Integer Type
       --  ^ Rationals expressed as significand and exponent
@@ -618,8 +620,8 @@ litIsTrivial _                  = True
 -- | True if code space does not go bad if we duplicate this literal
 litIsDupable :: DynFlags -> Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable _      (LitString _)      = False
-litIsDupable dflags (LitNumber nt i _) = case nt of
+litIsDupable _      (LitString _)       = False
+litIsDupable dflags (LitNumber nt i _)  = case nt of
   LitNumInteger -> inIntRange dflags i
   LitNumNatural -> inIntRange dflags i
   LitNumInt     -> True
@@ -627,7 +629,7 @@ litIsDupable dflags (LitNumber nt i _) = case nt of
   LitNumWord    -> True
   LitNumWord64  -> True
 litIsDupable dflags (LitRational i e _) = True
-litIsDupable _      _                = True
+litIsDupable _      _                   = True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (LitNumber _ i _) = i >= toInteger (ord minBound)
@@ -659,7 +661,7 @@ literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
 literalType (LitNumber _ _ t) = t
 literalType (LitRational _ _ t) = t
-literalType (RubbishLit)      = mkForAllTy a Inferred (mkTyVarTy a)
+literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
 
@@ -706,15 +708,15 @@ cmpLit lit1 lit2
   | otherwise                 = GT
 
 litTag :: Literal -> Int
-litTag (LitChar      _)   = 1
-litTag (LitString    _)   = 2
-litTag (LitNullAddr)      = 3
-litTag (LitFloat     _)   = 4
-litTag (LitDouble    _)   = 5
-litTag (LitLabel _ _ _)   = 6
-litTag (LitNumber  {})    = 7
+litTag (LitChar      _)    = 1
+litTag (LitString    _)    = 2
+litTag (LitNullAddr)       = 3
+litTag (LitFloat     _)    = 4
+litTag (LitDouble    _)    = 5
+litTag (LitLabel _ _ _)    = 6
+litTag (LitNumber  {})     = 7
 litTag (LitRational _ _ _) = 8
-litTag (LitRubbish)       = 9
+litTag (LitRubbish)        = 9
 
 {-
         Printing
@@ -740,6 +742,8 @@ pprLiteral add_par (LitRational i e _) =
     (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
 pprLiteral add_par (LitLabel l mb fod) =
     add_par (text "__label" <+> b <+> ppr fod)
+pprLiteral add_par (LitRational i e _) = 
+    (pprIntegerVal add_par i) <> (text "e") <> (pprIntegerVal add_par e)
     where b = case mb of
               Nothing -> pprHsString l
               Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
