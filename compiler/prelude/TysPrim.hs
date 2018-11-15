@@ -368,10 +368,10 @@ multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13
 funTyConName :: Name
 funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 
--- | The @(->)@ type constructor.
+-- | The @FUN@ type constructor.
 --
 -- @
--- (->) :: forall (m :: Multiplicity) {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+-- FUN :: forall (m :: Multiplicity) {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
 funTyCon :: TyCon
