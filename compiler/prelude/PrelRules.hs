@@ -1039,9 +1039,9 @@ dataToTagRule = a `mplus` b
       dflags <- getDynFlags
       [_, val_arg] <- getArgs
       in_scope <- getInScopeEnv
-      (dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
+      (floats, dc,_,_) <- liftMaybe $ exprIsConApp_maybe in_scope val_arg
       ASSERT( not (isNewTyCon (dataConTyCon dc)) ) return ()
-      return $ mkIntVal dflags (toInteger (dataConTagZ dc))
+      return $ wrapFloats floats (mkIntVal dflags (toInteger (dataConTagZ dc)))
 
 {- Note [dataToTag# magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
