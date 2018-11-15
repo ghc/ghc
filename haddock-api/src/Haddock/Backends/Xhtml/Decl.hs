@@ -32,6 +32,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
+import BasicTypes (PromotionFlag(..))
 import GHC hiding (LexicalFixity(..))
 import GHC.Exts
 import Name
@@ -1183,7 +1184,7 @@ ppr_mono_ty (HsRecTy {})        _ _ _ = toHtml "{..}"
        -- placeholder in the signature, which is followed by the field
        -- declarations.
 ppr_mono_ty (XHsType (NHsCoreTy {})) _ _ _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty (HsExplicitListTy _ Promoted tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
+ppr_mono_ty (HsExplicitListTy _ IsPromoted tys) u q _ = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty (HsExplicitListTy _ NotPromoted tys) u q _ = brackets $ hsep $ punctuate comma $ map (ppLType u q HideEmptyContexts) tys
 ppr_mono_ty (HsExplicitTupleTy _ tys) u q _ = promoQuote $ parenList $ map (ppLType u q HideEmptyContexts) tys
 

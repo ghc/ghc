@@ -17,7 +17,8 @@ module Haddock.Backends.Hoogle (
     ppHoogle
   ) where
 
-import BasicTypes (OverlapFlag(..), OverlapMode(..), SourceText(..))
+import BasicTypes ( OverlapFlag(..), OverlapMode(..), SourceText(..)
+                  , PromotionFlag(..) )
 import InstEnv (ClsInst(..))
 import Documentation.Haddock.Markup
 import Haddock.GhcUtils

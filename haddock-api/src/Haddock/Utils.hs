@@ -61,6 +61,7 @@ import Documentation.Haddock.Doc (emptyMetaDoc)
 import Haddock.Types
 import Haddock.GhcUtils
 
+import BasicTypes ( PromotionFlag(..) )
 import GHC
 import Name
 import HsTypes (extFieldOcc)

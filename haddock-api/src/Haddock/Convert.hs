@@ -17,7 +17,8 @@ module Haddock.Convert where
 -- instance heads, which aren't TyThings, so just export everything.
 
 import Bag ( emptyBag )
-import BasicTypes ( TupleSort(..), SourceText(..), LexicalFixity(..) )
+import BasicTypes ( TupleSort(..), SourceText(..), LexicalFixity(..)
+                  , PromotionFlag(..) )
 import Class
 import CoAxiom
 import ConLike
@@ -468,13 +469,13 @@ synifyType _ (TyConApp tc tys)
       | getName tc == listTyConName, [ty] <- vis_tys =
          noLoc $ HsListTy noExt (synifyType WithinType ty)
       | tc == promotedNilDataCon, [] <- vis_tys
-      = noLoc $ HsExplicitListTy noExt Promoted []
+      = noLoc $ HsExplicitListTy noExt IsPromoted []
       | tc == promotedConsDataCon
       , [ty1, ty2] <- vis_tys
       = let hTy = synifyType WithinType ty1
         in case synifyType WithinType ty2 of
-             tTy | L _ (HsExplicitListTy _ Promoted tTy') <- stripKindSig tTy
-                 -> noLoc $ HsExplicitListTy noExt Promoted (hTy : tTy')
+             tTy | L _ (HsExplicitListTy _ IsPromoted tTy') <- stripKindSig tTy
+                 -> noLoc $ HsExplicitListTy noExt IsPromoted (hTy : tTy')
                  | otherwise
                  -> noLoc $ HsOpTy noExt hTy (noLoc $ getName tc) tTy
       -- ditto for implicit parameter tycons

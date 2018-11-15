@@ -34,7 +34,7 @@ import Data.Map (Map)
 import Data.Data (Data)
 import qualified Data.Map as Map
 import Documentation.Haddock.Types
-import BasicTypes (Fixity(..))
+import BasicTypes (Fixity(..), PromotionFlag(..))
 
 import GHC hiding (NoLink)
 import DynFlags (Language)
