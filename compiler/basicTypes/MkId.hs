@@ -409,8 +409,8 @@ dictSelRule :: Int -> Arity -> RuleFun
 --
 dictSelRule val_index n_ty_args _ id_unf _ args
   | (dict_arg : _) <- drop n_ty_args args
-  , Just (_, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
-  = Just (getNth con_args val_index)
+  , Just (floats, _, _, con_args) <- exprIsConApp_maybe id_unf dict_arg
+  = Just (wrapFloats floats $ getNth con_args val_index)
   | otherwise
   = Nothing
 
@@ -596,7 +596,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                         | otherwise           = topDmd
 
              wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
-                         activeAfterInitial
+                         activeDuringFinal
                          -- See Note [Activation for data constructor wrappers]
 
              -- The wrapper will usually be inlined (see wrap_unf), so its
@@ -706,16 +706,24 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
 {- Note [Activation for data constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Activation on a data constructor wrapper allows it to inline in
-Phase 2 and later (1, 0).  But not in the InitialPhase.  That gives
-rewrite rules a chance to fire (in the InitialPhase) if they mention
-a data constructor on the left
+The Activation on a data constructor wrapper allows it to inline only in Phase
+0. This way rules have a chance to fire if they mention a data constructor on
+the left
    RULE "foo"  f (K a b) = ...
 Since the LHS of rules are simplified with InitialPhase, we won't
 inline the wrapper on the LHS either.
 
-People have asked for this before, but now that even the InitialPhase
-does some inlining, it has become important.
+On the other hand, this means that exprIsConApp_maybe must be able to deal
+with wrappers so that case-of-constructor is not delayed; see
+Note [exprIsConApp_maybe on data constructors with wrappers] for details.
+
+It used to activate in phases 2 (afterInitial) and later, but it makes it
+awkward to write a RULE[1] with a constructor on the left: it would work if a
+constructor has no wrapper, but whether a constructor has a wrapper depends, for
+instance, on the order of type argument of that constructors. Therefore changing
+the order of type argument could make previously working RULEs fail.
+
+See also https://ghc.haskell.org/trac/ghc/ticket/15840 .
 
 
 Note [Bangs on imported data constructors]
