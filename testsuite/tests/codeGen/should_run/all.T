@@ -181,3 +181,10 @@ test('T15696_1', normal, compile_and_run, ['-O'])
 test('T15696_2', normal, compile_and_run, ['-O'])
 # This requires -O
 test('T15696_3', normal, compile_and_run, ['-O'])
+
+test('T15892',
+     [ ignore_stdout,
+        # we want to do lots of major GC to make the bug more likely to
+        # happen, so -G1 -A32k:
+        extra_run_opts('+RTS -G1 -A32k -RTS') ],
+     compile_and_run, ['-O'])
