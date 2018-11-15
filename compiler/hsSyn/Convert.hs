@@ -1350,7 +1350,7 @@ cvtTypeKind ty_str ty
                            -- names, as opposed to PromotedT, which can only
                            -- contain data constructor names. See #15572.
                            let prom = if isRdrDataCon nm'
-                                      then Promoted
+                                      then IsPromoted
                                       else NotPromoted
                          ; mk_apps (HsTyVar noExt prom (noLoc nm')) tys'}
 
@@ -1398,8 +1398,8 @@ cvtTypeKind ty_str ty
                    }
 
            PromotedT nm -> do { nm' <- cName nm
-                              ; mk_apps (HsTyVar noExt Promoted
-                                                             (noLoc nm')) tys' }
+                              ; let hs_ty = HsTyVar noExt IsPromoted (noLoc nm')
+                              ; mk_apps hs_ty tys' }
                  -- Promoted data constructor; hence cName
 
            PromotedTupleT n
@@ -1408,20 +1408,20 @@ cvtTypeKind ty_str ty
              | m == n   -- Saturated
              -> returnL (HsExplicitTupleTy noExt tys')
              | otherwise
-             -> mk_apps (HsTyVar noExt Promoted
+             -> mk_apps (HsTyVar noExt IsPromoted
                                (noLoc (getRdrName (tupleDataCon Boxed n)))) tys'
              where
                m = length tys'
 
            PromotedNilT
-             -> mk_apps (HsExplicitListTy noExt Promoted []) tys'
+             -> mk_apps (HsExplicitListTy noExt IsPromoted []) tys'
 
            PromotedConsT  -- See Note [Representing concrete syntax in types]
                           -- in Language.Haskell.TH.Syntax
              | [ty1, L _ (HsExplicitListTy _ ip tys2)] <- tys'
              -> returnL (HsExplicitListTy noExt ip (ty1:tys2))
              | otherwise
-             -> mk_apps (HsTyVar noExt Promoted
+             -> mk_apps (HsTyVar noExt IsPromoted
                          (noLoc (getRdrName consDataCon)))
                         tys'
 

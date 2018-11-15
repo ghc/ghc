@@ -145,7 +145,7 @@
              [({ DumpParsedAst.hs:9:10-12 }
                (HsExplicitListTy
                 (NoExt)
-                (Promoted)
+                (IsPromoted)
                 []))]
              (Prefix)
              ({ DumpParsedAst.hs:9:21-24 }

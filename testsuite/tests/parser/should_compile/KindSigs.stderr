@@ -377,7 +377,7 @@
       ({ KindSigs.hs:26:13-29 }
        (HsExplicitListTy
         (NoExt)
-        (Promoted)
+        (IsPromoted)
         [({ KindSigs.hs:26:16-27 }
           (HsKindSig
            (NoExt)

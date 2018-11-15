@@ -191,7 +191,7 @@
                [({ DumpRenamedAst.hs:12:10-12 }
                  (HsExplicitListTy
                   (NoExt)
-                  (Promoted)
+                  (IsPromoted)
                   []))]
                (Prefix)
                ({ DumpRenamedAst.hs:12:21-24 }

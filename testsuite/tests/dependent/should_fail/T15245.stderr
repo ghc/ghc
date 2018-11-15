@@ -2,6 +2,6 @@
 T15245.hs:10:24: error:
     • Data constructor ‘MkK’ cannot be used here
         (it comes from a data family instance)
-    • In the type ‘ 'MkK’
-      In the first argument of ‘print’, namely ‘(typeRep @ 'MkK)’
-      In the expression: print (typeRep @ 'MkK)
+    • In the type ‘'MkK’
+      In the first argument of ‘print’, namely ‘(typeRep @'MkK)’
+      In the expression: print (typeRep @'MkK)

@@ -150,7 +150,7 @@ toIfaceTypeX fr (TyConApp tc tys)
     -- tuples
   | Just sort <- tyConTuple_maybe tc
   , n_tys == arity
-  = IfaceTupleTy sort IsNotPromoted (toIfaceTcArgsX fr tc tys)
+  = IfaceTupleTy sort NotPromoted (toIfaceTcArgsX fr tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
   , isTupleDataCon dc
@@ -159,7 +159,7 @@ toIfaceTypeX fr (TyConApp tc tys)
 
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
   , (k1:k2:_) <- tys
-  = let info = IfaceTyConInfo IsNotPromoted sort
+  = let info = IfaceTyConInfo NotPromoted sort
         sort | k1 `eqType` k2 = IfaceEqualityTyCon
              | otherwise      = IfaceNormalTyCon
     in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
@@ -191,7 +191,7 @@ toIfaceTyCon tc
     tc_name = tyConName tc
     info    = IfaceTyConInfo promoted sort
     promoted | isPromotedDataCon tc = IsPromoted
-             | otherwise            = IsNotPromoted
+             | otherwise            = NotPromoted
 
     tupleSort :: TyCon -> Maybe IfaceTyConSort
     tupleSort tc' =
@@ -217,7 +217,7 @@ toIfaceTyCon tc
 
 toIfaceTyCon_name :: Name -> IfaceTyCon
 toIfaceTyCon_name n = IfaceTyCon n info
-  where info = IfaceTyConInfo IsNotPromoted IfaceNormalTyCon
+  where info = IfaceTyConInfo NotPromoted IfaceNormalTyCon
   -- Used for the "rough-match" tycon stuff,
   -- where pretty-printing is not an issue
 

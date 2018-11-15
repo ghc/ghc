@@ -1153,13 +1153,13 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
-tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceAppArgs -> IfL Type
+tcIfaceTupleTy :: TupleSort -> PromotionFlag -> IfaceAppArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args
  = do { args' <- tcIfaceAppArgs args
       ; let arity = length args'
       ; base_tc <- tcTupleTyCon True sort arity
       ; case is_promoted of
-          IsNotPromoted
+          NotPromoted
             -> return (mkTyConApp base_tc args')
 
           IsPromoted
@@ -1673,7 +1673,7 @@ tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon (IfaceTyCon name info)
   = do { thing <- tcIfaceGlobal name
        ; return $ case ifaceTyConIsPromoted info of
-           IsNotPromoted -> tyThingTyCon thing
+           NotPromoted -> tyThingTyCon thing
            IsPromoted    -> promoteDataCon $ tyThingDataCon thing }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)

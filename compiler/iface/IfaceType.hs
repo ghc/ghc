@@ -16,7 +16,7 @@ module IfaceType (
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
         IfaceMCoercion(..),
         IfaceUnivCoProv(..),
-        IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..), IsPromoted(..),
+        IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..),
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
@@ -143,7 +143,7 @@ data IfaceType
 
   | IfaceTupleTy                  -- Saturated tuples (unsaturated ones use IfaceTyConApp)
        TupleSort                  -- What sort of tuple?
-       IsPromoted                 -- A bit like IfaceTyCon
+       PromotionFlag                 -- A bit like IfaceTyCon
        IfaceAppArgs               -- arity = length args
           -- For promoted data cons, the kind args are omitted
 
@@ -184,10 +184,6 @@ instance Monoid IfaceAppArgs where
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
                              , ifaceTyConInfo :: IfaceTyConInfo }
-    deriving (Eq)
-
--- | Is a TyCon a promoted data constructor or just a normal type constructor?
-data IsPromoted = IsNotPromoted | IsPromoted
     deriving (Eq)
 
 -- | The various types of TyCons which have special, built-in syntax.
@@ -290,7 +286,7 @@ See Note [The equality types story] in TysPrim.
 
 data IfaceTyConInfo   -- Used to guide pretty-printing
                       -- and to disambiguate D from 'D (they share a name)
-  = IfaceTyConInfo { ifaceTyConIsPromoted :: IsPromoted
+  = IfaceTyConInfo { ifaceTyConIsPromoted :: PromotionFlag
                    , ifaceTyConSort       :: IfaceTyConSort }
     deriving (Eq)
 
@@ -1033,11 +1029,24 @@ criteria are met:
    in TyCoRep.
 
 N.B. Until now (Aug 2018) we didn't check anything for coercion variables.
+
+Note [Printing promoted type constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GHCi session (Trac #14343)
+    > _ :: Proxy '[ 'True ]
+    error:
+      Found hole: _ :: Proxy '['True]
+
+This would be bad, because the '[' looks like a character literal.
+Solution: in type-level lists and tuples, add a leading space
+if the first type is itself promoted.  See pprSpaceIfPromotedTyCon.
 -}
+
 
 -------------------
 
 -- | Prefix a space if the given 'IfaceType' is a promoted 'TyCon'.
+-- See Note [Printing promoted type constructors]
 pprSpaceIfPromotedTyCon :: IfaceType -> SDoc -> SDoc
 pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
   = case ifaceTyConIsPromoted (ifaceTyConInfo tyCon) of
@@ -1229,7 +1238,7 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   | otherwise
   = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
-pprSum :: Arity -> IsPromoted -> IfaceAppArgs -> SDoc
+pprSum :: Arity -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprSum _arity is_promoted args
   =   -- drop the RuntimeRep vars.
       -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
@@ -1238,8 +1247,8 @@ pprSum _arity is_promoted args
     in pprPromotionQuoteI is_promoted
        <> sumParens (pprWithBars (ppr_ty topPrec) args')
 
-pprTuple :: PprPrec -> TupleSort -> IsPromoted -> IfaceAppArgs -> SDoc
-pprTuple ctxt_prec ConstraintTuple IsNotPromoted IA_Nil
+pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
+pprTuple ctxt_prec ConstraintTuple NotPromoted IA_Nil
   = maybeParen ctxt_prec appPrec $
     text "() :: Constraint"
 
@@ -1375,8 +1384,8 @@ pprPromotionQuote :: IfaceTyCon -> SDoc
 pprPromotionQuote tc =
     pprPromotionQuoteI $ ifaceTyConIsPromoted $ ifaceTyConInfo tc
 
-pprPromotionQuoteI  :: IsPromoted -> SDoc
-pprPromotionQuoteI IsNotPromoted = empty
+pprPromotionQuoteI  :: PromotionFlag -> SDoc
+pprPromotionQuoteI NotPromoted = empty
 pprPromotionQuoteI IsPromoted    = char '\''
 
 instance Outputable IfaceCoercion where
@@ -1388,17 +1397,6 @@ instance Binary IfaceTyCon where
    get bh = do n <- get bh
                i <- get bh
                return (IfaceTyCon n i)
-
-instance Binary IsPromoted where
-   put_ bh IsNotPromoted = putByte bh 0
-   put_ bh IsPromoted    = putByte bh 1
-
-   get bh = do
-       n <- getByte bh
-       case n of
-         0 -> return IsNotPromoted
-         1 -> return IsPromoted
-         _ -> fail "Binary(IsPromoted): fail)"
 
 instance Binary IfaceTyConSort where
    put_ bh IfaceNormalTyCon             = putByte bh 0

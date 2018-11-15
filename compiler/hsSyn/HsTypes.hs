@@ -24,7 +24,6 @@ module HsTypes (
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
-        Promoted(..),
         HsContext, LHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
@@ -515,10 +514,10 @@ data HsType pass
       , hst_ctxt  :: LHsContext pass       -- Context C => blah
       , hst_body  :: LHsType pass }
 
-  | HsTyVar             (XTyVar pass)
-                        Promoted -- whether explicitly promoted, for the pretty
-                                 -- printer
-                        (Located (IdP pass))
+  | HsTyVar  (XTyVar pass)
+              PromotionFlag    -- Whether explicitly promoted,
+                               -- for the pretty printer
+             (Located (IdP pass))
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in HsExpr
@@ -641,7 +640,7 @@ data HsType pass
 
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
-        Promoted           -- whether explcitly promoted, for pretty printer
+        PromotionFlag      -- whether explcitly promoted, for pretty printer
         [LHsType pass]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
       --         'ApiAnnotation.AnnClose' @']'@
@@ -853,12 +852,6 @@ data HsTupleSort = HsUnboxedTuple
                  | HsConstraintTuple
                  | HsBoxedOrConstraintTuple
                  deriving Data
-
-
--- | Promoted data types.
-data Promoted = Promoted
-              | NotPromoted
-              deriving (Data, Eq, Show)
 
 -- | Located Constructor Declaration Field
 type LConDeclField pass = Located (ConDeclField pass)
@@ -1401,11 +1394,9 @@ ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
 
 ppr_mono_ty (HsBangTy _ b ty)   = ppr b <> ppr_mono_lty ty
 ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
-ppr_mono_ty (HsTyVar _ NotPromoted (L _ name))= pprPrefixOcc name
-ppr_mono_ty (HsTyVar _ Promoted (L _ name))
-  = space <> quote (pprPrefixOcc name)
-                         -- We need a space before the ' above, so the parser
-                         -- does not attach it to the previous symbol
+ppr_mono_ty (HsTyVar _ prom (L _ name))
+  | isPromoted prom = quote (pprPrefixOcc name)
+  | otherwise       = pprPrefixOcc name
 ppr_mono_ty (HsFunTy _ ty1 ty2)   = ppr_fun_ty ty1 ty2
 ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
@@ -1418,11 +1409,11 @@ ppr_mono_ty (HsKindSig _ ty kind)
 ppr_mono_ty (HsListTy _ ty)       = brackets (ppr_mono_lty ty)
 ppr_mono_ty (HsIParamTy _ n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
 ppr_mono_ty (HsSpliceTy _ s)      = pprSplice s
-ppr_mono_ty (HsExplicitListTy _ Promoted tys)
-  = quote $ brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitListTy _ NotPromoted tys)
-  = brackets (interpp'SP tys)
-ppr_mono_ty (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
+ppr_mono_ty (HsExplicitListTy _ prom tys)
+  | isPromoted prom = quote $ brackets (maybeAddSpace tys $ interpp'SP tys)
+  | otherwise       = brackets (interpp'SP tys)
+ppr_mono_ty (HsExplicitTupleTy _ tys)
+  = quote $ parens (maybeAddSpace tys $ interpp'SP tys)
 ppr_mono_ty (HsTyLit _ t)       = ppr_tylit t
 ppr_mono_ty (HsWildCardTy {})   = char '_'
 
@@ -1490,6 +1481,46 @@ hsTypeNeedsParens p = go
     go (HsOpTy{})            = p >= opPrec
     go (HsParTy{})           = False
     go (HsDocTy _ (L _ t) _) = go t
+    go (XHsType{})           = False
+
+maybeAddSpace :: [LHsType pass] -> SDoc -> SDoc
+-- See Note [Printing promoted type constructors]
+-- in IfaceType.  This code implements the same
+-- logic for printing HsType
+maybeAddSpace tys doc
+  | (ty : _) <- tys
+  , lhsTypeHasLeadingPromotionQuote ty = space <> doc
+  | otherwise                          = doc
+
+lhsTypeHasLeadingPromotionQuote :: LHsType pass -> Bool
+lhsTypeHasLeadingPromotionQuote ty
+  = goL ty
+  where
+    goL (L _ ty) = go ty
+
+    go (HsForAllTy{})        = False
+    go (HsQualTy{ hst_ctxt = ctxt, hst_body = body})
+      | L _ (c:_) <- ctxt    = goL c
+      | otherwise            = goL body
+    go (HsBangTy{})          = False
+    go (HsRecTy{})           = False
+    go (HsTyVar _ p _)       = isPromoted p
+    go (HsFunTy _ arg _)     = goL arg
+    go (HsListTy{})          = False
+    go (HsTupleTy{})         = False
+    go (HsSumTy{})           = False
+    go (HsOpTy _ t1 _ _)     = goL t1
+    go (HsKindSig _ t _)     = goL t
+    go (HsIParamTy{})        = False
+    go (HsSpliceTy{})        = False
+    go (HsExplicitListTy _ p _) = isPromoted p
+    go (HsExplicitTupleTy{}) = True
+    go (HsTyLit{})           = False
+    go (HsWildCardTy{})      = False
+    go (HsStarTy{})          = False
+    go (HsAppTy _ t _)       = goL t
+    go (HsParTy{})           = False
+    go (HsDocTy _ t _)       = goL t
     go (XHsType{})           = False
 
 -- | @'parenthesizeHsType' p ty@ checks if @'hsTypeNeedsParens' p ty@ is
