@@ -22,7 +22,8 @@ import FamInstEnv       ( FamInstEnv )
 import Literal          ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import Id
 import MkId             ( seqId )
-import MkCore           ( mkImpossibleExpr, castBottomExpr )
+import MkCore           ( FloatBind, mkImpossibleExpr, castBottomExpr )
+import qualified MkCore as MkCore
 import IdInfo
 import Name             ( mkSystemVarName, isExternalName, getOccFS )
 import Coercion hiding  ( substCo, substCoVar )
@@ -2354,6 +2355,26 @@ Why don't we drop the case?  Because it's strict in v.  It's technically
 wrong to drop even unnecessary evaluations, and in practice they
 may be a result of 'seq' so we *definitely* don't want to drop those.
 I don't really know how to improve this situation.
+
+
+Note [FloatBinds from constructor wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have FloatBinds coming from the constructor wrapper
+(as in Note [exprIsConApp_maybe on data constructors with wrappers]),
+ew cannot float past them. We'd need to float the FloatBind
+together with the simplify floats, unfortunately the
+simplifier doesn't have case-floats. The simplest thing we can
+do is to wrap all the floats here. The next iteration of the
+simplifier will take care of all these cases and lets.
+
+Given data T = MkT !Bool, this allows us to simplify
+case $WMkT b of { MkT x -> f x }
+to
+case b of { b' -> f b' }.
+
+We could try and be more clever (like maybe wfloats only contain
+let binders, so we could float them). But the need for the
+extra complication is not clear.
 -}
 
 ---------------------------------------------------------
@@ -2378,25 +2399,36 @@ rebuildCase env scrut case_bndr alts cont
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (LitAlt lit) alts of
             Nothing           -> missingAlt env case_bndr alts cont
-            Just (_, bs, rhs) -> simple_rhs bs rhs }
+            Just (_, bs, rhs) -> simple_rhs [] scrut bs rhs }
 
-  | Just (con, ty_args, other_args) <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
+  | Just (wfloats, con, ty_args, other_args) <- exprIsConApp_maybe (getUnfoldingInRuleMatch env) scrut
         -- Works when the scrutinee is a variable with a known unfolding
         -- as well as when it's an explicit constructor application
   = do  { tick (KnownBranch case_bndr)
         ; case findAlt (DataAlt con) alts of
             Nothing  -> missingAlt env case_bndr alts cont
-            Just (DEFAULT, bs, rhs) -> simple_rhs bs rhs
-            Just (_, bs, rhs)       -> knownCon env scrut con ty_args other_args
+            Just (DEFAULT, bs, rhs) -> let con_app = Var (dataConWorkId con)
+                                                 `mkTyApps` ty_args
+                                                 `mkApps`   other_args
+                                       in simple_rhs wfloats con_app bs rhs
+            Just (_, bs, rhs)       -> knownCon env scrut wfloats con ty_args other_args
                                                 case_bndr bs rhs cont
         }
   where
-    simple_rhs bs rhs = ASSERT( null bs )
-                        do { (floats1, env') <- simplNonRecX env case_bndr scrut
-                               -- scrut is a constructor application,
-                               -- hence satisfies let/app invariant
-                           ; (floats2, expr') <- simplExprF env' rhs cont
-                           ; return (floats1 `addFloats` floats2, expr') }
+    simple_rhs wfloats scrut' bs rhs =
+      ASSERT( null bs )
+      do { let env0 = addNewInScopeIds env (concatMap MkCore.floatBindings wfloats)
+         ; (floats1, env') <- simplNonRecX env0 case_bndr scrut'
+             -- scrut is a constructor application,
+             -- hence satisfies let/app invariant
+         ; (floats2, expr') <- simplExprF env' rhs cont
+         ; case wfloats of
+             [] -> return (floats1 `addFloats` floats2, expr')
+             _ -> return
+               -- See Note [FloatBinds from constructor wrappers]
+                   ( emptyFloats env,
+                     MkCore.wrapFloats wfloats $
+                     wrapFloats (floats1 `addFloats` floats2) expr' )}
 
 
 --------------------------------------------------
@@ -2824,17 +2856,25 @@ All this should happen in one sweep.
 -}
 
 knownCon :: SimplEnv
-         -> OutExpr                             -- The scrutinee
-         -> DataCon -> [OutType] -> [OutExpr]   -- The scrutinee (in pieces)
-         -> InId -> [InBndr] -> InExpr          -- The alternative
+         -> OutExpr                                           -- The scrutinee
+         -> [FloatBind] -> DataCon -> [OutType] -> [OutExpr]  -- The scrutinee (in pieces)
+         -> InId -> [InBndr] -> InExpr                        -- The alternative
          -> SimplCont
          -> SimplM (SimplFloats, OutExpr)
 
-knownCon env scrut dc dc_ty_args dc_args bndr bs rhs cont
-  = do  { (floats1, env1)  <- bind_args env bs dc_args
+knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
+  = do  { let env0 = addNewInScopeIds env (concatMap MkCore.floatBindings dc_floats)
+        ; (floats1, env1)  <- bind_args env0 bs dc_args
         ; (floats2, env2) <- bind_case_bndr env1
         ; (floats3, expr') <- simplExprF env2 rhs cont
-        ; return (floats1 `addFloats` floats2 `addFloats` floats3, expr') }
+        ; case dc_floats of
+            [] ->
+              return (floats1 `addFloats` floats2 `addFloats` floats3, expr')
+            _ ->
+              return ( emptyFloats env
+               -- See Note [FloatBinds from constructor wrappers]
+                     , MkCore.wrapFloats dc_floats $
+                       wrapFloats (floats1 `addFloats` floats2 `addFloats` floats3) expr') }
   where
     zap_occ = zapBndrOccInfo (isDeadBinder bndr)    -- bndr is an InId
 
