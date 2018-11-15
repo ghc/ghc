@@ -366,7 +366,7 @@ multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
+funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 
 -- | The @(->)@ type constructor.
 --
