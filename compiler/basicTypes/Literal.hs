@@ -699,7 +699,7 @@ cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
 cmpLit (LitRational i1 e1 _) (LitRational i2 e2 _)
   | e1 == e2 = i1 `compare` i2
   | otherwise = e1 `compare` e2
-cmpLit (LitRubbish)          (LitRubbish)           = EQ
+cmpLit (LitRubbish)         (LitRubbish)          = EQ
 cmpLit lit1 lit2
   | litTag lit1 < litTag lit2 = LT
   | otherwise                 = GT
