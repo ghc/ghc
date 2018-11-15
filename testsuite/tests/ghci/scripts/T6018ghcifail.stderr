@@ -39,7 +39,7 @@
 
 <interactive>:55:41: error:
     Type family equation violates injectivity annotation.
-    Kind variable ‘k2’ cannot be inferred from the right-hand side.
+    Kind variable ‘k1’ cannot be inferred from the right-hand side.
     In the type family equation:
       PolyKindVarsF @{[k2]} @[k1] ('[] @k2) = '[] @k1
         -- Defined at <interactive>:55:41

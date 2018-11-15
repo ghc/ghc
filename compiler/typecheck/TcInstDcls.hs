@@ -642,11 +642,10 @@ tcDataFamInstDecl mb_clsinfo
 
                      ; return (pats, stupid_theta, res_kind) }
 
-       ; dvs  <- candidateQTyVarsOfTypes pats
+       ; let scoped_tvs = imp_tvs ++ exp_tvs
+       ; dvs  <- candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
 
-       ; checkFamPatBinders fam_tc imp_tvs exp_tvs qtvs pats
-       
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
        ; pats         <- zonkTcTypesToTypesX ze pats
@@ -677,9 +676,10 @@ tcDataFamInstDecl mb_clsinfo
              orig_res_ty = mkTyConApp fam_tc all_pats
              ty_binders  = full_tcbs `chkAppend` extra_tcbs
 
-       ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr imp_vars $$ ppr exp_bndrs $$ ppr cons)
+       ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr exp_bndrs
+                                      $$ ppr cons)
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcExtendTyVarEnv qtvs $
+           do { data_cons <- tcExtendTyVarEnv scoped_tvs $
                              -- For H98 decls, the tyvars scope
                              -- over the data constructors
                              tcConDecls rec_rep_tc ty_binders orig_res_ty cons
@@ -713,7 +713,7 @@ tcDataFamInstDecl mb_clsinfo
        -- Remember to check validity; no recursion to worry about here
        -- Check that left-hand sides are ok (mono-types, no type families,
        -- consistent instantiations, etc)
-       ; checkValidFamPats mb_clsinfo fam_tc qtvs [] pats extra_pats pp_hs_pats
+       ; checkValidCoAxBranch mb_clsinfo fam_tc (coAxiomSingleBranch axiom)
 
        -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (tcIsLiftedTypeKind final_res_kind) $

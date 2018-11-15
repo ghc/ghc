@@ -16,7 +16,7 @@ module TcTyClsDecls (
         -- Functions used by TcInstDcls to check
         -- data/type family instance declarations
         kcConDecl, tcConDecls, dataDeclChecks, checkValidTyCon,
-        tcFamTyPats, tcTyFamInstEqn, checkFamPatBinders,
+        tcFamTyPats, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         wrongKindOfFamily, dataConCtxt
     ) where
@@ -1842,20 +1842,17 @@ tcFamTyPatsAndGen fam_tc mb_cls_info imp_vars exp_bndrs hs_pats rhs_hs_ty
                      ; rhs_ty <- tcCheckLHsType rhs_hs_ty res_kind
                      ; return (pats, rhs_ty) }
 
-       -- Ignore which variables are Inferred, Specified, etc
-       -- (i.e. returned by bindImplicit/ExplicitTKBndrs)
-       -- The user never explicitly invokes a type-family instance.
-       -- So visible type application etc doesn't matter.
-       -- So we can just quantify over all the variabes in
-       -- whatever order quantifyTyVars decides.
-       ; dvs  <- candidateQTyVarsOfTypes pats
+       ; let scoped_tvs = imp_tvs ++ exp_tvs
+       ; dvs  <- candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
-
-       ; checkFamPatBinders fam_tc imp_tvs exp_tvs qtvs pats
 
        ; (ze, qtvs') <- zonkTyBndrs qtvs
        ; pats'       <- zonkTcTypesToTypesX ze pats
        ; rhs_ty'     <- zonkTcTypeToTypeX   ze rhs_ty
+
+       ; traceTc "xxx2" (ppr fam_tc $$ ppr qtvs)
+         -- Needs the pats to be zonked
+
        ; traceTc "tcTyFamInstEqn }" (ppr fam_tc <+> pprTyVars qtvs')
        ; return (qtvs', pats', rhs_ty') }
 
@@ -1871,9 +1868,8 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
        ; (subst, invis_pats) <- tcInstTyBinders emptyTCvSubst mb_kind_env invis_bndrs
        ; let fun_ty = mkTyConApp fam_tc invis_pats
 
-       ; (_, pats, res_kind)
-             <- tcInferApps typeLevelMode lhs_fun fun_ty
-                            (substTy subst body_kind) hs_pats
+       ; (_, pats, res_kind) <- tcInferApps typeLevelMode lhs_fun fun_ty
+                                            (substTy subst body_kind) hs_pats
 
        ; traceTc "End tcFamTyPats }" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
@@ -1888,78 +1884,8 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
     mb_kind_env = thdOf3 <$> mb_clsinfo
 
 
------------------
-checkFamPatBinders :: TyCon
-                   -> [TcTyVar]   -- Implicitly bound
-                   -> [TcTyVar]   -- Explicitly forall'd
-                   -> [TcTyVar]   -- Bound on LHS of family instance
-                   -> [TcType]    -- LHS patterns
-                   -> TcM ()
--- We do these binder checks now, in tcFamTyPatsAndGen, rather
--- than later, in checkValidFamEqn, for two reasons:
---   - We have the implicitly and explicitly
---     bound type variables conveniently to hand
---   - If implicit variables are out of scope it may
---     cause a crash; notably in tcConDecl in tcDataFamInstDecl
-checkFamPatBinders fam_tc imp_tvs exp_tvs qtvs pats
-  = checkNoErrs $  -- If this fails, doing tcConDecl will crash
-    do { -- Check for implicitly-bound tyvars, mentioned on the
-         -- RHS but not bound on the LHS
-         --    data T            = MkT (forall (a::k). blah)
-         --    data family D Int = MkD (forall (a::k). blah)
-         -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
-         -- We catch the former in kcLHsQTyVars, and the latter right here
-       ; check_tvs bad_exp_tvs (text "bound by a forall")
-
-         -- Check for explicitly forall'd variable that is not bound on LHS
-         --    data instance forall a.  T Int = MkT Int
-         -- See Note [Unused explicitly bound variables in a family pattern]
-       ; check_tvs bad_imp_tvs (text "mentioned in the RHS") }
-  where
-    qtv_set       = mkVarSet qtvs
-    exact_qtv_set = exactTyCoVarsOfTypes pats
-    bad_imp_tvs   = filterOut (`elemVarSet` exact_qtv_set) imp_tvs
-    bad_exp_tvs   = filterOut (`elemVarSet` exact_qtv_set) exp_tvs
-    dodgy_tvs     = qtv_set `minusVarSet` exact_qtv_set
-
-    check_tvs tvs what
-      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
-        hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
-              <+> isOrAre tvs <+> what <> comma)
-           2 (vcat [ text "but not bound on the LHS of the family instance"
-                   , mk_extra tvs ])
-
-    -- mk_extra: Trac #7536: give a decent error message for
-    --         type T a = Int
-    --         type instance F (T a) = a
-    mk_extra tvs = ppWhen (any (`elemVarSet` dodgy_tvs) tvs) $
-                   hang (text "The real LHS (expanding synonyms) is:")
-                      2 (pprTypeApp fam_tc (map expandTypeSynonyms pats))
-
-
-{- Note [Unused explicitly bound variables in a family pattern]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Why is 'unusedExplicitForAllErr' not just a warning?
-
-Consider the following examples:
-
-  type instance F a = Maybe b
-  type instance forall b. F a = Bool
-  type instance forall b. F a = Maybe b
-
-In every case, b is a type variable not determined by the LHS pattern. The
-first is caught by the renamer, but we catch the last two here. Perhaps one
-could argue that the second should be accepted, albeit with a warning, but
-consider the fact that in a type family instance, there is no way to interact
-with such a varable. At least with @x :: forall a. Int@ we can use visibile
-type application, like @x \@Bool 1@. (Of course it does nothing, but it is
-permissible.) In the type family case, the only sensible explanation is that
-the user has made a mistake -- thus we throw an error.
-
-
-Note [Constraints in patterns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Constraints in patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 NB: This isn't the whole story. See comment in tcFamTyPats.
 
 At first glance, it seems there is a complicated story to tell in tcFamTyPats
@@ -3154,11 +3080,10 @@ checkValidClass cls
 
              -- Check that any default declarations for associated types are valid
            ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
-             checkValidTyFamEqn mb_cls fam_tc
-                                fam_tvs [] (mkTyVarTys fam_tvs) rhs pp_lhs loc }
+             setSrcSpan loc $
+             checkValidTyFamEqn mb_cls fam_tc fam_tvs (mkTyVarTys fam_tvs) rhs }
         where
           fam_tvs = tyConTyVars fam_tc
-          pp_lhs  = ppr (mkTyConApp fam_tc (mkTyVarTys fam_tvs))
 
     check_dm :: UserTypeCtxt -> Id -> PredType -> Type -> DefMethInfo -> TcM ()
     -- Check validity of the /top-level/ generic-default type

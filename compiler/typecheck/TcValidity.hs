@@ -52,6 +52,7 @@ import VarEnv
 import VarSet
 import Id          ( idType, idName )
 import Var         ( VarBndr(..), mkTyVar )
+import FV
 import ErrUtils
 import DynFlags
 import Util
@@ -1771,12 +1772,11 @@ checkConsistentFamInst
                :: Maybe ClsInstInfo
                -> TyCon              -- ^ Family tycon
                -> [Type]             -- ^ Type patterns from instance
-               -> SDoc               -- ^ pretty-printed user-written instance head
                -> TcM ()
 -- See Note [Checking consistent instantiation]
 
-checkConsistentFamInst Nothing _ _ _ = return ()
-checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pats
+checkConsistentFamInst Nothing _ _ = return ()
+checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys
   = do { -- Check that the associated type indeed comes from this class
          -- See [Mismatched class methods and associated type families]
          -- in TcInstDecls.
@@ -1814,7 +1814,7 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pat
 
     pp_exp_act
       = vcat [ text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-             , text "  Actual:" <+> pp_hs_pats
+             , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_tys)
              , sdocWithDynFlags $ \dflags ->
                ppWhen (has_poly_args dflags) $
                vcat [ text "where the `<tv>' arguments are type variables,"
@@ -1913,25 +1913,20 @@ checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                                 , cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
-  = checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
-  where
-    pp_lhs = ppr (mkTyConApp fam_tc typats)
+  = setSrcSpan loc $
+    checkValidTyFamEqn mb_clsinfo fam_tc (tvs++cvs) typats rhs
 
 -- | Do validity checks on a type family equation, including consistency
 -- with any enclosing class instance head, termination, and lack of
 -- polytypes.
 checkValidTyFamEqn :: Maybe ClsInstInfo
                    -> TyCon   -- ^ of the type family
-                   -> [TyVar] -- ^ bound tyvars in the equation
-                   -> [CoVar] -- ^ bound covars in the equation
-                   -> [Type]  -- ^ type patterns
-                   -> Type    -- ^ rhs
-                   -> SDoc    -- ^ user-written LHS
-                   -> SrcSpan
+                   -> [Var]   -- ^ Bound variables in the equation
+                   -> [Type]  -- ^ Type patterns
+                   -> Type    -- ^ Rhs
                    -> TcM ()
-checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
-  = setSrcSpan loc $
-    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats [] pp_lhs
+checkValidTyFamEqn mb_clsinfo fam_tc qvs typats rhs
+  = do { checkValidFamPats mb_clsinfo fam_tc qvs typats rhs
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -1944,9 +1939,9 @@ checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
 
          -- We have a decidable instance unless otherwise permitted
        ; undecidable_ok <- xoptM LangExt.UndecidableInstances
-       ; traceTc "checkVTFE" (pp_lhs $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
+       ; traceTc "checkVTFE" (ppr fam_tc $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
        ; unless undecidable_ok $
-           mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
+         mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
 
 -- Make sure that each type family application is
 --   (1) strictly smaller than the lhs,
@@ -1976,20 +1971,85 @@ checkFamInstRhs lhs_tc lhs_tys famInsts
                        --   [a,b,a,a] \\ [a,a] = [b,a]
                        -- So we are counting repetitions
 
-checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
-                  -> [Type]   -- ^ patterns the user wrote
-                  -> [Type]   -- ^ "extra" patterns from a data instance kind sig
-                  -> SDoc     -- ^ pretty-printed user-written instance head
+checkValidFamPats :: Maybe ClsInstInfo
+                  -> TyCon -> [Var]
+                  -> [Type]   -- ^ patterns
+                  -> Type     -- ^ RHS
                   -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
 -- a) contain no type family applications
 --    (vanilla synonyms are fine, though)
 -- b) For associated types, are consistently instantiated
-checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
-  = do { checkValidTypePats fam_tc user_ty_pats
+checkValidFamPats mb_clsinfo fam_tc qvs pats rhs
+  = do { checkValidTypePats fam_tc pats
+
+         -- Check for things used on the right but not bound on the left
+       ; checkFamPatBinders fam_tc qvs pats rhs
 
          -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
+       ; checkConsistentFamInst mb_clsinfo fam_tc pats
+       ; traceTc "checkValidFamPats" (ppr fam_tc <+> ppr pats)
+       }
+
+-----------------
+checkFamPatBinders :: TyCon
+                   -> [TcTyVar]   -- Bound on LHS of family instance
+                   -> [TcType]    -- LHS patterns
+                   -> Type        -- RHS
+                   -> TcM ()
+-- We do these binder checks now, in tcFamTyPatsAndGen, rather
+-- than later, in checkValidFamEqn, for two reasons:
+--   - We have the implicitly and explicitly
+--     bound type variables conveniently to hand
+--   - If implicit variables are out of scope it may
+--     cause a crash; notably in tcConDecl in tcDataFamInstDecl
+checkFamPatBinders fam_tc qtvs pats rhs
+  = do { traceTc "checkFamPatBinders" $
+         vcat [ ppr (mkTyConApp fam_tc pats)
+              , text "qtvs:" <+> ppr qtvs
+              , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
+              , text "pat_tvs:" <+> ppr pat_tvs
+              , text "exact_pat_tvs:" <+> ppr exact_pat_tvs ]
+
+         -- Check for implicitly-bound tyvars, mentioned on the
+         -- RHS but not bound on the LHS
+         --    data T            = MkT (forall (a::k). blah)
+         --    data family D Int = MkD (forall (a::k). blah)
+         -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
+         -- We catch the former in kcLHsQTyVars, and the latter right here
+       ; check_tvs bad_rhs_tvs (text "mentioned in the RHS")
+                               (text "bound on the LHS of")
+
+         -- Check for explicitly forall'd variable that is not bound on LHS
+         --    data instance forall a.  T Int = MkT Int
+         -- See Note [Unused explicitly bound variables in a family pattern]
+       ; check_tvs bad_qtvs (text "bound by a forall")
+                            (text "used in") }
+  where
+    pat_tvs       = tyCoVarsOfTypes pats
+    exact_pat_tvs = exactTyCoVarsOfTypes pats
+    rhs_fvs       = tyCoFVsOfType rhs
+    used_tvs      = pat_tvs `unionVarSet` fvVarSet rhs_fvs
+    bad_qtvs      = filterOut (`elemVarSet` used_tvs) qtvs
+                    -- Bound but not used at all
+    bad_rhs_tvs   = filterOut (`elemVarSet` exact_pat_tvs) (fvVarList rhs_fvs)
+                    -- Used on RHS but not bound on LHS
+    dodgy_tvs     = pat_tvs `minusVarSet` exact_pat_tvs
+
+    check_tvs tvs what what2
+      = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $
+        hang (text "Type variable" <> plural tvs <+> pprQuotedList tvs
+              <+> isOrAre tvs <+> what <> comma)
+           2 (vcat [ text "but not" <+> what2 <+> text "the family instance"
+                   , mk_extra tvs ])
+
+    -- mk_extra: Trac #7536: give a decent error message for
+    --         type T a = Int
+    --         type instance F (T a) = a
+    mk_extra tvs = ppWhen (any (`elemVarSet` dodgy_tvs) tvs) $
+                   hang (text "The real LHS (expanding synonyms) is:")
+                      2 (pprTypeApp fam_tc (map expandTypeSynonyms pats))
+
 
 -- | Checks for occurrences of type families in class instances and type/data
 -- family instances.
@@ -2028,7 +2088,27 @@ nestedMsg what
   = sep [ text "Illegal nested" <+> what
         , parens undecidableMsg ]
 
-{-
+{- Note [Unused explicitly bound variables in a family pattern]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Why is 'unusedExplicitForAllErr' not just a warning?
+
+Consider the following examples:
+
+  type instance F a = Maybe b
+  type instance forall b. F a = Bool
+  type instance forall b. F a = Maybe b
+
+In every case, b is a type variable not determined by the LHS pattern. The
+first is caught by the renamer, but we catch the last two here. Perhaps one
+could argue that the second should be accepted, albeit with a warning, but
+consider the fact that in a type family instance, there is no way to interact
+with such a varable. At least with @x :: forall a. Int@ we can use visibile
+type application, like @x \@Bool 1@. (Of course it does nothing, but it is
+permissible.) In the type family case, the only sensible explanation is that
+the user has made a mistake -- thus we throw an error.
+
+
 ************************************************************************
 *                                                                      *
    Telescope checking

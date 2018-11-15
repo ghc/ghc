@@ -1,54 +1,54 @@
 
 ExplicitForAllFams4b.hs:7:24: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘J’
 
 ExplicitForAllFams4b.hs:8:22: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘J’
 
 ExplicitForAllFams4b.hs:11:24: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘K’
 
 ExplicitForAllFams4b.hs:12:22: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘K’
 
 ExplicitForAllFams4b.hs:15:27: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the newtype instance declaration for ‘L’
 
 ExplicitForAllFams4b.hs:16:25: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the newtype instance declaration for ‘L’
 
 ExplicitForAllFams4b.hs:23:17: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:24:15: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:25:17: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:26:15: error:
-    • Type variable ‘b’ is are bound by a forall,
+    • Type variable ‘b’ is bound by a forall,
         but not bound on the LHS of the family instance
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’

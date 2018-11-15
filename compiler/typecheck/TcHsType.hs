@@ -1547,9 +1547,7 @@ kcLHsQTyVars name flav cusk
        ; res_kind   <- zonkTcType           res_kind
 
        ; let mentioned_kv_set = candidateKindVars candidates
---             tc_tv_set        = mkVarSet tc_tvs
              specified        = scopedSort scoped_kvs
---                                filterOut (`elemVarSet` tc_tv_set) scoped_kvs
                                 -- NB: maintain the L-R order of scoped_kvs
 
              final_tc_binders =  mkNamedTyConBinders Inferred  inferred
