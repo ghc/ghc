@@ -198,9 +198,6 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
-                   -- tcExtendTyVarEnv here (instead of scopeTyVars) is OK:
-                   -- the tcDefMeth calls checkConstraints to bump the TcLevel
-                   -- and make the implication constraint
         ; dm_binds <- tcExtendTyVarEnv clas_tyvars $
                       mapM tc_item op_items
 

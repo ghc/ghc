@@ -1,4 +1,5 @@
 
 T10899.hs:7:3: error:
     • Illegal polymorphic type: forall (m :: * -> *). m a
-    • In the class declaration for ‘C’
+    • In the default type instance declaration for ‘F’
+      In the class declaration for ‘C’

@@ -547,29 +547,6 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 -}
 
-tcFamInstDeclChecks :: Maybe ClsInstInfo
-                      -> Located Name -> TcM TyCon
-tcFamInstDeclChecks mb_clsinfo fam_tc_lname
-  = do { -- Type family instances require -XTypeFamilies
-         -- and can't (currently) be in an hs-boot file
-       ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
-       ; type_families <- xoptM LangExt.TypeFamilies
-       ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
-       ; checkTc type_families $ badFamInstDecl fam_tc_lname
-       ; checkTc (not is_boot) $ badBootFamInstDeclErr
-
-       -- Look up the family TyCon and check for validity including
-       -- check that toplevel type instances are not for associated types.
-       ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
-
-       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
-
-       ; when (isNothing mb_clsinfo &&   -- Not in a class decl
-               isTyConAssoc fam_tc)      -- but an associated type
-              (addErr $ assocInClassErr fam_tc_lname)
-
-       ; return fam_tc }
-
 tcTyFamInstDecl :: Maybe ClsInstInfo
                 -> LTyFamInstDecl GhcRn -> TcM FamInst
   -- "type instance"
@@ -626,27 +603,19 @@ tcDataFamInstDecl mb_clsinfo
        ; let exp_bndrs = mb_bndrs `orElse` []
              data_ctxt = DataKindCtxt fam_name
 
-       ; (imp_tvs, (exp_tvs, (pats, stupid_theta, res_kind)))
-               <- pushTcLevelM_                                $
-                  solveEqualities                              $
-                  bindImplicitTKBndrs_Q_Skol imp_vars          $
-                  bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
-                  do { (pats, res_kind) <- tcFamTyPats fam_tc mb_clsinfo hs_pats
-                     ; stupid_theta <- tcHsContext ctxt
-                     ; mapM_ (wrapLocM kcConDecl) cons
+       ; (qtvs, pats, (stupid_theta, res_kind))
+            <- tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats $
+               \ res_kind -> do { stupid_theta <- tcHsContext ctxt
+                                ; mapM_ (wrapLocM kcConDecl) cons
 
-                     ; exp_res_kind <- case m_ksig of
-                          Nothing   -> return liftedTypeKind
-                          Just hs_k -> tcLHsKindSig data_ctxt hs_k
-                     ; _ <- checkExpectedKindX pp_hs_pats bogus_ty
-                                               res_kind exp_res_kind
-                            -- ToDo: what about a non-triv result?
+                                ; exp_res_kind <- case m_ksig of
+                                     Nothing   -> return liftedTypeKind
+                                     Just hs_k -> tcLHsKindSig data_ctxt hs_k
+                                ; _ <- checkExpectedKindX pp_hs_pats bogus_ty
+                                                          res_kind exp_res_kind
+                                       -- ToDo: what about a non-triv result?
 
-                     ; return (pats, stupid_theta, res_kind) }
-
-       ; let scoped_tvs = imp_tvs ++ exp_tvs
-       ; dvs  <- candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars emptyVarSet dvs
+                                ; return (stupid_theta, res_kind) }
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
@@ -684,7 +653,7 @@ tcDataFamInstDecl mb_clsinfo
        ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr exp_bndrs
                                       $$ ppr cons)
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { data_cons <- tcExtendTyVarEnv scoped_tvs $
+           do { data_cons <- tcExtendTyVarEnv qtvs $
                              -- For H98 decls, the tyvars scope
                              -- over the data constructors
                              tcConDecls rec_rep_tc ty_binders orig_res_ty cons
@@ -765,6 +734,30 @@ tcDataFamInstDecl _ (L _ (DataFamInstDecl (XHsImplicitBndrs _)))
 tcDataFamInstDecl _ (L _ (DataFamInstDecl (HsIB _ (XFamEqn _))))
   = panic "tcDataFamInstDecl"
 
+
+---------------------
+tcFamInstDeclChecks :: Maybe ClsInstInfo
+                      -> Located Name -> TcM TyCon
+tcFamInstDeclChecks mb_clsinfo fam_tc_lname
+  = do { -- Type family instances require -XTypeFamilies
+         -- and can't (currently) be in an hs-boot file
+       ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
+       ; type_families <- xoptM LangExt.TypeFamilies
+       ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
+       ; checkTc type_families $ badFamInstDecl fam_tc_lname
+       ; checkTc (not is_boot) $ badBootFamInstDeclErr
+
+       -- Look up the family TyCon and check for validity including
+       -- check that toplevel type instances are not for associated types.
+       ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
+
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+
+       ; when (isNothing mb_clsinfo &&   -- Not in a class decl
+               isTyConAssoc fam_tc)      -- but an associated type
+              (addErr $ assocInClassErr fam_tc_lname)
+
+       ; return fam_tc }
 
 {- Note [Associated type instances]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1314,8 +1307,6 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                                 , ib_pragmas    = sigs
                                 , ib_extensions = exts
                                 , ib_derived    = is_derived })
-      -- tcExtendTyVarEnv (not scopeTyVars) is OK because the TcLevel is pushed
-      -- in checkInstConstraints
   = tcExtendNameTyVarEnv (lexical_tvs `zip` tyvars) $
        -- The lexical_tvs scope over the 'where' part
     do { traceTc "tcInstMeth" (ppr sigs $$ ppr binds)

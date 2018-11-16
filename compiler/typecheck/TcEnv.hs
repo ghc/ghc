@@ -467,18 +467,10 @@ tcExtendKindEnv extra_env thing_inside
 
 -----------------------
 -- Scoped type and kind variables
--- Before using this function, consider using TcHsType.scopeTyVars, which
--- bumps the TcLevel and thus prevents any of these TyVars from appearing
--- in kinds of tyvars in an outer scope.
--- Indeed, you should always use scopeTyVars unless some other code nearby
--- bumps the TcLevel.
 tcExtendTyVarEnv :: [TyVar] -> TcM r -> TcM r
 tcExtendTyVarEnv tvs thing_inside
   = tcExtendNameTyVarEnv (mkTyVarNamePairs tvs) thing_inside
 
--- Before using this function, consider using TcHsType.scopeTyVars2, which
--- bumps the TcLevel and thus prevents any of these TyVars from appearing
--- in kinds of tyvars in an outer scope.
 tcExtendNameTyVarEnv :: [(Name,TcTyVar)] -> TcM r -> TcM r
 tcExtendNameTyVarEnv binds thing_inside
   -- this should be used only for explicitly mentioned scoped variables.

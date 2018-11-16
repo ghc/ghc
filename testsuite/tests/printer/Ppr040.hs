@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, RankNTypes, TypeOperators, DataKinds,
+{-# LANGUAGE RankNTypes, TypeOperators, DataKinds,
              PolyKinds, TypeFamilies, GADTs, StarIsType #-}
 
 module RAE_T32a where
@@ -13,14 +13,14 @@ type family (a :: TyArr k1 k2) @@ (b :: k1) :: k2
 data TyPi' (a :: *) (b :: TyArr a *) :: *
 type TyPi (a :: *) (b :: TyArr a *) = TyPi' a b -> *
 type family (a :: TyPi k1 k2) @@@ (b :: k1) :: k2 @@ b
-$(return [])
+-- $(return [])
 
 data MkStar (p :: *) (x :: TyArr' p *)
 type instance MkStar p @@ x = *
-$(return [])
+-- $(return [])
 
 type instance (MkStar p) @@ x = *
-$(return [])
+-- $(return [])
 
 foo :: forall p x . MkStar p @@ x
 foo = undefined
@@ -30,7 +30,7 @@ data Sigma (p :: *) (r :: TyPi p (MkStar p)) :: * where
     forall (p :: *) (r :: TyPi p (MkStar p)) (a :: p) (b :: r @@@ a).
     Sing * p -> Sing (TyPi p (MkStar p)) r -> Sing p a -> Sing (r @@@ a) b
         -> Sigma p r
-$(return [])
+-- $(return [])
 
 data instance Sing Sigma (Sigma p r) x where
   SSigma ::

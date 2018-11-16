@@ -1,5 +1,5 @@
 
-SimpleFail9.hs:14:8: error:
+SimpleFail9.hs:14:3: error:
     • Type indexes must match class instance head
       Expected: S7 (a, Int)
         Actual: S7 (b, Int)

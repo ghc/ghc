@@ -31,7 +31,7 @@ module TcHsType (
         tcDataKindSig,
 
           -- tyvars
-        scopeTyVars, zonkAndScopedSort,
+        zonkAndScopedSort,
 
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
@@ -47,7 +47,7 @@ module TcHsType (
         typeLevelMode, kindLevelMode,
 
         kindGeneralize, checkExpectedKindX,
-        instantiateTyN, 
+        instantiateTyN,
         reportFloatingKvs,
 
         -- Sort-checking kinds
@@ -232,7 +232,7 @@ tc_hs_sig_type_and_gen skol_info hs_sig_type ctxt_kind
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
               <- pushTcLevelM                                   $
                  solveLocalEqualitiesX "tc_hs_sig_type_and_gen" $
-                 bindImplicitTKBndrs_Skol sig_vars               $
+                 bindImplicitTKBndrs_Skol sig_vars              $
                  do { kind <- newExpectedKind ctxt_kind
 
                     ; tc_lhs_type typeLevelMode hs_ty kind }
@@ -1482,6 +1482,33 @@ newWildTyVar _name
        ; traceTc "newWildTyVar" (ppr tyvar)
        ; return tyvar }
 
+{- *********************************************************************
+*                                                                      *
+             Kind inference for type declarations
+*                                                                      *
+********************************************************************* -}
+
+{- Note [The initial kind of a type constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+kcLHsQTyVars is responsible for getting the initial kind of
+a type constructor.
+
+It has two cases:
+
+ * The TyCon has a CUSK.  In that case, find the full, final,
+   poly-kinded kind of the TyCon.  It's very like a term-level
+   binding where we have a complete type signature for the
+   function.
+
+ * It does not have a CUSK.  Find a monomorphic kind, with
+   unification variables in it; they will be generalised later.
+   It's very like a term-level binding where we do not have
+   a type signature (or, more accurately, where we have a
+   partial type signature), so we infer the type and generalise.
+-}
+
+
+------------------------------
 -- | Kind-check a 'LHsQTyVars'. If the decl under consideration has a complete,
 -- user-supplied kind signature (CUSK), generalise the result.
 -- Used in 'getInitialKind' (for tycon kinds and other kinds)
@@ -1496,12 +1523,25 @@ kcLHsQTyVars :: Name              -- ^ of the thing being checked
              -> LHsQTyVars GhcRn
              -> TcM Kind          -- ^ The result kind
              -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
-kcLHsQTyVars name flav cusk
+kcLHsQTyVars name flav cusk tvs thing_inside
+  | cusk      = kcLHsQTyVars_Cusk    name flav tvs thing_inside
+  | otherwise = kcLHsQTyVars_NonCusk name flav tvs thing_inside
+
+
+kcLHsQTyVars_Cusk, kcLHsQTyVars_NonCusk
+    :: Name              -- ^ of the thing being checked
+    -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
+    -> LHsQTyVars GhcRn
+    -> TcM Kind          -- ^ The result kind
+    -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
+
+------------------------------
+kcLHsQTyVars_Cusk name flav
   user_tyvars@(HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
                                            , hsq_dependent = dep_names }
                       , hsq_explicit = hs_tvs }) thing_inside
-  | cusk
-    -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
+  -- CUSK case
+  -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
   = addTyConFlavCtxt name flav $
     do { (scoped_kvs, (tc_tvs, res_kind))
            <- pushTcLevelM_                               $
@@ -1573,8 +1613,19 @@ kcLHsQTyVars name flav cusk
               , text "all_tv_prs" <+> ppr all_tv_prs ]
 
        ; return tycon }
+  where
+    ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
+              | otherwise            = AnyKind
 
-  | otherwise     -- Not CUSK
+kcLHsQTyVars_Cusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
+
+------------------------------
+kcLHsQTyVars_NonCusk name flav
+  user_tyvars@(HsQTvs { hsq_ext = HsQTvsRn { hsq_implicit = kv_ns
+                                           , hsq_dependent = dep_names }
+                      , hsq_explicit = hs_tvs }) thing_inside
+  -- Non_CUSK case
+  -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
   = do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
@@ -1614,7 +1665,7 @@ kcLHsQTyVars name flav cusk
        | otherwise
        = mkAnonTyConBinder tv
 
-kcLHsQTyVars _ _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
+kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
 
 
 {- Note [Kind-checking tyvar binders for associated types]
@@ -1847,28 +1898,6 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
 
 tcHsQTyVarBndr _ _ (XTyVarBndr _) = panic "tcHsTyVarBndr"
 
-
-
---------------------------
--- Bringing tyvars into scope
---------------------------
-
--- | Bring tyvars into scope, wrapping the thing_inside in an implication
--- constraint. The implication constraint is necessary to provide SkolemInfo
--- for the tyvars and to ensure that no unification variables made outside
--- the scope of these tyvars (i.e. lower TcLevel) unify with the locally-scoped
--- tyvars (i.e. higher TcLevel).
---
--- INVARIANT: The thing_inside must check only types, never terms.
---
--- Use this (not tcExtendTyVarEnv) wherever you expect a Λ or ∀ in Core.
--- Use tcExtendTyVarEnv otherwise.
-scopeTyVars :: SkolemInfo -> [TcTyVar] -> TcM a -> TcM a
-scopeTyVars skol_info tvs thing_inside
-  = fmap snd $ -- discard the TcEvBinds, which will always be empty
-    checkConstraints skol_info tvs [{- no EvVars -}] $
-    tcExtendTyVarEnv tvs $
-    thing_inside
 
 
 {- *********************************************************************

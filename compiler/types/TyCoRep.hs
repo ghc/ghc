@@ -3277,9 +3277,10 @@ debug_ppr_ty prec (TyConApp tc tys)
   | otherwise = maybeParen prec appPrec $
                 hang (ppr tc) 2 (sep (map (debug_ppr_ty appPrec) tys))
 
-debug_ppr_ty prec (AppTy t1 t2)
-  = hang (debug_ppr_ty prec t1)
-       2 (debug_ppr_ty appPrec t2)
+debug_ppr_ty _ (AppTy t1 t2)
+  = hang (debug_ppr_ty appPrec t1)  -- Print parens so we see ((a b) c)
+       2 (debug_ppr_ty appPrec t2)  -- so that we can distinguish
+                                    -- TyConApp from AppTy
 
 debug_ppr_ty prec (CastTy ty co)
   = maybeParen prec topPrec $
