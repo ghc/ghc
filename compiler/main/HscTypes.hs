@@ -3166,8 +3166,7 @@ moduleRetainsAllBindings hsc_env mod
     case bindingsRetentionMode dflags of
       Full -> targetRetainsAllBindings target
       Minimal ->
-          targetRetainsAllBindings target &&
-          (isInteractiveModule mod || moduleNameIsInHscTargets)
+          targetRetainsAllBindings target && moduleNameIsInHscTargets
   where
     thisModSummary = mgLookupModule (hsc_mod_graph hsc_env) mod
     moduleNameIsInHscTargets = any isThisModule (hsc_targets hsc_env)
