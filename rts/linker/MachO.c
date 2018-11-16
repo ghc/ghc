@@ -1660,7 +1660,7 @@ ocGetNames_MachO(ObjectCode* oc)
     commonCounter = (unsigned long)commonStorage;
 
     if (oc->info->symCmd) {
-        for (int i = 0; i < oc->n_symbols; i++) {
+        for (size_t i = 0; i < oc->info->n_macho_symbols; i++) {
             SymbolName* nm = oc->info->macho_symbols[i].name;
             MachONList *nlist = &oc->info->nlist[i];
             if((nlist->n_type & N_TYPE) == N_UNDF
