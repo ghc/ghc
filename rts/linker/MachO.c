@@ -1613,7 +1613,6 @@ ocGetNames_MachO(ObjectCode* oc)
                                    "ocGetNames_MachO(oc->symbols)");
 
     if (oc->info->symCmd) {
-        debugBelch("ocGetNames_MachO: %d macho symbols\n", oc->info->n_macho_symbols);
         for (size_t i = 0; i < oc->info->n_macho_symbols; i++) {
             SymbolName* nm = oc->info->macho_symbols[i].name;
             if(oc->info->nlist[i].n_type & N_STAB)
@@ -1663,14 +1662,14 @@ ocGetNames_MachO(ObjectCode* oc)
 
     if (oc->info->symCmd) {
         for (int i = 0; i < oc->n_symbols; i++) {
-            if((oc->info->nlist[i].n_type & N_TYPE) == N_UNDF
-             && (oc->info->nlist[i].n_type & N_EXT)
-             && (oc->info->nlist[i].n_value != 0)) {
+            SymbolName* nm = oc->info->macho_symbols[i].name;
+            MachONList *nlist = &oc->info->nlist[i];
+            if((nlist->n_type & N_TYPE) == N_UNDF
+             && (nlist->n_type & N_EXT)
+             && (nlist->n_value != 0)) {
+                unsigned long sz = nlist->n_value;
 
-                SymbolName* nm = oc->info->macho_symbols[i].name;
-                unsigned long sz = oc->info->nlist[i].n_value;
-
-                oc->info->nlist[i].n_value = commonCounter;
+                nlist->n_value = commonCounter;
 
                 /* also set the final address to the macho_symbol */
                 oc->info->macho_symbols[i].addr = (void*)commonCounter;
