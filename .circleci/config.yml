@@ -41,7 +41,7 @@ aliases:
   - &configure_unix
     run:
       name: Configure
-      command: ./configure $CONFIGURE_OPTS
+      command: ./configure 
   - &configure_unix_32
     run:
       name: Configure
@@ -162,8 +162,6 @@ jobs:
       # Only Sierra and onwards supports clock_gettime. See #12858
       ac_cv_func_clock_gettime: "no"
       GHC_COLLECTOR_FLAVOR: x86_64-darwin
-      # Build with in-tree GMP since this isn't available on OS X by default.
-      CONFIGURE_OPTS: --with-intree-gmp
       <<: *buildenv
       TEST_ENV: x86_64-darwin
     steps:
