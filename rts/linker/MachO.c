@@ -1613,14 +1613,17 @@ ocGetNames_MachO(ObjectCode* oc)
                                    "ocGetNames_MachO(oc->symbols)");
 
     if (oc->info->symCmd) {
+        debugBelch("ocGetNames_MachO: %d macho symbols\n", oc->info->n_macho_symbols);
         for (size_t i = 0; i < oc->info->n_macho_symbols; i++) {
+            SymbolName* nm = oc->info->macho_symbols[i].name;
             if(oc->info->nlist[i].n_type & N_STAB)
-                ;
+	        {
+		        IF_DEBUG(linker, debugBelch("ocGetNames_MachO: Skip STAB: %s\n", nm));
+	        }
             else if((oc->info->nlist[i].n_type & N_TYPE) == N_SECT)
             {
                 if(oc->info->nlist[i].n_type & N_EXT)
                 {
-                    SymbolName* nm = oc->info->macho_symbols[i].name;
                     if (   (oc->info->nlist[i].n_desc & N_WEAK_DEF)
                         && lookupSymbol_(nm)) {
                         // weak definition, and we already have a definition
@@ -1644,12 +1647,12 @@ ocGetNames_MachO(ObjectCode* oc)
                 }
                 else
                 {
-                    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not external, skipping\n"));
+                    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not external, skipping %s\n", nm));
                 }
             }
             else
             {
-                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not defined in this section, skipping\n"));
+                IF_DEBUG(linker, debugBelch("ocGetNames_MachO: \t...not defined in this section, skipping %s\n", nm));
             }
         }
     }
