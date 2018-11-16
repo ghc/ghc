@@ -32,8 +32,8 @@ holes3.hs:8:5: error:
       Valid hole fits include
         h :: [Char]
         f :: forall t. t
-        [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
+        [] :: forall a. [a]
 
 holes3.hs:11:15: error:
     • Found hole: _x :: b0
@@ -52,12 +52,6 @@ holes3.hs:11:15: error:
         h :: [Char]
         f :: forall t. t
         otherwise :: Bool
-        False :: Bool
-        True :: Bool
-        LT :: Ordering
-        EQ :: Ordering
-        GT :: Ordering
-        () :: ()
         lines :: String -> [String]
         unlines :: [String] -> String
         unwords :: [String] -> String
@@ -89,10 +83,14 @@ holes3.hs:11:15: error:
         fromIntegral :: forall a b. (Integral a, Num b) => a -> b
         toInteger :: forall a. Integral a => a -> Integer
         toRational :: forall a. Real a => a -> Rational
-        (:) :: forall a. a -> [a] -> [a]
-        Nothing :: forall a. Maybe a
-        Just :: forall a. a -> Maybe a
-        [] :: forall a. [a]
+        False :: Bool
+        True :: Bool
+        LT :: Ordering
+        EQ :: Ordering
+        GT :: Ordering
+        One :: GHC.Types.Multiplicity
+        Omega :: GHC.Types.Multiplicity
+        () :: ()
         asTypeOf :: forall a. a -> a -> a
         id :: forall a. a -> a
         until :: forall a. (a -> Bool) -> (a -> a) -> a -> a
@@ -173,8 +171,10 @@ holes3.hs:11:15: error:
         snd :: forall a b. (a, b) -> b
         map :: forall a b. (a -> b) -> [a] -> [b]
         realToFrac :: forall a b. (Real a, Fractional b) => a -> b
-        Left :: forall a b. a -> Either a b
-        Right :: forall a b. b -> Either a b
+        (:) :: forall a. a -> [a] -> [a]
+        Nothing :: forall a. Maybe a
+        Just :: forall a. a -> Maybe a
+        [] :: forall a. [a]
         maybe :: forall b a. b -> (a -> b) -> Maybe a -> b
         const :: forall a b. a -> b -> a
         scanl :: forall b a. (b -> a -> b) -> b -> [a] -> [b]
@@ -189,6 +189,8 @@ holes3.hs:11:15: error:
         round :: forall a b. (RealFrac a, Integral b) => a -> b
         truncate :: forall a b. (RealFrac a, Integral b) => a -> b
         ($) :: forall a b. (a -> b) -> a -> b
+        Left :: forall a b. a -> Either a b
+        Right :: forall a b. b -> Either a b
         either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
         curry :: forall a b c. ((a, b) -> c) -> a -> b -> c
         uncurry :: forall a b c. (a -> b -> c) -> (a, b) -> c

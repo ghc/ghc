@@ -1,14 +1,52 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 98, types: 38, coercions: 5, joins: 0/0}
+  = {terms: 107, types: 53, coercions: 11, joins: 0/0}
+
+-- RHS size: {terms: 4, types: 4, coercions: 3, joins: 0/0}
+Roles13.$WMkWrap [InlPrag=INLINE[2]] :: forall a. a -> Wrap a
+[GblId[DataConWrapper],
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity))
+                 (@ a[sk:0])
+                 (dt [Occ=Once] :: a[sk:0]) ->
+                 dt
+                 `cast` (Sym (Roles13.N:Wrap[0] <a[sk:0]>_R)
+                         :: a[sk:0] ~R# Wrap a[sk:0])}]
+Roles13.$WMkWrap
+  = \ (@ (n :: GHC.Types.Multiplicity))
+      (@ a[sk:0])
+      (dt [Occ=Once] :: a[sk:0]) ->
+      dt
+      `cast` (Sym (Roles13.N:Wrap[0] <a[sk:0]>_R)
+              :: a[sk:0] ~R# Wrap a[sk:0])
+
+-- RHS size: {terms: 3, types: 2, coercions: 2, joins: 0/0}
+Roles13.$WMkAge [InlPrag=INLINE[2]] :: Int -> Age
+[GblId[DataConWrapper],
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity)) (dt [Occ=Once] :: Int) ->
+                 dt `cast` (Sym (Roles13.N:Age[0]) :: Int ~R# Age)}]
+Roles13.$WMkAge
+  = \ (@ (n :: GHC.Types.Multiplicity)) (dt [Occ=Once] :: Int) ->
+      dt `cast` (Sym (Roles13.N:Age[0]) :: Int ~R# Age)
 
 -- RHS size: {terms: 2, types: 2, coercions: 0, joins: 0/0}
 convert1 :: Wrap Age -> Wrap Age
 [GblId, Arity=1, Caf=NoCafRefs, Unf=OtherCon []]
 convert1 = \ (ds :: Wrap Age) -> ds
 
--- RHS size: {terms: 1, types: 0, coercions: 5, joins: 0/0}
+-- RHS size: {terms: 1, types: 0, coercions: 6, joins: 0/0}
 convert :: Wrap Age -> Int
 [GblId, Arity=1, Caf=NoCafRefs, Unf=OtherCon []]
 convert

@@ -1,9 +1,9 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 63, types: 43, coercions: 1, joins: 0/0}
+  = {terms: 64, types: 45, coercions: 1, joins: 0/0}
 
--- RHS size: {terms: 2, types: 4, coercions: 1, joins: 0/0}
+-- RHS size: {terms: 3, types: 5, coercions: 1, joins: 0/0}
 T2431.$WRefl [InlPrag=INLINE[2]] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
@@ -11,9 +11,11 @@ T2431.$WRefl [InlPrag=INLINE[2]] :: forall a. a :~: a
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)}]
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity)) (@ a) ->
+                 T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)}]
 T2431.$WRefl
-  = \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)
+  = \ (@ (n :: GHC.Types.Multiplicity)) (@ a) ->
+      T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)
 
 -- RHS size: {terms: 4, types: 8, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a

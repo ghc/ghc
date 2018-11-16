@@ -1,15 +1,15 @@
 -- Type of data constructors are now linear
 ghci025
 T8958
--- Fails with linearity checks enable, skipped for data constructor type
-T7360
 -- See #42
 T14682
+
+# Typeable decomposition, currently not working
+T14236
 
 ### Polymorphism See #91
 
 AmapCoerce
-Roles13
 T10019
 T11345
 T11524a
@@ -17,18 +17,20 @@ T11721
 T11721_TH
 T11985
 T12785b
-T13032
 T13988
-T14236
 T14394
 T14773b
 T2110
-T2431
 T5327
 T8274
 TH_reifyDecl1
 TestTypeableBinary
 ghci
+rule2
+spec001
+
+# Debugger
+
 print002
 print003
 print006
@@ -39,13 +41,14 @@ print013
 print014
 print019
 print034
+
+# Pattern synonyms + records
+
 records-compile
 records-poly
 records-prov-req
 records-req-only
 records-run
-rule2
-spec001
 
 # FunCo fallout
 
@@ -59,9 +62,6 @@ dynamic-paper
 T14273
 T14343
 T14343b
-holes
-holes2
-holes3
 type_in_type_hole_fits
 valid_hole_fits
 valid_hole_fits_interactions
