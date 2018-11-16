@@ -69,6 +69,7 @@ case "$(uname)" in
     ln -s $HOME/.cabal/bin/alex /usr/local/bin/alex || true
     ln -s $HOME/.cabal/bin/happy /usr/local/bin/happy || true
     ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour || true
+    echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk
     ;;
   *)
     fail "uname=$(uname) not supported"
