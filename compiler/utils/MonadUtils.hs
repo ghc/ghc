@@ -30,8 +30,6 @@ module MonadUtils
 
 import GhcPrelude
 
-import Maybes
-
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
@@ -144,9 +142,10 @@ mapSndM f ((a,b):xs) = do { c <- f b; rs <- mapSndM f xs; return ((a,c):rs) }
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f xs = liftM concat (mapM f xs)
 
--- | Monadic version of mapMaybe
-mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
-mapMaybeM f = liftM catMaybes . mapM f
+-- | Applicative version of mapMaybe
+mapMaybeM :: Applicative m => (a -> m (Maybe b)) -> [a] -> m [b]
+mapMaybeM f = foldr g (pure [])
+  where g a = liftA2 (maybe id (:)) (f a)
 
 -- | Monadic version of fmap
 fmapMaybeM :: (Monad m) => (a -> m b) -> Maybe a -> m (Maybe b)
