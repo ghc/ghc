@@ -133,4 +133,4 @@ instance Outputable a => Outputable (UniqDSet a) where
   ppr = pprUniqDSet ppr
 
 pprUniqDSet :: (a -> SDoc) -> UniqDSet a -> SDoc
-pprUniqDSet f (UniqDSet s) = pprUniqDFM f s
+pprUniqDSet f = braces . pprWithCommas f . uniqDSetToList

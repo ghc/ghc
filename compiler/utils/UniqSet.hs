@@ -191,4 +191,6 @@ instance Outputable a => Outputable (UniqSet a) where
     ppr = pprUniqSet ppr
 
 pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
-pprUniqSet f (UniqSet s) = pprUniqFM f s
+-- It's OK to use nonDetUFMToList here because we only use it for
+-- pretty-printing.
+pprUniqSet f = braces . pprWithCommas f . nonDetEltsUniqSet
