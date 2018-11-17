@@ -668,8 +668,10 @@ scheduleYield (Capability **pcap, Task *task)
     // otherwise yield (sleep), and keep yielding if necessary.
     do {
         if (doIdleGCWork(cap, false)) {
+            // there's more idle GC work to do
             didGcLast = false;
         } else {
+            // no more idle GC work to do
             didGcLast = yieldCapability(&cap,task, !didGcLast);
         }
     }
@@ -1876,7 +1878,7 @@ delete_threads_and_gc:
         releaseGCThreads(cap, idle_cap);
     }
 #endif
-    if (heap_overflow && sched_state < SCHED_INTERRUPTING) {
+    if (heap_overflow && sched_state == SCHED_RUNNING) {
         // GC set the heap_overflow flag.  We should throw an exception if we
         // can, or shut down otherwise.
 
@@ -2660,7 +2662,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
         ASSERT(task->incall->tso == NULL);
         releaseCapability(cap);
     }
-    sched_state = SCHED_SHUTTING_DOWN;
+    ASSERT(sched_state == SCHED_SHUTTING_DOWN);
 
     shutdownCapabilities(task, wait_foreign);
 
@@ -2749,6 +2751,7 @@ performMajorGC(void)
 void
 interruptStgRts(void)
 {
+    ASSERT(sched_state != SCHED_SHUTTING_DOWN);
     sched_state = SCHED_INTERRUPTING;
     interruptAllCapabilities();
 #if defined(THREADED_RTS)
