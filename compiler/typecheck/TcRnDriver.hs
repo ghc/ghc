@@ -1732,11 +1732,11 @@ check_main dflags tcg_env explicit_mod_hdr
     main_fn     = getMainFun dflags
     interactive = ghcLink dflags == LinkInMemory
 
-    complain_no_main = checkTc (interactive && not explicit_mod_hdr) noMainMsg
-        -- In interactive mode, without an explicit module header, don't
-        -- worry about the absence of 'main'.
-        -- In other modes, fail altogether, so that we don't go on
-        -- and complain a second time when processing the export list.
+    complain_no_main = unless (interactive && not explicit_mod_hdr)
+                              (addErrTc noMainMsg)                  -- #12906
+        -- Without an explicit module header...
+          -- in interactive mode, don't worry about the absence of 'main'.
+          -- in other modes, add error message and go on with typechecking.
 
     mainCtxt  = text "When checking the type of the" <+> pp_main_fn
     noMainMsg = text "The" <+> pp_main_fn
