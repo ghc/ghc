@@ -127,9 +127,11 @@ tcRnExports explicit_mod exports
         -- In interactive mode, we behave as if he had
         -- written "module Main where ..."
         ; dflags <- getDynFlags
+        ; let is_main_mod = mainModIs dflags == this_mod
         ; let default_main = case mainFunIs dflags of
-                 Just main_fun -> mkUnqual varName (fsLit main_fun)
-                 Nothing       -> main_RDR_Unqual
+                 Just main_fun
+                     | is_main_mod -> mkUnqual varName (fsLit main_fun)
+                 _                 -> main_RDR_Unqual
         ; let real_exports
                  | explicit_mod = exports
                  | ghcLink dflags == LinkInMemory = Nothing

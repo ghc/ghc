@@ -171,16 +171,21 @@ same context. For example, this is fine: ::
       g :: Ord a => a -> Bool
       g y = (y <= y) || f True
 
-.. _infelicities-Modules:
+.. _infelicities-default-exports:
 
 Default Module headers with -main-is
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Haskell2010 report specifies in <https://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-990005.1> that
+The Haskell2010 Report specifies in <https://www.haskell.org/onlinereport/haskell2010/haskellch5.html#x11-990005.1> that
 
     "An abbreviated form of module, consisting only of the module body,
      is permitted. If this is used, the header is assumed to be
      `module Main(main) where`."
+
+GHC's ``-main-is`` option can be used to change the name of the top-level entry
+point from ``main`` to any other variable.  When compiling the main module and
+``-main-is`` has been used to rename the default entry point, GHC will also use
+the alternate name in the default export list.
 
 Consider the following program: ::
 
@@ -188,18 +193,29 @@ Consider the following program: ::
     program :: IO ()
     program = return ()
 
-Under the report, this would fail with ``ghc -main-is Main.program Main.hs``
-with the following errors: ::
+GHC will successfully compile this module with
+``ghc -main-is Main.program Main.hs``, because the default export list
+will include ``program`` rather than ``main``, as the Haskell Report
+typically requires.
 
-    Main.hs:1:1: error:
-        Not in scope: 'main'
-        Perhaps you meant 'min' (imported from Prelude)
+This change only applies to the main module.  Other modules will still export
+``main`` from a default export list, regardless of the ``-main-is`` flag.
+This allows use of ``-main-is`` with existing modules that export ``main`` via
+a default export list, even when ``-main-is`` points to a different entry
+point, as in this example (compiled with ``-main-is MainWrapper.program``). ::
 
-    Main.hs:1:1: error:
-        The main IO action 'program' is not exported by module 'Main'
+    -- file MainWrapper.hs
+    module MainWrapper where
+    import Main
 
-GHC's flag '-main-is' allows one to change the entry point name so that
-the above example would succeed.
+    program :: IO ()
+    program = putStrLn "Redirecting..." >> main
+
+    -- file Main.hs
+    main :: IO ()
+    main = putStrLn "I am main."
+
+.. _infelicities-Modules:
 
 Module system and interface files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
