@@ -77,6 +77,8 @@ Compiler
 - The :ghc-flag:`-fblock-layout-cfg` flag enables a new code layout algorithm on x86.
   This is enabled by default at  :ghc-flag:`-O` and :ghc-flag:`-O2`.
 
+- The deprecated ghc-flag ``-Wamp`` has been removed.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
