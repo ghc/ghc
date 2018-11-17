@@ -167,6 +167,7 @@ pushOnRunQueue (Capability *cap, StgTSO *tso)
 INLINE_HEADER StgTSO *
 popRunQueue (Capability *cap)
 {
+    ASSERT(cap->n_run_queue != 0);
     StgTSO *t = cap->run_queue_hd;
     ASSERT(t != END_TSO_QUEUE);
     cap->run_queue_hd = t->_link;
