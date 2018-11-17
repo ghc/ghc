@@ -558,6 +558,8 @@ Library
             TargetReg
             NCGMonad
             Instruction
+            BlockLayout
+            CFG
             Format
             Reg
             RegClass

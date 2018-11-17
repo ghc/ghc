@@ -156,7 +156,6 @@ cpsTop hsc_env proc =
                     return g
                else return g
 
-
         -- we don't need to split proc points for the NCG, unless
         -- tablesNextToCode is off.  The latter is because we have no
         -- label to put on info tables for basic blocks that are not

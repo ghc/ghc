@@ -46,7 +46,7 @@ instance Outputable Label where
 -----------------------------------------------------------------------------
 -- LabelSet
 
-newtype LabelSet = LS UniqueSet deriving (Eq, Ord, Show)
+newtype LabelSet = LS UniqueSet deriving (Eq, Ord, Show, Monoid, Semigroup)
 
 instance IsSet LabelSet where
   type ElemOf LabelSet = Label
@@ -64,7 +64,7 @@ instance IsSet LabelSet where
   setDifference (LS x) (LS y) = LS (setDifference x y)
   setIntersection (LS x) (LS y) = LS (setIntersection x y)
   setIsSubsetOf (LS x) (LS y) = setIsSubsetOf x y
-
+  setFilter f (LS s) = LS (setFilter (f . mkHooplLabel) s)
   setFoldl k z (LS s) = setFoldl (\a v -> k a (mkHooplLabel v)) z s
   setFoldr k z (LS s) = setFoldr (\v a -> k (mkHooplLabel v) a) z s
 
@@ -92,6 +92,7 @@ instance IsMap LabelMap where
   mapInsertWith f (Label k) v (LM m) = LM (mapInsertWith f k v m)
   mapDelete (Label k) (LM m) = LM (mapDelete k m)
   mapAlter f (Label k) (LM m) = LM (mapAlter f k m)
+  mapAdjust f (Label k) (LM m) = LM (mapAdjust f k m)
 
   mapUnion (LM x) (LM y) = LM (mapUnion x y)
   mapUnionWithKey f (LM x) (LM y) = LM (mapUnionWithKey (f . mkHooplLabel) x y)
@@ -105,7 +106,9 @@ instance IsMap LabelMap where
   mapFoldr k z (LM m) = mapFoldr k z m
   mapFoldlWithKey k z (LM m) =
       mapFoldlWithKey (\a v -> k a (mkHooplLabel v)) z m
+  mapFoldMapWithKey f (LM m) = mapFoldMapWithKey (\k v -> f (mkHooplLabel k) v) m
   mapFilter f (LM m) = LM (mapFilter f m)
+  mapFilterWithKey f (LM m) = LM (mapFilterWithKey (f . mkHooplLabel) m)
 
   mapElems (LM m) = mapElems m
   mapKeys (LM m) = map mkHooplLabel (mapKeys m)
