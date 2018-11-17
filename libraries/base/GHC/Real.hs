@@ -422,7 +422,7 @@ instance Real Natural where
 -- were not inlined the rules would not fire. The rules would also not
 -- fire if calls to quotInteger and so on were inlined, but this does not
 -- happen because they are all marked with NOINLINE pragma - see documentation
--- of integer-gmp or integer-simple.
+-- of integer-gmp, integer-openssl or integer-simple.
 
 -- | @since 2.0.1
 instance  Integral Integer where

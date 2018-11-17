@@ -283,5 +283,6 @@ data PlatformMisc = PlatformMisc
 
 data IntegerLibrary
     = IntegerGMP
+    | IntegerOpenSSL
     | IntegerSimple
     deriving (Read, Show, Eq)

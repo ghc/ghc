@@ -74,10 +74,9 @@ import GHC.Maybe
 import GHC.Types
 import GHC.Prim
 import {-# SOURCE #-} GHC.Exception.Type (underflowException, divZeroException)
+import GHC.Integer
 #if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals
-#else
-import GHC.Integer
 #endif
 
 default ()

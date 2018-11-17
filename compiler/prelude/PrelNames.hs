@@ -116,25 +116,27 @@ Note [The integer library]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Clearly, we need to know the names of various definitions of the integer
-library, e.g. the type itself, `mkInteger` etc. But there are two possible
+library, e.g. the type itself, `mkInteger` etc. But there are three possible
 implementations of the integer library:
 
  * integer-gmp (fast, but uses libgmp, which may not be available on all
    targets and is GPL licensed)
+ * integer-openssl (fast, BSD-licensed, but uses libcrypto of openssl, which may
+   not be available on all targets)
  * integer-simple (slow, but pure Haskell and BSD-licensed)
 
 We want the compiler to work with either one. The way we achieve this is:
 
- * When compiling the integer-{gmp,simple} library, we pass
+ * When compiling the integer-{gmp,openssl,simple} library, we pass
      -this-unit-id  integer-wired-in
-   to GHC (see the cabal file libraries/integer-{gmp,simple}.
+   to GHC (see the cabal file libraries/integer-{gmp,openssl,simple}.
  * This way, GHC can use just this UnitID (see Module.integerUnitId) when
    generating code, and the linker will succeed.
 
-Unfortuately, the abstraction is not complete: When using integer-gmp, we
-really want to use the S# constructor directly. This is controlled by
-the `integerLibrary` field of `DynFlags`: If it is IntegerGMP, we use
-this constructor directly (see  CorePrep.lookupIntegerSDataConName)
+Unfortuately, the abstraction is not complete: When using integer-gmp, we really
+want to use the S# constructor directly. This is controlled by the
+`integerLibrary` field of `DynFlags`: If it is IntegerGMP or IntegerOpenSSL, we
+use this constructor directly (see CorePrep.lookupIntegerSDataConName)
 
 When GHC reads the package data base, it (internally only) pretends it has UnitId
 `integer-wired-in` instead of the actual UnitId (which includes the version

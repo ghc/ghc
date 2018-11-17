@@ -21,7 +21,7 @@ data Flavour = Flavour {
     args :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
-    -- | Either 'integerGmp' or 'integerSimple'.
+    -- | Either 'integerGmp', 'integerOpenSSL' or 'integerSimple'.
     integerLibrary :: Action Package,
     -- | Build libraries these ways.
     libraryWays :: Ways,
@@ -34,7 +34,7 @@ data Flavour = Flavour {
     -- | Build profiled GHC.
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
-    ghcDebugged :: Bool
+    ghcDebugged :: Bool,
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
     ghcDocs :: Action DocTargets }
@@ -168,7 +168,7 @@ the `packages` setting of the user flavour as otherwise it will not be built.
 
 You can choose which integer library to use when builing GHC using the
 `integerLibrary` setting of the build flavour. Possible values are: `integerGmp`
-(default) and `integerSimple`.
+(default), `integerOpenSSL` and `integerSimple`.
 ```haskell
 userFlavour :: Flavour
 userFlavour = defaultFlavour { name = "user", integerLibrary = pure integerSimple }

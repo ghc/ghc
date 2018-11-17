@@ -49,6 +49,11 @@ Flag integer-simple
     Manual: True
     Default: False
 
+Flag integer-openssl
+    Description: Use integer-openssl
+    Manual: True
+    Default: False
+
 Flag integer-gmp
     Description: Use integer-gmp
     Manual: True
@@ -98,11 +103,14 @@ Library
     build-depends: rts == 1.0, ghc-prim >= 0.5.1.0 && < 0.7
 
     -- sanity-check to ensure exactly one flag is set
-    if !((flag(integer-gmp) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-simple)))
+    if !((flag(integer-gmp) && !flag(integer-openssl) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-openssl) && !flag(integer-simple)) || (!flag(integer-gmp) && !flag(integer-openssl) && flag(integer-simple)))
         build-depends: invalid-cabal-flag-settings<0
 
     if flag(integer-simple)
         build-depends: integer-simple ^>= 0.1.1
+
+    if flag(integer-openssl)
+        build-depends: integer-openssl ^>= 0.1.0
 
     if flag(integer-gmp)
         build-depends: integer-gmp ^>= 1.0.1

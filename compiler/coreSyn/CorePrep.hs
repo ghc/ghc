@@ -1504,12 +1504,15 @@ lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
 lookupIntegerSDataConName dflags hsc_env = case integerLibrary dflags of
     IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $
                   lookupGlobal hsc_env integerSDataConName
+    IntegerOpenSSL -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $
+                  lookupGlobal hsc_env integerSDataConName
     IntegerSimple -> return Nothing
 
 lookupNaturalSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
 lookupNaturalSDataConName dflags hsc_env = case integerLibrary dflags of
     IntegerGMP -> guardNaturalUse dflags $ liftM (Just . tyThingDataCon) $
                   lookupGlobal hsc_env naturalSDataConName
+    IntegerOpenSSL -> return Nothing
     IntegerSimple -> return Nothing
 
 -- | Helper for 'lookupMkIntegerName', 'lookupIntegerSDataConName'

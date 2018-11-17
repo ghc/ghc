@@ -22,7 +22,7 @@ data Flavour = Flavour {
     args :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
-    -- | Either 'integerGmp' or 'integerSimple'.
+    -- | Either 'integerGmp', 'integerOpenSSL' or 'integerSimple'.
     integerLibrary :: Action Package,
     -- | Build libraries these ways.
     libraryWays :: Ways,

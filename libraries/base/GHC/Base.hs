@@ -158,14 +158,12 @@ default ()              -- Double isn't available yet
 {-
 Note [Depend on GHC.Integer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Integer type is special because TidyPgm uses
-GHC.Integer.Type.mkInteger to construct Integer literal values
-Currently it reads the interface file whether or not the current
-module *has* any Integer literals, so it's important that
-GHC.Integer.Type (in package integer-gmp or integer-simple) is
-compiled before any other module.  (There's a hack in GHC to disable
-this for packages ghc-prim, integer-gmp, integer-simple, which aren't
-allowed to contain any Integer literals.)
+The Integer type is special because TidyPgm uses GHC.Integer.Type.mkInteger to
+construct Integer literal values Currently it reads the interface file whether
+or not the current module *has* any Integer literals, so it's important that
+GHC.Integer.Type (in package integer-...) is compiled before any other module.
+(There's a hack in GHC to disable this for packages ghc-prim and any of the
+integer-... packages, which aren't allowed to contain any Integer literals.)
 
 Likewise we implicitly need Integer when deriving things like Eq
 instances.

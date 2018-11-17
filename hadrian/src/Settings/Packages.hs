@@ -81,10 +81,7 @@ packageArgs = do
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
-            , notStage0 ? intLib == integerGmp ?
-              arg "integer-gmp"
-            , notStage0 ? intLib == integerSimple ?
-              arg "integer-simple" ]
+            , notStage0 ? arg (pkgName intLib) ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 

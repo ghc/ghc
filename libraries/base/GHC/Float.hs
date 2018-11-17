@@ -54,7 +54,7 @@ import GHC.Word
 import GHC.Arr
 import GHC.Float.RealFracMethods
 import GHC.Float.ConversionUtils
-import GHC.Integer.Logarithms ( integerLogBase# )
+import GHC.Integer.Logarithms
 import GHC.Integer.Logarithms.Internals
 
 infixr 8  **

@@ -1068,7 +1068,7 @@ versions of them installed. To the user, everything looks normal.
 
 However, for each invocation of GHC, only a single instance of each wired-in
 package will be recognised (the desired one is selected via
-@-package@\/@-hide-package@), and GHC will internall pretend that it has the
+@-package@\/@-hide-package@), and GHC will internally pretend that it has the
 *unversioned* 'UnitId', including in .hi files and object file symbols.
 
 Unselected versions of wired-in packages will be ignored, as will any other
@@ -1080,9 +1080,9 @@ the symbols in the object files have the unversioned unit id in their name.
 
 Make sure you change 'Packages.findWiredInPackages' if you add an entry here.
 
-For `integer-gmp`/`integer-simple` we also change the base name to
-`integer-wired-in`, but this is fundamentally no different.
-See Note [The integer library] in PrelNames.
+For `integer-gmp`, `integer-openssl` and `integer-simple` we also change the
+base name to `integer-wired-in`, but this is fundamentally no different. See
+Note [The integer library] in PrelNames.
 -}
 
 integerUnitId, primUnitId,

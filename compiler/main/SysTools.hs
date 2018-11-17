@@ -248,12 +248,15 @@ initSysTools top_dir
        integerLibrary <- getSetting "integer library"
        integerLibraryType <- case integerLibrary of
          "integer-gmp" -> pure IntegerGMP
+         "integer-openssl" -> pure IntegerOpenSSL
          "integer-simple" -> pure IntegerSimple
          _ -> pgmError $ unwords
            [ "Entry for"
            , show "integer library"
            , "must be one of"
            , show "integer-gmp"
+           , "or"
+           , show "integer-openssl"
            , "or"
            , show "integer-simple"
            ]
