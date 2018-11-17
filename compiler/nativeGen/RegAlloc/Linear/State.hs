@@ -27,7 +27,8 @@ module RegAlloc.Linear.State (
 
         getUniqueR,
 
-        recordSpill
+        recordSpill,
+        recordFixupBlock
 )
 where
 
@@ -39,6 +40,7 @@ import RegAlloc.Linear.Base
 import RegAlloc.Liveness
 import Instruction
 import Reg
+import BlockId
 
 import DynFlags
 import Unique
@@ -84,7 +86,8 @@ runR dflags block_assig freeregs assig stack us thing =
                 , ra_stack      = stack
                 , ra_us         = us
                 , ra_spills     = []
-                , ra_DynFlags   = dflags })
+                , ra_DynFlags   = dflags
+                , ra_fixups     = [] })
    of
         (# state'@RA_State
                 { ra_blockassig = block_assig
@@ -98,7 +101,8 @@ runR dflags block_assig freeregs assig stack us thing =
 makeRAStats :: RA_State freeRegs -> RegAllocStats
 makeRAStats state
         = RegAllocStats
-        { ra_spillInstrs        = binSpillReasons (ra_spills state) }
+        { ra_spillInstrs        = binSpillReasons (ra_spills state)
+        , ra_fixupList          = ra_fixups state }
 
 
 spillR :: Instruction instr
@@ -161,3 +165,7 @@ recordSpill :: SpillReason -> RegM freeRegs ()
 recordSpill spill
     = RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
 
+-- | Record a created fixup block
+recordFixupBlock :: BlockId -> BlockId -> BlockId -> RegM freeRegs ()
+recordFixupBlock from between to
+    = RegM $ \s -> (# s { ra_fixups = (from,between,to) : ra_fixups s}, () #)
