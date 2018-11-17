@@ -100,9 +100,9 @@ allocMoreStack
   :: Platform
   -> Int
   -> NatCmmDecl statics PPC.Instr.Instr
-  -> UniqSM (NatCmmDecl statics PPC.Instr.Instr)
+  -> UniqSM (NatCmmDecl statics PPC.Instr.Instr, [(BlockId,BlockId)])
 
-allocMoreStack _ _ top@(CmmData _ _) = return top
+allocMoreStack _ _ top@(CmmData _ _) = return (top,[])
 allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
     let
         infos   = mapKeys info
@@ -121,8 +121,10 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
         alloc   = mkStackAllocInstr   platform delta
         dealloc = mkStackDeallocInstr platform delta
 
+        retargetList = (zip entries (map mkBlockId uniqs))
+
         new_blockmap :: LabelMap BlockId
-        new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
+        new_blockmap = mapFromList retargetList
 
         insert_stack_insns (BasicBlock id insns)
             | Just new_blockid <- mapLookup id new_blockmap
@@ -156,7 +158,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
             = concatMap insert_stack_insns code
 
     -- in
-    return (CmmProc info lbl live (ListGraph new_code))
+    return (CmmProc info lbl live (ListGraph new_code),retargetList)
 
 
 -- -----------------------------------------------------------------------------

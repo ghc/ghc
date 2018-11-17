@@ -41,6 +41,7 @@ import Reg
 import Instruction
 
 import BlockId
+import CFG
 import Hoopl.Collections
 import Hoopl.Label
 import Cmm hiding (RegSet, emptyRegSet)
@@ -646,28 +647,35 @@ patchRegsLiveInstr patchF li
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with empty liveness information
 
 natCmmTopToLive
-        :: Instruction instr
-        => NatCmmDecl statics instr
+        :: (Instruction instr, Outputable instr)
+        => Maybe CFG -> NatCmmDecl statics instr
         -> LiveCmmDecl statics instr
 
-natCmmTopToLive (CmmData i d)
+natCmmTopToLive _ (CmmData i d)
         = CmmData i d
 
-natCmmTopToLive (CmmProc info lbl live (ListGraph []))
+natCmmTopToLive _ (CmmProc info lbl live (ListGraph []))
         = CmmProc (LiveInfo info [] Nothing mapEmpty) lbl live []
 
-natCmmTopToLive proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
- = let  first_id        = blockId first
+natCmmTopToLive mCfg proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
+        = CmmProc (LiveInfo info' (first_id : entry_ids) Nothing mapEmpty)
+                lbl live sccsLive
+   where
+        first_id        = blockId first
         all_entry_ids   = entryBlocks proc
-        sccs            = sccBlocks blocks all_entry_ids
-        entry_ids       = filter (/= first_id) all_entry_ids
+        sccs            = sccBlocks blocks all_entry_ids mCfg
         sccsLive        = map (fmap (\(BasicBlock l instrs) ->
-                                        BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
+                                       BasicBlock l (map (\i -> LiveInstr (Instr i) Nothing) instrs)))
                         $ sccs
 
-   in   CmmProc (LiveInfo info (first_id : entry_ids) Nothing mapEmpty)
-                lbl live sccsLive
-
+        entry_ids       = filter (reachable_node) .
+                          filter (/= first_id) $ all_entry_ids
+        info'           = mapFilterWithKey (\node _ -> reachable_node node) info
+        reachable_node
+          | Just cfg <- mCfg
+          = hasNode cfg
+          | otherwise
+          = const True
 
 --
 -- Compute the liveness graph of the set of basic blocks.  Important:
@@ -683,9 +691,10 @@ sccBlocks
         :: forall instr . Instruction instr
         => [NatBasicBlock instr]
         -> [BlockId]
+        -> Maybe CFG
         -> [SCC (NatBasicBlock instr)]
 
-sccBlocks blocks entries = map (fmap node_payload) sccs
+sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
   where
         nodes :: [ Node BlockId (NatBasicBlock instr) ]
         nodes = [ DigraphNode block id (getOutEdges instrs)
@@ -694,7 +703,12 @@ sccBlocks blocks entries = map (fmap node_payload) sccs
         g1 = graphFromEdgedVerticesUniq nodes
 
         reachable :: LabelSet
-        reachable = setFromList [ node_key node | node <- reachablesG g1 roots ]
+        reachable
+            | Just cfg <- mcfg
+            -- Our CFG only contains reachable nodes by construction.
+            = getCfgNodes cfg
+            | otherwise
+            = setFromList $ [ node_key node | node <- reachablesG g1 roots ]
 
         g2 = graphFromEdgedVerticesUniq [ node | node <- nodes
                                                , node_key node
@@ -713,8 +727,6 @@ sccBlocks blocks entries = map (fmap node_payload) sccs
         -- even though it asks for the whole triple.
         roots = [DigraphNode (panic "sccBlocks") b (panic "sccBlocks")
                 | b <- entries ]
-
-
 
 --------------------------------------------------------------------------------
 -- Annotate code with register liveness information

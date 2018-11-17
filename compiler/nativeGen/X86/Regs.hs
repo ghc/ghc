@@ -132,7 +132,6 @@ data Imm
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
 
-
 strImmLit :: String -> Imm
 strImmLit s = ImmLit (text s)
 

@@ -32,7 +32,9 @@ import PPC.Instr
 import PPC.Cond
 import PPC.Regs
 import CPrim
-import NCGMonad
+import NCGMonad   ( NatM, getNewRegNat, getNewLabelNat
+                  , getBlockIdNat, getPicBaseNat, getNewRegPairNat
+                  , getPicBaseMaybeNat )
 import Instruction
 import PIC
 import Format
