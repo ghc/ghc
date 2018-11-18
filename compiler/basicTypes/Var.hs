@@ -216,7 +216,7 @@ in its @VarDetails@.
 -- | Variable
 --
 -- Essentially a typed 'Name', that may also contain some additional information
--- about the 'Var' and it's use sites.
+-- about the 'Var' and its use sites.
 data Var
   = TyVar {  -- Type and kind variables
              -- see Note [Kind and type variables]
