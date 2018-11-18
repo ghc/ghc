@@ -885,7 +885,7 @@ callishPrimOpSupported dflags op
                      | otherwise     -> Right (genericIntQuotRemOp W8)
 
       Int16QuotRemOp | (ncg && x86ish)
-                        || llvm      -> Left (MO_S_QuotRem W16)
+                                     -> Left (MO_S_QuotRem W16)
                      | otherwise     -> Right (genericIntQuotRemOp W16)
 
 
@@ -904,7 +904,7 @@ callishPrimOpSupported dflags op
                      | otherwise      -> Right (genericWordQuotRemOp W8)
 
       Word16QuotRemOp| (ncg && x86ish)
-                        || llvm      -> Left (MO_U_QuotRem W16)
+                                     -> Left (MO_U_QuotRem W16)
                      | otherwise     -> Right (genericWordQuotRemOp W16)
 
       WordAdd2Op     | (ncg && (x86ish
