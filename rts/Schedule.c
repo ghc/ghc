@@ -2649,9 +2649,7 @@ void
 exitScheduler (bool wait_foreign USED_IF_THREADS)
                /* see Capability.c, shutdownCapability() */
 {
-    Task *task = NULL;
-
-    task = newBoundTask();
+    Task *task = newBoundTask();
 
     // If we haven't killed all the threads yet, do it now.
     if (sched_state < SCHED_SHUTTING_DOWN) {
