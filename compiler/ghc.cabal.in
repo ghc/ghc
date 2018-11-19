@@ -441,6 +441,7 @@ Library
         CoreToStg
         StgLint
         StgSyn
+        StgFVs
         CallArity
         DmdAnal
         Exitify

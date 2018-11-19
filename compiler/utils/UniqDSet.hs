@@ -33,7 +33,8 @@ module UniqDSet (
         isEmptyUniqDSet,
         lookupUniqDSet,
         uniqDSetToList,
-        partitionUniqDSet
+        partitionUniqDSet,
+        mapUniqDSet
     ) where
 
 import GhcPrelude
@@ -120,6 +121,10 @@ uniqDSetToList = eltsUDFM . getUniqDSet
 
 partitionUniqDSet :: (a -> Bool) -> UniqDSet a -> (UniqDSet a, UniqDSet a)
 partitionUniqDSet p = coerce . partitionUDFM p . getUniqDSet
+
+-- See Note [UniqSet invariant] in UniqSet.hs
+mapUniqDSet :: Uniquable b => (a -> b) -> UniqDSet a -> UniqDSet b
+mapUniqDSet f = mkUniqDSet . map f . uniqDSetToList
 
 -- Two 'UniqDSet's are considered equal if they contain the same
 -- uniques.

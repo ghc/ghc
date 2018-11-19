@@ -281,11 +281,10 @@ unariseBinding rho (StgRec xrhss)
   = StgRec <$> mapM (\(x, rhs) -> (x,) <$> unariseRhs rho rhs) xrhss
 
 unariseRhs :: UnariseEnv -> StgRhs -> UniqSM StgRhs
-unariseRhs rho (StgRhsClosure ccs fvs update_flag args expr)
+unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
   = do (rho', args1) <- unariseFunArgBinders rho args
        expr' <- unariseExpr rho' expr
-       let fvs' = unariseFreeVars rho fvs
-       return (StgRhsClosure ccs fvs' update_flag args1 expr')
+       return (StgRhsClosure ext ccs update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con args)
   = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
@@ -722,24 +721,6 @@ unariseConArgBinders rho xs = second concat <$> mapAccumLM unariseConArgBinder r
 -- See DataCon applications case in Note [Post-unarisation invariants].
 unariseConArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
 unariseConArgBinder = unariseArgBinder True
-
-unariseFreeVars :: UnariseEnv -> [InId] -> [OutId]
-unariseFreeVars rho fvs
- = [ v | fv <- fvs, StgVarArg v <- unariseFreeVar rho fv ]
-   -- Notice that we filter out any StgLitArgs
-   -- e.g.   case e of (x :: (# Int | Bool #))
-   --           (# v | #) ->  ... let {g = \y. ..x...} in ...
-   --           (# | w #) -> ...
-   --     Here 'x' is free in g's closure, and the env will have
-   --       x :-> [1, v]
-   --     we want to capture 'v', but not 1, in the free vars
-
-unariseFreeVar :: UnariseEnv -> Id -> [StgArg]
-unariseFreeVar rho x =
-  case lookupVarEnv rho x of
-    Just (MultiVal args) -> args
-    Just (UnaryVal arg)  -> [arg]
-    Nothing              -> [StgVarArg x]
 
 --------------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
 module StgCmmBind where
 
 import StgCmmMonad( FCode )
-import StgSyn( StgBinding )
+import StgSyn( CgStgBinding )
 
-cgBind :: StgBinding -> FCode ()
+cgBind :: CgStgBinding -> FCode ()

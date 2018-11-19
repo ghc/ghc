@@ -616,7 +616,7 @@ data GeneralFlag
    -- Except for uniques, as some simplifier phases introduce new
    -- variables that have otherwise identical names.
    | Opt_SuppressUniques
-   | Opt_SuppressStgFreeVars
+   | Opt_SuppressStgExts
    | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
    | Opt_SuppressTimestamps -- ^ Suppress timestamps in dumps
 
@@ -3166,7 +3166,7 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressTypeApplications
                   setGeneralFlag Opt_SuppressIdInfo
                   setGeneralFlag Opt_SuppressTicks
-                  setGeneralFlag Opt_SuppressStgFreeVars
+                  setGeneralFlag Opt_SuppressStgExts
                   setGeneralFlag Opt_SuppressTypeSignatures
                   setGeneralFlag Opt_SuppressTimestamps)
 
@@ -3976,7 +3976,9 @@ dFlagsDeps = [
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
      (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),
   flagSpec "suppress-ticks"             Opt_SuppressTicks,
-  flagSpec "suppress-stg-free-vars"     Opt_SuppressStgFreeVars,
+  depFlagSpec' "suppress-stg-free-vars" Opt_SuppressStgExts
+     (useInstead "-d" "suppress-stg-exts"),
+  flagSpec "suppress-stg-exts"          Opt_SuppressStgExts,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,

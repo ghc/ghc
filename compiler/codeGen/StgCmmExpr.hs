@@ -56,7 +56,7 @@ import Data.Function ( on )
 --              cgExpr: the main function
 ------------------------------------------------------------------------
 
-cgExpr  :: StgExpr -> FCode ReturnKind
+cgExpr  :: CgStgExpr -> FCode ReturnKind
 
 cgExpr (StgApp fun args)     = cgIdApp fun args
 
@@ -114,7 +114,7 @@ bound only to stable things like stack locations..  The 'e' part will
 execute *next*, just like the scrutinee of a case. -}
 
 -------------------------
-cgLneBinds :: BlockId -> StgBinding -> FCode ()
+cgLneBinds :: BlockId -> CgStgBinding -> FCode ()
 cgLneBinds join_id (StgNonRec bndr rhs)
   = do  { local_cc <- saveCurrentCostCentre
                 -- See Note [Saving the current cost centre]
@@ -135,7 +135,7 @@ cgLetNoEscapeRhs
     :: BlockId          -- join point for successor of let-no-escape
     -> Maybe LocalReg   -- Saved cost centre
     -> Id
-    -> StgRhs
+    -> CgStgRhs
     -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeRhs join_id local_cc bndr rhs =
@@ -149,9 +149,9 @@ cgLetNoEscapeRhs join_id local_cc bndr rhs =
 cgLetNoEscapeRhsBody
     :: Maybe LocalReg   -- Saved cost centre
     -> Id
-    -> StgRhs
+    -> CgStgRhs
     -> FCode (CgIdInfo, FCode ())
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _ _upd args body)
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure _ cc _upd args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc []
@@ -168,7 +168,7 @@ cgLetNoEscapeClosure
         -> Maybe LocalReg       -- Slot for saved current cost centre
         -> CostCentreStack      -- XXX: *** NOT USED *** why not?
         -> [NonVoid Id]         -- Args (as in \ args -> body)
-        -> StgExpr              -- Body (as in above)
+        -> CgStgExpr            -- Body (as in above)
         -> FCode (CgIdInfo, FCode ())
 
 cgLetNoEscapeClosure bndr cc_slot _unused_cc args body
@@ -298,7 +298,7 @@ data GcPlan
                         -- of the case alternative(s) into the upstream check
 
 -------------------------------------
-cgCase :: StgExpr -> Id -> AltType -> [StgAlt] -> FCode ReturnKind
+cgCase :: CgStgExpr -> Id -> AltType -> [CgStgAlt] -> FCode ReturnKind
 
 cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
   | isEnumerationTyCon tycon -- Note [case on bool]
@@ -547,7 +547,7 @@ maybeSaveCostCentre simple_scrut
 
 
 -----------------
-isSimpleScrut :: StgExpr -> AltType -> FCode Bool
+isSimpleScrut :: CgStgExpr -> AltType -> FCode Bool
 -- Simple scrutinee, does not block or allocate; hence safe to amalgamate
 -- heap usage from alternatives into the stuff before the case
 -- NB: if you get this wrong, and claim that the expression doesn't allocate
@@ -570,7 +570,7 @@ isSimpleOp (StgPrimOp op) stg_args                  = do
 isSimpleOp (StgPrimCallOp _) _                           = return False
 
 -----------------
-chooseReturnBndrs :: Id -> AltType -> [StgAlt] -> [NonVoid Id]
+chooseReturnBndrs :: Id -> AltType -> [CgStgAlt] -> [NonVoid Id]
 -- These are the binders of a case that are assigned by the evaluation of the
 -- scrutinee.
 -- They're non-void, see Note [Post-unarisation invariants] in UnariseStg.
@@ -591,7 +591,7 @@ chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
                              -- MultiValAlt has only one alternative
 
 -------------------------------------
-cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [StgAlt]
+cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
        -> FCode ReturnKind
 -- At this point the result of the case are in the binders
 cgAlts gc_plan _bndr PolyAlt [(_, _, rhs)]
@@ -666,7 +666,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --   goto L1
 
 -------------------
-cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
+cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
              -> FCode ( Maybe CmmAGraphScoped
                       , [(ConTagZ, CmmAGraphScoped)] )
 cgAlgAltRhss gc_plan bndr alts
@@ -686,13 +686,13 @@ cgAlgAltRhss gc_plan bndr alts
 
 
 -------------------
-cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
+cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
           -> FCode [(AltCon, CmmAGraphScoped)]
 cgAltRhss gc_plan bndr alts = do
   dflags <- getDynFlags
   let
     base_reg = idToReg dflags bndr
-    cg_alt :: StgAlt -> FCode (AltCon, CmmAGraphScoped)
+    cg_alt :: CgStgAlt -> FCode (AltCon, CmmAGraphScoped)
     cg_alt (con, bndrs, rhs)
       = getCodeScoped             $
         maybeAltHeapCheck gc_plan $

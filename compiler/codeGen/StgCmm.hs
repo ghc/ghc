@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 
 -----------------------------------------------------------------------------
 --
@@ -44,6 +45,7 @@ import Module
 import Outputable
 import Stream
 import BasicTypes
+import VarSet ( isEmptyVarSet )
 
 import OrdList
 import MkGraph
@@ -57,10 +59,10 @@ codeGen :: DynFlags
         -> Module
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
-        -> [StgTopBinding]             -- Bindings to convert
+        -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
         -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
-                                        -- be interleaved with output
+                                       -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
@@ -117,7 +119,7 @@ This is so that we can write the top level processing in a compositional
 style, with the increasing static environment being plumbed as a state
 variable. -}
 
-cgTopBinding :: DynFlags -> StgTopBinding -> FCode ()
+cgTopBinding :: DynFlags -> CgStgTopBinding -> FCode ()
 cgTopBinding dflags (StgTopLifted (StgNonRec id rhs))
   = do  { id' <- maybeExternaliseId dflags id
         ; let (info, fcode) = cgTopRhs dflags NonRecursive id' rhs
@@ -144,7 +146,7 @@ cgTopBinding dflags (StgTopStringLit id str)
         ; addBindC (litIdInfo dflags id' mkLFStringLit lit)
         }
 
-cgTopRhs :: DynFlags -> RecFlag -> Id -> StgRhs -> (CgIdInfo, FCode ())
+cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
         -- It's already been externalised if necessary
 
@@ -153,8 +155,8 @@ cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in UnariseStg
 
-cgTopRhs dflags rec bndr (StgRhsClosure cc fvs upd_flag args body)
-  = ASSERT(null fvs)    -- There should be no free variables
+cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
+  = ASSERT(isEmptyVarSet fvs)    -- There should be no free variables
     cgTopRhsClosure dflags rec bndr cc upd_flag args body
 
 
