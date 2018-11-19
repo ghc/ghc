@@ -68,7 +68,6 @@ import SrcLoc
 import ListSetOps
 import DynFlags
 import Unique
-import UniqFM( nonDetEltsUFM )
 import ConLike( ConLike(..) )
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
@@ -3240,8 +3239,7 @@ checkConsistentFamInst :: Maybe ClsInstInfo
 checkConsistentFamInst Nothing _ _ = return ()
 checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
   = do { traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
-                                                , ppr kind_prs
-                                                , ppr type_prs
+                                                , ppr arg_triples
                                                 , ppr mini_env ])
        -- Check that the associated type indeed comes from this class
        -- See [Mismatched class methods and associated type families]
@@ -3249,29 +3247,17 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
        ; checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
-       -- Check kind args first, suggesting -fprint-explicit-kiinds
-       -- if there is a mis-match here.
-       ; checkTc (isJust mb_kinds_match) (pp_wrong_at_arg $$ ppSuggestExplicitKinds)
-
-       -- Then type args.  If we do these first, then we'll fail to
-       -- suggest -fprint-explicit-kinds for (T @k  vs  T @Type)
-       ; checkTc (isJust mb_types_match) pp_wrong_at_arg
+       ; check_match arg_triples
        }
   where
-    kind_prs, type_prs :: [(Type,Type)]
-    (kind_prs, type_prs) = partitionInvisibles $
-                           [ ((cls_arg_ty, at_arg_ty), vis)
-                           | (fam_tc_tv, vis, at_arg_ty)
-                                <- zip3 (tyConTyVars fam_tc)
-                                        (tyConArgFlags fam_tc at_arg_tys)
-                                        at_arg_tys
-                           , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
+    arg_triples :: [(Type,Type, ArgFlag)]
+    arg_triples = [ (cls_arg_ty, at_arg_ty, vis)
+                  | (fam_tc_tv, vis, at_arg_ty)
+                       <- zip3 (tyConTyVars fam_tc)
+                               (tyConArgFlags fam_tc at_arg_tys)
+                               at_arg_tys
+                  , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
 
-
-    mb_types_match = alphaMatchTysX emptyTCvSubst type_prs
-    Just subst1    = mb_types_match
-    mb_kinds_match = alphaMatchTysX subst1 kind_prs
-    
     pp_wrong_at_arg = vcat [ text "Type indexes must match class instance head"
                            , text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
                            , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_arg_tys) ]
@@ -3281,22 +3267,22 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
     underscore at_tv  = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
     tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
 
-alphaMatchTysX :: TCvSubst -> [(Type,Type)] -> Maybe TCvSubst
-alphaMatchTysX subst pairs
-  | null pairs = Just subst
-  | otherwise  = go subst pairs
-  where
-    go :: TCvSubst -> [(Type,Type)] -> Maybe TCvSubst
-    go subst []
-      | allDistinctTyVars emptyVarSet $
-          nonDetEltsUFM (getTvSubstEnv subst)
-      = Just subst
+    check_match :: [(Type,Type, ArgFlag)] -> TcM ()
+    check_match triples = go emptyTCvSubst emptyTCvSubst triples
+
+    go _ _ [] = return ()
+    go lr_subst rl_subst ((ty1,ty2,vis):triples)
+      | Just lr_subst1 <- tcMatchTyX lr_subst ty1 ty2
+      , Just rl_subst1 <- tcMatchTyX rl_subst ty2 ty1
+      = go lr_subst1 rl_subst1 triples
       | otherwise
-      = Nothing
-    go subst ((ty1,ty2):prs)
-      = case tcMatchTyX subst ty1 ty2 of
-          Just subst' -> go subst' prs
-          Nothing     -> Nothing
+      = addErrTc (pp_wrong_at_arg $$
+                  ppWhen (isInvisibleArgFlag vis) ppSuggestExplicitKinds)
+       -- NB: checks left-to-right, kinds first.
+       -- If we types first, we'll fail to
+       -- suggest -fprint-explicit-kinds for a mis-match with
+       --    T @k    vs    T @Type
+       -- somewhere deep inside the type
 
 badATErr :: Name -> Name -> SDoc
 badATErr clas op
