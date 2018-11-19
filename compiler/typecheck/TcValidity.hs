@@ -1252,7 +1252,6 @@ check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
     mb_ty_args_msg
       | not (xopt LangExt.TypeSynonymInstances dflags)
       , not (all tcInstHeadTyNotSynonym ty_args)
-      , False  -- TODO check disabled due to (->)
       = Just head_type_synonym_msg
 
       | not (xopt LangExt.FlexibleInstances dflags)
@@ -1275,7 +1274,9 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 tcInstHeadTyNotSynonym ty
   = case ty of  -- Do not use splitTyConApp,
                 -- because that expands synonyms!
-        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc) || tc == arrowTyCon
+                -- Allow (->), e.g. instance Category (->),
+                -- even though it's a type synonym for FUN Omega
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
