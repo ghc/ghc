@@ -61,7 +61,7 @@ import Module
 import BasicTypes
 
 -- compiler/types
-import Type             ( funTyCon, Mult(..) )
+import Type             ( arrowTyCon, Mult(..) )
 import Kind             ( Kind )
 import Class            ( FunDep )
 
@@ -641,6 +641,8 @@ identifier :: { Located RdrName }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
+    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName arrowTyCon)
+                               [mop $1,mu AnnRarrow $2,mcp $3] }
     | '(' '~' ')'       {% ams (sLL $1 $> $ eqTyCon_RDR)
                                [mop $1,mj AnnTilde $2,mcp $3] }
 
@@ -2038,9 +2040,6 @@ atype :: { LHsType GhcPs }
 
                                              HsBoxedOrConstraintTuple ($2 : $4))
                                                 [mop $1,mcp $5] }
-        | '(' '->' ')'                {% ams (sLL $1 $> $ HsAppTy noExt (noLoc $ HsTyVar noExt NotPromoted (noLoc $ getRdrName funTyCon))
-                                                                        (noLoc $ HsTyVar noExt NotPromoted (noLoc $ getRdrName omegaDataConTyCon)))
-                                             [mop $1,mu AnnRarrow $2,mcp $3] }
         | '(#' '#)'                   {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple [])
                                              [mo $1,mc $2] }
         | '(#' comma_types1 '#)'      {% ams (sLL $1 $> $ HsTupleTy noExt HsUnboxedTuple $2)
@@ -3264,6 +3263,8 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
+        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName arrowTyCon)
+                                       [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
 oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
@@ -3343,7 +3344,7 @@ tyconsym :: { Located RdrName }
 op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
-        | '->'                  { sL1 $1 $ getRdrName funTyCon }
+        | '->'                  { sL1 $1 $ getRdrName arrowTyCon }
         | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 varop   :: { Located RdrName }

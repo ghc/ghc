@@ -123,7 +123,9 @@ module TysWiredIn (
         -- * Multiplicity and friends
         multiplicityTyConName, oneDataConName, omegaDataConName, multiplicityTy,
         multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy,
-        omegaDataConTyCon
+        omegaDataConTyCon,
+
+        arrowTyCon
 
 
 
@@ -144,6 +146,7 @@ import {-# SOURCE #-} KnownUniques
 -- others:
 import CoAxiom
 import Id
+import Var (VarBndr (Bndr))
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
@@ -744,7 +747,8 @@ isBuiltInOcc_maybe occ =
       "~"    -> Just eqTyConName
 
       -- function tycon
-      "->"   -> Just funTyConName
+      "FUN"  -> Just funTyConName
+      "->"  -> Just arrowTyConName
 
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
@@ -1177,6 +1181,23 @@ omegaDataConTy = mkTyConTy omegaDataConTyCon
 
 omegaDataConTyCon :: TyCon
 omegaDataConTyCon = promoteDataCon omegaDataCon
+
+arrowTy :: Type
+arrowTy = function omegaDataConTy
+
+arrowTyCon :: TyCon
+arrowTyCon = buildSynTyCon arrowTyConName [] arrowKind [] arrowTy
+  where arrowKind = mkTyConKind binders liftedTypeKind
+        -- See also funTyCon
+        binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
+                  , Bndr runtimeRep2TyVar (NamedTCB Inferred)
+                  ]
+                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
+                                                , tYPE runtimeRep2Ty
+                                                ]
+
+arrowTyConName :: Name
+arrowTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->") arrowTyConKey arrowTyCon
 
 {- *********************************************************************
 *                                                                      *
