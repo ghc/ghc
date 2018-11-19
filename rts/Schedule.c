@@ -492,7 +492,11 @@ run_thread:
             traceEventStopThread(cap, t, t->why_blocked + 6, 0);
         }
     } else {
-        traceEventStopThread(cap, t, ret, 0);
+        if (ret == StackOverflow) {
+          traceEventStopThread(cap, t, ret, t->tot_stack_size);
+        } else {
+          traceEventStopThread(cap, t, ret, 0);
+        }
     }
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
