@@ -1897,7 +1897,7 @@ tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats thing_inside
 tcFamTyPats :: TyCon -> Maybe ClsInstInfo
             -> HsTyPats GhcRn                  -- Patterns
             -> TcM ([TcType], TcKind)          -- (pats, rhs_kind)
-tcFamTyPats fam_tc mb_clsinfo hs_pats
+tcFamTyPats fam_tc _mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
               , text "arity:" <+> ppr fam_arity
@@ -1929,7 +1929,7 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
     fun_kind  = tyConKind fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
     (invis_bndrs, body_kind) = splitPiTysInvisibleN fam_arity fun_kind
-    mb_kind_env = thdOf3 <$> mb_clsinfo
+--     mb_kind_env = thdOf3 <$> mb_clsinfo
 
     bad_lhs fam_app
       = hang (text "Ill-typed LHS of family instance")
