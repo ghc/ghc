@@ -125,7 +125,7 @@ module TysWiredIn (
         multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy,
         omegaDataConTyCon,
 
-        arrowTyCon
+        arrowTyCon, arrowTyConName
 
 
 
