@@ -68,6 +68,7 @@ import SrcLoc
 import ListSetOps
 import DynFlags
 import Unique
+import UniqFM( nonDetEltsUFM )
 import ConLike( ConLike(..) )
 import BasicTypes
 import qualified GHC.LanguageExtensions as LangExt
@@ -1064,7 +1065,10 @@ kcConDecl (ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
     discardResult                   $
     bindExplicitTKBndrs_Skol ex_tvs $
     do { _ <- tcHsMbContext ex_ctxt
-       ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args) }
+       ; traceTc "kcConDecl {" (ppr name $$ ppr args)
+       ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys args)
+       ; traceTc "kcConDecl }" (ppr name)
+       }
               -- We don't need to check the telescope here, because that's
               -- done in tcConDecl
 
@@ -1898,7 +1902,10 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
          vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
               , text "arity:" <+> ppr fam_arity
               , text "invis_bndrs:" <+> ppr invis_bndrs ]
-       ; (subst, invis_pats) <- tcInstTyBinders emptyTCvSubst mb_kind_env invis_bndrs
+       ; (subst, invis_pats) <- tcInstTyBinders emptyTCvSubst
+                                        -- mb_kind_env
+                                        Nothing
+                                        invis_bndrs
        ; let fun_ty = mkTyConApp fam_tc invis_pats
 
        ; (fam_app, res_kind) <- tcInferApps typeLevelMode lhs_fun fun_ty
@@ -3223,19 +3230,6 @@ checkFamFlag tc_name
 -- types.
 type ClsInstInfo = (Class, [TyVar], VarEnv Type)
 
-type AssocInstArgShape = (Maybe Type, Type)
-  -- AssocInstArgShape is used only for associated family instances
-  --    (mb_exp, actual)
-  -- mb_exp = Just ty  => this arg corresponds to a class variable
-  --        = Nothing  => it doesn't correspond to a class variable
-  -- e.g.  class C b where
-  --          type F a b c
-  --       instance C [x] where
-  --          type F p [x] q
-  -- We get [AssocInstArgShape] = [ (Nothing,  p)
-  --                              , (Just [x], [x])
-  --                              , (Nothing,  q)]
-
 
 checkConsistentFamInst :: Maybe ClsInstInfo
                        -> TyCon     -- ^ Family tycon
@@ -3244,67 +3238,65 @@ checkConsistentFamInst :: Maybe ClsInstInfo
 -- See Note [Checking consistent instantiation]
 
 checkConsistentFamInst Nothing _ _ = return ()
-checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys
-  = do { -- Check that the associated type indeed comes from this class
-         -- See [Mismatched class methods and associated type families]
-         -- in TcInstDecls.
-
-         checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
+checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
+  = do { traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
+                                                , ppr kind_prs
+                                                , ppr type_prs
+                                                , ppr mini_env ])
+       -- Check that the associated type indeed comes from this class
+       -- See [Mismatched class methods and associated type families]
+       -- in TcInstDecls.
+       ; checkTc (Just (classTyCon clas) == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
 
-       -- Check type args first (more comprehensible)
-       ; checkTc (all check_arg type_shapes)   pp_wrong_at_arg
+       -- Check kind args first, suggesting -fprint-explicit-kiinds
+       -- if there is a mis-match here.
+       ; checkTc (isJust mb_kinds_match) (pp_wrong_at_arg $$ ppSuggestExplicitKinds)
 
-       -- And now kind args
-       ; checkTcM (all check_arg kind_shapes)
-                  (tidy_env2, pp_wrong_at_arg $$ ppSuggestExplicitKinds)
-
-       ; traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
-                                                , ppr arg_shapes
-                                                , ppr mini_env ]) }
+       -- Then type args.  If we do these first, then we'll fail to
+       -- suggest -fprint-explicit-kinds for (T @k  vs  T @Type)
+       ; checkTc (isJust mb_types_match) pp_wrong_at_arg
+       }
   where
-    arg_shapes :: [AssocInstArgShape]
-    arg_shapes = [ (lookupVarEnv mini_env fam_tc_tv, at_ty)
-                 | (fam_tc_tv, at_ty) <- tyConTyVars fam_tc `zip` at_tys ]
+    kind_prs, type_prs :: [(Type,Type)]
+    (kind_prs, type_prs) = partitionInvisibles $
+                           [ ((cls_arg_ty, at_arg_ty), vis)
+                           | (fam_tc_tv, vis, at_arg_ty)
+                                <- zip3 (tyConTyVars fam_tc)
+                                        (tyConArgFlags fam_tc at_arg_tys)
+                                        at_arg_tys
+                           , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
 
-    kind_shapes, type_shapes :: [AssocInstArgShape]
-    (kind_shapes, type_shapes) = partitionInvisibles $
-                                 arg_shapes `zip` tyConArgFlags fam_tc at_tys
 
-    check_arg :: AssocInstArgShape -> Bool
-    check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
-    check_arg (Nothing,     _    ) = True -- Arg position does not correspond
-                                          -- to a class variable
+    mb_types_match = alphaMatchTysX emptyTCvSubst type_prs
+    Just subst1    = mb_types_match
+    mb_kinds_match = alphaMatchTysX subst1 kind_prs
+    
+    pp_wrong_at_arg = vcat [ text "Type indexes must match class instance head"
+                           , text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
+                           , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_arg_tys) ]
 
-    pp_wrong_at_arg
-      = vcat [ text "Type indexes must match class instance head"
-             , pp_exp_act ]
+    expected_args = [ lookupVarEnv mini_env at_tv `orElse` underscore at_tv
+                    | at_tv <- tyConTyVars fam_tc ]
+    underscore at_tv  = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
+    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
 
-    pp_exp_act
-      = vcat [ text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-             , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_tys)
-             , sdocWithDynFlags $ \dflags ->
-               ppWhen (has_poly_args dflags) $
-               vcat [ text "where the `<tv>' arguments are type variables,"
-                    , text "distinct from each other and from the instance variables" ] ]
-
-    -- We need to tidy, since it's possible that expected_args will contain
-    -- inferred kind variables with names identical to those in at_tys. If we
-    -- don't, we'll end up with horrible messages like this one (#13972):
-    --
-    --   Expected: T (a -> Either a b)
-    --     Actual: T (a -> Either a b)
-    (tidy_env1, _) = tidyOpenTypes emptyTidyEnv at_tys
-    (tidy_env2, expected_args)
-      = tidyOpenTypes tidy_env1 [ exp_ty `orElse` mk_tv at_ty
-                                | (exp_ty, at_ty) <- arg_shapes ]
-    mk_tv at_ty   = mkTyVarTy (mkTyVar tv_name (typeKind at_ty))
-    tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "<tv>") noSrcSpan
-
-    has_poly_args dflags = any (isNothing . fst) shapes
-      where
-        shapes | gopt Opt_PrintExplicitKinds dflags = arg_shapes
-               | otherwise                          = type_shapes
+alphaMatchTysX :: TCvSubst -> [(Type,Type)] -> Maybe TCvSubst
+alphaMatchTysX subst pairs
+  | null pairs = Just subst
+  | otherwise  = go subst pairs
+  where
+    go :: TCvSubst -> [(Type,Type)] -> Maybe TCvSubst
+    go subst []
+      | allDistinctTyVars emptyVarSet $
+          nonDetEltsUFM (getTvSubstEnv subst)
+      = Just subst
+      | otherwise
+      = Nothing
+    go subst ((ty1,ty2):prs)
+      = case tcMatchTyX subst ty1 ty2 of
+          Just subst' -> go subst' prs
+          Nothing     -> Nothing
 
 badATErr :: Name -> Name -> SDoc
 badATErr clas op
