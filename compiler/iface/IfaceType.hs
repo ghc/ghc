@@ -1203,6 +1203,12 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   , rep `ifaceTyConHasKey` liftedRepDataConKey
   = kindType
 
+  | tc `ifaceTyConHasKey` funTyConKey
+  -- TODO should we check for PrintExplicitLinearity?
+  , IA_Vis (IfaceTyConApp rep IA_Nil) w <- tys
+  , rep `ifaceTyConHasKey` omegaDataConKey
+  = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (tys_wo_kinds_fun w))
+
   | otherwise
   = getPprDebug $ \dbg ->
     if | not dbg && tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
@@ -1216,7 +1222,8 @@ pprTyTcApp' ctxt_prec tc tys dflags style
          -> ppr_iface_tc_app ppr_ty ctxt_prec tc tys_wo_kinds
   where
     info = ifaceTyConInfo tc
-    tys_wo_kinds = appArgsIfaceTypes $ stripInvisArgs dflags tys
+    tys_wo_kinds_fun t = appArgsIfaceTypes $ stripInvisArgs dflags t
+    tys_wo_kinds = tys_wo_kinds_fun tys
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
