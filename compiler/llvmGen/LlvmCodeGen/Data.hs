@@ -50,10 +50,12 @@ genLlvmData (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _,
                       then ExternallyVisible else Internal
         link'    = if (externallyVisibleCLabel ind')
                       then ExternallyVisible else Internal
-        aliasDef = LMGlobalVar label i8Ptr link Nothing Nothing Alias
-        origDef  = LMStaticPointer $ LMGlobalVar label' i8Ptr link' Nothing Nothing Alias
+        tyAlias  = LMAlias (label `appendFS` structStr, LMStructU [])
 
-    pure ([LMGlobal aliasDef $ Just origDef], [i8])
+        aliasDef = LMGlobalVar label tyAlias link Nothing Nothing Alias
+        orig     = LMStaticPointer $ LMGlobalVar label' undefined link' Nothing Nothing Alias
+
+    pure ([LMGlobal aliasDef $ Just orig], [tyAlias])
 
 genLlvmData (sec, Statics lbl xs) = do
     label <- strCLabel_llvm lbl

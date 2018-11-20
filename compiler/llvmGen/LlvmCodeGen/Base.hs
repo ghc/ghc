@@ -57,6 +57,7 @@ import UniqSupply
 import ErrUtils
 import qualified Stream
 
+import Data.Maybe (fromJust)
 import Control.Monad (ap)
 
 -- ----------------------------------------------------------------------------
@@ -473,7 +474,16 @@ generateExternDecls = do
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
-aliasify glbl@(LMGlobal (LMGlobalVar _ _ _ _ _ Alias) _) = pure [glbl]
+aliasify (LMGlobal alias@(LMGlobalVar _ _ _ _ _ Alias) (Just orig)) = do
+    let LMGlobalVar lbl ty@LMAlias{} link sect align Alias = alias
+        defLbl = lbl `appendFS` fsLit "$def"
+        LMStaticPointer (LMGlobalVar label' _ link' Nothing Nothing Alias) = orig
+        defOrigLbl = label' `appendFS` fsLit "$def"
+        orig' = LMStaticPointer (LMGlobalVar label' i8Ptr link' Nothing Nothing Alias)
+    origType <- funLookup label'
+    let defOrig = LMBitc (LMStaticPointer (LMGlobalVar defOrigLbl (pLift $ fromJust origType) link' Nothing Nothing Alias)) (pLift ty)
+    pure [ LMGlobal (LMGlobalVar defLbl ty link sect align Alias) (Just defOrig)
+         , LMGlobal (LMGlobalVar lbl i8Ptr link sect align Alias) (Just orig')]
 aliasify (LMGlobal var val) = do
     let LMGlobalVar lbl ty link sect align const = var
 
