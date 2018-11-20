@@ -41,7 +41,7 @@ import PrelNames   ( coercibleTyConKey )
 import TysPrim     ( eqReprPrimTyCon )
 import Unique      ( hasKey )
 import Coercion    ( mkCoVarCo )
-import TysWiredIn  ( coercibleDataCon, omegaDataConTy )
+import TysWiredIn  ( coercibleDataCon )
 import DataCon     ( dataConWrapId )
 import MkCore      ( mkCoreLet )
 import Module

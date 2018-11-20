@@ -483,7 +483,7 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
                                   -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
 rnScaledLHsType doc (HsScaled w ty) = do
-  (w' , fvs_w) <- rnRig (mkTyKiEnv doc TypeLevel RnTypeBody) w
+  (w' , fvs_w) <- rnMult (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
   return (HsScaled w' ty', fvs `plusFV` fvs_w)
 
@@ -586,7 +586,7 @@ rnHsTyKi env (HsFunTy _ ty1 mult ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; (mult', w_fvs) <- rnRig env mult
+       ; (mult', w_fvs) <- rnMult env mult
        ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
@@ -683,14 +683,13 @@ rnHsTyKi env (HsWildCardTy _)
          --           user-written binding site, so don't treat
          --           it as a free variable
 
-rnRig :: RnTyKiEnv -> HsMult GhcPs -> RnM ((HsMult GhcRn), FreeVars)
-rnRig env r =
+rnMult :: RnTyKiEnv -> HsMult GhcPs -> RnM ((HsMult GhcRn), FreeVars)
+rnMult env r =
   case r of
     HsZero -> return (HsZero, emptyFVs)
     HsOne  -> return (HsOne, emptyFVs)
     HsOmega -> return (HsOmega, emptyFVs)
     HsMultTy ty -> (\(ty, fvs) -> (HsMultTy ty, fvs)) <$> rnLHsTyKi env ty
-    _r -> panic "TODO: Multiplicity polymorphism not implemented"
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name

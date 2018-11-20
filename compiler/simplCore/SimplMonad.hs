@@ -25,7 +25,7 @@ import Var              ( Var, isTyVar, mkLocalVar, VarMult(..) )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import Type             ( Type, mkLamTypes, Mult(..) )
+import Type             ( Type, mkLamTypes, Mult )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
 import UniqSupply

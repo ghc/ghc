@@ -1,9 +1,29 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 114, types: 53, coercions: 0, joins: 0/0}
+  = {terms: 121, types: 61, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+T7360.$WFoo1 [InlPrag=INLINE[2]] :: Foo
+[GblId[DataConWrapper],
+ Caf=NoCafRefs,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity)) -> T7360.Foo1}]
+T7360.$WFoo1 = \ (@ (n :: GHC.Types.Multiplicity)) -> T7360.Foo1
+
+-- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
+T7360.$WFoo2 [InlPrag=INLINE[2]] :: Foo
+[GblId[DataConWrapper],
+ Caf=NoCafRefs,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity)) -> T7360.Foo2}]
+T7360.$WFoo2 = \ (@ (n :: GHC.Types.Multiplicity)) -> T7360.Foo2
+
+-- RHS size: {terms: 7, types: 4, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[2]] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
@@ -12,10 +32,11 @@ T7360.$WFoo3 [InlPrag=INLINE[2]] :: Int -> Foo
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (dt [Occ=Once!] :: Int) ->
+         Tmpl= \ (@ (n :: GHC.Types.Multiplicity))
+                 (dt [Occ=Once!] :: Int) ->
                  case dt of { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }}]
 T7360.$WFoo3
-  = \ (dt [Occ=Once!] :: Int) ->
+  = \ (@ (n :: GHC.Types.Multiplicity)) (dt [Occ=Once!] :: Int) ->
       case dt of { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }
 
 -- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
