@@ -480,7 +480,7 @@ aliasify (LMGlobal var val) = do
         defVar = LMGlobalVar defLbl ty Internal sect align const
 
         defPtrVar = LMGlobalVar defLbl (LMPointer ty) link Nothing Nothing const
-        aliasVar = LMGlobalVar lbl (LMPointer i8Ptr) link Nothing Nothing Alias
+        aliasVar = LMGlobalVar lbl i8Ptr link Nothing Nothing Alias
         aliasVal = LMBitc (LMStaticPointer defPtrVar) i8Ptr
 
     -- we need to mark the $def symbols as used so LLVM doesn't forget which
