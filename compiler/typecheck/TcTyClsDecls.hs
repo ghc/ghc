@@ -38,10 +38,11 @@ import TcClassDcl
 import {-# SOURCE #-} TcInstDcls( tcInstDecls1 )
 import TcDeriv (DerivInfo)
 import TcHsType
+import Inst( tcInstTyBinders )
 import TcMType
+import TcUnify( unifyType )
 import TysWiredIn ( unitTy )
 import TcType
-import Inst( tcInstTyBinders )
 import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv
@@ -1787,7 +1788,9 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
                                       hs_pats
-                                      (tcCheckLHsType rhs_hs_ty)
+                                      (\ res_kind ->
+                                         do { traceTc "tcTyFasmInstEqn" (ppr fam_tc $$ ppr hs_pats $$ ppr res_kind)
+                                            ; tcCheckLHsType rhs_hs_ty res_kind })
 
        ; (ze, qtvs') <- zonkTyBndrs qtvs
        ; pats'       <- zonkTcTypesToTypesX ze pats
@@ -1896,43 +1899,67 @@ tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats thing_inside
 tcFamTyPats :: TyCon -> Maybe ClsInstInfo
             -> HsTyPats GhcRn                  -- Patterns
             -> TcM ([TcType], TcKind)          -- (pats, rhs_kind)
-tcFamTyPats fam_tc _mb_clsinfo hs_pats
+tcFamTyPats fam_tc mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
+         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
               , text "arity:" <+> ppr fam_arity
-              , text "invis_bndrs:" <+> ppr invis_bndrs ]
-       ; (subst, invis_pats) <- tcInstTyBinders emptyTCvSubst
-                                        -- mb_kind_env
-                                        Nothing
-                                        invis_bndrs
-       ; let fun_ty = mkTyConApp fam_tc invis_pats
+              , text "kind:" <+> ppr fam_kind ]
+
+       ; let fun_ty = mkTyConApp fam_tc []
 
        ; (fam_app, res_kind) <- tcInferApps typeLevelMode lhs_fun fun_ty
-                                            (substTy subst body_kind) hs_pats
+                                            fam_kind hs_pats
 
        ; traceTc "End tcFamTyPats }" $
-         vcat [ ppr fam_tc <+> dcolon <+> ppr fun_kind
+         vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
               , text "res_kind:" <+> ppr res_kind ]
 
+       -- Decompose fam_app to get the argument patterns
+       --
        -- We expect fam_app to look like (F t1 .. tn)
        -- tcInferApps is capable of returning ((F ty1 |> co) ty2),
        -- but that can't happen here because we already checked the
        -- arity of F matches the number of pattern
-       ; case splitTyConApp_maybe fam_app of
-           Just (_, pats) -> return  (pats, res_kind)
-           Nothing        -> WARN( True, bad_lhs fam_app )
-                             return ([], res_kind) }
+       ; pats <- case splitTyConApp_maybe fam_app of
+                   Just (_, pats) -> return pats
+                   Nothing        -> WARN( True, bad_lhs fam_app )
+                                     return []
+
+       ; (extra_pats, res_kind) <- tcInstTyBinders $
+                                   splitPiTysInvisible res_kind
+       ; let all_pats = pats ++ extra_pats
+
+       -- Ensure that the instance is consistent its parent class
+       ; addConsistencyConstraints mb_clsinfo fam_tc all_pats
+
+       ; return (all_pats, res_kind) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    fun_kind  = tyConKind fam_tc
+    fam_kind  = tyConKind fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
-    (invis_bndrs, body_kind) = splitPiTysInvisibleN fam_arity fun_kind
---     mb_kind_env = thdOf3 <$> mb_clsinfo
 
     bad_lhs fam_app
       = hang (text "Ill-typed LHS of family instance")
            2 (debugPprType fam_app)
+
+addConsistencyConstraints :: Maybe ClsInstInfo -> TyCon -> [Type] -> TcM ()
+-- In the corresponding positions of the class and type-family,
+-- ensure the the family argument is the same as the class argument
+--   E.g    class C a b c d where
+--             F c x y a :: Type
+-- Here the first  arg of F should be the same as the third of C
+--  and the fourth arg of F should be the same as the first of C
+
+addConsistencyConstraints Nothing _ _ = return ()
+addConsistencyConstraints (Just (_, _, inst_ty_env)) fam_tc pats
+  = mapM_ do_one (tyConTyVars fam_tc `zip` pats)
+  where
+    do_one (fam_tc_tv, pat)
+      | Just cls_arg_ty <- lookupVarEnv inst_ty_env fam_tc_tv
+      = discardResult (unifyType Nothing cls_arg_ty pat)
+      | otherwise
+      = return ()
 
 {- Note [Constraints in patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

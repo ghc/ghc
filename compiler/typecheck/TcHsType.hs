@@ -47,7 +47,6 @@ module TcHsType (
         typeLevelMode, kindLevelMode,
 
         kindGeneralize, checkExpectedKindX,
-        instantiateTyN,
         reportFloatingKvs,
 
         -- Sort-checking kinds
@@ -867,7 +866,7 @@ bigConstraintTuple arity
 -- | Apply a type of a given kind to a list of arguments. This instantiates
 -- invisible parameters as necessary. Always consumes all the arguments,
 -- using matchExpectedFunKind as necessary.
--- This takes an optional @VarEnv Kind@ which maps kind variables to kinds.
+-- This takes an optional @VarEnv Kind@ which maps kind variables to kinds.-
 -- These kinds should be used to instantiate invisible kind variables;
 -- they come from an enclosing class for an associated type/data family.
 tcInferApps :: TcTyMode
@@ -997,10 +996,10 @@ checkExpectedKindX pp_hs_ty ty act_kind exp_kind
         -- foralls out front. If the actual kind has more, instantiate accordingly.
         -- Otherwise, just pass the type & kind through: the errors are caught
         -- in unifyType.
-        let (exp_bndrs, _)            = splitPiTysInvisible exp_kind
-            (act_bndrs, act_inner_ki) = splitPiTysInvisible act_kind
-            n_to_inst                 = length act_bndrs - length exp_bndrs
-      ; (new_args, act_kind') <- instantiateTyN n_to_inst act_bndrs act_inner_ki
+        let n_exp_invis_bndrs = invisibleTyBndrCount exp_kind
+            n_act_invis_bndrs = invisibleTyBndrCount act_kind
+            n_to_inst         = n_act_invis_bndrs - n_exp_invis_bndrs
+      ; (new_args, act_kind') <- tcInstTyBinders (splitPiTysInvisibleN n_to_inst act_kind)
 
       ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                   , uo_expected = exp_kind
@@ -1023,37 +1022,6 @@ checkExpectedKindX pp_hs_ty ty act_kind exp_kind
                 ; let result_ty = ty' `mkNakedCastTy` co_k
                       -- See Note [The tcType invariant]
                 ; return result_ty } }
-
--- | Instantiate @n@ invisible arguments to a type. If @n <= 0@, no instantiation
--- occurs. If @n@ is too big, then all available invisible arguments are instantiated.
--- (In other words, this function is very forgiving about bad values of @n@.)
--- Why zonk the result? So that tcTyVar can obey (IT6) of Note [The tcType invariant]
-instantiateTyN :: HasDebugCallStack
-               => Int                              -- ^ @n@
-               -> [TyBinder] -> TcKind             -- ^ its kind (zonked)
-               -> TcM ([TcType], TcKind)   -- ^ The inst'ed type, new args, kind (zonked)
-instantiateTyN n bndrs inner_ki
-  | n <= 0            -- It's fine for it to be < 0.  E.g.
-  = return ([], ki)   -- Check that (Maybe :: forall {k}. k->*),
-                      --       and see the call to instantiateTyN in checkExpectedKind
-                      -- A user bug to be reported as such; it is not a compiler crash!
-
-  | otherwise
-  = do { (subst, inst_args) <- tcInstTyBinders empty_subst Nothing inst_bndrs
-       ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
-       ; ki' <- zonkTcType (substTy subst rebuilt_ki)
-       ; traceTc "instantiateTyN" (vcat [ ppr ki
-                                        , ppr n
-                                        , ppr subst
-                                        , ppr rebuilt_ki
-                                        , ppr ki' ])
-       ; return (inst_args, ki') }
-  where
-     -- NB: splitAt is forgiving with invalid numbers
-     (inst_bndrs, leftover_bndrs) = splitAt n bndrs
-     ki          = mkPiTys bndrs inner_ki
-     empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ki))
-
 
 ---------------------------
 tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
@@ -1141,11 +1109,13 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
               -- the mkNakedCastTy ensures (IT5) of Note [The tcType invariant]
 
       | otherwise
-      = do { tc_kind <- zonkTcType (tyConKind tc)
-           ; let (tc_kind_bndrs, tc_inner_ki) = splitPiTysInvisible tc_kind
-           ; (tc_args, kind) <- instantiateTyN (length (tyConBinders tc))
-                                               tc_kind_bndrs tc_inner_ki
-           ; let is_saturated = tc_args `lengthAtLeast` tyConArity tc
+      = do { let tc_arity = tyConArity tc
+           ; tc_kind <- zonkTcType (tyConKind tc)
+           ; (tc_args, kind) <- tcInstTyBinders (splitPiTysInvisibleN tc_arity tc_kind)
+                 -- Instantiate enough invisible arguments
+                 -- to saturate the family TyCon
+
+           ; let is_saturated = tc_args `lengthAtLeast` tc_arity
                  tc_ty
                    | is_saturated = mkTyConApp tc tc_args `mkNakedCastTy` mkNomReflCo kind
                       -- mkNakedCastTy is for (IT5) of Note [The tcType invariant]

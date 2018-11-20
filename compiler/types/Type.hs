@@ -63,6 +63,7 @@ module Type (
         stripCoercionTy, splitCoercionType_maybe,
 
         splitPiTysInvisible, splitPiTysInvisibleN,
+        invisibleTyBndrCount,
         filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
         tyConArgFlags, appTyArgFlags,
@@ -1539,6 +1540,17 @@ splitPiTys ty = split ty ty
                                      in  (Anon arg : bs, ty)
     split orig_ty _                = ([], orig_ty)
 
+invisibleTyBndrCount :: Type -> Int
+-- Returns the number of leading invisible forall'd binders in the type
+invisibleTyBndrCount ty = go ty
+  where
+    go :: Type -> Int
+    go ty               | Just ty' <- coreView ty = go ty'
+    go (ForAllTy b res) | Bndr _ vis <- b
+                        , isInvisibleArgFlag vis  = 1 + go res
+    go (FunTy arg res)  | isPredTy arg            = 1 + go res
+    go _                                          = 0
+
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
 -- Stops at the first visible binder
 splitPiTysInvisible :: Type -> ([TyCoBinder], Type)
@@ -1555,7 +1567,8 @@ splitPiTysInvisible ty = split ty ty []
 
 splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
 -- Same as splitPiTysInvisible, but stop when
--- you have found 'n' TyCoBinders
+--   - you have found 'n' TyCoBinders,
+--   - or you run out of invisible binders
 splitPiTysInvisibleN n ty = split n ty ty []
    where
     split n orig_ty ty bs
