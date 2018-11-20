@@ -37,7 +37,7 @@ structStr = fsLit "_struct"
 
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, CmmStatics) -> LlvmM LlvmData
-genLlvmData (sec, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+genLlvmData (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -46,11 +46,12 @@ genLlvmData (sec, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, 
   , isAliasToLocalOrIntoThisModule alias ind' = do
     label <- strCLabel_llvm alias
     label' <- strCLabel_llvm ind'
-    lmsec <- llvmSection sec
     let link     = if (externallyVisibleCLabel alias)
                       then ExternallyVisible else Internal
-        aliasDef = LMGlobalVar label i8Ptr link lmsec Nothing Alias
-        origDef  = LMStaticPointer $ LMGlobalVar label' i8Ptr link lmsec Nothing Alias -- FIXME
+        link'    = if (externallyVisibleCLabel ind')
+                      then ExternallyVisible else Internal
+        aliasDef = LMGlobalVar label i8Ptr link Nothing Nothing Alias
+        origDef  = LMStaticPointer $ LMGlobalVar label' i8Ptr link' Nothing Nothing Alias
 
     pure ([LMGlobal aliasDef $ Just origDef], [i8])
 
@@ -61,7 +62,7 @@ genLlvmData (sec, Statics lbl xs) = do
     let types   = map getStatType static
 
         strucTy = LMStruct types
-        tyAlias = LMAlias ((label `appendFS` structStr), strucTy)
+        tyAlias = LMAlias (label `appendFS` structStr, strucTy)
 
         struct         = Just $ LMStaticStruc static tyAlias
         link           = if (externallyVisibleCLabel lbl)
