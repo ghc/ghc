@@ -64,4 +64,4 @@ test('Flags02', normal, compile, ['-XSafe'])
 
 test('SafeFlags30', normal, compile_fail, [''])
 
-test('SafeIgnore', normal, multimod_compile, ['SafeIgnore', '-v0', '-fno-safe-haskell'])
+test('SafeIgnore', [], multimod_compile, ['SafeIgnore', '-v0 -fno-safe-haskell'])
