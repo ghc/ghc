@@ -2919,6 +2919,7 @@ trustInfoToNum it
             Sf_Unsafe       -> 1
             Sf_Trustworthy  -> 2
             Sf_Safe         -> 3
+            Sf_Ignore       -> 0
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
 numToTrustInfo 0 = setSafeMode Sf_None
@@ -2932,6 +2933,7 @@ numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")
 
 instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_None)          = text "none"
+    ppr (TrustInfo Sf_Ignore)        = text "none"
     ppr (TrustInfo Sf_Unsafe)        = text "unsafe"
     ppr (TrustInfo Sf_Trustworthy)   = text "trustworthy"
     ppr (TrustInfo Sf_Safe)          = text "safe"
