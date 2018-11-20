@@ -89,7 +89,7 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                                 Alias
            alias = LMGlobal funVar
                             (Just $ LMBitc (LMStaticPointer defVar)
-                                           (LMPointer $ LMInt 8))
+                                           i8Ptr)
 
        return (ppLlvmGlobal alias $+$ ppLlvmFunction fun', [])
 
