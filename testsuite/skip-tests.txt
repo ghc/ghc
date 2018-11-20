@@ -7,6 +7,11 @@ T14682
 # Typeable decomposition, currently not working
 T14236
 
+-- :i (->) not working after FUN change
+ghci020
+T8535
+T10145
+
 ### Polymorphism See #91
 
 AmapCoerce
@@ -18,7 +23,6 @@ T11721_TH
 T11985
 T12785b
 T13988
-T14236
 T14394
 T14773b
 T2110

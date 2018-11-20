@@ -33,7 +33,7 @@ module TysPrim(
         -- Kinds
         tYPE, primRepToRuntimeRep,
 
-        function,
+        functionWithMultiplicity,
         funTyCon, funTyConName,
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
@@ -505,8 +505,8 @@ tYPE :: Type -> Type
 tYPE rr = TyConApp tYPETyCon [rr]
 
 -- Given a Multiplicity, applies FUN to it.
-function :: Type -> Type
-function mul = TyConApp funTyCon [mul]
+functionWithMultiplicity :: Type -> Type
+functionWithMultiplicity mul = TyConApp funTyCon [mul]
 
 {-
 ************************************************************************

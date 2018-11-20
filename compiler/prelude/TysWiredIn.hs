@@ -1183,7 +1183,7 @@ omegaDataConTyCon :: TyCon
 omegaDataConTyCon = promoteDataCon omegaDataCon
 
 arrowTy :: Type
-arrowTy = function omegaDataConTy
+arrowTy = functionWithMultiplicity omegaDataConTy
 
 arrowTyCon :: TyCon
 arrowTyCon = buildSynTyCon arrowTyConName [] arrowKind [] arrowTy

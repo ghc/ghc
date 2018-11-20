@@ -1204,10 +1204,9 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   = kindType
 
   | tc `ifaceTyConHasKey` funTyConKey
-  -- TODO should we check for PrintExplicitLinearity?
-  , IA_Vis (IfaceTyConApp rep IA_Nil) w <- tys
+  , IA_Vis (IfaceTyConApp rep IA_Nil) args <- tys
   , rep `ifaceTyConHasKey` omegaDataConKey
-  = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (tys_wo_kinds_fun w))
+  = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (tys_wo_kinds_fun args))
 
   | otherwise
   = getPprDebug $ \dbg ->

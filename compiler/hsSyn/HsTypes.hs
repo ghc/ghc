@@ -1098,7 +1098,7 @@ mkHsAppTys = foldl' mkHsAppTy
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
 --
--- TODO should we also allow FUN?
+-- TODO Krzysztof: we might allow FUN for consistency.
 splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
