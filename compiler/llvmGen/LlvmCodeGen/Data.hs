@@ -37,6 +37,23 @@ structStr = fsLit "_struct"
 
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, CmmStatics) -> LlvmM LlvmData
+genLlvmData (sec, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+  | lbl == mkIndStaticInfoLabel
+  , let labelInd (CmmLabelOff l _) = Just l
+        labelInd (CmmLabel l) = Just l
+        labelInd _ = Nothing
+  , Just ind' <- labelInd ind
+  , isAliasToLocalOrIntoThisModule alias ind' = do
+    label <- strCLabel_llvm alias
+    label' <- strCLabel_llvm ind'
+    lmsec <- llvmSection sec
+    let link     = if (externallyVisibleCLabel alias)
+                      then ExternallyVisible else Internal
+        aliasDef = LMGlobalVar label i8Ptr link lmsec Nothing Alias
+        origDef  = LMStaticPointer $ LMGlobalVar label' i8Ptr link lmsec Nothing Alias -- FIXME
+
+    pure ([LMGlobal aliasDef $ Just origDef], [i8])
+
 genLlvmData (sec, Statics lbl xs) = do
     label <- strCLabel_llvm lbl
     static <- mapM genData xs

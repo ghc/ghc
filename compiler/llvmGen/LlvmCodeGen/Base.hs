@@ -473,6 +473,7 @@ generateExternDecls = do
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
+aliasify glbl@(LMGlobal (LMGlobalVar _ _ _ _ _ Alias) _) = pure [glbl]
 aliasify (LMGlobal var val) = do
     let LMGlobalVar lbl ty link sect align const = var
 
