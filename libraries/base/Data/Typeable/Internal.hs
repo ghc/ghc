@@ -90,7 +90,6 @@ import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
 import GHC.Show
-import GHC.Prim ( FUN )
 import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
 import GHC.TypeNats ( KnownNat, natVal' )
 import Unsafe.Coerce ( unsafeCoerce )
@@ -477,8 +476,9 @@ splitApp :: forall k (a :: k). ()
          -> AppOrCon a
 splitApp TrType = IsApp trTYPE trLiftedRep
 splitApp (TrApp {trAppFun = f, trAppArg = x}) = IsApp f x
-splitApp rep@(TrFun {trFunArg=a, trFunRes=b, trFunMul = _}) = IsApp (mkTrApp arr a) b
-  where arr = bareArrow rep
+splitApp rep@(TrFun {trFunArg=a, trFunRes=b, trFunMul = (eqTypeRep trOmega -> Just HRefl)}) = IsApp (mkTrApp arr a) b
+  where arr = bareArrow rep  -- TODO handle multiplicity
+splitApp (TrFun {}) = error "Data.Typeable.Internal.splitApp: Only unrestricted functions are supported"
 splitApp (TrTyCon{trTyCon = con, trKindVars = kinds})
   = case unsafeCoerce Refl :: IsApplication a :~: "" of
       Refl -> IsCon con kinds
@@ -563,7 +563,7 @@ typeRepTyCon :: TypeRep a -> TyCon
 typeRepTyCon TrType = tyConTYPE
 typeRepTyCon (TrTyCon {trTyCon = tc}) = tc
 typeRepTyCon (TrApp {trAppFun = a})   = typeRepTyCon a
-typeRepTyCon (TrFun {trFunMul = m})   = typeRepTyCon $ typeRep @(FUN 'Omega) -- TODO
+typeRepTyCon (TrFun {})               = typeRepTyCon $ typeRep @(->)
 
 -- | Type equality
 --
@@ -714,12 +714,12 @@ vecElemTypeRep e =
     rep :: forall (a :: VecElem). Typeable a => SomeKindedTypeRep VecElem
     rep = kindedTypeRep @VecElem @a
 
-bareArrow :: forall (m :: Multiplicity) (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-                    (a :: TYPE r1) (b :: TYPE r2).
-             TypeRep (a -->.(m) b)
-          -> TypeRep (FUN m :: TYPE r1 -> TYPE r2 -> Type)
-bareArrow (TrFun _ m a b) =
-    mkTrCon funTyCon [SomeTypeRep m, SomeTypeRep rep1, SomeTypeRep rep2]
+bareArrow :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                    (a :: TYPE r1) (b :: TYPE r2). ()
+          => TypeRep (a -> b)
+          -> TypeRep ((->) :: TYPE r1 -> TYPE r2 -> Type)
+bareArrow (TrFun _ _ a b) =
+    mkTrCon funTyCon [SomeTypeRep rep1, SomeTypeRep rep2]
   where
     rep1 = getRuntimeRep $ typeRepKind a :: TypeRep r1
     rep2 = getRuntimeRep $ typeRepKind b :: TypeRep r2
@@ -819,7 +819,9 @@ splitApps = go []
     go xs (TrApp {trAppFun = f, trAppArg = x})
       = go (SomeTypeRep x : xs) f
     go [] (TrFun {trFunArg = a, trFunRes = b, trFunMul = mul})
-      = (funTyCon, [SomeTypeRep mul, SomeTypeRep a, SomeTypeRep b])
+      | Just HRefl <- eqTypeRep trOmega mul = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
+      | otherwise = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Only unrestricted functions are supported"
+    -- TODO handle multiplicity
     go _  (TrFun {})
       = errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible 1"
     go [] TrType = (tyConTYPE, [SomeTypeRep trLiftedRep])
@@ -843,9 +845,8 @@ tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
   where
     liftedRepTyCon = typeRepTyCon (typeRep @RuntimeRep)
 
-
 funTyCon :: TyCon
-funTyCon = typeRepTyCon (typeRep @(FUN 'Omega))  -- TODO
+funTyCon = typeRepTyCon (typeRep @(->))
 
 isListTyCon :: TyCon -> Bool
 isListTyCon tc = tc == typeRepTyCon (typeRep :: TypeRep [])
