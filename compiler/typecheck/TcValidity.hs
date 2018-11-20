@@ -30,7 +30,7 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
-import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
+import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName, omegaDataConTy )
 import PrelNames
 import Type
 import Coercion
@@ -1256,7 +1256,6 @@ check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
 
       | not (xopt LangExt.FlexibleInstances dflags)
       , not (all tcInstHeadTyAppAllTyVars ty_args)
-      , False  -- TODO check disabled due to (->)
       = Just head_type_args_tyvars_msg
 
       | length ty_args /= 1
@@ -1283,10 +1282,15 @@ tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must be a constructor applied to type variable arguments
 -- or a type-level literal.
--- But we allow kind instantiations.
+-- But we allow
+-- 1) kind instantiations
+-- 2) the type (->) = FUN 'Omega, even though it's not in this form.
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
-  = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
+  = let tys' = filterOutInvisibleTypes tc tys  -- avoid kinds
+        tys'' | tc == funTyCon, tys_h:tys_t <- tys', tys_h `eqType` omegaDataConTy = tys_t
+              | otherwise = tys'
+    in ok tys''
   | LitTy _ <- ty = True  -- accept type literals (Trac #13833)
   | otherwise
   = False
