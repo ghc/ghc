@@ -1912,8 +1912,8 @@ typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 multiplicityTyConKey :: Unique
 multiplicityTyConKey = mkPreludeTyConUnique 191
 
-arrowTyConKey :: Unique
-arrowTyConKey = mkPreludeTyConUnique 192
+unrestrictedFunTyConKey :: Unique
+unrestrictedFunTyConKey = mkPreludeTyConUnique 192
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299

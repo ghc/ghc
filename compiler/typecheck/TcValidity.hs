@@ -1273,9 +1273,9 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 tcInstHeadTyNotSynonym ty
   = case ty of  -- Do not use splitTyConApp,
                 -- because that expands synonyms!
-        TyConApp tc _ -> not (isTypeSynonymTyCon tc) || tc == arrowTyCon
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc) || tc == unrestrictedFunTyCon
                 -- Allow (->), e.g. instance Category (->),
-                -- even though it's a type synonym for FUN Omega
+                -- even though it's a type synonym for FUN 'Omega
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool

@@ -125,7 +125,7 @@ module TysWiredIn (
         multiplicityTyCon, oneDataCon, omegaDataCon, oneDataConTy, omegaDataConTy,
         omegaDataConTyCon,
 
-        arrowTyCon, arrowTyConName
+        unrestrictedFunTyCon, unrestrictedFunTyConName
 
 
 
@@ -748,7 +748,7 @@ isBuiltInOcc_maybe occ =
 
       -- function tycon
       "FUN"  -> Just funTyConName
-      "->"  -> Just arrowTyConName
+      "->"  -> Just unrestrictedFunTyConName
 
       -- boxed tuple data/tycon
       "()"    -> Just $ tup_name Boxed 0
@@ -1182,11 +1182,11 @@ omegaDataConTy = mkTyConTy omegaDataConTyCon
 omegaDataConTyCon :: TyCon
 omegaDataConTyCon = promoteDataCon omegaDataCon
 
-arrowTy :: Type
-arrowTy = functionWithMultiplicity omegaDataConTy
+unrestrictedFunTy :: Type
+unrestrictedFunTy = functionWithMultiplicity omegaDataConTy
 
-arrowTyCon :: TyCon
-arrowTyCon = buildSynTyCon arrowTyConName [] arrowKind [] arrowTy
+unrestrictedFunTyCon :: TyCon
+unrestrictedFunTyCon = buildSynTyCon unrestrictedFunTyConName [] arrowKind [] unrestrictedFunTy
   where arrowKind = mkTyConKind binders liftedTypeKind
         -- See also funTyCon
         binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
@@ -1196,8 +1196,8 @@ arrowTyCon = buildSynTyCon arrowTyConName [] arrowKind [] arrowTy
                                                 , tYPE runtimeRep2Ty
                                                 ]
 
-arrowTyConName :: Name
-arrowTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->") arrowTyConKey arrowTyCon
+unrestrictedFunTyConName :: Name
+unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->") unrestrictedFunTyConKey unrestrictedFunTyCon
 
 {- *********************************************************************
 *                                                                      *

@@ -87,7 +87,7 @@ import RdrName ( RdrName )
 import NameSet ( NameSet, emptyNameSet )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
-import TysWiredIn( arrowTyConName )
+import TysWiredIn( unrestrictedFunTyConName )
 import Type
 import HsDoc
 import BasicTypes
@@ -1110,7 +1110,7 @@ splitHsFunType (L _ (HsFunTy _ x mult y))
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == arrowTyConName
+    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == unrestrictedFunTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = ((hsUnrestricted t1):args, res)

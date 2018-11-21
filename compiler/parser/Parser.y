@@ -61,7 +61,7 @@ import Module
 import BasicTypes
 
 -- compiler/types
-import Type             ( arrowTyCon, Mult(..) )
+import Type             ( unrestrictedFunTyCon, Mult(..) )
 import Kind             ( Kind )
 import Class            ( FunDep )
 
@@ -641,7 +641,7 @@ identifier :: { Located RdrName }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
-    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName arrowTyCon)
+    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                [mop $1,mu AnnRarrow $2,mcp $3] }
     | '(' '~' ')'       {% ams (sLL $1 $> $ eqTyCon_RDR)
                                [mop $1,mj AnnTilde $2,mcp $3] }
@@ -3263,7 +3263,7 @@ ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit 
         | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
-        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName arrowTyCon)
+        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName unrestrictedFunTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
         | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
 
@@ -3344,7 +3344,7 @@ tyconsym :: { Located RdrName }
 op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
-        | '->'                  { sL1 $1 $ getRdrName arrowTyCon }
+        | '->'                  { sL1 $1 $ getRdrName unrestrictedFunTyCon }
         | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 varop   :: { Located RdrName }

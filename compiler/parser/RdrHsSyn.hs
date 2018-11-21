@@ -90,7 +90,7 @@ import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
-import Type             ( TyThing(..), arrowTyCon )
+import Type             ( TyThing(..), unrestrictedFunTyCon )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
@@ -1865,7 +1865,7 @@ checkPrecP (L l (_,i)) (L _ ol)
  | otherwise = parseErrorSDoc l (text ("Precedence out of range: " ++ show i))
   where
     specialOp op = unLoc op `elem` [ eqTyCon_RDR
-                                   , getRdrName arrowTyCon ]
+                                   , getRdrName unrestrictedFunTyCon ]
 
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs

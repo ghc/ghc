@@ -45,4 +45,4 @@ multiplicityTy :: Type
 oneDataConTy :: Type
 omegaDataConTy :: Type
 omegaDataConTyCon :: TyCon
-arrowTyCon :: TyCon
+unrestrictedFunTyCon :: TyCon
