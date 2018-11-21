@@ -161,17 +161,15 @@ section "The word size story."
 -- This type won't be exported directly (since there is no concrete
 -- syntax for this sort of export) so we'll have to manually patch
 -- export lists in both GHC and Haddock.
-primtype FUN a b
-  {TODO update
-   The builtin function type, written in infix form as {\tt a -> b} and
-   in prefix form as {\tt (->) a b}. Values of this type are functions
-   taking inputs of type {\tt a} and producing outputs of type {\tt b}.
+primtype FUN m a b
+  {The builtin function type, written in infix form as {\tt a -->.(m) b}.
+   Values of this type are functions taking inputs of type {\tt a} and
+   producing outputs of type {\tt b}. The multiplicity of the input is
+   {\tt m}.
 
-   Note that {\tt a -> b} permits levity-polymorphism in both {\tt a} and
+   Note that {\tt FUN m a b} permits levity-polymorphism in both {\tt a} and
    {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
   }
-         -- This fixity is only the one picked up by Haddock. If you
-         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
 
 ------------------------------------------------------------------------
 section "Char#"

@@ -378,6 +378,7 @@ funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
+    -- See also unrestrictedFunTyCon
     tc_bndrs = [ Bndr multiplicityTyVar (NamedTCB Required)
                , Bndr runtimeRep1TyVar (NamedTCB Inferred)
                , Bndr runtimeRep2TyVar (NamedTCB Inferred)
