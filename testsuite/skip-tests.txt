@@ -42,14 +42,6 @@ print014
 print019
 print034
 
-# Pattern synonyms + records
-
-records-compile
-records-poly
-records-prov-req
-records-req-only
-records-run
-
 # FunCo fallout
 
 readRun004

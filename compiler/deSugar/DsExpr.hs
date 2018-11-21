@@ -667,13 +667,20 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExt con)
                         -- Reconstruct with the WrapId so that unpacking happens
-                 wrap = mkWpEvVarApps theta_vars                                <.>
+                 ensureAllFieldsUnrestricted expr =
+                   case con of
+                     RealDataCon _ -> expr <.> mkWpTyApps [omegaDataConTy]
+                     PatSynCon _ -> expr
+                       -- Currently:
+                       -- - Real data constructor have a single type argument which, when instantiated to Omega turn all field unrestricted
+                       -- - Pattern synonyms always have all their fields unrestricted.
+                 wrap = ensureAllFieldsUnrestricted $
+                        mkWpEvVarApps theta_vars                                <.>
                         dict_req_wrap                                           <.>
                         mkWpTyApps    [ lookupTyVar out_subst tv
                                           `orElse` mkTyVarTy tv
                                       | tv <- user_tvs
                                       , not (tv `elemVarEnv` wrap_subst) ]
-                        <.> mkWpTyApps [omegaDataConTy]
 
                           -- Be sure to use user_tvs (which may be ordered
                           -- differently than `univ_tvs ++ ex_tvs) above.
