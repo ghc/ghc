@@ -1893,14 +1893,25 @@ stg_makeStableNamezh ( P_ obj )
 {
     W_ index, sn_obj;
 
+    MAYBE_GC_P(stg_makeStableNamezh, obj);
+
     (index) = ccall lookupStableName(obj "ptr");
 
     /* Is there already a StableName for this heap object?
      *  stable_name_table is a pointer to an array of snEntry structs.
      */
     if ( snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) == NULL ) {
-        ALLOC_PRIM (SIZEOF_StgStableName);
-        sn_obj = Hp - SIZEOF_StgStableName + WDS(1);
+        // At this point we have a snEntry, but it doesn't look as used to the
+        // GC yet because we don't have a StableName object for the sn_obj field
+        // (remember that sn_obj == NULL means the entry is free). So if we call
+        // GC here we end up skipping the snEntry in gcStableNameTable(). This
+        // caused #15906. Solution: use allocate(), which does not call GC.
+        //
+        // (Alternatively we could use a special value for the sn_obj field to
+        // indicate that the entry is being allocated and not free, but that's
+        // too complicated and doesn't buy us much. See D5342?id=18700.)
+        ("ptr" sn_obj) = ccall allocate(MyCapability() "ptr",
+                                        BYTES_TO_WDS(SIZEOF_StgStableName));
         SET_HDR(sn_obj, stg_STABLE_NAME_info, CCCS);
         StgStableName_sn(sn_obj) = index;
         snEntry_sn_obj(W_[stable_name_table] + index*SIZEOF_snEntry) = sn_obj;
