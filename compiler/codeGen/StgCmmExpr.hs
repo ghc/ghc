@@ -151,7 +151,7 @@ cgLetNoEscapeRhsBody
     -> Id
     -> StgRhs
     -> FCode (CgIdInfo, FCode ())
-cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _bi _ _upd args body)
+cgLetNoEscapeRhsBody local_cc bndr (StgRhsClosure cc _ _upd args body)
   = cgLetNoEscapeClosure bndr local_cc cc (nonVoidIds args) body
 cgLetNoEscapeRhsBody local_cc bndr (StgRhsCon cc con args)
   = cgLetNoEscapeClosure bndr local_cc cc []

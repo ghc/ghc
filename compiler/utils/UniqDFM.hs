@@ -46,12 +46,13 @@ module UniqDFM (
         intersectUDFM, udfmIntersectUFM,
         intersectsUDFM,
         disjointUDFM, disjointUdfmUfm,
+        equalKeysUDFM,
         minusUDFM,
         listToUDFM,
         udfmMinusUFM,
         partitionUDFM,
         anyUDFM, allUDFM,
-        pprUDFM,
+        pprUniqDFM, pprUDFM,
 
         udfmToList,
         udfmToUfm,
@@ -66,6 +67,7 @@ import Outputable
 
 import qualified Data.IntMap as M
 import Data.Data
+import Data.Functor.Classes (Eq1 (..))
 import Data.List (sortBy)
 import Data.Function (on)
 import qualified Data.Semigroup as Semi
@@ -287,6 +289,10 @@ udfmToList :: UniqDFM elt -> [(Unique, elt)]
 udfmToList (UDFM m _i) =
   [ (getUnique k, taggedFst v)
   | (k, v) <- sortBy (compare `on` (taggedSnd . snd)) $ M.toList m ]
+
+-- Determines whether two 'UniqDFM's contain the same keys.
+equalKeysUDFM :: UniqDFM a -> UniqDFM b -> Bool
+equalKeysUDFM (UDFM m1 _) (UDFM m2 _) = liftEq (\_ _ -> True) m1 m2
 
 isNullUDFM :: UniqDFM elt -> Bool
 isNullUDFM (UDFM m _) = M.null m

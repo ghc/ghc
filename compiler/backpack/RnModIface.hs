@@ -139,10 +139,36 @@ rnDepModules sel deps = do
     -- in these dependencies.
     fmap (nubSort . concat) . T.forM (sel deps) $ \mod -> do
         dflags <- getDynFlags
+        -- For holes, its necessary to "see through" the instantiation
+        -- of the hole to get accurate family instance dependencies.
+        -- For example, if B imports <A>, and <A> is instantiated with
+        -- F, we must grab and include all of the dep_finsts from
+        -- F to have an accurate transitive dep_finsts list.
+        --
+        -- However, we MUST NOT do this for regular modules.
+        -- First, for efficiency reasons, doing this
+        -- bloats the the dep_finsts list, because we *already* had
+        -- those modules in the list (it wasn't a hole module, after
+        -- all). But there's a second, more important correctness
+        -- consideration: we perform module renaming when running
+        -- --abi-hash.  In this case, GHC's contract to the user is that
+        -- it will NOT go and read out interfaces of any dependencies
+        -- (https://github.com/haskell/cabal/issues/3633); the point of
+        -- --abi-hash is just to get a hash of the on-disk interfaces
+        -- for this *specific* package.  If we go off and tug on the
+        -- interface for /everything/ in dep_finsts, we're gonna have a
+        -- bad time.  (It's safe to do do this for hole modules, though,
+        -- because the hmap for --abi-hash is always trivial, so the
+        -- interface we request is local.  Though, maybe we ought
+        -- not to do it in this case either...)
+        --
+        -- This mistake was bug #15594.
         let mod' = renameHoleModule dflags hmap mod
-        iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
-                        $ loadSysInterface (text "rnDepModule") mod'
-        return (mod' : sel (mi_deps iface))
+        if isHoleModule mod
+          then do iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
+                                  $ loadSysInterface (text "rnDepModule") mod'
+                  return (mod' : sel (mi_deps iface))
+          else return [mod']
 
 {-
 ************************************************************************

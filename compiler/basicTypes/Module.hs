@@ -961,7 +961,7 @@ renameHoleUnitId' pkg_map env uid =
         IndefUnitId{ indefUnitIdComponentId = cid
                    , indefUnitIdInsts       = insts
                    , indefUnitIdFreeHoles   = fh })
-          -> if isNullUFM (intersectUFM_C const (udfmToUfm fh) env)
+          -> if isNullUFM (intersectUFM_C const (udfmToUfm (getUniqDSet fh)) env)
                 then uid
                 -- Functorially apply the substitution to the instantiation,
                 -- then check the 'PackageConfigMap' to see if there is

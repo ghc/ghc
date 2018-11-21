@@ -233,7 +233,7 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         DataFamInstTyCon T [Int] ax_ti
 
 * The axiom ax_ti may be eta-reduced; see
-  Note [Eta reduction for data family axioms] in FamInstEnv
+  Note [Eta reduction for data families] in FamInstEnv
 
 * Data family instances may have a different arity than the data family.
   See Note [Arity of data families] in FamInstEnv
@@ -1011,8 +1011,8 @@ data AlgTyConFlav
                -- and R:T is the representation TyCon (ie this one)
                -- and a,b,c are the tyConTyVars of this TyCon
                --
-               -- BUT may be eta-reduced; see TcInstDcls
-               --     Note [Eta reduction for data family axioms]
+               -- BUT may be eta-reduced; see FamInstEnv
+               --     Note [Eta reduction for data families]
 
           -- Cached fields of the CoAxiom, but adjusted to
           -- use the tyConTyVars of this TyCon

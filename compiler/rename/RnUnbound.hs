@@ -238,7 +238,7 @@ importSuggestions where_look hpt currMod imports rdr_name
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
   , Just name <- mod_name
-  , showNotImportedLine (fromJust mod_name)
+  , show_not_imported_line name
   = hsep
       [ text "No module named"
       , quotes (ppr name)
@@ -341,18 +341,18 @@ importSuggestions where_look hpt currMod imports rdr_name
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
 
-  -- See note [showNotImportedLine]
-  showNotImportedLine :: ModuleName -> Bool                           -- #15611
-  showNotImportedLine modnam
+  -- See note [When to show/hide the module-not-imported line]
+  show_not_imported_line :: ModuleName -> Bool                    -- #15611
+  show_not_imported_line modnam
       | modnam `elem`
           fmap moduleName (moduleEnvKeys (imp_mods imports)) = False   -- 1
-      | moduleName currMod == modnam       = False                     -- 2.1
-      | isLastLoadedMod modnam hptUniques  = False                     -- 2.2
-      | otherwise                          = True
+      | moduleName currMod == modnam          = False                  -- 2.1
+      | is_last_loaded_mod modnam hpt_uniques = False                  -- 2.2
+      | otherwise                             = True
     where
-      hptUniques = map fst (udfmToList hpt)
-      isLastLoadedMod _ []         = False
-      isLastLoadedMod modnam uniqs = last uniqs == getUnique modnam
+      hpt_uniques = map fst (udfmToList hpt)
+      is_last_loaded_mod _ []         = False
+      is_last_loaded_mod modnam uniqs = last uniqs == getUnique modnam
 
 extensionSuggestions :: RdrName -> SDoc
 extensionSuggestions rdrName
@@ -366,7 +366,7 @@ perhapsForallMsg
   = vcat [ text "Perhaps you intended to use ExplicitForAll or similar flag"
          , text "to enable explicit-forall syntax: forall <tvs>. <type>"]
 
-{- Note [showNotImportedLine]                                   -- #15611
+{- Note [When to show/hide the module-not-imported line]           -- #15611
 For the error message:
     Not in scope X.Y
     Module X does not export Y

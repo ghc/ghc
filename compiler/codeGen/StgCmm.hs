@@ -154,9 +154,9 @@ cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in UnariseStg
 
-cgTopRhs dflags rec bndr (StgRhsClosure cc bi fvs upd_flag args body)
+cgTopRhs dflags rec bndr (StgRhsClosure cc fvs upd_flag args body)
   = ASSERT(null fvs)    -- There should be no free variables
-    cgTopRhsClosure dflags rec bndr cc bi upd_flag args body
+    cgTopRhsClosure dflags rec bndr cc upd_flag args body
 
 
 ---------------------------------------------------------------
