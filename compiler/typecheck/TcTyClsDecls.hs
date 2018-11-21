@@ -40,7 +40,6 @@ import TcDeriv (DerivInfo)
 import TcHsType
 import Inst( tcInstTyBinders )
 import TcMType
-import TcUnify( unifyType )
 import TysWiredIn ( unitTy )
 import TcType
 import RnEnv( lookupConstructorFields )
@@ -1788,9 +1787,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
                                       hs_pats
-                                      (\ res_kind ->
-                                         do { traceTc "tcTyFasmInstEqn" (ppr fam_tc $$ ppr hs_pats $$ ppr res_kind)
-                                            ; tcCheckLHsType rhs_hs_ty res_kind })
+                                      (tcCheckLHsType rhs_hs_ty res_kind)
 
        ; (ze, qtvs') <- zonkTyBndrs qtvs
        ; pats'       <- zonkTcTypesToTypesX ze pats
@@ -1950,16 +1947,19 @@ addConsistencyConstraints :: Maybe ClsInstInfo -> TyCon -> [Type] -> TcM ()
 --             F c x y a :: Type
 -- Here the first  arg of F should be the same as the third of C
 --  and the fourth arg of F should be the same as the first of C
-
+--
+-- We emit /Derived/ constraints (a bit like fundeps) to encourage
+-- unification to happen, but without actually reporting errors.
+-- If, despite the efforts, corresponding positions do not match,
+-- checkConsistentFamInst will complain
 addConsistencyConstraints Nothing _ _ = return ()
 addConsistencyConstraints (Just (_, _, inst_ty_env)) fam_tc pats
-  = mapM_ do_one (tyConTyVars fam_tc `zip` pats)
-  where
-    do_one (fam_tc_tv, pat)
-      | Just cls_arg_ty <- lookupVarEnv inst_ty_env fam_tc_tv
-      = discardResult (unifyType Nothing cls_arg_ty pat)
-      | otherwise
-      = return ()
+  = emitDerivedEqs AssocFamPatOrigin
+                   [ (cls_ty, pat)
+                   | (fam_tc_tv, pat) <- tyConTyVars fam_tc `zip` pats
+                   , Just cls_ty <- [lookupVarEnv inst_ty_env fam_tc_tv] ]
+    -- Improve inference
+    -- Any mis-match is reports by checkConsistentFamInst
 
 {- Note [Constraints in patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3255,7 +3255,6 @@ checkFamFlag tc_name
 -- and and the @VarEnv Type@ maps class variables to their instance
 -- types.
 type ClsInstInfo = (Class, [TyVar], VarEnv Type)
-
 
 checkConsistentFamInst :: Maybe ClsInstInfo
                        -> TyCon     -- ^ Family tycon

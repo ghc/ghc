@@ -41,6 +41,7 @@ module TcMType (
   newEvVar, newEvVars, newDict,
   newWanted, newWanteds, newHoleCt, cloneWanted, cloneWC,
   emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
+  emitDerivedEqs,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
   newCoercionHole, fillCoercionHole, isFilledCoercionHole,
@@ -231,6 +232,20 @@ emitWanted origin pty
   = do { ev <- newWanted origin Nothing pty
        ; emitSimple $ mkNonCanonical ev
        ; return $ ctEvTerm ev }
+
+emitDerivedEqs :: CtOrigin -> [(TcType,TcType)] -> TcM ()
+-- Emit some new derived nominal equalities
+emitDerivedEqs origin pairs
+  | null pairs
+  = return ()
+  | otherwise
+  = do { loc <- getCtLocM origin Nothing
+       ; emitSimples (listToBag (map (mk_one loc) pairs)) }
+  where
+    mk_one loc (ty1, ty2)
+       = mkNonCanonical $
+         CtDerived { ctev_pred = mkPrimEqPred ty1 ty2
+                   , ctev_loc = loc }
 
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
