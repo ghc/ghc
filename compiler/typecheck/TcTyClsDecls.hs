@@ -1787,7 +1787,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
                                       hs_pats
-                                      (tcCheckLHsType rhs_hs_ty res_kind)
+                                      (tcCheckLHsType rhs_hs_ty)
 
        ; (ze, qtvs') <- zonkTyBndrs qtvs
        ; pats'       <- zonkTcTypesToTypesX ze pats
