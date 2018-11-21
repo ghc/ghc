@@ -215,6 +215,14 @@ ifeq "$(SKIP_PERF_TESTS)" "YES"
 RUNTEST_OPTS += --skip-perf-tests
 endif
 
+ifeq "$(ONLY_PERF_TESTS)" "YES"
+RUNTEST_OPTS += --only-perf-tests
+endif
+
+ifneq "$(TEST_ENV)" ""
+RUNTEST_OPTS += --test-env="$(TEST_ENV)"
+endif
+
 ifeq "$(CLEANUP)" "0"
 RUNTEST_OPTS += -e config.cleanup=False
 else ifeq "$(CLEANUP)" "NO"
@@ -266,6 +274,10 @@ RUNTEST_OPTS +=  \
 
 RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
 
+ifneq "$(METRICS_FILE)" ""
+RUNTEST_OPTS +=  \
+	--metrics-file "$(METRICS_FILE)"
+endif
 ifneq "$(JUNIT_FILE)" ""
 RUNTEST_OPTS +=  \
   --junit "$(JUNIT_FILE)"

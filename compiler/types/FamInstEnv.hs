@@ -7,6 +7,7 @@
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
+        etaExpandFamInstLHS,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
 
@@ -213,6 +214,11 @@ For a FamInst with fi_flavour = DataFamilyInst rep_tc,
 But when fi_flavour = SynFamilyInst,
   - fi_tys has the exact arity of the family tycon
 
+There are certain situations (e.g., pretty-printing) where it is necessary to
+deal with eta-expanded data family instances. For these situations, the
+etaExpandFamInstLHS function exists as a convenient way to perform this eta
+expansion. (See #9692, #14179, and #15845 for examples of what can go wrong if
+etaExpandFamInstLHS isn't used).
 
 (See also Note [Newtype eta] in TyCon.  This is notionally separate
 and deals with the axiom connecting a newtype with its representation
@@ -556,7 +562,7 @@ irrelevant (clause 1 of compatible) or benign (clause 2 of compatible).
 Note [Compatibility of eta-reduced axioms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In newtype instances of data families we eta-reduce the axioms,
-See Note [Eta reduction for data family axioms] in TcInstDcls. This means that
+See Note [Eta reduction for data families] in FamInstEnv. This means that
 we sometimes need to test compatibility of two axioms that were eta-reduced to
 different degrees, e.g.:
 

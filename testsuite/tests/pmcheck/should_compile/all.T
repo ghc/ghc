@@ -36,26 +36,19 @@ test('T9951b', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T9951', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T11303', normal, compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-test('T11276', compiler_stats_num_field('bytes allocated',
-  [(wordsize(64), 165890392, 10)]
-    # 2018-07-14: 165890392   INITIAL
-  ), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
+test('T11303', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
+test('T11276', collect_compiler_stats('bytes allocated',10), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 
-test('T11303b', compiler_stats_num_field('bytes allocated',
-  [(wordsize(64), 54373936, 10)]
-    # 2018-07-14: 54373936    INITIAL
-  ), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
+test('T11303b', collect_compiler_stats('bytes allocated',10), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 
-test('T11374', compiler_stats_num_field('bytes allocated',
-  [(wordsize(64), 280144864, 10)]
-    # 2018-07-14: 280144864   INITIAL
-  ), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
+test('T11374', collect_compiler_stats('bytes allocated',10), compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 
-test('T11195', compiler_stats_num_field('bytes allocated',
-  [(wordsize(64), 7852567480, 10)]
-    # 2018-07-14: 7852567480   INITIAL
-  ), compile, ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
+test('T11195', collect_compiler_stats('bytes allocated',10), compile,
+     ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
 
 test('T11984', normal, compile,
     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])

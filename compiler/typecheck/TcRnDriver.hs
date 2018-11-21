@@ -1759,9 +1759,11 @@ checkMainExported tcg_env
       Just main_name ->
          do { dflags <- getDynFlags
             ; let main_mod = mainModIs dflags
-            ; checkTc (main_name `elem` concatMap availNames (tcg_exports tcg_env)) $
-                text "The" <+> ppMainFn (nameRdrName main_name) <+>
-                text "is not exported by module" <+> quotes (ppr main_mod) }
+            ; when (ghcLink dflags /= LinkInMemory) $      -- #11647
+                checkTc (main_name `elem`
+                           concatMap availNames (tcg_exports tcg_env)) $
+                   text "The" <+> ppMainFn (nameRdrName main_name) <+>
+                   text "is not exported by module" <+> quotes (ppr main_mod) }
 
 ppMainFn :: RdrName -> SDoc
 ppMainFn main_fn

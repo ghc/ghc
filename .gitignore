@@ -215,3 +215,4 @@ GIT_COMMIT_ID
 ghc.nix/
 
 
+.gdb_history

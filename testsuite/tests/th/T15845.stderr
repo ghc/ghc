@@ -1,0 +1,5 @@
+data family T15845.F1 (a_0 :: *) (b_1 :: *) :: *
+data instance forall (a_2 :: *) (b_3 :: *). T15845.F1 ([a_2]) b_3
+    = T15845.MkF1
+data family T15845.F2 (a_0 :: *) :: *
+data instance forall (a_1 :: *). T15845.F2 a_1 = T15845.MkF2

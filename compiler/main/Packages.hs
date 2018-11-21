@@ -891,15 +891,28 @@ sortByPreference prec_map = sortBy (flip (compareByPreference prec_map))
 --
 -- Pursuant to #12518, we could change this policy to, for example, remove
 -- the version preference, meaning that we would always prefer the packages
--- in alter package database.
+-- in later package database.
 --
+-- Instead, we use that preference based policy only when one of the packages
+-- is integer-gmp and the other is integer-simple.
+-- This currently only happens when we're looking up which concrete
+-- package to use in place of @integer-wired-in@ and that two different
+-- package databases supply a different integer library. For more about
+-- the fake @integer-wired-in@ package, see Note [The integer library]
+-- in the @PrelNames@ module.
 compareByPreference
     :: PackagePrecedenceIndex
     -> PackageConfig
     -> PackageConfig
     -> Ordering
-compareByPreference prec_map pkg pkg' =
-    case comparing packageVersion pkg pkg' of
+compareByPreference prec_map pkg pkg'
+  | Just prec  <- Map.lookup (unitId pkg)  prec_map
+  , Just prec' <- Map.lookup (unitId pkg') prec_map
+  , differentIntegerPkgs pkg pkg'
+  = compare prec prec'
+
+  | otherwise
+  = case comparing packageVersion pkg pkg' of
         GT -> GT
         EQ | Just prec  <- Map.lookup (unitId pkg)  prec_map
            , Just prec' <- Map.lookup (unitId pkg') prec_map
@@ -909,6 +922,12 @@ compareByPreference prec_map pkg pkg' =
            | otherwise
            -> EQ
         LT -> LT
+
+  where isIntegerPkg p = packageNameString p `elem`
+          ["integer-simple", "integer-gmp"]
+        differentIntegerPkgs p p' =
+          isIntegerPkg p && isIntegerPkg p' &&
+          (packageName p /= packageName p')
 
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b

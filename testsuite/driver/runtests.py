@@ -23,8 +23,9 @@ import traceback
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from testutil import getStdout, Watcher
+from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestOptions, brokens
+from perf_notes import MetricChange
 from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -43,11 +44,13 @@ def signal_handler(signal, frame):
 # cmd-line options
 
 parser = argparse.ArgumentParser(description="GHC's testsuite driver")
+perf_group = parser.add_mutually_exclusive_group()
 
 parser.add_argument("-e", action='append', help="A string to execute from the command line.")
 parser.add_argument("--config-file", action="append", help="config file")
 parser.add_argument("--config", action='append', help="config field")
 parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
+parser.add_argument("--metrics-file", help="file in which to save (append) the performance test metrics. If omitted, git notes will be used.")
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
@@ -55,23 +58,32 @@ parser.add_argument("--way", action="append", help="just this way")
 parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
-parser.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
+parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
+perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
+perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 
 args = parser.parse_args()
 
-for e in args.e:
-    exec(e)
+if args.e:
+    for e in args.e:
+        exec(e)
 
-for arg in args.config_file:
-    exec(open(arg).read())
+if args.config_file:
+    for arg in args.config_file:
+        exec(open(arg).read())
 
-for arg in args.config:
-    field, value = arg.split('=', 1)
-    setattr(config, field, value)
+if args.config:
+    for arg in args.config:
+        field, value = arg.split('=', 1)
+        setattr(config, field, value)
 
 all_ways = config.run_ways+config.compile_ways+config.other_ways
-config.rootdirs = args.rootdir
+
+if args.rootdir:
+    config.rootdirs = args.rootdir
+
+config.metrics_file = args.metrics_file
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
 
@@ -108,7 +120,12 @@ if args.threads:
 
 if args.verbose is not None:
     config.verbose = args.verbose
+
 config.skip_perf_tests = args.skip_perf_tests
+config.only_perf_tests = args.only_perf_tests
+
+if args.test_env:
+    config.test_env = args.test_env
 
 config.cygwin = False
 config.msys = False
@@ -227,6 +244,14 @@ if config.timeout == -1:
 
 print('Timeout is ' + str(config.timeout))
 
+# Try get allowed performance changes from the git commit.
+try:
+    config.allowed_perf_changes = Perf.get_allowed_perf_changes()
+except subprocess.CalledProcessError:
+    print('Failed to get allowed metric changes from the HEAD git commit message.')
+
+print(len(config.allowed_perf_changes))
+
 # -----------------------------------------------------------------------------
 # The main dude
 
@@ -330,7 +355,31 @@ else:
     # flush everything before we continue
     sys.stdout.flush()
 
-    summary(t, sys.stdout, config.no_print_summary)
+    # Warn of new metrics.
+    new_metrics = [metric for (change, metric) in t.metrics if change == MetricChange.NewMetric]
+    spacing = "    "
+    if any(new_metrics):
+        print()
+        print(str_warn('New Metrics') + ' the previous git commit doesn\'t have metrics for the following tests:')
+        print(spacing + ('\n' + spacing).join(set([metric.test for metric in new_metrics])))
+
+    # Inform of how to accept metric changes.
+    if (len(t.unexpected_stat_failures) > 0):
+        print()
+        print(str_info("Some stats have changed") + " If this is expected, allow changes by appending the git commit message with this:")
+        print('-' * 25)
+        print(Perf.allow_changes_string(t.metrics))
+        print('-' * 25)
+
+    summary(t, sys.stdout, config.no_print_summary, True)
+
+    stats = [stat for (_, stat) in t.metrics]
+    if config.metrics_file:
+        print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
+        with open(config.metrics_file, 'a') as file:
+            file.write("\n" + Perf.format_perf_stat(stats))
+    else:
+        Perf.append_perf_stat(stats)
 
     if config.summary_file:
         with open(config.summary_file, 'w') as file:
