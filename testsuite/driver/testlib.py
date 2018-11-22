@@ -1921,9 +1921,9 @@ global gs_working
 gs_working = False
 if config.have_profiling:
   if config.gs != '':
-    resultGood = runCmd(genGSCmd(config.confdir + '/good.ps'));
+    resultGood = runCmd(genGSCmd(config.top + '/config/good.ps'));
     if resultGood == 0:
-        resultBad = runCmd(genGSCmd(config.confdir + '/bad.ps') +
+        resultBad = runCmd(genGSCmd(config.top + '/config/bad.ps') +
                                    ' >/dev/null 2>&1')
         if resultBad != 0:
             print("GhostScript available for hp2ps tests")
