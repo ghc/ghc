@@ -27,11 +27,8 @@ T14394
 T14773b
 T2110
 T5327
-T8274
 TH_reifyDecl1
-TestTypeableBinary
 ghci
-rule2
 spec001
 
 # Debugger
