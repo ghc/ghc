@@ -48,8 +48,8 @@
 
 module Lexer (
    Token(..), lexer, pragState, mkPState, mkPStatePure, PState(..),
-   P(..), ParseResult(..), mkParserFlags, ParserFlags(..), getSrcLoc,
-   getPState, extopt, withThisPackage,
+   P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags,
+   getSrcLoc, getPState, withThisPackage,
    failLocMsgP, failSpanMsgP, srcParseFail,
    getMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
@@ -61,8 +61,9 @@ module Lexer (
    inRulePrag,
    explicitNamespacesEnabled,
    patternSynonymsEnabled,
-   sccProfilingOn, hpcEnabled,
-   starIsTypeEnabled,
+   starIsTypeEnabled, monadComprehensionsEnabled, doAndIfThenElseEnabled,
+   nPlusKPatternsEnabled, blockArgumentsEnabled, gadtSyntaxEnabled,
+   multiWayIfEnabled, thQuotesEnabled,
    addWarning,
    lexTokenStream,
    addAnnotation,AddAnn,addAnnsAt,mkParensApiAnn,
@@ -1935,14 +1936,10 @@ data ParseResult a
 warnopt :: WarningFlag -> ParserFlags -> Bool
 warnopt f options = f `EnumSet.member` pWarningFlags options
 
--- | Test whether a 'LangExt.Extension' is set
-extopt :: LangExt.Extension -> ParserFlags -> Bool
-extopt f options = f `EnumSet.member` pExtensionFlags options
-
--- | The subset of the 'DynFlags' used by the parser
+-- | The subset of the 'DynFlags' used by the parser.
+-- See 'mkParserFlags' or 'mkParserFlags'' for ways to construct this.
 data ParserFlags = ParserFlags {
     pWarningFlags   :: EnumSet WarningFlag
-  , pExtensionFlags :: EnumSet LangExt.Extension
   , pThisPackage    :: UnitId      -- ^ key of package currently being compiled
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
@@ -2246,8 +2243,7 @@ setALRContext :: [ALRContext] -> P ()
 setALRContext cs = P $ \s -> POk (s {alr_context = cs}) ()
 
 getALRTransitional :: P Bool
-getALRTransitional = P $ \s@PState {options = o} ->
-  POk s (extopt LangExt.AlternativeLayoutRuleTransitional o)
+getALRTransitional = extension alternativeLayoutTransitionalRule
 
 getJustClosedExplicitLetBlock :: P Bool
 getJustClosedExplicitLetBlock
@@ -2294,6 +2290,7 @@ xbit = bit . fromEnum
 xtest :: ExtBits -> ExtsBitmap -> Bool
 xtest ext xmap = testBit xmap (fromEnum ext)
 
+-- | Subset of the language extensions that impact lexing and parsing.
 data ExtBits
   = FfiBit
   | InterruptibleFfiBit
@@ -2319,9 +2316,8 @@ data ExtBits
   | InRulePragBit
   | InNestedCommentBit -- See Note [Nested comment line pragmas]
   | RawTokenStreamBit -- producing a token stream with all comments included
-  | SccProfilingOnBit
-  | HpcBit
   | AlternativeLayoutRuleBit
+  | ALRTransitionalBit
   | RelaxedLayoutBit
   | NondecreasingIndentationBit
   | SafeHaskellBit
@@ -2335,8 +2331,12 @@ data ExtBits
   | StaticPointersBit
   | NumericUnderscoresBit
   | StarIsTypeBit
+  | BlockArgumentsBit
+  | NPlusKPatternsBit
+  | DoAndIfThenElseBit
+  | MultiWayIfBit
+  | GadtSyntaxBit
   deriving Enum
-
 
 always :: ExtsBitmap -> Bool
 always           _     = True
@@ -2366,6 +2366,8 @@ unboxedSumsEnabled :: ExtsBitmap -> Bool
 unboxedSumsEnabled = xtest UnboxedSumsBit
 datatypeContextsEnabled :: ExtsBitmap -> Bool
 datatypeContextsEnabled = xtest DatatypeContextsBit
+monadComprehensionsEnabled :: ExtsBitmap -> Bool
+monadComprehensionsEnabled = xtest TransformComprehensionsBit
 qqEnabled :: ExtsBitmap -> Bool
 qqEnabled = xtest QqBit
 inRulePrag :: ExtsBitmap -> Bool
@@ -2376,14 +2378,12 @@ rawTokenStreamEnabled :: ExtsBitmap -> Bool
 rawTokenStreamEnabled = xtest RawTokenStreamBit
 alternativeLayoutRule :: ExtsBitmap -> Bool
 alternativeLayoutRule = xtest AlternativeLayoutRuleBit
-hpcEnabled :: ExtsBitmap -> Bool
-hpcEnabled = xtest HpcBit
+alternativeLayoutTransitionalRule :: ExtsBitmap -> Bool
+alternativeLayoutTransitionalRule = xtest ALRTransitionalBit
 relaxedLayout :: ExtsBitmap -> Bool
 relaxedLayout = xtest RelaxedLayoutBit
 nondecreasingIndentation :: ExtsBitmap -> Bool
 nondecreasingIndentation = xtest NondecreasingIndentationBit
-sccProfilingOn :: ExtsBitmap -> Bool
-sccProfilingOn = xtest SccProfilingOnBit
 traditionalRecordSyntaxEnabled :: ExtsBitmap -> Bool
 traditionalRecordSyntaxEnabled = xtest TraditionalRecordSyntaxBit
 
@@ -2407,6 +2407,18 @@ numericUnderscoresEnabled :: ExtsBitmap -> Bool
 numericUnderscoresEnabled = xtest NumericUnderscoresBit
 starIsTypeEnabled :: ExtsBitmap -> Bool
 starIsTypeEnabled = xtest StarIsTypeBit
+blockArgumentsEnabled :: ExtsBitmap -> Bool
+blockArgumentsEnabled = xtest BlockArgumentsBit
+nPlusKPatternsEnabled :: ExtsBitmap -> Bool
+nPlusKPatternsEnabled = xtest NPlusKPatternsBit
+doAndIfThenElseEnabled :: ExtsBitmap -> Bool
+doAndIfThenElseEnabled = xtest DoAndIfThenElseBit
+multiWayIfEnabled :: ExtsBitmap -> Bool
+multiWayIfEnabled = xtest MultiWayIfBit
+gadtSyntaxEnabled :: ExtsBitmap -> Bool
+gadtSyntaxEnabled = xtest GadtSyntaxBit
+
+
 
 -- PState for parsing options pragmas
 --
@@ -2415,19 +2427,25 @@ pragState dynflags buf loc = (mkPState dynflags buf loc) {
                                  lex_state = [bol, option_prags, 0]
                              }
 
--- | Extracts the flag information needed for parsing
-mkParserFlags :: DynFlags -> ParserFlags
-mkParserFlags flags =
+{-# INLINE mkParserFlags' #-}
+mkParserFlags'
+  :: EnumSet WarningFlag        -- ^ warnings flags enabled
+  -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
+  -> UnitId                     -- ^ key of package currently being compiled
+  -> Bool                       -- ^ are safe imports on?
+  -> Bool                       -- ^ keeping Haddock comment tokens
+  -> Bool                       -- ^ keep regular comment tokens
+  -> ParserFlags
+-- ^ Given exactly the information needed, set up the 'ParserFlags'
+mkParserFlags' warningFlags extensionFlags thisPackage
+  safeImports isHaddock rawTokStream =
     ParserFlags {
-      pWarningFlags = DynFlags.warningFlags flags
-    , pExtensionFlags = DynFlags.extensionFlags flags
-    , pThisPackage = DynFlags.thisPackage flags
-    , pExtsBitmap = bitmap
+      pWarningFlags = warningFlags
+    , pThisPackage = thisPackage
+    , pExtsBitmap = safeHaskellBit .|. langExtBits .|. optBits
     }
   where
-    bitmap = safeHaskellBit .|. langExtBits .|. optBits
-    safeHaskellBit =
-          SafeHaskellBit `setBitIf` safeImportsOn flags
+    safeHaskellBit = SafeHaskellBit `setBitIf` safeImports
     langExtBits =
           FfiBit                      `xoptBit` LangExt.ForeignFunctionInterface
       .|. InterruptibleFfiBit         `xoptBit` LangExt.InterruptibleFFI
@@ -2449,6 +2467,7 @@ mkParserFlags flags =
       .|. TransformComprehensionsBit  `xoptBit` LangExt.TransformListComp
       .|. TransformComprehensionsBit  `xoptBit` LangExt.MonadComprehensions
       .|. AlternativeLayoutRuleBit    `xoptBit` LangExt.AlternativeLayoutRule
+      .|. ALRTransitionalBit          `xoptBit` LangExt.AlternativeLayoutRuleTransitional
       .|. RelaxedLayoutBit            `xoptBit` LangExt.RelaxedLayout
       .|. NondecreasingIndentationBit `xoptBit` LangExt.NondecreasingIndentation
       .|. TraditionalRecordSyntaxBit  `xoptBit` LangExt.TraditionalRecordSyntax
@@ -2462,18 +2481,31 @@ mkParserFlags flags =
       .|. StaticPointersBit           `xoptBit` LangExt.StaticPointers
       .|. NumericUnderscoresBit       `xoptBit` LangExt.NumericUnderscores
       .|. StarIsTypeBit               `xoptBit` LangExt.StarIsType
+      .|. BlockArgumentsBit           `xoptBit` LangExt.BlockArguments
+      .|. NPlusKPatternsBit           `xoptBit` LangExt.NPlusKPatterns
+      .|. DoAndIfThenElseBit          `xoptBit` LangExt.DoAndIfThenElse
+      .|. MultiWayIfBit               `xoptBit` LangExt.MultiWayIf
+      .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
     optBits =
-          HaddockBit        `goptBit` Opt_Haddock
-      .|. RawTokenStreamBit `goptBit` Opt_KeepRawTokenStream
-      .|. HpcBit            `goptBit` Opt_Hpc
-      .|. SccProfilingOnBit `goptBit` Opt_SccProfilingOn
+          HaddockBit        `setBitIf` isHaddock
+      .|. RawTokenStreamBit `setBitIf` rawTokStream
 
-    xoptBit bit ext = bit `setBitIf` xopt ext flags
-    goptBit bit opt = bit `setBitIf` gopt opt flags
+    xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b
                       | otherwise = 0
+
+-- | Extracts the flag information needed for parsing
+mkParserFlags :: DynFlags -> ParserFlags
+mkParserFlags =
+  mkParserFlags'
+    <$> DynFlags.warningFlags
+    <*> DynFlags.extensionFlags
+    <*> DynFlags.thisPackage
+    <*> safeImportsOn
+    <*> gopt Opt_Haddock
+    <*> gopt Opt_KeepRawTokenStream
 
 -- | Creates a parse state from a 'DynFlags' value
 mkPState :: DynFlags -> StringBuffer -> RealSrcLoc -> PState
@@ -2611,8 +2643,8 @@ srcParseErr options buf len
         pattern = decodePrevNChars 8 buf
         last100 = decodePrevNChars 100 buf
         mdoInLast100 = "mdo" `isInfixOf` last100
-        th_enabled = extopt LangExt.TemplateHaskell options
-        ps_enabled = extopt LangExt.PatternSynonyms options
+        th_enabled = thEnabled (pExtsBitmap options)
+        ps_enabled = patternSynonymsEnabled (pExtsBitmap options)
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors

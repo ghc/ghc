@@ -84,8 +84,6 @@ import TysWiredIn       ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nilD
 -- compiler/utils
 import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
-
-import qualified GHC.LanguageExtensions as LangExt
 }
 
 %expect 236 -- shift/reduce conflicts
@@ -3746,14 +3744,14 @@ fileSrcSpan = do
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
-  mwiEnabled <- liftM ((LangExt.MultiWayIf `extopt`) . options) getPState
+  mwiEnabled <- extension multiWayIfEnabled
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about if usage for beginners
 hintIf :: SrcSpan -> String -> P (LHsExpr GhcPs)
 hintIf span msg = do
-  mwiEnabled <- liftM ((LangExt.MultiWayIf `extopt`) . options) getPState
+  mwiEnabled <- extension multiWayIfEnabled
   if mwiEnabled
     then parseErrorSDoc span $ text $ "parse error in if statement"
     else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
@@ -3805,8 +3803,8 @@ warnSpaceAfterBang span = do
 -- variable or constructor. See Trac #13450.
 reportEmptyDoubleQuotes :: SrcSpan -> P (GenLocated SrcSpan (HsExpr GhcPs))
 reportEmptyDoubleQuotes span = do
-    thEnabled <- liftM ((LangExt.TemplateHaskellQuotes `extopt`) . options) getPState
-    if thEnabled
+    thQuotes <- extension thQuotesEnabled
+    if thQuotes
       then parseErrorSDoc span $ vcat
         [ text "Parser error on `''`"
         , text "Character literals may not be empty"
