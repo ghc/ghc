@@ -8,4 +8,5 @@ valid_hole_fits_interactions.hs:15:5: warning: [-Wtyped-holes (in -Wdefault)]
       Valid hole fits include
         f :: SBool 'True (bound at valid_hole_fits_interactions.hs:15:1)
         STrue :: SBool 'True
+          with STrue @'Omega
           (defined at valid_hole_fits_interactions.hs:12:3)
