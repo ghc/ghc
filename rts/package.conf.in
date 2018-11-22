@@ -174,9 +174,11 @@ ld-options:
 #if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,_hs_atomicwrite64"
 #endif
+#if defined(DEBUG)
           /* This symbol is useful in gdb, but not referred to anywhere,
            * so we need to force it to be included in the binary. */
          , "-Wl,-u,_findPtr"
+#endif
 #else
            "-Wl,-u,base_GHCziTopHandler_runIO_closure"
          , "-Wl,-u,base_GHCziTopHandler_runNonIO_closure"
@@ -275,9 +277,11 @@ ld-options:
 #if WORD_SIZE_IN_BITS == 64
          , "-Wl,-u,hs_atomicwrite64"
 #endif
+#if defined(DEBUG)
           /* This symbol is useful in gdb, but not referred to anywhere,
            * so we need to force it to be included in the binary. */
          , "-Wl,-u,findPtr"
+#endif
 #endif
 
 /*  Pick up static libraries in preference over dynamic if in earlier search
