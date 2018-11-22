@@ -540,9 +540,9 @@ instance (Multable a, Eq (DeBruijn a)) => Eq (DeBruijn (GMult a)) where
   (D _ Zero) == (D _ Zero) = True
   (D _ One) == (D _ One) = True
   (D _ Omega) == (D _ Omega) = True
-  (D env (RigAdd p q)) == (D env' (RigAdd p' q')) = (D env p) == (D env' p') && (D env q) == (D env' q')
-  (D env (RigMul p q)) == (D env' (RigMul p' q')) = (D env p) == (D env' p') && (D env q) == (D env' q')
-  (D env (RigThing a)) == (D env' (RigThing a')) = (D env a) == (D env' a')
+  (D env (MultAdd p q)) == (D env' (MultAdd p' q')) = (D env p) == (D env' p') && (D env q) == (D env' q')
+  (D env (MultMul p q)) == (D env' (MultMul p' q')) = (D env p) == (D env' p') && (D env q) == (D env' q')
+  (D env (MultThing a)) == (D env' (MultThing a')) = (D env a) == (D env' a')
   _ == _ = False
 
 instance Eq (DeBruijn VarMult) where

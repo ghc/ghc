@@ -1155,9 +1155,9 @@ collect_cand_qtvs is_dep bound dvs ty
     go_mult dv Zero  = return dv
     go_mult dv One   = return dv
     go_mult dv Omega = return dv
-    go_mult dv (RigAdd x y) = foldlM go_mult dv [x, y]
-    go_mult dv (RigMul x y) = foldlM go_mult dv [x, y]
-    go_mult dv (RigThing x) = go dv x
+    go_mult dv (MultAdd x y) = foldlM go_mult dv [x, y]
+    go_mult dv (MultMul x y) = foldlM go_mult dv [x, y]
+    go_mult dv (MultThing x) = go dv x
 
     go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
     go dv (TyConApp _ tys) = foldlM go dv tys

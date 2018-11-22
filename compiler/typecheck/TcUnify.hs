@@ -832,9 +832,9 @@ tcSubMult actual_w w
   where
     do_one mult =
       case mult of
-        RigAdd _ _ -> do
+        MultAdd _ _ -> do
           tcSubMult Omega w
-        RigMul m1 m2 -> do
+        MultMul m1 m2 -> do
           tcSubMult m1 w
           tcSubMult m2 w
         _ -> do_one_action mult w

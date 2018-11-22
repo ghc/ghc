@@ -340,7 +340,7 @@ type Scaled = GScaled Type
 instance Multable Type where
   fromMult One = oneDataConTy
   fromMult Omega = omegaDataConTy
-  fromMult (RigThing ty) = ty
+  fromMult (MultThing ty) = ty
   fromMult Zero =
     pprPanic "Type.fromMult" (text"A multiplicity 0 leaked into a type")
   fromMult r =
@@ -349,7 +349,7 @@ instance Multable Type where
   toMult ty
     | oneDataConTy `eqType` ty = One
     | omegaDataConTy `eqType` ty = Omega
-    | otherwise = unsafeRigThing ty
+    | otherwise = unsafeMultThing ty
 
 
 
@@ -1762,9 +1762,9 @@ ty_co_vars_of_mult :: Mult -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_mult Zero         is acc = acc
 ty_co_vars_of_mult One          is acc = acc
 ty_co_vars_of_mult Omega        is acc = acc
-ty_co_vars_of_mult (RigAdd x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
-ty_co_vars_of_mult (RigMul x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
-ty_co_vars_of_mult (RigThing x) is acc = ty_co_vars_of_type x is acc
+ty_co_vars_of_mult (MultAdd x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
+ty_co_vars_of_mult (MultMul x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
+ty_co_vars_of_mult (MultThing x) is acc = ty_co_vars_of_type x is acc
 
 ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_type (TyVarTy v) is acc
@@ -1924,9 +1924,9 @@ tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` 
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
 
 tyCoFVsOfRig :: Mult -> FV
-tyCoFVsOfRig (RigThing t) a b c = (tyCoFVsOfType t) a b c
-tyCoFVsOfRig (RigAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
-tyCoFVsOfRig (RigMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
+tyCoFVsOfRig (MultThing t) a b c = (tyCoFVsOfType t) a b c
+tyCoFVsOfRig (MultAdd m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
+tyCoFVsOfRig (MultMul m1 m2) a b c = (tyCoFVsOfRig m1 `unionFV` tyCoFVsOfRig m2) a b c
 tyCoFVsOfRig _ a b c = emptyFV a b c
 
 tyCoFVsBndr :: TyCoVarBinder -> FV -> FV
@@ -2033,7 +2033,7 @@ coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
 
 coVarsOfRig :: Mult -> CoVarSet
-coVarsOfRig (RigThing t) = coVarsOfType t
+coVarsOfRig (MultThing t) = coVarsOfType t
 coVarsOfRig _ = emptyVarSet
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
@@ -2115,13 +2115,13 @@ almost_devoid_co_var_of_mult :: Mult -> CoVar -> Bool
 almost_devoid_co_var_of_mult Zero _ = False
 almost_devoid_co_var_of_mult One _ = False
 almost_devoid_co_var_of_mult Omega _ = False
-almost_devoid_co_var_of_mult (RigAdd x y) cv
+almost_devoid_co_var_of_mult (MultAdd x y) cv
   = almost_devoid_co_var_of_mult x cv
   && almost_devoid_co_var_of_mult y cv
-almost_devoid_co_var_of_mult (RigMul x y) cv
+almost_devoid_co_var_of_mult (MultMul x y) cv
   = almost_devoid_co_var_of_mult x cv
   && almost_devoid_co_var_of_mult y cv
-almost_devoid_co_var_of_mult (RigThing x) cv
+almost_devoid_co_var_of_mult (MultThing x) cv
   = almost_devoid_co_var_of_type x cv
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
@@ -2205,9 +2205,9 @@ noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
 noFreeVarsOfMult :: Mult -> Bool
-noFreeVarsOfMult (RigThing ty) = noFreeVarsOfType ty
-noFreeVarsOfMult (RigAdd m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
-noFreeVarsOfMult (RigMul m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
+noFreeVarsOfMult (MultThing ty) = noFreeVarsOfType ty
+noFreeVarsOfMult (MultAdd m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
+noFreeVarsOfMult (MultMul m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
 noFreeVarsOfMult _ = True
 
 noFreeVarsOfVarMult :: VarMult -> Bool
@@ -2916,9 +2916,9 @@ subst_ty subst ty
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 subst_mult :: TCvSubst -> Mult -> Mult
-subst_mult subst (RigThing t) = RigThing (subst_ty subst t)
-subst_mult subst (RigAdd m1 m2) = RigAdd (subst_mult subst m1) (subst_mult subst m2)
-subst_mult subst (RigMul m1 m2) = RigMul (subst_mult subst m1) (subst_mult subst m2)
+subst_mult subst (MultThing t) = MultThing (subst_ty subst t)
+subst_mult subst (MultAdd m1 m2) = MultAdd (subst_mult subst m1) (subst_mult subst m2)
+subst_mult subst (MultMul m1 m2) = MultMul (subst_mult subst m1) (subst_mult subst m2)
 subst_mult _ r = r
 
 substTyVar :: TCvSubst -> TyVar -> Type

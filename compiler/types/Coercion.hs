@@ -656,7 +656,7 @@ mkFunCo r w co1 co2
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
   , Just (w, _) <- isReflCo_maybe w
-  = mkReflCo r (mkFunTy (RigThing w) ty1 ty2)
+  = mkReflCo r (mkFunTy (MultThing w) ty1 ty2)
   | otherwise = FunCo r w co1 co2
 
 -- | Apply a 'Coercion' to another 'Coercion'.

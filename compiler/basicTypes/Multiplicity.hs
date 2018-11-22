@@ -12,11 +12,11 @@ module Multiplicity
   , pattern Zero
   , pattern One
   , pattern Omega
-  , pattern RigAdd
-  , pattern RigMul
-  , pattern RigThing
+  , pattern MultAdd
+  , pattern MultMul
+  , pattern MultThing
   , Multable(..)
-  , unsafeRigThing
+  , unsafeMultThing
   , sup
   , GScaled(..)
   , unrestricted
@@ -44,9 +44,9 @@ data GMult a
   = Zero_
   | One_
   | Omega_
-  | RigAdd_ (GMult a) (GMult a)
-  | RigMul_ (GMult a) (GMult a)
-  | RigThing_ a
+  | MultAdd_ (GMult a) (GMult a)
+  | MultMul_ (GMult a) (GMult a)
+  | MultThing_ a
   deriving (Data)
 
 -- | The 'Multable' class describes the requirements that a type needs to be a
@@ -83,48 +83,48 @@ pattern One = One_
 pattern Omega :: GMult a
 pattern Omega = Omega_
 
-pattern RigMul :: GMult a -> GMult a -> GMult a
-pattern RigMul p q <- RigMul_ p q where
-  Zero `RigMul` _ = Zero
-  _ `RigMul` Zero = Zero
-  One `RigMul` p = p
-  p `RigMul` One = p
-  Omega `RigMul` _ = Omega
-  _ `RigMul` Omega = Omega
-  p `RigMul` q = RigMul_ p q
+pattern MultMul :: GMult a -> GMult a -> GMult a
+pattern MultMul p q <- MultMul_ p q where
+  Zero `MultMul` _ = Zero
+  _ `MultMul` Zero = Zero
+  One `MultMul` p = p
+  p `MultMul` One = p
+  Omega `MultMul` _ = Omega
+  _ `MultMul` Omega = Omega
+  p `MultMul` q = MultMul_ p q
 
-pattern RigAdd :: GMult a -> GMult a -> GMult a
-pattern RigAdd p q <- RigAdd_ p q where
-  Zero `RigAdd` p = p
-  p `RigAdd` Zero = p
-  One `RigAdd` One = Omega
-  Omega `RigAdd` _ = Omega
-  _ `RigAdd` Omega = Omega
-  p `RigAdd` q = RigAdd_ p q
+pattern MultAdd :: GMult a -> GMult a -> GMult a
+pattern MultAdd p q <- MultAdd_ p q where
+  Zero `MultAdd` p = p
+  p `MultAdd` Zero = p
+  One `MultAdd` One = Omega
+  Omega `MultAdd` _ = Omega
+  _ `MultAdd` Omega = Omega
+  p `MultAdd` q = MultAdd_ p q
 
-pattern RigThing :: Multable a => a -> GMult a
-pattern RigThing a <- RigThing_ a where
-  RigThing a = toMult a
+pattern MultThing :: Multable a => a -> GMult a
+pattern MultThing a <- MultThing_ a where
+  MultThing a = toMult a
 
-{-# COMPLETE Zero, One, Omega, RigMul, RigAdd, RigThing #-}
+{-# COMPLETE Zero, One, Omega, MultMul, MultAdd, MultThing #-}
 
 -- | Used to defined 'Multable' instances. Requires that the argument cannot be
 -- reified any further. There is probably no good reason to use it outside of a
 -- 'Multable' instance definition.
-unsafeRigThing :: a -> GMult a
-unsafeRigThing = RigThing_
+unsafeMultThing :: a -> GMult a
+unsafeMultThing = MultThing_
 
 instance Num (GMult a) where
-  (*) = RigMul
-  (+) = RigAdd
+  (*) = MultMul
+  (+) = MultAdd
 
 instance Multable a => Outputable (GMult a) where
   ppr Zero = text "0"
   ppr One = text "1"
   ppr Omega = text "ω"
-  ppr (RigAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
-  ppr (RigMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
-  ppr (RigThing t) = ppr t
+  ppr (MultAdd m1 m2) = parens (ppr m1 <+> text "+" <+> ppr m2)
+  ppr (MultMul m1 m2) = parens (ppr m1 <+> text "*" <+> ppr m2)
+  ppr (MultThing t) = ppr t
 
 -- | @sup w1 w2@ returns the smallest multiplicity larger than or equal to both @w1@
 -- and @w2@.
@@ -202,5 +202,5 @@ submultMaybe r1 r2 = go r1 r2
     go One   One   = Smaller
     -- The 1 <= p rule
     go One   _     = Smaller
---    go (RigThing t) (RigThing t') = Unknown
+--    go (MultThing t) (MultThing t') = Unknown
     go _     _     = Unknown

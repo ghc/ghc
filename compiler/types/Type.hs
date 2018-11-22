@@ -575,7 +575,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
-    go_mult (RigThing t) = toMult <$> go t
+    go_mult (MultThing t) = toMult <$> go t
     go_mult t = pure t
 
     (mktyconapp, mkappty, mkcastty)
@@ -2734,9 +2734,9 @@ eqMult :: Mult -> Mult -> Bool
 eqMult Zero Zero = True
 eqMult One One = True
 eqMult Omega Omega = True
-eqMult (RigThing ty) (RigThing ty') = eqType ty ty'
-eqMult (RigAdd r1 r2) (RigAdd r1' r2') = eqMult r1 r1' && eqMult r2 r2'
-eqMult (RigMul r1 r2) (RigMul r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult (MultThing ty) (MultThing ty') = eqType ty ty'
+eqMult (MultAdd r1 r2) (MultAdd r1' r2') = eqMult r1 r1' && eqMult r2 r2'
+eqMult (MultMul r1 r2) (MultMul r1' r2') = eqMult r1 r1' && eqMult r2 r2'
 eqMult _ _ = False
 
 -------------

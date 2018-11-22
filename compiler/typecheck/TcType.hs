@@ -924,9 +924,9 @@ exactTyCoVarsOfType ty
     go (CastTy ty co)       = go ty `unionVarSet` goCo co
     go (CoercionTy co)      = goCo co
 
-    go_mult (RigThing ty)       = go ty
-    go_mult (RigAdd m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
-    go_mult (RigMul m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
+    go_mult (MultThing ty)       = go ty
+    go_mult (MultAdd m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
+    go_mult (MultMul m1 m2)   = go_mult m1 `unionVarSet` go_mult m2
     go_mult _                = emptyVarSet
 
     goMCo MRefl    = emptyVarSet
@@ -987,9 +987,9 @@ anyRewritableTyVar ignore_cos role pred ty
     go rl bvs (CastTy ty co)    = go rl bvs ty || go_co rl bvs co
     go rl bvs (CoercionTy co)   = go_co rl bvs co  -- ToDo: check
 
-    go_mult rl bvs (RigThing ty) = go rl bvs ty
-    go_mult rl bvs (RigAdd m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
-    go_mult rl bvs (RigMul m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
+    go_mult rl bvs (MultThing ty) = go rl bvs ty
+    go_mult rl bvs (MultAdd m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
+    go_mult rl bvs (MultMul m1 m2) = go_mult rl bvs m1 || go_mult rl bvs m2
     go_mult _ _ _ = False
 
     go_tc NomEq  bvs _  tys = any (go NomEq bvs) tys
