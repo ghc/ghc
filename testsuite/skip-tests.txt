@@ -51,11 +51,3 @@ print034
 
 readRun004
 EtaExpandLevPoly
-
-# Hole suggestions
-T14273
-T14343
-T14343b
-type_in_type_hole_fits
-valid_hole_fits
-valid_hole_fits_interactions
