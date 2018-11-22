@@ -68,6 +68,8 @@ import qualified Lexer
 import StringBuffer
 import Outputable hiding ( printForUser, printForUserPartWay )
 
+import DynamicLoading ( initializePlugins )
+
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )
 import Config
@@ -2721,10 +2723,14 @@ newDynFlags interactive_only minus_opts = do
 
       when (interactive_only && packageFlagsChanged idflags1 idflags0) $ do
           liftIO $ hPutStrLn stderr "cannot set package flags with :seti; use :set"
-      GHC.setInteractiveDynFlags idflags1
+      -- Load any new plugins
+      hsc_env0 <- GHC.getSession
+      idflags2 <- liftIO (initializePlugins hsc_env0 idflags1)
+      GHC.setInteractiveDynFlags idflags2
       installInteractivePrint (interactivePrint idflags1) False
 
       dflags0 <- getDynFlags
+
       when (not interactive_only) $ do
         (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
         new_pkgs <- GHC.setProgramDynFlags dflags1
