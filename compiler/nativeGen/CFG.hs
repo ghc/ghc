@@ -481,9 +481,13 @@ addNodesBetween m updates =
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.
 getCfgProc :: D.CfgWeights -> RawCmmDecl -> CFG
-getCfgProc _ (CmmData {}) = mapEmpty
-getCfgProc weights (CmmProc _info _lab _live graph) =
-  getCfg weights graph
+getCfgProc _       (CmmData {}) = mapEmpty
+-- Sometimes GHC generates dummy procs which don't actually contain code.
+-- But they might contain bottoms in some fields so we check for an empty
+-- body first. In particular this happens with SplitObjs enabled.
+getCfgProc weights (CmmProc _info _lab _live graph)
+  | null (toBlockList graph) = mapEmpty
+  | otherwise                = getCfg weights graph
 
 
 getCfg :: D.CfgWeights -> CmmGraph -> CFG
