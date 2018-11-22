@@ -586,7 +586,7 @@ rnHsTyKi env (HsFunTy _ ty1 mult ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; (mult', w_fvs) <- rnMult env mult
+       ; (mult', w_fvs) <- rnHsArrow env mult
        ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
        ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
   where
@@ -690,6 +690,12 @@ rnMult env r =
     HsOne  -> return (HsOne, emptyFVs)
     HsOmega -> return (HsOmega, emptyFVs)
     HsMultTy ty -> (\(ty, fvs) -> (HsMultTy ty, fvs)) <$> rnLHsTyKi env ty
+
+rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
+rnHsArrow env HsUnrestrictedArrow = return (HsUnrestrictedArrow, emptyFVs)
+rnHsArrow env HsLinearArrow = return (HsLinearArrow, emptyFVs)
+rnHsArrow env (HsExplicitMult p)
+  = (\(mult, fvs) -> (HsExplicitMult mult, fvs)) <$> rnMult env p
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
@@ -1821,7 +1827,7 @@ extract_lty t_or_k (L _ ty) acc
       HsSumTy _ tys               -> extract_ltys t_or_k tys acc
       HsFunTy _ ty1 w ty2         -> extract_lty t_or_k ty1 $
                                      extract_lty t_or_k ty2 $
-                                     extract_mult t_or_k w acc
+                                     extract_hs_arrow t_or_k w acc
       HsIParamTy _ _ ty           -> extract_lty t_or_k ty acc
       HsOpTy _ ty1 tv ty2         -> extract_tv t_or_k tv   $
                                      extract_lty t_or_k ty1 $
@@ -1849,6 +1855,11 @@ extract_mult :: TypeOrKind -> HsMult GhcPs -> FreeKiTyVarsWithDups ->
                 FreeKiTyVarsWithDups
 extract_mult t_or_k (HsMultTy t) acc = extract_lty t_or_k t acc
 extract_mult t_or_k _ acc = acc
+
+extract_hs_arrow :: TypeOrKind -> HsArrow GhcPs -> FreeKiTyVarsWithDups ->
+                   FreeKiTyVarsWithDups
+extract_hs_arrow t_or_k (HsExplicitMult p) acc = extract_mult t_or_k p acc
+extract_hs_arrow _ _ acc = acc
 
 extractHsTvBndrs :: [LHsTyVarBndr GhcPs]
                  -> FreeKiTyVarsWithDups           -- Free in body

@@ -22,6 +22,7 @@ HsTypes: Abstract syntax: user-defined types
 
 module HsTypes (
         Mult, HsMult(..), HsScaled(..),
+        HsArrow(..), arrowToMult,
         hsLinear, hsUnrestricted, isHsOmega,
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr,
@@ -541,7 +542,7 @@ data HsType pass
 
   | HsFunTy             (XFunTy pass)
                         (LHsType pass)   -- function type
-                        (HsMult pass)
+                        (HsArrow pass)
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
 
@@ -761,7 +762,28 @@ instance Outputable a => Outputable (HsScaled pass a) where
    ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
                           ppr t
 
+-- | Denotes the type of arrows in the surface language
+data HsArrow pass
+  = HsUnrestrictedArrow
+    -- ^ a -> b
+  | HsLinearArrow
+    -- ^ a ->. b
+  | HsExplicitMult (HsMult pass)
+    -- ^ a -->.(m) b (very much including `a -->.(Omega) b`! This is how the
+    -- programmer wrote it.)
 
+-- | Convert an arrow into its corresponding multiplicity. In essence this
+-- erases the information of whether the programmer wrote an explicit
+-- multiplicity or a shorthand.
+arrowToMult :: HsArrow pass -> HsMult pass
+arrowToMult HsUnrestrictedArrow = HsOmega
+arrowToMult HsLinearArrow = HsOne
+arrowToMult (HsExplicitMult p) = p
+
+instance
+      (OutputableBndrId (GhcPass pass)) =>
+      Outputable (HsArrow (GhcPass pass)) where
+  ppr mult = ppr (arrowToMult mult)
 
 newtype HsWildCardInfo        -- See Note [The wildcard story for types]
     = AnonWildCard (Located Name)
@@ -1103,7 +1125,7 @@ splitHsFunType (L _ (HsParTy _ ty))
 
 splitHsFunType (L _ (HsFunTy _ x mult y))
   | (args, res) <- splitHsFunType y
-  = ((HsScaled mult x):args, res)
+  = ((HsScaled (arrowToMult mult) x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
@@ -1485,15 +1507,14 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId (GhcPass p))
-           => LHsType (GhcPass p) -> HsMult (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+           => LHsType (GhcPass p) -> HsArrow (GhcPass p) -> LHsType (GhcPass p) -> SDoc
 ppr_fun_ty ty1 mult ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
         arr = case mult of
-          HsZero -> text "->_0"
-          HsOne -> text "⊸"
-          HsOmega -> text "->"
-          HsMultTy ty -> text "->{" <> ppr_mono_lty ty <> text "}"
+          HsLinearArrow -> text "->."
+          HsUnrestrictedArrow -> text "->"
+          HsExplicitMult p -> text "->{" <> ppr p <> text "}"
     in
     sep [p1, arr <+> p2]
 
