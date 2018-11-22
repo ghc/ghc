@@ -4,13 +4,13 @@ TYPE CONSTRUCTORS
   type role F nominal nominal
   F :: * -> * -> *
 COERCION AXIOMS
-  axiom TypeFamilyInstanceLHS.D:R:FBool_ ::
-    F Bool _ = Bool -- Defined at TypeFamilyInstanceLHS.hs:8:15
-  axiom TypeFamilyInstanceLHS.D:R:FInt_ ::
-    F Int _ = Int -- Defined at TypeFamilyInstanceLHS.hs:7:15
+  axiom TypeFamilyInstanceLHS.D:R:FBool_1 ::
+    F Bool _1 = Bool -- Defined at TypeFamilyInstanceLHS.hs:8:15
+  axiom TypeFamilyInstanceLHS.D:R:FInt_1 ::
+    F Int _1 = Int -- Defined at TypeFamilyInstanceLHS.hs:7:15
 FAMILY INSTANCES
-  type instance F Int _
-  type instance F Bool _
+  type instance F Int _1
+  type instance F Bool _1
 Dependent modules: []
 Dependent packages: [base-4.12.0.0, ghc-prim-0.5.3,
                      integer-gmp-1.0.2.0]

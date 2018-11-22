@@ -1713,10 +1713,10 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
         do { let -- eta-expand lhs types, because sometimes data/newtype
                  -- instances are eta-reduced; See Trac #9692
                  -- See Note [Eta reduction for data families] in FamInstEnv
-                 (ee_tvs, ee_lhs) = etaExpandFamInstLHS fam_tvs lhs rhs
-                 fam'             = reifyName fam
-                 dataCons         = tyConDataCons rep_tc
-                 isGadt           = isGadtSyntaxTyCon rep_tc
+                 (ee_tvs, ee_lhs, _) = etaExpandFamInst fam_tvs lhs rhs
+                 fam'                = reifyName fam
+                 dataCons            = tyConDataCons rep_tc
+                 isGadt              = isGadtSyntaxTyCon rep_tc
            ; th_tvs <- reifyTyVarsToMaybe ee_tvs
            ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys ee_tvs)) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc ee_lhs

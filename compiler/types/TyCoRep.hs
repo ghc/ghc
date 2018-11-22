@@ -61,7 +61,7 @@ module TyCoRep (
         pickLR,
 
         -- * Pretty-printing
-        pprType, pprParendType, pprPrecType,
+        pprType, pprParendType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
@@ -3122,11 +3122,14 @@ pprType       = pprPrecType topPrec
 pprParendType = pprPrecType appPrec
 
 pprPrecType :: PprPrec -> Type -> SDoc
-pprPrecType prec ty
+pprPrecType = pprPrecTypeX emptyTidyEnv
+
+pprPrecTypeX :: TidyEnv -> PprPrec -> Type -> SDoc
+pprPrecTypeX env prec ty
   = getPprStyle $ \sty ->
     if debugStyle sty           -- Use pprDebugType when in
     then debug_ppr_ty prec ty   -- when in debug-style
-    else pprPrecIfaceType prec (tidyToIfaceTypeSty ty sty)
+    else pprPrecIfaceType prec (tidyToIfaceTypeStyX env ty sty)
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
@@ -3135,22 +3138,25 @@ pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
-tidyToIfaceTypeSty :: Type -> PprStyle -> IfaceType
-tidyToIfaceTypeSty ty sty
-  | userStyle sty = tidyToIfaceType ty
+tidyToIfaceTypeStyX :: TidyEnv -> Type -> PprStyle -> IfaceType
+tidyToIfaceTypeStyX env ty sty
+  | userStyle sty = tidyToIfaceTypeX env ty
   | otherwise     = toIfaceTypeX (tyCoVarsOfType ty) ty
      -- in latter case, don't tidy, as we'll be printing uniques.
 
 tidyToIfaceType :: Type -> IfaceType
+tidyToIfaceType = tidyToIfaceTypeX emptyTidyEnv
+
+tidyToIfaceTypeX :: TidyEnv -> Type -> IfaceType
 -- It's vital to tidy before converting to an IfaceType
 -- or nested binders will become indistinguishable!
 --
 -- Also for the free type variables, tell toIfaceTypeX to
 -- leave them as IfaceFreeTyVar.  This is super-important
 -- for debug printing.
-tidyToIfaceType ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env ty)
+tidyToIfaceTypeX env ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env' ty)
   where
-    env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
+    env'      = tidyFreeTyCoVars env free_tcvs
     free_tcvs = tyCoVarsOfTypeWellScoped ty
 
 ------------

@@ -7,7 +7,7 @@
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,
-        etaExpandFamInstLHS,
+        etaExpandFamInst,
         pprFamInst, pprFamInsts,
         mkImportedFamInst,
 
