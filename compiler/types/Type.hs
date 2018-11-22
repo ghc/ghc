@@ -204,7 +204,7 @@ module Type (
         pprType, pprParendType, pprPrecType,
         pprTypeApp, pprTyThingCategory, pprShortTyThing,
         pprTCvBndr, pprTCvBndrs, pprForAll, pprUserForAll,
-        pprSigmaType, ppSuggestExplicitKinds,
+        pprSigmaType, pprWithExplicitKindsWhen,
         pprTheta, pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprSourceTyCon,
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
@@ -1617,6 +1617,8 @@ appTyArgFlags ty = fun_kind_arg_flags (typeKind ty)
 fun_kind_arg_flags :: Kind -> [Type] -> [ArgFlag]
 fun_kind_arg_flags = go emptyTCvSubst
   where
+    go subst ki arg_tys
+      | Just ki' <- coreView ki = go subst ki' arg_tys
     go _ _ [] = []
     go subst (ForAllTy (Bndr tv argf) res_ki) (arg_ty:arg_tys)
       = argf : go subst' res_ki arg_tys

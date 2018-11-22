@@ -69,7 +69,7 @@ module TyCoRep (
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
-        pprDataCons, ppSuggestExplicitKinds,
+        pprDataCons, pprWithExplicitKindsWhen,
 
         pprCo, pprParendCo,
 
@@ -3356,13 +3356,14 @@ pprTypeApp tc tys
     -- TODO: toIfaceTcArgs seems rather wasteful here
 
 ------------------
-ppSuggestExplicitKinds :: SDoc
--- Print a helpful suggstion about -fprint-explicit-kinds,
--- if it is not already on
-ppSuggestExplicitKinds
-  = sdocWithDynFlags $ \ dflags ->
-    ppUnless (gopt Opt_PrintExplicitKinds dflags) $
-    text "Use -fprint-explicit-kinds to see the kind arguments"
+-- | Display all kind information (with @-fprint-explicit-kinds@) when the
+-- provided 'Bool' argument is 'True'.
+-- See @Note [Kind arguments in error messages]@ in "TcErrors".
+pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
+pprWithExplicitKindsWhen b
+  = updSDocDynFlags $ \dflags ->
+      if b then gopt_set dflags Opt_PrintExplicitKinds
+           else dflags
 
 {-
 %************************************************************************

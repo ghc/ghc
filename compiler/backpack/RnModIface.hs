@@ -740,6 +740,6 @@ rnIfaceForAllBndr :: Rename IfaceForAllBndr
 rnIfaceForAllBndr (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis
 
 rnIfaceAppArgs :: Rename IfaceAppArgs
-rnIfaceAppArgs (IA_Invis t ts) = IA_Invis <$> rnIfaceType t <*> rnIfaceAppArgs ts
-rnIfaceAppArgs (IA_Vis t ts) = IA_Vis <$> rnIfaceType t <*> rnIfaceAppArgs ts
+rnIfaceAppArgs (IA_Arg t a ts) = IA_Arg <$> rnIfaceType t <*> pure a
+                                        <*> rnIfaceAppArgs ts
 rnIfaceAppArgs IA_Nil = pure IA_Nil

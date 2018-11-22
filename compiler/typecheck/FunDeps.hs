@@ -394,7 +394,9 @@ checkInstCoverage be_liberal clas theta inst_taus
 
          undet_set = fold undetermined_tvs
 
-         msg = vcat [ -- text "ls_tvs" <+> ppr ls_tvs
+         msg = pprWithExplicitKindsWhen
+                 (isEmptyVarSet $ pSnd undetermined_tvs) $
+               vcat [ -- text "ls_tvs" <+> ppr ls_tvs
                       -- , text "closed ls_tvs" <+> ppr (closeOverKinds ls_tvs)
                       -- , text "theta" <+> ppr theta
                       -- , text "oclose" <+> ppr (oclose theta (closeOverKinds ls_tvs))
@@ -414,8 +416,6 @@ checkInstCoverage be_liberal clas theta inst_taus
                             <+> pprQuotedList rs ]
                     , text "Un-determined variable" <> pluralVarSet undet_set <> colon
                             <+> pprVarSet undet_set (pprWithCommas ppr)
-                    , ppWhen (isEmptyVarSet $ pSnd undetermined_tvs) $
-                      ppSuggestExplicitKinds
                     , ppWhen (not be_liberal &&
                               and (isEmptyVarSet <$> liberal_undet_tvs)) $
                       text "Using UndecidableInstances might help" ]

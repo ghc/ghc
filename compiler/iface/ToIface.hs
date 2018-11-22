@@ -305,14 +305,13 @@ toIfaceAppArgsX fr kind ty_args
       | Just ty' <- coreView ty
       = go env ty' ts
     go env (ForAllTy (Bndr tv vis) res) (t:ts)
-      | isVisibleArgFlag vis = IA_Vis   t' ts'
-      | otherwise            = IA_Invis t' ts'
+      = IA_Arg t' vis ts'
       where
         t'  = toIfaceTypeX fr t
         ts' = go (extendTCvSubst env tv t) res ts
 
     go env (FunTy _ res) (t:ts) -- No type-class args in tycon apps
-      = IA_Vis (toIfaceTypeX fr t) (go env res ts)
+      = IA_Arg (toIfaceTypeX fr t) Required (go env res ts)
 
     go env ty ts@(t1:ts1)
       | not (isEmptyTCvSubst env)
@@ -326,7 +325,7 @@ toIfaceAppArgsX fr kind ty_args
         -- carry on as if it were FunTy.  Without the test for
         -- isEmptyTCvSubst we'd get an infinite loop (Trac #15473)
         WARN( True, ppr kind $$ ppr ty_args )
-        IA_Vis (toIfaceTypeX fr t1) (go env ty ts1)
+        IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)

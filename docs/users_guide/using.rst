@@ -306,7 +306,7 @@ The available mode flags are:
     :shortdesc: Stop after generating C (``.hc`` file)
     :type: mode
     :category: phases
-    
+
     Stop after generating C (``.hc`` file)
 
 .. ghc-flag:: -S
@@ -320,7 +320,7 @@ The available mode flags are:
     :shortdesc: Stop after generating object (``.o``) file
     :type: mode
     :category: phases
-    
+
     Stop after generating object (``.o``) file
 
     This is the traditional batch-compiler mode, in which GHC can
@@ -770,7 +770,7 @@ messages and in GHCi:
 
     This flag also enables the printing of *inferred* type variables
     inside braces. See :ref:`inferred-vs-specified`.
-		   
+
 .. ghc-flag:: -fprint-explicit-kinds
     :shortdesc: Print explicit kind foralls and kind arguments in types.
         See also :ghc-flag:`-XKindSignatures`
@@ -785,15 +785,27 @@ messages and in GHCi:
     .. code-block:: none
 
            ghci> :set -XPolyKinds
-           ghci> data T a = MkT
+           ghci> data T a (b :: l) = MkT
            ghci> :t MkT
-           MkT :: forall (k :: Type) (a :: k). T a
+           MkT :: forall k l (a :: k) (b :: l). T a b
            ghci> :set -fprint-explicit-kinds
            ghci> :t MkT
-           MkT :: forall (k :: Type) (a :: k). T k a
+           MkT :: forall k l (a :: k) (b :: l). T @{k} @l a b
            ghci> :set -XNoPolyKinds
            ghci> :t MkT
-           MkT :: T * a
+           MkT :: T @{*} @* a b
+
+    In the output above, observe that ``T`` has two kind variables
+    (``k`` and ``l``) and two type variables (``a`` and ``b``). Note that
+    ``k`` is an *inferred* variable and ``l`` is a *specified* variable
+    (see :ref:`inferred-vs-specified`), so as a result, they are displayed
+    using slightly different syntax in the type ``T @{k} @l a b``. The
+    application of ``l`` (with ``@l``) is the standard syntax for visible
+    type application (see :ref:`visible-type-application`). The application
+    of ``k`` (with ``@{k}``), however, uses a hypothetical syntax for visible
+    type application of inferred type variables. This syntax is not currently
+    exposed to the programmer, but it is nevertheless displayed when
+    :ghc-flag:`-fprint-explicit-kinds` is enabled.
 
 .. ghc-flag:: -fprint-explicit-runtime-reps
     :shortdesc: Print ``RuntimeRep`` variables in types which are

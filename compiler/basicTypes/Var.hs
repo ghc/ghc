@@ -385,7 +385,7 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 -- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
 data ArgFlag = Inferred | Specified | Required
   deriving (Eq, Ord, Data)
-  -- (<) on ArgFlag meant "is less visible than"
+  -- (<) on ArgFlag means "is less visible than"
 
 -- | Does this 'ArgFlag' classify an argument that is written in Haskell?
 isVisibleArgFlag :: ArgFlag -> Bool
