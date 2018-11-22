@@ -17,7 +17,7 @@ module ToIface
     , toIfaceTyCon
     , toIfaceTyCon_name
     , toIfaceTyLit
-    , toIfaceRig
+    , toIfaceMult
       -- * Tidying types
     , tidyToIfaceType
     , tidyToIfaceContext
@@ -90,7 +90,7 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( toIfaceRig (idWeight covar)  
+toIfaceIdBndrX fr covar = ( toIfaceMult (idWeight covar)  
                           , occNameFS (getOccName covar)
                           , toIfaceTypeX fr (varType covar)
                           )
@@ -145,7 +145,7 @@ toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
 toIfaceTypeX fr (FunTy w t1 t2)
   | isPredTy t1 && w `eqMult` Omega   = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
-  | otherwise                   = IfaceFunTy (toIfaceRig w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+  | otherwise                   = IfaceFunTy (toIfaceMult w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -186,8 +186,8 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
-toIfaceRig :: Mult -> IfaceRig
-toIfaceRig = toIfaceType . fromMult
+toIfaceMult :: Mult -> IfaceMult
+toIfaceMult = toIfaceType . fromMult
 
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon

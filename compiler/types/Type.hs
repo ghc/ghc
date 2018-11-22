@@ -153,7 +153,7 @@ module Type (
         closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
         closeOverKinds,
 
-        noFreeVarsOfType, noFreeVarsOfRig, noFreeVarsOfVarMult,
+        noFreeVarsOfType, noFreeVarsOfMult, noFreeVarsOfVarMult,
         splitVisVarsOfType, splitVisVarsOfTypes,
         expandTypeSynonyms,
         typeSize, occCheckExpand,
@@ -207,7 +207,7 @@ module Type (
         substVarBndr, substVarBndrs,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        substRigUnchecked, substVarMult,
+        substMultUnchecked, substVarMult,
 
         -- * Pretty-printing
         pprType, pprParendType, pprPrecType,
@@ -566,7 +566,7 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (TyConApp tc tys)
       = do { tc' <- tycon tc
            ; mktyconapp tc' <$> mapM go tys }
-    go (FunTy w arg res)   = FunTy <$> go_rig w <*> go arg <*> go res
+    go (FunTy w arg res)   = FunTy <$> go_mult w <*> go arg <*> go res
     go (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
            ; inner' <- mapType mapper env' inner
@@ -575,8 +575,8 @@ mapType mapper@(TyCoMapper { tcm_smart = smart, tcm_tyvar = tyvar
     go (CastTy ty co)  = mkcastty <$> go ty <*> mapCoercion mapper env co
     go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
 
-    go_rig (RigThing t) = toMult <$> go t
-    go_rig t = pure t
+    go_mult (RigThing t) = toMult <$> go t
+    go_mult t = pure t
 
     (mktyconapp, mkappty, mkcastty)
       | smart     = (mkTyConApp, mkAppTy, mkCastTy)
@@ -2689,7 +2689,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy w1 s1 t1) (FunTy w2 s2 t2)
-      = go_rig env w1 w2 `thenCmpTy`
+      = go_mult env w1 w2 `thenCmpTy`
         go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
@@ -2714,8 +2714,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
             get_rank (ForAllTy {})   = 7
 
 
-    go_rig :: RnEnv2 -> Mult -> Mult -> TypeOrdering
-    go_rig env r1 r2 =
+    go_mult :: RnEnv2 -> Mult -> Mult -> TypeOrdering
+    go_mult env r1 r2 =
       if r1 `eqMult` r2
         then TEQ
         else

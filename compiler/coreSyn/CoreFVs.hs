@@ -716,7 +716,7 @@ freeVars = go
       | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs `unionFVs` rig_vars, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
-        rig_vars = tyCoVarsOfRigDSet (idWeight v)
+        rig_vars = tyCoVarsOfMultDSet (idWeight v)
         ty_fvs = dVarTypeTyCoVars v
                  -- See Note [The FVAnn invariant]
 
@@ -729,7 +729,7 @@ freeVars = go
         b_ty  = idType b
         b_w   = idWeight b
         b_fvs = tyCoVarsOfTypeDSet b_ty
-        w_fvs = tyCoVarsOfRigDSet b_w
+        w_fvs = tyCoVarsOfMultDSet b_w
                 -- See Note [The FVAnn invariant]
 
     go (App fun arg)

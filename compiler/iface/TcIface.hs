@@ -933,7 +933,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                 -- the argument types was recursively defined.
                 -- See also Note [Tying the knot]
                 ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                           $ mapM (\(w, ty) -> mkScaled <$> tcIfaceRig w <*> tcIfaceType ty) args
+                           $ mapM (\(w, ty) -> mkScaled <$> tcIfaceMult w <*> tcIfaceType ty) args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1137,7 +1137,7 @@ tcIfaceType = go
     go (IfaceTyVar n)         = TyVarTy <$> tcIfaceTyVar n
     go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy w t1 t2)     = FunTy <$> tcIfaceRig w <*> go t1 <*> go t2
+    go (IfaceFunTy w t1 t2)     = FunTy <$> tcIfaceMult w <*> go t1 <*> go t2
     go (IfaceDFunTy t1 t2)    = FunTy Omega <$> go t1 <*> go t2
     go (IfaceTupleTy s i tks) = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
@@ -1154,8 +1154,8 @@ tcIfaceType = go
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
 
-tcIfaceRig :: IfaceType -> IfL Mult
-tcIfaceRig if_ty = toMult <$> tcIfaceType if_ty
+tcIfaceMult :: IfaceType -> IfL Mult
+tcIfaceMult if_ty = toMult <$> tcIfaceType if_ty
 
 tcIfaceTupleTy :: TupleSort -> IsPromoted -> IfaceAppArgs -> IfL Type
 tcIfaceTupleTy sort is_promoted args
@@ -1730,7 +1730,7 @@ bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
 bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
-        ; w' <- tcIfaceRig w
+        ; w' <- tcIfaceMult w
         ; let id = mkLocalIdOrCoVar name (Regular w') ty'
         ; extendIfaceIdEnv [id] (thing_inside id) }
 

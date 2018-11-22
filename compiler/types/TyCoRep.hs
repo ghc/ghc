@@ -79,7 +79,7 @@ module TyCoRep (
         debugPprType,
 
         -- * Free variables
-        tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfRigDSet,
+        tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfMultDSet,
         tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
         tyCoFVsBndr, tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
@@ -92,7 +92,7 @@ module TyCoRep (
         almostDevoidCoVarOfCo,
         injectiveVarsOfBinder, injectiveVarsOfType,
 
-        noFreeVarsOfType, noFreeVarsOfCo, noFreeVarsOfRig,
+        noFreeVarsOfType, noFreeVarsOfCo, noFreeVarsOfMult,
         noFreeVarsOfVarMult,
 
         -- * Substitutions
@@ -134,7 +134,7 @@ module TyCoRep (
         substVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
 
-        substRigUnchecked, substVarMult,
+        substMultUnchecked, substVarMult,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -1758,13 +1758,13 @@ tyCoVarsOfType ty = ty_co_vars_of_type ty emptyVarSet emptyVarSet
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
 tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
 
-ty_co_vars_of_rig :: Mult -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_rig Zero         is acc = acc
-ty_co_vars_of_rig One          is acc = acc
-ty_co_vars_of_rig Omega        is acc = acc
-ty_co_vars_of_rig (RigAdd x y) is acc = ty_co_vars_of_rig x is (ty_co_vars_of_rig y is acc)
-ty_co_vars_of_rig (RigMul x y) is acc = ty_co_vars_of_rig x is (ty_co_vars_of_rig y is acc)
-ty_co_vars_of_rig (RigThing x) is acc = ty_co_vars_of_type x is acc
+ty_co_vars_of_mult :: Mult -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
+ty_co_vars_of_mult Zero         is acc = acc
+ty_co_vars_of_mult One          is acc = acc
+ty_co_vars_of_mult Omega        is acc = acc
+ty_co_vars_of_mult (RigAdd x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
+ty_co_vars_of_mult (RigMul x y) is acc = ty_co_vars_of_mult x is (ty_co_vars_of_mult y is acc)
+ty_co_vars_of_mult (RigThing x) is acc = ty_co_vars_of_type x is acc
 
 ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_type (TyVarTy v) is acc
@@ -1777,7 +1777,7 @@ ty_co_vars_of_type (TyVarTy v) is acc
 ty_co_vars_of_type (TyConApp _ tys)   is acc = ty_co_vars_of_types tys is acc
 ty_co_vars_of_type (LitTy {})         _  acc = acc
 ty_co_vars_of_type (AppTy fun arg)    is acc = ty_co_vars_of_type fun is (ty_co_vars_of_type arg is acc)
-ty_co_vars_of_type (FunTy w arg res)  is acc = ty_co_vars_of_rig w is (ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc))
+ty_co_vars_of_type (FunTy w arg res)  is acc = ty_co_vars_of_mult w is (ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc))
 ty_co_vars_of_type (ForAllTy (Bndr tv _) ty) is acc = ty_co_vars_of_type (varType tv) is $
                                                       ty_co_vars_of_type ty (extendVarSet is tv) acc
 ty_co_vars_of_type (CastTy ty co)     is acc = ty_co_vars_of_type ty is (ty_co_vars_of_co co is acc)
@@ -1864,8 +1864,8 @@ tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
-tyCoVarsOfRigDSet :: Mult -> DTyCoVarSet
-tyCoVarsOfRigDSet r = fvDVarSet $ tyCoFVsOfRig r
+tyCoVarsOfMultDSet :: Mult -> DTyCoVarSet
+tyCoVarsOfMultDSet r = fvDVarSet $ tyCoFVsOfRig r
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
@@ -2111,17 +2111,17 @@ almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
 almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
 
-almost_devoid_co_var_of_rig :: Mult -> CoVar -> Bool
-almost_devoid_co_var_of_rig Zero _ = False
-almost_devoid_co_var_of_rig One _ = False
-almost_devoid_co_var_of_rig Omega _ = False
-almost_devoid_co_var_of_rig (RigAdd x y) cv
-  = almost_devoid_co_var_of_rig x cv
-  && almost_devoid_co_var_of_rig y cv
-almost_devoid_co_var_of_rig (RigMul x y) cv
-  = almost_devoid_co_var_of_rig x cv
-  && almost_devoid_co_var_of_rig y cv
-almost_devoid_co_var_of_rig (RigThing x) cv
+almost_devoid_co_var_of_mult :: Mult -> CoVar -> Bool
+almost_devoid_co_var_of_mult Zero _ = False
+almost_devoid_co_var_of_mult One _ = False
+almost_devoid_co_var_of_mult Omega _ = False
+almost_devoid_co_var_of_mult (RigAdd x y) cv
+  = almost_devoid_co_var_of_mult x cv
+  && almost_devoid_co_var_of_mult y cv
+almost_devoid_co_var_of_mult (RigMul x y) cv
+  = almost_devoid_co_var_of_mult x cv
+  && almost_devoid_co_var_of_mult y cv
+almost_devoid_co_var_of_mult (RigThing x) cv
   = almost_devoid_co_var_of_type x cv
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
@@ -2133,7 +2133,7 @@ almost_devoid_co_var_of_type (AppTy fun arg) cv
   = almost_devoid_co_var_of_type fun cv
   && almost_devoid_co_var_of_type arg cv
 almost_devoid_co_var_of_type (FunTy w arg res) cv
-  = almost_devoid_co_var_of_rig w cv
+  = almost_devoid_co_var_of_mult w cv
   && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
@@ -2197,21 +2197,21 @@ noFreeVarsOfType (TyVarTy _)      = False
 noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
 noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
 noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
-noFreeVarsOfType (FunTy w t1 t2)  = noFreeVarsOfRig w
+noFreeVarsOfType (FunTy w t1 t2)  = noFreeVarsOfMult w
                                       && noFreeVarsOfType t1
                                       && noFreeVarsOfType t2
 noFreeVarsOfType (LitTy _)        = True
 noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
 noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
 
-noFreeVarsOfRig :: Mult -> Bool
-noFreeVarsOfRig (RigThing ty) = noFreeVarsOfType ty
-noFreeVarsOfRig (RigAdd m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
-noFreeVarsOfRig (RigMul m1 m2) = noFreeVarsOfRig m1 && noFreeVarsOfRig m2
-noFreeVarsOfRig _ = True
+noFreeVarsOfMult :: Mult -> Bool
+noFreeVarsOfMult (RigThing ty) = noFreeVarsOfType ty
+noFreeVarsOfMult (RigAdd m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
+noFreeVarsOfMult (RigMul m1 m2) = noFreeVarsOfMult m1 && noFreeVarsOfMult m2
+noFreeVarsOfMult _ = True
 
 noFreeVarsOfVarMult :: VarMult -> Bool
-noFreeVarsOfVarMult (Regular w) = noFreeVarsOfRig w
+noFreeVarsOfVarMult (Regular w) = noFreeVarsOfMult w
 noFreeVarsOfVarMult Alias = True
 
 noFreeVarsOfMCo :: MCoercion -> Bool
@@ -2838,13 +2838,13 @@ substTy subst ty
   | otherwise             = checkValidSubst subst [ty] [] $
                             subst_ty subst ty
 
-substRigUnchecked :: TCvSubst -> Mult -> Mult
-substRigUnchecked subst r
+substMultUnchecked :: TCvSubst -> Mult -> Mult
+substMultUnchecked subst r
   | isEmptyTCvSubst subst = r
-  | otherwise             = subst_rig subst r
+  | otherwise             = subst_mult subst r
 
 substVarMult :: TCvSubst -> VarMult -> VarMult
-substVarMult subst (Regular w) = Regular $ substRigUnchecked subst w
+substVarMult subst (Regular w) = Regular $ substMultUnchecked subst w
 substVarMult _ Alias = Alias
 
 -- | Substitute within a 'Type' disabling the sanity checks.
@@ -2905,7 +2905,7 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go (FunTy w arg res) = ((FunTy $! subst_rig subst w) $! go arg) $! go res
+    go (FunTy w arg res) = ((FunTy $! subst_mult subst w) $! go arg) $! go res
     go (ForAllTy (Bndr tv vis) ty)
                          = case substVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -2915,11 +2915,11 @@ subst_ty subst ty
     go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
-subst_rig :: TCvSubst -> Mult -> Mult
-subst_rig subst (RigThing t) = RigThing (subst_ty subst t)
-subst_rig subst (RigAdd m1 m2) = RigAdd (subst_rig subst m1) (subst_rig subst m2)
-subst_rig subst (RigMul m1 m2) = RigMul (subst_rig subst m1) (subst_rig subst m2)
-subst_rig _ r = r
+subst_mult :: TCvSubst -> Mult -> Mult
+subst_mult subst (RigThing t) = RigThing (subst_ty subst t)
+subst_mult subst (RigAdd m1 m2) = RigAdd (subst_mult subst m1) (subst_mult subst m2)
+subst_mult subst (RigMul m1 m2) = RigMul (subst_mult subst m1) (subst_mult subst m2)
+subst_mult _ r = r
 
 substTyVar :: TCvSubst -> TyVar -> Type
 substTyVar (TCvSubst _ tenv _) tv
