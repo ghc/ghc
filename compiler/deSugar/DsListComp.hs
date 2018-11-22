@@ -8,6 +8,7 @@ Desugaring list comprehensions, monad comprehensions and array comprehensions
 
 {-# LANGUAGE CPP, NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module DsListComp ( dsListComp, dsMonadComp ) where
 
@@ -483,8 +484,8 @@ dsMonadComp :: [ExprLStmt GhcTc] -> DsM CoreExpr
 dsMonadComp stmts = dsMcStmts stmts
 
 dsMcStmts :: [ExprLStmt GhcTc] -> DsM CoreExpr
-dsMcStmts []                    = panic "dsMcStmts"
-dsMcStmts (L loc stmt : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
+dsMcStmts []                          = panic "dsMcStmts"
+dsMcStmts ((dL->L loc stmt) : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
 
 ---------------
 dsMcStmt :: ExprStmt GhcTc -> [ExprLStmt GhcTc] -> DsM CoreExpr
@@ -638,7 +639,7 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
       | otherwise
         = extractMatchResult match (error "It can't fail")
 
-    mk_fail_msg :: DynFlags -> Located e -> String
+    mk_fail_msg :: HasSrcSpan e => DynFlags -> e -> String
     mk_fail_msg dflags pat
         = "Pattern match failure in monad comprehension at " ++
           showPpr dflags (getLoc pat)

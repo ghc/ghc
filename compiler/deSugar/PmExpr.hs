@@ -5,6 +5,7 @@ Haskell expressions (as used by the pattern matching checker) and utilities.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module PmExpr (
         PmExpr(..), PmLit(..), SimpleEq, ComplexEq, toComplex, eqPmLit,
@@ -235,7 +236,7 @@ substComplexEq x e (ex, ey)
 -- ** Lift source expressions (HsExpr Id) to PmExpr
 
 lhsExprToPmExpr :: LHsExpr GhcTc -> PmExpr
-lhsExprToPmExpr (L _ e) = hsExprToPmExpr e
+lhsExprToPmExpr (dL->L _ e) = hsExprToPmExpr e
 
 hsExprToPmExpr :: HsExpr GhcTc -> PmExpr
 
@@ -255,21 +256,21 @@ hsExprToPmExpr (HsLit     _ lit)
   = stringExprToList src s
   | otherwise = PmExprLit (PmSLit lit)
 
-hsExprToPmExpr e@(NegApp _ (L _ neg_expr) _)
+hsExprToPmExpr e@(NegApp _ (dL->L _ neg_expr) _)
   | PmExprLit (PmOLit False olit) <- hsExprToPmExpr neg_expr
     -- NB: DON'T simply @(NegApp (NegApp olit))@ as @x@. when extension
     -- @RebindableSyntax@ enabled, (-(-x)) may not equals to x.
   = PmExprLit (PmOLit True olit)
   | otherwise = PmExprOther e
 
-hsExprToPmExpr (HsPar _ (L _ e)) = hsExprToPmExpr e
+hsExprToPmExpr (HsPar _ (dL->L _ e)) = hsExprToPmExpr e
 
 hsExprToPmExpr e@(ExplicitTuple _ ps boxity)
   | all tupArgPresent ps = mkPmExprData tuple_con tuple_args
   | otherwise            = PmExprOther e
   where
     tuple_con  = tupleDataCon boxity (length ps)
-    tuple_args = [ lhsExprToPmExpr e | L _ (Present _ e) <- ps ]
+    tuple_args = [ lhsExprToPmExpr e | (dL->L _ (Present _ e)) <- ps ]
 
 hsExprToPmExpr e@(ExplicitList _  mb_ol elems)
   | Nothing <- mb_ol = foldr cons nil (map lhsExprToPmExpr elems)

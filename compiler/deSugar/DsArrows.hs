@@ -8,6 +8,7 @@ Desugaring arrow commands
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module DsArrows ( dsProcExpr ) where
 
@@ -19,7 +20,9 @@ import Match
 import DsUtils
 import DsMonad
 
-import HsSyn    hiding (collectPatBinders, collectPatsBinders, collectLStmtsBinders, collectLStmtBinders, collectStmtBinders )
+import HsSyn    hiding (collectPatBinders, collectPatsBinders,
+                        collectLStmtsBinders, collectLStmtBinders,
+                        collectStmtBinders )
 import TcHsSyn
 import qualified HsUtils
 
@@ -28,7 +31,8 @@ import qualified HsUtils
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
+import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
+                               dsSyntaxExpr )
 
 import TcType
 import Type ( splitPiTy )
@@ -103,7 +107,8 @@ mkCmdEnv tc_meths
   where
     mk_bind (std_name, expr)
       = do { rhs <- dsExpr expr
-           ; id <- newSysLocalDs (exprType rhs)  -- no check needed; these are functions
+           ; id <- newSysLocalDs (exprType rhs)
+           -- no check needed; these are functions
            ; return (NonRec id rhs, (std_name, id)) }
 
     unmaybe Nothing name = pprPanic "mkCmdEnv" (text "Not found:" <+> ppr name)
@@ -312,10 +317,11 @@ dsProcExpr
         :: LPat GhcTc
         -> LHsCmdTop GhcTc
         -> DsM CoreExpr
-dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
+dsProcExpr pat (dL->L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
     let locals = mkVarSet (collectPatBinders pat)
-    (core_cmd, _free_vars, env_ids) <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
+    (core_cmd, _free_vars, env_ids)
+       <- dsfixCmd meth_ids locals unitTy cmd_ty cmd
     let env_ty = mkBigCoreVarTupTy env_ids
     let env_stk_ty = mkCorePairTy env_ty unitTy
     let env_stk_expr = mkCorePairExpr (mkBigCoreVarTup env_ids) mkCoreUnitExpr
@@ -327,7 +333,7 @@ dsProcExpr pat (L _ (HsCmdTop (CmdTopTc _unitTy cmd_ty ids) cmd)) = do
                     (Lam var match_code)
                     core_cmd
     return (mkLets meth_binds proc_code)
-dsProcExpr _ (L _ XCmdTop{}) = panic "dsProcExpr"
+dsProcExpr _ _ = panic "dsProcExpr"
 
 {-
 Translation of a command judgement of the form
@@ -450,14 +456,15 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp _ cmd arg) env_ids = do
 
 dsCmd ids local_vars stack_ty res_ty
         (HsCmdLam _ (MG { mg_alts
-          = L _ [L _ (Match { m_pats  = pats
-                            , m_grhss = GRHSs _ [L _ (GRHS _ [] body)] _ })] }))
+          = (dL->L _ [dL->L _ (Match { m_pats  = pats
+                       , m_grhss = GRHSs _ [dL->L _ (GRHS _ [] body)] _ })]) }))
         env_ids = do
     let pat_vars = mkVarSet (collectPatsBinders pats)
     let
         local_vars' = pat_vars `unionVarSet` local_vars
         (pat_tys, stack_ty') = splitTypeAt (length pats) stack_ty
-    (core_body, free_vars, env_ids') <- dsfixCmd ids local_vars' stack_ty' res_ty body
+    (core_body, free_vars, env_ids')
+       <- dsfixCmd ids local_vars' stack_ty' res_ty body
     param_ids <- mapM newSysLocalDsNoLP pat_tys
     stack_id' <- newSysLocalDs stack_ty'
 
@@ -472,7 +479,8 @@ dsCmd ids local_vars stack_ty res_ty
 
     fail_expr <- mkFailExpr LambdaExpr in_ty'
     -- match the patterns against the parameters
-    match_code <- matchSimplys (map Var param_ids) LambdaExpr pats core_expr fail_expr
+    match_code <- matchSimplys (map Var param_ids) LambdaExpr pats core_expr
+                    fail_expr
     -- match the parameters against the top of the old stack
     (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code
     -- match the old environment and stack against the input
@@ -496,27 +504,33 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdPar _ cmd) env_ids
 dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
         env_ids = do
     core_cond <- dsLExpr cond
-    (core_then, fvs_then, then_ids) <- dsfixCmd ids local_vars stack_ty res_ty then_cmd
-    (core_else, fvs_else, else_ids) <- dsfixCmd ids local_vars stack_ty res_ty else_cmd
+    (core_then, fvs_then, then_ids)
+       <- dsfixCmd ids local_vars stack_ty res_ty then_cmd
+    (core_else, fvs_else, else_ids)
+       <- dsfixCmd ids local_vars stack_ty res_ty else_cmd
     stack_id   <- newSysLocalDs stack_ty
     either_con <- dsLookupTyCon eitherTyConName
     left_con   <- dsLookupDataCon leftDataConName
     right_con  <- dsLookupDataCon rightDataConName
 
-    let mk_left_expr ty1 ty2 e = mkCoreConApps left_con   [Type ty1, Type ty2, e]
-        mk_right_expr ty1 ty2 e = mkCoreConApps right_con [Type ty1, Type ty2, e]
+    let mk_left_expr ty1 ty2 e = mkCoreConApps left_con   [Type ty1,Type ty2, e]
+        mk_right_expr ty1 ty2 e = mkCoreConApps right_con [Type ty1,Type ty2, e]
 
         in_ty = envStackType env_ids stack_ty
         then_ty = envStackType then_ids stack_ty
         else_ty = envStackType else_ids stack_ty
         sum_ty = mkTyConApp either_con [then_ty, else_ty]
-        fvs_cond = exprFreeIdsDSet core_cond `uniqDSetIntersectUniqSet` local_vars
+        fvs_cond = exprFreeIdsDSet core_cond
+                   `uniqDSetIntersectUniqSet` local_vars
 
-        core_left  = mk_left_expr  then_ty else_ty (buildEnvStack then_ids stack_id)
-        core_right = mk_right_expr then_ty else_ty (buildEnvStack else_ids stack_id)
+        core_left  = mk_left_expr  then_ty else_ty
+                       (buildEnvStack then_ids stack_id)
+        core_right = mk_right_expr then_ty else_ty
+                       (buildEnvStack else_ids stack_id)
 
     core_if <- case mb_fun of
-       Just fun -> do { fun_apps <- dsSyntaxExpr fun [core_cond, core_left, core_right]
+       Just fun -> do { fun_apps <- dsSyntaxExpr fun
+                                      [core_cond, core_left, core_right]
                       ; matchEnvStack env_ids stack_id fun_apps }
        Nothing  -> matchEnvStack env_ids stack_id $
                    mkIfThenElse core_cond core_left core_right
@@ -554,7 +568,7 @@ case bodies, containing the following fields:
 -}
 
 dsCmd ids local_vars stack_ty res_ty
-      (HsCmdCase _ exp (MG { mg_alts = L l matches
+      (HsCmdCase _ exp (MG { mg_alts = (dL->L l matches)
                            , mg_ext = MatchGroupTc arg_tys _
                            , mg_origin = origin }))
       env_ids = do
@@ -566,8 +580,9 @@ dsCmd ids local_vars stack_ty res_ty
     let
         leaves = concatMap leavesMatch matches
         make_branch (leaf, bound_vars) = do
-            (core_leaf, _fvs, leaf_ids) <-
-                  dsfixCmd ids (bound_vars `unionVarSet` local_vars) stack_ty res_ty leaf
+            (core_leaf, _fvs, leaf_ids)
+               <- dsfixCmd ids (bound_vars `unionVarSet` local_vars) stack_ty
+                    res_ty leaf
             return ([mkHsEnvStackExpr leaf_ids stack_id],
                     envStackType leaf_ids stack_ty,
                     core_leaf)
@@ -602,7 +617,7 @@ dsCmd ids local_vars stack_ty res_ty
         in_ty = envStackType env_ids stack_ty
 
     core_body <- dsExpr (HsCase noExt exp
-                         (MG { mg_alts = L l matches'
+                         (MG { mg_alts = cL l matches'
                              , mg_ext = MatchGroupTc arg_tys sum_ty
                              , mg_origin = origin }))
         -- Note that we replace the HsCase result type by sum_ty,
@@ -618,13 +633,14 @@ dsCmd ids local_vars stack_ty res_ty
 --
 --              ---> premap (\ ((xs),stk) -> let binds in ((ys),stk)) c
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(L _ binds) body)
+dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(dL->L _ binds) body)
                                                                     env_ids = do
     let
         defined_vars = mkVarSet (collectLocalBinders binds)
         local_vars' = defined_vars `unionVarSet` local_vars
 
-    (core_body, _free_vars, env_ids') <- dsfixCmd ids local_vars' stack_ty res_ty body
+    (core_body, _free_vars, env_ids')
+       <- dsfixCmd ids local_vars' stack_ty res_ty body
     stack_id <- newSysLocalDs stack_ty
     -- build a new environment, plus the stack, using the let bindings
     core_binds <- dsLocalBinds lbinds (buildEnvStack env_ids' stack_id)
@@ -644,7 +660,8 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(L _ binds) body)
 --
 --              ---> premap (\ (env,stk) -> env) c
 
-dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo stmts_ty (L loc stmts))
+dsCmd ids local_vars stack_ty res_ty do_block@(HsCmdDo stmts_ty
+                                               (dL->L loc stmts))
                                                                    env_ids = do
     putSrcSpanDs loc $
       dsNoLevPoly stmts_ty
@@ -690,18 +707,21 @@ dsTrimCmdArg
         -> DsM (CoreExpr,       -- desugared expression
                 DIdSet)         -- subset of local vars that occur free
 dsTrimCmdArg local_vars env_ids
-                       (L _ (HsCmdTop (CmdTopTc stack_ty cmd_ty ids) cmd )) = do
+                       (dL->L _ (HsCmdTop
+                                 (CmdTopTc stack_ty cmd_ty ids) cmd )) = do
     (meth_binds, meth_ids) <- mkCmdEnv ids
-    (core_cmd, free_vars, env_ids') <- dsfixCmd meth_ids local_vars stack_ty cmd_ty cmd
+    (core_cmd, free_vars, env_ids')
+       <- dsfixCmd meth_ids local_vars stack_ty cmd_ty cmd
     stack_id <- newSysLocalDs stack_ty
-    trim_code <- matchEnvStack env_ids stack_id (buildEnvStack env_ids' stack_id)
+    trim_code
+      <- matchEnvStack env_ids stack_id (buildEnvStack env_ids' stack_id)
     let
         in_ty = envStackType env_ids stack_ty
         in_ty' = envStackType env_ids' stack_ty
         arg_code = if env_ids' == env_ids then core_cmd else
                 do_premap meth_ids in_ty in_ty' cmd_ty trim_code core_cmd
     return (mkLets meth_binds arg_code, free_vars)
-dsTrimCmdArg _ _ (L _ XCmdTop{}) = panic "dsTrimCmdArg"
+dsTrimCmdArg _ _ _ = panic "dsTrimCmdArg"
 
 -- Given D; xs |-a c : stk --> t, builds c with xs fed back.
 -- Typically needs to be prefixed with arr (\(p, stk) -> ((xs),stk))
@@ -759,7 +779,7 @@ dsCmdDo _ _ _ [] _ = panic "dsCmdDo"
 --
 --              ---> premap (\ (xs) -> ((xs), ())) c
 
-dsCmdDo ids local_vars res_ty [L loc (LastStmt _ body _ _)] env_ids = do
+dsCmdDo ids local_vars res_ty [dL->L loc (LastStmt _ body _ _)] env_ids = do
     putSrcSpanDs loc $ dsNoLevPoly res_ty
                          (text "In the command:" <+> ppr body)
     (core_body, env_ids') <- dsLCmd ids local_vars unitTy res_ty body env_ids
@@ -870,13 +890,14 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd _ _) env_ids = do
     env_id <- newSysLocalDs env_ty2
     uniqs <- newUniqueSupply
     let
-        after_c_ty = mkCorePairTy pat_ty env_ty2
-        out_ty = mkBigCoreVarTupTy out_ids
-        body_expr = coreCaseTuple uniqs env_id env_ids2 (mkBigCoreVarTup out_ids)
+       after_c_ty = mkCorePairTy pat_ty env_ty2
+       out_ty = mkBigCoreVarTupTy out_ids
+       body_expr = coreCaseTuple uniqs env_id env_ids2 (mkBigCoreVarTup out_ids)
 
     fail_expr <- mkFailExpr (StmtCtxt DoExpr) out_ty
     pat_id    <- selectSimpleMatchVarL pat
-    match_code <- matchSimply (Var pat_id) (StmtCtxt DoExpr) pat body_expr fail_expr
+    match_code
+      <- matchSimply (Var pat_id) (StmtCtxt DoExpr) pat body_expr fail_expr
     pair_id   <- newSysLocalDs after_c_ty
     let
         proj_expr = Lam pair_id (coreCasePair pair_id pat_id env_id match_code)
@@ -891,7 +912,8 @@ dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd _ _) env_ids = do
                 do_compose ids before_c_ty after_c_ty out_ty
                         (do_first ids in_ty1 pat_ty in_ty2 core_cmd) $
                 do_arr ids after_c_ty out_ty proj_expr,
-              fv_cmd `unionDVarSet` (mkDVarSet out_ids `uniqDSetMinusUniqSet` pat_vars))
+              fv_cmd `unionDVarSet` (mkDVarSet out_ids
+                                     `uniqDSetMinusUniqSet` pat_vars))
 
 -- D; xs' |-a do { ss } : t
 -- --------------------------------------
@@ -1118,7 +1140,8 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 
 leavesMatch :: LMatch GhcTc (Located (body GhcTc))
             -> [(Located (body GhcTc), IdSet)]
-leavesMatch (L _ (Match { m_pats = pats, m_grhss = GRHSs _ grhss (L _ binds) }))
+leavesMatch (dL->L _ (Match { m_pats = pats
+                            , m_grhss = GRHSs _ grhss (dL->L _ binds) }))
   = let
         defined_vars = mkVarSet (collectPatsBinders pats)
                         `unionVarSet`
@@ -1127,9 +1150,8 @@ leavesMatch (L _ (Match { m_pats = pats, m_grhss = GRHSs _ grhss (L _ binds) }))
     [(body,
       mkVarSet (collectLStmtsBinders stmts)
         `unionVarSet` defined_vars)
-    | L _ (GRHS _ stmts body) <- grhss]
-leavesMatch (L _ (Match _ _ _ (XGRHSs _))) = panic "leavesMatch"
-leavesMatch (L _ (XMatch _)) = panic "leavesMatch"
+    | (dL->L _ (GRHS _ stmts body)) <- grhss]
+leavesMatch _ = panic "leavesMatch"
 
 -- Replace the leaf commands in a match
 
@@ -1140,24 +1162,23 @@ replaceLeavesMatch
         -> ([Located (body' GhcTc)],            -- remaining leaf expressions
             LMatch GhcTc (Located (body' GhcTc))) -- updated match
 replaceLeavesMatch _res_ty leaves
-                        (L loc match@(Match { m_grhss = GRHSs x grhss binds }))
+                        (dL->L loc
+                          match@(Match { m_grhss = GRHSs x grhss binds }))
   = let
         (leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (match { m_ext = noExt, m_grhss = GRHSs x grhss' binds }))
-replaceLeavesMatch _ _ (L _ (Match _ _ _ (XGRHSs _)))
-  = panic "replaceLeavesMatch"
-replaceLeavesMatch _ _ (L _ (XMatch _)) = panic "replaceLeavesMatch"
+    (leaves', cL loc (match { m_ext = noExt, m_grhss = GRHSs x grhss' binds }))
+replaceLeavesMatch _ _ _ = panic "replaceLeavesMatch"
 
 replaceLeavesGRHS
         :: [Located (body' GhcTc)]  -- replacement leaf expressions of that type
         -> LGRHS GhcTc (Located (body GhcTc))     -- rhss of a case command
         -> ([Located (body' GhcTc)],              -- remaining leaf expressions
             LGRHS GhcTc (Located (body' GhcTc)))  -- updated GRHS
-replaceLeavesGRHS (leaf:leaves) (L loc (GRHS x stmts _))
-  = (leaves, L loc (GRHS x stmts leaf))
-replaceLeavesGRHS _ (L _ (XGRHS _)) = panic "replaceLeavesGRHS"
+replaceLeavesGRHS (leaf:leaves) (dL->L loc (GRHS x stmts _))
+  = (leaves, cL loc (GRHS x stmts leaf))
 replaceLeavesGRHS [] _ = panic "replaceLeavesGRHS []"
+replaceLeavesGRHS _ _ = panic "replaceLeavesGRHS"
 
 -- Balanced fold of a non-empty list.
 
@@ -1201,14 +1222,14 @@ collectPatsBinders pats = foldr collectl [] pats
 ---------------------
 collectl :: LPat GhcTc -> [Id] -> [Id]
 -- See Note [Dictionary binders in ConPatOut]
-collectl (L _ pat) bndrs
+collectl (dL->L _ pat) bndrs
   = go pat
   where
-    go (VarPat _ (L _ var))       = var : bndrs
+    go (VarPat _ (dL->L _ var))   = var : bndrs
     go (WildPat _)                = bndrs
     go (LazyPat _ pat)            = collectl pat bndrs
     go (BangPat _ pat)            = collectl pat bndrs
-    go (AsPat _ (L _ a) pat)      = a : collectl pat bndrs
+    go (AsPat _ (dL->L _ a) pat)  = a : collectl pat bndrs
     go (ParPat _ pat)             = collectl pat bndrs
 
     go (ListPat _ pats)           = foldr collectl bndrs pats
@@ -1221,7 +1242,7 @@ collectl (L _ pat) bndrs
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _ _)               = bndrs
     go (NPat {})                  = bndrs
-    go (NPlusKPat _ (L _ n) _ _ _ _) = n : bndrs
+    go (NPlusKPat _ (dL->L _ n) _ _ _ _) = n : bndrs
 
     go (SigPat _ pat _)           = collectl pat bndrs
     go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs

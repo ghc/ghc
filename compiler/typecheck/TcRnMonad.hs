@@ -8,6 +8,8 @@ Functions for working with the typechecker environment (setters, getters...).
 {-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances, BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE ViewPatterns #-}
+
 
 module TcRnMonad(
   -- * Initalisation
@@ -56,7 +58,7 @@ module TcRnMonad(
 
   -- * Error management
   getSrcSpanM, setSrcSpan, addLocM,
-  wrapLocM, wrapLocFstM, wrapLocSndM,
+  wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
   addErr,
   failWith, failAt,
@@ -835,23 +837,31 @@ setSrcSpan (RealSrcSpan real_loc) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
-addLocM :: (a -> TcM b) -> Located a -> TcM b
-addLocM fn (L loc a) = setSrcSpan loc $ fn a
+addLocM :: HasSrcSpan a => (SrcSpanLess a -> TcM b) -> a -> TcM b
+addLocM fn (dL->L loc a) = setSrcSpan loc $ fn a
 
-wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
-wrapLocM fn (L loc a) = setSrcSpan loc $ do b <- fn a; return (L loc b)
-
-wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
-wrapLocFstM fn (L loc a) =
+wrapLocM :: (HasSrcSpan a, HasSrcSpan b) =>
+            (SrcSpanLess a -> TcM (SrcSpanLess b)) -> a -> TcM b
+-- wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
+wrapLocM fn (dL->L loc a) = setSrcSpan loc $ do { b <- fn a
+                                                ; return (cL loc b) }
+wrapLocFstM :: (HasSrcSpan a, HasSrcSpan b) =>
+               (SrcSpanLess a -> TcM (SrcSpanLess b,c)) -> a -> TcM (b, c)
+wrapLocFstM fn (dL->L loc a) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (L loc b, c)
+    return (cL loc b, c)
 
-wrapLocSndM :: (a -> TcM (b,c)) -> Located a -> TcM (b, Located c)
-wrapLocSndM fn (L loc a) =
+wrapLocSndM :: (HasSrcSpan a, HasSrcSpan c) =>
+               (SrcSpanLess a -> TcM (b, SrcSpanLess c)) -> a -> TcM (b, c)
+wrapLocSndM fn (dL->L loc a) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (b, L loc c)
+    return (b, cL loc c)
+
+wrapLocM_ :: HasSrcSpan a =>
+             (SrcSpanLess a -> TcM ()) -> a -> TcM ()
+wrapLocM_ fn (dL->L loc a) = setSrcSpan loc (fn a)
 
 -- Reporting errors
 
@@ -1910,7 +1920,8 @@ forkM doc thing_inside
                         Just r  -> r) }
 
 setImplicitEnvM :: TypeEnv -> IfL a -> IfL a
-setImplicitEnvM tenv m = updLclEnv (\lcl -> lcl { if_implicits_env = Just tenv }) m
+setImplicitEnvM tenv m = updLclEnv (\lcl -> lcl
+                                     { if_implicits_env = Just tenv }) m
 
 {-
 Note [Masking exceptions in forkM_maybe]

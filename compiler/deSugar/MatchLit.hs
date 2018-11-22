@@ -7,6 +7,7 @@ Pattern-matching literal patterns
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module MatchLit ( dsLit, dsOverLit, dsOverLit', hsLitKey
                 , tidyLitPat, tidyNPat
@@ -251,10 +252,10 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Name)
 -- See if the expression is an Integral literal
 -- Remember to look through automatically-added tick-boxes! (Trac #8384)
-getLHsIntegralLit (L _ (HsPar _ e))            = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsTick _ _ e))         = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
+getLHsIntegralLit (dL->L _ (HsPar _ e))            = getLHsIntegralLit e
+getLHsIntegralLit (dL->L _ (HsTick _ _ e))         = getLHsIntegralLit e
+getLHsIntegralLit (dL->L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
+getLHsIntegralLit (dL->L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit _ = Nothing
 
 getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Name)
@@ -417,7 +418,7 @@ hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 
 matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchNPats (var:vars) ty (eqn1:eqns)    -- All for the same literal
-  = do  { let NPat _ (L _ lit) mb_neg eq_chk = firstPat eqn1
+  = do  { let NPat _ (dL->L _ lit) mb_neg eq_chk = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing  -> return lit_expr
@@ -448,7 +449,8 @@ We generate:
 matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- All NPlusKPats, for the *same* literal k
 matchNPlusKPats (var:vars) ty (eqn1:eqns)
-  = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus = firstPat eqn1
+  = do  { let NPlusKPat _ (dL->L _ n1) (dL->L _ lit1) lit2 ge minus
+                = firstPat eqn1
         ; lit1_expr   <- dsOverLit lit1
         ; lit2_expr   <- dsOverLit lit2
         ; pred_expr   <- dsSyntaxExpr ge    [Var var, lit1_expr]
@@ -460,7 +462,7 @@ matchNPlusKPats (var:vars) ty (eqn1:eqns)
                    adjustMatchResult (foldr1 (.) wraps)         $
                    match_result) }
   where
-    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ : pats })
+    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (dL->L _ n) _ _ _ _ : pats })
         = (wrapBind n n1, eqn { eqn_pats = pats })
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)

@@ -2148,16 +2148,26 @@ primLitOps str ty = (assoc_ty_id str litConTbl ty, \v -> boxed v)
 
 ordOpTbl :: [(Type, (RdrName, RdrName, RdrName, RdrName, RdrName))]
 ordOpTbl
- =  [(charPrimTy  , (ltChar_RDR  , leChar_RDR  , eqChar_RDR  , geChar_RDR  , gtChar_RDR  ))
-    ,(intPrimTy   , (ltInt_RDR   , leInt_RDR   , eqInt_RDR   , geInt_RDR   , gtInt_RDR   ))
-    ,(int8PrimTy  , (ltInt8_RDR  , leInt8_RDR  , eqInt8_RDR  , geInt8_RDR  , gtInt8_RDR   ))
-    ,(int16PrimTy , (ltInt16_RDR , leInt16_RDR , eqInt16_RDR , geInt16_RDR , gtInt16_RDR   ))
-    ,(wordPrimTy  , (ltWord_RDR  , leWord_RDR  , eqWord_RDR  , geWord_RDR  , gtWord_RDR  ))
-    ,(word8PrimTy , (ltWord8_RDR , leWord8_RDR , eqWord8_RDR , geWord8_RDR , gtWord8_RDR   ))
-    ,(word16PrimTy, (ltWord16_RDR, leWord16_RDR, eqWord16_RDR, geWord16_RDR, gtWord16_RDR  ))
-    ,(addrPrimTy  , (ltAddr_RDR  , leAddr_RDR  , eqAddr_RDR  , geAddr_RDR  , gtAddr_RDR  ))
-    ,(floatPrimTy , (ltFloat_RDR , leFloat_RDR , eqFloat_RDR , geFloat_RDR , gtFloat_RDR ))
-    ,(doublePrimTy, (ltDouble_RDR, leDouble_RDR, eqDouble_RDR, geDouble_RDR, gtDouble_RDR)) ]
+ =  [(charPrimTy  , (ltChar_RDR  , leChar_RDR
+     , eqChar_RDR  , geChar_RDR  , gtChar_RDR  ))
+    ,(intPrimTy   , (ltInt_RDR   , leInt_RDR
+     , eqInt_RDR   , geInt_RDR   , gtInt_RDR   ))
+    ,(int8PrimTy  , (ltInt8_RDR  , leInt8_RDR
+     , eqInt8_RDR  , geInt8_RDR  , gtInt8_RDR   ))
+    ,(int16PrimTy , (ltInt16_RDR , leInt16_RDR
+     , eqInt16_RDR , geInt16_RDR , gtInt16_RDR   ))
+    ,(wordPrimTy  , (ltWord_RDR  , leWord_RDR
+     , eqWord_RDR  , geWord_RDR  , gtWord_RDR  ))
+    ,(word8PrimTy , (ltWord8_RDR , leWord8_RDR
+     , eqWord8_RDR , geWord8_RDR , gtWord8_RDR   ))
+    ,(word16PrimTy, (ltWord16_RDR, leWord16_RDR
+     , eqWord16_RDR, geWord16_RDR, gtWord16_RDR  ))
+    ,(addrPrimTy  , (ltAddr_RDR  , leAddr_RDR
+     , eqAddr_RDR  , geAddr_RDR  , gtAddr_RDR  ))
+    ,(floatPrimTy , (ltFloat_RDR , leFloat_RDR
+     , eqFloat_RDR , geFloat_RDR , gtFloat_RDR ))
+    ,(doublePrimTy, (ltDouble_RDR, leDouble_RDR
+     , eqDouble_RDR, geDouble_RDR, gtDouble_RDR)) ]
 
 -- A mapping from a primitive type to a function that constructs its boxed
 -- version.

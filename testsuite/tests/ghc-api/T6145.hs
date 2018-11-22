@@ -1,4 +1,7 @@
 {-# LANGUAGE PatternGuards #-}
+{-# LANGUAGE ViewPatterns     #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies     #-}
 module Main where
 
 import System.IO
@@ -32,12 +35,12 @@ main = do
         removeFile "Test.hs"
         print ok
     where
-      isDataCon (L _ (AbsBinds { abs_binds = bs }))
+      isDataCon (dL->L _ (AbsBinds { abs_binds = bs }))
         = not (isEmptyBag (filterBag isDataCon bs))
-      isDataCon (L l (f@FunBind {}))
-        | (MG _ (L _ (m:_)) _) <- fun_matches f,
-          (L _ (c@ConPatOut{}):_)<-hsLMatchPats m,
-          (L l _)<-pat_con c
+      isDataCon (dL->L l (f@FunBind {}))
+        | (MG _ (dL->L _ (m:_)) _) <- fun_matches f,
+          ((dL->L _ (c@ConPatOut{})):_)<-hsLMatchPats m,
+          (dL->L l _)<-pat_con c
         = isGoodSrcSpan l       -- Check that the source location is a good one
       isDataCon _
         = False

@@ -8,6 +8,7 @@
 
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
+{-# LANGUAGE ViewPatterns #-}
 
 module DsMonad (
         DsM, mapM, mapAndUnzipM,

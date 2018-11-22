@@ -9,6 +9,7 @@ Desugaring foreign declarations (see also DsCCall).
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module DsForeign ( dsForeigns ) where
 
@@ -97,7 +98,7 @@ dsForeigns' fos = do
              (vcat cs $$ vcat fe_init_code),
             foldr (appOL . toOL) nilOL bindss)
   where
-   do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
+   do_ldecl (dL->L loc decl) = putSrcSpanDs loc (do_decl decl)
 
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
@@ -106,8 +107,10 @@ dsForeigns' fos = do
       traceIf (text "fi end" <+> ppr id)
       return (h, c, [], bs)
 
-   do_decl (ForeignExport { fd_name = L _ id, fd_e_ext = co
-                          , fd_fe = CExport (L _ (CExportStatic _ ext_nm cconv)) _ }) = do
+   do_decl (ForeignExport { fd_name = (dL->L _ id)
+                          , fd_e_ext = co
+                          , fd_fe = CExport
+                              (dL->L _ (CExportStatic _ ext_nm cconv)) _ }) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
    do_decl (XForeignDecl _) = panic "dsForeigns'"

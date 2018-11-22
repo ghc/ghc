@@ -1,6 +1,9 @@
 -- | Extract docs from the renamer output so they can be be serialized.
-{-# language LambdaCase #-}
-{-# language TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns #-}
+
 module ExtractDocs (extractDocs) where
 
 import GhcPrelude
@@ -110,7 +113,7 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
 
-getMainDeclBinder :: HsDecl pass -> [IdP pass]
+getMainDeclBinder :: HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of
@@ -137,13 +140,13 @@ getInstLoc :: InstDecl name -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
+    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = (dL->L l _) }}}) -> l
   TyFamInstD _ (TyFamInstDecl
     -- Since CoAxioms' Names refer to the whole line for type family instances
     -- in particular, we need to dig a bit deeper to pull out the entire
     -- equation. This does not happen for data family instances, for some
     -- reason.
-    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}}) -> l
+    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = (dL->L l _) }}}) -> l
   ClsInstD _ (XClsInstDecl _) -> error "getInstLoc"
   DataFamInstD _ (DataFamInstDecl (HsIB _ (XFamEqn _))) -> error "getInstLoc"
   TyFamInstD _ (TyFamInstDecl (HsIB _ (XFamEqn _))) -> error "getInstLoc"
@@ -160,7 +163,7 @@ subordinates :: Map SrcSpan Name
 subordinates instMap decl = case decl of
   InstD _ (ClsInstD _ d) -> do
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-      FamEqn { feqn_tycon = L l _
+      FamEqn { feqn_tycon = (dL->L l _)
              , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
     [ (n, [], M.empty) | Just n <- [M.lookup l instMap] ] ++ dataSubs defn
 
@@ -170,7 +173,8 @@ subordinates instMap decl = case decl of
             | isDataDecl  d -> dataSubs (tcdDataDefn d)
   _ -> []
   where
-    classSubs dd = [ (name, doc, declTypeDocs d) | (L _ d, doc) <- classDecls dd
+    classSubs dd = [ (name, doc, declTypeDocs d)
+                   | (dL->L _ d, doc) <- classDecls dd
                    , name <- getMainDeclBinder d, not (isValD d)
                    ]
     dataSubs :: HsDataDefn GhcRn
@@ -184,10 +188,10 @@ subordinates instMap decl = case decl of
                   | c <- cons, cname <- getConNames c ]
         fields  = [ (extFieldOcc n, maybeToList $ fmap unLoc doc, M.empty)
                   | RecCon flds <- map getConArgs cons
-                  , L _ (ConDeclField _ ns _ doc) <- (unLoc flds)
-                  , L _ n <- ns ]
+                  , (dL->L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
+                  , (dL->L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], M.empty)
-                  | HsIB { hsib_body = L l (HsDocTy _ _ doc) }
+                  | HsIB { hsib_body = (dL->L l (HsDocTy _ _ doc)) }
                       <- concatMap (unLoc . deriv_clause_tys . unLoc) $
                            unLoc $ dd_derivs dd
                   , Just instName <- [M.lookup l instMap] ]
@@ -199,7 +203,7 @@ conArgDocs con = case getConArgs con of
                    InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
                    RecCon _ -> go 1 ret
   where
-    go n (HsDocTy _ _ (L _ ds) : tys) = M.insert n ds $ go (n+1) tys
+    go n (HsDocTy _ _ (dL->L _ ds) : tys) = M.insert n ds $ go (n+1) tys
     go n (_ : tys) = go (n+1) tys
     go _ [] = M.empty
 
@@ -249,10 +253,11 @@ typeDocs = go 0
   where
     go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
     go n (HsQualTy   { hst_body = ty }) = go n (unLoc ty)
-    go n (HsFunTy _ (L _ (HsDocTy _ _ (L _ x))) (L _ ty)) =
+    go n (HsFunTy _ (dL->L _
+                      (HsDocTy _ _ (dL->L _ x))) (dL->L _ ty)) =
        M.insert n x $ go (n+1) ty
     go n (HsFunTy _ _ ty) = go (n+1) (unLoc ty)
-    go n (HsDocTy _ _ (L _ doc)) = M.singleton n doc
+    go n (HsDocTy _ _ (dL->L _ doc)) = M.singleton n doc
     go _ _ = M.empty
 
 -- | The top-level declarations of a module that we care about,
@@ -292,10 +297,10 @@ collectDocs = go Nothing []
   where
     go Nothing _ [] = []
     go (Just prev) docs [] = finished prev docs []
-    go prev docs (L _ (DocD _ (DocCommentNext str)) : ds)
+    go prev docs ((dL->L _ (DocD _ (DocCommentNext str))) : ds)
       | Nothing <- prev = go Nothing (str:docs) ds
       | Just decl <- prev = finished decl docs (go Nothing [str] ds)
-    go prev docs (L _ (DocD _ (DocCommentPrev str)) : ds) =
+    go prev docs ((dL->L _ (DocD _ (DocCommentPrev str))) : ds) =
       go prev (str:docs) ds
     go Nothing docs (d:ds) = go (Just d) docs ds
     go (Just prev) docs (d:ds) = finished prev docs (go (Just d) [] ds)
@@ -319,8 +324,8 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 -- | Go through all class declarations and filter their sub-declarations
 filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterClasses decls = [ if isClassD d then (L loc (filterClass d), doc) else x
-                      | x@(L loc d, doc) <- decls ]
+filterClasses decls = [ if isClassD d then (cL loc (filterClass d), doc) else x
+                      | x@(dL->L loc d, doc) <- decls ]
   where
     filterClass (TyClD x c) =
       TyClD x $ c { tcdSigs =
@@ -341,4 +346,5 @@ isClassD _ = False
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
 mkDecls :: (a -> [Located b]) -> (b -> c) -> a -> [Located c]
-mkDecls field con struct = [ L loc (con decl) | L loc decl <- field struct ]
+mkDecls field con struct = [ cL loc (con decl)
+                           | (dL->L loc decl) <- field struct ]

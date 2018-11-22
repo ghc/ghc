@@ -8,6 +8,7 @@ Pattern-matching constructors
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module MatchCon ( matchConFamily, matchPatSyn ) where
 
@@ -167,7 +168,8 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPatOut { pat_con = L _ con1, pat_arg_tys = arg_tys, pat_wrap = wrapper1,
+    ConPatOut { pat_con = (dL->L _ con1)
+              , pat_arg_tys = arg_tys, pat_wrap = wrapper1,
                 pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
               = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
@@ -188,7 +190,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
       = arg_vars
       where
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
-        lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
+        lookup_fld (dL->L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
 matchOneConLike _ _ [] = panic "matchOneCon []"
@@ -205,7 +207,7 @@ compatible_pats _                 _                 = True -- Prefix or infix co
 same_fields :: HsRecFields GhcTc (LPat GhcTc) -> HsRecFields GhcTc (LPat GhcTc)
             -> Bool
 same_fields flds1 flds2
-  = all2 (\(L _ f1) (L _ f2)
+  = all2 (\(dL->L _ f1) (dL->L _ f2)
                           -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
          (rec_flds flds1) (rec_flds flds2)
 

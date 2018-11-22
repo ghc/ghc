@@ -7,6 +7,7 @@
 
 {-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcHsType (
         -- Type signatures

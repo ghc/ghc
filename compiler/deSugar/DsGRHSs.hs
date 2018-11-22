@@ -7,6 +7,7 @@ Matching guarded right-hand-sides (GRHSs)
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
 
@@ -67,9 +68,10 @@ dsGRHSs _ (XGRHSs _) _ = panic "dsGRHSs"
 
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
-dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs))
+dsGRHS hs_ctx rhs_ty (dL->L _ (GRHS _ guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
-dsGRHS _ _ (L _ (XGRHS _)) = panic "dsGRHS"
+dsGRHS _ _ (dL->L _ (XGRHS _)) = panic "dsGRHS"
+dsGRHS _ _ _ = panic "dsGRHS: Impossible Match" -- due to #15884
 
 {-
 ************************************************************************
