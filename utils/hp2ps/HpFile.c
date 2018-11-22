@@ -53,17 +53,17 @@ floatish *samplemap;		/* sample intervals	*/
 floatish *markmap;		/* sample marks		*/
 
 /*
- *	An extremely simple parser. The input is organised into lines of 
+ *	An extremely simple parser. The input is organised into lines of
  *	the form
  *
  *      JOB s              -- job identifier string
- *	DATE s		   -- date string 
- *	SAMPLE_UNIT s	   -- sample unit eg "seconds" 
- *	VALUE_UNIT s	   -- value unit eg "bytes" 
- *	MARK i	   	   -- sample mark 
- *	BEGIN_SAMPLE i 	   -- start of ith sample 
- *	identifier i	   -- there are i identifiers in this sample 
- *	END_SAMPLE i   	   -- end of ith sample 
+ *	DATE s		   -- date string
+ *	SAMPLE_UNIT s	   -- sample unit eg "seconds"
+ *	VALUE_UNIT s	   -- value unit eg "bytes"
+ *	MARK i	   	   -- sample mark
+ *	BEGIN_SAMPLE i 	   -- start of ith sample
+ *	identifier i	   -- there are i identifiers in this sample
+ *	END_SAMPLE i   	   -- end of ith sample
  *
  */
 
@@ -146,7 +146,7 @@ GetHpLine(FILE *infp)
     case SAMPLE_UNIT_TOK:
 	GetHpTok(infp, 0);
 	if (thetok != STRING_TOK) {
-	    Error("%s, line %d: string must follow SAMPLE_UNIT", hpfile, 
+	    Error("%s, line %d: string must follow SAMPLE_UNIT", hpfile,
 	          linenum);
         }
 	sampleunitstring = thestring;
@@ -157,7 +157,7 @@ GetHpLine(FILE *infp)
     case VALUE_UNIT_TOK:
         GetHpTok(infp, 0);
 	if (thetok != STRING_TOK) {
-	    Error("%s, line %d: string must follow VALUE_UNIT", hpfile, 
+	    Error("%s, line %d: string must follow VALUE_UNIT", hpfile,
 	          linenum);
         }
 	valueunitstring = thestring;
@@ -183,11 +183,11 @@ GetHpLine(FILE *infp)
 		markmap = (floatish*) xrealloc(markmap, nmarkmax * sizeof(floatish));
 	    }
 	}
-	markmap[ nmarks++ ] = thefloatish; 
+	markmap[ nmarks++ ] = thefloatish;
         GetHpTok(infp, 1);
         break;
 
-    case BEGIN_SAMPLE_TOK: 
+    case BEGIN_SAMPLE_TOK:
 	insample = 1;
 	GetHpTok(infp, 0);
 	if (thetok != FLOAT_TOK) {
@@ -204,7 +204,7 @@ GetHpLine(FILE *infp)
 		samplemap = (floatish*) xmalloc(nsamplemax * sizeof(floatish));
 	    } else {
 		nsamplemax *= 2;
-		samplemap = (floatish*) xrealloc(samplemap, 
+		samplemap = (floatish*) xrealloc(samplemap,
 	                                      nsamplemax * sizeof(floatish));
 	    }
 	}
@@ -212,11 +212,11 @@ GetHpLine(FILE *infp)
 	GetHpTok(infp, 1);
 	break;
 
-    case END_SAMPLE_TOK: 
+    case END_SAMPLE_TOK:
 	insample = 0;
 	GetHpTok(infp, 0);
 	if (thetok != FLOAT_TOK) {
-	    Error("%s, line %d: floating point number must follow END_SAMPLE", 
+	    Error("%s, line %d: floating point number must follow END_SAMPLE",
                   hpfile, linenum);
 	}
         nsamples++;
@@ -226,7 +226,7 @@ GetHpLine(FILE *infp)
     case IDENTIFIER_TOK:
 	GetHpTok(infp, 0);
 	if (thetok != INTEGER_TOK) {
-	    Error("%s, line %d: integer must follow identifier", hpfile, 
+	    Error("%s, line %d: integer must follow identifier", hpfile,
                   linenum);
 	}
         StoreSample(GetEntry(theident), nsamples, thefloatish);
@@ -274,7 +274,7 @@ TokenToString(token t)
  *	Read the next token from the input and assign its value
  *	to the global variable "thetok". In the case of numbers,
  *	the corresponding value is also assigned to "theinteger"
- *	or "thefloatish" as appropriate; in the case of identifiers 
+ *	or "thefloatish" as appropriate; in the case of identifiers
  *	it is assigned to "theident".
  *
  *	startline argument should be true for the first token on a line
@@ -287,7 +287,7 @@ GetHpTok(FILE *infp, int startline)
     while (isspace(ch)) {		/* skip whitespace */
 	if (ch == '\n') linenum++;
 	ch = getc(infp);
-    } 
+    }
 
     if (ch == EOF) {
 	thetok = EOF_TOK;
@@ -332,7 +332,7 @@ GetHpTok(FILE *infp, int startline)
 
 /*
  *	Read a sequence of digits and convert the result to an integer
- *	or floating point value (assigned to the "theinteger" or 
+ *	or floating point value (assigned to the "theinteger" or
  *	"thefloatish").
  */
 
@@ -343,21 +343,21 @@ GetNumber(FILE *infp)
 {
     int i;
     int containsdot;
- 
+
     ASSERT(isdigit(ch)); /* we must have a digit to start with */
 
     containsdot = 0;
 
     for (i = 0; i < NUMBER_LENGTH && (isdigit(ch) || ch == '.'); i++) {
         numberstring[ i ] = ch;
-        containsdot |= (ch == '.'); 
+        containsdot |= (ch == '.');
         ch = getc(infp);
-    }   
- 
+    }
+
     ASSERT(i <= NUMBER_LENGTH); /* did not overflow */
 
     numberstring[ i ] = '\0';
- 
+
     if (containsdot) {
         thefloatish = (floatish) atof(numberstring);
 	return FLOAT_TOK;
@@ -373,7 +373,7 @@ GetNumber(FILE *infp)
 }
 
 /*
- *	Read a sequence of identifier characters and assign the result 
+ *	Read a sequence of identifier characters and assign the result
  *	to the string "theident".
  */
 
@@ -387,7 +387,7 @@ GetIdent(FILE *infp)
 	idbuffer[ i ] = ch;
 	ch = getc(infp);
     }
-    
+
     idbuffer[ i ] = '\0';
 
     if (theident)
@@ -398,45 +398,42 @@ GetIdent(FILE *infp)
 
 
 /*
- *	Read a sequence of characters that make up a string and 
- *	assign the result to "thestring".
+ * Read a sequence of characters that make up a string and assign the result to
+ * "thestring". A string is surrounded by double quotes, with a double quote
+ * itself escaped as two contiguous double quotes.
  */
 
 void
 GetString(FILE *infp)
 {
-    unsigned int i;
-    char *stringbuffer;
-    size_t stringbuffersize;
+    size_t stringbuffersize = 5000;
+    char *stringbuffer = xmalloc(stringbuffersize);
 
     ASSERT(ch == '\"');
 
-    stringbuffersize = 5000;
-    stringbuffer = xmalloc(stringbuffersize);
+    ch = getc(infp);  /* skip the '\"' that begins the string */
 
-    ch = getc(infp);	/* skip the '\"' that begins the string */
-
-    i = 0;
-    while (ch != '\"') {
+    for (size_t i = 0; ; ++i) {
         if (ch == EOF) {
-	        Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
+            Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
         }
-        else if (i == stringbuffersize - 1) {
-            stringbuffersize = 2 * stringbuffersize;
+        if (i == stringbuffersize) {
+            stringbuffersize *= 2;
             stringbuffer = xrealloc(stringbuffer, stringbuffersize);
         }
-        stringbuffer[ i++ ] = ch;
+        if (ch == '\"') {
+            ch = getc(infp);
+            if (ch != '\"') {
+                stringbuffer[i] = '\0';
+                break;
+            }
+        }
+        stringbuffer[i] = ch;
         ch = getc(infp);
     }
 
-    stringbuffer[i] = '\0'; 
     thestring = copystring(stringbuffer);
-
     free(stringbuffer);
-
-    ASSERT(ch == '\"');
-
-    ch = getc(infp);      /* skip the '\"' that terminates the string */
 }
 
 boolish
@@ -452,7 +449,7 @@ IsIdChar(int ch)
  *	of chunks to be retrieved given an identifier name.
  */
 
-#define N_HASH       	513 
+#define N_HASH       	513
 
 static struct entry* hashtable[ N_HASH ];
 
@@ -460,7 +457,7 @@ static intish
 Hash(char *s)
 {
     int r;
- 
+
     for (r = 0; *s; s++) {
         r = r + r + r + *s;
     }
@@ -471,10 +468,10 @@ Hash(char *s)
 }
 
 /*
- *      Get space for a new chunk. Initialise it, and return a pointer 
+ *      Get space for a new chunk. Initialise it, and return a pointer
  *	to the new chunk.
  */
- 
+
 static struct chunk*
 MakeChunk(void)
 {
@@ -482,10 +479,10 @@ MakeChunk(void)
     struct datapoint* d;
 
     ch = (struct chunk*) xmalloc( sizeof(struct chunk) );
- 
+
     d = (struct datapoint*) xmalloc (sizeof(struct datapoint) * N_CHUNK);
 
-    ch->nd = 0; 
+    ch->nd = 0;
     ch->d = d;
     ch->next = 0;
     return ch;
@@ -493,10 +490,10 @@ MakeChunk(void)
 
 
 /*
- *      Get space for a new entry. Initialise it, and return a pointer 
+ *      Get space for a new entry. Initialise it, and return a pointer
  *	to the new entry.
  */
- 
+
 struct entry *
 MakeEntry(char *name)
 {
@@ -504,12 +501,12 @@ MakeEntry(char *name)
 
     e = (struct entry *) xmalloc(sizeof(struct entry));
     e->chk = MakeChunk();
-    e->name = copystring(name); 
+    e->name = copystring(name);
     return e;
 }
 
 /*
- *	Get the entry associated with "name", creating a new entry if 
+ *	Get the entry associated with "name", creating a new entry if
  *	necessary.
  */
 
@@ -518,17 +515,17 @@ GetEntry(char *name)
 {
     intish h;
     struct entry* e;
- 
+
     h = Hash(name);
- 
+
     for (e = hashtable[ h ]; e; e = e->next) {
         if (strcmp(e->name, name) == 0) {
             break;
         }
     }
- 
+
     if (e) {
-	return (e); 
+	return (e);
     } else {
         nidents++;
         e = MakeEntry(name);
@@ -540,16 +537,16 @@ GetEntry(char *name)
 
 
 /*
- *      Store information from a sample. 
+ *      Store information from a sample.
  */
- 
+
 void
 StoreSample(struct entry *en, intish bucket, floatish value)
 {
-    struct chunk* chk; 
+    struct chunk* chk;
 
     for (chk = en->chk; chk->next != 0; chk = chk->next)
-	; 
+	;
 
     if (chk->nd < N_CHUNK) {
 	chk->d[ chk->nd ].bucket = bucket;
@@ -557,7 +554,7 @@ StoreSample(struct entry *en, intish bucket, floatish value)
 	chk->nd += 1;
     } else {
 	struct chunk* t;
-	t = chk->next = MakeChunk(); 
+	t = chk->next = MakeChunk();
 	t->d[ 0 ].bucket = bucket;
 	t->d[ 0 ].value  = value;
 	t->nd += 1;
@@ -569,7 +566,7 @@ struct entry** identtable;
 
 /*
  *	The hash table is useful while reading the input, but it
- *	becomes a liability thereafter. The code below converts 
+ *	becomes a liability thereafter. The code below converts
  *	it to a more easily processed table.
  */
 
@@ -592,7 +589,7 @@ MakeIdentTable(void)
 
     for (i = 0; i < N_HASH; i++) {
         for (e = hashtable[ i ]; e; e = e->next, j++) {
-	    identtable[ j ] = e; 
+	    identtable[ j ] = e;
         }
     }
 }
