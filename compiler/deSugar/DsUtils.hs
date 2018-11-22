@@ -403,8 +403,8 @@ mkErrorAppDs err_id ty msg = do
     dflags <- getDynFlags
     let
         full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
-        core_msg = Lit (mkMachString full_msg)
-        -- mkMachString returns a result of type String#
+        core_msg = Lit (mkLitString full_msg)
+        -- mkLitString returns a result of type String#
     return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
 
 {-

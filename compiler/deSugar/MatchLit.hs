@@ -80,14 +80,14 @@ dsLit :: HsLit GhcRn -> DsM CoreExpr
 dsLit l = do
   dflags <- getDynFlags
   case l of
-    HsStringPrim _ s -> return (Lit (MachStr s))
-    HsCharPrim   _ c -> return (Lit (MachChar c))
-    HsIntPrim    _ i -> return (Lit (mkMachIntWrap dflags i))
-    HsWordPrim   _ w -> return (Lit (mkMachWordWrap dflags w))
-    HsInt64Prim  _ i -> return (Lit (mkMachInt64Wrap dflags i))
-    HsWord64Prim _ w -> return (Lit (mkMachWord64Wrap dflags w))
-    HsFloatPrim  _ f -> return (Lit (MachFloat (fl_value f)))
-    HsDoublePrim _ d -> return (Lit (MachDouble (fl_value d)))
+    HsStringPrim _ s -> return (Lit (LitString s))
+    HsCharPrim   _ c -> return (Lit (LitChar c))
+    HsIntPrim    _ i -> return (Lit (mkLitIntWrap dflags i))
+    HsWordPrim   _ w -> return (Lit (mkLitWordWrap dflags w))
+    HsInt64Prim  _ i -> return (Lit (mkLitInt64Wrap dflags i))
+    HsWord64Prim _ w -> return (Lit (mkLitWord64Wrap dflags w))
+    HsFloatPrim  _ f -> return (Lit (LitFloat (fl_value f)))
+    HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
     HsInteger _ i _  -> mkIntegerExpr i
@@ -375,9 +375,9 @@ matchLiterals (var:vars) ty sub_groups
 
     wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
         -- Equality check for string literals
-    wrap_str_guard eq_str (MachStr s, mr)
+    wrap_str_guard eq_str (LitString s, mr)
         = do { -- We now have to convert back to FastString. Perhaps there
-               -- should be separate MachBytes and MachStr constructors?
+               -- should be separate LitBytes and LitString constructors?
                let s'  = mkFastStringByteString s
              ; lit    <- mkStringExprFS s'
              ; let pred = mkApps (Var eq_str) [Var var, lit]
@@ -391,20 +391,20 @@ hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
 -- Get the Core literal corresponding to a HsLit.
 -- It only works for primitive types and strings;
 -- others have been removed by tidy
--- For HsString, it produces a MachStr, which really represents an _unboxed_
+-- For HsString, it produces a LitString, which really represents an _unboxed_
 -- string literal; and we deal with it in matchLiterals above. Otherwise, it
 -- produces a primitive Literal of type matching the original HsLit.
 -- In the case of the fixed-width numeric types, we need to wrap here
 -- because Literal has an invariant that the literal is in range, while
 -- HsLit does not.
-hsLitKey dflags (HsIntPrim    _ i) = mkMachIntWrap  dflags i
-hsLitKey dflags (HsWordPrim   _ w) = mkMachWordWrap dflags w
-hsLitKey dflags (HsInt64Prim  _ i) = mkMachInt64Wrap  dflags i
-hsLitKey dflags (HsWord64Prim _ w) = mkMachWord64Wrap dflags w
-hsLitKey _      (HsCharPrim   _ c) = mkMachChar            c
-hsLitKey _      (HsFloatPrim  _ f) = mkMachFloat           (fl_value f)
-hsLitKey _      (HsDoublePrim _ d) = mkMachDouble          (fl_value d)
-hsLitKey _      (HsString _ s)     = MachStr (fastStringToByteString s)
+hsLitKey dflags (HsIntPrim    _ i) = mkLitIntWrap  dflags i
+hsLitKey dflags (HsWordPrim   _ w) = mkLitWordWrap dflags w
+hsLitKey dflags (HsInt64Prim  _ i) = mkLitInt64Wrap  dflags i
+hsLitKey dflags (HsWord64Prim _ w) = mkLitWord64Wrap dflags w
+hsLitKey _      (HsCharPrim   _ c) = mkLitChar            c
+hsLitKey _      (HsFloatPrim  _ f) = mkLitFloat           (fl_value f)
+hsLitKey _      (HsDoublePrim _ d) = mkLitDouble          (fl_value d)
+hsLitKey _      (HsString _ s)     = LitString (fastStringToByteString s)
 hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 
 {-

@@ -441,18 +441,18 @@ assembleI dflags i = case i of
                                                    Op q, Op np]
 
   where
-    literal (MachLabel fs (Just sz) _)
+    literal (LitLabel fs (Just sz) _)
      | platformOS (targetPlatform dflags) == OSMinGW32
          = litlabel (appendFS fs (mkFastString ('@':show sz)))
      -- On Windows, stdcall labels have a suffix indicating the no. of
      -- arg words, e.g. foo@8.  testcase: ffi012(ghci)
-    literal (MachLabel fs _ _) = litlabel fs
-    literal MachNullAddr       = int 0
-    literal (MachFloat r)      = float (fromRational r)
-    literal (MachDouble r)     = double (fromRational r)
-    literal (MachChar c)       = int (ord c)
-    literal (MachStr bs)       = lit [BCONPtrStr bs]
-       -- MachStr requires a zero-terminator when emitted
+    literal (LitLabel fs _ _) = litlabel fs
+    literal LitNullAddr       = int 0
+    literal (LitFloat r)      = float (fromRational r)
+    literal (LitDouble r)     = double (fromRational r)
+    literal (LitChar c)       = int (ord c)
+    literal (LitString bs)    = lit [BCONPtrStr bs]
+       -- LitString requires a zero-terminator when emitted
     literal (LitNumber nt i _) = case nt of
       LitNumInt     -> int (fromIntegral i)
       LitNumWord    -> int (fromIntegral i)
@@ -460,10 +460,10 @@ assembleI dflags i = case i of
       LitNumWord64  -> int64 (fromIntegral i)
       LitNumInteger -> panic "ByteCodeAsm.literal: LitNumInteger"
       LitNumNatural -> panic "ByteCodeAsm.literal: LitNumNatural"
-    -- We can lower 'RubbishLit' to an arbitrary constant, but @NULL@ is most
+    -- We can lower 'LitRubbish' to an arbitrary constant, but @NULL@ is most
     -- likely to elicit a crash (rather than corrupt memory) in case absence
     -- analysis messed up.
-    literal RubbishLit         = int 0
+    literal LitRubbish         = int 0
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]

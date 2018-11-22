@@ -684,7 +684,7 @@ cvtLitInteger :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- See Note [Integer literals] in Literal
 cvtLitInteger dflags _ (Just sdatacon) i
   | inIntRange dflags i -- Special case for small integers
-    = mkConApp sdatacon [Lit (mkMachInt dflags i)]
+    = mkConApp sdatacon [Lit (mkLitInt dflags i)]
 
 cvtLitInteger dflags mk_integer _ i
     = mkApps (Var mk_integer) [isNonNegative, ints]
@@ -694,7 +694,7 @@ cvtLitInteger dflags mk_integer _ i
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp intDataCon [Lit (mkMachInt dflags low)] : f high
+              in mkConApp intDataCon [Lit (mkLitInt dflags low)] : f high
         bits = 31
         mask = 2 ^ bits - 1
 
@@ -704,7 +704,7 @@ cvtLitNatural :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- See Note [Natural literals] in Literal
 cvtLitNatural dflags _ (Just sdatacon) i
   | inWordRange dflags i -- Special case for small naturals
-    = mkConApp sdatacon [Lit (mkMachWord dflags i)]
+    = mkConApp sdatacon [Lit (mkLitWord dflags i)]
 
 cvtLitNatural dflags mk_natural _ i
     = mkApps (Var mk_natural) [words]
@@ -712,7 +712,7 @@ cvtLitNatural dflags mk_natural _ i
         f 0 = []
         f x = let low  = x .&. mask
                   high = x `shiftR` bits
-              in mkConApp wordDataCon [Lit (mkMachWord dflags low)] : f high
+              in mkConApp wordDataCon [Lit (mkLitWord dflags low)] : f high
         bits = 32
         mask = 2 ^ bits - 1
 

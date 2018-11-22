@@ -19,7 +19,7 @@ module BufWrite (
         bPutStr,
         bPutFS,
         bPutFZS,
-        bPutLitString,
+        bPutPtrString,
         bPutReplicate,
         bFlush,
   ) where
@@ -98,15 +98,15 @@ bPutCStringLen b@(BufHandle buf r hdl) cstr@(ptr, len) = do
                 copyBytes (buf `plusPtr` i) ptr len
                 writeFastMutInt r (i + len)
 
-bPutLitString :: BufHandle -> LitString -> IO ()
-bPutLitString b@(BufHandle buf r hdl) l@(LitString a len) = l `seq` do
+bPutPtrString :: BufHandle -> PtrString -> IO ()
+bPutPtrString b@(BufHandle buf r hdl) l@(PtrString a len) = l `seq` do
   i <- readFastMutInt r
   if (i+len) >= buf_size
         then do hPutBuf hdl buf i
                 writeFastMutInt r 0
                 if (len >= buf_size)
                     then hPutBuf hdl a len
-                    else bPutLitString b l
+                    else bPutPtrString b l
         else do
                 copyBytes (buf `plusPtr` i) a len
                 writeFastMutInt r (i+len)

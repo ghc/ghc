@@ -998,9 +998,9 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         my_discr (LitAlt l, _, _)
            = case l of LitNumber LitNumInt i  _  -> DiscrI (fromInteger i)
                        LitNumber LitNumWord w _  -> DiscrW (fromInteger w)
-                       MachFloat r   -> DiscrF (fromRational r)
-                       MachDouble r  -> DiscrD (fromRational r)
-                       MachChar i    -> DiscrI (ord i)
+                       LitFloat r   -> DiscrF (fromRational r)
+                       LitDouble r  -> DiscrD (fromRational r)
+                       LitChar i    -> DiscrI (ord i)
                        _ -> pprPanic "schemeE(AnnCase).my_discr" (ppr l)
 
         maybe_ncons
@@ -1200,7 +1200,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                  StaticTarget _ _ _ False ->
                    panic "generateCCall: unexpected FFI value import"
                  StaticTarget _ target _ True ->
-                   Just (MachLabel target mb_size IsFunction)
+                   Just (LitLabel target mb_size IsFunction)
                    where
                       mb_size
                           | OSMinGW32 <- platformOS (targetPlatform dflags)
@@ -1300,13 +1300,13 @@ primRepToFFIType dflags r
 mkDummyLiteral :: DynFlags -> PrimRep -> Literal
 mkDummyLiteral dflags pr
    = case pr of
-        IntRep    -> mkMachInt dflags 0
-        WordRep   -> mkMachWord dflags 0
-        Int64Rep  -> mkMachInt64 0
-        Word64Rep -> mkMachWord64 0
-        AddrRep   -> MachNullAddr
-        DoubleRep -> MachDouble 0
-        FloatRep  -> MachFloat 0
+        IntRep    -> mkLitInt dflags 0
+        WordRep   -> mkLitWord dflags 0
+        Int64Rep  -> mkLitInt64 0
+        Word64Rep -> mkLitWord64 0
+        AddrRep   -> LitNullAddr
+        DoubleRep -> LitDouble 0
+        FloatRep  -> LitFloat 0
         _         -> pprPanic "mkDummyLiteral" (ppr pr)
 
 
@@ -1423,7 +1423,7 @@ implement_tagToId d s p arg names
            slide_ws = bytesToWords dflags (d - s + arg_bytes)
 
        return (push_arg
-               `appOL` unitOL (PUSH_UBX MachNullAddr 1)
+               `appOL` unitOL (PUSH_UBX LitNullAddr 1)
                    -- Push bogus word (see Note [Implementing tagToEnum#])
                `appOL` concatOL steps
                `appOL` toOL [ LABEL label_fail, CASEFAIL,
@@ -1507,7 +1507,7 @@ pushAtom d p (AnnVar var)
    = do topStrings <- getTopStrings
         dflags <- getDynFlags
         case lookupVarEnv topStrings var of
-            Just ptr -> pushAtom d p $ AnnLit $ mkMachWord dflags $
+            Just ptr -> pushAtom d p $ AnnLit $ mkLitWord dflags $
               fromIntegral $ ptrToWordPtr $ fromRemotePtr ptr
             Nothing -> do
                 let sz = idSizeCon dflags var
@@ -1523,12 +1523,13 @@ pushAtom _ _ (AnnLit lit) = do
                            wordsToBytes dflags size_words)
 
      case lit of
-        MachLabel _ _ _ -> code N
-        MachFloat _   -> code F
-        MachDouble _  -> code D
-        MachChar _    -> code N
-        MachNullAddr  -> code N
-        MachStr _     -> code N
+        LitLabel _ _ _   -> code N
+        LitFloat _       -> code F
+        LitDouble _      -> code D
+        LitChar _        -> code N
+        LitNullAddr      -> code N
+        LitString _      -> code N
+        LitRubbish       -> code N
         LitNumber nt _ _ -> case nt of
           LitNumInt     -> code N
           LitNumWord    -> code N
@@ -1539,7 +1540,6 @@ pushAtom _ _ (AnnLit lit) = do
           -- representation.
           LitNumInteger -> panic "pushAtom: LitInteger"
           LitNumNatural -> panic "pushAtom: LitNatural"
-        RubbishLit    -> code N
 
 pushAtom _ _ expr
    = pprPanic "ByteCodeGen.pushAtom"
@@ -1552,7 +1552,7 @@ pushAtom _ _ expr
 pushConstrAtom
     :: StackDepth -> BCEnv -> AnnExpr' Id DVarSet -> BcM (BCInstrList, ByteOff)
 
-pushConstrAtom _ _ (AnnLit lit@(MachFloat _)) =
+pushConstrAtom _ _ (AnnLit lit@(LitFloat _)) =
     return (unitOL (PUSH_UBX32 lit), 4)
 
 pushConstrAtom d p (AnnVar v)

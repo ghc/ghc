@@ -1854,8 +1854,8 @@ mkIntLit      :: DynFlags -> Integer -> Expr b
 -- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
 mkIntLitInt   :: DynFlags -> Int     -> Expr b
 
-mkIntLit    dflags n = Lit (mkMachInt dflags n)
-mkIntLitInt dflags n = Lit (mkMachInt dflags (toInteger n))
+mkIntLit    dflags n = Lit (mkLitInt dflags n)
+mkIntLitInt dflags n = Lit (mkLitInt dflags (toInteger n))
 
 -- | Create a machine word literal expression of type  @Word#@ from an @Integer@.
 -- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
@@ -1864,14 +1864,14 @@ mkWordLit     :: DynFlags -> Integer -> Expr b
 -- If you want an expression of type @Word@ use 'MkCore.mkWordExpr'
 mkWordLitWord :: DynFlags -> Word -> Expr b
 
-mkWordLit     dflags w = Lit (mkMachWord dflags w)
-mkWordLitWord dflags w = Lit (mkMachWord dflags (toInteger w))
+mkWordLit     dflags w = Lit (mkLitWord dflags w)
+mkWordLitWord dflags w = Lit (mkLitWord dflags (toInteger w))
 
 mkWord64LitWord64 :: Word64 -> Expr b
-mkWord64LitWord64 w = Lit (mkMachWord64 (toInteger w))
+mkWord64LitWord64 w = Lit (mkLitWord64 (toInteger w))
 
 mkInt64LitInt64 :: Int64 -> Expr b
-mkInt64LitInt64 w = Lit (mkMachInt64 (toInteger w))
+mkInt64LitInt64 w = Lit (mkLitInt64 (toInteger w))
 
 -- | Create a machine character literal expression of type @Char#@.
 -- If you want an expression of type @Char@ use 'MkCore.mkCharExpr'
@@ -1880,8 +1880,8 @@ mkCharLit :: Char -> Expr b
 -- If you want an expression of type @String@ use 'MkCore.mkStringExpr'
 mkStringLit :: String -> Expr b
 
-mkCharLit   c = Lit (mkMachChar c)
-mkStringLit s = Lit (mkMachString s)
+mkCharLit   c = Lit (mkLitChar c)
+mkStringLit s = Lit (mkLitString s)
 
 -- | Create a machine single precision literal expression of type @Float#@ from a @Rational@.
 -- If you want an expression of type @Float@ use 'MkCore.mkFloatExpr'
@@ -1890,8 +1890,8 @@ mkFloatLit :: Rational -> Expr b
 -- If you want an expression of type @Float@ use 'MkCore.mkFloatExpr'
 mkFloatLitFloat :: Float -> Expr b
 
-mkFloatLit      f = Lit (mkMachFloat f)
-mkFloatLitFloat f = Lit (mkMachFloat (toRational f))
+mkFloatLit      f = Lit (mkLitFloat f)
+mkFloatLitFloat f = Lit (mkLitFloat (toRational f))
 
 -- | Create a machine double precision literal expression of type @Double#@ from a @Rational@.
 -- If you want an expression of type @Double@ use 'MkCore.mkDoubleExpr'
@@ -1900,8 +1900,8 @@ mkDoubleLit :: Rational -> Expr b
 -- If you want an expression of type @Double@ use 'MkCore.mkDoubleExpr'
 mkDoubleLitDouble :: Double -> Expr b
 
-mkDoubleLit       d = Lit (mkMachDouble d)
-mkDoubleLitDouble d = Lit (mkMachDouble (toRational d))
+mkDoubleLit       d = Lit (mkLitDouble d)
+mkDoubleLitDouble d = Lit (mkLitDouble (toRational d))
 
 -- | Bind all supplied binding groups over an expression in a nested let expression. Assumes
 -- that the rhs satisfies the let/app invariant.  Prefer to use 'MkCore.mkCoreLets' if

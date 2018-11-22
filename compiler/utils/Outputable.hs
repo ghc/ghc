@@ -553,7 +553,7 @@ empty    :: SDoc
 char     :: Char       -> SDoc
 text     :: String     -> SDoc
 ftext    :: FastString -> SDoc
-ptext    :: LitString  -> SDoc
+ptext    :: PtrString  -> SDoc
 ztext    :: FastZString -> SDoc
 int      :: Int        -> SDoc
 integer  :: Integer    -> SDoc

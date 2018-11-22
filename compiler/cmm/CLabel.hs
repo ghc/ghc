@@ -419,7 +419,7 @@ data RtsLabelInfo
   | RtsSlowFastTickyCtr String
 
   deriving (Eq, Ord)
-  -- NOTE: Eq on LitString compares the pointer only, so this isn't
+  -- NOTE: Eq on PtrString compares the pointer only, so this isn't
   -- a real equality.
 
 
@@ -1368,7 +1368,7 @@ tempLabelPrefixOrUnderscore = sdocWithPlatform $ \platform ->
 underscorePrefix :: Bool   -- leading underscore on assembler labels?
 underscorePrefix = (cLeadingUnderscore == "YES")
 
-asmTempLabelPrefix :: Platform -> LitString  -- for formatting labels
+asmTempLabelPrefix :: Platform -> PtrString  -- for formatting labels
 asmTempLabelPrefix platform = case platformOS platform of
     OSDarwin -> sLit "L"
     OSAIX    -> sLit "__L" -- follow IBM XL C's convention

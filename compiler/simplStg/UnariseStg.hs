@@ -580,8 +580,8 @@ mkUbxSum dc ty_args args0
                          -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
-      slotRubbishArg FloatSlot  = StgLitArg (MachFloat 0)
-      slotRubbishArg DoubleSlot = StgLitArg (MachDouble 0)
+      slotRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
+      slotRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
     in
       tag_arg : mkTupArgs 0 sum_slots arg_idxs
 

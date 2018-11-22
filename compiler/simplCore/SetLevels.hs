@@ -980,7 +980,7 @@ It's important to float Integer literals, so that they get shared,
 rather than being allocated every time round the loop.
 Hence the litIsTrivial.
 
-Ditto literal strings (MachStr), which we'd like to float to top
+Ditto literal strings (LitString), which we'd like to float to top
 level, which is now possible.
 
 

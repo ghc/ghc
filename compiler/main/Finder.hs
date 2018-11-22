@@ -604,7 +604,7 @@ cannotFindInterface  :: DynFlags -> ModuleName -> InstalledFindResult -> SDoc
 cannotFindInterface = cantFindInstalledErr (sLit "Failed to load interface for")
                                            (sLit "Ambiguous interface for")
 
-cantFindErr :: LitString -> LitString -> DynFlags -> ModuleName -> FindResult
+cantFindErr :: PtrString -> PtrString -> DynFlags -> ModuleName -> FindResult
             -> SDoc
 cantFindErr _ multiple_found _ mod_name (FoundMultiple mods)
   | Just pkgs <- unambiguousPackages
@@ -751,8 +751,8 @@ cantFindErr cannot_find _ dflags mod_name find_result
                     <+> ppr (packageConfigId pkg))
               | otherwise = Outputable.empty
 
-cantFindInstalledErr :: LitString -> LitString -> DynFlags -> ModuleName -> InstalledFindResult
-            -> SDoc
+cantFindInstalledErr :: PtrString -> PtrString -> DynFlags -> ModuleName
+                     -> InstalledFindResult -> SDoc
 cantFindInstalledErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info

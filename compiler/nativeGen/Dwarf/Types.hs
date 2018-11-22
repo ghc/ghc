@@ -56,7 +56,7 @@ data DwarfInfo
                      , dwCompDir :: String
                      , dwLowLabel :: CLabel
                      , dwHighLabel :: CLabel
-                     , dwLineLabel :: LitString }
+                     , dwLineLabel :: PtrString }
   | DwarfSubprogram { dwChildren :: [DwarfInfo]
                     , dwName :: String
                     , dwLabel :: CLabel

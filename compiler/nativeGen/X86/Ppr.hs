@@ -407,7 +407,7 @@ pprReg f r
         _  -> ppr_reg_float i
       })
 
-ppr_reg_float :: Int -> LitString
+ppr_reg_float :: Int -> PtrString
 ppr_reg_float i = case i of
         16 -> sLit "%fake0";  17 -> sLit "%fake1"
         18 -> sLit "%fake2";  19 -> sLit "%fake3"
@@ -1202,17 +1202,17 @@ pprOperand _ (OpImm i)   = pprDollImm i
 pprOperand _ (OpAddr ea) = pprAddr ea
 
 
-pprMnemonic_  :: LitString -> SDoc
+pprMnemonic_  :: PtrString -> SDoc
 pprMnemonic_ name =
    char '\t' <> ptext name <> space
 
 
-pprMnemonic  :: LitString -> Format -> SDoc
+pprMnemonic  :: PtrString -> Format -> SDoc
 pprMnemonic name format =
    char '\t' <> ptext name <> pprFormat format <> space
 
 
-pprFormatImmOp :: LitString -> Format -> Imm -> Operand -> SDoc
+pprFormatImmOp :: PtrString -> Format -> Imm -> Operand -> SDoc
 pprFormatImmOp name format imm op1
   = hcat [
         pprMnemonic name format,
@@ -1223,14 +1223,14 @@ pprFormatImmOp name format imm op1
     ]
 
 
-pprFormatOp_ :: LitString -> Format -> Operand -> SDoc
+pprFormatOp_ :: PtrString -> Format -> Operand -> SDoc
 pprFormatOp_ name format op1
   = hcat [
         pprMnemonic_ name ,
         pprOperand format op1
     ]
 
-pprFormatOp :: LitString -> Format -> Operand -> SDoc
+pprFormatOp :: PtrString -> Format -> Operand -> SDoc
 pprFormatOp name format op1
   = hcat [
         pprMnemonic name format,
@@ -1238,7 +1238,7 @@ pprFormatOp name format op1
     ]
 
 
-pprFormatOpOp :: LitString -> Format -> Operand -> Operand -> SDoc
+pprFormatOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
 pprFormatOpOp name format op1 op2
   = hcat [
         pprMnemonic name format,
@@ -1248,7 +1248,7 @@ pprFormatOpOp name format op1 op2
     ]
 
 
-pprOpOp :: LitString -> Format -> Operand -> Operand -> SDoc
+pprOpOp :: PtrString -> Format -> Operand -> Operand -> SDoc
 pprOpOp name format op1 op2
   = hcat [
         pprMnemonic_ name,
@@ -1258,7 +1258,7 @@ pprOpOp name format op1 op2
     ]
 
 
-pprFormatReg :: LitString -> Format -> Reg -> SDoc
+pprFormatReg :: PtrString -> Format -> Reg -> SDoc
 pprFormatReg name format reg1
   = hcat [
         pprMnemonic name format,
@@ -1266,7 +1266,7 @@ pprFormatReg name format reg1
     ]
 
 
-pprFormatRegReg :: LitString -> Format -> Reg -> Reg -> SDoc
+pprFormatRegReg :: PtrString -> Format -> Reg -> Reg -> SDoc
 pprFormatRegReg name format reg1 reg2
   = hcat [
         pprMnemonic name format,
@@ -1276,7 +1276,7 @@ pprFormatRegReg name format reg1 reg2
     ]
 
 
-pprRegReg :: LitString -> Reg -> Reg -> SDoc
+pprRegReg :: PtrString -> Reg -> Reg -> SDoc
 pprRegReg name reg1 reg2
   = sdocWithPlatform $ \platform ->
     hcat [
@@ -1287,7 +1287,7 @@ pprRegReg name reg1 reg2
     ]
 
 
-pprFormatOpReg :: LitString -> Format -> Operand -> Reg -> SDoc
+pprFormatOpReg :: PtrString -> Format -> Operand -> Reg -> SDoc
 pprFormatOpReg name format op1 reg2
   = sdocWithPlatform $ \platform ->
     hcat [
@@ -1297,7 +1297,7 @@ pprFormatOpReg name format op1 reg2
         pprReg (archWordFormat (target32Bit platform)) reg2
     ]
 
-pprCondOpReg :: LitString -> Format -> Cond -> Operand -> Reg -> SDoc
+pprCondOpReg :: PtrString -> Format -> Cond -> Operand -> Reg -> SDoc
 pprCondOpReg name format cond op1 reg2
   = hcat [
         char '\t',
@@ -1309,7 +1309,7 @@ pprCondOpReg name format cond op1 reg2
         pprReg format reg2
     ]
 
-pprCondRegReg :: LitString -> Format -> Cond -> Reg -> Reg -> SDoc
+pprCondRegReg :: PtrString -> Format -> Cond -> Reg -> Reg -> SDoc
 pprCondRegReg name format cond reg1 reg2
   = hcat [
         char '\t',
@@ -1321,7 +1321,7 @@ pprCondRegReg name format cond reg1 reg2
         pprReg format reg2
     ]
 
-pprFormatFormatRegReg :: LitString -> Format -> Format -> Reg -> Reg -> SDoc
+pprFormatFormatRegReg :: PtrString -> Format -> Format -> Reg -> Reg -> SDoc
 pprFormatFormatRegReg name format1 format2 reg1 reg2
   = hcat [
         char '\t',
@@ -1334,7 +1334,7 @@ pprFormatFormatRegReg name format1 format2 reg1 reg2
         pprReg format2 reg2
     ]
 
-pprFormatFormatOpReg :: LitString -> Format -> Format -> Operand -> Reg -> SDoc
+pprFormatFormatOpReg :: PtrString -> Format -> Format -> Operand -> Reg -> SDoc
 pprFormatFormatOpReg name format1 format2 op1 reg2
   = hcat [
         pprMnemonic name format2,
@@ -1343,7 +1343,7 @@ pprFormatFormatOpReg name format1 format2 op1 reg2
         pprReg format2 reg2
     ]
 
-pprFormatRegRegReg :: LitString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprFormatRegRegReg :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
 pprFormatRegRegReg name format reg1 reg2 reg3
   = hcat [
         pprMnemonic name format,
@@ -1354,7 +1354,7 @@ pprFormatRegRegReg name format reg1 reg2 reg3
         pprReg format reg3
     ]
 
-pprFormatOpOpReg :: LitString -> Format -> Operand -> Operand -> Reg -> SDoc
+pprFormatOpOpReg :: PtrString -> Format -> Operand -> Operand -> Reg -> SDoc
 pprFormatOpOpReg name format op1 op2 reg3
   = hcat [
         pprMnemonic name format,
@@ -1365,7 +1365,7 @@ pprFormatOpOpReg name format op1 op2 reg3
         pprReg format reg3
     ]
 
-pprFormatAddrReg :: LitString -> Format -> AddrMode -> Reg -> SDoc
+pprFormatAddrReg :: PtrString -> Format -> AddrMode -> Reg -> SDoc
 pprFormatAddrReg name format op dst
   = hcat [
         pprMnemonic name format,
@@ -1375,7 +1375,7 @@ pprFormatAddrReg name format op dst
     ]
 
 
-pprFormatRegAddr :: LitString -> Format -> Reg -> AddrMode -> SDoc
+pprFormatRegAddr :: PtrString -> Format -> Reg -> AddrMode -> SDoc
 pprFormatRegAddr name format src op
   = hcat [
         pprMnemonic name format,
@@ -1385,7 +1385,7 @@ pprFormatRegAddr name format src op
     ]
 
 
-pprShift :: LitString -> Format -> Operand -> Operand -> SDoc
+pprShift :: PtrString -> Format -> Operand -> Operand -> SDoc
 pprShift name format src dest
   = hcat [
         pprMnemonic name format,
@@ -1395,7 +1395,7 @@ pprShift name format src dest
     ]
 
 
-pprFormatOpOpCoerce :: LitString -> Format -> Format -> Operand -> Operand -> SDoc
+pprFormatOpOpCoerce :: PtrString -> Format -> Format -> Operand -> Operand -> SDoc
 pprFormatOpOpCoerce name format1 format2 op1 op2
   = hcat [ char '\t', ptext name, pprFormat format1, pprFormat format2, space,
         pprOperand format1 op1,
@@ -1404,6 +1404,6 @@ pprFormatOpOpCoerce name format1 format2 op1 op2
     ]
 
 
-pprCondInstr :: LitString -> Cond -> SDoc -> SDoc
+pprCondInstr :: PtrString -> Cond -> SDoc -> SDoc
 pprCondInstr name cond arg
   = hcat [ char '\t', ptext name, pprCond cond, space, arg]

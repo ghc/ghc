@@ -848,8 +848,8 @@ Previously we had, as PatGroup constructors
 
 But Literal is really supposed to represent an *unboxed* literal, like Int#.
 We were sticking the literal from, say, an overloaded numeric literal pattern
-into a MachInt constructor. This didn't really make sense; and we now have
-the invariant that value in a MachInt must be in the range of the target
+into a LitInt constructor. This didn't really make sense; and we now have
+the invariant that value in a LitInt must be in the range of the target
 machine's Int# type, and an overloaded literal could meaningfully be larger.
 
 Solution: For pattern grouping purposes, just store the literal directly in

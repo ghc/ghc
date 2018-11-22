@@ -922,7 +922,7 @@ buggily is used we'll get a runtime error message.
 
 Coping with absence for *unlifted* types is important; see, for
 example, Trac #4306 and Trac #15627.  In the UnliftedRep case, we can
-use RubbishLit, which we need to apply to the required type.
+use LitRubbish, which we need to apply to the required type.
 For the unlifted types of singleton kind like Float#, Addr#, etc. we
 also find a suitable literal, using Literal.absentLiteralOf.  We don't
 have literals for every primitive type, so the function is partial.

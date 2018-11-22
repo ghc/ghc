@@ -270,7 +270,7 @@ data TextDetails = Chr  {-# UNPACK #-} !Char -- ^ A single Char fragment
                  | Str  String -- ^ A whole String fragment
                  | PStr FastString                      -- a hashed string
                  | ZStr FastZString                     -- a z-encoded string
-                 | LStr {-# UNPACK #-} !LitString
+                 | LStr {-# UNPACK #-} !PtrString
                    -- a '\0'-terminated array of bytes
                  | RStr {-# UNPACK #-} !Int {-# UNPACK #-} !Char
                    -- a repeated character (e.g., ' ')
@@ -306,17 +306,17 @@ text s = textBeside_ (Str s) (length s) Empty
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
 -- intermediate packing/unpacking of the string.
 {-# RULES "text/str"
-    forall a. text (unpackCString# a)  = ptext (mkLitString# a)
+    forall a. text (unpackCString# a)  = ptext (mkPtrString# a)
   #-}
 {-# RULES "text/unpackNBytes#"
-    forall p n. text (unpackNBytes# p n) = ptext (LitString (Ptr p) (I# n))
+    forall p n. text (unpackNBytes# p n) = ptext (PtrString (Ptr p) (I# n))
   #-}
 
 ftext :: FastString -> Doc
 ftext s = textBeside_ (PStr s) (lengthFS s) Empty
 
-ptext :: LitString -> Doc
-ptext s = textBeside_ (LStr s) (lengthLS s) Empty
+ptext :: PtrString -> Doc
+ptext s = textBeside_ (LStr s) (lengthPS s) Empty
 
 ztext :: FastZString -> Doc
 ztext s = textBeside_ (ZStr s) (lengthFZS s) Empty
@@ -941,7 +941,7 @@ txtPrinter (Chr c)    s  = c:s
 txtPrinter (Str s1)   s2 = s1 ++ s2
 txtPrinter (PStr s1)  s2 = unpackFS s1 ++ s2
 txtPrinter (ZStr s1)  s2 = zString s1 ++ s2
-txtPrinter (LStr s1)  s2 = unpackLitString s1 ++ s2
+txtPrinter (LStr s1)  s2 = unpackPtrString s1 ++ s2
 txtPrinter (RStr n c) s2 = replicate n c ++ s2
 
 -- | The general rendering interface.
@@ -1053,15 +1053,15 @@ printDoc_ mode pprCols hdl doc
                           -- NB. not hPutFS, we want this to go through
                           -- the I/O library's encoding layer. (#3398)
     put (ZStr s)   next = hPutFZS  hdl s >> next
-    put (LStr s)   next = hPutLitString hdl s >> next
+    put (LStr s)   next = hPutPtrString hdl s >> next
     put (RStr n c) next = hPutStr hdl (replicate n c) >> next
 
     done = return () -- hPutChar hdl '\n'
 
   -- some versions of hPutBuf will barf if the length is zero
-hPutLitString :: Handle -> LitString -> IO ()
-hPutLitString _handle (LitString _ 0) = return ()
-hPutLitString handle  (LitString a l) = hPutBuf handle a l
+hPutPtrString :: Handle -> PtrString -> IO ()
+hPutPtrString _handle (PtrString _ 0) = return ()
+hPutPtrString handle  (PtrString a l) = hPutBuf handle a l
 
 -- Printing output in LeftMode is performance critical: it's used when
 -- dumping C and assembly output, so we allow ourselves a few dirty
@@ -1099,7 +1099,7 @@ layLeft b (TextBeside s _ p) = s `seq` (put b s >> layLeft b p)
     put b (Str s)    = bPutStr  b s
     put b (PStr s)   = bPutFS   b s
     put b (ZStr s)   = bPutFZS  b s
-    put b (LStr s)   = bPutLitString b s
+    put b (LStr s)   = bPutPtrString b s
     put b (RStr n c) = bPutReplicate b n c
 layLeft _ _                  = panic "layLeft: Unhandled case"
 

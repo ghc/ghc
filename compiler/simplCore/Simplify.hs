@@ -19,7 +19,7 @@ import SimplEnv
 import SimplUtils
 import OccurAnal        ( occurAnalyseExpr )
 import FamInstEnv       ( FamInstEnv )
-import Literal          ( litIsLifted ) --, mkMachInt ) -- temporalily commented out. See #8326
+import Literal          ( litIsLifted ) --, mkLitInt ) -- temporalily commented out. See #8326
 import Id
 import MkId             ( seqId )
 import MkCore           ( mkImpossibleExpr, castBottomExpr )
@@ -1963,7 +1963,7 @@ tryRules env rules fn args call_cont
                = ASSERT( isEnumerationTyCon (dataConTyCon con) )
                 (LitAlt tag, [], rhs)
               where
-                tag = mkMachInt dflags (toInteger (dataConTag con - fIRST_TAG))
+                tag = mkLitInt dflags (toInteger (dataConTag con - fIRST_TAG))
              enum_to_tag alt = pprPanic "tryRules: tagToEnum" (ppr alt)
 
              new_alts = (DEFAULT, [], rhs1) : map enum_to_tag rest_alts

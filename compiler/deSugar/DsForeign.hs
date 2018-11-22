@@ -163,7 +163,7 @@ dsCImport id co (CLabel cid) cconv _ _ = do
    (resTy, foRhs) <- resultWrapper ty
    ASSERT(fromJust resTy `eqType` addrPrimTy)    -- typechecker ensures this
     let
-        rhs = foRhs (Lit (MachLabel cid stdcall_info fod))
+        rhs = foRhs (Lit (LitLabel cid stdcall_info fod))
         rhs' = Cast rhs co
         stdcall_info = fun_type_arg_stdcall_info dflags cconv ty
     in
@@ -442,8 +442,8 @@ dsFExportDynamic id co0 cconv = do
          -}
         adj_args      = [ mkIntLitInt dflags (ccallConvToInt cconv)
                         , Var stbl_value
-                        , Lit (MachLabel fe_nm mb_sz_args IsFunction)
-                        , Lit (mkMachString typestring)
+                        , Lit (LitLabel fe_nm mb_sz_args IsFunction)
+                        , Lit (mkLitString typestring)
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.)

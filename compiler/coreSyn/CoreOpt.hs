@@ -30,7 +30,7 @@ import CoreUtils
 import CoreFVs
 import PprCore  ( pprCoreBindings, pprRules )
 import OccurAnal( occurAnalyseExpr, occurAnalysePgm )
-import Literal  ( Literal(MachStr) )
+import Literal  ( Literal(LitString) )
 import Id
 import Var      ( varType, isNonCoVarId )
 import VarSet
@@ -816,8 +816,8 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         -- See Note [exprIsConApp_maybe on literal strings]
         | (fun `hasKey` unpackCStringIdKey) ||
           (fun `hasKey` unpackCStringUtf8IdKey)
-        , [arg]              <- args
-        , Just (MachStr str) <- exprIsLiteral_maybe (in_scope, id_unf) arg
+        , [arg]                <- args
+        , Just (LitString str) <- exprIsLiteral_maybe (in_scope, id_unf) arg
         = dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
@@ -858,7 +858,7 @@ dealWithStringLiteral fun str co
         rest = if BS.null charTail
                  then mkConApp nilDataCon [Type charTy]
                  else App (Var fun)
-                          (Lit (MachStr charTail))
+                          (Lit (LitString charTail))
 
     in pushCoDataCon consDataCon [Type charTy, char, rest] co
 
