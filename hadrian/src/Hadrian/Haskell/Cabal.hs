@@ -11,7 +11,8 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
     pkgVersion, pkgIdentifier, pkgSynopsis, pkgDescription, pkgDependencies,
-    pkgGenericDescription
+    pkgGenericDescription,
+    cabalArchString, cabalOsString,
     ) where
 
 import Development.Shake
@@ -54,3 +55,20 @@ pkgDependencies = fmap (map pkgName . packageDependencies) . readPackageData
 -- file is tracked.
 pkgGenericDescription :: Package -> Action GenericPackageDescription
 pkgGenericDescription = fmap genericPackageDescription . readPackageData
+
+-- | Cabal's rendering of an architecture as used in its directory structure.
+--
+-- Inverse of 'Cabal.Distribution.Simple.GHC.ghcArchString'.
+cabalArchString :: String -> String
+cabalArchString "powerpc"   = "ppc"
+cabalArchString "powerpc64" = "ppc64"
+cabalArchString other       = other
+
+-- | Cabal's rendering of an OS as used in its directory structure.
+--
+-- Inverse of 'Cabal.Distribution.Simple.GHC.ghcOsString'.
+cabalOsString :: String -> String
+cabalOsString "mingw32"  = "windows"
+cabalOsString "darwin"   = "osx"
+cabalOsString "solaris2" = "solaris"
+cabalOsString other      = other
