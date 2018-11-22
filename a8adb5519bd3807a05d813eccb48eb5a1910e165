@@ -147,3 +147,78 @@ i386-linux	T8766	normal	bytes allocated	8435556
 i386-linux	T9848	normal	bytes allocated	47408
 i386-linux	T13191	normal	bytes allocated	92976504
 i386-linux	T3474	normal	max_bytes_used	42772
+
+x86_64-linux	T3924	normal	bytes allocated	50752
+x86_64-linux	haddock.base	normal	bytes allocated	22653854936
+x86_64-linux	haddock.Cabal	normal	bytes allocated	23552745384
+x86_64-linux	haddock.compiler	normal	bytes allocated	60318730384
+x86_64-linux	join004	optasm	bytes allocated	16050712
+x86_64-linux	join002	optasm	bytes allocated	2000290816
+x86_64-linux	join007	optasm	bytes allocated	51032
+x86_64-linux	T5835	normal	max_bytes_used	44504
+x86_64-linux	T12791	normal	max_bytes_used	44504
+x86_64-linux	T10359	normal	bytes allocated	450896
+x86_64-linux	T14955	normal	bytes allocated	48050744
+x86_64-linux	join003	optasm	bytes allocated	2000290816
+x86_64-linux	T4830	normal	bytes allocated	98152
+x86_64-linux	T876	normal	bytes allocated	57664
+x86_64-linux	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+x86_64-linux	lazy-bs-alloc	normal	bytes allocated	428824
+x86_64-linux	T3586	normal	peak_megabytes_allocated	18
+x86_64-linux	T3586	normal	bytes allocated	16102216
+x86_64-linux	T3738	normal	peak_megabytes_allocated	2
+x86_64-linux	T3738	normal	bytes allocated	50512
+x86_64-linux	MethSharing	normal	peak_megabytes_allocated	2
+x86_64-linux	MethSharing	normal	bytes allocated	480098136
+x86_64-linux	T5113	normal	bytes allocated	8058600
+x86_64-linux	T4978	normal	bytes allocated	10136552
+x86_64-linux	Conversions	normal	bytes allocated	107776
+x86_64-linux	T5237	normal	bytes allocated	104480
+x86_64-linux	T5205	normal	bytes allocated	54376
+x86_64-linux	T5536	normal	bytes allocated	890357328
+x86_64-linux	T4267	normal	bytes allocated	41024
+x86_64-linux	T5949	normal	bytes allocated	201040
+x86_64-linux	T7619	normal	bytes allocated	41024
+x86_64-linux	T7436	normal	max_bytes_used	60368
+x86_64-linux	T7954	normal	bytes allocated	1280051064
+x86_64-linux	T7257	normal	peak_megabytes_allocated	228
+x86_64-linux	T7257	normal	bytes allocated	1297293256
+x86_64-linux	T7797	normal	bytes allocated	480050544
+x86_64-linux	InlineByteArrayAlloc	normal	bytes allocated	1440041024
+x86_64-linux	InlineArrayAlloc	normal	bytes allocated	1600041024
+x86_64-linux	T9339	normal	bytes allocated	50768
+x86_64-linux	InlineCloneArrayAlloc	normal	bytes allocated	1600041184
+x86_64-linux	T8472	normal	bytes allocated	50792
+x86_64-linux	T12990	normal	bytes allocated	20841040
+x86_64-linux	T9203	normal	bytes allocated	46371896
+x86_64-linux	T12996	normal	bytes allocated	79408
+x86_64-linux	T4474b	normal	bytes allocated	4831890008
+x86_64-linux	T13001	normal	bytes allocated	50656
+x86_64-linux	T4474a	normal	bytes allocated	4831890008
+x86_64-linux	T8763	normal	bytes allocated	41040
+x86_64-linux	T4474c	normal	bytes allocated	4831890008
+x86_64-linux	DeriveNull	normal	bytes allocated	112050864
+x86_64-linux	T13218	normal	bytes allocated	82005552
+x86_64-linux	T13218	normal	max_bytes_used	332488
+x86_64-linux	T15226a	normal	bytes allocated	41048
+x86_64-linux	T15426	normal	bytes allocated	41288
+x86_64-linux	T15226	normal	bytes allocated	41048
+x86_64-linux	T14936	normal	bytes allocated	51224
+x86_64-linux	T4334	normal	peak_megabytes_allocated	3
+x86_64-linux	T5549	normal	bytes allocated	5793140160
+x86_64-linux	T13623	normal	bytes allocated	50840
+x86_64-linux	T2762	normal	peak_megabytes_allocated	2
+x86_64-linux	space_leak_001	normal	peak_megabytes_allocated	4
+x86_64-linux	space_leak_001	normal	bytes allocated	11315396424
+x86_64-linux	space_leak_001	normal	max_bytes_used	441944
+x86_64-linux	T15578	normal	bytes allocated	800041424
+x86_64-linux	T14052	ghci	bytes allocated	2339850760
+x86_64-linux	T10678	normal	bytes allocated	64041472
+x86_64-linux	T7850	normal	peak_megabytes_allocated	5
+x86_64-linux	T4029	ghci	peak_megabytes_allocated	70
+x86_64-linux	T4029	ghci	max_bytes_used	20639584
+x86_64-linux	T13536a	optasm	bytes allocated	86728
+x86_64-linux	T8766	normal	bytes allocated	16828064
+x86_64-linux	T9848	normal	bytes allocated	51768
+x86_64-linux	T13191	normal	bytes allocated	185942728
+x86_64-linux	T3474	normal	max_bytes_used	44504
