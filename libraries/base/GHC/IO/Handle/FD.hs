@@ -130,7 +130,9 @@ addFilePathToIOError fun fp ioe
 --
 --  * 'isAlreadyInUseError' if the file is already open and cannot be reopened;
 --
---  * 'isDoesNotExistError' if the file does not exist; or
+--  * 'isDoesNotExistError' if the file does not exist or
+--    (on POSIX systems) is a FIFO without a reader and 'WriteMode' was
+--    requested; or
 --
 --  * 'isPermissionError' if the user does not have permission to open the file.
 --
@@ -161,7 +163,7 @@ openFileBlocking fp im =
 -- this is undesirable; also, as usual under Microsoft operating systems,
 -- text mode treats control-Z as EOF.  Binary mode turns off all special
 -- treatment of end-of-line and end-of-file characters.
--- (See also 'hSetBinaryMode'.)
+-- (See also 'System.IO.hSetBinaryMode'.)
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
