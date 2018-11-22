@@ -2935,7 +2935,10 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "pgmF"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_F   = f})))
   , make_ord_flag defFlag "pgmc"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[])})))
+      (hasArg (\f -> alterSettings (\s -> s { sPgm_c   = (f,[]),
+                                              -- Don't pass -no-pie with -pgmc
+                                              -- (see Trac #15319)
+                                              sGccSupportsNoPie = False})))
   , make_ord_flag defFlag "pgms"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
   , make_ord_flag defFlag "pgma"
