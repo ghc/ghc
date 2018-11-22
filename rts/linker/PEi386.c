@@ -1437,8 +1437,8 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 {
    bool has_code_section = false;
 
-   SymbolName* sname;
-   SymbolAddr* addr;
+   SymbolName* sname = NULL;
+   SymbolAddr* addr = NULL;
    unsigned int   i;
 
    COFF_HEADER_INFO *info = oc->info->ch_info;
@@ -1567,11 +1567,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             Allocate zeroed space for it */
         bss_sz = section.info->virtualSize;
         if (bss_sz < section.size) { bss_sz = section.size; }
-        bss_sz = section.info->alignment;
         zspace = stgCallocBytes(1, bss_sz, "ocGetNames_PEi386(anonymous bss)");
-        oc->sections[i].start = getAlignedMemory(zspace, section);
+        oc->sections[i].start = zspace;
         oc->sections[i].size  = bss_sz;
-        addProddableBlock(oc, zspace, bss_sz);
+        section  = oc->sections[i];
         /* debugBelch("BSS anon section at 0x%x\n", zspace); */
       }
 
@@ -1592,9 +1591,9 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (sz < section.info->virtualSize) sz = section.info->virtualSize;
 
       start = section.start;
-      end   = start + sz - 1;
+      end   = start + sz;
 
-      if (kind != SECTIONKIND_OTHER && end >= start) {
+      if (kind != SECTIONKIND_OTHER && end > start) {
           /* See Note [Section alignment].  */
           addCopySection(oc, &oc->sections[i], kind, SECTION_NOMEM, start, sz);
           addProddableBlock(oc, oc->sections[i].start, sz);
