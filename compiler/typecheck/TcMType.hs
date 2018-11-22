@@ -1152,16 +1152,16 @@ collect_cand_qtvs :: Bool   -- True <=> consider every fv in Type to be dependen
 collect_cand_qtvs is_dep bound dvs ty
   = go dvs ty
   where
-    go_rig dv Zero  = return dv
-    go_rig dv One   = return dv
-    go_rig dv Omega = return dv
-    go_rig dv (RigAdd x y) = foldlM go_rig dv [x, y]
-    go_rig dv (RigMul x y) = foldlM go_rig dv [x, y]
-    go_rig dv (RigThing x) = go dv x
+    go_mult dv Zero  = return dv
+    go_mult dv One   = return dv
+    go_mult dv Omega = return dv
+    go_mult dv (MultAdd x y) = foldlM go_mult dv [x, y]
+    go_mult dv (MultMul x y) = foldlM go_mult dv [x, y]
+    go_mult dv (MultThing x) = go dv x
 
     go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
     go dv (TyConApp _ tys) = foldlM go dv tys
-    go dv (FunTy w arg res) = do dv1 <- go_rig dv w
+    go dv (FunTy w arg res) = do dv1 <- go_mult dv w
                                  foldlM go dv1 [arg, res]
     go dv (LitTy {})       = return dv
     go dv (CastTy ty co)   = do dv1 <- go dv ty

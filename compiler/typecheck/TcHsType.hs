@@ -607,7 +607,7 @@ tc_mult mode r = case r of
                           case ty' of
                             t | isOneMultiplicity t -> return One
                             t | isOmegaMultiplicity t -> return Omega
-                            t -> return $ RigThing t
+                            t -> return $ MultThing t
 
 
 ------------------------------------------

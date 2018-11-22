@@ -254,7 +254,7 @@ data IfaceConDecl
           -- See Note [DataCon user type variable binders] in DataCon
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
-        ifConArgTys  :: [(IfaceRig, IfaceType)],-- Arg types
+        ifConArgTys  :: [(IfaceMult, IfaceType)],-- Arg types
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),

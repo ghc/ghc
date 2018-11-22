@@ -511,7 +511,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
             w_ty  = mkTyVarTy multiplicityTyVar
        ; let actual_res_ty
                  =  mkForAllTys [w_tvb] $
-                    mkFunTys [ mkScaled (RigThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                    mkFunTys [ mkScaled (MultThing w_ty) ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")

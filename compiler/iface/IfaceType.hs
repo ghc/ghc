@@ -16,7 +16,7 @@ module IfaceType (
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
         IfaceMCoercion(..),
         IfaceUnivCoProv(..),
-        IfaceRig,
+        IfaceMult,
         IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..), IsPromoted(..),
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
@@ -134,7 +134,7 @@ data IfaceType
                              -- See Note [Suppressing invisible arguments] for
                              -- an explanation of why the second field isn't
                              -- IfaceType, analogous to AppTy.
-  | IfaceFunTy     IfaceRig IfaceType IfaceType
+  | IfaceFunTy     IfaceMult IfaceType IfaceType
   | IfaceDFunTy    IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceAppArgs  -- Not necessarily saturated
@@ -148,7 +148,7 @@ data IfaceType
        IfaceAppArgs               -- arity = length args
           -- For promoted data cons, the kind args are omitted
 
-type IfaceRig = IfaceType
+type IfaceMult = IfaceType
 
 type IfacePredType = IfaceType
 type IfaceContext = [IfacePredType]

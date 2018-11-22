@@ -1821,7 +1821,7 @@ extract_lty t_or_k (L _ ty) acc
       HsSumTy _ tys               -> extract_ltys t_or_k tys acc
       HsFunTy _ ty1 w ty2         -> extract_lty t_or_k ty1 $
                                      extract_lty t_or_k ty2 $
-                                     extract_rig t_or_k w acc
+                                     extract_mult t_or_k w acc
       HsIParamTy _ _ ty           -> extract_lty t_or_k ty acc
       HsOpTy _ ty1 tv ty2         -> extract_tv t_or_k tv   $
                                      extract_lty t_or_k ty1 $
@@ -1845,10 +1845,10 @@ extract_lty t_or_k (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
 
-extract_rig :: TypeOrKind -> HsMult GhcPs -> FreeKiTyVarsWithDups ->
-               FreeKiTyVarsWithDups
-extract_rig t_or_k (HsMultTy t) acc = extract_lty t_or_k t acc
-extract_rig t_or_k _ acc = acc
+extract_mult :: TypeOrKind -> HsMult GhcPs -> FreeKiTyVarsWithDups ->
+                FreeKiTyVarsWithDups
+extract_mult t_or_k (HsMultTy t) acc = extract_lty t_or_k t acc
+extract_mult t_or_k _ acc = acc
 
 extractHsTvBndrs :: [LHsTyVarBndr GhcPs]
                  -> FreeKiTyVarsWithDups           -- Free in body
