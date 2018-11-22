@@ -760,7 +760,8 @@ mkForAllCo_NoRefl v kind_co co
   , ASSERT( not (isReflCo co)) True
   , isCoVar v
   , not (v `elemVarSet` tyCoVarsOfCo co)
-  = FunCo (coercionRole co) (error "TODO multiplicity coercion") kind_co co -- TODO Krzysztof
+  = FunCo (coercionRole co) (multToCo Omega) kind_co co
+      -- Functions from coercions are always unrestricted
   | otherwise
   = ForAllCo v kind_co co
 
