@@ -67,7 +67,7 @@ import Control.Arrow ( first )
 import Data.List ( mapAccumL )
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
-import Data.Maybe ( isNothing, maybe, fromMaybe )
+import Data.Maybe ( isNothing, fromMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
 {- | @rnSourceDecl@ "renames" declarations.

@@ -53,7 +53,7 @@ import Name
 import VarSet
 import Rules
 import VarEnv
-import Var( EvVar, varType )
+import Var( EvVar )
 import Outputable
 import Module
 import SrcLoc

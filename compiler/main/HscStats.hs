@@ -17,7 +17,6 @@ import SrcLoc
 import Util
 
 import Data.Char
-import Data.Foldable (foldl')
 
 -- | Source Statistics
 ppSourceStats :: Bool -> Located (HsModule GhcPs) -> SDoc

@@ -37,7 +37,7 @@ import Util
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( anyTypeOfKind )
 
-import Data.List (foldl', sort)
+import Data.List (sort)
 import qualified Data.IntSet as IS
 
 {- **********************************************************************

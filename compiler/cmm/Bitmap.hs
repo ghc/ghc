@@ -21,7 +21,6 @@ import SMRep
 import DynFlags
 import Util
 
-import Data.Foldable (foldl')
 import Data.Bits
 
 {-|

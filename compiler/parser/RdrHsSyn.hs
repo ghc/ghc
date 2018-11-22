@@ -106,7 +106,6 @@ import FastString
 import Maybes
 import Util
 import ApiAnnotation
-import HsExtension      ( noExt )
 import Data.List
 import DynFlags ( WarningFlag(..) )
 

@@ -65,7 +65,7 @@ import RnModIface
 import Util
 
 import Control.Monad
-import Data.List (find, foldl')
+import Data.List (find)
 
 import {-# SOURCE #-} TcRnDriver
 

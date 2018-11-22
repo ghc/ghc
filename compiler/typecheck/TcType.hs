@@ -224,7 +224,7 @@ import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List  ( mapAccumL, foldl' )
+import Data.List  ( mapAccumL )
 import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )

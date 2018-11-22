@@ -26,7 +26,7 @@ import TcValidity( allDistinctTyVars )
 import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
-import TcValidity
+import TcValidity( checkValidInstHead )
 import InstEnv
 import Inst
 import FamInstEnv

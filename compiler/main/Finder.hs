@@ -50,7 +50,6 @@ import System.Directory
 import System.FilePath
 import Control.Monad
 import Data.Time
-import Data.List        ( foldl' )
 
 
 type FileExt = String   -- Filename extension

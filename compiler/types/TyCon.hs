@@ -137,7 +137,8 @@ import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
                                  , mkFunKind, mkForAllKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
-                                 , dataConTyCon, dataConFullSig )
+                                 , dataConTyCon, dataConFullSig
+                                 , isUnboxedSumCon )
 
 import Binary
 import Var
@@ -159,7 +160,6 @@ import Util
 import Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import UniqSet
 import Module
-import {-# SOURCE #-} DataCon
 
 import qualified Data.Data as Data
 

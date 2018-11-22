@@ -69,7 +69,6 @@ import Control.Applicative (Alternative((<|>)), Const(Const))
 import Data.Functor.Identity (Identity(Identity))
 import Data.Proxy (Proxy(Proxy))
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Monoid (mappend)
 import Data.Ord (Down(Down))
 
 import GHC.Read (expectP, list, paren)

@@ -1,5 +1,5 @@
 
-mod177.hs:5:1: warning: [-Wunused-imports (in -Wextra)]
+mod177.hs:4:1: warning: [-Wunused-imports (in -Wextra)]
     The import of ‘Data.Maybe’ is redundant
       except perhaps to import instances from ‘Data.Maybe’
     To import instances alone, use: import Data.Maybe()

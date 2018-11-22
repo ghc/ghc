@@ -64,7 +64,7 @@ import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcHoleErrors ( findValidHoleFits )
 
-import Data.Semigroup   ( Semigroup )
+-- import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 
 

@@ -17,7 +17,7 @@ import GhcPrelude
 import qualified Data.IntMap.Strict as M
 import qualified Data.IntSet as S
 
-import Data.List (foldl', foldl1')
+import Data.List (foldl1')
 
 class IsSet set where
   type ElemOf set

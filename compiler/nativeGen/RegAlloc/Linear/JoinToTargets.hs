@@ -27,8 +27,6 @@ import Unique
 import UniqFM
 import UniqSet
 
-import Data.Foldable (foldl')
-
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --

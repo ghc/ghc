@@ -57,16 +57,15 @@ import TysWiredIn
 import DynFlags
 import Outputable as Ppr
 import GHC.Char
-import GHC.Exts
 import GHC.Exts.Heap
-import GHC.IO ( IO(..) )
 import SMRep ( roundUpTo )
 
 import Control.Monad
-import Data.Array.Base
 import Data.Maybe
 import Data.List
 #if defined(INTEGER_GMP)
+import GHC.Exts
+import Data.Array.Base
 import GHC.Integer.GMP.Internals
 #endif
 import qualified Data.Sequence as Seq

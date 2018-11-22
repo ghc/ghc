@@ -49,7 +49,6 @@ module GHC.StaticPtr
 
 import Foreign.C.Types     (CInt(..))
 import Foreign.Marshal     (allocaArray, peekArray)
-import GHC.Exts            (addrToAny#)
 import GHC.Ptr             (Ptr(..), nullPtr)
 import GHC.Fingerprint     (Fingerprint(..))
 import GHC.Prim

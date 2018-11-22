@@ -13,7 +13,6 @@ import Platform
 
 import Data.Word
 import Data.Bits
-import Data.Foldable (foldl')
 
 -- The PowerPC has 32 integer and 32 floating point registers.
 -- This is 32bit PowerPC, so Word64 is inefficient - two Word32s are much

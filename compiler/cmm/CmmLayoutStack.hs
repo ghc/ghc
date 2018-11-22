@@ -37,7 +37,7 @@ import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
-import Data.List (nub, foldl')
+import Data.List (nub)
 
 {- Note [Stack Layout]
 

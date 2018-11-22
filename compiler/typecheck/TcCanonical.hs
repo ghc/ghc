@@ -43,7 +43,7 @@ import Bag
 import MonadUtils
 import Control.Monad
 import Data.Maybe ( isJust )
-import Data.List  ( zip4, foldl' )
+import Data.List  ( zip4 )
 import BasicTypes
 
 import Data.Bifunctor ( bimap )

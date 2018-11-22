@@ -52,7 +52,6 @@ import UniqFM
 import Unique
 import Data.Coerce
 import Outputable
-import Data.Foldable (foldl')
 import Data.Data
 import qualified Data.Semigroup as Semi
 

@@ -60,7 +60,7 @@ import Name             ( NamedThing(..), nameSrcSpan )
 import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
-import Data.List        ( mapAccumL, foldl' )
+import Data.List        ( mapAccumL )
 import Control.Monad
 import CostCentre       ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S

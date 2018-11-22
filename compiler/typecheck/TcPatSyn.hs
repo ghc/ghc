@@ -17,15 +17,13 @@ import GhcPrelude
 
 import HsSyn
 import TcPat
-import Type( mkEmptyTCvSubst, tidyTyCoVarBinders, tidyTypes, tidyType )
+import Type( tidyTyCoVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
-import TcType( mkMinimalBySCs )
 import TcEnv
 import TcMType
 import TcHsSyn
 import TysPrim
-import TysWiredIn  ( runtimeRepTy )
 import Name
 import SrcLoc
 import PatSyn
