@@ -54,11 +54,10 @@ module TcMType (
   newMetaTyVarTyVars, newMetaTyVarTyVarX,
   newTyVarTyVar, newTauTyVar, newSkolemTyVar, newWildCardX,
   tcInstType,
-  tcInstSkolTyVars,tcInstSkolTyVarsX,
-  tcInstSuperSkolTyVarsX,
-  tcSkolDFunType, tcSuperSkolTyVars,
+  tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
+  tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
-  instSkolTyCoVarsX, freshenTyVarBndrs, freshenCoVarBndrsX,
+  freshenTyVarBndrs, freshenCoVarBndrsX,
 
   --------------------------------
   -- Zonking and tidying
@@ -529,7 +528,7 @@ tcInstSkolTyVars = tcInstSkolTyVarsX emptyTCvSubst
 
 tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
-tcInstSkolTyVarsX = tcInstSkolTyVars' False
+tcInstSkolTyVarsX = tcInstSkolTyVarsPushLevel False
 
 tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
@@ -537,25 +536,62 @@ tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
 
 tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
-tcInstSuperSkolTyVarsX subst = tcInstSkolTyVars' True subst
+tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
 
-tcInstSkolTyVars' :: Bool -> TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
+                          -> TcM (TCvSubst, [TcTyVar])
+-- Skolemise one level deeper, hence pushTcLevel
 -- See Note [Skolemising type variables]
-tcInstSkolTyVars' overlappable subst tvs
-  = do { loc    <- getSrcSpanM
-       ; tc_lvl <- getTcLevel
+tcInstSkolTyVarsPushLevel overlappable subst tvs
+  = do { tc_lvl <- getTcLevel
        ; let pushed_lvl = pushTcLevel tc_lvl
-             -- pushTcLevel: see Note [Skolemising type variables] (a)
+       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
 
-             details = SkolemTv pushed_lvl overlappable
+tcInstSkolTyVarsAt :: TcLevel -> Bool
+                   -> TCvSubst -> [TyVar]
+                   -> TcM (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsAt lvl overlappable subst tvs
+  = freshenTyCoVarsX new_skol_tv subst tvs
+  where
+    details = SkolemTv lvl overlappable
+    new_skol_tv name kind = mkTcTyVar name kind details
 
-             new_skol_tv :: TcTyCoVarMaker TcGblEnv TcLclEnv
-             new_skol_tv old_name kind
-               = do { uniq <- newUnique
-                     ; let name = mkInternalName uniq (getOccName old_name) loc
-                     ; return (mkTcTyVar name kind details) }
+------------------
+freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
+-- ^ Give fresh uniques to a bunch of TyVars, but they stay
+--   as TyVars, rather than becoming TcTyVars
+-- Used in FamInst.newFamInst, and Inst.newClsInst
+freshenTyVarBndrs = freshenTyCoVars mkTyVar
 
-       ; instSkolTyCoVarsX new_skol_tv subst tvs }
+freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcM (TCvSubst, [CoVar])
+-- ^ Give fresh uniques to a bunch of CoVars
+-- Used in FamInst.newFamInst
+freshenCoVarBndrsX subst = freshenTyCoVarsX mkCoVar subst
+
+------------------
+freshenTyCoVars :: (Name -> Kind -> TyCoVar)
+                -> [TyVar] -> TcM (TCvSubst, [TyCoVar])
+freshenTyCoVars mk_tcv = freshenTyCoVarsX mk_tcv emptyTCvSubst
+
+freshenTyCoVarsX :: (Name -> Kind -> TyCoVar)
+                 -> TCvSubst -> [TyCoVar]
+                 -> TcM (TCvSubst, [TyCoVar])
+freshenTyCoVarsX mk_tcv = mapAccumLM (freshenTyCoVarX mk_tcv)
+
+freshenTyCoVarX :: (Name -> Kind -> TyCoVar)
+                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
+-- This a complete freshening operation:
+-- the skolems have a fresh unique, and a location from the monad
+-- See Note [Skolemising type variables]
+freshenTyCoVarX mk_tcv subst tycovar
+  = do { loc  <- getSrcSpanM
+       ; uniq <- newUnique
+       ; let old_name = tyVarName tycovar
+             new_name = mkInternalName uniq (getOccName old_name) loc
+             new_kind = substTyUnchecked subst (tyVarKind tycovar)
+             new_tcv  = mk_tcv new_name new_kind
+             subst1   = extendTCvSubstWithClone subst tycovar new_tcv
+       ; return (subst1, new_tcv) }
 
 {- Note [Skolemising type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -579,65 +615,7 @@ d) The resulting skolems are
    but overlappable for tcInstSuperSkolTyVars
    See TcDerivInfer Note [Overlap and deriving] for an example
    of where this matters.
--}
 
-------------------
-freshenTyVarBndrs :: [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyVar])
--- ^ Give fresh uniques to a bunch of TyVars, but they stay
---   as TyVars, rather than becoming TcTyVars
--- Used in FamInst.newFamInst, and Inst.newClsInst
-freshenTyVarBndrs = instSkolTyCoVars mk_tv
-  where
-    mk_tv old_name kind
-       = do { uniq <- newUnique
-            ; return (mkTyVar (setNameUnique old_name uniq) kind) }
-
-freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcRnIf gbl lcl (TCvSubst, [CoVar])
--- ^ Give fresh uniques to a bunch of CoVars
--- Used in FamInst.newFamInst
-freshenCoVarBndrsX subst = instSkolTyCoVarsX mk_cv subst
-  where
-    mk_cv old_name kind
-      = do { uniq <- newUnique
-           ; return (mkCoVar (setNameUnique old_name uniq) kind) }
-
-------------------
-type TcTyCoVarMaker gbl lcl = Name -> Kind -> TcRnIf gbl lcl TyCoVar
-     -- The TcTyCoVarMaker should make a fresh Name, based on the old one
-     -- Freshness is critical. See Note [Skolems in zonkSyntaxExpr] in TcHsSyn
-
-instSkolTyCoVars :: TcTyCoVarMaker gbl lcl -> [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyCoVar])
-instSkolTyCoVars mk_tcv = instSkolTyCoVarsX mk_tcv emptyTCvSubst
-
-instSkolTyCoVarsX :: TcTyCoVarMaker gbl lcl
-                  -> TCvSubst -> [TyCoVar] -> TcRnIf gbl lcl (TCvSubst, [TyCoVar])
-instSkolTyCoVarsX mk_tcv = mapAccumLM (instSkolTyCoVarX mk_tcv)
-
-instSkolTyCoVarX :: TcTyCoVarMaker gbl lcl
-                 -> TCvSubst -> TyCoVar -> TcRnIf gbl lcl (TCvSubst, TyCoVar)
-instSkolTyCoVarX mk_tcv subst tycovar
-  = do  { new_tcv <- mk_tcv old_name kind
-        ; let subst1 | isTyVar new_tcv
-                     = extendTvSubstWithClone subst tycovar new_tcv
-                     | otherwise
-                     = extendCvSubstWithClone subst tycovar new_tcv
-        ; return (subst1, new_tcv) }
-  where
-    old_name = tyVarName tycovar
-    kind     = substTyUnchecked subst (tyVarKind tycovar)
-
-newFskTyVar :: TcType -> TcM TcTyVar
-newFskTyVar fam_ty
-  = do { uniq <- newUnique
-       ; ref  <- newMutVar Flexi
-       ; tclvl <- getTcLevel
-       ; let details = MetaTv { mtv_info  = FlatSkolTv
-                              , mtv_ref   = ref
-                              , mtv_tclvl = tclvl }
-             name = mkMetaTyVarName uniq (fsLit "fsk")
-       ; return (mkTcTyVar name (typeKind fam_ty) details) }
-
-{-
 Note [Kind substitution when instantiating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we instantiate a bunch of kind and type variables, first we
@@ -696,6 +674,17 @@ newTyVarTyVar name kind
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
 newSkolemTyVar name kind = do { lvl <- getTcLevel
                               ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+
+newFskTyVar :: TcType -> TcM TcTyVar
+newFskTyVar fam_ty
+  = do { uniq <- newUnique
+       ; ref  <- newMutVar Flexi
+       ; tclvl <- getTcLevel
+       ; let details = MetaTv { mtv_info  = FlatSkolTv
+                              , mtv_ref   = ref
+                              , mtv_tclvl = tclvl }
+             name = mkMetaTyVarName uniq (fsLit "fsk")
+       ; return (mkTcTyVar name (typeKind fam_ty) details) }
 
 newFmvTyVar :: TcType -> TcM TcTyVar
 -- Very like newMetaTyVar, except sets mtv_tclvl to one less
@@ -940,27 +929,27 @@ newOpenFlexiTyVarTy
   = do { kind <- newOpenTypeKind
        ; newFlexiTyVarTy kind }
 
-newMetaTyVarTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
-newMetaTyVarTyVars = mapAccumLM newMetaTyVarTyVarX emptyTCvSubst
-
 newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables
 -- Note that this works for a sequence of kind, type, and coercion variables
 -- variables.  Eg    [ (k:*), (a:k->k) ]
 --             Gives [ (k7:*), (a8:k7->k7) ]
-newMetaTyVars = mapAccumLM newMetaTyVarX emptyTCvSubst
+newMetaTyVars = newMetaTyVarsX emptyTCvSubst
     -- emptyTCvSubst has an empty in-scope set, but that's fine here
     -- Since the tyvars are freshly made, they cannot possibly be
     -- captured by any existing for-alls.
+
+newMetaTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- Just like newMetaTyVars, but start with an existing substitution.
+newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
 
 newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
 newMetaTyVarX subst tyvar = new_meta_tv_x TauTv subst tyvar
 
-newMetaTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
--- Just like newMetaTyVars, but start with an existing substitution.
-newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
+newMetaTyVarTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+newMetaTyVarTyVars = mapAccumLM newMetaTyVarTyVarX emptyTCvSubst
 
 newMetaTyVarTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Just like newMetaTyVarX, but make a TyVarTv

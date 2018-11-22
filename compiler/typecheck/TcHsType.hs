@@ -1523,8 +1523,7 @@ kcLHsQTyVars_Cusk name flav
            -- Now, because we're in a CUSK,
            -- we quantify over the mentioned kind vars
        ; let spec_req_tkvs = scoped_kvs ++ tc_tvs
-
-       ; all_kinds <- zonkTcTypes (res_kind : map tyVarKind spec_req_tkvs)
+             all_kinds     = res_kind : map tyVarKind spec_req_tkvs
 
        ; candidates <- candidateQTyVarsOfKinds all_kinds
              -- 'candidates' are all the variables that we are going to
@@ -1534,7 +1533,7 @@ kcLHsQTyVars_Cusk name flav
        ; let inf_candidates = candidates `delCandidates` spec_req_tkvs
 
        ; inferred <- quantifyTyVars emptyVarSet inf_candidates
-                     -- NB: qtkvs comes back sorted in dependency order
+                     -- NB: 'inferred' comes back sorted in dependency order
 
        ; scoped_kvs <- mapM zonkTyCoVarKind scoped_kvs
        ; tc_tvs     <- mapM zonkTyCoVarKind tc_tvs

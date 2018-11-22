@@ -42,8 +42,6 @@ import Type( mkTyVarBinders )
 
 import DynFlags
 import Var      ( TyVar, tyVarKind )
-import VarSet
-import VarEnv   ( mkInScopeSet )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
@@ -453,16 +451,9 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
         --         the easiest way to do so, and is very similar to
         --         the tcInstType in the CompleteSig case
         -- See Trac #14643
-       ; let in_scope = mkInScopeSet $ closeOverKinds $ unionVarSets
-                          [ mkVarSet (map snd wcs)
-                          , maybe emptyVarSet tyCoVarsOfType wcx
-                          , mkVarSet tvs
-                          , tyCoVarsOfTypes theta
-                          , tyCoVarsOfType tau ]
-               -- the in_scope is a bit bigger than nec'y, but too big is always
-               -- safe
-             empty_subst = mkEmptyTCvSubst in_scope
-       ; (subst, tvs') <- instSkolTyCoVarsX mk_sig_tv empty_subst tvs
+       ; (subst, tvs') <- newMetaTyVarTyVars tvs
+                         -- Why newMetaTyVarTyVars?  See TcBinds
+                         -- Note [Quantified variables in partial type signatures]
        ; let tv_prs = tv_names `zip` tvs'
              inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
@@ -472,12 +463,6 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_inst_tau   = substTy  subst tau }
        ; traceTc "End partial sig }" (ppr inst_sig)
        ; return inst_sig }
-  where
-    mk_sig_tv old_name kind
-      = do { uniq <- newUnique
-           ; newTyVarTyVar (setNameUnique old_name uniq) kind }
-      -- Why newTyVarTyVar?  See TcBinds
-      -- Note [Quantified variables in partial type signatures]
 
 
 {- Note [Pattern bindings and complete signatures]

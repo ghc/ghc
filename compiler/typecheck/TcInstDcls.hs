@@ -583,45 +583,25 @@ tcDataFamInstDecl mb_clsinfo
              , feqn_pats   = hs_pats
              , feqn_tycon  = lfam_name@(L _ fam_name)
              , feqn_fixity = fixity
-             , feqn_rhs    = HsDataDefn { dd_ND = new_or_data
-                                        , dd_cType = cType
-                                        , dd_ctxt = ctxt
-                                        , dd_cons = cons
+             , feqn_rhs    = HsDataDefn { dd_ND      = new_or_data
+                                        , dd_cType   = cType
+                                        , dd_ctxt    = hs_ctxt
+                                        , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
-                                        , dd_derivs = derivs } }}}))
+                                        , dd_derivs  = derivs } }}}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcFamInstDeclChecks mb_clsinfo lfam_name
 
        -- Check that the family declaration is for the right kind
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
-       ; gadt_syntax <- dataDeclChecks fam_name new_or_data ctxt cons
+       ; gadt_syntax <- dataDeclChecks fam_name new_or_data hs_ctxt hs_cons
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in FamInstEnv
 
-       -- Kind check type patterns
-       ; let exp_bndrs = mb_bndrs `orElse` []
-             data_ctxt = DataKindCtxt fam_name
-
-       ; (qtvs, pats, (stupid_theta, res_kind))
-            <- tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats $
-               \ res_kind -> do { stupid_theta <- tcHsContext ctxt
-                                ; mapM_ (wrapLocM kcConDecl) cons
-
-                                ; exp_res_kind <- case m_ksig of
-                                     Nothing   -> return liftedTypeKind
-                                     Just hs_k -> tcLHsKindSig data_ctxt hs_k
-                                ; _ <- checkExpectedKindX pp_hs_pats bogus_ty
-                                                          res_kind exp_res_kind
-                                       -- ToDo: what about a non-triv result?
-
-                                ; return (stupid_theta, res_kind) }
-
-       -- Zonk the patterns etc into the Type world
-       ; (ze, qtvs)   <- zonkTyBndrs qtvs
-       ; pats         <- zonkTcTypesToTypesX ze pats
-       ; res_kind     <- zonkTcTypeToTypeX   ze res_kind
-       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+       ; (qtvs, pats, res_kind, stupid_theta)
+             <- tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs
+                                fixity hs_ctxt hs_pats m_ksig hs_cons
 
        -- Construct representation tycon
        ; rep_tc_name <- newFamInstTyConName lfam_name pats
@@ -650,13 +630,13 @@ tcDataFamInstDecl mb_clsinfo
        -- Check that type patterns match the class instance head
        ; checkConsistentFamInst mb_clsinfo fam_tc all_pats
 
-       ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr exp_bndrs
-                                      $$ ppr cons)
+       ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr mb_bndrs
+                                      $$ ppr hs_cons)
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcExtendTyVarEnv qtvs $
                              -- For H98 decls, the tyvars scope
                              -- over the data constructors
-                             tcConDecls rec_rep_tc ty_binders orig_res_ty cons
+                             tcConDecls rec_rep_tc ty_binders orig_res_ty hs_cons
 
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
@@ -688,11 +668,6 @@ tcDataFamInstDecl mb_clsinfo
        -- Check that left-hand sides are ok (mono-types, no type families,
        -- consistent instantiations, etc)
        ; checkValidCoAxBranch fam_tc (coAxiomSingleBranch axiom)
-
-       -- Result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (tcIsLiftedTypeKind final_res_kind) $
-         tooFewParmsErr (tyConArity fam_tc)
-
        ; checkValidTyCon rep_tc
 
        ; let m_deriv_info = case derivs of
@@ -705,7 +680,6 @@ tcDataFamInstDecl mb_clsinfo
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) }
   where
-
     eta_reduce :: [Type] -> ([Type], [TyVar])
     -- See Note [Eta reduction for data families] in FamInstEnv
     -- Splits the incoming patterns into two: the [TyVar]
@@ -721,19 +695,54 @@ tcDataFamInstDecl mb_clsinfo
       = go pats (tv : etad_tvs)
     go pats etad_tvs = (reverse pats, etad_tvs)
 
-    pp_hs_pats = pprFamInstLHS lfam_name mb_bndrs hs_pats fixity (unLoc ctxt) m_ksig
-    bogus_ty   = pprPanic "tcDataFamInstDecl" (ppr fam_name <+> ppr hs_pats)
+tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 
+tcDataFamHeader :: Maybe ClsInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
+                -> LexicalFixity -> LHsContext GhcRn
+                -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
+                -> TcM ([TyVar], [Type], Kind, ThetaType)
+tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksig hs_cons
+  = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
+            <- pushTcLevelM_                                $
+               solveEqualities                              $
+               bindImplicitTKBndrs_Q_Skol imp_vars          $
+               bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
+               do { stupid_theta <- tcHsContext hs_ctxt
+                  ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc mb_clsinfo hs_pats
+                  ; mapM_ (wrapLocM kcConDecl) hs_cons
+                  ; res_kind <- tc_kind_sig m_ksig
+                  ; lhs_ty <- checkExpectedKindX pp_lhs lhs_ty lhs_kind res_kind
+                  ; return (stupid_theta, lhs_ty, res_kind) }
 
-tcDataFamInstDecl _
-    (L _ (DataFamInstDecl
-         { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = XHsDataDefn _ }}}))
-  = panic "tcDataFamInstDecl"
-tcDataFamInstDecl _ (L _ (DataFamInstDecl (XHsImplicitBndrs _)))
-  = panic "tcDataFamInstDecl"
-tcDataFamInstDecl _ (L _ (DataFamInstDecl (HsIB _ (XFamEqn _))))
-  = panic "tcDataFamInstDecl"
+       -- See Note [Generalising in tcFamTyPatsAndThen]
+       ; let scoped_tvs = imp_tvs ++ exp_tvs
+       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
+       ; qtvs <- quantifyTyVars emptyVarSet dvs
 
+       -- Zonk the patterns etc into the Type world
+       ; (ze, qtvs)   <- zonkTyBndrs qtvs
+       ; lhs_ty       <- zonkTcTypeToTypeX ze lhs_ty
+       ; res_kind     <- zonkTcTypeToTypeX ze res_kind
+       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+
+       ; let pats = unravelFamInstPats lhs_ty
+       ; return (qtvs, pats, res_kind, stupid_theta) }
+  where
+    fam_name  = tyConName fam_tc
+    data_ctxt = DataKindCtxt fam_name
+    pp_lhs    = pprFamInstLHS fam_name mb_bndrs hs_pats fixity hs_ctxt
+    exp_bndrs = mb_bndrs `orElse` []
+
+    -- See Note [Result kind signature for a data family instance]
+    tc_kind_sig Nothing
+      = return liftedTypeKind
+    tc_kind_sig (Just hs_kind)
+      = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
+           ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
+           ; lvl <- getTcLevel
+           ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
+             -- Perhaps surprisingly, we don't need the skolemised tvs themselves
+           ; return (substTy subst inner_kind) }
 
 ---------------------
 tcFamInstDeclChecks :: Maybe ClsInstInfo
@@ -759,8 +768,17 @@ tcFamInstDeclChecks mb_clsinfo fam_tc_lname
 
        ; return fam_tc }
 
-{- Note [Associated type instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Result kind signature for a data family instance]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The expected type might have a forall at the type. Normally, we
+can't skolemise in kinds because we don't have type-level lambda.
+But here, we're at the top-level of an instance declaration, so
+we actually have a place to put the regeneralised variables.
+Thus: skolemise away. cf. Inst.deeplySkolemise and TcUnify.tcSkolemise
+Examples in indexed-types/should_compile/T12369
+
+Note [Associated type instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow this:
   class C a where
     type T x a
@@ -1963,11 +1981,6 @@ notFamily :: TyCon -> SDoc
 notFamily tycon
   = vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
          , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
-
-tooFewParmsErr :: Arity -> SDoc
-tooFewParmsErr arity
-  = text "Family instance has too few parameters; expected" <+>
-    ppr arity
 
 assocInClassErr :: Located Name -> SDoc
 assocInClassErr name

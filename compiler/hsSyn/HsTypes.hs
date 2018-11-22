@@ -24,7 +24,7 @@ module HsTypes (
         HsWildCardBndrs(..),
         LHsSigType, LHsSigWcType, LHsWcType,
         HsTupleSort(..),
-        HsContext, LHsContext,
+        HsContext, LHsContext, noLHsContext,
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
 
@@ -63,7 +63,7 @@ module HsTypes (
 
         -- Printing
         pprHsType, pprHsForAll, pprHsForAllExtra, pprHsExplicitForAll,
-        pprHsContext, pprHsContextNoArrow, pprHsContextMaybe,
+        pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
 
@@ -90,7 +90,7 @@ import FastString
 import Maybes( isJust )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
-import Data.Maybe ( fromMaybe )
+import Data.List ( foldl' )
 
 {-
 ************************************************************************
@@ -264,8 +264,15 @@ quantified in left-to-right order in kind signatures is nice since:
 -- | Located Haskell Context
 type LHsContext pass = Located (HsContext pass)
       -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnUnit'
-
       -- For details on above see note [Api annotations] in ApiAnnotation
+
+noLHsContext :: LHsContext pass
+-- Use this when there is no context in the original program
+-- It would really be more kosher to use a Maybe, to distinguish
+--     class () => C a where ...
+-- from
+--     class C a where ...
+noLHsContext = noLoc []
 
 -- | Haskell Context
 type HsContext pass = [LHsType pass]
@@ -1126,7 +1133,7 @@ splitLHsForAllTy body              = ([], body)
 splitLHsQualTy :: LHsType pass -> (LHsContext pass, LHsType pass)
 splitLHsQualTy (L _ (HsParTy _ ty)) = splitLHsQualTy ty
 splitLHsQualTy (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body })) = (ctxt,     body)
-splitLHsQualTy body              = (noLoc [], body)
+splitLHsQualTy body              = (noLHsContext, body)
 
 splitLHsInstDeclTy :: LHsSigType GhcRn
                    -> ([Name], LHsContext GhcRn, LHsType GhcRn)
@@ -1307,7 +1314,7 @@ pprHsForAllExtra :: (OutputableBndrId (GhcPass p))
                  => Maybe SrcSpan -> [LHsTyVarBndr (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
 pprHsForAllExtra extra qtvs cxt
-  = pp_forall <+> pprHsContextExtra (isJust extra) (unLoc cxt)
+  = pp_forall <+> pprLHsContextExtra (isJust extra) cxt
   where
     pp_forall | null qtvs = whenPprDebug (forAllLit <> dot)
               | otherwise = forAllLit <+> interppSP qtvs <> dot
@@ -1319,36 +1326,28 @@ pprHsExplicitForAll :: (OutputableBndrId (GhcPass p))
 pprHsExplicitForAll (Just qtvs) = forAllLit <+> interppSP qtvs <> dot
 pprHsExplicitForAll Nothing     = empty
 
-pprHsContext :: (OutputableBndrId (GhcPass p)) => HsContext (GhcPass p) -> SDoc
-pprHsContext = maybe empty (<+> darrow) . pprHsContextMaybe
-
-pprHsContextNoArrow :: (OutputableBndrId (GhcPass p))
-                    => HsContext (GhcPass p) -> SDoc
-pprHsContextNoArrow = fromMaybe empty . pprHsContextMaybe
-
-pprHsContextMaybe :: (OutputableBndrId (GhcPass p))
-                  => HsContext (GhcPass p) -> Maybe SDoc
-pprHsContextMaybe []         = Nothing
-pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty pred
-pprHsContextMaybe cxt        = Just $ parens (interpp'SP cxt)
+pprLHsContext :: (OutputableBndrId (GhcPass p))
+              => LHsContext (GhcPass p) -> SDoc
+pprLHsContext lctxt
+  | null (unLoc lctxt) = empty
+  | otherwise          = pprLHsContextAlways lctxt
 
 -- For use in a HsQualTy, which always gets printed if it exists.
-pprHsContextAlways :: (OutputableBndrId (GhcPass p))
-                   => HsContext (GhcPass p) -> SDoc
-pprHsContextAlways []  = parens empty <+> darrow
-pprHsContextAlways [L _ ty] = ppr_mono_ty ty <+> darrow
-pprHsContextAlways cxt = parens (interpp'SP cxt) <+> darrow
+pprLHsContextAlways :: (OutputableBndrId (GhcPass p))
+                    => LHsContext (GhcPass p) -> SDoc
+pprLHsContextAlways (L _ ctxt)
+  = case ctxt of
+      []       -> parens empty             <+> darrow
+      [L _ ty] -> ppr_mono_ty ty           <+> darrow
+      _        -> parens (interpp'SP ctxt) <+> darrow
 
 -- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
-pprHsContextExtra :: (OutputableBndrId (GhcPass p))
-                  => Bool -> HsContext (GhcPass p) -> SDoc
-pprHsContextExtra show_extra ctxt
-  | not show_extra
-  = pprHsContext ctxt
-  | null ctxt
-  = char '_' <+> darrow
-  | otherwise
-  = parens (sep (punctuate comma ctxt')) <+> darrow
+pprLHsContextExtra :: (OutputableBndrId (GhcPass p))
+                   => Bool -> LHsContext (GhcPass p) -> SDoc
+pprLHsContextExtra show_extra lctxt@(L _ ctxt)
+  | not show_extra = pprLHsContext lctxt
+  | null ctxt      = char '_' <+> darrow
+  | otherwise      = parens (sep (punctuate comma ctxt')) <+> darrow
   where
     ctxt' = map ppr ctxt ++ [char '_']
 
@@ -1386,10 +1385,10 @@ ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 ppr_mono_ty :: (OutputableBndrId (GhcPass p)) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
-  = sep [pprHsForAll tvs (noLoc []), ppr_mono_lty ty]
+  = sep [pprHsForAll tvs noLHsContext, ppr_mono_lty ty]
 
-ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
-  = sep [pprHsContextAlways ctxt, ppr_mono_lty ty]
+ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
+  = sep [pprLHsContextAlways ctxt, ppr_mono_lty ty]
 
 ppr_mono_ty (HsBangTy _ b ty)   = ppr b <> ppr_mono_lty ty
 ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds

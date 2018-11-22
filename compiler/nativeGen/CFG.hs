@@ -489,7 +489,6 @@ getCfgProc weights (CmmProc _info _lab _live graph)
   | null (toBlockList graph) = mapEmpty
   | otherwise                = getCfg weights graph
 
-
 getCfg :: D.CfgWeights -> CmmGraph -> CFG
 getCfg weights graph =
   foldl' insertEdge edgelessCfg $ concatMap getBlockEdges blocks

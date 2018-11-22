@@ -16,10 +16,10 @@ module TcTyClsDecls (
         -- Functions used by TcInstDcls to check
         -- data/type family instance declarations
         kcConDecl, tcConDecls, dataDeclChecks, checkValidTyCon,
-        tcFamTyPatsAndGen, tcTyFamInstEqn,
+        tcFamTyPats, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         wrongKindOfFamily,
-        ClsInstInfo, checkConsistentFamInst
+        ClsInstInfo, checkConsistentFamInst, unravelFamInstPats
     ) where
 
 #include "HsVersions.h"
@@ -1429,7 +1429,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
                  (wrongNumberOfParmsErr fam_arity)
 
        -- Typecheck RHS
-       ; let pats = map hsLTyVarBndrToType exp_vars
+       ; let hs_pats = map hsLTyVarBndrToType exp_vars
 
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
@@ -1440,15 +1440,11 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
           -- type default LHS can mention *different* type variables than the
           -- enclosing class. So it's treated more as a freestanding beast.
        ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc Nothing
-                                                   imp_vars exp_vars pats
-                                                   (tcCheckLHsType hs_rhs_ty)
-
-       ; (ze, _qtvs) <- zonkTyBndrs qtvs
-       ; pats        <- zonkTcTypesToTypesX ze pats
-       ; rhs_ty      <- zonkTcTypeToTypeX   ze rhs_ty
+                                                   imp_vars exp_vars
+                                                   hs_pats hs_rhs_ty
 
          -- See Note [Type-checking default assoc decls]
-       ; traceTc "tcDefalut" (vcat [ppr (tyConTyVars fam_tc), ppr _qtvs, ppr pats])
+       ; traceTc "tcDefault" (vcat [ppr (tyConTyVars fam_tc), ppr qtvs, ppr pats])
        ; case tcMatchTys pats (mkTyVarTys (tyConTyVars fam_tc)) of
            Just subst -> return (Just (substTyUnchecked subst rhs_ty, loc) )
            Nothing    -> failWithTc (defaultAssocKindErr fam_tc)
@@ -1729,7 +1725,7 @@ kcTyFamInstEqn tc_fam_tc
                  , hsib_body = FamEqn { feqn_tycon = dL->L _ eqn_tc_name
                                       , feqn_bndrs = mb_expl_bndrs
                                       , feqn_pats  = hs_pats
-                                      , feqn_rhs   = rhs_hs_ty }}))
+                                      , feqn_rhs   = hs_rhs_ty }}))
   = setSrcSpan loc $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
@@ -1746,7 +1742,7 @@ kcTyFamInstEqn tc_fam_tc
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
          do { (_, res_kind) <- tcFamTyPats tc_fam_tc Nothing hs_pats
-            ; tcCheckLHsType rhs_hs_ty res_kind }
+            ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
@@ -1773,7 +1769,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
-                                      , feqn_rhs    = rhs_hs_ty }}))
+                                      , feqn_rhs    = hs_rhs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
     setSrcSpan loc $
     do {
@@ -1786,19 +1782,14 @@ tcTyFamInstEqn fam_tc mb_clsinfo
 
        ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
-                                      hs_pats
-                                      (tcCheckLHsType rhs_hs_ty)
-
-       ; (ze, qtvs') <- zonkTyBndrs qtvs
-       ; pats'       <- zonkTcTypesToTypesX ze pats
-       ; rhs_ty'     <- zonkTcTypeToTypeX   ze rhs_ty
+                                      hs_pats hs_rhs_ty
 
        -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc pats'
+       ; checkConsistentFamInst mb_clsinfo fam_tc pats
 
-       ; traceTc "tcTyFamInstEqn" (ppr fam_tc $$ ppr qtvs' $$ ppr pats' $$ ppr rhs_ty')
-       ; return (mkCoAxBranch qtvs' [] pats' rhs_ty'
-                              (map (const Nominal) qtvs')
+       ; traceTc "tcTyFamInstEqn" (ppr fam_tc $$ ppr qtvs $$ ppr pats $$ ppr rhs_ty)
+       ; return (mkCoAxBranch qtvs [] pats rhs_ty
+                              (map (const Nominal) qtvs)
                               loc) }
 
 tcTyFamInstEqn _ _ (dL->L _ (XHsImplicitBndrs _)) = panic "tcTyFamInstEqn"
@@ -1865,9 +1856,10 @@ Simple, neat, but a little non-obvious!
 tcFamTyPatsAndGen :: TyCon -> Maybe ClsInstInfo
                   -> [Name] -> [LHsTyVarBndr GhcRn]  -- Implicit and explicicit binder
                   -> HsTyPats GhcRn                  -- Patterns
-                  -> (TcKind -> TcM a)               -- RHS
-                  -> TcM ([TyVar], [TcType], a)      -- (tyvars, pats, rhs)
-tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats thing_inside
+                  -> LHsType GhcRn                   -- RHS
+                  -> TcM ([TyVar], [TcType], TcType)      -- (tyvars, pats, rhs)
+-- Used only for type families, not data families
+tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
   = do { traceTc "tcFamTyPatsAndGen {" (vcat [ ppr fam_tc <+> ppr hs_pats ])
 
        -- By now, for type families (but not data families) we should
@@ -1875,27 +1867,42 @@ tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats thing_inside
 
        -- This code is closely related to the code
        -- in TcHsType.kcLHsQTyVars_Cusk
-       ; (imp_tvs, (exp_tvs, (pats, rhs_ty)))
+       ; (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty)))
                <- pushTcLevelM_                                $
                   solveEqualities                              $
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
-                  do { (pats, res_kind) <- tcFamTyPats fam_tc mb_clsinfo hs_pats
-                     ; rhs_ty <- thing_inside res_kind
-                     ; return (pats, rhs_ty) }
+                  do { (lhs_ty, rhs_kind) <- tc_lhs
+                     ; rhs_ty <- tcCheckLHsType hs_rhs_ty rhs_kind
+                     ; return (lhs_ty, rhs_ty) }
 
        -- See Note [Generalising in tcFamTyPatsAndThen]
        ; let scoped_tvs = imp_tvs ++ exp_tvs
-       ; dvs  <- candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
+       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars emptyVarSet dvs
 
+       ; (ze, qtvs) <- zonkTyBndrs qtvs
+       ; lhs_ty     <- zonkTcTypeToTypeX ze lhs_ty
+       ; rhs_ty     <- zonkTcTypeToTypeX ze rhs_ty
+
+       ; let pats = unravelFamInstPats lhs_ty
        ; traceTc "tcFamTyPatsAndGen }" (ppr fam_tc <+> pprTyVars qtvs)
        ; return (qtvs, pats, rhs_ty) }
+  where
+    tc_lhs | null hs_pats
+           = do { (args, rhs_kind) <- tcInstTyBinders $
+                                      splitPiTysInvisibleN (tyConArity fam_tc)
+                                                           (tyConKind  fam_tc)
+                ; return (mkTyConApp fam_tc args, rhs_kind) }
+           | otherwise
+           = tcFamTyPats fam_tc mb_clsinfo hs_pats
+
 
 -----------------
 tcFamTyPats :: TyCon -> Maybe ClsInstInfo
-            -> HsTyPats GhcRn                  -- Patterns
-            -> TcM ([TcType], TcKind)          -- (pats, rhs_kind)
+            -> HsTyPats GhcRn                -- Patterns
+            -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
+-- Used for both type and data families
 tcFamTyPats fam_tc mb_clsinfo hs_pats
   = do { traceTc "tcFamTyPats {" $
          vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
@@ -1911,36 +1918,33 @@ tcFamTyPats fam_tc mb_clsinfo hs_pats
          vcat [ ppr fam_tc <+> dcolon <+> ppr fam_kind
               , text "res_kind:" <+> ppr res_kind ]
 
-       -- Decompose fam_app to get the argument patterns
-       --
-       -- We expect fam_app to look like (F t1 .. tn)
-       -- tcInferApps is capable of returning ((F ty1 |> co) ty2),
-       -- but that can't happen here because we already checked the
-       -- arity of F matches the number of pattern
-       ; pats <- case splitTyConApp_maybe fam_app of
-                   Just (_, pats) -> return pats
-                   Nothing        -> WARN( True, bad_lhs fam_app )
-                                     return []
-
-       ; (extra_pats, res_kind) <- tcInstTyBinders $
-                                   splitPiTysInvisible res_kind
-       ; let all_pats = pats ++ extra_pats
-
        -- Ensure that the instance is consistent its parent class
-       ; addConsistencyConstraints mb_clsinfo fam_tc all_pats
+       ; addConsistencyConstraints mb_clsinfo fam_app
 
-       ; return (all_pats, res_kind) }
+       ; return (fam_app, res_kind) }
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
     fam_kind  = tyConKind fam_tc
     lhs_fun   = noLoc (HsTyVar noExt NotPromoted (noLoc fam_name))
 
+unravelFamInstPats :: TcType -> [TcType]
+-- Decompose fam_app to get the argument patterns
+--
+-- We expect fam_app to look like (F t1 .. tn)
+-- tcInferApps is capable of returning ((F ty1 |> co) ty2),
+-- but that can't happen here because we already checked the
+-- arity of F matches the number of pattern
+unravelFamInstPats fam_app
+  = case splitTyConApp_maybe fam_app of
+      Just (_, pats) -> pats
+      Nothing        -> WARN( True, bad_lhs fam_app ) []
+  where
     bad_lhs fam_app
       = hang (text "Ill-typed LHS of family instance")
            2 (debugPprType fam_app)
 
-addConsistencyConstraints :: Maybe ClsInstInfo -> TyCon -> [Type] -> TcM ()
+addConsistencyConstraints :: Maybe ClsInstInfo -> TcType -> TcM ()
 -- In the corresponding positions of the class and type-family,
 -- ensure the the family argument is the same as the class argument
 --   E.g    class C a b c d where
@@ -1952,14 +1956,18 @@ addConsistencyConstraints :: Maybe ClsInstInfo -> TyCon -> [Type] -> TcM ()
 -- unification to happen, but without actually reporting errors.
 -- If, despite the efforts, corresponding positions do not match,
 -- checkConsistentFamInst will complain
-addConsistencyConstraints Nothing _ _ = return ()
-addConsistencyConstraints (Just (_, _, inst_ty_env)) fam_tc pats
-  = emitDerivedEqs AssocFamPatOrigin
-                   [ (cls_ty, pat)
+addConsistencyConstraints mb_clsinfo fam_app
+  | Just (_, _, inst_env) <- mb_clsinfo
+  , Just (fam_tc, pats) <- tcSplitTyConApp_maybe fam_app
+  = do { let eqs = [ (cls_ty, pat)
                    | (fam_tc_tv, pat) <- tyConTyVars fam_tc `zip` pats
-                   , Just cls_ty <- [lookupVarEnv inst_ty_env fam_tc_tv] ]
+                   , Just cls_ty <- [lookupVarEnv inst_env fam_tc_tv] ]
+       ; traceTc "addConsistencyConstraints" (ppr eqs)
+       ; emitDerivedEqs AssocFamPatOrigin eqs }
     -- Improve inference
     -- Any mis-match is reports by checkConsistentFamInst
+  | otherwise
+  = return ()
 
 {- Note [Constraints in patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3293,22 +3301,24 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
     underscore at_tv  = mkTyVarTy (mkTyVar tv_name (tyVarKind at_tv))
     tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
 
-    check_match :: [(Type,Type, ArgFlag)] -> TcM ()
+    -- For check_match, bind_me, see
+    -- Note [Matching in the consistent-instantation check]
+    check_match :: [(Type,Type,ArgFlag)] -> TcM ()
     check_match triples = go emptyTCvSubst emptyTCvSubst triples
 
     go _ _ [] = return ()
     go lr_subst rl_subst ((ty1,ty2,vis):triples)
-      | Just lr_subst1 <- tcMatchTyX lr_subst ty1 ty2
-      , Just rl_subst1 <- tcMatchTyX rl_subst ty2 ty1
+      | Just lr_subst1 <- tcMatchTyX_BM bind_me lr_subst ty1 ty2
+      , Just rl_subst1 <- tcMatchTyX_BM bind_me rl_subst ty2 ty1
       = go lr_subst1 rl_subst1 triples
       | otherwise
       = addErrTc (pp_wrong_at_arg $$
                   ppWhen (isInvisibleArgFlag vis) ppSuggestExplicitKinds)
-       -- NB: checks left-to-right, kinds first.
-       -- If we types first, we'll fail to
-       -- suggest -fprint-explicit-kinds for a mis-match with
-       --    T @k    vs    T @Type
-       -- somewhere deep inside the type
+
+    inst_tv_set = mkVarSet inst_tvs
+    bind_me tv | tv `elemVarSet` inst_tv_set = Skolem
+               | otherwise                   = BindMe
+
 
 badATErr :: Name -> Name -> SDoc
 badATErr clas op
@@ -3316,8 +3326,39 @@ badATErr clas op
           text "does not have an associated type", quotes (ppr op)]
 
 
-{- Note [Checking consistent instantiation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Matching in the consistent-instantation check]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Matching the class-instance header to family-instance tyvars is
+tricker than it sounds.  Consider (Trac #13972)
+    class C (a :: k) where
+      type T k :: Type
+    instance C Left where
+      type T (a -> Either a b) = Int
+
+Here there are no lexically-scoped variables from (C Left).
+Yet the real class-instance header is   C @(p -> Either @p @q)) (Left @p @q)
+while the type-family instance is       T (a -> Either @a @b)
+So we allow alpha-renaming of variables that don't come
+from the class-instance header.
+
+Here's another example (Trac #14045a)
+    class C (a :: k) where
+      data S (a :: k)
+    instance C (z :: Bool) where
+      data S :: Bool -> Type where
+
+Again, there is no lexical connection, but we will get
+   class-instance header:   C @Bool (z::Bool)
+   family instance          S @Bool (a::Bool)
+
+When looking for mis-matches, we check left-to-right,
+kinds first.  If we look at types first, we'll fail to
+suggest -fprint-explicit-kinds for a mis-match with
+      T @k    vs    T @Type
+somewhere deep inside the type
+
+Note [Checking consistent instantiation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Trac #11450 for background discussion on this check.
 
   class C a b where

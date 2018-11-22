@@ -1,7 +1,0 @@
-
-T13972.hs:12:8: error:
-    • Type indexes must match class instance head
-      Expected: T (a1 -> Either a1 b1)
-        Actual: T (a -> Either a b)
-    • In the type instance declaration for ‘T’
-      In the instance declaration for ‘C Left’

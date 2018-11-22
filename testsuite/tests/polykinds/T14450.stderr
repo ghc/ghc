@@ -1,8 +1,8 @@
 
-T14450.hs:33:13: error:
-    • Expected kind ‘k ~> k’,
-        but ‘IddSym0 :: Type ~> Type’ has kind ‘* ~> *’
-    • In the first argument of ‘Dom’, namely
-        ‘(IddSym0 :: Type ~> Type)’
-      In the type instance declaration for ‘Dom’
+T14450.hs:33:8: error:
+    • Type indexes must match class instance head
+      Expected: Dom IddSym0
+        Actual: Dom IddSym0
+      Use -fprint-explicit-kinds to see the kind arguments
+    • In the type instance declaration for ‘Dom’
       In the instance declaration for ‘Varpi (IddSym0 :: k ~> k)’

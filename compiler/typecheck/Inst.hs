@@ -492,7 +492,7 @@ tcInstTyBinders :: HasDebugCallStack
 -- Takes a pair because that is what splitPiTysInvisible returns
 -- See also Note [Bidirectional type checking]
 tcInstTyBinders (bndrs, ty)
-  | null bndrs        -- It's fine for bndrs to be empty e.g. 
+  | null bndrs        -- It's fine for bndrs to be empty e.g.
   = return ([], ty)   -- Check that (Maybe :: forall {k}. k->*),
                       --       and see the call to instTyBinders in checkExpectedKind
                       -- A user bug to be reported as such; it is not a compiler crash!
@@ -501,7 +501,7 @@ tcInstTyBinders (bndrs, ty)
   = do { (subst, args) <- mapAccumLM (tcInstTyBinder Nothing) empty_subst bndrs
        ; ty' <- zonkTcType (substTy subst ty)
                    -- Why zonk the result? So that tcTyVar can
-                   -- obey (IT6) of Note [The tcType invariant]
+                   -- obey (IT6) of Note [The tcType invariant] in TcHsType
                    -- ToDo: SLPJ: I don't think this is needed
        ; return (args, ty') }
   where

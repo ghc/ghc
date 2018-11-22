@@ -44,38 +44,64 @@ ExplicitForAllFams4b.hs:16:25: error:
         but not bound on the LHS of the family instance
     • In the newtype instance declaration for ‘L’
 
+ExplicitForAllFams4b.hs:23:17: error:
+    • Type variable ‘b’ is bound by a forall,
+        but not used in the family instance
+    • In the type instance declaration for ‘CT’
+      In the instance declaration for ‘C Int’
+
 ExplicitForAllFams4b.hs:23:20: error:
     • Type indexes must match class instance head
-      Expected: CT Int <tv>
+      Expected: CT Int _
         Actual: CT [a] (a, a)
-      where the `<tv>' arguments are type variables,
-      distinct from each other and from the instance variables
+    • In the type instance declaration for ‘CT’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:23:20: error:
+    Conflicting family instance declarations:
+      CT [a] (a, a) = Float -- Defined at ExplicitForAllFams4b.hs:23:20
+      CT _1 _2 = Maybe b -- Defined at ExplicitForAllFams4b.hs:24:20
+
+ExplicitForAllFams4b.hs:24:15: error:
+    • Type variable ‘b’ is mentioned in the RHS,
+        but not bound on the LHS of the family instance
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:24:20: error:
     • Type indexes must match class instance head
-      Expected: CT Int <tv>
+      Expected: CT Int _
         Actual: CT _ _1
-      where the `<tv>' arguments are type variables,
-      distinct from each other and from the instance variables
     • In the type instance declaration for ‘CT’
-      In the instance declaration for ‘C Int’
-
-ExplicitForAllFams4b.hs:25:3: error:
-    • Type indexes must match class instance head
-      Expected: CD Int <tv>
-        Actual: CD [a] (a, a)
-      where the `<tv>' arguments are type variables,
-      distinct from each other and from the instance variables
-    • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 
 ExplicitForAllFams4b.hs:26:3: error:
     • Type indexes must match class instance head
-      Expected: CD Int <tv>
+      Expected: CD Int _
+        Actual: CD [a] (a, a)
+    • In the data instance declaration for ‘CD’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:26:17: error:
+    • Type variable ‘b’ is mentioned in the RHS,
+        but not bound on the LHS of the family instance
+    • In the data instance declaration for ‘CD’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:26:20: error:
+    Conflicting family instance declarations:
+      CD [a] (a, a) -- Defined at ExplicitForAllFams4b.hs:26:20
+      CD _ _ -- Defined at ExplicitForAllFams4b.hs:27:20
+
+ExplicitForAllFams4b.hs:27:3: error:
+    • Type indexes must match class instance head
+      Expected: CD Int _
         Actual: CD _ _1
-      where the `<tv>' arguments are type variables,
-      distinct from each other and from the instance variables
+    • In the data instance declaration for ‘CD’
+      In the instance declaration for ‘C Int’
+
+ExplicitForAllFams4b.hs:27:15: error:
+    • Type variable ‘b’ is mentioned in the RHS,
+        but not bound on the LHS of the family instance
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’

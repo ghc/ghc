@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fprint-explicit-kinds #-}
 {-# LANGUAGE FlexibleInstances, TemplateHaskell, PolyKinds, TypeFamilies #-}
 
 module T9160 where

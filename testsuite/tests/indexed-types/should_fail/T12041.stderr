@@ -1,7 +1,8 @@
 
-T12041.hs:12:15: error:
-    • Expected kind ‘i -> Constraint’,
-        but ‘(~) Int’ has kind ‘* -> Constraint’
-    • In the type ‘(~) Int’
-      In the type instance declaration for ‘Ob’
+T12041.hs:12:8: error:
+    • Type indexes must match class instance head
+      Expected: Ob I
+        Actual: Ob I
+      Use -fprint-explicit-kinds to see the kind arguments
+    • In the type instance declaration for ‘Ob’
       In the instance declaration for ‘Category I’
