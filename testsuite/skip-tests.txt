@@ -1,7 +1,5 @@
 -- Type of data constructors are now linear
 ghci025
-T8958
-
 # Typeable decomposition, currently not working
 T14236
 
