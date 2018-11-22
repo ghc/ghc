@@ -33,6 +33,7 @@ module TysPrim(
         -- Kinds
         tYPE, primRepToRuntimeRep,
 
+        functionWithMultiplicity,
         funTyCon, funTyConName,
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
@@ -366,18 +367,19 @@ multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
+funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 
--- | The @(->)@ type constructor.
+-- | The @FUN@ type constructor.
 --
 -- @
--- (->) :: forall (m :: Multiplicity) (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
+-- FUN :: forall (m :: Multiplicity) {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ Bndr multiplicityTyVar (NamedTCB Inferred)
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ Bndr multiplicityTyVar (NamedTCB Required)
                , Bndr runtimeRep1TyVar (NamedTCB Inferred)
                , Bndr runtimeRep2TyVar (NamedTCB Inferred)
                ]
@@ -502,6 +504,10 @@ mkPrimTcName built_in_syntax occ key tycon
 -- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
 tYPE rr = TyConApp tYPETyCon [rr]
+
+-- Given a Multiplicity, applies FUN to it.
+functionWithMultiplicity :: Type -> Type
+functionWithMultiplicity mul = TyConApp funTyCon [mul]
 
 {-
 ************************************************************************

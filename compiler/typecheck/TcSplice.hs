@@ -1931,7 +1931,7 @@ reify_tc_app tc tys
                                             else TH.TupleT arity
          | tc `hasKey` constraintKindTyConKey
                                           = TH.ConstraintT
-         | tc `hasKey` funTyConKey        = TH.ArrowT
+         | tc `hasKey` unrestrictedFunTyConKey = TH.ArrowT
          | tc `hasKey` listTyConKey       = TH.ListT
          | tc `hasKey` nilDataConKey      = TH.PromotedNilT
          | tc `hasKey` consDataConKey     = TH.PromotedConsT

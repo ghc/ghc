@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
-             PolyKinds #-}
+             PolyKinds, NegativeLiterals #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -49,6 +49,18 @@ module GHC.Types (
 import GHC.Prim
 
 infixr 5 :
+
+
+{- *********************************************************************
+*                                                                      *
+                  Functions
+*                                                                      *
+********************************************************************* -}
+
+infixr -1 -> -- trac #10145
+
+-- | The built-in function type.
+data (->) a b
 
 {- *********************************************************************
 *                                                                      *

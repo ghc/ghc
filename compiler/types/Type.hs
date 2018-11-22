@@ -109,7 +109,7 @@ module Type (
         tyConBindersTyCoBinders,
 
         -- ** Common type constructors
-        funTyCon,
+        funTyCon, unrestrictedFunTyCon,
 
         -- ** Predicates on types
         isTyVarTy, isFunTy, isDictTy, isPredTy, isCoercionTy,
@@ -256,7 +256,7 @@ import TyCon
 import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, unitTy
                                  , typeSymbolKind, liftedTypeKind
-                                 , oneDataConTy, omegaDataConTy )
+                                 , oneDataConTy, omegaDataConTy, unrestrictedFunTyCon )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo

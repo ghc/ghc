@@ -30,7 +30,7 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..) )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
-import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
+import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName, omegaDataConTy )
 import PrelNames
 import Type
 import Coercion
@@ -1273,17 +1273,24 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 tcInstHeadTyNotSynonym ty
   = case ty of  -- Do not use splitTyConApp,
                 -- because that expands synonyms!
-        TyConApp tc _ -> not (isTypeSynonymTyCon tc)
+        TyConApp tc _ -> not (isTypeSynonymTyCon tc) || tc == unrestrictedFunTyCon
+                -- Allow (->), e.g. instance Category (->),
+                -- even though it's a type synonym for FUN 'Omega
         _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must be a constructor applied to type variable arguments
 -- or a type-level literal.
--- But we allow kind instantiations.
+-- But we allow
+-- 1) kind instantiations
+-- 2) the type (->) = FUN 'Omega, even though it's not in this form.
 tcInstHeadTyAppAllTyVars ty
   | Just (tc, tys) <- tcSplitTyConApp_maybe (dropCasts ty)
-  = ok (filterOutInvisibleTypes tc tys)  -- avoid kinds
+  = let tys' = filterOutInvisibleTypes tc tys  -- avoid kinds
+        tys'' | tc == funTyCon, tys_h:tys_t <- tys', tys_h `eqType` omegaDataConTy = tys_t
+              | otherwise = tys'
+    in ok tys''
   | LitTy _ <- ty = True  -- accept type literals (Trac #13833)
   | otherwise
   = False
