@@ -97,6 +97,9 @@ module Coercion (
         -- ** Forcing evaluation of coercions
         seqCo,
 
+        -- ** Eliding coercions
+        zapCoercion,
+
         -- * Pretty-printing
         pprCo, pprParendCo,
         pprCoAxiom, pprCoAxBranch, pprCoAxBranchLHS,
@@ -970,6 +973,8 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
+mkSymCo (UnivCo (ZappedProv fvs) r t1 t2) = UnivCo (ZappedProv fvs) r t2 t1
+-- TODO: Handle other provenances
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
@@ -1114,6 +1119,10 @@ nthCoRole n co
     (Pair lty _, r) = coercionKindRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
+mkLRCo lr (UnivCo (ZappedProv fvs) r t1 t2)
+                       = UnivCo (ZappedProv fvs) r
+                                (pickLR lr (splitAppTy t1))
+                                (pickLR lr (splitAppTy t2))
 mkLRCo lr co
   | Just (ty, eq) <- isReflCo_maybe co
   = mkReflCo eq (pickLR lr (splitAppTy ty))
@@ -1170,6 +1179,7 @@ mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
 mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
+mkKindCo (UnivCo (ZappedProv fvs) _ ty1 ty2) = mkUnivCo (ZappedProv fvs) Nominal (typeKind ty1) (typeKind ty2)
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
        -- generally, calling coercionKind during coercion creation is a bad idea,
@@ -1193,6 +1203,7 @@ mkSubCo (FunCo Nominal arg res)
   = FunCo Representational
           (downgradeRole Representational Nominal arg)
           (downgradeRole Representational Nominal res)
+mkSubCo (UnivCo (ZappedProv fvs) Nominal t1 t2) = UnivCo (ZappedProv fvs) Representational t1 t2
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
 
@@ -1293,6 +1304,7 @@ setNominalRole_maybe r co
                      PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
+                     ZappedProv _     -> False  -- conservatively say no
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1400,6 +1412,7 @@ promoteCoercion co = case co of
     UnivCo (PhantomProv kco) _ _ _    -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _) _ _ _       -> mkKindCo co
+    UnivCo (ZappedProv _) _ _ _       -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -2157,6 +2170,7 @@ seqProv UnsafeCoerceProv    = ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
+seqProv (ZappedProv fvs)    = seqDVarSet fvs
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()

@@ -65,6 +65,7 @@ module TcHsType (
 
 import GhcPrelude
 
+import DynFlags
 import HsSyn
 import TcRnMonad
 import TcEvidence

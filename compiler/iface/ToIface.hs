@@ -275,6 +275,13 @@ toIfaceCoercionX fr co
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
+    go_prov (ZappedProv fvs)    = IfaceZappedProv cvs fCvs
+                          where
+                            (fCvs, cvs) = partitionWith f $ dVarSetElems fvs
+                            isFree = (`elemVarSet` fr)
+                            f v | ASSERT(isCoVar v)
+                                  isFree v  = Left v
+                                | otherwise = Right $ toIfaceCoVar v
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet

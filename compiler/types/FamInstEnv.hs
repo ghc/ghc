@@ -1747,6 +1747,9 @@ allTyCoVarsInTy = go
     go_prov (PhantomProv co)    = go_co co
     go_prov (ProofIrrelProv co) = go_co co
     go_prov (PluginProv _)      = emptyVarSet
+    go_prov (ZappedProv _)      = emptyVarSet
+                                  -- We don't track free type variables, only
+                                  -- coercion variables.
 
 mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq

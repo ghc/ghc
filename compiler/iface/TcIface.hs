@@ -1209,7 +1209,12 @@ tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
 -}
 
 tcIfaceCo :: IfaceCoercion -> IfL Coercion
-tcIfaceCo = go
+tcIfaceCo = \co0 -> do
+    dflags <- getDynFlags
+    co <- go co0
+    if shouldBuildCoercions dflags
+      then return co
+      else return $ zapCoercion dflags co
   where
     go_mco IfaceMRefl    = pure MRefl
     go_mco (IfaceMCo co) = MCo <$> (go co)
@@ -1250,6 +1255,7 @@ tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfacePluginProv str)     = return $ PluginProv str
+tcIfaceUnivCoProv (IfaceZappedProv coFvs _) = ZappedProv . mkDVarSet <$> mapM tcIfaceLclId coFvs
 
 {-
 ************************************************************************
