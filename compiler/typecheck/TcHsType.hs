@@ -199,7 +199,10 @@ tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    tc_hs_sig_type_and_gen skol_info sig_ty (TheKind liftedTypeKind)
+    tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+       -- Do not zonk-to-Type, nor perform a validity check
+       -- We are in a knot with the class and associated types
+       -- Zonking and validity checking is done by tcClassDecl
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -209,7 +212,7 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- tc_hs_sig_type_and_gen skol_info sig_ty
+       ; ty <- tc_hs_sig_type skol_info sig_ty
                                       (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
 
@@ -219,14 +222,14 @@ tcHsSigType ctxt sig_ty
   where
     skol_info = SigTypeSkol ctxt
 
-tc_hs_sig_type_and_gen :: SkolemInfo -> LHsSigType GhcRn
-                       -> ContextKind -> TcM Type
+tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
+               -> ContextKind -> TcM Type
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking or zonking
-tc_hs_sig_type_and_gen skol_info hs_sig_type ctxt_kind
+tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
               <- pushTcLevelM                                   $
@@ -235,8 +238,8 @@ tc_hs_sig_type_and_gen skol_info hs_sig_type ctxt_kind
                  do { kind <- newExpectedKind ctxt_kind
 
                     ; tc_lhs_type typeLevelMode hs_ty kind }
-         -- Any remaining variables (unsolved in the solveLocalEqualities)
-         -- should be in the global tyvars, and therefore won't be quantified over
+       -- Any remaining variables (unsolved in the solveLocalEqualities)
+       -- should be in the global tyvars, and therefore won't be quantified
 
        ; spec_tkvs <- zonkAndScopedSort spec_tkvs
        ; let ty1 = mkSpecForAllTys spec_tkvs ty
@@ -246,7 +249,32 @@ tc_hs_sig_type_and_gen skol_info hs_sig_type ctxt_kind
 
        ; return (mkInvForAllTys kvs ty1) }
 
-tc_hs_sig_type_and_gen _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
+tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type_and_gen"
+
+tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
+-- tcTopLHsType is used for kind-checking top-level HsType where
+--   we want to fully solve /all/ equalities, and report errors
+-- Does zonking, but not validity checking because it's used
+--   for things (like deriving and instances) that aren't
+--   ordinary types
+tcTopLHsType hs_sig_type ctxt_kind
+  | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
+  = do { traceTc "tcTopLHsType {" (ppr hs_ty)
+       ; (spec_tkvs, ty)
+              <- pushTcLevelM_                     $
+                 solveEqualities                   $
+                 bindImplicitTKBndrs_Skol sig_vars $
+                 do { kind <- newExpectedKind ctxt_kind
+                    ; tc_lhs_type typeLevelMode hs_ty kind }
+
+       ; spec_tkvs <- zonkAndScopedSort spec_tkvs
+       ; let ty1 = mkSpecForAllTys spec_tkvs ty
+       ; kvs <- kindGeneralize ty1
+       ; final_ty <- zonkTcTypeToType (mkInvForAllTys kvs ty1)
+       ; traceTc "End tcTopLHsType }" (vcat [ppr hs_ty, ppr final_ty])
+       ; return final_ty}
+
+tcTopLHsType (XHsImplicitBndrs _) _ = panic "tcTopLHsType"
 
 -----------------
 tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
@@ -257,10 +285,9 @@ tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
 --    returns ([k], C, [k, Int], [k->k])
 -- Return values are fully zonked
 tcHsDeriv hs_ty
-  = do { ty <- checkNoErrs $
-                 -- avoid redundant error report with "illegal deriving", below
-               tc_hs_sig_type_and_gen (SigTypeSkol DerivClauseCtxt) hs_ty AnyKind
-       ; ty <- zonkTcTypeToType ty
+  = do { ty <- checkNoErrs $  -- Avoid redundant error report
+                              -- with "illegal deriving", below
+               tcTopLHsType hs_ty AnyKind
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (typeKind pred)
        ; case getClassPredTys_maybe pred of
@@ -280,15 +307,14 @@ tcHsDeriv hs_ty
 -- the type variable @a@.
 tcDerivStrategy
   :: forall a.
-     UserTypeCtxt
-  -> Maybe (DerivStrategy GhcRn) -- ^ The deriving strategy
+     Maybe (DerivStrategy GhcRn) -- ^ The deriving strategy
   -> TcM ([TyVar], a) -- ^ The thing to typecheck within the context of the
                       -- deriving strategy, which might quantify some type
                       -- variables of its own.
   -> TcM (Maybe (DerivStrategy GhcTc), [TyVar], a)
      -- ^ The typechecked deriving strategy, all quantified tyvars, and
      -- the payload of the typechecked thing.
-tcDerivStrategy user_ctxt mds thing_inside
+tcDerivStrategy mds thing_inside
   = case mds of
       Nothing -> boring_case Nothing
       Just ds -> do (ds', tvs, thing) <- tc_deriv_strategy ds
@@ -301,8 +327,7 @@ tcDerivStrategy user_ctxt mds thing_inside
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
       ty' <- checkNoErrs $
-             tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) ty AnyKind
-      ty' <- zonkTcTypeToType ty'
+             tcTopLHsType ty AnyKind
       let (via_tvs, via_pred) = splitForAllTys ty'
       tcExtendTyVarEnv via_tvs $ do
         (thing_tvs, thing) <- thing_inside
@@ -315,21 +340,18 @@ tcDerivStrategy user_ctxt mds thing_inside
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType GhcRn
-                -> TcM ([TyVar], ThetaType, Class, [Type])
+                -> TcM Type
 -- Like tcHsSigType, but for a class instance declaration
 tcHsClsInstType user_ctxt hs_inst_ty
   = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
-    {- We want to fail here if the tc_hs_sig_type_and_gen emits constraints.
-       First off, we know we'll never solve the constraints, as classes are
-       always at top level, and their constraints do not inform the kind checking
-       of method types. So failing isn't wrong. Yet, the reason we do it is
-       to avoid the validity checker from seeing unsolved coercion holes in
-       types. Much better just to report the kind error directly. -}
-    do { inst_ty <- failIfEmitsConstraints $
-                    tc_hs_sig_type_and_gen (SigTypeSkol user_ctxt) hs_inst_ty
-                                           (TheKind constraintKind)
-       ; inst_ty <- zonkTcTypeToType inst_ty
-       ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
+    do { -- Fail eagerly if tcTopLHsType fails.  We are at top level so
+         -- these constraints will never be solved later. And failing
+         -- eagerly avoids follow-on errors when checkValidInstance
+         -- sees an unsolved coercion hole
+         inst_ty <- checkNoErrs $
+                    tcTopLHsType hs_inst_ty (TheKind constraintKind)
+       ; checkValidInstance user_ctxt hs_inst_ty inst_ty
+       ; return inst_ty }
 
 ----------------------------------------------
 -- | Type-check a visible type application

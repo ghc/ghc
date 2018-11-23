@@ -1462,8 +1462,7 @@ and we /really/ don't want that.  So we carefully do /not/ expand
 synonyms, by matching on TyConApp directly.
 -}
 
-checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type
-                   -> TcM ([TyVar], ThetaType, Class, [Type])
+checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
   = failWithTc (hang (text "Instance head is not headed by a class:")
@@ -1508,9 +1507,9 @@ checkValidInstance ctxt hs_type ty
 
         ; traceTc "End checkValidInstance }" empty
 
-        ; return (tvs, theta, clas, inst_tys) }
+        ; return () }
   where
-    (tvs, theta, tau)    = tcSplitSigmaTy ty
+    (_tvs, theta, tau)   = tcSplitSigmaTy ty
     is_tc_app            = case tau of { TyConApp {} -> True; _ -> False }
     TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
     mb_cls               = tyConClass_maybe tc

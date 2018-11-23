@@ -617,7 +617,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mbl_deriv_strat overlap_mode))
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_deriv_strat, ppr deriv_ty]
        ; (mb_deriv_strat', tvs', (deriv_ctxt', cls, inst_tys'))
-           <- tcDerivStrategy ctxt mb_deriv_strat $ do
+           <- tcDerivStrategy mb_deriv_strat $ do
                 (tvs, deriv_ctxt, cls, inst_tys)
                   <- tcStandaloneDerivInstType ctxt deriv_ty
                 pure (tvs, (deriv_ctxt, cls, inst_tys))
@@ -718,19 +718,19 @@ tcStandaloneDerivInstType ctxt
   | (tvs, theta, rho) <- splitLHsSigmaTy deriv_ty_body
   , L _ [wc_pred] <- theta
   , L _ (HsWildCardTy (AnonWildCard (L wc_span _))) <- ignoreParens wc_pred
-  = do (deriv_tvs, _deriv_theta, deriv_cls, deriv_inst_tys)
-         <- tcHsClsInstType ctxt $
-            HsIB { hsib_ext = vars
-                 , hsib_body
-                     = L (getLoc deriv_ty_body) $
-                       HsForAllTy { hst_bndrs = tvs
-                                  , hst_xforall = noExt
-                                  , hst_body  = rho }}
-       pure (deriv_tvs, InferContext (Just wc_span), deriv_cls, deriv_inst_tys)
+  = do dfun_ty <- tcHsClsInstType ctxt $
+                  HsIB { hsib_ext = vars
+                       , hsib_body
+                           = L (getLoc deriv_ty_body) $
+                             HsForAllTy { hst_bndrs = tvs
+                                        , hst_xforall = noExt
+                                        , hst_body  = rho }}
+       let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
+       pure (tvs, InferContext (Just wc_span), cls, inst_tys)
   | otherwise
-  = do (deriv_tvs, deriv_theta, deriv_cls, deriv_inst_tys)
-         <- tcHsClsInstType ctxt deriv_ty
-       pure (deriv_tvs, SupplyContext deriv_theta, deriv_cls, deriv_inst_tys)
+  = do dfun_ty <- tcHsClsInstType ctxt deriv_ty
+       let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
+       pure (tvs, SupplyContext theta, cls, inst_tys)
 
 tcStandaloneDerivInstType _ (HsWC _ (XHsImplicitBndrs _))
   = panic "tcStandaloneDerivInstType"
@@ -768,7 +768,7 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
                 -- Typeable is special, because Typeable :: forall k. k -> Constraint
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
-                     tcDerivStrategy TcType.DerivClauseCtxt mb_deriv_strat $
+                     tcDerivStrategy mb_deriv_strat $
                      tcHsDeriv deriv_pred
 
         ; when (cls_arg_kinds `lengthIsNot` 1) $

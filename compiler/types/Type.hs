@@ -1340,8 +1340,7 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
                                 ~~~~~~~~
 -}
 
--- | Make a dependent forall over an Inferred (as opposed to Specified)
--- variable
+-- | Make a dependent forall over an Inferred variable
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
 mkTyCoInvForAllTy tv ty
   | isCoVar tv
@@ -1364,7 +1363,7 @@ mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
 mkInvForAllTys :: [TyVar] -> Type -> Type
 mkInvForAllTys tvs ty = foldr mkInvForAllTy ty tvs
 
--- | Like mkForAllTys, but assumes all variables are dependent and specified,
+-- | Like mkForAllTys, but assumes all variables are dependent and Specified,
 -- a common case
 mkSpecForAllTys :: [TyVar] -> Type -> Type
 mkSpecForAllTys tvs = ASSERT( all isTyVar tvs )
@@ -1542,14 +1541,8 @@ splitPiTys ty = split ty ty
 
 invisibleTyBndrCount :: Type -> Int
 -- Returns the number of leading invisible forall'd binders in the type
-invisibleTyBndrCount ty = go ty
-  where
-    go :: Type -> Int
-    go ty               | Just ty' <- coreView ty = go ty'
-    go (ForAllTy b res) | Bndr _ vis <- b
-                        , isInvisibleArgFlag vis  = 1 + go res
-    go (FunTy arg res)  | isPredTy arg            = 1 + go res
-    go _                                          = 0
+invisibleTyBndrCount ty = countWhile (isInvisibleArgFlag . binderArgFlag) $
+                          fst $ splitForAllVarBndrs ty
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
 -- Stops at the first visible binder

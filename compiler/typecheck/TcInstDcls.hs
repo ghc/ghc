@@ -58,7 +58,6 @@ import ErrUtils
 import FastString
 import Id
 import ListSetOps
-import MkId
 import Name
 import NameSet
 import Outputable
@@ -472,14 +471,18 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
   = setSrcSpan loc                      $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { traceTc "tcLocalInstDecl" (ppr hs_ty)
-        ; (tyvars, theta, clas, inst_tys)
-             <- tcHsClsInstType (InstDeclCtxt False) hs_ty
+        ; dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
+        ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
              -- NB: tcHsClsInstType does checkValidInstance
 
         ; (subst, skol_tvs) <- tcInstSkolTyVars tyvars
         ; let tv_skol_prs = [ (tyVarName tv, skol_tv)
                             | (tv, skol_tv) <- tyvars `zip` skol_tvs ]
-             -- The tyvars are TyVars, but we need
+              n_inferred = countWhile ((== Inferred) . binderArgFlag) $
+                           fst $ splitForAllVarBndrs dfun_ty
+              visible_skol_tvs = drop n_inferred skol_tvs
+
+        ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs $$ ppr visible_skol_tvs)
 
         -- Next, process any associated types.
         ; (datafam_stuff, tyfam_insts)
@@ -487,7 +490,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                 do  { let mini_env   = mkVarEnv (classTyVars clas `zip` substTys subst inst_tys)
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
                           mb_info    = InClsInst { ai_class = clas
-                                                 , ai_tyvars = skol_tvs
+                                                 , ai_tyvars = visible_skol_tvs
                                                  , ai_inst_env = mini_env }
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info) adts
                     ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
@@ -727,7 +730,7 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
        ; let pats = unravelFamInstPats lhs_ty
 
        -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo qtvs fam_tc pats
+       ; checkConsistentFamInst mb_clsinfo fam_tc pats
        ; return (qtvs, pats, res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
@@ -1943,8 +1946,7 @@ tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
 tcSpecInst :: Id -> Sig GhcRn -> TcM TcSpecPrag
 tcSpecInst dfun_id prag@(SpecInstSig _ _ hs_ty)
   = addErrCtxt (spec_ctxt prag) $
-    do  { (tyvars, theta, clas, tys) <- tcHsClsInstType SpecInstCtxt hs_ty
-        ; let spec_dfun_ty = mkDictFunTy tyvars theta clas tys
+    do  { spec_dfun_ty <- tcHsClsInstType SpecInstCtxt hs_ty
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where

@@ -1786,7 +1786,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       hs_pats hs_rhs_ty
 
        -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo qtvs fam_tc pats
+       ; checkConsistentFamInst mb_clsinfo fam_tc pats
 
        ; traceTc "tcTyFamInstEqn" (ppr fam_tc $$ ppr qtvs $$ ppr pats $$ ppr rhs_ty)
        ; return (mkCoAxBranch qtvs [] pats rhs_ty
@@ -3275,19 +3275,18 @@ isNotAssociated (InClsInst {}) = False
 
 checkConsistentFamInst
     :: AssocInstInfo
-    -> [TyVar]   -- ^ Quantified tyvars of the family instance
     -> TyCon     -- ^ Family tycon
     -> [Type]    -- ^ Type patterns from fammily instance
     -> TcM ()
 -- See Note [Checking consistent instantiation]
 
-checkConsistentFamInst NotAssociated _ _ _
+checkConsistentFamInst NotAssociated _ _
   = return ()
 
 checkConsistentFamInst (InClsInst { ai_class = clas
                                   , ai_tyvars = inst_tvs
                                   , ai_inst_env = mini_env })
-                       qtvs fam_tc at_arg_tys
+                       fam_tc at_arg_tys
   = do { traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
                                                 , ppr arg_triples
                                                 , ppr mini_env ])
@@ -3335,7 +3334,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
     -- /and/ in family instance must be one of the scoped variables
     -- shared between the two.  Don't let these alpha-raneme to
     -- anything else.
-    no_bind_set = mkVarSet inst_tvs `intersectVarSet` mkVarSet qtvs
+    no_bind_set = mkVarSet inst_tvs
     bind_me tv | tv `elemVarSet` no_bind_set = Skolem
                | otherwise                   = BindMe
 
