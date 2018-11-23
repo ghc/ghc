@@ -226,7 +226,7 @@ tcIfaceLclId occ
   = do  { lcl <- getLclEnv
         ; case (lookupFsEnv (if_id_env lcl) occ) of
             Just ty_var -> return ty_var
-            Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ)
+            Nothing     -> failIfM (text "Iface id out of scope: " <+> ppr occ $$ ppr (if_id_env lcl))
         }
 
 extendIfaceIdEnv :: [Id] -> IfL a -> IfL a

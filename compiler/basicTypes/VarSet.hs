@@ -26,7 +26,7 @@ module VarSet (
         nonDetFoldVarSet,
 
         -- * Deterministic Var set types
-        DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
+        DVarSet, DIdSet, DTyVarSet, DCoVarSet, DTyCoVarSet,
 
         -- ** Manipulating these sets
         emptyDVarSet, unitDVarSet, mkDVarSet,
@@ -228,6 +228,9 @@ type DIdSet      = UniqDSet Id
 
 -- | Deterministic Type Variable Set
 type DTyVarSet   = UniqDSet TyVar
+
+-- | Deterministic Coercion Variable Set
+type DCoVarSet   = UniqDSet CoVar
 
 -- | Deterministic Type or Coercion Variable Set
 type DTyCoVarSet = UniqDSet TyCoVar
