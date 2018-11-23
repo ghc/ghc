@@ -14,12 +14,12 @@ test('T3286', [], multimod_compile, ['T3286', '-v0'])
 test('T3579', normal, compile, [''])
 test('T2578', normal, run_command, ['$MAKE -s --no-print-directory T2578'])
 # skip llvm on i386 as we don't support fPIC
-test('jmp_tbl', when(arch('i386'), omit_ways(['llvm', 'optllvm'])), compile, ['-fPIC -O'])
+test('jmp_tbl', when(arch('i386'), omit_ways(llvm_ways)), compile, ['-fPIC -O'])
 test('massive_array',
-     [ when(arch('i386'), omit_ways(['llvm', 'optllvm'])) ],
+     [ when(arch('i386'), omit_ways(llvm_ways)) ],
      compile, ['-fPIC'])
 test('T7237', normal, compile, [''])
-test('T7574', [cmm_src, omit_ways(['llvm', 'optllvm'])], compile, [''])
+test('T7574', [cmm_src, omit_ways(llvm_ways)], compile, [''])
 test('T8205', normal, compile, ['-O0'])
 test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
