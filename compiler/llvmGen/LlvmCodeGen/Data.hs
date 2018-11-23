@@ -31,6 +31,11 @@ import Outputable
 structStr :: LMString
 structStr = fsLit "_struct"
 
+-- | The LLVM visibility of the label
+linkage :: CLabel -> LlvmLinkageType
+linkage lbl = if externallyVisibleCLabel lbl
+              then ExternallyVisible else Internal
+
 -- ----------------------------------------------------------------------------
 -- * Top level
 --
@@ -46,10 +51,8 @@ genLlvmData (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _,
   , isAliasToLocalOrIntoThisModule alias ind' = do
     label <- strCLabel_llvm alias
     label' <- strCLabel_llvm ind'
-    let link     = if (externallyVisibleCLabel alias)
-                      then ExternallyVisible else Internal
-        link'    = if (externallyVisibleCLabel ind')
-                      then ExternallyVisible else Internal
+    let link     = linkage alias
+        link'    = linkage ind'
         tyAlias  = LMAlias (label `appendFS` structStr, LMStructU [])
 
         aliasDef = LMGlobalVar label tyAlias link Nothing Nothing Alias
@@ -67,8 +70,7 @@ genLlvmData (sec, Statics lbl xs) = do
         tyAlias = LMAlias (label `appendFS` structStr, strucTy)
 
         struct         = Just $ LMStaticStruc static tyAlias
-        link           = if (externallyVisibleCLabel lbl)
-                            then ExternallyVisible else Internal
+        link           = linkage lbl
         align          = case sec of
                             Section CString _ -> Just 1
                             _                 -> Nothing
