@@ -45,7 +45,7 @@ case "$(uname)" in
       fi
     else
       cabal update
-      cabal install --reinstall hscolour
+      cabal install --reinstall hscolour alex
       sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     fi
     ;;
