@@ -498,6 +498,22 @@ opt_univ env sym (PhantomProv h) _r ty1 ty2
     ty1' = substTy (lcSubstLeft  env) ty1
     ty2' = substTy (lcSubstRight env) ty2
 
+opt_univ env sym (ZappedProv fvs) role ty1 ty2
+  | sym       = mkUnivCo (ZappedProv fvs') role ty2' ty1'
+  | otherwise = mkUnivCo (ZappedProv fvs') role ty1' ty2'
+  where
+    ty1' = substTy (lcSubstLeft env) ty1
+    ty2' = substTy (lcSubstRight env) ty2
+    fvs' = substFreeDVarSet (lcTCvSubst env) fvs
+
+opt_univ env sym (TcZappedProv fvs coholes) role ty1 ty2
+  | sym       = mkUnivCo (TcZappedProv fvs' coholes) role ty2' ty1'
+  | otherwise = mkUnivCo (TcZappedProv fvs' coholes) role ty1' ty2'
+  where
+    ty1' = substTy (lcSubstLeft env) ty1
+    ty2' = substTy (lcSubstRight env) ty2
+    fvs' = substFreeDVarSet (lcTCvSubst env) fvs
+
 opt_univ env sym prov role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
@@ -557,6 +573,9 @@ opt_univ env sym prov role oty1 oty2
       PhantomProv kco    -> PhantomProv $ opt_co4_wrap env sym False Nominal kco
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
+      ZappedProv fvs     -> ZappedProv $ substFreeDVarSet (lcTCvSubst env) fvs
+      TcZappedProv fvs coholes
+                         -> TcZappedProv (substFreeDVarSet (lcTCvSubst env) fvs) coholes
 
 -------------
 opt_transList :: InScopeSet -> [NormalCo] -> [NormalCo] -> [NormalCo]
@@ -638,6 +657,11 @@ opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
     opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)
       = Just $ ProofIrrelProv $ opt_trans is kco1 kco2
     opt_trans_prov (PluginProv str1)     (PluginProv str2)     | str1 == str2 = Just p1
+    opt_trans_prov (ZappedProv fvs1)     (ZappedProv fvs2)
+      = Just $ ZappedProv $ fvs1 `unionDVarSet` fvs2
+    opt_trans_prov (TcZappedProv fvs1 coholes1)
+                   (TcZappedProv fvs2 coholes2)
+      = Just $ TcZappedProv (fvs1 `unionDVarSet` fvs2) (coholes1 ++ coholes2)
     opt_trans_prov _ _ = Nothing
 
 -- Push transitivity down through matching top-level constructors.

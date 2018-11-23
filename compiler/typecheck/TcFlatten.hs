@@ -28,10 +28,12 @@ import Var
 import VarSet
 import VarEnv
 import Outputable
+import GHC.Driver.Session ( HasDynFlags(..) )
 import TcSMonad as TcS
 import BasicTypes( SwapFlag(..) )
 
 import Util
+import Pair
 import Bag
 import Control.Monad
 import MonadUtils    ( zipWith3M )
@@ -500,6 +502,9 @@ instance Monad FlatM where
 instance Applicative FlatM where
   pure x = FlatM $ const (pure x)
   (<*>) = ap
+
+instance HasDynFlags FlatM where
+  getDynFlags = liftTcS getDynFlags
 
 liftTcS :: TcS a -> FlatM a
 liftTcS thing_inside
@@ -1376,7 +1381,7 @@ flatten_exact_fam_app_fully tc tys
   -- See Note [Reduce type family applications eagerly]
      -- the following tcTypeKind should never be evaluated, as it's just used in
      -- casting, and casts by refl are dropped
-  = do { mOut <- try_to_reduce_nocache tc tys
+  = do { mOut <- try_to_reduce_nocache tc tys emptyDVarSet
        ; case mOut of
            Just out -> pure out
            Nothing -> do
@@ -1386,6 +1391,7 @@ flatten_exact_fam_app_fully tc tys
                                         -- each arg
                       flatten_args_tc tc (repeat Nominal) tys
                       -- kind_co :: tcTypeKind(F xis) ~N tcTypeKind(F tys)
+                      -- cos !! n :: (xis !! n) ~N  (tys !! n)
                ; eq_rel   <- getEqRel
                ; cur_flav <- getFlavour
                ; let role   = eqRelRole eq_rel
@@ -1420,6 +1426,7 @@ flatten_exact_fam_app_fully tc tys
                    _ -> do { mOut <- try_to_reduce tc
                                                    xis
                                                    kind_co
+                                                   (tyCoVarsOfCoDSet ret_co)
                                                    (`mkTransCo` ret_co)
                            ; case mOut of
                                Just out -> pure out
@@ -1465,25 +1472,34 @@ flatten_exact_fam_app_fully tc tys
                                -- where
                                -- orig_args is what was passed to the outer
                                -- function
+                  -> DTyCoVarSet  -- free variables of ret_co
                   -> (   Coercion     -- :: (xi |> kind_co) ~ F args
                       -> Coercion )   -- what to return from outer function
                   -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce tc tys kind_co update_co
-      = do { checkStackDepth (mkTyConApp tc tys)
+    try_to_reduce tc tys kind_co ret_co_fvs update_co
+      = do { let fvs =                tyCoVarsOfTypesDSet tys
+                       `unionDVarSet` tyCoVarsOfCoDSet kind_co
+                       `unionDVarSet` ret_co_fvs
+                     -- See Note [Zapping coercions] in TyCoRep
+                 fam_ty = mkTyConApp tc tys
+           ; checkStackDepth (mkTyConApp tc tys)
+           ; dflags <- getDynFlags
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
                  -- NB: norm_co will always be homogeneous. All type families
                  -- are homogeneous.
-               Just (norm_co, norm_ty)
+               Just (norm_co, norm_ty)  -- norm_co :: fam_ty ~R norm_ty
                  -> do { traceFlat "Eager T.F. reduction success" $
                          vcat [ ppr tc, ppr tys, ppr norm_ty
                               , ppr norm_co <+> dcolon
                                             <+> ppr (coercionKind norm_co)
                               ]
                        ; (xi, final_co) <- bumpDepth $ flatten_one norm_ty
+                           -- final_co :: xi ~ norm_ty
                        ; eq_rel <- getEqRel
                        ; let co = maybeTcSubCo eq_rel norm_co
                                    `mkTransCo` mkSymCo final_co
+                               -- co :: fam_ty ~eq_rel xi
                        ; flavour <- getFlavour
                            -- NB: only extend cache with nominal equalities
                        ; when (eq_rel == NomEq) $
@@ -1491,16 +1507,25 @@ flatten_exact_fam_app_fully tc tys
                          extendFlatCache tc tys ( co, xi, flavour )
                        ; let role = eqRelRole eq_rel
                              xi' = xi `mkCastTy` kind_co
-                             co' = update_co $
-                                   mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
-                       ; return $ Just (xi', co') }
+                             -- See Note [Zapping coercions]
+                             co' = mkTcCoherenceLeftCo role xi kind_co (mkSymCo co)
+                             co'_kind = Pair xi' fam_ty
+                               -- co' :: (xi |> kind_co) ~role fam_ty
+                             co'' = update_co $ mkZappedCoercion dflags co' co'_kind role fvs
+                             --co'' = update_co co'
+                       ; return $ Just (xi', co'') }
                Nothing -> pure Nothing }
 
     try_to_reduce_nocache :: TyCon   -- F, family tycon
                           -> [Type]  -- args, not necessarily flattened
+                          -> DTyCoVarSet -- free variables of ret_co
                           -> FlatM (Maybe (Xi, Coercion))
-    try_to_reduce_nocache tc tys
-      = do { checkStackDepth (mkTyConApp tc tys)
+    try_to_reduce_nocache tc tys fvs_ret_co
+      = do { let fvs = tyCoVarsOfTypesDSet tys `unionDVarSet` fvs_ret_co
+                     -- See Note [Zapping coercions] in TyCoRep
+                 fam_ty = mkTyConApp tc tys
+           ; checkStackDepth fam_ty
+           ; dflags <- getDynFlags
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
                  -- NB: norm_co will always be homogeneous. All type families
@@ -1508,9 +1533,12 @@ flatten_exact_fam_app_fully tc tys
                Just (norm_co, norm_ty)
                  -> do { (xi, final_co) <- bumpDepth $ flatten_one norm_ty
                        ; eq_rel <- getEqRel
+                       ; let role = eqRelRole eq_rel
                        ; let co  = mkSymCo (maybeTcSubCo eq_rel norm_co
                                             `mkTransCo` mkSymCo final_co)
-                       ; return $ Just (xi, co) }
+                             co' = mkZappedCoercion dflags co (Pair xi fam_ty) role fvs
+                             --co' = co
+                       ; return $ Just (xi, co') }
                Nothing -> pure Nothing }
 
 {- Note [Reduce type family applications eagerly]

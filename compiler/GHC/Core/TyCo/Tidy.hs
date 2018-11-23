@@ -26,9 +26,11 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import Name hiding (varName)
 import Var
 import VarEnv
+import VarSet
 import Util (seqList)
 
 import Data.List (mapAccumL)
+import Data.Maybe (fromMaybe)
 
 {-
 %************************************************************************
@@ -209,9 +211,7 @@ tidyCo env@(_, subst) co
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
     go (FunCo r co1 co2)     = (FunCo r $! go co1) $! go co2
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
+    go (CoVarCo cv)          = CoVarCo $ substCoVar cv
     go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = let args = map go cos
                                in  args `seqList` AxiomInstCo con ind args
@@ -230,6 +230,12 @@ tidyCo env@(_, subst) co
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
+    go_prov (ZappedProv fvs)    = ZappedProv $ mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs)
+    go_prov (TcZappedProv fvs coholes)
+                                = TcZappedProv (mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs))
+                                               coholes -- Tidying needed?
+
+    substCoVar cv = fromMaybe cv $ lookupVarEnv subst cv
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)

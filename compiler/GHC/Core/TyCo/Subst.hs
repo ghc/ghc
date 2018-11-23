@@ -46,6 +46,7 @@ module GHC.Core.TyCo.Subst
         substTyVarBndr, substTyVarBndrs,
         substCoVarBndr,
         substTyVar, substTyVars, substTyCoVars,
+        substFreeDVarSet,
         substForAllCoBndr,
         substVarBndrUsing, substForAllCoBndrUsing,
         checkValidSubst, isValidTCvSubst,
@@ -824,10 +825,21 @@ subst_co subst co
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
+    go_prov (ZappedProv fvs)     = ZappedProv (substFreeDVarSet subst fvs)
+    go_prov (TcZappedProv fvs coholes)
+                                 = TcZappedProv (substFreeDVarSet subst fvs) coholes
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
       = h { ch_co_var = updateVarType go_ty cv }
+
+-- | Perform a substitution within a 'DVarSet' of free variables.
+substFreeDVarSet :: TCvSubst -> DVarSet -> DVarSet
+substFreeDVarSet subst =
+    let f v
+          | isTyVar v = tyCoVarsOfTypeDSet $ substTyVar subst v
+          | otherwise = tyCoVarsOfCoDSet $ substCoVar subst v
+    in mapUnionDVarSet f . dVarSetElems
 
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)
@@ -908,14 +920,15 @@ substForAllCoCoVarBndrUsing sym sco (TCvSubst in_scope tenv cenv)
 
 substCoVar :: TCvSubst -> CoVar -> Coercion
 substCoVar (TCvSubst _ _ cenv) cv
-  = case lookupVarEnv cenv cv of
+  = ASSERT( isCoVar cv )
+    case lookupVarEnv cenv cv of
       Just co -> co
       Nothing -> CoVarCo cv
 
 substCoVars :: TCvSubst -> [CoVar] -> [Coercion]
 substCoVars subst cvs = map (substCoVar subst) cvs
 
-lookupCoVar :: TCvSubst -> Var -> Maybe Coercion
+lookupCoVar :: TCvSubst -> CoVar -> Maybe Coercion
 lookupCoVar (TCvSubst _ _ cenv) v = lookupVarEnv cenv v
 
 substTyVarBndr :: HasCallStack => TCvSubst -> TyVar -> (TCvSubst, TyVar)

@@ -40,6 +40,7 @@ module GHC.Driver.Session (
         lang_set,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
+        shouldBuildCoercions,
         dynamicTooMkDynamicDynFlags,
         dynamicOutputFile,
         DynFlags(..),
@@ -1184,6 +1185,14 @@ data RtsOptsEnabled
   = RtsOptsNone | RtsOptsIgnore | RtsOptsIgnoreAll | RtsOptsSafeOnly
   | RtsOptsAll
   deriving (Show)
+
+-- | Should we generate coercions?
+--
+-- See Note [Zapping coercions] for details.
+shouldBuildCoercions :: DynFlags -> Bool
+shouldBuildCoercions dflags =
+    gopt Opt_DoCoreLinting dflags && not (gopt Opt_DropCoercions dflags)
+    -- TODO: Add flag to explicitly enable coercion generation without linting?
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
@@ -2808,6 +2817,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_rtti)
   , make_ord_flag defGhcFlag "dcore-lint"
         (NoArg (setGeneralFlag Opt_DoCoreLinting))
+  , make_ord_flag defGhcFlag "ddrop-coercions"
+        (NoArg (setGeneralFlag Opt_DropCoercions))
   , make_ord_flag defGhcFlag "dstg-lint"
         (NoArg (setGeneralFlag Opt_DoStgLinting))
   , make_ord_flag defGhcFlag "dcmm-lint"

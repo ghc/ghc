@@ -843,7 +843,7 @@ loadDecl ignore_prags (_version, decl)
                       [(n, lookup n) | n <- implicit_names]
         }
   where
-    doc = text "Declaration for" <+> ppr (ifName decl)
+    doc = text "Declaration for" <+> ppr (ifName decl) $$ ppr decl
 
 bumpDeclStats :: Name -> IfL ()         -- Record that one more declaration has actually been used
 bumpDeclStats name

@@ -1531,12 +1531,24 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
+  | ZappedProv { zappedFreeVars :: DTyCoVarSet }
+    -- ^ See Note [Zapping coercions].
+    -- Free variables must be tracked in 'DVarSet' since they appear in
+    -- interface files. See Note [Deterministic UniqFM] for details.
+
+  | TcZappedProv { zappedFreeVars :: DTyCoVarSet
+                 , zappedCoHoles  :: [CoercionHole]
+                 }
+
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
+  ppr (ZappedProv fvs)   = parens (text "zapped" <+> brackets (ppr fvs))
+  ppr (TcZappedProv fvs coholes)
+                         = parens (text "zapped" <+> brackets (ppr fvs) <+> brackets (ppr coholes))
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
@@ -1602,12 +1614,15 @@ equality types story] in TysPrim for background on equality constraints.
 
 For unboxed equalities:
   - Generate a CoercionHole, a mutable variable just like a unification
-    variable
+    variable.
   - Wrap the CoercionHole in a Wanted constraint; see TcRnTypes.TcEvDest
   - Use the CoercionHole in a Coercion, via HoleCo
   - Solve the constraint later
   - When solved, fill in the CoercionHole by side effect, instead of
     doing the let-binding thing
+  - To ensure that Core Lint can catch when a CoercionHole variable
+    inappropriately persists beyond typechecking we distinguish such
+    variables by giving them the CoercionHoleId IdDetails.
 
 The main reason for all this is that there may be no good place to let-bind
 the evidence for unboxed equalities:
@@ -1853,6 +1868,14 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_prov env (PhantomProv co)    = go_co env co
     go_prov env (ProofIrrelProv co) = go_co env co
     go_prov _   (PluginProv _)      = mempty
+    go_prov env (ZappedProv fvs)    = tycovars env fvs
+    go_prov env (TcZappedProv fvs hole) = tycovars env fvs `mappend` foldMap (cohole env) hole
+
+    tycovars env = foldDVarSet f mempty
+      where f v acc
+              | isTyVar v = tyvar env v `mappend` acc
+              | isCoVar v = covar env v `mappend` acc
+              | otherwise = error "unknown thingy"
 
 {- *********************************************************************
 *                                                                      *
@@ -1908,3 +1931,5 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+provSize (ZappedProv _)      = 1
+provSize (TcZappedProv _ _)  = 1

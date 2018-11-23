@@ -17,7 +17,8 @@ COST CENTRE           MODULE                SRC                     no.     entr
 
 MAIN                  MAIN                  <built-in>               45          0    0.0    0.0   100.0  100.0
  CAF                  Main                  <entire-module>          89          0    0.0    0.0   100.0  100.0
-  main                Main                  T2552.hs:(17,1)-(20,17)  90          1    0.0    0.0   100.0  100.0
+  main                Main                  T2552.hs:12:1-12         90          1    0.0    0.0   100.0  100.0
+   fib3               Main                  T2552.hs:(1,1)-(5,61)    92          1    0.0    0.0    37.8   33.3
    fib1               Main                  T2552.hs:(1,1)-(5,61)    92          1    0.0    0.0    37.8   33.3
     fib1.fib1'        Main                  T2552.hs:(3,5)-(5,61)    93          1    0.0    0.0    37.8   33.3
      nfib'            Main                  T2552.hs:3:35-40         94          1    0.0    0.0    37.8   33.3
@@ -25,7 +26,7 @@ MAIN                  MAIN                  <built-in>               45         
    fib2               Main                  T2552.hs:7:1-16          96          1    0.0    0.0    31.1   33.3
     fib2'             Main                  T2552.hs:(8,1)-(10,57)   97          1    0.0    0.0    31.1   33.3
      fib2'.nfib       Main                  T2552.hs:10:5-57         98    1028457   31.1   33.3    31.1   33.3
-   fib3               Main                  T2552.hs:12:1-12         99          1    0.0    0.0     0.0    0.0
+   fib3               Main                  T2552.hs:12:1-12         99          0    0.0    0.0     0.0    0.0
    fib3'              Main                  T2552.hs:(13,1)-(15,57) 100          1    0.0    0.0    31.1   33.3
     fib3'.nfib        Main                  T2552.hs:15:5-57        101    1028457   31.1   33.3    31.1   33.3
  CAF                  GHC.IO.Handle.FD      <entire-module>          84          0    0.0    0.0     0.0    0.0

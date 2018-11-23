@@ -474,6 +474,10 @@ expandTypeSynonyms ty
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
+    go_prov subst (ZappedProv fvs)
+      = ZappedProv $ substFreeDVarSet subst fvs
+    go_prov subst (TcZappedProv fvs coholes)
+      = TcZappedProv (substFreeDVarSet subst fvs) coholes
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -716,7 +720,22 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov _   p@(PluginProv _)    = return p
-
+    go_prov env (ZappedProv fvs)
+      = let bndrFVs v
+              | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
+              | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
+              | otherwise = pprPanic "mapCoercion(ZappedProv): Bad free variable" (ppr v)
+        in do fvs' <- unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
+              return $ ZappedProv fvs'
+    go_prov env (TcZappedProv fvs coholes)
+      = let bndrFVs v
+              | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
+              | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
+              | otherwise = pprPanic "mapCoercion(TcZappedProv): Bad free variable" (ppr v)
+        in do fvs' <- unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
+              coholes' <- mapM (cohole env) coholes
+              let fvs'' = mapUnionDVarSet tyCoVarsOfCoDSet coholes'
+              return $ ZappedProv $ fvs' `unionDVarSet` fvs''
 
 {-
 ************************************************************************
@@ -2772,7 +2791,8 @@ occCheckExpand vs_to_avoid ty
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
-
+    go_prov _   p@(ZappedProv _)    = return p
+    go_prov _   p@(TcZappedProv{})  = return p
 
 {-
 %************************************************************************
@@ -2827,6 +2847,11 @@ tyConsOfType ty
      go_prov (PluginProv _)      = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate
+     go_prov (ZappedProv _)      = emptyUniqSet
+     go_prov (TcZappedProv _ _)  = emptyUniqSet
+        -- [ZappedCoDifference] that this will not report TyCons present in the
+        -- unzapped proof but not its kind. See Note [Zapping coercions] in
+        -- TyCoRep.
 
      go_s tys     = foldr (unionUniqSets . go)     emptyUniqSet tys
      go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos

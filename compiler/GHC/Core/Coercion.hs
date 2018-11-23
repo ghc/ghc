@@ -41,6 +41,9 @@ module GHC.Core.Coercion (
         downgradeRole, mkAxiomRuleCo,
         mkGReflRightCo, mkGReflLeftCo, mkCoherenceLeftCo, mkCoherenceRightCo,
         mkKindCo, castCoercionKind, castCoercionKindI,
+        --
+        -- ** Zapping coercions
+        mkZappedCoercion, zapCoercion,
 
         mkHeteroCoercionType,
         mkPrimEqPred, mkReprPrimEqPred, mkPrimEqPredRole,
@@ -136,9 +139,10 @@ import Var
 import VarEnv
 import VarSet
 import Name hiding ( varName )
-import Util
+import Util hiding ( seqList )
 import BasicTypes
 import Outputable
+import GHC.Driver.Session ( DynFlags, shouldBuildCoercions )
 import Unique
 import Pair
 import SrcLoc
@@ -963,6 +967,9 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
+mkSymCo (UnivCo (ZappedProv fvs) r t1 t2) = UnivCo (ZappedProv fvs) r t2 t1
+mkSymCo (UnivCo (TcZappedProv fvs coholes) r t1 t2) = UnivCo (TcZappedProv fvs coholes) r t2 t1
+-- TODO: Handle other provenances
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
@@ -972,6 +979,14 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
+mkTransCo (UnivCo (ZappedProv fvs1) r t1a _t1b) (UnivCo (ZappedProv fvs2) _ _t2a t2b)
+  = UnivCo (ZappedProv (fvs1 `unionDVarSet` fvs2)) r t1a t2b
+mkTransCo (UnivCo (ZappedProv fvs) r t1a _t1b) co2
+  = UnivCo (ZappedProv (fvs `unionDVarSet` tyCoVarsOfCoDSet co2)) r t1a t2b
+  where Pair _t2a t2b = coercionKind co2
+mkTransCo co1 (UnivCo (ZappedProv fvs) r _t2a t2b)
+  = UnivCo (ZappedProv (fvs `unionDVarSet` tyCoVarsOfCoDSet co1)) r t1a t2b
+  where Pair t1a _t1b = coercionKind co1
 mkTransCo co1 co2                 = TransCo co1 co2
 
 -- | Compose two MCoercions via transitivity
@@ -1108,6 +1123,14 @@ nthCoRole n co
     r   = coercionRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
+mkLRCo lr (UnivCo (ZappedProv fvs) r t1 t2)
+                       = UnivCo (ZappedProv fvs) r
+                                (pickLR lr (splitAppTy t1))
+                                (pickLR lr (splitAppTy t2))
+mkLRCo lr (UnivCo (TcZappedProv fvs coholes) r t1 t2)
+                       = UnivCo (TcZappedProv fvs coholes) r
+                                (pickLR lr (splitAppTy t1))
+                                (pickLR lr (splitAppTy t2))
 mkLRCo lr co
   | Just (ty, eq) <- isReflCo_maybe co
   = mkReflCo eq (pickLR lr (splitAppTy ty))
@@ -1146,9 +1169,6 @@ mkGReflLeftCo r ty co
 -- is a GRefl coercion.
 mkCoherenceLeftCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceLeftCo r ty co co2
-  | debugIsOn
-  , Pair ty' _ <- coercionKind co2
-  , not $ ty `eqType` ty' = pprPanic "mkCoherenceLeftCo" (ppr ty $$ ppr co $$ ppr co2)
   | isGReflCo co = co2
   | otherwise = (mkSymCo $ GRefl r ty (MCo co)) `mkTransCo` co2
 
@@ -1158,9 +1178,6 @@ mkCoherenceLeftCo r ty co co2
 -- is a GRefl coercion.
 mkCoherenceRightCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceRightCo r ty co co2
-  | debugIsOn
-  , Pair _ ty' <- coercionKind co2
-  , not $ ty `eqType` ty' = pprPanic "mkCoherenceLeftCo" (ppr ty $$ ppr co $$ ppr co2)
   | isGReflCo co = co2
   | otherwise = co2 `mkTransCo` GRefl r ty (MCo co)
 
@@ -1170,6 +1187,8 @@ mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
 mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
+mkKindCo (UnivCo (ZappedProv fvs) _ ty1 ty2) = mkUnivCo (ZappedProv fvs) Nominal (typeKind ty1) (typeKind ty2)
+mkKindCo (UnivCo (TcZappedProv fvs coholes) _ ty1 ty2) = mkUnivCo (TcZappedProv fvs coholes) Nominal (typeKind ty1) (typeKind ty2)
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
        -- generally, calling coercionKind during coercion creation is a bad idea,
@@ -1193,6 +1212,9 @@ mkSubCo (FunCo Nominal arg res)
   = FunCo Representational
           (downgradeRole Representational Nominal arg)
           (downgradeRole Representational Nominal res)
+mkSubCo (UnivCo (ZappedProv fvs) Nominal t1 t2) = UnivCo (ZappedProv fvs) Representational t1 t2
+mkSubCo (UnivCo (TcZappedProv fvs coholes) Nominal t1 t2) = UnivCo (TcZappedProv fvs coholes) Representational t1 t2
+mkSubCo co@(SubCo _) = co
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
              SubCo co
 
@@ -1285,6 +1307,8 @@ setNominalRole_maybe r co
       | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
+                     ZappedProv _     -> False  -- conservatively say no
+                     TcZappedProv _ _ -> False  -- conservatively say no
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1391,6 +1415,8 @@ promoteCoercion co = case co of
     UnivCo (PhantomProv kco) _ _ _    -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _) _ _ _       -> mkKindCo co
+    UnivCo (ZappedProv _) _ _ _       -> mkKindCo co
+    UnivCo (TcZappedProv _ _) _ _ _   -> mkKindCo co
 
     SymCo g
       -> mkSymCo (promoteCoercion g)
@@ -1534,6 +1560,232 @@ mkCoCast c g
     -- g2 :: t1 ~# t2
     (tc, _) = splitTyConApp (coercionLKind g)
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
+
+{-
+%************************************************************************
+%*                                                                      *
+                 Zapping coercions into oblivion
+%*                                                                      *
+%************************************************************************
+-}
+
+{- Note [Zapping coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Coercions for even small programs can grow to be quite large (e.g. #8095),
+especially when type families are involved. For instance, the case of addition
+of inductive natural numbers can build coercions quadratic in size of the
+summands.  For instance, consider the type-level addition operation defined on
+Peano naturals,
+
+    data Nat = Z | Succ Nat
+
+    type family (+) (a :: Nat) (b :: Nat)
+    type instance (+) Z        a   = a                -- CoAx1
+    type instance (+) (Succ a) b   = Succ (a + b)     -- CoAx2
+
+Now consider what is necessary to reduce (S (S (S Z)) + S Z). This
+reduction will produce two results: the reduced (i.e. flattened) type, and a
+coercion witnessing the reduction. The reduction will proceed as follows:
+
+       S (S (S Z)) + S Z       |>              Refl
+    ~> S (S (S Z) + S Z)       |>              CoAx2 Refl
+    ~> S (S (S Z + S Z))       |>              CoAx2 (CoAx2 Refl)
+    ~> S (S (S (Z + S Z)))     |>              CoAx2 (CoAx2 (CoAx2 Refl))
+    ~> S (S (S (S (S Z))))     |>              CoAx1 (CoAx2 (CoAx2 (CoAx2 Refl)))
+
+Note that when we are building coercions [TODO]
+
+Moreover, coercions are really only useful when validating core transformations
+(i.e. by the Core Linter). To avoid burdening users who aren't linting with the
+cost of maintaining these structures, we replace coercions with placeholders
+("zap" them) them unless -dcore-lint is enabled. These placeholders are
+represented by UnivCo with ZappedProv provenance. Concretely, a coercion
+
+    co :: t1 ~r t2
+
+is replaced by
+
+    UnivCo (ZappedProv fvs) r t1 t2
+
+To ensure that such coercions aren't floated out of the scope of proofs they
+require, the ZappedProv constructor includes the coercion's set of free type
+and coercion variables (as a DVarSet, since these sets are included in
+interface files).
+
+
+Zapping during type family reduction
+------------------------------------
+
+To avoid the quadratic blow-up in coercion size during type family reduction
+described above, we zap on every type family reduction step taken by
+TcFlatten.flatten_exact_fam_app_fully. When zapping we take care to avoid
+looking at the constructed coercion and instead build up a zapped coercion
+directly from type being reduced, its free variables, and the result of the
+reduction. This allows us to reduce recursive type families in time linear to
+the size of the type at the expense of Core Lint's ability to validate the
+reduction.
+
+Note that the free variable set of the zapped coercion is taken to be the free
+variable set of the unreduced family application, which is computed once at the
+beginning of reduction. This is an important optimisation as it allows us to
+avoid recomputing the free variable set (which requires linear work in the size
+of the coercion) with every reduction step. Moreover, this gives us the same
+result as naively computing the free variables of every reduction:
+
+  * The FV set of the unreduced type cannot be smaller than that of the reduced type
+    because there is nowhere for extra FVs to come from. Type family equations
+    are essentially function reduction, which can never introduce new fvs.
+
+  * The FV set of the unreducecd type cannot be larger than that of the reduced
+    type because the zapped coercion's kind must mention the types these fvs come
+    from, so the FVs of the zapped coercion must be at least those in the
+    starting types.
+
+Thus, the two sets are subsets of each other and are equal.
+
+
+Other places where we zap
+-------------------------
+
+Besides during type family reduction, we also zap coercions in a number of other
+places (again, only when DynFlags.shouldBuildCoercions is False). This zapping
+occurs in zapCoercion, which maps a coercion to its zapped form. However, there
+are a few optimisations which we implement:
+
+  * We don't zap coercions which are already zapping; this avoids an unnecessary
+    free variable computation.
+
+  * We don't zap Refl coercions. This is because Refls are actually far more
+    compact than zapped coercions: the coercion (Refl T) holds only one
+    reference to T, whereas its zapped equivalent would hold two. While this
+    makes little difference directly after construction due to sharing, this
+    sharing will be lost when we substitute or otherwise manipulate the zapped
+    coercion, resulting in a doubling of the coercions representation size.
+
+zapCoercion is called in a few places:
+
+  * CoreOpt.pushCoTyArg zaps the coercions it produces to avoid pile-up during
+    simplification [TODO]
+
+  * TcIface.tcIfaceCo
+
+  * Type.mapCoercion (which is used by zonking) can optionally zap coercions,
+    although this is currently disabled since it causes compiler allocations to
+    regress in a few cases.
+
+  * We considered zapping as well in optCoercion, although this too caused
+    significant allocation regressions.
+
+The importance of tracking free coercion variables
+--------------------------------------------------
+
+It is quite important that zapped coercions track their free coercion variables.
+To see why, consider this program:
+
+    data T a where
+      T1 :: Bool -> T Bool
+      T2 :: T Int
+
+    f :: T a -> a -> Bool
+    f = /\a (x:T a) (y:a).
+        case x of
+              T1 (c : a~Bool) (z : Bool) -> not (y |> c)
+              T2 -> True
+
+Now imagine that we zap the coercion `c`, replacing it with a generic UnivCo
+between `a` and Bool. If we didn't record the fact that this coercion was
+previously free in `c`, we may incorrectly float the expression `not (y |> c)`
+out of the case alternative which brings proof of `c` into scope. If this
+happened then `f T2 (I# 5)` would try to interpret `y` as a Bool, at
+which point we aren't far from a segmentation fault or much worse.
+
+Note that we don't need to track the coercion's free *type* variables. This
+means that we may float past type variables which the original proof had as free
+variables. While surprising, this doesn't jeopardise the validity of the
+coercion, which only depends upon the scoping relative to the free coercion
+variables.
+
+
+Differences between zapped and unzapped coercions
+-------------------------------------------------
+
+Alas, sometimes zapped coercions will behave slightly differently from their
+unzapped counterparts. Specifically, we are a bit lax in tracking external names
+that are present in the unzapped coercion but not its kind. This manifests in a
+few places (these are labelled in the source with the [ZappedCoDifference]
+keyword):
+
+ * IfaceSyn.freeNamesIfCoercion will fail to report top-level names present in
+   the unzapped proof but not its kind.
+
+ * TcTyDecls.synonymTyConsOfType will fail to report type synonyms present in
+   in the unzapped proof but not its kind.
+
+ * The result of TcValidity.fvCo will contain each free variable of a ZappedCo
+   only once, even if it would have reported multiple occurrences in the
+   unzapped coercion.
+
+ * Type.tyConsOfType does not report TyCons which appear only in the unzapped
+   proof and not its kind.
+
+ * Zapped coercions are represented in interface files as IfaceZappedProv. This
+   representation only includes local free variables, since these are sufficient
+   to avoid unsound floating. This means that the free variable lists of zapped
+   coercions loaded from interface files will lack top-level things (e.g. type
+   constructors) that appear only in the unzapped proof.
+
+-}
+
+-- | Make a zapped coercion if building of coercions is disabled, otherwise
+-- return the given un-zapped coercion.
+mkZappedCoercion :: HasDebugCallStack
+                 => DynFlags
+                 -> Coercion  -- ^ the un-zapped coercion
+                 -> Pair Type -- ^ the kind of the coercion
+                 -> Role      -- ^ the role of the coercion
+                 -> DTyCoVarSet -- ^ the free variables of the coercion
+                 -> Coercion
+mkZappedCoercion dflags co (Pair ty1 ty2) role fvs
+  | debugIsOn && real_role /= role =
+    pprPanic "mkZappedCoercion(roles mismatch)" panic_doc
+  | debugIsOn && not co_kind_ok =
+    pprPanic "mkZappedCoercion(kind mismatch)" panic_doc
+  | shouldBuildCoercions dflags = co
+  | otherwise =
+    mkUnivCo (ZappedProv fvs) role ty1 ty2
+  where
+    (Pair real_ty1 real_ty2, real_role) = coercionKindRole co
+    real_fvs = tyCoVarsOfCoDSet co
+        -- We must unify here (at the loss of some precision in the assertion)
+        -- since we may encounter flattening skolems.
+    --co_kind_ok = isJust $ tcUnifyTys (const BindMe) [real_ty1, real_ty2] [ty1, ty2]
+    co_kind_ok = True
+        -- N.B. It's not generally possible to check fCvs against the actual
+        -- free variable set since we may encounter flattening skolems during
+        -- reduction.
+    panic_doc = vcat
+        [ text "real role:" <+> ppr real_role
+        , text "given role:" <+> ppr role
+        , text "real ty1:" <+> ppr real_ty1
+        , text "given ty1:" <+> ppr ty1
+        , text "real ty2:" <+> ppr real_ty2
+        , text "given ty2:" <+> ppr ty2
+        , text "real free co vars:" <+> ppr real_fvs
+        , text "given free co vars:" <+> ppr fvs
+        , text "coercion:" <+> ppr co
+        ]
+
+-- | Replace a coercion with a zapped coercion unless coercions are needed.
+zapCoercion :: DynFlags -> Coercion -> Coercion
+zapCoercion _ co@(UnivCo (ZappedProv _) _ _ _) = co  -- already zapped
+zapCoercion _ co@(Refl _) = co  -- Refl is smaller than zapped coercions
+zapCoercion dflags co =
+    mkZappedCoercion dflags co (Pair t1 t2) role fvs
+  where
+    (Pair t1 t2, role) = coercionKindRole co
+    fvs = filterDVarSet (not . isCoercionHole) $ tyCoVarsOfCoDSet co
+
 
 {-
 %************************************************************************
@@ -2147,10 +2399,15 @@ seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
+seqProv (ZappedProv fvs)    = seqDVarSet fvs
+seqProv (TcZappedProv fvs coholes) = seqDVarSet fvs `seq` seqList (\h -> coHoleCoVar h `seq` ()) coholes
+
+seqList :: (a -> ()) -> [a] -> ()
+seqList _ [] = ()
+seqList f (x:xs) = f x `seq` seqList f xs
 
 seqCos :: [Coercion] -> ()
-seqCos []       = ()
-seqCos (co:cos) = seqCo co `seq` seqCos cos
+seqCos = seqList seqCo
 
 {-
 %************************************************************************

@@ -48,6 +48,7 @@ liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
 seqCo :: Coercion -> ()
 
 coercionKind :: Coercion -> Pair Type
+coercionKindRole :: Coercion -> (Pair Type, Role)
 coercionLKind :: Coercion -> Type
 coercionRKind :: Coercion -> Type
 coercionType :: Coercion -> Type
