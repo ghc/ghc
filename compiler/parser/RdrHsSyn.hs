@@ -107,6 +107,7 @@ import Maybes
 import Util
 import ApiAnnotation
 import Data.List
+import qualified GHC.LanguageExtensions as LangExt
 import DynFlags ( WarningFlag(..) )
 
 import Control.Monad
@@ -891,8 +892,8 @@ checkRecordSyntax lr@(L loc r)
 checkEmptyGADTs :: Located ([AddAnn], [LConDecl GhcPs])
                 -> P (Located ([AddAnn], [LConDecl GhcPs]))
 checkEmptyGADTs gadts@(L span (_, []))               -- Empty GADT declaration.
-    = do gadtSyntax <- extension gadtSyntaxEnabled   -- GADTs implies GADTSyntax
-         if gadtSyntax
+    = do opts <- fmap options getPState
+         if LangExt.GADTSyntax `extopt` opts         -- GADTs implies GADTSyntax
             then return gadts
             else parseErrorSDoc span $ vcat
               [ text "Illegal keyword 'where' in data declaration"
@@ -956,8 +957,8 @@ checkBlockArguments expr = case unLoc expr of
     _ -> return ()
   where
     check element = do
-      blockArguments <- extension blockArgumentsEnabled
-      unless blockArguments $
+      pState <- getPState
+      unless (extopt LangExt.BlockArguments (options pState)) $
         parseErrorSDoc (getLoc expr) $
           text "Unexpected " <> text element <> text " in function application:"
            $$ nest 4 (ppr expr)
@@ -1042,7 +1043,8 @@ checkPat msg loc e _
 
 checkAPat :: SDoc -> SrcSpan -> HsExpr GhcPs -> P (Pat GhcPs)
 checkAPat msg loc e0 = do
- nPlusKPatterns <- extension nPlusKPatternsEnabled
+ pState <- getPState
+ let opts = options pState
  case e0 of
    EWildPat _ -> return (WildPat noExt)
    HsVar _ x  -> return (VarPat noExt x)
@@ -1076,7 +1078,7 @@ checkAPat msg loc e0 = do
    -- n+k patterns
    OpApp _ (L nloc (HsVar _ (L _ n))) (L _ (HsVar _ (L _ plus)))
            (L lloc (HsOverLit _ lit@(OverLit {ol_val = HsIntegral {}})))
-                      | nPlusKPatterns && (plus == plus_RDR)
+                      | extopt LangExt.NPlusKPatterns opts && (plus == plus_RDR)
                       -> return (mkNPlusKPat (L nloc n) (L lloc lit))
 
    OpApp _ l (L cl (HsVar _ (L _ c))) r
@@ -1239,8 +1241,8 @@ checkDoAndIfThenElse :: LHsExpr GhcPs
                      -> P ()
 checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
  | semiThen || semiElse
-    = do doAndIfThenElse <- extension doAndIfThenElseEnabled
-         unless doAndIfThenElse $ do
+    = do pState <- getPState
+         unless (extopt LangExt.DoAndIfThenElse (options pState)) $ do
              parseErrorSDoc (combineLocs guardExpr elseExpr)
                             (text "Unexpected semi-colons in conditional:"
                           $$ nest 4 expr
@@ -1747,8 +1749,8 @@ mergeDataCon all_xs =
 
 checkMonadComp :: P (HsStmtContext Name)
 checkMonadComp = do
-    monadComprehensions <- extension monadComprehensionsEnabled
-    return $ if monadComprehensions
+    pState <- getPState
+    return $ if extopt LangExt.MonadComprehensions (options pState)
                 then MonadComp
                 else ListComp
 
