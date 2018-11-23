@@ -3744,14 +3744,14 @@ fileSrcSpan = do
 -- Hint about the MultiWayIf extension
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
-  mwiEnabled <- getBit MultiWayIfBit
+  mwiEnabled <- extension multiWayIfEnabled
   unless mwiEnabled $ parseErrorSDoc span $
     text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about if usage for beginners
 hintIf :: SrcSpan -> String -> P (LHsExpr GhcPs)
 hintIf span msg = do
-  mwiEnabled <- getBit MultiWayIfBit
+  mwiEnabled <- extension multiWayIfEnabled
   if mwiEnabled
     then parseErrorSDoc span $ text $ "parse error in if statement"
     else parseErrorSDoc span $ text $ "parse error in if statement: "++msg
@@ -3759,8 +3759,8 @@ hintIf span msg = do
 -- Hint about explicit-forall, assuming UnicodeSyntax is on
 hintExplicitForall :: SrcSpan -> P ()
 hintExplicitForall span = do
-    forall   <- getBit ExplicitForallBit
-    rulePrag <- getBit InRulePragBit
+    forall      <- extension explicitForallEnabled
+    rulePrag    <- extension inRulePrag
     unless (forall || rulePrag) $ parseErrorSDoc span $ vcat
       [ text "Illegal symbol '\x2200' in type" -- U+2200 FOR ALL
       , text "Perhaps you intended to use RankNTypes or a similar language"
@@ -3770,7 +3770,7 @@ hintExplicitForall span = do
 -- Hint about explicit-forall, assuming UnicodeSyntax is off
 hintExplicitForall' :: SrcSpan -> P (GenLocated SrcSpan RdrName)
 hintExplicitForall' span = do
-    forall <- getBit ExplicitForallBit
+    forall    <- extension explicitForallEnabled
     let illegalDot = "Illegal symbol '.' in type"
     if forall
       then parseErrorSDoc span $ vcat
@@ -3790,7 +3790,7 @@ checkIfBang _ = False
 -- | Warn about missing space after bang
 warnSpaceAfterBang :: SrcSpan -> P ()
 warnSpaceAfterBang span = do
-    bang_on <- getBit BangPatBit
+    bang_on <- extension bangPatEnabled
     unless bang_on $
       addWarning Opt_WarnSpaceAfterBang span msg
     where
@@ -3803,7 +3803,7 @@ warnSpaceAfterBang span = do
 -- variable or constructor. See Trac #13450.
 reportEmptyDoubleQuotes :: SrcSpan -> P (GenLocated SrcSpan (HsExpr GhcPs))
 reportEmptyDoubleQuotes span = do
-    thQuotes <- getBit ThQuotesBit
+    thQuotes <- extension thQuotesEnabled
     if thQuotes
       then parseErrorSDoc span $ vcat
         [ text "Parser error on `''`"
