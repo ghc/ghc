@@ -449,11 +449,11 @@ tcLocalInstDecl :: LInstDecl GhcRn
         --
         -- We check for respectable instance type, and context
 tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
-  = do { fam_inst <- tcTyFamInstDecl Nothing (L loc decl)
+  = do { fam_inst <- tcTyFamInstDecl NotAssociated (L loc decl)
        ; return ([], [fam_inst], []) }
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
-  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl Nothing (L loc decl)
+  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl NotAssociated (L loc decl)
        ; return ([], [fam_inst], maybeToList m_deriv_info) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))
@@ -486,7 +486,9 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
              <- tcExtendNameTyVarEnv tv_skol_prs $
                 do  { let mini_env   = mkVarEnv (classTyVars clas `zip` substTys subst inst_tys)
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
-                          mb_info    = Just (clas, skol_tvs, mini_env)
+                          mb_info    = InClsInst { ai_class = clas
+                                                 , ai_tyvars = skol_tvs
+                                                 , ai_inst_env = mini_env }
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info) adts
                     ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats
 
@@ -547,7 +549,7 @@ lot of kinding and type checking code with ordinary algebraic data types (and
 GADTs).
 -}
 
-tcTyFamInstDecl :: Maybe ClsInstInfo
+tcTyFamInstDecl :: AssocInstInfo
                 -> LTyFamInstDecl GhcRn -> TcM FamInst
   -- "type instance"
   -- See Note [Associated type instances]
@@ -573,7 +575,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; let axiom = mkUnbranchedCoAxiom rep_tc_name fam_tc co_ax_branch
        ; newFamInst SynFamilyInst axiom }
 
-tcDataFamInstDecl :: Maybe ClsInstInfo
+tcDataFamInstDecl :: AssocInstInfo
                   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo
@@ -626,9 +628,6 @@ tcDataFamInstDecl mb_clsinfo
              all_pats    = pats `chkAppend` extra_pats
              orig_res_ty = mkTyConApp fam_tc all_pats
              ty_binders  = full_tcbs `chkAppend` extra_tcbs
-
-       -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc all_pats
 
        ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr mb_bndrs
                                       $$ ppr hs_cons)
@@ -697,7 +696,7 @@ tcDataFamInstDecl mb_clsinfo
 
 tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 
-tcDataFamHeader :: Maybe ClsInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
+tcDataFamHeader :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
                 -> LexicalFixity -> LHsContext GhcRn
                 -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
                 -> TcM ([TyVar], [Type], Kind, ThetaType)
@@ -726,6 +725,9 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
 
        ; let pats = unravelFamInstPats lhs_ty
+
+       -- Check that type patterns match the class instance head
+       ; checkConsistentFamInst mb_clsinfo qtvs fam_tc pats
        ; return (qtvs, pats, res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
@@ -745,8 +747,7 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
            ; return (substTy subst inner_kind) }
 
 ---------------------
-tcFamInstDeclChecks :: Maybe ClsInstInfo
-                      -> Located Name -> TcM TyCon
+tcFamInstDeclChecks :: AssocInstInfo -> Located Name -> TcM TyCon
 tcFamInstDeclChecks mb_clsinfo fam_tc_lname
   = do { -- Type family instances require -XTypeFamilies
          -- and can't (currently) be in an hs-boot file
@@ -762,8 +763,8 @@ tcFamInstDeclChecks mb_clsinfo fam_tc_lname
 
        ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
 
-       ; when (isNothing mb_clsinfo &&   -- Not in a class decl
-               isTyConAssoc fam_tc)      -- but an associated type
+       ; when (isNotAssociated mb_clsinfo &&   -- Not in a class decl
+               isTyConAssoc fam_tc)            -- but an associated type
               (addErr $ assocInClassErr fam_tc_lname)
 
        ; return fam_tc }

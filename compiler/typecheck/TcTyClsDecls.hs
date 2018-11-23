@@ -19,7 +19,8 @@ module TcTyClsDecls (
         tcFamTyPats, tcTyFamInstEqn,
         tcAddTyFamInstCtxt, tcMkDataFamInstCtxt, tcAddDataFamInstCtxt,
         wrongKindOfFamily,
-        ClsInstInfo, checkConsistentFamInst, unravelFamInstPats
+        AssocInstInfo(..), isNotAssociated,
+        checkConsistentFamInst, unravelFamInstPats
     ) where
 
 #include "HsVersions.h"
@@ -1435,11 +1436,11 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
           -- the LHsQTyVars used for declaring a tycon, but the names here
           -- are different.
 
-          -- You might think we should pass in some ClsInstInfo, as we're looking
+          -- You might think we should pass in some AssocInstInfo, as we're looking
           -- at an associated type. But this would be wrong, because an associated
           -- type default LHS can mention *different* type variables than the
           -- enclosing class. So it's treated more as a freestanding beast.
-       ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc Nothing
+       ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc NotAssociated
                                                    imp_vars exp_vars
                                                    hs_pats hs_rhs_ty
 
@@ -1564,7 +1565,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                                    [] False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
 
-       ; branches <- mapAndReportM (tcTyFamInstEqn tc_fam_tc Nothing) eqns
+       ; branches <- mapAndReportM (tcTyFamInstEqn tc_fam_tc NotAssociated) eqns
          -- Do not attempt to drop equations dominated by earlier
          -- ones here; in the case of mutual recursion with a data
          -- type, we get a knot-tying failure.  Instead we check
@@ -1741,7 +1742,7 @@ kcTyFamInstEqn tc_fam_tc
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
-         do { (_, res_kind) <- tcFamTyPats tc_fam_tc Nothing hs_pats
+         do { (_, res_kind) <- tcFamTyPats tc_fam_tc NotAssociated hs_pats
             ; tcCheckLHsType hs_rhs_ty res_kind }
              -- Why "_Tv" here?  Consider (Trac #14066
              --  type family Bar x y where
@@ -1759,7 +1760,7 @@ kcTyFamInstEqn _ _ = panic "kcTyFamInstEqn: Impossible Match" -- due to #15884
 
 
 --------------------------
-tcTyFamInstEqn :: TcTyCon -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
+tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
                -> TcM (KnotTied CoAxBranch)
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
@@ -1785,7 +1786,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       hs_pats hs_rhs_ty
 
        -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc pats
+       ; checkConsistentFamInst mb_clsinfo qtvs fam_tc pats
 
        ; traceTc "tcTyFamInstEqn" (ppr fam_tc $$ ppr qtvs $$ ppr pats $$ ppr rhs_ty)
        ; return (mkCoAxBranch qtvs [] pats rhs_ty
@@ -1853,7 +1854,7 @@ Simple, neat, but a little non-obvious!
 -}
 
 --------------------------
-tcFamTyPatsAndGen :: TyCon -> Maybe ClsInstInfo
+tcFamTyPatsAndGen :: TyCon -> AssocInstInfo
                   -> [Name] -> [LHsTyVarBndr GhcRn]  -- Implicit and explicicit binder
                   -> HsTyPats GhcRn                  -- Patterns
                   -> LHsType GhcRn                   -- RHS
@@ -1899,7 +1900,7 @@ tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
 
 
 -----------------
-tcFamTyPats :: TyCon -> Maybe ClsInstInfo
+tcFamTyPats :: TyCon -> AssocInstInfo
             -> HsTyPats GhcRn                -- Patterns
             -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
 -- Used for both type and data families
@@ -1944,7 +1945,7 @@ unravelFamInstPats fam_app
       = hang (text "Ill-typed LHS of family instance")
            2 (debugPprType fam_app)
 
-addConsistencyConstraints :: Maybe ClsInstInfo -> TcType -> TcM ()
+addConsistencyConstraints :: AssocInstInfo -> TcType -> TcM ()
 -- In the corresponding positions of the class and type-family,
 -- ensure the the family argument is the same as the class argument
 --   E.g    class C a b c d where
@@ -1957,7 +1958,7 @@ addConsistencyConstraints :: Maybe ClsInstInfo -> TcType -> TcM ()
 -- If, despite the efforts, corresponding positions do not match,
 -- checkConsistentFamInst will complain
 addConsistencyConstraints mb_clsinfo fam_app
-  | Just (_, _, inst_env) <- mb_clsinfo
+  | InClsInst { ai_inst_env = inst_env } <- mb_clsinfo
   , Just (fam_tc, pats) <- tcSplitTyConApp_maybe fam_app
   = do { let eqs = [ (cls_ty, pat)
                    | (fam_tc_tv, pat) <- tyConTyVars fam_tc `zip` pats
@@ -3262,16 +3263,31 @@ checkFamFlag tc_name
 -- class, the [TyVar] are the type variable of the instance decl,
 -- and and the @VarEnv Type@ maps class variables to their instance
 -- types.
-type ClsInstInfo = (Class, [TyVar], VarEnv Type)
+data AssocInstInfo
+  = NotAssociated
+  | InClsInst { ai_class    :: Class
+              , ai_tyvars   :: [TyVar]
+              , ai_inst_env :: VarEnv Type }
 
-checkConsistentFamInst :: Maybe ClsInstInfo
-                       -> TyCon     -- ^ Family tycon
-                       -> [Type]    -- ^ Type patterns from instance
-                       -> TcM ()
+isNotAssociated :: AssocInstInfo -> Bool
+isNotAssociated NotAssociated  = True
+isNotAssociated (InClsInst {}) = False
+
+checkConsistentFamInst
+    :: AssocInstInfo
+    -> [TyVar]   -- ^ Quantified tyvars of the family instance
+    -> TyCon     -- ^ Family tycon
+    -> [Type]    -- ^ Type patterns from fammily instance
+    -> TcM ()
 -- See Note [Checking consistent instantiation]
 
-checkConsistentFamInst Nothing _ _ = return ()
-checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
+checkConsistentFamInst NotAssociated _ _ _
+  = return ()
+
+checkConsistentFamInst (InClsInst { ai_class = clas
+                                  , ai_tyvars = inst_tvs
+                                  , ai_inst_env = mini_env })
+                       qtvs fam_tc at_arg_tys
   = do { traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
                                                 , ppr arg_triples
                                                 , ppr mini_env ])
@@ -3315,8 +3331,12 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_arg_tys
       = addErrTc (pp_wrong_at_arg $$
                   ppWhen (isInvisibleArgFlag vis) ppSuggestExplicitKinds)
 
-    inst_tv_set = mkVarSet inst_tvs
-    bind_me tv | tv `elemVarSet` inst_tv_set = Skolem
+    -- A variable that is /both/ in the class-instance header,
+    -- /and/ in family instance must be one of the scoped variables
+    -- shared between the two.  Don't let these alpha-raneme to
+    -- anything else.
+    no_bind_set = mkVarSet inst_tvs `intersectVarSet` mkVarSet qtvs
+    bind_me tv | tv `elemVarSet` no_bind_set = Skolem
                | otherwise                   = BindMe
 
 
