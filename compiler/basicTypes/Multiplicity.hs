@@ -51,7 +51,7 @@ data GMult a
 
 -- | The 'Multable' class describes the requirements that a type needs to be a
 -- good citizen as an argument of 'GMult'
-class Outputable a => Multable a where
+class Multable a where
   -- | A way to relect multiplicities into @a@
   fromMult :: GMult a -> a
 
@@ -118,7 +118,7 @@ instance Num (GMult a) where
   (*) = MultMul
   (+) = MultAdd
 
-instance Multable a => Outputable (GMult a) where
+instance (Outputable a, Multable a) => Outputable (GMult a) where
   ppr Zero = text "0"
   ppr One = text "1"
   ppr Omega = text "ω"

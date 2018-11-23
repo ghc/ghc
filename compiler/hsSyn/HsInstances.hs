@@ -382,11 +382,6 @@ deriving instance Data (HsType GhcPs)
 deriving instance Data (HsType GhcRn)
 deriving instance Data (HsType GhcTc)
 
--- deriving instance (DataIdLR p p) => Data (HsMult p)
-deriving instance Data (HsMult GhcPs)
-deriving instance Data (HsMult GhcRn)
-deriving instance Data (HsMult GhcTc)
-
 -- deriving instance (DataIdLR p p) => Data (HsArrow p)
 deriving instance Data (HsArrow GhcPs)
 deriving instance Data (HsArrow GhcRn)
