@@ -746,7 +746,8 @@ warnUselessTypeable
 
 ------------------------------------------------------------------
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
-                                             --   Can be a data instance, hence [Type] args
+                    -- Can be a data instance, hence [Type] args
+                    -- and in that case the TyCon is the /family/ tycon
              -> Maybe (DerivStrategy GhcRn)  -- The optional deriving strategy
              -> LHsSigType GhcRn             -- The deriving predicate
              -> TcM (Maybe EarlyDerivSpec)
@@ -784,6 +785,7 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
           let (arg_kinds, _)  = splitFunTys cls_arg_kind
               n_args_to_drop  = length arg_kinds
               n_args_to_keep  = length tc_args - n_args_to_drop
+                                -- See Note [tc_args and tycon arity]
               (tc_args_to_keep, args_to_drop)
                               = splitAt n_args_to_keep tc_args
               inst_ty_kind    = typeKind (mkTyConApp tc tc_args_to_keep)
@@ -888,7 +890,24 @@ deriveTyData tvs tc tc_args mb_deriv_strat deriv_pred
         ; return $ Just spec } }
 
 
-{-
+{- Note [tc_args and tycon arity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might wonder if we could use (tyConArity tc) at this point, rather
+than (length tc_args).  But for data families the two can differ!  The
+tc and tc_args passed into 'deriveTyData' come from 'deriveClause' which
+in turn gets them from 'tyConFamInstSig_maybe' which in turn gets them
+from DataFamInstTyCon:
+
+| DataFamInstTyCon          -- See Note [Data type families]
+      (CoAxiom Unbranched)
+      TyCon   -- The family TyCon
+      [Type]  -- Argument types (mentions the tyConTyVars of this TyCon)
+              -- No shorter in length than the tyConTyVars of the family TyCon
+              -- How could it be longer? See [Arity of data families] in FamInstEnv
+
+Notice that the arg tys might not be the same as the family tycon arity
+(= length tyConTyVars).
+
 Note [Unify kinds in deriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider (Trac #8534)

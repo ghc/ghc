@@ -90,7 +90,6 @@ import FastString
 import Maybes( isJust )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
-import Data.List ( foldl' )
 
 {-
 ************************************************************************

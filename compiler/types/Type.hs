@@ -106,7 +106,8 @@ module Type (
         tyCoBinderType, tyCoBinderVar_maybe,
         tyBinderType,
         binderRelevantType_maybe, caseBinder,
-        isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
+        isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder,
+        isInvisibleBinder, isNamedBinder,
         tyConBindersTyCoBinders,
 
         -- ** Common type constructors

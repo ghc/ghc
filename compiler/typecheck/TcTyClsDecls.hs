@@ -1440,9 +1440,9 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
           -- at an associated type. But this would be wrong, because an associated
           -- type default LHS can mention *different* type variables than the
           -- enclosing class. So it's treated more as a freestanding beast.
-       ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc NotAssociated
-                                                   imp_vars exp_vars
-                                                   hs_pats hs_rhs_ty
+       ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc NotAssociated
+                                                    imp_vars exp_vars
+                                                    hs_pats hs_rhs_ty
 
          -- See Note [Type-checking default assoc decls]
        ; traceTc "tcDefault" (vcat [ppr (tyConTyVars fam_tc), ppr qtvs, ppr pats])
@@ -1781,7 +1781,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; checkTc (hs_pats `lengthIs` vis_arity) $
          wrongNumberOfParmsErr vis_arity
 
-       ; (qtvs, pats, rhs_ty) <- tcFamTyPatsAndGen fam_tc mb_clsinfo
+       ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc mb_clsinfo
                                       imp_vars (mb_expl_bndrs `orElse` [])
                                       hs_pats hs_rhs_ty
 
@@ -1854,14 +1854,14 @@ Simple, neat, but a little non-obvious!
 -}
 
 --------------------------
-tcFamTyPatsAndGen :: TyCon -> AssocInstInfo
-                  -> [Name] -> [LHsTyVarBndr GhcRn]  -- Implicit and explicicit binder
-                  -> HsTyPats GhcRn                  -- Patterns
-                  -> LHsType GhcRn                   -- RHS
-                  -> TcM ([TyVar], [TcType], TcType)      -- (tyvars, pats, rhs)
+tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
+                   -> [Name] -> [LHsTyVarBndr GhcRn]  -- Implicit and explicicit binder
+                   -> HsTyPats GhcRn                  -- Patterns
+                   -> LHsType GhcRn                   -- RHS
+                   -> TcM ([TyVar], [TcType], TcType)      -- (tyvars, pats, rhs)
 -- Used only for type families, not data families
-tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
-  = do { traceTc "tcFamTyPatsAndGen {" (vcat [ ppr fam_tc <+> ppr hs_pats ])
+tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
+  = do { traceTc "tcTyFamInstEqnGuts {" (vcat [ ppr fam_tc <+> ppr hs_pats ])
 
        -- By now, for type families (but not data families) we should
        -- have checked that the number of patterns matches tyConArity
@@ -1887,7 +1887,7 @@ tcFamTyPatsAndGen fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; rhs_ty     <- zonkTcTypeToTypeX ze rhs_ty
 
        ; let pats = unravelFamInstPats lhs_ty
-       ; traceTc "tcFamTyPatsAndGen }" (ppr fam_tc <+> pprTyVars qtvs)
+       ; traceTc "tcTyFamInstEqnGuts }" (ppr fam_tc <+> pprTyVars qtvs)
        ; return (qtvs, pats, rhs_ty) }
   where
     tc_lhs | null hs_pats
@@ -3260,14 +3260,15 @@ checkFamFlag tc_name
 
 -- | Extra information about the parent instance declaration, needed
 -- when type-checking associated types. The 'Class' is the enclosing
--- class, the [TyVar] are the type variable of the instance decl,
--- and and the @VarEnv Type@ maps class variables to their instance
--- types.
+-- class, the [TyVar] are the /scoped/ type variable of the instance decl.
+-- The @VarEnv Type@ maps class variables to their instance types.
 data AssocInstInfo
   = NotAssociated
   | InClsInst { ai_class    :: Class
-              , ai_tyvars   :: [TyVar]
-              , ai_inst_env :: VarEnv Type }
+              , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
+              , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
+                -- See Note [Matching in the consistent-instantation check]
+    }
 
 isNotAssociated :: AssocInstInfo -> Bool
 isNotAssociated NotAssociated  = True
@@ -3307,9 +3308,11 @@ checkConsistentFamInst (InClsInst { ai_class = clas
                                at_arg_tys
                   , Just cls_arg_ty <- [lookupVarEnv mini_env fam_tc_tv] ]
 
-    pp_wrong_at_arg = vcat [ text "Type indexes must match class instance head"
-                           , text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-                           , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_arg_tys) ]
+    pp_wrong_at_arg vis
+      = pprWithExplicitKindsWhen (isInvisibleArgFlag vis) $
+        vcat [ text "Type indexes must match class instance head"
+             , text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
+             , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_arg_tys) ]
 
     expected_args = [ lookupVarEnv mini_env at_tv `orElse` underscore at_tv
                     | at_tv <- tyConTyVars fam_tc ]
@@ -3327,13 +3330,10 @@ checkConsistentFamInst (InClsInst { ai_class = clas
       , Just rl_subst1 <- tcMatchTyX_BM bind_me rl_subst ty2 ty1
       = go lr_subst1 rl_subst1 triples
       | otherwise
-      = addErrTc (pp_wrong_at_arg $$
-                  ppWhen (isInvisibleArgFlag vis) ppSuggestExplicitKinds)
+      = addErrTc (pp_wrong_at_arg vis)
 
-    -- A variable that is /both/ in the class-instance header,
-    -- /and/ in family instance must be one of the scoped variables
-    -- shared between the two.  Don't let these alpha-raneme to
-    -- anything else.
+    -- The scoped type variables from the class-isntance header
+    -- should not be alpha-raenamed.
     no_bind_set = mkVarSet inst_tvs
     bind_me tv | tv `elemVarSet` no_bind_set = Skolem
                | otherwise                   = BindMe
@@ -3359,6 +3359,9 @@ Yet the real class-instance header is   C @(p -> Either @p @q)) (Left @p @q)
 while the type-family instance is       T (a -> Either @a @b)
 So we allow alpha-renaming of variables that don't come
 from the class-instance header.
+
+We track the lexically-scoped type variables from the
+class-instance header in ai_tyvars.
 
 Here's another example (Trac #14045a)
     class C (a :: k) where

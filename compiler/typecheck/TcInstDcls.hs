@@ -68,6 +68,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
+import Data.List( mapAccumL )
 
 
 {-
@@ -612,7 +613,7 @@ tcDataFamInstDecl mb_clsinfo
        ; rep_tc_name <- newFamInstTyConName lfam_name pats
        ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
 
-       ; let (eta_pats, etad_tvs) = eta_reduce pats
+       ; let (eta_pats, etad_tvs) = eta_reduce fam_tc pats
              eta_tvs              = filterOut (`elem` etad_tvs) qtvs
                  -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
 
@@ -632,8 +633,16 @@ tcDataFamInstDecl mb_clsinfo
              orig_res_ty = mkTyConApp fam_tc all_pats
              ty_binders  = full_tcbs `chkAppend` extra_tcbs
 
-       ; traceTc "tcDataFamInstDecl" (ppr fam_tc $$ ppr pats $$ ppr imp_vars $$ ppr mb_bndrs
-                                      $$ ppr hs_cons)
+       ; traceTc "tcDataFamInstDecl" $
+         vcat [ text "Fam tycon:" <+> ppr fam_tc
+              , text "Pats:" <+> ppr pats
+              , text "all_pats:" <+> ppr all_pats
+              , text "ty_binders" <+> ppr ty_binders
+              , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
+              , text "deps:" <+> ppr (map isNamedTyConBinder (tyConBinders fam_tc))
+              , text "eta_pats" <+> ppr eta_pats
+              , text "eta_tvs" <+> ppr eta_tvs ]
+
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcExtendTyVarEnv qtvs $
                              -- For H98 decls, the tyvars scope
@@ -682,20 +691,31 @@ tcDataFamInstDecl mb_clsinfo
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) }
   where
-    eta_reduce :: [Type] -> ([Type], [TyVar])
+    eta_reduce :: TyCon -> [Type] -> ([Type], [TyVar])
     -- See Note [Eta reduction for data families] in FamInstEnv
     -- Splits the incoming patterns into two: the [TyVar]
     -- are the patterns that can be eta-reduced away.
     -- e.g.     T [a] Int a d c   ==>  (T [a] Int a, [d,c])
     --
     -- NB: quadratic algorithm, but types are small here
-    eta_reduce pats
-      = go (reverse pats) []
-    go (pat:pats) etad_tvs
-      | Just tv <- getTyVar_maybe pat
-      , not (tv `elemVarSet` tyCoVarsOfTypes pats)
+    eta_reduce fam_tc pats
+        = go (reverse (zip3 pats fvs_s deps)) []
+        where
+          fvs_s :: [TyCoVarSet]  -- 1-1 correspondence with pats
+                                 -- Each elt is the free vars of all /earlier/ pats
+          (_, fvs_s) = mapAccumL add_fvs emptyVarSet pats
+          add_fvs fvs pat = (fvs `unionVarSet` tyCoVarsOfType pat, fvs)
+
+          deps :: [Bool]
+          deps = map isNamedBinder tc_bndrs ++ repeat False
+          (tc_bndrs, _) = splitPiTys (tyConKind fam_tc)
+
+    go ((pat, fvs_to_the_left, is_dep):pats) etad_tvs
+      | not is_dep
+      , Just tv <- getTyVar_maybe pat
+      , not (tv `elemVarSet` fvs_to_the_left)
       = go pats (tv : etad_tvs)
-    go pats etad_tvs = (reverse pats, etad_tvs)
+    go pats etad_tvs = (reverse (map fstOf3 pats), etad_tvs)
 
 tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 

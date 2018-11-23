@@ -232,9 +232,9 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
-              <- pushTcLevelM                                   $
-                 solveLocalEqualitiesX "tc_hs_sig_type_and_gen" $
-                 bindImplicitTKBndrs_Skol sig_vars              $
+              <- pushTcLevelM                           $
+                 solveLocalEqualitiesX "tc_hs_sig_type" $
+                 bindImplicitTKBndrs_Skol sig_vars      $
                  do { kind <- newExpectedKind ctxt_kind
 
                     ; tc_lhs_type typeLevelMode hs_ty kind }
