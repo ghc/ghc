@@ -1788,6 +1788,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
                                     ; check_kinds kco k1 k2 }
 
            PluginProv _     -> return ()  -- no extra checks
+           ZappedProv fvs   -> mapM_ lintTyCoVarInScope (dVarSetElems fvs)
 
        ; when (r /= Phantom && classifiesTypeWithValues k1
                             && classifiesTypeWithValues k2)
@@ -2013,7 +2014,6 @@ lintCoercion this@(AxiomRuleCo co cs)
 lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
-
 
 ----------
 lintUnliftedCoVar :: CoVar -> LintM ()

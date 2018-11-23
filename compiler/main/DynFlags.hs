@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -------------------------------------------------------------------------------
 --
@@ -45,6 +46,7 @@ module DynFlags (
         DynFlags(..),
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
+        DynFlagsEnvM, runDynFlagsEnvM,
         RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         targetRetainsAllBindings,
@@ -63,6 +65,7 @@ module DynFlags (
         makeDynFlagsConsistent,
         shouldUseColor,
         shouldUseHexWordLiterals,
+        shouldBuildCoercions,
         positionIndependent,
         optimisationFlags,
 
@@ -501,6 +504,7 @@ data GeneralFlag
    | Opt_D_faststring_stats
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
+   | Opt_DropCoercions
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
@@ -1358,6 +1362,17 @@ instance (Monad m, HasDynFlags m) => HasDynFlags (MaybeT m) where
 instance (Monad m, HasDynFlags m) => HasDynFlags (ExceptT e m) where
     getDynFlags = lift getDynFlags
 
+-- | A reader monad over 'DynFlags'.
+newtype DynFlagsEnvM a = DynFlagsEnvM (Reader DynFlags a)
+                       deriving (Functor, Applicative, Monad)
+
+instance HasDynFlags DynFlagsEnvM where
+    getDynFlags = DynFlagsEnvM ask
+
+runDynFlagsEnvM :: DynFlags -> DynFlagsEnvM a -> a
+runDynFlagsEnvM dflags (DynFlagsEnvM m) = runReader m dflags
+
+
 class ContainsDynFlags t where
     extractDynFlags :: t -> DynFlags
 
@@ -1686,6 +1701,14 @@ shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
 shouldUseHexWordLiterals :: DynFlags -> Bool
 shouldUseHexWordLiterals dflags =
   Opt_HexWordLiterals `EnumSet.member` generalFlags dflags
+
+-- | Should we generate coercions?
+--
+-- See Note [Zapping coercions] for details.
+shouldBuildCoercions :: DynFlags -> Bool
+shouldBuildCoercions dflags =
+    gopt Opt_DoCoreLinting dflags && not (gopt Opt_DropCoercions dflags)
+    -- TODO: Add flag to explicitly enable coercion generation without linting?
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
@@ -3463,6 +3486,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_rtti)
   , make_ord_flag defGhcFlag "dcore-lint"
         (NoArg (setGeneralFlag Opt_DoCoreLinting))
+  , make_ord_flag defGhcFlag "ddrop-coercions"
+        (NoArg (setGeneralFlag Opt_DropCoercions))
   , make_ord_flag defGhcFlag "dstg-lint"
         (NoArg (setGeneralFlag Opt_DoStgLinting))
   , make_ord_flag defGhcFlag "dcmm-lint"

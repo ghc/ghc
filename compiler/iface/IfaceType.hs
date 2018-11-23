@@ -335,6 +335,13 @@ data IfaceUnivCoProv
   | IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
+  | IfaceZappedProv [IfLclName] [CoVar]
+    -- ^ @local cvs, free cvs@
+    --
+    -- Local variables are those bound in the current IfaceType; free variables
+    -- are used only when printing open types and are not serialised; see Note
+    -- [Free tyvars in IfaceType].
+    -- See Note [Zapping coercions] in TyCoRep.
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -510,6 +517,9 @@ substIfaceType env ty
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
     go_prov (IfacePluginProv str)    = IfacePluginProv str
+    go_prov (IfaceZappedProv cvs fCvs)
+                                     = IfaceZappedProv
+                                         cvs fCvs
 
 substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
@@ -1533,6 +1543,11 @@ pprIfaceUnivCoProv (IfaceProofIrrelProv co)
   = text "irrel" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfacePluginProv s)
   = text "plugin" <+> doubleQuotes (text s)
+pprIfaceUnivCoProv (IfaceZappedProv cvs fCvs)
+  = text "Zapped" <> brackets (whenPprDebug fvsDoc)
+  where
+    fvsDoc = text "free covars:" <+> ppr cvs
+          $$ text "open free covars:" <+> ppr fCvs
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -1879,6 +1894,11 @@ instance Binary IfaceUnivCoProv where
   put_ bh (IfacePluginProv a) = do
           putByte bh 4
           put_ bh a
+  put_ bh (IfaceZappedProv coFvs _) = do
+          putByte bh 5
+          put_ bh coFvs
+          -- N.B. Free variables aren't serialised; see Note [Free tyvars in
+          -- IfaceType].
 
   get bh = do
       tag <- getByte bh
@@ -1890,6 +1910,10 @@ instance Binary IfaceUnivCoProv where
                    return $ IfaceProofIrrelProv a
            4 -> do a <- get bh
                    return $ IfacePluginProv a
+           5 -> do a <- get bh
+                   -- N.B. Free variables aren't serialised; see Note [Free
+                   -- tyvars in IfaceType].
+                   return $ IfaceZappedProv a []
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
 

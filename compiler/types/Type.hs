@@ -267,7 +267,8 @@ import FV
 import Outputable
 import FastString
 import Pair
-import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
+import DynFlags  ( HasDynFlags(..)
+                 , gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
 import Unique ( nonDetCmpUnique )
 
@@ -479,6 +480,8 @@ expandTypeSynonyms ty
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
+    go_prov subst (ZappedProv fvs)
+      = ZappedProv $ substFreeDVarSet subst fvs
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -547,7 +550,8 @@ data TyCoMapper env m
       }
 
 {-# INLINABLE mapType #-}  -- See Note [Specialising mappers]
-mapType :: Monad m => TyCoMapper env m -> env -> Type -> m Type
+mapType :: (Monad m, HasDynFlags m)
+        => TyCoMapper env m -> env -> Type -> m Type
 mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
                            , tcm_tycobinder = tycobinder
                            , tcm_tycon = tycon })
@@ -582,7 +586,7 @@ mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
 {-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
-mapCoercion :: Monad m
+mapCoercion :: (Monad m, HasDynFlags m)
             => TyCoMapper env m -> env -> Coercion -> m Coercion
 mapCoercion mapper@(TyCoMapper { tcm_covar = covar
                                , tcm_hole = cohole
@@ -629,6 +633,11 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
+    go_prov (ZappedProv fvs)
+      = let bndrFVs v =
+              ASSERT(isCoVar v)
+              tyCoVarsOfCoDSet <$> covar env v
+        in ZappedProv . unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
 
 {-
 ************************************************************************
@@ -3012,7 +3021,7 @@ occCheckExpand vs_to_avoid ty
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
-
+    go_prov _   p@(ZappedProv _)    = return p
 
 {-
 %************************************************************************
@@ -3068,6 +3077,10 @@ tyConsOfType ty
      go_prov (PluginProv _)      = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate
+     go_prov (ZappedProv _)      = emptyUniqSet
+        -- [ZappedCoDifference] that this will not report TyCons present in the
+        -- unzapped proof but not its kind. See Note [Zapping coercions] in
+        -- TyCoRep.
 
      go_s tys     = foldr (unionUniqSets . go)     emptyUniqSet tys
      go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
