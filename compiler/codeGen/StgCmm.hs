@@ -45,7 +45,7 @@ import Module
 import Outputable
 import Stream
 import BasicTypes
-import VarSet ( isEmptyVarSet )
+import VarSet ( isEmptyDVarSet )
 
 import OrdList
 import MkGraph
@@ -156,7 +156,7 @@ cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
       -- see Note [Post-unarisation invariants] in UnariseStg
 
 cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
-  = ASSERT(isEmptyVarSet fvs)    -- There should be no free variables
+  = ASSERT(isEmptyDVarSet fvs)    -- There should be no free variables
     cgTopRhsClosure dflags rec bndr cc upd_flag args body
 
 

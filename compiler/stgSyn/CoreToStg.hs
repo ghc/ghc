@@ -631,8 +631,8 @@ coreToStgLet bind body = do
 
         -- Compute the new let-expression
     let
-        new_let | isJoinBind bind = StgLetNoEscape bind2 body2
-                | otherwise       = StgLet bind2 body2
+        new_let | isJoinBind bind = StgLetNoEscape noExtSilent bind2 body2
+                | otherwise       = StgLet noExtSilent bind2 body2
 
     return new_let
   where

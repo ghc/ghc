@@ -1004,6 +1004,58 @@ by saying ``-fno-wombat``.
     Chapter 7 of `Andre Santos's PhD
     thesis <http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz>`__
 
+.. ghc-flag:: -fstg-lift-lams
+    :shortdesc: Enable late lambda lifting on the STG intermediate
+        language. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams
+    :category:
+
+    :default: on
+
+    Enables the late lambda lifting optimisation on the STG
+    intermediate language. This selectively lifts local functions to
+    top-level by converting free variables into function parameters.
+
+.. ghc-flag:: -fstg-lift-lams-known
+    :shortdesc: Allow turning known into unknown calls while performing
+        late lambda lifting.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams-known
+    :category:
+
+    :default: off
+
+    Allow turning known into unknown calls while performing
+    late lambda lifting. This is deemed non-beneficial, so it's
+    off by default.
+
+.. ghc-flag:: -fstg-lift-lams-non-rec-args
+    :shortdesc: Create top-level non-recursive functions with at most <n>
+        parameters while performing late lambda lifting.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams-non-rec-args-any
+    :category:
+
+    :default: 5
+
+    Create top-level non-recursive functions with at most <n> parameters
+    while performing late lambda lifting. The default is 5, the number of
+    available parameter registers on x86_64.
+
+.. ghc-flag:: -fstg-lift-lams-rec-args
+    :shortdesc: Create top-level recursive functions with at most <n>
+        parameters while performing late lambda lifting.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams-rec-args-any
+    :category:
+
+    :default: 5
+
+    Create top-level recursive functions with at most <n> parameters
+    while performing late lambda lifting. The default is 5, the number of
+    available parameter registers on x86_64.
+
 .. ghc-flag:: -fstrictness
     :shortdesc: Turn on strictness analysis.
         Implied by :ghc-flag:`-O`. Implies :ghc-flag:`-fworker-wrapper`

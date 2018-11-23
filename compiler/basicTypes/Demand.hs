@@ -10,7 +10,7 @@
 module Demand (
         StrDmd, UseDmd(..), Count,
 
-        Demand, CleanDemand, getStrDmd, getUseDmd,
+        Demand, DmdShell, CleanDemand, getStrDmd, getUseDmd,
         mkProdDmd, mkOnceUsedDmd, mkManyUsedDmd, mkHeadStrict, oneifyDmd,
         toCleanDmd,
         absDmd, topDmd, botDmd, seqDmd,
@@ -48,9 +48,9 @@ module Demand (
         deferAfterIO,
         postProcessUnsat, postProcessDmdType,
 
-        splitProdDmd_maybe, peelCallDmd, mkCallDmd, mkWorkerDemand,
-        dmdTransformSig, dmdTransformDataConSig, dmdTransformDictSelSig,
-        argOneShots, argsOneShots, saturatedByOneShots,
+        splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd,
+        mkWorkerDemand, dmdTransformSig, dmdTransformDataConSig,
+        dmdTransformDictSelSig, argOneShots, argsOneShots, saturatedByOneShots,
         trimToType, TypeShape(..),
 
         useCount, isUsedOnce, reuseEnv,
@@ -787,7 +787,7 @@ botDmd = JD { sd = strBot, ud = useBot }
 seqDmd :: Demand
 seqDmd = JD { sd = Str VanStr HeadStr, ud = Use One UHead }
 
-oneifyDmd :: Demand -> Demand
+oneifyDmd :: JointDmd s (Use u) -> JointDmd s (Use u)
 oneifyDmd (JD { sd = s, ud = Use _ a }) = JD { sd = s, ud = Use One a }
 oneifyDmd jd                            = jd
 
@@ -796,7 +796,7 @@ isTopDmd :: Demand -> Bool
 isTopDmd (JD {sd = Lazy, ud = Use Many Used}) = True
 isTopDmd _                                    = False
 
-isAbsDmd :: Demand -> Bool
+isAbsDmd :: JointDmd (Str s) (Use u) -> Bool
 isAbsDmd (JD {ud = Abs}) = True   -- The strictness part can be HyperStr
 isAbsDmd _               = False  -- for a bottom demand
 
@@ -804,7 +804,7 @@ isSeqDmd :: Demand -> Bool
 isSeqDmd (JD {sd = Str VanStr HeadStr, ud = Use _ UHead}) = True
 isSeqDmd _                                                = False
 
-isUsedOnce :: Demand -> Bool
+isUsedOnce :: JointDmd (Str s) (Use u) -> Bool
 isUsedOnce (JD { ud = a }) = case useCount a of
                                One  -> True
                                Many -> False
@@ -817,7 +817,7 @@ seqDemandList :: [Demand] -> ()
 seqDemandList [] = ()
 seqDemandList (d:ds) = seqDemand d `seq` seqDemandList ds
 
-isStrictDmd :: Demand -> Bool
+isStrictDmd :: JointDmd (Str s) (Use u) -> Bool
 -- See Note [Strict demands]
 isStrictDmd (JD {ud = Abs})  = False
 isStrictDmd (JD {sd = Lazy}) = False

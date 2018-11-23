@@ -353,11 +353,11 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
                        -- bndr may have a unboxed sum/tuple type but it will be
                        -- dead after unarise (checked in StgLint)
 
-unariseExpr rho (StgLet bind e)
-  = StgLet <$> unariseBinding rho bind <*> unariseExpr rho e
+unariseExpr rho (StgLet ext bind e)
+  = StgLet ext <$> unariseBinding rho bind <*> unariseExpr rho e
 
-unariseExpr rho (StgLetNoEscape bind e)
-  = StgLetNoEscape <$> unariseBinding rho bind <*> unariseExpr rho e
+unariseExpr rho (StgLetNoEscape ext bind e)
+  = StgLetNoEscape ext <$> unariseBinding rho bind <*> unariseExpr rho e
 
 unariseExpr rho (StgTick tick e)
   = StgTick tick <$> unariseExpr rho e

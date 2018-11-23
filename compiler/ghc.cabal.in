@@ -433,6 +433,11 @@ Library
         SimplStg
         StgStats
         StgCse
+        StgLiftLams
+        StgLiftLams.Analysis
+        StgLiftLams.LiftM
+        StgLiftLams.Transformation
+        StgSubst
         UnariseStg
         RepType
         Rules

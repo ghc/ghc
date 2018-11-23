@@ -1,3 +1,0 @@
-# See Note [Spaces in TEST_HC].
-echo
-echo 'Possible fix: put quotes around $(TEST_HC) in your Makefile.'

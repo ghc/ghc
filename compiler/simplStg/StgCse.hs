@@ -331,14 +331,14 @@ stgCseExpr env (StgConApp dataCon args tys)
 -- The binding might be removed due to CSE (we do not want trivial bindings on
 -- the STG level), so use the smart constructor `mkStgLet` to remove the binding
 -- if empty.
-stgCseExpr env (StgLet binds body)
+stgCseExpr env (StgLet ext binds body)
     = let (binds', env') = stgCseBind env binds
           body' = stgCseExpr env' body
-      in mkStgLet StgLet binds' body'
-stgCseExpr env (StgLetNoEscape binds body)
+      in mkStgLet (StgLet ext) binds' body'
+stgCseExpr env (StgLetNoEscape ext binds body)
     = let (binds', env') = stgCseBind env binds
           body' = stgCseExpr env' body
-      in mkStgLet StgLetNoEscape binds' body'
+      in mkStgLet (StgLetNoEscape ext) binds' body'
 
 -- Case alternatives
 -- Extend the CSE environment

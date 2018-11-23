@@ -897,9 +897,10 @@ zapStableUnfolding id
 {-
 Note [transferPolyIdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
-This transfer is used in two places:
+This transfer is used in three places:
         FloatOut (long-distance let-floating)
         SimplUtils.abstractFloats (short-distance let-floating)
+        StgLiftLams (selectively lambda-lift local functions to top-level)
 
 Consider the short-distance let-floating:
 
