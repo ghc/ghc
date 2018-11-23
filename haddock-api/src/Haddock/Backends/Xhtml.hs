@@ -397,11 +397,11 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode pkg qual_opt ifaces = d
       where
         names = exportName item ++ exportSubs item
 
-    exportSubs :: ExportItem name -> [IdP name]
+    exportSubs :: ExportItem DocNameI -> [IdP DocNameI]
     exportSubs ExportDecl { expItemSubDocs } = map fst expItemSubDocs
     exportSubs _ = []
 
-    exportName :: ExportItem name -> [IdP name]
+    exportName :: ExportItem DocNameI -> [IdP DocNameI]
     exportName ExportDecl { expItemDecl } = getMainDeclBinder (unLoc expItemDecl)
     exportName ExportNoDecl { expItemName } = [expItemName]
     exportName _ = []

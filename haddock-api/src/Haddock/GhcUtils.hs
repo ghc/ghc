@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns, FlexibleInstances, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -48,7 +49,8 @@ isConSym :: OccName -> Bool
 isConSym = isLexConSym . occNameFS
 
 
-getMainDeclBinder :: HsDecl name -> [IdP name]
+getMainDeclBinder :: (SrcSpanLess (LPat p) ~ Pat p , HasSrcSpan (LPat p)) =>
+                     HsDecl p -> [IdP p]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of
@@ -434,5 +436,3 @@ setStubDir    f d = d{ stubDir    = Just f
   -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
   -- \#included from the .hc file when compiling with -fvia-C.
 setOutputDir  f = setObjectDir f . setHiDir f . setStubDir f
-
-
