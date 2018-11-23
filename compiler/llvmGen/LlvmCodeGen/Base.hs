@@ -31,7 +31,7 @@ module LlvmCodeGen.Base (
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
 
-        aliasify,
+        aliasify, llvmDefLabel
     ) where
 
 #include "HsVersions.h"
@@ -378,7 +378,7 @@ ghcInternalFunctions = do
     mk "newSpark" (llvmWord dflags) [i8Ptr, i8Ptr]
   where
     mk n ret args = do
-      let n' = fsLit n `appendFS` fsLit "$def"
+      let n' = llvmDefLabel $ fsLit n
           decl = LlvmFunctionDecl n' ExternallyVisible CC_Ccc ret
                                  FixedArgs (tysToParams args) Nothing
       renderLlvm $ ppLlvmFunctionDecl decl
@@ -438,11 +438,14 @@ getGlobalPtr llvmLbl = do
   let mkGlbVar lbl ty = LMGlobalVar lbl (LMPointer ty) Private Nothing Nothing
   case m_ty of
     -- Directly reference if we have seen it already
-    Just ty -> return $ mkGlbVar (llvmLbl `appendFS` fsLit "$def") ty Global
+    Just ty -> return $ mkGlbVar (llvmDefLabel llvmLbl) ty Global
     -- Otherwise use a forward alias of it
     Nothing -> do
       saveAlias llvmLbl
       return $ mkGlbVar llvmLbl i8 Alias
+
+llvmDefLabel :: LMString -> LMString
+llvmDefLabel = (`appendFS` fsLit "$def")
 
 -- | Generate definitions for aliases forward-referenced by @getGlobalPtr@.
 --
@@ -476,9 +479,9 @@ generateExternDecls = do
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
 aliasify (LMGlobal alias@(LMGlobalVar _ _ _ _ _ Alias) (Just orig)) = do
     let LMGlobalVar lbl ty@LMAlias{} link sect align Alias = alias
-        defLbl = lbl `appendFS` fsLit "$def"
+        defLbl = llvmDefLabel lbl
         LMStaticPointer (LMGlobalVar label' _ link' Nothing Nothing Alias) = orig
-        defOrigLbl = label' `appendFS` fsLit "$def"
+        defOrigLbl = llvmDefLabel label'
         orig' = LMStaticPointer (LMGlobalVar label' i8Ptr link' Nothing Nothing Alias)
     origType <- funLookup label'
     let defOrig = LMBitc (LMStaticPointer (LMGlobalVar defOrigLbl (pLift $ fromJust origType) link' Nothing Nothing Alias)) (pLift ty)
@@ -487,7 +490,7 @@ aliasify (LMGlobal alias@(LMGlobalVar _ _ _ _ _ Alias) (Just orig)) = do
 aliasify (LMGlobal var val) = do
     let LMGlobalVar lbl ty link sect align const = var
 
-        defLbl = lbl `appendFS` fsLit "$def"
+        defLbl = llvmDefLabel lbl
         defVar = LMGlobalVar defLbl ty Internal sect align const
 
         defPtrVar = LMGlobalVar defLbl (LMPointer ty) link Nothing Nothing const
