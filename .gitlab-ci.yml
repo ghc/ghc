@@ -1,24 +1,174 @@
-# image: ghcci/x86_64-linux:0.0.4
 variables:
   GIT_SSL_NO_VERIFY: "1"
 
 before_script:
-  - mkdir -p ~/.ssh
-  - chmod 700 ~/.ssh
-  #- git config --global user.email "user@example.com"
-  #- git config --global user.name "User name"
-  - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
-  - chmod 644 ~/.ssh/known_hosts
-  #- sudo apt-get update -y
-  #- sudo apt-get install jq wget -y
-  #- 'which ssh-agent || sudo apt-get install openssh-client -y'
-  - eval $(ssh-agent -s)
-  ## Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
-  ## We're using tr to fix line endings which makes ed25519 keys work
-  ## without extra base64 encoding.
-  ## https://gitlab.com/gitlab-examples/ssh-private-key/issues/1#note_48526556
-  ##
-  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  - python .gitlab/fix-submodules.py
+  - git submodule sync --recursive
+  - git submodule update --init --recursive
+  - git checkout .gitmodules
+
+############################################################
+# Validation via Pipelines (hadrian)
+############################################################
+
+.validate-hadrian:
+  script:
+    - bash .circleci/prepare-system.sh
+    - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
+    - ./boot
+    - ./configure
+    - hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh`
+  cache:
+    key: hadrian
+    paths:
+      - cabal-cache
+  image: ghcci/x86_64-linux:0.0.8
+
+validate-x86_64-linux-hadrian:
+  extends: .validate-hadrian
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+  tags:
+    - x86_64-linux
+
+############################################################
+# Validation via Pipelines (make)
+############################################################
+
+.validate:
+  script:
+    - make clean || true
+    - ./boot
+    - ./configure
+    - |
+      THREADS=`mk/detect-cpu-count.sh`
+      make V=0 -j$THREADS HADDOCK_DOCS=NO
+    - |
+      make binary-dist TAR_COMP_OPTS="-1"
+      mv ghc-*.tar.xz ghc.tar.xz
+    - |
+      THREADS=`mk/detect-cpu-count.sh`
+      make test THREADS=$THREADS JUNIT_FILE=../../junit.xml
+  image: ghcci/x86_64-linux:0.0.8
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
+
+validate-x86_64-darwin:
+  extends: .validate
+  tags:
+    - x86_64-darwin
+  variables:
+    GHC_VERSION: 8.6.2
+    MACOSX_DEPLOYMENT_TARGET: "10.7"
+    # Only Sierra and onwards supports clock_gettime. See #12858
+    ac_cv_func_clock_gettime: "no"
+  before_script:
+    - python .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+
+    - bash .gitlab/darwin-init.sh
+    - PATH="`pwd`/toolchain/bin:$PATH"
+      # Disable sphinx PDF output as MacTeX apparently doesn't provide xelatex
+    - echo "BUILD_SPHINX_PDF=NO" >> mk/build.mk
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: darwin
+    paths:
+      - cabal-cache
+      - toolchain
+
+validate-x86_64-linux:
+  extends: .validate
+  tags:
+    - x86_64-linux
+  before_script:
+    - python .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+
+    - bash .circleci/prepare-system.sh
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+  cache:
+    key: darwin
+    paths:
+      - cabal-cache
+      - toolchain
+
+############################################################
+# Validation via Pipelines (make, Windows)
+############################################################
+
+validate-x86_64-windows:
+  variables:
+    GHC_VERSION: "8.6.2"
+  script:
+    - bash -e .gitlab/win32-init.sh
+    - |
+      set MSYSTEM=MINGW64
+      python boot
+      bash -c './configure --with-ghc=`pwd`/toolchain/bin/ghc --enable-tarballs-autodownload HappyCmd=`pwd`/toolchain/bin/happy AlexCmd=`pwd`/toolchain/bin/alex'
+      mkdir -p _build
+      cp -R inplace/mingw _build/mingw
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh -j`mk/detect-cpu-count.sh` --flavour=Quick"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh binary-dist"
+    - mv ghc-*.tar.xz ghc.tar.xz
+    - bash -c 'make V=0 -j`mk/detect-cpu-count.sh` HADDOCK_DOCS=NO test THREADS=$THREADS JUNIT_FILE=../../junit.xml'
+    - cp -Rf $APPDATA/cabal cabal-cache
+  cache:
+    key: windows
+    paths:
+      - cabal-cache
+      - ghc-8.6.2
+      - ghc-tarballs
+  tags:
+    - x86_64-windows
+
+
+############################################################
+# Validation via CircleCI
+############################################################
+
+.circleci:
+  image: ghcci/x86_64-linux:0.0.8
+  tags:
+    - circleci
+  before_script:
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    #- git config --global user.email "user@example.com"
+    #- git config --global user.name "User name"
+    - echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    #- sudo apt-get update -y
+    #- sudo apt-get install jq wget -y
+    #- 'which ssh-agent || sudo apt-get install openssh-client -y'
+    - eval $(ssh-agent -s)
+    ## Add the SSH key stored in SSH_PRIVATE_KEY variable to the agent store
+    ## We're using tr to fix line endings which makes ed25519 keys work
+    ## without extra base64 encoding.
+    ## https://gitlab.com/gitlab-examples/ssh-private-key/issues/1#note_48526556
+
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - ghc.tar.xz
+      - junit.xml
 
 # All validation jobs keep the bindists and test results are artifacts,
 # when we get far enough to generate them.
@@ -26,94 +176,18 @@ before_script:
 # This requires updating the maximum artifacts size limit in Gitlab to
 # something like 200MB.
 
-validate-x86_64-linux:
+circleci-validate-x86_64-linux:
+  extends: .circleci
   script: ".gitlab/circle-ci-job.sh validate-x86_64-linux"
-  artifacts:
-    when: always
-    reports:
-      junit: junit.xml
-    paths:
-      - ghc.tar.xz
-      - junit.xml
 
-validate-i386-linux:
+circleci-validate-i386-linux:
+  extends: .circleci
   script: ".gitlab/circle-ci-job.sh validate-i386-linux"
-  artifacts:
-    when: always
-    reports:
-      junit: junit.xml
-    paths:
-      - ghc.tar.xz
-      - junit.xml
 
-# validate-x86_64-freebsd:
+# circleci-validate-x86_64-freebsd:
+#   extends: .circleci
 #   script: ".gitlab/circle-ci-job.sh validate-x86_64-freebsd"
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: junit.xml
-#     paths:
-#       - ghc.tar.xz
-#       - junit.xml
 
-validate-x86_64-darwin:
+circleci-validate-x86_64-darwin:
+  extends: .circleci
   script: ".gitlab/circle-ci-job.sh validate-x86_64-darwin"
-  artifacts:
-    when: always
-    reports:
-      junit: junit.xml
-    paths:
-      - ghc.tar.xz
-      - junit.xml
-
-validate-hadrian-x86_64-linux:
-  script: ".gitlab/circle-ci-job.sh validate-hadrian-x86_64-linux"
-  # the testsuite doesn't pass with hadrian yet...
-  #
-  # artifacts:
-  #   when: always
-  #   reports:
-  #     junit: junit.xml
-  #   paths:
-  #     - ghc.tar.xz
-  #     - junit.xml
-
-# validate-x86_64-linux-unreg:
-#   script: ".gitlab/circle-ci-job.sh validate-x86_64-linux-unreg"
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: junit.xml
-#     paths:
-#       - ghc.tar.xz
-#       - junit.xml
-
-# validate-x86_64-linux-llvm:
-#   script: ".gitlab/circle-ci-job.sh validate-x86_64-linux-llvm"
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: junit.xml
-#     paths:
-#       - ghc.tar.xz
-#       - junit.xml
-
-# validate-x86_64-linux-debug:
-#   script: ".gitlab/circle-ci-job.sh validate-x86_64-linux-debug"
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: junit.xml
-#     paths:
-#       - ghc.tar.xz
-#       - junit.xml
-
-# slow-validate-x86_64-linux:
-#   script: ".gitlab/circle-ci-job.sh slow-validate-x86_64-linux"
-#   artifacts:
-#     when: always
-#     reports:
-#       junit: junit.xml
-#     paths:
-#       - ghc.tar.xz
-#       - junit.xml

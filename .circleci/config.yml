@@ -111,7 +111,7 @@ jobs:
   "validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.7
+      - image: ghcci/x86_64-linux:0.0.8
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux
@@ -185,7 +185,7 @@ jobs:
   "validate-hadrian-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.7
+      - image: ghcci/x86_64-linux:0.0.8
     environment:
       <<: *buildenv
     steps:
@@ -200,7 +200,7 @@ jobs:
   "validate-x86_64-linux-unreg":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.7
+      - image: ghcci/x86_64-linux:0.0.8
     environment:
       <<: *buildenv
       TEST_ENV: x86_64-linux-unreg
@@ -220,7 +220,7 @@ jobs:
   "validate-x86_64-linux-llvm":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.7
+      - image: ghcci/x86_64-linux:0.0.8
     environment:
       <<: *buildenv
       BUILD_FLAVOUR: perf-llvm
@@ -250,7 +250,7 @@ jobs:
   "validate-x86_64-linux-debug":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.7
+      - image: ghcci/x86_64-linux:0.0.8
     environment:
       BUILD_FLAVOUR: devel2
       <<: *buildenv
@@ -272,7 +272,7 @@ jobs:
   "validate-i386-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/i386-linux:0.0.6
+      - image: ghcci/i386-linux:0.0.7
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: i386-linux
@@ -295,7 +295,7 @@ jobs:
   "validate-x86_64-fedora":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux-fedora:0.0.16
+      - image: ghcci/x86_64-linux-fedora:0.0.17
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-fedora
@@ -318,7 +318,7 @@ jobs:
   "slow-validate-x86_64-linux":
     resource_class: xlarge
     docker:
-      - image: ghcci/x86_64-linux:0.0.7
+      - image: ghcci/x86_64-linux:0.0.8
     environment:
       <<: *buildenv
       GHC_COLLECTOR_FLAVOR: x86_64-linux
