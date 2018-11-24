@@ -27,15 +27,6 @@ case "$(uname)" in
     if [[ -n ${TARGET:-} ]]; then
       if [[ $TARGET = FreeBSD ]]; then
         # cross-compiling to FreeBSD
-        add-apt-repository -y ppa:hvr/ghc
-        apt-get update -qq
-        apt-get install -qy ghc-8.0.2 cabal-install-1.24 alex happy \
-                            ncurses-dev git make automake autoconf gcc perl \
-                            python3 texinfo xz-utils lbzip2 patch
-        cabal update
-        cabal install --reinstall hscolour --index-state=$hackage_index_state
-        ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour
-
         echo 'HADDOCK_DOCS = NO' >> mk/build.mk
         echo 'WERROR=' >> mk/build.mk
         # https://circleci.com/docs/2.0/env-vars/#interpolating-environment-variables-to-set-other-environment-variables
@@ -43,10 +34,6 @@ case "$(uname)" in
       else
         fail "TARGET=$target not supported"
       fi
-    else
-      cabal update
-      cabal install --reinstall hscolour
-      sudo ln -s /home/ghc/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     fi
     ;;
 

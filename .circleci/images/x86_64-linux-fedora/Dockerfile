@@ -42,8 +42,7 @@ USER ghc
 WORKDIR /home/ghc/
 
 # Install Alex, Happy, and HsColor with Cabal
-RUN cabal update
-RUN cabal install alex happy hscolour
+RUN cabal update && cabal install alex happy hscolour
 ENV PATH /home/ghc/.cabal/bin:$PATH
 
 CMD ["bash"]
