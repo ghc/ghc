@@ -22,11 +22,11 @@ static char *thestring;
 int theinteger;
 floatish thefloatish;
 int ch;						/* last character read  */
-token thetok; 					/* last token           */
+token thetok;           /* last token           */
 int linenum;					/* current line number  */
 int endfile;					/* true at end of file  */
 
-static boolish gotjob = 0;			/* "JOB" read	        */
+static boolish gotjob = 0;			/* "JOB" read         */
 static boolish gotdate = 0;			/* "DATE" read          */
 static boolish gotvalueunit = 0;		/* "VALUE_UNIT" read    */
 static boolish gotsampleunit = 0;		/* "SAMPLE_UNIT" read   */
@@ -57,13 +57,13 @@ floatish *markmap;		/* sample marks		*/
  *	the form
  *
  *      JOB s              -- job identifier string
- *	DATE s		   -- date string
- *	SAMPLE_UNIT s	   -- sample unit eg "seconds"
- *	VALUE_UNIT s	   -- value unit eg "bytes"
- *	MARK i	   	   -- sample mark
- *	BEGIN_SAMPLE i 	   -- start of ith sample
- *	identifier i	   -- there are i identifiers in this sample
- *	END_SAMPLE i   	   -- end of ith sample
+ *	DATE s       -- date string
+ *	SAMPLE_UNIT s    -- sample unit eg "seconds"
+ *	VALUE_UNIT s     -- value unit eg "bytes"
+ *	MARK i         -- sample mark
+ *	BEGIN_SAMPLE i     -- start of ith sample
+ *	identifier i     -- there are i identifiers in this sample
+ *	END_SAMPLE i       -- end of ith sample
  *
  */
 
@@ -82,27 +82,27 @@ GetHpFile(FILE *infp)
     GetHpTok(infp, 1);
 
     while (endfile == 0) {
-	GetHpLine(infp);
+  GetHpLine(infp);
     }
 
     if (!gotjob) {
-	Error("%s: JOB missing", hpfile);
+  Error("%s: JOB missing", hpfile);
     }
 
     if (!gotdate) {
-	Error("%s: DATE missing", hpfile);
+  Error("%s: DATE missing", hpfile);
     }
 
     if (!gotvalueunit) {
-	Error("%s: VALUE_UNIT missing", hpfile);
+  Error("%s: VALUE_UNIT missing", hpfile);
     }
 
     if (!gotsampleunit) {
-	Error("%s: SAMPLE_UNIT missing", hpfile);
+  Error("%s: SAMPLE_UNIT missing", hpfile);
     }
 
     if (nsamples == 0) {
-	Error("%s: contains no samples", hpfile);
+  Error("%s: contains no samples", hpfile);
     }
 
 
@@ -124,123 +124,123 @@ GetHpLine(FILE *infp)
 
     switch (thetok) {
     case JOB_TOK:
-	GetHpTok(infp, 0);
-	if (thetok != STRING_TOK) {
-	    Error("%s, line %d: string must follow JOB", hpfile, linenum);
+  GetHpTok(infp, 0);
+  if (thetok != STRING_TOK) {
+      Error("%s, line %d: string must follow JOB", hpfile, linenum);
         }
-	jobstring = thestring;
-	gotjob = 1;
+  jobstring = thestring;
+  gotjob = 1;
         GetHpTok(infp, 1);
-	break;
+  break;
 
     case DATE_TOK:
-	GetHpTok(infp, 0);
-	if (thetok != STRING_TOK) {
-	    Error("%s, line %d: string must follow DATE", hpfile, linenum);
+  GetHpTok(infp, 0);
+  if (thetok != STRING_TOK) {
+      Error("%s, line %d: string must follow DATE", hpfile, linenum);
         }
-	datestring = thestring;
-	gotdate = 1;
+  datestring = thestring;
+  gotdate = 1;
         GetHpTok(infp, 1);
-	break;
+  break;
 
     case SAMPLE_UNIT_TOK:
-	GetHpTok(infp, 0);
-	if (thetok != STRING_TOK) {
-	    Error("%s, line %d: string must follow SAMPLE_UNIT", hpfile,
-	          linenum);
+  GetHpTok(infp, 0);
+  if (thetok != STRING_TOK) {
+      Error("%s, line %d: string must follow SAMPLE_UNIT", hpfile,
+            linenum);
         }
-	sampleunitstring = thestring;
-	gotsampleunit = 1;
+  sampleunitstring = thestring;
+  gotsampleunit = 1;
         GetHpTok(infp, 1);
-	break;
+  break;
 
     case VALUE_UNIT_TOK:
         GetHpTok(infp, 0);
-	if (thetok != STRING_TOK) {
-	    Error("%s, line %d: string must follow VALUE_UNIT", hpfile,
-	          linenum);
+  if (thetok != STRING_TOK) {
+      Error("%s, line %d: string must follow VALUE_UNIT", hpfile,
+            linenum);
         }
-	valueunitstring = thestring;
-	gotvalueunit = 1;
+  valueunitstring = thestring;
+  gotvalueunit = 1;
         GetHpTok(infp, 1);
-	break;
+  break;
 
     case MARK_TOK:
-	GetHpTok(infp, 0);
+  GetHpTok(infp, 0);
         if (thetok != FLOAT_TOK) {
             Error("%s, line %d, floating point number must follow MARK",
-	          hpfile, linenum);
+            hpfile, linenum);
         }
-	if (insample) {
-	    Error("%s, line %d, MARK occurs within sample", hpfile, linenum);
-	}
-	if (nmarks >= nmarkmax) {
-	    if (!markmap) {
-		nmarkmax = N_MARKS;
-		markmap = (floatish*) xmalloc(nmarkmax * sizeof(floatish));
-	    } else {
-		nmarkmax *= 2;
-		markmap = (floatish*) xrealloc(markmap, nmarkmax * sizeof(floatish));
-	    }
-	}
-	markmap[ nmarks++ ] = thefloatish;
+  if (insample) {
+      Error("%s, line %d, MARK occurs within sample", hpfile, linenum);
+  }
+  if (nmarks >= nmarkmax) {
+      if (!markmap) {
+    nmarkmax = N_MARKS;
+    markmap = (floatish*) xmalloc(nmarkmax * sizeof(floatish));
+      } else {
+    nmarkmax *= 2;
+    markmap = (floatish*) xrealloc(markmap, nmarkmax * sizeof(floatish));
+      }
+  }
+  markmap[ nmarks++ ] = thefloatish;
         GetHpTok(infp, 1);
         break;
 
     case BEGIN_SAMPLE_TOK:
-	insample = 1;
-	GetHpTok(infp, 0);
-	if (thetok != FLOAT_TOK) {
-	    Error("%s, line %d, floating point number must follow BEGIN_SAMPLE",	          hpfile, linenum);
-	}
-	if (thefloatish < lastsample) {
-	    Error("%s, line %d, samples out of sequence", hpfile, linenum);
-	} else {
-	    lastsample = thefloatish;
+  insample = 1;
+  GetHpTok(infp, 0);
+  if (thetok != FLOAT_TOK) {
+      Error("%s, line %d, floating point number must follow BEGIN_SAMPLE",            hpfile, linenum);
+  }
+  if (thefloatish < lastsample) {
+      Error("%s, line %d, samples out of sequence", hpfile, linenum);
+  } else {
+      lastsample = thefloatish;
         }
-	if (nsamples >= nsamplemax) {
-	    if (!samplemap) {
-		nsamplemax = N_SAMPLES;
-		samplemap = (floatish*) xmalloc(nsamplemax * sizeof(floatish));
-	    } else {
-		nsamplemax *= 2;
-		samplemap = (floatish*) xrealloc(samplemap,
-	                                      nsamplemax * sizeof(floatish));
-	    }
-	}
-	samplemap[ nsamples ] = thefloatish;
-	GetHpTok(infp, 1);
-	break;
+  if (nsamples >= nsamplemax) {
+      if (!samplemap) {
+    nsamplemax = N_SAMPLES;
+    samplemap = (floatish*) xmalloc(nsamplemax * sizeof(floatish));
+      } else {
+    nsamplemax *= 2;
+    samplemap = (floatish*) xrealloc(samplemap,
+                                        nsamplemax * sizeof(floatish));
+      }
+  }
+  samplemap[ nsamples ] = thefloatish;
+  GetHpTok(infp, 1);
+  break;
 
     case END_SAMPLE_TOK:
-	insample = 0;
-	GetHpTok(infp, 0);
-	if (thetok != FLOAT_TOK) {
-	    Error("%s, line %d: floating point number must follow END_SAMPLE",
+  insample = 0;
+  GetHpTok(infp, 0);
+  if (thetok != FLOAT_TOK) {
+      Error("%s, line %d: floating point number must follow END_SAMPLE",
                   hpfile, linenum);
-	}
+  }
         nsamples++;
-	GetHpTok(infp, 1);
-	break;
+  GetHpTok(infp, 1);
+  break;
 
     case IDENTIFIER_TOK:
-	GetHpTok(infp, 0);
-	if (thetok != INTEGER_TOK) {
-	    Error("%s, line %d: integer must follow identifier", hpfile,
+  GetHpTok(infp, 0);
+  if (thetok != INTEGER_TOK) {
+      Error("%s, line %d: integer must follow identifier", hpfile,
                   linenum);
-	}
+  }
         StoreSample(GetEntry(theident), nsamples, thefloatish);
-	GetHpTok(infp, 1);
+  GetHpTok(infp, 1);
         break;
 
     case EOF_TOK:
         endfile = 1;
-	break;
+  break;
 
     default:
-	Error("%s, line %d: %s unexpected", hpfile, linenum,
-	      TokenToString(thetok));
-	break;
+  Error("%s, line %d: %s unexpected", hpfile, linenum,
+        TokenToString(thetok));
+  break;
     }
 }
 
@@ -249,23 +249,23 @@ char *
 TokenToString(token t)
 {
    switch (t) {
-	case EOF_TOK:		return "EOF";
-	case INTEGER_TOK:	return "integer";
-	case FLOAT_TOK:		return "floating point number";
-	case IDENTIFIER_TOK:	return "identifier";
-	case STRING_TOK:	return "string";
-	case BEGIN_SAMPLE_TOK:  return "BEGIN_SAMPLE";
-	case END_SAMPLE_TOK:    return "END_SAMPLE";
-	case JOB_TOK:		return "JOB";
-	case DATE_TOK:		return "DATE";
-	case SAMPLE_UNIT_TOK:   return "SAMPLE_UNIT";
-	case VALUE_UNIT_TOK:    return "VALUE_UNIT";
-	case MARK_TOK:		return "MARK";
+  case EOF_TOK:		return "EOF";
+  case INTEGER_TOK:	return "integer";
+  case FLOAT_TOK:		return "floating point number";
+  case IDENTIFIER_TOK:	return "identifier";
+  case STRING_TOK:	return "string";
+  case BEGIN_SAMPLE_TOK:  return "BEGIN_SAMPLE";
+  case END_SAMPLE_TOK:    return "END_SAMPLE";
+  case JOB_TOK:		return "JOB";
+  case DATE_TOK:		return "DATE";
+  case SAMPLE_UNIT_TOK:   return "SAMPLE_UNIT";
+  case VALUE_UNIT_TOK:    return "VALUE_UNIT";
+  case MARK_TOK:		return "MARK";
 
-	case X_RANGE_TOK:	return "X_RANGE";
-	case Y_RANGE_TOK:	return "Y_RANGE";
-	case ORDER_TOK:		return "ORDER";
-	case SHADE_TOK:		return "SHADE";
+  case X_RANGE_TOK:	return "X_RANGE";
+  case Y_RANGE_TOK:	return "Y_RANGE";
+  case ORDER_TOK:		return "ORDER";
+  case SHADE_TOK:		return "SHADE";
         default:		return "(strange token)";
     }
 }
@@ -285,47 +285,47 @@ GetHpTok(FILE *infp, int startline)
 {
 
     while (isspace(ch)) {		/* skip whitespace */
-	if (ch == '\n') linenum++;
-	ch = getc(infp);
+  if (ch == '\n') linenum++;
+  ch = getc(infp);
     }
 
     if (ch == EOF) {
-	thetok = EOF_TOK;
-	return;
+  thetok = EOF_TOK;
+  return;
     }
 
     if (isdigit(ch) && !startline) {
-	/* there should not be numbers at start of line */
-	thetok = GetNumber(infp);
-	return;
+  /* there should not be numbers at start of line */
+  thetok = GetNumber(infp);
+  return;
     } else if (ch == '\"') {
-	GetString(infp);
-	thetok = STRING_TOK;
-	return;
+  GetString(infp);
+  thetok = STRING_TOK;
+  return;
     } else if (IsIdChar(ch)) {
-	GetIdent(infp);
-	if (!isupper((int)theident[0])) {
-	    thetok = IDENTIFIER_TOK;
-	} else if (strcmp(theident, "BEGIN_SAMPLE") == 0) {
+  GetIdent(infp);
+  if (!isupper((int)theident[0])) {
+      thetok = IDENTIFIER_TOK;
+  } else if (strcmp(theident, "BEGIN_SAMPLE") == 0) {
             thetok = BEGIN_SAMPLE_TOK;
-	} else if (strcmp(theident, "END_SAMPLE") == 0) {
+  } else if (strcmp(theident, "END_SAMPLE") == 0) {
             thetok = END_SAMPLE_TOK;
-	} else if (strcmp(theident, "JOB") == 0) {
-	    thetok = JOB_TOK;
-	} else if (strcmp(theident, "DATE") == 0) {
-	    thetok = DATE_TOK;
-	} else if (strcmp(theident, "SAMPLE_UNIT") == 0) {
-	    thetok = SAMPLE_UNIT_TOK;
-	} else if (strcmp(theident, "VALUE_UNIT") == 0) {
-	    thetok = VALUE_UNIT_TOK;
-	} else if (strcmp(theident, "MARK") == 0) {
-	    thetok = MARK_TOK;
-	} else {
+  } else if (strcmp(theident, "JOB") == 0) {
+      thetok = JOB_TOK;
+  } else if (strcmp(theident, "DATE") == 0) {
+      thetok = DATE_TOK;
+  } else if (strcmp(theident, "SAMPLE_UNIT") == 0) {
+      thetok = SAMPLE_UNIT_TOK;
+  } else if (strcmp(theident, "VALUE_UNIT") == 0) {
+      thetok = VALUE_UNIT_TOK;
+  } else if (strcmp(theident, "MARK") == 0) {
+      thetok = MARK_TOK;
+  } else {
             thetok = IDENTIFIER_TOK;
-	}
-	return;
+  }
+  return;
     } else {
-	Error("%s, line %d: strange character (%c)", hpfile, linenum, ch);
+  Error("%s, line %d: strange character (%c)", hpfile, linenum, ch);
     }
 }
 
@@ -360,7 +360,7 @@ GetNumber(FILE *infp)
 
     if (containsdot) {
         thefloatish = (floatish) atof(numberstring);
-	return FLOAT_TOK;
+  return FLOAT_TOK;
     } else {
         theinteger = atoi(numberstring);
         /* Set thefloatish too.
@@ -384,56 +384,59 @@ GetIdent(FILE *infp)
     char idbuffer[5000];
 
     for (i = 0; i < (sizeof idbuffer)-1 && IsIdChar(ch); i++) {
-	idbuffer[ i ] = ch;
-	ch = getc(infp);
+  idbuffer[ i ] = ch;
+  ch = getc(infp);
     }
 
     idbuffer[ i ] = '\0';
 
     if (theident)
-	free(theident);
+  free(theident);
 
     theident = copystring(idbuffer);
 }
 
 
 /*
- * Read a sequence of characters that make up a string and assign the result to
- * "thestring". A string is surrounded by double quotes, with a double quote
- * itself escaped as two contiguous double quotes.
+ *	Read a sequence of characters that make up a string and
+ *	assign the result to "thestring".
  */
 
 void
 GetString(FILE *infp)
 {
-    size_t stringbuffersize = 5000;
-    char *stringbuffer = xmalloc(stringbuffersize);
+    unsigned int i;
+    char *stringbuffer;
+    size_t stringbuffersize;
 
     ASSERT(ch == '\"');
 
-    ch = getc(infp);  /* skip the '\"' that begins the string */
+    stringbuffersize = 5000;
+    stringbuffer = xmalloc(stringbuffersize);
 
-    for (size_t i = 0; ; ++i) {
+    ch = getc(infp);	/* skip the '\"' that begins the string */
+
+    i = 0;
+    while (ch != '\"') {
         if (ch == EOF) {
-            Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
+          Error("%s, line %d: EOF when expecting \"", hpfile, linenum, ch);
         }
-        if (i == stringbuffersize) {
-            stringbuffersize *= 2;
+        else if (i == stringbuffersize - 1) {
+            stringbuffersize = 2 * stringbuffersize;
             stringbuffer = xrealloc(stringbuffer, stringbuffersize);
         }
-        if (ch == '\"') {
-            ch = getc(infp);
-            if (ch != '\"') {
-                stringbuffer[i] = '\0';
-                break;
-            }
-        }
-        stringbuffer[i] = ch;
+        stringbuffer[ i++ ] = ch;
         ch = getc(infp);
     }
 
+    stringbuffer[i] = '\0';
     thestring = copystring(stringbuffer);
+
     free(stringbuffer);
+
+    ASSERT(ch == '\"');
+
+    ch = getc(infp);      /* skip the '\"' that terminates the string */
 }
 
 boolish
@@ -449,7 +452,7 @@ IsIdChar(int ch)
  *	of chunks to be retrieved given an identifier name.
  */
 
-#define N_HASH       	513
+#define N_HASH        513
 
 static struct entry* hashtable[ N_HASH ];
 
@@ -525,7 +528,7 @@ GetEntry(char *name)
     }
 
     if (e) {
-	return (e);
+  return (e);
     } else {
         nidents++;
         e = MakeEntry(name);
@@ -546,18 +549,18 @@ StoreSample(struct entry *en, intish bucket, floatish value)
     struct chunk* chk;
 
     for (chk = en->chk; chk->next != 0; chk = chk->next)
-	;
+  ;
 
     if (chk->nd < N_CHUNK) {
-	chk->d[ chk->nd ].bucket = bucket;
-	chk->d[ chk->nd ].value  = value;
-	chk->nd += 1;
+  chk->d[ chk->nd ].bucket = bucket;
+  chk->d[ chk->nd ].value  = value;
+  chk->nd += 1;
     } else {
-	struct chunk* t;
-	t = chk->next = MakeChunk();
-	t->d[ 0 ].bucket = bucket;
-	t->d[ 0 ].value  = value;
-	t->nd += 1;
+  struct chunk* t;
+  t = chk->next = MakeChunk();
+  t->d[ 0 ].bucket = bucket;
+  t->d[ 0 ].value  = value;
+  t->nd += 1;
     }
 }
 
@@ -580,7 +583,7 @@ MakeIdentTable(void)
     nidents = 0;
     for (i = 0; i < N_HASH; i++) {
         for (e = hashtable[ i ]; e; e = e->next) {
-	    nidents++;
+      nidents++;
         }
     }
 
@@ -589,7 +592,7 @@ MakeIdentTable(void)
 
     for (i = 0; i < N_HASH; i++) {
         for (e = hashtable[ i ]; e; e = e->next, j++) {
-	    identtable[ j ] = e;
+      identtable[ j ] = e;
         }
     }
 }
