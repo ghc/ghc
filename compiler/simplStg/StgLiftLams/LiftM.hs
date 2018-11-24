@@ -47,7 +47,6 @@ import Control.Monad.Trans.RWS.Strict ( RWST, runRWST )
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Control.Monad.Trans.Cont ( ContT (..) )
 import Data.ByteString ( ByteString )
-import Data.List ( foldl' )
 
 -- | @uncurry 'mkStgBinding' . 'decomposeStgBinding' = id@
 decomposeStgBinding :: GenStgBinding pass -> (RecFlag, [(BinderP pass, GenStgRhs pass)])
