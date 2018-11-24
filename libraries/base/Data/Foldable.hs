@@ -204,7 +204,7 @@ class Foldable t where
     -- For a general 'Foldable' structure this should be semantically identical
     -- to,
     --
-    -- @foldl f z = 'List.foldl'' f z . 'toList'@
+    -- @foldl' f z = 'List.foldl'' f z . 'toList'@
     --
     foldl' :: (b -> a -> b) -> b -> t a -> b
     foldl' f z0 xs = foldr f' id xs z0
