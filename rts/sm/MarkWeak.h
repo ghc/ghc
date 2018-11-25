@@ -15,9 +15,7 @@
 
 #include "BeginPrivate.h"
 
-extern StgWeak *old_weak_ptr_list;
 extern StgTSO *resurrected_threads;
-extern StgTSO *exception_threads;
 
 void    collectFreshWeakPtrs   ( void );
 void    initWeakForGC          ( void );
