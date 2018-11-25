@@ -153,7 +153,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 
 
 pprDatas :: (Alignment, CmmStatics) -> SDoc
-
+-- See note [compile-time elimination of static indirections]
 pprDatas (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l

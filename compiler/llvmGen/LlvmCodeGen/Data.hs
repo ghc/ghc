@@ -42,6 +42,7 @@ linkage lbl = if externallyVisibleCLabel lbl
 
 -- | Pass a CmmStatic section to an equivalent Llvm code.
 genLlvmData :: (Section, CmmStatics) -> LlvmM LlvmData
+-- See note [compile-time elimination of static indirections]
 genLlvmData (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
@@ -53,10 +54,15 @@ genLlvmData (_, Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _,
     label' <- strCLabel_llvm ind'
     let link     = linkage alias
         link'    = linkage ind'
+        -- the LLVM type we give the alias is an empty strzct type
+        -- but it doesn't really matter, as the pointer is only
+        -- used for (bit/int)casting.
         tyAlias  = LMAlias (label `appendFS` structStr, LMStructU [])
 
         aliasDef = LMGlobalVar label tyAlias link Nothing Nothing Alias
-        orig     = LMStaticPointer $ LMGlobalVar label' undefined link' Nothing Nothing Alias
+        -- we don't know the type of the indirectee here
+        indType = error "will be filled by 'aliasify', later"
+        orig     = LMStaticPointer $ LMGlobalVar label' indType link' Nothing Nothing Alias
 
     pure ([LMGlobal aliasDef $ Just orig], [tyAlias])
 

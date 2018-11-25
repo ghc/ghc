@@ -1455,7 +1455,8 @@ isAliasToLocalOrIntoThisModule _ lab
 
 isAliasToLocalOrIntoThisModule _ _ = False
 
-{- NOTE Compile-time elimination of static indirections
+{-
+   Note [compile-time elimination of static indirections]
 
 As described in #15155, certain static values are repesentaionally
 equivalent, e.g. 'cast'ed values (when created by 'newtype' wrappers).

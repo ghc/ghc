@@ -444,6 +444,8 @@ getGlobalPtr llvmLbl = do
       saveAlias llvmLbl
       return $ mkGlbVar llvmLbl i8 Alias
 
+-- | Derive the definition label. It has a identified
+-- structure type.
 llvmDefLabel :: LMString -> LMString
 llvmDefLabel = (`appendFS` fsLit "$def")
 
@@ -477,14 +479,21 @@ generateExternDecls = do
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
-aliasify (LMGlobal alias@(LMGlobalVar _ _ _ _ _ Alias) (Just orig)) = do
-    let LMGlobalVar lbl ty@LMAlias{} link sect align Alias = alias
+-- See note [compile-time elimination of static indirections]
+-- Here we obtain the indirectee's precise type and introduce
+-- fresh aliases to both the precise typed label (lbl$def) and the i8*
+-- typed (regular) label of it with the matching new names.
+aliasify (LMGlobal indirectee@(LMGlobalVar _ _ _ _ _ Alias) (Just orig)) = do
+    let LMGlobalVar lbl ty@LMAlias{} link sect align Alias = indirectee
         defLbl = llvmDefLabel lbl
         LMStaticPointer (LMGlobalVar label' _ link' Nothing Nothing Alias) = orig
         defOrigLbl = llvmDefLabel label'
         orig' = LMStaticPointer (LMGlobalVar label' i8Ptr link' Nothing Nothing Alias)
     origType <- funLookup label'
-    let defOrig = LMBitc (LMStaticPointer (LMGlobalVar defOrigLbl (pLift $ fromJust origType) link' Nothing Nothing Alias)) (pLift ty)
+    let defOrig = LMBitc (LMStaticPointer (LMGlobalVar defOrigLbl
+                                           (pLift $ fromJust origType) link'
+                                           Nothing Nothing Alias))
+                         (pLift ty)
     pure [ LMGlobal (LMGlobalVar defLbl ty link sect align Alias) (Just defOrig)
          , LMGlobal (LMGlobalVar lbl i8Ptr link sect align Alias) (Just orig')]
 aliasify (LMGlobal var val) = do
