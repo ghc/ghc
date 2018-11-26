@@ -121,18 +121,8 @@ libraryObjects :: Context -> Action [FilePath]
 libraryObjects context@Context{..} = do
     hsObjs   <- hsObjects    context
     noHsObjs <- nonHsObjects context
-
-    -- This will create split objects if required (we don't track them
-    -- explicitly as this would needlessly bloat the Shake database).
     need $ noHsObjs ++ hsObjs
-
-    split <- interpretInContext context =<< splitObjects <$> flavour
-    let getSplitObjs = concatForM hsObjs $ \obj -> do
-            let dir = dropExtension obj ++ "_" ++ osuf way ++ "_split"
-            contents <- liftIO $ IO.getDirectoryContents dir
-            return . map (dir -/-) $ filter (not . all (== '.')) contents
-
-    (noHsObjs ++) <$> if split then getSplitObjs else return hsObjs
+    return (noHsObjs ++ hsObjs)
 
 -- * Library paths types and parsers
 
