@@ -504,10 +504,6 @@ stripLive dflags live
            in   CmmProc info label live
                           (ListGraph $ map (stripLiveBlock dflags) $ first' : rest')
 
-        -- procs used for stg_split_markers don't contain any blocks, and have no first_id.
-        stripCmm (CmmProc (LiveInfo info [] _ _) label live [])
-         =      CmmProc info label live (ListGraph [])
-
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
         stripCmm proc
                  = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (ppr proc)

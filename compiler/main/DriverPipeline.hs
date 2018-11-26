@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns #-}
+{-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -70,7 +70,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import Data.List        ( isInfixOf, isSuffixOf, intercalate )
+import Data.List        ( isInfixOf, intercalate )
 import Data.Maybe
 import Data.Version
 import Data.Either      ( partitionEithers )
@@ -247,7 +247,7 @@ compileOne' m_tc_result mHscMessage
 
        src_flavour = ms_hsc_src summary
        mod_name = ms_mod_name summary
-       next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
+       next_phase = hscPostBackendPhase src_flavour hsc_lang
        object_filename = ml_obj_file location
 
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
@@ -505,7 +505,6 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
 
    let
         dflags    = hsc_dflags hsc_env
-        split     = gopt Opt_SplitObjs dflags
         mb_o_file = outputFile dflags
         ghc_link  = ghcLink dflags      -- Set by -c or -no-link
 
@@ -522,11 +521,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
                 -- -o foo applies to the file we are compiling now
          | otherwise = Persistent
 
-        stop_phase' = case stop_phase of
-                        As _ | split -> SplitAs
-                        _            -> stop_phase
-
-   ( _, out_file) <- runPipeline stop_phase' hsc_env
+   ( _, out_file) <- runPipeline stop_phase hsc_env
                             (src, fmap RealPhase mb_phase) Nothing output
                             Nothing{-no ModLocation-} []
    return out_file
@@ -1085,7 +1080,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
         let o_file = ml_obj_file location -- The real object file
             hsc_lang = hscTarget dflags
-            next_phase = hscPostBackendPhase dflags src_flavour hsc_lang
+            next_phase = hscPostBackendPhase src_flavour hsc_lang
 
         case result of
             HscNotGeneratingCode ->
@@ -1138,7 +1133,7 @@ runPhase (RealPhase Cmm) input_fn dflags
   = do
         let hsc_lang = hscTarget dflags
 
-        let next_phase = hscPostBackendPhase dflags HsSrcFile hsc_lang
+        let next_phase = hscPostBackendPhase HsSrcFile hsc_lang
 
         output_fn <- phaseOutputFilename next_phase
 
@@ -1281,40 +1276,9 @@ runPhase (RealPhase cc_phase) input_fn dflags
         return (RealPhase next_phase, output_fn)
 
 -----------------------------------------------------------------------------
--- Splitting phase
-
-runPhase (RealPhase Splitter) input_fn dflags
-  = do  -- tmp_pfx is the prefix used for the split .s files
-
-        split_s_prefix <-
-          liftIO $ newTempName dflags TFL_CurrentModule "split"
-        let n_files_fn = split_s_prefix
-
-        liftIO $ SysTools.runSplit dflags
-                          [ SysTools.FileOption "" input_fn
-                          , SysTools.FileOption "" split_s_prefix
-                          , SysTools.FileOption "" n_files_fn
-                          ]
-
-        -- Save the number of split files for future references
-        s <- liftIO $ readFile n_files_fn
-        let n_files = read s :: Int
-            dflags' = dflags { splitInfo = Just (split_s_prefix, n_files) }
-
-        setDynFlags dflags'
-
-        -- Remember to delete all these files
-        liftIO $ addFilesToClean dflags' TFL_CurrentModule $
-                                 [ split_s_prefix ++ "__" ++ show n ++ ".s"
-                                 | n <- [1..n_files]]
-
-        return (RealPhase SplitAs,
-                "**splitter**") -- we don't use the filename in SplitAs
-
------------------------------------------------------------------------------
 -- As, SpitAs phase : Assembler
 
--- This is for calling the assembler on a regular assembly file (not split).
+-- This is for calling the assembler on a regular assembly file
 runPhase (RealPhase (As with_cpp)) input_fn dflags
   = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
@@ -1379,96 +1343,6 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         return (RealPhase next_phase, output_fn)
 
 
--- This is for calling the assembler on a split assembly file (so a collection
--- of assembly files)
-runPhase (RealPhase SplitAs) _input_fn dflags
-  = do
-        -- we'll handle the stub_o file in this phase, so don't MergeForeign,
-        -- just jump straight to StopLn afterwards.
-        let next_phase = StopLn
-        output_fn <- phaseOutputFilename next_phase
-
-        let base_o = dropExtension output_fn
-            osuf = objectSuf dflags
-            split_odir  = base_o ++ "_" ++ osuf ++ "_split"
-
-        let pic_c_flags = picCCOpts dflags
-
-        -- this also creates the hierarchy
-        liftIO $ createDirectoryIfMissing True split_odir
-
-        -- remove M_split/ *.o, because we're going to archive M_split/ *.o
-        -- later and we don't want to pick up any old objects.
-        fs <- liftIO $ getDirectoryContents split_odir
-        liftIO $ mapM_ removeFile $
-                map (split_odir </>) $ filter (osuf `isSuffixOf`) fs
-
-        let (split_s_prefix, n) = case splitInfo dflags of
-                                  Nothing -> panic "No split info"
-                                  Just x -> x
-
-        let split_s   n = split_s_prefix ++ "__" ++ show n <.> "s"
-
-            split_obj :: Int -> FilePath
-            split_obj n = split_odir </>
-                          takeFileName base_o ++ "__" ++ show n <.> osuf
-
-        let assemble_file n
-              = SysTools.runAs dflags (
-
-        -- We only support SparcV9 and better because V8 lacks an atomic CAS
-        -- instruction so we have to make sure that the assembler accepts the
-        -- instruction set. Note that the user can still override this
-        -- (e.g., -mcpu=ultrasparc). GCC picks the "best" -mcpu flag
-        -- regardless of the ordering.
-        --
-        -- This is a temporary hack.
-                          (if platformArch (targetPlatform dflags) == ArchSPARC
-                           then [SysTools.Option "-mcpu=v9"]
-                           else []) ++
-
-                          -- See Note [-fPIC for assembler]
-                          map SysTools.Option pic_c_flags ++
-
-                          [ SysTools.Option "-c"
-                          , SysTools.Option "-o"
-                          , SysTools.FileOption "" (split_obj n)
-                          , SysTools.FileOption "" (split_s n)
-                          ])
-
-        liftIO $ mapM_ assemble_file [1..n]
-
-        -- Note [pipeline-split-init]
-        -- If we have a stub file -- which will be part of foreign_os --
-        --  it may contain constructor
-        -- functions for initialisation of this module.  We can't
-        -- simply leave the stub as a separate object file, because it
-        -- will never be linked in: nothing refers to it.  We need to
-        -- ensure that if we ever refer to the data in this module
-        -- that needs initialisation, then we also pull in the
-        -- initialisation routine.
-        --
-        -- To that end, we make a DANGEROUS ASSUMPTION here: the data
-        -- that needs to be initialised is all in the FIRST split
-        -- object.  See Note [codegen-split-init].
-        --
-        -- We also merge in all the foreign objects since we're at it.
-
-        PipeState{foreign_os} <- getPipeState
-        if null foreign_os
-          then return ()
-          else liftIO $ do
-             tmp_split_1 <- newTempName dflags TFL_CurrentModule osuf
-             let split_1 = split_obj 1
-             copyFile split_1 tmp_split_1
-             removeFile split_1
-             joinObjectFiles dflags (tmp_split_1 : foreign_os) split_1
-
-        -- join them into a single .o file
-        liftIO $ joinObjectFiles dflags (map split_obj [1..n]) output_fn
-
-        return (RealPhase next_phase, output_fn)
-
 -----------------------------------------------------------------------------
 -- LlvmOpt phase
 runPhase (RealPhase LlvmOpt) input_fn dflags
@@ -1510,13 +1384,10 @@ runPhase (RealPhase LlvmOpt) input_fn dflags
 
 runPhase (RealPhase LlvmLlc) input_fn dflags
   = do
-    next_phase <- if fastLlvmPipeline dflags
-                  then maybeMergeForeign
-                  -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
-                  else case gopt Opt_NoLlvmMangler dflags of
-                         False                            -> return LlvmMangle
-                         True | gopt Opt_SplitObjs dflags -> return Splitter
-                         True                             -> return (As False)
+    next_phase <- if | fastLlvmPipeline dflags -> maybeMergeForeign
+                     -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
+                     | gopt Opt_NoLlvmMangler dflags -> return (As False)
+                     | otherwise -> return LlvmMangle
 
     output_fn <- phaseOutputFilename next_phase
 
@@ -1588,7 +1459,7 @@ runPhase (RealPhase LlvmLlc) input_fn dflags
 
 runPhase (RealPhase LlvmMangle) input_fn dflags
   = do
-      let next_phase = if gopt Opt_SplitObjs dflags then Splitter else As False
+      let next_phase = As False
       output_fn <- phaseOutputFilename next_phase
       liftIO $ llvmFixupAsm dflags input_fn output_fn
       return (RealPhase next_phase, output_fn)
@@ -2271,14 +2142,13 @@ sourceModified dest_file src_timestamp = do
              return (t2 <= src_timestamp)
 
 -- | What phase to run after one of the backend code generators has run
-hscPostBackendPhase :: DynFlags -> HscSource -> HscTarget -> Phase
-hscPostBackendPhase _ HsBootFile _    =  StopLn
-hscPostBackendPhase _ HsigFile _      =  StopLn
-hscPostBackendPhase dflags _ hsc_lang =
+hscPostBackendPhase :: HscSource -> HscTarget -> Phase
+hscPostBackendPhase HsBootFile _    =  StopLn
+hscPostBackendPhase HsigFile _      =  StopLn
+hscPostBackendPhase _ hsc_lang =
   case hsc_lang of
-        HscC -> HCc
-        HscAsm | gopt Opt_SplitObjs dflags -> Splitter
-               | otherwise                 -> As False
+        HscC           -> HCc
+        HscAsm         -> As False
         HscLlvm        -> LlvmOpt
         HscNothing     -> StopLn
         HscInterpreted -> StopLn

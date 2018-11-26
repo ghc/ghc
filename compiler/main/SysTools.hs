@@ -139,7 +139,7 @@ initSysTools top_dir
              -- NB: top_dir is assumed to be in standard Unix
              -- format, '/' separated
        mtool_dir <- findToolDir top_dir
-             -- see Note [tooldir: How GHC finds mingw and perl on Windows]
+             -- see Note [tooldir: How GHC finds mingw on Windows]
 
        let installed :: FilePath -> FilePath
            installed file = top_dir </> file
@@ -212,7 +212,6 @@ initSysTools top_dir
        ldSupportsBuildId       <- getBooleanSetting "ld supports build-id"
        ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
        ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
-       perl_path <- getToolSetting "perl command"
 
        let pkgconfig_path = installed "package.conf.d"
            ghc_usage_msg_path  = installed "ghc-usage.txt"
@@ -221,9 +220,6 @@ initSysTools top_dir
              -- For all systems, unlit, split, mangle are GHC utilities
              -- architecture-specific stuff is done when building Config.hs
            unlit_path = libexec cGHC_UNLIT_PGM
-
-             -- split is a Perl script
-           split_script  = libexec cGHC_SPLIT_PGM
 
        windres_path <- getToolSetting "windres command"
        libtool_path <- getToolSetting "libtool command"
@@ -234,15 +230,6 @@ initSysTools top_dir
 
        touch_path <- getToolSetting "touch command"
 
-       let -- On Win32 we don't want to rely on #!/bin/perl, so we prepend
-           -- a call to Perl to get the invocation of split.
-           -- On Unix, scripts are invoked using the '#!' method.  Binary
-           -- installations of GHC on Unix place the correct line on the
-           -- front of the script at installation time, so we don't want
-           -- to wire-in our knowledge of $(PERL) on the host system here.
-           (split_prog,  split_args)
-             | isWindowsHost = (perl_path,    [Option split_script])
-             | otherwise     = (split_script, [])
        mkdll_prog <- getToolSetting "dllwrap command"
        let mkdll_args = []
 
@@ -297,7 +284,6 @@ initSysTools top_dir
                     sPgm_P   = (cpp_prog, cpp_args),
                     sPgm_F   = "",
                     sPgm_c   = (gcc_prog, gcc_args),
-                    sPgm_s   = (split_prog,split_args),
                     sPgm_a   = (as_prog, as_args),
                     sPgm_l   = (ld_prog, ld_args),
                     sPgm_dll = (mkdll_prog,mkdll_args),

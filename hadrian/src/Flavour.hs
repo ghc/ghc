@@ -26,8 +26,6 @@ data Flavour = Flavour {
     libraryWays :: Ways,
     -- | Build RTS these ways.
     rtsWays :: Ways,
-    -- | Build split objects.
-    splitObjects :: Predicate,
     -- | Build dynamic GHC programs.
     dynamicGhcPrograms :: Action Bool,
     -- | Enable GHCi debugger.

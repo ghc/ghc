@@ -17,7 +17,6 @@ compileAndLinkHs :: Args
 compileAndLinkHs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     mconcat [ arg "-Wall"
             , commonGhcArgs
-            , splitObjects <$> flavour ? arg "-split-objs"
             , ghcLinkArgs
             , defaultGhcWarningsArgs
             , builder (Ghc CompileHs) ? arg "-c"

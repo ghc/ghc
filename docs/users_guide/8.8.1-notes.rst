@@ -92,6 +92,11 @@ Compiler
   taking advantage of :extension:`DerivingStrategies`. The warning is supplied at each
   ``deriving`` site.
 
+- Support for object splitting with the flag ``-split-objs`` is removed.  Using
+  this flag now results in a warning and does nothing.  Use
+  :ghc-flag:`-split-sections` instead.
+
+
 Runtime system
 ~~~~~~~~~~~~~~
 

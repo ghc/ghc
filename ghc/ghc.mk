@@ -154,12 +154,6 @@ $(GHC_STAGE1) : | $(GHC_DEPENDENCIES)
 $(GHC_STAGE2) : | $(GHC_DEPENDENCIES)
 $(GHC_STAGE3) : | $(GHC_DEPENDENCIES)
 
-ifeq "$(GhcUnregisterised)" "NO"
-$(GHC_STAGE1) : | $$(ghc-split_INPLACE)
-$(GHC_STAGE2) : | $$(ghc-split_INPLACE)
-$(GHC_STAGE3) : | $$(ghc-split_INPLACE)
-endif
-
 ifeq "$(Windows_Host)" "YES"
 $(GHC_STAGE1) : | $$(touchy_INPLACE)
 $(GHC_STAGE2) : | $$(touchy_INPLACE)

@@ -163,7 +163,6 @@ $1_$2_$3_MOST_DIR_HC_OPTS = \
 $1_$2_$3_ALL_HC_OPTS = \
  -hisuf $$($3_hisuf) -osuf  $$($3_osuf) -hcsuf $$($3_hcsuf) \
  $$($1_$2_$3_MOST_DIR_HC_OPTS) \
- $$(if $$(findstring YES,$$($1_$2_SplitObjs)),$$(if $$(findstring dyn,$3),,-split-objs),) \
  $$(if $$(findstring YES,$$($1_$2_SplitSections)),$$(if $$(findstring dyn,$3),,-split-sections),) \
  $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too))
 

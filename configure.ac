@@ -386,20 +386,6 @@ then
     fp_prog_ar="${mingwbin}ar.exe"
 
     AC_PATH_PROG([Genlib],[genlib])
-
-    # NB. Download the perl binaries if required
-    if ! test -d inplace/perl ||
-         test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz
-    then
-        AC_MSG_NOTICE([Making in-tree perl tree])
-        rm -rf inplace/perl
-        mkdir inplace/perl
-        (
-            cd inplace/perl &&
-            tar -zxf ../../ghc-tarballs/perl/ghc-perl*.tar.gz
-        )
-        AC_MSG_NOTICE([In-tree perl tree created])
-    fi
 fi
 
 # We don't want to bundle a MinGW-w64 toolchain
@@ -695,36 +681,6 @@ AC_SUBST([GhcLibsWithUnix])
 
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
-
-# Check for split-objs
-SplitObjsBroken=NO
-dnl ** look for `perl'
-case $HostOS_CPP in
-cygwin32|mingw32)
-  if test "$EnableDistroToolchain" = "NO"; then
-    PerlCmd=$hardtop/inplace/perl/perl
-  else
-    AC_PATH_PROG([PerlCmd],[perl])
-  fi
-  # because of Trac #15051 SplitObjs is useless on Windows.  It regresses
-  # build times to days for a build, and this effect is also there for end users
-  # of GHC.  So unfortunately we have to disable it, even without having
-  # split-sections.  Though the compile time hit for split-sections should be
-  # tiny compared to this so maybe we should enable it for x86_64.
-  SplitObjsBroken=YES
-  ;;
-*)
-    AC_PATH_PROG([PerlCmd],[perl])
-    if test -z "$PerlCmd"
-    then
-        AC_MSG_WARN([No Perl on PATH, disabling split object support])
-        SplitObjsBroken=YES
-    else
-        FPTOOLS_CHECK_PERL_VERSION
-    fi
-    ;;
-esac
-AC_SUBST([SplitObjsBroken])
 
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
@@ -1391,7 +1347,6 @@ echo "\
    genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
-   Perl         : $PerlCmd
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
 

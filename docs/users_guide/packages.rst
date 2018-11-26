@@ -1023,9 +1023,9 @@ extra indirection).
    ``HSfoo.o`` file that has been pre-linked. Loading the ``.o`` file is
    slightly quicker, but at the expense of having another copy of the
    compiled package. The rule of thumb is that if the modules of the
-   package were compiled with :ghc-flag:`-split-objs` then building the
+   package were compiled with :ghc-flag:`-split-sections` then building the
    ``HSfoo.o`` is worthwhile because it saves time when loading the
-   package into GHCi. Without :ghc-flag:`-split-objs`, there is not much
+   package into GHCi. Without :ghc-flag:`-split-sections`, there is not much
    difference in load time between the ``.o`` and ``.a`` libraries, so
    it is better to save the disk space and only keep the ``.a`` around.
    In a GHC distribution we provide ``.o`` files for most packages

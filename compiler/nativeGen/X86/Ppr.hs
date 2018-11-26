@@ -83,17 +83,14 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   pprProcAlignment $$
   case topInfoTable proc of
     Nothing ->
-       case blocks of
-         []     -> -- special case for split markers:
-           pprLabel lbl
-         blocks -> -- special case for code without info table:
-           pprSectionAlign (Section Text lbl) $$
-           pprProcAlignment $$
-           pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-           vcat (map (pprBasicBlock top_info) blocks) $$
-           (if debugLevel dflags > 0
-            then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
-           pprSizeDecl lbl
+        -- special case for code without info table:
+        pprSectionAlign (Section Text lbl) $$
+        pprProcAlignment $$
+        pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+        vcat (map (pprBasicBlock top_info) blocks) $$
+        (if debugLevel dflags > 0
+         then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+        pprSizeDecl lbl
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->

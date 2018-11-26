@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdConfigure, cmdSplitObjects,
+    cmdProgressColour, cmdProgressInfo, cmdConfigure,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -25,7 +25,6 @@ data CommandLineArgs = CommandLineArgs
     , integerSimple  :: Bool
     , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
-    , splitObjects   :: Bool
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
     , docTargets     :: DocTargets }
@@ -40,7 +39,6 @@ defaultCommandLineArgs = CommandLineArgs
     , integerSimple  = False
     , progressColour = Auto
     , progressInfo   = Brief
-    , splitObjects   = False
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
     , docTargets     = Set.fromList [minBound..maxBound] }
@@ -120,9 +118,6 @@ readProgressInfo ms =
     go _         = Nothing
     set :: ProgressInfo -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { progressInfo = flag }
-
-readSplitObjects :: Either String (CommandLineArgs -> CommandLineArgs)
-readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 
 readTestCompiler :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestCompiler compiler = maybe (Left "Cannot parse compiler") (Right . set) compiler
@@ -220,8 +215,6 @@ optDescrs =
       "Use colours in progress info (Never, Auto or Always)."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
-    , Option [] ["split-objects"] (NoArg readSplitObjects)
-      "Generate split objects (requires a full clean rebuild)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
       "Strip down docs targets (none, no-haddocks, no-sphinx[-{html, pdfs, man}]."
     , Option [] ["test-compiler"] (OptArg readTestCompiler "TEST_COMPILER")
@@ -282,9 +275,6 @@ cmdProgressColour = progressColour <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs
-
-cmdSplitObjects :: Action Bool
-cmdSplitObjects = splitObjects <$> cmdLineArgs
 
 cmdDocsArgs :: Action DocTargets
 cmdDocsArgs = docTargets <$> cmdLineArgs

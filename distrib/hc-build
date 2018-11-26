@@ -32,7 +32,6 @@ cat >>mk/build.mk <<END
 GhcUnregisterised=YES
 GhcWithInterpreter=NO
 GhcWithNativeCodeGen=NO
-SplitObjs=NO
 GhcLibWays=
 GhcWithSMP=NO
 END

@@ -1,7 +1,7 @@
 module Settings.Default (
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
     defaultArgs, defaultLibraryWays, defaultRtsWays,
-    defaultFlavour, defaultSplitObjects
+    defaultFlavour
     ) where
 
 import Flavour
@@ -18,4 +18,3 @@ sourceArgs :: SourceArgs -> Args
 defaultBuilderArgs, defaultPackageArgs, defaultArgs :: Args
 defaultLibraryWays, defaultRtsWays :: Ways
 defaultFlavour :: Flavour
-defaultSplitObjects :: Predicate
