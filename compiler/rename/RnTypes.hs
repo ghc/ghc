@@ -483,7 +483,7 @@ rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
                                   -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
 rnScaledLHsType doc (HsScaled w ty) = do
-  (w' , fvs_w) <- rnMult (mkTyKiEnv doc TypeLevel RnTypeBody) w
+  (w' , fvs_w) <- rnHsArrow (mkTyKiEnv doc TypeLevel RnTypeBody) w
   (ty', fvs) <- rnLHsType doc ty
   return (HsScaled w' ty', fvs `plusFV` fvs_w)
 
@@ -683,19 +683,11 @@ rnHsTyKi env (HsWildCardTy _)
          --           user-written binding site, so don't treat
          --           it as a free variable
 
-rnMult :: RnTyKiEnv -> HsMult GhcPs -> RnM ((HsMult GhcRn), FreeVars)
-rnMult env r =
-  case r of
-    HsZero -> return (HsZero, emptyFVs)
-    HsOne  -> return (HsOne, emptyFVs)
-    HsOmega -> return (HsOmega, emptyFVs)
-    HsMultTy ty -> (\(ty, fvs) -> (HsMultTy ty, fvs)) <$> rnLHsTyKi env ty
-
 rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
-rnHsArrow env HsUnrestrictedArrow = return (HsUnrestrictedArrow, emptyFVs)
-rnHsArrow env HsLinearArrow = return (HsLinearArrow, emptyFVs)
+rnHsArrow _env HsUnrestrictedArrow = return (HsUnrestrictedArrow, emptyFVs)
+rnHsArrow _env HsLinearArrow = return (HsLinearArrow, emptyFVs)
 rnHsArrow env (HsExplicitMult p)
-  = (\(mult, fvs) -> (HsExplicitMult mult, fvs)) <$> rnMult env p
+  = (\(mult, fvs) -> (HsExplicitMult mult, fvs)) <$> rnLHsTyKi env p
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
@@ -1851,14 +1843,9 @@ extract_lty t_or_k (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
 
-extract_mult :: TypeOrKind -> HsMult GhcPs -> FreeKiTyVarsWithDups ->
-                FreeKiTyVarsWithDups
-extract_mult t_or_k (HsMultTy t) acc = extract_lty t_or_k t acc
-extract_mult t_or_k _ acc = acc
-
 extract_hs_arrow :: TypeOrKind -> HsArrow GhcPs -> FreeKiTyVarsWithDups ->
                    FreeKiTyVarsWithDups
-extract_hs_arrow t_or_k (HsExplicitMult p) acc = extract_mult t_or_k p acc
+extract_hs_arrow t_or_k (HsExplicitMult p) acc = extract_lty t_or_k p acc
 extract_hs_arrow _ _ acc = acc
 
 extractHsTvBndrs :: [LHsTyVarBndr GhcPs]

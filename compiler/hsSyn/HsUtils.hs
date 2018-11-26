@@ -696,13 +696,6 @@ typeToLHsType ty
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
-multToHsMult :: Mult -> HsMult GhcPs
-multToHsMult Zero = HsZero
-multToHsMult One  = HsOne
-multToHsMult Omega = HsOmega
-multToHsMult (MultThing ty) = HsMultTy (typeToLHsType ty)
-multToHsMult _ = panic "multToHsMult: polymorphism not yet implemented"
-
 -- | This is used to transform an arrow from Core's Type to surface
 -- syntax. There is a choice between being very explicit here, or trying to
 -- refold arrows into shorthands as much as possible. We choose to do the
@@ -711,7 +704,8 @@ multToHsMult _ = panic "multToHsMult: polymorphism not yet implemented"
 multToHsArrow :: Mult -> HsArrow GhcPs
 multToHsArrow One = HsLinearArrow
 multToHsArrow Omega = HsUnrestrictedArrow
-multToHsArrow p = HsExplicitMult (multToHsMult p)
+multToHsArrow (MultThing ty) = HsExplicitMult (typeToLHsType ty)
+multToHsMult _ = panic "multToHsArrow: polymorphism not yet implemented"
 
 {-
 Note [Kind signatures in typeToLHsType]

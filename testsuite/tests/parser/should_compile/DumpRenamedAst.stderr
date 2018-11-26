@@ -104,7 +104,7 @@
             (Nothing)
             (PrefixCon
              [(HsScaled
-               (HsOne)
+               (HsLinearArrow)
                ({ DumpRenamedAst.hs:8:26-30 }
                 (HsTyVar
                  (NoExt)
@@ -378,7 +378,7 @@
                (Nothing)
                (PrefixCon
                 [(HsScaled
-                  (HsOne)
+                  (HsLinearArrow)
                   ({ DumpRenamedAst.hs:18:10-34 }
                    (HsParTy
                     (NoExt)

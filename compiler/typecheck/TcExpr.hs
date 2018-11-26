@@ -1407,7 +1407,6 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; (inner_wrap, args', inner_res_ty)
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
-           ; let w = scaledMult arg_ty
            ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
                     , HsValArg arg' : args'
                     , inner_res_ty ) }

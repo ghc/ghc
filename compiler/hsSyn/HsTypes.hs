@@ -88,8 +88,9 @@ import RdrName ( RdrName )
 import NameSet ( NameSet, emptyNameSet )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
-import TysWiredIn( unrestrictedFunTyConName )
+import TysWiredIn( unrestrictedFunTyConName, omegaDataConName, oneDataConName )
 import Type
+import Multiplicity
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -737,30 +738,34 @@ data HsTyLit
   | HsStrTy SourceText FastString
     deriving Data
 
-data HsMult pass = HsZero | HsOne | HsOmega | HsMultTy (LHsType pass)
+-- | Serves as an intermediate type in the conversion to an Type-level multiplicity
+type HsMult = GMult (LHsType GhcRn)
 
-instance
-      (OutputableBndrId (GhcPass pass)) =>
-      Outputable (HsMult (GhcPass pass)) where
-  ppr HsZero = text "0"
-  ppr HsOne = text "1"
-  ppr HsOmega = text "ω"
-  ppr (HsMultTy p) = ppr p
+oneDataConHsTy :: HsType GhcRn
+oneDataConHsTy = HsTyVar noExt NotPromoted (noLoc omegaDataConName)
 
-hsUnrestricted, hsLinear :: a -> HsScaled pass a
-hsUnrestricted = HsScaled HsOmega
-hsLinear = HsScaled HsOne
+omegaDataConHsTy :: HsType GhcRn
+omegaDataConHsTy = HsTyVar noExt NotPromoted (noLoc oneDataConName)
 
-isHsOmega :: HsMult pass -> Bool
-isHsOmega HsOmega = True
+instance Multable (LHsType GhcRn) where
+  fromMult One = noLoc oneDataConHsTy
+  fromMult Omega = noLoc omegaDataConHsTy
+  fromMult (MultThing ty) = ty
+  fromMult Zero =
+    pprPanic "HsTypes.fromMult" (text"A multiplicity 0 leaked into a type")
+  fromMult r =
+    pprPanic "HsTypes.fromMult" (text"TODO")
+
+  toMult ty
+    | L _ (HsTyVar _ _ (L _ n)) <- ty
+    , oneDataConName == n = One
+    | L _ (HsTyVar _ _ (L _ n)) <- ty
+    , omegaDataConName == n = Omega
+    | otherwise = unsafeMultThing ty
+
+isHsOmega :: HsMult -> Bool
+isHsOmega Omega = True
 isHsOmega _ = False
-
-data HsScaled pass a = HsScaled { hsMult :: HsMult pass, hsThing :: a }
-  deriving (Traversable, Functor, Foldable)
-
-instance Outputable a => Outputable (HsScaled pass a) where
-   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
-                          ppr t
 
 -- | Denotes the type of arrows in the surface language
 data HsArrow pass
@@ -768,22 +773,40 @@ data HsArrow pass
     -- ^ a -> b
   | HsLinearArrow
     -- ^ a ->. b
-  | HsExplicitMult (HsMult pass)
+  | HsExplicitMult (LHsType pass)
     -- ^ a -->.(m) b (very much including `a -->.(Omega) b`! This is how the
-    -- programmer wrote it.)
+    -- programmer wrote it). It is stored as an `HsType` so as to preserve the
+    -- syntax as written in the program.
 
 -- | Convert an arrow into its corresponding multiplicity. In essence this
 -- erases the information of whether the programmer wrote an explicit
 -- multiplicity or a shorthand.
-arrowToMult :: HsArrow pass -> HsMult pass
-arrowToMult HsUnrestrictedArrow = HsOmega
-arrowToMult HsLinearArrow = HsOne
-arrowToMult (HsExplicitMult p) = p
+arrowToMult :: HsArrow GhcRn -> HsMult
+arrowToMult HsUnrestrictedArrow = Omega
+arrowToMult HsLinearArrow = One
+arrowToMult (HsExplicitMult p) = MultThing p
+
+-- | This is used in the syntax. In constructor declaration. It must keep the
+-- arrow representation.
+data HsScaled pass a = HsScaled { hsMult :: HsArrow pass, hsThing :: a }
+  deriving (Traversable, Functor, Foldable)
+
+-- | When creating syntax we use the shorthands. It's better for printing, also,
+-- the shorthands work trivially at each pass.
+hsUnrestricted, hsLinear :: a -> HsScaled pass a
+hsUnrestricted = HsScaled HsUnrestrictedArrow
+hsLinear = HsScaled HsLinearArrow
+
+instance Outputable a => Outputable (HsScaled pass a) where
+   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
+                          ppr t
 
 instance
       (OutputableBndrId (GhcPass pass)) =>
       Outputable (HsArrow (GhcPass pass)) where
-  ppr mult = ppr (arrowToMult mult)
+  ppr HsUnrestrictedArrow = text "(->)"
+  ppr HsLinearArrow = text "(->.)"
+  ppr (HsExplicitMult p) = ppr p
 
 newtype HsWildCardInfo        -- See Note [The wildcard story for types]
     = AnonWildCard (Located Name)
@@ -1125,7 +1148,7 @@ splitHsFunType (L _ (HsParTy _ ty))
 
 splitHsFunType (L _ (HsFunTy _ x mult y))
   | (args, res) <- splitHsFunType y
-  = ((HsScaled (arrowToMult mult) x):args, res)
+  = ((HsScaled mult x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
   = go t1 [t2]
