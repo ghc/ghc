@@ -283,6 +283,11 @@ typedef struct {
     StgClosure*              value;
 } StgMVar;
 
+typedef struct {
+    StgHeader                header;
+    StgClosure*              value;
+} StgWithFrame;
+
 
 /* STM data structures
  *

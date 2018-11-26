@@ -830,6 +830,7 @@ pprCallishMachOp_for_C mop
         MO_SubIntC    {} -> unsupported
         MO_U_Mul2     {} -> unsupported
         MO_Touch         -> unsupported
+        MO_With          -> unsupported -- TODO
         (MO_Prefetch_Data _ ) -> unsupported
         --- we could support prefetch via "__builtin_prefetch"
         --- Not adding it for now

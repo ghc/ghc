@@ -325,6 +325,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
         case STOP_FRAME:
         case CATCH_FRAME:
         case RET_SMALL:
+        case WITH_FRAME:
             bitmap = BITMAP_BITS(info->i.layout.bitmap);
             size   = BITMAP_SIZE(info->i.layout.bitmap);
             p++;

@@ -2918,9 +2918,55 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
 
 primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
+   { {\tt touch# x} ensures that the {\tt x} is kept alive at least until
+     the {\tt touch#} expression is reached.
+
+     However, note that this is extremely fragile. It is recommended that you
+     use the safer {\tt with#} whenever possible. If you must use {\tt touch#},
+     do take precautions to ensure that GHC doesn't conclude that the {\tt
+     touch#} is unreachable (e.g. with judicious use of {\tt NOINLINE}.}
    with
    code_size = { 0 }
    has_side_effects = True
+
+primop WithOp "with#" GenPrimOp
+   o -> (State# s -> (# State# s, p #)) -> State# s -> (# State# s, p #)
+   { {\tt with# x k} evaluates {\tt k} ensuring that value {\tt x} remains alive
+     until {\tt k} returns. Note that this is not fully polymorphic in {\tt
+     RuntimeRep}; it can only be applied to Haskell pointers (i.e. {\tt
+     LiftedRep} and {\tt UnliftedRep}).}
+   with
+   has_side_effects = True
+   out_of_line      = True
+
+-- Note [The hidden dangers of touch#]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For a long time all GHC had to control object lifetime was touch#. However,
+-- this was dangerously susceptible to being dropped by the simplifier. Consider
+-- this case
+--
+--     test :: IO ()
+--     test = do
+--         arr <- newPinnedByteArray 42
+--         doSomething (byteArrayContents arr)
+--         touch arr
+--
+-- If the simplifier believes that `doSomething` will fail to return (e.g.
+-- because it is of the form forever ...), then it will be tempted to drop the
+-- continuation containing touch#. This would result in the garbage collector
+-- inappropriately freeing arr, resulting in catastrophe. This was the cause of
+-- Trac #14346.
+--
+-- In this sense, with# is significantly safer, allowing us to instead write,
+--
+--     test = do
+--         arr <- newPinnedByteArray 42
+--         with# arr (unIO (doSomething (byteArrayContents arr)))
+--
+-- This construction the compiler can't mangle as there is no continuation to
+-- drop. Instead, with# keeps arr alive by pushing a stack frame. Consequently,
+-- arr will be kept alive as long as we are in unIO (doSomething ...). If and
+-- when doSomething returns, the frame will be dropped and arr allowed to die.
 
 ------------------------------------------------------------------------
 section "Stable pointers and names"

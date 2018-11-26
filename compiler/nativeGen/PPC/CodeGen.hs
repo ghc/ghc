@@ -2049,6 +2049,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_WriteBarrier  -> unsupported
                     MO_Touch         -> unsupported
                     MO_Prefetch_Data _ -> unsupported
+                    MO_With          -> unsupported
                 unsupported = panic ("outOfLineCmmOp: " ++ show mop
                                   ++ " not supported")
 

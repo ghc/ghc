@@ -2458,3 +2458,24 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }
+
+#define WITH_FRAME_FIELDS(w_,p_,info_ptr,p1,p2,value)  \
+    w_ info_ptr,                                       \
+    PROF_HDR_FIELDS(w_,p1,p2)                          \
+    p_ value
+
+INFO_TABLE_RET(stg_with_frame, WITH_FRAME,
+               WITH_FRAME_FIELDS(W_,P_,
+                                 info_ptr, p1, p2,
+                                 value))
+    return (P_ result) // value returned to the frame
+{
+    return (result);
+}
+
+stg_withzh ( P_ value, P_ cont )
+{
+    jump stg_ap_v_fast
+        (WITH_FRAME_FIELDS(,,stg_with_frame_info, CCCS, 0, value))
+        (cont);
+}

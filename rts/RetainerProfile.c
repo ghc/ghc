@@ -1052,6 +1052,7 @@ isRetainer( StgClosure *c )
     case CATCH_STM_FRAME:
     case UNDERFLOW_FRAME:
     case ATOMICALLY_FRAME:
+    case WITH_FRAME:
     case STOP_FRAME:
     case RET_BCO:
     case RET_SMALL:
@@ -1065,6 +1066,11 @@ isRetainer( StgClosure *c )
         return false;
     }
 }
+
+
+#if N_CLOSURE_TYPES != 65
+#error Closure types changed: update RetainerProfile.c:isRetainer!
+#endif
 
 /* -----------------------------------------------------------------------------
  *  Returns the retainer function value for the closure *c, i.e., R(*c).

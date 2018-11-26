@@ -591,6 +591,7 @@ data CallishMachOp
 
   | MO_WriteBarrier
   | MO_Touch         -- Keep variables live (when using interior pointers)
+  | MO_With
 
   -- Prefetch
   | MO_Prefetch_Data Int -- Prefetch hint. May change program performance but not

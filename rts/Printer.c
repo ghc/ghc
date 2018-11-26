@@ -955,10 +955,11 @@ const char *closure_type_names[] = {
  [SMALL_MUT_ARR_PTRS_DIRTY] = "SMALL_MUT_ARR_PTRS_DIRTY",
  [SMALL_MUT_ARR_PTRS_FROZEN_DIRTY] = "SMALL_MUT_ARR_PTRS_FROZEN_DIRTY",
  [SMALL_MUT_ARR_PTRS_FROZEN_CLEAN] = "SMALL_MUT_ARR_PTRS_FROZEN_CLEAN",
- [COMPACT_NFDATA]        = "COMPACT_NFDATA"
+ [COMPACT_NFDATA]        = "COMPACT_NFDATA",
+ [WITH_FRAME]            = "WITH_FRAME"
 };
 
-#if N_CLOSURE_TYPES != 64
+#if N_CLOSURE_TYPES != 65
 #error Closure types changed: update Printer.c!
 #endif
 

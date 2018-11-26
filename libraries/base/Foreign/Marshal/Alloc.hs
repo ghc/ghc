@@ -142,11 +142,9 @@ allocaBytes (I# size) action = IO $ \ s0 ->
      case newPinnedByteArray# size s0      of { (# s1, mbarr# #) ->
      case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->
      let addr = Ptr (byteArrayContents# barr#) in
-     case action addr     of { IO action' ->
-     case action' s2      of { (# s3, r #) ->
-     case touch# barr# s3 of { s4 ->
-     (# s4, r #)
-  }}}}}
+     case action addr                      of { IO action' ->
+     with# barr# action' s2
+  }}}
 -- See Note [NOINLINE for touch#]
 {-# NOINLINE allocaBytes #-}
 
@@ -156,10 +154,8 @@ allocaBytesAligned (I# size) (I# align) action = IO $ \ s0 ->
      case unsafeFreezeByteArray# mbarr# s1 of { (# s2, barr#  #) ->
      let addr = Ptr (byteArrayContents# barr#) in
      case action addr     of { IO action' ->
-     case action' s2      of { (# s3, r #) ->
-     case touch# barr# s3 of { s4 ->
-     (# s4, r #)
-  }}}}}
+     with# barr# action' s2
+  }}}
 -- See Note [NOINLINE for touch#]
 {-# NOINLINE allocaBytesAligned #-}
 

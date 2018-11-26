@@ -456,6 +456,7 @@ RTS_FUN_DECL(stg_finalizzeWeakzh);
 RTS_FUN_DECL(stg_deRefWeakzh);
 
 RTS_FUN_DECL(stg_runRWzh);
+RTS_FUN_DECL(stg_withzh);
 
 RTS_FUN_DECL(stg_newBCOzh);
 RTS_FUN_DECL(stg_mkApUpd0zh);
