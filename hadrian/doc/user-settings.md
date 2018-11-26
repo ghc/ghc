@@ -23,8 +23,6 @@ data Flavour = Flavour {
     libraryWays :: Ways,
     -- | Build RTS these ways.
     rtsWays :: Ways,
-    -- | Build split objects.
-    splitObjects :: Predicate,
     -- | Build dynamic GHC programs.
     dynamicGhcPrograms :: Action Bool,
     -- | Enable GHCi debugger.
@@ -274,13 +272,6 @@ You can pass several `--docs=...` flags, Hadrian will combine
 their effects.
 
 ## Miscellaneous
-
-To change the default behaviour of Hadrian with respect to building split
-objects, override the `splitObjects` setting of the `Flavour` record:
-```haskell
-userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user", splitObjects = return False }
-```
 
 Hadrian prints various progress info during the build. You can change the colours
 used by default by overriding `buildProgressColour` and `successColour`:

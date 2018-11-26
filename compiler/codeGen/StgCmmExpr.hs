@@ -758,19 +758,14 @@ cgIdApp fun_id args = do
     dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
     self_loop_info <- getSelfLoop
-    let cg_fun_id   = cg_id fun_info
-           -- NB: use (cg_id fun_info) instead of fun_id, because
-           -- the former may be externalised for -split-objs.
-           -- See Note [Externalise when splitting] in StgCmmMonad
-
-        fun_arg     = StgVarArg cg_fun_id
-        fun_name    = idName    cg_fun_id
+    let fun_arg     = StgVarArg fun_id
+        fun_name    = idName    fun_id
         fun         = idInfoToAmode fun_info
         lf_info     = cg_lf         fun_info
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
         node_points dflags = nodeMustPointToIt dflags lf_info
-    case getCallMethod dflags fun_name cg_fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
+    case getCallMethod dflags fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
             -- A value in WHNF, so we can just return it.
         ReturnIt
           | isVoidTy (idType fun_id) -> emitReturn []

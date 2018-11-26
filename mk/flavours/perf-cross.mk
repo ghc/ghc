@@ -3,7 +3,6 @@ GhcStage1HcOpts    = -O2
 GhcStage2HcOpts    = -O2 -fllvm
 GhcLibHcOpts       = -O2 -fllvm
 BUILD_PROF_LIBS    = YES
-#SplitObjs
 HADDOCK_DOCS       = NO
 BUILD_SPHINX_HTML  = NO
 BUILD_SPHINX_PDF   = NO

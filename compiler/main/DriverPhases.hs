@@ -138,8 +138,6 @@ data Phase
         | Cobjc         -- Compile Objective-C
         | Cobjcxx       -- Compile Objective-C++
         | HCc           -- Haskellised C (as opposed to vanilla C) compilation
-        | Splitter      -- Assembly file splitter (part of '-split-objs')
-        | SplitAs       -- Assembler for split assembly files (part of '-split-objs')
         | As Bool       -- Assembler for regular assembly files (Bool: with-cpp)
         | LlvmOpt       -- Run LLVM opt tool over llvm assembly
         | LlvmLlc       -- LLVM bitcode to native assembly
@@ -173,8 +171,6 @@ eqPhase (Hsc   _)   (Hsc   _)  = True
 eqPhase Cc          Cc         = True
 eqPhase Cobjc       Cobjc      = True
 eqPhase HCc         HCc        = True
-eqPhase Splitter    Splitter   = True
-eqPhase SplitAs     SplitAs    = True
 eqPhase (As x)      (As y)     = x == y
 eqPhase LlvmOpt     LlvmOpt    = True
 eqPhase LlvmLlc     LlvmLlc    = True
@@ -218,11 +214,9 @@ nextPhase dflags p
       Cpp   sf   -> HsPp sf
       HsPp  sf   -> Hsc  sf
       Hsc   _    -> maybeHCc
-      Splitter   -> SplitAs
       LlvmOpt    -> LlvmLlc
       LlvmLlc    -> LlvmMangle
       LlvmMangle -> As False
-      SplitAs    -> MergeForeign
       As _       -> MergeForeign
       Ccxx       -> As False
       Cc         -> As False
@@ -257,7 +251,6 @@ startPhase "M"        = Cobjcxx
 startPhase "mm"       = Cobjcxx
 startPhase "cc"       = Ccxx
 startPhase "cxx"      = Ccxx
-startPhase "split_s"  = Splitter
 startPhase "s"        = As False
 startPhase "S"        = As True
 startPhase "ll"       = LlvmOpt
@@ -286,13 +279,11 @@ phaseInputExt Ccxx                = "cpp"
 phaseInputExt Cobjc               = "m"
 phaseInputExt Cobjcxx             = "mm"
 phaseInputExt Cc                  = "c"
-phaseInputExt Splitter            = "split_s"
 phaseInputExt (As True)           = "S"
 phaseInputExt (As False)          = "s"
 phaseInputExt LlvmOpt             = "ll"
 phaseInputExt LlvmLlc             = "bc"
 phaseInputExt LlvmMangle          = "lm_s"
-phaseInputExt SplitAs             = "split_s"
 phaseInputExt CmmCpp              = "cmmcpp"
 phaseInputExt Cmm                 = "cmm"
 phaseInputExt MergeForeign        = "o"

@@ -134,7 +134,7 @@ bindistRules = do
         need $ map (bindistFilesDir -/-)
                    (["configure", "Makefile"] ++ bindistInstallFiles)
         need $ map ((bindistFilesDir -/- "wrappers") -/-) ["check-api-annotations"
-                   , "check-ppr", "ghc", "ghc-iserv", "ghc-pkg", "ghc-split"
+                   , "check-ppr", "ghc", "ghc-iserv", "ghc-pkg"
                    , "ghci-script", "ghci", "haddock", "hpc", "hp2ps", "hsc2hs"
                    , "runghc"]
 

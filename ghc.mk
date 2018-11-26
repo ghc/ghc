@@ -330,11 +330,6 @@ include rules/build-prog.mk
 include rules/shell-wrapper.mk
 
 # -----------------------------------------------------------------------------
-# Build a perl script
-
-include rules/build-perl.mk
-
-# -----------------------------------------------------------------------------
 # Build a package
 
 include rules/build-package.mk
@@ -626,7 +621,6 @@ BUILD_DIRS += utils/mkdirhier
 BUILD_DIRS += utils/touchy
 BUILD_DIRS += utils/unlit
 BUILD_DIRS += utils/hp2ps
-BUILD_DIRS += driver/split
 BUILD_DIRS += utils/genprimopcode
 BUILD_DIRS += driver
 BUILD_DIRS += driver/ghci
@@ -699,9 +693,6 @@ BUILD_DIRS := $(filter-out docs/users_guide,$(BUILD_DIRS))
 endif
 ifeq "$(Windows_Host)" "NO"
 BUILD_DIRS := $(filter-out utils/touchy,$(BUILD_DIRS))
-endif
-ifeq "$(GhcUnregisterised)" "YES"
-BUILD_DIRS := $(filter-out driver/split,$(BUILD_DIRS))
 endif
 ifeq "$(GhcWithInterpreter)" "NO"
 # runghc is just GHCi in disguise
@@ -1422,7 +1413,6 @@ distclean : clean
 # Also clean Windows-only inplace directories.
 # Don't delete 'inplace' itself, it contains source files.
 	$(call removeTrees,inplace/mingw)
-	$(call removeTrees,inplace/perl)
 
 # Remove the fs utilities.
 	$(call removeFiles,utils/lndir/fs.h)

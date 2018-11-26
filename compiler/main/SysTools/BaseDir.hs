@@ -68,7 +68,7 @@ On Windows:
 from topdir we can find package.conf, ghc-asm, etc.
 
 
-Note [tooldir: How GHC finds mingw and perl on Windows]
+Note [tooldir: How GHC finds mingw on Windows]
 
 GHC has some custom logic on Windows for finding the mingw
 toolchain and perl. Depending on whether GHC is built

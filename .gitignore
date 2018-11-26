@@ -68,7 +68,6 @@ _darcs/
 /driver/ghc/dist/
 /driver/haddock/dist/
 /driver/ghci/dist/
-/driver/split/dist/
 /includes/dist-*/
 /libffi/dist-install/
 /libraries/*/dist-boot/

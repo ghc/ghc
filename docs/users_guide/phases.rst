@@ -732,21 +732,6 @@ for example).
     option for Apple's Linker (``-F`` already means something else for
     GHC).
 
-.. ghc-flag:: -split-objs
-    :shortdesc: Split objects (for libraries)
-    :type: dynamic
-    :category: linking
-
-    Tell the linker to split the single object file that would normally
-    be generated into multiple object files, one per top-level Haskell
-    function or type in the module. This only makes sense for libraries,
-    where it means that executables linked against the library are
-    smaller as they only link against the object files that they need.
-    However, assembling all the sections separately is expensive, so
-    this is slower than compiling normally. Additionally, the size of
-    the library itself (the ``.a`` file) can be a factor of 2 to 2.5
-    larger.
-
 .. ghc-flag:: -split-sections
     :shortdesc: Split sections for link-time dead-code stripping
     :type: dynamic
@@ -758,9 +743,7 @@ for example).
     output file.
 
     When linking, the linker can automatically remove all unreferenced sections
-    and thus produce smaller executables. The effect is similar to
-    :ghc-flag:`-split-objs`, but somewhat more efficient - the generated library
-    files are about 30% smaller than with :ghc-flag:`-split-objs`.
+    and thus produce smaller executables.
 
 .. ghc-flag:: -static
     :shortdesc: Use static Haskell libraries

@@ -1494,7 +1494,7 @@ doCodeGen hsc_env this_mod data_tycons
     -- we generate one SRT for the whole module.
     let
      pipeline_stream
-      | gopt Opt_SplitObjs dflags || gopt Opt_SplitSections dflags ||
+      | gopt Opt_SplitSections dflags ||
         osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline us cmmgroup = do

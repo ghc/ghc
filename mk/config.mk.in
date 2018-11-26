@@ -327,39 +327,9 @@ GhcLibHcOpts=-O2 -haddock
 StripLibraries=NO
 
 # ----------------------------------------------------------------------------
-# Object-file splitting
-#
-# 	Set SplitObjs=YES or NO in your build.mk
-#
-#	Don't use -split-objs in in GhcLibHcOpts, because the build
-#		system needs to do other special magic if you are
-#		doing object-file splitting
-
-ArchSupportsSplitObjs=$(if $(filter \
-  $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO)#
-
-# We used to support splitting on Darwin, but there is no point, since Darwin
-# uses subsections via symbols
-OsSupportsSplitObjs=$(if $(filter $(TargetOS_CPP),\
-   mingw32 linux solaris2 freebsd dragonfly netbsd openbsd),YES,NO)
-SplitObjsBroken = @SplitObjsBroken@
-
-SupportsSplitObjs := $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
-                                $(filter YES,$(OsSupportsSplitObjs)),\
-                                $(filter NO,$(SplitObjsBroken)),\
-                                $(filter YES,$(GhcWithNativeCodeGen))),YES,NO)
-
-# By default, enable SplitObjs for the libraries if this build supports it.
-# Unless SplitSections is enabled - then let that take precedence.
-SplitObjs = $(if $(and $(filter YES,$(SupportsSplitObjs)),\
-                       $(filter NO,$(SplitSections))),YES,NO)
-
-# ----------------------------------------------------------------------------
 # Section splitting
 #
-# Similar to -ffunction-sections -fdata-sections in GCC. Provides space saving
-# like SplitObjs, but doesn't require post-processing and splitting of object
-# files.
+# Similar to -ffunction-sections -fdata-sections in GCC.
 #
 # Set SplitSections=YES or NO in your build.mk to override the default.
 #

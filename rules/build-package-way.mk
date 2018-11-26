@@ -74,12 +74,7 @@ else # ifneq "$3" "dyn"
 # Build the ordinary .a library
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS)
 	$$(call removeFiles,$$@ $$@.contents)
-ifeq "$$($1_$2_SplitObjs)" "YES"
-	$$(FIND) $$(patsubst %.$$($3_osuf),%_$$($3_osuf)_split,$$($1_$2_$3_HS_OBJS)) -name '*.$$($3_osuf)' -print >> $$@.contents
-	echo $$($1_$2_$3_NON_HS_OBJS) >> $$@.contents
-else
 	echo $$($1_$2_$3_ALL_OBJS) >> $$@.contents
-endif
 ifeq "$$($1_$2_ArSupportsAtFile)" "YES"
 	$$(call cmd,$1_$2_AR) $$($1_$2_AR_OPTS) $$($1_$2_EXTRA_AR_ARGS) $$@ @$$@.contents
 else

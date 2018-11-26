@@ -174,11 +174,6 @@ generateRules = do
     priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
     priority 2.0 $ (root -/- generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
 
-    forM_ [Stage0 ..] $ \stage ->
-        root -/- ghcSplitPath stage %> \path -> do
-            generate path emptyTarget generateGhcSplit
-            makeExecutable path
-
     -- TODO: simplify, get rid of fake rts context
     root -/- generatedDir ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
@@ -199,26 +194,6 @@ emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
 -- the resulting 'String' is a valid C preprocessor identifier.
 cppify :: String -> String
 cppify = replaceEq '-' '_' . replaceEq '.' '_'
-
-ghcSplitSource :: FilePath
-ghcSplitSource = "driver/split/ghc-split.pl"
-
--- ref: rules/build-perl.mk
--- | Generate the @ghc-split@ Perl script.
-generateGhcSplit :: Expr String
-generateGhcSplit = do
-    trackGenerateHs
-    targetPlatform <- getSetting TargetPlatform
-    ghcEnableTNC   <- expr $ yesNo <$> ghcEnableTablesNextToCode
-    perlPath       <- getBuilderPath Perl
-    contents       <- expr $ readFileLines ghcSplitSource
-    return . unlines $
-        [ "#!" ++ perlPath
-        , "my $TARGETPLATFORM = " ++ show targetPlatform ++ ";"
-        -- I don't see where the ghc-split tool uses TNC, but
-        -- it's in the build-perl macro.
-        , "my $TABLES_NEXT_TO_CODE = " ++ show ghcEnableTNC ++ ";"
-        ] ++ contents
 
 -- | Generate @ghcplatform.h@ header.
 generateGhcPlatformH :: Expr String
@@ -289,7 +264,6 @@ generateConfigHs = do
             | intLib == integerGmp    = "IntegerGMP"
             | intLib == integerSimple = "IntegerSimple"
             | otherwise = error $ "Unknown integer library: " ++ pkgName intLib
-    cSupportsSplitObjs         <- expr $ yesNo <$> supportsSplitObjects
     cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
     cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
     cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
@@ -341,8 +315,6 @@ generateConfigHs = do
         , "cIntegerLibrary       = " ++ show (pkgName intLib)
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
-        , "cSupportsSplitObjs    :: String"
-        , "cSupportsSplitObjs    = " ++ show cSupportsSplitObjs
         , "cGhcWithInterpreter   :: String"
         , "cGhcWithInterpreter   = " ++ show cGhcWithInterpreter
         , "cGhcWithNativeCodeGen :: String"
@@ -357,8 +329,6 @@ generateConfigHs = do
         , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
         , "cGHC_UNLIT_PGM        :: String"
         , "cGHC_UNLIT_PGM        = " ++ show cGHC_UNLIT_PGM
-        , "cGHC_SPLIT_PGM        :: String"
-        , "cGHC_SPLIT_PGM        = " ++ show "ghc-split"
         , "cLibFFI               :: Bool"
         , "cLibFFI               = " ++ show cLibFFI
         , "cGhcThreaded :: Bool"
