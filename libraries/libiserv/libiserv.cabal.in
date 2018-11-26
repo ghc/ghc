@@ -1,5 +1,9 @@
+-- WARNING: libiserv.cabal is automatically generated from libiserv.cabal.in by
+-- ../../configure.  Make sure you are editing libiserv.cabal.in, not
+-- libiserv.cabal.
+
 Name: libiserv
-Version: 8.7.1
+Version: @ProjectVersionMunged@
 Copyright: XXX
 License: BSD3
 License-File: LICENSE
@@ -25,7 +29,7 @@ Library
                    bytestring >= 0.10 && < 0.11,
                    containers >= 0.5 && < 0.7,
                    deepseq    >= 1.4 && < 1.5,
-                   ghci       == 8.7.*
+                   ghci       == @ProjectVersionMunged@
     if flag(network)
        Exposed-Modules: Remote.Message
                       , Remote.Slave
