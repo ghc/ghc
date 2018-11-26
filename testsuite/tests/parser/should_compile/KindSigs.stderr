@@ -290,7 +290,7 @@
                 ({ KindSigs.hs:22:16-19 }
                  (Unqual
                   {OccName: Type}))))))))
-          (HsOmega)
+          (HsUnrestrictedArrow)
           ({ KindSigs.hs:22:25-44 }
            (HsFunTy
             (NoExt)
@@ -301,7 +301,7 @@
               ({ KindSigs.hs:22:25-28 }
                (Unqual
                 {OccName: Bool}))))
-            (HsOmega)
+            (HsUnrestrictedArrow)
             ({ KindSigs.hs:22:33-44 }
              (HsParTy
               (NoExt)

@@ -52,7 +52,7 @@
           (Nothing)
           (PrefixCon
            [(HsScaled
-             (HsOne)
+             (HsLinearArrow)
              ({ DumpParsedAst.hs:5:26-30 }
               (HsTyVar
                (NoExt)
