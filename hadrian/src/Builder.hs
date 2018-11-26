@@ -181,8 +181,7 @@ instance H.Builder Builder where
             unlitPath  <- builderPath Unlit
             ghcdeps <- ghcDeps stage
             ghcgens <- generatedGhcDependencies stage
-            return $ [ root -/- ghcSplitPath stage -- TODO: Make conditional on --split-objects
-                     , unlitPath ]
+            return $ [ unlitPath ]
                   ++ ghcdeps
                   ++ ghcgens
                   ++ [ touchyPath | win ]
