@@ -1,0 +1,74 @@
+i386-linux	T3924	normal	bytes allocated	46832
+i386-linux	haddock.base	normal	bytes allocated	3978404072
+i386-linux	haddock.Cabal	normal	bytes allocated	96024620
+i386-linux	haddock.compiler	normal	bytes allocated	2422091796
+i386-linux	join002	optasm	bytes allocated	1000046880
+i386-linux	join007	optasm	bytes allocated	46900
+i386-linux	T5835	normal	max_bytes_used	42724
+i386-linux	join004	optasm	bytes allocated	8046812
+i386-linux	join003	optasm	bytes allocated	1000046880
+i386-linux	T10359	normal	bytes allocated	351384
+i386-linux	T14955	normal	bytes allocated	24046820
+i386-linux	T12791	normal	max_bytes_used	42724
+i386-linux	T876	normal	bytes allocated	50224
+i386-linux	T3586	normal	bytes allocated	16073880
+i386-linux	T3586	normal	peak_megabytes_allocated	18
+i386-linux	T4830	normal	bytes allocated	70884
+i386-linux	lazy-bs-alloc	normal	bytes allocated	419856
+i386-linux	lazy-bs-alloc	normal	peak_megabytes_allocated	2
+i386-linux	T5113	normal	bytes allocated	4050756
+i386-linux	MethSharing	normal	bytes allocated	240070900
+i386-linux	MethSharing	normal	peak_megabytes_allocated	2
+i386-linux	T3738	normal	bytes allocated	46712
+i386-linux	T3738	normal	peak_megabytes_allocated	2
+i386-linux	T4978	normal	bytes allocated	10105692
+i386-linux	T5205	normal	bytes allocated	49480
+i386-linux	T5237	normal	bytes allocated	76200
+i386-linux	Conversions	normal	bytes allocated	77696
+i386-linux	T7797	normal	bytes allocated	240046728
+i386-linux	T5536	normal	bytes allocated	445172812
+i386-linux	T7436	normal	max_bytes_used	42724
+i386-linux	T7954	normal	bytes allocated	720047004
+i386-linux	T5949	normal	bytes allocated	117900
+i386-linux	T7619	normal	bytes allocated	37892
+i386-linux	T4267	normal	bytes allocated	37892
+i386-linux	InlineArrayAlloc	normal	bytes allocated	800037892
+i386-linux	T7257	normal	bytes allocated	811050236
+i386-linux	T7257	normal	peak_megabytes_allocated	217
+i386-linux	T9339	normal	bytes allocated	46840
+i386-linux	T8472	normal	bytes allocated	46844
+i386-linux	InlineCloneArrayAlloc	normal	bytes allocated	800037972
+i386-linux	T9203	normal	bytes allocated	72600892
+i386-linux	T4474a	normal	bytes allocated	2415966460
+i386-linux	InlineByteArrayAlloc	normal	bytes allocated	1360037892
+i386-linux	T13001	normal	bytes allocated	46784
+i386-linux	T4474c	normal	bytes allocated	2415966460
+i386-linux	T4474b	normal	bytes allocated	2415966460
+i386-linux	T12996	normal	bytes allocated	60976
+i386-linux	T5549	normal	bytes allocated	2896607896
+i386-linux	T12990	normal	bytes allocated	10437900
+i386-linux	T8763	normal	bytes allocated	37892
+i386-linux	T13218	normal	max_bytes_used	166288
+i386-linux	T13218	normal	bytes allocated	41036540
+i386-linux	T15226	normal	bytes allocated	37904
+i386-linux	T15226a	normal	bytes allocated	37904
+i386-linux	DeriveNull	normal	bytes allocated	56046880
+i386-linux	T15426	normal	bytes allocated	38024
+i386-linux	T14936	normal	bytes allocated	47060
+i386-linux	T13623	normal	bytes allocated	46876
+i386-linux	T4334	normal	peak_megabytes_allocated	3
+i386-linux	T2762	normal	peak_megabytes_allocated	2
+i386-linux	T14052	ghci	bytes allocated	1200544428
+i386-linux	space_leak_001	normal	max_bytes_used	428112
+i386-linux	space_leak_001	normal	bytes allocated	661907740
+i386-linux	space_leak_001	normal	peak_megabytes_allocated	4
+i386-linux	T15578	normal	bytes allocated	800038056
+i386-linux	T10678	normal	bytes allocated	40038184
+i386-linux	T7850	normal	peak_megabytes_allocated	3
+i386-linux	T4029	ghci	max_bytes_used	11796332
+i386-linux	T4029	ghci	peak_megabytes_allocated	36
+i386-linux	T13536a	optasm	bytes allocated	48428
+i386-linux	T8766	normal	bytes allocated	8435488
+i386-linux	T9848	normal	bytes allocated	47332
+i386-linux	T13191	normal	bytes allocated	92976436
+i386-linux	T3474	normal	max_bytes_used	42724
