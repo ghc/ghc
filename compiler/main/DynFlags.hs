@@ -90,7 +90,7 @@ module DynFlags (
         ghcUsagePath, ghciUsagePath, topDir, tmpDir, rawSettings,
         versionedAppDir,
         extraGccViaCFlags, systemPackageConfig,
-        pgm_L, pgm_P, pgm_F, pgm_c, pgm_s, pgm_a, pgm_l, pgm_dll, pgm_T,
+        pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
         pgm_lcc, pgm_i, opt_L, opt_P, opt_F, opt_c, opt_a, opt_l, opt_i,
         opt_P_signature,
@@ -526,7 +526,6 @@ data GeneralFlag
    | Opt_ExcessPrecision
    | Opt_EagerBlackHoling
    | Opt_NoHsMain
-   | Opt_SplitObjs
    | Opt_SplitSections
    | Opt_StgStats
    | Opt_HideAllPackages
@@ -1739,13 +1738,10 @@ wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
 wayUnsetGeneralFlags _ (WayCustom {}) = []
 wayUnsetGeneralFlags _ WayThreaded = []
 wayUnsetGeneralFlags _ WayDebug    = []
-wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting objects
+wayUnsetGeneralFlags _ WayDyn      = [-- There's no point splitting
                                       -- when we're going to be dynamically
                                       -- linking. Plus it breaks compilation
                                       -- on OSX x86.
-                                      Opt_SplitObjs,
-                                      -- If splitobjs wasn't useful for this,
-                                      -- assume sections aren't either.
                                       Opt_SplitSections]
 wayUnsetGeneralFlags _ WayProf     = []
 wayUnsetGeneralFlags _ WayEventLog = []
@@ -3007,7 +3003,7 @@ dynamic_flags_deps = [
                                               -- (see Trac #15319)
                                               sGccSupportsNoPie = False})))
   , make_ord_flag defFlag "pgms"
-      (hasArg (\f -> alterSettings (\s -> s { sPgm_s   = (f,[])})))
+      (HasArg (\f -> addWarn "Object splitting was removed in GHC 8.8"))
   , make_ord_flag defFlag "pgma"
       (hasArg (\f -> alterSettings (\s -> s { sPgm_a   = (f,[])})))
   , make_ord_flag defFlag "pgml"
@@ -3048,9 +3044,7 @@ dynamic_flags_deps = [
         alterSettings (\s -> s { sOpt_windres = f : sOpt_windres s})))
 
   , make_ord_flag defGhcFlag "split-objs"
-      (NoArg (if can_split
-                then setGeneralFlag Opt_SplitObjs
-                else addWarn "ignoring -split-objs"))
+      (NoArg $ addWarn "ignoring -split-objs")
 
   , make_ord_flag defGhcFlag "split-sections"
       (noArgM (\dflags -> do
@@ -5563,12 +5557,6 @@ picPOpts dflags
  | otherwise           = []
 
 -- -----------------------------------------------------------------------------
--- Splitting
-
-can_split :: Bool
-can_split = cSupportsSplitObjs == "YES"
-
--- -----------------------------------------------------------------------------
 -- Compiler Info
 
 compilerInfo :: DynFlags -> [(String, String)]
@@ -5590,7 +5578,7 @@ compilerInfo dflags
        ("Host platform",               cHostPlatformString),
        ("Target platform",             cTargetPlatformString),
        ("Have interpreter",            cGhcWithInterpreter),
-       ("Object splitting supported",  cSupportsSplitObjs),
+       ("Object splitting supported",  showBool False),
        ("Have native code generator",  cGhcWithNativeCodeGen),
        ("Support SMP",                 cGhcWithSMP),
        ("Tables next to code",         cGhcEnableTablesNextToCode),
