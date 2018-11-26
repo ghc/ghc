@@ -180,8 +180,7 @@ instance H.Builder Builder where
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
             ghcdeps <- ghcDeps stage
-            return $ [ root -/- ghcSplitPath stage -- TODO: Make conditional on --split-objects
-                     , unlitPath ]
+            return $ [ unlitPath ]
                   ++ ghcdeps
                   ++ [ touchyPath | win ]
 

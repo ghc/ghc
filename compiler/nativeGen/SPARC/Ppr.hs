@@ -61,13 +61,10 @@ pprNatCmmDecl (CmmData section dats) =
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   case topInfoTable proc of
     Nothing ->
-       case blocks of
-         []     -> -- special case for split markers:
-           pprLabel lbl
-         blocks -> -- special case for code without info table:
-           pprSectionAlign (Section Text lbl) $$
-           pprLabel lbl $$ -- blocks guaranteed not null, so label needed
-           vcat (map (pprBasicBlock top_info) blocks)
+        -- special case for code without info table:
+        pprSectionAlign (Section Text lbl) $$
+        pprLabel lbl $$ -- blocks guaranteed not null, so label needed
+        vcat (map (pprBasicBlock top_info) blocks)
 
     Just (Statics info_lbl _) ->
       sdocWithPlatform $ \platform ->

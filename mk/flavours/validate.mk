@@ -4,7 +4,6 @@ GhcStage1HcOpts    = -O -DDEBUG
 GhcStage2HcOpts    = -O -dcore-lint -dno-debug-output
 GhcLibHcOpts       = -O -dcore-lint -dno-debug-output
 BUILD_PROF_LIBS    = NO
-SplitObjs          = NO
 SplitSections      = NO
 HADDOCK_DOCS       = YES
 BUILD_SPHINX_HTML  = YES
