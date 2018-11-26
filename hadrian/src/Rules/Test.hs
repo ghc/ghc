@@ -75,7 +75,10 @@ testRules = do
             setEnv "CHECK_API_ANNOTATIONS" annotationsPath
 
         -- Execute the test target.
-        buildWithCmdOptions env $ target (vanillaContext Stage2 compiler) RunTest [] []
+        -- We override the verbosity setting to make sure the user can see
+        -- the test output: https://ghc.haskell.org/trac/ghc/ticket/15951.
+        withVerbosity Loud $ buildWithCmdOptions env $
+            target (vanillaContext Stage2 compiler) RunTest [] []
 
 -- | Build extra programs and libraries required by testsuite
 needTestsuitePackages :: Action ()
