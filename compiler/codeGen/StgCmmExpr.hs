@@ -304,10 +304,13 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
   | isEnumerationTyCon tycon -- Note [case on bool]
   = do { tag_expr <- do_enum_primop op args
 
-       ; dflags <- getDynFlags
-       ; tmp_reg <- bindArgToReg (NonVoid bndr)
-       ; emitAssign (CmmLocal tmp_reg)
-                    (tagToClosure dflags tycon tag_expr)
+       -- If the binder is not dead, convert the tag to a constructor
+       -- and assign it.
+       ; unless (isDeadBinder bndr) $ do
+            { dflags <- getDynFlags
+            ; tmp_reg <- bindArgToReg (NonVoid bndr)
+            ; emitAssign (CmmLocal tmp_reg)
+                         (tagToClosure dflags tycon tag_expr) }
 
        ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
                                               (NonVoid bndr) alts
