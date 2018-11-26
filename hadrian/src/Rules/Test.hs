@@ -81,7 +81,9 @@ testRules = do
 needTestsuitePackages :: Action ()
 needTestsuitePackages = do
     targets   <- mapM (needFile Stage1) =<< testsuitePackages
-    needIservBins
+    -- iserv is not supported under Windows
+    windows <- windowsHost
+    when (not windows) needIservBins
     need targets
 
 -- | Build the timeout program.
