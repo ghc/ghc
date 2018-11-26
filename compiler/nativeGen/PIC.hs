@@ -563,8 +563,6 @@ pprGotDeclaration _ _ _
 -- For each processor architecture, there are two versions, one for PIC
 -- and one for non-PIC.
 --
--- Whenever you change something in this assembler output, make sure
--- the splitter in driver/split/ghc-split.pl recognizes the new output
 
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
 pprImportedSymbol dflags platform@(Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl

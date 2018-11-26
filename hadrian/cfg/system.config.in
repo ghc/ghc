@@ -43,7 +43,6 @@ hs-cpp-args         = @HaskellCPPArgs@
 #===============
 
 solaris-broken-shld  = @SOLARIS_BROKEN_SHLD@
-split-objects-broken = @SplitObjsBroken@
 ghc-unregisterised   = @Unregisterised@
 ghc-source-path      = @hardtop@
 leading-underscore   = @LeadingUnderscore@

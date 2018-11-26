@@ -300,7 +300,6 @@ generateConfigHs = do
             | intLib == integerGmp    = "IntegerGMP"
             | intLib == integerSimple = "IntegerSimple"
             | otherwise = error $ "Unknown integer library: " ++ pkgName intLib
-    cSupportsSplitObjs         <- expr $ yesNo <$> supportsSplitObjects
     cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
     cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
     cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
@@ -352,8 +351,6 @@ generateConfigHs = do
         , "cIntegerLibrary       = " ++ show (pkgName intLib)
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
-        , "cSupportsSplitObjs    :: String"
-        , "cSupportsSplitObjs    = " ++ show cSupportsSplitObjs
         , "cGhcWithInterpreter   :: String"
         , "cGhcWithInterpreter   = " ++ show cGhcWithInterpreter
         , "cGhcWithNativeCodeGen :: String"
