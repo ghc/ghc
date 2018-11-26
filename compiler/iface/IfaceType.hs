@@ -8,6 +8,7 @@ This module defines interface types and binders
 
 {-# LANGUAGE CPP, FlexibleInstances, BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
     -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 
 module IfaceType (
@@ -1334,9 +1335,23 @@ ppr_equality ctxt_prec tc args
 
 
 pprIfaceCoTcApp :: PprPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc
-pprIfaceCoTcApp ctxt_prec tc tys = ppr_iface_tc_app ppr_co ctxt_prec tc tys
+pprIfaceCoTcApp ctxt_prec tc tys =
+  ppr_iface_tc_app (\prec (co, _) -> ppr_co prec co) ctxt_prec tc
+    (map (, Required) tys)
+    -- We are trying to re-use ppr_iface_tc_app here, which requires its
+    -- arguments to be accompanied by visibilities. But visibility is
+    -- irrelevant when printing coercions, so just default everything to
+    -- Required.
 
-ppr_iface_tc_app :: (PprPrec -> a -> SDoc) -> PprPrec -> IfaceTyCon -> [a] -> SDoc
+-- | Pretty-prints an application of a type constructor to some arguments
+-- (whose visibilities are known). This is polymorphic (over @a@) since we use
+-- this function to pretty-print two different things:
+--
+-- 1. Types (from `pprTyTcApp'`)
+--
+-- 2. Coercions (from 'pprIfaceCoTcApp')
+ppr_iface_tc_app :: (PprPrec -> (a, ArgFlag) -> SDoc)
+                 -> PprPrec -> IfaceTyCon -> [(a, ArgFlag)] -> SDoc
 ppr_iface_tc_app pp _ tc [ty]
   | tc `ifaceTyConHasKey` listTyConKey = pprPromotionQuote tc <> brackets (pp topPrec ty)
 
@@ -1347,8 +1362,11 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)
 
-  | [ty1,ty2] <- tys  -- Infix, two arguments;
-                      -- we know nothing of precedence though
+  | [ ty1@(_, Required)
+    , ty2@(_, Required) ] <- tys
+      -- Infix, two visible arguments (we know nothing of precedence though).
+      -- Don't apply this special case if one of the arguments is invisible,
+      -- lest we print something like (@LiftedRep -> @LiftedRep) (#15941).
   = pprIfaceInfixApp ctxt_prec (ppr tc)
                      (pp opPrec ty1) (pp opPrec ty2)
 
