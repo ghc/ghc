@@ -121,17 +121,14 @@ variable. -}
 
 cgTopBinding :: DynFlags -> CgStgTopBinding -> FCode ()
 cgTopBinding dflags (StgTopLifted (StgNonRec id rhs))
-  = do  { id' <- maybeExternaliseId dflags id
-        ; let (info, fcode) = cgTopRhs dflags NonRecursive id' rhs
+  = do  { let (info, fcode) = cgTopRhs dflags NonRecursive id rhs
         ; fcode
-        ; addBindC info -- Add the *un-externalised* Id to the envt,
-                        -- so we find it when we look up occurrences
+        ; addBindC info
         }
 
 cgTopBinding dflags (StgTopLifted (StgRec pairs))
   = do  { let (bndrs, rhss) = unzip pairs
-        ; bndrs' <- Prelude.mapM (maybeExternaliseId dflags) bndrs
-        ; let pairs' = zip bndrs' rhss
+        ; let pairs' = zip bndrs rhss
               r = unzipWith (cgTopRhs dflags Recursive) pairs'
               (infos, fcodes) = unzip r
         ; addBindsC infos
@@ -139,8 +136,7 @@ cgTopBinding dflags (StgTopLifted (StgRec pairs))
         }
 
 cgTopBinding dflags (StgTopStringLit id str)
-  = do  { id' <- maybeExternaliseId dflags id
-        ; let label = mkBytesLabel (idName id')
+  = do  { let label = mkBytesLabel (idName id)
         ; let (lit, decl) = mkByteStringCLit label (BS.unpack str)
         ; emitDecl decl
         ; addBindC (litIdInfo dflags id' mkLFStringLit lit)
@@ -148,7 +144,6 @@ cgTopBinding dflags (StgTopStringLit id str)
 
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...
-        -- It's already been externalised if necessary
 
 cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
   = cgTopRhsCon dflags bndr con (assertNonVoidStgArgs args)
@@ -227,25 +222,3 @@ cgDataCon data_con
                }
                     -- The case continuation code expects a tagged pointer
         }
-
----------------------------------------------------------------
---      Stuff to support splitting
----------------------------------------------------------------
-
-maybeExternaliseId :: DynFlags -> Id -> FCode Id
-maybeExternaliseId dflags id
-  | gopt Opt_SplitObjs dflags,  -- See Note [Externalise when splitting]
-                                -- in StgCmmMonad
-    isInternalName name = do { mod <- getModuleName
-                             ; return (setIdName id (externalise mod)) }
-  | otherwise           = return id
-  where
-    externalise mod = mkExternalName uniq mod new_occ loc
-    name    = idName id
-    uniq    = nameUnique name
-    new_occ = mkLocalOcc uniq (nameOccName name)
-    loc     = nameSrcSpan name
-        -- We want to conjure up a name that can't clash with any
-        -- existing name.  So we generate
-        --      Mod_$L243foo
-        -- where 243 is the unique.

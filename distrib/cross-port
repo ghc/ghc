@@ -35,7 +35,6 @@ if [ ! -f b1-stamp ]; then
    echo "GhcUnregisterised = YES" >> mk/build.mk
    echo "GhcLibHcOpts = -O -H32m -fvia-C -keep-hc-files" >> mk/build.mk
    echo "GhcLibWays =" >> mk/build.mk
-   echo "SplitObjs = NO" >> mk/build.mk
 
    # We could optimise slightly by not building hslibs here.  Also, building
    # the RTS is not necessary (and might not be desirable if we're using
