@@ -26,7 +26,6 @@ module Base (
     generatedDir, generatedPath, stageBinPath, stageLibPath, templateHscPath,
     ghcDeps, includesDependencies, haddockDeps, relativePackageDbPath,
     packageDbPath, packageDbStamp,
-    ghcSplitPath
     ) where
 
 import Control.Applicative
@@ -137,9 +136,3 @@ haddockDeps stage = do
 -- | Path to 'hsc2hs' template.
 templateHscPath :: Stage -> Action FilePath
 templateHscPath stage = stageLibPath stage <&> (-/- "template-hsc.h")
-
--- | @ghc-split@ is a Perl script used by GHC when run with @-split-objs@ flag.
--- It is generated in "Rules.Generate". This function returns the path relative
--- to the build root under which we will copy @ghc-split@.
-ghcSplitPath :: Stage -> FilePath
-ghcSplitPath stage = stageString stage -/- "bin" -/- "ghc-split"
