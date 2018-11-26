@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -1120,7 +1121,7 @@ repTy (HsAppTy _ f a)       = do
                                 f1 <- repLTy f
                                 a1 <- repLTy a
                                 repTapp f1 a1
-repTy (HsFunTy _ f HsOmega a)       = do
+repTy (HsFunTy _ f (arrowToMult -> HsOmega) a) = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon

@@ -105,7 +105,7 @@ import TcEvidence
 import RdrName
 import Var
 import TyCoRep
-import Multiplicity ( pattern Zero, pattern One, pattern Omega )
+import Multiplicity ( pattern Zero, pattern One, pattern Omega, pattern MultThing )
 import Type   ( filterOutInvisibleTypes )
 import TysWiredIn ( unitTy, omegaDataConTy )
 import TcType
@@ -499,7 +499,7 @@ nlList exprs          = noLoc (ExplicitList noExt Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => LHsType p -> HsMult p -> LHsType p -> LHsType p
+nlHsFunTy :: (XFunTy p ~ NoExt, XParTy p ~ NoExt) => LHsType p -> HsArrow p -> LHsType p -> LHsType p
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExt f (parenthesizeHsType appPrec t))
@@ -665,7 +665,7 @@ typeToLHsType ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                         , hst_xqual = noExt
                         , hst_body = go tau })
-    go (FunTy mult arg res) = nlHsFunTy (go arg) (multToHsMult mult) (go res)
+    go (FunTy mult arg res) = nlHsFunTy (go arg) (multToHsArrow mult) (go res)
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
       = noLoc (HsForAllTy { hst_bndrs = map go_tv tvs
@@ -696,11 +696,23 @@ typeToLHsType ty
     go_tv tv = noLoc $ KindedTyVar noExt (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
 
-multToHsMult :: Mult -> HsMult p
+multToHsMult :: Mult -> HsMult GhcPs
 multToHsMult Zero = HsZero
 multToHsMult One  = HsOne
 multToHsMult Omega = HsOmega
+multToHsMult (MultThing ty) = HsMultTy (typeToLHsType ty)
 multToHsMult _ = panic "multToHsMult: polymorphism not yet implemented"
+
+-- | This is used to transform an arrow from Core's Type to surface
+-- syntax. There is a choice between being very explicit here, or trying to
+-- refold arrows into shorthands as much as possible. We choose to do the
+-- latter, for it should be more readable. It also helps printing Haskell'98
+-- code into Haskell'98 syntax.
+multToHsArrow :: Mult -> HsArrow GhcPs
+multToHsArrow One = HsLinearArrow
+multToHsArrow Omega = HsUnrestrictedArrow
+multToHsArrow p = HsExplicitMult (multToHsMult p)
+
 {-
 Note [Kind signatures in typeToLHsType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

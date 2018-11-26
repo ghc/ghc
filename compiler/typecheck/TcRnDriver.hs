@@ -2274,7 +2274,7 @@ getGhciStepIO = do
 
         step_ty = noLoc $ HsForAllTy { hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
                                      , hst_xforall = noExt
-                                     , hst_body  = nlHsFunTy ghciM HsOmega ioM }
+                                     , hst_body  = nlHsFunTy ghciM HsUnrestrictedArrow ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
