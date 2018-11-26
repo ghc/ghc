@@ -131,11 +131,6 @@ askLd dflags args = do
   runSomethingWith dflags "gcc" p args2 $ \real_args ->
     readCreateProcessWithExitCode' (proc p real_args){ env = mb_env }
 
-runSplit :: DynFlags -> [Option] -> IO ()
-runSplit dflags args = do
-  let (p,args0) = pgm_s dflags
-  runSomething dflags "Splitter" p (args0++args)
-
 runAs :: DynFlags -> [Option] -> IO ()
 runAs dflags args = do
   let (p,args0) = pgm_a dflags

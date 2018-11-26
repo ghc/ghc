@@ -114,10 +114,6 @@ four settings: `none`, `brief` (one line per build command; this is the default
 setting), `normal` (typically a box per build command), and `unicorn` (when
 `normal` just won't do).
 
-* `--split-objects`: generate split objects, which are switched off by default.
-Due to a GHC [bug][ghc-split-objs-bug], you need a full clean rebuild when using
-this flag.
-
 * `--verbose`: run Hadrian in verbose mode. In particular this prints diagnostic
 messages by Shake oracles.
 
@@ -263,7 +259,6 @@ projects), as well as Well-Typed.
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
 [windows-build]: https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md
-[ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187
 [dynamic-windows-issue]: https://github.com/snowleopard/hadrian/issues/343
