@@ -1403,12 +1403,12 @@ mkLamTypes vs ty = foldr mkLamType ty vs
 -- We want (k:*) Named, (b:k) Anon, (c:k) Anon
 --
 -- All non-coercion binders are /visible/.
-mkTyConBindersPreferAnon :: [TyVar] -> Type -> [TyConBinder]
-mkTyConBindersPreferAnon vars inner_ty = ASSERT( all isTyVar vars)
-                                               fst (go vars)
+mkTyConBindersPreferAnon :: [TyVar] -> TyCoVarSet -> [TyConBinder]
+mkTyConBindersPreferAnon vars inner_tkvs = ASSERT( all isTyVar vars)
+                                           fst (go vars)
   where
     go :: [TyVar] -> ([TyConBinder], VarSet) -- also returns the free vars
-    go [] = ([], tyCoVarsOfType inner_ty)
+    go [] = ([], inner_tkvs)
     go (v:vs) | v `elemVarSet` fvs
               = ( Bndr v (NamedTCB Required) : binders
                 , fvs `delVarSet` v `unionVarSet` kind_vars )

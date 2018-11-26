@@ -380,8 +380,7 @@ TcTyCons are used for two distinct purposes
 
     Instead of trying, we just store the list of type variables to
     bring into scope, in the tyConScopedTyVars field of the TcTyCon.
-    These tyvars are brought into scope in kcTyClTyVars and
-    tcTyClTyVars, both in TcHsType.
+    These tyvars are brought into scope in TcHsType.bindTyClTyVars.
 
     In a TcTyCon, why is tyConScopedTyVars :: [(Name,TcTyVar)] rather
     than just [TcTyVar]?  Consider these mutually-recursive decls
@@ -731,7 +730,7 @@ paths for
 
 Note that neither code path worries about point (4) above, as this
 is nicely handled by not mangling the res_kind. (Mangling res_kinds is done
-*after* all this stuff, in tcDataDefn's call to tcDataKindSig.)
+*after* all this stuff, in tcDataDefn's call to etaExpandAlgTyCon.)
 
 We can tell Inferred apart from Specified by looking at the scoped
 tyvars; Specified are always included there.
@@ -1023,23 +1022,21 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
     --    (b) dd_ctxt is not allowed for GADT-style decls, so we can ignore it
 
   | HsDataDefn { dd_ctxt = ctxt, dd_cons = cons } <- defn
-  = kcTyClTyVars name $
+  = bindTyClTyVars name $ \ _ _ ->
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kcConDecl) cons }
 
-kcTyClDecl (SynDecl { tcdLName = (dL->L _ name)
-                    , tcdRhs = lrhs })
-  = kcTyClTyVars name $
-    do  { syn_tc <- kcLookupTcTyCon name
+kcTyClDecl (SynDecl { tcdLName = dl->L _ name, tcdRhs = rhs })
+  = bindTyClTyVars name $ \ _ res_kind ->
+    discardResult $ tcCheckLHsType rhs res_kind
         -- NB: check against the result kind that we allocated
         -- in getInitialKinds.
-        ; discardResult $ tcCheckLHsType lrhs (tyConResKind syn_tc) }
 
 kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
                       , tcdCtxt = ctxt, tcdSigs = sigs })
-  = kcTyClTyVars name $
+  = bindTyClTyVars name $ \ _ _ ->
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM_ kc_sig)     sigs }
+        ; mapM_ (wrapLocM_ kc_sig) sigs }
   where
     kc_sig (ClassOpSig _ _ nms op_ty) = kcHsSigType nms op_ty
     kc_sig _                          = return ()
@@ -1266,7 +1263,7 @@ tcTyClDecl1 _parent roles_info
             (SynDecl { tcdLName = (dL->L _ tc_name)
                      , tcdRhs   = rhs })
   = ASSERT( isNothing _parent )
-    tcTyClTyVars tc_name $ \ binders res_kind ->
+    bindTyClTyVars tc_name $ \ binders res_kind ->
     tcTySynRhs roles_info tc_name binders res_kind rhs
 
   -- "data/newtype" declaration
@@ -1274,7 +1271,7 @@ tcTyClDecl1 _parent roles_info
             (DataDecl { tcdLName = (dL->L _ tc_name)
                       , tcdDataDefn = defn })
   = ASSERT( isNothing _parent )
-    tcTyClTyVars tc_name $ \ tycon_binders res_kind ->
+    bindTyClTyVars tc_name $ \ tycon_binders res_kind ->
     tcDataDefn roles_info tc_name tycon_binders res_kind defn
 
 tcTyClDecl1 _parent roles_info
@@ -1306,7 +1303,7 @@ tcClassDecl1 :: RolesInfo -> Name -> LHsContext GhcRn
 tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
   = fixM $ \ clas ->
     -- We need the knot because 'clas' is passed into tcClassATs
-    tcTyClTyVars class_name $ \ binders res_kind ->
+    bindTyClTyVars class_name $ \ binders res_kind ->
     do { MASSERT2( tcIsConstraintKind res_kind
                  , ppr class_name $$ ppr res_kind )
        ; traceTc "tcClassDecl 1" (ppr class_name $$ ppr binders)
@@ -1432,7 +1429,7 @@ tcDefaultAssocDecl fam_tc [dL->L loc (FamEqn { feqn_tycon = L _ tc_name
        -- Typecheck RHS
        ; let hs_pats = map hsLTyVarBndrToType exp_vars
 
-          -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
+          -- NB: Use tcFamTyPats, not bindTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
           -- are different.
 
@@ -1501,7 +1498,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                               , fdTyVars = user_tyvars
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
-  = tcTyClTyVars tc_name $ \ binders res_kind -> do
+  = bindTyClTyVars tc_name $ \ binders res_kind -> do
   { traceTc "data family:" (ppr tc_name)
   ; checkFamFlag tc_name
 
@@ -1527,7 +1524,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   ; return tycon }
 
   | OpenTypeFamily <- fam_info
-  = tcTyClTyVars tc_name $ \ binders res_kind -> do
+  = bindTyClTyVars tc_name $ \ binders res_kind -> do
   { traceTc "open type family:" (ppr tc_name)
   ; checkFamFlag tc_name
   ; inj' <- tcInjectivity binders inj
@@ -1543,8 +1540,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- the variables in the header scope only over the injectivity
          -- declaration but this is not involved here
        ; (inj', binders, res_kind)
-            <- tcTyClTyVars tc_name
-               $ \ binders res_kind ->
+            <- bindTyClTyVars tc_name $ \ binders res_kind ->
                do { inj' <- tcInjectivity binders inj
                   ; return (inj', binders, res_kind) }
 
@@ -1662,7 +1658,7 @@ tcDataDefn roles_info
  =  do { gadt_syntax <- dataDeclChecks tc_name new_or_data ctxt cons
 
        ; tcg_env <- getGblEnv
-       ; (extra_bndrs, final_res_kind) <- tcDataKindSig tycon_binders res_kind
+       ; (extra_bndrs, final_res_kind) <- etaExpandAlgTyCon tycon_binders res_kind
 
        ; let hsc_src = tcg_src tcg_env
        ; unless (mk_permissive_kind hsc_src cons) $
@@ -1890,13 +1886,41 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; traceTc "tcTyFamInstEqnGuts }" (ppr fam_tc <+> pprTyVars qtvs)
        ; return (qtvs, pats, rhs_ty) }
   where
-    tc_lhs | null hs_pats
+    tc_lhs | null hs_pats  -- See Note [Apparently-nullary families]
            = do { (args, rhs_kind) <- tcInstTyBinders $
                                       splitPiTysInvisibleN (tyConArity fam_tc)
                                                            (tyConKind  fam_tc)
                 ; return (mkTyConApp fam_tc args, rhs_kind) }
            | otherwise
            = tcFamTyPats fam_tc mb_clsinfo hs_pats
+
+{- Note [Apparently-nullary families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  type family F :: k -> *
+
+This really means
+  type family F @k :: k -> *
+
+That is, the family has arity 1, and can match on the kind. So it's
+not really a nullary family.   NB that
+  type famly F2 :: forall k. k -> *
+is quite different and really does have arity 0.
+
+Returning to F we might have
+  type instannce F = Maybe
+which instantaite 'k' to '*' and really means
+  type instannce F @* = Maybe
+
+Conclusion: in this odd case where there are no LHS patterns, we
+should instantiate any invisible foralls in F's kind, to saturate
+its arity (but no more).  This is what happens in tc_lhs in
+tcTyFamInstEqnGuts.
+
+If there are any visible patterns, then the first will force
+instantiation of any Inferred quantifiers for F -- remember,
+Inferred quantifiers always come first.
+-}
 
 
 -----------------

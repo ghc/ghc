@@ -27,8 +27,8 @@ module TcHsType (
         ContextKind(..),
 
                 -- Type checking type and class decls
-        kcLookupTcTyCon, kcTyClTyVars, tcTyClTyVars,
-        tcDataKindSig,
+        kcLookupTcTyCon, bindTyClTyVars,
+        etaExpandAlgTyCon, tcbVisibilities,
 
           -- tyvars
         zonkAndScopedSort,
@@ -79,7 +79,7 @@ import TcHsSyn
 import TcErrors ( reportAllUnsolved )
 import TcType
 import Inst   ( tcInstTyBinders, tcInstTyBinder )
-import TyCoRep( TyCoBinder(..), TyBinder )  -- Used in tcDataKindSig
+import TyCoRep( TyCoBinder(..), TyBinder )  -- Used in etaExpandAlgTyCon
 import Type
 import Coercion
 import RdrName( lookupLocalRdrOcc )
@@ -1890,6 +1890,35 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
 tcHsQTyVarBndr _ _ (XTyVarBndr _) = panic "tcHsTyVarBndr"
 
 
+--------------------------------------
+-- Binding type/class variables in the
+-- kind-checking and typechecking phases
+--------------------------------------
+
+bindTyClTyVars :: Name
+               -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
+-- ^ Used for the type variables of a type or class decl
+-- in the "kind checking" and "type checking" pass,
+-- but not in the initial-kind run.
+bindTyClTyVars tycon_name thing_inside
+  = do { tycon <- kcLookupTcTyCon tycon_name
+       ; let scoped_prs = tcTyConScopedTyVars tycon
+             res_kind   = tyConResKind tycon
+             binders    = tyConBinders tycon
+       ; traceTc "bindTyClTyVars" (ppr tycon_name <+> ppr binders)
+       ; tcExtendNameTyVarEnv scoped_prs $
+         thing_inside binders res_kind }
+
+-- getInitialKind has made a suitably-shaped kind for the type or class
+-- Look it up in the local environment. This is used only for tycons
+-- that we're currently type-checking, so we're sure to find a TcTyCon.
+kcLookupTcTyCon :: Name -> TcM TcTyCon
+kcLookupTcTyCon nm
+  = do { tc_ty_thing <- tcLookup nm
+       ; return $ case tc_ty_thing of
+           ATcTyCon tc -> tc
+           _           -> pprPanic "kcLookupTcTyCon" (ppr tc_ty_thing) }
+
 
 {- *********************************************************************
 *                                                                      *
@@ -2020,60 +2049,10 @@ Hence using zonked_kinds when forming tvs'.
 
 -}
 
---------------------
--- getInitialKind has made a suitably-shaped kind for the type or class
--- Look it up in the local environment. This is used only for tycons
--- that we're currently type-checking, so we're sure to find a TcTyCon.
-kcLookupTcTyCon :: Name -> TcM TcTyCon
-kcLookupTcTyCon nm
-  = do { tc_ty_thing <- tcLookup nm
-       ; return $ case tc_ty_thing of
-           ATcTyCon tc -> tc
-           _           -> pprPanic "kcLookupTcTyCon" (ppr tc_ty_thing) }
-
------------------------
--- | Bring tycon tyvars into scope. This is used during the "kind-checking"
--- pass in TcTyClsDecls. (Never in getInitialKind, never in the
--- "type-checking"/desugaring pass.)
--- Never emits constraints, though the thing_inside might.
-kcTyClTyVars :: Name -> TcM a -> TcM a
-kcTyClTyVars tycon_name thing_inside
-  = do { tycon <- kcLookupTcTyCon tycon_name
-       ; tcExtendNameTyVarEnv (tcTyConScopedTyVars tycon) $ thing_inside }
-
-tcTyClTyVars :: Name
-             -> ([TyConBinder] -> Kind -> TcM a) -> TcM a
--- ^ Used for the type variables of a type or class decl
--- on the second full pass (type-checking/desugaring) in TcTyClDecls.
--- This is *not* used in the initial-kind run, nor in the "kind-checking" pass.
--- Accordingly, everything passed to the continuation is fully zonked.
---
--- (tcTyClTyVars T [a,b] thing_inside)
---   where T : forall k1 k2 (a:k1 -> *) (b:k1). k2 -> *
---   calls thing_inside with arguments
---      [k1,k2,a,b] [k1:*, k2:*, Anon (k1 -> *), Anon k1] (k2 -> *)
---   having also extended the type environment with bindings
---   for k1,k2,a,b
---
--- Never emits constraints.
---
--- The LHsTyVarBndrs is always user-written, and the full, generalised
--- kind of the tycon is available in the local env.
-tcTyClTyVars tycon_name thing_inside
-  = do { tycon <- kcLookupTcTyCon tycon_name
-       ; let scoped_prs = tcTyConScopedTyVars tycon
-             res_kind   = tyConResKind tycon
-             binders    = tyConBinders tycon
-
-       ; traceTc "tcTyClTyVars" (ppr tycon_name <+> ppr binders)
-       ; pushTcLevelM_                   $
-         tcExtendNameTyVarEnv scoped_prs $
-         thing_inside binders res_kind }
-
 -----------------------------------
-tcDataKindSig :: [TyConBinder]
-              -> Kind
-              -> TcM ([TyConBinder], Kind)
+etaExpandAlgTyCon :: [TyConBinder]
+                  -> Kind
+                  -> TcM ([TyConBinder], Kind)
 -- GADT decls can have a (perhaps partial) kind signature
 --      e.g.  data T a :: * -> * -> * where ...
 -- This function makes up suitable (kinded) TyConBinders for the
@@ -2082,7 +2061,7 @@ tcDataKindSig :: [TyConBinder]
 -- Never emits constraints.
 -- It's a little trickier than you might think: see
 -- Note [TyConBinders for the result kind signature of a data type]
-tcDataKindSig tc_bndrs kind
+etaExpandAlgTyCon tc_bndrs kind
   = do  { loc     <- getSrcSpanM
         ; uniqs   <- newUniqueSupply
         ; rdr_env <- getLocalRdrEnv
@@ -2126,13 +2105,37 @@ badKindSig check_for_type kind
                text "return kind" ])
         2 (ppr kind)
 
+tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
+-- Result is in 1-1 correpondence with orig_args
+tcbVisibilities tc orig_args
+  = go (tyConKind tc) init_subst orig_args
+  where
+    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfTypes orig_args))
+    go _ _ []
+      = []
+
+    go fun_kind subst all_args@(arg : args)
+      | Just (tcb, inner_kind) <- splitPiTy_maybe fun_kind
+      = case tcb of
+          Anon _              -> AnonTCB      : go inner_kind subst  args
+          Named (Bndr tv vis) -> NamedTCB vis : go inner_kind subst' args
+                 where
+                    subst' = extendTCvSubst subst tv arg
+
+      | not (isEmptyTCvSubst subst)
+      = go (substTy subst fun_kind) init_subst all_args
+
+      | otherwise
+      = pprPanic "addTcbVisibilities" (ppr tc <+> ppr orig_args)
+
+
 {- Note [TyConBinders for the result kind signature of a data type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Given
   data T (a::*) :: * -> forall k. k -> *
 we want to generate the extra TyConBinders for T, so we finally get
   (a::*) (b::*) (k::*) (c::k)
-The function tcDataKindSig generates these extra TyConBinders from
+The function etaExpandAlgTyCon generates these extra TyConBinders from
 the result kind signature.
 
 We need to take care to give the TyConBinders

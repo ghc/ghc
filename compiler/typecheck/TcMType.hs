@@ -1738,8 +1738,8 @@ zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
                | otherwise    = ASSERT2( isCoVar tv, ppr tv )
                                 mkCoercionTy . mkCoVarCo <$> zonkTyCoVarKind tv
    -- Hackily, when typechecking type and class decls
-   -- we have TyVars in scopeadded (only) in
-   -- TcHsType.tcTyClTyVars, but it seems
+   -- we have TyVars in scope added (only) in
+   -- TcHsType.bindTyClTyVars, but it seems
    -- painful to make them into TcTyVars there
 
 zonkTyCoVarsAndFV :: TyCoVarSet -> TcM TyCoVarSet

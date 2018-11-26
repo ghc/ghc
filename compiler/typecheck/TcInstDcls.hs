@@ -543,7 +543,7 @@ tcClsInstDecl (L _ (XClsInstDecl _)) = panic "tcClsInstDecl"
 {-
 ************************************************************************
 *                                                                      *
-               Type checking family instances
+               Type family instances
 *                                                                      *
 ************************************************************************
 
@@ -561,7 +561,8 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpan loc           $
     tcAddTyFamInstCtxt decl  $
     do { let fam_lname = feqn_tycon (hsib_body eqn)
-       ; fam_tc <- tcFamInstDeclChecks mb_clsinfo fam_lname
+       ; fam_tc <- tcLookupLocatedTyCon fam_lname
+       ; tcFamInstDeclChecks mb_clsinfo fam_tc
 
          -- (0) Check it's an open type family
        ; checkTc (isTypeFamilyTyCon fam_tc)     (wrongKindOfFamily fam_tc)
@@ -578,6 +579,56 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; rep_tc_name <- newFamInstAxiomName fam_lname [coAxBranchLHS co_ax_branch]
        ; let axiom = mkUnbranchedCoAxiom rep_tc_name fam_tc co_ax_branch
        ; newFamInst SynFamilyInst axiom }
+
+
+---------------------
+tcFamInstDeclChecks :: AssocInstInfo -> TyCon -> TcM ()
+-- Used for both type and data families
+tcFamInstDeclChecks mb_clsinfo fam_tc
+  = do { -- Type family instances require -XTypeFamilies
+         -- and can't (currently) be in an hs-boot file
+       ; traceTc "tcFamInstDecl" (ppr fam_tc)
+       ; type_families <- xoptM LangExt.TypeFamilies
+       ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
+       ; checkTc type_families $ badFamInstDecl fam_tc
+       ; checkTc (not is_boot) $ badBootFamInstDeclErr
+
+       -- Check that it is a family TyCon, and that
+       -- oplevel type instances are not for associated types.
+       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
+
+       ; when (isNotAssociated mb_clsinfo &&   -- Not in a class decl
+               isTyConAssoc fam_tc)            -- but an associated type
+              (addErr $ assocInClassErr fam_tc)
+       }
+
+{- Note [Associated type instances]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We allow this:
+  class C a where
+    type T x a
+  instance C Int where
+    type T (S y) Int = y
+    type T Z     Int = Char
+
+Note that
+  a) The variable 'x' is not bound by the class decl
+  b) 'x' is instantiated to a non-type-variable in the instance
+  c) There are several type instance decls for T in the instance
+
+All this is fine.  Of course, you can't give any *more* instances
+for (T ty Int) elsewhere, because it's an *associated* type.
+
+
+************************************************************************
+*                                                                      *
+               Data family instances
+*                                                                      *
+************************************************************************
+
+For some reason data family instances are a lot more complicated
+than type family instances
+-}
 
 tcDataFamInstDecl :: AssocInstInfo
                   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
@@ -597,7 +648,9 @@ tcDataFamInstDecl mb_clsinfo
                                         , dd_derivs  = derivs } }}}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
-    do { fam_tc <- tcFamInstDeclChecks mb_clsinfo lfam_name
+    do { fam_tc <- tcLookupLocatedTyCon lfam_name
+
+       ; tcFamInstDeclChecks mb_clsinfo fam_tc
 
        -- Check that the family declaration is for the right kind
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
@@ -609,25 +662,27 @@ tcDataFamInstDecl mb_clsinfo
              <- tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs
                                 fixity hs_ctxt hs_pats m_ksig hs_cons
 
-       -- Construct representation tycon
-       ; rep_tc_name <- newFamInstTyConName lfam_name pats
-       ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
+       -- Eta-reduce the axiom if possible
+       -- Quite tricky: see Note [Eta-reduction for data families]
+       ; let (eta_pats, eta_tcbs) = eta_reduce fam_tc pats
+             eta_tvs       = map binderVar eta_tcbs
+             post_eta_qtvs = filterOut (`elem` eta_tvs) qtvs
 
-       ; let (eta_pats, etad_tvs) = eta_reduce fam_tc pats
-             eta_tvs              = filterOut (`elem` etad_tvs) qtvs
-                 -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
-
-             full_tcbs = mkTyConBindersPreferAnon (eta_tvs ++ etad_tvs) res_kind
+             full_tcbs = mkTyConBindersPreferAnon post_eta_qtvs
+                            (tyCoVarsOfType (mkSpecForAllTys eta_tvs res_kind))
+                         ++ eta_tcbs
                  -- Put the eta-removed tyvars at the end
                  -- Remember, qtvs is in arbitrary order, except kind vars are
-                 -- first, so there is no reason to suppose that the etad_tvs
+                 -- first, so there is no reason to suppose that the eta_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
 
-       -- Deal with any kind signature.
+       -- Eta-expand the representation tycon until it has reult kind *
        -- See also Note [Arity of data families] in FamInstEnv
-       ; (extra_tcbs, final_res_kind) <- tcDataKindSig full_tcbs res_kind
+       -- NB: we can do this after eta-reducing the axiom, because if
+       --     we did it before the "extra" tvs from etaExpandAlgTyCon
+       --     would always be eta-reduced
+       ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
        ; checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
-
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats `chkAppend` extra_pats
              orig_res_ty = mkTyConApp fam_tc all_pats
@@ -636,12 +691,12 @@ tcDataFamInstDecl mb_clsinfo
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
               , text "Pats:" <+> ppr pats
+              , text "visibliities:" <+> ppr (tcbVisibilities fam_tc pats)
               , text "all_pats:" <+> ppr all_pats
               , text "ty_binders" <+> ppr ty_binders
               , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
-              , text "deps:" <+> ppr (map isNamedTyConBinder (tyConBinders fam_tc))
               , text "eta_pats" <+> ppr eta_pats
-              , text "eta_tvs" <+> ppr eta_tvs ]
+              , text "eta_tcbs" <+> ppr eta_tcbs ]
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
            do { data_cons <- tcExtendTyVarEnv qtvs $
@@ -649,16 +704,17 @@ tcDataFamInstDecl mb_clsinfo
                              -- over the data constructors
                              tcConDecls rec_rep_tc ty_binders orig_res_ty hs_cons
 
+              ; rep_tc_name <- newFamInstTyConName lfam_name pats
+              ; axiom_name  <- newFamInstAxiomName lfam_name [pats]
               ; tc_rhs <- case new_or_data of
                      DataType -> return (mkDataTyConRhs data_cons)
                      NewType  -> ASSERT( not (null data_cons) )
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
 
-              ; let axiom  = mkSingleCoAxiom Representational
-                                             axiom_name eta_tvs [] fam_tc eta_pats
-                                             (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
+              ; let axiom  = mkSingleCoAxiom Representational axiom_name
+                                 post_eta_qtvs [] fam_tc eta_pats
+                                 (mkTyConApp rep_tc (mkTyVarTys post_eta_qtvs))
                     parent = DataFamInstTyCon axiom fam_tc all_pats
-
 
                       -- NB: Use the full ty_binders from the pats. See bullet toward
                       -- the end of Note [Data type families] in TyCon
@@ -691,7 +747,7 @@ tcDataFamInstDecl mb_clsinfo
        ; fam_inst <- newFamInst (DataFamilyInst rep_tc) axiom
        ; return (fam_inst, m_deriv_info) }
   where
-    eta_reduce :: TyCon -> [Type] -> ([Type], [TyVar])
+    eta_reduce :: TyCon -> [Type] -> ([Type], [TyConBinder])
     -- See Note [Eta reduction for data families] in FamInstEnv
     -- Splits the incoming patterns into two: the [TyVar]
     -- are the patterns that can be eta-reduced away.
@@ -699,30 +755,32 @@ tcDataFamInstDecl mb_clsinfo
     --
     -- NB: quadratic algorithm, but types are small here
     eta_reduce fam_tc pats
-        = go (reverse (zip3 pats fvs_s deps)) []
+        = go (reverse (zip3 pats fvs_s vis_s)) []
         where
+          vis_s :: [TyConBndrVis]
+          vis_s = tcbVisibilities fam_tc pats
+
           fvs_s :: [TyCoVarSet]  -- 1-1 correspondence with pats
                                  -- Each elt is the free vars of all /earlier/ pats
           (_, fvs_s) = mapAccumL add_fvs emptyVarSet pats
           add_fvs fvs pat = (fvs `unionVarSet` tyCoVarsOfType pat, fvs)
 
-          deps :: [Bool]
-          deps = map isNamedBinder tc_bndrs ++ repeat False
-          (tc_bndrs, _) = splitPiTys (tyConKind fam_tc)
-
-    go ((pat, fvs_to_the_left, is_dep):pats) etad_tvs
-      | not is_dep
-      , Just tv <- getTyVar_maybe pat
+    go ((pat, fvs_to_the_left, tcb_vis):pats) etad_tvs
+      | Just tv <- getTyVar_maybe pat
       , not (tv `elemVarSet` fvs_to_the_left)
-      = go pats (tv : etad_tvs)
+      = go pats (Bndr tv tcb_vis : etad_tvs)
     go pats etad_tvs = (reverse (map fstOf3 pats), etad_tvs)
 
 tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 
+-----------------------
 tcDataFamHeader :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
                 -> LexicalFixity -> LHsContext GhcRn
                 -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
                 -> TcM ([TyVar], [Type], Kind, ThetaType)
+-- The "header" is the part other than the data constructors themselves
+-- e.g.  data instance D [a] :: * -> * = ...
+-- Here the "header" is the bit before the "=" sign
 tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksig hs_cons
   = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
             <- pushTcLevelM_                                $
@@ -747,10 +805,10 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
        ; res_kind     <- zonkTcTypeToTypeX ze res_kind
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
 
-       ; let pats = unravelFamInstPats lhs_ty
-
        -- Check that type patterns match the class instance head
+       ; let pats = unravelFamInstPats lhs_ty
        ; checkConsistentFamInst mb_clsinfo fam_tc pats
+
        ; return (qtvs, pats, res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
@@ -769,29 +827,6 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
 
----------------------
-tcFamInstDeclChecks :: AssocInstInfo -> Located Name -> TcM TyCon
-tcFamInstDeclChecks mb_clsinfo fam_tc_lname
-  = do { -- Type family instances require -XTypeFamilies
-         -- and can't (currently) be in an hs-boot file
-       ; traceTc "tcFamInstDecl" (ppr fam_tc_lname)
-       ; type_families <- xoptM LangExt.TypeFamilies
-       ; is_boot       <- tcIsHsBootOrSig   -- Are we compiling an hs-boot file?
-       ; checkTc type_families $ badFamInstDecl fam_tc_lname
-       ; checkTc (not is_boot) $ badBootFamInstDeclErr
-
-       -- Look up the family TyCon and check for validity including
-       -- check that toplevel type instances are not for associated types.
-       ; fam_tc <- tcLookupLocatedTyCon fam_tc_lname
-
-       ; checkTc (isFamilyTyCon fam_tc) (notFamily fam_tc)
-
-       ; when (isNotAssociated mb_clsinfo &&   -- Not in a class decl
-               isTyConAssoc fam_tc)            -- but an associated type
-              (addErr $ assocInClassErr fam_tc_lname)
-
-       ; return fam_tc }
-
 {- Note [Result kind signature for a data family instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The expected type might have a forall at the type. Normally, we
@@ -801,27 +836,93 @@ we actually have a place to put the regeneralised variables.
 Thus: skolemise away. cf. Inst.deeplySkolemise and TcUnify.tcSkolemise
 Examples in indexed-types/should_compile/T12369
 
-Note [Associated type instances]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We allow this:
-  class C a where
-    type T x a
-  instance C Int where
-    type T (S y) Int = y
-    type T Z     Int = Char
+Note [Eta-reduction for data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   data D :: * -> * -> * -> * -> *
 
-Note that
-  a) The variable 'x' is not bound by the class decl
-  b) 'x' is instantiated to a non-type-variable in the instance
-  c) There are several type instance decls for T in the instance
+   data instance D [(a,b)] p q :: * -> * where
+      D1 :: blah1
+      D2 :: blah2
 
-All this is fine.  Of course, you can't give any *more* instances
-for (T ty Int) elsewhere, because it's an *associated* type.
+Then we'll generate a representation data type
+  data Drep a b p q z where
+      D1 :: blah1
+      D2 :: blah2
+
+and an axiom to connect them
+  axiom AxDrep forall a b p q z. D [(a,b]] p q z = Drep a b p q z
+
+except that we'll eta-reduce the axiom to
+  axiom AxDrep forall a b. D [(a,b]] = Drep a b
+There are several fiddly subtleties lurking here
+
+* The representation tycon Drep is parameerised over the free
+  variables of the pattern, in no particular order. So there is no
+  guarantee that 'p' and 'q' will come last in Drep's parameters, and
+  in the right order.  So, if the /patterns/ of the family insatance
+  are eta-redcible, we re-order Drep's parameters to put the
+  eta-reduced type variables last.
+
+* Although we eta-reduce the axiom, we eta-/expand/ the representation
+  tycon Drep.  The kind of D says it takses four arguments, but the
+  data instance header only supplies three.  But the AlgTyCOn for Drep
+  itself must have enough TyConBinders so that its result kind is Type.
+  So, with etaExpandAlgTyCon we make up some extra TyConBinders
+
+* The result kind in the instance might be a polykind, like this:
+     data family DP a :: forall k. k -> *
+     data instance DP [b] :: forall k1 k2. (k1,k2) -> *
+
+  So in type-checking the LHS (DP Int) we need to check that it is
+  more polymorphic than the signature.  To do that we must skolemise
+  the siganture and istantiate the call of DP.  So we end up with
+     data instance DP [b] @(k1,k2) (z :: (k1,k2)) where
+
+  Note that we must parameterise the representation tycon DPrep over
+  'k1' and 'k2', as well as 'b'.
+
+  The skolemise bit is done in tc_kind_sig, while the instantiate bit
+  is done by the checkExpectedKind that immediately follows.
+
+* Very fiddly point.  When we eta-reduce to
+     axiom AxDrep forall a b. D [(a,b]] = Drep a b
+
+  we want the kind of (D [(a,b)]) to be the same as the kind of
+  (Drep a b).  This ensures that applying the axiom doesn't change the
+  kind.  Why is that hard?  Because the kind of (Drep a b) depends on
+  the TyConBndrVis on Drep's arguments. In particular do we have
+    (forall (k::*). blah) or (* -> blah)?
+
+  We must match whatever D does!  In Trac #15817 we had
+      data family X a :: forall k. * -> *   -- Note: a forall that is not used
+      data instance X Int b = MkX
+
+  So the data intance is really
+      data istance X Int @k b = MkX
+
+  The axiom will look like
+      axiom    X Int = Xrep
+
+  and it's important that XRep :: forall k * -> *, following X.
+
+  To achieve this we get the TyConBndrVis flags from tcbVisibilities,
+  and use those flags for any eta-reduced arguments.  Sigh.
+
+* The final turn of the knife is that tcbVisibilities is itself
+  tricky to sort out.  Consider
+      data family D k :: k
+  Then consider D (forall k2. k2 -> k2) Type Type
+  The visibilty flags on an application of D may affected by the arguments
+  themselves.  Heavy sigh.  But not truly hard; that's what tcbVisibilities
+  does.
+
 -}
+
 
 {- *********************************************************************
 *                                                                      *
-      Type-checking instance declarations, pass 2
+      Class instance declarations, pass 2
 *                                                                      *
 ********************************************************************* -}
 
@@ -2005,12 +2106,12 @@ notFamily tycon
   = vcat [ text "Illegal family instance for" <+> quotes (ppr tycon)
          , nest 2 $ parens (ppr tycon <+> text "is not an indexed type family")]
 
-assocInClassErr :: Located Name -> SDoc
+assocInClassErr :: TyCon -> SDoc
 assocInClassErr name
  = text "Associated type" <+> quotes (ppr name) <+>
    text "must be inside a class instance"
 
-badFamInstDecl :: Located Name -> SDoc
+badFamInstDecl :: TyCon -> SDoc
 badFamInstDecl tc_name
   = vcat [ text "Illegal family instance for" <+>
            quotes (ppr tc_name)
