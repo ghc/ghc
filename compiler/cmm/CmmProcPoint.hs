@@ -19,7 +19,7 @@ import CmmUtils
 import CmmInfo
 import CmmLive
 import CmmSwitch
-import Data.List (sortBy, foldl')
+import Data.List (sortBy)
 import Maybes
 import Control.Monad
 import Outputable

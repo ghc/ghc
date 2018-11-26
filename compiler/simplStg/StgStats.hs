@@ -66,9 +66,6 @@ combineSEs = foldr combineSE emptySE
 countOne :: CounterType -> StatEnv
 countOne c = Map.singleton c 1
 
-countN :: CounterType -> Int -> StatEnv
-countN = Map.singleton
-
 {-
 ************************************************************************
 *                                                                      *
@@ -131,9 +128,8 @@ statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 statRhs top (_, StgRhsCon _ _ _)
   = countOne (ConstructorBinds top)
 
-statRhs top (_, StgRhsClosure _ fv u _ body)
-  = statExpr body                       `combineSE`
-    countN FreeVariables (length fv)    `combineSE`
+statRhs top (_, StgRhsClosure _ _ u _ body)
+  = statExpr body `combineSE`
     countOne (
       case u of
         ReEntrant   -> ReEntrantBinds   top
@@ -157,12 +153,12 @@ statExpr (StgConApp _ _ _)= countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
 statExpr (StgTick _ e)    = statExpr e
 
-statExpr (StgLetNoEscape binds body)
+statExpr (StgLetNoEscape _ binds body)
   = statBinding False{-not top-level-} binds    `combineSE`
     statExpr body                               `combineSE`
     countOne LetNoEscapes
 
-statExpr (StgLet binds body)
+statExpr (StgLet _ binds body)
   = statBinding False{-not top-level-} binds    `combineSE`
     statExpr body
 

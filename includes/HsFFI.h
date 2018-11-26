@@ -126,7 +126,7 @@ extern void hs_free_stable_ptr_unsafe (HsStablePtr sp);
 extern void hs_free_stable_ptr (HsStablePtr sp);
 extern void hs_free_fun_ptr    (HsFunPtr fp);
 
-extern StgPtr hs_spt_lookup(StgWord64 key[2]);
+extern StgPtr hs_spt_lookup(StgWord64 key1, StgWord64 key2);
 extern int hs_spt_keys(StgPtr keys[], int szKeys);
 extern int hs_spt_key_count (void);
 

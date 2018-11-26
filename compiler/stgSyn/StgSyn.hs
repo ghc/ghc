@@ -10,18 +10,33 @@ generation.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module StgSyn (
-        GenStgArg(..),
+        StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
+        StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
+        NoExtSilent, noExtSilent,
+
         UpdateFlag(..), isUpdatable,
 
-        -- a set of synonyms for the most common (only :-) parameterisation
-        StgArg,
+        -- a set of synonyms for the vanilla parameterisation
         StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt,
+
+        -- a set of synonyms for the code gen parameterisation
+        CgStgTopBinding, CgStgBinding, CgStgExpr, CgStgRhs, CgStgAlt,
+
+        -- a set of synonyms for the lambda lifting parameterisation
+        LlStgTopBinding, LlStgBinding, LlStgExpr, LlStgRhs, LlStgAlt,
 
         -- a set of synonyms to distinguish in- and out variants
         InStgArg,  InStgTopBinding,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt,
@@ -47,6 +62,7 @@ import GhcPrelude
 import CoreSyn     ( AltCon, Tickish )
 import CostCentre  ( CostCentreStack )
 import Data.ByteString ( ByteString )
+import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import DataCon
 import DynFlags
@@ -54,6 +70,7 @@ import FastString
 import ForeignCall ( ForeignCall )
 import Id
 import IdInfo      ( mayHaveCafRefs )
+import VarSet
 import Literal     ( Literal, literalType )
 import Module      ( Module )
 import Outputable
@@ -83,25 +100,25 @@ with respect to binder and occurrence information (just as in
 -}
 
 -- | A top-level binding.
-data GenStgTopBinding bndr occ
+data GenStgTopBinding pass
 -- See Note [CoreSyn top-level string literals]
-  = StgTopLifted (GenStgBinding bndr occ)
-  | StgTopStringLit bndr ByteString
+  = StgTopLifted (GenStgBinding pass)
+  | StgTopStringLit Id ByteString
 
-data GenStgBinding bndr occ
-  = StgNonRec bndr (GenStgRhs bndr occ)
-  | StgRec    [(bndr, GenStgRhs bndr occ)]
+data GenStgBinding pass
+  = StgNonRec (BinderP pass) (GenStgRhs pass)
+  | StgRec    [(BinderP pass, GenStgRhs pass)]
 
 {-
 ************************************************************************
 *                                                                      *
-\subsection{@GenStgArg@}
+\subsection{@StgArg@}
 *                                                                      *
 ************************************************************************
 -}
 
-data GenStgArg occ
-  = StgVarArg  occ
+data StgArg
+  = StgVarArg  Id
   | StgLitArg  Literal
 
 -- | Does this constructor application refer to
@@ -147,7 +164,7 @@ stgArgType (StgLitArg lit) = literalType lit
 
 
 -- | Strip ticks of a given type from an STG expression
-stripStgTicksTop :: (Tickish Id -> Bool) -> StgExpr -> ([Tickish Id], StgExpr)
+stripStgTicksTop :: (Tickish Id -> Bool) -> GenStgExpr p -> ([Tickish Id], GenStgExpr p)
 stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
          go ts other               = (reverse ts, other)
@@ -190,10 +207,10 @@ There is no constructor for a lone variable; it would appear as
 @StgApp var []@.
 -}
 
-data GenStgExpr bndr occ
+data GenStgExpr pass
   = StgApp
-        occ             -- function
-        [GenStgArg occ] -- arguments; may be empty
+        Id       -- function
+        [StgArg] -- arguments; may be empty
 
 {-
 ************************************************************************
@@ -211,14 +228,14 @@ primitives, and literals.
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound first
   | StgConApp   DataCon
-                [GenStgArg occ] -- Saturated
-                [Type]          -- See Note [Types in StgConApp] in UnariseStg
+                [StgArg] -- Saturated
+                [Type]   -- See Note [Types in StgConApp] in UnariseStg
 
-  | StgOpApp    StgOp           -- Primitive op or foreign call
-                [GenStgArg occ] -- Saturated.
-                Type            -- Result type
-                                -- We need to know this so that we can
-                                -- assign result registers
+  | StgOpApp    StgOp    -- Primitive op or foreign call
+                [StgArg] -- Saturated.
+                Type     -- Result type
+                         -- We need to know this so that we can
+                         -- assign result registers
 
 {-
 ************************************************************************
@@ -229,10 +246,11 @@ primitives, and literals.
 
 StgLam is used *only* during CoreToStg's work. Before CoreToStg has
 finished it encodes (\x -> e) as (let f = \x -> e in f)
+TODO: Encode this via an extension to GenStgExpr à la TTG.
 -}
 
   | StgLam
-        (NonEmpty bndr)
+        (NonEmpty (BinderP pass))
         StgExpr    -- Body of lambda
 
 {-
@@ -246,14 +264,10 @@ This has the same boxed/unboxed business as Core case expressions.
 -}
 
   | StgCase
-        (GenStgExpr bndr occ)
-                    -- the thing to examine
-
-        bndr        -- binds the result of evaluating the scrutinee
-
+        (GenStgExpr pass) -- the thing to examine
+        (BinderP pass) -- binds the result of evaluating the scrutinee
         AltType
-
-        [GenStgAlt bndr occ]
+        [GenStgAlt pass]
                     -- The DEFAULT case is always *first*
                     -- if it is there at all
 
@@ -352,12 +366,14 @@ And so the code for let(rec)-things:
 -}
 
   | StgLet
-        (GenStgBinding bndr occ)    -- right hand sides (see below)
-        (GenStgExpr bndr occ)       -- body
+        (XLet pass)
+        (GenStgBinding pass)    -- right hand sides (see below)
+        (GenStgExpr pass)       -- body
 
   | StgLetNoEscape
-        (GenStgBinding bndr occ)    -- right hand sides (see below)
-        (GenStgExpr bndr occ)       -- body
+        (XLetNoEscape pass)
+        (GenStgBinding pass)    -- right hand sides (see below)
+        (GenStgExpr pass)       -- body
 
 {-
 %************************************************************************
@@ -370,8 +386,8 @@ Finally for @hpc@ expressions we introduce a new STG construct.
 -}
 
   | StgTick
-    (Tickish bndr)
-    (GenStgExpr bndr occ)       -- sub expression
+    (Tickish Id)
+    (GenStgExpr pass)       -- sub expression
 
 -- END of GenStgExpr
 
@@ -386,15 +402,15 @@ Here's the rest of the interesting stuff for @StgLet@s; the first
 flavour is for closures:
 -}
 
-data GenStgRhs bndr occ
+data GenStgRhs pass
   = StgRhsClosure
-        CostCentreStack         -- CCS to be attached (default is CurrentCCS)
-        [occ]                   -- non-global free vars; a list, rather than
-                                -- a set, because order is important
-        !UpdateFlag             -- ReEntrant | Updatable | SingleEntry
-        [bndr]                  -- arguments; if empty, then not a function;
-                                -- as above, order is important.
-        (GenStgExpr bndr occ)   -- body
+        (XRhsClosure pass) -- ^ Extension point for non-global free var
+                           --   list just before 'CodeGen'.
+        CostCentreStack    -- ^ CCS to be attached (default is CurrentCCS)
+        !UpdateFlag        -- ^ 'ReEntrant' | 'Updatable' | 'SingleEntry'
+        [BinderP pass]     -- ^ arguments; if empty, then not a function;
+                           --   as above, order is important.
+        (GenStgExpr pass)  -- ^ body
 
 {-
 An example may be in order.  Consider:
@@ -413,14 +429,54 @@ The second flavour of right-hand-side is for constructors (simple but important)
 -}
 
   | StgRhsCon
-        CostCentreStack  -- CCS to be attached (default is CurrentCCS).
-                         -- Top-level (static) ones will end up with
-                         -- DontCareCCS, because we don't count static
-                         -- data in heap profiles, and we don't set CCCS
-                         -- from static closure.
-        DataCon          -- Constructor. Never an unboxed tuple or sum, as those
-                         -- are not allocated.
-        [GenStgArg occ]  -- Args
+        CostCentreStack -- CCS to be attached (default is CurrentCCS).
+                        -- Top-level (static) ones will end up with
+                        -- DontCareCCS, because we don't count static
+                        -- data in heap profiles, and we don't set CCCS
+                        -- from static closure.
+        DataCon         -- Constructor. Never an unboxed tuple or sum, as those
+                        -- are not allocated.
+        [StgArg]        -- Args
+
+-- | Used as a data type index for the stgSyn AST
+data StgPass
+  = Vanilla
+  | LiftLams
+  | CodeGen
+
+-- | Like 'HsExpression.NoExt', but with an 'Outputable' instance that returns
+-- 'empty'.
+data NoExtSilent = NoExtSilent
+  deriving (Data, Eq, Ord)
+
+instance Outputable NoExtSilent where
+  ppr _ = empty
+
+-- | Used when constructing a term with an unused extension point that should
+-- not appear in pretty-printed output at all.
+noExtSilent :: NoExtSilent
+noExtSilent = NoExtSilent
+-- TODO: Maybe move this to HsExtensions? I'm not sure about the implications
+-- on build time...
+
+-- TODO: Do we really want to the extension point type families to have a closed
+-- domain?
+type family BinderP (pass :: StgPass)
+type instance BinderP 'Vanilla = Id
+type instance BinderP 'CodeGen = Id
+
+type family XRhsClosure (pass :: StgPass)
+type instance XRhsClosure 'Vanilla = NoExtSilent
+-- | Code gen needs to track non-global free vars
+type instance XRhsClosure 'CodeGen = DIdSet
+
+type family XLet (pass :: StgPass)
+type instance XLet 'Vanilla = NoExtSilent
+type instance XLet 'CodeGen = NoExtSilent
+
+type family XLetNoEscape (pass :: StgPass)
+type instance XLetNoEscape 'Vanilla = NoExtSilent
+type instance XLetNoEscape 'CodeGen = NoExtSilent
 
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
@@ -441,7 +497,7 @@ stgRhsArity (StgRhsCon _ _ _) = 0
 -- is that `TidyPgm` computed the CAF info on the `Id` but some transformations
 -- have taken place since then.
 
-topStgBindHasCafRefs :: GenStgTopBinding bndr Id -> Bool
+topStgBindHasCafRefs :: GenStgTopBinding pass -> Bool
 topStgBindHasCafRefs (StgTopLifted (StgNonRec _ rhs))
   = topRhsHasCafRefs rhs
 topStgBindHasCafRefs (StgTopLifted (StgRec binds))
@@ -449,14 +505,14 @@ topStgBindHasCafRefs (StgTopLifted (StgRec binds))
 topStgBindHasCafRefs StgTopStringLit{}
   = False
 
-topRhsHasCafRefs :: GenStgRhs bndr Id -> Bool
+topRhsHasCafRefs :: GenStgRhs pass -> Bool
 topRhsHasCafRefs (StgRhsClosure _ _ upd _ body)
   = -- See Note [CAF consistency]
     isUpdatable upd || exprHasCafRefs body
 topRhsHasCafRefs (StgRhsCon _ _ args)
   = any stgArgHasCafRefs args
 
-exprHasCafRefs :: GenStgExpr bndr Id -> Bool
+exprHasCafRefs :: GenStgExpr pass -> Bool
 exprHasCafRefs (StgApp f args)
   = stgIdHasCafRefs f || any stgArgHasCafRefs args
 exprHasCafRefs StgLit{}
@@ -469,29 +525,29 @@ exprHasCafRefs (StgLam _ body)
   = exprHasCafRefs body
 exprHasCafRefs (StgCase scrt _ _ alts)
   = exprHasCafRefs scrt || any altHasCafRefs alts
-exprHasCafRefs (StgLet bind body)
+exprHasCafRefs (StgLet _ bind body)
   = bindHasCafRefs bind || exprHasCafRefs body
-exprHasCafRefs (StgLetNoEscape bind body)
+exprHasCafRefs (StgLetNoEscape _ bind body)
   = bindHasCafRefs bind || exprHasCafRefs body
 exprHasCafRefs (StgTick _ expr)
   = exprHasCafRefs expr
 
-bindHasCafRefs :: GenStgBinding bndr Id -> Bool
+bindHasCafRefs :: GenStgBinding pass -> Bool
 bindHasCafRefs (StgNonRec _ rhs)
   = rhsHasCafRefs rhs
 bindHasCafRefs (StgRec binds)
   = any rhsHasCafRefs (map snd binds)
 
-rhsHasCafRefs :: GenStgRhs bndr Id -> Bool
+rhsHasCafRefs :: GenStgRhs pass -> Bool
 rhsHasCafRefs (StgRhsClosure _ _ _ _ body)
   = exprHasCafRefs body
 rhsHasCafRefs (StgRhsCon _ _ args)
   = any stgArgHasCafRefs args
 
-altHasCafRefs :: GenStgAlt bndr Id -> Bool
+altHasCafRefs :: GenStgAlt pass -> Bool
 altHasCafRefs (_, _, rhs) = exprHasCafRefs rhs
 
-stgArgHasCafRefs :: GenStgArg Id -> Bool
+stgArgHasCafRefs :: StgArg -> Bool
 stgArgHasCafRefs (StgVarArg id)
   = stgIdHasCafRefs id
 stgArgHasCafRefs _
@@ -523,10 +579,10 @@ constructors or literals (which are guaranteed to have the Real McCoy)
 rather than from the scrutinee type.
 -}
 
-type GenStgAlt bndr occ
-  = (AltCon,            -- alts: data constructor,
-     [bndr],            -- constructor's parameters,
-     GenStgExpr bndr occ)       -- ...right-hand side.
+type GenStgAlt pass
+  = (AltCon,          -- alts: data constructor,
+     [BinderP pass],  -- constructor's parameters,
+     GenStgExpr pass) -- ...right-hand side.
 
 data AltType
   = PolyAlt             -- Polymorphic (a lifted type variable)
@@ -546,12 +602,23 @@ data AltType
 This happens to be the only one we use at the moment.
 -}
 
-type StgTopBinding = GenStgTopBinding Id Id
-type StgBinding  = GenStgBinding  Id Id
-type StgArg      = GenStgArg      Id
-type StgExpr     = GenStgExpr     Id Id
-type StgRhs      = GenStgRhs      Id Id
-type StgAlt      = GenStgAlt      Id Id
+type StgTopBinding = GenStgTopBinding 'Vanilla
+type StgBinding    = GenStgBinding    'Vanilla
+type StgExpr       = GenStgExpr       'Vanilla
+type StgRhs        = GenStgRhs        'Vanilla
+type StgAlt        = GenStgAlt        'Vanilla
+
+type LlStgTopBinding = GenStgTopBinding 'LiftLams
+type LlStgBinding    = GenStgBinding    'LiftLams
+type LlStgExpr       = GenStgExpr       'LiftLams
+type LlStgRhs        = GenStgRhs        'LiftLams
+type LlStgAlt        = GenStgAlt        'LiftLams
+
+type CgStgTopBinding = GenStgTopBinding 'CodeGen
+type CgStgBinding    = GenStgBinding    'CodeGen
+type CgStgExpr       = GenStgExpr       'CodeGen
+type CgStgRhs        = GenStgRhs        'CodeGen
+type CgStgAlt        = GenStgAlt        'CodeGen
 
 {- Many passes apply a substitution, and it's very handy to have type
    synonyms to remind us whether or not the substitution has been applied.
@@ -634,17 +701,23 @@ Robin Popplestone asked for semi-colon separators on STG binds; here's
 hoping he likes terminators instead...  Ditto for case alternatives.
 -}
 
-pprGenStgTopBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                 => GenStgTopBinding bndr bdee -> SDoc
+type OutputablePass pass =
+  ( Outputable (XLet pass)
+  , Outputable (XLetNoEscape pass)
+  , Outputable (XRhsClosure pass)
+  , OutputableBndr (BinderP pass)
+  )
 
+pprGenStgTopBinding
+  :: OutputablePass pass => GenStgTopBinding pass -> SDoc
 pprGenStgTopBinding (StgTopStringLit bndr str)
   = hang (hsep [pprBndr LetBind bndr, equals])
         4 (pprHsBytes str <> semi)
 pprGenStgTopBinding (StgTopLifted bind)
   = pprGenStgBinding bind
 
-pprGenStgBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                 => GenStgBinding bndr bdee -> SDoc
+pprGenStgBinding
+  :: OutputablePass pass => GenStgBinding pass -> SDoc
 
 pprGenStgBinding (StgNonRec bndr rhs)
   = hang (hsep [pprBndr LetBind bndr, equals])
@@ -665,31 +738,26 @@ pprStgTopBindings :: [StgTopBinding] -> SDoc
 pprStgTopBindings binds
   = vcat $ intersperse blankLine (map pprGenStgTopBinding binds)
 
-instance (Outputable bdee) => Outputable (GenStgArg bdee) where
+instance Outputable StgArg where
     ppr = pprStgArg
 
-instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                => Outputable (GenStgTopBinding bndr bdee) where
+instance OutputablePass pass => Outputable (GenStgTopBinding pass) where
     ppr = pprGenStgTopBinding
 
-instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                => Outputable (GenStgBinding bndr bdee) where
+instance OutputablePass pass => Outputable (GenStgBinding pass) where
     ppr = pprGenStgBinding
 
-instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                => Outputable (GenStgExpr bndr bdee) where
+instance OutputablePass pass => Outputable (GenStgExpr pass) where
     ppr = pprStgExpr
 
-instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
-                => Outputable (GenStgRhs bndr bdee) where
+instance OutputablePass pass => Outputable (GenStgRhs pass) where
     ppr rhs = pprStgRhs rhs
 
-pprStgArg :: (Outputable bdee) => GenStgArg bdee -> SDoc
+pprStgArg :: StgArg -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
 
-pprStgExpr :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
-           => GenStgExpr bndr bdee -> SDoc
+pprStgExpr :: OutputablePass pass => GenStgExpr pass -> SDoc
 -- special case
 pprStgExpr (StgLit lit)     = ppr lit
 
@@ -733,19 +801,19 @@ pprStgExpr (StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag a
 
 -- special case: let ... in let ...
 
-pprStgExpr (StgLet bind expr@(StgLet _ _))
+pprStgExpr (StgLet ext bind expr@StgLet{})
   = ($$)
-      (sep [hang (text "let {")
+      (sep [hang (text "let" <+> ppr ext <+> text "{")
                 2 (hsep [pprGenStgBinding bind, text "} in"])])
       (ppr expr)
 
 -- general case
-pprStgExpr (StgLet bind expr)
-  = sep [hang (text "let {") 2 (pprGenStgBinding bind),
+pprStgExpr (StgLet ext bind expr)
+  = sep [hang (text "let" <+> ppr ext <+> text "{") 2 (pprGenStgBinding bind),
            hang (text "} in ") 2 (ppr expr)]
 
-pprStgExpr (StgLetNoEscape bind expr)
-  = sep [hang (text "let-no-escape {")
+pprStgExpr (StgLetNoEscape ext bind expr)
+  = sep [hang (text "let-no-escape" <+> ppr ext <+> text "{")
                 2 (pprGenStgBinding bind),
            hang (text "} in ")
                 2 (ppr expr)]
@@ -765,8 +833,7 @@ pprStgExpr (StgCase expr bndr alt_type alts)
            nest 2 (vcat (map pprStgAlt alts)),
            char '}']
 
-pprStgAlt :: (OutputableBndr bndr, Outputable occ, Ord occ)
-          => GenStgAlt bndr occ -> SDoc
+pprStgAlt :: OutputablePass pass => GenStgAlt pass -> SDoc
 pprStgAlt (con, params, expr)
   = hang (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
          4 (ppr expr <> semi)
@@ -782,23 +849,22 @@ instance Outputable AltType where
   ppr (AlgAlt tc)     = text "Alg"    <+> ppr tc
   ppr (PrimAlt tc)    = text "Prim"   <+> ppr tc
 
-pprStgRhs :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
-          => GenStgRhs bndr bdee -> SDoc
+pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
 
 -- special case
-pprStgRhs (StgRhsClosure cc [free_var] upd_flag [{-no args-}] (StgApp func []))
+pprStgRhs (StgRhsClosure ext cc upd_flag [{-no args-}] (StgApp func []))
   = sdocWithDynFlags $ \dflags ->
     hsep [ ppr cc,
-           if not $ gopt Opt_SuppressStgFreeVars dflags
-             then brackets (ppr free_var) else empty,
+           if not $ gopt Opt_SuppressStgExts dflags
+             then ppr ext else empty,
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
 
 -- general case
-pprStgRhs (StgRhsClosure cc free_vars upd_flag args body)
+pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
-                if not $ gopt Opt_SuppressStgFreeVars dflags
-                  then brackets (interppSP free_vars) else empty,
+                if not $ gopt Opt_SuppressStgExts dflags
+                  then ppr ext else empty,
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)
 

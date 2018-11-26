@@ -859,6 +859,8 @@ avoidClashesOccEnv env occs = go env emptyUFM occs
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
   | not (fs `elemUFM` env)
+    && (fs /= fsLit "_")
+        -- See Note [Always number wildcard types when tidying]
   = (addToUFM env fs 1, occ)   -- Desired OccName is free
   | otherwise
   = case lookupUFM env base1 of
@@ -884,6 +886,34 @@ tidyOccName env occ@(OccName occ_sp fs)
                      --          new_fs, so that we know it is taken
                      -- If they are the same (n==1), the former wins
                      -- See Note [TidyOccEnv]
+
+{-
+Note [Always number wildcard types when tidying]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following example (from the DataFamilyInstanceLHS test case):
+
+  data family Sing (a :: k)
+  data instance Sing (_ :: MyKind) where
+      SingA :: Sing A
+      SingB :: Sing B
+
+If we're not careful during tidying, then when this program is compiled with
+-ddump-types, we'll get the following information:
+
+  COERCION AXIOMS
+    axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
+      Sing _ = DataFamilyInstanceLHS.R:SingMyKind_ _
+
+Yikes! We shouldn't have a wildcard type appearing on the RHS like that. To
+avoid this issue, during tidying, we always opt to add a numeric suffix to
+types that are simply `_`. That way, you instead end up with:
+
+  COERCION AXIOMS
+    axiom DataFamilyInstanceLHS.D:R:SingMyKind_0 ::
+      Sing _1 = DataFamilyInstanceLHS.R:SingMyKind_ _1
+
+Which is at least legal syntax.
+-}
 
 {-
 ************************************************************************

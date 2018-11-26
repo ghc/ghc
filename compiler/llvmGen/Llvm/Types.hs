@@ -188,7 +188,8 @@ pprSpecialStatic (LMBitc v t) =
 pprSpecialStatic stat = ppr stat
 
 
-pprStaticArith :: LlvmStatic -> LlvmStatic -> LitString -> LitString -> String -> SDoc
+pprStaticArith :: LlvmStatic -> LlvmStatic -> PtrString -> PtrString
+                  -> String -> SDoc
 pprStaticArith s1 s2 int_op float_op op_name =
   let ty1 = getStatType s1
       op  = if isFloat ty1 then float_op else int_op

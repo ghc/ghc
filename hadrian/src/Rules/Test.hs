@@ -104,9 +104,13 @@ timeoutProgBuilder = do
             makeExecutable (root -/- timeoutPath)
 
 needIservBins :: Action ()
-needIservBins =
+needIservBins = do
+    rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
     need =<< traverse programPath
-      [ Context Stage1 iserv w | w <- [vanilla, profiling] ]
+               [ Context Stage1 iserv w
+               | w <- [vanilla, profiling, dynamic]
+               , w `elem` rtsways
+               ]
 
 needTestBuilders :: Action ()
 needTestBuilders = do

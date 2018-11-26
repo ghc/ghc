@@ -15,7 +15,7 @@
 -- Optional instance of 'Text.Show.Show' for functions:
 --
 -- > instance Show (a -> b) where
--- >    showsPrec _ _ = showString \"\<function\>\"
+-- >    showsPrec _ _ = showString "<function>"
 --
 -----------------------------------------------------------------------------
 

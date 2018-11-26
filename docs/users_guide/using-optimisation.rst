@@ -45,7 +45,7 @@ optimisation to be performed, which can have an impact on how much of
 your program needs to be recompiled when you change something. This is
 one reason to stick to no-optimisation when developing code.
 
-**No ``-O*``-type option specified:** This is taken to mean “Please 
+**No ``-O*``-type option specified:** This is taken to mean “Please
 compile quickly; I'm not over-bothered about compiled-code quality.”
 So, for example, ``ghc -c Foo.hs``
 
@@ -219,6 +219,58 @@ by saying ``-fno-wombat``.
     This is mostly done during Cmm passes. However this can miss corner cases. So at -O2
     we run the pass again at the asm stage to catch these.
 
+.. ghc-flag:: -fblock-layout-cfg
+    :shortdesc: Use the new cfg based block layout algorithm.
+    :type: dynamic
+    :reverse: -fno-block-layout-cfg
+    :category:
+
+    :default: off but enabled with :ghc-flag:`-O`.
+
+    The new algorithm considers all outgoing edges of a basic blocks for
+    code layout instead of only the last jump instruction.
+    It also builds a control flow graph for functions, tries to find
+    hot code paths and place them sequentially leading to better cache utilization
+    and performance.
+
+    This is expected to improve performance on average, but actual performance
+    difference can vary.
+
+    If you find cases of significant performance regressions, which can
+    be traced back to obviously bad code layout please open a ticket.
+
+.. ghc-flag:: -fblock-layout-weights
+    :shortdesc: Sets edge weights used by the new code layout algorithm.
+    :type: dynamic
+    :category:
+
+    This flag is hacker territory. The main purpose of this flag is to make
+    it easy to debug and tune the new code layout algorithm. There is no
+    guarantee that values giving better results now won't be worse with
+    the next release.
+
+    If you feel your code warrants modifying these settings please consult
+    the source code for default values and documentation. But I strongly
+    advise against this.
+
+.. ghc-flag:: -fblock-layout-weightless
+    :shortdesc: Ignore cfg weights for code layout.
+    :type: dynamic
+    :reverse: -fno-block-layout-weightless
+    :category:
+
+    :default: off
+
+    When not using the cfg based blocklayout layout is determined either
+    by the last jump in a basic block or the heaviest outgoing edge of the
+    block in the cfg.
+
+    With this flag enabled we use the last jump instruction in blocks.
+    Without this flags the old algorithm also uses the heaviest outgoing
+    edge.
+
+    When this flag is enabled and :ghc-flag:`-fblock-layout-cfg` is disabled
+    block layout behaves the same as in 8.6 and earlier.
 
 .. ghc-flag:: -fcpr-anal
     :shortdesc: Turn on CPR analysis in the demand analyser. Implied by :ghc-flag:`-O`.
@@ -951,6 +1003,58 @@ by saying ``-fno-wombat``.
     function into a non-recursive one with a local recursive loop. See
     Chapter 7 of `Andre Santos's PhD
     thesis <http://research.microsoft.com/en-us/um/people/simonpj/papers/santos-thesis.ps.gz>`__
+
+.. ghc-flag:: -fstg-lift-lams
+    :shortdesc: Enable late lambda lifting on the STG intermediate
+        language. Implied by :ghc-flag:`-O2`.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams
+    :category:
+
+    :default: on
+
+    Enables the late lambda lifting optimisation on the STG
+    intermediate language. This selectively lifts local functions to
+    top-level by converting free variables into function parameters.
+
+.. ghc-flag:: -fstg-lift-lams-known
+    :shortdesc: Allow turning known into unknown calls while performing
+        late lambda lifting.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams-known
+    :category:
+
+    :default: off
+
+    Allow turning known into unknown calls while performing
+    late lambda lifting. This is deemed non-beneficial, so it's
+    off by default.
+
+.. ghc-flag:: -fstg-lift-lams-non-rec-args
+    :shortdesc: Create top-level non-recursive functions with at most <n>
+        parameters while performing late lambda lifting.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams-non-rec-args-any
+    :category:
+
+    :default: 5
+
+    Create top-level non-recursive functions with at most <n> parameters
+    while performing late lambda lifting. The default is 5, the number of
+    available parameter registers on x86_64.
+
+.. ghc-flag:: -fstg-lift-lams-rec-args
+    :shortdesc: Create top-level recursive functions with at most <n>
+        parameters while performing late lambda lifting.
+    :type: dynamic
+    :reverse: -fno-stg-lift-lams-rec-args-any
+    :category:
+
+    :default: 5
+
+    Create top-level recursive functions with at most <n> parameters
+    while performing late lambda lifting. The default is 5, the number of
+    available parameter registers on x86_64.
 
 .. ghc-flag:: -fstrictness
     :shortdesc: Turn on strictness analysis.

@@ -17,7 +17,7 @@ module IfaceType (
         IfaceMCoercion(..),
         IfaceUnivCoProv(..),
         IfaceMult,
-        IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..), IsPromoted(..),
+        IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..),
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
@@ -29,8 +29,8 @@ module IfaceType (
         -- Equality testing
         isIfaceLiftedTypeKind,
 
-        -- Conversion from IfaceAppArgs -> [IfaceType]
-        appArgsIfaceTypes,
+        -- Conversion from IfaceAppArgs to IfaceTypes/ArgFlags
+        appArgsIfaceTypes, appArgsIfaceTypesArgFlags,
 
         -- Printing
         pprIfaceType, pprParendIfaceType, pprPrecIfaceType,
@@ -144,7 +144,7 @@ data IfaceType
 
   | IfaceTupleTy                  -- Saturated tuples (unsaturated ones use IfaceTyConApp)
        TupleSort                  -- What sort of tuple?
-       IsPromoted                 -- A bit like IfaceTyCon
+       PromotionFlag                 -- A bit like IfaceTyCon
        IfaceAppArgs               -- arity = length args
           -- For promoted data cons, the kind args are omitted
 
@@ -161,21 +161,27 @@ data IfaceTyLit
 type IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
 type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
 
--- See Note [Suppressing invisible arguments]
--- We use a new list type (rather than [(IfaceType,Bool)], because
--- it'll be more compact and faster to parse in interface
--- files. Rather than two bytes and two decisions (nil/cons, and
--- type/kind) there'll just be one.
+-- | Stores the arguments in a type application as a list.
+-- See @Note [Suppressing invisible arguments]@.
 data IfaceAppArgs
   = IA_Nil
-  | IA_Vis   IfaceType IfaceAppArgs   -- "Vis" means show when pretty-printing
-  | IA_Invis IfaceKind IfaceAppArgs   -- "Invis" means don't show when pretty-printing
-                                      --         except with -fprint-explicit-kinds
+  | IA_Arg IfaceType    -- The type argument
+
+           ArgFlag      -- The argument's visibility. We store this here so
+                        -- that we can:
+                        --
+                        -- 1. Avoid pretty-printing invisible (i.e., specified
+                        --    or inferred) arguments when
+                        --    -fprint-explicit-kinds isn't enabled, or
+                        -- 2. When -fprint-explicit-kinds *is*, enabled, print
+                        --    specified arguments in @(...) and inferred
+                        --    arguments in @{...}.
+
+           IfaceAppArgs -- The rest of the arguments
 
 instance Semi.Semigroup IfaceAppArgs where
-  IA_Nil <> xs           = xs
-  IA_Vis ty rest <> xs   = IA_Vis ty (rest Semi.<> xs)
-  IA_Invis ki rest <> xs = IA_Invis ki (rest Semi.<> xs)
+  IA_Nil <> xs              = xs
+  IA_Arg ty argf rest <> xs = IA_Arg ty argf (rest Semi.<> xs)
 
 instance Monoid IfaceAppArgs where
   mempty = IA_Nil
@@ -187,10 +193,6 @@ instance Monoid IfaceAppArgs where
 -- properly.
 data IfaceTyCon = IfaceTyCon { ifaceTyConName :: IfExtName
                              , ifaceTyConInfo :: IfaceTyConInfo }
-    deriving (Eq)
-
--- | Is a TyCon a promoted data constructor or just a normal type constructor?
-data IsPromoted = IsNotPromoted | IsPromoted
     deriving (Eq)
 
 -- | The various types of TyCons which have special, built-in syntax.
@@ -243,29 +245,29 @@ Here is how each equality predicate* is printed in homogeneous and
 heterogeneous contexts, depending on which combination of the
 -fprint-explicit-kinds and -fprint-equality-relations flags is used:
 
----------------------------------------------------------------------------------------
-|         Predicate             |        Neither flag        | -fprint-explicit-kinds |
-|-------------------------------|----------------------------|------------------------|
-| a ~ b         (homogeneous)   |        a ~ b               | (a :: *) ~  (b :: *)   |
-| a ~~ b,       homogeneously   |        a ~ b               | (a :: *) ~  (b :: *)   |
-| a ~~ b,       heterogeneously |        a ~~ c              | (a :: *) ~~ (c :: k)   |
-| a ~# b,       homogeneously   |        a ~ b               | (a :: *) ~  (b :: *)   |
-| a ~# b,       heterogeneously |        a ~~ c              | (a :: *) ~~ (c :: k)   |
-| Coercible a b (homogeneous)   |        Coercible a b       | Coercible * a b        |
-| a ~R# b,      homogeneously   |        Coercible a b       | Coercible * a b        |
-| a ~R# b,      heterogeneously |        a ~R# b             | (a :: *) ~R# (c :: k)  |
-|-------------------------------|----------------------------|------------------------|
-|         Predicate             | -fprint-equality-relations |      Both flags        |
-|-------------------------------|----------------------------|------------------------|
-| a ~ b         (homogeneous)   |        a ~  b              | (a :: *) ~  (b :: *)   |
-| a ~~ b,       homogeneously   |        a ~~ b              | (a :: *) ~~ (b :: *)   |
-| a ~~ b,       heterogeneously |        a ~~ c              | (a :: *) ~~ (c :: k)   |
-| a ~# b,       homogeneously   |        a ~# b              | (a :: *) ~# (b :: *)   |
-| a ~# b,       heterogeneously |        a ~# c              | (a :: *) ~# (c :: k)   |
-| Coercible a b (homogeneous)   |        Coercible a b       | Coercible * a b        |
-| a ~R# b,      homogeneously   |        a ~R# b             | (a :: *) ~R# (b :: *)  |
-| a ~R# b,      heterogeneously |        a ~R# b             | (a :: *) ~R# (c :: k)  |
----------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------
+|         Predicate             |        Neither flag        |    -fprint-explicit-kinds   |
+|-------------------------------|----------------------------|-----------------------------|
+| a ~ b         (homogeneous)   |        a ~ b               | (a :: Type) ~  (b :: Type)  |
+| a ~~ b,       homogeneously   |        a ~ b               | (a :: Type) ~  (b :: Type)  |
+| a ~~ b,       heterogeneously |        a ~~ c              | (a :: Type) ~~ (c :: k)     |
+| a ~# b,       homogeneously   |        a ~ b               | (a :: Type) ~  (b :: Type)  |
+| a ~# b,       heterogeneously |        a ~~ c              | (a :: Type) ~~ (c :: k)     |
+| Coercible a b (homogeneous)   |        Coercible a b       | Coercible @Type a b         |
+| a ~R# b,      homogeneously   |        Coercible a b       | Coercible @Type a b         |
+| a ~R# b,      heterogeneously |        a ~R# b             | (a :: Type) ~R# (c :: k)    |
+|-------------------------------|----------------------------|-----------------------------|
+|         Predicate             | -fprint-equality-relations |          Both flags         |
+|-------------------------------|----------------------------|-----------------------------|
+| a ~ b         (homogeneous)   |        a ~  b              | (a :: Type) ~  (b :: Type)  |
+| a ~~ b,       homogeneously   |        a ~~ b              | (a :: Type) ~~ (b :: Type)  |
+| a ~~ b,       heterogeneously |        a ~~ c              | (a :: Type) ~~ (c :: k)     |
+| a ~# b,       homogeneously   |        a ~# b              | (a :: Type) ~# (b :: Type)  |
+| a ~# b,       heterogeneously |        a ~# c              | (a :: Type) ~# (c :: k)     |
+| Coercible a b (homogeneous)   |        Coercible a b       | Coercible @Type a b         |
+| a ~R# b,      homogeneously   |        a ~R# b             | (a :: Type) ~R# (b :: Type) |
+| a ~R# b,      heterogeneously |        a ~R# b             | (a :: Type) ~R# (c :: k)    |
+--------------------------------------------------------------------------------------------
 
 (* There is no heterogeneous, representational, lifted equality counterpart
 to (~~). There could be, but there seems to be no use for it.)
@@ -293,7 +295,7 @@ See Note [The equality types story] in TysPrim.
 
 data IfaceTyConInfo   -- Used to guide pretty-printing
                       -- and to disambiguate D from 'D (they share a name)
-  = IfaceTyConInfo { ifaceTyConIsPromoted :: IsPromoted
+  = IfaceTyConInfo { ifaceTyConIsPromoted :: PromotionFlag
                    , ifaceTyConSort       :: IfaceTyConSort }
     deriving (Eq)
 
@@ -356,7 +358,8 @@ isIfaceLiftedTypeKind :: IfaceKind -> Bool
 isIfaceLiftedTypeKind (IfaceTyConApp tc IA_Nil)
   = isLiftedTypeKindTyConName (ifaceTyConName tc)
 isIfaceLiftedTypeKind (IfaceTyConApp tc
-                       (IA_Vis (IfaceTyConApp ptr_rep_lifted IA_Nil) IA_Nil))
+                       (IA_Arg (IfaceTyConApp ptr_rep_lifted IA_Nil)
+                               Required IA_Nil))
   =  tc `ifaceTyConHasKey` tYPETyConKey
   && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
 isIfaceLiftedTypeKind _ = False
@@ -442,8 +445,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceCoercionTy {})    = False -- Safe
 
     go_args IA_Nil = True
-    go_args (IA_Vis   arg args) = go arg && go_args args
-    go_args (IA_Invis arg args) = go arg && go_args args
+    go_args (IA_Arg arg _ args) = go arg && go_args args
 
 {- Note [Substitution on IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -512,9 +514,8 @@ substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
   = go args
   where
-    go IA_Nil            = IA_Nil
-    go (IA_Vis ty tys)   = IA_Vis   (substIfaceType env ty) (go tys)
-    go (IA_Invis ty tys) = IA_Invis (substIfaceType env ty) (go tys)
+    go IA_Nil              = IA_Nil
+    go (IA_Arg ty arg tys) = IA_Arg (substIfaceType env ty) arg (go tys)
 
 substIfaceTyVar :: IfaceTySubst -> IfLclName -> IfaceType
 substIfaceTyVar env tv
@@ -537,25 +538,33 @@ stripInvisArgs dflags tys
     where
       suppress_invis c
         = case c of
-            IA_Nil        -> IA_Nil
-            IA_Invis _ ts -> suppress_invis ts
-            IA_Vis   t ts -> IA_Vis t $ suppress_invis ts
+            IA_Nil -> IA_Nil
+            IA_Arg t argf ts
+              |  isVisibleArgFlag argf
+              -> IA_Arg t argf $ suppress_invis ts
               -- Keep recursing through the remainder of the arguments, as it's
               -- possible that there are remaining invisible ones.
               -- See the "In type declarations" section of Note [VarBndrs,
               -- TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+              |  otherwise
+              -> suppress_invis ts
 
 appArgsIfaceTypes :: IfaceAppArgs -> [IfaceType]
 appArgsIfaceTypes IA_Nil = []
-appArgsIfaceTypes (IA_Invis t ts) = t : appArgsIfaceTypes ts
-appArgsIfaceTypes (IA_Vis   t ts) = t : appArgsIfaceTypes ts
+appArgsIfaceTypes (IA_Arg t _ ts) = t : appArgsIfaceTypes ts
+
+appArgsIfaceTypesArgFlags :: IfaceAppArgs -> [(IfaceType, ArgFlag)]
+appArgsIfaceTypesArgFlags IA_Nil = []
+appArgsIfaceTypesArgFlags (IA_Arg t a ts)
+                                 = (t, a) : appArgsIfaceTypesArgFlags ts
 
 ifaceVisAppArgsLength :: IfaceAppArgs -> Int
 ifaceVisAppArgsLength = go 0
   where
-    go !n IA_Nil            = n
-    go n  (IA_Vis _ rest)   = go (n+1) rest
-    go n  (IA_Invis _ rest) = go n rest
+    go !n IA_Nil = n
+    go n  (IA_Arg _ argf rest)
+      | isVisibleArgFlag argf = go (n+1) rest
+      | otherwise             = go n rest
 
 {-
 Note [Suppressing invisible arguments]
@@ -616,6 +625,37 @@ By flattening the arguments like this, we obtain two benefits:
     is not a constant-time operation, so by flattening the arguments first, we
     decrease the number of times we have to call typeKind.
 
+Note [Pretty-printing invisible arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Suppressing invisible arguments] is all about how to avoid printing
+invisible arguments when the -fprint-explicit-kinds flag is disables. Well,
+what about when it's enabled? Then we can and should print invisible kind
+arguments, and this Note explains how we do it.
+
+As two running examples, consider the following code:
+
+  {-# LANGUAGE PolyKinds #-}
+  data T1 a
+  data T2 (a :: k)
+
+When displaying these types (with -fprint-explicit-kinds on), we could just
+do the following:
+
+  T1 k a
+  T2 k a
+
+That certainly gets the job done. But it lacks a crucial piece of information:
+is the `k` argument inferred or specified? To communicate this, we use visible
+kind application syntax to distinguish the two cases:
+
+  T1 @{k} a
+  T2 @k   a
+
+Here, @{k} indicates that `k` is an inferred argument, and @k indicates that
+`k` is a specified argument. (See
+Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep for
+a lengthier explanation on what "inferred" and "specified" mean.)
+
 ************************************************************************
 *                                                                      *
                 Pretty-printing
@@ -670,10 +710,19 @@ pprIfaceTvBndr use_parens (tv, ki)
                  | otherwise  = id
 
 pprIfaceTyConBinders :: [IfaceTyConBinder] -> SDoc
-pprIfaceTyConBinders = sep . map (go . ifTyConBinderVar)
+pprIfaceTyConBinders = sep . map go
   where
-    go (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
-    go (IfaceTvBndr bndr) = pprIfaceTvBndr True bndr
+    go :: IfaceTyConBinder -> SDoc
+    go (Bndr (IfaceIdBndr bndr) _) = pprIfaceIdBndr bndr
+    go (Bndr (IfaceTvBndr bndr) vis) =
+      -- See Note [Pretty-printing invisible arguments]
+      case vis of
+        AnonTCB            -> ppr_bndr True
+        NamedTCB Required  -> ppr_bndr True
+        NamedTCB Specified -> char '@' <> ppr_bndr True
+        NamedTCB Inferred  -> char '@' <> braces (ppr_bndr False)
+      where
+        ppr_bndr use_parens = pprIfaceTvBndr use_parens bndr
 
 instance Binary IfaceBndr where
     put_ bh (IfaceIdBndr aa) = do
@@ -748,9 +797,9 @@ ppr_ty ctxt_prec (IfaceAppTy t ts)
         sdocWithDynFlags $ \dflags ->
         pprIfacePrefixApp ctxt_prec
                           (ppr_ty funPrec t)
-                          (map (ppr_ty appPrec) (tys_wo_kinds dflags))
+                          (map (ppr_app_arg appPrec) (tys_wo_kinds dflags))
 
-    tys_wo_kinds dflags = appArgsIfaceTypes $ stripInvisArgs dflags ts
+    tys_wo_kinds dflags = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags ts
 
     -- Strip any casts from the head of the application
     ppr_app_ty_no_casts =
@@ -872,8 +921,8 @@ defaultRuntimeRepVars sty = go emptyFsEnv
 
     go_args :: FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
     go_args _ IA_Nil = IA_Nil
-    go_args subs (IA_Vis ty args)   = IA_Vis   (go subs ty) (go_args subs args)
-    go_args subs (IA_Invis ty args) = IA_Invis (go subs ty) (go_args subs args)
+    go_args subs (IA_Arg ty argf args)
+                     = IA_Arg (go subs ty) argf (go_args subs args)
 
     liftedRep :: IfaceTyCon
     liftedRep =
@@ -951,8 +1000,7 @@ defaultMultiplicityVars sty = go emptyFsEnv
 
     go_args :: FastStringEnv () -> IfaceAppArgs -> IfaceAppArgs
     go_args _ IA_Nil = IA_Nil
-    go_args subs (IA_Vis ty args)   = IA_Vis   (go subs ty) (go_args subs args)
-    go_args subs (IA_Invis ty args) = IA_Invis (go subs ty) (go_args subs args)
+    go_args subs (IA_Arg ty vis args)   = IA_Arg (go subs ty) vis (go_args subs args)
 
     omega_ty :: IfaceTyCon
     omega_ty =
@@ -987,16 +1035,24 @@ pprIfaceAppArgs  = ppr_app_args topPrec
 pprParendIfaceAppArgs = ppr_app_args appPrec
 
 ppr_app_args :: PprPrec -> IfaceAppArgs -> SDoc
-ppr_app_args ctx_prec args
- = let ppr_rest    = ppr_app_args ctx_prec
-       pprTys t ts = ppr_ty ctx_prec t <+> ppr_rest ts
-   in case args of
-        IA_Nil        -> empty
-        IA_Vis   t ts -> pprTys t ts
-        IA_Invis t ts -> sdocWithDynFlags $ \dflags ->
-                         if gopt Opt_PrintExplicitKinds dflags
-                            then pprTys t ts
-                            else ppr_rest ts
+ppr_app_args ctx_prec = go
+  where
+    go :: IfaceAppArgs -> SDoc
+    go IA_Nil             = empty
+    go (IA_Arg t argf ts) = ppr_app_arg ctx_prec (t, argf) <+> go ts
+
+-- See Note [Pretty-printing invisible arguments]
+ppr_app_arg :: PprPrec -> (IfaceType, ArgFlag) -> SDoc
+ppr_app_arg ctx_prec (t, argf) =
+  sdocWithDynFlags $ \dflags ->
+  let print_kinds = gopt Opt_PrintExplicitKinds dflags
+  in case argf of
+       Required  -> ppr_ty ctx_prec t
+       Specified |  print_kinds
+                 -> char '@' <> ppr_ty appPrec t
+       Inferred  |  print_kinds
+                 -> char '@' <> braces (ppr_ty topPrec t)
+       _         -> empty
 
 -------------------
 pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
@@ -1129,11 +1185,24 @@ criteria are met:
    in TyCoRep.
 
 N.B. Until now (Aug 2018) we didn't check anything for coercion variables.
+
+Note [Printing promoted type constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this GHCi session (Trac #14343)
+    > _ :: Proxy '[ 'True ]
+    error:
+      Found hole: _ :: Proxy '['True]
+
+This would be bad, because the '[' looks like a character literal.
+Solution: in type-level lists and tuples, add a leading space
+if the first type is itself promoted.  See pprSpaceIfPromotedTyCon.
 -}
+
 
 -------------------
 
 -- | Prefix a space if the given 'IfaceType' is a promoted 'TyCon'.
+-- See Note [Printing promoted type constructors]
 pprSpaceIfPromotedTyCon :: IfaceType -> SDoc -> SDoc
 pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
   = case ifaceTyConIsPromoted (ifaceTyConInfo tyCon) of
@@ -1161,7 +1230,8 @@ pprIfaceTyList ctxt_prec ty1 ty2
      --             = (tys, Just tl) means ty is of form t1:t2:...tn:tl
     gather (IfaceTyConApp tc tys)
       | tc `ifaceTyConHasKey` consDataConKey
-      , (IA_Invis _ (IA_Vis ty1 (IA_Vis ty2 IA_Nil))) <- tys
+      , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
+      , isInvisibleArgFlag argf
       , (args, tl) <- gather ty2
       = (ty1:args, tl)
       | tc `ifaceTyConHasKey` nilDataConKey
@@ -1181,7 +1251,8 @@ pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceAppArgs
             -> DynFlags -> PprStyle -> SDoc
 pprTyTcApp' ctxt_prec tc tys dflags style
   | ifaceTyConName tc `hasKey` ipClassKey
-  , IA_Vis (IfaceLitTy (IfaceStrTyLit n)) (IA_Vis ty IA_Nil) <- tys
+  , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
+           Required (IA_Arg ty Required IA_Nil) <- tys
   = maybeParen ctxt_prec funPrec
     $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
 
@@ -1195,18 +1266,19 @@ pprTyTcApp' ctxt_prec tc tys dflags style
 
   | tc `ifaceTyConHasKey` consDataConKey
   , not (gopt Opt_PrintExplicitKinds dflags)
-  , IA_Invis _ (IA_Vis ty1 (IA_Vis ty2 IA_Nil)) <- tys
+  , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
+  , isInvisibleArgFlag argf
   = pprIfaceTyList ctxt_prec ty1 ty2
 
   | tc `ifaceTyConHasKey` tYPETyConKey
-  , IA_Vis (IfaceTyConApp rep IA_Nil) IA_Nil <- tys
+  , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
   , rep `ifaceTyConHasKey` liftedRepDataConKey
   = kindType
 
   | tc `ifaceTyConHasKey` funTyConKey
-  , IA_Vis (IfaceTyConApp rep IA_Nil) args <- tys
+  , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
   , rep `ifaceTyConHasKey` omegaDataConKey
-  = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (tys_wo_kinds_fun args))
+  = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (appArgsIfaceTypes $ stripInvisArgs dflags args))
 
   | otherwise
   = getPprDebug $ \dbg ->
@@ -1218,11 +1290,10 @@ pprTyTcApp' ctxt_prec tc tys dflags style
          -> doc
 
        | otherwise
-         -> ppr_iface_tc_app ppr_ty ctxt_prec tc tys_wo_kinds
+         -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc tys_wo_kinds
   where
     info = ifaceTyConInfo tc
-    tys_wo_kinds_fun t = appArgsIfaceTypes $ stripInvisArgs dflags t
-    tys_wo_kinds = tys_wo_kinds_fun tys
+    tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags tys
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -1331,7 +1402,7 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   | otherwise
   = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp appPrec) tys)
 
-pprSum :: Arity -> IsPromoted -> IfaceAppArgs -> SDoc
+pprSum :: Arity -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprSum _arity is_promoted args
   =   -- drop the RuntimeRep vars.
       -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
@@ -1340,8 +1411,8 @@ pprSum _arity is_promoted args
     in pprPromotionQuoteI is_promoted
        <> sumParens (pprWithBars (ppr_ty topPrec) args')
 
-pprTuple :: PprPrec -> TupleSort -> IsPromoted -> IfaceAppArgs -> SDoc
-pprTuple ctxt_prec ConstraintTuple IsNotPromoted IA_Nil
+pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
+pprTuple ctxt_prec ConstraintTuple NotPromoted IA_Nil
   = maybeParen ctxt_prec appPrec $
     text "() :: Constraint"
 
@@ -1477,8 +1548,8 @@ pprPromotionQuote :: IfaceTyCon -> SDoc
 pprPromotionQuote tc =
     pprPromotionQuoteI $ ifaceTyConIsPromoted $ ifaceTyConInfo tc
 
-pprPromotionQuoteI  :: IsPromoted -> SDoc
-pprPromotionQuoteI IsNotPromoted = empty
+pprPromotionQuoteI  :: PromotionFlag -> SDoc
+pprPromotionQuoteI NotPromoted = empty
 pprPromotionQuoteI IsPromoted    = char '\''
 
 instance Outputable IfaceCoercion where
@@ -1490,17 +1561,6 @@ instance Binary IfaceTyCon where
    get bh = do n <- get bh
                i <- get bh
                return (IfaceTyCon n i)
-
-instance Binary IsPromoted where
-   put_ bh IsNotPromoted = putByte bh 0
-   put_ bh IsPromoted    = putByte bh 1
-
-   get bh = do
-       n <- getByte bh
-       case n of
-         0 -> return IsNotPromoted
-         1 -> return IsPromoted
-         _ -> fail "Binary(IsPromoted): fail)"
 
 instance Binary IfaceTyConSort where
    put_ bh IfaceNormalTyCon             = putByte bh 0
@@ -1540,22 +1600,18 @@ instance Binary IfaceTyLit where
 instance Binary IfaceAppArgs where
   put_ bh tk =
     case tk of
-      IA_Vis   t ts -> putByte bh 0 >> put_ bh t >> put_ bh ts
-      IA_Invis t ts -> putByte bh 1 >> put_ bh t >> put_ bh ts
-      IA_Nil        -> putByte bh 2
+      IA_Arg t a ts -> putByte bh 0 >> put_ bh t >> put_ bh a >> put_ bh ts
+      IA_Nil        -> putByte bh 1
 
   get bh =
     do c <- getByte bh
        case c of
          0 -> do
            t  <- get bh
+           a  <- get bh
            ts <- get bh
-           return $! IA_Vis t ts
-         1 -> do
-           t  <- get bh
-           ts <- get bh
-           return $! IA_Invis t ts
-         2 -> return IA_Nil
+           return $! IA_Arg t a ts
+         1 -> return IA_Nil
          _ -> panic ("get IfaceAppArgs " ++ show c)
 
 -------------------

@@ -64,7 +64,7 @@ module TyCoRep (
         pickLR,
 
         -- * Pretty-printing
-        pprType, pprParendType, pprPrecType,
+        pprType, pprParendType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
@@ -72,7 +72,7 @@ module TyCoRep (
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
-        pprDataCons, ppSuggestExplicitKinds,
+        pprDataCons, pprWithExplicitKindsWhen,
 
         pprCo, pprParendCo,
 
@@ -740,7 +740,7 @@ See also Note [Required, Specified, and Inferred for types] in TcTyClsDecls
   Visible Type Applications paper (ESOP'16).
 
 Note [No Required TyCoBinder in terms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't allow Required foralls for term variables, including pattern
 synonyms and data constructors.  Why?  Because then an application
 would need a /compulsory/ type argument (possibly without an "@"?),
@@ -748,6 +748,9 @@ thus (f Int); and we don't have concrete syntax for that.
 
 We could change this decision, but Required, Named TyCoBinders are rare
 anyway.  (Most are Anons.)
+
+However the type of a term can (just about) have a required quantifier;
+see Note [Required quantifiers in the type of a term] in TcExpr.
 -}
 
 
@@ -3250,11 +3253,14 @@ pprType       = pprPrecType topPrec
 pprParendType = pprPrecType appPrec
 
 pprPrecType :: PprPrec -> Type -> SDoc
-pprPrecType prec ty
+pprPrecType = pprPrecTypeX emptyTidyEnv
+
+pprPrecTypeX :: TidyEnv -> PprPrec -> Type -> SDoc
+pprPrecTypeX env prec ty
   = getPprStyle $ \sty ->
     if debugStyle sty           -- Use pprDebugType when in
     then debug_ppr_ty prec ty   -- when in debug-style
-    else pprPrecIfaceType prec (tidyToIfaceTypeSty ty sty)
+    else pprPrecIfaceType prec (tidyToIfaceTypeStyX env ty sty)
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
@@ -3263,22 +3269,25 @@ pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
-tidyToIfaceTypeSty :: Type -> PprStyle -> IfaceType
-tidyToIfaceTypeSty ty sty
-  | userStyle sty = tidyToIfaceType ty
+tidyToIfaceTypeStyX :: TidyEnv -> Type -> PprStyle -> IfaceType
+tidyToIfaceTypeStyX env ty sty
+  | userStyle sty = tidyToIfaceTypeX env ty
   | otherwise     = toIfaceTypeX (tyCoVarsOfType ty) ty
      -- in latter case, don't tidy, as we'll be printing uniques.
 
 tidyToIfaceType :: Type -> IfaceType
+tidyToIfaceType = tidyToIfaceTypeX emptyTidyEnv
+
+tidyToIfaceTypeX :: TidyEnv -> Type -> IfaceType
 -- It's vital to tidy before converting to an IfaceType
 -- or nested binders will become indistinguishable!
 --
 -- Also for the free type variables, tell toIfaceTypeX to
 -- leave them as IfaceFreeTyVar.  This is super-important
 -- for debug printing.
-tidyToIfaceType ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env ty)
+tidyToIfaceTypeX env ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env' ty)
   where
-    env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
+    env'      = tidyFreeTyCoVars env free_tcvs
     free_tcvs = tyCoVarsOfTypeWellScoped ty
 
 ------------
@@ -3485,13 +3494,14 @@ pprTypeApp tc tys
     -- TODO: toIfaceTcArgs seems rather wasteful here
 
 ------------------
-ppSuggestExplicitKinds :: SDoc
--- Print a helpful suggstion about -fprint-explicit-kinds,
--- if it is not already on
-ppSuggestExplicitKinds
-  = sdocWithDynFlags $ \ dflags ->
-    ppUnless (gopt Opt_PrintExplicitKinds dflags) $
-    text "Use -fprint-explicit-kinds to see the kind arguments"
+-- | Display all kind information (with @-fprint-explicit-kinds@) when the
+-- provided 'Bool' argument is 'True'.
+-- See @Note [Kind arguments in error messages]@ in "TcErrors".
+pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
+pprWithExplicitKindsWhen b
+  = updSDocDynFlags $ \dflags ->
+      if b then gopt_set dflags Opt_PrintExplicitKinds
+           else dflags
 
 {-
 %************************************************************************

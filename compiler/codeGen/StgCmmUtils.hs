@@ -86,27 +86,27 @@ import Data.Word
 -------------------------------------------------------------------------
 
 cgLit :: Literal -> FCode CmmLit
-cgLit (MachStr s) = newByteStringCLit (BS.unpack s)
+cgLit (LitString s) = newByteStringCLit (BS.unpack s)
  -- not unpackFS; we want the UTF-8 byte stream.
-cgLit other_lit   = do dflags <- getDynFlags
-                       return (mkSimpleLit dflags other_lit)
+cgLit other_lit     = do dflags <- getDynFlags
+                         return (mkSimpleLit dflags other_lit)
 
 mkSimpleLit :: DynFlags -> Literal -> CmmLit
-mkSimpleLit dflags (MachChar   c)    = CmmInt (fromIntegral (ord c)) (wordWidth dflags)
-mkSimpleLit dflags MachNullAddr      = zeroCLit dflags
+mkSimpleLit dflags (LitChar   c)                = CmmInt (fromIntegral (ord c))
+                                                         (wordWidth dflags)
+mkSimpleLit dflags LitNullAddr                  = zeroCLit dflags
 mkSimpleLit dflags (LitNumber LitNumInt i _)    = CmmInt i (wordWidth dflags)
 mkSimpleLit _      (LitNumber LitNumInt64 i _)  = CmmInt i W64
 mkSimpleLit dflags (LitNumber LitNumWord i _)   = CmmInt i (wordWidth dflags)
 mkSimpleLit _      (LitNumber LitNumWord64 i _) = CmmInt i W64
-mkSimpleLit _      (MachFloat r)     = CmmFloat r W32
-mkSimpleLit _      (MachDouble r)    = CmmFloat r W64
-mkSimpleLit _      (MachLabel fs ms fod)
-        = CmmLabel (mkForeignLabel fs ms labelSrc fod)
-        where
-                -- TODO: Literal labels might not actually be in the current package...
-                labelSrc = ForeignLabelInThisPackage
--- NB: RubbishLit should have been lowered in "CoreToStg"
-mkSimpleLit _ other             = pprPanic "mkSimpleLit" (ppr other)
+mkSimpleLit _      (LitFloat r)                 = CmmFloat r W32
+mkSimpleLit _      (LitDouble r)                = CmmFloat r W64
+mkSimpleLit _      (LitLabel fs ms fod)
+  = let -- TODO: Literal labels might not actually be in the current package...
+        labelSrc = ForeignLabelInThisPackage
+    in CmmLabel (mkForeignLabel fs ms labelSrc fod)
+-- NB: LitRubbish should have been lowered in "CoreToStg"
+mkSimpleLit _      other = pprPanic "mkSimpleLit" (ppr other)
 
 --------------------------------------------------------------------------
 --

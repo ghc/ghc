@@ -668,3 +668,8 @@ T12955:
 T12971:
 	mkdir -p ä
 	TMP=ä "$(TEST_HC)" $(TEST_HC_OPTS) --make T12971
+
+.PHONY: T14452
+T14452:
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v -c -O2 T14452.hs 2>&1 | grep 'O3' \
+	| awk 'NF{print $$NF; exit}'  # awk: extract last word of line

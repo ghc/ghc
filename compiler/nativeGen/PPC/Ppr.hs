@@ -986,7 +986,7 @@ pprInstr (UPDATE_SP fmt amount)
 -- pprInstr _ = panic "pprInstr (ppc)"
 
 
-pprLogic :: LitString -> Reg -> Reg -> RI -> SDoc
+pprLogic :: PtrString -> Reg -> Reg -> RI -> SDoc
 pprLogic op reg1 reg2 ri = hcat [
         char '\t',
         ptext op,
@@ -1039,7 +1039,7 @@ pprDiv fmt sgn reg1 reg2 reg3 = hcat [
     ]
 
 
-pprUnary :: LitString -> Reg -> Reg -> SDoc
+pprUnary :: PtrString -> Reg -> Reg -> SDoc
 pprUnary op reg1 reg2 = hcat [
         char '\t',
         ptext op,
@@ -1050,7 +1050,7 @@ pprUnary op reg1 reg2 = hcat [
     ]
 
 
-pprBinaryF :: LitString -> Format -> Reg -> Reg -> Reg -> SDoc
+pprBinaryF :: PtrString -> Format -> Reg -> Reg -> Reg -> SDoc
 pprBinaryF op fmt reg1 reg2 reg3 = hcat [
         char '\t',
         ptext op,

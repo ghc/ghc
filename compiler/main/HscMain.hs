@@ -85,7 +85,6 @@ module HscMain
 import GhcPrelude
 
 import Data.Data hiding (Fixity, TyCon)
-import DynFlags         (addPluginModuleName)
 import Id
 import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )
@@ -124,6 +123,7 @@ import CorePrep
 import CoreToStg        ( coreToStg )
 import qualified StgCmm ( codeGen )
 import StgSyn
+import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
 import ProfInit
 import TyCon
@@ -1426,10 +1426,11 @@ doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 
+    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
     let cmm_stream :: Stream IO CmmGroup ()
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
-                           cost_centre_info stg_binds hpc_info
+                           cost_centre_info stg_binds_w_fvs hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
         -- stream of CmmGroup (not necessarily synchronised: one

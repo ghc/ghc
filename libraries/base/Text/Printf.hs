@@ -14,7 +14,7 @@
 -- A C @printf(3)@-like formatter. This version has been
 -- extended by Bart Massey as per the recommendations of
 -- John Meacham and Simon Marlow
--- \<<http://comments.gmane.org/gmane.comp.lang.haskell.libraries/4726>\>
+-- <http://comments.gmane.org/gmane.comp.lang.haskell.libraries/4726>
 -- to support extensible formatting for new datatypes.  It
 -- has also been extended to support almost all C
 -- @printf(3)@ syntax.
@@ -107,7 +107,7 @@ import System.IO
 -- hello, 123, 3.1416
 --
 -- The return value is either 'String' or @('IO' a)@ (which
--- should be @('IO' '()')@, but Haskell's type system
+-- should be @('IO' ())@, but Haskell's type system
 -- makes this hard).
 --
 -- The format string consists of ordinary characters and
@@ -115,8 +115,8 @@ import System.IO
 -- one of the arguments to 'printf' in the output string. A
 -- format specification is introduced by the @%@ character;
 -- this character can be self-escaped into the format string
--- using @%%@. A format specification ends with a /format
--- character/ that provides the primary information about
+-- using @%%@. A format specification ends with a
+-- /format character/ that provides the primary information about
 -- how to format the value. The rest of the conversion
 -- specification is optional.  In order, one may have flag
 -- characters, a width specifier, a precision specifier, and
@@ -423,7 +423,7 @@ data FormatAdjustment = LeftAdjust | ZeroPad
 -- @since 4.7.0.0
 data FormatSign = SignPlus | SignSpace
 
--- | Description of field formatting for 'formatArg'. See UNIX `printf`(3)
+-- | Description of field formatting for 'formatArg'. See UNIX @printf(3)@
 -- for a description of how field formatting works.
 --
 -- @since 4.7.0.0
@@ -436,7 +436,7 @@ data FieldFormat = FieldFormat {
                                -- plus sign for positive
                                -- numbers.
   fmtAlternate :: Bool,        -- ^ Indicates an "alternate
-                               -- format".  See printf(3)
+                               -- format".  See @printf(3)@
                                -- for the details, which
                                -- vary by argument spec.
   fmtModifiers :: String,      -- ^ Characters that appeared

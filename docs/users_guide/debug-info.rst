@@ -17,9 +17,15 @@ useable by most UNIX debugging tools.
 
     Emit debug information in object code. Currently only DWARF debug
     information is supported on x86-64 and i386. Currently debug levels 0
-    through 3 are accepted, with 0 disabling debug information production
-    and higher numbers producing richer output. If ⟨n⟩ is omitted, level 2
-    is assumed.
+    through 3 are accepted:
+
+     * ``-g0``: no debug information produced
+     * ``-g1``: produces stack unwinding records for top-level functions (sufficient for basic backtraces)
+     * ``-g2``: produces stack unwinding records for top-level functions as well
+       as inner blocks (allowing more precise backtraces than with ``-g1``).
+     * ``-g3``: same as ``-g2``.
+
+    If ⟨n⟩ is omitted, level 2 is assumed.
 
 
 Tutorial

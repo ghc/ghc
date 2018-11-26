@@ -147,7 +147,8 @@ regAlloc
         -> UniqSM ( NatCmmDecl statics instr
                   , Maybe Int  -- number of extra stack slots required,
                                -- beyond maxSpillSlots
-                  , Maybe RegAllocStats)
+                  , Maybe RegAllocStats
+                  )
 
 regAlloc _ (CmmData sec d)
         = return
@@ -522,6 +523,11 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     -- only dead in the code that follows in the current basic block).
     (fixup_blocks, adjusted_instr)
         <- joinToTargets block_live block_id instr
+
+    -- Debugging - show places where the reg alloc inserted
+    -- assignment fixup blocks.
+    -- when (not $ null fixup_blocks) $
+    --    pprTrace "fixup_blocks" (ppr fixup_blocks) (return ())
 
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.

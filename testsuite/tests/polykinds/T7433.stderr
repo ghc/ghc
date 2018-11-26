@@ -2,5 +2,5 @@
 T7433.hs:2:10: error:
     • Data constructor ‘Z’ cannot be used here
         (perhaps you intended to use DataKinds)
-    • In the type ‘ 'Z’
+    • In the type ‘'Z’
       In the type declaration for ‘T’

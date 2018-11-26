@@ -469,11 +469,11 @@ rnBind _ bind@(PatBind { pat_lhs = pat
 
               ok_nobind_pat
                   = -- See Note [Pattern bindings that bind no variables]
-                    case pat of
-                       L _ (WildPat {})   -> True
-                       L _ (BangPat {})   -> True -- #9127, #13646
-                       L _ (SplicePat {}) -> True
-                       _                  -> False
+                    case unLoc pat of
+                       WildPat {}   -> True
+                       BangPat {}   -> True -- #9127, #13646
+                       SplicePat {} -> True
+                       _            -> False
 
         -- Warn if the pattern binds no variables
         -- See Note [Pattern bindings that bind no variables]

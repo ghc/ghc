@@ -1,1 +1,2 @@
-Test (narrowInt8# 1#) (narrowWord8# 2##)
+Test1 (narrowInt8# 1#) (narrowWord8# 2##)
+Test2 (narrowInt16# 1#) (narrowWord16# 2##)

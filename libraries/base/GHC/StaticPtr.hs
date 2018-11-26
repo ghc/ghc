@@ -48,9 +48,7 @@ module GHC.StaticPtr
   ) where
 
 import Foreign.C.Types     (CInt(..))
-import Foreign.Marshal     (allocaArray, peekArray, withArray)
-import Foreign.Ptr         (castPtr)
-import GHC.Exts            (addrToAny#)
+import Foreign.Marshal     (allocaArray, peekArray)
 import GHC.Ptr             (Ptr(..), nullPtr)
 import GHC.Fingerprint     (Fingerprint(..))
 import GHC.Prim
@@ -89,13 +87,13 @@ staticKey (StaticPtr w0 w1 _ _) = Fingerprint (W64# w0) (W64# w1)
 --
 unsafeLookupStaticPtr :: StaticKey -> IO (Maybe (StaticPtr a))
 unsafeLookupStaticPtr (Fingerprint w1 w2) = do
-    ptr@(Ptr addr) <- withArray [w1,w2] (hs_spt_lookup . castPtr)
+    ptr@(Ptr addr) <- hs_spt_lookup w1 w2
     if (ptr == nullPtr)
     then return Nothing
     else case addrToAny# addr of
            (# spe #) -> return (Just spe)
 
-foreign import ccall unsafe hs_spt_lookup :: Ptr () -> IO (Ptr a)
+foreign import ccall unsafe hs_spt_lookup :: Word64 -> Word64 -> IO (Ptr a)
 
 -- | A class for things buildable from static pointers.
 class IsStatic p where

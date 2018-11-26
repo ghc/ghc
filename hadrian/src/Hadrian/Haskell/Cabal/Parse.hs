@@ -63,7 +63,7 @@ parsePackageData pkg = do
         libDeps = collectDeps (C.condLibrary gpd)
         exeDeps = map (collectDeps . Just . snd) (C.condExecutables gpd)
         allDeps = concat (libDeps : exeDeps)
-        sorted  = sort [ C.unPackageName p | C.Dependency p _ <- allDeps ]
+        sorted  = sort [ C.unPackageName p | C.Dependency p _ _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
         depPkgs = catMaybes $ map findPackageByName deps
     return $ PackageData name version (C.synopsis pd) (C.description pd) depPkgs gpd

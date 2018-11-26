@@ -69,7 +69,6 @@ import Control.Applicative (Alternative((<|>)), Const(Const))
 import Data.Functor.Identity (Identity(Identity))
 import Data.Proxy (Proxy(Proxy))
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Monoid (mappend)
 import Data.Ord (Down(Down))
 
 import GHC.Read (expectP, list, paren)
@@ -752,7 +751,7 @@ showsBinaryWith sp1 sp2 name d x y = showParen (d > 10) $
 -- and then parses its argument using 'readsPrec'.
 --
 -- @since 4.9.0.0
-{-# DEPRECATED readsUnary "Use readsUnaryWith to define liftReadsPrec" #-}
+{-# DEPRECATED readsUnary "Use 'readsUnaryWith' to define 'liftReadsPrec'" #-}
 readsUnary :: (Read a) => String -> (a -> t) -> String -> ReadS t
 readsUnary name cons kw s =
     [(cons x,t) | kw == name, (x,t) <- readsPrec 11 s]
@@ -761,7 +760,7 @@ readsUnary name cons kw s =
 -- and then parses its argument using 'readsPrec1'.
 --
 -- @since 4.9.0.0
-{-# DEPRECATED readsUnary1 "Use readsUnaryWith to define liftReadsPrec" #-}
+{-# DEPRECATED readsUnary1 "Use 'readsUnaryWith' to define 'liftReadsPrec'" #-}
 readsUnary1 :: (Read1 f, Read a) => String -> (f a -> t) -> String -> ReadS t
 readsUnary1 name cons kw s =
     [(cons x,t) | kw == name, (x,t) <- readsPrec1 11 s]
@@ -770,7 +769,8 @@ readsUnary1 name cons kw s =
 -- and then parses its arguments using 'readsPrec1'.
 --
 -- @since 4.9.0.0
-{-# DEPRECATED readsBinary1 "Use readsBinaryWith to define liftReadsPrec" #-}
+{-# DEPRECATED readsBinary1
+      "Use 'readsBinaryWith' to define 'liftReadsPrec'" #-}
 readsBinary1 :: (Read1 f, Read1 g, Read a) =>
     String -> (f a -> g a -> t) -> String -> ReadS t
 readsBinary1 name cons kw s =
@@ -781,7 +781,7 @@ readsBinary1 name cons kw s =
 -- constructor with name @n@ and argument @x@, in precedence context @d@.
 --
 -- @since 4.9.0.0
-{-# DEPRECATED showsUnary "Use showsUnaryWith to define liftShowsPrec" #-}
+{-# DEPRECATED showsUnary "Use 'showsUnaryWith' to define 'liftShowsPrec'" #-}
 showsUnary :: (Show a) => String -> Int -> a -> ShowS
 showsUnary name d x = showParen (d > 10) $
     showString name . showChar ' ' . showsPrec 11 x
@@ -790,7 +790,7 @@ showsUnary name d x = showParen (d > 10) $
 -- constructor with name @n@ and argument @x@, in precedence context @d@.
 --
 -- @since 4.9.0.0
-{-# DEPRECATED showsUnary1 "Use showsUnaryWith to define liftShowsPrec" #-}
+{-# DEPRECATED showsUnary1 "Use 'showsUnaryWith' to define 'liftShowsPrec'" #-}
 showsUnary1 :: (Show1 f, Show a) => String -> Int -> f a -> ShowS
 showsUnary1 name d x = showParen (d > 10) $
     showString name . showChar ' ' . showsPrec1 11 x
@@ -800,7 +800,8 @@ showsUnary1 name d x = showParen (d > 10) $
 -- context @d@.
 --
 -- @since 4.9.0.0
-{-# DEPRECATED showsBinary1 "Use showsBinaryWith to define liftShowsPrec" #-}
+{-# DEPRECATED showsBinary1
+      "Use 'showsBinaryWith' to define 'liftShowsPrec'" #-}
 showsBinary1 :: (Show1 f, Show1 g, Show a) =>
     String -> Int -> f a -> g a -> ShowS
 showsBinary1 name d x y = showParen (d > 10) $

@@ -53,7 +53,6 @@ import GHC.Base
 import GHC.List ((!!), foldr1, break)
 import GHC.Num
 import GHC.Stack.Types
-import GHC.Types (TypeLitSort (..))
 
 
 -- | The @shows@ functions return a function that prepends the

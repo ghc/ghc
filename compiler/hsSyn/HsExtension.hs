@@ -18,7 +18,6 @@ module HsExtension where
 
 import GhcPrelude
 
-import GHC.Exts (Constraint)
 import Data.Data hiding ( Fixity )
 import PlaceHolder
 import Name

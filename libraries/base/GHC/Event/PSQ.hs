@@ -49,7 +49,6 @@ import GHC.Event.Unique
 import GHC.Word (Word64)
 import GHC.Num (Num(..))
 import GHC.Real (fromIntegral)
-import GHC.Types (Int)
 
 #include "MachDeps.h"
 

@@ -28,6 +28,7 @@ module BasicTypes(
 
         Alignment,
 
+        PromotionFlag(..), isPromoted,
         FunctionOrData(..),
 
         WarningTxt(..), pprWarningTxtForMsg, StringLiteral(..),
@@ -269,6 +270,24 @@ isSwapped NotSwapped = False
 unSwap :: SwapFlag -> (a->a->b) -> a -> a -> b
 unSwap NotSwapped f a b = f a b
 unSwap IsSwapped  f a b = f b a
+
+
+{- *********************************************************************
+*                                                                      *
+           Promotion flag
+*                                                                      *
+********************************************************************* -}
+
+-- | Is a TyCon a promoted data constructor or just a normal type constructor?
+data PromotionFlag
+  = NotPromoted
+  | IsPromoted
+  deriving ( Eq, Data )
+
+isPromoted :: PromotionFlag -> Bool
+isPromoted IsPromoted  = True
+isPromoted NotPromoted = False
+
 
 {-
 ************************************************************************

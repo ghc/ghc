@@ -19,14 +19,14 @@ bindistRules = do
         need targets
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
-        hostOs         <- setting BuildOs
-        hostArch       <- setting BuildArch
+        cabalHostOs    <- cabalOsString <$> setting BuildOs
+        cabalHostArch  <- cabalArchString <$> setting BuildArch
         rtsDir         <- pkgIdentifier rts
 
         let ghcBuildDir      = root -/- stageString Stage1
             bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
             ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
-            distDir          = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
+            distDir          = cabalHostArch ++ "-" ++ cabalHostOs ++ "-ghc-" ++ version
             rtsIncludeDir    = ghcBuildDir -/- "lib" -/- distDir -/- rtsDir
                                -/- "include"
 

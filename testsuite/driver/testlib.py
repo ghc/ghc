@@ -905,9 +905,10 @@ def do_test(name, way, func, args, files):
                            stderr = subprocess.STDOUT,
                            print_output = config.verbose >= 3)
 
-        if exit_code != 0:
+        # If user used expect_broken then don't record failures of pre_cmd
+        if exit_code != 0 and opts.expect not in ['fail']:
             framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
-            if_verbose(1, '** pre_cmd was "{0}". Running trace'.format(override_options(opts.pre_cmd)))
+            if_verbose(1, '** pre_cmd was "{0}".'.format(override_options(opts.pre_cmd)))
 
     result = func(*[name,way] + args)
 
@@ -1924,9 +1925,9 @@ global gs_working
 gs_working = False
 if config.have_profiling:
   if config.gs != '':
-    resultGood = runCmd(genGSCmd(config.confdir + '/good.ps'));
+    resultGood = runCmd(genGSCmd(config.top + '/config/good.ps'));
     if resultGood == 0:
-        resultBad = runCmd(genGSCmd(config.confdir + '/bad.ps') +
+        resultBad = runCmd(genGSCmd(config.top + '/config/bad.ps') +
                                    ' >/dev/null 2>&1')
         if resultBad != 0:
             print("GhostScript available for hp2ps tests")

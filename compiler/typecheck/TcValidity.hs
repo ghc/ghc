@@ -1795,7 +1795,7 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pat
 
        -- And now kind args
        ; checkTcM (all check_arg kind_shapes)
-                  (tidy_env2, pp_wrong_at_arg $$ ppSuggestExplicitKinds)
+                  (tidy_env2, pprWithExplicitKindsWhen True pp_wrong_at_arg)
 
        ; traceTc "checkConsistentFamInst" (vcat [ ppr inst_tvs
                                                 , ppr arg_shapes
@@ -2008,41 +2008,27 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pat
 -- | Checks for occurrences of type families in class instances and type/data
 -- family instances.
 checkValidTypePats :: TyCon -> [Type] -> TcM ()
-checkValidTypePats tc pat_ty_args =
-  traverse_ (check_valid_type_pat False) invis_ty_args *>
-  traverse_ (check_valid_type_pat True)  vis_ty_args
+checkValidTypePats tc pat_ty_args = do
+  -- Check that each of pat_ty_args is a monotype.
+  -- One could imagine generalising to allow
+  --      instance C (forall a. a->a)
+  -- but we don't know what all the consequences might be.
+  traverse_ checkValidMonoType pat_ty_args
+
+  -- Ensure that no type family instances occur a type pattern
+  case tcTyConAppTyFamInstsAndVis tc pat_ty_args of
+    [] -> pure ()
+    ((tf_is_invis_arg, tf_tc, tf_args):_) -> failWithTc $
+      ty_fam_inst_illegal_err tf_is_invis_arg (mkTyConApp tf_tc tf_args)
   where
-    (invis_ty_args, vis_ty_args) = partitionInvisibleTypes tc pat_ty_args
     inst_ty = mkTyConApp tc pat_ty_args
 
-    check_valid_type_pat
-      :: Bool -- True if this is an /visible/ argument to the TyCon.
-      -> Type -> TcM ()
-    -- Used for type patterns in class instances,
-    -- and in type/data family instances
-    check_valid_type_pat vis_arg pat_ty
-      = do { -- Check that pat_ty is a monotype
-             checkValidMonoType pat_ty
-                 -- One could imagine generalising to allow
-                 --      instance C (forall a. a->a)
-                 -- but we don't know what all the consequences might be
-
-              -- Ensure that no type family instances occur a type pattern
-           ; case tcTyFamInsts pat_ty of
-               [] -> pure ()
-               ((tf_tc, tf_args):_) ->
-                 failWithTc $
-                 ty_fam_inst_illegal_err vis_arg (mkTyConApp tf_tc tf_args) }
-
     ty_fam_inst_illegal_err :: Bool -> Type -> SDoc
-    ty_fam_inst_illegal_err vis_arg ty
-      = sdocWithDynFlags $ \dflags ->
+    ty_fam_inst_illegal_err invis_arg ty
+      = pprWithExplicitKindsWhen invis_arg $
         hang (text "Illegal type synonym family application"
-                <+> quotes (ppr ty) <+> text "in instance" <>
-             colon) 2 $
-          vcat [ ppr inst_ty
-               , ppUnless (vis_arg || gopt Opt_PrintExplicitKinds dflags) $
-                 text "Use -fprint-explicit-kinds to see the kind arguments" ]
+                <+> quotes (ppr ty) <+> text "in instance" <> colon)
+           2 (ppr inst_ty)
 
 -- Error messages
 

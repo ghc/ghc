@@ -27,7 +27,7 @@ import System.FilePath
 import Data.List
 
 -- POSIX
-#if defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 import System.Environment (getExecutablePath)
 #endif
 
@@ -136,7 +136,7 @@ rootDir :: FilePath -> FilePath
 rootDir = takeDirectory . takeDirectory . normalise
 
 getBaseDir = Just . (\p -> p </> "lib") . rootDir <$> getExecutablePath
-#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS)
+#elif defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(freebsd_HOST_OS)
 -- on unix, this is a bit more confusing.
 -- The layout right now is something like
 --

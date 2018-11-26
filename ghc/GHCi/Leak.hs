@@ -7,7 +7,7 @@ module GHCi.Leak
 
 import Control.Monad
 import Data.Bits
-import DynFlags (settings, sTargetPlatform)
+import DynFlags ( sTargetPlatform )
 import Foreign.Ptr (ptrToIntPtr, intPtrToPtr)
 import GHC
 import GHC.Exts (anyToAddr#)

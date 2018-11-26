@@ -23,9 +23,7 @@ module Data.Functor.Sum (
 
 import Control.Applicative ((<|>))
 import Data.Data (Data)
-import Data.Foldable (Foldable(foldMap))
 import Data.Functor.Classes
-import Data.Traversable (Traversable(traverse))
 import GHC.Generics (Generic, Generic1)
 import Text.Read (Read(..), readListDefault, readListPrecDefault)
 

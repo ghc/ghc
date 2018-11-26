@@ -227,9 +227,6 @@ substArg :: CseEnv -> InStgArg -> OutStgArg
 substArg env (StgVarArg from) = StgVarArg (substVar env from)
 substArg _   (StgLitArg lit)  = StgLitArg lit
 
-substVars :: CseEnv -> [InId] -> [OutId]
-substVars env = map (substVar env)
-
 substVar :: CseEnv -> InId -> OutId
 substVar env id = fromMaybe id $ lookupVarEnv (ce_subst env) id
 
@@ -284,9 +281,9 @@ stgCseTopLvl in_scope (StgTopLifted (StgRec eqs))
   where in_scope' = in_scope `extendInScopeSetList` [ bndr | (bndr, _) <- eqs ]
 
 stgCseTopLvlRhs :: InScopeSet -> InStgRhs -> OutStgRhs
-stgCseTopLvlRhs in_scope (StgRhsClosure ccs occs upd args body)
+stgCseTopLvlRhs in_scope (StgRhsClosure ext ccs upd args body)
     = let body' = stgCseExpr (initEnv in_scope) body
-      in  StgRhsClosure ccs occs upd args body'
+      in  StgRhsClosure ext ccs upd args body'
 stgCseTopLvlRhs _ (StgRhsCon ccs dataCon args)
     = StgRhsCon ccs dataCon args
 
@@ -334,14 +331,14 @@ stgCseExpr env (StgConApp dataCon args tys)
 -- The binding might be removed due to CSE (we do not want trivial bindings on
 -- the STG level), so use the smart constructor `mkStgLet` to remove the binding
 -- if empty.
-stgCseExpr env (StgLet binds body)
+stgCseExpr env (StgLet ext binds body)
     = let (binds', env') = stgCseBind env binds
           body' = stgCseExpr env' body
-      in mkStgLet StgLet binds' body'
-stgCseExpr env (StgLetNoEscape binds body)
+      in mkStgLet (StgLet ext) binds' body'
+stgCseExpr env (StgLetNoEscape ext binds body)
     = let (binds', env') = stgCseBind env binds
           body' = stgCseExpr env' body
-      in mkStgLet StgLetNoEscape binds' body'
+      in mkStgLet (StgLetNoEscape ext) binds' body'
 
 -- Case alternatives
 -- Extend the CSE environment
@@ -402,12 +399,11 @@ stgCseRhs env bndr (StgRhsCon ccs dataCon args)
           pair = (bndr, StgRhsCon ccs dataCon args')
       in (Just pair, env')
   where args' = substArgs env args
-stgCseRhs env bndr (StgRhsClosure ccs occs upd args body)
+stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
     = let (env1, args') = substBndrs env args
           env2 = forgetCse env1 -- See note [Free variables of an StgClosure]
           body' = stgCseExpr env2 body
-      in (Just (substVar env bndr, StgRhsClosure ccs occs' upd args' body'), env)
-  where occs' = substVars env occs
+      in (Just (substVar env bndr, StgRhsClosure ext ccs upd args' body'), env)
 
 
 mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr

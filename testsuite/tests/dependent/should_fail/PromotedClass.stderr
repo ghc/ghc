@@ -2,5 +2,5 @@
 PromotedClass.hs:10:15: error:
     • Data constructor ‘MkX’ cannot be used here
         (it has an unpromotable context ‘Show a’)
-    • In the first argument of ‘Proxy’, namely ‘( 'MkX  'True)’
-      In the type signature: foo :: Proxy ( 'MkX  'True)
+    • In the first argument of ‘Proxy’, namely ‘('MkX 'True)’
+      In the type signature: foo :: Proxy ('MkX 'True)

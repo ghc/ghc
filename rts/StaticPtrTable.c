@@ -76,9 +76,10 @@ void hs_spt_remove(StgWord64 key[2]) {
    }
 }
 
-StgPtr hs_spt_lookup(StgWord64 key[2]) {
+StgPtr hs_spt_lookup(StgWord64 key1, StgWord64 key2) {
   if (spt) {
     ACQUIRE_LOCK(&spt_lock);
+    StgWord64 key[2] = { key1, key2 };
     const StgStablePtr * entry = lookupHashTable(spt, (StgWord)key);
     const StgPtr ret = entry ? deRefStablePtr(*entry) : NULL;
     RELEASE_LOCK(&spt_lock);

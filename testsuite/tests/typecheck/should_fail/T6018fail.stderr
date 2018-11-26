@@ -60,33 +60,31 @@ T6018fail.hs:53:15: error:
 T6018fail.hs:61:10: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k2’ cannot be inferred from the right-hand side.
-    Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
-      PolyKindVarsF '[] = '[] -- Defined at T6018fail.hs:61:10
+      PolyKindVarsF @{[k2]} @[k1] ('[] @k2) = '[] @k1
+        -- Defined at T6018fail.hs:61:10
 
 T6018fail.hs:64:15: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k1’ cannot be inferred from the right-hand side.
-    Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
-      PolyKindVars '[] = '[] -- Defined at T6018fail.hs:64:15
+      PolyKindVars @[k1] @[k2] ('[] @k1) = '[] @k2
+        -- Defined at T6018fail.hs:64:15
 
 T6018fail.hs:68:15: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k’ cannot be inferred from the right-hand side.
-    Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
       forall k (a :: k) (b :: k).
-        Fc a b = Int -- Defined at T6018fail.hs:68:15
+        Fc @k a b = Int -- Defined at T6018fail.hs:68:15
 
 T6018fail.hs:72:15: error:
     Type family equation violates injectivity annotation.
     Type and kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
-    Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
       forall k (a :: k) (b :: k).
-        Gc a b = Int -- Defined at T6018fail.hs:72:15
+        Gc @k a b = Int -- Defined at T6018fail.hs:72:15
 
 T6018fail.hs:76:15: error:
     Type family equations violate injectivity annotation:
@@ -140,10 +138,9 @@ T6018fail.hs:120:15: error:
     Type family equation violates injectivity annotation.
     Type and kind variables ‘k’, ‘c’
     cannot be inferred from the right-hand side.
-    Use -fprint-explicit-kinds to see the kind arguments
     In the type family equation:
       forall k a b (c :: k).
-        G7 a b c = [G7a a b c] -- Defined at T6018fail.hs:120:15
+        G7 @k a b c = [G7a @k a b c] -- Defined at T6018fail.hs:120:15
 
 T6018fail.hs:131:1: error:
     Type family equations violate injectivity annotation:

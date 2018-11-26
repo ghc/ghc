@@ -7,6 +7,11 @@
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE ViewPatterns       #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE PatternSynonyms    #-}
+
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
@@ -70,11 +75,16 @@ module SrcLoc (
 
         -- ** Deconstructing Located
         getLoc, unLoc,
+        unRealSrcSpan, getRealSrcSpan,
 
         -- ** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost,
-        spans, isSubspanOf, sortLocated
+        spans, isSubspanOf, sortLocated,
+
+        -- ** HasSrcSpan
+        HasSrcSpan(..), SrcSpanLess, dL, cL,
+        pattern LL, onHasSrcSpan, liftL
     ) where
 
 import GhcPrelude
@@ -169,7 +179,7 @@ advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 ************************************************************************
 -}
 
-sortLocated :: [Located a] -> [Located a]
+sortLocated :: HasSrcSpan a => [a] -> [a]
 sortLocated things = sortBy (comparing getLoc) things
 
 instance Outputable RealSrcLoc where
@@ -517,35 +527,36 @@ data GenLocated l e = L l e
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
 
-unLoc :: GenLocated l e -> e
-unLoc (L _ e) = e
+unLoc :: HasSrcSpan a => a -> SrcSpanLess a
+unLoc (dL->L _ e) = e
 
-getLoc :: GenLocated l e -> l
-getLoc (L l _) = l
+getLoc :: HasSrcSpan a => a -> SrcSpan
+getLoc (dL->L l _) = l
 
-noLoc :: e -> Located e
-noLoc e = L noSrcSpan e
+noLoc :: HasSrcSpan a => SrcSpanLess a -> a
+noLoc e = cL noSrcSpan e
 
-mkGeneralLocated :: String -> e -> Located e
-mkGeneralLocated s e = L (mkGeneralSrcSpan (fsLit s)) e
+mkGeneralLocated :: HasSrcSpan e => String -> SrcSpanLess e -> e
+mkGeneralLocated s e = cL (mkGeneralSrcSpan (fsLit s)) e
 
-combineLocs :: Located a -> Located b -> SrcSpan
+combineLocs :: (HasSrcSpan a , HasSrcSpan b) => a -> b -> SrcSpan
 combineLocs a b = combineSrcSpans (getLoc a) (getLoc b)
 
 -- | Combine locations from two 'Located' things and add them to a third thing
-addCLoc :: Located a -> Located b -> c -> Located c
-addCLoc a b c = L (combineSrcSpans (getLoc a) (getLoc b)) c
+addCLoc :: (HasSrcSpan a , HasSrcSpan b , HasSrcSpan c) =>
+           a -> b -> SrcSpanLess c -> c
+addCLoc a b c = cL (combineSrcSpans (getLoc a) (getLoc b)) c
 
 -- not clear whether to add a general Eq instance, but this is useful sometimes:
 
 -- | Tests whether the two located things are equal
-eqLocated :: Eq a => Located a -> Located a -> Bool
+eqLocated :: (HasSrcSpan a , Eq (SrcSpanLess a)) => a -> a -> Bool
 eqLocated a b = unLoc a == unLoc b
 
 -- not clear whether to add a general Ord instance, but this is useful sometimes:
 
 -- | Tests the ordering of the two located things
-cmpLocated :: Ord a => Located a -> Located a -> Ordering
+cmpLocated :: (HasSrcSpan a , Ord (SrcSpanLess a)) => a -> a -> Ordering
 cmpLocated a b = unLoc a `compare` unLoc b
 
 instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
@@ -586,3 +597,94 @@ isSubspanOf src parent
     | srcSpanFileName_maybe parent /= srcSpanFileName_maybe src = False
     | otherwise = srcSpanStart parent <= srcSpanStart src &&
                   srcSpanEnd parent   >= srcSpanEnd src
+
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{HasSrcSpan Typeclass to Set/Get Source Location Spans}
+*                                                                      *
+************************************************************************
+-}
+
+{-
+Note [HasSrcSpan Typeclass]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To be able to uniformly set/get source location spans (of `SrcSpan`) in
+syntactic entities (`HsSyn`), we use the typeclass `HasSrcSpan`.
+More details can be found at the following wiki page
+  ImplementingTreesThatGrow/HandlingSourceLocations
+
+For most syntactic entities, the source location spans are stored in
+a syntactic entity by a wapper constuctor (introduced by TTG's
+new constructor extension), e.g., by `NewPat (WrapperPat sp pat)`
+for a source location span `sp` and a pattern `pat`.
+-}
+
+-- | Determines the type of undecorated syntactic entities
+-- For most syntactic entities `E`, where source location spans are
+-- introduced by a wrapper construtor of the same syntactic entity,
+-- we have `SrcSpanLess E = E`.
+-- However, some syntactic entities have a different type compared to
+-- a syntactic entity `e :: E` may have the type `Located E` when
+-- decorated by wrapping it with `L sp e` for a source span `sp`.
+type family SrcSpanLess a
+
+-- | A typeclass to set/get SrcSpans
+class HasSrcSpan a where
+  -- | Composes a `SrcSpan` decoration with an undecorated syntactic
+  --   entity to form its decorated variant
+  composeSrcSpan   :: Located (SrcSpanLess a) -> a
+
+  -- | Decomposes a decorated syntactic entity into its `SrcSpan`
+  --   decoration and its undecorated variant
+  decomposeSrcSpan :: a -> Located (SrcSpanLess a)
+  {- laws:
+       composeSrcSpan . decomposeSrcSpan = id
+       decomposeSrcSpan . composeSrcSpan = id
+
+     in other words, `HasSrcSpan` defines an iso relation between
+     a `SrcSpan`-decorated syntactic entity and its undecorated variant
+     (together with the `SrcSpan`).
+  -}
+
+type instance SrcSpanLess (GenLocated l e) = e
+instance HasSrcSpan (Located a) where
+  composeSrcSpan   = id
+  decomposeSrcSpan = id
+
+
+-- | An abbreviated form of decomposeSrcSpan,
+--   mainly to be used in ViewPatterns
+dL :: HasSrcSpan a => a -> Located (SrcSpanLess a)
+dL = decomposeSrcSpan
+
+-- | An abbreviated form of composeSrcSpan,
+--   mainly to replace the hardcoded `L`
+cL :: HasSrcSpan a => SrcSpan -> SrcSpanLess a -> a
+cL sp e = composeSrcSpan (L sp e)
+
+-- | A Pattern Synonym to Set/Get SrcSpans
+pattern LL :: HasSrcSpan a => SrcSpan -> SrcSpanLess a -> a
+pattern LL sp e <- (dL->L sp e)
+  where
+        LL sp e = cL sp e
+
+-- | Lifts a function of undecorated entities to one of decorated ones
+onHasSrcSpan :: (HasSrcSpan a , HasSrcSpan b) =>
+                (SrcSpanLess a -> SrcSpanLess b) -> a -> b
+onHasSrcSpan f (dL->L l e) = cL l (f e)
+
+liftL :: (HasSrcSpan a, HasSrcSpan b, Monad m) =>
+         (SrcSpanLess a -> m (SrcSpanLess b)) -> a -> m b
+liftL f (dL->L loc a) = do
+  a' <- f a
+  return $ cL loc a'
+
+
+getRealSrcSpan :: RealLocated a -> RealSrcSpan
+getRealSrcSpan (L l _) = l
+
+unRealSrcSpan :: RealLocated a -> a
+unRealSrcSpan  (L _ e) = e

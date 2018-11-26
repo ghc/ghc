@@ -30,11 +30,10 @@ infixr 1 >>>, <<<
 
 -- | A class for categories. Instances should satisfy the laws
 --
--- @
--- f '.' 'id'  =  f  -- (right identity)
--- 'id' '.' f  =  f  -- (left identity)
--- f '.' (g '.' h)  =  (f '.' g) '.' h  -- (associativity)
--- @
+-- [Right identity] @f '.' 'id'  =  f@
+-- [Left identity]  @'id' '.' f  =  f@
+-- [Associativity]  @f '.' (g '.' h)  =  (f '.' g) '.' h@
+--
 class Category cat where
     -- | the identity morphism
     id :: cat a a

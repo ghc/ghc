@@ -11,7 +11,6 @@ import Reg
 import Panic
 import Platform
 
-import Data.Foldable (foldl')
 import Data.Word
 import Data.Bits
 

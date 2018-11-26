@@ -9,15 +9,18 @@ module Rules.Documentation (
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 
+import Rules.Generate (ghcPrimDependencies)
 import Base
 import Context
-import Expression (getContextData, interpretInContext)
+import Expression (getContextData, interpretInContext, (?), package)
 import Flavour
 import Oracles.ModuleFiles
 import Packages
 import Settings
 import Target
 import Utilities
+
+import Data.List (union)
 
 docRoot :: FilePath
 docRoot = "docs"
@@ -67,15 +70,20 @@ documentationRules = do
     buildManPage
     buildPdfDocumentation
 
+    -- a phony rule that runs Haddock for "Haskell Hierarchical Libraries" and
+    -- the "GHC-API"
+    "docs-haddock" ~> do
+        root <- buildRoot
+        need [ root -/- pathIndex "libraries" ]
+
+    -- a phony rule that runs Haddock, builds the User's guide, builds
+    -- Haddock's manual, and builds man pages
     "docs" ~> do
         root <- buildRoot
-        let html     = htmlRoot -/- "index.html"
+        let html     = htmlRoot -/- "index.html" -- also implies "docs-haddock"
             archives = map pathArchive docPaths
             pdfs     = map pathPdf $ docPaths \\ ["libraries"]
-        need $ map (root -/-) $ [html] ++ archives ++ pdfs
-        need [ root -/- htmlRoot -/- "libraries" -/- "gen_contents_index"
-             , root -/- htmlRoot -/- "libraries" -/- "prologue.txt"
-             , root -/- manPageBuildPath ]
+        need $ map (root -/-) $ [html] ++ archives ++ pdfs ++ [manPageBuildPath]
 
 ------------------------------------- HTML -------------------------------------
 
@@ -85,11 +93,6 @@ buildHtmlDocumentation = do
     mapM_ buildSphinxHtml $ docPaths \\ ["libraries"]
     buildLibraryDocumentation
     root <- buildRootRules
-    root -/- htmlRoot -/- "libraries/gen_contents_index" %>
-        copyFile "libraries/gen_contents_index"
-
-    root -/- htmlRoot -/- "libraries/prologue.txt" %>
-        copyFile "libraries/prologue.txt"
 
     root -/- htmlRoot -/- "index.html" %> \file -> do
         need [root -/- haddockHtmlLib]
@@ -116,13 +119,19 @@ buildLibraryDocumentation = do
     root -/- haddockHtmlLib %> \_ ->
         copyDirectory "utils/haddock/haddock-api/resources/html" (root -/- docRoot)
 
+    -- Building the "Haskell Hierarchical Libraries" index
     root -/- htmlRoot -/- "libraries/index.html" %> \file -> do
-        need [root -/- haddockHtmlLib]
+        need [ root -/- haddockHtmlLib
+             , "libraries/prologue.txt" ]
+
+        -- We want Haddocks for everything except `rts` to be built, but we
+        -- don't want the index to be polluted by stuff from `ghc`-the-library
+        -- (there will be a seperate top-level link to those Haddocks).
         haddocks <- allHaddocks
-        let libDocs = filter
-                (\x -> takeFileName x `notElem` ["ghc.haddock", "rts.haddock"])
-                haddocks
-        need (root -/- haddockHtmlLib : libDocs)
+        let neededDocs = filter (\x -> takeFileName x /= "rts.haddock") haddocks
+            libDocs = filter (\x -> takeFileName x /= "ghc.haddock") neededDocs
+
+        need neededDocs
         build $ target docContext (Haddock BuildIndex) libDocs [file]
 
 allHaddocks :: Action [FilePath]
@@ -150,7 +159,15 @@ buildPackageDocumentation context@Context {..} = when (stage == Stage1 && packag
     root -/- htmlRoot -/- "libraries" -/- pkgName package -/- pkgName package <.> "haddock" %> \file -> do
         need [root -/- htmlRoot -/- "libraries" -/- pkgName package -/- "haddock-prologue.txt"]
         haddocks <- haddockDependencies context
-        srcs <- hsSources context
+
+        -- `ghc-prim` has a source file for 'GHC.Prim' which is generated just
+        -- for Haddock. We need to 'union' (instead of '++') to avoid passing
+        -- 'GHC.PrimopWrappers' (which unfortunately shows up in both
+        -- `generatedSrcs` and `vanillaSrcs`) to Haddock twice.
+        generatedSrcs <- interpretInContext context (Expression.package ghcPrim ? ghcPrimDependencies)
+        vanillaSrcs <- hsSources context
+        let srcs = vanillaSrcs `union` generatedSrcs
+
         need $ srcs ++ haddocks ++ [root -/- haddockHtmlLib]
 
         -- Build Haddock documentation
