@@ -476,7 +476,6 @@ AC_DEFUN([FP_SETTINGS],
 	SettingsLdCommand="\$tooldir/${mingw_bin_prefix}ld.exe"
 	SettingsArCommand="\$tooldir/${mingw_bin_prefix}ar.exe"
 	SettingsRanlibCommand="\$tooldir/${mingw_bin_prefix}ranlib.exe"
-	SettingsPerlCommand='$tooldir/perl/perl.exe'
 	SettingsDllWrapCommand="\$tooldir/${mingw_bin_prefix}dllwrap.exe"
 	SettingsWindresCommand="\$tooldir/${mingw_bin_prefix}windres.exe"
         SettingsTouchCommand='$topdir/bin/touchy.exe'
@@ -488,7 +487,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$(basename $LdCmd)"
         SettingsArCommand="$(basename $ArCmd)"
-        SettingsPerlCommand="$(basename $PerlCmd)"
         SettingsDllWrapCommand="$(basename $DllWrapCmd)"
         SettingsWindresCommand="$(basename $WindresCmd)"
         SettingsTouchCommand='$topdir/bin/touchy.exe'
@@ -499,7 +497,6 @@ AC_DEFUN([FP_SETTINGS],
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsRanlibCommand="$RanlibCmd"
-        SettingsPerlCommand="$PerlCmd"
         if test -z "$DllWrapCmd"
         then
             SettingsDllWrapCommand="/bin/false"
@@ -552,7 +549,6 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsLdFlags)
     AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsRanlibCommand)
-    AC_SUBST(SettingsPerlCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLibtoolCommand)
@@ -1325,22 +1321,6 @@ AC_DEFUN([FP_GCC_SUPPORTS_NO_PIE],
        AC_MSG_RESULT([no])
    fi
    rm -f conftest.c conftest.o conftest
-])
-
-dnl Small feature test for perl version. Assumes PerlCmd
-dnl contains path to perl binary.
-dnl
-dnl (Perl versions prior to v5.6 does not contain the string "v5";
-dnl instead they display version strings such as "version 5.005".)
-dnl
-AC_DEFUN([FPTOOLS_CHECK_PERL_VERSION],
-[$PerlCmd -v >conftest.out 2>&1
-   if grep "v5" conftest.out >/dev/null 2>&1; then
-      :
-   else
-      AC_MSG_ERROR([your version of perl probably won't work, try upgrading it.])
-   fi
-rm -fr conftest*
 ])
 
 
