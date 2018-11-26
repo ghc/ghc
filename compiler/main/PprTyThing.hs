@@ -21,7 +21,7 @@ module PprTyThing (
 
 import GhcPrelude
 
-import Type    ( TyThing(..) )
+import Type    ( ArgFlag(..), TyThing(..), mkTyVarBinders, pprUserForAll )
 import IfaceSyn ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
 import CoAxiom ( coAxiomTyCon )
@@ -117,9 +117,13 @@ pprFamInst (FamInst { fi_flavor = DataFamilyInst rep_tc })
   = pprTyThingInContextLoc (ATyCon rep_tc)
 
 pprFamInst (FamInst { fi_flavor = SynFamilyInst, fi_axiom = axiom
-                    , fi_tys = lhs_tys, fi_rhs = rhs })
+                    , fi_tvs = tvs, fi_tys = lhs_tys, fi_rhs = rhs })
   = showWithLoc (pprDefinedAt (getName axiom)) $
-    hang (text "type instance" <+> pprTypeApp (coAxiomTyCon axiom) lhs_tys)
+    hang (text "type instance"
+            <+> pprUserForAll (mkTyVarBinders Specified tvs)
+                -- See Note [Printing foralls in type family instances]
+                -- in IfaceType
+            <+> pprTypeApp (coAxiomTyCon axiom) lhs_tys)
        2 (equals <+> ppr rhs)
 
 ----------------------------

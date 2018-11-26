@@ -64,12 +64,11 @@ import SrcLoc
 import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
-import Var( VarBndr(..) )
+import Var( VarBndr(..), binderVar )
 import TyCon ( Role (..), Injectivity(..) )
 import Util( dropList, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
-import DynFlags
 
 import Control.Monad
 import System.IO.Unsafe
@@ -558,7 +557,6 @@ pprAxBranch :: SDoc -> IfaceAxBranch -> SDoc
 -- be a branch for an imported TyCon, so it would be an ExtName
 -- So it's easier to take an SDoc here
 pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
-                                 , ifaxbCoVars = cvs
                                  , ifaxbLHS = pat_tys
                                  , ifaxbRHS = rhs
                                  , ifaxbIncomps = incomps })
@@ -566,16 +564,8 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
     $+$
     nest 2 maybe_incomps
   where
-    ppr_binders = sdocWithDynFlags $ \dflags ->
-                  ppWhen (gopt Opt_PrintExplicitForalls dflags) ppr_binders'
-
-    ppr_binders'
-      | null tvs && null cvs = empty
-      | null cvs
-      = brackets (pprWithCommas (pprIfaceTvBndr True) tvs)
-      | otherwise
-      = brackets (pprWithCommas (pprIfaceTvBndr True) tvs <> semi <+>
-                  pprWithCommas pprIfaceIdBndr cvs)
+    -- See Note [Printing foralls in type family instances] in IfaceType
+    ppr_binders = pprUserIfaceForAll $ map (mkIfaceForAllTvBndr Specified) tvs
     pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
     maybe_incomps = ppUnless (null incomps) $ parens $
                     text "incompatible indices:" <+> ppr incomps
@@ -718,6 +708,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
+    -- See Note [Printing foralls in type family instances] in IfaceType
+    pp_data_inst_forall :: SDoc
+    pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
+
+    forall_bndrs :: [IfaceForAllBndr]
+    forall_bndrs = [Bndr (binderVar tc_bndr) Specified | tc_bndr <- binders]
 
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
@@ -728,7 +724,9 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_lhs = case parent of
                IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing
-               _          -> text "instance" <+> pprIfaceTyConParent parent
+               IfDataInstance{}
+                          -> text "instance" <+> pp_data_inst_forall
+                                             <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
@@ -821,11 +819,16 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
   = text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
 
   | otherwise
-  = hang (text "type family" <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind))
+  = hang (text "type family"
+            <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind)
+            <+> ppShowRhs ss (pp_where rhs))
        2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
     $$
     nest 2 (ppShowRhs ss (pp_branches rhs))
   where
+    pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
+    pp_where _                              = empty
+
     pp_inj Nothing    _   = empty
     pp_inj (Just res) inj
        | Injective injectivity <- inj = hsep [ equals, ppr res
@@ -848,13 +851,12 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
       = ppShowIface ss (text "built-in")
 
     pp_branches (IfaceClosedSynFamilyTyCon (Just (ax, brs)))
-      = hang (text "where")
-           2 (vcat (map (pprAxBranch
-                           (pprPrefixIfDeclBndr
-                             (ss_how_much ss)
-                             (occName tycon))
-                        ) brs)
-              $$ ppShowIface ss (text "axiom" <+> ppr ax))
+      = vcat (map (pprAxBranch
+                     (pprPrefixIfDeclBndr
+                       (ss_how_much ss)
+                       (occName tycon))
+                  ) brs)
+        $$ ppShowIface ss (text "axiom" <+> ppr ax)
     pp_branches _ = Outputable.empty
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
