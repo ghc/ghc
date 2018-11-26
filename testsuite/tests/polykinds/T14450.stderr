@@ -1,8 +1,7 @@
 
 T14450.hs:33:8: error:
     • Type indexes must match class instance head
-      Expected: Dom IddSym0
-        Actual: Dom IddSym0
-      Use -fprint-explicit-kinds to see the kind arguments
+      Expected: Dom @k @k (IddSym0 @k)
+        Actual: Dom @* @* (IddSym0 @*)
     • In the type instance declaration for ‘Dom’
       In the instance declaration for ‘Varpi (IddSym0 :: k ~> k)’

@@ -858,10 +858,15 @@ avoidClashesOccEnv env occs = go env emptyUFM occs
 
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 tidyOccName env occ@(OccName occ_sp fs)
+{-
   | not (fs `elemUFM` env)
     && (fs /= fsLit "_")
         -- See Note [Always number wildcard types when tidying]
   = (addToUFM env fs 1, occ)   -- Desired OccName is free
+-}
+  | isUnderscoreFS fs
+  = (env, occ)
+
   | otherwise
   = case lookupUFM env base1 of
        Nothing -> (addToUFM env base1 2, OccName occ_sp base1)

@@ -935,8 +935,8 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
 mkTransCo co1 co2                 = TransCo co1 co2
 
 mkNthCo :: HasDebugCallStack
-        => Role  -- the role of the coercion you're creating
-        -> Int
+        => Role  -- The role of the coercion you're creating
+        -> Int   -- Zero-indexed
         -> Coercion
         -> Coercion
 mkNthCo r n co

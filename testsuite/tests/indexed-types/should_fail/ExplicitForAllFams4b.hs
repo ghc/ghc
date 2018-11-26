@@ -4,9 +4,10 @@
 module ExplicitForAllFams4 where
 
 type family J a
-type instance forall a b. J [a]    = Float
-type instance forall b.   J _      = Maybe b
+type instance forall a . J [a]    = Float
+type instance forall .   J _      = Int
 
+{-
 data family K a
 data instance forall a b. K (a, Bool) = K5 Float
 data instance forall b.   K _         = K6 (Maybe b)
@@ -25,3 +26,4 @@ instance C Int where
 
   data forall a b. CD [a] (a,a)     = CD5 Float
   data forall b.   CD _ _           = CD6 (Maybe b)
+-}

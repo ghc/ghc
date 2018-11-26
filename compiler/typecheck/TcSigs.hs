@@ -325,8 +325,8 @@ tcPatSynSig name sig_ty
   , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
        ; (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
-           <- solveEqualities                   $
-                -- See Note [solveEqualities in tcPatSynSig]
+           <- pushTcLevelM_   $
+              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
               bindImplicitTKBndrs_Skol implicit_hs_tvs $
               bindExplicitTKBndrs_Skol univ_hs_tvs     $
               bindExplicitTKBndrs_Skol ex_hs_tvs       $

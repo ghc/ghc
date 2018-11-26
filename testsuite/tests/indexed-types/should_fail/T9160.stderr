@@ -1,8 +1,7 @@
 
 T9160.hs:20:8: error:
     • Type indexes must match class instance head
-      Expected: F
-        Actual: F
-      Use -fprint-explicit-kinds to see the kind arguments
+      Expected: F @*
+        Actual: F @(* -> *)
     • In the type instance declaration for ‘F’
       In the instance declaration for ‘C (a :: *)’

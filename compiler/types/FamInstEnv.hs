@@ -690,9 +690,26 @@ mkCoAxBranch tvs cvs lhs rhs roles loc
                , cab_loc     = loc
                , cab_incomps = placeHolderIncomps }
   where
-    (env1, tvs1) = tidyVarBndrs emptyTidyEnv tvs
-    (env,  cvs1) = tidyVarBndrs env1         cvs
+    used = tyCoVarsOfTypes (map varType tvs) `unionVarSet`
+           tyCoVarsOfTypes (map varType cvs) `unionVarSet`
+           tyCoVarsOfType rhs
+    (env1, tvs1) = mapAccumL tidy_bndr emptyTidyEnv tvs
+    (env,  cvs1) = mapAccumL tidy_bndr env1         cvs
     -- See Note [Tidy axioms when we build them]
+
+    tidy_bndr env bndr
+      | isUnderscoreFS (occNameFS old_occ) = tidy_wildcard
+      | otherwise                          = tidyVarBndr env bndr
+      where
+        tidy_wildcard | bndr `elemVarSet` used
+                      = tidyVarBndr env (bndr `setVarName` new_name)
+                      | otherwise
+                      = (env, bndr)
+
+        old_name = Var.varName bndr
+        old_occ  = getOccName old_name
+        new_name = tidyNameOcc old_name new_occ
+        new_occ  = mkOccName (occNameSpace old_occ) "x"
 
 -- all of the following code is here to avoid mutual dependencies with
 -- Coercion

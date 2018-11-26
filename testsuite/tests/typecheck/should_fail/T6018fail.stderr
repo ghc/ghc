@@ -61,7 +61,7 @@ T6018fail.hs:61:10: error:
     Type family equation violates injectivity annotation.
     Kind variable ‘k1’ cannot be inferred from the right-hand side.
     In the type family equation:
-      PolyKindVarsF @{[k2]} @[k1] ('[] @k2) = '[] @k1
+      PolyKindVarsF @{[k1]} @[k2] ('[] @k1) = '[] @k2
         -- Defined at T6018fail.hs:61:10
 
 T6018fail.hs:64:15: error:

@@ -23,12 +23,12 @@ instance SC Identity
 
 -------------------------------------------------------------------------------
 
-data family Sing :: k -> Type
-data instance Sing ::  Identity a -> Type where
+data family Sing :: forall k. k -> Type
+data instance Sing :: forall a. Identity a -> Type where
   SIdentity :: Sing x -> Sing ('Identity x)
 
 newtype Par1 p = Par1 p
-data instance Sing ::  Par1 p -> Type where
+data instance Sing :: forall p. Par1 p -> Type where
   SPar1 :: Sing x -> Sing ('Par1 x)
 
 type family Rep1 (f :: Type -> Type) :: Type -> Type

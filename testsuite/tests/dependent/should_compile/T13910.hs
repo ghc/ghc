@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{- # LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
@@ -15,13 +15,6 @@ module T13910 where
 import Data.Kind
 import Data.Type.Equality
 
-class SingKind k where
-  type Demote k = (r :: Type) | r -> k
-
-instance SingKind (a :~: b) where
-  type Demote (a :~: b) = a :~: b
-
-{-
 data family Sing (a :: k)
 
 class SingKind k where
@@ -153,4 +146,3 @@ leibnizTyFun :: forall (t :: Type) (f :: t ~> Type) (a :: t) (b :: t).
              -> f @@ a
              -> f @@ b
 leibnizTyFun = leibnizPoly @(:~>) @_ @f
--}

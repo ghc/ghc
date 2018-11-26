@@ -1791,7 +1791,8 @@ checkFamPatBinders :: TyCon
 --     cause a crash; notably in tcConDecl in tcDataFamInstDecl
 checkFamPatBinders fam_tc qtvs pats rhs
   = do { traceTc "checkFamPatBinders" $
-         vcat [ ppr (mkTyConApp fam_tc pats)
+         vcat [ debugPprType (mkTyConApp fam_tc pats)
+              , ppr (mkTyConApp fam_tc pats)
               , text "qtvs:" <+> ppr qtvs
               , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
               , text "pat_tvs:" <+> ppr pat_tvs

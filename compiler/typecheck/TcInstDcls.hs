@@ -789,7 +789,7 @@ tcDataFamHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity hs_ctxt hs_pats m_ksi
                bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc mb_clsinfo hs_pats
-                  ; mapM_ (wrapLocM kcConDecl) hs_cons
+                  ; mapM_ (wrapLocM_ kcConDecl) hs_cons
                   ; res_kind <- tc_kind_sig m_ksig
                   ; lhs_ty <- checkExpectedKindX pp_lhs lhs_ty lhs_kind res_kind
                   ; return (stupid_theta, lhs_ty, res_kind) }

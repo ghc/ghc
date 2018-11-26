@@ -1341,7 +1341,7 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
                                 ~~~~~~~~
 -}
 
--- | Make a dependent forall over an Inferred variable
+-- | Make a dependent forall over an Inferred variablem
 mkTyCoInvForAllTy :: TyCoVar -> Type -> Type
 mkTyCoInvForAllTy tv ty
   | isCoVar tv
@@ -1439,15 +1439,6 @@ splitTyVarForAllTys ty = split ty ty []
     split _ (ForAllTy (Bndr tv _) ty) tvs | isTyVar tv = split ty ty (tv:tvs)
     split orig_ty _                   tvs              = (reverse tvs, orig_ty)
 
--- | Like 'splitPiTys' but split off only /named/ binders.
-splitForAllVarBndrs :: Type -> ([TyCoVarBinder], Type)
-splitForAllVarBndrs ty = split ty ty []
-  where
-    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
-    split _       (ForAllTy b res) bs = split res res (b:bs)
-    split orig_ty _                bs = (reverse bs, orig_ty)
-{-# INLINE splitForAllVarBndrs #-}
-
 -- | Checks whether this is a proper forall (with a named binder)
 isForAllTy :: Type -> Bool
 isForAllTy ty | Just ty' <- coreView ty = isForAllTy ty'
@@ -1531,19 +1522,29 @@ splitPiTy ty
 -- | Split off all TyCoBinders to a type, splitting both proper foralls
 -- and functions
 splitPiTys :: Type -> ([TyCoBinder], Type)
-splitPiTys ty = split ty ty
+splitPiTys ty = split ty ty []
   where
-    split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
-    split _       (ForAllTy b res) = let (bs, ty) = split res res
-                                     in  (Named b : bs, ty)
-    split _       (FunTy arg res)  = let (bs, ty) = split res res
-                                     in  (Anon arg : bs, ty)
-    split orig_ty _                = ([], orig_ty)
+    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
+    split _       (ForAllTy b res) bs = split res res (Named b  : bs)
+    split _       (FunTy arg res)  bs = split res res (Anon arg : bs)
+    split orig_ty _                bs = (reverse bs, orig_ty)
+
+-- | Like 'splitPiTys' but split off only /named/ binders
+--   and returns TyCoVarBinders rather than TyCoBinders
+splitForAllVarBndrs :: Type -> ([TyCoVarBinder], Type)
+splitForAllVarBndrs ty = split ty ty []
+  where
+    split orig_ty ty bs | Just ty' <- coreView ty = split orig_ty ty' bs
+    split _       (ForAllTy b res) bs = split res res (b:bs)
+    split orig_ty _                bs = (reverse bs, orig_ty)
+{-# INLINE splitForAllVarBndrs #-}
 
 invisibleTyBndrCount :: Type -> Int
 -- Returns the number of leading invisible forall'd binders in the type
-invisibleTyBndrCount ty = countWhile (isInvisibleArgFlag . binderArgFlag) $
-                          fst $ splitForAllVarBndrs ty
+-- Includes invisible predicate arguments; e.g. for
+--    e.g.  forall {k}. (k ~ *) => k -> k
+-- returns 2 not 1
+invisibleTyBndrCount ty = length (fst (splitPiTysInvisible ty))
 
 -- Like splitPiTys, but returns only *invisible* binders, including constraints
 -- Stops at the first visible binder

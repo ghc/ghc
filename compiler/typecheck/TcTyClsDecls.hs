@@ -909,7 +909,7 @@ getInitialKind :: Bool -> TyClDecl GhcRn -> TcM [TcTyCon]
 -- No family instances are passed to getInitialKinds
 
 getInitialKind cusk
-    (ClassDecl { tcdLName = dl->L _ name
+    (ClassDecl { tcdLName = dL->L _ name
                , tcdTyVars = ktvs
                , tcdATs = ats })
   = do { tycon <- kcLHsQTyVars name ClassFlavour cusk ktvs $
@@ -921,7 +921,7 @@ getInitialKind cusk
        ; return (tycon : inner_tcs) }
 
 getInitialKind cusk
-    (DataDecl { tcdLName = dl->L _ name
+    (DataDecl { tcdLName = dL->L _ name
               , tcdTyVars = ktvs
               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                          , dd_ND = new_or_data } })
@@ -936,7 +936,7 @@ getInitialKind _ (FamDecl { tcdFam = decl })
   = do { tc <- getFamDeclInitialKind Nothing decl
        ; return [tc] }
 
-getInitialKind cusk (SynDecl { tcdLName = dl->L _ name
+getInitialKind cusk (SynDecl { tcdLName = dL->L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
   = do  { tycon <- kcLHsQTyVars name TypeSynonymFlavour cusk ktvs $
@@ -994,7 +994,7 @@ getFamDeclInitialKind _ (XFamilyDecl _) = panic "getFamDeclInitialKind"
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
-kcLTyClDecl (dl->L loc decl)
+kcLTyClDecl (dL->L loc decl)
   = setSrcSpan loc $
     tcAddDeclCtxt decl $
     do { traceTc "kcTyClDecl {" (ppr tc_name)
@@ -1026,7 +1026,7 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kcConDecl) cons }
 
-kcTyClDecl (SynDecl { tcdLName = dl->L _ name, tcdRhs = rhs })
+kcTyClDecl (SynDecl { tcdLName = dL->L _ name, tcdRhs = rhs })
   = bindTyClTyVars name $ \ _ res_kind ->
     discardResult $ tcCheckLHsType rhs res_kind
         -- NB: check against the result kind that we allocated
@@ -1311,7 +1311,8 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
              roles = roles_info tycon_name  -- for TyCon and Class
 
        ; (ctxt, fds, sig_stuff, at_stuff)
-            <- solveEqualities $
+            <- pushTcLevelM_   $
+               solveEqualities $
                do { ctxt <- tcHsContext hs_ctxt
                   ; fds  <- mapM (addLocM tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
@@ -1638,7 +1639,9 @@ tcTySynRhs :: RolesInfo
 tcTySynRhs roles_info tc_name binders res_kind hs_ty
   = do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
-       ; rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
+       ; rhs_ty <- pushTcLevelM_   $
+                   solveEqualities $
+                   tcCheckLHsType hs_ty res_kind
        ; rhs_ty <- zonkTcTypeToType rhs_ty
        ; let roles = roles_info tc_name
              tycon = buildSynTyCon tc_name binders res_kind roles rhs_ty
@@ -1664,7 +1667,7 @@ tcDataDefn roles_info
        ; unless (mk_permissive_kind hsc_src cons) $
          checkTc (tcIsLiftedTypeKind final_res_kind) (badKindSig True res_kind)
 
-       ; stupid_tc_theta <- solveEqualities $ tcHsContext ctxt
+       ; stupid_tc_theta <- pushTcLevelM_ $ solveEqualities $ tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypesToTypes stupid_tc_theta
        ; kind_signatures <- xoptM LangExt.KindSignatures
 
@@ -1718,11 +1721,11 @@ kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
 -- Used for the equations of a closed type family only
 -- Not used for data/type instances
 kcTyFamInstEqn tc_fam_tc
-    (dl->L loc (HsIB { hsib_ext = imp_vars
-                 , hsib_body = FamEqn { feqn_tycon = dL->L _ eqn_tc_name
-                                      , feqn_bndrs = mb_expl_bndrs
-                                      , feqn_pats  = hs_pats
-                                      , feqn_rhs   = hs_rhs_ty }}))
+    (dL->L loc (HsIB { hsib_ext = imp_vars
+                     , hsib_body = FamEqn { feqn_tycon = dL->L _ eqn_tc_name
+                                          , feqn_bndrs = mb_expl_bndrs
+                                          , feqn_pats  = hs_pats
+                                          , feqn_rhs   = hs_rhs_ty }}))
   = setSrcSpan loc $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
@@ -1750,8 +1753,8 @@ kcTyFamInstEqn tc_fam_tc
     fam_name  = tyConName tc_fam_tc
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
 
-kcTyFamInstEqn _ (dl->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
-kcTyFamInstEqn _ (dl->L _ (HsIB _ (XFamEqn _))) = panic "kcTyFamInstEqn"
+kcTyFamInstEqn _ (dL->L _ (XHsImplicitBndrs _)) = panic "kcTyFamInstEqn"
+kcTyFamInstEqn _ (dL->L _ (HsIB _ (XFamEqn _))) = panic "kcTyFamInstEqn"
 kcTyFamInstEqn _ _ = panic "kcTyFamInstEqn: Impossible Match" -- due to #15884
 
 
@@ -1762,7 +1765,7 @@ tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
 -- (typechecked here) have TyFamInstEqns
 
 tcTyFamInstEqn fam_tc mb_clsinfo
-    (dl->L loc (HsIB { hsib_ext = imp_vars
+    (dL->L loc (HsIB { hsib_ext = imp_vars
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
@@ -1789,8 +1792,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                               (map (const Nominal) qtvs)
                               loc) }
 
-tcTyFamInstEqn _ _ (dL->L _ (XHsImplicitBndrs _)) = panic "tcTyFamInstEqn"
-tcTyFamInstEqn _ _ (dL->L _ (HsIB _ (XFamEqn _))) = panic "tcTyFamInstEqn"
+tcTyFamInstEqn _ _ _ = panic "tcTyFamInstEqn"
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -2231,7 +2233,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_tmpl
            , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
-       ; let (dl->L _ name : _) = names
+       ; let ((dL->L _ name) : _) = names
 
        ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushTcLevelM_    $  -- We are going to generalise

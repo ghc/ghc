@@ -1189,7 +1189,8 @@ reifyInstances th_nm th_tys
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
         ; (_tvs, ty)
-            <- solveEqualities                  $ -- Avoid error cascade if there are unsolved
+            <- pushTcLevelM_   $
+               solveEqualities $ -- Avoid error cascade if there are unsolved
                bindImplicitTKBndrs_Skol tv_names $
                fst <$> tcLHsType rn_ty
         ; ty <- zonkTcTypeToType ty
